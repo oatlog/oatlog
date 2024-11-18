@@ -73,18 +73,24 @@ more compute-restricted scenarios. Think scenarios closer to a C compiler than a
 = Goal
 
 The goal of this project is to implement an E-Graph engine that achieves higher performance than
-other state-of-the-art implementations (like egg @egg and egglog @egglog) measured in nodes created
-per second on existing E-Graph rulesets.
+other state-of-the-art implementations (like egg @egg and egglog @egglog) measured in E-nodes per
+second on existing E-Graph rulesets.
 
 Additionally, we may modify rulesets to better exploit the performance characteristics of our
 E-Graph engine to the extent that this does not in practice lead to missed equivalences or
 simplifications. #todo[elaborate on rule design, large vs small, often vs rare, lattice
 computations.]
 
-Relevant E-Graph applications that could be used for benchmarks include
-- #todo[a]
-- #todo[b]
-- #todo[Alejandro's SyCAM / Syntax-guided synthesis?]
+The E-Graph applications that we aim to use for benchmarking are
+- Herbie, a tool to automatically find floating-point expressions that minimize numerical error
+  given an expression in real numbers
+- `math`, a small computer algebra system from egg's test suite
+- Steensgaard style unification-based points-to analysis
+since these were all used to benchmark egglog @egglog.
+
+#todo[regarding Alejandro's SyCAM: I find little public information on this as I suppose it is not yet
+published, and while I think it is a reasonable application I think leaning on egglog's existing
+benchmarks makes more sense.]
 
 = State of the art
 
@@ -95,7 +101,8 @@ This section assumes some familiarity with E-Graphs. Refer to section #link(<wha
 
 #todo[egg, batched rewriting]
 
-#todo[egglog]
+#todo[egglog, their paper has benchmark showing approximately a million E-nodes per second,
+improving from about 100k E-nodes per second in one benchmark.]
 
 #todo[other stuff]
 
