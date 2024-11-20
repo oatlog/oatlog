@@ -37,18 +37,6 @@ Suggested Examiner at CSE:\
 // Pedro Petersen Moura Trancoso (#email("ppedro@chalmers.se"))
 #v(0.5cm)
 
-Relevant completed courses for both Loke Gustafsson and Erik Magnusson:
-
-DAT400 High-performance parallel programming\
-TDA283 Compiler construction\
-(DAT400 is related through performance engineering)
-
-#v(0.6cm)
-
-(Note regarding MPHPC relevance: This project is performance engineering combined with compiler and
-database algorithms. The performance engineering is the core of the connection to MPHPC. In
-particular, we plan to implement rule matching and rewriting using code generation aiming for
-maximum performance.)
 
 #v(1cm)
 #datetime.today().display("[month repr:long] [day padding:none], [year]")
@@ -56,13 +44,41 @@ maximum performance.)
 
 #counter(page).update(1)
 
-= Introduction
+= Relevance to MPHPC
+The project is fundamentally about improving the runtime of a domain specific database, both with improved algorithms and low-level optimizations. 
+// "low-level optimizations" = constant factor stuff.
 
+== Relevant completed courses for both Loke Gustafsson and Erik Magnusson:
+=== Performance engineering
+DAT400 High-performance parallel programming\
+EDA284 Parallel computer architecture\
+DAT105 Computer architecture\
+=== Algorithm design
+TIN093 Algorithms\
+TDA507 Computational methods in bioinformatics
+=== Database and Compilers
+TDA283 Compiler construction\
+DAT475 Advanced databases
+
+// TDA596 Distributed systems
+// DAT575 Interconnection networks
+// EDA387 Computer networks
+// DAT147 Technical writing in Computer Systems and Networks
+// DAT205 Advanced computer graphics
+// DAT278 Sustainable computing
+// TDA362 Computer graphics
+// This project is performance engineering combined with compiler and database algorithms. 
+// The performance engineering is the core of the connection to MPHPC. 
+// In particular, we plan to implement rule matching and rewriting using code generation aiming for maximum performance.
+
+
+
+= Introduction
 E-Graphs are a data structure that store expressions deduplicated through equivalence relations.
 They are potentially useful when doing any kind of symbolic rewrites and are successfully employed
 in modern SMT solvers and in optimizing compilers in which they solve the phase ordering problem and
-reduce the need for heuristics. See #link(<whyegraphs>, "\"Why E-Graphs\"") for an explanation of
-the core problem E-Graphs solve.
+reduce the need for heuristics. 
+See #link(<whyegraphs>, "\"Why E-Graphs\"") for an explanation of the core problem E-Graphs solve.
 
 But there are obstacles preventing E-Graphs from reaching more widespread use within compilers. The
 size of a converged E-Graph is generally exponential in the complexity of the rewrite rules,
@@ -106,32 +122,30 @@ improving from about 100k E-nodes per second in one benchmark.]
 
 = Goal
 
-The goal of this project is to implement an E-Graph engine that achieves higher performance than
-other state-of-the-art implementations (like egg @egg, egglog @egglog, eqlog @eqlog) measured in E-nodes per
-second on existing E-Graph rulesets.
+The goal of this project is to implement an E-Graph engine that achieves a lower runtime than other state-of-the-art implementations (like egg @egg, egglog @egglog, eqlog @eqlog) measured in E-nodes per second on existing E-Graph rulesets.
 
-Additionally, we may modify rulesets to better exploit the performance characteristics of our
-E-Graph engine to the extent that this does not in practice lead to missed equivalences or
-simplifications. This could include essentially inlining rules within each other, decreasing the
-size of the E-Graph in exchange for increasing the number of rules.
+= Research questions
+- Can an E-Graph engine that outperforms state-of-the-art implementations in E-nodes per second be created?
+    - Can rulesets be automatically optimized to improve performance, can the joins be reordered for performance?
+    - What memory access patterns do E-graph engines have, can the engine be optimized with the knowledge of the memory access patterns?
+- How can a optimal or near-optimal expression be extracted with low runtime?
 
+
+= Benchmarks
 The E-Graph applications that we aim to use for benchmarking are
 - Herbie @herbie, a tool to automatically find floating-point expressions that minimize numerical error
   given an expression in real numbers
 - `math`, a small computer algebra system from egg's test suite
 - Steensgaard style unification-based points-to analysis
-since these were all used to benchmark egglog @egglog.
+Since these were all used to benchmark egglog @egglog.
 
-#todo[regarding Alejandro's SyCAM: I find little public information on this as I suppose it is not yet
-published, and while I think it is a reasonable application I think leaning on egglog's existing
-benchmarks makes more sense.]
+
+#todo[regarding Alejandro's SyCAM: I find little public information on this as I suppose it is not yet published, and while I think it is a reasonable application I think leaning on egglog's existing benchmarks makes more sense.]
 
 = Approach
 
-egglog made E-Graph rule application incremental and improved performance by an order of magnitude
-by rephrasing the problem as a Datalog-inspired relational database in which we can accelerate
-lookups through indices. Eqlog is similar but is implemented using code generation rather than as an
-interpreter.
+egglog made E-Graph rule application incremental and improved performance by an order of magnitude by rephrasing the problem as a Datalog-inspired relational database in which we can accelerate lookups through indices. 
+Eqlog is similar but is implemented using code generation rather than as an interpreter.
 
 We have ideas to improve performance using a mix of
 
@@ -152,9 +166,7 @@ We have ideas to improve performance using a mix of
   ]
 )
 
-We generally think that the design space is sufficiently large and the domain sufficiently immature
-that performance improvements are possible over egglog and Eqlog, even if the algorithmic behavior
-is kept relatively unchanged.
+We generally think that the design space is sufficiently large and the domain sufficiently immature that performance improvements are possible over egglog and Eqlog, even if the algorithmic behavior is kept relatively unchanged.
 
 #show bibliography: set heading(numbering: "1   ")
 #bibliography("refs.bib", title: "References")
