@@ -7,7 +7,7 @@
 }
 
 #set document(title: "Fast E-Graph engine: Master's thesis proposal")
-#set page("us-letter", margin: (x: 2in, y: 1.70in), numbering: "1")
+#set page("us-letter", margin: (x: 1.5in, y: 1.70in), numbering: "1")
 #set text(font: "New Computer Modern")
 #set heading(numbering: "1.1    ")
 #show heading.where(level: 1): set block(above: 2.5em, below: 1.65em)
@@ -112,44 +112,62 @@ searched, while not duplicating work like a backtracking search would.
 == History of E-Graphs and the state of the art
 
 === E-graphs (1980) @oldegraph
-E-graphs are not a new concept, and have been used to perform program verification and for proof assistants.
+
+E-graphs are not a new concept, and have been used to perform program verification and for proof
+assistants.
 
 === Egg (2021) @egg
-Egg is an e graph implementation where each rule is attempted to be matched against the entire database.
-The rewrites are performed in batches, meaning that all rules are applied, and then the database invariants fixed.
+
+Egg is an E-Graph implementation where each rule is attempted to be matched against the entire
+database. The rewrites are performed in batches, meaning that all rules are applied, and then the
+database invariants fixed.
 
 === Egglog @egglog and Eqlog @eqlog (2023) 
-Egglog and Eqlog are simultaneous independent discovery of improvements to egg, for example adding indexes per node type and only comparing changed parts of the graph with the rules, yielding significant improvements to the computational complexity.
-A notable difference is that Egglog focuses on useability and is very dynamic for REPL-style applications, while Eqlog is designed to be embedded into programs and the rules are processed at compile time. 
 
-The egglog paper has a benchmark showing approximately a million E-nodes per second, improving from about 100k E-nodes per second.
+Egglog and Eqlog are simultaneous independent discovery of significant improvements to egg, for
+example adding indexes per node type and only comparing changed parts of the graph with the rules,
+yielding significant improvements to the computational complexity. A notable difference is that
+Egglog focuses on useability and is very dynamic for REPL-style applications, while Eqlog is
+designed to be embedded into programs and the rules are processed at compile time. 
+
+The egglog paper has a benchmark showing approximately a million E-nodes per second, improving from
+egg's about 100k E-nodes per second in a specific benchmark.
 
 === "Fast and Optimal Extraction for Sparse Equality Graphs" (2024) @fastextract
-Since E-graphs store deduplicated expressions, it means that there are exponentially many expressions for a typical E-graph, and therefore extracting a good expression is challenging.
-Even for simple cost functions the problem is NP-hard, and integer linear programming is typically used to extract the best result.
-The fast extraction paper @fastextract shows that it is possible to perform optimal extraction in a reasonable time if the E-graph is close to a tree.
+
+Since E-graphs store deduplicated expressions, it means that there are exponentially many
+expressions for a typical E-graph, and therefore extracting a good expression is challenging. Even
+for simple cost functions the problem is NP-hard, and integer linear programming is typically used
+  to extract the best result. The fast extraction paper @fastextract shows that it is possible to
+  perform optimal extraction in a reasonable time if the E-graph is close to a tree.
 
 = Goal
 
-The goal of this project is to implement an E-Graph engine that achieves a lower runtime than other state-of-the-art implementations (like egg @egg, egglog @egglog, eqlog @eqlog) measured in E-nodes per second on existing E-Graph rulesets.
+The goal of this project is to implement an E-Graph engine that runs faster than other
+state-of-the-art implementations (like egg @egg, egglog @egglog, eqlog @eqlog) measured in E-nodes
+per second on existing E-Graph rulesets.
 
 = Research questions
 - Can an E-Graph engine that outperforms state-of-the-art implementations in E-nodes per second be created?
-    - Can rulesets be automatically optimized to improve performance, can the joins be reordered for performance?
-    - What memory access patterns do E-graph engines have, can the engine be optimized with the knowledge of the memory access patterns?
+    - Can rulesets be automatically preprocessed to improve performance, and can joins be reordered for performance?
+    - What memory access patterns do E-graph engines have, can the engine be optimized with
+      knowledge of those memory access patterns?
 - How can a optimal or near-optimal expression be extracted with low runtime?
 
 
 = Benchmarks
+
 The E-Graph applications that we aim to use for benchmarking are
 - Herbie @herbie, a tool to automatically find floating-point expressions that minimize numerical error
   given an expression in real numbers
 - `math`, a small computer algebra system from egg's test suite
 - Steensgaard style unification-based points-to analysis
-Since these were all used to benchmark egglog @egglog.
+since these were all used to benchmark egglog @egglog.
 
 
-#todo[regarding Alejandro's SyCAM: I find little public information on this as I suppose it is not yet published, and while I think it is a reasonable application I think leaning on egglog's existing benchmarks makes more sense.]
+#todo[regarding Alejandro's SyCAM: We find little public information on this as we suppose it is not
+yet published, and while it seems like a reasonable application we think leaning on egglog's existing
+benchmarks makes more sense.]
 
 = Approach
 
