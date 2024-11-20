@@ -111,14 +111,23 @@ searched, while not duplicating work like a backtracking search would.
 
 == History of E-Graphs and the state of the art
 
-#todo[pre-egg]
+=== E-graphs (1980) @oldegraph
+E-graphs are not a new concept, and have been used to perform program verification and for proof assistants.
 
-#todo[egg, batched rewriting]
+=== Egg (2021) @egg
+Egg is an e graph implementation where each rule is attempted to be matched against the entire database.
+The rewrites are performed in batches, meaning that all rules are applied, and then the database invariants fixed.
 
-#todo[egglog, their paper has benchmark showing approximately a million E-nodes per second,
-improving from about 100k E-nodes per second in one benchmark.]
+=== Egglog @egglog and Eqlog @eqlog (2023) 
+Egglog and Eqlog are simultaneous independent discovery of improvements to egg, for example adding indexes per node type and only comparing changed parts of the graph with the rules, yielding significant improvements to the computational complexity.
+A notable difference is that Egglog focuses on useability and is very dynamic for REPL-style applications, while Eqlog is designed to be embedded into programs and the rules are processed at compile time. 
 
-#todo[eqlog]
+The egglog paper has a benchmark showing approximately a million E-nodes per second, improving from about 100k E-nodes per second.
+
+=== "Fast and Optimal Extraction for Sparse Equality Graphs" (2024) @fastextract
+Since E-graphs store deduplicated expressions, it means that there are exponentially many expressions for a typical E-graph, and therefore extracting a good expression is challenging.
+Even for simple cost functions the problem is NP-hard, and integer linear programming is typically used to extract the best result.
+The fast extraction paper @fastextract shows that it is possible to perform optimal extraction in a reasonable time if the E-graph is close to a tree.
 
 = Goal
 
@@ -153,7 +162,7 @@ We have ideas to improve performance using a mix of
   [
     ruleset preprocessing, such as composing rules or special-casing specific rewrites to not have
     to add as many nodes. For example could rewriting $a+b$ to $b+a$ be skipped if any rules
-    matching $a+b$ also tried matching $b+a$
+    matching $a+b$ also tried matching $b+a$.
   ],
   [
     skipping unnecessary indices, as we think is done by Eqlog but not egglog
