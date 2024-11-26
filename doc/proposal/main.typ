@@ -44,6 +44,8 @@ Suggested Examiner at CSE:\
 
 #counter(page).update(1)
 
+#outline()
+
 = Relevance to MPHPC
 The project is fundamentally about improving the runtime of a domain specific database, both with improved algorithms and low-level optimizations. 
 // "low-level optimizations" = constant factor stuff.
@@ -73,7 +75,7 @@ DAT475 Advanced databases
 
 
 
-= Introduction
+= Problem description
 E-Graphs are a data structure that store expressions deduplicated through equivalence relations.
 They are potentially useful when doing any kind of symbolic rewrites and are successfully employed
 in modern SMT solvers and in optimizing compilers in which they solve the phase ordering problem and
@@ -87,6 +89,105 @@ algorithmic and implementation improvements would go a long way towards making E
 more compute-restricted scenarios. Think scenarios closer to a C compiler than a theorem prover.
 
 == What are E-graphs <whategraphs>
+
+It is a graph with two types of nodes, E-classes and terms.
+E-classes represents a set of equivalent expressions and contains terms. 
+Terms represent an operation that takes in a number of E-classes.
+See @egraphrust and @egraphcpp in the appendix for examples of how they could look like in code.
+
+By adding rewrite rules and applying them repeatedly, every possible way to rewrite an expression can be found, and the best expression according to some metric can be picked.
+
+// = Problem description
+// Context, statement of problem, significance, scope, link to research questions.
+
+
+== What is the actual computation to optimize?
+Rewrites on an e-graph can be seen as a query in a relational database that create new nodes, so the computation will be dominated by joins.
+
+For example the following rewrite rule:
+$ a * c + b * c #sym.arrow (a + b) * c $
+become the following constraints
+$
+&"if " &x = "mul"(a, c)\
+&      &y = "mul"(b, c)\
+&      &z = "add"(x, y)\
+&"then " &w = "add"(a, b)\ // create node
+&        &z = "mul"(w, c)\ // create node, union
+$
+which could be generated into
+```rust
+for (x1, a, c1) in egraph.table_mul.iter() {
+    for (y1, b, c2) in egraph.table_mul.iter() {
+        if c1 != c2 { continue; }
+        for (z1, x2, y2) in egraph.table_add.iter() {
+            if x1 != x2 { continue; }
+            if y1 != y2 { continue; }
+
+            let w = egraph.table_add.create_node(a, b);
+            let z2 = egraph.table_mul.create_node(w, c1);
+
+            egraph.set_equal(z1, z2);
+        }
+    }
+}
+```
+That code is of course very slow, but we can add indexes:
+```rust
+// note that the index() functions are oversimplified compared to what an actual api could look like.
+for (x, a, c) in egraph.table_mul.iter() {
+    for (y, b, _) in egraph.table_mul.index(c) {
+        for (z1, _, _) in egraph.table_add.index(x, y) {
+            let w = egraph.table_add.create_node(a, b);
+            let z2 = egraph.table_mul.create_node(w, c1);
+            egraph.set_equal(z1, z2);
+        }
+    }
+}
+```
+something like the above code is more or less what the kernel of the E-Graph engine will look like.
+
+
+
+
+#todo[Explain that the produced "expressions" are DAGs so the output is actually useful]
+
+== E-Graph Example
+Let's take the example from the egg paper @egg $x_i$ represents eclass with id $i$. 
++ insert $ (a #sym.dot.op 2 ) / 2 $ into the graph\
+  $
+  x_0 &= { x_1 / x_2 }\
+  x_1 &= { x_3 #sym.dot.op x_2 }\
+  x_2 &= { 2 }\
+  x_3 &= { a }
+  $
++ apply $x #sym.dot 2 #sym.arrow x << 1$\
+  $
+  x_0 &= { x_1 / x_2 }\
+  x_1 &= { x_3 #sym.dot.op x_2, x_3 << x_4 }\
+  x_2 &= { 2 }\
+  x_3 &= { a }\
+  x_4 &= { 1 }
+  $
++ apply $(x #sym.dot.op y)/z #sym.arrow x #sym.dot.op (y / z)$\
+  $
+  x_0 &= { x_1 / x_2, x_3 #sym.dot.op x_5 }\
+  x_1 &= { x_3 #sym.dot.op x_2, x_3 << x_4 }\
+  x_2 &= { 2 }\
+  x_3 &= { a }\
+  x_4 &= { 1 }\
+  x_5 &= { x_2 / x_2 }
+  $
++ apply $x/x => 1$ and $1 #sym.dot.op x #sym.arrow x$\
+  $
+  x_0 &= { x_1 / x_2, x_3 #sym.dot.op x_0, 1, x_2 / x_2, a }\
+  x_1 &= { x_3 #sym.dot.op x_2, x_3 << x_4 }\
+  x_2 &= { 2 }
+  $
+the expression $a$ can now be extracted from the E-graph.
+
+#pagebreak()
+
+
 
 #link("https://www.cole-k.com/2023/07/24/e-graphs-primer/") is better than anything we could fit
 here.
@@ -109,37 +210,8 @@ that would be slow. Most compilers instead opt to do this heuristically. E-Graph
 this problem, allowing multiple rewrites but committing to one only after all rewrites have been
 searched, while not duplicating work like a backtracking search would.
 
-== History of E-Graphs and the state of the art
 
-=== E-graphs (1980) @oldegraph
 
-E-graphs are not a new concept, and have been used to perform program verification and for proof
-assistants.
-
-=== Egg (2021) @egg
-
-Egg is an E-Graph implementation where each rule is attempted to be matched against the entire
-database. The rewrites are performed in batches, meaning that all rules are applied, and then the
-database invariants fixed.
-
-=== Egglog @egglog and Eqlog @eqlog (2023) 
-
-Egglog and Eqlog are simultaneous independent discovery of significant improvements to egg, for
-example adding indexes per node type and only comparing changed parts of the graph with the rules,
-yielding significant improvements to the computational complexity. A notable difference is that
-Egglog focuses on useability and is very dynamic for REPL-style applications, while Eqlog is
-designed to be embedded into programs and the rules are processed at compile time. 
-
-The egglog paper has a benchmark showing approximately a million E-nodes per second, improving from
-egg's about 100k E-nodes per second in a specific benchmark.
-
-=== "Fast and Optimal Extraction for Sparse Equality Graphs" (2024) @fastextract
-
-Since E-graphs store deduplicated expressions, it means that there are exponentially many
-expressions for a typical E-graph, and therefore extracting a good expression is challenging. Even
-for simple cost functions the problem is NP-hard, and integer linear programming is typically used
-  to extract the best result. The fast extraction paper @fastextract shows that it is possible to
-  perform optimal extraction in a reasonable time if the E-graph is close to a tree.
 
 = Goal
 
@@ -152,8 +224,9 @@ per second on existing E-Graph rulesets.
     - Can rulesets be automatically preprocessed to improve performance, and can joins be reordered for performance?
     - What memory access patterns do E-graph engines have, can the engine be optimized with
       knowledge of those memory access patterns?
+    - How do rewrite rules typically behave, when do they create many nodes, can the engine be specialized for rules that 
+      create too many nodes?
 - How can a optimal or near-optimal expression be extracted with low runtime?
-
 
 = Benchmarks
 
@@ -164,6 +237,7 @@ The E-Graph applications that we aim to use for benchmarking are
 - Steensgaard style unification-based points-to analysis
 since these were all used to benchmark egglog @egglog.
 
+For extraction we are leaning towards creating our own benchmarks, but also consider using the egg extraction gym @egggym, but it has a problem of the benchmarks testing the worst case instead of the average case and the graphs are not very realistic. 
 
 #todo[regarding Alejandro's SyCAM: We find little public information on this as we suppose it is not
 yet published, and while it seems like a reasonable application we think leaning on egglog's existing
@@ -195,5 +269,149 @@ We have ideas to improve performance using a mix of
 
 We generally think that the design space is sufficiently large and the domain sufficiently immature that performance improvements are possible over egglog and Eqlog, even if the algorithmic behavior is kept relatively unchanged.
 
+
+
+
+= Related Work
+
+== E-graphs (1980) @oldegraph
+
+E-graphs are not a new concept, and have been used to perform program verification and for proof
+assistants.
+
+== Egg (2021) @egg
+
+Egg is an E-Graph implementation where each rule is attempted to be matched against the entire
+database. The rewrites are performed in batches, meaning that all rules are applied, and then the
+database invariants fixed.
+
+== Egglog @egglog and Eqlog @eqlog (2023) 
+
+Egglog and Eqlog are simultaneous independent discovery of significant improvements to egg, for
+example adding indexes per node type and only comparing changed parts of the graph with the rules,
+yielding significant improvements to the computational complexity. A notable difference is that
+Egglog focuses on useability and is very dynamic for REPL-style applications, while Eqlog is
+designed to be embedded into programs and the rules are processed at compile time. 
+
+The egglog paper has a benchmark showing approximately a million E-nodes per second, improving from
+egg's about 100k E-nodes per second in a specific benchmark.
+
+== "Fast and Optimal Extraction for Sparse Equality Graphs" (2024) @fastextract
+
+Since E-graphs store deduplicated expressions, it means that there are exponentially many
+expressions for a typical E-graph, and therefore extracting a good expression is challenging. Even
+for simple cost functions the problem is NP-hard, and integer linear programming is typically used
+  to extract the best result. The fast extraction paper @fastextract shows that it is possible to
+  perform optimal extraction in a reasonable time if the E-graph is close to a tree.
+
+
+
+
 #show bibliography: set heading(numbering: "1   ")
 #bibliography("refs.bib", title: "References")
+
+
+#pagebreak()
+= Appendix
+
+== Example E-graph code for rust <egraphrust>
+```rust
+type TermId = u32;
+type EClassId = u32;
+
+struct AddTerm {
+    EClassId a,
+    EClassId b,
+}
+
+struct SubTerm {
+    EClassId a,
+    EClassId b,
+}
+
+struct MulTerm {
+    EClassId a,
+    EClassId b,
+}
+
+struct FusedMultiplyAddTerm {
+    EClassId a,
+    EClassId b,
+    EClassId c,
+}
+
+enum Term {
+    Add(AddTerm),
+    Sub(SubTerm),
+    Mul(MulTerm),
+    FusedMultiplyAdd(FusedMultiplyAddTerm),
+}
+
+struct EClass {
+    terms: Vec<TermId>,
+}
+
+struct EGraph {
+    eclasses: Vec<EClass>,
+    terms: Vec<Term>,
+}
+```
+#pagebreak()
+== Example E-graph code for c++ <egraphcpp>
+
+```cpp
+typedef u32 TermId;
+typedef u32 EClassId;
+
+struct AddTerm {
+    EClassId a;
+    EClassId b;
+};
+
+struct SubTerm {
+    EClassId a;
+    EClassId b;
+};
+
+struct MulTerm {
+    EClassId a;
+    EClassId b;
+};
+
+struct FusedMultiplyAddTerm {
+    EClassId a;
+    EClassId b;
+    EClassId c;
+};
+
+enum TermType {
+    ADD;
+    SUB;
+    MUL;
+    FUSED_MULTIPLY_ADD;
+};
+
+union TermInner {
+    AddTerm add;
+    SubTerm sub;
+    MulTerm mul;
+    FusedMultiplyAddTerm fma;
+};
+
+struct Term {
+    TermInner inner;
+    TermType type;
+};
+
+struct EClass {
+    vector<TermId> terms,
+};
+
+struct EGraph {
+    vector<EClass> eclasses;
+    vector<Term> terms;
+}
+```
+
+
+
