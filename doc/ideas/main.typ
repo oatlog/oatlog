@@ -20,3 +20,8 @@ Should everything be indexed?
 
 Compute SoN node weights by dfs, bitset of ancestors, symbolic variables and solve linear equations
 for weight.
+
+Rules that explode could be run less ofthen (eg a + b => b + a)
+
+Visualize queries as joins to understand what typical queries actually do.
+
