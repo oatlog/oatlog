@@ -47,9 +47,11 @@ Suggested Examiner at CSE:\
 #outline()
 
 #pagebreak()
+
 = Relevance to MPHPC
-The project is fundamentally about improving the runtime of a domain specific database, both with improved algorithms and low-level optimizations. 
-// "low-level optimizations" = constant factor stuff.
+
+The project is fundamentally about improving the performance of a domain specific database, both
+with improved algorithms and low-level optimizations.
 
 == Relevant completed courses for both Loke Gustafsson and Erik Magnusson:
 === Performance engineering
@@ -70,43 +72,42 @@ DAT475 Advanced databases
 // DAT205 Advanced computer graphics
 // DAT278 Sustainable computing
 // TDA362 Computer graphics
-// This project is performance engineering combined with compiler and database algorithms. 
-// The performance engineering is the core of the connection to MPHPC. 
+// This project is performance engineering combined with compiler and database algorithms.
+// The performance engineering is the core of the connection to MPHPC.
 // In particular, we plan to implement rule matching and rewriting using code generation aiming for maximum performance.
 
 
 
 = Introduction
 // Introduction
-// Briefly describe and motivate the project, and convince the reader of the importance of the proposed thesis work. 
-// A good introduction will answer these questions: 
-// Why is addressing these challenges significant for gaining new knowledge in the studied domain? 
+// Briefly describe and motivate the project, and convince the reader of the importance of the proposed thesis work.
+// A good introduction will answer these questions:
+// Why is addressing these challenges significant for gaining new knowledge in the studied domain?
 // How and where can this new knowledge be applied?
 
 
 E-Graphs are a data structure that store expressions deduplicated through equivalence relations.
 They are potentially useful when doing any kind of symbolic rewrites and are successfully employed
 in modern SMT solvers and in optimizing compilers in which they solve the phase ordering problem and
-reduce the need for heuristics. 
+reduce the need for heuristics.
 See #link(<whyegraphs>, "\"Why E-Graphs\"") for an explanation of the core problem E-Graphs solve.
 
 But there are obstacles preventing E-Graphs from reaching more widespread use within compilers. The
-size of a converged E-Graph is generally exponential in the complexity of the rewrite rules,
+size of a converged E-Graph is generally exponential given sufficiently complex rewrite rules,
 necessitating lots of compute and even timeouts to achieve results. Improvements in rewrite rules,
 algorithmic and implementation improvements would go a long way towards making E-Graphs viable in
-more compute-restricted scenarios. Think scenarios closer to a C compiler than a theorem prover.
+more compute-restricted scenarios, such as in a C compiler rather than in a theorem prover.
 
 
-#pagebreak()
 = Problem
-// This section is optional. 
+// This section is optional.
 // It may be used if there is a need to describe the problem that you want to solve in more technical detail and if this problem description is too extensive to fit in the introduction
 
 
 == What are E-graphs <whategraphs>
 
 It is a graph with two types of nodes, E-classes and terms.
-E-classes represents a set of equivalent expressions and contains terms. 
+E-classes represents a set of equivalent expressions and contains terms.
 Terms represent an operation that takes in a number of E-classes.
 See @egraphrust and @egraphcpp in the appendix for examples of how they could look like in code.
 By adding rewrite rules and applying them repeatedly, every possible way to rewrite an expression can be found, and the best expression according to some metric can be picked.
@@ -149,7 +150,7 @@ x4 = [t3 & x3, _blsr_u32(x3)]
 ```
 The E-class x4 now represents 16 expressions in a compact way.
 Picking a good expression is called *extraction*.
-Since it is possible to get exponentially many expressions, it is hard to pick an optimal expression. 
+Since it is possible to get exponentially many expressions, it is hard to pick an optimal expression.
 For example if the cost function was a constant 1 for every node, the optimal extracted expression would be:
 ```c
 x1 = _blsr_u32(x0)
@@ -160,13 +161,12 @@ x4 = _blsr_u32(x3)
 Actually, even for simple cost functions, extraction is NP-hard, but there are both heuristics and algorithms that work well on some types of E-Graphs @fastextract.
 
 
-#pagebreak()
 == What is the actual computation to optimize?
 Rewrites on an e-graph can be seen as a query in a relational database that create new nodes, so the computation will be dominated by joins.
 
 For example the following rewrite rule:
-$ a * c + b * c #sym.arrow (a + b) * c $
-become the following constraints
+$ a dot c + b dot c #sym.arrow (a + b) dot c $
+becomes the following constraints
 $
 &"if " &x = "mul"(a, c)\
 &      &y = "mul"(b, c)\
@@ -174,7 +174,7 @@ $
 &"then " &w = "add"(a, b)\ // create node
 &        &z = "mul"(w, c)\ // create node, union
 $
-which could be generated into
+which could be generated into (pseudocode)
 ```rust
 for (x1, a, c1) in egraph.table_mul.iter() {
     for (y1, b, c2) in egraph.table_mul.iter() {
@@ -210,7 +210,7 @@ something like the above code is more or less what the kernel of the E-Graph eng
 
 
 // == E-Graph Example
-// Let's take the example from the egg paper @egg $x_i$ represents eclass with id $i$. 
+// Let's take the example from the egg paper @egg $x_i$ represents eclass with id $i$.
 // + insert $ (a #sym.dot.op 2 ) / 2 $ into the graph\
 //   $
 //   x_0 &= { x_1 / x_2 }\
@@ -242,11 +242,10 @@ something like the above code is more or less what the kernel of the E-Graph eng
 //   x_2 &= { 2 }
 //   $
 // the expression $a$ can now be extracted from the E-graph.
-// 
-// #pagebreak()
-// 
-// 
-// 
+//
+//
+//
+//
 // #link("https://www.cole-k.com/2023/07/24/e-graphs-primer/") is better than anything we could fit
 // here.
 
@@ -271,12 +270,11 @@ searched, while not duplicating work like a backtracking search would.
 
 
 
-#pagebreak()
 = Context and Related Work
 
 // Context
 // Use one or two relevant and high quality references for providing evidence from the literature that the proposed study indeed includes scientific and engineering challenges, or is related to existing ones. Convince the reader that the problem addressed in this thesis has not been solved prior to this project.
-We believe that E-graphs are very unexplored, and there is great potential for improvement. 
+We believe that E-graphs are very unexplored, and there is great potential for improvement.
 There are few papers and as far as we know the only production compiler that uses E-Graphs is Cranelift (2022), but it uses acyclic E-Graphs, specifically because regular E-Graphs where not performant enough, which makes Cranelift miss out on potential optimizations @cranelift_egraph_rfc @acyclic_egraphs.
 
 == E-graphs (1980) @oldegraph
@@ -290,16 +288,16 @@ Egg is an E-Graph implementation where each rule is attempted to be matched agai
 database. The rewrites are performed in batches, meaning that all rules are applied, and then the
 database invariants fixed.
 
-== Egglog @egglog and Eqlog @eqlog (2023) 
+== Egglog @egglog and Eqlog @eqlog (2023)
 
 Egglog and Eqlog are simultaneous independent discovery of significant improvements to egg, for
 example adding indexes per node type and only comparing changed parts of the graph with the rules,
 yielding significant improvements to the computational complexity. A notable difference is that
 Egglog focuses on useability and is very dynamic for REPL-style applications, while Eqlog is
-designed to be embedded into programs and the rules are processed at compile time. 
+designed to be embedded into programs and the rules are processed at compile time.
 
 The egglog paper has a benchmark showing approximately a million E-nodes per second, improving from
-egg's about 100k E-nodes per second in a specific benchmark.
+egg's about 100k E-nodes per second in that same benchmark.
 
 == "Fast and Optimal Extraction for Sparse Equality Graphs" (2024) @fastextract
 
@@ -311,10 +309,9 @@ for simple cost functions the problem is NP-hard, and integer linear programming
 
 
 
-#pagebreak();
 = Goal
 // Goals and Challenges
-// Describe your contribution with respect to concepts, theory and technical goals. 
+// Describe your contribution with respect to concepts, theory and technical goals.
 // Ensure that the scientific and engineering challenges stand out so that the reader can easily recognize that you are planning to solve an advanced problem.
 
 The goal of this project is to implement an E-Graph engine that runs faster than other
@@ -322,18 +319,17 @@ state-of-the-art implementations (like egg @egg, egglog @egglog, eqlog @eqlog) m
 per second on existing E-Graph rulesets.
 
 == Research questions
-- Can an E-Graph engine that outperforms state-of-the-art implementations in E-nodes per second be created?
-    - Can rulesets be automatically preprocessed to improve performance, and can joins be reordered for performance?
-    - What memory access patterns do E-graph engines have, can the engine be optimized with
-      knowledge of those memory access patterns?
-    - How do rewrite rules typically behave, when do they create many nodes, can the engine be specialized for rules that 
-      create too many nodes?
+- Can we write an E-Graph engine that outperforms state-of-the-art implementations in E-nodes per second?
+- Can rulesets be automatically preprocessed to improve performance, and can joins be reordered for performance?
+- What memory access patterns do E-graph engines have, can the engine be optimized with
+  knowledge of those memory access patterns?
+- How do rewrite rules typically behave, when do they create many nodes, can the engine be specialized for rules that
+  create too many nodes? (such as commutativity and associativity)
 - How can a optimal or near-optimal expression be extracted with low runtime?
 
 
 
 
-#pagebreak();
 = Approach
 
 
@@ -357,7 +353,7 @@ per second on existing E-Graph rulesets.
 
 == Ideas for improvements
 
-Egglog made E-Graph rule application incremental and improved performance by an order of magnitude by rephrasing the problem as a Datalog-inspired relational database in which we can accelerate lookups through indices. 
+Egglog made E-Graph rule application incremental and improved performance by an order of magnitude by rephrasing the problem as a Datalog-inspired relational database in which we can accelerate lookups through indices.
 Eqlog is similar but is implemented using code generation rather than as an interpreter.
 
 We have ideas to improve performance using a mix of
@@ -369,13 +365,16 @@ We have ideas to improve performance using a mix of
     matching $a+b$ also tried matching $b+a$.
   ],
   [
-    skipping unnecessary indices, as we think is done by Eqlog but not egglog
+    skipping maintaining unnecessary indices, as we think is done by Eqlog but not egglog
   ],
   [
     optimizing index data structures for joining, considering memory access, possibly using SIMD
   ],
   [
     matching multiple rules together at the same time
+  ],
+  [
+    speeding up joins by strategically materializing subqueries
   ]
 )
 
@@ -393,7 +392,9 @@ The E-Graph applications that we aim to use for benchmarking are
 - Steensgaard style unification-based points-to analysis
 since these were all used to benchmark egglog @egglog.
 
-For extraction we are leaning towards creating our own benchmarks, but also consider using the egg extraction gym @egggym, but it has a problem of the benchmarks testing the worst case instead of the average case and the graphs are not very realistic. 
+For extraction we are leaning towards creating our own benchmarks. We are also considering using the
+egg extraction gym @egggym, but it has a problem of the benchmarks testing the worst case instead of
+the average case and the scenarios are very synthetic.
 
 #todo[regarding Alejandro's SyCAM: We find little public information on this as we suppose it is not
 yet published, and while it seems like a reasonable application we think leaning on egglog's existing
@@ -412,6 +413,9 @@ benchmarks makes more sense.]
 = Appendix
 
 == Example E-graph code for rust <egraphrust>
+
+(On a conceptual level, real implementations would be very different)
+
 ```rust
 type TermId = u32;
 type EClassId = u32;
@@ -453,8 +457,9 @@ struct EGraph {
     terms: Vec<Term>,
 }
 ```
-#pagebreak()
-== Example E-graph code for c++ <egraphcpp>
+== Example E-graph code for C++ <egraphcpp>
+
+(On a conceptual level, real implementations would be very different)
 
 ```cpp
 typedef u32 TermId;
