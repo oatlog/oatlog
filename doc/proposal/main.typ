@@ -6,7 +6,7 @@
   [#text(fill: red, weight: "bold", size: 12pt)[TODO #msg]]
 }
 
-#set document(title: "Fast E-Graph engine: Master's thesis proposal")
+#set document(title: "Faster e-graph engines: Master's thesis proposal")
 #set page("us-letter", margin: (x: 1.5in, y: 1.70in), numbering: "1")
 #set text(font: "New Computer Modern")
 #set heading(numbering: "1.1    ")
@@ -20,7 +20,7 @@
 
 #text(16pt)[#smallcaps[Master thesis project proposal]]
 #v(0.1em)
-#text(20pt, weight: "bold")[Fast E-Graph engine]
+#text(20pt, weight: "bold")[Faster e-graph engines]
 #v(4em)
 
 #text(14pt)[Loke Gustafsson (#email("lokeg@chalmers.se"))]
@@ -57,9 +57,8 @@ with improved algorithms and low-level optimizations.
 
 #todo[egraphs are used in compilers, egraphs are basically graph databases.]
 
-
-
 == Relevant completed courses for both Loke Gustafsson and Erik Magnusson:
+
 === Performance engineering
 DAT400 High-performance parallel programming\
 EDA284 Parallel computer architecture\
@@ -86,6 +85,12 @@ DAT475 Advanced databases
 
 = Introduction
 
+#todo[Our talking points in order]
+
+#todo[MPHPC connection]
+
+#todo[Brief e-graph intro, incl cranelift]
+
 #todo[use grammarly or similar to fix grammar.]
 
 // Introduction
@@ -95,41 +100,267 @@ DAT475 Advanced databases
 // How and where can this new knowledge be applied?
 
 
-E-Graphs are a data structure that store expressions deduplicated through equivalence relations.
+E-graphs are a data structure that store expressions deduplicated through equivalence relations.
 They are potentially useful when doing any kind of symbolic rewrites and are successfully employed
 in modern SMT solvers and in optimizing compilers in which they solve the phase ordering problem and
 reduce the need for heuristics.
-See #link(<whyegraphs>, "\"Why E-Graphs\"") for an explanation of the core problem E-Graphs solve.
+See @whyegraphs for an explanation of the core problem e-graphs solve.
 
-#todo[what timeouts? confusing, remove or explain that we are exploring for some amount of time, then exploit the graph that you have built.]
+But there are obstacles preventing e-graphs from reaching more widespread use within compilers. The
+size of a converged e-graph is generally exponential given sufficiently complex rewrite rules,
+necessitating lots of compute and even timeouts to terminate in feasible time. Improvements in
+rewrite rules, algorithmic and implementation improvements would go a long way towards making
+e-graphs viable in more compute-restricted scenarios, such as in a C compiler rather than in a
+theorem prover.
 
-But there are obstacles preventing E-Graphs from reaching more widespread use within compilers. The
-size of a converged E-Graph is generally exponential given sufficiently complex rewrite rules,
-necessitating lots of compute and even timeouts to achieve results. Improvements in rewrite rules,
-algorithmic and implementation improvements would go a long way towards making E-Graphs viable in
-more compute-restricted scenarios, such as in a C compiler rather than in a theorem prover.
+#todo[Reference forward from introduction to where "duplicate" information is presented. Some
+duplication is fine.]
 
+#todo["Rethorical Moves in research article introductions"]
+
+#todo[establishing territory, establishing a niche, ~~occupying a niche (results)~~.]
+
+#todo[See "Why e-graphs" -> See Section 3.3.]
+
+
+#todo[talk more about cranelift, and use it as a connection to MPHPC, use e-graph presentation stuff
+in proposal.]
+
+#todo[communicate that the actual motivation is compilers, even if we are not literally building a
+compiler.]
+
+#todo[Communicate autovectorization as example of an optimization where E-graphs make compiler
+development easier]
 
 = Problem
+
 // This section is optional.
-// It may be used if there is a need to describe the problem that you want to solve in more technical detail and if this problem description is too extensive to fit in the introduction
+
+// It may be used if there is a need to describe the problem that you want to solve in more
+// technical detail and if this problem description is too extensive to fit in the introduction
+
+== Why e-graphs <whyegraphs>
+
+A traditional compiler has many passes, each heuristically performing rewrites. This has what is
+called the phase ordering problem, where the rewrites applied depend on which order passes are run
+in and passes in practice must be run many times in order to reach a fixed point.
+
+The phase ordering problem can be solved by replacing coarse-grained passes with fine-grained
+rewrite rules. This is called peephole rewriting and lets us apply monotonic rewrites to improve the
+program. #footnote[Sea of Nodes is a promising compiler IR that is especially suited to peephole
+rewriting @son.]
+
+But peephole rewriting does not help us when there are multiple potentially good but mutually
+incompatible rewrites we could apply. Since one rewrite can unlock other beneficial rewrites later
+on, we cannot select them greedily. One can imagine solving this with a backtracking search, but
+that would be slow. Most compilers instead opt to do this heuristically. E-graphs solve precisely
+this problem, allowing multiple rewrites but committing to one only after all rewrites have been
+searched, while not duplicating work like a backtracking search would.
+
+== What are e-graphs <whategraphs>
+
+E-graphs are graphs with two types of nodes: e-classes and terms. E-classes represents a set of
+equivalent expressions and contains terms. Terms represent an operation that takes in a number of
+e-classes. By adding rewrite rules and applying them repeatedly, every possible way to rewrite an
+expression can be found, and the best expression according to some metric can be extracted.
+Extraction is NP-hard but there are both heuristics and algorithms that work well on some types of
+e-graphs @fastextract.
+
+NOTE: E-graphs don't just operate on simple expression trees, because subexpressions are
+deduplicated.
+
+@appendix-egraph-example in the appendix shows an example of an e-graph.
+
+== What is the actual computation to optimize?
+
+Rewrites on an e-graph can be seen as a query in a relational or graph database that create new
+nodes, so the computation will be dominated by joins and insertions. This database is domain
+specific and has different performance requirements than a traditional general-purpose database. For
+example, it is in memory, often stores only triplets of 32-bit integers, and has canonicalization
+through union-find built in.
+
+@appendix-egraph-kernel in the appendix shows an example of an e-graph rule compiled to code.
+
+= Context and related work
+
+// Context
+
+// Use one or two relevant and high quality references for providing evidence from the literature
+// that the proposed study indeed includes scientific and engineering challenges, or is related to
+// existing ones. Convince the reader that the problem addressed in this thesis has not been solved
+// prior to this project.
+
+We believe that e-graphs are very unexplored, and there is great potential for improvement. Recent
+papers have considerably improved their performance and capabilities, and there is as far as we know
+only one production compiler, Cranelift (2022) @cranelift, that uses e-graphs. However because
+regular e-graphs are not performant enough, Cranelift uses weaker acyclic e-graphs which makes
+Cranelift miss out on potential optimizations @cranelift_egraph_rfc @acyclic_egraphs.
+
+== E-graphs (1980)
+
+E-graphs are not a new concept, and have been used to perform program verification and for proof
+assistants @oldegraph.
+
+== Egg (2021)
+
+Egg @egg is an E-graph implementation where each rule is attempted to be matched against the entire
+database. The rewrites are performed in batches, meaning that all rules are applied, and then the
+database invariants fixed.
+
+== Egglog and Eqlog (2023)
+
+Egglog @egglog and Eqlog @eqlog are simultaneous independent discovery of a unification between
+e-graphs and datalog. This yields a vastly improved computational complexity in comparison to egg,
+by allowing adding indices per node type and matching rewrite rules incrementally against only parts
+of the graph that have changed. A notable difference between them is that Egglog focuses on
+useability and has a dynamic REPL-style interface, while Eqlog is designed to be embedded into
+programs and processes rules at compile time.
+
+The egglog paper has a benchmark showing approximately a million E-nodes per second, improving from
+egg's about 100k E-nodes per second in that same benchmark.
+
+== "Fast and Optimal Extraction for Sparse Equality Graphs" (2024)
+
+E-graphs store an exponential number of equivalent expressions in a deduplicated manner but do not
+solve the problem of quickly extracting the optimal among them. The extraction problem is similar to
+instruction selection or graph covering and is NP-hard for even simple cost functions. Integer
+linear programming is typically used to extract the best expression in an e-graph. It has however
+been shown @fastextract that optimal extraction is possible in a reasonable time if the e-graph is
+close to a tree.
+
+= Goal
+
+// Goals and Challenges
+
+// Describe your contribution with respect to concepts, theory and technical goals. Ensure that the
+// scientific and engineering challenges stand out so that the reader can easily recognize that you
+// are planning to solve an advanced problem.
+
+The goal of this project is to implement an e-graph engine that runs faster than other
+state-of-the-art implementations (like egg @egg, egglog @egglog, eqlog @eqlog) measured in e-nodes
+per second on existing e-graph rulesets.
+
+== Research questions
+
+- Can we write an e-graph engine that outperforms state-of-the-art implementations in e-nodes per
+  second?
+- Can rulesets be automatically preprocessed to improve performance?
+- Can joins be reordered or cached to improve performance?
+- What memory access patterns do e-graph engines have, and can the engine be optimized with
+  knowledge of those memory access patterns?
+- How do rewrite rules typically behave, under what constraints do they create many nodes, and can
+  the engine be specialized for rules that create too many nodes? (such as commutativity and
+  associativity)
+- How can a optimal or near-optimal expression be extracted with low run time?
+
+= Approach
+
+// Various scientific approaches are appropriate for different challenges and project goals. Outline
+// and justify the ones that you have selected.
+
+// [benchmarks] For example, when your project considers systematic data collection, you need to
+// explain how you will analyze the data, in order to address your challenges and project goals.
+
+// [not really applicable] One scientific approach is to use formal models and rigorous mathematical
+// argumentation to address aspects like correctness and efficiency. If this is relevant, describe
+// the related algorithmic subjects, and how you plan to address the studied problem. For example,
+// if your plan is to study the problem from a computability aspect, address the relevant issues,
+// such as algorithm and data structure design, complexity analysis, etc. If you plan to develop and
+// evaluate a prototype, briefly describe your plans to design, implement, and evaluate your
+// prototype by reviewing at most two relevant issues, such as key functionalities and their
+// evaluation criteria.
+
+// [ ] The design and implementation should specify prototype properties, such as functionalities
+// and performance goals, e.g., scalability, memory, energy.
+
+// [ ] Motivate key design selection, with respect to state of the art and existing platforms,
+// libraries, etc.
+
+// [ ] When discussing evaluation criteria, describe the testing environment, e.g., testbed
+// experiments, simulation, and user studies, which you plan to use when assessing your prototype.
+
+// [ ] Specify key tools, and preliminary test-case scenarios.
+
+// [ ] Explain how and why you plan to use the evaluation criteria in order to demonstrate the
+// functionalities and design goals.
+
+// [ ] Explain how you plan to compare your prototype to the state of the art using the proposed
+// test-case evaluation scenarios and benchmarks.
+
+We generally think that the design space is sufficiently large and the domain sufficiently immature
+that performance improvements are possible over egglog and Eqlog, even if the algorithmic behavior
+is kept relatively unchanged.
+
+== Ideas for improvements
+
+We aim to improve performance using a mix of ideas specific to e-graphs:
+
+#list(
+  [
+    ruleset preprocessing by special-casing specific rewrites to avoid adding as many nodes. For
+    example could rewriting $a+b$ to $b+a$ be skipped if any rules attempting to match $a+b$ also
+    attempt matching $b+a$.
+  ],
+  [
+    ruleset preprocessing by composing rules, creating signficantly more rules or more expressive
+    rules but removing rules that are especially problematic in terms of creating a lot of nodes
+  ],
+  [
+    matching multiple rules together at the same time
+  ],
+)
+
+Techinques from databases:
+
+#list(
+  [
+    skipping maintaining unnecessary indices, as we think is done by Eqlog but not egglog
+  ],
+  [
+    speeding up joins by strategically materializing subqueries
+  ],
+)
+
+And general performance engineering:
+
+#list(
+  [
+    leveraging code generation to specialize query execution to the given ruleset
+  ],
+  [
+    optimizing index data structures for the joins in the e-graph usage pattern, considering memory
+    locality and instruction level parallelism
+  ],
+)
 
 
-== What are E-graphs <whategraphs>
+== Benchmarks and testing environment
 
-#todo[move to appendix]
+We intend to run the benchmarks on our personal computers, with the assumption that the results generalizes to other hardware.
 
-It is a graph with two types of nodes, E-classes and terms.
-E-classes represents a set of equivalent expressions and contains terms.
-Terms represent an operation that takes in a number of E-classes.
-See @egraphrust and @egraphcpp in the appendix for examples of how they could look like in code.
-By adding rewrite rules and applying them repeatedly, every possible way to rewrite an expression can be found, and the best expression according to some metric can be picked.
+The e-graph applications that we aim to use for benchmarking are
 
-NOTE: E-graphs don't just operate on simple expression trees, because subexpressions are deduplicated.
+- Herbie @herbie, a tool to automatically find floating-point expressions that minimize numerical
+  error given an expression in real numbers
+- `math`, a small computer algebra system from egg's test suite
+- Steensgaard style unification-based points-to analysis
 
-#todo[put rest in appendix and link]
+since these were all used to benchmark egglog @egglog.
+
+For extraction we are leaning towards creating our own benchmarks. We are also considering using the
+egg extraction gym @egggym, but its benchmarks test synthetic worst-case scenarios rather than the
+average case.
+
+#show bibliography: set heading(numbering: "1   ")
+#bibliography("refs.bib", title: "References")
+
+#pagebreak()
+= Appendix
+
+== E-graph example <appendix-egraph-example>
 
 For example, consider this c code that removes the 4 rightmost set bits:
+
 ```c
 int x1 = (x0 - 1) & x0; // 1011011 -> 1011010
 int x2 = (x1 - 1) & x1; // 1011010 -> 1011000
@@ -164,7 +395,7 @@ x3 = [t2 & x2, _blsr_u32(x2)]
 t3 = [x3 - 1]
 x4 = [t3 & x3, _blsr_u32(x3)]
 ```
-The E-class x4 now represents 16 expressions in a compact way.
+The E-class `x4` now represents 16 expressions in a compact way.
 Picking a good expression is called *extraction*.
 Since it is possible to get exponentially many expressions, it is hard to pick an optimal expression.
 For example if the cost function was a constant 1 for every node, the optimal extracted expression would be:
@@ -174,15 +405,18 @@ x2 = _blsr_u32(x1)
 x3 = _blsr_u32(x2)
 x4 = _blsr_u32(x3)
 ```
-Actually, even for simple cost functions, extraction is NP-hard, but there are both heuristics and algorithms that work well on some types of E-Graphs @fastextract.
 
+Extraction is NP-hard for even simple cost functions, but there are both heuristics and algorithms
+that work well on some types of E-graphs @fastextract.
 
-== What is the actual computation to optimize?
-Rewrites on an e-graph can be seen as a query in a relational database that create new nodes, so the computation will be dominated by joins.
+== E-graph rule compilation example <appendix-egraph-kernel>
 
-For example the following rewrite rule:
+Consider the following rewrite rule
+
 $ a dot c + b dot c #sym.arrow (a + b) dot c $
-becomes the following constraints
+
+which can be written as a relational query
+
 $
 &"if " &x = "mul"(a, c)\
 &      &y = "mul"(b, c)\
@@ -190,10 +424,8 @@ $
 &"then " &w = "add"(a, b)\ // create node
 &        &z = "mul"(w, c)\ // create node, union
 $
-which could be generated into (pseudocode)
 
-#todo[summarize code put in appendix and link]
-#todo[indexes instead of concatenating loops, this is the kind of structure we are interested in.]
+which in turn can be generated into (pseudocode)
 
 ```rust
 for (x1, a, c1) in egraph.table_mul.iter() {
@@ -211,7 +443,9 @@ for (x1, a, c1) in egraph.table_mul.iter() {
     }
 }
 ```
+
 That code is of course very slow, but we can add indexes:
+
 ```rust
 for (x, a, c) in egraph.table_mul.iter() {
     for (y, b, _) in egraph.table_mul.index_2(c) {
@@ -223,336 +457,5 @@ for (x, a, c) in egraph.table_mul.iter() {
     }
 }
 ```
-something like the above code is more or less what the kernel of the E-Graph engine will look like.
 
-
-
-
-
-// == E-Graph Example
-// Let's take the example from the egg paper @egg $x_i$ represents eclass with id $i$.
-// + insert $ (a #sym.dot.op 2 ) / 2 $ into the graph\
-//   $
-//   x_0 &= { x_1 / x_2 }\
-//   x_1 &= { x_3 #sym.dot.op x_2 }\
-//   x_2 &= { 2 }\
-//   x_3 &= { a }
-//   $
-// + apply $x #sym.dot 2 #sym.arrow x << 1$\
-//   $
-//   x_0 &= { x_1 / x_2 }\
-//   x_1 &= { x_3 #sym.dot.op x_2, x_3 << x_4 }\
-//   x_2 &= { 2 }\
-//   x_3 &= { a }\
-//   x_4 &= { 1 }
-//   $
-// + apply $(x #sym.dot.op y)/z #sym.arrow x #sym.dot.op (y / z)$\
-//   $
-//   x_0 &= { x_1 / x_2, x_3 #sym.dot.op x_5 }\
-//   x_1 &= { x_3 #sym.dot.op x_2, x_3 << x_4 }\
-//   x_2 &= { 2 }\
-//   x_3 &= { a }\
-//   x_4 &= { 1 }\
-//   x_5 &= { x_2 / x_2 }
-//   $
-// + apply $x/x => 1$ and $1 #sym.dot.op x #sym.arrow x$\
-//   $
-//   x_0 &= { x_1 / x_2, x_3 #sym.dot.op x_0, 1, x_2 / x_2, a }\
-//   x_1 &= { x_3 #sym.dot.op x_2, x_3 << x_4 }\
-//   x_2 &= { 2 }
-//   $
-// the expression $a$ can now be extracted from the E-graph.
-//
-//
-//
-//
-// #link("https://www.cole-k.com/2023/07/24/e-graphs-primer/") is better than anything we could fit
-// here.
-
-== Why E-Graphs <whyegraphs>
-
-A traditional compiler has many passes, each heuristically performing rewrites. This has what is
-called the phase ordering problem, where the rewrites applied depend on which order passes are run
-in and passes in practice must be run many times in order to reach a fixed point.
-
-The phase ordering problem can be solved by replacing coarse-grained passes with fine-grained
-rewrite rules. This is called peephole rewriting and lets us apply monotonic rewrites to improve the
-program. #footnote[Sea of Nodes is a promising compiler IR that is especially suited to peephole
-rewriting @son.]
-
-But peephole rewriting does not help us when there are multiple potentially good but mutually
-incompatible rewrites we could apply. Since one rewrite can unlock other beneficial rewrites later
-on, we cannot select them greedily. One can imagine solving this with a backtracking search, but
-that would be slow. Most compilers instead opt to do this heuristically. E-Graphs solve precisely
-this problem, allowing multiple rewrites but committing to one only after all rewrites have been
-searched, while not duplicating work like a backtracking search would.
-
-#todo[duplicating information is fine, summaries are fine, reference other sections "we can do egraphs, see section X, we can do ... se section Y."]
-
-#todo["Rethorical Moves in research article introductions"]
-#todo[establishing territory, establishing a niche, ~~occupying a niche (results)~~.]
-#todo[See "Why E-Graphs" -> See Section 3.3.]
-
-
-
-= Context and Related Work
-
-// Context
-// Use one or two relevant and high quality references for providing evidence from the literature that the proposed study indeed includes scientific and engineering challenges, or is related to existing ones. Convince the reader that the problem addressed in this thesis has not been solved prior to this project.
-We believe that E-graphs are very unexplored, and there is great potential for improvement.
-There are few papers and as far as we know the only production compiler that uses E-Graphs is Cranelift (2022), but it uses acyclic E-Graphs, specifically because regular E-Graphs where not performant enough, which makes Cranelift miss out on potential optimizations @cranelift_egraph_rfc @acyclic_egraphs.
-
-#todo[talk more about cranelift, and use it as a connection to MPHPC, use e-graph presentation stuff in proposal.]
-
-#todo[communicate that the actual motivation is compilers, even if we are not literally building a compiler.]
-
-#todo[have example rewrite rules for SIMD?]
-
-#todo[remove references from titles and put into text.]
-
-== E-graphs (1980) @oldegraph
-
-E-graphs are not a new concept, and have been used to perform program verification and for proof
-assistants.
-
-== Egg (2021) @egg
-
-Egg is an E-Graph implementation where each rule is attempted to be matched against the entire
-database. The rewrites are performed in batches, meaning that all rules are applied, and then the
-database invariants fixed.
-
-== Egglog @egglog and Eqlog @eqlog (2023)
-
-Egglog and Eqlog are simultaneous independent discovery of significant improvements to egg, for
-example adding indexes per node type and only comparing changed parts of the graph with the rules,
-yielding significant improvements to the computational complexity. A notable difference is that
-Egglog focuses on useability and is very dynamic for REPL-style applications, while Eqlog is
-designed to be embedded into programs and the rules are processed at compile time.
-
-The egglog paper has a benchmark showing approximately a million E-nodes per second, improving from
-egg's about 100k E-nodes per second in that same benchmark.
-
-== "Fast and Optimal Extraction for Sparse Equality Graphs" (2024) @fastextract
-
-#todo["fast extraction paper"]
-
-Since E-graphs store deduplicated expressions, it means that there are exponentially many
-expressions for a typical E-graph, and therefore extracting a good expression is challenging. Even
-for simple cost functions the problem is NP-hard, and integer linear programming is typically used
-  to extract the best result. The fast extraction paper @fastextract shows that it is possible to
-  perform optimal extraction in a reasonable time if the E-graph is close to a tree.
-
-
-
-= Goal
-
-#todo[good to have questions after explaining everything]
-
-// Goals and Challenges
-// Describe your contribution with respect to concepts, theory and technical goals.
-// Ensure that the scientific and engineering challenges stand out so that the reader can easily recognize that you are planning to solve an advanced problem.
-
-The goal of this project is to implement an E-Graph engine that runs faster than other
-state-of-the-art implementations (like egg @egg, egglog @egglog, eqlog @eqlog) measured in E-nodes
-per second on existing E-Graph rulesets.
-
-== Research questions
-- Can we write an E-Graph engine that outperforms state-of-the-art implementations in E-nodes per second?
-- Can rulesets be automatically preprocessed to improve performance, and can joins be reordered for performance?
-- What memory access patterns do E-graph engines have, can the engine be optimized with
-  knowledge of those memory access patterns?
-- How do rewrite rules typically behave, when do they create many nodes, can the engine be specialized for rules that
-  create too many nodes? (such as commutativity and associativity)
-- How can a optimal or near-optimal expression be extracted with low runtime?
-
-
-
-
-= Approach
-
-
-
-// Approach
-// Various scientific approaches are appropriate for different challenges and project goals.
-// Outline and justify the ones that you have selected.
-// [benchmarks] For example, when your project considers systematic data collection, you need to explain how you will analyze the data, in order to address your challenges and project goals.
-// [not really applicable] One scientific approach is to use formal models and rigorous mathematical argumentation to address aspects like correctness and efficiency.
-// If this is relevant, describe the related algorithmic subjects, and how you plan to address the studied problem.
-// For example, if your plan is to study the problem from a computability aspect, address the relevant issues, such as algorithm and data structure design, complexity analysis, etc.
-// If you plan to develop and evaluate a prototype, briefly describe your plans to design, implement, and evaluate your prototype by reviewing at most two relevant issues, such as key functionalities and their evaluation criteria.
-// [ ] The design and implementation should specify prototype properties, such as functionalities and performance goals, e.g., scalability, memory, energy.
-// [ ] Motivate key design selection, with respect to state of the art and existing platforms, libraries, etc.
-// [ ] When discussing evaluation criteria, describe the testing environment, e.g., testbed experiments, simulation, and user studies, which you plan to use when assessing your prototype.
-// [ ] Specify key tools, and preliminary test-case scenarios.
-// [ ] Explain how and why you plan to use the evaluation criteria in order to demonstrate the functionalities and design goals.
-// [ ] Explain how you plan to compare your prototype to the state of the art using the proposed test-case evaluation scenarios and benchmarks.
-
-
-
-== Ideas for improvements
-
-Egglog made E-Graph rule application incremental and improved performance by an order of magnitude by rephrasing the problem as a Datalog-inspired relational database in which we can accelerate lookups through indices.
-Eqlog is similar but is implemented using code generation rather than as an interpreter.
-
-We have ideas to improve performance using a mix of
-
-#list(
-  [
-    #todo[matching a + b implies matching b + a. matching a + b attempts to match b + a.]
-
-    ruleset preprocessing, such as composing rules or special-casing specific rewrites to not have
-    to add as many nodes. For example could rewriting $a+b$ to $b+a$ be skipped if any rules
-    matching $a+b$ also tried matching $b+a$.
-  ],
-  [
-    skipping maintaining unnecessary indices, as we think is done by Eqlog but not egglog
-  ],
-  [
-    #todo[either be sure to use SIMD, not perhaps. we do more research on this. we can be pretty sure that using SIMD makes sense.]
-
-    optimizing index data structures for joining, considering memory access, possibly using SIMD
-  ],
-  [
-    matching multiple rules together at the same time
-  ],
-  [
-    speeding up joins by strategically materializing subqueries
-  ]
-)
-
-We generally think that the design space is sufficiently large and the domain sufficiently immature that performance improvements are possible over egglog and Eqlog, even if the algorithmic behavior is kept relatively unchanged.
-
-
-== Benchmarks and testing environment
-We intend to run the benchmarks on our personal computers, with the assumption that the results generalizes to other hardware.
-
-
-The E-Graph applications that we aim to use for benchmarking are
-- Herbie @herbie, a tool to automatically find floating-point expressions that minimize numerical error
-  given an expression in real numbers
-- `math`, a small computer algebra system from egg's test suite
-- Steensgaard style unification-based points-to analysis
-since these were all used to benchmark egglog @egglog.
-
-For extraction we are leaning towards creating our own benchmarks. We are also considering using the
-egg extraction gym @egggym, but it has a problem of the benchmarks testing the worst case instead of
-the average case and the scenarios are very synthetic.
-
-
-
-
-
-
-
-#show bibliography: set heading(numbering: "1   ")
-#bibliography("refs.bib", title: "References")
-
-
-#pagebreak()
-= Appendix
-
-== Example E-graph code for rust <egraphrust>
-
-(On a conceptual level, real implementations would be very different)
-
-```rust
-type TermId = u32;
-type EClassId = u32;
-
-struct AddTerm {
-    EClassId a,
-    EClassId b,
-}
-
-struct SubTerm {
-    EClassId a,
-    EClassId b,
-}
-
-struct MulTerm {
-    EClassId a,
-    EClassId b,
-}
-
-struct FusedMultiplyAddTerm {
-    EClassId a,
-    EClassId b,
-    EClassId c,
-}
-
-enum Term {
-    Add(AddTerm),
-    Sub(SubTerm),
-    Mul(MulTerm),
-    FusedMultiplyAdd(FusedMultiplyAddTerm),
-}
-
-struct EClass {
-    terms: Vec<TermId>,
-}
-
-struct EGraph {
-    eclasses: Vec<EClass>,
-    terms: Vec<Term>,
-}
-```
-== Example E-graph code for C++ <egraphcpp>
-
-(On a conceptual level, real implementations would be very different)
-
-```cpp
-typedef u32 TermId;
-typedef u32 EClassId;
-
-struct AddTerm {
-    EClassId a;
-    EClassId b;
-};
-
-struct SubTerm {
-    EClassId a;
-    EClassId b;
-};
-
-struct MulTerm {
-    EClassId a;
-    EClassId b;
-};
-
-struct FusedMultiplyAddTerm {
-    EClassId a;
-    EClassId b;
-    EClassId c;
-};
-
-enum TermType {
-    ADD;
-    SUB;
-    MUL;
-    FUSED_MULTIPLY_ADD;
-};
-
-union TermInner {
-    AddTerm add;
-    SubTerm sub;
-    MulTerm mul;
-    FusedMultiplyAddTerm fma;
-};
-
-struct Term {
-    TermInner inner;
-    TermType type;
-};
-
-struct EClass {
-    vector<TermId> terms,
-};
-
-struct EGraph {
-    vector<EClass> eclasses;
-    vector<Term> terms;
-}
-```
-
-
-
+This code is more or less what a rule kernel generated by an E-graph engine could look like.
