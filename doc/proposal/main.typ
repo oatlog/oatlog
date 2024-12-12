@@ -53,6 +53,12 @@ Suggested Examiner at CSE:\
 The project is fundamentally about improving the performance of a domain specific database, both
 with improved algorithms and low-level optimizations.
 
+#todo[connection egraph -> cranelift -> compilers]
+
+#todo[egraphs are used in compilers, egraphs are basically graph databases.]
+
+
+
 == Relevant completed courses for both Loke Gustafsson and Erik Magnusson:
 === Performance engineering
 DAT400 High-performance parallel programming\
@@ -79,6 +85,9 @@ DAT475 Advanced databases
 
 
 = Introduction
+
+#todo[use grammarly or similar to fix grammar.]
+
 // Introduction
 // Briefly describe and motivate the project, and convince the reader of the importance of the proposed thesis work.
 // A good introduction will answer these questions:
@@ -91,6 +100,8 @@ They are potentially useful when doing any kind of symbolic rewrites and are suc
 in modern SMT solvers and in optimizing compilers in which they solve the phase ordering problem and
 reduce the need for heuristics.
 See #link(<whyegraphs>, "\"Why E-Graphs\"") for an explanation of the core problem E-Graphs solve.
+
+#todo[what timeouts? confusing, remove or explain that we are exploring for some amount of time, then exploit the graph that you have built.]
 
 But there are obstacles preventing E-Graphs from reaching more widespread use within compilers. The
 size of a converged E-Graph is generally exponential given sufficiently complex rewrite rules,
@@ -106,6 +117,8 @@ more compute-restricted scenarios, such as in a C compiler rather than in a theo
 
 == What are E-graphs <whategraphs>
 
+#todo[move to appendix]
+
 It is a graph with two types of nodes, E-classes and terms.
 E-classes represents a set of equivalent expressions and contains terms.
 Terms represent an operation that takes in a number of E-classes.
@@ -113,6 +126,9 @@ See @egraphrust and @egraphcpp in the appendix for examples of how they could lo
 By adding rewrite rules and applying them repeatedly, every possible way to rewrite an expression can be found, and the best expression according to some metric can be picked.
 
 NOTE: E-graphs don't just operate on simple expression trees, because subexpressions are deduplicated.
+
+#todo[put rest in appendix and link]
+
 For example, consider this c code that removes the 4 rightmost set bits:
 ```c
 int x1 = (x0 - 1) & x0; // 1011011 -> 1011010
@@ -175,6 +191,10 @@ $
 &        &z = "mul"(w, c)\ // create node, union
 $
 which could be generated into (pseudocode)
+
+#todo[summarize code put in appendix and link]
+#todo[indexes instead of concatenating loops, this is the kind of structure we are interested in.]
+
 ```rust
 for (x1, a, c1) in egraph.table_mul.iter() {
     for (y1, b, c2) in egraph.table_mul.iter() {
@@ -267,6 +287,11 @@ that would be slow. Most compilers instead opt to do this heuristically. E-Graph
 this problem, allowing multiple rewrites but committing to one only after all rewrites have been
 searched, while not duplicating work like a backtracking search would.
 
+#todo[duplicating information is fine, summaries are fine, reference other sections "we can do egraphs, see section X, we can do ... se section Y."]
+
+#todo["Rethorical Moves in research article introductions"]
+#todo[establishing territory, establishing a niche, ~~occupying a niche (results)~~.]
+#todo[See "Why E-Graphs" -> See Section 3.3.]
 
 
 
@@ -276,6 +301,14 @@ searched, while not duplicating work like a backtracking search would.
 // Use one or two relevant and high quality references for providing evidence from the literature that the proposed study indeed includes scientific and engineering challenges, or is related to existing ones. Convince the reader that the problem addressed in this thesis has not been solved prior to this project.
 We believe that E-graphs are very unexplored, and there is great potential for improvement.
 There are few papers and as far as we know the only production compiler that uses E-Graphs is Cranelift (2022), but it uses acyclic E-Graphs, specifically because regular E-Graphs where not performant enough, which makes Cranelift miss out on potential optimizations @cranelift_egraph_rfc @acyclic_egraphs.
+
+#todo[talk more about cranelift, and use it as a connection to MPHPC, use e-graph presentation stuff in proposal.]
+
+#todo[communicate that the actual motivation is compilers, even if we are not literally building a compiler.]
+
+#todo[have example rewrite rules for SIMD?]
+
+#todo[remove references from titles and put into text.]
 
 == E-graphs (1980) @oldegraph
 
@@ -301,6 +334,8 @@ egg's about 100k E-nodes per second in that same benchmark.
 
 == "Fast and Optimal Extraction for Sparse Equality Graphs" (2024) @fastextract
 
+#todo["fast extraction paper"]
+
 Since E-graphs store deduplicated expressions, it means that there are exponentially many
 expressions for a typical E-graph, and therefore extracting a good expression is challenging. Even
 for simple cost functions the problem is NP-hard, and integer linear programming is typically used
@@ -310,6 +345,9 @@ for simple cost functions the problem is NP-hard, and integer linear programming
 
 
 = Goal
+
+#todo[good to have questions after explaining everything]
+
 // Goals and Challenges
 // Describe your contribution with respect to concepts, theory and technical goals.
 // Ensure that the scientific and engineering challenges stand out so that the reader can easily recognize that you are planning to solve an advanced problem.
@@ -360,6 +398,8 @@ We have ideas to improve performance using a mix of
 
 #list(
   [
+    #todo[matching a + b implies matching b + a. matching a + b attempts to match b + a.]
+
     ruleset preprocessing, such as composing rules or special-casing specific rewrites to not have
     to add as many nodes. For example could rewriting $a+b$ to $b+a$ be skipped if any rules
     matching $a+b$ also tried matching $b+a$.
@@ -368,6 +408,8 @@ We have ideas to improve performance using a mix of
     skipping maintaining unnecessary indices, as we think is done by Eqlog but not egglog
   ],
   [
+    #todo[either be sure to use SIMD, not perhaps. we do more research on this. we can be pretty sure that using SIMD makes sense.]
+
     optimizing index data structures for joining, considering memory access, possibly using SIMD
   ],
   [
@@ -396,9 +438,6 @@ For extraction we are leaning towards creating our own benchmarks. We are also c
 egg extraction gym @egggym, but it has a problem of the benchmarks testing the worst case instead of
 the average case and the scenarios are very synthetic.
 
-#todo[regarding Alejandro's SyCAM: We find little public information on this as we suppose it is not
-yet published, and while it seems like a reasonable application we think leaning on egglog's existing
-benchmarks makes more sense.]
 
 
 
