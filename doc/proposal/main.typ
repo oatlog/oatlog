@@ -51,25 +51,25 @@ Suggested Examiner at CSE:\
 = Introduction
 
 Modern software development relies heavily on efficient and reliable compilers with sophisticated
-optimizations. In practice this has lead to a few large compiler backends which have received
+optimizations. In practice, this has led to a few large compiler backends that have received
 significant engineering effort yet are difficult to modify while ensuring correctness and which
-struggle with the compilation-time and generated-code-quality trade-off. LLVM @llvm is a poster child of
-these issues. As we will expand upon in @whyegraphs, this can be addressed by raising the level of
-abstraction for the optimization pass writer from custom passes to rewrite rules, in the form of
-peephole rewriting and in particular using e-graphs.
+struggle with the compilation-time and generated-code-quality trade-off. LLVM @llvm is a poster
+child of these issues. As we will expand upon in @whyegraphs, this can be addressed by raising the
+level of abstraction for the optimization pass writer from custom passes to rewrite rules, in the
+form of peephole rewriting and in particular using e-graphs.
 
-Yet e-graphs suffer from a combinatorical explosion that currently severely limits what applications
+Yet e-graphs suffer from a combinatorial explosion that currently severely limits what applications
 they are suitable for. The compiler backend Cranelift @cranelift is the only production compiler we
 know of that has incorporated e-graphs, but it has done so in the weaker form of acyclic e-graphs
 due to performance problems of full e-graphs.
 
-There are recent developments unifying e-graphs with datalog, unlocking incremental rule matching
-and bringing an order of magnitude speedup. The insight is that an e-graph engine is very similar to
-a graph database, with its ruleset being a schema and a set of queries that insert terms until
+Recent developments have unified e-graphs with datalog, unlocking incremental rule matching, and
+bringing an order of magnitude speedup. The insight is that an e-graph engine is very similar to a
+graph database, with its ruleset being a schema and a set of queries that insert terms until
 reaching a fixed point. This is elaborated upon in @whategraphs and @whatcomputation.
 
-Relational databases are mature technology with rich theory and a wide breadth of implementations,
-providing many techniques that could be transferred to e-graphs. At the same time e-graphs have
+Relational databases are a mature technology with rich theory and a wide breadth of implementations,
+providing many techniques that could be transferred to e-graphs. At the same time, e-graphs have
 unique requirements and have been understood as databases only recently. We believe the immaturity
 of e-graphs in this domain leaves significant improvements on the table.
 
@@ -77,14 +77,14 @@ We aim to implement an e-graph engine with performance improving upon the state 
 exploring techniques such as join implementation and query planning in addition to e-graph-specific
 rule preprocessing. We will combine this with general performance engineering in terms of leveraging
 code generation with compile-time ruleset specialization and optimizing, in particular indices and
-insertions, for memory locality and instruction level parallelism.
+insertions, for memory locality and instruction-level parallelism.
 
 == Relevance to MPHPC
 
-Our project is relevant to MPHPC to the extent that implementing a domain specific graph database
+Our project is relevant to MPHPC to the extent that implementing a domain-specific graph database
 with an eye to performance engineering, applying database techniques to a new domain in which they
 have historically not been applied, is relevant to MPHPC. As a bonus, the domain of e-graphs happen
-to be a keystone in unlocking ways to more easily implement optimizations such as autovectorization
+to be a keystone in unlocking ways to implement optimizations such as autovectorization more easily
 in compilers, although this is a downstream use case and not a focus of the thesis.
 
 Relevant courses include those in which we have encountered performance engineering (DAT400
@@ -100,17 +100,17 @@ construction).
 // It may be used if there is a need to describe the problem that you want to solve in more
 // technical detail and if this problem description is too extensive to fit in the introduction
 
-E-graphs are a data structure that store expressions deduplicated through equivalence relations.
-They are potentially useful when doing any kind of symbolic rewrites and are successfully employed
-in modern SMT solvers and in optimizing compilers in which they solve the phase ordering problem and
+E-graphs are data structures that store expressions deduplicated through equivalence relations and
+are potentially useful when doing any kind of symbolic rewrites. They are successfully employed in
+modern SMT solvers and in optimizing compilers in which they solve the phase ordering problem and
 reduce the need for heuristics.
 
-But there are obstacles preventing e-graphs from reaching more widespread use within compilers. The
-size of a converged e-graph is generally exponential given sufficiently complex rewrite rules,
-necessitating lots of compute and even timeouts to terminate in feasible time. Improvements in
-rewrite rules, algorithmic and implementation improvements would go a long way towards making
-e-graphs viable in more compute-restricted scenarios, such as in a C compiler rather than in a
-theorem prover.
+However, there are obstacles preventing e-graphs from reaching more widespread use within compilers.
+The size of a converged e-graph is generally exponential given sufficiently complex rewrite rules,
+necessitating lots of compute and even timeouts for them to terminate in a reasonable time.
+Improvements in rewrite rules, algorithmic and implementation improvements would go a long way
+towards making e-graphs viable in more compute-restricted scenarios, such as in a C compiler rather
+than a theorem prover.
 
 == Why e-graphs <whyegraphs>
 
@@ -119,13 +119,13 @@ called the phase ordering problem, where the rewrites applied depend on which or
 in and passes in practice must be run many times in order to reach a fixed point.
 
 The phase ordering problem can be solved by replacing coarse-grained passes with fine-grained
-rewrite rules. This is called peephole rewriting and lets us apply monotonic rewrites to improve the
-program. #footnote[Sea of Nodes is a promising compiler IR that is especially suited to peephole
+rewrite rules. This is called peephole rewriting and it lets us apply monotonic rewrites to improve
+the program. #footnote[Sea of Nodes is a promising compiler IR especially suited to peephole
 rewriting @son.]
 
-However peephole rewriting does not help us when there are multiple potentially good but mutually
+However, peephole rewriting does not help us when there are multiple potentially good but mutually
 incompatible rewrites that we could apply. Since one rewrite can unlock other beneficial rewrites
-later on, we cannot select them greedily. One could solve this with a backtracking search, but that
+later, we cannot select them greedily. One could solve this with a backtracking search, but that
 would be slow. Most compilers instead opt to do this heuristically. E-graphs solve precisely this
 problem, allowing multiple rewrites but committing to one only after all rewrites have been
 searched, while not duplicating work like a backtracking search would.
@@ -133,7 +133,7 @@ searched, while not duplicating work like a backtracking search would.
 == What are e-graphs <whategraphs>
 
 E-graphs are graphs with two types of nodes: e-classes and terms. E-classes represent a set of
-equivalent expressions and contains terms. Terms represent an operation that takes in a number of
+equivalent expressions and contain terms. Terms represent an operation that takes as input multiple
 e-classes. By adding rewrite rules and applying them repeatedly, every possible way to rewrite an
 expression can be found, and the best expression according to some metric can be extracted.
 Extraction is NP-hard but there are both heuristics and algorithms that work well on some types of
@@ -146,47 +146,40 @@ deduplicated.
 
 == What is the actual computation to optimize? <whatcomputation>
 
-Rewrites on an e-graph can be seen as a query in a relational or graph database that create new
-nodes, so the computation will be dominated by joins and insertions. This database is domain
-specific and has different performance requirements than a traditional general-purpose database. For
-example, it is in memory, often stores only triplets of 32-bit integers, and has canonicalization
-through union-find built in.
+Rewrites on an e-graph can be seen as queries in a relational or graph database that create new
+nodes, so the computation will be dominated by joins and insertions. This database is
+domain-specific and has different performance requirements than a traditional general-purpose
+database. For example, it is in memory, often stores only triplets of 32-bit integers, and has
+canonicalization through union-find built-in.
 
 @appendix-egraph-kernel in the appendix shows an example of an e-graph rule compiled to code.
 
 = Context and related work
 
-// Context
-
-// Use one or two relevant and high quality references for providing evidence from the literature
-// that the proposed study indeed includes scientific and engineering challenges, or is related to
-// existing ones. Convince the reader that the problem addressed in this thesis has not been solved
-// prior to this project.
-
-We believe that e-graphs are very unexplored, and there is great potential for improvement. Recent
-work has considerably improved their performance and capabilities, and there is as far as we know
-only one production compiler, Cranelift (2022) @cranelift, that uses e-graphs. However because
-regular e-graphs are not performant enough, Cranelift uses weaker acyclic e-graphs which makes
-Cranelift miss out on potential optimizations @cranelift_egraph_rfc @acyclic_egraphs.
+We believe that e-graphs are very unexplored, with great potential for improvement. Recent work has
+considerably improved their performance and capabilities, and there is as far as we know only one
+production compiler using e-graphs, Cranelift (2022) @cranelift. However because regular e-graphs
+are not performant enough, Cranelift uses weaker acyclic e-graphs that make it miss out on potential
+optimizations @cranelift_egraph_rfc @acyclic_egraphs.
 
 == E-graphs (1980)
 
-E-graphs are not a new concept, and have been used to perform program verification and for proof
+E-graphs are not a new concept and have been used to perform program verification and in proof
 assistants @oldegraph.
 
 == Egg (2021)
 
 Egg @egg is an e-graph implementation where each rule is attempted to be matched against the entire
-database. The rewrites are performed in batches, meaning that all rules are applied, and then the
-database invariants fixed.
+database. The rewrites are performed in batches, meaning all rules are applied and then the database
+invariants are fixed.
 
 == Egglog and eqlog (2023)
 
-Egglog @egglog and eqlog @eqlog are simultaneous independent discovery of a unification between
+Egglog @egglog and eqlog @eqlog are simultaneous independent discoveries of a unification between
 e-graphs and datalog. This yields a vastly improved computational complexity in comparison to egg,
 by allowing adding indices per node type and matching rewrite rules incrementally against only parts
 of the graph that have changed. A notable difference between them is that egglog focuses on
-useability and has a dynamic REPL-style interface, while eqlog is designed to be embedded into
+useability and has a dynamic REPL-style interface while eqlog is designed to be embedded into
 programs and processes rules at compile time.
 
 The egglog paper has a benchmark showing approximately a million e-nodes per second, improving from
@@ -224,7 +217,7 @@ per second on existing e-graph rulesets.
 - How do rewrite rules typically behave, under what constraints do they create many nodes, and can
   the engine be specialized for rules that create too many nodes? (such as commutativity and
   associativity)
-- How can a optimal or near-optimal expression be extracted with low run time?
+- How can an optimal or near-optimal expression be extracted quickly?
 
 = Approach
 
@@ -275,7 +268,7 @@ We aim to improve performance using a mix of ideas specific to e-graphs:
     attempt matching $b+a$.
   ],
   [
-    ruleset preprocessing by composing rules, creating signficantly more rules or more expressive
+    ruleset preprocessing by composing rules, creating significantly more rules or more expressive
     rules but removing rules that are especially problematic in terms of creating a lot of nodes
   ],
   [
@@ -283,7 +276,7 @@ We aim to improve performance using a mix of ideas specific to e-graphs:
   ],
 )
 
-Techinques from databases:
+Techniques from databases:
 
 #list(
   [
@@ -302,7 +295,7 @@ And general performance engineering:
   ],
   [
     optimizing index data structures for the joins in the e-graph usage pattern, considering memory
-    locality and instruction level parallelism
+    locality and instruction-level parallelism
   ],
 )
 
@@ -321,9 +314,9 @@ The e-graph applications that we aim to use for benchmarking are
 
 since these were all used to benchmark egglog @egglog.
 
-For extraction we are leaning towards creating our own benchmarks. We are also considering using the
-egg extraction gym @egggym, but its benchmarks test synthetic worst-case scenarios rather than the
-average case.
+For extraction, we are leaning towards creating our own benchmarks. We are also considering using
+the egg extraction gym @egggym, but its benchmarks test synthetic worst-case scenarios rather than
+the average case.
 
 #show bibliography: set heading(numbering: "1   ")
 #bibliography("refs.bib", title: "References")
@@ -342,7 +335,7 @@ int x3 = (x2 - 1) & x2; // 1011000 -> 1010000
 int x4 = (x3 - 1) & x3; // 1010000 -> 1000000
 ```
 
-Where it written as a simple expression tree, it would explode into the following:
+Where if it is written as a simple expression tree, it would explode into the following
 
 ```c
 int x3 = (((((((x0 - 1) & x0) - 1) & ((x0 - 1) & x0)) - 1) & ((((x0 - 1) & x0) - 1) & ((x0 - 1) & x0))) - 1) & ((((((x0 - 1) & x0) - 1) & ((x0 - 1) & x0)) - 1) & ((((x0 - 1) & x0) - 1) & ((x0 - 1) & x0)))
@@ -378,7 +371,7 @@ x4 = [t3 & x3, _blsr_u32(x3)]
 
 The e-class `x4` now represents 16 expressions in a compact way. Picking a good expression is called
 *extraction*. Since it is possible to get exponentially many expressions, it is hard to pick an
-optimal expression. For example if the cost function was a constant 1 for every node, the optimal
+optimal expression. For example, if the cost function was a constant 1 for every node, the optimal
 extracted expression would be:
 
 ```c
