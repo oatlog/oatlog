@@ -83,56 +83,70 @@ insertions, for memory locality and instruction-level parallelism.
 
 Our project is relevant to MPHPC to the extent that implementing a domain-specific graph database
 with an eye to performance engineering, applying database techniques to a new domain in which they
-have historically not been applied, is relevant to MPHPC. 
+have historically not been applied, is relevant to MPHPC.
 
-As a bonus, the domain of e-graphs happen to be a keystone in unlocking ways to implement 
-optimizations such as autovectorization significantly more easily and correctly in compilers, 
+As a bonus, the domain of e-graphs happen to be a keystone in unlocking ways to implement
+optimizations such as autovectorization significantly more easily and correctly in compilers,
 although this is a downstream use case and not a focus of the thesis.
 
 Relevant courses include those in which we have encountered performance engineering (DAT400
-High-performance parallel programming, EDA284 Parallel computer architecture) and algorithm design
-(TIN093 Algorithms, /*TDA251 Advanced algorithms, */TDA507 Computational methods in bioinformatics), as
-well as the concrete domains of databases (DAT475 Advanced databases) and compilers (TDA283 Compiler
-construction).
+High-performance parallel programming, EDA284 Parallel computer architecture, DAT105 Computer
+architecture) and algorithm design (TIN093 Algorithms, TDA507 Computational methods in
+bioinformatics), as well as the concrete domains of databases (DAT475 Advanced databases) and
+compilers (TDA283 Compiler construction).
 
-=== DAT400 High-performance parallel programming
-- *General performance modeling with the Roofline model*, which will be used on the E-graph engine.
-- *Loop reordering*, which is essentially the same as problem as query planning for the E-graph engine except that the query planning will be automated.
-- *General knowledge about cache-lines*, information was presented on how cache-lines are organized from the perspective of optimizing software, which will inform how memory is laid out in the E-graph engine, for example picking between Array-of-Struct vs Struct-of-Array layouts.
-- *Practice optimizing CUDA, OPENMP code*, while the E-graph engine is planned to be single threaded, writing SIMT code would help us decide what if and how different parts of the E-graph engine could use SIMD.
+The following subsections include concrete examples of course contents that will have been relevant
+experiences for us in relation to this thesis project.
 
-=== EDA284 Parallel computer architecture
-- *Deep knowledge of cache-coherence protocols*, how cache lines work which inform how memory is laid out in the E-graph engine, for example picking between Array-of-Struct vs Struct-of-Array layouts.
-- *Compute energy usage*, we were shown that runtime is a reasonable indicator of energy usage.
-- *(Project) Practice optimizing a sequential program, thinking about memory access patterns, roofline, adding SIMD, parallelism*, this is essentially a small scale version of what we want to do with E-graphs, we want to take an existing algorithm and optimize it, except that we will not use multiple threads. 
+=== DAT400 High-performance parallel programming, EDA284 Parallel computer architecture and DAT105 Computer architecture
+
+- *General performance modeling with the Roofline model*, which will be used on the e-graph engine.
+- *Loop reordering* is essentially the same as query planning for the e-graph engine, except that
+  query planning will be automated.
+- *General knowledge about cache-lines* from the perspective of software, which will inform how
+  memory should be used in the e-graph engine, for example helping us pick between Array-of-Struct
+  vs Struct-of-Array layouts.
+- *Practice optimizing CUDA, OPENMP code*. Although the e-graph engine is planned to be single
+  threaded, experience in data parallelism helps us utilize SIMD and superscalar execution
+  effectively.
+- *Understanding instruction-level parallelism (ILP)* is important when microoptimizing, which will
+  likely be useful for the inner loops of the joins.
+- *Hands-on optimization projects*. Practical experience optimizing sequential programs, thinking
+  about memory access patterns, roofline modeling, SIMD, parallelism mirrors the type of work we
+  will do with the e-graph engine aside from us not focusing on single-threaded performance.
+
+=== TDA507 Computational methods in bioinformatics and TIN093 Algorithms
+- *Heuristic algorithm design*. With rules like commutativity and associativity e-graphs experience
+  combinatorial explosion, so we need some methods to make the performance on common instances
+  reasonable even if the actual problem is exponential.
+- *Algorithm analysis and proofs*. While we don't care that much about the theoretical worst case,
+  it is still very useful to avoid accidentally making our e-graph engine significantly worse for
+  some inputs.
+- *Formal descriptions of algorithms*. Being able to describe our algorithms will be useful for
+  actually writing our paper.
+- *Algorithm design*. We must design and decide on algorithms for query optimization and join
+  strategies. Making sure that a join is worst case optimal is not trivial and it would be useful to
+  compare this against non-optimal joins to see what the big-O constant factors are for different
+  join algorithms for tables of different sizes. We will likely select sub-optimal complexities for
+  smaller tables.
 
 === TDA283 Compiler construction
-- *Knowing how to write a compiler*, at a high level, the compile-time part of the project is a compiler from rewrite rules into an e-graph engine that has all the rules embedded in it.
-- *Understanding what a compiler writer wants from LLVM*, An implicit goal of the project is that it is still useful for compiler writers, so we want to make sure the engine is useable to compiler writers.
-- *Optimizer implementation*, query planning is essentially a compiler optimization problem, so knowing how to write an optimizer is useful. 
+- *Knowing how to write a compiler*. At a high level, the compile-time part of the project is a
+  compiler from rewrite rules into an e-graph engine that has all the rules embedded in it.
+- *Understanding compiler writer needs*. An implicit goal of the project is that it is useful for
+  compiler writers, so understanding their perspective is valuable.
+- *Optimizer implementation*. Query planning is essentially a compiler optimization problem, so
+  knowing how to write an optimizer is useful.
 
 === DAT475 Advanced databases
-- *Concepts relating to DBMS implementation*, since we are essentially implementing a database, this is useful, although the course is not focused on implantation.
-- *Reasoning about database design (normalization, indexes etc..)*, the database that we design should have indexes where it makes sense, and normalized where it makes sense.
-- *Query optimization and reasoning about different query plans*, Since we want to generate ideal query plans at compile time, this is very useful.
-- *Introduction to graph databases*, an e-graph is more accurately a graph database since the queries include repeatedly joining the same tables, which is just graph traversal, so knowing about graph databases is useful.
-
-=== TDA507 Computational methods in bioinformatics
-- *"Good enough" Heuristic algorithm design*, with rules like commutativity and associativity, an e-graph will explode, so we need some methods to make reasonable performance good even if the actual problem is exponential.
-
-=== TIN093 Algorithms
-- *Algorithm analysis and proofs*, while we don't care that much about the theoretical worst case, it is still very useful to avoid accidentally making our e-graph engine significantly worse for some inputs.
-- *Formal descriptions of algorithms*, being able to describe our algorithms will be useful for actually writing our paper.
-- *Algorithm design*, the key algorithms we need to design are for query optimization and join strategies. Making sure that a join is worst case optimal is not trivial and it would be useful to compare this against non-optimal joins to see what the big-O constant factors are for different join algorithms for tables of different sizes.
-It's very possible that we will pick sub-optimal complexities for smaller tables.
-
-=== DAT205 Advanced computer graphics
-- *(Project) Writing and optimizing GPGPU code*, since gpu hardware is essentially a bunch of SIMD units, practice of implementing SIMT code translates to writing SIMD code.
-//- *Reading papers?*
-
-=== DAT105 Computer architecture
-- *Understanding ILP*, instruction-level parallelism is important when microoptimizing, which will likley be useful for the inner loops of the joins.
-- *Understanding cache*, same reasons as before.
+- *Concepts relating to DBMS implementation* are useful since we are essentially implementing a
+  database.
+- *Reasoning about database design (normalization, indexes etc...)* helps us write heuristics to
+  decide what to index and what to normalize.
+- *Query optimization and reasoning about different query plans* is useful since we want to generate
+  good query plans at compile time.
+- *Introduction to graph databases*. E-graphs resemble graph databases because of their repeated
+  joins that are effectively graph traversal.
 
 = Problem
 
