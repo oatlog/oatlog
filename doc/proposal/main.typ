@@ -6,7 +6,7 @@
   [#text(fill: red, weight: "bold", size: 12pt)[TODO #msg]]
 }
 
-#set document(title: "Faster e-graph engines: Master's thesis proposal")
+#set document(title: "A faster e-graph engine: Master's thesis proposal")
 #set page("us-letter", margin: (x: 1.5in, y: 1.70in), numbering: "1")
 #set text(font: "New Computer Modern")
 #set heading(numbering: "1.1    ")
@@ -20,7 +20,7 @@
 
 #text(16pt)[#smallcaps[Master thesis project proposal]]
 #v(0.1em)
-#text(20pt, weight: "bold")[Faster e-graph engines]
+#text(20pt, weight: "bold")[A faster e-graph engine]
 #v(4em)
 
 #text(14pt)[Loke Gustafsson (#email("lokeg@chalmers.se"))]
@@ -113,7 +113,7 @@ experiences for us in relation to this thesis project.
   likely be useful for the inner loops of the joins.
 - *Hands-on optimization projects*. Practical experience optimizing sequential programs, thinking
   about memory access patterns, roofline modeling, SIMD, parallelism mirrors the type of work we
-  will do with the e-graph engine aside from us not focusing on single-threaded performance.
+  will do with the e-graph engine aside from us focusing on single-threaded performance.
 
 === TDA507 Computational methods in bioinformatics and TIN093 Algorithms
 - *Heuristic algorithm design*. With rules like commutativity and associativity e-graphs experience
