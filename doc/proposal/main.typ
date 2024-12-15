@@ -83,15 +83,26 @@ insertions, for memory locality and instruction-level parallelism.
 
 Our project is relevant to MPHPC to the extent that implementing a domain-specific graph database
 with an eye to performance engineering, applying database techniques to a new domain in which they
-have historically not been applied, is relevant to MPHPC. As a bonus, the domain of e-graphs happen
-to be a keystone in unlocking ways to implement optimizations such as autovectorization more easily
-in compilers, although this is a downstream use case and not a focus of the thesis.
+have historically not been applied, is relevant to MPHPC. 
+
+As a bonus, the domain of e-graphs happen to be a keystone in unlocking ways to implement 
+optimizations such as autovectorization significantly more easily and correctly in compilers, 
+although this is a downstream use case and not a focus of the thesis.
 
 Relevant courses include those in which we have encountered performance engineering (DAT400
 High-performance parallel programming, EDA284 Parallel computer architecture) and algorithm design
 (TIN093 Algorithms, TDA251 Advanced algorithms, TDA507 Computational methods in bioinformatics), as
 well as the concrete domains of databases (DAT475 Advanced databases) and compilers (TDA283 Compiler
 construction).
+
+=== DAT400 High-performance parallel programming
+- **General performance modeling with the Roofline model**, which will be used on the E-graph engine.
+- **Loop reordering**, which is essentially the same as problem as query planning for the E-graph engine except that the query planning will be automated.
+- **General knowledge about cache-lines**, information was presented on how cache-lines are organized from the perspective of optimizing software, which will inform how memory is laid out in the E-graph engine, for example picking between Array-of-Struct vs Struct-of-Array layouts.
+- **Practice optimizing CUDA, OPENMP code**, while the E-graph engine is planned to be single threaded, writing SIMT code would help us decide what if and how different parts of the E-graph engine could use SIMD.
+
+=== EDA284 Parallel computer architecture
+
 
 = Problem
 
