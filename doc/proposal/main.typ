@@ -415,12 +415,13 @@ algorithms with a lower run time by using aforementioned low-level optimization 
 
 Answering R1, R2, R3, R4 depends on the performance of the e-graph engine itself. We will evaluate
 this using benchmarks on our personal computers, with the assumption that the results generalize to
-other hardware. The e-graph applications that we aim to use for benchmarking are
+other hardware. The e-graph applications that we aim to use for benchmarking are:
 - Herbie @herbie, a tool to automatically find floating-point expressions that minimize numerical
   error given an expression in real numbers
 - `math`, a small computer algebra system from egg's test suite
-- Steensgaard style unification-based points-to analysis Specifically we want to measure performance
-  in terms of created nodes per second.
+- Steensgaard style unification-based points-to analysis
+
+Specifically we want to measure performance in terms of created nodes per second.
 
 R5 is evaluated by the results of profiling in the e-graph engine.
 
