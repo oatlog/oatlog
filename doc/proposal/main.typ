@@ -312,10 +312,14 @@ Concretely, we will create a Rust library that takes in a set of rewrite rules a
 The main focus is optimizing the runtime on the generated E-graph engine (R1).
 In terms of features we are aiming to implement a similar feature set to Egglog @egglog.
 
+We generally think that the design space is sufficiently large and the domain sufficiently immature
+that performance improvements are possible over egglog and eqlog, even if the algorithmic behavior
+is kept relatively unchanged.
+
 === Analysis, visualization
 // * memory access patterns, 
 Compared to something like matrix multiplication, the memory access patterns of an e-graph engine (R4) are much harder to analyze, and we want to visualize the memory access patterns somehow, in the hopes that it gives us insights in how we should change the design.
-[TODO: link to fasterthanlime memory visualization tool video?]
+Something like `mevi` @mevi2024 could be used for this.
 
 To understand how queries typically look (R3), we want to visualize them somehow, one approach is to turn the rewrite rules into a bipartite graph of attributes and tables, and add edges between tables and attributes that are equal.
 By doing this we hope to be able to categorize queries into different types.
@@ -327,25 +331,25 @@ To understand how rules behave (R5), we will add profiling into the engine itsel
 
 === Optimization, standard low-level optimizations (SIMD, ILP...)
 // * workflow, perf, looking at assembly, 
-The basic workflow for low-level (meaning non-algorithmic) optimizations  will be looking at benchmark and profiling results, and identifying bottlenecks. Standard approaches include:
+The basic workflow for low-level (meaning non-algorithmic) optimizations  will be looking at benchmark results, profiling results and generated assembly to identify bottlenecks and areas of potential improvement. Standard approaches include:
 - *Vectorization (SIMD)*, we think this might be applicable in the inner loops for the joins and maybe on filtering, although that is significantly harder. Even if indexes are used, we can use gather instructions.
 - *Improving ILP*, orthogonally to SIMD, we can leverage ILP, in practice this will probably mostly be about unrolling the inner loops and avoiding unnecessary loop dependencies.
 - *Loop reordering*, since joins are essentially nested loops, the entire query plan portion of the project can be used to pick a good loop ordering.
 - *Memory layouts*, picking between Array-of-Struct vs Struct-of-Array or other memory layouts depending on the memory access patterns (R4). Additionally think about cache alignment to reduce the number of unnecessary cache lines used.
 
-=== Improving rulesets (R4)
+=== Improving rulesets (R2)
 We think it is possible to preprocess rulesets by special-casing certain rules, for example commutativity and associativity generally results in an exponential number of nodes. 
 For example a rule like $a + b$ -> $b + a$ could be removed and instead any time $a + b$ is attemted to be match, the engine also tries to match with $b + a$.
 
 Additionally, some rules may match against similar patterns and we might be able to match against both at the same time, which could save on memory locality and compute.
 
-=== Improving indexes, query plans and joins
+=== Improving indexes, query plans and joins (R2, R3)
 We want to turn all the queries into graphs and somehow construct reasonable query plans from them.
 This could include:
-- Picking between join algorithms
+- Picking between join algorithms such as merge, hash etc
 - Using worst-case optimal joins
-- Adding/removing indexes
-- Materializing sub-queries
+- Adding indexes strategically, since some indexes are not needed or might not provide a benefit, we think is done by eqlog but not egglog
+- Strategically materializing sub-queries, for example if the join between two tables is significantly smaller than the two original tables, memory bandwidth and compute can be saved.
 
 === Improving expression exploration priority
 We have some ideas on how to handle rules that create lots of nodes:
@@ -365,87 +369,85 @@ The e-graph applications that we aim to use for benchmarking are
   error given an expression in real numbers
 - `math`, a small computer algebra system from egg's test suite
 - Steensgaard style unification-based points-to analysis
+Specifically we want to measure performance in terms of created nodes per second.
 
 R5 is evaluated by the results of profiling in the e-graph engine.
 
-R6 is orthogonal to the engine itself
+R6 is orthogonal to the engine itself, we plan on writing our own extraction benchmarks, but are also considering using the egg extraction gym @egggym, although it has the drawback of the tests being very synthetic worst-case scenarios rather than the average case.
 
-== Prototype design
-// * prototype properties, functionalities and performance goals
-// * motivate key design selection, wrt state of the art, existing libraries etc...
-== Prototype implementation
-// * prototype properties, functionalities and performance goals
-== Prototype evaluation
-// * testing environment
-// * how to compare against state of the art.
-
-// * ? key tools and test-case scenarios
-
-
-We generally think that the design space is sufficiently large and the domain sufficiently immature
-that performance improvements are possible over egglog and eqlog, even if the algorithmic behavior
-is kept relatively unchanged.
-
-== Ideas for improvements
-
-We aim to improve performance using a mix of ideas specific to e-graphs:
-
-#list(
-  [
-    ruleset preprocessing by special-casing specific rewrites to avoid adding as many nodes. For
-    example could rewriting $a+b$ to $b+a$ be skipped if any rules attempting to match $a+b$ also
-    attempt matching $b+a$.
-  ],
-  [
-    ruleset preprocessing by composing rules, creating significantly more rules or more expressive
-    rules but removing rules that are especially problematic in terms of creating a lot of nodes
-  ],
-  [
-    matching multiple rules together at the same time
-  ],
-)
-
-Techniques from databases:
-
-#list(
-  [
-    skipping maintaining unnecessary indices, as we think is done by eqlog but not egglog
-  ],
-  [
-    speeding up joins by strategically materializing subqueries
-  ],
-)
-
-And general performance engineering:
-
-#list(
-  [
-    leveraging code generation to specialize query execution to the given ruleset
-  ],
-  [
-    optimizing index data structures for the joins in the e-graph usage pattern, considering memory
-    locality and instruction-level parallelism
-  ],
-)
+// == Prototype design
+// // * prototype properties, functionalities and performance goals
+// // * motivate key design selection, wrt state of the art, existing libraries etc...
+// == Prototype implementation
+// // * prototype properties, functionalities and performance goals
+// == Prototype evaluation
+// // * testing environment
+// // * how to compare against state of the art.
+// 
+// // * ? key tools and test-case scenarios
 
 
-== Benchmarks and testing environment
 
-We intend to run the benchmarks on our personal computers, with the assumption that the results
-generalize to other hardware.
+// == Ideas for improvements
+// 
+// We aim to improve performance using a mix of ideas specific to e-graphs:
+// 
+// #list(
+//   [
+//     ruleset preprocessing by special-casing specific rewrites to avoid adding as many nodes. For
+//     example could rewriting $a+b$ to $b+a$ be skipped if any rules attempting to match $a+b$ also
+//     attempt matching $b+a$.
+//   ],
+//   [
+//     ruleset preprocessing by composing rules, creating significantly more rules or more expressive
+//     rules but removing rules that are especially problematic in terms of creating a lot of nodes
+//   ],
+//   [
+//     matching multiple rules together at the same time
+//   ],
+// )
+// 
+// Techniques from databases:
+// 
+// #list(
+//   [
+//     skipping maintaining unnecessary indices, as we think is done by eqlog but not egglog
+//   ],
+//   [
+//     speeding up joins by strategically materializing subqueries
+//   ],
+// )
+// 
+// And general performance engineering:
+// 
+// #list(
+//   [
+//     leveraging code generation to specialize query execution to the given ruleset
+//   ],
+//   [
+//     optimizing index data structures for the joins in the e-graph usage pattern, considering memory
+//     locality and instruction-level parallelism
+//   ],
+// )
 
-The e-graph applications that we aim to use for benchmarking are
 
-- Herbie @herbie, a tool to automatically find floating-point expressions that minimize numerical
-  error given an expression in real numbers
-- `math`, a small computer algebra system from egg's test suite
-- Steensgaard style unification-based points-to analysis
-
-since these were all used to benchmark egglog @egglog.
-
-For extraction, we are leaning towards creating our own benchmarks. We are also considering using
-the egg extraction gym @egggym, but its benchmarks test synthetic worst-case scenarios rather than
-the average case.
+// == Benchmarks and testing environment
+// 
+// We intend to run the benchmarks on our personal computers, with the assumption that the results
+// generalize to other hardware.
+// 
+// The e-graph applications that we aim to use for benchmarking are
+// 
+// - Herbie @herbie, a tool to automatically find floating-point expressions that minimize numerical
+//   error given an expression in real numbers
+// - `math`, a small computer algebra system from egg's test suite
+// - Steensgaard style unification-based points-to analysis
+// 
+// since these were all used to benchmark egglog @egglog.
+// 
+// For extraction, we are leaning towards creating our own benchmarks. We are also considering using
+// the egg extraction gym @egggym, but its benchmarks test synthetic worst-case scenarios rather than
+// the average case.
 
 #show bibliography: set heading(numbering: "1   ")
 #bibliography("refs.bib", title: "References")
