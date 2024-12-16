@@ -314,24 +314,48 @@ In terms of features we are aiming to implement a similar feature set to Egglog 
 
 === Analysis, visualization
 // * memory access patterns, 
+Compared to something like matrix multiplication, the memory access patterns of an e-graph engine (R4) are much harder to analyze, and we want to visualize the memory access patterns somehow, in the hopes that it gives us insights in how we should change the design.
+[TODO: link to fasterthanlime memory visualization tool video?]
+
+To understand how queries typically look (R3), we want to visualize them somehow, one approach is to turn the rewrite rules into a bipartite graph of attributes and tables, and add edges between tables and attributes that are equal.
+By doing this we hope to be able to categorize queries into different types.
+If it turns out that optimizing general queries is essentially impossible, we can hard code certain query types to still get good performance.
 
 === Profiling
-To gain a better understanding of bottlenecks, we will use profiling tools such as `perf`
+To gain a better understanding of bottlenecks, we will use profiling tools such as `perf`.
+To understand how rules behave (R5), we will add profiling into the engine itself, for example, storing how many nodes each rule generated.
 
-=== Optimization, standard low-level optimizations
+=== Optimization, standard low-level optimizations (SIMD, ILP...)
 // * workflow, perf, looking at assembly, 
+The basic workflow for low-level (meaning non-algorithmic) optimizations  will be looking at benchmark and profiling results, and identifying bottlenecks. Standard approaches include:
+- *Vectorization (SIMD)*, we think this might be applicable in the inner loops for the joins and maybe on filtering, although that is significantly harder. Even if indexes are used, we can use gather instructions.
+- *Improving ILP*, orthogonally to SIMD, we can leverage ILP, in practice this will probably mostly be about unrolling the inner loops and avoiding unnecessary loop dependencies.
+- *Loop reordering*, since joins are essentially nested loops, the entire query plan portion of the project can be used to pick a good loop ordering.
+- *Memory layouts*, picking between Array-of-Struct vs Struct-of-Array or other memory layouts depending on the memory access patterns (R4). Additionally think about cache alignment to reduce the number of unnecessary cache lines used.
 
+=== Improving rulesets (R4)
+We think it is possible to preprocess rulesets by special-casing certain rules, for example commutativity and associativity generally results in an exponential number of nodes. 
+For example a rule like $a + b$ -> $b + a$ could be removed and instead any time $a + b$ is attemted to be match, the engine also tries to match with $b + a$.
 
-=== Improving rulesets
+Additionally, some rules may match against similar patterns and we might be able to match against both at the same time, which could save on memory locality and compute.
 
-=== Improving query plans
-
-=== Improving joins
+=== Improving indexes, query plans and joins
+We want to turn all the queries into graphs and somehow construct reasonable query plans from them.
+This could include:
+- Picking between join algorithms
+- Using worst-case optimal joins
+- Adding/removing indexes
+- Materializing sub-queries
 
 === Improving expression exploration priority
-// * exploding rules
+We have some ideas on how to handle rules that create lots of nodes:
+- Reducing how often they run
+- Special casing them in the engine itself [a+b -> b+a]
+- Performing extractions regularly to explore more locally optimal expressions.
 
 === Improving extraction
+We plan to analyze the recently published extraction paper @fastextract and create our own heuristics. 
+If we don't find any algorithmic improvements, we hope to at least implement existing algorithms with a lower runtime by using aforementioned low-level optimization techniques.
 
 == Evaluation
 Answering R1, R2, R3, R4 depends on the performance of the E-graph engine itself.
@@ -342,7 +366,9 @@ The e-graph applications that we aim to use for benchmarking are
 - `math`, a small computer algebra system from egg's test suite
 - Steensgaard style unification-based points-to analysis
 
-R5 is evaluated by 
+R5 is evaluated by the results of profiling in the e-graph engine.
+
+R6 is orthogonal to the engine itself
 
 == Prototype design
 // * prototype properties, functionalities and performance goals
