@@ -145,7 +145,7 @@ experiences for us in relation to this thesis project.
 === DAT475 Advanced databases
 - *Concepts relating to DBMS implementation* are useful since we are essentially implementing a
   database.
-- *Reasoning about database design (normalization, indexes etc...)* helps us write heuristics to
+- *Reasoning about database design (normalization, indices etc...)* helps us write heuristics to
   decide what to index and what to normalize.
 - *Query optimization and reasoning about different query plans* is useful since we want to generate
   good query plans at compile time.
@@ -262,20 +262,23 @@ close to a tree.
 // Describe your contribution with respect to concepts, theory and technical goals. Ensure that the
 // scientific and engineering challenges stand out so that the reader can easily recognize that you
 // are planning to solve an advanced problem.
+
 The goal of this project is to implement an e-graph engine that runs faster than other
 state-of-the-art implementations (like egg @egg, egglog @egglog, eqlog @eqlog) measured in e-nodes
 per second on existing e-graph rulesets.
 
 
-
-
 == Research questions
 
-- R1: Can we write an e-graph engine that outperforms state-of-the-art implementations in e-nodes per second?
+- R1: Can we write an e-graph engine that outperforms state-of-the-art implementations in e-nodes
+  per second?
 - R2: Can rulesets be automatically preprocessed to improve performance?
 - R3: Can joins be reordered or cached to improve performance?
-- R4: What memory access patterns do e-graph engines have, and can the engine be optimized with knowledge of those memory access patterns?
-- R5: How do rewrite rules typically behave, under what constraints do they create many nodes, and can the engine be specialized for rules that create too many nodes? (such as commutativity and associativity)
+- R4: What memory access patterns do e-graph engines have, and can the engine be optimized with
+  knowledge of those memory access patterns?
+- R5: How do rewrite rules typically behave, under what constraints do they create many nodes, and
+  can the engine be specialized for rules that create too many nodes? (such as commutativity and
+  associativity)
 - R6: How can an optimal or near-optimal expression be extracted quickly?
 
 = Approach
@@ -314,75 +317,117 @@ per second on existing e-graph rulesets.
 // test-case evaluation scenarios and benchmarks.
 
 == Design and implementation
-Concretely, we will create a Rust library that takes in a set of rewrite rules and generates Rust code for a E-graph engine with the optimized rewrite rules hard-coded.
-The main focus is optimizing the runtime on the generated E-graph engine (R1).
-In terms of features we are aiming to implement a similar feature set to Egglog @egglog.
+
+Concretely, we will create a Rust library that takes in a set of rewrite rules and generates Rust
+code for a e-graph engine with the optimized rewrite rules hard-coded. The main focus is optimizing
+the run time of the generated e-graph engine (R1). In terms of features we are aiming to implement a
+similar feature set to egglog @egglog.
 
 We generally think that the design space is sufficiently large and the domain sufficiently immature
 that performance improvements are possible over egglog and eqlog, even if the algorithmic behavior
 is kept relatively unchanged.
 
 === Analysis, visualization
-// * memory access patterns,
-Compared to something like matrix multiplication, the memory access patterns of an e-graph engine (R4) are much harder to analyze, and we want to visualize the memory access patterns somehow, in the hopes that it gives us insights in how we should change the design.
-Something like `mevi` @mevi2024 could be used for this.
 
-To understand how queries typically look (R3), we want to visualize them somehow, one approach is to turn the rewrite rules into a bipartite graph of attributes and tables, and add edges between tables and attributes that are equal.
-By doing this we hope to be able to categorize queries into different types.
-If it turns out that optimizing general queries is essentially impossible, we can hard code certain query types to still get good performance.
+Compared to something like matrix multiplication, the memory access patterns of an e-graph engine
+(R4) are much harder to analyze. We want to visualize the memory access patterns somehow, in the
+hopes that it gives us insights in how we should change the design. Something like `mevi` @mevi2024
+could be used for this.
 
-While the roofline model is not directly applicable to what the engine is doing since there are no floating-point operations, we can still use a similar analysis to identify if we are fundamentally limited by latency or bandwidth for L1, L2 and RAM.
-// To create exact theoretical bounds on the performance we can expect we will compare the  
+We want to visualize queries to understand what they typically look like (R3). One approach is to
+turn the rewrite rules into a bipartite graph of columns and tables, adding edges between tables and
+the columns they are joined by. By doing this we hope to be able to categorize queries into
+different types. If it turns out that optimizing general queries is essentially impossible, we can
+hard code certain query types to still get good performance.
+
+While the roofline model is not directly applicable to what the engine is doing since there are no
+floating-point operations, we can still use a similar analysis to identify if we are fundamentally
+limited by latency or L1, L2 or RAM throughput.
 
 === Profiling
-To gain a better understanding of bottlenecks, we will use profiling tools such as `perf`.
-To understand how rules behave (R5), we will add profiling into the engine itself, for example, storing how many nodes each rule generated.
+
+To gain a better understanding of bottlenecks, we will use profiling tools such as `perf` and Intel
+Processor Trace. To understand how rules behave (R5), we will add profiling into the engine itself,
+for example storing how many nodes each rule generated.
+
+=== Leveraging code generation
+
+Since rulesets are embedded at compile time, the Rust compiler (using LLVM) will be able to perform
+more aggressive optimizations compared to if we interpreted rulesets directly. This means it is
+crucial that we emit generated code in such a way that does not inhibit LLVM optimizations. In
+practice this requires us to keep track of function inlining in the generated code, allowing
+specialization without exploding code size.
 
 === Optimization, standard low-level optimizations (SIMD, ILP...)
-// * workflow, perf, looking at assembly,
-The basic workflow for low-level (meaning non-algorithmic) optimizations  will be looking at benchmark results, profiling results and generated assembly to identify bottlenecks and areas of potential improvement. Standard approaches include:
-- *Vectorization (SIMD)*, we think this might be applicable in the inner loops for the joins and maybe on filtering, although that is significantly harder. Even if indexes are used, we can use gather instructions.
-- *Improving ILP*, orthogonally to SIMD, we can leverage ILP, in practice this will probably mostly be about unrolling the inner loops and avoiding unnecessary loop dependencies.
-- *Loop reordering*, since joins are essentially nested loops, the entire query plan portion of the project can be used to pick a good loop ordering.
-- *Memory layouts*, picking between Array-of-Struct vs Struct-of-Array or other memory layouts depending on the memory access patterns (R4). Additionally think about cache alignment to reduce the number of unnecessary cache lines used.
+
+The basic workflow for low-level (meaning non-algorithmic) optimizations will be looking at
+benchmark results, profiling results and generated assembly to identify bottlenecks and areas of
+potential improvement. Standard approaches include:
+- *Vectorization (SIMD)*: We think SIMD might be applicable in the inner loops for the joins and
+  maybe on filtering, although that is significantly harder. Even if indices are used, we can use
+  gather instructions.
+- *Improving ILP*: Orthogonally to SIMD, we can leverage ILP. In practice this will probably mostly
+  be about unrolling the inner loops and avoiding unnecessary loop dependencies, but it could also
+  include techniques such as turning data dependencies into control dependencies to leverage
+  speculation.
+- *Loop reordering*: Since joins are essentially nested loops, the entire query plan portion of the
+  project can be used to pick a good loop ordering.
+- *Memory layouts*: Picking between Array-of-Struct vs Struct-of-Array or other memory layouts
+  depending on the memory access patterns (R4). Additionally we may consider cache alignment to
+  reduce the number of unnecessary cache lines used.
 
 === Improving rulesets (R2)
-We think it is possible to preprocess rulesets by special-casing certain rules, for example commutativity and associativity generally results in an exponential number of nodes.
-For example a rule like $a + b$ -> $b + a$ could be removed and instead any time $a + b$ is attemted to be match, the engine also tries to match with $b + a$.
 
-Additionally, some rules may match against similar patterns and we might be able to match against both at the same time, which could save on memory locality and compute.
+We think it is possible to preprocess rulesets by special-casing certain rules. For example,
+commutativity and associativity generally results in the number of nodes scaling exponentially with
+the size of the input. For example a rule like $a + b$ #sym.arrow $b + a$ could be removed and
+instead any time matching $a + b$ is attemted, the engine could also try to match with $b + a$.
 
-=== Improving indexes, query plans and joins (R2, R3)
+Additionally, some rules may match against similar patterns and we might be able to match against
+both at the same time, which could improve memory locality and reduce compute.
+
+=== Improving indices, query plans and joins (R2, R3)
+
 We want to turn all the queries into graphs and somehow construct reasonable query plans from them.
 This could include:
-- Picking between join algorithms such as merge, hash etc
-- Using worst-case optimal joins
-- Adding indexes strategically, since some indexes are not needed or might not provide a benefit, we think is done by eqlog but not egglog
-- Strategically materializing sub-queries, for example if the join between two tables is significantly smaller than the two original tables, memory bandwidth and compute can be saved.
+- Picking between join algorithms such as merge, hash etc.
+- Using worst-case optimal joins.
+- Adding indices strategically, since some indices are not needed or might not provide a benefit. We
+  think is done by eqlog but not egglog.
+- Strategically materializing sub-queries. For example if the join between two tables is
+  significantly smaller than the two original tables, memory bandwidth and compute can be saved by
+  not recomputing this subquery unnecessarily.
 
 === Improving expression exploration priority
+
 We have some ideas on how to handle rules that create lots of nodes:
 - Reducing how often they run
-- Special casing them in the engine itself [a+b -> b+a]
+- Special casing them in the engine itself [$a+b$ #sym.arrow $b+a$]
 - Performing extractions regularly to explore more locally optimal expressions.
 
 === Improving extraction
-We plan to analyze the recently published extraction paper @fastextract and create our own heuristics.
-If we don't find any algorithmic improvements, we hope to at least implement existing algorithms with a lower runtime by using aforementioned low-level optimization techniques.
+
+We plan to analyze the recently published extraction paper @fastextract and create our own
+heuristics. If we don't find any algorithmic improvements, we hope to at least implement existing
+algorithms with a lower run time by using aforementioned low-level optimization techniques.
 
 == Evaluation
-Answering R1, R2, R3, R4 depends on the performance of the E-graph engine itself.
-We will evaluate this using benchmarks on our personal computers, with the assumption that the results generalize to other hardware.
-The e-graph applications that we aim to use for benchmarking are
+
+Answering R1, R2, R3, R4 depends on the performance of the e-graph engine itself. We will evaluate
+this using benchmarks on our personal computers, with the assumption that the results generalize to
+other hardware. The e-graph applications that we aim to use for benchmarking are
 - Herbie @herbie, a tool to automatically find floating-point expressions that minimize numerical
   error given an expression in real numbers
 - `math`, a small computer algebra system from egg's test suite
-- Steensgaard style unification-based points-to analysis
-Specifically we want to measure performance in terms of created nodes per second.
+- Steensgaard style unification-based points-to analysis Specifically we want to measure performance
+  in terms of created nodes per second.
 
 R5 is evaluated by the results of profiling in the e-graph engine.
 
-R6 is orthogonal to the engine itself, we plan on writing our own extraction benchmarks, but are also considering using the egg extraction gym @egggym, although it has the drawback of the tests being very synthetic worst-case scenarios rather than the average case.
+R6 is orthogonal to the engine itself. We plan on writing our own extraction benchmarks, We are
+considering using the egg extraction gym @egggym, but will likely write our own extraction
+benchmarks since the gym benchmarks have the drawback of testing very synthetic worst-case scenarios
+rather than the average case.
 
 // == Prototype design
 // // * prototype properties, functionalities and performance goals
@@ -559,7 +604,7 @@ for (x1, a, c1) in egraph.table_mul.iter() {
 }
 ```
 
-That code is of course very slow, but we can add indexes:
+That code is of course very slow, but we can add indices:
 
 ```rust
 for (x, a, c) in egraph.table_mul.iter() {
