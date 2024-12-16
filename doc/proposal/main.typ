@@ -327,7 +327,7 @@ We generally think that the design space is sufficiently large and the domain su
 that performance improvements are possible over egglog and eqlog, even if the algorithmic behavior
 is kept relatively unchanged.
 
-=== Analysis, visualization
+=== Analysis and visualization
 
 Compared to something like matrix multiplication, the memory access patterns of an e-graph engine
 (R4) are much harder to analyze. We want to visualize the memory access patterns somehow, in the
