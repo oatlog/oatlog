@@ -325,6 +325,9 @@ To understand how queries typically look (R3), we want to visualize them somehow
 By doing this we hope to be able to categorize queries into different types.
 If it turns out that optimizing general queries is essentially impossible, we can hard code certain query types to still get good performance.
 
+While the roofline model is not directly applicable to what the engine is doing since there are no floating-point operations, we can still use a similar analysis to identify if we are fundamentally limited by latency or bandwidth for L1, L2 and RAM.
+// To create exact theoretical bounds on the performance we can expect we will compare the  
+
 === Profiling
 To gain a better understanding of bottlenecks, we will use profiling tools such as `perf`.
 To understand how rules behave (R5), we will add profiling into the engine itself, for example, storing how many nodes each rule generated.
