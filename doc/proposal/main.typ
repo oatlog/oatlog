@@ -95,6 +95,10 @@ architecture) and algorithm design (TIN093 Algorithms, TDA507 Computational meth
 bioinformatics), as well as the concrete domains of databases (DAT475 Advanced databases) and
 compilers (TDA283 Compiler construction).
 
+/*
+
+COMMENTED OUT DUE TO BEING UNTYPICAL FOR THESIS PROPOSALS
+
 The following subsections include concrete examples of course contents that will have been relevant
 experiences for us in relation to this thesis project.
 
@@ -147,6 +151,8 @@ experiences for us in relation to this thesis project.
   good query plans at compile time.
 - *Introduction to graph databases*. E-graphs resemble graph databases because of their repeated
   joins that are effectively graph traversal.
+
+*/
 
 = Problem
 
@@ -317,7 +323,7 @@ that performance improvements are possible over egglog and eqlog, even if the al
 is kept relatively unchanged.
 
 === Analysis, visualization
-// * memory access patterns, 
+// * memory access patterns,
 Compared to something like matrix multiplication, the memory access patterns of an e-graph engine (R4) are much harder to analyze, and we want to visualize the memory access patterns somehow, in the hopes that it gives us insights in how we should change the design.
 Something like `mevi` @mevi2024 could be used for this.
 
@@ -333,7 +339,7 @@ To gain a better understanding of bottlenecks, we will use profiling tools such 
 To understand how rules behave (R5), we will add profiling into the engine itself, for example, storing how many nodes each rule generated.
 
 === Optimization, standard low-level optimizations (SIMD, ILP...)
-// * workflow, perf, looking at assembly, 
+// * workflow, perf, looking at assembly,
 The basic workflow for low-level (meaning non-algorithmic) optimizations  will be looking at benchmark results, profiling results and generated assembly to identify bottlenecks and areas of potential improvement. Standard approaches include:
 - *Vectorization (SIMD)*, we think this might be applicable in the inner loops for the joins and maybe on filtering, although that is significantly harder. Even if indexes are used, we can use gather instructions.
 - *Improving ILP*, orthogonally to SIMD, we can leverage ILP, in practice this will probably mostly be about unrolling the inner loops and avoiding unnecessary loop dependencies.
@@ -341,7 +347,7 @@ The basic workflow for low-level (meaning non-algorithmic) optimizations  will b
 - *Memory layouts*, picking between Array-of-Struct vs Struct-of-Array or other memory layouts depending on the memory access patterns (R4). Additionally think about cache alignment to reduce the number of unnecessary cache lines used.
 
 === Improving rulesets (R2)
-We think it is possible to preprocess rulesets by special-casing certain rules, for example commutativity and associativity generally results in an exponential number of nodes. 
+We think it is possible to preprocess rulesets by special-casing certain rules, for example commutativity and associativity generally results in an exponential number of nodes.
 For example a rule like $a + b$ -> $b + a$ could be removed and instead any time $a + b$ is attemted to be match, the engine also tries to match with $b + a$.
 
 Additionally, some rules may match against similar patterns and we might be able to match against both at the same time, which could save on memory locality and compute.
@@ -361,7 +367,7 @@ We have some ideas on how to handle rules that create lots of nodes:
 - Performing extractions regularly to explore more locally optimal expressions.
 
 === Improving extraction
-We plan to analyze the recently published extraction paper @fastextract and create our own heuristics. 
+We plan to analyze the recently published extraction paper @fastextract and create our own heuristics.
 If we don't find any algorithmic improvements, we hope to at least implement existing algorithms with a lower runtime by using aforementioned low-level optimization techniques.
 
 == Evaluation
@@ -386,15 +392,15 @@ R6 is orthogonal to the engine itself, we plan on writing our own extraction ben
 // == Prototype evaluation
 // // * testing environment
 // // * how to compare against state of the art.
-// 
+//
 // // * ? key tools and test-case scenarios
 
 
 
 // == Ideas for improvements
-// 
+//
 // We aim to improve performance using a mix of ideas specific to e-graphs:
-// 
+//
 // #list(
 //   [
 //     ruleset preprocessing by special-casing specific rewrites to avoid adding as many nodes. For
@@ -409,9 +415,9 @@ R6 is orthogonal to the engine itself, we plan on writing our own extraction ben
 //     matching multiple rules together at the same time
 //   ],
 // )
-// 
+//
 // Techniques from databases:
-// 
+//
 // #list(
 //   [
 //     skipping maintaining unnecessary indices, as we think is done by eqlog but not egglog
@@ -420,9 +426,9 @@ R6 is orthogonal to the engine itself, we plan on writing our own extraction ben
 //     speeding up joins by strategically materializing subqueries
 //   ],
 // )
-// 
+//
 // And general performance engineering:
-// 
+//
 // #list(
 //   [
 //     leveraging code generation to specialize query execution to the given ruleset
@@ -435,19 +441,19 @@ R6 is orthogonal to the engine itself, we plan on writing our own extraction ben
 
 
 // == Benchmarks and testing environment
-// 
+//
 // We intend to run the benchmarks on our personal computers, with the assumption that the results
 // generalize to other hardware.
-// 
+//
 // The e-graph applications that we aim to use for benchmarking are
-// 
+//
 // - Herbie @herbie, a tool to automatically find floating-point expressions that minimize numerical
 //   error given an expression in real numbers
 // - `math`, a small computer algebra system from egg's test suite
 // - Steensgaard style unification-based points-to analysis
-// 
+//
 // since these were all used to benchmark egglog @egglog.
-// 
+//
 // For extraction, we are leaning towards creating our own benchmarks. We are also considering using
 // the egg extraction gym @egggym, but its benchmarks test synthetic worst-case scenarios rather than
 // the average case.
