@@ -38,7 +38,7 @@
             find . -name '*.nix' | grep -v Cargo.nix | xargs nixfmt'';
         };
 
-        devShell = pkgs.mkShell {
+        devShells.default = pkgs.mkShell {
           nativeBuildInputs = let p = pkgs;
           in [
             p.bashInteractive
