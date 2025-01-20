@@ -1,0 +1,290 @@
+```
+main.rs -> egglog::cli
+cli.rs
+
+
+```
+
+generated symbols start with "__" and is configurable. (set_reserved_symbol)
+
+fact directory: Pathbuf
+
+semi-naive optimization flag?
+
+
+unionfind.rs is just regular union-find, with following extra
+* iterate dirty ids
+
+Vec<Cell> just convenient.
+
+
+symbol_table: string <-> int
+
+Programs: 
+`ast/mod.rs`
+```rust
+pub(crate) type ResolvedNCommand = GenericNCommand<ResolvedCall, ResolvedVar>;
+
+/// The egglog internal representation of already compiled rules
+pub(crate) enum Ruleset {
+    /// Represents a ruleset with a set of rules.
+    /// Use an [`IndexMap`] to ensure egglog is deterministic.
+    /// Rules added to the [`IndexMap`] first apply their
+    /// actions first.
+    Rules(Symbol, IndexMap<Symbol, CompiledRule>),
+    /// A combined ruleset may contain other rulesets.
+    Combined(Symbol, Vec<Symbol>),
+}
+
+#[derive(Clone, Debug)]
+pub(crate) struct CompiledRule {
+    pub(crate) query: CompiledQuery,
+    pub(crate) program: Program,
+}
+```
+
+// string -> sexps(all_sexps) -> Vec<Command> (map parse_command for each sexp in file) -> run_program
+
+`lib.rs`
+```rust
+pub fn run_program(&mut self, program: Vec<Command>) -> Result<Vec<String>, Error> {
+    for command in program {
+        for processed in self.process_command(command)? {
+            self.run_command(processed);
+        }
+    }
+}
+fn process_command(&mut self, command: Command) -> Result<Vec<ResolvedNCommand>, Error> {
+    let program = desugar::desugar_program(vec![command], &mut self.parser, self.seminaive)?;
+
+    let program = self
+        .type_info
+        .typecheck_program(&mut self.parser.symbol_gen, &program)?;
+
+    let program = remove_globals(program, &mut self.parser.symbol_gen);
+
+    Ok(program)
+}
+```
+
+
+
+`ast/parse.rs`
+```rust
+#[derive(Clone)]
+pub struct Parser {
+    commands: HashMap<Symbol, Arc<dyn Macro<Vec<Command>>>>,
+    actions: HashMap<Symbol, Arc<dyn Macro<Vec<Action>>>>,
+    exprs: HashMap<Symbol, Arc<dyn Macro<Expr>>>,
+    pub symbol_gen: SymbolGen,
+}
+
+```
+
+`lib.rs`
+```rust
+#[derive(Clone)]
+pub struct EGraph {
+    pub parser: Parser,
+    egraphs: Vec<Self>,
+    unionfind: UnionFind,
+    pub functions: IndexMap<Symbol, Function>,
+    rulesets: IndexMap<Symbol, Ruleset>,
+    rule_last_run_timestamp: HashMap<Symbol, u32>,
+    interactive_mode: bool,
+    timestamp: u32,
+    pub run_mode: RunMode,
+    pub fact_directory: Option<PathBuf>,
+    pub seminaive: bool,
+    type_info: TypeInfo,
+    extract_report: Option<ExtractReport>,
+    /// The run report for the most recent run of a schedule.
+    recent_run_report: Option<RunReport>,
+    /// The run report unioned over all runs so far.
+    overall_run_report: RunReport,
+    /// Messages to be printed to the user. If this is `None`, then we are ignoring messages.
+    msgs: Option<Vec<String>>,
+}
+```
+
+
+`gj.rs`
+```rust
+type Query = crate::core::Query<ResolvedCall, Symbol>;
+
+#[derive(Debug, Clone)]
+pub struct CompiledQuery {
+    query: Query,
+    // Ordering is used for the tuple
+    // The GJ variable ordering is stored in the context
+    pub vars: IndexMap<Symbol, VarInfo>,
+}
+
+
+#[derive(Clone, Debug)]
+enum Instr<'a> {
+    Intersect {
+        /// index into Context.tuple
+        value_idx: usize,
+        /// (for debug) 
+        variable_name: Symbol, 
+        /// (for debug) 
+        info: VarInfo2, 
+        /// branch on 1, 2, multiple
+        trie_accesses: Vec<(usize /* index into tries */, TrieAccess<'a>)>,
+    },
+    ConstrainConstant {
+        // index into tries
+        index: usize,
+        val: Value,
+        trie_access: TrieAccess<'a>,
+    },
+    Call {
+        prim: SpecializedPrimitive,
+        args: Vec<AtomTerm>,
+        check: bool, // check or assign to output variable
+    },
+}
+
+struct Context<'b> {
+    query: &'b CompiledQuery,
+    join_var_ordering: Vec<Symbol>,
+    tuple: Vec<Value>,
+    matches: usize,
+    egraph: &'b EGraph,
+}
+
+
+```
+
+`core.rs`
+```rust
+#[derive(Debug, Clone)]
+pub struct Query<Head, Leaf> {
+    pub atoms: Vec<GenericAtom<Head, Leaf>>,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Hash)]
+pub struct GenericAtom<Head, Leaf> {
+    pub span: Span,
+    pub head: Head,
+    pub args: Vec<GenericAtomTerm<Leaf>>,
+}
+
+#[derive(Debug, Clone)]
+pub enum GenericAtomTerm<Leaf> {
+    Var(Span, Leaf),
+    Literal(Span, Literal),
+    Global(Span, Leaf),
+}
+
+
+```
+
+
+`expr.rs`
+```rust
+#[derive(Debug, PartialEq, Eq, PartialOrd, Ord, Hash, Clone)]
+pub enum Literal {
+    Int(i64),
+    Float(OrderedFloat<f64>),
+    String(Symbol),
+    Bool(bool),
+    Unit,
+}
+
+```
+
+
+All predefined types defined in `sort/`
+
+
+GJ = Global Join ?
+
+
+
+
+
+
+
+
+- `./cli.rs` 
+    - `egraph.parse_and_run_program(string)`
+- `./lib.rs`
+    - `let parsed = self.parser.get_program_from_string(filename, input)?;`
+    - `self.run_program(parsed)`
+- `ast/parse.rs` 
+    - `let sexps = all_sexps(Context::new(filename, input))?;`
+    - `let nested = map_fallible(&sexps, self, Self::parse_command)?;`
+- `./lib.rs`
+    - `self.process_command(command)` `Command` -> `ResolvedNCommand`
+
+
+
+
+
+
+- `./actions.rs` Runs on matches.
+- `./ast/desugar.rs` Command to NCommand
+- `./ast/expr.rs`
+- `./ast/mod.rs`
+- `./ast/parse.rs` String to Command
+- `./ast/remove_globals.rs` `(let x 3)` to `(function x () i64)`
+- `./cli.rs`
+- `./constraint.rs`
+- `./core.rs`
+- `./extract.rs`
+- `./function/mod.rs`
+    - Function here means "what we store in tables", each table is a "Function".
+- `./function/binary_search.rs` binary search table
+- `./function/index.rs` column index
+- `./function/table.rs`
+- `./gj.rs`
+- `./lib.rs`
+- `./main.rs`
+- `./serialize.rs` Serialize egraph
+- `./sort/macros.rs` rust helper macro to add a primitive
+// - `./sort/bigint.rs` Bit int "sort"
+// - `./sort/bigrat.rs` Big rational "sort"
+// - `./sort/bool.rs` bool "sort"
+// - `./sort/f64.rs` f64 
+// - `./sort/fn.rs` function types (store functions as values)
+// - `./sort/i64.rs` i64 type
+// - `./sort/map.rs`
+// - `./sort/mod.rs`
+// - `./sort/multiset.rs`
+// - `./sort/set.rs`
+// - `./sort/string.rs`
+// - `./sort/unit.rs`
+// - `./sort/vec.rs`
+- `./termdag.rs`
+- `./typechecking.rs` NCommand to ResolvedNCommand
+- `./unionfind.rs` regular union find, but iterate stale ids.
+- `./util.rs`
+- `./value.rs` tag = something, then constant folded value?
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+= WTF
+```rust
+let mut tries: Vec<LazyTrie> = Vec::with_capacity(cq.query.funcs().collect::<Vec<_>>().len());
+```
+
+```rust
+    fn gj_for_atom<F>(...) {
+        // do the gj
+        ...
+    }
+
+```
