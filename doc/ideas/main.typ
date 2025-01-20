@@ -45,3 +45,105 @@ Maybe we can represent the set of bitsets resonably?
 Use Egg/Egglog for query preprocessing so we don't have to self-host.
 
 Maybe we should make a toy compiler SoN IR since that would actually require cyclic queries.
+
+== Eqlog notes
+
+TODO run `display_morphisms`.
+
+"Each statement in a rule corresponds to a morphism of structures. The domain of this morphism
+corresponds to the data that has been queries or asserted earlier in the rule, and the codomain to
+the result of adjoining the data in that statement. Codomain and domain of subsequent statements
+match, so their morphisms are composable."
+
+*Implicit functionality* (`functionality_v2`) for a function `func foo(A) -> B;` is equivalent to
+
+```
+rule implicit_functionality_foo {
+  if #[age = dirty] b1 = foo(a);
+  if #[age = all] b2 = foo(a);
+  then b1 = b2
+}
+```
+i.e. functions are single-valued.
+
+Semi-naive evaluation computes the closure incrementally. It is facilitated by tracking *dirty*
+(`QueryAge::New`) tuples. If statements that query tuples may filter to `QueryAge::{New, Old, All}`.
+Queries can be incrementalized using inclusion-exclusion.
+
+TODO Why is surjectivity tracked for `then` statements??
+
+TODO really understand functions vs predicates vs relations etc
+
+=== Files
+
+- `eqlog.vim` has vim syntax files
+- `eqlog-runtime` has sugar around `include!("generated_stuff.rs")` and a union find implementation.
+
+==== `eqlog`
+
+Flow, all orchestrated by `build` :
+
++ lalrpop parse
++ eqlog theory (the self-hosted part)
++ semantic checking (non-transforming)
++ `flatten.rs`/`index_selection.rs`/`sort_if_stmts.rs` flatten rules, determine join order and
+  indices
++ `rust_gen.rs` (non-rules taken from eqlog theory)
+
+All files:
+
+- `build.rs`: Orchestration
+- `debug.rs`
+- `eqlog_util.rs`: Some manual join queries used within `flatten.rs`
+- `error.rs`
+- `flat_eqlog`
+  - `ast.rs`: Defines IR for rules composed of if and then statements. IR of `FlatFunc`s that are
+    query prefixes ending in `FlatFunc` calls.
+  - `index_selection.rs`: *Heuristically* TODO
+  - `mod.rs`: Informative, understandable. Also implements implicit functionality
+  - `slice_group_by.rs`: Copy pasted `chunk_by`
+  - `sort_if_stmts.rs`: *Heuristically* determine join order by sorting a `&mut [FlatStmt]`.
+    Preferring earlier
+    - equality checks over relation checks
+    - `QueryAge::New`, i.e. checks only matching dirty tuples
+    - introducing fewer variables
+  - `var_info.rs`: Computes `fixed_vars`/`if_stmt_rel_infos` for `sort_if_stmts` and
+    `index_selection`.
+- `flatten.rs`: TODO
+- `fmt_util.rs`: Good idea!
+- `grammar.lalrpop`
+- `grammar_util.rs`
+- `lib.rs`: Only really exporting `process(in_dir, out_dir)`
+- `main.rs`: CLI wrapper
+- `rust_gen.rs`: Given theory structure from eqlog and flattened rules, straightforwardly generate
+  code. Flat rules are used in `write_module>write_theory_impl>display_rule_fns`
+- `semantics`: Semantic compilation error checking. Surfaces errors detected in the e-graph with
+  error code and source locations
+  - `check_epic.rs`
+- - `mod.rs`
+- `source_display.rs`: Pretty printing compilation errors with context
+
+==== `eqlog-eqlog/src/eqlog.eqlog` / `eqlog-eqlog/src/prebuilt/eqlog.rs`
+
+https://www.mbid.me/posts/type-checking-with-eqlog-parsing/
+
+Semantically annotating the lalrpop AST is implementing in eqlog itself ("the Eqlog theory"). This
+includes
+- scopes and control flow (really just match statements)
+- desugaring
+- error handling
+
+The AST is in fact represented as an e-graph, the lalrpop hooks do e-graph insertions directly.
+
+Fun facts include using peano arithmetic to represent function arity. Eqlog does not have primitive
+types.
+
+This seems error prone and largely unnecessary. Maybe a DSL for type checking makes sense for
+complicated languages but we do not want a complicated language.
+
+=== Generated code
+
+Generated code looks like (generates table structs with all useful indices, )
+```
+TODO EXAMPLE
+```
