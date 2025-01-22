@@ -1,3 +1,115 @@
+
+= Parsing
+
+
+```rust
+// toplevel
+// (<command> ...<args>)
+
+// if command is a self.commands macro, parse args as a macro
+
+
+// decl sort, decl "function", decl rule.
+
+
+// (set-option <name> <value>)
+// Command::SetOption { name, value }
+// NCommand::SetOption { name, value }
+
+// (sort <name>)
+Command::Sort ( name, None )
+NCommand::Sort( sort, None )
+// Declared in typchk
+
+// (sort <name> (<funcname> ...<args>))
+Command::Sort ( name, Some((funcname, args.map(Self::parse_expr))))
+NCommand::Sort( sort, maybe_sorts )
+// Declared in typchk
+
+// Schema := (inputs..) output
+// merge xor no-merge is mandatory. merge gets implicit args: old, new
+// (function <name> (<input sort>*) <output sort> (:no-merge)? (:merge <Expr>)?)
+Command::Function { name, schema, merge }
+NCommand::Function (FunctionDecl{  name, subtype: Custom, schema, merge, cost: None, unextractable: true })
+// adds bound vars "old", "new" for merge.
+ResolvedNCommand::Function(typchk(decl))
+
+// (constructor <name> (<input sort>*) <output sort> (:cost <Expr>) (:unextractable)?)
+Command::Constructor { name, schema, cost, unextractable }
+NCommand::Function (FunctionDecl{ name, subtype: Constructor, schema, merge: None, cost, unextractable })
+// adds bound vars "old", "new" for merge.
+ResolvedNCommand::Function(typchk(decl))
+
+// (relation <name> (<input sort>*))
+Command::Relation { name, inputs}
+NCommand::Function (FunctionDecl{ name, subtype: Relation, schema: Schema { input, output: "Unit" }, merge: None, cost: None, unextractable: true })
+// adds bound vars "old", "new" for merge.
+ResolvedNCommand::Function(typchk(decl))
+
+// (ruleset <name>)
+Command::AddRuleset(name)
+NCommand::AddRuleset(name)
+
+// options are (:ruleset <name>), (:name <name>)
+// fact is expr or (= expr expr)
+// head is action
+// body is fact
+// (rule (<fact>*) (<action>*) <option>*)
+Command::Rule { ruleset, name, rule: Rule { head, body } }
+NCommand::NormRule { ruleset, name, rule }
+// connect head, atom variables
+ResolvedNCommand::NormRule { ruleset, name, rule: typchk(ruleset))
+
+// (run <ruleset>? <repeat> <:until (<fact>*)>?)
+// ...
+// (run-schedule <schedule>*)
+// ...
+
+// (simplify <schedule> <expr>)
+Command::Simplify { schedule, expr }
+// reduces to insert, run schedule and extract
+
+// (check <fact>*)
+Command::Check(facts)
+NCommand::Check(facts)
+ResolvedNCommand::Check(typchk(facts))
+
+// Otherwise, parse as action and flatten
+Command::Action(action)
+NCommand::CoreAction(action)
+
+
+// constructor vs function?
+
+
+// desugared:
+// datatype
+// rewrite
+// birewrite
+// include
+// simplify
+// fail
+
+// desugared in parse.rs
+
+```
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 ```
 main.rs -> egglog::cli
 cli.rs
@@ -203,7 +315,7 @@ GJ = Global Join ?
 
 
 
-
+https://github.com/frankmcsherry/blog/blob/master/posts/2018-05-19.md
 
 
 
@@ -221,15 +333,35 @@ GJ = Global Join ?
 
 
 
+paper, why partial functions?
+f(a) = b
+f(c) = d
+a = c => b = d
 
+seminaive means "match against the changes to the database", so that we don't match things we have already seen (paper).
+
+primitives are different to functions because they can not be union-ed.
+
+egglog language docs: https://docs.rs/egglog/0.4.0/egglog/ast/type.Command.html
+
+egglog has indexes for all inputs and the output of a function, see `functions/mod.rs:135`
+
+
+TODO: what is subsumed? is it like deleted?
+
+table is sorted by timestamp, which is why binary search is used. Why is there no index-like thing for timestamps?
 
 
 - `./actions.rs` Runs on matches.
-- `./ast/desugar.rs` Command to NCommand
+- `./ast/desugar.rs` `desugar_program`: `Vec<Command>` to `Vec<NCommand>`
 - `./ast/expr.rs`
 - `./ast/mod.rs`
-- `./ast/parse.rs` String to Command
-- `./ast/remove_globals.rs` `(let x 3)` to `(function x () i64)`
+- `./ast/parse.rs` 
+    - `Parser`: contains macros for: `commands`, `actions`, `exprs`.
+    - `get_program_from_string`: `(&mut Parser, String)` to `Vec<Command>`
+        - `all_sexps`: `String` to `Vec<Sexp>`
+        - `parse_command` `(&mut Parser, Sexp)` to `Vec<Command>` (flattened later)
+- `./ast/remove_globals.rs` rewrite top-level `(let x 3)` to `(function x () i64)`
 - `./cli.rs`
 - `./constraint.rs`
 - `./core.rs`
@@ -237,10 +369,47 @@ GJ = Global Join ?
 - `./function/mod.rs`
     - Function here means "what we store in tables", each table is a "Function".
 - `./function/binary_search.rs` binary search table
-- `./function/index.rs` column index
+- `./function/index.rs` 
+    - column index. It is a `HashMap<u64, Vec<Offset>` with a way to update based on dirty ids from UF.
+    - `CompositeIndex` is `Vec<ColumnIndex>`, `functions/mod.rs:142` indicates it is eq containers sorts (`eq_sort`, `eq_container_sort`)
 - `./function/table.rs`
-- `./gj.rs`
+- `./gj.rs` (`gj_for_atom`)
 - `./lib.rs`
+    - `parse_and_run_program`: `(&mut EGraph, String)`
+        - `run_program`: `(&mut EGraph, Vec<Command>)`
+            - `process_command`: `(&mut EGraph, Command)` to `ResolvedNCommand`
+            - `run_command`: `(&mut EGraph, ResolvedNCommand)`
+                - `set_option`: only sets interactive mode
+                - `declare_function`: adds a function (table) to `self.functions`
+                - `add_ruleset`: add entry for symbol in `self.rulesets`
+                - `add_combined_ruleset`: (unstable combined ruleset)
+                - `add_rule_with_name`: fill ruleset entry with rule (compile query).
+                - `run_schedule`: run a sequence of rulesets, rebuild each time.
+                    - `step_rules`
+                        - `SearchResult` is semantically a `Vec<Vec<Value>>`, but flattened into a `Vec<Value>`. `did_match` flag because some rules have zero variables.
+                        - `search_rules: `(&mut EGraph, ruleset)` to `SearchResult` (map from rule to list of matches)
+                            - `run_query`: `(&mut EGraph, CompiledQuery, f)` calls `f(values)` on each match. 
+                                - Timestamps are used to make things seminaive. They are used to filter what is new. This way, some rules can run very rarely and still "catch up" on all the changes so far.
+                                - Timestamp constraints are essentially the following:
+                                    - `<--   4 atoms    -->` 
+                                    - `[new, all, all, all]`
+                                    - `[old, new, all, all]`
+                                    - `[old, old, new, all]`
+                                    - `[old, old, old, new]`
+                                - `gj_for_atom`: `(&mut EGraph, timestamp_ranges, CompiledQuery, f)`
+                        - `apply_rules`: `(&mut EGraph, SearchResult)`
+                            - Essentially a stack based VM.
+                            - `run_actions`: `(stack, matched_values, program)`
+                                - `Load`: push stack or matched value.
+                                - `CallFunction`: table lookup as if it was a function call, add empty entry if not found (useful for relations).
+                                - `CallPrimitive`: calls `dyn PrimitiveLike.apply` as an actual function and puts result on stack. 
+                                - `Set`: change "output" part of table function to stack value.
+                                - `Union`: combine some number of elements on the stack.
+                                - `Extract`: perform extraction (why here?)
+                                - `Panic`: panic
+                                - `Literal`: push a literal (i64 etc) on the stack.
+                                - `Change`: delete row OR mark as subsumed?
+
 - `./main.rs`
 - `./serialize.rs` Serialize egraph
 - `./sort/macros.rs` rust helper macro to add a primitive
@@ -258,7 +427,7 @@ GJ = Global Join ?
 // - `./sort/unit.rs`
 // - `./sort/vec.rs`
 - `./termdag.rs`
-- `./typechecking.rs` NCommand to ResolvedNCommand
+- `./typechecking.rs` `typecheck_program`: `NCommand` to `ResolvedNCommand`, adds sorts
 - `./unionfind.rs` regular union find, but iterate stale ids.
 - `./util.rs`
 - `./value.rs` tag = something, then constant folded value?
@@ -266,6 +435,15 @@ GJ = Global Join ?
 
 
 
+// set of sorts, relations (functions), 
+
+f(a,b) = x
+f(a,b) = y
+=> x = y
+
+
+f() = 3
+f() = 4
 
 
 
@@ -276,15 +454,3 @@ GJ = Global Join ?
 
 
 
-= WTF
-```rust
-let mut tries: Vec<LazyTrie> = Vec::with_capacity(cq.query.funcs().collect::<Vec<_>>().len());
-```
-
-```rust
-    fn gj_for_atom<F>(...) {
-        // do the gj
-        ...
-    }
-
-```
