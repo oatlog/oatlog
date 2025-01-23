@@ -3,9 +3,5 @@
 version = 4
 
 [[package]]
-name = "egraph_macros"
-version = "0.1.0"
-
-[[package]]
 name = "egraph_scratch"
 version = "0.1.0"

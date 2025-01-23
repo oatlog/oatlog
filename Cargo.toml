@@ -1,6 +1,7 @@
-[package]
-name = "masters-thesis"
-version = "0.1.0"
-edition = "2021"
+[workspace]
+members = [
+    "egraph_scratch",
+    "egraph_macros",
+]
+resolver = "2"
 
-[dependencies]
