@@ -83,6 +83,136 @@ sometimes mean a concrete computation and sometimes mean constructing a new e-cl
 whether all inputs are known. This can be seen as function overloading between a primitive and
 nonprimitive type, again motivating treating those types as distinct.
 
+== Container types
+
+Containers of primitives behave like any other primitive. Containers of nonprimitives require
+e-classes to handle solving equations like
+
+```
+; x+2x+2 = 5
+(set (Sum (Var "x") (Prod (Num 2) (Var "x")) (Num 2)) (Num 5))
+
+rule {
+  if num_total = Sum sum_set // relation
+  if num_total = Num total // relation
+  if true = MultisetContains sum_set const_num // container pseudo-relation
+  if const_num = Num const // relation
+  then Sum (multiset-remove sum_set const_num) = total - const
+}
+```
+
+Multisets are best represented as maps from item to count.
+
+Primitive functions (including container methods but also i64 add and max, etc) can be seen
+emulating corresponding relations. A set could be (very inefficiently) emulated by having relations
+`set-insert` and `set-contains`, together with a rule that listens to `set-insert` and populates the
+`set-contains` of the new set with the new element as well as all old elements:
+
+```
+rule {
+  if s = set-insert _ e
+  then set-contains s e
+}
+rule {
+  if s = set-insert s_old _
+  if set-contains s_old e
+  then set-contains s e
+}
+```
+
+What is meant by "emulating a relation"? It means providing index lookup functions for all relevant
+indices of the relation. Note that some indices are impossible and have to be prevented by the type
+system:
+
+PRIMITIVE TYPES ARE THOSE THAT CONCEPTUALLY HAVE INFINITELY MANY VALUES KNOWN ALREADY
+
+```rust
+fn add_x_y_z(x: i64, y: i64, z: i64) -> impl Iterator<Item = ()> {
+  (x + y == z).then(()).into()
+}
+fn add_x_y(x: i64, y: i64) -> impl Iterator<Item = (i64,)> {
+  once(x + y)
+}
+fn add_x_z(x: i64, z: i64) -> impl Iterator<Item = (i64,)> {
+  once(z - x)
+}
+fn add_y_z(y: i64, z: i64) -> impl Iterator<Item = (i64,)> {
+  once(z - y)
+}
+// add_iter, add_x, add_y, add_z are all impossible as there are infinitely many
+// solutions to `x + y = z` when less than two variables are predetermined.
+```
+
+There is a design decision on whether to assign e-classes to containers. Strictly speaking this is
+probably(?) up to the implementation of the primitive. Type variables get e-classes, containers
+don't. But if containers got e-classes they would need to handle creation through existential
+quantifiers, which kind of defeats a lot of the point with having the intrinsic functions in the
+first place. TLDR it is probably possible to give containers' e-classes but if that is not necessary
+everything is easier.
+
+```
+// set_insert (Set<T> T) Set<T>
+// set_contains (Set<T> T) ()
+
+struct Set<T>(u32); // store hash code
+struct SetTheory<T> {
+  set_hash_to_id: BTreeMap<Hash, Set<T>>,
+  set_id_to_persist: BTreeMap<Set<T>, PersistSet<T>>,
+  el_to_id: BTreeMap<T, Vec<Set<T>>>,
+}
+
+// TODO THINK ABOUT CANONICALIZATION
+// SHOULD NOT ASSIGN E-CLASS TO CONTAINERS, SINCE WE ALWAYS WANT TO KNOW THE STRUCTURE
+
+fn set_insert_set_el_ret<T>(set: Set<T>, el: T, ret: Set<T>) -> impl Iterator<Item = ()> {
+  // map both sets to persist, loop in tandem
+  todo!()
+}
+fn set_insert_set_el(set: Set<T>, el: T) -> impl Iterator<Item = (Set<T>,)> {
+  // map set to persist, do insert, lookup by hash and return combined if found
+  todo!()
+}
+fn set_insert_set_ret(set: Set<T>, ret: Set<T>) -> impl Iterator<Item = (T,)> {
+  // map both sets to persist, loop in tandem
+  todo!()
+}
+fn set_insert_el_ret(el: T, ret: Set<T>) -> impl Iterator<Item = (Set<T>,)> {
+  // map set to persist, do remove, lookup by hash and return diff if found
+  todo!()
+}
+fn set_insert_set(set: Set<T>) -> impl Iterator<Item = (T,Set<T>)> {
+  // INFEASIBLE
+  panic!()
+}
+fn set_insert_el(el: T) -> impl Iterator<Item = (Set<T>,Set<T>)> {
+  // loop `ret` using `el_to_id`, recurse `set_insert_el_ret`
+  todo!()
+}
+fn set_insert_ret(ret: Set<T>) -> impl Iterator<Item = (Set<T>,T)> {
+  // loop `el` in `ret`, recurse `set_insert_el_ret`
+  todo!()
+}
+fn set_insert_iter() -> impl Iterator<Item = (Set<T>,T)> {
+  // loop `ret` using set_id_to_persist, recurse `set_insert_ret`
+  todo!()
+}
+// All indices aside from `set_insert_set` (known input set, which when combined with any element
+// becomes any known set) are implementable
+```
+
+== Forall and Exists
+
+A rule consists of a set of variables, a set of premises and a set of actions. Variables are
+logically either forall or exists. Forall means looping through existing matches, while exists means
+creating a new e-class and referring to it. Variables that are mentioned in the premises cannot be
+exists, since creating an e-class is a mutation on the database. Hence premise variables are always
+forall and only action variables can be either. Since forall action variables are implemented with a
+loop through elements of a type, this is essentially another join/premise.
+
+Hence, the Eqlog way is the one that makes sense. Variables are implicitly exists, unless they
+are mentioned in the premises. To allow unfiltered forall variables, the language must allow
+something like `if x: El`.
+
 == Simultaneous matching and control flow
 
 Control flow within a rule is equivalent to duplicating the rule for every possible flow
