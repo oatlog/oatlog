@@ -2,6 +2,10 @@
 
 = Ideas
 
+In eqlog we can write "if x: math" to match all math, but in egglog we need to match each constructor the workaround in egglog is (relation MathU (Math)), but this information is already in the union find datastructure.
+
+Forget types to get as many different groups as possible to reduce the number of indexes to search for when unioning.
+
 Minimum spanning tree with weights negative number of shared variables to determine join order.
 
 Dynamic join order, determine best from a set of generated candidates at run time while computing
@@ -297,3 +301,130 @@ Generated code looks like (generates table structs with all useful indices, )
 ```
 TODO EXAMPLE
 ```
+
+
+
+= Extraction: Egraphs as circuits
+(independent discovery)
+- `https://arxiv.org/abs/2408.17042` "E-Graphs as Circuits, and Optimal Extraction via Treewidth"
+- `https://dl.acm.org/doi/abs/10.1145/3689801` "Fast and Optimal Extraction for Sparse Equality Graphs"
+
+Treat egraph as a circuit where 
+- ENode/Term is an AND gate (or constant 1 if zero inputs). 
+- EClass/Variable is an OR gate. 
+- Join all "output variables" with an and gate, called OUT
+
+Problem is to pick a set of gates so that OUT is still 1.
+
+We can use existing algorithms to simplify the circuit before extraction to accelerate it.
+
+Algorithm uses tree decomposition `https://en.wikipedia.org/wiki/Tree_decomposition`
+NP, but P for bounded treewidth, which is typically the case.
+
+
+Algorithm is essentially:
+1. Convert to circuit
+2. Simplify circuit (their heuristics)
+3. Tree decomposition (external library)
+4. Their algorithm.
+
+(costs can be arbitrary)
+
+
+= Scheduling
+Currently the proposed schedule is to run all rules and then canonicalize + insert.
+```rust
+loop {
+    to_be_unified, to_be_inserted += self.apply_rule0();
+    to_be_unified, to_be_inserted += self.apply_rule1();
+    to_be_unified, to_be_inserted += self.apply_rule2();
+
+    self.insert_and_canonicalize(to_be_unified, to_be_inserted);
+}
+```
+But because of implicit functionality: $f(a) = b, f(c) = d, a = c ==> b = d$, inserts AND canonicalization can add more things to unify.
+Eqlog implements implicit functionality as a rule instead:
+```rust
+self.implicit_functionality_0_0(&mut delta); // <---------
+self.anonymous_rule_0_0(&mut delta);
+self.anonymous_rule_1_0(&mut delta);
+self.anonymous_rule_2_0(&mut delta);
+self.anonymous_rule_3_0(&mut delta);
+self.anonymous_rule_4_0(&mut delta);
+self.anonymous_rule_5_0(&mut delta);
+
+self.drop_dirt(); // old_index += new_index; new_index.clear()
+delta.apply_surjective(self); // apply_equalities(); apply_tuples();
+self.canonicalize();
+```
+
+
+```rust
+// pseudocode of eqlog scheduling
+// implicit self.
+loop {
+    delta += self.implicit_functionality();
+    delta += self.rule0();
+    delta += self.rule1();
+    delta += self.rule2();
+
+    // drop dirt (for each old index)
+    old_index += new_index
+    new_index.clear()
+
+    // apply_non_surjective
+    // apply_equalities
+    for (lhs, rhs) in delta.new_equalites.drain(..).filter(lhs != rhs) {
+        let removed_eclass = unionfind.combine(lhs, rhs);
+        old_eclasses.remove(removed_eclass);
+        new_eclasses.remove(removed_eclass);
+        uprooted_eclasses.push(removed_eclass);
+    }
+    // apply_tuples
+    for (Add(a, b), res) in delta.new_add.drain(..) {
+        add_table.insert(find(a), find(b), find(res)); // maybe violate implicit functionality
+    }
+    for (Mul(a, b), res) in delta.new_mul.drain(..) {
+        mul_table.insert(find(a), find(b), find(res)); // maybe violate implicit functionality
+    }
+
+    // canonicalize
+    for uprooted_eclass in uprooted_eclasses {
+        let removed_rows = add_table.drain_if_contains(uprooted_eclass).collect();
+        for row in removed_rows {
+            let row = row.map(find);
+            add_table.insert(row); // maybe violate implicit functionality
+        }
+    }
+    for uprooted_eclass in uprooted_eclasses {
+        let removed_rows = mul_table.drain_if_contains(uprooted_eclass).collect();
+        for row in removed_rows {
+            let row = row.map(find);
+            mul_table.insert(row); // maybe violate implicit functionality
+        }
+    }
+    uprooted_eclasses.clear();
+
+
+}
+```
+- Can we use type information to reduce the number of iterations for `uprooted_eclass`?
+- Can we implement implicit functionality with insert (`BTreeMap`?)
+
+
+```rust
+loop {
+    loop {
+        rows_that_add_eclasses += rule
+        done = cannoicalize();
+        if !done { break; }
+    }
+    apply(rules_that_add_eclasses);
+}
+
+```
+
+What would it look like if it was part of the engine?
+(argument: fewer EClasses maybe makes the database faster/generates less redundant stuff?)
+Each time we do an INSERT, and there is a conflict, we queue the join of the two eclasses and let the old one stay there.
+
