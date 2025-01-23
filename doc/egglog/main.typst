@@ -451,6 +451,24 @@ f() = 4
 
 
 
+store a set of primitive sorts.
+store a set of primitive functions.
+
+
+to construct bigint there is f(i64) -> bigint
+
+primitive functions: f(primitive) = primitive: predefined, only runs in actions?
+constructor: f(primitive) = eclass
+function: f(eclass) = eclass
+lattice: f(eclass) = primitive: needs merge
+
+
+
+(rule 
+     (constructor (lattice x))
+     
+)
+
 
 
 
