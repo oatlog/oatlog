@@ -48,6 +48,37 @@ Use Egg/Egglog for query preprocessing so we don't have to self-host.
 
 Maybe we should make a toy compiler SoN IR since that would actually require cyclic queries.
 
+== Handling primitives
+
+Unknown values must always be represented by an e-class. Known values are necessarily primitives and
+can be represented by a concrete bit pattern. The major design decision is whether to
+
+1. Have nonprimitive types always represented by an e-class, primitive types always represented by a
+  bit pattern
+2. The above, but additionally allow primitive types to be unknown and represented by an e-class.
+
+The solution allowing unknown values of primitive types must have tables where entries along a
+column are e-classes and bitpatterns heterogonously. The most reasonable way to implement this seems
+to be to have e-classes even for values with known bitpatterns, with bitpatterns being mapped to in
+some side table.
+
+NOTE: Another implementation would be tagged unions, where we pack bitpatterns and e-classes into a
+column and branch on them when doing queries. This seems messy, complicating queries and weird for
+large bitpatterns (list etc, want to avoid comparing lists for equality), and I have not thought
+about it further.
+
+This solution would be virtually the same in implementation as duplicating each primitive type into
+a known primitive (say `i64`) and unknown nonprimitive (say `I64`), with a partial `known` function.
+
+Hence, while I am still unsure about the frontend language design, *the IR can assume disjoint
+"known primitve" and "unknown nonprimitive" types*. Also this is assumed in the Egglog frontend
+language. Eqlog does not have primitives.
+
+Additionally, if the same type supported both known and unknown values, functions on that type would
+sometimes mean a concrete computation and sometimes mean constructing a new e-class, depending on
+whether all inputs are known. This can be seen as function overloading between a primitive and
+nonprimitive type, again motivating treating those types as distinct.
+
 == Simultaneous matching and control flow
 
 Control flow within a rule is equivalent to duplicating the rule for every possible flow
