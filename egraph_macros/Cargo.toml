@@ -1,6 +1,15 @@
+
+[lib]
+proc-macro = true
+
+
 [package]
 name = "egraph_macros"
 version = "0.1.0"
 edition = "2021"
 
 [dependencies]
+syn = "2.0.96"
+quote = "1.0"
+proc-macro2 = "1.0"
+bumpalo = "3.16.0"
