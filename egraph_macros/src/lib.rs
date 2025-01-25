@@ -72,9 +72,6 @@
     rust_2018_idioms
 )]
 
-
-extern crate proc_macro;
-
 mod frontend;
 
 #[proc_macro]

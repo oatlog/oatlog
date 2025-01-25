@@ -5,7 +5,20 @@ fn main() {
     compile_egraph!(
         // "some path",
         (
-            (add 1 1)
+            (datatype Math
+                (Mul Math Math) 
+                (Add Math Math)
+                (Const i64)
+            )
+
+            (let one (Const 1))
+
+            (let one (Add one one))
+
+
+            // (rule ((= a (Add b c))) ((union a (Add c b))))
+
+            // (rewrite (Add a (Add b c)) (Add (Add a b) c))
         ),
         // {
         //     fn some_rust_code();
