@@ -2,6 +2,7 @@ use egraph_macros::compile_egraph;
 fn main() {
 
 
+    // TODO: egglog has builtin include, so just use that.
     compile_egraph!(
         // "some path",
         (
@@ -11,9 +12,13 @@ fn main() {
                 (Const i64)
             )
 
+            (datatype Math2
+                (Muul Maath Math)
+            )
+
             (let one (Const 1))
 
-            (let one (Add one one))
+            // (let one (Add one one))
 
 
             // (rule ((= a (Add b c))) ((union a (Add c b))))

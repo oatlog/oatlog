@@ -37,35 +37,35 @@ macro_rules! error_span {
 
 #[rustfmt::skip]
 macro_rules! err_ {
-    ($span2:expr, $a0:literal) => { Err((format!($a0), $span2)) };
-    ($span2:expr, $a0:literal, $a1:tt) => { Err((format!($a0, $a1), $span2)) };
-    ($span2:expr, $a0:literal, $a1:tt, $a2:tt) => { Err((format!($a0, $a1, $a2), $span2)) };
-    ($span2:expr, $a0:literal, $a1:tt, $a2:tt, $a3:tt) => { Err((format!($a0, $a1, $a2, $a3), $span2)) };
-    ($span2:expr, $a0:literal, $a1:tt, $a2:tt, $a3:tt, $a4:tt) => { Err((format!($a0, $a1, $a2, $a3, $a4), $span2)) };
-    ($span2:expr, $a0:literal, $a1:tt, $a2:tt, $a3:tt, $a4:tt, $a5:tt) => { Err((format!($a0, $a1, $a2, $a3, $a4, $a5), $span2)) };
-    ($span2:expr, $a0:literal, $a1:tt, $a2:tt, $a3:tt, $a4:tt, $a5:tt, $a6:tt) => { Err((format!($a0, $a1, $a2, $a3, $a4, $a5, $a6), $span2)) };
-    ($span2:expr, $a0:literal, $a1:tt, $a2:tt, $a3:tt, $a4:tt, $a5:tt, $a6:tt, $a7:tt) => { Err((format!($a0, $a1, $a2, $a3, $a4, $a5, $a6, $a7), $span2)) };
-    ($span2:expr, $a0:literal, $a1:tt, $a2:tt, $a3:tt, $a4:tt, $a5:tt, $a6:tt, $a7:tt, $a8:tt) => { Err((format!($a0, $a1, $a2, $a3, $a4, $a5, $a6, $a7, $a8), $span2)) };
-    ($span2:expr, $a0:literal, $a1:tt, $a2:tt, $a3:tt, $a4:tt, $a5:tt, $a6:tt, $a7:tt, $a8:tt, $a9:tt) => { Err((format!($a0, $a1, $a2, $a3, $a4, $a5, $a6, $a7, $a8, $a9), $span2)) };
-    ($span2:expr, $a0:literal, $a1:tt, $a2:tt, $a3:tt, $a4:tt, $a5:tt, $a6:tt, $a7:tt, $a8:tt, $a9:tt, $a10:tt) => { Err((format!($a0, $a1, $a2, $a3, $a4, $a5, $a6, $a7, $a8, $a9, $a10), $span2)) };
-    ($span2:expr, $a0:literal, $a1:tt, $a2:tt, $a3:tt, $a4:tt, $a5:tt, $a6:tt, $a7:tt, $a8:tt, $a9:tt, $a10:tt, $a11:tt) => { Err((format!($a0, $a1, $a2, $a3, $a4, $a5, $a6, $a7, $a8, $a9, $a10, $a11), $span2)) };
-    ($span2:expr, $a0:literal, $a1:tt, $a2:tt, $a3:tt, $a4:tt, $a5:tt, $a6:tt, $a7:tt, $a8:tt, $a9:tt, $a10:tt, $a11:tt, $a12:tt) => { Err((format!($a0, $a1, $a2, $a3, $a4, $a5, $a6, $a7, $a8, $a9, $a10, $a11, $a12), $span2)) };
+    ($span2:expr, $a0:literal) => { Err(syn::Error::new($span2, format!($a0))) };
+    ($span2:expr, $a0:literal, $a1:tt) => { Err(syn::Error::new($span2, format!($a0, $a1))) };
+    ($span2:expr, $a0:literal, $a1:tt, $a2:tt) => { Err(syn::Error::new($span2, format!($a0, $a1, $a2))) };
+    ($span2:expr, $a0:literal, $a1:tt, $a2:tt, $a3:tt) => { Err(syn::Error::new($span2, format!($a0, $a1, $a2, $a3))) };
+    ($span2:expr, $a0:literal, $a1:tt, $a2:tt, $a3:tt, $a4:tt) => { Err(syn::Error::new($span2, format!($a0, $a1, $a2, $a3, $a4))) };
+    ($span2:expr, $a0:literal, $a1:tt, $a2:tt, $a3:tt, $a4:tt, $a5:tt) => { Err(syn::Error::new($span2, format!($a0, $a1, $a2, $a3, $a4, $a5))) };
+    ($span2:expr, $a0:literal, $a1:tt, $a2:tt, $a3:tt, $a4:tt, $a5:tt, $a6:tt) => { Err(syn::Error::new($span2, format!($a0, $a1, $a2, $a3, $a4, $a5, $a6))) };
+    ($span2:expr, $a0:literal, $a1:tt, $a2:tt, $a3:tt, $a4:tt, $a5:tt, $a6:tt, $a7:tt) => { Err(syn::Error::new($span2, format!($a0, $a1, $a2, $a3, $a4, $a5, $a6, $a7))) };
+    ($span2:expr, $a0:literal, $a1:tt, $a2:tt, $a3:tt, $a4:tt, $a5:tt, $a6:tt, $a7:tt, $a8:tt) => { Err(syn::Error::new($span2, format!($a0, $a1, $a2, $a3, $a4, $a5, $a6, $a7, $a8))) };
+    ($span2:expr, $a0:literal, $a1:tt, $a2:tt, $a3:tt, $a4:tt, $a5:tt, $a6:tt, $a7:tt, $a8:tt, $a9:tt) => { Err(syn::Error::new($span2, format!($a0, $a1, $a2, $a3, $a4, $a5, $a6, $a7, $a8, $a9))) };
+    ($span2:expr, $a0:literal, $a1:tt, $a2:tt, $a3:tt, $a4:tt, $a5:tt, $a6:tt, $a7:tt, $a8:tt, $a9:tt, $a10:tt) => { Err(syn::Error::new($span2, format!($a0, $a1, $a2, $a3, $a4, $a5, $a6, $a7, $a8, $a9, $a10))) };
+    ($span2:expr, $a0:literal, $a1:tt, $a2:tt, $a3:tt, $a4:tt, $a5:tt, $a6:tt, $a7:tt, $a8:tt, $a9:tt, $a10:tt, $a11:tt) => { Err(syn::Error::new($span2, format!($a0, $a1, $a2, $a3, $a4, $a5, $a6, $a7, $a8, $a9, $a10, $a11))) };
+    ($span2:expr, $a0:literal, $a1:tt, $a2:tt, $a3:tt, $a4:tt, $a5:tt, $a6:tt, $a7:tt, $a8:tt, $a9:tt, $a10:tt, $a11:tt, $a12:tt) => { Err(syn::Error::new($span2, format!($a0, $a1, $a2, $a3, $a4, $a5, $a6, $a7, $a8, $a9, $a10, $a11, $a12))) };
 }
 #[rustfmt::skip]
 macro_rules! ret_ {
-    ($span2:expr, $a0:literal) => { return Err((format!($a0), $span2)) };
-    ($span2:expr, $a0:literal, $a1:tt) => { return Err((format!($a0, $a1), $span2)) };
-    ($span2:expr, $a0:literal, $a1:tt, $a2:tt) => { return Err((format!($a0, $a1, $a2), $span2)) };
-    ($span2:expr, $a0:literal, $a1:tt, $a2:tt, $a3:tt) => { return Err((format!($a0, $a1, $a2, $a3), $span2)) };
-    ($span2:expr, $a0:literal, $a1:tt, $a2:tt, $a3:tt, $a4:tt) => { return Err((format!($a0, $a1, $a2, $a3, $a4), $span2)) };
-    ($span2:expr, $a0:literal, $a1:tt, $a2:tt, $a3:tt, $a4:tt, $a5:tt) => { return Err((format!($a0, $a1, $a2, $a3, $a4, $a5), $span2)) };
-    ($span2:expr, $a0:literal, $a1:tt, $a2:tt, $a3:tt, $a4:tt, $a5:tt, $a6:tt) => { return Err((format!($a0, $a1, $a2, $a3, $a4, $a5, $a6), $span2)) };
-    ($span2:expr, $a0:literal, $a1:tt, $a2:tt, $a3:tt, $a4:tt, $a5:tt, $a6:tt, $a7:tt) => { return Err((format!($a0, $a1, $a2, $a3, $a4, $a5, $a6, $a7), $span2)) };
-    ($span2:expr, $a0:literal, $a1:tt, $a2:tt, $a3:tt, $a4:tt, $a5:tt, $a6:tt, $a7:tt, $a8:tt) => { return Err((format!($a0, $a1, $a2, $a3, $a4, $a5, $a6, $a7, $a8), $span2)) };
-    ($span2:expr, $a0:literal, $a1:tt, $a2:tt, $a3:tt, $a4:tt, $a5:tt, $a6:tt, $a7:tt, $a8:tt, $a9:tt) => { return Err((format!($a0, $a1, $a2, $a3, $a4, $a5, $a6, $a7, $a8, $a9), $span2)) };
-    ($span2:expr, $a0:literal, $a1:tt, $a2:tt, $a3:tt, $a4:tt, $a5:tt, $a6:tt, $a7:tt, $a8:tt, $a9:tt, $a10:tt) => { return Err((format!($a0, $a1, $a2, $a3, $a4, $a5, $a6, $a7, $a8, $a9, $a10), $span2)) };
-    ($span2:expr, $a0:literal, $a1:tt, $a2:tt, $a3:tt, $a4:tt, $a5:tt, $a6:tt, $a7:tt, $a8:tt, $a9:tt, $a10:tt, $a11:tt) => { return Err((format!($a0, $a1, $a2, $a3, $a4, $a5, $a6, $a7, $a8, $a9, $a10, $a11), $span2)) };
-    ($span2:expr, $a0:literal, $a1:tt, $a2:tt, $a3:tt, $a4:tt, $a5:tt, $a6:tt, $a7:tt, $a8:tt, $a9:tt, $a10:tt, $a11:tt, $a12:tt) => { return Err((format!($a0, $a1, $a2, $a3, $a4, $a5, $a6, $a7, $a8, $a9, $a10, $a11, $a12), $span2)) };
+    ($span2:expr, $a0:literal) => { return Err(syn::Error::new($span2, format!($a0))) };
+    ($span2:expr, $a0:literal, $a1:tt) => { return Err(syn::Error::new($span2, format!($a0, $a1))) };
+    ($span2:expr, $a0:literal, $a1:tt, $a2:tt) => { return Err(syn::Error::new($span2, format!($a0, $a1, $a2))) };
+    ($span2:expr, $a0:literal, $a1:tt, $a2:tt, $a3:tt) => { return Err(syn::Error::new($span2, format!($a0, $a1, $a2, $a3))) };
+    ($span2:expr, $a0:literal, $a1:tt, $a2:tt, $a3:tt, $a4:tt) => { return Err(syn::Error::new($span2, format!($a0, $a1, $a2, $a3, $a4))) };
+    ($span2:expr, $a0:literal, $a1:tt, $a2:tt, $a3:tt, $a4:tt, $a5:tt) => { return Err(syn::Error::new($span2, format!($a0, $a1, $a2, $a3, $a4, $a5))) };
+    ($span2:expr, $a0:literal, $a1:tt, $a2:tt, $a3:tt, $a4:tt, $a5:tt, $a6:tt) => { return Err(syn::Error::new($span2, format!($a0, $a1, $a2, $a3, $a4, $a5, $a6))) };
+    ($span2:expr, $a0:literal, $a1:tt, $a2:tt, $a3:tt, $a4:tt, $a5:tt, $a6:tt, $a7:tt) => { return Err(syn::Error::new($span2, format!($a0, $a1, $a2, $a3, $a4, $a5, $a6, $a7))) };
+    ($span2:expr, $a0:literal, $a1:tt, $a2:tt, $a3:tt, $a4:tt, $a5:tt, $a6:tt, $a7:tt, $a8:tt) => { return Err(syn::Error::new($span2, format!($a0, $a1, $a2, $a3, $a4, $a5, $a6, $a7, $a8))) };
+    ($span2:expr, $a0:literal, $a1:tt, $a2:tt, $a3:tt, $a4:tt, $a5:tt, $a6:tt, $a7:tt, $a8:tt, $a9:tt) => { return Err(syn::Error::new($span2, format!($a0, $a1, $a2, $a3, $a4, $a5, $a6, $a7, $a8, $a9))) };
+    ($span2:expr, $a0:literal, $a1:tt, $a2:tt, $a3:tt, $a4:tt, $a5:tt, $a6:tt, $a7:tt, $a8:tt, $a9:tt, $a10:tt) => { return Err(syn::Error::new($span2, format!($a0, $a1, $a2, $a3, $a4, $a5, $a6, $a7, $a8, $a9, $a10))) };
+    ($span2:expr, $a0:literal, $a1:tt, $a2:tt, $a3:tt, $a4:tt, $a5:tt, $a6:tt, $a7:tt, $a8:tt, $a9:tt, $a10:tt, $a11:tt) => { return Err(syn::Error::new($span2, format!($a0, $a1, $a2, $a3, $a4, $a5, $a6, $a7, $a8, $a9, $a10, $a11))) };
+    ($span2:expr, $a0:literal, $a1:tt, $a2:tt, $a3:tt, $a4:tt, $a5:tt, $a6:tt, $a7:tt, $a8:tt, $a9:tt, $a10:tt, $a11:tt, $a12:tt) => { return Err(syn::Error::new($span2, format!($a0, $a1, $a2, $a3, $a4, $a5, $a6, $a7, $a8, $a9, $a10, $a11, $a12))) };
 }
 
 #[rustfmt::skip]
@@ -75,100 +75,109 @@ macro_rules! register_span {
         let _span = $span;
 
         macro_rules! bare {
-            ($a0:literal) => { ((format!($a0), _span)) };
-            ($a0:literal, $a1:tt) => { ((format!($a0, $a1), _span)) };
-            ($a0:literal, $a1:tt, $a2:tt) => { ((format!($a0, $a1, $a2), _span)) };
-            ($a0:literal, $a1:tt, $a2:tt, $a3:tt) => { ((format!($a0, $a1, $a2, $a3), _span)) };
-            ($a0:literal, $a1:tt, $a2:tt, $a3:tt, $a4:tt) => { ((format!($a0, $a1, $a2, $a3, $a4), _span)) };
-            ($a0:literal, $a1:tt, $a2:tt, $a3:tt, $a4:tt, $a5:tt) => { ((format!($a0, $a1, $a2, $a3, $a4, $a5), _span)) };
-            ($a0:literal, $a1:tt, $a2:tt, $a3:tt, $a4:tt, $a5:tt, $a6:tt) => { ((format!($a0, $a1, $a2, $a3, $a4, $a5, $a6), _span)) };
-            ($a0:literal, $a1:tt, $a2:tt, $a3:tt, $a4:tt, $a5:tt, $a6:tt, $a7:tt) => { ((format!($a0, $a1, $a2, $a3, $a4, $a5, $a6, $a7), _span)) };
-            ($a0:literal, $a1:tt, $a2:tt, $a3:tt, $a4:tt, $a5:tt, $a6:tt, $a7:tt, $a8:tt) => { ((format!($a0, $a1, $a2, $a3, $a4, $a5, $a6, $a7, $a8), _span)) };
-            ($a0:literal, $a1:tt, $a2:tt, $a3:tt, $a4:tt, $a5:tt, $a6:tt, $a7:tt, $a8:tt, $a9:tt) => { ((format!($a0, $a1, $a2, $a3, $a4, $a5, $a6, $a7, $a8, $a9), _span)) };
-            ($a0:literal, $a1:tt, $a2:tt, $a3:tt, $a4:tt, $a5:tt, $a6:tt, $a7:tt, $a8:tt, $a9:tt, $a10:tt) => { ((format!($a0, $a1, $a2, $a3, $a4, $a5, $a6, $a7, $a8, $a9, $a10), _span)) };
-            ($a0:literal, $a1:tt, $a2:tt, $a3:tt, $a4:tt, $a5:tt, $a6:tt, $a7:tt, $a8:tt, $a9:tt, $a10:tt, $a11:tt) => { ((format!($a0, $a1, $a2, $a3, $a4, $a5, $a6, $a7, $a8, $a9, $a10, $a11), _span)) };
-            ($a0:literal, $a1:tt, $a2:tt, $a3:tt, $a4:tt, $a5:tt, $a6:tt, $a7:tt, $a8:tt, $a9:tt, $a10:tt, $a11:tt, $a12:tt) => { ((format!($a0, $a1, $a2, $a3, $a4, $a5, $a6, $a7, $a8, $a9, $a10, $a11, $a12), _span)) };
-            ($span2:expr, $a0:literal) => { ((format!($a0), $span2)) };
-            ($span2:expr, $a0:literal, $a1:tt) => { ((format!($a0, $a1), $span2)) };
-            ($span2:expr, $a0:literal, $a1:tt, $a2:tt) => { ((format!($a0, $a1, $a2), $span2)) };
-            ($span2:expr, $a0:literal, $a1:tt, $a2:tt, $a3:tt) => { ((format!($a0, $a1, $a2, $a3), $span2)) };
-            ($span2:expr, $a0:literal, $a1:tt, $a2:tt, $a3:tt, $a4:tt) => { ((format!($a0, $a1, $a2, $a3, $a4), $span2)) };
-            ($span2:expr, $a0:literal, $a1:tt, $a2:tt, $a3:tt, $a4:tt, $a5:tt) => { ((format!($a0, $a1, $a2, $a3, $a4, $a5), $span2)) };
-            ($span2:expr, $a0:literal, $a1:tt, $a2:tt, $a3:tt, $a4:tt, $a5:tt, $a6:tt) => { ((format!($a0, $a1, $a2, $a3, $a4, $a5, $a6), $span2)) };
-            ($span2:expr, $a0:literal, $a1:tt, $a2:tt, $a3:tt, $a4:tt, $a5:tt, $a6:tt, $a7:tt) => { ((format!($a0, $a1, $a2, $a3, $a4, $a5, $a6, $a7), $span2)) };
-            ($span2:expr, $a0:literal, $a1:tt, $a2:tt, $a3:tt, $a4:tt, $a5:tt, $a6:tt, $a7:tt, $a8:tt) => { ((format!($a0, $a1, $a2, $a3, $a4, $a5, $a6, $a7, $a8), $span2)) };
-            ($span2:expr, $a0:literal, $a1:tt, $a2:tt, $a3:tt, $a4:tt, $a5:tt, $a6:tt, $a7:tt, $a8:tt, $a9:tt) => { ((format!($a0, $a1, $a2, $a3, $a4, $a5, $a6, $a7, $a8, $a9), $span2)) };
-            ($span2:expr, $a0:literal, $a1:tt, $a2:tt, $a3:tt, $a4:tt, $a5:tt, $a6:tt, $a7:tt, $a8:tt, $a9:tt, $a10:tt) => { ((format!($a0, $a1, $a2, $a3, $a4, $a5, $a6, $a7, $a8, $a9, $a10), $span2)) };
-            ($span2:expr, $a0:literal, $a1:tt, $a2:tt, $a3:tt, $a4:tt, $a5:tt, $a6:tt, $a7:tt, $a8:tt, $a9:tt, $a10:tt, $a11:tt) => { ((format!($a0, $a1, $a2, $a3, $a4, $a5, $a6, $a7, $a8, $a9, $a10, $a11), $span2)) };
-            ($span2:expr, $a0:literal, $a1:tt, $a2:tt, $a3:tt, $a4:tt, $a5:tt, $a6:tt, $a7:tt, $a8:tt, $a9:tt, $a10:tt, $a11:tt, $a12:tt) => { ((format!($a0, $a1, $a2, $a3, $a4, $a5, $a6, $a7, $a8, $a9, $a10, $a11, $a12), $span2)) };
+            ($a0:literal) => { syn::Error::new(_span, format!($a0)) };
+            ($a0:literal, $a1:tt) => { syn::Error::new(_span, format!($a0, $a1)) };
+            ($a0:literal, $a1:tt, $a2:tt) => { syn::Error::new(_span, format!($a0, $a1, $a2)) };
+            ($a0:literal, $a1:tt, $a2:tt, $a3:tt) => { syn::Error::new(_span, format!($a0, $a1, $a2, $a3)) };
+            ($a0:literal, $a1:tt, $a2:tt, $a3:tt, $a4:tt) => { syn::Error::new(_span, format!($a0, $a1, $a2, $a3, $a4)) };
+            ($a0:literal, $a1:tt, $a2:tt, $a3:tt, $a4:tt, $a5:tt) => { syn::Error::new(_span, format!($a0, $a1, $a2, $a3, $a4, $a5)) };
+            ($a0:literal, $a1:tt, $a2:tt, $a3:tt, $a4:tt, $a5:tt, $a6:tt) => { syn::Error::new(_span, format!($a0, $a1, $a2, $a3, $a4, $a5, $a6)) };
+            ($a0:literal, $a1:tt, $a2:tt, $a3:tt, $a4:tt, $a5:tt, $a6:tt, $a7:tt) => { syn::Error::new(_span, format!($a0, $a1, $a2, $a3, $a4, $a5, $a6, $a7)) };
+            ($a0:literal, $a1:tt, $a2:tt, $a3:tt, $a4:tt, $a5:tt, $a6:tt, $a7:tt, $a8:tt) => { syn::Error::new(_span, format!($a0, $a1, $a2, $a3, $a4, $a5, $a6, $a7, $a8)) };
+            ($a0:literal, $a1:tt, $a2:tt, $a3:tt, $a4:tt, $a5:tt, $a6:tt, $a7:tt, $a8:tt, $a9:tt) => { syn::Error::new(_span, format!($a0, $a1, $a2, $a3, $a4, $a5, $a6, $a7, $a8, $a9)) };
+            ($a0:literal, $a1:tt, $a2:tt, $a3:tt, $a4:tt, $a5:tt, $a6:tt, $a7:tt, $a8:tt, $a9:tt, $a10:tt) => { syn::Error::new(_span, format!($a0, $a1, $a2, $a3, $a4, $a5, $a6, $a7, $a8, $a9, $a10)) };
+            ($a0:literal, $a1:tt, $a2:tt, $a3:tt, $a4:tt, $a5:tt, $a6:tt, $a7:tt, $a8:tt, $a9:tt, $a10:tt, $a11:tt) => { syn::Error::new(_span, format!($a0, $a1, $a2, $a3, $a4, $a5, $a6, $a7, $a8, $a9, $a10, $a11)) };
+            ($a0:literal, $a1:tt, $a2:tt, $a3:tt, $a4:tt, $a5:tt, $a6:tt, $a7:tt, $a8:tt, $a9:tt, $a10:tt, $a11:tt, $a12:tt) => { syn::Error::new(_span, format!($a0, $a1, $a2, $a3, $a4, $a5, $a6, $a7, $a8, $a9, $a10, $a11, $a12)) };
+            ($span2:expr, $a0:literal) => { syn::Error::new($span2, format!($a0)) };
+            ($span2:expr, $a0:literal, $a1:tt) => { syn::Error::new($span2, format!($a0, $a1)) };
+            ($span2:expr, $a0:literal, $a1:tt, $a2:tt) => { syn::Error::new($span2, format!($a0, $a1, $a2)) };
+            ($span2:expr, $a0:literal, $a1:tt, $a2:tt, $a3:tt) => { syn::Error::new($span2, format!($a0, $a1, $a2, $a3)) };
+            ($span2:expr, $a0:literal, $a1:tt, $a2:tt, $a3:tt, $a4:tt) => { syn::Error::new($span2, format!($a0, $a1, $a2, $a3, $a4)) };
+            ($span2:expr, $a0:literal, $a1:tt, $a2:tt, $a3:tt, $a4:tt, $a5:tt) => { syn::Error::new($span2, format!($a0, $a1, $a2, $a3, $a4, $a5)) };
+            ($span2:expr, $a0:literal, $a1:tt, $a2:tt, $a3:tt, $a4:tt, $a5:tt, $a6:tt) => { syn::Error::new($span2, format!($a0, $a1, $a2, $a3, $a4, $a5, $a6)) };
+            ($span2:expr, $a0:literal, $a1:tt, $a2:tt, $a3:tt, $a4:tt, $a5:tt, $a6:tt, $a7:tt) => { syn::Error::new($span2, format!($a0, $a1, $a2, $a3, $a4, $a5, $a6, $a7)) };
+            ($span2:expr, $a0:literal, $a1:tt, $a2:tt, $a3:tt, $a4:tt, $a5:tt, $a6:tt, $a7:tt, $a8:tt) => { syn::Error::new($span2, format!($a0, $a1, $a2, $a3, $a4, $a5, $a6, $a7, $a8)) };
+            ($span2:expr, $a0:literal, $a1:tt, $a2:tt, $a3:tt, $a4:tt, $a5:tt, $a6:tt, $a7:tt, $a8:tt, $a9:tt) => { syn::Error::new($span2, format!($a0, $a1, $a2, $a3, $a4, $a5, $a6, $a7, $a8, $a9)) };
+            ($span2:expr, $a0:literal, $a1:tt, $a2:tt, $a3:tt, $a4:tt, $a5:tt, $a6:tt, $a7:tt, $a8:tt, $a9:tt, $a10:tt) => { syn::Error::new($span2, format!($a0, $a1, $a2, $a3, $a4, $a5, $a6, $a7, $a8, $a9, $a10)) };
+            ($span2:expr, $a0:literal, $a1:tt, $a2:tt, $a3:tt, $a4:tt, $a5:tt, $a6:tt, $a7:tt, $a8:tt, $a9:tt, $a10:tt, $a11:tt) => { syn::Error::new($span2, format!($a0, $a1, $a2, $a3, $a4, $a5, $a6, $a7, $a8, $a9, $a10, $a11)) };
+            ($span2:expr, $a0:literal, $a1:tt, $a2:tt, $a3:tt, $a4:tt, $a5:tt, $a6:tt, $a7:tt, $a8:tt, $a9:tt, $a10:tt, $a11:tt, $a12:tt) => { syn::Error::new($span2, format!($a0, $a1, $a2, $a3, $a4, $a5, $a6, $a7, $a8, $a9, $a10, $a11, $a12)) };
         }
         macro_rules! err {
-            ($a0:literal) => { Err((format!($a0), _span)) };
-            ($a0:literal, $a1:tt) => { Err((format!($a0, $a1), _span)) };
-            ($a0:literal, $a1:tt, $a2:tt) => { Err((format!($a0, $a1, $a2), _span)) };
-            ($a0:literal, $a1:tt, $a2:tt, $a3:tt) => { Err((format!($a0, $a1, $a2, $a3), _span)) };
-            ($a0:literal, $a1:tt, $a2:tt, $a3:tt, $a4:tt) => { Err((format!($a0, $a1, $a2, $a3, $a4), _span)) };
-            ($a0:literal, $a1:tt, $a2:tt, $a3:tt, $a4:tt, $a5:tt) => { Err((format!($a0, $a1, $a2, $a3, $a4, $a5), _span)) };
-            ($a0:literal, $a1:tt, $a2:tt, $a3:tt, $a4:tt, $a5:tt, $a6:tt) => { Err((format!($a0, $a1, $a2, $a3, $a4, $a5, $a6), _span)) };
-            ($a0:literal, $a1:tt, $a2:tt, $a3:tt, $a4:tt, $a5:tt, $a6:tt, $a7:tt) => { Err((format!($a0, $a1, $a2, $a3, $a4, $a5, $a6, $a7), _span)) };
-            ($a0:literal, $a1:tt, $a2:tt, $a3:tt, $a4:tt, $a5:tt, $a6:tt, $a7:tt, $a8:tt) => { Err((format!($a0, $a1, $a2, $a3, $a4, $a5, $a6, $a7, $a8), _span)) };
-            ($a0:literal, $a1:tt, $a2:tt, $a3:tt, $a4:tt, $a5:tt, $a6:tt, $a7:tt, $a8:tt, $a9:tt) => { Err((format!($a0, $a1, $a2, $a3, $a4, $a5, $a6, $a7, $a8, $a9), _span)) };
-            ($a0:literal, $a1:tt, $a2:tt, $a3:tt, $a4:tt, $a5:tt, $a6:tt, $a7:tt, $a8:tt, $a9:tt, $a10:tt) => { Err((format!($a0, $a1, $a2, $a3, $a4, $a5, $a6, $a7, $a8, $a9, $a10), _span)) };
-            ($a0:literal, $a1:tt, $a2:tt, $a3:tt, $a4:tt, $a5:tt, $a6:tt, $a7:tt, $a8:tt, $a9:tt, $a10:tt, $a11:tt) => { Err((format!($a0, $a1, $a2, $a3, $a4, $a5, $a6, $a7, $a8, $a9, $a10, $a11), _span)) };
-            ($a0:literal, $a1:tt, $a2:tt, $a3:tt, $a4:tt, $a5:tt, $a6:tt, $a7:tt, $a8:tt, $a9:tt, $a10:tt, $a11:tt, $a12:tt) => { Err((format!($a0, $a1, $a2, $a3, $a4, $a5, $a6, $a7, $a8, $a9, $a10, $a11, $a12), _span)) };
-            ($span2:expr, $a0:literal) => { Err((format!($a0), $span2)) };
-            ($span2:expr, $a0:literal, $a1:tt) => { Err((format!($a0, $a1), $span2)) };
-            ($span2:expr, $a0:literal, $a1:tt, $a2:tt) => { Err((format!($a0, $a1, $a2), $span2)) };
-            ($span2:expr, $a0:literal, $a1:tt, $a2:tt, $a3:tt) => { Err((format!($a0, $a1, $a2, $a3), $span2)) };
-            ($span2:expr, $a0:literal, $a1:tt, $a2:tt, $a3:tt, $a4:tt) => { Err((format!($a0, $a1, $a2, $a3, $a4), $span2)) };
-            ($span2:expr, $a0:literal, $a1:tt, $a2:tt, $a3:tt, $a4:tt, $a5:tt) => { Err((format!($a0, $a1, $a2, $a3, $a4, $a5), $span2)) };
-            ($span2:expr, $a0:literal, $a1:tt, $a2:tt, $a3:tt, $a4:tt, $a5:tt, $a6:tt) => { Err((format!($a0, $a1, $a2, $a3, $a4, $a5, $a6), $span2)) };
-            ($span2:expr, $a0:literal, $a1:tt, $a2:tt, $a3:tt, $a4:tt, $a5:tt, $a6:tt, $a7:tt) => { Err((format!($a0, $a1, $a2, $a3, $a4, $a5, $a6, $a7), $span2)) };
-            ($span2:expr, $a0:literal, $a1:tt, $a2:tt, $a3:tt, $a4:tt, $a5:tt, $a6:tt, $a7:tt, $a8:tt) => { Err((format!($a0, $a1, $a2, $a3, $a4, $a5, $a6, $a7, $a8), $span2)) };
-            ($span2:expr, $a0:literal, $a1:tt, $a2:tt, $a3:tt, $a4:tt, $a5:tt, $a6:tt, $a7:tt, $a8:tt, $a9:tt) => { Err((format!($a0, $a1, $a2, $a3, $a4, $a5, $a6, $a7, $a8, $a9), $span2)) };
-            ($span2:expr, $a0:literal, $a1:tt, $a2:tt, $a3:tt, $a4:tt, $a5:tt, $a6:tt, $a7:tt, $a8:tt, $a9:tt, $a10:tt) => { Err((format!($a0, $a1, $a2, $a3, $a4, $a5, $a6, $a7, $a8, $a9, $a10), $span2)) };
-            ($span2:expr, $a0:literal, $a1:tt, $a2:tt, $a3:tt, $a4:tt, $a5:tt, $a6:tt, $a7:tt, $a8:tt, $a9:tt, $a10:tt, $a11:tt) => { Err((format!($a0, $a1, $a2, $a3, $a4, $a5, $a6, $a7, $a8, $a9, $a10, $a11), $span2)) };
-            ($span2:expr, $a0:literal, $a1:tt, $a2:tt, $a3:tt, $a4:tt, $a5:tt, $a6:tt, $a7:tt, $a8:tt, $a9:tt, $a10:tt, $a11:tt, $a12:tt) => { Err((format!($a0, $a1, $a2, $a3, $a4, $a5, $a6, $a7, $a8, $a9, $a10, $a11, $a12), $span2)) };
+            ($a0:literal) => { Err(syn::Error::new(_span, format!($a0))) };
+            ($a0:literal, $a1:tt) => { Err(syn::Error::new(_span, format!($a0, $a1))) };
+            ($a0:literal, $a1:tt, $a2:tt) => { Err(syn::Error::new(_span, format!($a0, $a1, $a2))) };
+            ($a0:literal, $a1:tt, $a2:tt, $a3:tt) => { Err(syn::Error::new(_span, format!($a0, $a1, $a2, $a3))) };
+            ($a0:literal, $a1:tt, $a2:tt, $a3:tt, $a4:tt) => { Err(syn::Error::new(_span, format!($a0, $a1, $a2, $a3, $a4))) };
+            ($a0:literal, $a1:tt, $a2:tt, $a3:tt, $a4:tt, $a5:tt) => { Err(syn::Error::new(_span, format!($a0, $a1, $a2, $a3, $a4, $a5))) };
+            ($a0:literal, $a1:tt, $a2:tt, $a3:tt, $a4:tt, $a5:tt, $a6:tt) => { Err(syn::Error::new(_span, format!($a0, $a1, $a2, $a3, $a4, $a5, $a6))) };
+            ($a0:literal, $a1:tt, $a2:tt, $a3:tt, $a4:tt, $a5:tt, $a6:tt, $a7:tt) => { Err(syn::Error::new(_span, format!($a0, $a1, $a2, $a3, $a4, $a5, $a6, $a7))) };
+            ($a0:literal, $a1:tt, $a2:tt, $a3:tt, $a4:tt, $a5:tt, $a6:tt, $a7:tt, $a8:tt) => { Err(syn::Error::new(_span, format!($a0, $a1, $a2, $a3, $a4, $a5, $a6, $a7, $a8))) };
+            ($a0:literal, $a1:tt, $a2:tt, $a3:tt, $a4:tt, $a5:tt, $a6:tt, $a7:tt, $a8:tt, $a9:tt) => { Err(syn::Error::new(_span, format!($a0, $a1, $a2, $a3, $a4, $a5, $a6, $a7, $a8, $a9))) };
+            ($a0:literal, $a1:tt, $a2:tt, $a3:tt, $a4:tt, $a5:tt, $a6:tt, $a7:tt, $a8:tt, $a9:tt, $a10:tt) => { Err(syn::Error::new(_span, format!($a0, $a1, $a2, $a3, $a4, $a5, $a6, $a7, $a8, $a9, $a10))) };
+            ($a0:literal, $a1:tt, $a2:tt, $a3:tt, $a4:tt, $a5:tt, $a6:tt, $a7:tt, $a8:tt, $a9:tt, $a10:tt, $a11:tt) => { Err(syn::Error::new(_span, format!($a0, $a1, $a2, $a3, $a4, $a5, $a6, $a7, $a8, $a9, $a10, $a11))) };
+            ($a0:literal, $a1:tt, $a2:tt, $a3:tt, $a4:tt, $a5:tt, $a6:tt, $a7:tt, $a8:tt, $a9:tt, $a10:tt, $a11:tt, $a12:tt) => { Err(syn::Error::new(_span, format!($a0, $a1, $a2, $a3, $a4, $a5, $a6, $a7, $a8, $a9, $a10, $a11, $a12))) };
+            ($span2:expr, $a0:literal) => { Err(syn::Error::new($span2, format!($a0))) };
+            ($span2:expr, $a0:literal, $a1:tt) => { Err(syn::Error::new($span2, format!($a0, $a1))) };
+            ($span2:expr, $a0:literal, $a1:tt, $a2:tt) => { Err(syn::Error::new($span2, format!($a0, $a1, $a2))) };
+            ($span2:expr, $a0:literal, $a1:tt, $a2:tt, $a3:tt) => { Err(syn::Error::new($span2, format!($a0, $a1, $a2, $a3))) };
+            ($span2:expr, $a0:literal, $a1:tt, $a2:tt, $a3:tt, $a4:tt) => { Err(syn::Error::new($span2, format!($a0, $a1, $a2, $a3, $a4))) };
+            ($span2:expr, $a0:literal, $a1:tt, $a2:tt, $a3:tt, $a4:tt, $a5:tt) => { Err(syn::Error::new($span2, format!($a0, $a1, $a2, $a3, $a4, $a5))) };
+            ($span2:expr, $a0:literal, $a1:tt, $a2:tt, $a3:tt, $a4:tt, $a5:tt, $a6:tt) => { Err(syn::Error::new($span2, format!($a0, $a1, $a2, $a3, $a4, $a5, $a6))) };
+            ($span2:expr, $a0:literal, $a1:tt, $a2:tt, $a3:tt, $a4:tt, $a5:tt, $a6:tt, $a7:tt) => { Err(syn::Error::new($span2, format!($a0, $a1, $a2, $a3, $a4, $a5, $a6, $a7))) };
+            ($span2:expr, $a0:literal, $a1:tt, $a2:tt, $a3:tt, $a4:tt, $a5:tt, $a6:tt, $a7:tt, $a8:tt) => { Err(syn::Error::new($span2, format!($a0, $a1, $a2, $a3, $a4, $a5, $a6, $a7, $a8))) };
+            ($span2:expr, $a0:literal, $a1:tt, $a2:tt, $a3:tt, $a4:tt, $a5:tt, $a6:tt, $a7:tt, $a8:tt, $a9:tt) => { Err(syn::Error::new($span2, format!($a0, $a1, $a2, $a3, $a4, $a5, $a6, $a7, $a8, $a9))) };
+            ($span2:expr, $a0:literal, $a1:tt, $a2:tt, $a3:tt, $a4:tt, $a5:tt, $a6:tt, $a7:tt, $a8:tt, $a9:tt, $a10:tt) => { Err(syn::Error::new($span2, format!($a0, $a1, $a2, $a3, $a4, $a5, $a6, $a7, $a8, $a9, $a10))) };
+            ($span2:expr, $a0:literal, $a1:tt, $a2:tt, $a3:tt, $a4:tt, $a5:tt, $a6:tt, $a7:tt, $a8:tt, $a9:tt, $a10:tt, $a11:tt) => { Err(syn::Error::new($span2, format!($a0, $a1, $a2, $a3, $a4, $a5, $a6, $a7, $a8, $a9, $a10, $a11))) };
+            ($span2:expr, $a0:literal, $a1:tt, $a2:tt, $a3:tt, $a4:tt, $a5:tt, $a6:tt, $a7:tt, $a8:tt, $a9:tt, $a10:tt, $a11:tt, $a12:tt) => { Err(syn::Error::new($span2, format!($a0, $a1, $a2, $a3, $a4, $a5, $a6, $a7, $a8, $a9, $a10, $a11, $a12))) };
         }
         macro_rules! ret {
-            ($a0:literal) => { return Err((format!($a0), _span)) };
-            ($a0:literal, $a1:tt) => { return Err((format!($a0, $a1), _span)) };
-            ($a0:literal, $a1:tt, $a2:tt) => { return Err((format!($a0, $a1, $a2), _span)) };
-            ($a0:literal, $a1:tt, $a2:tt, $a3:tt) => { return Err((format!($a0, $a1, $a2, $a3), _span)) };
-            ($a0:literal, $a1:tt, $a2:tt, $a3:tt, $a4:tt) => { return Err((format!($a0, $a1, $a2, $a3, $a4), _span)) };
-            ($a0:literal, $a1:tt, $a2:tt, $a3:tt, $a4:tt, $a5:tt) => { return Err((format!($a0, $a1, $a2, $a3, $a4, $a5), _span)) };
-            ($a0:literal, $a1:tt, $a2:tt, $a3:tt, $a4:tt, $a5:tt, $a6:tt) => { return Err((format!($a0, $a1, $a2, $a3, $a4, $a5, $a6), _span)) };
-            ($a0:literal, $a1:tt, $a2:tt, $a3:tt, $a4:tt, $a5:tt, $a6:tt, $a7:tt) => { return Err((format!($a0, $a1, $a2, $a3, $a4, $a5, $a6, $a7), _span)) };
-            ($a0:literal, $a1:tt, $a2:tt, $a3:tt, $a4:tt, $a5:tt, $a6:tt, $a7:tt, $a8:tt) => { return Err((format!($a0, $a1, $a2, $a3, $a4, $a5, $a6, $a7, $a8), _span)) };
-            ($a0:literal, $a1:tt, $a2:tt, $a3:tt, $a4:tt, $a5:tt, $a6:tt, $a7:tt, $a8:tt, $a9:tt) => { return Err((format!($a0, $a1, $a2, $a3, $a4, $a5, $a6, $a7, $a8, $a9), _span)) };
-            ($a0:literal, $a1:tt, $a2:tt, $a3:tt, $a4:tt, $a5:tt, $a6:tt, $a7:tt, $a8:tt, $a9:tt, $a10:tt) => { return Err((format!($a0, $a1, $a2, $a3, $a4, $a5, $a6, $a7, $a8, $a9, $a10), _span)) };
-            ($a0:literal, $a1:tt, $a2:tt, $a3:tt, $a4:tt, $a5:tt, $a6:tt, $a7:tt, $a8:tt, $a9:tt, $a10:tt, $a11:tt) => { return Err((format!($a0, $a1, $a2, $a3, $a4, $a5, $a6, $a7, $a8, $a9, $a10, $a11), _span)) };
-            ($a0:literal, $a1:tt, $a2:tt, $a3:tt, $a4:tt, $a5:tt, $a6:tt, $a7:tt, $a8:tt, $a9:tt, $a10:tt, $a11:tt, $a12:tt) => { return Err((format!($a0, $a1, $a2, $a3, $a4, $a5, $a6, $a7, $a8, $a9, $a10, $a11, $a12), _span)) };
-            ($span2:expr, $a0:literal) => { return Err((format!($a0), $span2)) };
-            ($span2:expr, $a0:literal, $a1:tt) => { return Err((format!($a0, $a1), $span2)) };
-            ($span2:expr, $a0:literal, $a1:tt, $a2:tt) => { return Err((format!($a0, $a1, $a2), $span2)) };
-            ($span2:expr, $a0:literal, $a1:tt, $a2:tt, $a3:tt) => { return Err((format!($a0, $a1, $a2, $a3), $span2)) };
-            ($span2:expr, $a0:literal, $a1:tt, $a2:tt, $a3:tt, $a4:tt) => { return Err((format!($a0, $a1, $a2, $a3, $a4), $span2)) };
-            ($span2:expr, $a0:literal, $a1:tt, $a2:tt, $a3:tt, $a4:tt, $a5:tt) => { return Err((format!($a0, $a1, $a2, $a3, $a4, $a5), $span2)) };
-            ($span2:expr, $a0:literal, $a1:tt, $a2:tt, $a3:tt, $a4:tt, $a5:tt, $a6:tt) => { return Err((format!($a0, $a1, $a2, $a3, $a4, $a5, $a6), $span2)) };
-            ($span2:expr, $a0:literal, $a1:tt, $a2:tt, $a3:tt, $a4:tt, $a5:tt, $a6:tt, $a7:tt) => { return Err((format!($a0, $a1, $a2, $a3, $a4, $a5, $a6, $a7), $span2)) };
-            ($span2:expr, $a0:literal, $a1:tt, $a2:tt, $a3:tt, $a4:tt, $a5:tt, $a6:tt, $a7:tt, $a8:tt) => { return Err((format!($a0, $a1, $a2, $a3, $a4, $a5, $a6, $a7, $a8), $span2)) };
-            ($span2:expr, $a0:literal, $a1:tt, $a2:tt, $a3:tt, $a4:tt, $a5:tt, $a6:tt, $a7:tt, $a8:tt, $a9:tt) => { return Err((format!($a0, $a1, $a2, $a3, $a4, $a5, $a6, $a7, $a8, $a9), $span2)) };
-            ($span2:expr, $a0:literal, $a1:tt, $a2:tt, $a3:tt, $a4:tt, $a5:tt, $a6:tt, $a7:tt, $a8:tt, $a9:tt, $a10:tt) => { return Err((format!($a0, $a1, $a2, $a3, $a4, $a5, $a6, $a7, $a8, $a9, $a10), $span2)) };
-            ($span2:expr, $a0:literal, $a1:tt, $a2:tt, $a3:tt, $a4:tt, $a5:tt, $a6:tt, $a7:tt, $a8:tt, $a9:tt, $a10:tt, $a11:tt) => { return Err((format!($a0, $a1, $a2, $a3, $a4, $a5, $a6, $a7, $a8, $a9, $a10, $a11), $span2)) };
-            ($span2:expr, $a0:literal, $a1:tt, $a2:tt, $a3:tt, $a4:tt, $a5:tt, $a6:tt, $a7:tt, $a8:tt, $a9:tt, $a10:tt, $a11:tt, $a12:tt) => { return Err((format!($a0, $a1, $a2, $a3, $a4, $a5, $a6, $a7, $a8, $a9, $a10, $a11, $a12), $span2)) };
+            ($a0:literal) => { return Err(syn::Error::new(_span, format!($a0))) };
+            ($a0:literal, $a1:tt) => { return Err(syn::Error::new(_span, format!($a0, $a1))) };
+            ($a0:literal, $a1:tt, $a2:tt) => { return Err(syn::Error::new(_span, format!($a0, $a1, $a2))) };
+            ($a0:literal, $a1:tt, $a2:tt, $a3:tt) => { return Err(syn::Error::new(_span, format!($a0, $a1, $a2, $a3))) };
+            ($a0:literal, $a1:tt, $a2:tt, $a3:tt, $a4:tt) => { return Err(syn::Error::new(_span, format!($a0, $a1, $a2, $a3, $a4))) };
+            ($a0:literal, $a1:tt, $a2:tt, $a3:tt, $a4:tt, $a5:tt) => { return Err(syn::Error::new(_span, format!($a0, $a1, $a2, $a3, $a4, $a5))) };
+            ($a0:literal, $a1:tt, $a2:tt, $a3:tt, $a4:tt, $a5:tt, $a6:tt) => { return Err(syn::Error::new(_span, format!($a0, $a1, $a2, $a3, $a4, $a5, $a6))) };
+            ($a0:literal, $a1:tt, $a2:tt, $a3:tt, $a4:tt, $a5:tt, $a6:tt, $a7:tt) => { return Err(syn::Error::new(_span, format!($a0, $a1, $a2, $a3, $a4, $a5, $a6, $a7))) };
+            ($a0:literal, $a1:tt, $a2:tt, $a3:tt, $a4:tt, $a5:tt, $a6:tt, $a7:tt, $a8:tt) => { return Err(syn::Error::new(_span, format!($a0, $a1, $a2, $a3, $a4, $a5, $a6, $a7, $a8))) };
+            ($a0:literal, $a1:tt, $a2:tt, $a3:tt, $a4:tt, $a5:tt, $a6:tt, $a7:tt, $a8:tt, $a9:tt) => { return Err(syn::Error::new(_span, format!($a0, $a1, $a2, $a3, $a4, $a5, $a6, $a7, $a8, $a9))) };
+            ($a0:literal, $a1:tt, $a2:tt, $a3:tt, $a4:tt, $a5:tt, $a6:tt, $a7:tt, $a8:tt, $a9:tt, $a10:tt) => { return Err(syn::Error::new(_span, format!($a0, $a1, $a2, $a3, $a4, $a5, $a6, $a7, $a8, $a9, $a10))) };
+            ($a0:literal, $a1:tt, $a2:tt, $a3:tt, $a4:tt, $a5:tt, $a6:tt, $a7:tt, $a8:tt, $a9:tt, $a10:tt, $a11:tt) => { return Err(syn::Error::new(_span, format!($a0, $a1, $a2, $a3, $a4, $a5, $a6, $a7, $a8, $a9, $a10, $a11))) };
+            ($a0:literal, $a1:tt, $a2:tt, $a3:tt, $a4:tt, $a5:tt, $a6:tt, $a7:tt, $a8:tt, $a9:tt, $a10:tt, $a11:tt, $a12:tt) => { return Err(syn::Error::new(_span, format!($a0, $a1, $a2, $a3, $a4, $a5, $a6, $a7, $a8, $a9, $a10, $a11, $a12))) };
+            ($span2:expr, $a0:literal) => { return Err(syn::Error::new($span2, format!($a0))) };
+            ($span2:expr, $a0:literal, $a1:tt) => { return Err(syn::Error::new($span2, format!($a0, $a1))) };
+            ($span2:expr, $a0:literal, $a1:tt, $a2:tt) => { return Err(syn::Error::new($span2, format!($a0, $a1, $a2))) };
+            ($span2:expr, $a0:literal, $a1:tt, $a2:tt, $a3:tt) => { return Err(syn::Error::new($span2, format!($a0, $a1, $a2, $a3))) };
+            ($span2:expr, $a0:literal, $a1:tt, $a2:tt, $a3:tt, $a4:tt) => { return Err(syn::Error::new($span2, format!($a0, $a1, $a2, $a3, $a4))) };
+            ($span2:expr, $a0:literal, $a1:tt, $a2:tt, $a3:tt, $a4:tt, $a5:tt) => { return Err(syn::Error::new($span2, format!($a0, $a1, $a2, $a3, $a4, $a5))) };
+            ($span2:expr, $a0:literal, $a1:tt, $a2:tt, $a3:tt, $a4:tt, $a5:tt, $a6:tt) => { return Err(syn::Error::new($span2, format!($a0, $a1, $a2, $a3, $a4, $a5, $a6))) };
+            ($span2:expr, $a0:literal, $a1:tt, $a2:tt, $a3:tt, $a4:tt, $a5:tt, $a6:tt, $a7:tt) => { return Err(syn::Error::new($span2, format!($a0, $a1, $a2, $a3, $a4, $a5, $a6, $a7))) };
+            ($span2:expr, $a0:literal, $a1:tt, $a2:tt, $a3:tt, $a4:tt, $a5:tt, $a6:tt, $a7:tt, $a8:tt) => { return Err(syn::Error::new($span2, format!($a0, $a1, $a2, $a3, $a4, $a5, $a6, $a7, $a8))) };
+            ($span2:expr, $a0:literal, $a1:tt, $a2:tt, $a3:tt, $a4:tt, $a5:tt, $a6:tt, $a7:tt, $a8:tt, $a9:tt) => { return Err(syn::Error::new($span2, format!($a0, $a1, $a2, $a3, $a4, $a5, $a6, $a7, $a8, $a9))) };
+            ($span2:expr, $a0:literal, $a1:tt, $a2:tt, $a3:tt, $a4:tt, $a5:tt, $a6:tt, $a7:tt, $a8:tt, $a9:tt, $a10:tt) => { return Err(syn::Error::new($span2, format!($a0, $a1, $a2, $a3, $a4, $a5, $a6, $a7, $a8, $a9, $a10))) };
+            ($span2:expr, $a0:literal, $a1:tt, $a2:tt, $a3:tt, $a4:tt, $a5:tt, $a6:tt, $a7:tt, $a8:tt, $a9:tt, $a10:tt, $a11:tt) => { return Err(syn::Error::new($span2, format!($a0, $a1, $a2, $a3, $a4, $a5, $a6, $a7, $a8, $a9, $a10, $a11))) };
+            ($span2:expr, $a0:literal, $a1:tt, $a2:tt, $a3:tt, $a4:tt, $a5:tt, $a6:tt, $a7:tt, $a8:tt, $a9:tt, $a10:tt, $a11:tt, $a12:tt) => { return Err(syn::Error::new($span2, format!($a0, $a1, $a2, $a3, $a4, $a5, $a6, $a7, $a8, $a9, $a10, $a11, $a12))) };
         }
     };
 }
 
-pub fn compile_egraph(x: proc_macro::TokenStream) -> proc_macro::TokenStream {
-    compile_egraph_inner(x)
-        .unwrap_or_else(|(msg, span)| syn::Error::new(span, msg).to_compile_error().into())
+trait ResultExt {
+    fn add_err(self, syn_err: syn::Error) -> Self;
+}
+impl<T> ResultExt for syn::Result<T> {
+    fn add_err(self, new_err: syn::Error) -> Self {
+        self.map_err(|mut err| {
+            syn::Error::combine(&mut err, new_err);
+            err
+        })
+    }
 }
 
-fn compile_egraph_inner(
-    x: proc_macro::TokenStream,
-) -> Result<proc_macro::TokenStream, (String, Span)> {
+pub fn compile_egraph(x: proc_macro::TokenStream) -> proc_macro::TokenStream {
+    compile_egraph_inner(x).unwrap_or_else(|err| err.to_compile_error().into())
+}
+
+fn compile_egraph_inner(x: proc_macro::TokenStream) -> syn::Result<proc_macro::TokenStream> {
     let x = proc_macro2::TokenStream::from(x);
     let mut parser = Parser::new();
     for token_tree in x.into_iter() {
@@ -259,7 +268,7 @@ struct SexpSpan {
     x: Sexp,
 }
 impl SexpSpan {
-    fn call(self, context: &'static str) -> SResult<(&'static str, &'static [SexpSpan])> {
+    fn call(self, context: &'static str) -> syn::Result<(&'static str, &'static [SexpSpan])> {
         if let Sexp::List(
             [SexpSpan {
                 span: _,
@@ -272,21 +281,21 @@ impl SexpSpan {
             err_!(self.span, "{context}: expected call")
         }
     }
-    fn atom(self, context: &'static str) -> SResult<&'static str> {
+    fn atom(self, context: &'static str) -> syn::Result<&'static str> {
         if let Sexp::Atom(x) = self.x {
             Ok(x)
         } else {
             err_!(self.span, "{context}: expected atom")
         }
     }
-    fn list(self, context: &'static str) -> SResult<&'static [SexpSpan]> {
+    fn list(self, context: &'static str) -> syn::Result<&'static [SexpSpan]> {
         if let Sexp::List(x) = self.x {
             Ok(x)
         } else {
             err_!(self.span, "{context}: expected list")
         }
     }
-    fn uint(self, context: &'static str) -> SResult<u64> {
+    fn uint(self, context: &'static str) -> syn::Result<u64> {
         register_span!(self.span);
         let Sexp::Literal(x) = self.x else {
             ret!("{context}: expected an int literal")
@@ -297,7 +306,7 @@ impl SexpSpan {
     }
 
     // run for each toplevel egglog expression
-    fn parse_sexp(tt: proc_macro2::TokenTree) -> Result<SexpSpan, (String, Span)> {
+    fn parse_sexp(tt: proc_macro2::TokenTree) -> syn::Result<SexpSpan> {
         // NOTE: handle variable valitity after tokenization.
         let span = tt.span();
         Ok(SexpSpan {
@@ -377,8 +386,6 @@ impl SexpSpan {
         })
     }
 }
-
-type SResult<T> = Result<T, (String, Span)>;
 
 trait Id: Into<usize> + From<usize> + Copy + Default + std::fmt::Debug + Ord {}
 impl<T: Into<usize> + From<usize> + Copy + Default + std::fmt::Debug + Ord> Id for T {}
@@ -476,6 +483,25 @@ impl FunctionData {
 //     Constructor,
 //     Symbolic,
 // }
+
+fn placeholder_span() -> Span {
+    Span::call_site()
+}
+
+/// Including span information in a way that makes it act like a T 
+/// in every way. 
+#[derive(Educe, Copy, Clone)]
+#[educe(PartialEq, Eq, PartialOrd, Ord, Hash, Debug)]
+struct Spanned<T> {
+    x: T,
+    #[educe(Eq(ignore))]
+    #[educe(Ord(ignore))]
+    #[educe(Hash(ignore))]
+    #[educe(Debug(ignore))]
+    span: Span,
+}
+
+type SpanStr = Spanned<&'static str>;
 
 #[derive(Debug, Clone, PartialEq)]
 struct StringIds<T>(BTreeMap<&'static str, T>);
@@ -725,17 +751,16 @@ impl Parser {
         parser
     }
 
-    fn parse_egglog(&mut self, stream: proc_macro2::TokenStream) -> Result<(), (String, Span)> {
+    fn parse_egglog(&mut self, stream: proc_macro2::TokenStream) -> syn::Result<()> {
         for tt in stream {
             let sexp = SexpSpan::parse_sexp(tt)?;
             // panic!("{:#?}", sexp);
-            self.parse_toplevel(sexp)
-                .map_err(|(s, span)| (s.to_string(), span))?;
+            self.parse_toplevel(sexp)?;
         }
         Ok(())
     }
 
-    fn parse_toplevel(&mut self, x: SexpSpan) -> SResult<()> {
+    fn parse_toplevel(&mut self, x: SexpSpan) -> syn::Result<()> {
         register_span!(x.span);
         let (function_name, args) = x.call("toplevel")?;
 
@@ -782,7 +807,7 @@ impl Parser {
                     let inputs = inputs
                         .iter()
                         .map(|x| Ok(self.type_ids.lookup(x.atom("input type")?)))
-                        .collect::<Result<Vec<_>, _>>()?;
+                        .collect::<syn::Result<Vec<_>>>()?;
 
                     self.add_function(function_name, inputs, Some(output_type), None, cost, x.span);
                 }
@@ -938,7 +963,7 @@ impl Parser {
         Ok(())
     }
 
-    fn parse_inputs(&self, inputs: &'static SexpSpan) -> SResult<Vec<TypeId>> {
+    fn parse_inputs(&self, inputs: &'static SexpSpan) -> syn::Result<Vec<TypeId>> {
         inputs
             .list("input types")?
             .iter()
@@ -1006,7 +1031,7 @@ impl Parser {
         &mut self,
         x: SexpSpan,
         local_bindings: &Option<&mut BTreeMap<&'static str, Expr>>,
-    ) -> SResult<Expr> {
+    ) -> syn::Result<Expr> {
         Ok(match x.x {
             Sexp::Literal(x) => Expr::Literal(x),
             // TODO: this can cause an infinite recursion maybe?
@@ -1220,7 +1245,11 @@ impl Parser {
             },
             |x| x.len(),
         );
-        assert_eq!(to_globalize.len(), 0, "compute cycle for let expression: {to_globalize:?}");
+        assert_eq!(
+            to_globalize.len(),
+            0,
+            "compute cycle for let expression: {to_globalize:?}"
+        );
         self.initial
             .push(Initial::ComputeGlobal(local_to_global[&root_id]));
     }
@@ -1231,7 +1260,7 @@ impl Parser {
         // Some =>
         // &mut Option<&mut T> because Option<&mut T> is !Copy
         local_bindings: &mut Option<&mut BTreeMap<&'static str, Expr>>,
-    ) -> SResult<Option<Action>> {
+    ) -> syn::Result<Option<Action>> {
         let (function_name, args) = x.call("action is a function call")?;
         register_span!(x.span);
 
@@ -1296,7 +1325,9 @@ impl Parser {
     }
 }
 
-fn parse_options(mut s: &'static [SexpSpan]) -> SResult<Vec<(&'static str, &'static [SexpSpan])>> {
+fn parse_options(
+    mut s: &'static [SexpSpan],
+) -> syn::Result<Vec<(&'static str, &'static [SexpSpan])>> {
     fn is_option(opt: &SexpSpan) -> bool {
         if let Sexp::Atom(opt) = opt.x {
             opt.starts_with(":")
@@ -1837,7 +1868,8 @@ mod compile_rule {
                             variables,
                             types,
                             action_union,
-                        ).unwrap();
+                        )
+                        .unwrap();
                         // .insert(Call {
                         //     id: *id,
                         //     args: args.clone(),
@@ -1860,7 +1892,8 @@ mod compile_rule {
                 variables,
                 types,
                 action_union,
-            ).unwrap();
+            )
+            .unwrap();
         }
         Ok(())
     }
