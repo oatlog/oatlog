@@ -1,0 +1,7 @@
+
+(datatype Foo
+    (Add Foo Foo)
+)
+
+(let x (Add 1 1))
+(let y (missing_function Foo Foo))

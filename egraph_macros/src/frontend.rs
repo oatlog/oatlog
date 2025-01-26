@@ -1,6 +1,7 @@
-// #![deny(unused_must_use)]
 #![deny(clippy::only_used_in_recursion)]
 #![deny(clippy::map_clone)]
+#![deny(unused_must_use)]
+// TODO: ban retain_mut
 
 use educe::Educe;
 use proc_macro2::{Delimiter, Spacing, Span, TokenTree};
@@ -174,7 +175,10 @@ impl<T> ResultExt for syn::Result<T> {
 }
 
 pub fn compile_egraph(x: proc_macro::TokenStream) -> proc_macro::TokenStream {
-    compile_egraph_inner(x).unwrap_or_else(|err| err.to_compile_error().into())
+    let now = std::time::Instant::now();
+    let res = compile_egraph_inner(x).unwrap_or_else(|err| err.to_compile_error().into());
+    eprintln!("{:?}", now.elapsed());
+    res
 }
 
 fn compile_egraph_inner(x: proc_macro::TokenStream) -> syn::Result<proc_macro::TokenStream> {
@@ -230,7 +234,7 @@ fn fixpoint_mut<E, V: PartialEq, T, A: FnMut(&mut T) -> Result<(), E>, B: FnMut(
     Ok(())
 }
 
-#[derive(Copy, Clone, Debug, PartialEq, PartialOrd, Eq, Ord)]
+#[derive(Copy, Clone, Debug, PartialEq, PartialOrd, Eq, Ord, Hash)]
 enum Literal {
     I64(i64),
     F64(OrdF64),
@@ -247,6 +251,18 @@ impl Literal {
         }
     }
 }
+impl Display for Literal {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            Literal::I64(x) => std::fmt::Display::fmt(x, f),
+            Literal::F64(OrdF64(x)) => std::fmt::Display::fmt(x, f),
+            Literal::String(x) => std::fmt::Debug::fmt(x, f),
+            Literal::Bool(x) => std::fmt::Display::fmt(x, f),
+            Literal::Unit => std::fmt::Debug::fmt(&(), f),
+        }
+    }
+}
+
 #[derive(Copy, Clone, Debug, PartialEq, PartialOrd)]
 struct OrdF64(f64);
 impl Eq for OrdF64 {}
@@ -255,20 +271,22 @@ impl Ord for OrdF64 {
         self.0.total_cmp(&other.0)
     }
 }
+impl Hash for OrdF64 {
+    fn hash<H: Hasher>(&self, state: &mut H) {
+        self.0.to_bits().hash(state);
+    }
+}
 #[derive(Copy, Clone, Debug)]
 enum Sexp {
-    Literal(Literal),
+    Literal(Spanned<Literal>),
     List(&'static [SexpSpan]),
     // TODO: join punctuation and ident to capture surrounding rust functions.
-    Atom(&'static str),
+    Atom(Str),
 }
-#[derive(Copy, Clone, Debug)]
-struct SexpSpan {
-    span: Span,
-    x: Sexp,
-}
+type SexpSpan = Spanned<Sexp>;
+
 impl SexpSpan {
-    fn call(self, context: &'static str) -> syn::Result<(&'static str, &'static [SexpSpan])> {
+    fn call(self, context: &'static str) -> syn::Result<(Str, &'static [SexpSpan])> {
         if let Sexp::List(
             [SexpSpan {
                 span: _,
@@ -281,7 +299,7 @@ impl SexpSpan {
             err_!(self.span, "{context}: expected call")
         }
     }
-    fn atom(self, context: &'static str) -> syn::Result<&'static str> {
+    fn atom(self, context: &'static str) -> syn::Result<Str> {
         if let Sexp::Atom(x) = self.x {
             Ok(x)
         } else {
@@ -304,6 +322,16 @@ impl SexpSpan {
         u64::try_from(x.i64().map_err(|_| bare!("{context}; expected int"))?)
             .map_err(|_| bare!("{context}: expected positive int"))
     }
+    fn string(self, context: &'static str) -> syn::Result<&'static str> {
+        register_span!(self.span);
+        let Sexp::Literal(x) = self.x else {
+            ret!("{context}: expected a string literal");
+        };
+        let Literal::String(x) = x.x else {
+            ret!("{context}: expected a string literal");
+        };
+        Ok(x)
+    }
 
     // run for each toplevel egglog expression
     fn parse_sexp(tt: proc_macro2::TokenTree) -> syn::Result<SexpSpan> {
@@ -317,7 +345,7 @@ impl SexpSpan {
                         ret_!(group.span(), "only () is allowed here, not [] or {{}}");
                     }
                     let mut v = Vec::new();
-                    let mut partial_punctuation: Option<String> = None;
+                    let mut partial_punctuation: Option<Spanned<String>> = None;
                     let mut first_token = true;
                     for tt in group.stream() {
                         let span = tt.span();
@@ -332,14 +360,15 @@ impl SexpSpan {
                             if let Some(x) = partial_punctuation.as_mut() {
                                 x.push(punct.as_char());
                             } else {
-                                partial_punctuation = Some(String::from(punct.as_char()));
+                                partial_punctuation =
+                                    Some(Spanned::new(String::from(punct.as_char()), punct.span()));
                             }
                             if punct.spacing() == Spacing::Alone {
                                 if let Some(partial) = take(&mut partial_punctuation) {
                                     first_token = false;
                                     v.push(SexpSpan {
                                         span,
-                                        x: Sexp::Atom(partial.leak()),
+                                        x: Sexp::Atom(partial.map_s(|x| &*x.leak())),
                                     });
                                 }
                             }
@@ -347,7 +376,7 @@ impl SexpSpan {
                             if let Some(partial) = take(&mut partial_punctuation) {
                                 v.push(SexpSpan {
                                     span,
-                                    x: Sexp::Atom(partial.leak()),
+                                    x: Sexp::Atom(partial.map_s(|x| &*x.leak())),
                                 });
                             }
                             first_token = false;
@@ -357,12 +386,14 @@ impl SexpSpan {
                     if let Some(partial) = take(&mut partial_punctuation) {
                         v.push(SexpSpan {
                             span,
-                            x: Sexp::Atom(partial.leak()),
+                            x: Sexp::Atom(partial.map_s(|x| &*x.leak())),
                         });
                     }
                     Sexp::List(v.leak())
                 }
-                TokenTree::Ident(ident) => Sexp::Atom(ident.to_string().leak()),
+                TokenTree::Ident(ident) => {
+                    Sexp::Atom(Str::new(ident.to_string().leak(), ident.span()))
+                }
                 TokenTree::Punct(punct) => {
                     ret_!(
                         punct.span(),
@@ -374,13 +405,16 @@ impl SexpSpan {
                 TokenTree::Literal(literal) => {
                     let x = syn::Lit::new(literal);
 
-                    Sexp::Literal(match &x {
-                        syn::Lit::Str(x) => Literal::String(&*x.value().leak()),
-                        syn::Lit::Int(x) => Literal::I64(x.base10_parse().unwrap()),
-                        syn::Lit::Float(x) => Literal::F64(OrdF64(x.base10_parse().unwrap())),
-                        syn::Lit::Bool(lit_bool) => Literal::Bool(lit_bool.value()),
-                        _ => ret_!(x.span(), "unexpected literal"),
-                    })
+                    Sexp::Literal(Spanned::new(
+                        match &x {
+                            syn::Lit::Str(x) => Literal::String(&*x.value().leak()),
+                            syn::Lit::Int(x) => Literal::I64(x.base10_parse().unwrap()),
+                            syn::Lit::Float(x) => Literal::F64(OrdF64(x.base10_parse().unwrap())),
+                            syn::Lit::Bool(lit_bool) => Literal::Bool(lit_bool.value()),
+                            _ => ret_!(x.span(), "unexpected literal"),
+                        },
+                        x.span(),
+                    ))
                 }
             },
         })
@@ -414,21 +448,18 @@ id_wrap!(TypeVarId);
 id_wrap!(FunctionId);
 id_wrap!(VariableId);
 
-#[derive(Debug, Clone, Educe)]
-#[educe(PartialEq)]
+#[derive(Debug, Clone, PartialEq)]
 struct TypeData {
-    name: &'static str,
+    name: Str,
     /// Something like `MyPrimitiveType`
     /// List if something like (Vec i64)
-    primitive: Option<Vec<&'static str>>,
-    #[educe(PartialEq(ignore))]
-    span: Span,
+    primitive: Option<Vec<Str>>,
 }
 
 #[derive(Debug, Clone, Educe)]
 #[educe(PartialEq)]
 struct FunctionData {
-    name: &'static str,
+    name: Str,
     inputs: Vec<TypeId>,
     // for variadic functions, possibly do the following:
     // varadic : Option<TypeId>
@@ -437,8 +468,6 @@ struct FunctionData {
     // kind: FunctionKind,
     merge: Option<Expr>,
     cost: Option<u64>,
-    #[educe(PartialEq(ignore))]
-    span: Span,
 }
 impl FunctionData {
     fn check_compatible(&self, inputs: &[Option<TypeId>], output: Option<TypeId>) -> bool {
@@ -484,62 +513,85 @@ impl FunctionData {
 //     Symbolic,
 // }
 
+// Span -> Enum(placeholder, Span) so eq can be implemented
 fn placeholder_span() -> Span {
     Span::call_site()
 }
 
-/// Including span information in a way that makes it act like a T 
-/// in every way. 
+/// Including span information in a way that makes it act like a T
+/// in terms of equality, functions, etc.
 #[derive(Educe, Copy, Clone)]
-#[educe(PartialEq, Eq, PartialOrd, Ord, Hash, Debug)]
+#[educe(PartialEq, Eq, PartialOrd, Ord, Hash)]
 struct Spanned<T> {
     x: T,
     #[educe(Eq(ignore))]
     #[educe(Ord(ignore))]
     #[educe(Hash(ignore))]
-    #[educe(Debug(ignore))]
     span: Span,
 }
+impl<T> Spanned<T> {
+    fn new(x: T, span: Span) -> Self {
+        Self { x, span }
+    }
+    fn with_placeholder(x: T) -> Self {
+        Self::new(x, placeholder_span())
+    }
+    fn map_s<V, F: FnMut(T) -> V>(self, mut f: F) -> Spanned<V> {
+        Spanned::new(f(self.x), self.span)
+    }
+}
+impl<T: std::fmt::Display> std::fmt::Display for Spanned<T> {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        self.x.fmt(f)
+    }
+}
+impl<T: std::fmt::Debug> std::fmt::Debug for Spanned<T> {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        self.x.fmt(f)
+    }
+}
+impl<T> Deref for Spanned<T> {
+    type Target = T;
 
-type SpanStr = Spanned<&'static str>;
+    fn deref(&self) -> &Self::Target {
+        &self.x
+    }
+}
+impl<T> DerefMut for Spanned<T> {
+    fn deref_mut(&mut self) -> &mut Self::Target {
+        &mut self.x
+    }
+}
+type Str = Spanned<&'static str>;
 
 #[derive(Debug, Clone, PartialEq)]
-struct StringIds<T>(BTreeMap<&'static str, T>);
+struct StringIds<T>(BTreeMap<&'static str, Spanned<T>>, &'static str);
 impl<T: Id> StringIds<T> {
-    fn inverse(&self) -> BTreeMap<T, &'static str> {
-        self.0.iter().map(|(k, v)| (*v, *k)).collect()
-    }
-    fn map_ids(self, f: &mut impl FnMut(T) -> T) -> Self {
-        Self(self.0.into_iter().map(|(k, v)| (k, f(v))).collect())
-    }
     fn len(&self) -> usize {
         self.0.len()
     }
-    fn add_unique(&mut self, s: &'static str) -> T {
+    fn add_unique(&mut self, s: Str) -> syn::Result<T> {
         let id = self.0.len().into();
-        assert!(self.0.insert(s, id).is_none());
-        id
-    }
-    fn add_maybe_duplicate(&mut self, s: &'static str) -> T {
-        let id = self.0.len().into();
-        *self.0.entry(s).or_insert(id)
-    }
-    fn add_duplicate(&mut self, s: &'static str) -> T {
-        *self.0.get(s).unwrap()
+        self.0
+            .insert_unique(s.x, Spanned::new(id, s.span), self.1)?;
+        Ok(id)
     }
     fn add_internal_id(&mut self) -> T {
-        let s = &*format!("__{}", self.0.len()).leak();
-        self.add_unique(s)
+        let s = Str::new(&*format!("__{}", self.0.len()).leak(), placeholder_span());
+        self.add_unique(s).expect("generated id should be unique")
     }
-    fn lookup(&self, s: &'static str) -> T {
-        if let Some(value) = self.0.get(s) {
-            *value
+    fn lookup(&self, s: Str) -> syn::Result<T> {
+        if let Some(value) = self.0.get(s.x) {
+            Ok(**value)
         } else {
-            panic!("\"{}\" does not exist in {:?}", s, &self.0);
+            Err(syn::Error::new(
+                s.span,
+                format!("{} {s} is not defined", self.1),
+            ))
         }
     }
-    fn new() -> Self {
-        Self(BTreeMap::new())
+    fn new(label: &'static str) -> Self {
+        Self(BTreeMap::new(), label)
     }
 }
 fn is_internal_id(s: &str) -> bool {
@@ -703,7 +755,7 @@ struct GlobalVariableInfo {
     compute: ComputeMethod,
 }
 
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Debug, Clone, PartialEq, Eq, Hash)]
 enum ComputeMethod {
     Function {
         function: FunctionId,
@@ -712,40 +764,128 @@ enum ComputeMethod {
     Literal(Literal),
 }
 
+fn already_defined(
+    identifier: &'static str,
+    old: Span,
+    new: Span,
+    context: &'static str,
+) -> syn::Error {
+    let mut err = syn::Error::new(new, format!("{context} {identifier} already defined"));
+    syn::Error::combine(
+        &mut err,
+        syn::Error::new(
+            old,
+            format!("{context} {identifier} originally defined here"),
+        ),
+    );
+    err
+}
+
+trait MapExt<K, V> {
+    fn insert_unique(&mut self, k: K, v: V, context: &'static str) -> syn::Result<V>;
+}
+impl<V: Clone> MapExt<Str, V> for BTreeMap<Str, V> {
+    fn insert_unique(&mut self, k: Str, v: V, context: &'static str) -> syn::Result<V> {
+        use std::collections::btree_map::Entry;
+        match self.entry(k) {
+            Entry::Vacant(entry) => {
+                entry.insert(v.clone());
+                Ok(v)
+            }
+            Entry::Occupied(entry) => Err(already_defined(k.x, entry.key().span, k.span, context)),
+        }
+    }
+}
+impl<V: Clone> MapExt<&'static str, Spanned<V>> for BTreeMap<&'static str, Spanned<V>> {
+    fn insert_unique(
+        &mut self,
+        k: &'static str,
+        v: Spanned<V>,
+        context: &'static str,
+    ) -> syn::Result<Spanned<V>> {
+        use std::collections::btree_map::Entry;
+        match self.entry(k) {
+            Entry::Vacant(entry) => {
+                entry.insert(v.clone());
+                Ok(v)
+            }
+            Entry::Occupied(entry) => Err(already_defined(k, entry.get().span, v.span, context)),
+        }
+    }
+}
+
+/// Global parsing state
 #[derive(Debug, PartialEq, Clone)]
 struct Parser {
-    rulesets: HashSet<&'static str>,
+    rulesets: BTreeMap<Str, ()>,
 
-    functions: HashMap<FunctionId, FunctionData>,
-    function_possible_ids: HashMap<&'static str, Vec<FunctionId>>,
+    functions: BTreeMap<FunctionId, FunctionData>,
+    function_possible_ids: BTreeMap<Str, Vec<FunctionId>>,
     function_id_gen: IdGen<FunctionId>,
 
     types: HashMap<TypeId, TypeData>,
     type_ids: StringIds<TypeId>,
 
+    /// x in (let x (Const 1)) -> id
     global_variables: StringIds<GlobalId>,
+    /// Const 1 in (let x (Const 1)) -> id
+    global_compute: HashMap<ComputeMethod, GlobalId>,
+    /// id -> metadata
     global_variable_info: HashMap<GlobalId, GlobalVariableInfo>,
 
     initial: Vec<Initial>,
 }
 impl Parser {
+    fn add_global(name: Option<Str>, compute: ComputeMethod) -> syn::Result<()> {
+        todo!()
+    }
+    fn memento(&self) -> impl PartialEq {
+        let Parser {
+            rulesets,
+            functions,
+            function_possible_ids,
+            function_id_gen,
+            types,
+            type_ids,
+            global_variables,
+            global_variable_info,
+            initial,
+            global_compute,
+        } = self;
+
+        (
+            rulesets.clone(),
+            functions.clone(),
+            function_possible_ids.clone(),
+            function_id_gen.clone(),
+            types.clone(),
+            type_ids.clone(),
+            global_variables.clone(),
+            global_variable_info.clone(),
+            global_compute.clone(),
+            initial.clone(),
+        )
+    }
     fn new() -> Self {
         let mut parser = Parser {
-            rulesets: HashSet::new(),
+            rulesets: BTreeMap::new(),
 
-            functions: HashMap::new(),
-            function_possible_ids: HashMap::new(),
+            functions: BTreeMap::new(),
+            function_possible_ids: BTreeMap::new(),
             function_id_gen: IdGen::new(),
 
             types: HashMap::new(),
-            type_ids: StringIds::new(),
-            global_variables: StringIds::new(),
+            type_ids: StringIds::new("type"),
+            global_variables: StringIds::new("global variable"),
             global_variable_info: HashMap::new(),
             initial: Vec::new(),
+            global_compute: HashMap::new(),
         };
-        let default_span = Span::call_site();
         for builtin in BUILTIN_SORTS {
-            let _ty = parser.add_sort(builtin, Some(vec![builtin]), default_span);
+            let _ty = parser.add_sort(
+                Str::with_placeholder(builtin),
+                Some(vec![Str::with_placeholder(builtin)]),
+            );
         }
 
         parser
@@ -754,8 +894,10 @@ impl Parser {
     fn parse_egglog(&mut self, stream: proc_macro2::TokenStream) -> syn::Result<()> {
         for tt in stream {
             let sexp = SexpSpan::parse_sexp(tt)?;
-            // panic!("{:#?}", sexp);
-            self.parse_toplevel(sexp)?;
+            self.parse_toplevel(sexp).add_err(syn::Error::new(
+                sexp.span,
+                format!("while parsing this toplevel expression"),
+            ))?;
         }
         Ok(())
     }
@@ -765,13 +907,13 @@ impl Parser {
         let (function_name, args) = x.call("toplevel")?;
 
         let unimplemented_msg = err!("does not make sense for compiled");
-        match function_name {
+        match *function_name {
             "set-option" => return unimplemented_msg,
             "sort" => match args {
                 [name] => {
                     let name = name.atom("sort name")?;
                     let primitive = None;
-                    let _ = self.add_sort(name, primitive, x.span);
+                    let _ = self.add_sort(name, primitive);
                 }
                 [name, primitive] => {
                     let name = name.atom("sort name")?;
@@ -780,7 +922,7 @@ impl Parser {
                         .into_iter()
                         .map(|x| x.atom("sort primitive"))
                         .collect::<Result<Vec<_>, _>>()?;
-                    let _ = self.add_sort(name, Some(primitive), x.span);
+                    let _ = self.add_sort(name, Some(primitive));
                 }
                 _ => ret!("usage: (sort <name>) or (sort <name> (<collection> <args>*))"),
             },
@@ -788,7 +930,7 @@ impl Parser {
                 let [name, constructors @ ..] = args else {
                     ret!("usage: (datatype <name> <variant>*)");
                 };
-                let output_type = self.add_sort(name.atom("datatype")?, None, x.span);
+                let output_type = self.add_sort(name.atom("datatype")?, None)?;
                 for constructor in constructors {
                     let (function_name, args) = constructor.call("datatype constructor")?;
 
@@ -797,7 +939,11 @@ impl Parser {
                     let inputs = match args {
                         [inputs @ .., SexpSpan {
                             span: _,
-                            x: Sexp::Atom(":cost"),
+                            x:
+                                Sexp::Atom(Str {
+                                    x: ":cost",
+                                    span: _,
+                                }),
                         }, c] => {
                             cost = Some(c.uint("constructor cost")?);
                             inputs
@@ -806,10 +952,10 @@ impl Parser {
                     };
                     let inputs = inputs
                         .iter()
-                        .map(|x| Ok(self.type_ids.lookup(x.atom("input type")?)))
+                        .map(|x| self.type_ids.lookup(x.atom("input type")?))
                         .collect::<syn::Result<Vec<_>>>()?;
 
-                    self.add_function(function_name, inputs, Some(output_type), None, cost, x.span);
+                    self.add_function(function_name, inputs, Some(output_type), None, cost);
                 }
             }
             "datatype*" => ret!("\"datatype*\" unimplemented, unclear what this does"),
@@ -820,13 +966,13 @@ impl Parser {
                 };
                 let name = name.atom("function name")?;
                 let inputs = self.parse_inputs(inputs)?;
-                let output = self.type_ids.lookup(output.atom("function output")?);
+                let output = self.type_ids.lookup(output.atom("function output")?)?;
                 let merge = match parse_options(options)?.as_slice() {
                     [(":merge", [expr])] => Some(self.parse_expr(*expr, &None)?),
                     [(":no_merge", [])] => None,
                     _ => ret!("missing merge options (:merge <expr>) or (:no_merge)"),
                 };
-                self.add_function(name, inputs, Some(output), merge, None, x.span);
+                self.add_function(name, inputs, Some(output), merge, None);
             }
             "constructor" => {
                 let [name, inputs, output, options @ ..] = args else {
@@ -834,7 +980,7 @@ impl Parser {
                 };
                 let name = name.atom("constructor name")?;
                 let inputs = self.parse_inputs(inputs)?;
-                let output = self.type_ids.lookup(output.atom("constructor output")?);
+                let output = self.type_ids.lookup(output.atom("constructor output")?)?;
                 let mut cost = Some(1);
                 match parse_options(options)?.as_slice() {
                     [(":cost", [c])] => cost = Some(c.uint("constructor cost value")?),
@@ -842,7 +988,7 @@ impl Parser {
                     [] => (),
                     _ => ret!("missing merge options (:merge <expr>) or (:no_merge)"),
                 };
-                self.add_function(name, inputs, Some(output), None, cost, x.span);
+                self.add_function(name, inputs, Some(output), None, cost);
             }
             "relation" => {
                 let [name, inputs] = args else {
@@ -850,16 +996,15 @@ impl Parser {
                 };
                 let name = name.atom("relation name")?;
                 let inputs = self.parse_inputs(inputs)?;
-                self.add_function(name, inputs, None, None, None, x.span);
+                self.add_function(name, inputs, None, None, None);
             }
 
             "ruleset" => {
                 let [name] = args else {
                     ret!("usage: (ruleset <name>)");
                 };
-                if !self.rulesets.insert(name.atom("ruleset name")?) {
-                    ret!("ruleset already defined");
-                }
+                self.rulesets
+                    .insert_unique(name.atom("ruleset name")?, (), "ruleset")?
             }
 
             "rule" => {
@@ -892,7 +1037,7 @@ impl Parser {
                     ruleset,
                     facts,
                     actions.into_iter().flatten().collect(),
-                );
+                )?;
             }
             "rewrite" => {
                 let [lhs, rhs, options @ ..] = args else {
@@ -914,7 +1059,7 @@ impl Parser {
                 }
                 let mut facts = extra_facts;
                 facts.push(lhs.clone());
-                self.add_rule(None, ruleset, facts, vec![Action::Union(lhs, rhs)]);
+                self.add_rule(None, ruleset, facts, vec![Action::Union(lhs, rhs)])?;
             }
             "birewrite" => {
                 let [lhs, rhs, options @ ..] = args else {
@@ -936,7 +1081,7 @@ impl Parser {
                 for (lhs, rhs) in [(lhs.clone(), rhs.clone()), (rhs, lhs)] {
                     let mut facts = extra_facts.clone();
                     facts.push(lhs.clone());
-                    self.add_rule(None, ruleset, facts, vec![Action::Union(lhs, rhs)]);
+                    self.add_rule(None, ruleset, facts, vec![Action::Union(lhs, rhs)])?;
                 }
             }
 
@@ -952,7 +1097,29 @@ impl Parser {
             "print_size" => return unimplemented_msg,
             "input" => return unimplemented_msg,
             "output" => return unimplemented_msg,
-            "include" => return unimplemented_msg,
+            "include" => {
+                // TODO: strip ; comments
+                let [filepath] = args else {
+                    ret!("usage (include \"<filepath>\")");
+                };
+                let filepath = filepath.string("filepath")?;
+                let span = x.span;
+
+                let working_directory = std::env::current_dir().unwrap();
+
+                let content = std::fs::read_to_string(filepath).map_err(|e| {
+                    syn::Error::new(
+                        span,
+                        format!("{e}, working directory is {working_directory:?}"),
+                    )
+                })?;
+
+                let stream = content.parse::<proc_macro2::TokenStream>().unwrap();
+                self.parse_egglog(stream).add_err(syn::Error::new(
+                    span,
+                    format!("while parsing \"{filepath}\""),
+                ))?;
+            }
             "fail" => return unimplemented_msg,
 
             _ => {
@@ -967,43 +1134,34 @@ impl Parser {
         inputs
             .list("input types")?
             .iter()
-            .map(|x| Ok(self.type_ids.lookup(x.atom("input type")?)))
+            .map(|x| self.type_ids.lookup(x.atom("input type")?))
             .collect()
     }
 
-    fn add_sort(
-        &mut self,
-        name: &'static str,
-        primitive: Option<Vec<&'static str>>,
-        span: Span,
-    ) -> TypeId {
-        let id = self.type_ids.add_unique(name);
-        self.types.insert(
-            id,
-            TypeData {
-                name,
-                primitive,
-                span,
-            },
-        );
-        id
+    fn add_sort(&mut self, name: Str, primitive: Option<Vec<Str>>) -> syn::Result<TypeId> {
+        let id = self.type_ids.add_unique(name)?;
+        self.types.insert(id, TypeData { name, primitive });
+        Ok(id)
     }
 
     fn add_function(
         &mut self,
-        name: &'static str,
+        name: Str,
         inputs: Vec<TypeId>,
         output: Option<TypeId>,
         merge: Option<Expr>,
         // None means it can not be extracted
         cost: Option<u64>,
-        span: Span,
     ) {
         // functions: HashMap<FunctionId, FunctionData>,
         // function_possible_ids: HashMap<&'static str, Vec<FunctionId>>,
         // function_id_gen: IdGen<FunctionId>,
 
-        let output = output.unwrap_or_else(|| self.type_ids.lookup(BUILTIN_UNIT));
+        let output = output.unwrap_or_else(|| {
+            self.type_ids
+                .lookup(Str::with_placeholder(BUILTIN_UNIT))
+                .expect("unit type exists")
+        });
         let id = self.function_id_gen.gen();
         self.function_possible_ids.entry(name).or_default().push(id);
         self.functions.insert(
@@ -1014,7 +1172,6 @@ impl Parser {
                 output,
                 merge,
                 cost,
-                span,
             },
         );
     }
@@ -1022,28 +1179,24 @@ impl Parser {
 
 #[derive(Debug, Clone, PartialEq)]
 enum Expr {
-    Literal(Literal),
-    Var(&'static str),
-    Call(&'static str, Vec<Expr>),
+    Literal(Spanned<Literal>),
+    Var(Str),
+    Call(Str, Vec<Expr>),
 }
 impl Parser {
     fn parse_expr(
         &mut self,
         x: SexpSpan,
-        local_bindings: &Option<&mut BTreeMap<&'static str, Expr>>,
+        local_bindings: &Option<&mut BTreeMap<Str, Expr>>,
     ) -> syn::Result<Expr> {
         Ok(match x.x {
             Sexp::Literal(x) => Expr::Literal(x),
-            // TODO: this can cause an infinite recursion maybe?
-            // (let x (Const 1))
-            // (let x (Add x x))
-            // (let x (Mul x x)) -> (Mul (Add x x) (Add x x))
             Sexp::Atom(x) => local_bindings
                 .as_ref()
-                .and_then(|local_bindings| local_bindings.get(x))
+                .and_then(|local_bindings| local_bindings.get(&x))
                 .cloned()
                 .unwrap_or(Expr::Var(x)),
-            Sexp::List([]) => Expr::Literal(Literal::Unit),
+            Sexp::List([]) => Expr::Literal(Spanned::new(Literal::Unit, x.span)),
             Sexp::List(_) => {
                 let (function_name, args) = x.call("general call function name")?;
                 let args = args
@@ -1087,11 +1240,13 @@ impl Parser {
             Literal::Bool(_) => BUILTIN_BOOL,
             Literal::Unit => BUILTIN_UNIT,
         };
-        self.type_ids.lookup(name)
+        self.type_ids
+            .lookup(Str::with_placeholder(name))
+            .expect("builtin types defined")
     }
-    fn add_toplevel_binding(&mut self, binding_name: &'static str, expr: Expr) {
+    fn add_toplevel_binding(&mut self, binding_name: Str, expr: Expr) -> syn::Result<()> {
         struct UnknownFunction {
-            name: &'static str,
+            name: Str,
             ids: Vec<FunctionId>,
             args: Vec<VariableId>,
             // possibly unit
@@ -1099,7 +1254,7 @@ impl Parser {
         }
 
         enum Compute {
-            Literal(Literal),
+            Literal(Spanned<Literal>),
             Function(FunctionId, Vec<VariableId>),
             Global(GlobalId),
         }
@@ -1109,13 +1264,13 @@ impl Parser {
             variables: &mut TVec<VariableId, (Option<Compute>, Option<TypeId>)>,
             unknown: &mut Vec<UnknownFunction>,
             expr: Expr,
-        ) -> VariableId {
-            match expr {
+        ) -> syn::Result<VariableId> {
+            Ok(match expr {
                 Expr::Literal(x) => {
-                    variables.add((Some(Compute::Literal(x)), Some(parser.literal_type(x))))
+                    variables.add((Some(Compute::Literal(x)), Some(parser.literal_type(*x))))
                 }
                 Expr::Var(x) => {
-                    let global_id = parser.global_variables.lookup(x);
+                    let global_id = parser.global_variables.lookup(x)?;
                     variables.add((
                         Some(Compute::Global(global_id)),
                         Some(parser.global_variable_info[&global_id].ty),
@@ -1123,11 +1278,11 @@ impl Parser {
                 }
                 Expr::Call(name, args) => {
                     let rval = variables.add((None, None));
-                    let ids = parser.function_possible_ids[name].clone();
+                    let ids = parser.function_possible_ids[&name].clone();
                     let args: Vec<_> = args
                         .into_iter()
                         .map(|x| parse(parser, variables, unknown, x))
-                        .collect();
+                        .collect::<Result<_, _>>()?;
                     unknown.push(UnknownFunction {
                         name,
                         ids,
@@ -1136,14 +1291,14 @@ impl Parser {
                     });
                     rval
                 }
-            }
+            })
         }
 
         let mut variables = TVec::new();
         let mut unknown = Vec::new();
-        let root_id = parse(self, &mut variables, &mut unknown, expr);
+        let root_id = parse(self, &mut variables, &mut unknown, expr)?;
 
-        fixpoint_mut(
+        let () = fixpoint_mut(
             &mut unknown,
             |unknown| {
                 let mut error = Ok(());
@@ -1156,16 +1311,37 @@ impl Parser {
                      }| {
                         let output_ty = variables[*rval].1;
                         let inputs_ty: Vec<_> = args.iter().map(|x| variables[*x].1).collect();
-                        ids.retain(|function_id| {
-                            let function = &self.functions[function_id];
-                            function.check_compatible(&inputs_ty, output_ty)
-                        });
+                        let possible_ids: Vec<_> = ids
+                            .iter()
+                            .copied()
+                            .filter(|function_id| {
+                                let function = &self.functions[function_id];
+                                function.check_compatible(&inputs_ty, output_ty)
+                            })
+                            .collect();
 
-                        match ids.as_slice() {
+                        match possible_ids.as_slice() {
                             [] => {
-                                error = Err(format!(
-                                    "{name} has no type valid variant in this context"
-                                ));
+                                let inputs_ty_s = inputs_ty
+                                    .iter()
+                                    .map(|ty| match ty {
+                                        Some(ty) => *self.types[ty].name,
+                                        None => "_",
+                                    })
+                                    .collect::<Vec<_>>()
+                                    .join(" ");
+                                let output_ty_s = match output_ty {
+                                    Some(ty) => *self.types[&ty].name,
+                                    None => "_",
+                                };
+                                let mut err = syn::Error::new(
+                                    name.span,
+                                    format!("{name} has no variant for fn({inputs_ty_s}) -> {output_ty_s}"),
+                                );
+                                for id in ids {
+                                    self.err_function_defined_here(*id, &mut err);
+                                }
+                                error = Err(err);
                                 false
                             }
                             [function_id] => {
@@ -1190,11 +1366,35 @@ impl Parser {
                 error
             },
             |unknown| unknown.len(),
-        )
-        .unwrap();
+        )?;
 
-        if unknown.len() != 0 {
-            panic!("function call ambigious");
+        if let Some(unknown) = unknown.iter().next() {
+            // panic!("function call ambigious");
+
+            let output_ty = variables[unknown.rval].1;
+            let inputs_ty: Vec<_> = unknown.args.iter().map(|x| variables[*x].1).collect();
+
+            let inputs_ty_s = inputs_ty
+                .iter()
+                .map(|ty| match ty {
+                    Some(ty) => *self.types[ty].name,
+                    None => "_",
+                })
+                .collect::<Vec<_>>()
+                .join(" ");
+            let output_ty_s = match output_ty {
+                Some(ty) => *self.types[&ty].name,
+                None => "_",
+            };
+            let name = unknown.name;
+            let mut err = syn::Error::new(
+                name.span,
+                format!("call to {name} is ambigious fn({inputs_ty_s}) -> {output_ty_s}"),
+            );
+            for id in unknown.ids.iter() {
+                self.err_function_defined_here(*id, &mut err);
+            }
+            return Err(err);
         }
 
         let mut local_to_global = HashMap::new();
@@ -1205,7 +1405,9 @@ impl Parser {
                 vars.retain(|&x| {
                     let mut add_global_id = |info| {
                         let global_id = if x == root_id {
-                            self.global_variables.add_unique(binding_name)
+                            self.global_variables
+                                .add_unique(binding_name)
+                                .expect("TODO: err in retain")
                         } else {
                             self.global_variables.add_internal_id()
                         };
@@ -1217,7 +1419,7 @@ impl Parser {
                     let global_id = match variables[x].0.as_ref().unwrap() {
                         Compute::Literal(literal) => add_global_id(GlobalVariableInfo {
                             ty,
-                            compute: ComputeMethod::Literal(*literal),
+                            compute: ComputeMethod::Literal(**literal),
                         }),
                         Compute::Function(function_id, args) => {
                             if let Some(args) = args
@@ -1252,6 +1454,33 @@ impl Parser {
         );
         self.initial
             .push(Initial::ComputeGlobal(local_to_global[&root_id]));
+        Ok(())
+    }
+
+    fn err_type_defined_here(&mut self, id: TypeId, err: &mut syn::Error) {
+        let name = self.type_name(id);
+        syn::Error::combine(
+            err,
+            syn::Error::new(name.span, format!("type {name} defined here")),
+        )
+    }
+    fn err_function_defined_here(&mut self, id: FunctionId, err: &mut syn::Error) {
+        let function = &self.functions[&id];
+        let inputs_ty_s = function
+            .inputs
+            .iter()
+            .map(|ty| *self.types[ty].name)
+            .collect::<Vec<_>>()
+            .join(" ");
+        let output_ty_s = *self.types[&function.output].name;
+        let name = &function.name;
+        syn::Error::combine(
+            err,
+            syn::Error::new(
+                name.span,
+                format!("{name} defined here fn({inputs_ty_s}) -> {output_ty_s}"),
+            ),
+        )
     }
     fn parse_action(
         &mut self,
@@ -1259,13 +1488,13 @@ impl Parser {
         // None => toplevel
         // Some =>
         // &mut Option<&mut T> because Option<&mut T> is !Copy
-        local_bindings: &mut Option<&mut BTreeMap<&'static str, Expr>>,
+        local_bindings: &mut Option<&mut BTreeMap<Str, Expr>>,
     ) -> syn::Result<Option<Action>> {
         let (function_name, args) = x.call("action is a function call")?;
         register_span!(x.span);
 
         let unimplemented_msg = err!("does not make sense for compiled");
-        Ok(match function_name {
+        Ok(match *function_name {
             "let" => {
                 let [name, expr] = args else {
                     ret!("usage: (let <name> <expr>)")
@@ -1276,9 +1505,9 @@ impl Parser {
                 if let Some(local_bindings) = local_bindings {
                     // TODO: currently allows shadowing other local variables
                     // "expansion" is recursive, so we need to detect cycles when expanding
-                    local_bindings.insert(name, expr.clone());
+                    local_bindings.insert_unique(name, expr.clone(), "local binding")?;
                 } else {
-                    self.add_toplevel_binding(name, expr);
+                    self.add_toplevel_binding(name, expr)?;
                 }
                 None
             }
@@ -1323,6 +1552,10 @@ impl Parser {
             }
         })
     }
+
+    fn type_name(&self, ty: TypeId) -> Str {
+        self.types[&ty].name
+    }
 }
 
 fn parse_options(
@@ -1345,13 +1578,14 @@ fn parse_options(
             }
             i += 1;
         }
-        out.push((opt, &rest[..i]));
+        out.push((*opt, &rest[..i]));
         s = &rest[i..];
     }
     Ok(out)
 }
 
 mod compile_rule {
+    use super::*;
 
     // Literal > Exists > Forall?
     // Default impl is only for UF
@@ -1361,9 +1595,34 @@ mod compile_rule {
         Forall,
         // action default
         Exists,
-        // TODO: turn any variables with unit type into `Literal::Unit`
-        // Literal OR global when global is added
-        Literal(Literal),
+        PseudoLiteral(PseudoLiteral),
+    }
+    /// References a specific "value" (global or literal)
+    /// It is never valid to try to unify a pseudoliteral with a different pseudoliteral
+    /// It basically acts like a literal.
+    ///
+    /// (let one (Const 1))
+    /// (let also_one (Add (Const 1) (Const 0)))
+    /// (let one_alias one)
+    ///
+    /// ... (= 1 1)           ; ok -> delete constraint
+    /// ... (= 1 2)           ; not ok (refers to different literals)
+    /// ... (= one one_alias) ; ok -> delete constraint
+    /// ... (= one also_one)  ; not ok (refers to different globals)
+    ///
+    /// TODO: deduplicate globals so that aliases that happen to be equal are valid
+    /// TODO: turn any variables with unit type into `Literal::Unit`
+
+    /// (rule
+    ///   ((= e (Add a b)))
+    ///   ((union e (Add b a)))
+    /// )
+    ///
+
+    #[derive(Copy, Clone, PartialOrd, PartialEq, Debug)]
+    enum PseudoLiteral {
+        Literal(Spanned<Literal>),
+        Global(GlobalId),
     }
 
     #[derive(Copy, Clone, Ord, PartialOrd, Eq, PartialEq, Debug)]
@@ -1376,11 +1635,12 @@ mod compile_rule {
     // Default impl is only for UF
     #[derive(Copy, Clone, PartialEq, Debug)]
     struct VariableInfo {
-        name: Option<&'static str>,
+        name: Option<Str>,
         restrict: Restrict,
         ty: TypeVarId,
     }
 
+    // TODO: maybe move is_premise to this struct?
     #[derive(Clone, PartialEq, Debug)]
     struct UnknownCall {
         name: &'static str,
@@ -1403,15 +1663,125 @@ mod compile_rule {
         }
     }
 
-    use super::*;
+    /// Per rule parsing state.
+
+    struct Ctx<'a> {
+        variables: &'a mut UFData<VariableId, VariableInfo>,
+        types: &'a mut UFData<TypeVarId, Option<TypeId>>,
+        /// Unmerged variables in actions
+        union_queue: &'a mut Vec<(VariableId, VariableId)>,
+        premise_call: &'a mut Vec<UnknownCall>,
+        action_call: &'a mut Vec<UnknownCall>,
+    }
+    impl<'a> Ctx<'a> {
+        /// For finding fixpoint
+        fn memento(&self) -> impl PartialEq {
+            let Ctx {
+                variables,
+                types,
+                union_queue,
+                premise_call,
+                action_call,
+            } = self;
+            (
+                (&**variables).clone(),
+                (&**types).clone(),
+                (&**union_queue).clone(),
+                (&**premise_call).clone(),
+                (&**action_call).clone(),
+            )
+        }
+        fn merge_variables(
+            &mut self,
+            parser: &mut Parser,
+            a: VariableId,
+            b: VariableId,
+            is_premise: IsPremise,
+        ) -> syn::Result<()> {
+            {
+                let a = self.variables.find(a);
+                let b = self.variables.find(b);
+                let an = self.variables.lookup(a).name;
+                let bn = self.variables.lookup(b).name;
+                eprintln!("merge({a:?}{an:?} {b:?}{bn:?} {is_premise:?})")
+            }
+            // merge type before because ctx lifetime
+            {
+                let ta = self.variables.lookup(a).ty;
+                let tb = self.variables.lookup(b).ty;
+                merge_types(parser, &mut self.types, ta, tb)?;
+            }
+            use IsPremise::*;
+            use Restrict::*;
+            let x: Result<Option<(VariableId, VariableId)>, syn::Result<()>> =
+                self.variables.union_merge(
+                    a,
+                    b,
+                    |VariableInfo {
+                         name: namea,
+                         restrict: ra,
+                         ty: ta,
+                     },
+                     VariableInfo {
+                         name: nameb,
+                         restrict: rb,
+                         ty: tb,
+                     }| {
+                        let ta = self.types.find(ta);
+                        let tb = self.types.find(tb);
+                        assert_eq!(ta, tb, "types are already merged");
+                        let restrict = match (ra, rb, is_premise) {
+                            (Forall, Forall, Action) => Forall,
+                            (Forall, Exists, Action) | (Exists, Forall, Action) => Exists,
+                            (Exists, Exists, Premise) => Exists,
+                            (Exists, Exists, Action) => {
+                                self.union_queue.push((a, b));
+                                return Err(Ok(()));
+                            }
+                            (Forall, PseudoLiteral(literal), _)
+                            | (Exists, PseudoLiteral(literal), _)
+                            | (PseudoLiteral(literal), Forall, _)
+                            | (PseudoLiteral(literal), Exists, _) => {
+                                Restrict::PseudoLiteral(literal)
+                            }
+                            (PseudoLiteral(l0), PseudoLiteral(l1), _) => {
+                                if l0 == l1 {
+                                    Restrict::PseudoLiteral(l0)
+                                } else {
+                                    todo!("err")
+                                    //return Err(Err(format!("literal mismatch {l0:?} != {l1:?}")));
+                                }
+                            }
+                            (Forall, x, Premise) | (x, Forall, Premise) => {
+                                eprintln!("this should be unreachable...");
+                                x
+                            }
+                        };
+
+                        let merged_info = VariableInfo {
+                            name: namea.or(nameb),
+                            restrict,
+                            ty: ta,
+                        };
+                        Ok(merged_info)
+                    },
+                );
+            match x {
+                Ok(_) => Ok(()),
+                Err(Ok(())) => Ok(()),
+                Err(Err(err)) => Err(err),
+            }
+        }
+    }
+
     impl Parser {
         pub(super) fn add_rule(
             &mut self,
-            name: Option<&'static str>,
-            ruleset: Option<&'static str>,
+            name: Option<Str>,
+            ruleset: Option<Str>,
             facts: Vec<Expr>,
             actions: Vec<Action>,
-        ) {
+        ) -> syn::Result<()> {
             // TODO: expand Expr
             // TODO: implement constant folding using the given primitive indexes
 
@@ -1466,24 +1836,28 @@ mod compile_rule {
             let mut variables: UFData<VariableId, VariableInfo> = UFData::new();
             let mut types: UFData<TypeVarId, Option<TypeId>> = UFData::new();
             let mut bound_variables: BTreeMap<&'static str, VariableId> = BTreeMap::new();
-            let mut action_union = Vec::new();
-            let mut premise_call = Vec::new();
-            let mut action_call = Vec::new();
+            let mut action_union: Vec<(VariableId, VariableId)> = Vec::new();
+            let mut premise_call: Vec<UnknownCall> = Vec::new();
+            let mut action_call: Vec<UnknownCall> = Vec::new();
+
+            let mut ctx = Ctx {
+                variables: &mut variables,
+                types: &mut types,
+                union_queue: &mut action_union,
+                premise_call: &mut premise_call,
+                action_call: &mut action_call,
+            };
+
             for premise in facts {
                 // TODO: propagate parse_expr error
                 // TODO: assert that this expr returns unit
-                let _ = parse_expr(
+                let _: VariableId = parse_expr(
                     self,
-                    &mut variables,
-                    &mut types,
+                    &mut ctx,
                     &mut bound_variables,
                     IsPremise::Premise,
                     &premise,
-                    &mut action_union,
-                    &mut premise_call,
-                    &mut action_call,
-                )
-                .unwrap();
+                )?;
             }
             for action in actions {
                 // TODO: propagate parse_expr error
@@ -1491,89 +1865,27 @@ mod compile_rule {
                 let expr = pseudo_parse_action(action);
                 let _ = parse_expr(
                     self,
-                    &mut variables,
-                    &mut types,
+                    &mut ctx,
                     &mut bound_variables,
                     IsPremise::Action,
                     &expr,
-                    &mut action_union,
-                    &mut premise_call,
-                    &mut action_call,
                 )
                 .unwrap();
             }
 
             let mut known_call: BTreeMap<Call, (VariableId, IsPremise)> = BTreeMap::new();
-            let parser = self;
+
+            let mut memento = (known_call.clone(), ctx.memento(), self.memento());
+            let start = std::time::Instant::now();
             loop {
-                // TODO: handle err
-                let err = resolve_calls(
-                    &mut premise_call,
-                    &mut action_call,
-                    &mut types,
-                    &mut variables,
-                    parser,
-                    &mut known_call,
-                    &mut action_union,
-                );
-                break;
+                eprintln!("step! {:?}", start.elapsed());
+                resolve_calls(self, &mut ctx, &mut known_call)?;
+                let new_memento = (known_call.clone(), ctx.memento(), self.memento());
+                if memento == new_memento {
+                    break;
+                }
+                memento = new_memento;
             }
-
-            let mut state = (
-                &mut premise_call,
-                &mut action_call,
-                &mut types,
-                &mut variables,
-                parser,
-                &mut known_call,
-                &mut action_union,
-            );
-
-            // TODO: handle err
-            let err = fixpoint_mut(
-                &mut state,
-                |(
-                    premise_call,
-                    action_call,
-                    types,
-                    variables,
-                    parser,
-                    known_call,
-                    action_union,
-                )| {
-                    resolve_calls(
-                        premise_call,
-                        action_call,
-                        types,
-                        variables,
-                        parser,
-                        known_call,
-                        action_union,
-                    )
-                },
-                |(
-                    premise_call,
-                    action_call,
-                    types,
-                    variables,
-                    parser,
-                    known_call,
-                    action_union,
-                )| {
-                    (
-                        (&**premise_call).clone(),
-                        (&**action_call).clone(),
-                        (&**types).clone(),
-                        (&**variables).clone(),
-                        (&**parser).clone(),
-                        (&**known_call).clone(),
-                        (&**action_union).clone(),
-                    )
-                },
-            );
-
-            err.unwrap();
-            dbg!(&state);
 
             {
                 let mut facts = Vec::new();
@@ -1590,124 +1902,71 @@ mod compile_rule {
                 eprintln!("{facts:#?}");
                 eprintln!("{actions:#?}");
             }
-
-            eprintln!("foobar");
-
-            todo!("typecheck")
+            // TODO: add rule to parser
+            Ok(())
         }
     }
 
     fn merge_types(
+        parser: &mut Parser,
         types: &mut UFData<TypeVarId, Option<TypeId>>,
         ta: TypeVarId,
         tb: TypeVarId,
-    ) -> Result<(), String> {
+    ) -> syn::Result<()> {
         types
             .union_merge(ta, tb, |a, b| match (a, b) {
                 (None, None) => Ok(None),
                 (None, Some(x)) | (Some(x), None) => Ok(Some(x)),
                 (Some(a), Some(b)) => {
                     if a == b {
-                        Ok(Some(a))
-                    } else {
-                        Err(format!("type mismatch between type {a:?} and type {b:?}"))
+                        return Ok(Some(a));
                     }
+
+                    let name_a = parser.type_name(a);
+                    let name_b = parser.type_name(b);
+
+                    // TODO: remove placeholder_span
+                    let mut err = syn::Error::new(
+                        placeholder_span(),
+                        format!("type mismatch between type {name_a} and type {name_b}"),
+                    );
+
+                    parser.err_type_defined_here(a, &mut err);
+                    parser.err_type_defined_here(b, &mut err);
+
+                    Err(err)
                 }
             })
             .map(|_| ())
-    }
-
-    fn merge_variables(
-        variables: &mut UFData<VariableId, VariableInfo>,
-        a: VariableId,
-        b: VariableId,
-        types: &mut UFData<TypeVarId, Option<TypeId>>,
-        is_premise: IsPremise,
-        action_union: &mut Vec<(VariableId, VariableId)>,
-    ) -> Result<(), Result<(), String>> {
-        use IsPremise::*;
-        use Restrict::*;
-        let x: Result<Option<(VariableId, VariableId)>, Result<(), String>> = variables
-            .union_merge(
-                a,
-                b,
-                |VariableInfo {
-                     name: namea,
-                     restrict: ra,
-                     ty: ta,
-                 },
-                 VariableInfo {
-                     name: nameb,
-                     restrict: rb,
-                     ty: tb,
-                 }| {
-                    // TODO: inform caller what types where mismatched.
-                    merge_types(types, ta, tb).map_err(Err)?;
-
-                    let restrict = match (ra, rb, is_premise) {
-                        (Forall, Forall, Action) => Forall,
-                        (Forall, _, Premise) | (_, Forall, Premise) => unreachable!(),
-                        (Forall, Exists, Action) | (Exists, Forall, Action) => Exists,
-                        (Exists, Exists, Premise) => Exists,
-                        (Exists, Exists, Action) => {
-                            action_union.push((a, b));
-                            return Err(Ok(()));
-                        }
-                        (Forall, Literal(literal), _)
-                        | (Exists, Literal(literal), _)
-                        | (Literal(literal), Forall, _)
-                        | (Literal(literal), Exists, _) => Restrict::Literal(literal),
-                        (Literal(l0), Literal(l1), _) => {
-                            if l0 == l1 {
-                                Restrict::Literal(l0)
-                            } else {
-                                return Err(Err(format!("literal mismatch {l0:?} != {l1:?}")));
-                            }
-                        }
-                    };
-
-                    let merged_info = VariableInfo {
-                        name: namea.or(nameb),
-                        restrict,
-                        ty: ta,
-                    };
-                    Ok(merged_info)
-                },
-            );
-        x.map(|_| ())
     }
 
     // None on (= a b)
     // bogus variables are returned as unit literals
     fn parse_expr(
         parser: &mut Parser,
-        variables: &mut UFData<VariableId, VariableInfo>,
-        types: &mut UFData<TypeVarId, Option<TypeId>>,
+        ctx: &mut Ctx<'_>,
         bound_variables: &mut BTreeMap<&'static str, VariableId>,
         is_premise: IsPremise,
         expr: &Expr,
-        union_queue: &mut Vec<(VariableId, VariableId)>,
-        premise_call: &mut Vec<UnknownCall>,
-        action_call: &mut Vec<UnknownCall>,
-    ) -> Result<VariableId, String> {
+    ) -> syn::Result<VariableId> {
         let default_restrict = match is_premise {
             IsPremise::Premise => Restrict::Exists,
             IsPremise::Action => Restrict::Forall,
         };
         match expr {
             Expr::Literal(literal) => {
-                let ty = parser.literal_type(*literal);
-                let typevar = types.add(Some(ty));
-                let variable_id = variables.add(VariableInfo {
-                    restrict: Restrict::Literal(*literal),
+                let ty = parser.literal_type(**literal);
+                let typevar = ctx.types.add(Some(ty));
+                let variable_id = ctx.variables.add(VariableInfo {
+                    restrict: Restrict::PseudoLiteral(PseudoLiteral::Literal(*literal)),
                     ty: typevar,
                     name: None,
                 });
                 Ok(variable_id)
             }
-            Expr::Var(name) => Ok(*bound_variables.entry(*name).or_insert_with(|| {
-                let typevar = types.add(None);
-                let variable_id = variables.add(VariableInfo {
+            Expr::Var(name) => Ok(*bound_variables.entry(name).or_insert_with(|| {
+                let typevar = ctx.types.add(None);
+                let variable_id = ctx.variables.add(VariableInfo {
                     restrict: default_restrict,
                     ty: typevar,
                     name: Some(*name),
@@ -1717,38 +1976,21 @@ mod compile_rule {
             Expr::Call(name, args) => {
                 let args = args
                     .iter()
-                    .map(|expr| {
-                        parse_expr(
-                            parser,
-                            variables,
-                            types,
-                            bound_variables,
-                            is_premise,
-                            expr,
-                            union_queue,
-                            premise_call,
-                            action_call,
-                        )
-                    })
+                    .map(|expr| parse_expr(parser, ctx, bound_variables, is_premise, expr))
                     .collect::<Result<Vec<_>, _>>()?;
 
-                match *name {
+                match **name {
                     "=" => {
                         for (a, b) in args.windows(2).map(|w| (w[0], w[1])) {
-                            let ta = variables.lookup(a).ty;
-                            let tb = variables.lookup(b).ty;
-                            types.union_eq(ta, tb).map_err(|()| format!("oops"))?;
-                            if let Err(err) =
-                                merge_variables(variables, a, b, types, is_premise, union_queue)
-                            {
-                                err?;
-                            }
+                            ctx.merge_variables(parser, a, b, is_premise)?;
                         }
 
-                        let typevar = types.add(Some(parser.literal_type(Literal::Unit)));
-                        let variable_id = variables.add(VariableInfo {
+                        let typevar = ctx.types.add(Some(parser.literal_type(Literal::Unit)));
+                        let variable_id = ctx.variables.add(VariableInfo {
                             name: None,
-                            restrict: Restrict::Literal(Literal::Unit),
+                            restrict: Restrict::PseudoLiteral(PseudoLiteral::Literal(
+                                Spanned::with_placeholder(Literal::Unit),
+                            )),
                             ty: typevar,
                         });
 
@@ -1756,16 +1998,16 @@ mod compile_rule {
                     }
                     _ => {
                         let ids = parser.function_possible_ids[name].clone();
-                        let rval_typevar = types.add(None);
-                        let rval = variables.add(VariableInfo {
+                        let rval_typevar = ctx.types.add(None);
+                        let rval = ctx.variables.add(VariableInfo {
                             // TODO: is default_restrict correct here?
                             restrict: default_restrict,
                             ty: rval_typevar,
                             name: None,
                         });
                         let calls = match is_premise {
-                            IsPremise::Premise => premise_call,
-                            IsPremise::Action => action_call,
+                            IsPremise::Premise => &mut ctx.premise_call,
+                            IsPremise::Action => &mut ctx.action_call,
                         };
                         calls.push(UnknownCall {
                             name,
@@ -1783,22 +2025,21 @@ mod compile_rule {
     fn pseudo_parse_action(action: Action) -> Expr {
         match action {
             Action::Expr(expr) => expr,
-            Action::Union(a, b) => Expr::Call("=", vec![a, b]),
+            Action::Union(a, b) => Expr::Call(Str::with_placeholder("="), vec![a, b]),
         }
     }
 
-    fn insert_call(
+    fn insert_known_call(
+        parser: &mut Parser,
+        ctx: &mut Ctx<'_>,
         known_call: &mut BTreeMap<Call, (VariableId, IsPremise)>,
         new_call: Call,
         rval: VariableId,
         premise: IsPremise,
-        variables: &mut UFData<VariableId, VariableInfo>,
-        types: &mut UFData<TypeVarId, Option<TypeId>>,
-        action_union: &mut Vec<(VariableId, VariableId)>,
-    ) -> Result<(), Result<(), String>> {
+    ) -> syn::Result<()> {
         use std::collections::btree_map::Entry;
-        let new_call = new_call.normalize(variables);
-        let rval = variables.find(rval);
+        let new_call = new_call.normalize(&mut ctx.variables);
+        let rval = ctx.variables.find(rval);
         match known_call.entry(new_call) {
             Entry::Vacant(entry) => {
                 entry.insert((rval, premise));
@@ -1807,27 +2048,23 @@ mod compile_rule {
                 let (old_rval, old_premise) = *entry.get();
                 let premise = premise.max(old_premise);
                 // TODO: why did I nest these errors??
-                merge_variables(variables, rval, old_rval, types, premise, action_union)?;
+                ctx.merge_variables(parser, rval, old_rval, premise)?;
             }
         }
         Ok(())
     }
 
     fn resolve_calls(
-        premise_call: &mut Vec<UnknownCall>,
-        action_call: &mut Vec<UnknownCall>,
-        types: &mut UFData<TypeVarId, Option<TypeId>>,
-        variables: &mut UFData<VariableId, VariableInfo>,
         parser: &mut Parser,
+        ctx: &mut Ctx<'_>,
         known_call: &mut BTreeMap<Call, (VariableId, IsPremise)>,
-        action_union: &mut Vec<(VariableId, VariableId)>,
-    ) -> Result<(), String> {
+    ) -> syn::Result<()> {
         for is_premise in [IsPremise::Premise, IsPremise::Action] {
-            match is_premise {
-                IsPremise::Premise => &mut *premise_call,
-                IsPremise::Action => &mut *action_call,
-            }
-            .retain_mut(|call| {
+            let mut unknown_calls = match is_premise {
+                IsPremise::Premise => take(ctx.premise_call),
+                IsPremise::Action => take(ctx.action_call),
+            };
+            unknown_calls.retain_mut(|call| {
                 let UnknownCall {
                     name,
                     ids,
@@ -1836,9 +2073,9 @@ mod compile_rule {
                 } = call;
                 let at: Vec<_> = args
                     .iter()
-                    .map(|a| *types.lookup(variables.lookup(*a).ty))
+                    .map(|a| *ctx.types.lookup(ctx.variables.lookup(*a).ty))
                     .collect();
-                let rt = *types.lookup(variables.lookup(*rval).ty);
+                let rt = *ctx.types.lookup(ctx.variables.lookup(*rval).ty);
 
                 ids.retain(|id| parser.functions[id].check_compatible(&at, rt));
 
@@ -1848,16 +2085,17 @@ mod compile_rule {
                         panic!("no function named {} can be used here", name);
                     }
                     [id] => {
-                        // we just checked that the types are valid with check_compatible, so just
-                        // write.
+                        // we just checked that the types are valid with check_compatible, so just write.
                         let function = &parser.functions[id];
                         for (&var, &ty) in args.iter().zip(function.inputs.iter()) {
-                            let typevar = variables.lookup(var).ty;
-                            *types.lookup(typevar) = Some(ty);
+                            let typevar = ctx.variables.lookup(var).ty;
+                            *ctx.types.lookup(typevar) = Some(ty);
                         }
 
                         // TODO: Err handling
-                        insert_call(
+                        insert_known_call(
+                            parser,
+                            ctx,
                             known_call,
                             Call {
                                 id: *id,
@@ -1865,35 +2103,23 @@ mod compile_rule {
                             },
                             *rval,
                             is_premise,
-                            variables,
-                            types,
-                            action_union,
                         )
                         .unwrap();
-                        // .insert(Call {
-                        //     id: *id,
-                        //     args: args.clone(),
-                        //     rval: *rval,
-                        // });
 
                         false
                     }
                     _ => true,
                 }
             });
+
+            match is_premise {
+                IsPremise::Premise => *ctx.premise_call = unknown_calls,
+                IsPremise::Action => *ctx.action_call = unknown_calls,
+            };
         }
         for (call, (rval, premise)) in take(known_call) {
             // TODO: handle err
-            let err = insert_call(
-                known_call,
-                call,
-                rval,
-                premise,
-                variables,
-                types,
-                action_union,
-            )
-            .unwrap();
+            let () = insert_known_call(parser, ctx, known_call, call, rval, premise)?;
         }
         Ok(())
     }
