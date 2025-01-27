@@ -262,7 +262,6 @@ Make two E-classes equal.
 == Primitive function
 
 
-
 = Limitations
 // what is left out
 
@@ -273,9 +272,15 @@ Make two E-classes equal.
 = Risk analysis and ethical considerations
 // Democratizing compiler 
 // Proving correctness on optimizations.
+We do not think there are any severe ethical considerations for this project, since there are no research participants involved.
+However, the impact of the correctness of our engine is amplified by any users of it since user code correctness depends on our engine, so we need to be careful about correctness.
+To this end, we write our code in Rust, mainly because we are expects in the language and the language generally makes it easier to write correct high performance code.
+One potential pitfall for us is that we implement semantics that are different from what the users expect or add unsound optimizations.
+We think the cost of our and faculty time for this project is outweighed by the research value.
+
 
 = Time plan
-Given that the frontend in about 1 person week, we are very confident that we will complete a working egraph compiler.
+Given that the frontend was already done in about 3-5 person days, we are very confident that we will complete a at least a working egraph engine.
 
 
 // approximate date when work is to be finished.
