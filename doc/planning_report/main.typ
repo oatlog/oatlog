@@ -129,6 +129,7 @@ production compiler using e-graphs, Cranelift (2022) @cranelift. However because
 are not performant enough, Cranelift uses weaker acyclic e-graphs that make it miss out on potential
 optimizations @cranelift_egraph_rfc @acyclic_egraphs.
 
+
 == E-graphs (1980)
 
 E-graphs are not a new concept and have been used to perform program verification and in proof
@@ -152,14 +153,24 @@ programs and processes rules at compile time.
 The egglog paper has a benchmark showing approximately a million e-nodes per second, improving from
 egg's about 100k e-nodes per second in that same benchmark.
 
-== "Fast and Optimal Extraction for Sparse Equality Graphs" (2024)
+== Fast and optimal extraction and Egraphs as circuits (2024)
 
 E-graphs store an exponential number of equivalent expressions in a deduplicated manner but do not
 solve the problem of quickly extracting the optimal among them. The extraction problem is similar to
 instruction selection or graph covering and is NP-hard for even simple cost functions. Integer
-linear programming is typically used to extract the best expression in an e-graph. It has however
-been shown @fastextract that optimal extraction is possible in a reasonable time if the e-graph is
-close to a tree.
+linear programming is typically used to extract the best expression in an e-graph. 
+
+However, it was independently discovered that linear time extraction is possible for a bounded treewidth @fastextract @egraphcircuit.
+Quite a lot of algorithms that are NP-hard, are polynomial for a bounded treewidth, so in this sense it is essentially a standard method applied to the extraction problem, in this case the complexity is $O(n * f("treewidth"))$
+Informally, treewidth is a measure of how close a graph is to a tree, and can be computed from a tree decomposition of the graph.
+Generally Egraphs tend to have a low treewidth, so this algorithm tends to applicable to practical egraphs,
+
+As a preprocessing step, the algorithm simplifies the egraph by treating it as a boolean circuit and simplifying it using standard techniques to slightly reduce the size of the problem. 
+The E-nodes with zero inputs become a constant 1.
+E-nodes become and gates of all their inputs and E-classes become or gates of all their inputs.
+The problem is essentially to set the extracted E-class to 1 while removing as many gates as possible.
+There are many straightforward simplifications that can be done to the graph, for example, an and gate with duplicate inputs from the same node can remove one of the inputs.
+
 
 = Goal
 The goal of this project is to implement an e-graph engine that runs faster than other
