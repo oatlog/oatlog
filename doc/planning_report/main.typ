@@ -6,9 +6,11 @@
   [#text(fill: red, weight: "bold", size: 12pt)[TODO #msg]]
 }
 
-// #set document(title: "A faster e-graph engine: Master's thesis proposal")
-#set document(title: "Better Together: Unifying Egglog and Eqlog")
-#set page("us-letter", margin: (x: 1.5in, y: 1.70in), numbering: "1")
+#let title = "Compiled e-raph rewrting with primitives"
+//#let title = "A faster e-graph engine"
+
+#set document(title: title)
+#set page("a4", numbering: "1")
 #set text(font: "New Computer Modern")
 #set heading(numbering: "1.1    ")
 #show heading.where(level: 1): set block(above: 2.5em, below: 1.65em)
@@ -21,7 +23,7 @@
 
 #text(16pt)[#smallcaps[Master thesis planning report]]
 #v(0.1em)
-#text(20pt, weight: "bold")[A faster e-graph engine]
+#text(20pt, weight: "bold", title)
 #v(4em)
 
 #text(14pt)[Loke Gustafsson (#email("lokeg@chalmers.se"))]
@@ -39,8 +41,6 @@
 
 #pagebreak()
 
-
-// from proposal
 = Introduction
 
 Modern software development relies heavily on efficient and reliable compilers with sophisticated
@@ -73,10 +73,6 @@ rule preprocessing. We will combine this with general performance engineering in
 code generation with compile-time ruleset specialization and optimizing, in particular indices and
 insertions, for memory locality and instruction-level parallelism.
 
-// [relevance to MPHPC omitted]
-
-
-// from proposal
 = Problem
 
 E-graphs are data structures that store expressions deduplicated through equivalence relations and
@@ -169,8 +165,6 @@ close to a tree.
 The goal of this project is to implement an e-graph engine that runs faster than other
 state-of-the-art implementations (like egg @egg, egglog @egglog, eqlog @eqlog) measured in e-nodes
 per second on existing e-graph rulesets.
-
-// [research questions omitted]
 
 = Approach
 
@@ -270,20 +264,23 @@ Make two E-classes equal.
 // how should the work be carried out
 
 = Risk analysis and ethical considerations
-// Democratizing compiler 
+// Democratizing compiler
 // Proving correctness on optimizations.
-We do not think there are any severe ethical considerations for this project, since there are no research participants involved.
-However, the impact of the correctness of our engine is amplified by any users of it since user code correctness depends on our engine, so we need to be careful about correctness.
-To this end, we write our code in Rust, mainly because we are expects in the language and the language generally makes it easier to write correct high performance code.
-One potential pitfall for us is that we implement semantics that are different from what the users expect or add unsound optimizations.
-We think the cost of our and faculty time for this project is outweighed by the research value.
+
+We do not think there are any severe ethical considerations for this project, since there are no
+research participants involved. However, the impact of the correctness of our engine is amplified by
+any users of it since user code correctness depends on our engine, so we need to be careful about
+correctness. To this end, we write our code in Rust, mainly because we are expects in the language
+and the language generally makes it easier to write correct high performance code. One potential
+pitfall for us is that we implement semantics that are different from what the users expect or add
+unsound optimizations. We think the cost of our and faculty time for this project is outweighed by
+the research value.
 
 
 = Time plan
-Given that the frontend was already done in about 3-5 person days, we are very confident that we will complete a at least a working egraph engine.
 
-
-// approximate date when work is to be finished.
+Given that the frontend was already done in about 3-5 person days, we are very confident that we
+will complete a at least a working egraph engine.
 
 #[
 #set page(flipped:true)
@@ -322,7 +319,7 @@ Given that the frontend was already done in about 3-5 person days, we are very c
                    e ,  e ,  e ,  e ,  e ,  e ,  e ,   e ,   e ,   e ,   e ,   e ,   e ,   e ,   x ,   e ,   e ,   e ,   e ,   e ,
   [Finalize report /*w23*/],
                    e ,  e ,  e ,  e ,  e ,  e ,  e ,   e ,   e ,   e ,   e ,   e ,   e ,   e ,   e ,   x ,   x ,   e ,   e ,   e ,
-  [Presentation/Opposition /*w22*/],
+  [Presentation and opposition /*w22*/],
                    e ,  e ,  e ,  e ,  e ,  e ,  e ,   e ,   e ,   e ,   e ,   e ,   e ,   e ,   e ,   e ,   e ,   e ,   x ,   e ,
   [Final report submission /*w23*/],
                    e ,  e ,  e ,  e ,  e ,  e ,  e ,   e ,   e ,   e ,   e ,   e ,   e ,   e ,   e ,   e ,   e ,   e ,   e ,   x ,
@@ -330,25 +327,13 @@ Given that the frontend was already done in about 3-5 person days, we are very c
 )
 ]
 
-+ Literature study
-+ End-to-end working egglog compatible for most programs.
-+ Read eqlog and egglog codebases.
-+ Setup benchmarks against egglog
-+ Maybe setup benchmarks against eqlog
-+ Describe formal semantics of what our engine supports, and difference to eqlog and egglog.
-+ Related work
-+ Basic formal explanation and theory.
-+ Finish report
-
-
-
 #show bibliography: set heading(numbering: "1   ")
 #bibliography("refs.bib", title: "References")
 
 == What is an egraph (Informal, somewhat easy to understand, connect to databases directly? present SQL equivalent/graph equivalent of a query?)
 
-// e-nod = term = tuple i en relation
-// e-class = variabel = element i tuple i en relation
+// e-node = term = tuple in a relation
+// e-class = variabel = element of a tuple in a relation
 
 = Distributive law example
 
@@ -362,9 +347,9 @@ Add, Mul and Const represent tables where Add and Mul have columns for their inp
 (function Mul (Math Math) Math)
 (function Const (i64) Math)
 
-(rule 
+(rule
     ( ; list of premises
-        (= e (Mul (Add a b) c)) 
+        (= e (Mul (Add a b) c))
     )
     ( ; list of actions
         (union e (Add (Mul a c) (Mul b c)))
@@ -391,7 +376,7 @@ rule distributive_law {
 ```
 
 == Rust
-The above could be transformed into something like this Rust pseudocode, 
+The above could be transformed into something like this Rust pseudocode,
 ```rust
 for (t0, c, e) in tables.mul.iter() {
     for (a, b, _t0) in tables.add.index_2(t0) { // <- index on t0 to join Mul and Add tables
@@ -422,11 +407,11 @@ JOIN (SELECT
     t2 = new_eclass(),
     t3 = new_eclass(),
 )
-SELECT 
+SELECT
     Add.lhs AS a,
     Add.rhs AS b,
     Mul.rhs AS c,
     Mul.result as e
 INNER JOIN Mul ON Add.result = Mul.lhs;
-FROM Add 
+FROM Add
 ```
