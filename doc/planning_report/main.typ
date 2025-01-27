@@ -169,50 +169,53 @@ Given that the frontend in about 1 person week, we are very confident that we wi
 // e-nod = term = tuple i en relation
 // e-class = variabel = element i tuple i en relation
 
-== Distributive law example
-Modified example math.egglog 
+= Distributive law example
 
-```
+== Egglog
+As an example, a Rule for the distributive law, $(a + b) * c = a * c + b * c$ for Egglog, Eqlog, Rust pseudocode, and SQL pseudocode.
+In egglog, a Rule is a list of premises followed by a list of actions to take when the premises match some part of the database.
+Add, Mul and Const represent tables where Add and Mul have columns for their inputs and their output and Const has a column for its value and a column for its output.
+```sexp
 (sort Math)
 (function Add (Math Math) Math)
-(function Sub (Math Math) Math)
 (function Mul (Math Math) Math)
-(function Div (Math Math) Math)
 (function Const (i64) Math)
-(function UpperBound (Math) i64 
-    :merge (min old new))
-(function LowerBound (Math) i64 
-    :merge (max old new))
 
 (rule 
-    (
-        (= e (Mul (Add a b) c))
+    ( ; list of premises
+        (= e (Mul (Add a b) c)) 
     )
-    (
+    ( ; list of actions
         (union e (Add (Mul a c) (Mul b c)))
     )
 )
 ```
 
+== Eqlog
+Eqlog is similar, but the language is very desugared, it is almost just a query plan.
+It also lacks primitives, meaning it can not represent constants, primitive functions, etc.
 ```
 type Math;
 func add(Math, Math) -> Math;
-func sub(Math, Math) -> Math;
 func mul(Math, Math) -> Math;
-func div(Math, Math) -> Math;
 // func const(i64) -> Math;  not possible to express in eqlog
 
-if e = mul(t0, c);
-if t0 = add(a, b);
-then t1 := mul(a, c)!;
-then t2 := mul(b, c)!;
-then e = add(t1, t2);
+rule distributive_law {
+    if e = mul(t0, c); // premise
+    if t0 = add(a, b); // premise
+    then t1 := mul(a, c)!; // action
+    then t2 := mul(b, c)!; // action
+    then e = add(t1, t2); // action
+}
 ```
 
-
+== Rust
+The above could be transformed into something like this Rust pseudocode, 
 ```rust
 for (t0, c, e) in tables.mul.iter() {
-    for (a, b, _t0) in tables.add.index_2(t0) {
+    for (a, b, _t0) in tables.add.index_2(t0) { // <- index on t0 to join Mul and Add tables
+
+        // actions
         let t1 = tables.mul.insert_new(a, c);
         let t2 = tables.mul.insert_new(b, c);
         tables.add.insert_existing(t1, t2, e);
@@ -221,11 +224,13 @@ for (t0, c, e) in tables.mul.iter() {
 ```
 
 
+== SQL
+Since the queries are essentially database queries, we can express them as Pseudo-SQL, although the queries become quite complicated because SQL is not a great language to express both reads and writes in the same query.
 ```sql
+-- Relevant here is that we can represent the Egraph as a table.
+-- There is no explicit "Eclass" table, the Eclass is just the relationship between rows in the database.
 CREATE TABLE Add   ( lhs Eclass, rhs Eclass, result Eclass);
-CREATE TABLE Sub   ( lhs Eclass, rhs Eclass, result Eclass);
 CREATE TABLE Mul   ( lhs Eclass, rhs Eclass, result Eclass);
-CREATE TABLE Div   ( lhs Eclass, rhs Eclass, result Eclass);
 CREATE TABLE Const ( num i64,                result Eclass);
 
 SET_EQUAL(e, t3) WITH
