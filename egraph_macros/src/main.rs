@@ -1,43 +1,132 @@
 use egraph_macros::compile_egraph;
 fn main() {
     // TODO: egglog has builtin include, so just use that.
-    compile_egraph!(
-        // "some path",
-        (
-            (datatype Math
-                (Mul Math Math)
-                (Add Math Math)
-                (Const i64)
-            )
-
-            (let one (Const 1))
-
-            (rule ((= a b)) ((Add a b)))
-
-            (rewrite (Add a b) (Add b a))
+    ((
+        // (datatype Math
+        //     (Mul Math Math)
+        //     (Add Math Math)
+        //     (Const i64)
+        // )
+        // (let one (Const 1))
+        // // (rewrite (Add a b) (Add b a))
 
 
+/*
+   
+https://www.youtube.com/watch?v=9epgZ-e6DUU
+https://inria.hal.science/hal-01723236v1/document
 
-            //(function counter (Math) i64)
+(sort Data)
+(sort Phi)
+(sort Region)
+(sort Control)
+(sort Jump)
+(sort Cond)
+(sort Branch)
 
-            // (rule ((counter a c)) ((counter a (c+1)))
+(sort Start)
+
+(function Start () Start)
 
 
-            // (include "egraph_macros/foo.egglog")
-
-            // (let two (Add 1 1))
-
-            // (let one (Add one one))
+(sort DataVec (Vec Data))
+(sort ControlVec (Vec Control))
 
 
-            // (rule ((= a (Add b c))) ((union a (Add c b))))
+(function Const (i64) Data)
+(function Add (Data Data) Data)
+(function Sub (Data Data) Data)
+(function Mul (Data Data) Data)
+(function Div (Data Data) Data)
+(function Eq (Data Data) Data)
 
-            //(rewrite (Add a (Add b c)) (Add (Add a b) c))
-        ),
-        // {
-        //     fn some_rust_code();
-        //     fn some_rust_code2();
-        //     fn some_rust_code3();
-        // }
-    );
+
+(function Phi (Region, DataVec) Phi)
+
+(function Region (ControlVec) Region)
+
+(function Return (Region Data)  
+(function Jump (Region) Control)
+(function If (Region Data) Cond)
+(function IfTrue (Cond) Branch)
+(function IfFalse (Cond) Branch)
+
+
+
+
+
+// https://github.com/SeaOfNodes/Simple/blob/main/chapter03/README.md
+// (sort Control)
+// (sort Data)
+
+
+// (function Start (ControlToken Data) Control)
+// (function Return (Control, Data) Control)
+// (function Constant (i64) Data)
+// (function Add (Data Data) Data)
+// (function Sub (Data Data) Data)
+// (function Mul (Data Data) Data)
+// (function Div (Data Data) Data)
+// (function Negate (Data) Data)
+
+
+
+(function Start () ())
+
+// predecessor, data to return
+(function Return (Control Data) Control)
+(
+
+
+
+https://rust-lang.github.io/polonius/rules/atoms.html
+
+(sort Path)
+
+(function PathVar (Variable) Path)
+(function PathField (Path Field) Path) // 
+(function PathIndex (Path) Path) // x[something], but borrow checker does not track what that
+                                 // something is
+(function PathDeref (Path) Path)
+
+
+// https://www.irisa.fr/celtique/ext/sea-of-nodes/
+
+(sort Memory)
+(sort Nat)
+
+(function MemRead (Memory Nat) Nat)
+
+(function MemWrite (Memory Nat Nat) Memory)
+
+
+(sort Val)
+
+// TODO: would be nice if Val = Memory | Nat
+//       essentially duplicating rules?
+(function ValMem (Memory) Val)
+(function ValNat (Nat) Val)
+
+(sort Node)
+
+(sort Id)
+
+(sort IdVec (Vec Id))
+
+(function Region (IdVec) Node)
+(function Cst (Val) Node)
+(function BinOp (Id Id) Node)
+(function Phi (Id IdVec) Node)
+(function Store (Id Id Id) Node)
+(function Load (Id Id Id Node)
+(function Jmp (Id) Node)
+(function If (Id) Node)
+(function IfT (Id) Node)
+(function IfF (Id) Node)
+(function Return (Id Id) Node)
+(function ZeroCheck (Id Id) Node)
+
+
+*/
+    ));
 }
