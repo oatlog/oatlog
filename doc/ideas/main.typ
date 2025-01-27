@@ -5,6 +5,9 @@
 In eqlog we can write "if x: math" to match all math, but in egglog we need to match each constructor the workaround in egglog is (relation MathU (Math)), but this information is already in the union find datastructure.
 
 Forget types to get as many different groups as possible to reduce the number of indexes to search for when unioning.
+Will this work if the user can enter arbitrary type valid expressions into the database?
+
+Given how primitive functions emulate databases, can we constant fold "backwards"? eg (union (+ a 1) 2) <=> a = add_y_z(1, 2) = 1
 
 Minimum spanning tree with weights negative number of shared variables to determine join order.
 
