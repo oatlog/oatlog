@@ -1,7 +1,6 @@
 [workspace]
 members = [
-    "egraph_scratch",
+    #"egraph_scratch",
     "egraph_macros",
 ]
 resolver = "2"
-

@@ -26,7 +26,7 @@
 
         cargoNix = import ./Cargo.nix { inherit pkgs; };
 
-        masters-thesis = cargoNix.workspaceMembers.masters-thesis.build;
+        egraph_macros = cargoNix.workspaceMembers.egraph_macros.build;
       in {
         formatter = pkgs.writeShellApplication {
           name = "format";
@@ -55,11 +55,11 @@
           '';
         };
 
-        checks.default = masters-thesis.override { runTests = true; };
+        checks.default = egraph_macros.override { runTests = true; };
 
         packages = rec {
-          default = masters-thesis;
-          inherit masters-thesis;
+          default = egraph_macros;
+          inherit egraph_macros;
         };
       });
 }
