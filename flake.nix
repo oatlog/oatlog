@@ -25,8 +25,6 @@
         lib = pkgs.lib;
 
         cargoNix = import ./Cargo.nix { inherit pkgs; };
-
-        egraph_macros = cargoNix.workspaceMembers.egraph_macros.build;
       in {
         formatter = pkgs.writeShellApplication {
           name = "format";
@@ -55,11 +53,12 @@
           '';
         };
 
-        checks.default = egraph_macros.override { runTests = true; };
+        checks.default = cargoNix.workspaceMembers.egraph.build.override { runTests = true; };
 
         packages = rec {
-          default = egraph_macros;
-          inherit egraph_macros;
+          default = egraph;
+          egraph = cargoNix.workspaceMembers.egraph.build;
+          math = cargoNix.workspaceMembers.math.build;
         };
       });
 }

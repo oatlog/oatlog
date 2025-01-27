@@ -76,5 +76,25 @@ mod frontend;
 
 #[proc_macro]
 pub fn compile_egraph(x: proc_macro::TokenStream) -> proc_macro::TokenStream {
-    frontend::compile_egraph(x)
+    proc_macro::TokenStream::from(frontend::compile_egraph(proc_macro2::TokenStream::from(x)))
+}
+
+#[cfg(test)]
+mod test {
+    use super::*;
+    use proc_macro2::TokenStream;
+
+    #[test]
+    fn simple() {
+        let stream = "(
+            (datatype Math
+                (Mul Math Math)
+                (Add Math Math)
+                (Const i64)
+            )
+            (let one (Const 1))
+            (rewrite (Add a b) (Add b a))
+        )".parse::<TokenStream>().unwrap();
+        assert_eq!(frontend::compile_egraph(stream).to_string(), "");
+    }
 }

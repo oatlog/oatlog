@@ -32,7 +32,7 @@ use std::{
 
 macro_rules! error_span {
     ($x:ident, $msg:literal) => {
-        return proc_macro::TokenStream::from(quote_spanned!($x.span() => compile_error!($msg)))
+        return proc_macro2::TokenStream::from(quote_spanned!($x.span() => compile_error!($msg)))
     }
 }
 
@@ -177,15 +177,14 @@ impl<T> ResultExt for syn::Result<T> {
     }
 }
 
-pub fn compile_egraph(x: proc_macro::TokenStream) -> proc_macro::TokenStream {
+pub fn compile_egraph(x: proc_macro2::TokenStream) -> proc_macro2::TokenStream {
     let now = std::time::Instant::now();
     let res = compile_egraph_inner(x).unwrap_or_else(|err| err.to_compile_error().into());
     eprintln!("{:?}", now.elapsed());
     res
 }
 
-fn compile_egraph_inner(x: proc_macro::TokenStream) -> syn::Result<proc_macro::TokenStream> {
-    let x = proc_macro2::TokenStream::from(x);
+fn compile_egraph_inner(x: proc_macro2::TokenStream) -> syn::Result<proc_macro2::TokenStream> {
     let mut parser = Parser::new();
     for token_tree in x.into_iter() {
         register_span!(token_tree.span());
@@ -291,6 +290,9 @@ type SexpSpan = Spanned<Sexp>;
 static BYTE_RANGE_REGEX: std::sync::LazyLock<regex::Regex> =
     std::sync::LazyLock::new(|| regex::Regex::new(r".*\(([0-9]+).*\.\.([0-9]+)\).*").unwrap());
 
+// NOTE: This works around that `proc_macro2::Span::byte_range` is for proc-macro contexts only
+// valid on nightly. Luckily the `Debug` implementation on stable (although doing this is unstable
+// itself) has the correct range.
 fn byte_range(span: Span) -> std::ops::Range<usize> {
     let s = format!("{span:?}");
     let caps = BYTE_RANGE_REGEX.captures(&s).unwrap();
@@ -1491,7 +1493,7 @@ enum Initial {
     /// only globals listed as `ComputeGlobal` may be referenced.
     /// it is possible that there are request to compute the same
     /// thing twice if the following occurs:
-    /// ```
+    /// ```text
     /// (let x (foobar a b))
     /// (let y x)
     /// ```

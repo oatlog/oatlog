@@ -1,18 +1,16 @@
-use egraph_macros::compile_egraph;
 fn main() {
     // TODO: egglog has builtin include, so just use that.
-    ((
-        // (datatype Math
-        //     (Mul Math Math)
-        //     (Add Math Math)
-        //     (Const i64)
-        // )
-        // (let one (Const 1))
-        // // (rewrite (Add a b) (Add b a))
-
+    egraph::compile_egraph!((
+        (datatype Math
+            (Mul Math Math)
+            (Add Math Math)
+            (Const i64)
+        )
+        (let one (Const 1))
+        (rewrite (Add a b) (Add b a))
 
 /*
-   
+
 https://www.youtube.com/watch?v=9epgZ-e6DUU
 https://inria.hal.science/hal-01723236v1/document
 
@@ -45,7 +43,7 @@ https://inria.hal.science/hal-01723236v1/document
 
 (function Region (ControlVec) Region)
 
-(function Return (Region Data)  
+(function Return (Region Data)
 (function Jump (Region) Control)
 (function If (Region Data) Cond)
 (function IfTrue (Cond) Branch)
@@ -84,7 +82,7 @@ https://rust-lang.github.io/polonius/rules/atoms.html
 (sort Path)
 
 (function PathVar (Variable) Path)
-(function PathField (Path Field) Path) // 
+(function PathField (Path Field) Path) //
 (function PathIndex (Path) Path) // x[something], but borrow checker does not track what that
                                  // something is
 (function PathDeref (Path) Path)

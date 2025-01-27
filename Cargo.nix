@@ -32,27 +32,25 @@ rec {
   # "public" attributes that we attempt to keep stable with new versions of crate2nix.
   #
 
-  rootCrate = rec {
-    packageId = "egraph_macros";
 
-    # Use this attribute to refer to the derivation building your root crate package.
-    # You can override the features with rootCrate.build.override { features = [ "default" "feature1" ... ]; }.
-    build = internal.buildRustCrateWithFeatures {
-      inherit packageId;
-    };
-
-    # Debug support which might change between releases.
-    # File a bug if you depend on any for non-debug work!
-    debug = internal.debugCrate { inherit packageId; };
-  };
   # Refer your crate build derivation by name here.
   # You can override the features with
   # workspaceMembers."${crateName}".build.override { features = [ "default" "feature1" ... ]; }.
   workspaceMembers = {
-    "egraph_macros" = rec {
-      packageId = "egraph_macros";
+    "egraph" = rec {
+      packageId = "egraph";
       build = internal.buildRustCrateWithFeatures {
-        packageId = "egraph_macros";
+        packageId = "egraph";
+      };
+
+      # Debug support which might change between releases.
+      # File a bug if you depend on any for non-debug work!
+      debug = internal.debugCrate { inherit packageId; };
+    };
+    "math" = rec {
+      packageId = "math";
+      build = internal.buildRustCrateWithFeatures {
+        packageId = "math";
       };
 
       # Debug support which might change between releases.
@@ -152,18 +150,11 @@ rec {
         };
         resolvedDefaultFeatures = [ "Clone" "Copy" "Debug" "Default" "Deref" "DerefMut" "Eq" "Hash" "Into" "Ord" "PartialEq" "PartialOrd" "default" ];
       };
-      "egraph_macros" = rec {
-        crateName = "egraph_macros";
+      "egraph" = rec {
+        crateName = "egraph";
         version = "0.1.0";
         edition = "2021";
-        crateBin = [
-          {
-            name = "egraph_macros";
-            path = "src/main.rs";
-            requiredFeatures = [ ];
-          }
-        ];
-        src = lib.cleanSourceWith { filter = sourceFilter;  src = ./egraph_macros; };
+        src = lib.cleanSourceWith { filter = sourceFilter;  src = ./egraph; };
         procMacro = true;
         dependencies = [
           {
@@ -173,6 +164,7 @@ rec {
           {
             name = "proc-macro2";
             packageId = "proc-macro2";
+            features = [ "span-locations" ];
           }
           {
             name = "quote";
@@ -234,6 +226,26 @@ rec {
         features = {
         };
       };
+      "math" = rec {
+        crateName = "math";
+        version = "0.1.0";
+        edition = "2021";
+        crateBin = [
+          {
+            name = "math";
+            path = "src/main.rs";
+            requiredFeatures = [ ];
+          }
+        ];
+        src = lib.cleanSourceWith { filter = sourceFilter;  src = ./examples/math; };
+        dependencies = [
+          {
+            name = "egraph";
+            packageId = "egraph";
+          }
+        ];
+
+      };
       "memchr" = rec {
         crateName = "memchr";
         version = "2.7.4";
@@ -273,7 +285,7 @@ rec {
         features = {
           "default" = [ "proc-macro" ];
         };
-        resolvedDefaultFeatures = [ "default" "proc-macro" ];
+        resolvedDefaultFeatures = [ "default" "proc-macro" "span-locations" ];
       };
       "quote" = rec {
         crateName = "quote";

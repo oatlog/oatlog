@@ -3,16 +3,14 @@
 proc-macro = true
 
 [package]
-name = "egraph_macros"
+name = "egraph"
 version = "0.1.0"
 edition = "2021"
 
 [dependencies]
 syn = "2.0.96"
 quote = "1.0"
-proc-macro2 = "1.0"
+proc-macro2 = { version = "1.0", features = ["span-locations"] }
 
-educe = { version = "0.6.0" }
+educe = "0.6.0"
 regex = "1.11.1"
-
-

@@ -24,7 +24,7 @@ dependencies = [
 ]
 
 [[package]]
-name = "egraph_macros"
+name = "egraph"
 version = "0.1.0"
 dependencies = [
  "educe",
@@ -52,6 +52,13 @@ dependencies = [
  "proc-macro2",
  "quote",
  "syn",
+]
+
+[[package]]
+name = "math"
+version = "0.1.0"
+dependencies = [
+ "egraph",
 ]
 
 [[package]]
