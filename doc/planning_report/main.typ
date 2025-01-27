@@ -169,21 +169,20 @@ Given that the frontend in about 1 person week, we are very confident that we wi
 // e-nod = term = tuple i en relation
 // e-class = variabel = element i tuple i en relation
 
-== Egglog math example
-Modified example math.egglog TODO CITE
+== Distributive law example
+Modified example math.egglog 
 
 ```
 (sort Math)
-    
 (function Add (Math Math) Math)
 (function Sub (Math Math) Math)
 (function Mul (Math Math) Math)
 (function Div (Math Math) Math)
-
 (function Const (i64) Math)
-
-
-(rewrite (Add a b) (Add b a))
+(function UpperBound (Math) i64 
+    :merge (min old new))
+(function LowerBound (Math) i64 
+    :merge (max old new))
 
 (rule 
     (
@@ -193,13 +192,34 @@ Modified example math.egglog TODO CITE
         (union e (Add (Mul a c) (Mul b c)))
     )
 )
-
-
-if t0 = Add(a b)
-if e = Mul(t0 c)
-then ...
+```
 
 ```
+type Math;
+func add(Math, Math) -> Math;
+func sub(Math, Math) -> Math;
+func mul(Math, Math) -> Math;
+func div(Math, Math) -> Math;
+// func const(i64) -> Math;  not possible to express in eqlog
+
+if e = mul(t0, c);
+if t0 = add(a, b);
+then t1 := mul(a, c)!;
+then t2 := mul(b, c)!;
+then e = add(t1, t2);
+```
+
+
+```rust
+for (t0, c, e) in tables.mul.iter() {
+    for (a, b, _t0) in tables.add.index_2(t0) {
+        let t1 = tables.mul.insert_new(a, c);
+        let t2 = tables.mul.insert_new(b, c);
+        tables.add.insert_existing(t1, t2, e);
+    }
+}
+```
+
 
 ```sql
 CREATE TABLE Add   ( lhs Eclass, rhs Eclass, result Eclass);
@@ -208,9 +228,19 @@ CREATE TABLE Mul   ( lhs Eclass, rhs Eclass, result Eclass);
 CREATE TABLE Div   ( lhs Eclass, rhs Eclass, result Eclass);
 CREATE TABLE Const ( num i64,                result Eclass);
 
+SET_EQUAL(e, t3) WITH
+INSERT INTO add VALUES (t1, t2, t3)
+INSERT INTO mul VALUES (a, c, t1), (b, c, t2)
+JOIN (SELECT
+    t1 = new_eclass(),
+    t2 = new_eclass(),
+    t3 = new_eclass(),
+)
 SELECT 
-Add.lhs AS a, Add.rhs AS b, Mul.rhs AS c, Mul.result as e
-FROM Add 
+    Add.lhs AS a,
+    Add.rhs AS b,
+    Mul.rhs AS c,
+    Mul.result as e
 INNER JOIN Mul ON Add.result = Mul.lhs;
-
+FROM Add 
 ```
