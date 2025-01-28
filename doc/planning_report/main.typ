@@ -6,7 +6,7 @@
   [#text(fill: red, weight: "bold", size: 12pt)[TODO #msg]]
 }
 
-#let title = "Compiled e-raph rewrting with primitives"
+#let title = "Compiled e-graph rewritng with primitives"
 //#let title = "A faster e-graph engine"
 
 #set document(title: title)
