@@ -126,8 +126,8 @@ deduplicated.
 We believe that e-graphs are very unexplored, with great potential for improvement. Recent work has
 considerably improved their performance and capabilities, and there is as far as we know only one
 production compiler using e-graphs, Cranelift (2022) @cranelift. However because regular e-graphs
-are not performant enough, Cranelift uses weaker acyclic e-graphs that make it miss out on potential
-optimizations @cranelift_egraph_rfc @acyclic_egraphs.
+are not performant enough, Cranelift uses weaker acyclic e-graphs (aegraphs) that make it miss out
+on potential optimizations @cranelift_egraph_rfc @acyclic_egraphs.
 
 
 == E-graphs (1980)
@@ -173,11 +173,38 @@ There are many straightforward simplifications that can be done to the graph, fo
 
 
 = Goal
+
 The goal of this project is to implement an e-graph engine that runs faster than other
 state-of-the-art implementations (like egg @egg, egglog @egglog, eqlog @eqlog) measured in e-nodes
 per second on existing e-graph rulesets.
 
+== Limitations
+
+Our goal can be further clarified by stating what we are not doing. We are not
+
+- applying e-graphs to solve problems, but rather improving e-graph technology itself
+- concerned with performance on worst-case inputs or with proving time complexity bounds, but rather
+  practical performance on practical inputs
+- designing a logic programming language, instead prioritizing interoperability by staying
+  syntactically and semantically close to the egglog language.
+- aiming to implement exactly all functionality present in egglog and eqlog
+- sacrificing expressive power in the name of performance, as Cranelift's aegraphs @acyclic_egraphs
+  do
+- writing an interpreter, and can therefore assume all rules are known up front
+
+== Evaluation
+
+As we aim to support theories specified in the egglog language, we can piggy-back on test cases and
+applications that are already written. We aim to primarily verify correctness and benchmark by using
+the Egglog test suite. Additionally, we might also use larger e-graph applications such as Herbie
+@herbie, that already have implementations in the egglog language @egglogHerbie, as an end-to-end
+case study in the usability and performance of our engine.
+
 = Approach
+
+#todo([basic stuff we aim to do])
+
+#todo([list of ideas we want to investigate])
 
 == Design and implementation
 
@@ -185,11 +212,6 @@ Concretely, we will create a Rust library that takes in a set of rewrite rules a
 code for a e-graph engine with the optimized rewrite rules hard-coded. The main focus is optimizing
 the run time of the generated e-graph engine (R1). In terms of features we are aiming to implement a
 similar feature set to egglog @egglog.
-
-We generally think that the design space is sufficiently large and the domain sufficiently immature
-that performance improvements are possible over egglog and eqlog, even if the algorithmic behavior
-is kept relatively unchanged.
-
 
 ```rust
 compile_egraph!(
@@ -265,11 +287,6 @@ Make two E-classes equal.
 == Primitive value
 
 == Primitive function
-
-
-= Limitations
-// what is left out
-
 
 = Method of accomplishment
 // how should the work be carried out
