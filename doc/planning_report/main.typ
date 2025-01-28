@@ -135,11 +135,41 @@ on potential optimizations @cranelift_egraph_rfc @acyclic_egraphs.
 E-graphs are not a new concept and have been used to perform program verification and in proof
 assistants @oldegraph.
 
+== Wost-case optimal joins (pre-print 2012, published 2018)
+
+A wost-case optimal join is $O("max possible output tuples")$ given the input size and query @optimaljoin.
+It has been shown that it is not possible to get a wost-case optimal join from just binary joins are not asymptotically optimal, so a new algorithm is needed @optimaljoin.
+There is a worst-case optimal join algorithm called generic join.
+For any variable ordering, it recursively finds the value for a variable, one at a time.
+As far as we can tell, implementing this is quite straightforward, and it is also used in egglog @relationalematching.
+
+// @optimaljoin
+// @relationalematching
 == Egg (2021)
 
 Egg @egg is an e-graph implementation where each rule is attempted to be matched against the entire
 database. The rewrites are performed in batches, meaning all rules are applied and then the database
 invariants are fixed.
+
+
+== Relational E-matching (2022)
+
+E-matching finds a set of terms matching a particular pattern, for example $"Add"("Mul"(a, c), "Mul"(b, c))$.
+For egg, the evaluation is top-down, so something like:
+```rust
+for (t0, t1, e) in add(*) {
+    for (a, c1, _) in mul(t0) {
+        for (b, c2, _) in mul(t1) {
+            if c1 != c2 { continue; }
+            do_action();
+        }
+    }
+}
+```
+But E-matching can be transformed into a conjunctive query @relationalematching.
+$ Q(a, b, c, t_0, t_1, t_2) <- "Add"(t_0, t_1, t_2), "Mul"(a, c, t_0), "Mul"(b, c, t_1) $
+
+Implementing E-matching as a relational query is algorithmically more efficient and has lower runtime in practice @relationalematching.
 
 == Egglog and eqlog (2023)
 
@@ -153,7 +183,7 @@ programs and processes rules at compile time.
 The egglog paper has a benchmark showing approximately a million e-nodes per second, improving from
 egg's about 100k e-nodes per second in that same benchmark.
 
-== Fast and optimal extraction and Egraphs as circuits (2024)
+== Fast and optimal extraction and E-graphs as circuits (2024)
 
 E-graphs store an exponential number of equivalent expressions in a deduplicated manner but do not
 solve the problem of quickly extracting the optimal among them. The extraction problem is similar to
@@ -261,7 +291,7 @@ There is exactly one edge from and E-node to an E-class.
 Represents a set of equivalent expressions.
 Element in a tuple in a relation
 
-== E-node // function?
+== E-node or Term // function?
 Also known as "term"
 A tuple in a row in the database.
 Informally, refers to a specific operation, eg (Add x y)
