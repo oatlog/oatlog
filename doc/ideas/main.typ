@@ -561,3 +561,78 @@ What would it look like if it was part of the engine?
 (argument: fewer EClasses maybe makes the database faster/generates less redundant stuff?)
 Each time we do an INSERT, and there is a conflict, we queue the join of the two eclasses and let the old one stay there.
 
+= Worst case optimal joins are easy (2022)
+https://dl.acm.org/doi/pdf/10.1145/3498696
+I think this paper is from egglog authors egglog already uses them.
+
+Query plans are presented with variables as nodes and relations as hyperedges, which is just the dual of what we first thought about (relations as nodes and variables as hyperedges).
+
+The complexity bound for $Q(x,y,z) = R(x,y),S(y,z)$ is essentially $O(|R|*|S|)$.
+But the bound for $Q(x,y,z) = R(x,y),S(y,z),T(z,x)$ is super tight, the "AGM" bound is $O(N^(3/2)$, computed from "the fractional edge cover of the query hypergraph", which is the max possible size of $Q$.
+
+== Generic join
+Given a variable ordering, it is guaranteed to be worst case optimal (linear in the output size), but different variable orderings have different practical performance.
+
+```rust
+// Atom = Add(a,b) or Mul(d, e)
+// essentially a premise
+struct Atom {
+    table: TableId,
+    vars: Vec<VariableId>,
+}
+fn generic_join(
+    query: &[Atom], 
+    partial_result: &mut Vec<u32>, 
+    next_variable: VariableId, 
+    output: &mut Vec<Vec<u32>>
+) {
+    if next_variable = VariableId(-1) {
+        output.push(partial_result.clone());
+    }
+
+    // If we have "Forall x where x: Math" this can be empty.
+    let relevant_atoms: Vec<Atom> = query
+        .iter()
+        .filter(|atom| atom.vars.contains(next_varible))
+        .collect();
+
+    let possible_values: Vec<u32> = intersect(partial_result, &relevant_atoms);
+
+    for value in possible_values {
+        partial_result.push(value);
+        generic_join(query, partial_result, next_variable - 1, output);
+        partial_result.pop(value);
+    }
+}
+
+// the authors might use tries instead of btreemaps.
+
+// algorithm for intersect not shown, must run in: O(min(table size))
+// in other words, we are forced to do "smaller to larger" matching, which makes sense
+// but has the consequence that we need to be slightly dynamic.
+fn intersect(partial_result: &Vec<u32>, atoms: &[Atom]) -> Vec<u32> {
+    let min_atom: &Atom = atoms.iter()
+        .min_by(|id| table_size(id))
+        .unwrap();
+
+    let mut possible_values: Vec<u32> = index_table(min_atom.table, partial_result);
+
+    for atom in atoms {
+        // real impl would need to handle variable reordering.
+        possible_values.retain(|value| {
+            table_contains(atom.table, partial_result, atom)
+        })
+    }
+    possible_values
+}
+
+struct Query {
+    atoms: Vec<Atom>,
+    variables_names: Vec<String>
+}
+let query = (/* ... */);
+
+// relabel VariableId so we go from highest to lowest variableid
+generic_join(&query.atoms, EMPTY_SET, query.variables_names.len());
+```
+
