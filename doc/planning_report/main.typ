@@ -301,6 +301,33 @@ case study in the usability and performance of our engine.
 #todo([basic stuff we aim to do])
 
 
+
+
+Concretely, we will create a Rust library that takes in a set of rewrite rules in the egglog language 
+and generates Rust code for a e-graph engine with the optimized rewrite rules hard-coded. The main 
+focus is optimizing the run time of the generated e-graph engine. In terms of features we are aiming 
+to implement a similar feature set to egglog @egglog.
+```rust
+compile_egraph!(
+    (sort Math)
+    (function Add (Math Math) Math)
+    (rewrite (Add a b) (Add b a)
+    /* ... */
+);
+// expands to ->
+struct Egraph {
+    /* ... */
+}
+impl Egraph {
+    /* ... */
+}
+```
+#figure(
+    image("architecture.svg", width: 89%),
+    caption: [High-level overview of rule compilation.]
+)
+
+
 = What we want to explore
 #todo([list of ideas we want to investigate])
 
@@ -443,28 +470,11 @@ Eqlog schedules by running all rules without modifying the database, removing ro
 Eglog also runs all rules that do not create new E-classes until closure before running any rules that create E-classes.
 The motivation for this is that without creating E-classes, the size of the database is limited, and equal E-classes will be unified faster. 
 
-== Design and implementation
+== Extraction
 
-Concretely, we will create a Rust library that takes in a set of rewrite rules and generates Rust
-code for a e-graph engine with the optimized rewrite rules hard-coded. The main focus is optimizing
-the run time of the generated e-graph engine (R1). In terms of features we are aiming to implement a
-similar feature set to egglog @egglog.
+We want to implement existing treewidth-based extraction algorithms @fastextract @egraphcircuit and heuristic extraction algorithms with a good constant factor.
+We would also like to explore what types of extraction functions are viable, for example minimizing latency given a model for the CPU that considers instruction-level parallelism would essentially give the same result as simulating every possible expression.
 
-```rust
-compile_egraph!(
-    (sort Math)
-    (function Add (Math Math) Math)
-    (rewrite (Add a b) (Add b a)
-    /* ... */
-);
-// expands to ->
-struct Egraph {
-    /* ... */
-}
-impl Egraph {
-    /* ... */
-}
-```
 
 // [analysis and visualization omitted]
 
@@ -477,10 +487,7 @@ impl Egraph {
 // [improving extraction omitted]
 
 
-#figure(
-    image("architecture.svg", width: 89%),
-    caption: [High-level overview of rule compilation.]
-)
+
 
 
 
@@ -497,8 +504,41 @@ impl Egraph {
 = Formal problem formulation
 // extended version of scientific problem description
 
+Given an expression, and a set of rules, find a set of equivalent expressions encoded as an E-graph and extract an equivalent expression with minimal cost and runtime, making trade-offs between cost and runtime.
+
+== E-graph
+An E-graph can be defined as a tuple $G = (U, H)$ where #footnote[This is a slightly modified definition from @egg. There is no direct concept of an "E-class", only E-class ids, an E-class exists implicitly based on the contents of H.]
+- H is the hashcons, a map from E-nodes to E-class ids #footnote[This is the database].
+- U is the union-find data structure over E-class ids, encoding an equivalence relation $(equiv_id)$, providing functions union #footnote[In practice union mutates U in-place and both union and find is $approx O(1)$.] and find where
+    - $"find"(U, a) = "find"(U, b) <==> a equiv_id b$ 
+    - $U' = "union"(U, a, b) ==> "find"(U', a) = "find"(U', b)$ 
+//- Conceptually it also contains a map from E-class ids to an E-class, 
+//- M is a map from E-class ids to an E-class
+- An E-class id is canonical iff $"find"(U, a) = a$ @egg
+- An E-node $n=f(a_1, a_2, ...)$ is canonical iff $n=f("find"(U, a_1), "find"(U, a_2), ...)$ @egg
+- An E-graph is canonical iff H only contains canonical E-nodes.
+
+== Rule
+A rule states that if the predicates match the E-graph, some new information can be added to it.
+A rule R can be defined as a tuple $R = (P, A, V)$ where:
+- $V$ is a set of variables $V = {v_1, v_2, ... } = V_p union V_a$, where:
+    - $V_p$ is the set of variables referenced in P
+    - $V_a$ is the set of variables referenced only in A ($V_p sect V_a = emptyset$)
+- P is the set of predicates, $P = {f(v_1, v_2, ...}, f(v_1, v_2, ...), ...}$
+- A is a tuple (A_i, A_u) where:
+    - $A_i$ is the set of E-nodes to be added to H, along with the E-class to assign it, but referencing V instead, $A_i = {(v_1, f(v_2, v_3 ...)), (v_1, f(v_2, v_3 ...)) ...}$
+    - $A_u$ is the set of pairs to be unified in U, $A_u = {(v_1, v_2), (v_1, v_2), ...}$
+    - All variables in $V_a$ are to be replaced with newly created E-classes.
+    - If a $V_a$ is empty then the rule is called surjective and is guaranteed to terminate.
+- A Rule matches an E-graph if there is some set of E-nodes in H that match P.
 
 
+== Extraction
+An extraction for an E-graph $G = (U, H)$, and a set of E-classes E is a set of E-nodes X, such that:
+- $forall e in E, e in H[X]$
+- $forall n in X and n = f(a_1, a_2, ...) ==> a_1, a_2, ... in H[X]$
+The cost $c(X)$ is an arbitrary function
+#footnote[For $c(X) = |X|$ the problem is NP-hard @fastextract. Typically, $c(X)$ is a function of the type of E-node.]
 
 = Method of accomplishment
 // how should the work be carried out
