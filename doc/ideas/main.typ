@@ -588,6 +588,7 @@ fn generic_join(
 ) {
     if next_variable = VariableId(-1) {
         output.push(partial_result.clone());
+        return;
     }
 
     // If we have "Forall x where x: Math" this can be empty.
