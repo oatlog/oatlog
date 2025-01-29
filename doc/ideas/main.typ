@@ -653,4 +653,402 @@ But since we can implement implicit functionality as a rule, we can also impleme
 (rule ((MultiReturn x y a b) (MultiReturn x y c d)) ((union a c) (union b d)))
 ```
 
+Given that implicit functionality can be implemented in userspace, the engine does not really need to care about what parts of a function is "inputs" or "outputs".
+
+
+= TODO READ
+Papers are just under the first author i looked at.
+I stopped adding authors after a while since this is just too many papers.
+
+== Max Willsey (papers done, co-authors done)
+https://dl.acm.org/profile/99659359379
+
+From Binary Join to Free Join
+https://dl.acm.org/doi/10.1145/3665252.3665259
+
+Equality Saturation Theory Exploration à la Carte
+https://dl.acm.org/doi/10.1145/3622834
+
+Free Join: Unifying Worst-Case Optimal and Traditional Joins
+https://dl.acm.org/doi/10.1145/3589295
+
+DONE: Better Together: Unifying Datalog and Equality Saturation
+https://dl.acm.org/doi/10.1145/3591239
+
+babble: Learning Better Abstractions with E-Graphs and Anti-unification
+https://dl.acm.org/doi/10.1145/3571207
+
+DONE: Relational e-matching (introduces usage of database instead of top-down e-matching)
+https://dl.acm.org/doi/10.1145/3498696
+
+Rewrite rule inference using equality saturation (create rewrite rules using egraphs)
+https://dl.acm.org/doi/10.1145/3485496
+
+egg: Fast and extensible equality saturation
+https://dl.acm.org/doi/10.1145/3434304
+
+Practical and Flexible Equality Saturation
+https://dl.acm.org/doi/book/10.5555/AAI28541239
+
+Synthesizing structured CAD models with equality saturation and inverse transformations
+https://dl.acm.org/doi/10.1145/3385412.3386012
+
+== Yisu Remy Wang (papers done, co-authors done)
+https://dl.acm.org/profile/99660535337
+
+Convergence of datalog over (Pre-) Semirings (something about recursive queries)
+https://dl.acm.org/doi/10.1145/3643027
+https://dl.acm.org/doi/10.1145/3604437.3604454
+
+Optimizing Recursive Queries with Progam Synthesis
+https://dl.acm.org/doi/10.1145/3514221.3517827
+
+== Dan Suciu (DONEISH, co-authors done)
+https://dl.acm.org/profile/81100357807
+
+Pessimistic Cardinality Estimation
+https://dl.acm.org/doi/10.1145/3712311.3712313
+
+Insert-Only versus Insert-Delete in Dynamic Query Evaluation
+https://dl.acm.org/doi/10.1145/3695837
+
+Join Size Bounds using lp-Norms on Degree Sequences
+https://dl.acm.org/doi/10.1145/3651597
+
+The Moments Method for Approximate Data Cube Queries
+https://dl.acm.org/doi/10.1145/3651147
+
+From Shapley Value to Model Counting and Back
+https://dl.acm.org/doi/10.1145/3651142
+
+Optimizing Nested Recursive Queries
+https://dl.acm.org/doi/10.1145/3639271
+
+Technical Perspective: Accurate Summary-based Cardinality Estimation Through the Lens of Cardinality Estimation Graphs
+https://dl.acm.org/doi/10.1145/3604437.3604457
+
+SafeBound: A Practical System for Generating Cardinality Bounds
+https://dl.acm.org/doi/10.1145/3588907
+
+Quasi-Stable Coloring for Graph Compression: Approximating Max-Flow, Linear Programs, and Centrality
+https://dl.acm.org/doi/10.14778/3574245.3574264
+
+Datalog in Wonderland (thing that introduces Semirings)
+https://dl.acm.org/doi/10.1145/3552490.3552492
+
+The Seattle report on database research (metaanalysis)
+https://dl.acm.org/doi/10.1145/3524284
+
+Bag Query Containment and Information Theory
+https://dl.acm.org/doi/10.1145/3472391
+
+A Dichotomy for the Generalized Model Counting Problem for Unions of Conjunctive Queries
+https://dl.acm.org/doi/10.1145/3452021.3458313
+
+Technical Perspective for: Query Games in Databases
+https://dl.acm.org/doi/10.1145/3471485.3471503
+
+SPORES: sum-product optimization via relational equality saturation for large scale linear algebra (maybe the sum sets thing we want?)
+https://dl.acm.org/doi/10.14778/3407790.3407799
+
+Probabilistic Databases for All
+https://dl.acm.org/doi/10.1145/3375395.3389129
+
+EntropyDB: a probabilistic approach to approximate query processing
+https://dl.acm.org/doi/10.1007/s00778-019-00582-9
+
+Pessimistic Cardinality Estimation: Tighter Upper Bounds for Intermediate Join Cardinalities
+https://dl.acm.org/doi/10.1145/3299869.3319894
+
+Algorithmic Aspects of Parallel Query Processing
+https://dl.acm.org/doi/10.1145/3183713.3197388
+
+BREAK
+
+== Anjali Pal (DONE)
+https://dl.acm.org/profile/99661038926
+
+
+== Brett Saiki (DONE)
+https://dl.acm.org/profile/99659899355
+
+Odyssey: An Interactive Workbench for Expert-Driven Floating-Point Expression Rewriting
+https://dl.acm.org/doi/10.1145/3586183.3606819
+
+
+== Ryan Tjoa (DONE)
+https://dl.acm.org/profile/99661037943
+
+
+== Cynthia Richey (DONE)
+https://dl.acm.org/profile/99661038847
+
+
+== Amy Zhu (DONE)
+https://dl.acm.org/profile/99659898855
+
+Computational Illusion Knitting (not related, just cool maybe?)
+https://dl.acm.org/doi/10.1145/3658231
+
+
+== Oliver Flatt (DONE)
+https://dl.acm.org/profile/99659669268
+
+
+== Zachary Tatlock (DONE)
+https://dl.acm.org/profile/81392605383
+
+Verified peephole optimizations for CompCert
+https://dl.acm.org/doi/10.1145/2908080.2908109
+
+Bringing extensibility to verified compilers
+https://dl.acm.org/doi/10.1145/1806596.1806611
+
+Proving optimizations correct using parameterized program equivalence
+https://dl.acm.org/doi/10.1145/1542476.1542513
+
+Equality saturation: a new approach to optimization (origin of e-graph optimizations?)
+https://dl.acm.org/doi/10.1145/1480881.1480915
+
+
+== Chandrakana Nandi (DONE)
+https://dl.acm.org/profile/99658711740
+
+
+== Caleb Winston (DONE)
+https://dl.acm.org/profile/99660502069
+
+
+== Luis H Ceze (IGNORED, UNRELATED)
+https://dl.acm.org/profile/81100112680
+
+
+== Yisu Remy Wang (DONE)
+https://dl.acm.org/profile/99659670940
+
+
+== Yihong Zhang (DONE)
+https://dl.acm.org/profile/99659904088
+
+Efficient Bottom-Up Synthesis for Programs with Local Variables
+https://dl.acm.org/doi/10.1145/3632894
+
+== Adam Anderson (No public articles???)
+https://dl.acm.org/profile/99659538972
+
+== Adriana Schulz (DONE)
+https://dl.acm.org/profile/99658628097
+
+
+== Dan Grossman (IGNORE REMAINING)
+https://dl.acm.org/profile/81405594870
+
+Avoiding Instruction-Centric Microarchitectural Timing Channels Via Binary-Code Transformations
+https://dl.acm.org/doi/10.1145/3620665.3640400
+
+
+== Ceze Luis (No public articles???)
+https://dl.acm.org/profile/99660180144
+
+
+== Mahmoud Abo-Khamis (DONE)
+https://dl.acm.org/profile/99658720750
+
+The Complexity of Boolean Conjunctive Queries with Intersection Joins
+https://dl.acm.org/doi/10.1145/3517804.3524156
+
+Instance Optimal Join Size Estimation
+https://dl.acm.org/doi/10.1016/j.procs.2021.11.019
+
+Functional Aggregate Queries with Additive Inequalities
+https://dl.acm.org/doi/10.1145/3426865
+
+Juggling Functions Inside a Database
+https://dl.acm.org/doi/10.1145/3093754.3093757
+
+Joins via Geometric Resolutions: Worst Case and Beyond
+https://dl.acm.org/doi/10.1145/2967101
+https://dl.acm.org/doi/10.1145/2745754.2745776
+
+Computing Join Queries with Functional Dependencies
+https://dl.acm.org/doi/10.1145/2902251.2902289
+
+FAQ: Questions Asked Frequently
+https://dl.acm.org/doi/10.1145/2902251.2902280
+
+
+== Hung Q. Ngo (DONE)
+https://dl.acm.org/profile/81100419207
+
+Polynomial Time Convergence of the Iterative Evaluation of Datalogo Programs
+https://dl.acm.org/doi/10.1145/3695839
+
+Database Theory Column
+https://dl.acm.org/doi/10.1145/3623800.3623806
+
+Worst-Case Optimal Join Algorithms: Techniques, Results, and Open Problems
+https://dl.acm.org/doi/10.1145/3196959.3196990
+
+Worst-case Optimal Join Algorithms
+https://dl.acm.org/doi/10.1145/3180143
+
+Beyond worst-case analysis for joins with minesweeper
+https://dl.acm.org/doi/10.1145/2594538.2594547
+
+Skew strikes back: new developments in the theory of join algorithms
+https://dl.acm.org/doi/10.1145/2590989.2590991
+
+
+== Reinhard Pichler (TOO LONG)
+https://dl.acm.org/profile/81100363710
+
+Fast Parallel Hypertree Decompositions in Logarithmic Recursion Depth
+https://dl.acm.org/doi/10.1145/3638758
+
+SparqLog: A System for Efficient Evaluation of SPARQL 1.1 Queries via Datalog
+https://dl.acm.org/doi/10.14778/3625054.3625061
+
+Towards Tractability of the Diversity of Query Answers: Ultrametrics to the Rescue
+https://dl.acm.org/doi/10.1145/3695833
+
+Fast and parallel decomposition of constraint satisfaction problems
+https://dl.acm.org/doi/10.1007/s10601-022-09332-1
+
+
+== David Cao (DONE)
+https://dl.acm.org/profile/99660422635
+
+
+== Philip Zucker (DONE)
+https://dl.acm.org/profile/99660971800
+
+
+== Eli Rosenthal (DONE)
+https://dl.acm.org/profile/99660973128
+
+
+== Kyle B Deeds (DONE)
+https://dl.acm.org/profile/99660894683
+
+
+== Dan Olteanu (TOO LONG)
+https://dl.acm.org/profile/81100025114
+
+
+== Ahmet Kara (DONE)
+https://dl.acm.org/profile/99659317273
+
+
+== Vasileios Nakos (DONE)
+https://dl.acm.org/profile/99658637093
+
+
+== Peter Lindner (DONE)
+https://dl.acm.org/profile/99660929999
+
+Query Optimization by Quantifier Elimination
+https://dl.acm.org/doi/10.1145/3651607
+
+
+== Sachin Basil John (DONE)
+https://dl.acm.org/profile/99659165759
+
+
+== Christoph E Koch
+https://dl.acm.org/profile/81100303201
+
+Multi-objective parametric query optimization
+https://dl.acm.org/doi/10.1145/3068612
+
+
+== Amir Shaikhha
+https://dl.acm.org/profile/99658630539
+
+Fine-Tuning Data Structures for Query Processing
+https://dl.acm.org/doi/10.1145/3579990.3580016
+
+Functional collection programming with semi-ring dictionaries
+https://dl.acm.org/doi/10.1145/3527333
+
+Building Efficient Query Engines in a High-Level Language
+https://dl.acm.org/doi/10.1145/3183653
+
+How to Architect a Query Compiler
+https://dl.acm.org/doi/10.1145/2882903.2915244
+
+
+== Maximilian Joel Schleich (DONE)
+https://dl.acm.org/profile/99659039802
+
+
+== Magdalena Balazinska (TOO LONG, 2017)
+https://dl.acm.org/profile/81100195486
+
+
+== Edward Misback (DONE)
+https://dl.acm.org/profile/99661040998
+
+
+== Caleb C Chan (DONE)
+https://dl.acm.org/profile/99661041009
+
+
+== Eunice Jun (DONE)
+https://dl.acm.org/profile/99659131304
+
+
+== Pavel Panchekha (DONE)
+https://dl.acm.org/profile/83058855557
+
+Implementation and Synthesis of Math Library Functions
+https://dl.acm.org/doi/10.1145/3632874
+
+Synthesizing mathematical identities with e-graphs
+https://dl.acm.org/doi/10.1145/3520308.3534506
+
+Choosing mathematical function implementations for speed and accuracy
+https://dl.acm.org/doi/10.1145/3519939.3523452
+
+Scalable yet rigorous floating-point error analysis
+https://dl.acm.org/doi/10.5555/3433701.3433768
+
+Finding root causes of floating point error
+https://dl.acm.org/doi/10.1145/3192366.3192411
+
+
+== Eric Mullen (DONE)
+https://dl.acm.org/profile/81486654933
+
+
+== Daryl Zuniga (DONE)
+https://dl.acm.org/profile/99659033113
+
+
+== Ross Tate (DONE)
+https://dl.acm.org/profile/81392610098
+
+Equality saturation: using equational reasoning to optimize imperative functions
+https://dl.acm.org/doi/book/10.5555/2520957
+
+
+== Michael Benjamin Stepp (DONE)
+https://dl.acm.org/profile/81336493326
+
+
+== Sorin Lucian Lerner (DONE)
+https://dl.acm.org/profile/81100399150
+
+
+== George Chichirim (DONE)
+https://dl.acm.org/profile/99660480538
+
+
+== Antonia Kormpa (DONE)
+https://dl.acm.org/profile/99660480412
+
+
+== Sungjin Im (DONE)
+https://dl.acm.org/profile/99660345884
+
+
 
