@@ -637,3 +637,20 @@ let query = (/* ... */);
 generic_join(&query.atoms, EMPTY_SET, query.variables_names.len());
 ```
 
+
+= Multiple return is easy
+
+Multiple return can not be emulated by returning a tuple, you have to return an e-class, but that is annoying and you need a bunch of extra rules.
+Another way to implement it is with multiple functions, but that wastes memory.
+But since we can implement implicit functionality as a rule, we can also implement multiple return as a rule.
+```
+(relation SingleReturn (Math Math Math Math))
+
+(rule ((SingleReturn x y z a) (SingleReturn x y z b)) ((union a b)))
+
+(relation MultiReturn (Math Math Math Math))
+
+(rule ((MultiReturn x y a b) (MultiReturn x y c d)) ((union a c) (union b d)))
+```
+
+
