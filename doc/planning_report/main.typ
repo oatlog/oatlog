@@ -323,6 +323,7 @@ The goal of this project is to implement an e-graph engine that runs faster than
 state-of-the-art implementations (like egg @egg, egglog @egglog, eqlog @eqlog) measured in e-nodes
 per second on existing e-graph rulesets.
 
+
 == Limitations
 
 Our goal can be further clarified by stating what we are not doing. We are not
@@ -344,6 +345,8 @@ applications that are already written. We aim to primarily verify correctness an
 the Egglog test suite. Additionally, we might also use larger e-graph applications such as Herbie
 @herbie, that already have implementations in the egglog language @egglogHerbie, as an end-to-end
 case study in the usability and performance of our engine.
+E-nodes per second is a decent metric because it measures the size of the database, and increasing the size of the database is the goal of applying rules. 
+One could also use time to closure but that restricts rulesets.
 
 
 
@@ -382,7 +385,6 @@ impl Egraph {
 
 #pagebreak()
 = What we want to explore
-#todo([list of ideas we want to investigate])
 
 == Query planning
 
@@ -432,6 +434,7 @@ Some rules can be applied as soon as something is inserted into the database, so
 (rule ((= e Const x)) ((evals-to x)) ; Apply when a Const is created.
 ```
 
+#pagebreak()
 == Special case handling of rules
 // Some rules do not really add any information to the database, for example, consider the following:
 
