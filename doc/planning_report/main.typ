@@ -180,12 +180,60 @@ Rewrites mean that if the left side matches, add the right side to the database 
 
 
 
-NOTE: E-graphs don't just operate on simple expression trees, because subexpressions are
-deduplicated.
+
+@rosettaexample shows an example of how a egglog rule can be transformed to eqlog, Rust, and SQL.
 
 
-#todo[fix refs?]
+// #todo[fix refs?]
 //@appendix-egraph-example in the appendix shows an example of an e-graph.
+
+
+
+#pagebreak()
+= Formal problem formulation
+// extended version of scientific problem description
+
+Given an expression, and a set of rules, find a set of equivalent expressions encoded as an E-graph and extract an equivalent expression with minimal cost and runtime, making trade-offs between cost and runtime.
+
+== E-graph
+An E-graph can be defined as a tuple $G = (U, H)$ where #footnote[This is a slightly modified definition from @egg. There is no direct concept of an "E-class", only E-class ids, an E-class exists implicitly based on the contents of H.]
+- H is the hashcons, a map from E-nodes to E-class ids #footnote[This is the database].
+- U is the union-find data structure over E-class ids, encoding an equivalence relation $(equiv_id)$, providing functions union #footnote[In practice union mutates U in-place and both union and find is $approx O(1)$.] and find where
+    - $"find"(U, a) = "find"(U, b) <==> a equiv_id b$ 
+    - $U' = "union"(U, a, b) ==> "find"(U', a) = "find"(U', b)$ 
+//- Conceptually it also contains a map from E-class ids to an E-class, 
+//- M is a map from E-class ids to an E-class
+- An E-class id is canonical iff $"find"(U, a) = a$ @egg
+- An E-node $n=f(a_1, a_2, ...)$ is canonical iff $n=f("find"(U, a_1), "find"(U, a_2), ...)$ @egg
+- An E-graph is canonical iff H only contains canonical E-nodes.
+
+== Rule
+A rule states that if the predicates match the E-graph, some new information can be added to it.
+A rule R can be defined as a tuple $R = (P, A, V)$ where:
+- $V$ is a set of variables $V = {v_1, v_2, ... } = V_p union V_a$, where:
+    - $V_p$ is the set of variables referenced in P
+    - $V_a$ is the set of variables referenced only in A ($V_p sect V_a = emptyset$)
+- P is the set of predicates, $P = {f(v_1, v_2, ...}, f(v_1, v_2, ...), ...}$
+- A is a tuple (A_i, A_u) where:
+    - $A_i$ is the set of E-nodes to be added to H, along with the E-class to assign it, but referencing V instead, $A_i = {(v_1, f(v_2, v_3 ...)), (v_1, f(v_2, v_3 ...)) ...}$
+    - $A_u$ is the set of pairs to be unified in U, $A_u = {(v_1, v_2), (v_1, v_2), ...}$
+    - All variables in $V_a$ are to be replaced with newly created E-classes.
+    - If a $V_a$ is empty then the rule is called surjective and is guaranteed to terminate.
+- A Rule matches an E-graph if there is some set of E-nodes in H that match P.
+
+
+== Extraction
+An extraction for an E-graph $G = (U, H)$, and a set of E-classes E is a set of E-nodes X, such that:
+- $forall e in E, e in H[X]$
+- $forall n in X and n = f(a_1, a_2, ...) ==> a_1, a_2, ... in H[X]$
+The cost $c(X)$ is an arbitrary function
+#footnote[For $c(X) = |X|$ the problem is NP-hard @fastextract. Typically, $c(X)$ is a function of the type of E-node.]
+
+== Primitives, Collections and Primitive Functions.
+Primitives are conceptually just known bit patterns (for example `i64`), Collections are Primitives that can contain E-classes (for example `Set<Math>`) and Primitive Functions are Functions from Primitives to Primitives.
+
+It is unclear if they have a solid theoretical foundation, as papers for egg @egg nor egglog @egglog barely mention them or go into any depth. This is discussed more in @primitiveimpl.
+
 
 = Context and related work
 
@@ -208,6 +256,7 @@ It has been shown that it is not possible to get a wost-case optimal join from j
 There is a worst-case optimal join algorithm called generic join.
 For any variable ordering, it recursively finds the value for a variable, one at a time.
 As far as we can tell, implementing this is quite straightforward, and it is also used in egglog @relationalematching.
+Generic join performs worse in practice for some queries (has a bad constant factor), free join @freejoin1 @freejoin2 is a newly developed (2023) algorithm that unifies binary joins and generic joins.
 
 // @optimaljoin
 // @relationalematching
@@ -296,6 +345,9 @@ the Egglog test suite. Additionally, we might also use larger e-graph applicatio
 @herbie, that already have implementations in the egglog language @egglogHerbie, as an end-to-end
 case study in the usability and performance of our engine.
 
+
+
+#pagebreak()
 = Approach
 
 #todo([basic stuff we aim to do])
@@ -323,11 +375,12 @@ impl Egraph {
 }
 ```
 #figure(
-    image("architecture.svg", width: 89%),
+    image("architecture.svg", width: 99%),
     caption: [High-level overview of rule compilation.]
 )
 
 
+#pagebreak()
 = What we want to explore
 #todo([list of ideas we want to investigate])
 
@@ -440,7 +493,7 @@ We would like to get a better understanding of how E-graphs typically behave, fo
 // There is not really a lot of available information on how egraphs typically behave, for example what is the ratio between the number of E-classes and E-nodes. 
 
 
-== Implementing Primitives and Primitive Functions
+== Implementing Primitives and Primitive Functions <primitiveimpl>
 
 A key difference between eqlog and egglog is that egglog has support for primitives and collections.
 Simple primitives like integers are mostly straightforward to implement, they are like E-classes that can not be merged, conceptually they represent a literal bit-pattern.
@@ -450,10 +503,10 @@ Primitive functions are also a bit strange, for example:
 ```rust
 fn add(i64, i64) -> i64;
 ```
-This is essentially a (practically) infinite, or non-partial Function that is only indexed on the two inputs.
+This is essentially a (practically) infinite table, or non-partial Function that is only indexed on the two inputs.
 But what happens if we allow adding more indexes, for example an index for finding one of the arguments given the result and one of the arguments:
 ```rust
-fn add((/* known */), (/* unknown */)) -> (/* unknown */);
+fn add((/* known */), (/* unknown */)) -> (/* known */);
 ```
 Obviously, this is just subtraction, a user could just write that themselves, but for the backend it opens up more possible query plans.
 
@@ -493,55 +546,9 @@ We would also like to explore what types of extraction functions are viable, for
 
 
 
-= Background
-// Why is this relevant?
 // https://chalmers.instructure.com/courses/232/pages/work-flow-timeline-and-tasks
 
 
-= Aim
-// What should be accomplished?
-
-= Formal problem formulation
-// extended version of scientific problem description
-
-Given an expression, and a set of rules, find a set of equivalent expressions encoded as an E-graph and extract an equivalent expression with minimal cost and runtime, making trade-offs between cost and runtime.
-
-== E-graph
-An E-graph can be defined as a tuple $G = (U, H)$ where #footnote[This is a slightly modified definition from @egg. There is no direct concept of an "E-class", only E-class ids, an E-class exists implicitly based on the contents of H.]
-- H is the hashcons, a map from E-nodes to E-class ids #footnote[This is the database].
-- U is the union-find data structure over E-class ids, encoding an equivalence relation $(equiv_id)$, providing functions union #footnote[In practice union mutates U in-place and both union and find is $approx O(1)$.] and find where
-    - $"find"(U, a) = "find"(U, b) <==> a equiv_id b$ 
-    - $U' = "union"(U, a, b) ==> "find"(U', a) = "find"(U', b)$ 
-//- Conceptually it also contains a map from E-class ids to an E-class, 
-//- M is a map from E-class ids to an E-class
-- An E-class id is canonical iff $"find"(U, a) = a$ @egg
-- An E-node $n=f(a_1, a_2, ...)$ is canonical iff $n=f("find"(U, a_1), "find"(U, a_2), ...)$ @egg
-- An E-graph is canonical iff H only contains canonical E-nodes.
-
-== Rule
-A rule states that if the predicates match the E-graph, some new information can be added to it.
-A rule R can be defined as a tuple $R = (P, A, V)$ where:
-- $V$ is a set of variables $V = {v_1, v_2, ... } = V_p union V_a$, where:
-    - $V_p$ is the set of variables referenced in P
-    - $V_a$ is the set of variables referenced only in A ($V_p sect V_a = emptyset$)
-- P is the set of predicates, $P = {f(v_1, v_2, ...}, f(v_1, v_2, ...), ...}$
-- A is a tuple (A_i, A_u) where:
-    - $A_i$ is the set of E-nodes to be added to H, along with the E-class to assign it, but referencing V instead, $A_i = {(v_1, f(v_2, v_3 ...)), (v_1, f(v_2, v_3 ...)) ...}$
-    - $A_u$ is the set of pairs to be unified in U, $A_u = {(v_1, v_2), (v_1, v_2), ...}$
-    - All variables in $V_a$ are to be replaced with newly created E-classes.
-    - If a $V_a$ is empty then the rule is called surjective and is guaranteed to terminate.
-- A Rule matches an E-graph if there is some set of E-nodes in H that match P.
-
-
-== Extraction
-An extraction for an E-graph $G = (U, H)$, and a set of E-classes E is a set of E-nodes X, such that:
-- $forall e in E, e in H[X]$
-- $forall n in X and n = f(a_1, a_2, ...) ==> a_1, a_2, ... in H[X]$
-The cost $c(X)$ is an arbitrary function
-#footnote[For $c(X) = |X|$ the problem is NP-hard @fastextract. Typically, $c(X)$ is a function of the type of E-node.]
-
-= Method of accomplishment
-// how should the work be carried out
 
 = Risk analysis and ethical considerations
 // Democratizing compiler
@@ -558,9 +565,7 @@ the research value.
 
 
 = Time plan
-
-Given that the frontend was already done in about 3-5 person days, we are very confident that we
-will complete a at least a working egraph engine.
+See next page.
 
 #[
 #set page(flipped:true)
@@ -609,15 +614,16 @@ will complete a at least a working egraph engine.
 
 #show bibliography: set heading(numbering: "1   ")
 #bibliography("refs.bib", title: "References")
+#pagebreak()
 
-== What is an egraph (Informal, somewhat easy to understand, connect to databases directly? present SQL equivalent/graph equivalent of a query?)
+= Appendix
 
 // e-node = term = tuple in a relation
 // e-class = variabel = element of a tuple in a relation
 
-= Distributive law example
+== Distributive law example <rosettaexample>
 
-== Egglog
+=== Egglog
 As an example, a Rule for the distributive law, $(a + b) * c = a * c + b * c$ for Egglog, Eqlog, Rust pseudocode, and SQL pseudocode.
 In egglog, a Rule is a list of premises followed by a list of actions to take when the premises match some part of the database.
 Add, Mul and Const represent tables where Add and Mul have columns for their inputs and their output and Const has a column for its value and a column for its output.
@@ -637,7 +643,7 @@ Add, Mul and Const represent tables where Add and Mul have columns for their inp
 )
 ```
 
-== Eqlog
+=== Eqlog
 Eqlog is similar, but the language is very desugared, it is almost just a query plan.
 It also lacks primitives, meaning it can not represent constants, primitive functions, etc.
 ```
@@ -655,7 +661,7 @@ rule distributive_law {
 }
 ```
 
-== Rust
+=== Rust
 The above could be transformed into something like this Rust pseudocode,
 ```rust
 for (t0, c, e) in tables.mul.iter() {
@@ -670,7 +676,7 @@ for (t0, c, e) in tables.mul.iter() {
 ```
 
 
-== SQL
+=== SQL
 Since the queries are essentially database queries, we can express them as Pseudo-SQL, although the queries become quite complicated because SQL is not a great language to express both reads and writes in the same query.
 ```sql
 -- Relevant here is that we can represent the Egraph as a table.
