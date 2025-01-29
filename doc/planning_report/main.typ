@@ -221,14 +221,7 @@ Rewrites mean that if the left side matches, add the right side to the database 
 // === Primitive function
 
 
-
-
 @rosettaexample shows an example of how a egglog rule can be transformed to eqlog, Rust, and SQL.
-
-
-// #todo[fix refs?]
-//@appendix-egraph-example in the appendix shows an example of an e-graph.
-
 
 
 #pagebreak()
@@ -394,10 +387,6 @@ One could also use time to closure but that restricts rulesets.
 
 #pagebreak()
 = Approach
-
-#todo([basic stuff we aim to do])
-
-
 
 
 Concretely, we will create a Rust library that takes in a set of rewrite rules in the egglog language 
