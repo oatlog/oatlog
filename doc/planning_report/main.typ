@@ -6,7 +6,7 @@
   [#text(fill: red, weight: "bold", size: 12pt)[TODO #msg]]
 }
 
-#let title = "Compiled e-graph rewritng with primitives"
+#let title = "Compiled e-graph rewriting with primitives"
 //#let title = "A faster e-graph engine"
 
 #set document(title: title)
@@ -43,13 +43,55 @@
 
 = Introduction
 
+A traditional optimizing compiler applies optimization passes sequentially and destructively, in
+such a way that earlier passes may perform rewrites that both unlock and inhibit other optimizations
+later. The unlocking aspect is traditionally partially handled by running important passes multiple
+times, interleaved with others, but this is computationally inefficient and does not address the
+inherent order dependence of destructive rewrites. This is called the phase ordering problem.
+Additionally, ad-hoc passes implemented as arbitrary transforms on the compiler's intermediate
+representation are difficult to model formally and to prove correct.
+
+The first of these issues can be solved by replacing globally rewriting passes with local rewrites.
+These local rewrites can be expressed within some framework that tracks dependencies and thus
+incrementally applies them until reaching a fix point. This avoids the computational inefficiency of
+having to reprocess the entire code with repeated passes, while at the same time not missing
+rewrites unlocked by other rewrites. This is called peephole rewriting and it lets us apply
+monotonic rewrites to improve the program #footnote[Sea of Nodes is a compiler IR design especially
+suited to peephole rewriting @son.].
+
+Peephole rewriting does however not avoid the issue of destructive rewrites being order-dependent in
+the face of multiple potentially good but mutually incompatible rewrites. Since one rewrite can
+unlock other beneficial rewrites later, one cannot select them greedily. This could be handled with a
+slow backtracking search, but most compilers instead do this heuristically.
+
+E-graphs and equality saturation (EqSat) are techniques that can be used to augment peephole
+rewriting to make it nondestructive. They allow multiple rewrites of a value, committing to one only
+after all rewrites have been searched while not duplicating work post-branch like a backtracking
+search would.
+
+E-graphs are data structures capable of compactly representing an exponential number of expressions
+evaluating to the same value, by letting operators take not other expressions but rather equivalence
+classes as input. An e-graph can be seen as a graph of e-nodes partitioned into e-classes, where
+e-nodes take e-classes as input. Concretely, the expressions $2a+b$ and $(a<<1)+b$ if known to be
+equal would be stored as an addition taking as its left argument a reference to the equivalence
+class ${2a, a<<1}$ and thus avoiding duplicated storage of any expression having $2a$ as a
+subexpression.
+
+Equality saturation (EqSat) denotes a workflow where an e-graph is initialized with a set of
+expressions representing facts or computations, and rewrite rules corresponding to logical
+deductions or algebraic simplifications respectively are applied until reaching a fix point. Rewrite
+rules pattern match on the existing e-graph and perform actions such as inserting new e-nodes and
+equating existing e-nodes (and transitively hence their e-classes).
+
+TODO
+
 Modern software development relies heavily on efficient and reliable compilers with sophisticated
 optimizations. In practice, this has led to a few large compiler backends that have received
 significant engineering effort yet are difficult to modify while ensuring correctness and which
 struggle with the compilation-time and generated-code-quality trade-off. LLVM @llvm is a poster
 child of these issues. As we will expand upon in @whyegraphs, this can be addressed by raising the
 level of abstraction for the optimization pass writer from custom passes to rewrite rules, in the
-form of peephole rewriting and in particular using e-graphs.
+form of peephole rewriting and in particular using e-graphs -- TODO.
 
 Yet e-graphs suffer from a combinatorial explosion that currently severely limits what applications
 they are suitable for. The compiler backend Cranelift @cranelift is the only production compiler we
@@ -303,14 +345,14 @@ egg's about 100k e-nodes per second in that same benchmark.
 E-graphs store an exponential number of equivalent expressions in a deduplicated manner but do not
 solve the problem of quickly extracting the optimal among them. The extraction problem is similar to
 instruction selection or graph covering and is NP-hard for even simple cost functions. Integer
-linear programming is typically used to extract the best expression in an e-graph. 
+linear programming is typically used to extract the best expression in an e-graph.
 
 However, it was independently discovered that linear time extraction is possible for a bounded treewidth @fastextract @egraphcircuit.
 Quite a lot of algorithms that are NP-hard, are polynomial for a bounded treewidth, so in this sense it is essentially a standard method applied to the extraction problem, in this case the complexity is $O(n * f("treewidth"))$
 Informally, treewidth is a measure of how close a graph is to a tree, and can be computed from a tree decomposition of the graph.
 Generally Egraphs tend to have a low treewidth, so this algorithm tends to applicable to practical egraphs,
 
-As a preprocessing step, the algorithm simplifies the egraph by treating it as a boolean circuit and simplifying it using standard techniques to slightly reduce the size of the problem. 
+As a preprocessing step, the algorithm simplifies the egraph by treating it as a boolean circuit and simplifying it using standard techniques to slightly reduce the size of the problem.
 The E-nodes with zero inputs become a constant 1.
 E-nodes become and gates of all their inputs and E-classes become or gates of all their inputs.
 The problem is essentially to set the extracted E-class to 1 while removing as many gates as possible.
