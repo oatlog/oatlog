@@ -114,6 +114,72 @@ expression can be found, and the best expression according to some metric can be
 Extraction is NP-hard but there are both heuristics and algorithms that work well on some types of
 e-graphs @fastextract.
 
+Here is an example of E-graph rules written in the egglog language.
+```
+(sort Math)
+(function Add (Math Math) Math)
+(function Sub (Math Math) Math)
+(function Mul (Math Math) Math)
+(function Div (Math Math) Math)
+(function Pow (Math) Math)
+(function Const (i64) Math)
+(function Var (String) Math)
+
+(rewrite (Add a b) (Add b a))
+(rewrite (Add a (Add b c)) (Add (Add a b) c))
+
+(rewrite (Mul a b) (Mul b a))
+(rewrite (Mul a (Mul b c)) (Mul (Mul a b) c))
+
+(rewrite (Mul (Add a b) c) (Add (Mul a c) (Mul b c)))
+
+(rewrite (Add x (Const 0)) x)
+(rewrite (Mul x (Const 1)) (x))
+```
+Math is essentially a sum type, where Add, Sub, etc are constructors.
+Rewrites mean that if the left side matches, add the right side to the database and unify it with the left side.
+
+// == Egraph
+// An Egraph is a bipartite graph of E-nodes and E-classes.
+// There is exactly one edge from and E-node to an E-class.
+
+
+// === E-class
+// Represents a set of equivalent expressions.
+// Element in a tuple in a relation
+// 
+// === E-node or Term // function?
+// Also known as "term"
+// A tuple in a row in the database.
+// Informally, refers to a specific operation, eg (Add x y)
+
+
+// === Rule
+// A rule consists of a set of Premises, Actions and Variables.
+// If the Premises hold, then the Action is executed.
+
+// === Variables
+// Variables are either referred to in Premise set or Action set.
+// A variable referred to in Premise set is Forall.
+// A variable referred to in only Action is Exists.
+
+// === Premise
+// 
+// 
+// 
+// === Action
+// Either a Union or Tuple to be created.
+// 
+// === Union
+// Make two E-classes equal.
+// 
+// 
+// === Primitive value
+// 
+// === Primitive function
+
+
+
 NOTE: E-graphs don't just operate on simple expression trees, because subexpressions are
 deduplicated.
 
@@ -433,40 +499,6 @@ impl Egraph {
 
 
 
-== Egraph
-An Egraph is a bipartite graph of E-nodes and E-classes.
-There is exactly one edge from and E-node to an E-class.
-
-== E-class
-Represents a set of equivalent expressions.
-Element in a tuple in a relation
-
-== E-node or Term // function?
-Also known as "term"
-A tuple in a row in the database.
-Informally, refers to a specific operation, eg (Add x y)
-
-
-== Rule
-A rule consists of (Premise set, Action set, Variable set).
-
-== Variables
-Variables are either referred to in Premise set or Action set.
-A variable referred to in Premise set is Forall.
-A variable referred to in only Action is Exists.
-
-== Premise
-
-== Action
-Either a Union or Tuple to be created.
-
-== Union
-Make two E-classes equal.
-
-
-== Primitive value
-
-== Primitive function
 
 = Method of accomplishment
 // how should the work be carried out
