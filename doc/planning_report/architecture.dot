@@ -1,0 +1,27 @@
+digraph G {
+    rankdir="LR";
+    ranksep=0.0;
+    nodesep=0.4;
+    "egglog Rules" -> "frontend";
+    "egglog Functions" -> "frontend";
+    subgraph cluster_proc_macro {
+        "frontend" [shape=rect];     
+        label = "proc macro";
+        "frontend" -> "Functions";
+        "frontend" -> "Rules";
+        "Functions" -> "optimizer";
+        "Rules" -> "optimizer";
+        subgraph cluster_backend {
+            label = "backend";
+            "optimizer" [shape=rect];
+            "codegen" [shape=rect];
+            "optimizer" -> "codegen";
+        }   
+    }
+    "codegen" -> "Rust code";
+    "Rust code" -> "rustc";
+    "rustc" [shape=rect];
+    "rustc" -> "final binary"
+}
+
+

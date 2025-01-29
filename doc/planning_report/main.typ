@@ -234,7 +234,148 @@ case study in the usability and performance of our engine.
 
 #todo([basic stuff we aim to do])
 
+
+= What we want to explore
 #todo([list of ideas we want to investigate])
+
+== Query planning
+
+If generic join is used, a query plan is a permutation of variables, and an ordering of the constraints when picking the variables.
+With some cost estimate of a query plan, exhaustive search might work for up to 5-10 variables.
+Additionally, to minimize the number of indexes, rules need to be optimized globally.
+
+Therefore, heuristics are needed, one option is to create many locally good query plans for each rule and then pick a set of query plans that minimize total number of indexes.
+A problem is that to get algorithmically optimal performance, we would need to update the constraint ordering based on the relative sizes of the tables.
+
+== Algorithmic improvements
+
+Since both worst-case optimal joins and extraction with a bounded treewidth have been shown to be algorithmically optimal @optimaljoin @relationalematching @fastextract @egraphcircuit, we would need to reformulate the problem in order to make algorithmic improvements.
+
+== Merging Rules
+Some rules share prefixes of other rules, in that case, they can be merged:
+```rust
+for (/* ... */) in (/* ... */) { // shared prefix 
+    for (/* ... */) in (/* ... */) { // shared prefix
+        for (/* ... */) in (/* ... */) { // rule 1
+            /* ... */
+        }
+        for (/* ... */) in (/* ... */) { // rule 2
+            /* ... */
+        }
+    }
+}
+```
+
+== Eagerly applying Rules
+Some rules can be applied as soon as something is inserted into the database, so searching the database for matches of the rule is not needed, for example:
+```
+(sort Math)
+(function Const (i64) Math)
+(function Add (Math Math) Math)
+(function Mul (Math Math) Math)
+
+(relation LessOrEqual (Math Math))
+(rule ((x)) ((LessOrEqual x x))) ; Apply when new E-class created
+
+(funciton UpperBound (Math) i64 :merge (min old new))
+
+(rule ((x)) ((UpperBound x i64::MAX))) ; Apply when new E-class created
+
+(function evals-to (Math) i64 :no-merge)
+
+(rule ((= e Const x)) ((evals-to x)) ; Apply when a Const is created.
+```
+
+== Special case handling of rules
+// Some rules do not really add any information to the database, for example, consider the following:
+
+It is very common for Rules to simply express that some Function is associative, commutative, transitive etc.
+We can use that information to optimize for common patterns.
+For example for transitivity:
+```
+(relation (LessThan Math Math))
+(rule ((LessThan x y) (LessThan y z)) ((LessThan x z)))
+```
+The problem with this rule is that it generates $O(n^2)$ E-classes for $O(n)$ facts since it adds an E-node for all pairs.
+The engine could disable that rule and instead check if there is a path between the two e-classes.
+This is more expensive when just checking if `(LessThan x y)`, but indexing for a known `x` and unknown `y` does not add any extra cost, since it is essentially a BFS.
+
+
+// Associative: (rewrite (F (F x y) z) (F x (F y z)))
+// 
+// Commutative: (rewrite (F x y) (F y x))
+// 
+// Transitive: (rule ((F x y) (F y z)) ((F x z)))
+// 
+// Equivalence: Commutative + Transitive
+// ```
+// (sort Math)
+// (relation Le (Math Math)) ; less than 
+// (rule ((x)) ((Le x x))) 
+// (rule ((x)) ((Le x x))) 
+// ```
+
+// == Multiple return
+// 
+// Implicit functionality meaning that $f(a) = b and f(a) = c ==> b = c$ would be useful for functions returning multiple values.
+// Implicit functionality can be implemented in userspace:
+// ```
+// (relation f (Math Math Math))
+// 
+// (rule ((f x y a), (f x y b)) ((union a b))
+// ```
+// And 
+// 
+// 
+// Multiple return, equivalent to multiple functions, but that is unergonomic
+// 
+// a b c d e
+// a b c g f
+
+== Indexing data structures
+
+In a typical database, there is only a single primary key, not that many indexes, and the indexes that exist are for an exact set of columns.
+But for typical queries on an E-graph, essentially everything needs to be indexed.
+With many b-tree sets storing permutations of a table, each b-tree acts as an index for each prefix of that permutation. 
+Since eqlog uses b-tree sets for indexes, we are fairly confident that it will work reasonably well, but we also want to explore other options.
+For example, a trie has the same asymptotic runtime, but uses less memory if there are many long shared prefixes.
+
+== General profiling and understanding of how E-graphs behave
+
+We would like to get a better understanding of how E-graphs typically behave, for example how quickly do they tend to grow per application of a rule? What is the ratio between the number of E-classes and E-nodes? What do the memory access patterns tend to look like?
+
+// There is not really a lot of available information on how egraphs typically behave, for example what is the ratio between the number of E-classes and E-nodes. 
+
+
+== Implementing Primitives and Primitive Functions
+
+A key difference between eqlog and egglog is that egglog has support for primitives and collections.
+Simple primitives like integers are mostly straightforward to implement, they are like E-classes that can not be merged, conceptually they represent a literal bit-pattern.
+But collections, for example a lists or sets are harder since, they can not be merged directly, but if the E-classes that they contain are unified, then collections can be merged.
+
+Primitive functions are also a bit strange, for example:
+```rust
+fn add(i64, i64) -> i64;
+```
+This is essentially a (practically) infinite, or non-partial Function that is only indexed on the two inputs.
+But what happens if we allow adding more indexes, for example an index for finding one of the arguments given the result and one of the arguments:
+```rust
+fn add((/* known */), (/* unknown */)) -> (/* unknown */);
+```
+Obviously, this is just subtraction, a user could just write that themselves, but for the backend it opens up more possible query plans.
+
+Thinking about this for collections is very hard, but to give an idea of what it could look like, we could have interesting queries like "what sets contains this element", "what multisets have 3 copies of something".
+These are not actually implementable since the query results would be infinite, but if there is a constraint that it needs to be contained in some table, then it becomes conceptually possible to query.
+Ideally, we would want to implement Primitives and Primitive Functions in a way that users can create their own by writing some Rust code. 
+
+== Scheduling 
+
+Semi-naive evaluation avoids recomputing the same facts by only matching "new" facts against the database.
+This is a great optimization, and very loosely speaking makes it $O(1)$ to generate potentially a new fact instead of $O(n)$.
+However, if it is done slightly incorrectly by adding a "new" fact to the old set too early, it is possible that some facts will never be created.
+Eqlog schedules by running all rules without modifying the database, removing rows in the database that are now wrong to to canonicalization and then inserting everything back into the database.
+Eglog also runs all rules that do not create new E-classes until closure before running any rules that create E-classes.
+The motivation for this is that without creating E-classes, the size of the database is limited, and equal E-classes will be unified faster. 
 
 == Design and implementation
 
@@ -268,6 +409,15 @@ impl Egraph {
 // [improving indices omitted]
 // [improving expression exploration priority omitted]
 // [improving extraction omitted]
+
+
+#figure(
+    image("architecture.svg", width: 89%),
+    caption: [High-level overview of rule compilation.]
+)
+
+
+
 
 
 = Background
