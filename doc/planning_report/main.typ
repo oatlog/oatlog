@@ -216,8 +216,6 @@ side matches, add the right side to the database and unify it with the left side
 
 @rosettaexample shows an example of how a egglog rule can be transformed to eqlog, Rust, and SQL.
 
-#todo[maybe explain typical UF implementation? (or cite paper that introduced UF, cited by egg)]
-
 #pagebreak()
 == E-graphs, formally
 // extended version of scientific problem description
@@ -343,12 +341,40 @@ e-graphs (aegraphs) that make it miss out on potential optimizations @cranelift_
 // lambda = type of function, Add, Sub, Mul
 // R is the union-find datastructure?
 
-
 === Union-find (1964)
 Union-find, $"U"$ is a data structure used for efficiently merging and checking if elements belong to the same set. Initially all sets are distinct @unionfindoriginal @fastunionfind:
 - $"find"("U", v)$ returns a _representative_ element for the set that $v$ belongs to. Iff $"find"("U", u) = "find"("U", v)$ then $u$ and $v$ belong to the same set.
 - $"union"("U", u, v)$ merges#footnote[by mutating U in-place] the two sets that $u$ and $v$. After running union, $"find"("U", u) = "find"("U", v)$.
 Both operations run in almost $O(1)$ and outside the context of E-graphs, one use is when implementing Kruskal's minimum spanning tree algorithm for checking if two vertices belong to different points.
+
+This is how union-find can be implemented#footnote[simplified, so does not have $approx O(1)$ complexity for union and find, path compression and smaller to larger merging is required for that.]:
+```rust
+struct UnionFind {
+    representative: Vec<usize>
+}
+impl UnionFind {
+    fn new(n: usize) -> Self {
+        Self {
+            // each set points to itself.
+            representative: (0..n).collect(),
+        }
+    }
+    fn find(&self, i: usize) -> usize {
+        // follow representative for i until we reach root
+        if i == representative[i] {
+            i
+        } else {
+            self.find(representative[i], repr)
+        }
+    }
+    fn union(&mut self, i: usize, j: usize) {
+        if self.find(i) != self.find(j) {
+            // set representative of first set to the second set
+            self.representative[self.find(j)] = self.find(i);
+        }
+    }
+}
+```
 
 == Congruence closure algorithms (1980)
 // is it this: $a = b ==> f(a) = f(b)$?
