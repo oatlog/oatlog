@@ -54,13 +54,15 @@ inherent order dependence of destructive rewrites. This is called the phase orde
 Additionally, ad-hoc passes implemented as arbitrary transforms on the compiler's intermediate
 representation are difficult to model formally and to prove correct.
 
-The first of these issues can be solved by replacing globally rewriting passes with local rewrites.
-These local rewrites can be expressed within some framework that tracks dependencies and thus
-incrementally applies them until reaching a fix point. This avoids the computational inefficiency of
-having to reprocess the entire code with repeated passes, while at the same time not missing
-rewrites unlocked by other rewrites. This is called peephole rewriting and it lets us apply
-monotonic rewrites to improve the program #footnote[Sea of Nodes is a compiler IR design especially
-suited to peephole rewriting @son.].
+The unlocking half of the issue can be avoided by replacing globally rewriting passes with local
+rewrites. These local rewrites can be expressed within some framework that tracks dependencies and
+thus incrementally applies them until reaching a fix point. This avoids the computational
+inefficiency of having to reprocess the entire code with repeated passes, while at the same time not
+missing rewrites unlocked by other rewrites. This is called peephole rewriting and it lets us apply
+monotonic rewrites to improve the program #footnote[Sea of Nodes is a compiler IR design that
+represents both data flow and control flow as expressions with no side effects, making it especially
+suited to peephole rewriting @son.]. At the same time, an optimization paradigm based on algebraic
+rewrites eases formally modelling programs and proving the correctness of optimizations.
 
 Peephole rewriting does however not avoid the issue of destructive rewrites being order-dependent in
 the face of multiple potentially good but mutually incompatible rewrites. Since one rewrite can
@@ -75,37 +77,38 @@ search would.
 E-graphs are data structures capable of compactly representing an exponential number of expressions
 evaluating to the same value, by letting operators take not other expressions but rather equivalence
 classes as input. An e-graph can be seen as a graph of e-nodes partitioned into e-classes, where
-e-nodes take e-classes as input. Concretely, the expressions $2a+b$ and $(a<<1)+b$ if known to be
-equal would be stored as an addition taking as its left argument a reference to the equivalence
-class ${2a, a<<1}$ and thus avoiding duplicated storage of any expression having $2a$ as a
-subexpression.
+e-nodes take e-classes as input. Concretely, the expressions $2a+b$ and $(a<<1)+b$ would be stored
+as an addition taking as its left argument a reference to the equivalence class ${2a, a<<1}$, thus
+avoiding duplicated storage of any expression having $2a$ and therefore also $a<<1$ as possible
+subexpressions.
 
-Equality saturation (EqSat) denotes a workflow where an e-graph is initialized with a set of
-expressions representing facts or computations, and rewrite rules corresponding to logical
-deductions or algebraic simplifications respectively are applied until reaching a fix point. Rewrite
-rules pattern match on the existing e-graph and perform actions such as inserting new e-nodes and
-equating existing e-nodes (and transitively hence their e-classes).
+A general workflow involves an e-graph initialized with a set of expressions representing facts or
+computations, and rewrite rules corresponding to logical deductions or optimizations respectively
+are applied until reaching a fix point or some other criteria is met. Rewrite rules pattern match on
+the existing e-graph and perform actions such as inserting new e-nodes and equating existing e-nodes
+(and hence their e-classes). When e-graphs are used for program synthesis or optimization, rather
+than automated theorem proving, a workflow called equality saturation (EqSat) @equalitysaturation,
+there is then a final extraction phase where some procedure selects from the e-graph globally
+optimized expressions equivalent to the initial ones.
 
-TODO
+Yet e-graphs, although they reduce it with efficient deduplication, suffer from the combinatorial
+explosion that results when trying to find every equivalent representation of their initial
+expression. This is a major problem in practice and currently severely limits what applications they
+are suitable for. While we have chosen optimizing compilers as illustration of their usefulness,
+e-graphs were originally developed for automated theorem proving @oldegraph @egraphwithexplain.
+E-graphs have been used for for example synthesis of low-error floating point expressions @herbie
+and optimization of linear algebra expressions @spores, but are absent from general-purpose
+compilers. In fact, the compiler backend Cranelift @cranelift is the only production compiler for
+general-purpose code we know of that has incorporated e-graphs, but it has done so in the weaker
+form of acyclic e-graphs due to performance problems of full e-graphs.
 
-Modern software development relies heavily on efficient and reliable compilers with sophisticated
-optimizations. In practice, this has led to a few large compiler backends that have received
-significant engineering effort yet are difficult to modify while ensuring correctness and which
-struggle with the compilation-time and generated-code-quality trade-off. LLVM @llvm is a poster
-child of these issues. As we will expand upon in @whyegraphs, this can be addressed by raising the
-level of abstraction for the optimization pass writer from custom passes to rewrite rules, in the
-form of peephole rewriting and in particular using e-graphs -- TODO.
+Our thesis aims to contribute to faster e-graphs for EqSat, which would speed up many applications
+and bring EqSat for general-purpose compilers closer to being feasible.
 
-Yet e-graphs suffer from a combinatorial explosion that currently severely limits what applications
-they are suitable for. The compiler backend Cranelift @cranelift is the only production compiler we
-know of that has incorporated e-graphs, but it has done so in the weaker form of acyclic e-graphs
-due to performance problems of full e-graphs.
-
-Recent developments have unified e-graphs with datalog, unlocking incremental rule matching, and
-bringing an order of magnitude speedup. The insight is that an e-graph engine is very similar to a
-graph database, with its ruleset being a schema and a set of queries that insert terms until
-reaching a fixed point. //This is elaborated upon in @whategraphs and @whatcomputation.
-#todo[fix refs?]
+Recent developments @eqlog @egglog @relationalematching have unified e-graphs with datalog,
+unlocking incremental rule matching and bringing an order of magnitude speedup. The insight is that
+an e-graph engine is very similar to a relational database, with its ruleset being a schema and a
+set of queries that insert tuples representing e-nodes until reaching a fixed point.
 
 Relational databases are a mature technology with rich theory and a wide breadth of implementations,
 providing many techniques that could be transferred to e-graphs. At the same time, e-graphs have
