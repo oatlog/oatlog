@@ -203,7 +203,7 @@ Rewrites mean that if the left side matches, add the right side to the database 
 // === E-class
 // Represents a set of equivalent expressions.
 // Element in a tuple in a relation
-// 
+//
 // === E-node or Term // function?
 // Also known as "term"
 // A tuple in a row in the database.
@@ -220,18 +220,18 @@ Rewrites mean that if the left side matches, add the right side to the database 
 // A variable referred to in only Action is Exists.
 
 // === Premise
-// 
-// 
-// 
+//
+//
+//
 // === Action
 // Either a Union or Tuple to be created.
-// 
+//
 // === Union
 // Make two E-classes equal.
-// 
-// 
+//
+//
 // === Primitive value
-// 
+//
 // === Primitive function
 
 
@@ -251,9 +251,9 @@ Given an expression, and a set of rules, find a set of equivalent expressions en
 An E-graph can be defined as a tuple $G = (U, H)$ where #footnote[This is a slightly modified definition from @egg. There is no direct concept of an "E-class", only E-class ids, an E-class exists implicitly based on the contents of H.]
 - H is the hashcons, a map from E-nodes to E-class ids #footnote[This is the database].
 - U is the union-find data structure over E-class ids, encoding an equivalence relation $(equiv_id)$, providing functions union #footnote[In practice union mutates U in-place and both union and find is $approx O(1)$.] and find where
-    - $"find"(U, a) = "find"(U, b) <==> a equiv_id b$ 
-    - $U' = "union"(U, a, b) ==> "find"(U', a) = "find"(U', b)$ 
-//- Conceptually it also contains a map from E-class ids to an E-class, 
+    - $"find"(U, a) = "find"(U, b) <==> a equiv_id b$
+    - $U' = "union"(U, a, b) ==> "find"(U', a) = "find"(U', b)$
+//- Conceptually it also contains a map from E-class ids to an E-class,
 //- M is a map from E-class ids to an E-class
 - An E-class id is canonical iff $"find"(U, a) = a$ @egg
 - An E-node $n=f(a_1, a_2, ...)$ is canonical iff $n=f("find"(U, a_1), "find"(U, a_2), ...)$ @egg
@@ -281,7 +281,7 @@ An extraction for an E-graph $G = (U, H)$, and a set of E-classes E is a set of 
 The cost $c(X)$ is an arbitrary function
 #footnote[
 Typically, $c(X) = sum_(x in X) w(x)$, where $w(x)$ is a weight based on the type of E-node.
-Minimal cost extraction for functions like this is NP-hard by reduction from MIN-SAT @extractnphard. 
+Minimal cost extraction for functions like this is NP-hard by reduction from MIN-SAT @extractnphard.
 ]
 
 == Primitives, Collections and Primitive Functions.
@@ -301,7 +301,7 @@ are not performant enough, Cranelift uses weaker acyclic e-graphs (aegraphs) tha
 on potential optimizations @cranelift_egraph_rfc @acyclic_egraphs.
 
 
-== Equality saturation 
+== Equality saturation
 
 #todo[
 maybe use this?
@@ -414,7 +414,7 @@ applications that are already written. We aim to primarily verify correctness an
 the Egglog test suite. Additionally, we might also use larger e-graph applications such as Herbie
 @herbie, that already have implementations in the egglog language @egglogHerbie, as an end-to-end
 case study in the usability and performance of our engine.
-E-nodes per second is a decent metric because it measures the size of the database, and increasing the size of the database is the goal of applying rules. 
+E-nodes per second is a decent metric because it measures the size of the database, and increasing the size of the database is the goal of applying rules.
 One could also use time to closure but that restricts rulesets.
 
 #todo[Matti: Please explain thoroughly what kind of environment you are using for running the experiments (both hardware and software) (reproduceability, hardware/software, nix)]
@@ -424,9 +424,9 @@ One could also use time to closure but that restricts rulesets.
 
 #todo[Matti: Expand what the feature set [referring to egglog] is (not just say it's similar to something in some paper)]
 
-Concretely, we will create a Rust library that takes in a set of rewrite rules in the egglog language 
-and generates Rust code for a e-graph engine with the optimized rewrite rules hard-coded. The main 
-focus is optimizing the run time of the generated e-graph engine. In terms of features we are aiming 
+Concretely, we will create a Rust library that takes in a set of rewrite rules in the egglog language
+and generates Rust code for a e-graph engine with the optimized rewrite rules hard-coded. The main
+focus is optimizing the run time of the generated e-graph engine. In terms of features we are aiming
 to implement a similar feature set to egglog @egglog.
 ```rust
 compile_egraph!(
@@ -468,7 +468,7 @@ Since both worst-case optimal joins and extraction with a bounded treewidth have
 == Merging Rules
 Some rules share prefixes of other rules, in that case, they can be merged:
 ```rust
-for (/* ... */) in (/* ... */) { // shared prefix 
+for (/* ... */) in (/* ... */) { // shared prefix
     for (/* ... */) in (/* ... */) { // shared prefix
         for (/* ... */) in (/* ... */) { // rule 1
             /* ... */
@@ -517,33 +517,33 @@ This is more expensive when just checking if `(LessThan x y)`, but indexing for 
 
 
 // Associative: (rewrite (F (F x y) z) (F x (F y z)))
-// 
+//
 // Commutative: (rewrite (F x y) (F y x))
-// 
+//
 // Transitive: (rule ((F x y) (F y z)) ((F x z)))
-// 
+//
 // Equivalence: Commutative + Transitive
 // ```
 // (sort Math)
-// (relation Le (Math Math)) ; less than 
-// (rule ((x)) ((Le x x))) 
-// (rule ((x)) ((Le x x))) 
+// (relation Le (Math Math)) ; less than
+// (rule ((x)) ((Le x x)))
+// (rule ((x)) ((Le x x)))
 // ```
 
 // == Multiple return
-// 
+//
 // Implicit functionality meaning that $f(a) = b and f(a) = c ==> b = c$ would be useful for functions returning multiple values.
 // Implicit functionality can be implemented in userspace:
 // ```
 // (relation f (Math Math Math))
-// 
+//
 // (rule ((f x y a), (f x y b)) ((union a b))
 // ```
-// And 
-// 
-// 
+// And
+//
+//
 // Multiple return, equivalent to multiple functions, but that is unergonomic
-// 
+//
 // a b c d e
 // a b c g f
 
@@ -551,7 +551,7 @@ This is more expensive when just checking if `(LessThan x y)`, but indexing for 
 
 In a typical database, there is only a single primary key, not that many indexes, and the indexes that exist are for an exact set of columns.
 But for typical queries on an E-graph, essentially everything needs to be indexed.
-With many b-tree sets storing permutations of a table, each b-tree acts as an index for each prefix of that permutation. 
+With many b-tree sets storing permutations of a table, each b-tree acts as an index for each prefix of that permutation.
 Since eqlog uses b-tree sets for indexes, we are fairly confident that it will work reasonably well, but we also want to explore other options.
 For example, a trie has the same asymptotic runtime, but uses less memory if there are many long shared prefixes.
 
@@ -559,7 +559,7 @@ For example, a trie has the same asymptotic runtime, but uses less memory if the
 
 We would like to get a better understanding of how E-graphs typically behave, for example how quickly do they tend to grow per application of a rule? What is the ratio between the number of E-classes and E-nodes? What do the memory access patterns tend to look like?
 
-// There is not really a lot of available information on how egraphs typically behave, for example what is the ratio between the number of E-classes and E-nodes. 
+// There is not really a lot of available information on how egraphs typically behave, for example what is the ratio between the number of E-classes and E-nodes.
 
 
 == Implementing Primitives and Primitive Functions <primitiveimpl>
@@ -581,16 +581,16 @@ Obviously, this is just subtraction, a user could just write that themselves, bu
 
 Thinking about this for collections is very hard, but to give an idea of what it could look like, we could have interesting queries like "what sets contains this element", "what multisets have 3 copies of something".
 These are not actually implementable since the query results would be infinite, but if there is a constraint that it needs to be contained in some table, then it becomes conceptually possible to query.
-Ideally, we would want to implement Primitives and Primitive Functions in a way that users can create their own by writing some Rust code. 
+Ideally, we would want to implement Primitives and Primitive Functions in a way that users can create their own by writing some Rust code.
 
-== Scheduling 
+== Scheduling
 
 Semi-naive evaluation avoids recomputing the same facts by only matching "new" facts against the database.
 This is a great optimization, and very loosely speaking makes it $O(1)$ to generate potentially a new fact instead of $O(n)$.
 However, if it is done slightly incorrectly by adding a "new" fact to the old set too early, it is possible that some facts will never be created.
 Eqlog schedules by running all rules without modifying the database, removing rows in the database that are now wrong to to canonicalization and then inserting everything back into the database.
 Eglog also runs all rules that do not create new E-classes until closure before running any rules that create E-classes.
-The motivation for this is that without creating E-classes, the size of the database is limited, and equal E-classes will be unified faster. 
+The motivation for this is that without creating E-classes, the size of the database is limited, and equal E-classes will be unified faster.
 
 == Extraction
 
@@ -681,21 +681,36 @@ See next page.
 )
 ]
 
-#show bibliography: set heading(numbering: "1   ")
 #bibliography("refs.bib", title: "References")
 #pagebreak()
 
+// Appendix
+#set heading(
+  numbering: "A.1",
+  supplement: [Appendix]
+)
+#show heading: it => {
+  if it.level == 1 and it.numbering != none {
+    [
+      #align(center, text(size: 20pt, [#it.supplement #counter(heading).display()]))
+    ]
+  } else if it.numbering != none {
+    [#counter(heading).display().]
+  }
 
-#todo[mad typst skillz]
-= Appendix
+  align(center, it.body)
+  parbreak()
+}
+#counter(heading).update(0)
+
 
 // e-node = term = tuple in a relation
 // e-class = variabel = element of a tuple in a relation
 
-== Distributive law example <rosettaexample>
+= Distributive law example <rosettaexample>
 #todo[Matti: The explanation in the Appendix is useful but a good explanation should be integrated in the thesis proper (referring to previous example in appendix)]
 
-=== Egglog
+== Egglog
 As an example, a Rule for the distributive law, $(a + b) * c = a * c + b * c$ for Egglog, Eqlog, Rust pseudocode, and SQL pseudocode.
 In egglog, a Rule is a list of premises followed by a list of actions to take when the premises match some part of the database.
 Add, Mul and Const represent tables where Add and Mul have columns for their inputs and their output and Const has a column for its value and a column for its output.
@@ -715,7 +730,7 @@ Add, Mul and Const represent tables where Add and Mul have columns for their inp
 )
 ```
 
-=== Eqlog
+== Eqlog
 Eqlog is similar, but the language is very desugared, it is almost just a query plan.
 It also lacks primitives, meaning it can not represent constants, primitive functions, etc.
 ```
@@ -733,7 +748,7 @@ rule distributive_law {
 }
 ```
 
-=== Rust
+== Rust
 The above could be transformed into something like this Rust pseudocode,
 ```rust
 for (t0, c, e) in tables.mul.iter() {
@@ -748,7 +763,7 @@ for (t0, c, e) in tables.mul.iter() {
 ```
 
 
-=== SQL
+== SQL
 Since the queries are essentially database queries, we can express them as Pseudo-SQL, although the queries become quite complicated because SQL is not a great language to express both reads and writes in the same query.
 ```sql
 -- Relevant here is that we can represent the Egraph as a table.
