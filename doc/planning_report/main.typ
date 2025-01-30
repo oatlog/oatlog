@@ -218,14 +218,46 @@ side matches, add the right side to the database and unify it with the left side
 
 #todo[maybe explain typical UF implementation? (or cite paper that introduced UF, cited by egg)]
 
+#pagebreak()
 == E-graphs, formally
 // extended version of scientific problem description
 #todo[make it more general, less egglog-ish, or introduce egglog semantics.]
 #todo[hard to understand, give more context/intuition.]
 
+NOTE: this section may be easier to understand by reading @relatedwork first.
+
 Given an expression, and a set of rules, find a set of equivalent expressions encoded as an E-graph and extract an equivalent expression with minimal cost and runtime, making trade-offs between cost and runtime.
 
+
+=== Congruence closure <congruenceclosureformal>
+The congruence closure problem @congruenceclosure can be defined by the following:
+- Let $G = (V, E)/*, n = |V|, m = |E|*/$ be a directed graph with ordered edges, allowing for multi-edges. This represents the initial expressions.
+- Let $lambda (v)$ be the vertex label#footnote[for example Add, Sub, Mul, etc. This is to make sure that Add(a, b) is not considered the same as Mul(a, b).] for $v$.
+- Let $delta (v)$ be the vertex out-degree.
+- Let $v[i]$ be the i'th successor#footnote[successor of v means "input" to v]  of $v$.
+- Let $R$ be a relation #footnote[a relation encodes some relationship, it is essentially a set of pairs. R is basically the "union-find" datastructure.] on $V$.
+- Congruence#footnote[loosely speaking, are they the same according to R?] of u and v on R is defined by:
+  $ "congruent"(R, u, v) := lambda (u) = lambda (v) and delta (u) = delta (v) and forall i, (u[i], v[i]) in R $
+- $R$ is _closed under congruences_ iff $ forall u forall v, "congruent"(R, u, v) <==> (u, v) in R $
+- The congruence closure of R is called R' and is the minimal extension to R in order to make it closed under congruences  #footnote[So essentially, if two functions have the same input, they should have the same value.] @congruenceclosure.
+
+This can be implemented using the Union-find data structure, denoted $"U"$, by running $"merge"("U", x, y)$ for all $(x,y) in R$ @congruenceclosure
+
+`merge(U, u, v):`
++ If $"find"("U", u) == "find"("U", v)$ return
++ $P_u = "set of predecessors of all vertices equivalent to u according to U"$
++ $P_v = "set of predecessors of all vertices equivalent to v according to U"$
++ call $"union"("U", u, v)$
++ $forall x, forall y$ such that $x in P_u and y in P_v and "find"("U", x) != "find"("U", y) and "congruent"("U", x, y)$ then call $"merge"("U", x, y)$.
+
+`congruent(U, u, v):` $delta (u) == delta (v) and forall i, "find"("U", u[i]) = "find"("U", v[i])$
+
+U now stores the sets of equivalent expressions.
+
+
 === E-graph
+#todo[rephrase as an extension of congruence closure?]
+
 An E-graph can be defined as a tuple $G = (U, H)$ where #footnote[This is a slightly modified definition from @egg. There is no direct concept of an "E-class", only E-class ids, an E-class exists implicitly based on the contents of H.]
 - H is the hashcons, a map from E-nodes to E-class ids #footnote[This is the database].
 - U is the union-find data structure over E-class ids, encoding an equivalence relation $(equiv_id)$, providing functions union #footnote[In practice union mutates U in-place and both union and find is $approx O(1)$.] and find where
@@ -263,12 +295,15 @@ Minimal cost extraction for functions like this is NP-hard by reduction from MIN
 ]
 
 === Primitives, Collections and Primitive Functions.
-Primitives are conceptually just known bit patterns (for example `i64`), Collections are Primitives that can contain E-classes (for example `Set<Math>`) and Primitive Functions are Functions from Primitives to Primitives.
-
+Primitives represent a specific value instead of a set of equivalent expressions.
+Collections are Primitives that can contain E-classes (for example `Set<Math>`) and Primitive Functions are Functions from Primitives to Primitives.
+A key property of primitives is that they can not be unified/merged, unless the values are the same.
+While Collections can not be merged, they can become equal when the E-classes that they contain are unified.
 It is unclear if they have a solid theoretical foundation, as papers for egg @egg nor egglog @egglog barely mention them or go into any depth. This is discussed more in @primitiveimpl.
 
 
-== Related work
+#pagebreak()
+== Related work <relatedwork>
 
 Recent work has considerably improved their performance and capabilities, and there is as far as we
 know only one production compiler using e-graphs, Cranelift (2022) @cranelift. However because
@@ -310,9 +345,9 @@ e-graphs (aegraphs) that make it miss out on potential optimizations @cranelift_
 
 
 === Union-find (1964)
-Union-find, $"UF"$ is a data structure used for efficiently merging and checking if elements belong to the same set. Initially all sets are distinct @unionfindoriginal @fastunionfind:
-- $"find"("UF", v)$ returns a _representative_ element for the set that $v$ belongs to. Iff $"find"("UF", u) = "find"("UF", v)$ then $u$ and $v$ belong to the same set.
-- $"union"("UF", u, v)$ merges#footnote[by mutating UF in-place] the two sets that $u$ and $v$. After running union, $"find"("UF", u) = "find"("UF", v)$.
+Union-find, $"U"$ is a data structure used for efficiently merging and checking if elements belong to the same set. Initially all sets are distinct @unionfindoriginal @fastunionfind:
+- $"find"("U", v)$ returns a _representative_ element for the set that $v$ belongs to. Iff $"find"("U", u) = "find"("U", v)$ then $u$ and $v$ belong to the same set.
+- $"union"("U", u, v)$ merges#footnote[by mutating U in-place] the two sets that $u$ and $v$. After running union, $"find"("U", u) = "find"("U", v)$.
 Both operations run in almost $O(1)$ and outside the context of E-graphs, one use is when implementing Kruskal's minimum spanning tree algorithm for checking if two vertices belong to different points.
 
 == Congruence closure algorithms (1980)
@@ -325,18 +360,6 @@ This is sometimes called "canonicalization" when applied to E-graphs.
 It can be implemented using union-find.
 
 
-// TODO: move to formal part
-== Congruence closure <congruenceclosureformal>
-
-- Let $G = (V, E)/*, n = |V|, m = |E|*/$ be a directed graph with multi-edges.
-- Let $lambda (v)$ be the vertex label#footnote[for example Add, Sub, Mul, etc. This is to make sure that Add(a, b) is not considered the same as Mul(a, b).] for $v$.
-- Let $delta (v)$ be the vertex out-degree.
-- Let $v[i]$ be the i'th successor#footnote[successor of v means "input" to v]  of $v$.
-- Let $R$ be a relation #footnote[a relation encodes some relationship, it is essentially a set of pairs. R is basically the "union-find" datastructure.] on $V$.
-- Congruence#footnote[loosely speaking, are they the same according to R?] of u and v on R is defined by:
-  $ "congruent"(R, u, v) := lambda (u) = lambda (v) and delta (u) = delta (v) and forall i, (u[i], v[i]) in R $
-- $R$ is _closed under congruences_ iff $ forall u forall v, "congruent"(R, u, v) <==> (u, v) in R $
-- The congruence closure of R is called R' and is the minimal extension to R in order to make it closed under congruences. #footnote[So essentially, if two functions have the same input, they should have the same value.]
 
 //
 //
@@ -353,13 +376,8 @@ It can be implemented using union-find.
 
 
 === Equality saturation (TODO)
+#todo[is this different from congruence closure?]
 
-#todo[
-maybe use this?
-
-Fast Decision Procedures Based on Congruence Closure
-https://dl.acm.org/doi/10.1145/322186.322198
-]
 
 === E-graphs (1980)
 
@@ -426,9 +444,9 @@ linear programming is typically used to extract the best expression in an e-grap
 
 However, it was independently discovered that linear time extraction is possible for a bounded treewidth @fastextract @egraphcircuit.
 Quite a lot of algorithms that are NP-hard, are polynomial for a bounded treewidth, so in this sense it is essentially a standard method applied to the extraction problem, in this case the complexity is $O(n * f("treewidth"))$
-#todo[Matti: What does it mean that the e-graph is close to a tree?]
 Informally, treewidth is a measure of how close a graph is to a tree, and can be computed from a tree decomposition of the graph.
-Generally Egraphs tend to have a low treewidth, so this algorithm tends to applicable to practical egraphs,
+Generally, E-graphs tend to have a low treewidth, so this algorithm tends to applicable to practical egraphs.
+This is somewhat intuitive when considering that only expressions that were already somewhat similar tend to get unified, so the E-graph is never really that random.
 
 As a preprocessing step, the algorithm simplifies the egraph by treating it as a boolean circuit and simplifying it using standard techniques to slightly reduce the size of the problem.
 The E-nodes with zero inputs become a constant 1.
