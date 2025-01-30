@@ -496,7 +496,8 @@ Our goal can be further clarified by stating what we are not doing. We are not
   practical performance on practical inputs
 - designing a logic programming language, instead prioritizing interoperability by staying
   syntactically and semantically close to the egglog language.
-- aiming to implement exactly all functionality present in egglog and eqlog
+- aiming to implement exactly all functionality present in egglog and eqlog.
+  Specifically, we will not be implementing language features that do not make sense at compile time such as printing current state, only running specific Rules, extraction. Some of these will instead move to a Rust API to be used at runtime.
 - sacrificing expressive power in the name of performance, as Cranelift's aegraphs @acyclic_egraphs
   do
 - writing an interpreter or considering non-EqSat workflows, and can therefore assume all rules are
