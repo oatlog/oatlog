@@ -159,6 +159,17 @@ expression can be found, and the best expression according to some metric can be
 Extraction is NP-hard but there are both heuristics and algorithms that work well on some types of
 e-graphs @fastextract.
 
+#figure(
+    image("egraph_example.svg", width: 99%),
+    caption: [
+    Example of an egraph that initially contains $(a + 2) * c$.
+    The oval shapes are E-classes, representing a set of equivalent expressions.
+    The rectangle shapes are E-nodes.
+    The orange colored edges and shapes are what was added after a rule was applied.
+    ]
+)
+
+#pagebreak()
 Here is an example of E-graph rules written in the egglog language.
 ```
 (sort Math)
