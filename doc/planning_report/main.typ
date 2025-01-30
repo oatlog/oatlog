@@ -41,7 +41,6 @@
 
 #pagebreak()
 
-
 #todo[Matti: make it clear that these are performance implementations on your engine (vs. optimizations conducted using an e-graph in relation to a compiler backend)]
 
 = Introduction
@@ -121,39 +120,11 @@ rule preprocessing. We will combine this with general performance engineering in
 code generation with compile-time ruleset specialization and optimizing, in particular indices and
 insertions, for memory locality and instruction-level parallelism.
 
-= Problem
+= Background
 
-E-graphs are data structures that store expressions deduplicated through equivalence relations and
-are potentially useful when doing any kind of symbolic rewrites. They are successfully employed in
-modern SMT solvers and in optimizing compilers in which they solve the phase ordering problem and
-reduce the need for heuristics.
+#todo([introduce the background])
 
-However, there are obstacles preventing e-graphs from reaching more widespread use within compilers.
-The size of a converged e-graph is generally exponential given sufficiently complex rewrite rules,
-necessitating lots of compute and even timeouts for them to terminate in a reasonable time.
-Improvements in rewrite rules, algorithmic and implementation improvements would go a long way
-towards making e-graphs viable in more compute-restricted scenarios, such as in a C compiler rather
-than a theorem prover.
-
-== Why e-graphs <whyegraphs>
-
-A traditional compiler has many passes, each heuristically performing rewrites. This has what is
-called the phase ordering problem, where the rewrites applied depend on which order passes are run
-in and passes in practice must be run many times in order to reach a fixed point.
-
-The phase ordering problem can be solved by replacing coarse-grained passes with fine-grained
-rewrite rules. This is called peephole rewriting and it lets us apply monotonic rewrites to improve
-the program. #footnote[Sea of Nodes is a promising compiler IR especially suited to peephole
-rewriting @son.]
-
-However, peephole rewriting does not help us when there are multiple potentially good but mutually
-incompatible rewrites that we could apply. Since one rewrite can unlock other beneficial rewrites
-later, we cannot select them greedily. One could solve this with a backtracking search, but that
-would be slow. Most compilers instead opt to do this heuristically. E-graphs solve precisely this
-problem, allowing multiple rewrites but committing to one only after all rewrites have been
-searched, while not duplicating work like a backtracking search would.
-
-== What are e-graphs <whategraphs>
+== E-graphs, informally
 
 E-graphs are graphs with two types of nodes: e-classes and terms. E-classes represent a set of
 equivalent expressions and contain terms. Terms represent an operation that takes as input multiple
@@ -165,15 +136,17 @@ e-graphs @fastextract.
 #figure(
     image("egraph_example.svg", width: 99%),
     caption: [
-    Example of an egraph that initially contains $(a + 2) * c$.
+    Example of an egraph that initially contains $(a + 2) dot c$.
     The oval shapes are E-classes, representing a set of equivalent expressions, and take in E-nodes.
     The rectangle shapes are E-nodes, and have E-classes as arguments.
     The orange colored edges and shapes are what was added after a rule was applied.
     ]
 )
 
-#pagebreak()
+#block(breakable: false, [
+
 Here is an example of E-graph rules written in the egglog language.
+
 ```
 (sort Math)
 (function Add (Math Math) Math)
@@ -195,8 +168,11 @@ Here is an example of E-graph rules written in the egglog language.
 (rewrite (Add x (Const 0)) x)
 (rewrite (Mul x (Const 1)) (x))
 ```
-Math is essentially a sum type, where Add, Sub, etc are constructors.
-Rewrites mean that if the left side matches, add the right side to the database and unify it with the left side.
+
+Math is essentially a sum type, where Add, Sub, etc are constructors. Rewrites mean that if the left
+side matches, add the right side to the database and unify it with the left side.
+
+])
 
 // == Egraph
 // An Egraph is a bipartite graph of E-nodes and E-classes.
@@ -242,15 +218,14 @@ Rewrites mean that if the left side matches, add the right side to the database 
 
 #todo[maybe explain typical UF implementation? (or cite paper that introduced UF, cited by egg)]
 
-#pagebreak()
-= Formal problem formulation
+== E-graphs, formally
 // extended version of scientific problem description
 #todo[make it more general, less egglog-ish, or introduce egglog semantics.]
 #todo[hard to understand, give more context/intuition.]
 
 Given an expression, and a set of rules, find a set of equivalent expressions encoded as an E-graph and extract an equivalent expression with minimal cost and runtime, making trade-offs between cost and runtime.
 
-== E-graph
+=== E-graph
 An E-graph can be defined as a tuple $G = (U, H)$ where #footnote[This is a slightly modified definition from @egg. There is no direct concept of an "E-class", only E-class ids, an E-class exists implicitly based on the contents of H.]
 - H is the hashcons, a map from E-nodes to E-class ids #footnote[This is the database].
 - U is the union-find data structure over E-class ids, encoding an equivalence relation $(equiv_id)$, providing functions union #footnote[In practice union mutates U in-place and both union and find is $approx O(1)$.] and find where
@@ -262,7 +237,7 @@ An E-graph can be defined as a tuple $G = (U, H)$ where #footnote[This is a slig
 - An E-node $n=f(a_1, a_2, ...)$ is canonical iff $n=f("find"(U, a_1), "find"(U, a_2), ...)$ @egg
 - An E-graph is canonical iff H only contains canonical E-nodes.
 
-== Rule
+=== Rule
 A rule states that if the predicates match the E-graph, some new information can be added to it.
 A rule R can be defined as a tuple $R = (P, A, V)$ where:
 - $V$ is a set of variables $V = {v_1, v_2, ... } = V_p union V_a$, where:
@@ -277,7 +252,7 @@ A rule R can be defined as a tuple $R = (P, A, V)$ where:
 - A Rule matches an E-graph if there is some set of E-nodes in H that match P.
 
 
-== Extraction
+=== Extraction
 An extraction for an E-graph $G = (U, H)$, and a set of E-classes E is a set of E-nodes X, such that:
 - $forall e in E, e in H[X]$
 - $forall n in X and n = f(a_1, a_2, ...) ==> a_1, a_2, ... in H[X]$
@@ -287,20 +262,19 @@ Typically, $c(X) = sum_(x in X) w(x)$, where $w(x)$ is a weight based on the typ
 Minimal cost extraction for functions like this is NP-hard by reduction from MIN-SAT @extractnphard.
 ]
 
-== Primitives, Collections and Primitive Functions.
+=== Primitives, Collections and Primitive Functions.
 Primitives are conceptually just known bit patterns (for example `i64`), Collections are Primitives that can contain E-classes (for example `Set<Math>`) and Primitive Functions are Functions from Primitives to Primitives.
 
 It is unclear if they have a solid theoretical foundation, as papers for egg @egg nor egglog @egglog barely mention them or go into any depth. This is discussed more in @primitiveimpl.
 
 
-= Context and related work
-#todo[Matti: mentions "regular" e-graphs, do note that regularity in graph theory has a specific meaning]
+== Related work
 
-We believe that e-graphs are very unexplored, with great potential for improvement. Recent work has
-considerably improved their performance and capabilities, and there is as far as we know only one
-production compiler using e-graphs, Cranelift (2022) @cranelift. However because regular e-graphs
-are not performant enough, Cranelift uses weaker acyclic e-graphs (aegraphs) that make it miss out
-on potential optimizations @cranelift_egraph_rfc @acyclic_egraphs.
+Recent work has considerably improved their performance and capabilities, and there is as far as we
+know only one production compiler using e-graphs, Cranelift (2022) @cranelift. However because
+standard e-graphs and their implementations are not performant enough, Cranelift uses weaker acyclic
+e-graphs (aegraphs) that make it miss out on potential optimizations @cranelift_egraph_rfc
+@acyclic_egraphs.
 
 // "Fast and Optimal Extraction for Sparse Equality Graphs"
 // https://dl.acm.org/doi/pdf/10.1145/3689801#page=26&zoom=100,28,604
@@ -335,7 +309,7 @@ on potential optimizations @cranelift_egraph_rfc @acyclic_egraphs.
 // R is the union-find datastructure?
 
 
-== Union-find (1964)
+=== Union-find (1964)
 Union-find, $"UF"$ is a data structure used for efficiently merging and checking if elements belong to the same set. Initially all sets are distinct @unionfindoriginal @fastunionfind:
 - $"find"("UF", v)$ returns a _representative_ element for the set that $v$ belongs to. Iff $"find"("UF", u) = "find"("UF", v)$ then $u$ and $v$ belong to the same set.
 - $"union"("UF", u, v)$ merges#footnote[by mutating UF in-place] the two sets that $u$ and $v$. After running union, $"find"("UF", u) = "find"("UF", v)$.
@@ -360,7 +334,7 @@ Both operations run in almost $O(1)$ and outside the context of E-graphs, one us
 
 
 
-== Equality saturation
+=== Equality saturation (TODO)
 
 #todo[
 maybe use this?
@@ -369,14 +343,14 @@ Fast Decision Procedures Based on Congruence Closure
 https://dl.acm.org/doi/10.1145/322186.322198
 ]
 
-== E-graphs (1980)
+=== E-graphs (1980)
 
 #todo[Matti: Introduce e-graphs earlier and be more concrete, the report should be understandable for someone who has no prior knowledge on the topic]
 
 E-graphs are not a new concept and have been used to perform program verification and in proof
 assistants @oldegraph.
 
-== Wost-case optimal joins (pre-print 2012, published 2018)
+=== Wost-case optimal joins (pre-print 2012, published 2018)
 
 A wost-case optimal join is $O("max possible output tuples")$ given the input size and query @optimaljoin.
 It has been shown that it is not possible to get a wost-case optimal join from just binary joins are not asymptotically optimal, so a new algorithm is needed @optimaljoin.
@@ -387,14 +361,14 @@ Generic join performs worse in practice for some queries (has a bad constant fac
 
 // @optimaljoin
 // @relationalematching
-== Egg (2021)
+=== Egg (2021)
 
 Egg @egg is an e-graph implementation where each rule is attempted to be matched against the entire
 database. The rewrites are performed in batches, meaning all rules are applied and then the database
 invariants are fixed.
 
 
-== Relational E-matching (2022)
+=== Relational E-matching (2022)
 
 E-matching finds a set of terms matching a particular pattern, for example $"Add"("Mul"(a, c), "Mul"(b, c))$.
 For egg, the evaluation is top-down, so something like:
@@ -413,7 +387,7 @@ $ Q(a, b, c, t_0, t_1, t_2) <- "Add"(t_0, t_1, t_2), "Mul"(a, c, t_0), "Mul"(b, 
 
 Implementing E-matching as a relational query is algorithmically more efficient and has lower runtime in practice @relationalematching.
 
-== Egglog and eqlog (2023)
+=== Egglog and eqlog (2023)
 
 Egglog @egglog and eqlog @eqlog are simultaneous independent discoveries of a unification between
 e-graphs and datalog. This yields a vastly improved computational complexity in comparison to egg,
@@ -425,7 +399,7 @@ programs and processes rules at compile time.
 The egglog paper has a benchmark showing approximately a million e-nodes per second, improving from
 egg's about 100k e-nodes per second in that same benchmark.
 
-== Fast and optimal extraction and E-graphs as circuits (2024)
+=== Fast and optimal extraction and E-graphs as circuits (2024)
 
 E-graphs store an exponential number of equivalent expressions in a deduplicated manner but do not
 solve the problem of quickly extracting the optimal among them. The extraction problem is similar to
@@ -444,13 +418,12 @@ E-nodes become and gates of all their inputs and E-classes become or gates of al
 The problem is essentially to set the extracted E-class to 1 while removing as many gates as possible.
 There are many straightforward simplifications that can be done to the graph, for example, an and gate with duplicate inputs from the same node can remove one of the inputs.
 
-
+#pagebreak()
 = Goal
 
-The goal of this project is to implement an e-graph engine that runs faster than other
-state-of-the-art implementations (like egg @egg, egglog @egglog, eqlog @eqlog) measured in e-nodes
-per second on existing e-graph rulesets.
-
+The goal of this project is to implement an e-graph engine which is roughly compatible with the
+egglog language @egglog and which briefly stated runs faster than other state-of-the-art
+implementations (like egg @egg, egglog @egglog, eqlog @eqlog).
 
 == Limitations
 
@@ -464,19 +437,28 @@ Our goal can be further clarified by stating what we are not doing. We are not
 - aiming to implement exactly all functionality present in egglog and eqlog
 - sacrificing expressive power in the name of performance, as Cranelift's aegraphs @acyclic_egraphs
   do
-- writing an interpreter, and can therefore assume all rules are known up front
+- writing an interpreter or considering non-EqSat workflows, and can therefore assume all rules are
+  known up front
 
 == Evaluation
 
+Defining a good single metric for
+benchmarking is unfortunately nontrivial and taking inspiration from previous work @egg @egglog we
+plan to combine measuring
+- e-nodes created per second, between engines implementing the same ruleset with similar scheduling,
+  since this implies roughly the same e-nodes (semantically) are created
+- time until convergence for small theories with finite closure
+- time required for equivalent optimization as measured by specific program synthesis applications
+  such as Herbie @herbie
+
 As we aim to support theories specified in the egglog language, we can piggy-back on test cases and
 applications that are already written. We aim to primarily verify correctness and benchmark by using
-the Egglog test suite. Additionally, we might also use larger e-graph applications such as Herbie
-@herbie, that already have implementations in the egglog language @egglogHerbie, as an end-to-end
-case study in the usability and performance of our engine.
-E-nodes per second is a decent metric because it measures the size of the database, and increasing the size of the database is the goal of applying rules.
-One could also use time to closure but that restricts rulesets.
+the egglog test suite, supplemented with larger e-graph applications that already have
+implementations in the egglog language @egglogHerbie as an end-to-end case study in the usability
+and performance of our engine.
 
-#todo[Matti: Please explain thoroughly what kind of environment you are using for running the experiments (both hardware and software) (reproduceability, hardware/software, nix)]
+#todo[Matti: Please explain thoroughly what kind of environment you are using for running the
+experiments (both hardware and software) (reproduceability, hardware/software, nix)]
 
 #pagebreak()
 = Approach
@@ -507,9 +489,7 @@ impl Egraph {
     caption: [High-level overview of rule compilation.]
 )
 
-
-#pagebreak()
-= What we want to explore
+The rest of this section shows ideas we want to explore.
 
 == Query planning
 
@@ -540,6 +520,7 @@ for (/* ... */) in (/* ... */) { // shared prefix
 ```
 
 == Eagerly applying Rules
+#block(breakable: false, [
 Some rules can be applied as soon as something is inserted into the database, so searching the database for matches of the rule is not needed, for example:
 ```
 (sort Math)
@@ -558,8 +539,8 @@ Some rules can be applied as soon as something is inserted into the database, so
 
 (rule ((= e Const x)) ((evals-to x)) ; Apply when a Const is created.
 ```
+])
 
-#pagebreak()
 == Special case handling of rules
 // Some rules do not really add any information to the database, for example, consider the following:
 
@@ -676,8 +657,7 @@ We would also like to explore what types of extraction functions are viable, for
 
 // https://chalmers.instructure.com/courses/232/pages/work-flow-timeline-and-tasks
 
-
-
+#pagebreak()
 = Risk analysis and ethical considerations
 // Democratizing compiler
 // Proving correctness on optimizations.
@@ -691,7 +671,7 @@ pitfall for us is that we implement semantics that are different from what the u
 unsound optimizations. We think the cost of our and faculty time for this project is outweighed by
 the research value.
 
-
+#pagebreak()
 = Time plan
 See next page.
 
