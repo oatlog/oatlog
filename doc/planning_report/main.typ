@@ -216,6 +216,22 @@ side matches, add the right side to the database and unify it with the left side
 
 @rosettaexample shows an example of how a egglog rule can be transformed to eqlog, Rust, and SQL.
 
+#figure(
+table(
+    columns: (1fr, auto, auto),
+    table.header([*Meaning*], [*egglog*], [*eqlog*]),
+    [a set of variables, actions and predicates], [Rule],[morphism],
+    [what to check against the database], [Predicate], [morphism],
+    [A single part of a conjunctive query], [Atom], [morphism],
+    [what to apply to the database, either the unification of two e-classes or the creation of an E-node], [Action], [morphism],
+    [a table], [Function], [morphism],
+    [represents a row in a table, eg Add(a,b)], [E-node], [morphism],
+    [represents a set of equivalent expressions], [E-class], [morphism],
+    [represents the type of values], [sort], [morphism],
+),
+caption: [comparasion of egglog and eqlog terminology.]
+)
+
 #pagebreak()
 == E-graphs, formally
 // extended version of scientific problem description
