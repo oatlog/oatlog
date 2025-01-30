@@ -166,8 +166,8 @@ e-graphs @fastextract.
     image("egraph_example.svg", width: 99%),
     caption: [
     Example of an egraph that initially contains $(a + 2) * c$.
-    The oval shapes are E-classes, representing a set of equivalent expressions.
-    The rectangle shapes are E-nodes.
+    The oval shapes are E-classes, representing a set of equivalent expressions, and take in E-nodes.
+    The rectangle shapes are E-nodes, and have E-classes as arguments.
     The orange colored edges and shapes are what was added after a rule was applied.
     ]
 )
@@ -294,7 +294,6 @@ It is unclear if they have a solid theoretical foundation, as papers for egg @eg
 
 
 = Context and related work
-
 #todo[Matti: mentions "regular" e-graphs, do note that regularity in graph theory has a specific meaning]
 
 We believe that e-graphs are very unexplored, with great potential for improvement. Recent work has
@@ -302,6 +301,63 @@ considerably improved their performance and capabilities, and there is as far as
 production compiler using e-graphs, Cranelift (2022) @cranelift. However because regular e-graphs
 are not performant enough, Cranelift uses weaker acyclic e-graphs (aegraphs) that make it miss out
 on potential optimizations @cranelift_egraph_rfc @acyclic_egraphs.
+
+// "Fast and Optimal Extraction for Sparse Equality Graphs"
+// https://dl.acm.org/doi/pdf/10.1145/3689801#page=26&zoom=100,28,604
+// points to
+// "Fast Decision Procedures Based on Congruence Closure" (1980)
+// https://dl.acm.org/doi/10.1145/322186.322198
+// Proof-Producing Congruence Closure
+// https://doi.org/10.1007/978-3-540-32033-3_33
+
+// == "Fast Decision Procedures Based on Congruence Closure" (1980)
+// // https://dl.acm.org/doi/10.1145/322186.322198
+// Problem: verify that two expressions are equal as a consequence of another equality:
+// $ f(a,b) = a ==> f(f(a,b),b) = a $
+// $ f(a) = a ==> f(f(f(f(f(a))))) = a $
+// #quote[
+// this is reducible to constructing the "congruence closure" of a relation on a graph.
+// ]
+// Computing the congruence closure
+//
+// - Let $G = (V, E)$ be a directed graph with $n$ vertices and $m$ edges, with multiple edges allowed between a pair of vertices.
+// - Let $lambda (v)$ be a vertex label.
+// - Let $delta (v)$ be the vertex out-degree
+// - Let $v[i]$ be the $i$'th successor of $v$
+// - $u$ is a predecessor of $v$ if $exists i, v = u[i]$
+// - "we assume no isolated vertices exist"? $n = O(m)$
+// - Let R be a relation on V.
+// - $"congruent"(R, u, v) :=  lambda (u) = lambda (v) and delta (u) = delta (v) and forall i, (u[i], v[i]) in R$
+// - $R$ is _closed under congruences_ if $forall u forall v, "congruent"(R, u, v) ==> (u, v) in R$
+// - "There exists a unique minimal extension $R'$ of $R$ such that $R'$ is an equivalence relation and $R'$ is closed under congruences. $R'$ is the congruence closure of $R$"
+//
+// lambda = type of function, Add, Sub, Mul
+// R is the union-find datastructure?
+
+
+== Union-find (1964)
+Union-find, $"UF"$ is a data structure used for efficiently merging and checking if elements belong to the same set. Initially all sets are distinct @unionfindoriginal @fastunionfind:
+- $"find"("UF", v)$ returns a _representative_ element for the set that $v$ belongs to. Iff $"find"("UF", u) = "find"("UF", v)$ then $u$ and $v$ belong to the same set.
+- $"union"("UF", u, v)$ merges#footnote[by mutating UF in-place] the two sets that $u$ and $v$. After running union, $"find"("UF", u) = "find"("UF", v)$.
+Both operations run in almost $O(1)$ and outside the context of E-graphs, one use is when implementing Kruskal's minimum spanning tree algorithm for checking if two vertices belong to different points.
+
+// == Congruence closure
+// is it this: $a = b ==> f(a) = f(b)$?
+// USING: "Fast Decision Procedures Based on Congruence Closure"
+
+// Given an expression like $f(f(a, b), b)$ and knowing that $f(a, b) = a$, we want an algorithm to show that $f(f(a, b), b) = a$.
+//
+//
+// - Let $G = (V, E), n = |V|, m = |E|$ be a directed graph with multi-edges.
+// - Let $lambda (v)$ be the vertex label#footnote[for example Add, Sub, etc.] for $v$.
+// - Let $delta (v)$ be the vertex out-degree.
+// - Let $v[i]$ be the i'th successor#footnote[successor of v means "input" to v]  of $v$.
+// - Let $R$ be a relation #footnote[a relation encodes some relationship, it is essentially a set of pairs. R is basically the "union-find" datastructure.] on $V$.
+// - Congruence#footnote[loosely speaking, are they the same?] of u and v on R is defined by: $"congruent"(R, u, v) := lambda (u) = lambda (v) and delta (u) = delta (v) and forall i, (u[i], v[i]) in R$
+// - $R$ is _closed under congruences_ iff $forall u forall v, "congruent"(R, u, v) <==> (u, v) in R$.
+// - The congruence closure of R is called R' and is the minimal extension to R in order to make it closed under congruences. #footnote[So essentially, if two functions have the same input, they should have the same value.]
+
+
 
 
 == Equality saturation
