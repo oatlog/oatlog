@@ -730,14 +730,10 @@ We would also like to explore what types of extraction functions are viable, for
 // Democratizing compiler
 // Proving correctness on optimizations.
 
-We do not think there are any severe ethical considerations for this project, since there are no
-research participants involved. However, the impact of the correctness of our engine is amplified by
-any users of it since user code correctness depends on our engine, so we need to be careful about
-correctness. To this end, we write our code in Rust, mainly because we are expects in the language
-and the language generally makes it easier to write correct high performance code. One potential
-pitfall for us is that we implement semantics that are different from what the users expect or add
-unsound optimizations. We think the cost of our and faculty time for this project is outweighed by
-the research value.
+We do not think there are any severe ethical considerations for this project, since there are no research participants involved.
+However, the impact of the correctness of our engine is amplified by any users of it since user code correctness depends on our engine, so we need to be careful about correctness.
+One potential pitfall for us is that we implement semantics that are different from what the users expect or add unsound optimizations.
+We think the cost of our and faculty time for this project is outweighed by the research value.
 
 #pagebreak()
 = Time plan
