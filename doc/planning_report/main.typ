@@ -519,8 +519,14 @@ the egglog test suite, supplemented with larger e-graph applications that alread
 implementations in the egglog language @egglogHerbie as an end-to-end case study in the usability
 and performance of our engine.
 
-#todo[Matti: Please explain thoroughly what kind of environment you are using for running the
-experiments (both hardware and software) (reproduceability, hardware/software, nix)]
+//#todo[Matti: Please explain thoroughly what kind of environment you are using for running the
+// experiments (both hardware and software) (reproduceability, hardware/software, nix)]
+
+== Environment
+We will be using the nix @nix to specify the software environment, so the exact software environment will be specified in the same repository as the source code.
+It is expected that we will only be using profiling tools such as perf @perf in addition to our own Rust code.
+We will be using our personal computers to run the benchmarks, exact hardware will be specified once we have run tests.
+
 
 #pagebreak()
 = Approach
