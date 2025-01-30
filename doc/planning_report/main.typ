@@ -41,6 +41,9 @@
 
 #pagebreak()
 
+
+#todo[Matti: make it clear that these are performance implementations on your engine (vs. optimizations conducted using an e-graph in relation to a compiler backend)]
+
 = Introduction
 
 A traditional optimizing compiler applies optimization passes sequentially and destructively, in
@@ -223,10 +226,13 @@ Rewrites mean that if the left side matches, add the right side to the database 
 
 @rosettaexample shows an example of how a egglog rule can be transformed to eqlog, Rust, and SQL.
 
+#todo[maybe explain typical UF implementation? (or cite paper that introduced UF, cited by egg)]
 
 #pagebreak()
 = Formal problem formulation
 // extended version of scientific problem description
+#todo[make it more general, less egglog-ish, or introduce egglog semantics.]
+#todo[hard to understand, give more context/intuition.]
 
 Given an expression, and a set of rules, find a set of equivalent expressions encoded as an E-graph and extract an equivalent expression with minimal cost and runtime, making trade-offs between cost and runtime.
 
@@ -262,7 +268,10 @@ An extraction for an E-graph $G = (U, H)$, and a set of E-classes E is a set of 
 - $forall e in E, e in H[X]$
 - $forall n in X and n = f(a_1, a_2, ...) ==> a_1, a_2, ... in H[X]$
 The cost $c(X)$ is an arbitrary function
-#footnote[For $c(X) = |X|$ the problem is NP-hard @fastextract. Typically, $c(X)$ is a function of the type of E-node.]
+#footnote[
+Typically, $c(X) = sum_(x in X) w(x)$, where $w(x)$ is a weight based on the type of E-node.
+Minimal cost extraction for functions like this is NP-hard by reduction from MIN-SAT @extractnphard. 
+]
 
 == Primitives, Collections and Primitive Functions.
 Primitives are conceptually just known bit patterns (for example `i64`), Collections are Primitives that can contain E-classes (for example `Set<Math>`) and Primitive Functions are Functions from Primitives to Primitives.
@@ -272,6 +281,8 @@ It is unclear if they have a solid theoretical foundation, as papers for egg @eg
 
 = Context and related work
 
+#todo[Matti: mentions "regular" e-graphs, do note that regularity in graph theory has a specific meaning]
+
 We believe that e-graphs are very unexplored, with great potential for improvement. Recent work has
 considerably improved their performance and capabilities, and there is as far as we know only one
 production compiler using e-graphs, Cranelift (2022) @cranelift. However because regular e-graphs
@@ -279,7 +290,18 @@ are not performant enough, Cranelift uses weaker acyclic e-graphs (aegraphs) tha
 on potential optimizations @cranelift_egraph_rfc @acyclic_egraphs.
 
 
+== Equality saturation 
+
+#todo[
+maybe use this?
+
+Fast Decision Procedures Based on Congruence Closure
+https://dl.acm.org/doi/10.1145/322186.322198
+]
+
 == E-graphs (1980)
+
+#todo[Matti: Introduce e-graphs earlier and be more concrete, the report should be understandable for someone who has no prior knowledge on the topic]
 
 E-graphs are not a new concept and have been used to perform program verification and in proof
 assistants @oldegraph.
@@ -342,6 +364,7 @@ linear programming is typically used to extract the best expression in an e-grap
 
 However, it was independently discovered that linear time extraction is possible for a bounded treewidth @fastextract @egraphcircuit.
 Quite a lot of algorithms that are NP-hard, are polynomial for a bounded treewidth, so in this sense it is essentially a standard method applied to the extraction problem, in this case the complexity is $O(n * f("treewidth"))$
+#todo[Matti: What does it mean that the e-graph is close to a tree?]
 Informally, treewidth is a measure of how close a graph is to a tree, and can be computed from a tree decomposition of the graph.
 Generally Egraphs tend to have a low treewidth, so this algorithm tends to applicable to practical egraphs,
 
@@ -383,11 +406,12 @@ case study in the usability and performance of our engine.
 E-nodes per second is a decent metric because it measures the size of the database, and increasing the size of the database is the goal of applying rules. 
 One could also use time to closure but that restricts rulesets.
 
-
+#todo[Matti: Please explain thoroughly what kind of environment you are using for running the experiments (both hardware and software) (reproduceability, hardware/software, nix)]
 
 #pagebreak()
 = Approach
 
+#todo[Matti: Expand what the feature set [referring to egglog] is (not just say it's similar to something in some paper)]
 
 Concretely, we will create a Rust library that takes in a set of rewrite rules in the egglog language 
 and generates Rust code for a e-graph engine with the optimized rewrite rules hard-coded. The main 
@@ -650,12 +674,15 @@ See next page.
 #bibliography("refs.bib", title: "References")
 #pagebreak()
 
+
+#todo[mad typst skillz]
 = Appendix
 
 // e-node = term = tuple in a relation
 // e-class = variabel = element of a tuple in a relation
 
 == Distributive law example <rosettaexample>
+#todo[Matti: The explanation in the Appendix is useful but a good explanation should be integrated in the thesis proper (referring to previous example in appendix)]
 
 === Egglog
 As an example, a Rule for the distributive law, $(a + b) * c = a * c + b * c$ for Egglog, Eqlog, Rust pseudocode, and SQL pseudocode.
