@@ -315,11 +315,29 @@ Union-find, $"UF"$ is a data structure used for efficiently merging and checking
 - $"union"("UF", u, v)$ merges#footnote[by mutating UF in-place] the two sets that $u$ and $v$. After running union, $"find"("UF", u) = "find"("UF", v)$.
 Both operations run in almost $O(1)$ and outside the context of E-graphs, one use is when implementing Kruskal's minimum spanning tree algorithm for checking if two vertices belong to different points.
 
-// == Congruence closure
+== Congruence closure algorithms (1980)
 // is it this: $a = b ==> f(a) = f(b)$?
 // USING: "Fast Decision Procedures Based on Congruence Closure"
 
-// Given an expression like $f(f(a, b), b)$ and knowing that $f(a, b) = a$, we want an algorithm to show that $f(f(a, b), b) = a$.
+Given an expression like $f(f(a, b), b)$ and knowing that $f(a, b) = a$, we want an algorithm to show that $f(f(a, b), b) = a$.
+This can be done by computing the congruence closure @congruenceclosure, which essentially assigns equivalence classes to expressions and merges equal expressions, this is described formally in @congruenceclosureformal.
+This is sometimes called "canonicalization" when applied to E-graphs.
+It can be implemented using union-find.
+
+
+// TODO: move to formal part
+== Congruence closure <congruenceclosureformal>
+
+- Let $G = (V, E)/*, n = |V|, m = |E|*/$ be a directed graph with multi-edges.
+- Let $lambda (v)$ be the vertex label#footnote[for example Add, Sub, Mul, etc. This is to make sure that Add(a, b) is not considered the same as Mul(a, b).] for $v$.
+- Let $delta (v)$ be the vertex out-degree.
+- Let $v[i]$ be the i'th successor#footnote[successor of v means "input" to v]  of $v$.
+- Let $R$ be a relation #footnote[a relation encodes some relationship, it is essentially a set of pairs. R is basically the "union-find" datastructure.] on $V$.
+- Congruence#footnote[loosely speaking, are they the same according to R?] of u and v on R is defined by:
+  $ "congruent"(R, u, v) := lambda (u) = lambda (v) and delta (u) = delta (v) and forall i, (u[i], v[i]) in R $
+- $R$ is _closed under congruences_ iff $ forall u forall v, "congruent"(R, u, v) <==> (u, v) in R $
+- The congruence closure of R is called R' and is the minimal extension to R in order to make it closed under congruences. #footnote[So essentially, if two functions have the same input, they should have the same value.]
+
 //
 //
 // - Let $G = (V, E), n = |V|, m = |E|$ be a directed graph with multi-edges.
