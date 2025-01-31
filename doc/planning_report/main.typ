@@ -243,60 +243,64 @@ NOTE: this section may be easier to understand by reading @relatedwork first.
 Given an expression, and a set of rules, find a set of equivalent expressions encoded as an E-graph and extract an equivalent expression with minimal cost and runtime, making trade-offs between cost and runtime.
 
 
-=== Congruence closure <congruenceclosureformal>
-The congruence closure problem @congruenceclosure can be defined by the following:
-- Let $G = (V, E)/*, n = |V|, m = |E|*/$ be a directed graph with ordered edges, allowing for multi-edges. This represents the initial expressions.
-- Let $lambda (v)$ be the vertex label#footnote[for example Add, Sub, Mul, etc. This is to make sure that Add(a, b) is not considered the same as Mul(a, b).] for $v$.
-- Let $delta (v)$ be the vertex out-degree.
-- Let $v[i]$ be the i'th successor#footnote[successor of v means "input" to v]  of $v$.
-- Let $R$ be a relation #footnote[a relation encodes some relationship, it is essentially a set of pairs. R is basically the "union-find" datastructure.] on $V$.
-- Congruence#footnote[loosely speaking, are they the same according to R?] of u and v on R is defined by:
-  $ "congruent"(R, u, v) := lambda (u) = lambda (v) and delta (u) = delta (v) and forall i, (u[i], v[i]) in R $
-- $R$ is _closed under congruences_ iff $ forall u forall v, "congruent"(R, u, v) <==> (u, v) in R $
-- The congruence closure of R is called R' and is the minimal extension to R in order to make it closed under congruences  #footnote[So essentially, if two functions have the same input, they should have the same value.] @congruenceclosure.
-
-This can be implemented using the Union-find data structure, denoted $"U"$, by running $"merge"("U", x, y)$ for all $(x,y) in R$ @congruenceclosure
-
-`merge(U, u, v):`
-+ If $"find"("U", u) == "find"("U", v)$ return
-+ $P_u = "set of predecessors of all vertices equivalent to u according to U"$
-+ $P_v = "set of predecessors of all vertices equivalent to v according to U"$
-+ call $"union"("U", u, v)$
-+ $forall x, forall y$ such that $x in P_u and y in P_v and "find"("U", x) != "find"("U", y) and "congruent"("U", x, y)$ then call $"merge"("U", x, y)$.
-
-`congruent(U, u, v):` $delta (u) == delta (v) and forall i, "find"("U", u[i]) = "find"("U", v[i])$
-
-U now stores the sets of equivalent expressions.
 
 
 === E-graph
-#todo[rephrase as an extension of congruence closure?]
+// #todo[rephrase as an extension of congruence closure?]
+
 
 An E-graph can be defined as a tuple $G = (U, H)$ where #footnote[This is a slightly modified definition from @egg. There is no direct concept of an "E-class", only E-class ids, an E-class exists implicitly based on the contents of H.]
+- U is the union-find data structure over E-class ids, storing an equivalence relation.// $(equiv_id)$
 - H is the hashcons, a map from E-nodes to E-class ids #footnote[This is the database].
-- U is the union-find data structure over E-class ids, encoding an equivalence relation $(equiv_id)$, providing functions union #footnote[In practice union mutates U in-place and both union and find is $approx O(1)$.] and find where
-    - $"find"(U, a) = "find"(U, b) <==> a equiv_id b$
-    - $U' = "union"(U, a, b) ==> "find"(U', a) = "find"(U', b)$
+// , providing functions union #footnote[In practice union mutates U in-place and both union and find is $approx O(1)$.] and find where
+//     - $"find"(U, a) = "find"(U, b) <==> a equiv_id b$
+//     - $U' = "union"(U, a, b) ==> "find"(U', a) = "find"(U', b)$
 //- Conceptually it also contains a map from E-class ids to an E-class,
 //- M is a map from E-class ids to an E-class
 - An E-class id is canonical iff $"find"(U, a) = a$ @egg
-- An E-node $n=f(a_1, a_2, ...)$ is canonical iff $n=f("find"(U, a_1), "find"(U, a_2), ...)$ @egg
-- An E-graph is canonical iff H only contains canonical E-nodes.
+- An E-node $n=f(a_1, a_2, ...)$ is canonical iff $n="canonicalize"(n)$ @egg where
+    - $"canonicalize"(f(a_1, a_2, ...)) = f("find"(U, a_1), "find"(U, a_2), ...)$
+// - An E-graph is canonical iff H only contains canonical E-nodes.
 
-=== Rule
-A rule states that if the predicates match the E-graph, some new information can be added to it.
-A rule R can be defined as a tuple $R = (P, A, V)$ where:
-- $V$ is a set of variables $V = {v_1, v_2, ... } = V_p union V_a$, where:
-    - $V_p$ is the set of variables referenced in P
-    - $V_a$ is the set of variables referenced only in A ($V_p sect V_a = emptyset$)
-- P is the set of predicates, $P = {f(v_1, v_2, ...}, f(v_1, v_2, ...), ...}$
-- A is a tuple (A_i, A_u) where:
-    - $A_i$ is the set of E-nodes to be added to H, along with the E-class to assign it, but referencing V instead, $A_i = {(v_1, f(v_2, v_3 ...)), (v_1, f(v_2, v_3 ...)) ...}$
-    - $A_u$ is the set of pairs to be unified in U, $A_u = {(v_1, v_2), (v_1, v_2), ...}$
-    - All variables in $V_a$ are to be replaced with newly created E-classes.
-    - If a $V_a$ is empty then the rule is called surjective and is guaranteed to terminate.
-- A Rule matches an E-graph if there is some set of E-nodes in H that match P.
+An E-graph, $E$ defines the following operations @egg #footnote[this is one of many ways to define them]:
+- $"add"(E, n)$ adds the E-node n to the E-graph, if it already exists, it returns the existing E-class id, otherwise it returns a new E-class id. @egg
+- $"union"(E, a, b)$ unifies E-classes $a$ and $b$ in $U$ @egg.
+- $"find"(E, a)$ returns the canonical E-class id for the E-class id a @egg.
+- $"ematch"(E, p)$ performs E-matching on pattern p containing placeholder variables returning a list of tuples $(sigma, c)$, where $sigma$ is the variable substitutions and c is the root E-class id @egg.
 
+Using these operations, rewrites on the E-graph can be implemented by first calling ematch and then add and union.
+
+To check if two expressions are equal in the E-graph, both can be added and their E-classes compared using their canonical E-class ids from find.
+
+=== E-graphs invariants
+- All E-nodes in H are canonical ($n = "canonicalize"(n)$).
+- H only maps to canonical E-class ids.
+The invariants are to be enforced after every modification to the E-graph.
+The invariants can be enforced by canonicalizing the E-nodes in H and unifying the E-classes when there is a collision in the map.
+As an optimization, fixing the E-graph invariants may be delayed.
+
+=== Extended E-matching semantics for egglog
+Egglog extends E-matching to include multiple patterns that share variables.
+
+== Rule
+A rule is a tuple R = (V, P, A) where:
+- V is the set of variables used in the patterns.
+- P is a set of patterns.
+- A is a set of actions where an action is either a call to add or union:
+
+// === Rule
+// A rule states that if the predicates match the E-graph, some new information can be added to it.
+// A rule R can be defined as a tuple $R = (P, A, V)$ where:
+// - $V$ is a set of variables $V = {v_1, v_2, ... } = V_p union V_a$, where:
+//     - $V_p$ is the set of variables referenced in P
+//     - $V_a$ is the set of variables referenced only in A ($V_p sect V_a = emptyset$)
+// - P is the set of predicates, $P = {f(v_1, v_2, ...}, f(v_1, v_2, ...), ...}$
+// - A is a tuple (A_i, A_u) where:
+//     - $A_i$ is the set of E-nodes to be added to H, along with the E-class to assign it, but referencing V instead, $A_i = {(v_1, f(v_2, v_3 ...)), (v_1, f(v_2, v_3 ...)) ...}$
+//     - $A_u$ is the set of pairs to be unified in U, $A_u = {(v_1, v_2), (v_1, v_2), ...}$
+//     - All variables in $V_a$ are to be replaced with newly created E-classes.
+//     - If a $V_a$ is empty then the rule is called surjective and is guaranteed to terminate.
+// - A Rule matches an E-graph if there is some set of E-nodes in H that match P.
 
 === Extraction
 An extraction for an E-graph $G = (U, H)$, and a set of E-classes E is a set of E-nodes X, such that:
@@ -397,10 +401,34 @@ impl UnionFind {
 // USING: "Fast Decision Procedures Based on Congruence Closure"
 
 Given an expression like $f(f(a, b), b)$ and knowing that $f(a, b) = a$, we want an algorithm to show that $f(f(a, b), b) = a$.
-This can be done by computing the congruence closure @congruenceclosure, which essentially assigns equivalence classes to expressions and merges equal expressions, this is described formally in @congruenceclosureformal.
+This can be done by computing the congruence closure @congruenceclosure, which essentially assigns equivalence classes to expressions and merges equal expressions.
 This is sometimes called "canonicalization" when applied to E-graphs.
 It can be implemented using union-find.
 
+
+The congruence#footnote[congruence is essentially "considered equal"] closure problem @congruenceclosure can be defined by the following:
+- Let $G = (V, E)/*, n = |V|, m = |E|*/$ be a directed graph with ordered edges, allowing for multi-edges. This represents the initial expressions.
+- Let $lambda (v)$ be the vertex label#footnote[for example Add, Sub, Mul, etc. This is to make sure that Add(a, b) is not considered the same as Mul(a, b).] for $v$.
+- Let $delta (v)$ be the vertex out-degree.
+- Let $v[i]$ be the i'th successor#footnote[successor of v means "input" to v]  of $v$.
+- Let $R$ be a relation #footnote[a relation encodes some relationship, it is essentially a set of pairs. R is basically the "union-find" datastructure.] on $V$.
+- Congruence#footnote[loosely speaking, are they the same according to R?] of u and v on R is defined by:
+  $ "congruent"(R, u, v) := lambda (u) = lambda (v) and delta (u) = delta (v) and forall i, (u[i], v[i]) in R $
+- $R$ is _closed under congruences_ iff $ forall u forall v, "congruent"(R, u, v) <==> (u, v) in R $
+- The congruence closure of R is called R' and is the minimal extension to R in order to make it closed under congruences  #footnote[So essentially, if two functions have the same input, they should have the same value.] @congruenceclosure.
+
+This can be implemented using the Union-find data structure, denoted $"U"$, by running $"merge"("U", x, y)$ for all $(x,y) in R$ @congruenceclosure
+
+`merge(U, u, v):`
++ If $"find"("U", u) == "find"("U", v)$ return
++ $P_u = "set of predecessors of all vertices equivalent to u according to U"$
++ $P_v = "set of predecessors of all vertices equivalent to v according to U"$
++ call $"union"("U", u, v)$
++ $forall x, forall y$ such that $x in P_u and y in P_v and "find"("U", x) != "find"("U", y) and "congruent"("U", x, y)$ then call $"merge"("U", x, y)$.
+
+`congruent(U, u, v):` $delta (u) == delta (v) and forall i, "find"("U", u[i]) = "find"("U", v[i])$
+
+U now stores the sets of equivalent expressions.
 
 
 //
