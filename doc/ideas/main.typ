@@ -442,9 +442,9 @@ TODO EXAMPLE
 - `https://arxiv.org/abs/2408.17042` "E-Graphs as Circuits, and Optimal Extraction via Treewidth"
 - `https://dl.acm.org/doi/abs/10.1145/3689801` "Fast and Optimal Extraction for Sparse Equality Graphs"
 
-Treat egraph as a circuit where 
-- ENode/Term is an AND gate (or constant 1 if zero inputs). 
-- EClass/Variable is an OR gate. 
+Treat egraph as a circuit where
+- ENode/Term is an AND gate (or constant 1 if zero inputs).
+- EClass/Variable is an OR gate.
 - Join all "output variables" with an and gate, called OUT
 
 Problem is to pick a set of gates so that OUT is still 1.
@@ -581,9 +581,9 @@ struct Atom {
     vars: Vec<VariableId>,
 }
 fn generic_join(
-    query: &[Atom], 
-    partial_result: &mut Vec<u32>, 
-    next_variable: VariableId, 
+    query: &[Atom],
+    partial_result: &mut Vec<u32>,
+    next_variable: VariableId,
     output: &mut Vec<Vec<u32>>
 ) {
     if next_variable = VariableId(-1) {
@@ -654,6 +654,52 @@ But since we can implement implicit functionality as a rule, we can also impleme
 ```
 
 Given that implicit functionality can be implemented in userspace, the engine does not really need to care about what parts of a function is "inputs" or "outputs".
+
+
+= If the database does not care about what is "output", what does it mean for a rule to not create E-classes?
+
+I think we need to have the following in the IR:
+Predicates: Mul(var, var, var)
+Actions:
+- insert: Mul(var, var, var)
+- eclass: var = create_eclass()
+- union: union(var, var)
+
+HYPOTHESIS: it is always better to add more constraints to a rule.
+
+Since implicit functional equality is just a rule, and we should use information functional equality to determine when to create an eclass, that means we should "apply" surjective rules to other rules, to automatically add more constraints.
+
+Rules that just add constraints: probably fine
+Rules that also add E-nodes: probably fine?
+Rules that also add E-classes: probably not fine
+
+We could treat commutativity similarly to functional equality:
+```
+; implicit functionality
+(rule (= e1 (Add a b)) (= e2 (Add a b)) ((union e1 e2)))
+
+; commutativity
+(rule (= e (Add a b)) (union e (Add a b))
+
+; can be treated like functional equality:
+(rule (= e1 (Add a b)) (= e2 (Add b a)) ((union e1 e2)))
+```
+
+if `(rewrite (Add a b) (Add b a))` is builtin to all actions, we can delete the rule and treat it as functional equality.
+
+```
+(rule ((= e1 (Add a b)) (= e2 (Add b a))) (...))
+; equivalent to:
+(rule (= e (Add a b)) (...))
+```
+
+Is "applying rules to rules" sound from a phase ordering perspective?
+
+If the constraints is just (union a b) then probably yes, since I think that forms a lattice (union-find union is commutative).
+
+Since we use UF, this is provably true since the order for union does not matter.
+
+IF it is sound to split a rule into the "union" part and "adding E-nodes" part, then we can apply the "union" part of every rule to every rule.
 
 
 = TODO READ
