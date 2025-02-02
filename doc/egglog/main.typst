@@ -472,3 +472,115 @@ lattice: f(eclass) = primitive: needs merge
 
 
 
+
+
+
+
+
+= Better Together: Unifying Datalog and Equality Saturation
+
+
+egglog is a fixpoint reasoning system.
+
+Datalog:
+- incremental execution
+- cooperating analyses
+- lattice-based reasoning <-- primitives?
+
+Eqset:
+- term rewriting
+- congruence closure
+- extraction of optimized terms
+
+Analyses are needed in Herbie, because otherwise unsound rewrites like $x/x -> 1$ are applied.
+
+egglog is an extension of datalog:
+- built-in notion of equality, user can assert that two terms are equal.
+- built-in support for uninterpreted functions. from a relational perspective it is a relation with a functional dependence in its inputs to its output.
+- merge functions resolve functional dependency violations.
+
+
+Datalog:
+- rules: $Q(x) :- R_1(x_1), ... R_n(x_n)$
+- premise = body
+- action = head
+
+In datalog, every program terminates to a single fixpoint.
+
+
+uninterpreted constants are not directly referred to in the program.
+
+interpreted constants = primitives.
+
+
+users can implement uninterpreted sorts.
+
+primitives are called "base types"
+
+- pattern matching is done modulo equality.
+- rewriting is non-destructive.
+
+
+Core egglog is a subset of egglog. egglog can be desugared into core egglog.
+
+Syntax (of core egglog):
+- Program, $P := R_1, ..., R_n$.
+- Rule, $R := A_1, ..., A_m$.
+- Atom, $A := f(p_1, ..., p_k) -> o | f(p_1, ..., p_k)$
+- Pattern, $p$
+- Term, $t$
+- Base pattern, $o = v | x$
+- Constant, $v = c | n$
+- Interpreted constant, $c in C$
+- Uninterpreted constant, $n in N$
+- Variable, $x, y, ...$
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
