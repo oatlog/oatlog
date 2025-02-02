@@ -41,7 +41,8 @@
 
 #pagebreak()
 
-#todo[Matti: make it clear that these are performance implementations on your engine (vs. optimizations conducted using an e-graph in relation to a compiler backend)]
+#todo[Matti: make it clear that these are performance implementations on your engine (vs.
+optimizations conducted using an e-graph in relation to a compiler backend)]
 
 = Introduction
 
@@ -126,111 +127,121 @@ insertions, for memory locality and instruction-level parallelism.
 
 == E-graphs, informally
 
-E-graphs are graphs with two types of nodes: e-classes and terms. E-classes represent a set of
-equivalent expressions and contain terms. Terms represent an operation that takes as input multiple
-e-classes. By adding rewrite rules and applying them repeatedly, every possible way to rewrite an
-expression can be found, and the best expression according to some metric can be extracted.
-Extraction is NP-hard but there are both heuristics and algorithms that work well on some types of
-e-graphs @fastextract.
+E-graphs are motivated by the observation that expression directed acyclic graphs (DAGs) can
+efficiently represent a nested expression with a common subexpression, like say $f(g(x), g(x))$, as
+well as multiple expressions sharing a common subexpression, like say $f(g(x))$ and $h(g(x))$), but
+they can not efficiently deduplicate multiple identical consumers of different inputs, such as
+$f(g(x))$ and $f(h(x))$. This is problematic when exploring local rewrites for optimization or
+theorem proving purposes as these activities will create many similar expressions.
+
+One could address the deduplication problem by introducing a function-like abstraction, but this
+would still require some at least constant-sized top-level bookkeeping per expression. In the
+specific case of local equality-preserving rewrites however, it makes sense to instead introduce a
+notion of e-classes of equal e-nodes, that operations/e-nodes refer to rather than referring to
+subexpressions/other e-nodes directly. This allows an e-graph to represent an exponential number of
+equivalent expressions, parameterized by mappings from e-class to e-node.
+
+E-graphs can be represented as graphs in multiple ways. In one formulation, hinted at by the
+terminology of e-nodes and e-classes, e-nodes are the nodes of the graph and e-classes are
+equivalence classes of nodes under an equivalence relation. Nodes are annotated by what primitive
+operation they perform on their inputs, like addition or a bitshift. Unlike an actual graph, edges
+denoting inputs for use in operations, run not from nodes to nodes but rather from e-classes to
+(e-)nodes. #todo[pseudo-graph figure illustration]
+
+E-graphs can also be represented as bipartite graphs with two types of nodes, e-classes and e-nodes.
+Edges run from e-nodes to e-classes denoting membership in that equivalence class, and from
+e-classes to e-nodes denoting being used as input in the e-node's operation. Operation input edges
+are ordered from the point of view of the operation since not all operations are commutative.
+Finally, every e-node is a member of exactly one e-class and no e-class is empty.
+
+Rewrite rules look for subgraph "patterns" and add new e-classes and e-nodes, and join existing
+e-classes by vertex contraction. EqSat involves repeatedly applying a set of rewrite rules, then
+finally performing extraction, i.e. determining canonical e-nodes for respective e-classes such that
+the implied DAG of e-nodes has some minimal cost.
+
+A set of rewrite rules is called a theory, and these can be shown to converge to finite e-graphs
+under some conditions. Practically, many theories diverge and the EqSat rewriting phase is often
+performed until some timeout or until some other condition is met.
+
+Extraction, even when using a sum of static e-node costs as a cost function, is NP-hard, but there
+are both heuristics and algorithms that work well on some types of e-graphs @fastextract.
+
+@informal-egraph-figure shows an example e-graph represented as a bipartite graph.
+@informal-theory-example shows an example EqSat theory specified in the egglog domain-specific
+langauge @egglog. @rosetta-table shows different terminology and relates e-graphs to relational
+databases. @rosettaexample shows an example of how a egglog rule can be transformed to eqlog, Rust,
+and SQL.
 
 #figure(
-    image("egraph_example.svg", width: 99%),
+    image("egraph_example.svg", width: 75%),
     caption: [
-    Example of an egraph that initially contains $(a + 2) dot c$.
-    The oval shapes are E-classes, representing a set of equivalent expressions, and take in E-nodes.
-    The rectangle shapes are E-nodes, and have E-classes as arguments.
-    The orange colored edges and shapes are what was added after a rule was applied.
+    Example of a bipartite-formulation e-graph that initially contains $(a + 2) dot c$.
+    The oval shapes are e-classes, representing a set of equivalent expressions, with incoming edges
+    denoting e-node members.
+    The rectangle shapes are e-nodes, which have e-classes as arguments.
+    The orange colored edges and shapes are those added due to the applied rules.
     ]
-)
-
-#block(breakable: false, [
-
-Here is an example of E-graph rules written in the egglog language.
-
-```
-(sort Math)
-(function Add (Math Math) Math)
-(function Sub (Math Math) Math)
-(function Mul (Math Math) Math)
-(function Div (Math Math) Math)
-(function Pow (Math) Math)
-(function Const (i64) Math)
-(function Var (String) Math)
-
-(rewrite (Add a b) (Add b a))
-(rewrite (Add a (Add b c)) (Add (Add a b) c))
-
-(rewrite (Mul a b) (Mul b a))
-(rewrite (Mul a (Mul b c)) (Mul (Mul a b) c))
-
-(rewrite (Mul (Add a b) c) (Add (Mul a c) (Mul b c)))
-
-(rewrite (Add x (Const 0)) x)
-(rewrite (Mul x (Const 1)) (x))
-```
-
-Math is essentially a sum type, where Add, Sub, etc are constructors. Rewrites mean that if the left
-side matches, add the right side to the database and unify it with the left side.
-
-])
-
-// == Egraph
-// An Egraph is a bipartite graph of E-nodes and E-classes.
-// There is exactly one edge from and E-node to an E-class.
-
-
-// === E-class
-// Represents a set of equivalent expressions.
-// Element in a tuple in a relation
-//
-// === E-node or Term // function?
-// Also known as "term"
-// A tuple in a row in the database.
-// Informally, refers to a specific operation, eg (Add x y)
-
-
-// === Rule
-// A rule consists of a set of Premises, Actions and Variables.
-// If the Premises hold, then the Action is executed.
-
-// === Variables
-// Variables are either referred to in Premise set or Action set.
-// A variable referred to in Premise set is Forall.
-// A variable referred to in only Action is Exists.
-
-// === Premise
-//
-//
-//
-// === Action
-// Either a Union or Tuple to be created.
-//
-// === Union
-// Make two E-classes equal.
-//
-//
-// === Primitive value
-//
-// === Primitive function
-
-
-@rosettaexample shows an example of how a egglog rule can be transformed to eqlog, Rust, and SQL.
+) <informal-egraph-figure>
 
 #figure(
-table(
-    columns: (1fr, auto, auto),
-    table.header([*Meaning*], [*egglog*], [*eqlog*]),
-    [a set of variables, actions and predicates], [Rule],[morphism],
-    [what to check against the database], [Predicate], [morphism],
-    [A single part of a conjunctive query], [Atom], [morphism],
-    [what to apply to the database, either the unification of two e-classes or the creation of an E-node], [Action], [morphism],
-    [a table], [Function], [morphism],
-    [represents a row in a table, eg Add(a,b)], [E-node], [morphism],
-    [represents a set of equivalent expressions], [E-class], [morphism],
-    [represents the type of values], [sort], [morphism],
-),
-caption: [comparasion of egglog and eqlog terminology.]
-)
+  ```
+  (sort Math)
+  (function Add (Math Math) Math)
+  (function Sub (Math Math) Math)
+  (function Mul (Math Math) Math)
+  (function Div (Math Math) Math)
+  (function Pow (Math) Math)
+  (function Const (i64) Math)
+  (function Var (String) Math)
+
+  (rewrite (Add a b) (Add b a))                         // commutativity
+  (rewrite (Add a (Add b c)) (Add (Add a b) c))         // associativity
+
+  (rewrite (Mul a b) (Mul b a))                         // commutativity
+  (rewrite (Mul a (Mul b c)) (Mul (Mul a b) c))         // associativity
+
+  (rewrite (Mul (Add a b) c) (Add (Mul a c) (Mul b c))) // distributivity
+
+  (rewrite (Add x (Const 0)) x)                         // additive unit
+  (rewrite (Mul x (Const 1)) (x))                       // multiplicative unit
+  ```,
+
+  caption: [
+
+    A theory written in the egglog language. `Math` is essentially a sum type, where `Add`, `Sub`,
+    etc are constructors. Rewrites mean that if the left side matches, add the right side to the
+    database and unify it with the left side. Egglog semantics define running a set of rules as
+    using their left side patterns to figure out what right side actions to perform, then doing all
+    actions as a batch. Egglog defines a command `run <count>`, not shown here, than runs the set of
+    all rules some number of times or until convergence.
+
+  ],
+) <informal-theory-example>
+
+#figure(
+  table(
+    columns: (auto, auto, auto, 1fr),
+    table.header(
+      table.cell(colspan: 4, [*Approximate nomenclature guide*]),
+      [*egglog*], [*eqlog*], [*database*], [*comment*]
+    ),
+    [rule], [rule], [query],
+    [],
+    [predicate], [if stmt], [join+where],
+    [logical premise],
+    [action], [then stmt], [insert/unify],
+    [logical consequence],
+    [function], [function], [table],
+    [e.g. `Add: Math * Math -> Math`],
+    [e-node], [?], [row/tuple],
+    [represents a small computation, e.g. `Add(a,b)`],
+    [e-class], [?], [cell element],
+    [represents a set of equivalent expressions],
+    [sort], [type], [],
+    [e.g. `Math`],
+  ),
+  caption: [Comparison of egglog, eqlog and relational database terminology.]
+) <rosetta-table>
 
 #pagebreak()
 == E-graphs, formally
