@@ -51,7 +51,7 @@ inherent order dependence of destructive rewrites. This is called the phase orde
 Additionally, ad-hoc passes implemented as arbitrary transforms on the compiler's intermediate
 representation are difficult to model formally and to prove correct.
 
-The unlocking half of the issue can be avoided by replacing globally rewriting passes with local
+The unlocking half of the issue can be avoided by replacing global rewrite passes with local
 rewrites. These local rewrites can be expressed within some framework that tracks dependencies and
 thus incrementally applies them until reaching a fix point. This avoids the computational
 inefficiency of having to reprocess the entire code with repeated passes, while at the same time not
@@ -88,8 +88,8 @@ than automated theorem proving, a workflow called equality saturation (EqSat) @e
 there is then a final extraction phase where some procedure selects from the e-graph globally
 optimized expressions equivalent to the initial ones.
 
-Yet e-graphs, although they reduce it with efficient deduplication, suffer from the combinatorial
-explosion that results when trying to find every equivalent representation of their initial
+Even though it is reduced through efficient deduplication, e-graphs still suffer from the resulting
+combinatorial explosion from trying to find every equivalent representation of the initial
 expression. This is a major problem in practice and currently severely limits what applications they
 are suitable for. While we have chosen optimizing compilers as illustration of their usefulness,
 e-graphs were originally developed for automated theorem proving @oldegraph @egraphwithexplain.
@@ -195,38 +195,6 @@ and SQL.
     rather than as a bipartite graph.
     ]
 ) <informal-egraph-figure-non-bipartite>
-
-
-#block(breakable: false, [
-
-Here is an example of E-graph rules written in the egglog language.
-
-```
-(sort Math)
-(function Add (Math Math) Math)
-(function Sub (Math Math) Math)
-(function Mul (Math Math) Math)
-(function Div (Math Math) Math)
-(function Pow (Math) Math)
-(function Const (i64) Math)
-(function Var (String) Math)
-
-(rewrite (Add a b) (Add b a))
-(rewrite (Add a (Add b c)) (Add (Add a b) c))
-
-(rewrite (Mul a b) (Mul b a))
-(rewrite (Mul a (Mul b c)) (Mul (Mul a b) c))
-
-(rewrite (Mul (Add a b) c) (Add (Mul a c) (Mul b c)))
-
-(rewrite (Add x (Const 0)) x)
-(rewrite (Mul x (Const 1)) (x))
-```
-
-Math is essentially a sum type, where Add, Sub, etc are constructors. Rewrites mean that if the left
-side matches, add the right side to the database and unify it with the left side.
-
-])
 
 // == Egraph
 // An Egraph is a bipartite graph of E-nodes and E-classes.
@@ -335,7 +303,7 @@ side matches, add the right side to the database and unify it with the left side
 // #todo[make it more general, less egglog-ish, or introduce egglog semantics.]
 // #todo[hard to understand, give more context/intuition.]
 
-NOTE: this section may be easier to understand by reading @relatedwork first.
+#text(style: "italic", [ Note that this section may be easier to understand by reading @relatedwork first. ])
 
 Given an expression, and a set of rules, find a set of equivalent expressions encoded as an e-graph and extract an equivalent expression with minimal cost and runtime, making trade-offs between cost and runtime.
 
@@ -463,37 +431,41 @@ Union-find, $"U"$ is a data structure used for efficiently merging and checking 
 - $"union"("U", u, v)$ merges#footnote[by mutating U in-place] the two sets that $u$ and $v$. After running union, $"find"("U", u) = "find"("U", v)$.
 Both operations run in almost $O(1)$ and outside the context of e-graphs, one use is when implementing Kruskal's minimum spanning tree algorithm for checking if two vertices belong to different points.
 
-This is how union-find can be implemented#footnote[simplified, so this code does not have $approx
-O(1)$ complexity for union and find. Real implementations use path compression and smaller-to-larger
-merging to achieve that. ]:
+#figure(
+    ```rust
+    struct UnionFind {
+        representative: Vec<usize>
+    }
+    impl UnionFind {
+        fn new(n: usize) -> Self {
+            Self {
+                // each set points to itself.
+                representative: (0..n).collect(),
+            }
+        }
+        fn find(&self, i: usize) -> usize {
+            // follow representative for i until we reach root
+            if i == representative[i] {
+                i
+            } else {
+                self.find(representative[i], repr)
+            }
+        }
+        fn union(&mut self, i: usize, j: usize) {
+            if self.find(i) != self.find(j) {
+                // set representative of first set to the second set
+                self.representative[self.find(j)] = self.find(i);
+            }
+        }
+    }
+    ```,
+    caption: [
+        This is how union-find can be implemented. Note that this simplified, so this code does not have $approx
+        O(1)$ complexity for union and find. Real implementations use path compression and smaller-to-larger
+        merging to achieve that.
+    ]
+)
 
-```rust
-struct UnionFind {
-    representative: Vec<usize>
-}
-impl UnionFind {
-    fn new(n: usize) -> Self {
-        Self {
-            // each set points to itself.
-            representative: (0..n).collect(),
-        }
-    }
-    fn find(&self, i: usize) -> usize {
-        // follow representative for i until we reach root
-        if i == representative[i] {
-            i
-        } else {
-            self.find(representative[i], repr)
-        }
-    }
-    fn union(&mut self, i: usize, j: usize) {
-        if self.find(i) != self.find(j) {
-            // set representative of first set to the second set
-            self.representative[self.find(j)] = self.find(i);
-        }
-    }
-}
-```
 
 === Congruence closure algorithms (1980)
 // is it this: $a = b ==> f(a) = f(b)$?
@@ -552,7 +524,7 @@ assistants @oldegraph.
 === Wost-case optimal joins (pre-print 2012, published 2018)
 
 A wost-case optimal join is $O("max possible output tuples")$ given the input size and query @optimaljoin.
-It has been shown that it is not possible to get a wost-case optimal join from just binary joins are not asymptotically optimal, so a new algorithm is needed @optimaljoin.
+It has been shown that it is not possible to get a wost-case optimal join from just binary joins, so a new algorithm is needed @optimaljoin.
 There is a worst-case optimal join algorithm called generic join.
 For any variable ordering, it recursively finds the value for a variable, one at a time.
 As far as we can tell, implementing this is quite straightforward, and it is also used in egglog @relationalematching.
@@ -630,9 +602,9 @@ This is somewhat intuitive when considering that only expressions that were alre
 
 As a preprocessing step, the algorithm simplifies the egraph by treating it as a boolean circuit and simplifying it using standard techniques to slightly reduce the size of the problem.
 The e-nodes with zero inputs become a constant 1.
-E-nodes become and gates of all their inputs and e-classes become or gates of all their inputs.
+E-nodes become `and` gates of all their inputs and e-classes become `or` gates of all their inputs.
 The problem is essentially to set the extracted e-class to 1 while removing as many gates as possible.
-There are many straightforward simplifications that can be done to the graph, for example, an and gate with duplicate inputs from the same node can remove one of the inputs.
+There are many straightforward simplifications that can be done to the graph, for example, an `and` gate with duplicate inputs from the same node can remove one of the inputs.
 
 = Goal
 
@@ -642,22 +614,22 @@ implementations (like egg @egg, egglog @egglog, eqlog @eqlog).
 
 == Limitations
 
-Our goal can be further clarified by stating what we are not doing. We are not
+Our goal can be further clarified by stating what we are not doing.
 
-- applying e-graphs to solve problems, but rather improving e-graph technology itself
-- concerned with performance on worst-case inputs or with proving time complexity bounds, but rather
+- We are not applying e-graphs to solve a specific problem, but rather improving e-graph technology itself
+- We are not concerned with performance on theoretical worst-case inputs or with proving time complexity bounds, but rather
   practical performance on practical inputs
-- designing a logic programming / theory description language, instead prioritizing interoperability
+- We are not designing a logic programming / theory description language, instead prioritizing interoperability
   by staying syntactically and semantically close to the egglog language.
-- aiming to implement exactly all functionality present in egglog and eqlog. Specifically, we will
+- We are not aiming to implement exactly all functionality present in egglog and eqlog. Specifically, we will
   not be implementing language features that do not make sense at compile time, such as printing
   current state, only running specific rules, extraction, etc. Some of these will instead move to a
   Rust API to be used at runtime.
-- sacrificing expressive power in the name of performance, as Cranelift's aegraphs @acyclic_egraphs
+- We are not sacrificing expressive power in the name of performance, as Cranelift's aegraphs @acyclic_egraphs
   do
-- writing an interpreter or considering non-EqSat workflows, and can therefore assume all rules are
+- We are not writing an interpreter or considering non-EqSat workflows, and can therefore assume all rules are
   known up front
-- doing distributed (multi-node) computations or GPU computations, but rather CPU computation with
+- We are not doing distributed (multi-node) computations or GPU computations, but rather CPU computation with
   any (non-instruction-level) parallelism being shared-memory.
 
 == Evaluation
@@ -687,7 +659,7 @@ environment alongside our source code in the same repository, which we additiona
 source. We expect our dependencies to be roughly
 - a x86_64 system running a recent Linux kernel
 - nix
-- a rust toolchain
+- a Rust toolchain
 - profiling tools such as perf @perf
 - egglog and eqlog, for benchmarking
 
@@ -716,6 +688,7 @@ implement a similar feature set to egglog @egglog. That roughly includes
 
 The final thesis will specify the exact language our code implements.
 
+#figure(
 ```rust
 compile_egraph!(
     (sort Math)
@@ -730,7 +703,9 @@ struct Egraph {
 impl Egraph {
     /* ... */
 }
-```
+```,
+caption: [Example of what our library could look like]
+)
 #figure(
     image("architecture.svg", width: 99%),
     caption: [Simplified, expected high-level overview of rule compilation.]
@@ -742,10 +717,10 @@ The rest of this section shows ideas we want to explore.
 
 If generic join is used, a query plan is a permutation of variables, and an ordering of the constraints when picking the variables.
 With some cost estimate of a query plan, exhaustive search might work for up to 5-10 variables.
-Additionally, to minimize the number of indexes, rules need to be optimized globally.
+Additionally, to minimize the number of indexes, rules need to be optimized globally, meaning we have a combinatorial explosion.
 
 Therefore, heuristics are needed, one option is to create many locally good query plans for each rule and then pick a set of query plans that minimize total number of indexes.
-A problem is that to get algorithmically optimal performance, we would need to update the constraint ordering based on the relative sizes of the tables.
+A problem is that to get algorithmically optimal performance, query plans need to be dynamic depending on the relative sizes of tables at runtime.
 
 == Algorithmic worst-case bounds as guidance
 
