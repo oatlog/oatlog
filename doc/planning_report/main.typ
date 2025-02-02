@@ -41,9 +41,6 @@
 
 #pagebreak()
 
-#todo[Matti: make it clear that these are performance implementations on your engine (vs.
-optimizations conducted using an e-graph in relation to a compiler backend)]
-
 = Introduction
 
 A traditional optimizing compiler applies optimization passes sequentially and destructively, in
@@ -146,7 +143,7 @@ terminology of e-nodes and e-classes, e-nodes are the nodes of the graph and e-c
 equivalence classes of nodes under an equivalence relation. Nodes are annotated by what primitive
 operation they perform on their inputs, like addition or a bitshift. Unlike an actual graph, edges
 denoting inputs for use in operations, run not from nodes to nodes but rather from e-classes to
-(e-)nodes. 
+(e-)nodes.
 
 E-graphs can also be represented as bipartite graphs with two types of nodes, e-classes and e-nodes.
 Edges run from e-nodes to e-classes denoting membership in that equivalence class, and from
@@ -326,7 +323,6 @@ side matches, add the right side to the database and unify it with the left side
   caption: [Comparison of egglog, eqlog and relational database terminology.]
 ) <rosetta-table>
 
-#pagebreak()
 == E-graphs, formally
 // extended version of scientific problem description
 // #todo[make it more general, less egglog-ish, or introduce egglog semantics.]
@@ -334,7 +330,7 @@ side matches, add the right side to the database and unify it with the left side
 
 NOTE: this section may be easier to understand by reading @relatedwork first.
 
-Given an expression, and a set of rules, find a set of equivalent expressions encoded as an E-graph and extract an equivalent expression with minimal cost and runtime, making trade-offs between cost and runtime.
+Given an expression, and a set of rules, find a set of equivalent expressions encoded as an e-graph and extract an equivalent expression with minimal cost and runtime, making trade-offs between cost and runtime.
 
 
 
@@ -343,38 +339,38 @@ Given an expression, and a set of rules, find a set of equivalent expressions en
 // #todo[rephrase as an extension of congruence closure?]
 
 
-An E-graph can be defined as a tuple $G = (U, H)$ where #footnote[This is a slightly modified definition from @egg. There is no direct concept of an "E-class", only E-class ids, an E-class exists implicitly based on the contents of H.]
-- U is the union-find data structure over E-class ids, storing an equivalence relation.// $(equiv_id)$
-- H is the hashcons, a map from E-nodes to E-class ids #footnote[This is the database].
+An e-graph can be defined as a tuple $G = (U, H)$ where #footnote[This is a slightly modified definition from @egg. There is no direct concept of an "e-class", only e-class ids, an e-class exists implicitly based on the contents of H.]
+- U is the union-find data structure over e-class ids, storing an equivalence relation.// $(equiv_id)$
+- H is the hashcons, a map from e-nodes to e-class ids #footnote[This is the database].
 // , providing functions union #footnote[In practice union mutates U in-place and both union and find is $approx O(1)$.] and find where
 //     - $"find"(U, a) = "find"(U, b) <==> a equiv_id b$
 //     - $U' = "union"(U, a, b) ==> "find"(U', a) = "find"(U', b)$
-//- Conceptually it also contains a map from E-class ids to an E-class,
-//- M is a map from E-class ids to an E-class
-- An E-class id is canonical iff $"find"(U, a) = a$ @egg
-- An E-node $n=f(a_1, a_2, ...)$ is canonical iff $n="canonicalize"(n)$ @egg where
+//- Conceptually it also contains a map from e-class ids to an e-class,
+//- M is a map from e-class ids to an e-class
+- An e-class id is canonical iff $"find"(U, a) = a$ @egg
+- An e-node $n=f(a_1, a_2, ...)$ is canonical iff $n="canonicalize"(n)$ @egg where
     - $"canonicalize"(f(a_1, a_2, ...)) = f("find"(U, a_1), "find"(U, a_2), ...)$
-// - An E-graph is canonical iff H only contains canonical E-nodes.
+// - An e-graph is canonical iff H only contains canonical e-nodes.
 
-An E-graph, $E$ defines the following operations @egg #footnote[this is one of many ways to define them]:
-- $"add"(E, n)$ adds the E-node n to the E-graph, if it already exists, it returns the existing E-class id, otherwise it returns a new E-class id. @egg
-- $"union"(E, a, b)$ unifies E-classes $a$ and $b$ in $U$ @egg.
-- $"find"(E, a)$ returns the canonical E-class id for the E-class id a @egg.
-- $"ematch"(E, p)$ performs E-matching on pattern p containing placeholder variables returning a list of tuples $(sigma, c)$, where $sigma$ is the variable substitutions and c is the root E-class id @egg.
+An e-graph, $E$ defines the following operations @egg #footnote[this is one of many ways to define them]:
+- $"add"(E, n)$ adds the e-node n to the e-graph, if it already exists, it returns the existing e-class id, otherwise it returns a new e-class id. @egg
+- $"union"(E, a, b)$ unifies e-classes $a$ and $b$ in $U$ @egg.
+- $"find"(E, a)$ returns the canonical e-class id for the e-class id a @egg.
+- $"ematch"(E, p)$ performs e-matching on pattern p containing placeholder variables returning a list of tuples $(sigma, c)$, where $sigma$ is the variable substitutions and c is the root e-class id @egg.
 
-Using these operations, rewrites on the E-graph can be implemented by first calling ematch and then add and union.
+Using these operations, rewrites on the e-graph can be implemented by first calling ematch and then add and union.
 
-To check if two expressions are equal in the E-graph, both can be added and their E-classes compared using their canonical E-class ids from find.
+To check if two expressions are equal in the e-graph, both can be added and their e-classes compared using their canonical e-class ids from find.
 
 === E-graphs invariants
-- All E-nodes in H are canonical ($n = "canonicalize"(n)$).
-- H only maps to canonical E-class ids.
-The invariants are to be enforced after every modification to the E-graph.
-The invariants can be enforced by canonicalizing the E-nodes in H and unifying the E-classes when there is a collision in the map.
-As an optimization, fixing the E-graph invariants may be delayed.
+- All e-nodes in H are canonical ($n = "canonicalize"(n)$).
+- H only maps to canonical e-class ids.
+The invariants are to be enforced after every modification to the e-graph.
+The invariants can be enforced by canonicalizing the e-nodes in H and unifying the e-classes when there is a collision in the map.
+As an optimization, fixing the e-graph invariants may be delayed.
 
-=== Extended E-matching semantics for egglog
-Egglog extends E-matching to include multiple patterns that share variables.
+=== Extended e-matching semantics for egglog
+Egglog extends e-matching to include multiple patterns that share variables.
 
 == Rule
 A rule is a tuple R = (V, P, A) where:
@@ -383,38 +379,37 @@ A rule is a tuple R = (V, P, A) where:
 - A is a set of actions where an action is either a call to add or union:
 
 // === Rule
-// A rule states that if the predicates match the E-graph, some new information can be added to it.
+// A rule states that if the predicates match the e-graph, some new information can be added to it.
 // A rule R can be defined as a tuple $R = (P, A, V)$ where:
 // - $V$ is a set of variables $V = {v_1, v_2, ... } = V_p union V_a$, where:
 //     - $V_p$ is the set of variables referenced in P
 //     - $V_a$ is the set of variables referenced only in A ($V_p sect V_a = emptyset$)
 // - P is the set of predicates, $P = {f(v_1, v_2, ...}, f(v_1, v_2, ...), ...}$
 // - A is a tuple (A_i, A_u) where:
-//     - $A_i$ is the set of E-nodes to be added to H, along with the E-class to assign it, but referencing V instead, $A_i = {(v_1, f(v_2, v_3 ...)), (v_1, f(v_2, v_3 ...)) ...}$
+//     - $A_i$ is the set of e-nodes to be added to H, along with the e-class to assign it, but referencing V instead, $A_i = {(v_1, f(v_2, v_3 ...)), (v_1, f(v_2, v_3 ...)) ...}$
 //     - $A_u$ is the set of pairs to be unified in U, $A_u = {(v_1, v_2), (v_1, v_2), ...}$
-//     - All variables in $V_a$ are to be replaced with newly created E-classes.
+//     - All variables in $V_a$ are to be replaced with newly created e-classes.
 //     - If a $V_a$ is empty then the rule is called surjective and is guaranteed to terminate.
-// - A Rule matches an E-graph if there is some set of E-nodes in H that match P.
+// - A Rule matches an e-graph if there is some set of e-nodes in H that match P.
 
 === Extraction
-An extraction for an E-graph $G = (U, H)$, and a set of E-classes E is a set of E-nodes X, such that:
+An extraction for an e-graph $G = (U, H)$, and a set of e-classes E is a set of e-nodes X, such that:
 - $forall e in E, e in H[X]$
 - $forall n in X and n = f(a_1, a_2, ...) ==> a_1, a_2, ... in H[X]$
 The cost $c(X)$ is an arbitrary function
 #footnote[
-Typically, $c(X) = sum_(x in X) w(x)$, where $w(x)$ is a weight based on the type of E-node.
+Typically, $c(X) = sum_(x in X) w(x)$, where $w(x)$ is a weight based on the type of e-node.
 Minimal cost extraction for functions like this is NP-hard by reduction from MIN-SAT @extractnphard.
 ]
 
 === Primitives, Collections and Primitive Functions.
 Primitives represent a specific value instead of a set of equivalent expressions.
-Collections are Primitives that can contain E-classes (for example `Set<Math>`) and Primitive Functions are Functions from Primitives to Primitives.
+Collections are Primitives that can contain e-classes (for example `Set<Math>`) and Primitive Functions are Functions from Primitives to Primitives.
 A key property of primitives is that they can not be unified/merged, unless the values are the same.
-While Collections can not be merged, they can become equal when the E-classes that they contain are unified.
+While Collections can not be merged, they can become equal when the e-classes that they contain are unified.
 It is unclear if they have a solid theoretical foundation, as papers for egg @egg nor egglog @egglog barely mention them or go into any depth. This is discussed more in @primitiveimpl.
 
 
-#pagebreak()
 == Related work <relatedwork>
 
 Recent work has considerably improved their performance and capabilities, and there is as far as we
@@ -459,9 +454,12 @@ e-graphs (aegraphs) that make it miss out on potential optimizations @cranelift_
 Union-find, $"U"$ is a data structure used for efficiently merging and checking if elements belong to the same set. Initially all sets are distinct @unionfindoriginal @fastunionfind:
 - $"find"("U", v)$ returns a _representative_ element for the set that $v$ belongs to. Iff $"find"("U", u) = "find"("U", v)$ then $u$ and $v$ belong to the same set.
 - $"union"("U", u, v)$ merges#footnote[by mutating U in-place] the two sets that $u$ and $v$. After running union, $"find"("U", u) = "find"("U", v)$.
-Both operations run in almost $O(1)$ and outside the context of E-graphs, one use is when implementing Kruskal's minimum spanning tree algorithm for checking if two vertices belong to different points.
+Both operations run in almost $O(1)$ and outside the context of e-graphs, one use is when implementing Kruskal's minimum spanning tree algorithm for checking if two vertices belong to different points.
 
-This is how union-find can be implemented#footnote[simplified, so does not have $approx O(1)$ complexity for union and find, path compression and smaller to larger merging is required for that.]:
+This is how union-find can be implemented#footnote[simplified, so this code does not have $approx
+O(1)$ complexity for union and find. Real implementations use path compression and smaller-to-larger
+merging to achieve that. ]:
+
 ```rust
 struct UnionFind {
     representative: Vec<usize>
@@ -496,7 +494,7 @@ impl UnionFind {
 
 Given an expression like $f(f(a, b), b)$ and knowing that $f(a, b) = a$, we want an algorithm to show that $f(f(a, b), b) = a$.
 This can be done by computing the congruence closure @congruenceclosure, which essentially assigns equivalence classes to expressions and merges equal expressions.
-This is sometimes called "canonicalization" when applied to E-graphs.
+This is sometimes called "canonicalization" when applied to e-graphs.
 It can be implemented using union-find.
 
 
@@ -579,7 +577,7 @@ database. The rewrites are performed in batches, meaning all rules are applied a
 invariants are fixed.
 
 
-=== Relational E-matching (2022)
+=== Relational e-matching (2022)
 
 E-matching finds a set of terms matching a particular pattern, for example $"Add"("Mul"(a, c), "Mul"(b, c))$.
 For egg, the evaluation is top-down, so something like:
@@ -593,10 +591,10 @@ for (t0, t1, e) in add(*) {
     }
 }
 ```
-But E-matching can be transformed into a conjunctive query @relationalematching.
+But e-matching can be transformed into a conjunctive query @relationalematching.
 $ Q(a, b, c, t_0, t_1, t_2) <- "Add"(t_0, t_1, t_2), "Mul"(a, c, t_0), "Mul"(b, c, t_1) $
 
-Implementing E-matching as a relational query is algorithmically more efficient and has lower runtime in practice @relationalematching.
+Implementing e-matching as a relational query is algorithmically more efficient and has lower runtime in practice @relationalematching.
 
 === Egglog and eqlog (2023)
 
@@ -610,7 +608,7 @@ programs and processes rules at compile time.
 The egglog paper has a benchmark showing approximately a million e-nodes per second, improving from
 egg's about 100k e-nodes per second in that same benchmark.
 
-=== Fast and optimal extraction and E-graphs as circuits (2024)
+=== Fast and optimal extraction and e-graphs as circuits (2024)
 
 E-graphs store an exponential number of equivalent expressions in a deduplicated manner but do not
 solve the problem of quickly extracting the optimal among them. The extraction problem is similar to
@@ -620,16 +618,15 @@ linear programming is typically used to extract the best expression in an e-grap
 However, it was independently discovered that linear time extraction is possible for a bounded treewidth @fastextract @egraphcircuit.
 Quite a lot of algorithms that are NP-hard, are polynomial for a bounded treewidth, so in this sense it is essentially a standard method applied to the extraction problem, in this case the complexity is $O(n * f("treewidth"))$
 Informally, treewidth is a measure of how close a graph is to a tree, and can be computed from a tree decomposition of the graph.
-Generally, E-graphs tend to have a low treewidth, so this algorithm tends to applicable to practical egraphs.
-This is somewhat intuitive when considering that only expressions that were already somewhat similar tend to get unified, so the E-graph is never really that random.
+Generally, e-graphs tend to have a low treewidth, so this algorithm tends to applicable to practical egraphs.
+This is somewhat intuitive when considering that only expressions that were already somewhat similar tend to get unified, so the e-graph is never really that random.
 
 As a preprocessing step, the algorithm simplifies the egraph by treating it as a boolean circuit and simplifying it using standard techniques to slightly reduce the size of the problem.
-The E-nodes with zero inputs become a constant 1.
-E-nodes become and gates of all their inputs and E-classes become or gates of all their inputs.
-The problem is essentially to set the extracted E-class to 1 while removing as many gates as possible.
+The e-nodes with zero inputs become a constant 1.
+E-nodes become and gates of all their inputs and e-classes become or gates of all their inputs.
+The problem is essentially to set the extracted e-class to 1 while removing as many gates as possible.
 There are many straightforward simplifications that can be done to the graph, for example, an and gate with duplicate inputs from the same node can remove one of the inputs.
 
-#pagebreak()
 = Goal
 
 The goal of this project is to implement an e-graph engine which is roughly compatible with the
@@ -643,19 +640,23 @@ Our goal can be further clarified by stating what we are not doing. We are not
 - applying e-graphs to solve problems, but rather improving e-graph technology itself
 - concerned with performance on worst-case inputs or with proving time complexity bounds, but rather
   practical performance on practical inputs
-- designing a logic programming language, instead prioritizing interoperability by staying
-  syntactically and semantically close to the egglog language.
-- aiming to implement exactly all functionality present in egglog and eqlog.
-  Specifically, we will not be implementing language features that do not make sense at compile time such as printing current state, only running specific Rules, extraction. Some of these will instead move to a Rust API to be used at runtime.
+- designing a logic programming / theory description language, instead prioritizing interoperability
+  by staying syntactically and semantically close to the egglog language.
+- aiming to implement exactly all functionality present in egglog and eqlog. Specifically, we will
+  not be implementing language features that do not make sense at compile time, such as printing
+  current state, only running specific rules, extraction, etc. Some of these will instead move to a
+  Rust API to be used at runtime.
 - sacrificing expressive power in the name of performance, as Cranelift's aegraphs @acyclic_egraphs
   do
 - writing an interpreter or considering non-EqSat workflows, and can therefore assume all rules are
   known up front
+- doing distributed (multi-node) computations or GPU computations, but rather CPU computation with
+  any (non-instruction-level) parallelism being shared-memory.
 
 == Evaluation
 
 Defining a good single metric for
-benchmarking is unfortunately nontrivial and taking inspiration from previous work @egg @egglog we
+benchmarking is unfortunately nontrivial and taking inspiration from previous work @egg @egglog, we
 plan to combine measuring
 - e-nodes created per second, between engines implementing the same ruleset with similar scheduling,
   since this implies roughly the same e-nodes (semantically) are created
@@ -673,20 +674,43 @@ and performance of our engine.
 // experiments (both hardware and software) (reproduceability, hardware/software, nix)]
 
 == Environment
-We will be using the nix @nix to specify the software environment, so the exact software environment will be specified in the same repository as the source code.
-It is expected that we will only be using profiling tools such as perf @perf in addition to our own Rust code.
-We will be using our personal computers to run the benchmarks, exact hardware will be specified once we have run tests.
 
+We will be using the nix @nix package manager and build system to reproducibly specify our software
+environment alongside our source code in the same repository, which we additionally will open
+source. We expect our dependencies to be roughly
+- a x86_64 system running a recent Linux kernel
+- nix
+- a rust toolchain
+- profiling tools such as perf @perf
+- egglog and eqlog, for benchmarking
 
-#pagebreak()
+Crucially we do not expect to rely on external solvers, we do not expect to incorporate unfree code,
+and we expect the performance of our e-graph engine to rely almost entirely on our code and the Rust
+toolchain.
+
+We will be using our personal computers to run the benchmarks, with exact hardware specified in the
+final thesis. Relevant hardware components include processor and memory, but due to factors like
+cooling and microcode updates the final benchmarks will ultimately only be relevant in relation to
+each other.
+
 = Approach
 
 #todo[Matti: Expand what the feature set [referring to egglog] is (not just say it's similar to something in some paper)]
 
-Concretely, we will create a Rust library that takes in a set of rewrite rules in the egglog language
-and generates Rust code for a e-graph engine with the optimized rewrite rules hard-coded. The main
-focus is optimizing the run time of the generated e-graph engine. In terms of features we are aiming
-to implement a similar feature set to egglog @egglog.
+Concretely, we will create a Rust library that takes in a set of rewrite rules in the egglog
+language and generates Rust code for an e-graph engine with the optimized rewrite rules hard-coded.
+The main focus is on optimizing the run time of the generated e-graph engine, with the time to
+compile the theory into generated code being less important.  In terms of features we are aiming to
+implement a similar feature set to egglog @egglog. That roughly includes
+- Declaring sorts
+- Declaring functions
+- Defining rules that match e-nodes using premises and apply actions
+- Premises that implicitly declare e-class variables and constrain those variables by requiring
+  e-nodes using those e-classes
+- Actions that add e-nodes, create new e-classes and unify existing e-classes
+
+The final thesis will specify the exact language our code implements.
+
 ```rust
 compile_egraph!(
     (sort Math)
@@ -704,7 +728,7 @@ impl Egraph {
 ```
 #figure(
     image("architecture.svg", width: 99%),
-    caption: [High-level overview of rule compilation.]
+    caption: [Simplified, expected high-level overview of rule compilation.]
 )
 
 The rest of this section shows ideas we want to explore.
@@ -720,10 +744,16 @@ A problem is that to get algorithmically optimal performance, we would need to u
 
 == Algorithmic improvements
 
-Since both worst-case optimal joins and extraction with a bounded treewidth have been shown to be algorithmically optimal @optimaljoin @relationalematching @fastextract @egraphcircuit, we would need to reformulate the problem in order to make algorithmic improvements.
+Since both worst-case optimal joins and extraction with a bounded treewidth have been shown to be
+algorithmically optimal @optimaljoin @relationalematching @fastextract @egraphcircuit, we would need
+to reformulate the problem in order to make algorithmic improvements.
 
-== Merging Rules
-Some rules share prefixes of other rules, in that case, they can be merged:
+#todo([What is this supposed to mean?])
+
+== Merging rules
+
+Some rules share prefixes of other rules, in which case they can be merged:
+
 ```rust
 for (/* ... */) in (/* ... */) { // shared prefix
     for (/* ... */) in (/* ... */) { // shared prefix
@@ -737,9 +767,15 @@ for (/* ... */) in (/* ... */) { // shared prefix
 }
 ```
 
-== Eagerly applying Rules
-#block(breakable: false, [
-Some rules can be applied as soon as something is inserted into the database, so searching the database for matches of the rule is not needed, for example:
+This essentially involves creating a trie of all rules after deciding their query plans.
+
+== Eagerly applying rules
+
+Rules can be removed without changing the theory semantics if other rules can be adapted to
+additionally have the effect of the first rule. This shows up for example when having rules that
+insert something for every instance of a sort or match on a single function. The following are such
+examples:
+
 ```
 (sort Math)
 (function Const (i64) Math)
@@ -747,32 +783,35 @@ Some rules can be applied as soon as something is inserted into the database, so
 (function Mul (Math Math) Math)
 
 (relation LessOrEqual (Math Math))
-(rule ((x)) ((LessOrEqual x x))) ; Apply when new E-class created
+(rule ((x)) ((LessOrEqual x x))) ; Apply when new Math e-class created
 
-(funciton UpperBound (Math) i64 :merge (min old new))
-
-(rule ((x)) ((UpperBound x i64::MAX))) ; Apply when new E-class created
+(function UpperBound (Math) i64 :merge (min old new))
+(rule ((x)) ((UpperBound x i64::MAX))) ; Apply when new Math e-class created
 
 (function evals-to (Math) i64 :no-merge)
-
 (rule ((= e Const x)) ((evals-to x)) ; Apply when a Const is created.
 ```
-])
+
+These rules can be elided from all EqSat iterations aside from the first one, if any rules creating
+new `Math` e-classes or `Const` e-nodes also perform the actions specified in these rules.
 
 == Special case handling of rules
 // Some rules do not really add any information to the database, for example, consider the following:
 
-It is very common for Rules to simply express that some Function is associative, commutative, transitive etc.
-We can use that information to optimize for common patterns.
-For example for transitivity:
+It is very common for rules to simply express that some function is associative, or commutative,
+transitive etc. We can use that information to optimize for common patterns. For example for
+transitivity:
+
 ```
 (relation (LessThan Math Math))
 (rule ((LessThan x y) (LessThan y z)) ((LessThan x z)))
 ```
-The problem with this rule is that it generates $O(n^2)$ E-classes for $O(n)$ facts since it adds an E-node for all pairs.
-The engine could disable that rule and instead check if there is a path between the two e-classes.
-This is more expensive when just checking if `(LessThan x y)`, but indexing for a known `x` and unknown `y` does not add any extra cost, since it is essentially a BFS.
 
+The problem with this rule is that it generates $O(n^2)$ e-classes for $O(n)$ facts since it adds an
+e-node for all pairs. The engine could disable that rule and instead check if there is a path
+between the two e-classes. This is more expensive when just checking if `(LessThan x y)`, but
+indexing for a known `x` and unknown `y` does not add any extra cost, since it is essentially a BFS.
+Additionally, more advanced data structures could possibly speed this up further.
 
 // Associative: (rewrite (F (F x y) z) (F x (F y z)))
 //
@@ -807,54 +846,86 @@ This is more expensive when just checking if `(LessThan x y)`, but indexing for 
 
 == Indexing data structures
 
-In a typical database, there is only a single primary key, not that many indexes, and the indexes that exist are for an exact set of columns.
-But for typical queries on an E-graph, essentially everything needs to be indexed.
-With many b-tree sets storing permutations of a table, each b-tree acts as an index for each prefix of that permutation.
-Since eqlog uses b-tree sets for indexes, we are fairly confident that it will work reasonably well, but we also want to explore other options.
-For example, a trie has the same asymptotic runtime, but uses less memory if there are many long shared prefixes.
+In a typical database, there is only a single primary key, not that many indexes, and the indexes
+that exist are for an exact set of columns. But for typical queries on an e-graph, essentially
+everything needs to be indexed. With many b-tree sets storing column-permuted rows of a table, each
+b-tree acts as an index for each prefix of that permutation. Since eqlog uses b-tree sets for
+indexes, we are fairly confident that it will work reasonably well, but we also want to explore
+other options. For example, a trie has the same asymptotic runtime, but uses less memory if there
+are many long shared prefixes.
 
-== General profiling and understanding of how E-graphs behave
+== General profiling and understanding of how e-graphs behave
 
-We would like to get a better understanding of how E-graphs typically behave, for example how quickly do they tend to grow per application of a rule? What is the ratio between the number of E-classes and E-nodes? What do the memory access patterns tend to look like?
-
-// There is not really a lot of available information on how egraphs typically behave, for example what is the ratio between the number of E-classes and E-nodes.
-
+We would like to get a better understanding of how e-graphs typically behave, regarding factors
+like:
+- How quickly do they tend to grow per application of a rule?
+- What is the ratio between the number of e-classes and e-nodes?
+- What do the memory access patterns tend to look like?
 
 == Implementing Primitives and Primitive Functions <primitiveimpl>
 
 A key difference between eqlog and egglog is that egglog has support for primitives and collections.
-Simple primitives like integers are mostly straightforward to implement, they are like E-classes that can not be merged, conceptually they represent a literal bit-pattern.
-But collections, for example a lists or sets are harder since, they can not be merged directly, but if the E-classes that they contain are unified, then collections can be merged.
+Simple primitives like integers are mostly straightforward to implement. They are like e-classes
+that can not be merged, and can be refered to by a literal bit-pattern rather than an abstract id.
+Collections however, like lists or sets, are harder since they can not be merged directly but they
+can be implicitly merged if the e-classes that they contain are unified.
 
-Primitive functions are also a bit strange, for example:
+Primitive functions are also a bit strange. Consider for example
 ```rust
 fn add(i64, i64) -> i64;
 ```
-This is essentially a (practically) infinite table, or non-partial Function that is only indexed on the two inputs.
-But what happens if we allow adding more indexes, for example an index for finding one of the arguments given the result and one of the arguments:
+
+This is essentially a (practically) infinite table, or non-partial Function that is only indexed on
+the two inputs. But what happens if we allow adding more indexes, such as an index for finding one
+of the arguments given the result and one of the arguments?
+
 ```rust
 fn add((/* known */), (/* unknown */)) -> (/* known */);
 ```
-Obviously, this is just subtraction, a user could just write that themselves, but for the backend it opens up more possible query plans.
 
-Thinking about this for collections is very hard, but to give an idea of what it could look like, we could have interesting queries like "what sets contains this element", "what multisets have 3 copies of something".
-These are not actually implementable since the query results would be infinite, but if there is a constraint that it needs to be contained in some table, then it becomes conceptually possible to query.
-Ideally, we would want to implement Primitives and Primitive Functions in a way that users can create their own by writing some Rust code.
+Obviously, this is just subtraction which a user could just write for themselves, but for the
+backend this opens up more possible query plans.
+
+We find primitive collections to be conceptually complex, but to give an idea of how this could be
+utilized, we could have interesting queries like "what sets contains this element", "what multisets
+have 3 copies of something", etc. These are not actually implementable since the query results would
+be infinite, but if constrained to only return previously constructed values this becomes possible
+to query and even index on.
+
+Ideally, we would want to implement primitives and primitive functions in a way that users can
+create their own by writing some Rust code implementing some API.
 
 == Scheduling
 
-Semi-naive evaluation avoids recomputing the same facts by only matching "new" facts against the database.
-This is a great optimization, and very loosely speaking makes it $O(1)$ to generate potentially a new fact instead of $O(n)$.
-However, if it is done slightly incorrectly by adding a "new" fact to the old set too early, it is possible that some facts will never be created.
-Eqlog schedules by running all rules without modifying the database, removing rows in the database that are now wrong to to canonicalization and then inserting everything back into the database.
-Eglog also runs all rules that do not create new E-classes until closure before running any rules that create E-classes.
-The motivation for this is that without creating E-classes, the size of the database is limited, and equal E-classes will be unified faster.
+Semi-naive evaluation avoids recomputing known facts by requiring that all matches have at least one
+new/dirty bound variable. This is a great optimization, implementing using inclusion-exclusion, and
+very loosely speaking makes it $O(1)$ to generate potentially a new fact instead of $O(n)$. However,
+if it is done slightly incorrectly by marking a "new" fact as "old" too early, it is possible that
+  some facts will never be created. Eqlog schedules by running all rules without modifying the
+  database, removing rows in the database that are now wrong due to canonicalization and then
+  inserting everything back into the database. Eglog also runs all rules that do not create new
+  e-classes until closure before running any rules that create e-classes. The motivation for this is
+  that without creating e-classes, the size of the database is limited, and equal e-classes will be
+  unified faster.
+
+Generally, we want to investigate ways to run rules differently often based on how they affect the
+e-graph, and ways to lower the overhead of tracking ages of database items.
+
+== Code generation
+
+Since we are doing performance-critical code generation, we want to generate code that is easily
+reasoned about by rustc and in particular LLVM. This implies a strong benefit of static rather than
+dynamic code, to get better aliasing analysis, function inlining etc. We must balance this with
+effective dynamism that could be useful for things such as query planning. Profiling our code guides
+us here.
 
 == Extraction
 
-We want to implement existing treewidth-based extraction algorithms @fastextract @egraphcircuit and heuristic extraction algorithms with a good constant factor.
-We would also like to explore what types of extraction functions are viable, for example minimizing latency given a model for the CPU that considers instruction-level parallelism would essentially give the same result as simulating every possible expression.
+We want to implement existing treewidth-based extraction algorithms @fastextract @egraphcircuit and
+heuristic extraction algorithms with a good constant factor.
 
+We would also like to explore what types of extraction functions are viable, such as minimizing
+latency given an approximate OoO model of a CPU.
 
 // [analysis and visualization omitted]
 
@@ -875,17 +946,16 @@ We would also like to explore what types of extraction functions are viable, for
 
 // https://chalmers.instructure.com/courses/232/pages/work-flow-timeline-and-tasks
 
-#pagebreak()
 = Risk analysis and ethical considerations
-// Democratizing compiler
-// Proving correctness on optimizations.
 
-We do not think there are any severe ethical considerations for this project, since there are no research participants involved.
-However, the impact of the correctness of our engine is amplified by any users of it since user code correctness depends on our engine, so we need to be careful about correctness.
-One potential pitfall for us is that we implement semantics that are different from what the users expect or add unsound optimizations.
-We think the cost of our and faculty time for this project is outweighed by the research value.
+We do not think there are any severe ethical considerations for this project since there are no
+research participants involved. However, the impact of the correctness of our engine is amplified by
+any users of it since user code correctness depends on our engine, so we need to be careful about
+correctness. One potential pitfall for us is that we implement semantics that are different from
+what the users expect or add unsound optimizations. It is therefore important that we specify our
+behavior and try to statically prevent bug classes in our compiler where possible. We think the cost
+of our and faculty time for this project is outweighed by its research value.
 
-#pagebreak()
 = Time plan
 See next page.
 
@@ -899,38 +969,36 @@ See next page.
 
 #table(
   columns: (20em, 1fr, 1fr, 1fr, 1fr, 1fr, 1fr, 1fr, 1fr, 1fr, 1fr, 1fr, 1fr, 1fr, 1fr, 1fr, 1fr, 1fr, 1fr, 1fr, 1fr),
-  [ISO Week 2025],[4], [5], [6], [7], [8], [9], [10],[11], [12], [13], [14], [15], [16], [17], [18], [19], [20], [21], [22], [23],
+  [ISO Week 2025],[4], [5], [6], [7], [8],[9],[10],[11],[12],[13],[14],[15],[16],[17],[18],[19],[20],[21],[22],[23],
   [Read eqlog and egglog codebases.],
-                   x ,  e ,  e ,  e ,  e ,  e ,  e ,   e ,   e ,   e ,   e ,   e ,   e ,   e ,   e ,   e ,   e ,   e ,   e ,   e ,
+                   x ,  e ,  e ,  e ,  e , e , e ,   e ,  e ,  e ,  e ,  e ,  e ,  e ,  e ,  e ,  e ,  e ,  e ,  e ,
+  [Planning report],
+                   e ,  x ,  e ,  e ,  e , e , e ,   e ,  e ,  e ,  e ,  e ,  e ,  e ,  e ,  e ,  e ,  e ,  e ,  e ,
   [Literature study],
-                   x ,  x ,  x ,  e ,  e ,  e ,  e ,   e ,   x ,   x ,   e ,   e ,   e ,   e ,   e ,   e ,   e ,   e ,   e ,   e ,
-  [Writing seminar 1/*, 3 February w6*/],
-                   e ,  e ,  x ,  e ,  e ,  e ,  e ,   e ,   e ,   e ,   e ,   e ,   e ,   e ,   e ,   e ,   e ,   e ,   e ,   e ,
-  [Related work],
-                   e ,  e ,  x ,  e ,  e ,  e ,  e ,   e ,   e ,   e ,   e ,   e ,   e ,   e ,   e ,   e ,   e ,   e ,   e ,   e ,
-  [End-to-end working egglog compatible for most programs.],
-                   e ,  e ,  x ,  x ,  e ,  e ,  e ,   e ,   e ,   e ,   e ,   e ,   e ,   e ,   e ,   e ,   e ,   e ,   e ,   e ,
+                   x ,  x ,  x ,  e ,  e , e , e ,   e ,  x ,  x ,  e ,  e ,  e ,  e ,  e ,  e ,  e ,  e ,  e ,  e ,
+  [End-to-end working compiler compatible with egglog for most programs],
+                   e ,  e ,  x ,  x ,  x , x , e ,   e ,  e ,  e ,  e ,  e ,  e ,  e ,  e ,  e ,  e ,  e ,  e ,  e ,
   [Setup benchmarks against egglog],
-                   e ,  e ,  e ,  x ,  e ,  e ,  e ,   e ,   e ,   e ,   e ,   e ,   e ,   e ,   e ,   e ,   e ,   e ,   e ,   e ,
-  [Maybe setup benchmarks against eqlog],
-                   e ,  e ,  e , [?],  e ,  e ,  e ,   e ,   e ,   e ,   e ,   e ,   e ,   e ,   e ,   e ,   e ,   e ,   e ,   e ,
-  [Iteratively improve engine],
-                   e ,  e ,  e ,  e ,  x ,  x ,  x ,   x ,   x ,   x ,   x ,   x ,   x ,   x ,   x ,   e ,   e ,   e ,   e ,   e ,
-  [Basic formal explanation and theory.],
-                   e ,  e ,  e ,  e ,  e ,  e ,  e ,   x ,   e ,   e ,   e ,   e ,   e ,   e ,   e ,   e ,   e ,   e ,   e ,   e ,
-  [Halftime report /*w12*/],
-                   e ,  e ,  e ,  e ,  e ,  e ,  e ,   e ,   x ,   e ,   e ,   e ,   e ,   e ,   e ,   e ,   e ,   e ,   e ,   e ,
+                   e ,  e ,  e ,  e ,  x , x , e ,   e ,  e ,  e ,  e ,  e ,  e ,  e ,  e ,  e ,  e ,  e ,  e ,  e ,
+  [Setup benchmarks against eqlog, to the extent possible given semantic differences],
+                   e ,  e ,  e ,  e , [?],[?], e ,   e ,  e ,  e ,  e ,  e ,  e ,  e ,  e ,  e ,  e ,  e ,  e ,  e ,
   [Describe formal semantics of what our engine supports, and difference to eqlog and egglog.],
-                   e ,  e ,  e ,  e ,  e ,  e ,  e ,   e ,   e ,   x ,   e ,   e ,   e ,   e ,   e ,   e ,   e ,   e ,   e ,   e ,
-  [Writing seminar 2/*, 29 April w18*/],
-                   e ,  e ,  e ,  e ,  e ,  e ,  e ,   e ,   e ,   e ,   e ,   e ,   e ,   e ,   x ,   e ,   e ,   e ,   e ,   e ,
-  [Finalize report /*w23*/],
-                   e ,  e ,  e ,  e ,  e ,  e ,  e ,   e ,   e ,   e ,   e ,   e ,   e ,   e ,   e ,   x ,   x ,   e ,   e ,   e ,
-  [Presentation and opposition /*w22*/],
-                   e ,  e ,  e ,  e ,  e ,  e ,  e ,   e ,   e ,   e ,   e ,   e ,   e ,   e ,   e ,   e ,   e ,   e ,   x ,   e ,
-  [Final report submission /*w23*/],
-                   e ,  e ,  e ,  e ,  e ,  e ,  e ,   e ,   e ,   e ,   e ,   e ,   e ,   e ,   e ,   e ,   e ,   e ,   e ,   x ,
-  [ISO Week 2025],[4], [5], [6], [7], [8], [9], [10],[11], [12], [13], [14], [15], [16], [17], [18], [19], [20], [21], [22], [23],
+                   e ,  e ,  e ,  e ,  e , e , e ,   x ,  e ,  e ,  e ,  e ,  e ,  e ,  e ,  e ,  e ,  e ,  e ,  e ,
+  [Iteratively improve engine],
+                   e ,  e ,  e ,  e ,  x , x , x ,   x ,  x ,  x ,  x ,  x ,  x ,  x ,  x ,  e ,  e ,  e ,  e ,  e ,
+  [Writing seminar 1 (3 February W6)],
+                   e ,  e ,  x ,  e ,  e , e , e ,   e ,  e ,  e ,  e ,  e ,  e ,  e ,  e ,  e ,  e ,  e ,  e ,  e ,
+  [Writing seminar 2 (29 April W18)],
+                   e ,  e ,  e ,  e ,  e , e , e ,   e ,  e ,  e ,  e ,  e ,  e ,  e ,  x ,  e ,  e ,  e ,  e ,  e ,
+  [Halftime report (W12)],
+                   e ,  e ,  e ,  e ,  e , e , e ,   e ,  x ,  e ,  e ,  e ,  e ,  e ,  e ,  e ,  e ,  e ,  e ,  e ,
+  [Finalize report (W20)],
+                   e ,  e ,  e ,  e ,  e , e , e ,   e ,  e ,  e ,  e ,  e ,  e ,  e ,  e ,  x ,  x ,  e ,  e ,  e ,
+  [Presentation and opposition (TBD \~W22)],
+                   e ,  e ,  e ,  e ,  e , e , e ,   e ,  e ,  e ,  e ,  e ,  e ,  e ,  e ,  e ,  e ,  e ,  x ,  e ,
+  [Final report submission (TBD \~W23)],
+                   e ,  e ,  e ,  e ,  e , e , e ,   e ,  e ,  e ,  e ,  e ,  e ,  e ,  e ,  e ,  e ,  e ,  e ,  x ,
+  [ISO Week 2025],[4], [5], [6], [7], [8],[9],[10],[11],[12],[13],[14],[15],[16],[17],[18],[19],[20],[21],[22],[23],
 )
 ]
 
@@ -947,11 +1015,12 @@ See next page.
     [
       #align(center, text(size: 20pt, [#it.supplement #counter(heading).display()]))
     ]
+    align(center, it.body)
   } else if it.numbering != none {
-    [#counter(heading).display().]
+    [#counter(heading).display(). ]
+    it.body
   }
 
-  align(center, it.body)
   parbreak()
 }
 #counter(heading).update(0)
@@ -960,12 +1029,18 @@ See next page.
 // e-node = term = tuple in a relation
 // e-class = variabel = element of a tuple in a relation
 
-= Distributive law example <rosettaexample>
+= Distributive law example in many languages <rosettaexample>
+
+This appendix shows code implementing a rule for the distributive law, $(a + b) dot c = a dot c + b
+dot c$, in Egglog, Eqlog, Rust pseudocode and SQL pseudocode.
 
 == Egglog
-As an example, a Rule for the distributive law, $(a + b) * c = a * c + b * c$ for Egglog, Eqlog, Rust pseudocode, and SQL pseudocode.
-In egglog, a Rule is a list of premises followed by a list of actions to take when the premises match some part of the database.
-Add, Mul and Const represent tables where Add and Mul have columns for their inputs and their output and Const has a column for its value and a column for its output.
+
+In egglog, a rule is a list of premises followed by a
+list of actions to take when the premises match some part of the database. Add, Mul and Const
+represent tables where Add and Mul have columns for their inputs and their output and Const has a
+column for its value and a column for its output.
+
 ```sexp
 (sort Math)
 (function Add (Math Math) Math)
@@ -1016,7 +1091,11 @@ for (t0, c, e) in tables.mul.iter() {
 
 
 == SQL
-Since the queries are essentially database queries, we can express them as Pseudo-SQL, although the queries become quite complicated because SQL is not a great language to express both reads and writes in the same query.
+
+Since the queries are essentially database queries, we can express them as Pseudo-SQL. The queries
+become quite complicated because SQL is not a great language to express both reads and writes in the
+same query.
+
 ```sql
 -- Relevant here is that we can represent the Egraph as a table.
 -- There is no explicit "Eclass" table, the Eclass is just the relationship between rows in the database.
@@ -1024,13 +1103,11 @@ CREATE TABLE Add   ( lhs Eclass, rhs Eclass, result Eclass);
 CREATE TABLE Mul   ( lhs Eclass, rhs Eclass, result Eclass);
 CREATE TABLE Const ( num i64,                result Eclass);
 
-SET_EQUAL(e, t3) WITH
-INSERT INTO add VALUES (t1, t2, t3)
+INSERT INTO add VALUES (t1, t2, e)
 INSERT INTO mul VALUES (a, c, t1), (b, c, t2)
 JOIN (SELECT
     t1 = new_eclass(),
     t2 = new_eclass(),
-    t3 = new_eclass(),
 )
 SELECT
     Add.lhs AS a,
