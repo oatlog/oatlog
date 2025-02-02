@@ -120,7 +120,13 @@ insertions, for memory locality and instruction-level parallelism.
 
 = Background
 
-#todo([introduce the background])
+This section motivates and introduces e-graphs in more detail, describes them and the EqSat workflow
+formally, and finally giving an overview of the relevant related work and different approaches.
+
+While a lot of this section can be considered background for the planning report, as a whole it
+should probably be seen as a very early draft of the background and literature review in the final
+report. In particular, the section on formal semantics does not really make sense without a
+comparison to Egglog and Eqlog, as well as an engine of our own to specify.
 
 == E-graphs, informally
 
@@ -185,7 +191,8 @@ and SQL.
 #figure(
     image("egraph_cluster.svg", width: 60%),
     caption: [
-    The same e-graph as the bipartite-formulation, but drawing E-classes as groups of E-nodes.
+    The same e-graph as in @informal-egraph-figure, but drawing e-classes as groups of e-nodes
+    rather than as a bipartite graph.
     ]
 ) <informal-egraph-figure-non-bipartite>
 
@@ -695,8 +702,6 @@ each other.
 
 = Approach
 
-#todo[Matti: Expand what the feature set [referring to egglog] is (not just say it's similar to something in some paper)]
-
 Concretely, we will create a Rust library that takes in a set of rewrite rules in the egglog
 language and generates Rust code for an e-graph engine with the optimized rewrite rules hard-coded.
 The main focus is on optimizing the run time of the generated e-graph engine, with the time to
@@ -959,7 +964,10 @@ behavior and try to statically prevent bug classes in our compiler where possibl
 of our and faculty time for this project is outweighed by its research value.
 
 = Time plan
-See next page.
+
+See next page. Generally, we plan to use an iterative workflow with an early end-to-end working
+compiler. This provides us with time to investigate techniques for implementing the engine
+internals, as well as time to specify our semantics relatively early.
 
 #[
 #set page(flipped:true)
