@@ -742,13 +742,15 @@ Additionally, to minimize the number of indexes, rules need to be optimized glob
 Therefore, heuristics are needed, one option is to create many locally good query plans for each rule and then pick a set of query plans that minimize total number of indexes.
 A problem is that to get algorithmically optimal performance, we would need to update the constraint ordering based on the relative sizes of the tables.
 
-== Algorithmic improvements
+== Algorithmic worst-case bounds as guidance
 
-Since both worst-case optimal joins and extraction with a bounded treewidth have been shown to be
-algorithmically optimal @optimaljoin @relationalematching @fastextract @egraphcircuit, we would need
-to reformulate the problem in order to make algorithmic improvements.
-
-#todo([What is this supposed to mean?])
+Worst-case optimal joins and extraction with a bounded treewidth have been shown to have
+algorithmically optimal solutions @optimaljoin @relationalematching @fastextract @egraphcircuit.
+This means we should not focus on finding better algorithms to these same problems, but instead
+focus on
+- constant factor improvements
+- improvements on practical, average cases using heuristics
+- leveraging these component algorithms as well as possible
 
 == Merging rules
 
