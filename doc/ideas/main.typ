@@ -701,6 +701,122 @@ Since we use UF, this is provably true since the order for union does not matter
 
 IF it is sound to split a rule into the "union" part and "adding E-nodes" part, then we can apply the "union" part of every rule to every rule.
 
+= IR
+
+Kind of the IR that eqlog uses
+```rust
+struct Rule {
+    variables: UFData<VariableId, VariableInfo>,
+    premise: Vec<Premise>,
+    action: Vec<Action>,
+}
+
+enum Premise {
+    // this exist in the database.
+    // args includes the result.
+    // implicit functionality is separate rule.
+    Function {
+        id: FunctionId,
+        args: Vec<VariableId>,
+    },
+    // This variable is of this type.
+    Sort {
+        id: VariableId,
+        ty: TypeId,
+    },
+}
+
+enum Action {
+    Function {
+        id: FunctionId,
+        args: FunctionArgs,
+    },
+    Union {
+        a: VariableId,
+        b: VariableId,
+    },
+}
+```
+
+// union(a,b), union(b,c) <=> union(a,b), union(a, c)
+
+
+// "max compression" IR, recompute information if needed, always normalized.
+// ids are 0..n
+```rust
+struct Rule {
+    // variable id -> type
+    ty: Vec<TypeId>
+
+    premise: Premise,
+
+    action: Action,
+}
+impl Rule {
+    // invalidates external VariableId's
+    // batching makes it possible to add many equalites without invalidation.
+    fn unify(&mut self, x: &[(VariableId, VariableId)]);
+    fn ids(&self) -> { self.ty.len() }
+    fn surjective(&self) -> bool;
+}
+struct Premise {
+    function: HashSet<(FunctionId, Vec<VariableId>)>,
+    // mark variable as part of premise.
+    sort: HashSet<VariableId>,
+    // unify: UF<VariableId> (desugared)
+}
+// variables not mentioned in premise create new e-classes.
+struct Action {
+    function: HashSet<(FunctionId, Vec<VariableId>)>,
+    unify: UF<VariableId>,
+}
+```
+Normalization:
+- all variables mentioned, equivalent to "all unit variables removed" (pre-ir).
+- Any "unify" in premise is desugared.
+- $forall e, e in "Action.function" and e in "Premise.function"$ remove $e$ from `Action.function`
+- if a and b are equivalent in `unify`, but a or b is only mentioned in action, unify them.
+
+
+What happens to a Rule when we unify (assuming variables are truly equal)?
+- The set of things we match against is a subset of the original set.
+
+
+Rule equality:
+- for some permutation of variables.
+- premise and action matches.
+
+Premise equality:
+- for some permutation of variables.
+- premises matches.
+
+Counterargument to "apply rules to rules":
+
+```
+(rule ((= e1 (Add a b)) (= e2 (Add a b))) ((union e1 e2))
+(rule ((= e1 (Add a b)) (= e2 (Add a b))) ((union e1 e2))
+```
+
+"Applying rules to rules" will result in:
+
+
+```
+(rule ((= e (Add a b)) (= e (Add a b))) ((union e e))
+(rule ((= e (Add a b)) (= e (Add a b))) ((union e e))
+```
+which will not match anything.
+
+
+If a rule is to be applied into another rule, it needs to first be turned into an "invariant rule" so that other rules can assume that the invariant rule always holds.
+
+It is kind of a graph where nodes are sets of rules and transitions are turning rules into invariants, so some DP can be used here.
+
+Let INV(x) be turning rule x into an invariant rule and applying it to the other rules.
+
+Does INV(a) then INV(b) = INV(b) then INV(a). If so, we only need to care about the set of rules that will be turned into invariant rules.
+
+A rule being an invariant rule requires that an "eqivalent" rule exists in the final theory where we define "equivalent" to allow for merging of rules.
+
 
 = TODO READ
 Papers are just under the first author i looked at.
