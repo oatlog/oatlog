@@ -146,7 +146,7 @@ terminology of e-nodes and e-classes, e-nodes are the nodes of the graph and e-c
 equivalence classes of nodes under an equivalence relation. Nodes are annotated by what primitive
 operation they perform on their inputs, like addition or a bitshift. Unlike an actual graph, edges
 denoting inputs for use in operations, run not from nodes to nodes but rather from e-classes to
-(e-)nodes. #todo[pseudo-graph figure illustration]
+(e-)nodes. 
 
 E-graphs can also be represented as bipartite graphs with two types of nodes, e-classes and e-nodes.
 Edges run from e-nodes to e-classes denoting membership in that equivalence class, and from
@@ -167,6 +167,7 @@ Extraction, even when using a sum of static e-node costs as a cost function, is 
 are both heuristics and algorithms that work well on some types of e-graphs @fastextract.
 
 @informal-egraph-figure shows an example e-graph represented as a bipartite graph.
+@informal-egraph-figure-non-bipartite shows the same e-graph, but drawing e-classes as groups of e-nodes.
 @informal-theory-example shows an example EqSat theory specified in the egglog domain-specific
 langauge @egglog. @rosetta-table shows different terminology and relates e-graphs to relational
 databases. @rosettaexample shows an example of how a egglog rule can be transformed to eqlog, Rust,
@@ -185,11 +186,11 @@ and SQL.
 
 
 #figure(
-    image("egraph_cluster.svg", width: 99%),
+    image("egraph_cluster.svg", width: 60%),
     caption: [
-    The same e-graph as before with the "cluster interpretation".
+    The same e-graph as the bipartite-formulation, but drawing E-classes as groups of E-nodes.
     ]
-)
+) <informal-egraph-figure-non-bipartite>
 
 
 #block(breakable: false, [
@@ -328,8 +329,8 @@ side matches, add the right side to the database and unify it with the left side
 #pagebreak()
 == E-graphs, formally
 // extended version of scientific problem description
-#todo[make it more general, less egglog-ish, or introduce egglog semantics.]
-#todo[hard to understand, give more context/intuition.]
+// #todo[make it more general, less egglog-ish, or introduce egglog semantics.]
+// #todo[hard to understand, give more context/intuition.]
 
 NOTE: this section may be easier to understand by reading @relatedwork first.
 
@@ -539,9 +540,7 @@ U now stores the sets of equivalent expressions.
 
 
 === E-graphs (1980)
-
-#todo[Matti: Introduce e-graphs earlier and be more concrete, the report should be understandable for someone who has no prior knowledge on the topic]
-
+// #todo[Matti: Introduce e-graphs earlier and be more concrete, the report should be understandable for someone who has no prior knowledge on the topic]
 E-graphs are not a new concept and have been used to perform program verification and in proof
 assistants @oldegraph.
 
@@ -962,7 +961,6 @@ See next page.
 // e-class = variabel = element of a tuple in a relation
 
 = Distributive law example <rosettaexample>
-#todo[Matti: The explanation in the Appendix is useful but a good explanation should be integrated in the thesis proper (referring to previous example in appendix)]
 
 == Egglog
 As an example, a Rule for the distributive law, $(a + b) * c = a * c + b * c$ for Egglog, Eqlog, Rust pseudocode, and SQL pseudocode.
