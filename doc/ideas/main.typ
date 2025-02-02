@@ -818,6 +818,175 @@ Does INV(a) then INV(b) = INV(b) then INV(a). If so, we only need to care about 
 A rule being an invariant rule requires that an "eqivalent" rule exists in the final theory where we define "equivalent" to allow for merging of rules.
 
 
+= Semantics for optimizations
+
+In order to prove that an optimization is valid, we need to prove that two theories are equivalent, so we need some semantics.
+
+Having semantics based on exact iterations is bad because we want to run some rules more often (surjective etc).
+
+What do rules do?
+- "If rule matches the database, the actions will at some point be applied in the database in some order interleaved with actions from other rules"
+    - This means we have have some freedom to apply changes however we want.
+    - It is fine to delay implicit functionality.
+
+When do rules run?
+- user can trigger an "iteration" somehow.
+- Alternatives (are these equivalent?)
+    - "Rules run infinitely many times after infinitely many iterations" (self-stabilizing time scales)
+        - If we want to run surjective/convergent rules first.
+    - "Rules run after finitely many iterations"
+        - More understandable, finite can depend on size of e-graph, so we can still run surjective/convergent rules first.
+
+
+What Theory transformations are sound?
+- Merging rules with equivalent premises.
+    - unfortunately equivalent is maybe a property of the entire theory, and not the pair of premises
+      when applying rules to rules.
+- Applying rules to rules (equality)
+    - rules assuming functional equality to reduce variables is sound since eqlog does it?
+        - this is just applying rules to rules.
+    - if we can assume that another rule will unify variables eventually, it is sound to add that unification as a constraint to the current rule.
+        - however that means that the applied rule must still run.
+            - applying a rule to itself will just make the action and premise equal.
+            - one solution: once a rule has been applied to another rule, no other rule can be applied to it. (it becomes an invariant)
+- Normalizing a rule
+    - entry in action and premise -> delete entry in action
+    - etc
+
+
+
+= Scheduling semi-naive evaluation, what exactly is semi-naive evaluation?
+eqlog mentions that we can exploit symmetries to generate less loops.
+
+https://inst.eecs.berkeley.edu/~cs294-260/sp24/2024-02-05-datalog#semi-naive-evaluation
+
+```prolog
+edge(1, 2).
+edge(2, 3).
+edge(3, 4).
+
+path(X, Y) :- edge(X, Y).
+path(X, Z) :- edge(X, Y), path(Y, Z).
+```
+
+- `path(X, Y) :- edge(X, Y).` quickly stops adding information to the database.
+- `path(X, Z) :- edge(X, Y), path(Y, Z).` is a join of edge and path.
+
+- $R, S$ are relations,
+- $R dot S$ is their join. $Delta R$ is new tuples to $R$,
+- $R + Delta R$ is the state of the next iteration.
+- Algebraic manipulation shows that #footnote[this is so cool]:
+$ R dot S + Delta (R dot S) = (R + Delta R) dot (S + Delta S) $
+$ R dot S + Delta (R dot S) = R dot S + R dot Delta S + S dot Delta R + Delta R dot Delta S $
+$ Delta (R dot S) = R dot Delta S + S dot Delta R + Delta R dot Delta S $
+
+We only want to compute $ Delta (R dot S) $.
+
+Is the $ Delta R dot Delta S $ factor relevant here?
+
+```
+(rule ((= e (Add (Mul a c) (Mul b c)))) ((union e (Mul c (Add a b)))))
+
+if we just pretend like it's a derivative?
+
+A = Add
+B = Mul1
+C = Mul2
+
+ABC' = ABC' + AB'C + A'BC + (infinitesimal)
+
+Add * Mul1 * new(Mul2) + Add * new(Mul1) * Mul2 + new(Add) * Mul1 * Mul2
+^^^^^^^^^^^^^^^^^^^^^^   ^^^^^^^^^^^^^^^^^^^^^^
+these are actually equal because of symmetry, right?
+```
+The $ Delta R dot Delta S $ part is resolved by matching (all, all, new) instead of (old, old, new).
+
+Assuming old >> new, we can just eagerly insert new into old and keep new.
+
+HYPOTHESIS: we always want to start with the "new" part.
+- if this is false, we can use essentially the same query plan for each "delta join".
+
+```
+(a + da) * (b + db) * (c + dc)
+
+ a *  b *  c <- alredy looked at, ignore
+da *  b *  c
+ a * db *  c
+da * db *  c
+ a *  b * dc
+da *  b * dc
+ a * db * dc
+da * db * dc
+
+da *  b *  c +
+( a + da) * db *  c +
+( a + da) * ( b + db) * dc
+
+ergo:
+
+(new, old, old)
+(all, new, old)
+(all, all, new)
+```
+
+= Semi-naive symmetries
+
+If our query is Add, Add, Mul and it is isomorphic with swapping the adds, then we can remove one of the semi-naive loops.
+
+= Magic Sets
+https://inst.eecs.berkeley.edu/~cs294-260/sp24/2024-02-05-datalog#semi-naive-evaluation
+
+We want to steer the evaluation to prove a specific thing (kinda from BFS to A*).
+For example prove path(23, 42).
+
+https://inst.eecs.berkeley.edu/~cs294-260/sp24/2024-02-21-datalog-fp
+https://inst.eecs.berkeley.edu/~cs294-260/sp24/papers/functional-programming-datalog.pdf
+"Functional Programming with Datalog"
+
+Bottom-up evaluation might not terminate, for example the factorial function:
+- `fact(0, 1) -> fact(1,1) -> fact(2, 2) -> fact(3,6) -> ...(infinitely)...`
+
+Algo:
+- Compute demand patterns
+    - fact(bound, free), path(bound, bound)
+    - finding indexes-ish, but from a demand perspective.
+- Introduce demand predicates
+- Derive demand rules
+
+= Parallelism
+
+So we think that we should have 1 thread per e-graph, so no parallelism is needed?
+But assuming the queries are really expensive and we don't have an amdahl's law situation, it might not be that hard to run queries in parallel, since they do not really need to write to shared memory.
+
+This _might_ be useful for whole-program optimization using e-graphs, (or proving hard to prove things I guess?).
+
+= Merging and semi-naive evaluation
+
+`(rule ((= (Foo a) (Bar b))) (...))`
+
+Imagine that an e-class that contains Foo is merged into an e-class that contains Bar, for purposes of semi-naive-evaluation, what is actually new?
+
+If we assume our queries are "just doing database stuff" and semi-naive stuff always works, then the bit-pattern for the Foo e-node changed, so it is the new part.
+
+= Scheduling is obvious (?) once you understand semi-naive-evaluation
+
+- Rules only care about new inserts to the database.
+- They don't care when things "become equal".
+- They don't care when things are deleted.
+
++ state is ONLY (all, new), rest is "transient/temporary state"
++ (new_equalites, new_rows) = rules((all, new))
++ new_rows += invalidated_from_new_equalites()
++ all += new
++ all += new_rows
++ new = new_rows
+
+The database is never really inconsistent here, between iterations of this loop, all equality constraints are fully applied (except functional equality, crap).
+I think it is fine for functional equality to be violated, the database will eventually fix itself.
+If we make inserts detect functional equality violations, we can simply make them defer the union and only keep one copy of the two functions.
+As long as the equality information is eventually added to the database it will be fine.
+
+
 = TODO READ
 Papers are just under the first author i looked at.
 I stopped adding authors after a while since this is just too many papers.
