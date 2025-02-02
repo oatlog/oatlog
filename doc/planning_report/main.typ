@@ -183,6 +183,88 @@ and SQL.
     ]
 ) <informal-egraph-figure>
 
+
+#figure(
+    image("egraph_cluster.svg", width: 99%),
+    caption: [
+    The same e-graph as before with the "cluster interpretation".
+    ]
+)
+
+
+#block(breakable: false, [
+
+Here is an example of E-graph rules written in the egglog language.
+
+```
+(sort Math)
+(function Add (Math Math) Math)
+(function Sub (Math Math) Math)
+(function Mul (Math Math) Math)
+(function Div (Math Math) Math)
+(function Pow (Math) Math)
+(function Const (i64) Math)
+(function Var (String) Math)
+
+(rewrite (Add a b) (Add b a))
+(rewrite (Add a (Add b c)) (Add (Add a b) c))
+
+(rewrite (Mul a b) (Mul b a))
+(rewrite (Mul a (Mul b c)) (Mul (Mul a b) c))
+
+(rewrite (Mul (Add a b) c) (Add (Mul a c) (Mul b c)))
+
+(rewrite (Add x (Const 0)) x)
+(rewrite (Mul x (Const 1)) (x))
+```
+
+Math is essentially a sum type, where Add, Sub, etc are constructors. Rewrites mean that if the left
+side matches, add the right side to the database and unify it with the left side.
+
+])
+
+// == Egraph
+// An Egraph is a bipartite graph of E-nodes and E-classes.
+// There is exactly one edge from and E-node to an E-class.
+
+
+// === E-class
+// Represents a set of equivalent expressions.
+// Element in a tuple in a relation
+//
+// === E-node or Term // function?
+// Also known as "term"
+// A tuple in a row in the database.
+// Informally, refers to a specific operation, eg (Add x y)
+
+
+// === Rule
+// A rule consists of a set of Premises, Actions and Variables.
+// If the Premises hold, then the Action is executed.
+
+// === Variables
+// Variables are either referred to in Premise set or Action set.
+// A variable referred to in Premise set is Forall.
+// A variable referred to in only Action is Exists.
+
+// === Premise
+//
+//
+//
+// === Action
+// Either a Union or Tuple to be created.
+//
+// === Union
+// Make two E-classes equal.
+//
+//
+// === Primitive value
+//
+// === Primitive function
+
+
+@rosettaexample shows an example of how a egglog rule can be transformed to eqlog, Rust, and SQL.
+
 #figure(
   ```
   (sort Math)
@@ -407,7 +489,7 @@ impl UnionFind {
 }
 ```
 
-== Congruence closure algorithms (1980)
+=== Congruence closure algorithms (1980)
 // is it this: $a = b ==> f(a) = f(b)$?
 // USING: "Fast Decision Procedures Based on Congruence Closure"
 
@@ -456,10 +538,6 @@ U now stores the sets of equivalent expressions.
 
 
 
-=== Equality saturation (TODO)
-#todo[is this different from congruence closure?]
-
-
 === E-graphs (1980)
 
 #todo[Matti: Introduce e-graphs earlier and be more concrete, the report should be understandable for someone who has no prior knowledge on the topic]
@@ -475,6 +553,23 @@ There is a worst-case optimal join algorithm called generic join.
 For any variable ordering, it recursively finds the value for a variable, one at a time.
 As far as we can tell, implementing this is quite straightforward, and it is also used in egglog @relationalematching.
 Generic join performs worse in practice for some queries (has a bad constant factor), free join @freejoin1 @freejoin2 is a newly developed (2023) algorithm that unifies binary joins and generic joins.
+
+
+
+
+=== Equality saturation (2009)
+// "Equality Saturation: a New Approach to Optimization"
+// @equalitysaturation
+// "using e-graphs for rewriting programs for optimization in multiple passes until fixpoint"
+// commute under composition.
+// commutative semigroup endomorphisms
+
+In a traditional compiler there are multiple independent destructive optimization passes applied sequentially @equalitysaturation.
+Traditional compilers have the phase ordering problem where passes are not commutative, passes may unlock or inhibit other passes.
+Equality saturation is an approach where a set of of equivalent programs are created where passes add equality information and then the optimal program is selected @equalitysaturation.
+This can be implemented using E-graphs @equalitysaturation.
+
+
 
 // @optimaljoin
 // @relationalematching
