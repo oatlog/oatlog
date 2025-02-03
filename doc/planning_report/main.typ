@@ -56,8 +56,6 @@
 
 #pagebreak()
 
-#todo[introduce citations]
-
 = Introduction
 
 A traditional optimizing compiler applies optimization passes sequentially and destructively, in
@@ -436,7 +434,9 @@ e-graphs (aegraphs) that make it miss out on potential optimizations @cranelift_
 // R is the union-find datastructure?
 
 === Union-find (1964 @unionfindoriginal)
-Union-find, $"U"$ is a data structure used for efficiently merging and checking if elements belong to the same set. Initially, all sets are distinct @unionfindoriginal @fastunionfind:
+Union-find, $"U"$ is a data structure used for efficiently merging and checking if elements belong to the same set.
+This is useful when implementing an e-graph to canonicalize e-classes.
+Initially, all sets are distinct @unionfindoriginal @fastunionfind:
 - $"find"("U", v)$ returns a _representative_ element for the set that $v$ belongs to. Iff $"find"("U", u) = "find"("U", v)$ then $u$ and $v$ belong to the same set.
 - $"union"("U", u, v)$ merges#footnote[by mutating U in-place] the two sets that $u$ and $v$. After running union, $"find"("U", u) = "find"("U", v)$.
 Both operations run in almost $O(1)$.  Outside the context of e-graphs, union find is for example used to implement Kruskal's minimum spanning tree algorithm for checking if two vertices belong to different components.
@@ -479,7 +479,7 @@ Both operations run in almost $O(1)$.  Outside the context of e-graphs, union fi
 
 
 === Congruence closure algorithms (1980 @congruenceclosure)
-#todo[delete or move]
+// #todo[delete or move]
 // is it this: $a = b ==> f(a) = f(b)$?
 // USING: "Fast Decision Procedures Based on Congruence Closure"
 
@@ -489,29 +489,29 @@ This is sometimes called "canonicalization" when applied to e-graphs.
 It can be implemented using union-find.
 
 
-The congruence#footnote[congruence is essentially "considered equal"] closure problem @congruenceclosure can be defined by the following:
-- Let $G = (V, E)/*, n = |V|, m = |E|*/$ be a directed graph with ordered edges, allowing multi-edges. This represents the initial expressions.
-- Let $lambda (v)$ be the vertex label#footnote[for example Add, Sub, Mul, etc. This is to make sure that Add(a, b) is not considered the same as Mul(a, b).] for $v$.
-- Let $delta (v)$ be the vertex out-degree.
-- Let $v[i]$ be the i'th successor#footnote[successor of v means "input" to v]  of $v$.
-- Let $R$ be a relation #footnote[A relation encodes some relationship and can be seen as a set of pairs. R is basically the "union-find" datastructure.] on $V$.
-- Congruence#footnote[loosely speaking, are they the same according to R?] of u and v on R is defined by:
-  $ "congruent"(R, u, v) := lambda (u) = lambda (v) and delta (u) = delta (v) and forall i, (u[i], v[i]) in R $
-- $R$ is _closed under congruences_ iff $ forall u forall v, "congruent"(R, u, v) <==> (u, v) in R $
-- The congruence closure of R is called R' and is the minimal extension to R in order to make it closed under congruences  #footnote[So essentially, if two functions have the same input, they should have the same value.] @congruenceclosure.
-
-This can be implemented using the Union-find data structure, denoted $"U"$, by running $"merge"("U", x, y)$ for all $(x,y) in R$ @congruenceclosure
-
-`merge(U, u, v):`
-+ If $"find"("U", u) == "find"("U", v)$ return
-+ $P_u = "set of predecessors of all vertices equivalent to u according to U"$
-+ $P_v = "set of predecessors of all vertices equivalent to v according to U"$
-+ call $"union"("U", u, v)$
-+ $forall x, forall y$ such that $x in P_u and y in P_v and "find"("U", x) != "find"("U", y) and "congruent"("U", x, y)$ then call $"merge"("U", x, y)$.
-
-`congruent(U, u, v):` $delta (u) == delta (v) and forall i, "find"("U", u[i]) = "find"("U", v[i])$
-
-U now stores the sets of equivalent expressions.
+// The congruence#footnote[congruence is essentially "considered equal"] closure problem @congruenceclosure can be defined by the following:
+// - Let $G = (V, E)/*, n = |V|, m = |E|*/$ be a directed graph with ordered edges, allowing multi-edges. This represents the initial expressions.
+// - Let $lambda (v)$ be the vertex label#footnote[for example Add, Sub, Mul, etc. This is to make sure that Add(a, b) is not considered the same as Mul(a, b).] for $v$.
+// - Let $delta (v)$ be the vertex out-degree.
+// - Let $v[i]$ be the i'th successor#footnote[successor of v means "input" to v]  of $v$.
+// - Let $R$ be a relation #footnote[A relation encodes some relationship and can be seen as a set of pairs. R is basically the "union-find" datastructure.] on $V$.
+// - Congruence#footnote[loosely speaking, are they the same according to R?] of u and v on R is defined by:
+//   $ "congruent"(R, u, v) := lambda (u) = lambda (v) and delta (u) = delta (v) and forall i, (u[i], v[i]) in R $
+// - $R$ is _closed under congruences_ iff $ forall u forall v, "congruent"(R, u, v) <==> (u, v) in R $
+// - The congruence closure of R is called R' and is the minimal extension to R in order to make it closed under congruences  #footnote[So essentially, if two functions have the same input, they should have the same value.] @congruenceclosure.
+//
+// This can be implemented using the Union-find data structure, denoted $"U"$, by running $"merge"("U", x, y)$ for all $(x,y) in R$ @congruenceclosure
+//
+// `merge(U, u, v):`
+// + If $"find"("U", u) == "find"("U", v)$ return
+// + $P_u = "set of predecessors of all vertices equivalent to u according to U"$
+// + $P_v = "set of predecessors of all vertices equivalent to v according to U"$
+// + call $"union"("U", u, v)$
+// + $forall x, forall y$ such that $x in P_u and y in P_v and "find"("U", x) != "find"("U", y) and "congruent"("U", x, y)$ then call $"merge"("U", x, y)$.
+//
+// `congruent(U, u, v):` $delta (u) == delta (v) and forall i, "find"("U", u[i]) = "find"("U", v[i])$
+//
+// U now stores the sets of equivalent expressions.
 
 
 //
@@ -533,16 +533,6 @@ U now stores the sets of equivalent expressions.
 E-graphs are not a new concept and have been used to perform program verification and in proof
 assistants @oldegraph.
 
-=== Wost-case optimal joins (2012 @optimaljoin)
-
-#todo[swap order with equality saturation]
-
-A worst-case optimal join has time complexity $O("max possible output tuples")$ given the input size and query @optimaljoin.
-It has been shown that it is not possible to get a worst-case optimal join from just binary joins, so a new algorithm is needed @optimaljoin.
-There is a worst-case optimal join algorithm called generic join.
-For any variable ordering, it recursively finds the value for a variable, one at a time.
-As far as we can tell, implementing this is quite straightforward, and it is also used in egglog @relationalematching.
-However, generic join performs worse in practice for some queries where it has a bad constant factor. Free join @freejoin1 @freejoin2 is a newly developed (2023) algorithm that unifies binary and generic joins.
 
 
 === Equality saturation (2009 @equalitysaturation)
@@ -557,6 +547,14 @@ Traditional compilers have the phase ordering problem due to passes being noncom
 Equality saturation is an approach where a set of equivalent programs are created where passes add equality information and then the optimal program is selected @equalitysaturation.
 This can be implemented using E-graphs @equalitysaturation.
 
+=== Wost-case optimal joins (2012 @optimaljoin)
+
+A worst-case optimal join has time complexity $O("max possible output tuples")$ given the input size and query @optimaljoin.
+It has been shown that it is not possible to get a worst-case optimal join from just binary joins, so a new algorithm is needed @optimaljoin.
+There is a worst-case optimal join algorithm called generic join.
+For any variable ordering, it recursively finds the value for a variable, one at a time.
+As far as we can tell, implementing this is quite straightforward, and it is also used in egglog @relationalematching.
+However, generic join performs worse in practice for some queries where it has a bad constant factor. Free join @freejoin1 @freejoin2 is a newly developed (2023) algorithm that unifies binary and generic joins.
 
 // @optimaljoin
 // @relationalematching
@@ -605,15 +603,15 @@ solve the problem of quickly extracting the optimal among them. The extraction p
 instruction selection or graph covering and is NP-hard for even simple cost functions. Integer
 linear programming is typically used to extract the best expression in an e-graph.
 
-However, there were recently two independent discoveries of an algorithm that performs linear time extraction for a bounded treewidth @fastextract @egraphcircuit.
+However, there were recently two independent discoveries of an algorithm that performs linear time extraction for a #emph([bounded treewidth]) @fastextract @egraphcircuit.
 As quite a lot of algorithms that are NP-hard are polynomial for bounded treewidth, this is in some sense a standard method applied to the extraction problem.
 Informally, treewidth measures how close a graph is to a tree and can be computed from a tree decomposition of the graph.
 This algorithm is applicable in practice as e-graphs tend to have low treewidth @fastextract.
 
-As a preprocessing step, the algorithm simplifies the e-graph by treating it as a boolean circuit and simplifying it using standard techniques, slightly reducing the size of the problem.
+As a preprocessing step, the algorithm simplifies the e-graph by treating it as a boolean circuit and simplifying it using standard techniques, slightly reducing the size of the problem @egraphcircuit.
 E-nodes with zero inputs are treated as constant 1, while other e-nodes become `and` gates of all their inputs and e-classes become `or` gates of all their inputs.
-The problem is, essentially, reformulated to set the extracted e-class to 1 while removing as many gates as possible.
-There are many straightforward simplifications that the graph can be preprocessed with. For example, an `and` gate with duplicate inputs from the same node can remove one of the inputs.
+The problem is, essentially, reformulated to set the extracted e-class to 1 while removing as many gates as possible @egraphcircuit.
+There are many straightforward simplifications that the graph can be preprocessed with. For example, an `and` gate with duplicate inputs from the same node can remove one of the inputs @egraphcircuit.
 
 = Goal
 
@@ -629,8 +627,8 @@ Our goal can be further clarified by stating what we are not doing.
 - We are not concerned with performance on theoretical worst-case inputs or with proving time complexity bounds, but rather
   practical performance on practical inputs
 - We are not designing a logic programming/theory description language, instead prioritizing interoperability
-  by staying syntactically and semantically close to the egglog language.
-- We are not aiming to implement exactly all functionality present in egglog and eqlog. Specifically, we will
+  by staying syntactically and semantically close to the egglog language @egglog.
+- We are not aiming to implement exactly all functionality present in egglog @egglog and eqlog @eqlog. Specifically, we will
   not be implementing language features that do not make sense at compile time, such as printing
   current state, only running specific rules, extraction, etc. Some of these will instead move to a
   Rust API to be used at runtime.
@@ -652,7 +650,7 @@ plan to combine measuring
 - and time required for equivalent optimization as measured by specific program synthesis applications
   such as Herbie @herbie.
 
-As we aim to support theories specified in the egglog language, we can piggy-back on test cases and
+As we aim to support theories specified in the egglog language @egglog, we can piggy-back on test cases and
 applications that are already written. We aim to primarily verify correctness and benchmark by using
 the egglog test suite, supplemented with larger e-graph applications that already have
 implementations in the egglog language @egglogHerbie as an end-to-end case study in the usability
@@ -684,7 +682,7 @@ each other.
 = Approach
 
 Concretely, we will create a Rust library that takes in a set of rewrite rules in the egglog
-language and generates Rust code for an e-graph engine with the optimized rewrite rules hard-coded.
+language @egglog and generates Rust code for an e-graph engine with the optimized rewrite rules hard-coded.
 The main focus is on optimizing the run time of the generated e-graph engine, with the time to
 compile the theory into generated code being less important.  In terms of features, we are aiming to
 implement a similar feature set to egglog @egglog. That roughly includes
@@ -726,7 +724,7 @@ The rest of this section shows ideas we want to explore.
 
 == Query planning
 
-If generic join is used, a query plan is a permutation of variables and an ordering of the constraints when picking the variables @optimaljoin.
+If generic join @optimaljoin is used, a query plan is a permutation of variables and an ordering of the constraints when picking the variables.
 With some cost estimate of a query plan, exhaustive search might work only for up to 5-10 variables.
 Additionally, minimizing the number of indexes globally requires optimizing join order globally which causes a combinatorial explosion.
 Therefore, some heuristics are needed. One option is to create many locally good query plans for each rule and then pick a set of query plans that minimize the total number of indexes.
@@ -890,7 +888,7 @@ create their own by implementing some API in Rust.
 Semi-naive evaluation avoids recomputing known facts by requiring that all matches have at least one
 new/dirty bound variable. This is a great optimization, implementing using inclusion-exclusion, and
 very loosely speaking makes it $O(1)$ to generate potentially a new fact instead of $O(n)$. However,
-if it is done slightly incorrectly by marking a "new" fact as "old" too early, 
+if it is done slightly incorrectly by marking a "new" fact as "old" too early,
 some facts may never be created. Eqlog schedules by running all rules without modifying the
 database, removing rows that are now wrong due to canonicalization, and then
 inserting everything back into the database. Eglog also runs all rules that do not create new
@@ -906,7 +904,7 @@ e-graph, and ways to lower the overhead of tracking the age of database items.
 Since we are doing performance-critical code generation, we want to generate code that is easily
 reasoned about by rustc and in particular LLVM. This implies a strong benefit of static rather than
 dynamic code, to get better aliasing analysis, function inlining, etc. We must balance this with
-effective dynamism that could be useful for query planning. 
+effective dynamism that could be useful for query planning.
 
 == Extraction
 
