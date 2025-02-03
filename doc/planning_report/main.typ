@@ -39,7 +39,7 @@
 
 #outline()
 
-#locate(loc => {
+#context(loc => {
   let elems = query(selector.or(figure), loc)
   let refs = query(ref, loc)
   let missing_label = elems.filter(e => not e.has("label"))
