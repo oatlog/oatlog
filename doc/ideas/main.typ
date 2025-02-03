@@ -987,6 +987,18 @@ If we make inserts detect functional equality violations, we can simply make the
 As long as the equality information is eventually added to the database it will be fine.
 
 
+= Subsume/delete but good
+
+Subsume (disable extraction of other enodes) is bad because old enodes are still matched on and we want to get rid of them.
+Delete is bad because the facts will be rediscovered.
+
+Sublimate = delete all enodes except this one and flag it so that no new enodes evaluate to this.
+
+set high bit = do not add enodes that evaluate to this.
+
+MEASURE: How many e-nodes are in e-classes that contain a Const?
+HYPOTHESIS: It is O(1) e-nodes.
+
 = TODO READ
 Papers are just under the first author i looked at.
 I stopped adding authors after a while since this is just too many papers.
