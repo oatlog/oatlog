@@ -39,9 +39,9 @@
 
 #outline()
 
-#context(loc => {
-  let elems = query(selector.or(figure), loc)
-  let refs = query(ref, loc)
+#context {
+  let elems = query(selector.or(figure))
+  let refs = query(ref)
   let missing_label = elems.filter(e => not e.has("label"))
   if missing_label.len() > 0 {
     panic("these pages contain figures without labels:" + missing_label.map(e => str(e.location().page())).join(", "))
@@ -52,7 +52,7 @@
   if missing.len() > 0 {
     panic("Unreferenced labels: " + missing.map(str).join(", "))
   }
-})
+}
 
 #pagebreak()
 
