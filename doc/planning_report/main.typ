@@ -48,27 +48,27 @@ such a way that earlier passes may perform rewrites that both unlock and inhibit
 later. The unlocking aspect is traditionally partially handled by running important passes multiple
 times, interleaved with others, but this is computationally inefficient and does not address the
 inherent order dependence of destructive rewrites. This is called the phase ordering problem.
-Additionally, ad-hoc passes implemented as arbitrary transforms on the compiler's intermediate
-representation are difficult to model formally and to prove correct.
+Additionally, ad-hoc passes, implemented as arbitrary transforms on the compiler's intermediate
+representation, are difficult to model formally and to prove correct.
 
 The unlocking half of the issue can be avoided by replacing global rewrite passes with local
 rewrites. These local rewrites can be expressed within some framework that tracks dependencies and
-thus incrementally applies them until reaching a fix point. This avoids the computational
+thus incrementally applies them until reaching a fixpoint. This avoids the computational
 inefficiency of having to reprocess the entire code with repeated passes, while at the same time not
 missing rewrites unlocked by other rewrites. This is called peephole rewriting and it lets us apply
 monotonic rewrites to improve the program #footnote[Sea of Nodes is a compiler IR design that
 represents both data flow and control flow as expressions with no side effects, making it especially
 suited to peephole rewriting @son.]. At the same time, an optimization paradigm based on algebraic
-rewrites eases formally modelling programs and proving the correctness of optimizations.
+rewrites eases formally modeling programs and proving the correctness of optimizations.
 
 Peephole rewriting does however not avoid the issue of destructive rewrites being order-dependent in
 the face of multiple potentially good but mutually incompatible rewrites. Since one rewrite can
 unlock other beneficial rewrites later, one cannot select them greedily. This could be handled with a
-slow backtracking search, but most compilers instead do this heuristically.
+slow backtracking search, but most compilers do this heuristically instead.
 
 E-graphs and equality saturation (EqSat) are techniques that can be used to augment peephole
 rewriting to make it nondestructive. They allow multiple rewrites of a value, committing to one only
-after all rewrites have been searched while not duplicating work post-branch like a backtracking
+after all rewrites have been searched while not duplicating work post-branch as a backtracking
 search would.
 
 E-graphs are data structures capable of compactly representing an exponential number of expressions
@@ -81,23 +81,22 @@ subexpressions.
 
 A general workflow involves an e-graph initialized with a set of expressions representing facts or
 computations, and rewrite rules corresponding to logical deductions or optimizations respectively
-are applied until reaching a fix point or some other criteria is met. Rewrite rules pattern match on
+are applied until reaching a fixpoint or until some other criterion is met. Rewrite rules pattern match on
 the existing e-graph and perform actions such as inserting new e-nodes and equating existing e-nodes
 (and hence their e-classes). When e-graphs are used for program synthesis or optimization, rather
 than automated theorem proving, a workflow called equality saturation (EqSat) @equalitysaturation,
 there is then a final extraction phase where some procedure selects from the e-graph globally
 optimized expressions equivalent to the initial ones.
 
-Even though it is reduced through efficient deduplication, e-graphs still suffer from the resulting
-combinatorial explosion from trying to find every equivalent representation of the initial
-expression. This is a major problem in practice and currently severely limits what applications they
-are suitable for. While we have chosen optimizing compilers as illustration of their usefulness,
+E-graphs suffer from the
+combinatorial explosion resulting from trying to find every equivalent representation of the initial
+expression, despite it being reduced through their efficient deduplication. This is a major problem in practice and currently severely limits what applications e-graphs
+are suitable for. While we have chosen optimizing compilers to illustrate their usefulness,
 e-graphs were originally developed for automated theorem proving @oldegraph @egraphwithexplain.
-E-graphs have been used for for example synthesis of low-error floating point expressions @herbie
-and optimization of linear algebra expressions @spores, but are absent from general-purpose
-compilers. In fact, the compiler backend Cranelift @cranelift is the only production compiler for
+E-graphs have been used for synthesis of low-error floating point expressions @herbie, optimization of linear algebra expressions @spores, and more, but are absent from general-purpose
+compilers. The compiler backend Cranelift @cranelift is the only production compiler for
 general-purpose code we know of that has incorporated e-graphs, but it has done so in the weaker
-form of acyclic e-graphs due to performance problems of full e-graphs.
+form of acyclic e-graphs (aegraphs) due to performance problems of full e-graphs.
 
 Our thesis aims to contribute to faster e-graphs for EqSat, which would speed up many applications
 and bring EqSat for general-purpose compilers closer to being feasible.
@@ -130,7 +129,7 @@ sense without a comparison to Egglog and Eqlog, as well as an engine of our own 
 
 == E-graphs, informally
 
-E-graphs are motivated by the observation that expression directed acyclic graphs (DAGs) can
+E-graphs are motivated by the observation that directed acyclic graphs (DAGs) of expressions can
 efficiently represent a nested expression with a common subexpression, like say $f(g(x), g(x))$, as
 well as multiple expressions sharing a common subexpression, like say $f(g(x))$ and $h(g(x))$), but
 they can not efficiently deduplicate multiple identical consumers of different inputs, such as
@@ -139,16 +138,15 @@ theorem proving purposes as these activities will create many similar expression
 
 One could address the deduplication problem by introducing a function-like abstraction, but this
 would still require some at least constant-sized top-level bookkeeping per expression. In the
-specific case of local equality-preserving rewrites however, it makes sense to instead introduce a
-notion of e-classes of equal e-nodes, that operations/e-nodes refer to rather than referring to
-subexpressions/other e-nodes directly. This allows an e-graph to represent an exponential number of
+specific case of local equality-preserving rewrites, however, it makes sense to instead introduce a
+notion of e-classes of equal e-nodes that e-nodes refer to rather than referring to other e-nodes directly. This allows an e-graph to represent an exponential number of
 equivalent expressions, parameterized by mappings from e-class to e-node.
 
 E-graphs can be represented as graphs in multiple ways. In one formulation, hinted at by the
 terminology of e-nodes and e-classes, e-nodes are the nodes of the graph and e-classes are
 equivalence classes of nodes under an equivalence relation. Nodes are annotated by what primitive
 operation they perform on their inputs, like addition or a bitshift. Unlike an actual graph, edges
-denoting inputs for use in operations, run not from nodes to nodes but rather from e-classes to
+denoting inputs for use in operations run, not from nodes to nodes, but rather from e-classes to
 (e-)nodes.
 
 E-graphs can also be represented as bipartite graphs with two types of nodes, e-classes and e-nodes.
@@ -157,7 +155,7 @@ e-classes to e-nodes denoting being used as input in the e-node's operation. Ope
 are ordered from the point of view of the operation since not all operations are commutative.
 Finally, every e-node is a member of exactly one e-class and no e-class is empty.
 
-Rewrite rules look for subgraph "patterns" and add new e-classes and e-nodes, and join existing
+Rewrite rules look for subgraph "patterns", then once these match add new e-classes and e-nodes and join existing
 e-classes by vertex contraction. EqSat involves repeatedly applying a set of rewrite rules, then
 finally performing extraction, i.e. determining canonical e-nodes for respective e-classes such that
 the implied DAG of e-nodes has some minimal cost.
@@ -172,8 +170,8 @@ are both heuristics and algorithms that work well on some types of e-graphs @fas
 @informal-egraph-figure shows an example e-graph represented as a bipartite graph.
 @informal-egraph-figure-non-bipartite shows the same e-graph, but drawing e-classes as groups of e-nodes.
 @informal-theory-example shows an example EqSat theory specified in the egglog domain-specific
-langauge @egglog. @rosetta-table shows different terminology and relates e-graphs to relational
-databases. @rosettaexample shows an example of how a egglog rule can be transformed to eqlog, Rust,
+language @egglog. @rosetta-table shows different terminology and relates e-graphs to relational
+databases. @rosettaexample shows how an egglog rule can be transformed to eqlog, Rust,
 and SQL.
 
 #figure(
@@ -183,7 +181,7 @@ and SQL.
     The oval shapes are e-classes, representing a set of equivalent expressions, with incoming edges
     denoting e-node members.
     The rectangle shapes are e-nodes, which have e-classes as arguments.
-    The orange colored edges and shapes are those added due to the applied rules.
+    The orange-colored edges and shapes are those added due to the applied rules.
     ]
 ) <informal-egraph-figure>
 
@@ -198,7 +196,7 @@ and SQL.
 
 // == Egraph
 // An Egraph is a bipartite graph of E-nodes and E-classes.
-// There is exactly one edge from and E-node to an E-class.
+// There is exactly one edge from each E-node to an E-class.
 
 
 // === E-class
@@ -235,9 +233,6 @@ and SQL.
 //
 // === Primitive function
 
-
-@rosettaexample shows an example of how a egglog rule can be transformed to eqlog, Rust, and SQL.
-
 #figure(
   ```
   (sort Math)
@@ -267,7 +262,7 @@ and SQL.
     etc are constructors. Rewrites mean that if the left side matches, add the right side to the
     database and unify it with the left side. Egglog semantics define running a set of rules as
     using their left side patterns to figure out what right side actions to perform, then doing all
-    actions as a batch. Egglog defines a command `run <count>`, not shown here, than runs the set of
+    actions as a batch. Egglog defines a command `run <count>`, not shown here, that runs the set of
     all rules some number of times or until convergence.
 
   ],
@@ -295,7 +290,7 @@ and SQL.
     [sort], [type], [],
     [e.g. `Math`],
   ),
-  caption: [Comparison of egglog, eqlog and relational database terminology.]
+  caption: [Comparison of egglog, eqlog, and relational database terminology.]
 ) <rosetta-table>
 
 == E-graphs, formally
@@ -333,7 +328,7 @@ An e-graph, $E$ defines the following operations @egg #footnote[this is one of m
 - $"find"(E, a)$ returns the canonical e-class id for the e-class id a @egg.
 - $"ematch"(E, p)$ performs e-matching on pattern p containing placeholder variables returning a list of tuples $(sigma, c)$, where $sigma$ is the variable substitutions and c is the root e-class id @egg.
 
-Using these operations, rewrites on the e-graph can be implemented by first calling ematch and then add and union.
+Using these operations rewrites on the e-graph can be implemented by first calling ematch and then add and union.
 
 To check if two expressions are equal in the e-graph, both can be added and their e-classes compared using their canonical e-class ids from find.
 
@@ -380,8 +375,8 @@ Minimal cost extraction for functions like this is NP-hard by reduction from MIN
 === Primitives, Collections and Primitive Functions.
 Primitives represent a specific value instead of a set of equivalent expressions.
 Collections are Primitives that can contain e-classes (for example `Set<Math>`) and Primitive Functions are Functions from Primitives to Primitives.
-A key property of primitives is that they can not be unified/merged, unless the values are the same.
-While Collections can not be merged, they can become equal when the e-classes that they contain are unified.
+A key property of primitives is that they can not be unified/merged unless the values are the same.
+While Collections can not be merged, they can become equal when the e-classes they contain are unified.
 It is unclear if they have a solid theoretical foundation, as papers for egg @egg nor egglog @egglog barely mention them or go into any depth. This is discussed more in @primitiveimpl.
 
 
@@ -407,7 +402,7 @@ e-graphs (aegraphs) that make it miss out on potential optimizations @cranelift_
 // $ f(a,b) = a ==> f(f(a,b),b) = a $
 // $ f(a) = a ==> f(f(f(f(f(a))))) = a $
 // #quote[
-// this is reducible to constructing the "congruence closure" of a relation on a graph.
+// This is reducible to constructing the "congruence closure" of a relation on a graph.
 // ]
 // Computing the congruence closure
 //
@@ -426,10 +421,10 @@ e-graphs (aegraphs) that make it miss out on potential optimizations @cranelift_
 // R is the union-find datastructure?
 
 === Union-find (1964)
-Union-find, $"U"$ is a data structure used for efficiently merging and checking if elements belong to the same set. Initially all sets are distinct @unionfindoriginal @fastunionfind:
+Union-find, $"U"$ is a data structure used for efficiently merging and checking if elements belong to the same set. Initially, all sets are distinct @unionfindoriginal @fastunionfind:
 - $"find"("U", v)$ returns a _representative_ element for the set that $v$ belongs to. Iff $"find"("U", u) = "find"("U", v)$ then $u$ and $v$ belong to the same set.
 - $"union"("U", u, v)$ merges#footnote[by mutating U in-place] the two sets that $u$ and $v$. After running union, $"find"("U", u) = "find"("U", v)$.
-Both operations run in almost $O(1)$ and outside the context of e-graphs, one use is when implementing Kruskal's minimum spanning tree algorithm for checking if two vertices belong to different points.
+Both operations run in almost $O(1)$.  Outside the context of e-graphs, union find is for example used to implement Kruskal's minimum spanning tree algorithm for checking if two vertices belong to different components.
 
 #figure(
     ```rust
@@ -439,7 +434,7 @@ Both operations run in almost $O(1)$ and outside the context of e-graphs, one us
     impl UnionFind {
         fn new(n: usize) -> Self {
             Self {
-                // each set points to itself.
+                // each set points to itself
                 representative: (0..n).collect(),
             }
         }
@@ -460,7 +455,7 @@ Both operations run in almost $O(1)$ and outside the context of e-graphs, one us
     }
     ```,
     caption: [
-        This is how union-find can be implemented. Note that this simplified, so this code does not have $approx
+        This is how union-find can be implemented. Note that this is simplified, so this code does not have $approx
         O(1)$ complexity for union and find. Real implementations use path compression and smaller-to-larger
         merging to achieve that.
     ]
@@ -478,11 +473,11 @@ It can be implemented using union-find.
 
 
 The congruence#footnote[congruence is essentially "considered equal"] closure problem @congruenceclosure can be defined by the following:
-- Let $G = (V, E)/*, n = |V|, m = |E|*/$ be a directed graph with ordered edges, allowing for multi-edges. This represents the initial expressions.
+- Let $G = (V, E)/*, n = |V|, m = |E|*/$ be a directed graph with ordered edges, allowing multi-edges. This represents the initial expressions.
 - Let $lambda (v)$ be the vertex label#footnote[for example Add, Sub, Mul, etc. This is to make sure that Add(a, b) is not considered the same as Mul(a, b).] for $v$.
 - Let $delta (v)$ be the vertex out-degree.
 - Let $v[i]$ be the i'th successor#footnote[successor of v means "input" to v]  of $v$.
-- Let $R$ be a relation #footnote[a relation encodes some relationship, it is essentially a set of pairs. R is basically the "union-find" datastructure.] on $V$.
+- Let $R$ be a relation #footnote[A relation encodes some relationship and can be seen as a set of pairs. R is basically the "union-find" datastructure.] on $V$.
 - Congruence#footnote[loosely speaking, are they the same according to R?] of u and v on R is defined by:
   $ "congruent"(R, u, v) := lambda (u) = lambda (v) and delta (u) = delta (v) and forall i, (u[i], v[i]) in R $
 - $R$ is _closed under congruences_ iff $ forall u forall v, "congruent"(R, u, v) <==> (u, v) in R $
@@ -521,16 +516,14 @@ U now stores the sets of equivalent expressions.
 E-graphs are not a new concept and have been used to perform program verification and in proof
 assistants @oldegraph.
 
-=== Wost-case optimal joins (pre-print 2012, published 2018)
+=== Worst-case optimal joins (pre-print 2012, published 2018)
 
-A wost-case optimal join is $O("max possible output tuples")$ given the input size and query @optimaljoin.
-It has been shown that it is not possible to get a wost-case optimal join from just binary joins, so a new algorithm is needed @optimaljoin.
+A worst-case optimal join has time complexity $O("max possible output tuples")$ given the input size and query @optimaljoin.
+It has been shown that it is not possible to get a worst-case optimal join from just binary joins, so a new algorithm is needed @optimaljoin.
 There is a worst-case optimal join algorithm called generic join.
 For any variable ordering, it recursively finds the value for a variable, one at a time.
 As far as we can tell, implementing this is quite straightforward, and it is also used in egglog @relationalematching.
-Generic join performs worse in practice for some queries (has a bad constant factor), free join @freejoin1 @freejoin2 is a newly developed (2023) algorithm that unifies binary joins and generic joins.
-
-
+However, generic join performs worse in practice for some queries where it has a bad constant factor. Free join @freejoin1 @freejoin2 is a newly developed (2023) algorithm that unifies binary and generic joins.
 
 
 === Equality saturation (2009)
@@ -540,11 +533,10 @@ Generic join performs worse in practice for some queries (has a bad constant fac
 // commute under composition.
 // commutative semigroup endomorphisms
 
-In a traditional compiler there are multiple independent destructive optimization passes applied sequentially @equalitysaturation.
-Traditional compilers have the phase ordering problem where passes are not commutative, passes may unlock or inhibit other passes.
-Equality saturation is an approach where a set of of equivalent programs are created where passes add equality information and then the optimal program is selected @equalitysaturation.
+In a traditional compiler, multiple independent destructive optimization passes are applied sequentially @equalitysaturation.
+Traditional compilers have the phase ordering problem due to passes being noncommutative when they unlock or inhibit other passes.
+Equality saturation is an approach where a set of equivalent programs are created where passes add equality information and then the optimal program is selected @equalitysaturation.
 This can be implemented using E-graphs @equalitysaturation.
-
 
 
 // @optimaljoin
@@ -552,13 +544,13 @@ This can be implemented using E-graphs @equalitysaturation.
 === Egg (2021)
 
 Egg @egg is an e-graph implementation where each rule is attempted to be matched against the entire
-database. The rewrites are performed in batches, meaning all rules are applied and then the database
+database. The rewrites are performed in batches, meaning first all rules are applied and then the database
 invariants are fixed.
 
 
 === Relational e-matching (2022)
 
-E-matching finds a set of terms matching a particular pattern, for example $"Add"("Mul"(a, c), "Mul"(b, c))$.
+E-matching finds a set of terms matching a particular pattern such as $"Add"("Mul"(a, c), "Mul"(b, c))$.
 For egg, the evaluation is top-down, so something like:
 ```rust
 for (t0, t1, e) in add(*) {
@@ -580,8 +572,8 @@ Implementing e-matching as a relational query is algorithmically more efficient 
 Egglog @egglog and eqlog @eqlog are simultaneous independent discoveries of a unification between
 e-graphs and datalog. This yields a vastly improved computational complexity in comparison to egg,
 by allowing adding indices per node type and matching rewrite rules incrementally against only parts
-of the graph that have changed. A notable difference between them is that egglog focuses on
-useability and has a dynamic REPL-style interface while eqlog is designed to be embedded into
+of the graph that have changed. A notable difference between the two is that egglog focuses on
+useability and has a dynamic REPL-style interface. Eqlog, on the other hand, is designed to be embedded into
 programs and processes rules at compile time.
 
 The egglog paper has a benchmark showing approximately a million e-nodes per second, improving from
@@ -594,17 +586,15 @@ solve the problem of quickly extracting the optimal among them. The extraction p
 instruction selection or graph covering and is NP-hard for even simple cost functions. Integer
 linear programming is typically used to extract the best expression in an e-graph.
 
-However, it was independently discovered that linear time extraction is possible for a bounded treewidth @fastextract @egraphcircuit.
-Quite a lot of algorithms that are NP-hard, are polynomial for a bounded treewidth, so in this sense it is essentially a standard method applied to the extraction problem, in this case the complexity is $O(n * f("treewidth"))$
-Informally, treewidth is a measure of how close a graph is to a tree, and can be computed from a tree decomposition of the graph.
-Generally, e-graphs tend to have a low treewidth, so this algorithm tends to applicable to practical egraphs.
-This is somewhat intuitive when considering that only expressions that were already somewhat similar tend to get unified, so the e-graph is never really that random.
+However, there were recently two independent discoveries of an algorithm that performs linear time extraction for a bounded treewidth @fastextract @egraphcircuit.
+As quite a lot of algorithms that are NP-hard are polynomial for bounded treewidth, this is in some sense a standard method applied to the extraction problem.
+Informally, treewidth measures how close a graph is to a tree and can be computed from a tree decomposition of the graph.
+This algorithm is applicable in practice as e-graphs tend to have low treewidth @fastextract.
 
-As a preprocessing step, the algorithm simplifies the egraph by treating it as a boolean circuit and simplifying it using standard techniques to slightly reduce the size of the problem.
-The e-nodes with zero inputs become a constant 1.
-E-nodes become `and` gates of all their inputs and e-classes become `or` gates of all their inputs.
-The problem is essentially to set the extracted e-class to 1 while removing as many gates as possible.
-There are many straightforward simplifications that can be done to the graph, for example, an `and` gate with duplicate inputs from the same node can remove one of the inputs.
+As a preprocessing step, the algorithm simplifies the e-graph by treating it as a boolean circuit and simplifying it using standard techniques, slightly reducing the size of the problem.
+E-nodes with zero inputs are treated as constant 1, while other e-nodes become `and` gates of all their inputs and e-classes become `or` gates of all their inputs.
+The problem is, essentially, reformulated to set the extracted e-class to 1 while removing as many gates as possible.
+There are many straightforward simplifications that the graph can be preprocessed with. For example, an `and` gate with duplicate inputs from the same node can remove one of the inputs.
 
 = Goal
 
@@ -619,7 +609,7 @@ Our goal can be further clarified by stating what we are not doing.
 - We are not applying e-graphs to solve a specific problem, but rather improving e-graph technology itself
 - We are not concerned with performance on theoretical worst-case inputs or with proving time complexity bounds, but rather
   practical performance on practical inputs
-- We are not designing a logic programming / theory description language, instead prioritizing interoperability
+- We are not designing a logic programming/theory description language, instead prioritizing interoperability
   by staying syntactically and semantically close to the egglog language.
 - We are not aiming to implement exactly all functionality present in egglog and eqlog. Specifically, we will
   not be implementing language features that do not make sense at compile time, such as printing
@@ -628,7 +618,7 @@ Our goal can be further clarified by stating what we are not doing.
 - We are not sacrificing expressive power in the name of performance, as Cranelift's aegraphs @acyclic_egraphs
   do
 - We are not writing an interpreter or considering non-EqSat workflows, and can therefore assume all rules are
-  known up front
+  known upfront
 - We are not doing distributed (multi-node) computations or GPU computations, but rather CPU computation with
   any (non-instruction-level) parallelism being shared-memory.
 
@@ -650,14 +640,14 @@ implementations in the egglog language @egglogHerbie as an end-to-end case study
 and performance of our engine.
 
 //#todo[Matti: Please explain thoroughly what kind of environment you are using for running the
-// experiments (both hardware and software) (reproduceability, hardware/software, nix)]
+// experiments (both hardware and software) (reproducibility, hardware/software, nix)]
 
 == Environment
 
 We will be using the nix @nix package manager and build system to reproducibly specify our software
 environment alongside our source code in the same repository, which we additionally will open
 source. We expect our dependencies to be roughly
-- a x86_64 system running a recent Linux kernel
+- an x86_64 system running a recent Linux kernel
 - nix
 - a Rust toolchain
 - profiling tools such as perf @perf
@@ -667,7 +657,7 @@ Crucially we do not expect to rely on external solvers, we do not expect to inco
 and we expect the performance of our e-graph engine to rely almost entirely on our code and the Rust
 toolchain.
 
-We will be using our personal computers to run the benchmarks, with exact hardware specified in the
+We will be using our personal computers to run the benchmarks, with the exact hardware specified in the
 final thesis. Relevant hardware components include processor and memory, but due to factors like
 cooling and microcode updates the final benchmarks will ultimately only be relevant in relation to
 each other.
@@ -677,11 +667,11 @@ each other.
 Concretely, we will create a Rust library that takes in a set of rewrite rules in the egglog
 language and generates Rust code for an e-graph engine with the optimized rewrite rules hard-coded.
 The main focus is on optimizing the run time of the generated e-graph engine, with the time to
-compile the theory into generated code being less important.  In terms of features we are aiming to
+compile the theory into generated code being less important.  In terms of features, we are aiming to
 implement a similar feature set to egglog @egglog. That roughly includes
 - Declaring sorts
 - Declaring functions
-- Defining rules that match e-nodes using premises and apply actions
+- Defining rules that match e-nodes using premises and that apply actions
 - Premises that implicitly declare e-class variables and constrain those variables by requiring
   e-nodes using those e-classes
 - Actions that add e-nodes, create new e-classes and unify existing e-classes
@@ -715,18 +705,18 @@ The rest of this section shows ideas we want to explore.
 
 == Query planning
 
-If generic join is used, a query plan is a permutation of variables, and an ordering of the constraints when picking the variables.
-With some cost estimate of a query plan, exhaustive search might work for up to 5-10 variables.
-Additionally, to minimize the number of indexes, rules need to be optimized globally, meaning we have a combinatorial explosion.
+If generic join is used, a query plan is a permutation of variables and an ordering of the constraints when picking the variables.
+With some cost estimate of a query plan, exhaustive search might work only for up to 5-10 variables.
+Additionally, minimizing the number of indexes globally requires optimizing join order globally which causes a combinatorial explosion.
 
-Therefore, heuristics are needed, one option is to create many locally good query plans for each rule and then pick a set of query plans that minimize total number of indexes.
+Therefore, some heuristics are needed. One option is to create many locally good query plans for each rule and then pick a set of query plans that minimize the total number of indexes.
 A problem is that to get algorithmically optimal performance, query plans need to be dynamic depending on the relative sizes of tables at runtime.
 
 == Algorithmic worst-case bounds as guidance
 
-Worst-case optimal joins and extraction with a bounded treewidth have been shown to have
+Worst-case optimal joins and extraction with bounded treewidth have been shown to have
 algorithmically optimal solutions @optimaljoin @relationalematching @fastextract @egraphcircuit.
-This means we should not focus on finding better algorithms to these same problems, but instead
+This means we should not focus on finding better algorithms for these same problems, but instead
 focus on
 - constant factor improvements
 - improvements on practical, average cases using heuristics
@@ -753,8 +743,7 @@ This essentially involves creating a trie of all rules after deciding their quer
 
 == Eagerly applying rules
 
-Rules can be removed without changing the theory semantics if other rules can be adapted to
-additionally have the effect of the first rule. This shows up for example when having rules that
+Rules can be removed without changing the theory semantics if other rules can be adapted to have the effect of the first rule. This shows up for example when having rules that
 insert something for every instance of a sort or match on a single function. The following are such
 examples:
 
@@ -765,23 +754,22 @@ examples:
 (function Mul (Math Math) Math)
 
 (relation LessOrEqual (Math Math))
-(rule ((x)) ((LessOrEqual x x))) ; Apply when new Math e-class created
+(rule ((x)) ((LessOrEqual x x))) ; Apply when a new Math e-class created
 
 (function UpperBound (Math) i64 :merge (min old new))
-(rule ((x)) ((UpperBound x i64::MAX))) ; Apply when new Math e-class created
+(rule ((x)) ((UpperBound x i64::MAX))) ; Apply when a new Math e-class created
 
 (function evals-to (Math) i64 :no-merge)
 (rule ((= e Const x)) ((evals-to x)) ; Apply when a Const is created.
 ```
 
-These rules can be elided from all EqSat iterations aside from the first one, if any rules creating
+These rules can be elided from all EqSat iterations aside from the first if any rules creating
 new `Math` e-classes or `Const` e-nodes also perform the actions specified in these rules.
 
 == Special case handling of rules
-// Some rules do not really add any information to the database, for example, consider the following:
 
-It is very common for rules to simply express that some function is associative, or commutative,
-transitive etc. We can use that information to optimize for common patterns. For example for
+It is common for rules to express that some function is associative, commutative,
+transitive, etc. We can use that information to optimize for common patterns. For example for
 transitivity:
 
 ```
@@ -793,7 +781,7 @@ The problem with this rule is that it generates $O(n^2)$ e-classes for $O(n)$ fa
 e-node for all pairs. The engine could disable that rule and instead check if there is a path
 between the two e-classes. This is more expensive when just checking if `(LessThan x y)`, but
 indexing for a known `x` and unknown `y` does not add any extra cost, since it is essentially a BFS.
-Additionally, more advanced data structures could possibly speed this up further.
+Additionally, more advanced data structures could speed this up further.
 
 // Associative: (rewrite (F (F x y) z) (F x (F y z)))
 //
@@ -828,17 +816,17 @@ Additionally, more advanced data structures could possibly speed this up further
 
 == Indexing data structures
 
-In a typical database, there is only a single primary key, not that many indexes, and the indexes
+In a typical database, there is only a single primary key, not that many indices and the indices
 that exist are for an exact set of columns. But for typical queries on an e-graph, essentially
 everything needs to be indexed. With many b-tree sets storing column-permuted rows of a table, each
 b-tree acts as an index for each prefix of that permutation. Since eqlog uses b-tree sets for
 indexes, we are fairly confident that it will work reasonably well, but we also want to explore
-other options. For example, a trie has the same asymptotic runtime, but uses less memory if there
+other options. For example, a trie has the same asymptotic runtime but uses less memory if there
 are many long shared prefixes.
 
 == General profiling and understanding of how e-graphs behave
 
-We would like to get a better understanding of how e-graphs typically behave, regarding factors
+We want to get a better understanding of how e-graphs typically behave, regarding factors
 like:
 - How quickly do they tend to grow per application of a rule?
 - What is the ratio between the number of e-classes and e-nodes?
@@ -846,10 +834,10 @@ like:
 
 == Implementing Primitives and Primitive Functions <primitiveimpl>
 
-A key difference between eqlog and egglog is that egglog has support for primitives and collections.
+A key difference between eqlog and egglog is that egglog supports primitives and collections.
 Simple primitives like integers are mostly straightforward to implement. They are like e-classes
 that can not be merged, and can be refered to by a literal bit-pattern rather than an abstract id.
-Collections however, like lists or sets, are harder since they can not be merged directly but they
+Collections such as lists and sets, however, are harder since they can not be merged directly but they
 can be implicitly merged if the e-classes that they contain are unified.
 
 Primitive functions are also a bit strange. Consider for example
@@ -857,7 +845,7 @@ Primitive functions are also a bit strange. Consider for example
 fn add(i64, i64) -> i64;
 ```
 
-This is essentially a (practically) infinite table, or non-partial Function that is only indexed on
+This is essentially a (practically) infinite table, a non-partial Function indexed on only
 the two inputs. But what happens if we allow adding more indexes, such as an index for finding one
 of the arguments given the result and one of the arguments?
 
@@ -865,41 +853,39 @@ of the arguments given the result and one of the arguments?
 fn add((/* known */), (/* unknown */)) -> (/* known */);
 ```
 
-Obviously, this is just subtraction which a user could just write for themselves, but for the
+Obviously, this is just subtraction which a user could write for themselves, but for the
 backend this opens up more possible query plans.
 
 We find primitive collections to be conceptually complex, but to give an idea of how this could be
-utilized, we could have interesting queries like "what sets contains this element", "what multisets
-have 3 copies of something", etc. These are not actually implementable since the query results would
+utilized, we could have interesting queries like "What sets contain this element?", "What multisets
+have 3 copies of something?", etc. These are not actually implementable since the query results would
 be infinite, but if constrained to only return previously constructed values this becomes possible
 to query and even index on.
 
-Ideally, we would want to implement primitives and primitive functions in a way that users can
-create their own by writing some Rust code implementing some API.
+Ideally, we would want to implement primitives and primitive functions in a way that lets users create their own by writing some Rust code that implements some API.
 
 == Scheduling
 
 Semi-naive evaluation avoids recomputing known facts by requiring that all matches have at least one
 new/dirty bound variable. This is a great optimization, implementing using inclusion-exclusion, and
 very loosely speaking makes it $O(1)$ to generate potentially a new fact instead of $O(n)$. However,
-if it is done slightly incorrectly by marking a "new" fact as "old" too early, it is possible that
-  some facts will never be created. Eqlog schedules by running all rules without modifying the
-  database, removing rows in the database that are now wrong due to canonicalization and then
+if it is done slightly incorrectly by marking a "new" fact as "old" too early,
+some facts may never be created. Eqlog schedules by running all rules without modifying the
+  database, removing rows that are now wrong due to canonicalization, and then
   inserting everything back into the database. Eglog also runs all rules that do not create new
   e-classes until closure before running any rules that create e-classes. The motivation for this is
   that without creating e-classes, the size of the database is limited, and equal e-classes will be
   unified faster.
 
 Generally, we want to investigate ways to run rules differently often based on how they affect the
-e-graph, and ways to lower the overhead of tracking ages of database items.
+e-graph, and ways to lower the overhead of tracking the age of database items.
 
 == Code generation
 
 Since we are doing performance-critical code generation, we want to generate code that is easily
 reasoned about by rustc and in particular LLVM. This implies a strong benefit of static rather than
-dynamic code, to get better aliasing analysis, function inlining etc. We must balance this with
-effective dynamism that could be useful for things such as query planning. Profiling our code guides
-us here.
+dynamic code, to get better aliasing analysis, function inlining, etc. We must balance this with
+effective dynamism that could be useful for query planning. Profiling will guide such decisions.
 
 == Extraction
 
@@ -930,17 +916,17 @@ latency given an approximate OoO model of a CPU.
 
 = Risk analysis and ethical considerations
 
-We do not think there are any severe ethical considerations for this project since there are no
-research participants involved. However, the impact of the correctness of our engine is amplified by
-any users of it since user code correctness depends on our engine, so we need to be careful about
+We do not think there are any severe ethical considerations for this project since no
+research participants are involved. However, the impact of the correctness of our engine is amplified by
+any users since user code correctness depends on our engine, so we need to be careful about
 correctness. One potential pitfall for us is that we implement semantics that are different from
 what the users expect or add unsound optimizations. It is therefore important that we specify our
-behavior and try to statically prevent bug classes in our compiler where possible. We think the cost
-of our and faculty time for this project is outweighed by its research value.
+behavior and statically prevent bug classes in our compiler where possible. We think the cost
+in terms of our own and faculty time for this project is outweighed by its research value.
 
 = Time plan
 
-See next page. Generally, we plan to use an iterative workflow with an early end-to-end working
+See the next page. Generally, we plan to use an iterative workflow with an early end-to-end working
 compiler. This provides us with time to investigate techniques for implementing the engine
 internals, as well as time to specify our semantics relatively early.
 
@@ -967,7 +953,7 @@ internals, as well as time to specify our semantics relatively early.
                    e ,  e ,  e ,  e ,  x , x , e ,   e ,  e ,  e ,  e ,  e ,  e ,  e ,  e ,  e ,  e ,  e ,  e ,  e ,
   [Setup benchmarks against eqlog, to the extent possible given semantic differences],
                    e ,  e ,  e ,  e , [?],[?], e ,   e ,  e ,  e ,  e ,  e ,  e ,  e ,  e ,  e ,  e ,  e ,  e ,  e ,
-  [Describe formal semantics of what our engine supports, and difference to eqlog and egglog.],
+  [Describe the formal semantics of our engine, and its difference to eqlog and egglog.],
                    e ,  e ,  e ,  e ,  e , e , e ,   x ,  e ,  e ,  e ,  e ,  e ,  e ,  e ,  e ,  e ,  e ,  e ,  e ,
   [Iteratively improve engine],
                    e ,  e ,  e ,  e ,  x , x , x ,   x ,  x ,  x ,  x ,  x ,  x ,  x ,  x ,  e ,  e ,  e ,  e ,  e ,
@@ -1009,10 +995,6 @@ internals, as well as time to specify our semantics relatively early.
   parbreak()
 }
 #counter(heading).update(0)
-
-
-// e-node = term = tuple in a relation
-// e-class = variabel = element of a tuple in a relation
 
 = Distributive law example in many languages <rosettaexample>
 
@@ -1077,7 +1059,7 @@ for (t0, c, e) in tables.mul.iter() {
 
 == SQL
 
-Since the queries are essentially database queries, we can express them as Pseudo-SQL. The queries
+Since the queries can be seen as database queries, we can express them as pseudo-SQL. The queries
 become quite complicated because SQL is not a great language to express both reads and writes in the
 same query.
 
