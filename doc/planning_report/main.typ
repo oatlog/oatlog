@@ -551,7 +551,7 @@ This can be implemented using e-graphs @equalitysaturation. The main difference 
 automated theorem proving is that extraction is required to select an optimal program from the many
 programs represented by the e-graph.
 
-=== Wost-case optimal joins (2012)
+=== Worst-case optimal joins (2012)
 
 A worst-case optimal join has time complexity $O("max possible output tuples")$ given the input size and query @optimaljoin.
 It has been shown that it is not possible to get a worst-case optimal join from just binary joins, so a new algorithm is needed @optimaljoin.
