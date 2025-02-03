@@ -294,9 +294,9 @@ and SQL.
     [logical consequence],
     [function], [function], [table],
     [e.g. `Add: Math * Math -> Math`],
-    [e-node], [?], [row/tuple],
-    [represents a small computation, e.g. `Add(a,b)`],
-    [e-class], [?], [cell element],
+    [e-node], [tuple], [row/tuple],
+    [represents a small computation, e.g. `Add(a,b) = c`],
+    [e-class], [element], [cell element],
     [represents a set of equivalent expressions],
     [sort], [type], [],
     [e.g. `Math`],
@@ -434,11 +434,15 @@ e-graphs (aegraphs) that make it miss out on potential optimizations @cranelift_
 // R is the union-find datastructure?
 
 === Union-find (1964 @unionfindoriginal)
-Union-find, $"U"$ is a data structure used for efficiently merging and checking if elements belong to the same set.
-This is useful when implementing an e-graph to canonicalize e-classes.
-Initially, all sets are distinct @unionfindoriginal @fastunionfind:
-- $"find"("U", v)$ returns a _representative_ element for the set that $v$ belongs to. Iff $"find"("U", u) = "find"("U", v)$ then $u$ and $v$ belong to the same set.
-- $"union"("U", u, v)$ merges#footnote[by mutating U in-place] the two sets that $u$ and $v$. After running union, $"find"("U", u) = "find"("U", v)$.
+
+Union-find, $"U"$ is a data structure used for efficiently merging and checking if elements belong
+to the same set. This is useful when implementing an e-graph to canonicalize e-classes. Initially,
+all sets are distinct @unionfindoriginal @fastunionfind:
+- $"find"("U", v)$ returns a _representative_ element for the set that $v$ belongs to. Iff
+  $"find"("U", u) = "find"("U", v)$ then $u$ and $v$ belong to th' same set.
+- $"U"' = "union"("U", u, v)$ merges#footnote[by mutating U in-place] the two sets that $u$ and $v$.
+  After running union, $"find"("U"', u) = "find"("U"', v)$.
+
 Both operations run in almost $O(1)$.  Outside the context of e-graphs, union find is for example used to implement Kruskal's minimum spanning tree algorithm for checking if two vertices belong to different components.
 @union-find-impl shows an example implementation of union-find.
 
@@ -970,7 +974,7 @@ table(
   [Setup benchmarks against egglog],
                    e ,  e ,  e ,  e ,  x , x , e ,   e ,  e ,  e ,  e ,  e ,  e ,  e ,  e ,  e ,  e ,  e ,  e ,  e ,
   [(optional) Setup benchmarks against eqlog, to the extent possible given semantic differences],
-                   e ,  e ,  e ,  e , [?],[?], e ,   e ,  e ,  e ,  e ,  e ,  e ,  e ,  e ,  e ,  e ,  e ,  e ,  e ,
+                   e ,  e ,  e ,  e ,  x , x , e ,   e ,  e ,  e ,  e ,  e ,  e ,  e ,  e ,  e ,  e ,  e ,  e ,  e ,
   [Describe the formal semantics of our engine, and its difference to eqlog and egglog.],
                    e ,  e ,  e ,  e ,  e , e , e ,   x ,  e ,  e ,  e ,  e ,  e ,  e ,  e ,  e ,  e ,  e ,  e ,  e ,
   [Iteratively improve engine],
@@ -1028,10 +1032,10 @@ dot c$, in Egglog, Eqlog, Rust pseudocode and SQL pseudocode.
 
 == Egglog
 
-In egglog, a rule is a list of premises followed by a
-list of actions to take when the premises match some part of the database. Add, Mul and Const
-represent tables where Add and Mul have columns for their inputs and their output and Const has a
-column for its value and a column for its output.
+In egglog, a rule is a list of premises followed by a list of actions to take when the premises
+match some part of the database. `Add`, `Mul` and `Const` represent tables where `Add` and `Mul`
+have columns for their inputs and their output and `Const` has a column for its value and a column
+for its output.
 
 ```sexp
 (sort Math)
