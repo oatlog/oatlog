@@ -119,15 +119,10 @@ insertions, for memory locality and instruction-level parallelism.
 
 = Background
 
-This section motivates and introduces e-graphs in more detail, describes them and the EqSat workflow
-formally, and finally giving an overview of the relevant related work and different approaches.
+This section motivates and introduces e-graphs in more detail, and then gives an overview of the
+relevant related work.
 
-#text(style: "italic", [While a lot of this section can be considered background for the planning
-report, as a whole it should probably be seen as a very early draft of the background and literature
-review in the final report. In particular, the section on formal semantics does not really make
-sense without a comparison to Egglog and Eqlog, as well as an engine of our own to specify.])
-
-== E-graphs, informally
+== E-graphs
 
 E-graphs are motivated by the observation that directed acyclic graphs (DAGs) of expressions can
 efficiently represent a nested expression with a common subexpression, like say $f(g(x), g(x))$, as
@@ -293,17 +288,11 @@ and SQL.
   caption: [Comparison of egglog, eqlog, and relational database terminology.]
 ) <rosetta-table>
 
-== E-graphs, formally
-// extended version of scientific problem description
-// #todo[make it more general, less egglog-ish, or introduce egglog semantics.]
-// #todo[hard to understand, give more context/intuition.]
 
-#text(style: "italic", [ Note that this section may be easier to understand by reading @relatedwork first. ])
+/*
+== EqSat problem statement
 
 Given an expression, and a set of rules, find a set of equivalent expressions encoded as an e-graph and extract an equivalent expression with minimal cost and runtime, making trade-offs between cost and runtime.
-
-
-
 
 === E-graph
 // #todo[rephrase as an extension of congruence closure?]
@@ -378,6 +367,8 @@ Collections are Primitives that can contain e-classes (for example `Set<Math>`) 
 A key property of primitives is that they can not be unified/merged unless the values are the same.
 While Collections can not be merged, they can become equal when the e-classes they contain are unified.
 It is unclear if they have a solid theoretical foundation, as papers for egg @egg nor egglog @egglog barely mention them or go into any depth. This is discussed more in @primitiveimpl.
+
+*/
 
 
 == Related work <relatedwork>
