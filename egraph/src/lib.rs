@@ -72,7 +72,10 @@
     rust_2018_idioms
 )]
 
+mod ids;
 mod frontend;
+mod hir;
+mod union_find;
 
 #[proc_macro]
 pub fn compile_egraph(x: proc_macro::TokenStream) -> proc_macro::TokenStream {

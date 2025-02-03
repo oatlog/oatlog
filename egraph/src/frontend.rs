@@ -6,6 +6,8 @@
 use educe::Educe;
 use proc_macro2::{Delimiter, Spacing, Span, TokenTree};
 use syn::spanned::Spanned as _;
+use crate::ids::{Id, FunctionId, GlobalId, TypeId, TypeVarId, Variable, VariableId};
+use crate::union_find::*;
 
 #[allow(unused_imports)]
 use std::{
@@ -518,35 +520,6 @@ impl SexpSpan {
     }*/
 }
 
-trait Id: Into<usize> + From<usize> + Copy + Default + std::fmt::Debug + Ord + 'static {}
-impl<T: Into<usize> + From<usize> + Copy + Default + std::fmt::Debug + Ord + 'static> Id for T {}
-
-macro_rules! id_wrap {
-    ($i:ident) => {
-        #[must_use]
-        #[derive(Debug, Default, Copy, Clone, Eq, PartialEq, Hash, Ord, PartialOrd)]
-        struct $i(usize);
-        impl From<usize> for $i {
-            fn from(x: usize) -> Self {
-                $i(x)
-            }
-        }
-        impl From<$i> for usize {
-            fn from($i(x): $i) -> usize {
-                x
-            }
-        }
-    };
-}
-
-id_wrap!(GlobalId);
-id_wrap!(TypeId);
-id_wrap!(TypeVarId);
-id_wrap!(FunctionId);
-id_wrap!(VariableId);
-// for backend
-id_wrap!(Variable);
-
 #[derive(Debug, Clone, PartialEq)]
 struct TypeData {
     name: Str,
@@ -724,114 +697,6 @@ impl<T: Id> IdGen<T> {
     }
 }
 
-enum Uninhabited {}
-trait Merge<D, E>: FnMut(D, D) -> Result<D, E> {}
-impl<D, E, T: FnMut(D, D) -> Result<D, E>> Merge<D, E> for T {}
-trait NoMerge: Merge<(), Uninhabited> {}
-impl<T: Merge<(), Uninhabited>> NoMerge for T {}
-type UF<T> = UFData<T, ()>;
-
-/// Union Find with optional attached data.
-///
-///
-/// Clone is fine because find will give the same value for both objects
-/// no matter what order find is called
-/// Eq is semantically weird because `find` modifies the object, therefore find semantically modifies
-/// the datastructure.
-#[derive(Clone, PartialEq, Eq, Debug)]
-struct UFData<T, D> {
-    repr: Vec<T>,
-    data: Vec<D>,
-}
-impl<T: Id, D: Default + Clone> UFData<T, D> {
-    fn new_with_size(n: usize) -> Self {
-        Self {
-            repr: (0..n).map(T::from).collect(),
-            data: vec![D::default(); n],
-        }
-    }
-}
-
-impl<T: Id, D: Clone> UFData<T, D> {
-    fn iter_sets(&mut self) -> impl Iterator<Item = (T, D)> + use<'_, T, D> {
-        (0..self.repr.len()).filter_map(|i0| {
-            let i0 = i0.into();
-            let i = self.find(i0);
-            if i != i0 {
-                return None;
-            }
-            Some((i, self.data[i.into()].clone()))
-        })
-    }
-}
-impl<T: Id, D> UFData<T, D> {
-    fn new() -> Self {
-        Self {
-            repr: vec![],
-            data: vec![],
-        }
-    }
-    fn find(&mut self, i: T) -> T {
-        if i == self.repr[i.into()] {
-            i
-        } else {
-            self.repr[i.into()] = self.find(self.repr[i.into()]);
-            self.repr[i.into()]
-        }
-    }
-}
-impl<T: Id, D: Clone> UFData<T, D> {
-    fn lookup(&mut self, i: T) -> &mut D {
-        let idx = self.find(i).into();
-        &mut self.data[idx]
-    }
-    fn add(&mut self, data: D) -> T {
-        let id: T = self.repr.len().into();
-        self.repr.push(id);
-        self.data.push(data);
-        id
-    }
-
-    /// Union a and b, calls `merge` if a and b are different
-    ///
-    /// Merge returns a result, if Err, it means it is not possible to merge
-    /// the two data values and the union is canceled
-    ///
-    fn union_merge<E, F: Merge<D, E>>(
-        &mut self,
-        i: T,
-        j: T,
-        mut merge: F,
-    ) -> Result<Option<(T, T)>, E> {
-        let (i, j) = (self.find(i), self.find(j));
-        if i == j {
-            return Ok(None);
-        }
-        let a = (*self.lookup(i)).clone();
-        let b = (*self.lookup(j)).clone();
-
-        // merge canceled if err
-        let res = (merge)(a, b)?;
-
-        self.data[j.into()] = res;
-        self.repr[j.into()] = i;
-        Ok(Some((i, j)))
-    }
-}
-
-impl<T: Id, D: Clone + Eq> UFData<T, D> {
-    fn union_eq(&mut self, i: T, j: T) -> Result<Option<(T, T)>, ()> {
-        self.union_merge(i, j, |a, b| if a == b { Ok(a) } else { Err(()) })
-    }
-}
-
-impl<T: Id> UF<T> {
-    fn union(&mut self, i: T, j: T) -> Option<(T, T)> {
-        let res: Result<_, Uninhabited> = self.union_merge(i, j, |(), ()| Ok(()));
-        let Ok(res) = res;
-        res
-    }
-}
 
 /// Vec with typed indexes.
 #[derive(PartialEq, Eq, Default)]
@@ -1350,7 +1215,7 @@ impl Parser {
                             for x in x {
                                 extra_facts.push(self.parse_expr(*x, &None)?);
                             }
-                        },
+                        }
                         _ => ret!(
                             "unknown option, supported: (:ruleset <ruleset>) (:when (<facts>))"
                         ),
@@ -1829,9 +1694,9 @@ mod compile_rule {
                     } = call;
                     let at: Vec<_> = args
                         .iter()
-                        .map(|a| *self.types.lookup(self.variables.lookup(*a).ty))
+                        .map(|a| self.types[self.variables[*a].ty])
                         .collect();
-                    let rt = *self.types.lookup(self.variables.lookup(*rval).ty);
+                    let rt = self.types[self.variables[*rval].ty];
 
                     ids.retain(|id| parser.functions[id].check_compatible(&at, rt));
 
@@ -1844,12 +1709,12 @@ mod compile_rule {
                             // we just checked that the types are valid with check_compatible, so just write.
                             let function = &parser.functions[id];
                             for (&var, &ty) in args.iter().zip(function.inputs.iter()) {
-                                let typevar = self.variables.lookup(var).ty;
+                                let typevar = self.variables[var].ty;
                                 eprintln!("setting typevar {typevar:?} to type {ty:?}");
-                                *self.types.lookup(typevar) = Some(ty);
+                                self.types[typevar] = Some(ty);
                             }
-                            let typevar = self.variables.lookup(*rval);
-                            *self.types.lookup(typevar.ty) = Some(function.output);
+                            let rval_info = self.variables[*rval];
+                            self.types[rval_info.ty] = Some(function.output);
 
                             // TODO: Err handling
                             insert_known_call(
@@ -1910,14 +1775,14 @@ mod compile_rule {
             {
                 let a = self.variables.find(a);
                 let b = self.variables.find(b);
-                let an = self.variables.lookup(a).name;
-                let bn = self.variables.lookup(b).name;
+                let an = self.variables[a].name;
+                let bn = self.variables[b].name;
                 eprintln!("merge({a:?}{an:?} {b:?}{bn:?} {is_premise:?})")
             }
             // merge type before because ctx lifetime
             {
-                let ta = self.variables.lookup(a).ty;
-                let tb = self.variables.lookup(b).ty;
+                let ta = self.variables[a].ty;
+                let tb = self.variables[b].ty;
                 merge_types(parser, &mut self.types, ta, tb)?;
             }
             use IsPremise::*;
@@ -2096,7 +1961,6 @@ mod compile_rule {
                 memento = new_memento;
             }
 
-            // TODO: unzip here
             let (variable_map, variables): (
                 BTreeMap<_, _>,
                 TVec<Variable, (TypeId, Option<GlobalId>, &'static str)>,
@@ -2108,7 +1972,7 @@ mod compile_rule {
                     let a = (id, (Variable(i), meta));
 
                     let b = (
-                        ctx.types.lookup(meta.ty).unwrap(),
+                        ctx.types[meta.ty].unwrap(),
                         match meta.restrict {
                             Restrict::Forall => None,
                             Restrict::Exists => None,
@@ -2140,9 +2004,11 @@ mod compile_rule {
                 .into_iter()
                 .filter(|a| !premises.contains(a))
                 .collect();
-            let join = ctx.union_queue.iter().map(|(a, b)| {
-                (variable_map[a].0, variable_map[b].0)
-            }).collect();
+            let join = ctx
+                .union_queue
+                .iter()
+                .map(|(a, b)| (variable_map[a].0, variable_map[b].0))
+                .collect();
             let rule = Rule {
                 premises,
                 actions,
@@ -2309,3 +2175,4 @@ mod compile_rule {
         Ok(())
     }
 }
+
