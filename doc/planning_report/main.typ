@@ -433,11 +433,11 @@ e-graphs (aegraphs) that make it miss out on potential optimizations @cranelift_
 // lambda = type of function, Add, Sub, Mul
 // R is the union-find datastructure?
 
-=== Union-find (1964 @unionfindoriginal)
+=== Union-find (1964)
 
-Union-find, $"U"$ is a data structure used for efficiently merging and checking if elements belong
+Union-find @unionfindoriginal @fastunionfind, $"U"$ is a data structure used for efficiently merging and checking if elements belong
 to the same set. This is useful when implementing an e-graph to canonicalize e-classes. Initially,
-all sets are distinct @unionfindoriginal @fastunionfind:
+all sets are distinct:
 - $"find"("U", v)$ returns a _representative_ element for the set that $v$ belongs to. Iff
   $"find"("U", u) = "find"("U", v)$ then $u$ and $v$ belong to th' same set.
 - $"U"' = "union"("U", u, v)$ merges#footnote[by mutating U in-place] the two sets that $u$ and $v$.
@@ -481,18 +481,6 @@ Both operations run in almost $O(1)$.  Outside the context of e-graphs, union fi
     ]
 )<union-find-impl>
 
-
-=== Congruence closure algorithms (1980 @congruenceclosure)
-// #todo[delete or move]
-// is it this: $a = b ==> f(a) = f(b)$?
-// USING: "Fast Decision Procedures Based on Congruence Closure"
-
-Given an expression like $f(f(a, b), b)$ and knowing that $f(a, b) = a$, we want an algorithm to show that $f(f(a, b), b) = a$.
-This can be done by computing the congruence closure @congruenceclosure, which essentially assigns equivalence classes to expressions and merges equal expressions.
-This is sometimes called "canonicalization" when applied to e-graphs.
-It can be implemented using union-find.
-
-
 // The congruence#footnote[congruence is essentially "considered equal"] closure problem @congruenceclosure can be defined by the following:
 // - Let $G = (V, E)/*, n = |V|, m = |E|*/$ be a directed graph with ordered edges, allowing multi-edges. This represents the initial expressions.
 // - Let $lambda (v)$ be the vertex label#footnote[for example Add, Sub, Mul, etc. This is to make sure that Add(a, b) is not considered the same as Mul(a, b).] for $v$.
@@ -532,14 +520,23 @@ It can be implemented using union-find.
 
 
 
-=== E-graphs (1980 @oldegraph)
-// #todo[Matti: Introduce e-graphs earlier and be more concrete, the report should be understandable for someone who has no prior knowledge on the topic]
-E-graphs are not a new concept and have been used to perform program verification and in proof
-assistants @oldegraph.
+=== E-graphs (1980)
 
+E-graphs @oldegraph were introduced as a congruence closure algorithm useful for automated theorem proving.
+E-graphs in this use case do not require extraction unless used to generate short proofs, but
+notably they support fast undo. The undo operation is useful when generating the congruence closures
+not of a single theory but of many theories differing in their initial assumptions. In particular, a
+theorem prover may assume some boolean formula of statements within a theory, which results in a set
+of assumptions for each configuration satisfying the boolean formula. Concretely, assuming
 
+$
+f(f(f(f(f(f(x)))))) = x and (f(f(f(f(x))))=x or f(f(f(x))) = x)
+$
 
-=== Equality saturation (2009 @equalitysaturation)
+one could use e-graphs with a branch on the disjunction to simplify the formula to $f(f(x))=x or
+f(f(f(x)))=x$ @oldegraph.
+
+=== Equality saturation (2009)
 // "Equality Saturation: a New Approach to Optimization"
 // @equalitysaturation
 // "using e-graphs for rewriting programs for optimization in multiple passes until fixpoint"
@@ -549,9 +546,12 @@ assistants @oldegraph.
 In a traditional compiler, multiple independent destructive optimization passes are applied sequentially @equalitysaturation.
 Traditional compilers have the phase ordering problem due to passes being noncommutative when they unlock or inhibit other passes.
 Equality saturation is an approach where a set of equivalent programs are created where passes add equality information and then the optimal program is selected @equalitysaturation.
-This can be implemented using E-graphs @equalitysaturation.
 
-=== Wost-case optimal joins (2012 @optimaljoin)
+This can be implemented using e-graphs @equalitysaturation. The main difference to e-graphs in
+automated theorem proving is that extraction is required to select an optimal program from the many
+programs represented by the e-graph.
+
+=== Wost-case optimal joins (2012)
 
 A worst-case optimal join has time complexity $O("max possible output tuples")$ given the input size and query @optimaljoin.
 It has been shown that it is not possible to get a worst-case optimal join from just binary joins, so a new algorithm is needed @optimaljoin.
@@ -562,14 +562,14 @@ However, generic join performs worse in practice for some queries where it has a
 
 // @optimaljoin
 // @relationalematching
-=== Egg (2021 @egg)
+=== Egg (2021)
 
 Egg @egg is an e-graph implementation where each rule is attempted to be matched against the entire
 database. The rewrites are performed in batches, meaning first all rules are applied and then the database
 invariants are fixed.
 
 
-=== Relational e-matching (2022 @relationalematching)
+=== Relational e-matching (2022)
 
 E-matching finds a set of terms matching a particular pattern such as $"Add"("Mul"(a, c), "Mul"(b, c))$.
 For egg, the evaluation is top-down, so something like:
@@ -588,9 +588,9 @@ $ Q(a, b, c, t_0, t_1, t_2) <- "Add"(t_0, t_1, t_2), "Mul"(a, c, t_0), "Mul"(b, 
 
 Implementing e-matching as a relational query is algorithmically more efficient and has lower runtime in practice @relationalematching.
 
-=== Egglog and eqlog (2023 @egglog @eqlog)
+=== Egglog and eqlog (2023)
 
-Egglog @egglog and eqlog @eqlog are simultaneous independent discoveries of a unification between
+Egglog @egglog and eqlog @eqlog are simultaneous, largely independent discoveries of a unification between
 e-graphs and datalog. This yields a vastly improved computational complexity in comparison to egg @egg,
 by allowing adding indices per node type and matching rewrite rules incrementally against only parts
 of the graph that have changed. A notable difference between the two is that egglog focuses on
@@ -600,7 +600,7 @@ programs and processes rules at compile time.
 The egglog @egglog paper has a benchmark showing approximately a million e-nodes per second, improving from
 egg's @egg about 100k e-nodes per second in that same benchmark.
 
-=== Fast and optimal extraction and e-graphs as circuits (2024 @fastextract @egraphcircuit)
+=== Fast and optimal extraction and e-graphs as circuits (2024)
 
 E-graphs store an exponential number of equivalent expressions in a deduplicated manner but do not
 solve the problem of quickly extracting the optimal among them. The extraction problem is similar to
