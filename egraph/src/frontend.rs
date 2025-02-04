@@ -3,11 +3,12 @@
 #![deny(unused_must_use)]
 // TODO: ban retain_mut
 
+use crate::ids::{FunctionId, GlobalId, Id, TypeId, TypeVarId, Variable, VariableId};
+use crate::union_find::*;
+use crate::typed_vec::TVec;
 use educe::Educe;
 use proc_macro2::{Delimiter, Spacing, Span, TokenTree};
 use syn::spanned::Spanned as _;
-use crate::ids::{Id, FunctionId, GlobalId, TypeId, TypeVarId, Variable, VariableId};
-use crate::union_find::*;
 
 #[allow(unused_imports)]
 use std::{
@@ -697,58 +698,9 @@ impl<T: Id> IdGen<T> {
     }
 }
 
-
-/// Vec with typed indexes.
-#[derive(PartialEq, Eq, Default)]
-struct TVec<K, V> {
-    x: Vec<V>,
-    _marker: PhantomData<K>,
-}
-impl<K, V> Extend<V> for TVec<K, V> {
-    fn extend<T: IntoIterator<Item = V>>(&mut self, iter: T) {
-        self.x.extend(iter)
-    }
-}
-impl<K: Id, V> TVec<K, V> {
-    fn push(&mut self, expected_id: K, v: V) {
-        assert_eq!(self.x.len(), expected_id.into());
-        self.x.push(v);
-    }
-    fn new() -> Self {
-        Self {
-            x: Vec::new(),
-            _marker: PhantomData,
-        }
-    }
-    fn add(&mut self, v: V) -> K {
-        let id = self.x.len().into();
-        self.x.push(v);
-        id
-    }
-    fn all(&self) -> Vec<K> {
-        (0..self.x.len()).map(|x| x.into()).collect()
-    }
-}
-impl<K: Id, V> std::ops::Index<K> for TVec<K, V> {
-    type Output = V;
-
-    fn index(&self, idx: K) -> &Self::Output {
-        &self.x[idx.into()]
-    }
-}
-impl<K: Id, V> std::ops::IndexMut<K> for TVec<K, V> {
-    fn index_mut(&mut self, idx: K) -> &mut Self::Output {
-        &mut self.x[idx.into()]
-    }
-}
-impl<K, V: Debug> Debug for TVec<K, V> {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        self.x.fmt(f)
-    }
-}
-impl<K, V: Clone + PartialEq> TVec<K, V> {
+impl<K: Id, V: Clone + PartialEq> TVec<K, V> {
     fn memento(&self) -> impl PartialEq {
-        self.x.clone()
+        self.inner().clone()
     }
 }
 
@@ -962,8 +914,15 @@ impl Parser {
         )
     }
 
-    /// add global symbol and maybe add internal id if the global is computed in a new way.
-    /// Err if global symbol already defined
+    /// Add a global variable. Hashcons based on the compute method
+    ///
+    /// # Returns
+    ///
+    /// (possibly new) global id
+    ///
+    /// # Errors
+    ///
+    /// If global symbol is already defined with that name
     fn add_global(
         &mut self,
         name: Option<Str>,
@@ -1966,7 +1925,7 @@ mod compile_rule {
                 TVec<Variable, (TypeId, Option<GlobalId>, &'static str)>,
             ) = ctx
                 .variables
-                .iter_sets()
+                .iter_roots()
                 .enumerate()
                 .map(|(i, (id, meta))| {
                     let a = (id, (Variable(i), meta));
@@ -2176,3 +2135,290 @@ mod compile_rule {
     }
 }
 
+mod compile_rule2 {
+
+    use super::{
+        replace, Action, BTreeMap, ComputeMethod, Expr, FunctionId, GlobalId, Literal, MapExt,
+        Parser, Str, TVec, TypeId, TypeVarId, UFData, VariableId,
+    };
+
+    #[derive(Copy, Clone, PartialEq, Debug)]
+    struct VariableInfo {
+        /// ONLY for debug
+        /// sometimes a literal
+        label: Option<Str>,
+        global: Option<GlobalId>,
+        ty: TypeVarId,
+    }
+
+    struct UnknownCall {
+        name: &'static str,
+        ids: Vec<FunctionId>,
+        args: Vec<VariableId>,
+        rval: VariableId,
+    }
+
+    struct KnownCall {
+        id: FunctionId,
+        args: Vec<VariableId>,
+        rval: VariableId,
+    }
+
+    fn parse_expr(
+        parser: &mut Parser,
+        variables: &mut TVec<VariableId, VariableInfo>,
+        types: &mut UFData<TypeVarId, Option<TypeId>>,
+        bound_variables: &mut BTreeMap<&'static str, VariableId>,
+        unify: &mut Vec<(VariableId, VariableId)>,
+        expr: &Expr,
+        calls: &mut Vec<UnknownCall>,
+    ) -> syn::Result<VariableId> {
+        match expr {
+            Expr::Literal(literal) => {
+                let ty = parser.literal_type(**literal);
+                let typevar = types.add(Some(ty));
+                let global_id = parser.add_global(None, ty, ComputeMethod::Literal(**literal))?;
+                let variable_id = variables.add(VariableInfo {
+                    label: Some(literal.map_s(|s| &*s.to_string().leak())),
+                    global: Some(global_id),
+                    ty: typevar,
+                });
+
+                Ok(variable_id)
+            }
+            Expr::Var(name) => {
+                if let Some(&global_id) = parser.global_variable_names.get(name) {
+                    let ty = parser.global_variable_info[global_id].ty;
+                    let typevar = types.add(Some(ty));
+                    let variable_id = variables.add(VariableInfo {
+                        label: Some(*name),
+                        global: Some(global_id),
+                        ty: typevar,
+                    });
+                    return Ok(variable_id);
+                }
+                Ok(*bound_variables.entry(name).or_insert_with(|| {
+                    let typevar = types.add(None);
+                    let variable_id = variables.add(VariableInfo {
+                        label: Some(*name),
+                        global: None,
+                        ty: typevar,
+                    });
+                    variable_id
+                }))
+            }
+            Expr::Call(name, args) => {
+                let args: Vec<_> = args
+                    .iter()
+                    .map(|expr| {
+                        parse_expr(
+                            parser,
+                            variables,
+                            types,
+                            bound_variables,
+                            unify,
+                            &expr,
+                            calls,
+                        )
+                    })
+                    .collect::<Result<_, _>>()?;
+
+                match **name {
+                    "=" => {
+                        for (a, b) in args.windows(2).map(|w| (w[0], w[1])) {
+                            let ta = variables[a].ty;
+                            let tb = variables[b].ty;
+                            let _: Option<(TypeVarId, TypeVarId)> = types
+                                .union_eq(ta, tb)
+                                .map_err(|()| syn::Error::new(name.span, "type mismatch"))?;
+                            unify.push((a, b));
+                        }
+                        let rval_ty = parser.literal_type(Literal::Unit);
+                        let rval_typevar = types.add(Some(rval_ty));
+                        let rval = variables.add(VariableInfo {
+                            label: None,
+                            global: None,
+                            ty: rval_typevar,
+                        });
+                        Ok(rval)
+                    }
+                    _ => {
+                        let rval_typevar = types.add(None);
+                        let rval = variables.add(VariableInfo {
+                            label: None,
+                            global: None,
+                            ty: rval_typevar,
+                        });
+                        let ids = parser
+                            .function_possible_ids
+                            .lookup(*name, "function call")?;
+                        calls.push(UnknownCall {
+                            name: **name,
+                            ids,
+                            args,
+                            rval,
+                        });
+                        Ok(rval)
+                    }
+                }
+            }
+        }
+    }
+
+    impl Parser {
+        pub(super) fn add_rule2(
+            &mut self,
+            name: Option<Str>,
+            ruleset: Option<Str>,
+            premises: Vec<Expr>,
+            actions: Vec<Action>,
+        ) -> syn::Result<()> {
+            let mut variables: TVec<VariableId, VariableInfo> = TVec::new();
+            let mut types: UFData<TypeVarId, Option<TypeId>> = UFData::new();
+            let mut bound_variables: BTreeMap<&'static str, VariableId> = BTreeMap::new();
+            let mut premise_unify = Vec::new();
+            let mut premise_unknown = Vec::new();
+            let sort_constraints = premises
+                .into_iter()
+                .map(|premise| {
+                    parse_expr(
+                        self,
+                        &mut variables,
+                        &mut types,
+                        &mut bound_variables,
+                        &mut premise_unify,
+                        &premise,
+                        &mut premise_unknown,
+                    )
+                })
+                .collect::<Result<_, _>>()?;
+
+            let mut action_unify = Vec::new();
+            let mut action_unknown = Vec::new();
+
+            for action in actions {
+                let expr = pseudo_parse_action(action);
+                let _: VariableId = parse_expr(
+                    self,
+                    &mut variables,
+                    &mut types,
+                    &mut bound_variables,
+                    &mut action_unify,
+                    &expr,
+                    &mut action_unknown,
+                )?;
+            }
+
+            let mut premise_calls: Vec<KnownCall> = Vec::new();
+            let mut action_calls: Vec<KnownCall> = Vec::new();
+
+            let mut memento = (premise_unknown.len(), action_unknown.len());
+            loop {
+                for (known, unknown) in [
+                    (&mut premise_calls, &mut premise_unknown),
+                    (&mut action_calls, &mut action_unknown),
+                ] {
+                    unknown.retain_mut(
+                        |UnknownCall {
+                             name,
+                             ids,
+                             args,
+                             rval,
+                         }| {
+                            let at: Vec<_> = args.iter().map(|a| types[variables[*a].ty]).collect();
+                            let rt = types[variables[*rval].ty];
+                            ids.retain(|id| self.functions[id].check_compatible(&at, rt));
+
+                            match ids.as_slice() {
+                                [] => {
+                                    panic!("no function named {} can be used here", name);
+                                }
+                                [id] => {
+                                    let function = &self.functions[id];
+                                    for (&var, &ty) in args.iter().zip(function.inputs.iter()) {
+                                        let typevar = variables[var].ty;
+                                        types[typevar] = Some(ty);
+                                    }
+                                    let rval_typevar = variables[*rval].ty;
+                                    types[rval_typevar] = Some(function.output);
+
+                                    known.push(KnownCall {
+                                        id: *id,
+                                        args: args.to_vec(),
+                                        rval: *rval,
+                                    });
+
+                                    false
+                                }
+                                _ => true,
+                            }
+                        },
+                    )
+                }
+                let new_memento = (premise_unknown.len(), action_unknown.len());
+                if replace(&mut memento, new_memento) == new_memento {
+                    break;
+                }
+            }
+
+            if memento != (0, 0) || types.iter_roots().any(|(_, ty)| ty.is_none()) {
+                panic!("type inference failed");
+            }
+
+            let unit_ty = self.literal_type(Literal::Unit);
+            let to_delete: Vec<_> = variables
+                .iter()
+                .filter_map(|(i, info)| (types[info.ty].unwrap() == unit_ty).then_some(i))
+                .collect();
+
+            let premise_relations: Vec<_> = premise_calls
+                .into_iter()
+                .map(|known| {
+                    let KnownCall { id, mut args, rval } = known;
+                    if types[variables[rval].ty].unwrap() != unit_ty {
+                        args.push(rval);
+                    }
+                    crate::hir::Call { function: id, args }
+                })
+                .collect();
+            let action_relations: Vec<_> = action_calls
+                .into_iter()
+                .map(|known| {
+                    let KnownCall { id, mut args, rval } = known;
+                    if types[variables[rval].ty].unwrap() != unit_ty {
+                        args.push(rval);
+                    }
+                    crate::hir::Call { function: id, args }
+                })
+                .collect();
+
+            let variables = variables
+                .iter()
+                .map(
+                    |(_, VariableInfo { label, global, ty })| crate::hir::VariableInfo {
+                        name: label.map(|x| *x),
+                        ty: types[*ty].unwrap(),
+                        global: *global,
+                    },
+                )
+                .collect();
+            let rule = crate::hir::Rule::new(
+                variables,
+                premise_relations,
+                premise_unify,
+                sort_constraints,
+                action_relations,
+                action_unify,
+                to_delete,
+            );
+            todo!()
+        }
+    }
+
+    fn pseudo_parse_action(action: Action) -> Expr {
+        match action {
+            Action::Expr(expr) => expr,
+            Action::Union(a, b) => Expr::Call(Str::with_placeholder("="), vec![a, b]),
+        }
+    }
+}
