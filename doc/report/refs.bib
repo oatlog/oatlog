@@ -1,0 +1,254 @@
+@article{egglog,
+  author = {Zhang, Yihong and Wang, Yisu Remy and Flatt, Oliver and Cao, David and Zucker, Philip and Rosenthal, Eli and Tatlock, Zachary and Willsey, Max},
+  title = {Better Together: Unifying Datalog and Equality Saturation},
+  year = {2023},
+  issue_date = {June 2023},
+  publisher = {Association for Computing Machinery},
+  address = {New York, NY, USA},
+  volume = {7},
+  number = {PLDI},
+  url = {https://doi.org/10.1145/3591239},
+  doi = {10.1145/3591239},
+  abstract = {We present egglog, a fixpoint reasoning system that unifies Datalog and equality saturation (EqSat). Like Datalog, egglog supports efficient incremental execution, cooperating analyses, and lattice-based reasoning. Like EqSat, egglog supports term rewriting, efficient congruence closure, and extraction of optimized terms. We identify two recent applications -- a unification-based pointer analysis in Datalog and an EqSat-based floating-point term rewriter -- that have been hampered by features missing from Datalog but found in EqSat or vice-versa. We evaluate our system by reimplementing those projects in egglog. The resulting systems in egglog are faster, simpler, and fix bugs found in the original systems.},
+  journal = {Proc. ACM Program. Lang.},
+  month = {jun},
+  articleno = {125},
+  numpages = {25},
+  keywords = {Datalog, Program optimization, Rewrite systems, Equality saturation}
+}
+
+@article{egg,
+author = {Willsey, Max and Nandi, Chandrakana and Wang, Yisu Remy and Flatt, Oliver and Tatlock, Zachary and Panchekha, Pavel},
+title = {egg: Fast and extensible equality saturation},
+year = {2021},
+issue_date = {January 2021},
+publisher = {Association for Computing Machinery},
+address = {New York, NY, USA},
+volume = {5},
+number = {POPL},
+url = {https://doi.org/10.1145/3434304},
+doi = {10.1145/3434304},
+abstract = {An e-graph efficiently represents a congruence relation over many expressions. Although they were originally developed in the late 1970s for use in automated theorem provers, a more recent technique known as equality saturation repurposes e-graphs to implement state-of-the-art, rewrite-driven compiler optimizations and program synthesizers. However, e-graphs remain unspecialized for this newer use case. Equality saturation workloads exhibit distinct characteristics and often require ad-hoc e-graph extensions to incorporate transformations beyond purely syntactic rewrites.  This work contributes two techniques that make e-graphs fast and extensible, specializing them to equality saturation. A new amortized invariant restoration technique called rebuilding takes advantage of equality saturation's distinct workload, providing asymptotic speedups over current techniques in practice. A general mechanism called e-class analyses integrates domain-specific analyses into the e-graph, reducing the need for ad hoc manipulation.  We implemented these techniques in a new open-source library called egg. Our case studies on three previously published applications of equality saturation highlight how egg's performance and flexibility enable state-of-the-art results across diverse domains.},
+journal = {Proc. ACM Program. Lang.},
+month = jan,
+articleno = {23},
+numpages = {29},
+keywords = {equality saturation, e-graphs}
+}
+
+@article{herbie,
+  title={Automatically improving accuracy for floating point expressions},
+  author={Panchekha, Pavel and Sanchez-Stern, Alex and Wilcox, James R and Tatlock, Zachary},
+  journal={Acm Sigplan Notices},
+  volume={50},
+  number={6},
+  pages={1--11},
+  year={2015},
+  publisher={ACM New York, NY, USA}
+}
+
+@article{spores,
+  title={SPORES: sum-product optimization via relational equality saturation for large scale linear algebra},
+  author={Wang, Yisu Remy and Hutchison, Shana and Leang, Jonathan and Howe, Bill and Suciu, Dan},
+  journal={arXiv preprint arXiv:2002.07951},
+  year={2020}
+}
+
+@unpublished{eqlog,
+  author = {Bidlingmaier, Martin E},
+  title = {An Evaluation Algorithm for Datalog with Equality},
+  url = {https://arxiv.org/pdf/2302.05792},
+  note = {preprint at \url{https://arxiv.org/pdf/2302.05792}}
+}
+
+@InProceedings{llvm,
+  author = {Chris Lattner and Vikram Adve},
+  title = {{LLVM}: A Compilation Framework for Lifelong Program Analysis and Transformation},
+  booktitle = {CGO},
+  address = {San Jose, CA, USA},
+  month = {Mar},
+  year = {2004},
+  pages = {75–88},
+}
+
+@article{fastextract,
+  title={Fast and optimal extraction for sparse equality graphs},
+  author={Goharshady, Amir Kafshdar and Lam, Chun Kit and Parreaux, Lionel},
+  journal={Proceedings of the ACM on Programming Languages},
+  volume={8},
+  number={OOPSLA2},
+  pages={2551--2577},
+  year={2024},
+  publisher={ACM New York, NY, USA}
+}
+
+@phdthesis{oldegraph,
+  title={Techniques for program verification},
+  author={Nelson, Charles Gregory},
+  year={1980},
+  publisher={Stanford University}
+}
+
+@inproceedings{egraphwithexplain,
+  title={Proof-producing congruence closure},
+  author={Nieuwenhuis, Robert and Oliveras, Albert},
+  booktitle={International Conference on Rewriting Techniques and Applications},
+  pages={453--468},
+  year={2005},
+  organization={Springer}
+}
+
+@misc{egggym,
+  title = {Extraction Gym https://github.com/egraphs-good/extraction-gym},
+  year = {2024},
+  publisher = {GitHub},
+  journal = {GitHub repository},
+  howpublished = {\url{https://github.com/egraphs-good/extraction-gym}},
+}
+
+@misc{cranelift,
+  author       = {{Bytecode Alliance}},
+  title        = {Cranelift},
+  year         = {2022},
+  howpublished = {\url{https://cranelift.dev/}},
+  note         = {Accessed: 2024-12-12}
+}
+
+@misc{cranelift_egraph_rfc,
+  author       = {{Bytecode Alliance}},
+  title        = {Cranelift E-Graph Optimization Framework RFC},
+  year         = {2022},
+  howpublished = {\url{https://github.com/bytecodealliance/rfcs/blob/main/accepted/cranelift-egraph.md}},
+  note         = {Accessed: 2024-11-28}
+}
+
+@inproceedings{acyclic_egraphs,
+  author       = {Chris Fallin},
+  title        = {Acyclic E-graphs for Efficient Optimization in a Production Compiler},
+  booktitle    = {Proceedings of the E-Graphs Workshop, part of PLDI 2023},
+  year         = {2023},
+  note         = {Available at \url{https://pldi23.sigplan.org/details/egraphs-2023-papers/2/-graphs-Acyclic-E-graphs-for-Efficient-Optimization-in-a-Production-Compiler}},
+}
+
+@article{son,
+  title={A simple graph-based intermediate representation},
+  author={Click, Cliff and Paleczny, Michael},
+  journal={ACM Sigplan Notices},
+  volume={30},
+  number={3},
+  pages={35--49},
+  year={1995},
+  publisher={ACM New York, NY, USA}
+}
+
+@misc{mevi2024,
+  author       = {Amos Wenger},
+  title        = {Mevi - A memory visualizer for Linux 5.7+},
+  year         = {2024},
+  url          = {https://github.com/fasterthanlime/mevi},
+  note         = {Accessed: 2024-12-16}
+}
+
+@article{egraphcircuit,
+  title={E-Graphs as Circuits, and Optimal Extraction via Treewidth},
+  author={Sun, Glenn and Zhang, Yihong and Ni, Haobin},
+  journal={arXiv preprint arXiv:2408.17042},
+  year={2024}
+}
+
+@article{egglogHerbie,
+  title={egglog In Practice: Automatically Improving Floating-point Error},
+  author={Flatt, Oliver and Zhang, Yihong}
+}
+
+@article{relationalematching,
+  title={Relational E-matching},
+  author={Zhang, Yihong and Wang, Yisu Remy and Willsey, Max and Tatlock, Zachary},
+  journal={arXiv preprint arXiv:2108.02290},
+  year={2021}
+}
+
+@article{optimaljoin,
+  title={Worst-case optimal join algorithms},
+  author={Ngo, Hung Q and Porat, Ely and R{\'e}, Christopher and Rudra, Atri},
+  journal={Journal of the ACM (JACM)},
+  volume={65},
+  number={3},
+  pages={1--40},
+  year={2018},
+  publisher={ACM New York, NY, USA}
+}
+
+@article{freejoin1,
+  title={Free join: Unifying worst-case optimal and traditional joins},
+  author={Wang, Yisu Remy and Willsey, Max and Suciu, Dan},
+  journal={Proceedings of the ACM on Management of Data},
+  volume={1},
+  number={2},
+  pages={1--23},
+  year={2023},
+  publisher={ACM New York, NY, USA}
+}
+
+@article{freejoin2,
+  title={From Binary Join to Free Join},
+  author={Remy Wang, Yisu and Willsey, Max and Suciu, Dan},
+  journal={ACM SIGMOD Record},
+  volume={53},
+  number={1},
+  pages={25--31},
+  year={2024},
+  publisher={ACM New York, NY, USA}
+}
+
+@book{extractnphard,
+  title={Equality saturation: engineering challenges and applications},
+  author={Stepp, Michael Benjamin},
+  year={2011},
+  publisher={University of California, San Diego}
+}
+
+@inproceedings{equalitysaturation,
+  title={Equality saturation: a new approach to optimization},
+  author={Tate, Ross and Stepp, Michael and Tatlock, Zachary and Lerner, Sorin},
+  booktitle={Proceedings of the 36th annual ACM SIGPLAN-SIGACT symposium on Principles of programming languages},
+  pages={264--276},
+  year={2009}
+}
+
+@article{unionfindoriginal,
+  title={An improved equivalence algorithm},
+  author={Galler, Bernard A and Fisher, Michael J},
+  journal={Communications of the ACM},
+  volume={7},
+  number={5},
+  pages={301--303},
+  year={1964},
+  publisher={ACM New York, NY, USA}
+}
+
+@article{fastunionfind,
+  title={Efficiency of a good but not linear set union algorithm},
+  author={Tarjan, Robert Endre},
+  journal={Journal of the ACM (JACM)},
+  volume={22},
+  number={2},
+  pages={215--225},
+  year={1975},
+  publisher={ACM New York, NY, USA}
+}
+
+@inproceedings{nix,
+  title={Nix: A Safe and Policy-Free System for Software Deployment.},
+  author={Dolstra, Eelco and De Jonge, Merijn and Visser, Eelco and others},
+  booktitle={LISA},
+  volume={4},
+  pages={79--92},
+  year={2004}
+}
+
+@misc{perf,
+  title = {perf: Performance analysis tools for Linux},
+  url = {https://github.com/torvalds/linux/tree/master/tools/perf},
+  note = {Accessed: 2025-01-30}
+}

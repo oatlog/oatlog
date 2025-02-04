@@ -1,0 +1,3 @@
+[submodule "doc/report/mastery-chs"]
+	path = doc/report/mastery-chs
+	url = https://github.com/CMDJojo/mastery-chs.git
