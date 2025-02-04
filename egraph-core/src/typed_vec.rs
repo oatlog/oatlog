@@ -12,7 +12,7 @@ pub(crate) struct TVec<K, V> {
 }
 impl<K, V> Extend<V> for TVec<K, V> {
     fn extend<T: IntoIterator<Item = V>>(&mut self, iter: T) {
-        self.x.extend(iter)
+        self.x.extend(iter);
     }
 }
 
@@ -52,7 +52,7 @@ impl<K: Id, V> TVec<K, V> {
         id
     }
     pub(crate) fn all(&self) -> Vec<K> {
-        (0..self.x.len()).map(|x| x.into()).collect()
+        (0..self.x.len()).map(Into::into).collect()
     }
     pub(crate) fn inner(&self) -> &Vec<V> {
         &self.x

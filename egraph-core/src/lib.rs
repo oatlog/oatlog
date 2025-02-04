@@ -4,6 +4,7 @@ mod hir;
 mod union_find;
 mod typed_vec;
 
+#[must_use]
 pub fn compile_str(s: &str) -> String {
     frontend::compile_egraph(s.parse::<proc_macro2::TokenStream>().unwrap()).to_string()
 }

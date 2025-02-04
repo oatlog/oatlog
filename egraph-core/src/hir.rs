@@ -164,8 +164,7 @@ impl Rule {
                     .filter_map(|(a, b)| {
                         match (morphism[*a].map(|(x, _)| x), morphism[*b].map(|(x, _)| x)) {
                             (None, None) => None,
-                            (None, Some(_)) => panic!("what"),
-                            (Some(_), None) => panic!("what"),
+                            (None, Some(_)) | (Some(_), None) => panic!("what"),
                             (Some(a), Some(b)) => Some((a, b)),
                         }
                     })

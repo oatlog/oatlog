@@ -1,11 +1,10 @@
 #![deny(clippy::only_used_in_recursion)]
 #![deny(clippy::map_clone)]
 #![deny(unused_must_use)]
-// TODO: ban retain_mut
 
 use crate::ids::{FunctionId, GlobalId, Id, TypeId, TypeVarId, Variable, VariableId};
 use crate::typed_vec::TVec;
-use crate::union_find::*;
+use crate::union_find::UFData;
 use educe::Educe;
 use proc_macro2::{Delimiter, Span, TokenTree};
 
@@ -164,9 +163,6 @@ macro_rules! register_span {
     };
 }
 
-/// Generate something that can be compared so that a fixed point can be identified without
-/// implementing clone since implementing clone for something that generates unique ids is bad.
-
 trait ResultExt {
     fn add_err(self, syn_err: syn::Error) -> Self;
 }
@@ -179,16 +175,17 @@ impl<T> ResultExt for syn::Result<T> {
     }
 }
 
+#[must_use]
 pub fn compile_egraph(x: proc_macro2::TokenStream) -> proc_macro2::TokenStream {
     let now = std::time::Instant::now();
-    let res = compile_egraph_inner(x).unwrap_or_else(|err| err.to_compile_error().into());
+    let res = compile_egraph_inner(x).unwrap_or_else(|err| err.to_compile_error());
     eprintln!("{:?}", now.elapsed());
     res
 }
 
 fn compile_egraph_inner(x: proc_macro2::TokenStream) -> syn::Result<proc_macro2::TokenStream> {
     let mut parser = Parser::new();
-    for token_tree in x.into_iter() {
+    for token_tree in x {
         register_span!(token_tree.span());
 
         match token_tree {
@@ -248,9 +245,14 @@ impl Display for Literal {
     }
 }
 
-#[derive(Copy, Clone, Debug, PartialEq, PartialOrd)]
+#[derive(Copy, Clone, Debug, PartialEq)]
 struct OrdF64(f64);
 impl Eq for OrdF64 {}
+impl PartialOrd for OrdF64 {
+    fn partial_cmp(&self, other: &Self) -> Option<Ordering> {
+        Some(std::cmp::Ord::cmp(self, other))
+    }
+}
 impl Ord for OrdF64 {
     fn cmp(&self, other: &Self) -> Ordering {
         self.0.total_cmp(&other.0)
@@ -316,7 +318,7 @@ impl SexpSpan {
             ret!("{context}: expected an int literal")
         };
 
-        u64::try_from(x.i64().map_err(|_| bare!("{context}; expected int"))?)
+        u64::try_from(x.i64().map_err(|()| bare!("{context}; expected int"))?)
             .map_err(|_| bare!("{context}: expected positive int"))
     }
     fn string(self, context: &'static str) -> syn::Result<&'static str> {
@@ -338,7 +340,7 @@ impl SexpSpan {
                     v.push(SexpSpan {
                         span,
                         x: Sexp::Atom(Spanned::new(text.leak(), span)),
-                    })
+                    });
                 }
             };
         }
@@ -396,7 +398,7 @@ impl SexpSpan {
                             },
                             x.span(),
                         )),
-                    })
+                    });
                 }
             }
         }
@@ -565,13 +567,13 @@ impl<T: Id> IdGen<T> {
     }
 }
 
-const BUILTIN_I64: &'static str = "i64";
-const BUILTIN_F64: &'static str = "f64";
-const BUILTIN_STRING: &'static str = "String";
-const BUILTIN_BOOL: &'static str = "bool";
-const BUILTIN_UNIT: &'static str = "()";
+const BUILTIN_I64: &str = "i64";
+const BUILTIN_F64: &str = "f64";
+const BUILTIN_STRING: &str = "String";
+const BUILTIN_BOOL: &str = "bool";
+const BUILTIN_UNIT: &str = "()";
 
-const BUILTIN_SORTS: [&'static str; 5] = [
+const BUILTIN_SORTS: [&str; 5] = [
     BUILTIN_I64,
     BUILTIN_F64,
     BUILTIN_STRING,
@@ -673,7 +675,7 @@ struct Rule {
     actions: Vec<(FunctionId, Vec<Variable>, Variable)>,
     /// Variables to unify when action is triggered
     join: Vec<(Variable, Variable)>,
-    /// (type, global_id, name)
+    /// (`type`, `global_id`, `name`)
     variables: TVec<Variable, (TypeId, Option<GlobalId>, &'static str)>,
 }
 
@@ -690,9 +692,9 @@ struct Parser {
     types: BTreeMap<TypeId, TypeData>,
     type_ids: StringIds<TypeId>,
 
-    /// "database index" for global_variable_info
+    /// "database index" for `global_variable_info`
     global_variable_names: BTreeMap<Str, GlobalId>,
-    /// "database index" for global_variable_info
+    /// "database index" for `global_variable_info`
     global_compute: BTreeMap<ComputeMethod, GlobalId>,
     /// id -> metadata
     global_variable_info: TVec<GlobalId, GlobalVariableInfo>,
@@ -747,7 +749,6 @@ impl Parser {
     //     w!("}}");
     //     eprintln!("{buf}");
     // }
-
 
     /// Add a global variable. Hashcons based on the compute method
     ///
@@ -824,7 +825,7 @@ impl Parser {
         for sexp in sexp {
             self.parse_toplevel(sexp).add_err(syn::Error::new(
                 sexp.span,
-                format!("while parsing this toplevel expression"),
+                "while parsing this toplevel expression".to_string(),
             ))?;
         }
         Ok(())
@@ -847,7 +848,7 @@ impl Parser {
                     let name = name.atom("sort name")?;
                     let primitive: Vec<_> = primitive
                         .list("sort")?
-                        .into_iter()
+                        .iter()
                         .map(|x| x.atom("sort primitive"))
                         .collect::<Result<Vec<_>, _>>()?;
                     let _ = self.add_sort(name, Some(primitive));
@@ -896,7 +897,7 @@ impl Parser {
                 let inputs = self.parse_inputs(inputs)?;
                 let output = self.type_ids.lookup(output.atom("function output")?)?;
                 let merge = match parse_options(options)?.as_slice() {
-                    [(":merge", [expr])] => Some(self.parse_expr(*expr, &None)?),
+                    [(":merge", [expr])] => Some(Parser::parse_expr(*expr, &None)?),
                     [(":no_merge", [])] => None,
                     _ => ret!("missing merge options (:merge <expr>) or (:no_merge)"),
                 };
@@ -932,7 +933,7 @@ impl Parser {
                     ret!("usage: (ruleset <name>)");
                 };
                 self.rulesets
-                    .insert_unique(name.atom("ruleset name")?, (), "ruleset")?
+                    .insert_unique(name.atom("ruleset name")?, (), "ruleset")?;
             }
 
             "rule" => {
@@ -941,14 +942,14 @@ impl Parser {
                 };
                 let facts = facts
                     .list("rule facts")?
-                    .into_iter()
-                    .map(|x| self.parse_expr(*x, &None))
+                    .iter()
+                    .map(|x| Parser::parse_expr(*x, &None))
                     .collect::<Result<Vec<_>, _>>()?;
                 let mut local_bindings = BTreeMap::new();
                 let mut local_bindings = Some(&mut local_bindings);
                 let actions = actions
                     .list("rule actions")?
-                    .into_iter()
+                    .iter()
                     .map(|x| self.parse_action(*x, &mut local_bindings))
                     .collect::<Result<Vec<_>, _>>()?;
                 let mut ruleset = None;
@@ -971,8 +972,8 @@ impl Parser {
                 let [lhs, rhs, options @ ..] = args else {
                     ret!("usage: (rewrite <lhs expr> <rhs expr> <option>*)");
                 };
-                let lhs = self.parse_expr(*lhs, &None)?;
-                let rhs = self.parse_expr(*rhs, &None)?;
+                let lhs = Parser::parse_expr(*lhs, &None)?;
+                let rhs = Parser::parse_expr(*rhs, &None)?;
                 let mut ruleset = None;
                 let mut extra_facts = Vec::new();
                 // TODO: maybe support this at some point.
@@ -984,11 +985,14 @@ impl Parser {
                         (":when", [x]) => {
                             let x = x.list("when constraint")?;
                             for x in x {
-                                extra_facts.push(self.parse_expr(*x, &None)?);
+                                extra_facts.push(Parser::parse_expr(*x, &None)?);
                             }
                         },
                         _ => ret!("unknown option, supported: (:ruleset <ruleset>) (:subsume) (:when (<facts>))"),
                     }
+                }
+                if subsume {
+                    unimplemented!("subsume is not implemented");
                 }
                 let mut facts = extra_facts;
                 facts.push(lhs.clone());
@@ -998,8 +1002,8 @@ impl Parser {
                 let [lhs, rhs, options @ ..] = args else {
                     ret!("usage (birewrite <expr> <expr> <option>*)");
                 };
-                let lhs = self.parse_expr(*lhs, &None)?;
-                let rhs = self.parse_expr(*rhs, &None)?;
+                let lhs = Parser::parse_expr(*lhs, &None)?;
+                let rhs = Parser::parse_expr(*rhs, &None)?;
                 let mut ruleset = None;
                 let mut extra_facts = Vec::new();
                 for opt in parse_options(options)? {
@@ -1008,7 +1012,7 @@ impl Parser {
                         (":when", [x]) => {
                             let x = x.list("when constraint")?;
                             for x in x {
-                                extra_facts.push(self.parse_expr(*x, &None)?);
+                                extra_facts.push(Parser::parse_expr(*x, &None)?);
                             }
                         }
                         _ => ret!(
@@ -1022,19 +1026,6 @@ impl Parser {
                     self.add_rule(None, ruleset, facts, vec![Action::Union(lhs, rhs)])?;
                 }
             }
-
-            "run" => return unimplemented_msg,
-            "run_schedule" => return unimplemented_msg,
-            "simplify" => return unimplemented_msg,
-            "query_extract" => return unimplemented_msg,
-            "check" => return unimplemented_msg,
-            "push" => return unimplemented_msg,
-            "pop" => return unimplemented_msg,
-            "print_stats" => return unimplemented_msg,
-            "print_function" => return unimplemented_msg,
-            "print_size" => return unimplemented_msg,
-            "input" => return unimplemented_msg,
-            "output" => return unimplemented_msg,
             "include" => {
                 // TODO: strip ; comments
                 let [filepath] = args else {
@@ -1058,7 +1049,10 @@ impl Parser {
                     format!("while parsing \"{filepath}\""),
                 ))?;
             }
-            "fail" => return unimplemented_msg,
+            "run" | "run_schedule" | "simplify" | "query_extract" | "check" | "push" | "pop"
+            | "print_stats" | "print_function" | "print_size" | "input" | "output" | "fail" => {
+                return unimplemented_msg
+            }
 
             _ => {
                 self.parse_action(x, &mut None)?;
@@ -1119,7 +1113,6 @@ enum Expr {
 }
 impl Parser {
     fn parse_expr(
-        &mut self,
         x: SexpSpan,
         local_bindings: &Option<&mut BTreeMap<Str, Expr>>,
     ) -> syn::Result<Expr> {
@@ -1134,8 +1127,8 @@ impl Parser {
             Sexp::List(_) => {
                 let (function_name, args) = x.call("general call function name")?;
                 let args = args
-                    .into_iter()
-                    .map(|x| self.parse_expr(*x, local_bindings))
+                    .iter()
+                    .map(|x| Self::parse_expr(*x, local_bindings))
                     .collect::<Result<Vec<_>, _>>()?;
                 Expr::Call(function_name, args)
             }
@@ -1259,7 +1252,7 @@ impl Parser {
         syn::Error::combine(
             err,
             syn::Error::new(name.span, format!("type {name} defined here")),
-        )
+        );
     }
     fn err_function_defined_here(&mut self, id: FunctionId, err: &mut syn::Error) {
         let function = &self.functions[&id];
@@ -1277,7 +1270,7 @@ impl Parser {
                 name.span,
                 format!("{name} defined here fn({inputs_ty_s}) -> {output_ty_s}"),
             ),
-        )
+        );
     }
     fn parse_action(
         &mut self,
@@ -1298,11 +1291,11 @@ impl Parser {
                 };
                 let name = name.atom("let binding name")?;
 
-                let expr = self.parse_expr(*expr, local_bindings)?;
+                let expr = Parser::parse_expr(*expr, local_bindings)?;
                 if let Some(local_bindings) = local_bindings {
                     // TODO: currently allows shadowing other local variables
                     // "expansion" is recursive, so we need to detect cycles when expanding
-                    local_bindings.insert_unique(name, expr.clone(), "local binding")?;
+                    local_bindings.insert_unique(name, expr, "local binding")?;
                 } else {
                     self.add_toplevel_binding(name, expr)?;
                 }
@@ -1316,33 +1309,29 @@ impl Parser {
                 let (function_name, args) = call.call("table + inputs to set to")?;
                 let args = args
                     .iter()
-                    .map(|x| self.parse_expr(*x, local_bindings))
+                    .map(|x| Parser::parse_expr(*x, local_bindings))
                     .collect::<Result<Vec<_>, _>>()?;
 
                 // TODO: is this fine?
                 Some(Action::Union(
                     Expr::Call(function_name, args),
-                    self.parse_expr(*res, local_bindings)?,
+                    Parser::parse_expr(*res, local_bindings)?,
                 ))
             }
-            // delete
-            "delete" => return unimplemented_msg,
-            // mark as non-extractable
-            "subsume" => return unimplemented_msg,
             // mark two eclasses as equal
             "union" => {
                 let [lhs, rhs] = args else {
                     ret!("usage: (union <lhs expr> <rhs expr>)")
                 };
-                let lhs = self.parse_expr(*lhs, local_bindings)?;
-                let rhs = self.parse_expr(*rhs, local_bindings)?;
+                let lhs = Parser::parse_expr(*lhs, local_bindings)?;
+                let rhs = Parser::parse_expr(*rhs, local_bindings)?;
                 Some(Action::Union(lhs, rhs))
             }
-            "panic" => return unimplemented_msg,
-            "extract" => return unimplemented_msg,
+
+            "delete" | "subsume" | "panic" | "extract" => return unimplemented_msg,
             _ => {
                 if local_bindings.is_some() {
-                    Some(Action::Expr(self.parse_expr(x, local_bindings)?))
+                    Some(Action::Expr(Parser::parse_expr(x, local_bindings)?))
                 } else {
                     ret!("arbitrary expressions as actions not allowed on toplevel")
                 }
@@ -1360,7 +1349,7 @@ fn parse_options(
 ) -> syn::Result<Vec<(&'static str, &'static [SexpSpan])>> {
     fn is_option(opt: &SexpSpan) -> bool {
         if let Sexp::Atom(opt) = opt.x {
-            opt.starts_with(":")
+            opt.starts_with(':')
         } else {
             false
         }
@@ -1419,39 +1408,36 @@ mod compile_rule {
         expr: &Expr,
         calls: &mut Vec<UnknownCall>,
     ) -> syn::Result<VariableId> {
-        match expr {
+        Ok(match expr {
             Expr::Literal(literal) => {
                 let ty = parser.literal_type(**literal);
                 let typevar = types.add(Some(ty));
                 let global_id = parser.add_global(None, ty, ComputeMethod::Literal(**literal))?;
-                let variable_id = variables.add(VariableInfo {
+                variables.add(VariableInfo {
                     label: Some(literal.map_s(|s| &*s.to_string().leak())),
                     global: Some(global_id),
                     ty: typevar,
-                });
-
-                Ok(variable_id)
+                })
             }
             Expr::Var(name) => {
                 if let Some(&global_id) = parser.global_variable_names.get(name) {
                     let ty = parser.global_variable_info[global_id].ty;
                     let typevar = types.add(Some(ty));
-                    let variable_id = variables.add(VariableInfo {
+                    variables.add(VariableInfo {
                         label: Some(*name),
                         global: Some(global_id),
                         ty: typevar,
-                    });
-                    return Ok(variable_id);
+                    })
+                } else {
+                    *bound_variables.entry(name).or_insert_with(|| {
+                        let typevar = types.add(None);
+                        variables.add(VariableInfo {
+                            label: Some(*name),
+                            global: None,
+                            ty: typevar,
+                        })
+                    })
                 }
-                Ok(*bound_variables.entry(name).or_insert_with(|| {
-                    let typevar = types.add(None);
-                    let variable_id = variables.add(VariableInfo {
-                        label: Some(*name),
-                        global: None,
-                        ty: typevar,
-                    });
-                    variable_id
-                }))
             }
             Expr::Call(name, args) => {
                 let args: Vec<_> = args
@@ -1463,7 +1449,7 @@ mod compile_rule {
                             types,
                             bound_variables,
                             unify,
-                            &expr,
+                            expr,
                             calls,
                         )
                     })
@@ -1481,12 +1467,11 @@ mod compile_rule {
                         }
                         let rval_ty = parser.literal_type(Literal::Unit);
                         let rval_typevar = types.add(Some(rval_ty));
-                        let rval = variables.add(VariableInfo {
+                        variables.add(VariableInfo {
                             label: None,
                             global: None,
                             ty: rval_typevar,
-                        });
-                        Ok(rval)
+                        })
                     }
                     _ => {
                         let rval_typevar = types.add(None);
@@ -1504,11 +1489,11 @@ mod compile_rule {
                             args,
                             rval,
                         });
-                        Ok(rval)
+                        rval
                     }
                 }
             }
-        }
+        })
     }
 
     impl Parser {
@@ -1564,6 +1549,7 @@ mod compile_rule {
                     (&mut premise_calls, &mut premise_unknown),
                     (&mut action_calls, &mut action_unknown),
                 ] {
+                    // TODO: ban retain_mut
                     unknown.retain_mut(
                         |UnknownCall {
                              name,
@@ -1577,7 +1563,7 @@ mod compile_rule {
 
                             match ids.as_slice() {
                                 [] => {
-                                    panic!("no function named {} can be used here", name);
+                                    panic!("no function named {name} can be used here");
                                 }
                                 [id] => {
                                     let function = &self.functions[id];
@@ -1590,7 +1576,7 @@ mod compile_rule {
 
                                     known.push(KnownCall {
                                         id: *id,
-                                        args: args.to_vec(),
+                                        args: args.clone(),
                                         rval: *rval,
                                     });
 
@@ -1599,7 +1585,7 @@ mod compile_rule {
                                 _ => true,
                             }
                         },
-                    )
+                    );
                 }
                 let new_memento = (premise_unknown.len(), action_unknown.len());
                 if replace(&mut memento, new_memento) == new_memento {
@@ -1607,9 +1593,11 @@ mod compile_rule {
                 }
             }
 
-            if memento != (0, 0) || types.iter_roots().any(|(_, ty)| ty.is_none()) {
-                panic!("type inference failed");
-            }
+            assert_eq!(memento, (0, 0), "type_inference failed");
+            assert!(
+                types.iter_roots().all(|(_, ty)| ty.is_some()),
+                "type inference failed"
+            );
 
             let unit_ty = self.literal_type(Literal::Unit);
             let to_delete: Vec<_> = variables
