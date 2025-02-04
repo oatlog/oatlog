@@ -29,7 +29,6 @@ impl<K: Id, V: Clone> UFData<K, V> {
         }
     }
 }
-impl<K: Id, V: PartialEq> Eq for UFData<K, V> {}
 impl<K: Id, V: PartialEq> PartialEq for UFData<K, V> {
     fn eq(&self, other: &Self) -> bool {
         self.canonicalize();
@@ -48,31 +47,6 @@ impl<K: Id, V: PartialEq> PartialEq for UFData<K, V> {
     }
 }
 
-impl<K: Id, V: Clone> UFData<K, V> {
-    /// Iterate the root representatives and their data
-    pub(crate) fn iter_roots(&self) -> impl Iterator<Item = (K, V)> + use<'_, K, V> {
-        (0..self.repr.len()).filter_map(|i0| {
-            let i0 = i0.into();
-            let i = self.find(i0);
-            if i != i0 {
-                return None;
-            }
-            Some((i, self.data[i.into()].clone()))
-        })
-    }
-}
-impl<K: Id, V: Clone> UFData<K, V> {
-    /// Iterate all entries, including non-root.
-    ///
-    /// Iterator element is (id, find(id), find(id).value)
-    pub(crate) fn iter_all(&self) -> impl Iterator<Item = (K, K, V)> + use<'_, K, V> {
-        (0..self.repr.len()).map(|i0| {
-            let i0 = i0.into();
-            let i = self.find(i0);
-            (i, i0, self.data[i.into()].clone())
-        })
-    }
-}
 impl<K: Id, V> UFData<K, V> {
     /// Make repr only contain canonical data.
     fn canonicalize(&self) {
@@ -96,23 +70,33 @@ impl<K: Id, V> UFData<K, V> {
         }
     }
 }
-impl<T: Id, D> Index<T> for UFData<T, D> {
-    type Output = D;
+impl<K: Id, V: Clone> UFData<K, V> {
+    /// Iterate the root representatives and their data
+    pub(crate) fn iter_roots(&self) -> impl Iterator<Item = (K, V)> + use<'_, K, V> {
+        (0..self.repr.len()).filter_map(|i0| {
+            let i0 = i0.into();
+            let i = self.find(i0);
+            if i != i0 {
+                return None;
+            }
+            Some((i, self.data[i.into()].clone()))
+        })
+    }
 
-    fn index(&self, i: T) -> &Self::Output {
-        &self.data[self.find(i).into()]
+    /// Iterate all entries, including non-root.
+    ///
+    /// Iterator element is (id, find(id), find(id).value)
+    pub(crate) fn iter_all(&self) -> impl Iterator<Item = (K, K, V)> + use<'_, K, V> {
+        (0..self.repr.len()).map(|i0| {
+            let i0 = i0.into();
+            let i = self.find(i0);
+            (i, i0, self.data[i.into()].clone())
+        })
     }
-}
-impl<T: Id, D> IndexMut<T> for UFData<T, D> {
-    fn index_mut(&mut self, i: T) -> &mut Self::Output {
-        let idx = self.find(i).into();
-        &mut self.data[idx]
-    }
-}
-impl<T: Id, D: Clone> UFData<T, D> {
+
     /// Add a new entry
-    pub(crate) fn add(&mut self, data: D) -> T {
-        let id: T = self.repr.len().into();
+    pub(crate) fn add(&mut self, data: V) -> K {
+        let id: K = self.repr.len().into();
         self.repr.push(Cell::new(id));
         self.data.push(data);
         id
@@ -123,12 +107,12 @@ impl<T: Id, D: Clone> UFData<T, D> {
     /// Merge returns a result, if Err, it means it is not possible to merge
     /// the two data values and the union is canceled
     ///
-    pub(crate) fn union_merge<E, F: Merge<D, E>>(
+    pub(crate) fn union_merge<E, F: Merge<V, E>>(
         &mut self,
-        i: T,
-        j: T,
+        i: K,
+        j: K,
         mut merge: F,
-    ) -> Result<Option<(T, T)>, E> {
+    ) -> Result<Option<(K, K)>, E> {
         let (i, j) = (self.find(i), self.find(j));
         if i == j {
             return Ok(None);
@@ -166,5 +150,18 @@ impl<K: Id, V: Clone> FromIterator<V> for UFData<K, V> {
             uf.add(x);
         }
         uf
+    }
+}
+impl<K: Id, V> Index<K> for UFData<K, V> {
+    type Output = V;
+
+    fn index(&self, i: K) -> &Self::Output {
+        &self.data[self.find(i).into()]
+    }
+}
+impl<K: Id, V> IndexMut<K> for UFData<K, V> {
+    fn index_mut(&mut self, i: K) -> &mut Self::Output {
+        let idx = self.find(i).into();
+        &mut self.data[idx]
     }
 }

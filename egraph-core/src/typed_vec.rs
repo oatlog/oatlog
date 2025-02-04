@@ -5,7 +5,7 @@ use std::marker::PhantomData;
 use crate::ids::Id;
 
 /// Vec with typed indexes.
-#[derive(PartialEq, Eq, Default)]
+#[derive(Clone, PartialEq, Eq, Default)]
 pub(crate) struct TVec<K, V> {
     x: Vec<V>,
     _marker: PhantomData<K>,
@@ -24,19 +24,27 @@ impl<K: Id, V: Clone> TVec<K, V> {
         }
     }
 }
-impl<K: Id, V> TVec<K, V> {
-    pub(crate) fn iter(&self) -> impl Iterator<Item = (K, &V)> {
-        (0..).map(K::from).zip(self.x.iter())
-    }
-    pub(crate) fn push(&mut self, expected_id: K, v: V) {
-        assert_eq!(self.x.len(), expected_id.into());
-        self.x.push(v);
-    }
+impl<K, V> TVec<K, V> {
     pub(crate) fn new() -> Self {
         Self {
             x: Vec::new(),
             _marker: PhantomData,
         }
+    }
+    pub(crate) fn len(&self) -> usize {
+        self.x.len()
+    }
+}
+impl<K: Id, V> TVec<K, V> {
+    pub(crate) fn iter(&self) -> impl Iterator<Item=&V> {
+        self.x.iter()
+    }
+    pub(crate) fn indexed_iter(&self) -> impl Iterator<Item = (K, &V)> {
+        (0..).map(K::from).zip(self.x.iter())
+    }
+    pub(crate) fn push(&mut self, expected_id: K, v: V) {
+        assert_eq!(self.x.len(), expected_id.into());
+        self.x.push(v);
     }
     pub(crate) fn add(&mut self, v: V) -> K {
         let id = self.x.len().into();
@@ -65,5 +73,12 @@ impl<K: Id, V> std::ops::IndexMut<K> for TVec<K, V> {
 impl<K, V: Debug> Debug for TVec<K, V> {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         self.x.fmt(f)
+    }
+}
+impl<K, V> FromIterator<V> for TVec<K, V> {
+    fn from_iter<T: IntoIterator<Item = V>>(iter: T) -> Self {
+        let mut x = Self::new();
+        x.extend(iter);
+        x
     }
 }
