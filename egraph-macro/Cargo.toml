@@ -1,12 +1,14 @@
 [package]
-name = "egraph"
+name = "egraph-macro"
 version = "0.1.0"
 edition = "2021"
 
+[lib]
+proc-macro = true
+
 [dependencies]
-clap.workspace = true
 egraph-core.workspace = true
-egraph-macro.workspace = true
+proc-macro2.workspace = true
 
 [lints]
 workspace = true
