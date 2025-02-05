@@ -20,8 +20,29 @@ syn = "2.0.96"
 
 [workspace.lints.rust]
 unsafe_code = "deny" # override to allow per file
+unknown_lints = "deny" 
+renamed_and_removed_lints = "deny"
+
+rust_2018_idioms = { level = "warn", priority = -1 }
+nonstandard_style = { level = "warn", priority = -1 }
+future_incompatible = { level = "warn", priority = -1 }
+unexpected_cfgs = "warn"
 
 [workspace.lints.clippy]
+correctness = { level = "deny", priority = -1 }
+suspicious = { level = "deny", priority = -1 }
+
+
+complexity = { level = "warn", priority = -1 }
+perf = { level = "warn", priority = -1 }
+
+# cargo 
+cargo_common_metadata = "allow"
+multiple_crate_versions = "warn"
+negative_feature_names = "warn"
+redundant_feature_names = "warn"
+wildcard_dependencies = "warn"
+
 await_holding_lock = "warn"
 char_lit_as_u8 = "warn"
 checked_conversions = "warn"
@@ -40,7 +61,6 @@ flat_map_option = "warn"
 float_cmp_const = "warn"
 fn_params_excessive_bools = "warn"
 from_iter_instead_of_collect = "warn"
-future_incompatible = "warn"
 if_let_mutex = "warn"
 implicit_clone = "warn"
 imprecise_flops = "warn"
@@ -62,21 +82,18 @@ match_same_arms = "warn"
 match_wild_err_arm = "warn"
 match_wildcard_for_single_variants = "warn"
 mem_forget = "warn"
-mismatched_target_os = "warn"
 missing_enforced_import_renames = "warn"
 mut_mut = "warn"
 mutex_integer = "warn"
 needless_borrow = "warn"
 needless_continue = "warn"
 needless_for_each = "warn"
-nonstandard_style = "warn"
 option_option = "warn"
 path_buf_push_overwrite = "warn"
 ptr_as_ptr = "warn"
 rc_mutex = "warn"
 ref_option_ref = "warn"
 rest_pat_in_fully_bound_structs = "warn"
-rust_2018_idiom = "warn"
 same_functions_in_if_condition = "warn"
 semicolon_if_nothing_returned = "warn"
 single_match_else = "warn"
