@@ -1,8 +1,9 @@
-mod ids;
+mod codegen;
 mod frontend;
 mod hir;
-mod union_find;
+mod ids;
 mod typed_vec;
+mod union_find;
 
 #[must_use]
 pub fn compile_str(s: &str) -> String {
@@ -13,7 +14,6 @@ pub use frontend::compile_egraph as compile;
 #[cfg(test)]
 mod test {
     use super::*;
-    use proc_macro2::TokenStream;
 
     #[test]
     fn simple() {

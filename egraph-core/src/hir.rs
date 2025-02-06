@@ -103,7 +103,7 @@ impl Rule {
     fn unify(&self, merge: &[(VariableId, VariableId)], delete: &[VariableId]) -> Self {
         let n = self.variables.len();
         let mut keep: UFData<VariableId, (bool, VariableInfo)> =
-            self.variables.iter().map(|v| (true, *v)).collect();
+            self.variables.values().map(|v| (true, *v)).collect();
         for (a, b) in merge {
             keep.union_merge::<Uninhabited, _>(*a, *b, |(_, va), (_, vb)| {
                 Ok((true, VariableInfo::merge(va, vb)))

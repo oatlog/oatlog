@@ -1,5 +1,9 @@
-use std::{path::PathBuf, io::{self, Read, Write}, fs};
 use clap::Parser;
+use std::{
+    fs,
+    io::{self, Read, Write},
+    path::PathBuf,
+};
 
 #[derive(Parser)]
 #[command(version, about, long_about = None)]

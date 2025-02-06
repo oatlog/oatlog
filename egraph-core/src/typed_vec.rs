@@ -5,10 +5,18 @@ use std::marker::PhantomData;
 use crate::ids::Id;
 
 /// Vec with typed indexes.
-#[derive(Clone, PartialEq, Eq, Default)]
+#[derive(Clone, PartialEq, Eq)]
 pub(crate) struct TVec<K, V> {
     x: Vec<V>,
     _marker: PhantomData<K>,
+}
+impl<K, V> Default for TVec<K, V> {
+    fn default() -> Self {
+        Self {
+            x: Vec::new(),
+            _marker: PhantomData,
+        }
+    }
 }
 impl<K, V> Extend<V> for TVec<K, V> {
     fn extend<T: IntoIterator<Item = V>>(&mut self, iter: T) {
@@ -36,10 +44,10 @@ impl<K, V> TVec<K, V> {
     }
 }
 impl<K: Id, V> TVec<K, V> {
-    pub(crate) fn iter(&self) -> impl Iterator<Item=&V> {
+    pub(crate) fn values(&self) -> impl Iterator<Item=&V> {
         self.x.iter()
     }
-    pub(crate) fn indexed_iter(&self) -> impl Iterator<Item = (K, &V)> {
+    pub(crate) fn iter(&self) -> impl Iterator<Item = (K, &V)> {
         (0..).map(K::from).zip(self.x.iter())
     }
     pub(crate) fn push(&mut self, expected_id: K, v: V) {
@@ -63,6 +71,13 @@ impl<K: Id, V> std::ops::Index<K> for TVec<K, V> {
 
     fn index(&self, idx: K) -> &Self::Output {
         &self.x[idx.into()]
+    }
+}
+impl<K: Id, V> std::ops::Index<&K> for TVec<K, V> {
+    type Output = V;
+
+    fn index(&self, idx: &K) -> &Self::Output {
+        self.index(*idx)
     }
 }
 impl<K: Id, V> std::ops::IndexMut<K> for TVec<K, V> {

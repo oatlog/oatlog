@@ -32,7 +32,7 @@
             [ pkgs.rust-bin.stable.latest.default pkgs.nixfmt-classic ];
           text = ''
             set -v
-            cargo fmt
+            cargo fmt --all
             find . -name '*.nix' | grep -v Cargo.nix | xargs nixfmt'';
         };
 

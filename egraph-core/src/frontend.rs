@@ -1,6 +1,4 @@
-#![deny(clippy::only_used_in_recursion)]
-#![deny(clippy::map_clone)]
-#![deny(unused_must_use)]
+// TODO: ban retain_mut
 
 use crate::ids::{FunctionId, GlobalId, Id, TypeId, TypeVarId, Variable, VariableId};
 use crate::typed_vec::TVec;
@@ -1601,7 +1599,7 @@ mod compile_rule {
 
             let unit_ty = self.literal_type(Literal::Unit);
             let to_delete: Vec<_> = variables
-                .indexed_iter()
+                .iter()
                 .filter_map(|(i, info)| (types[info.ty].unwrap() == unit_ty).then_some(i))
                 .collect();
 
@@ -1627,7 +1625,7 @@ mod compile_rule {
                 .collect();
 
             let variables = variables
-                .indexed_iter()
+                .iter()
                 .map(
                     |(_, VariableInfo { label, global, ty })| crate::hir::VariableInfo {
                         name: label.map(|x| *x),
