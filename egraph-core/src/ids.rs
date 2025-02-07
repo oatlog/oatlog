@@ -32,7 +32,6 @@ macro_rules! id_wrap {
 pub(crate) use id_wrap;
 id_wrap!(RelationId, "id for a function/table/relation");
 id_wrap!(VariableId, "id for a variable within a rule");
-id_wrap!(Variable, "todo delete");
 id_wrap!(PremiseId, "id for a premise variable (forall)");
 id_wrap!(ActionId, "id for an action variable (exists)");
 id_wrap!(GlobalId, "id for a global variable");

@@ -1,40 +1,33 @@
-// TODO: ban retain_mut
+//! Frontend, parse source text into HIR.
 
-use crate::hir;
-use crate::ids::{GlobalId, Id, RelationId, TypeId, TypeVarId, Variable, VariableId};
-use crate::typed_vec::TVec;
-use crate::union_find::UFData;
+use std::{
+    cmp::Ordering,
+    collections::{btree_map::Entry, BTreeMap},
+    convert::TryFrom,
+    fmt::{Debug, Display},
+    hash::{Hash, Hasher},
+    mem::take,
+    ops::{Deref, DerefMut, FnMut},
+};
+
 use educe::Educe;
 use proc_macro2::{Delimiter, Span, TokenTree};
 
-#[allow(unused_imports)]
-use std::{
-    array::from_fn,
-    cmp::{Ordering, Reverse},
-    collections::btree_map::Entry,
-    collections::{hash_map::DefaultHasher, BTreeMap, BTreeSet, BinaryHeap, VecDeque},
-    convert::{TryFrom, TryInto},
-    fmt::{Debug, Display},
-    hash::{Hash, Hasher},
-    io::{BufRead, StdinLock, StdoutLock, Write},
-    iter::FromIterator,
-    marker::PhantomData,
-    mem::{replace, swap, take, MaybeUninit},
-    num::ParseIntError,
-    ops::{
-        Add, AddAssign, BitAnd, BitAndAssign, BitOr, BitOrAssign, BitXor, BitXorAssign, Deref,
-        DerefMut, Div, DivAssign, Drop, Fn, FnMut, FnOnce, Index, IndexMut, Mul, MulAssign, Neg,
-        Not, RangeBounds, Rem, RemAssign, Shl, ShlAssign, Shr, ShrAssign, Sub, SubAssign,
-    },
-    slice,
-    str::{FromStr, SplitWhitespace},
+use crate::{
+    hir,
+    ids::{GlobalId, Id, RelationId, TypeId},
+    typed_vec::TVec,
 };
 
+// TODO: ban retain_mut
+
+/*
 macro_rules! error_span {
     ($x:ident, $msg:literal) => {
         return proc_macro2::TokenStream::from(quote_spanned!($x.span() => compile_error!($msg)))
     }
 }
+*/
 
 #[rustfmt::skip]
 macro_rules! err_ {
@@ -75,6 +68,7 @@ macro_rules! register_span {
         // repeated stuff because nested varadic macros do not seem to work that well.
         let _span = $span;
 
+        #[allow(unused)]
         macro_rules! bare {
             ($a0:literal) => { syn::Error::new(_span, format!($a0)) };
             ($a0:literal, $a1:tt) => { syn::Error::new(_span, format!($a0, $a1)) };
@@ -103,6 +97,7 @@ macro_rules! register_span {
             ($span2:expr, $a0:literal, $a1:tt, $a2:tt, $a3:tt, $a4:tt, $a5:tt, $a6:tt, $a7:tt, $a8:tt, $a9:tt, $a10:tt, $a11:tt) => { syn::Error::new($span2, format!($a0, $a1, $a2, $a3, $a4, $a5, $a6, $a7, $a8, $a9, $a10, $a11)) };
             ($span2:expr, $a0:literal, $a1:tt, $a2:tt, $a3:tt, $a4:tt, $a5:tt, $a6:tt, $a7:tt, $a8:tt, $a9:tt, $a10:tt, $a11:tt, $a12:tt) => { syn::Error::new($span2, format!($a0, $a1, $a2, $a3, $a4, $a5, $a6, $a7, $a8, $a9, $a10, $a11, $a12)) };
         }
+        #[allow(unused)]
         macro_rules! err {
             ($a0:literal) => { Err(syn::Error::new(_span, format!($a0))) };
             ($a0:literal, $a1:tt) => { Err(syn::Error::new(_span, format!($a0, $a1))) };
@@ -188,7 +183,7 @@ fn compile_egraph_inner(x: proc_macro2::TokenStream) -> syn::Result<proc_macro2:
         register_span!(token_tree.span());
 
         match token_tree {
-            TokenTree::Group(ref group) => {
+            TokenTree::Group(group) => {
                 let delim = group.delimiter();
                 let stream = group.stream();
                 match delim {
@@ -204,7 +199,7 @@ fn compile_egraph_inner(x: proc_macro2::TokenStream) -> syn::Result<proc_macro2:
             TokenTree::Punct(_) => (),
             TokenTree::Literal(literal) => {
                 let x = syn::Lit::new(literal);
-                match &x {
+                match x {
                     syn::Lit::Str(_) => ret!(x.span(), "reading files unimplemented"),
                     _ => ret!(x.span(), "expected a string literal"),
                 }
@@ -225,8 +220,8 @@ enum Literal {
 }
 impl Literal {
     fn i64(&self) -> Result<i64, ()> {
-        if let Self::I64(i) = self {
-            Ok(*i)
+        if let Self::I64(i) = *self {
+            Ok(i)
         } else {
             Err(())
         }
@@ -402,9 +397,8 @@ impl SexpSpan {
             }
         }
         end_token!();
-        // (end token)
 
-        Ok(dbg!(v))
+        Ok(v)
     }
 }
 
@@ -527,42 +521,32 @@ impl<T> DerefMut for Spanned<T> {
 type Str = Spanned<&'static str>;
 
 #[derive(Debug, PartialEq)]
-struct StringIds<T>(BTreeMap<&'static str, Spanned<T>>, &'static str);
+struct StringIds<T> {
+    x: BTreeMap<&'static str, Spanned<T>>,
+    label: &'static str,
+}
 impl<T: Id> StringIds<T> {
-    fn len(&self) -> usize {
-        self.0.len()
-    }
     fn add_unique(&mut self, s: Str) -> syn::Result<T> {
-        let id = self.0.len().into();
-        self.0
-            .insert_unique(s.x, Spanned::new(id, s.span), self.1)?;
+        let id = self.x.len().into();
+        self.x
+            .insert_unique(s.x, Spanned::new(id, s.span), self.label)?;
         Ok(id)
     }
     fn lookup(&self, s: Str) -> syn::Result<T> {
-        if let Some(value) = self.0.get(s.x) {
+        if let Some(value) = self.x.get(s.x) {
             Ok(**value)
         } else {
             Err(syn::Error::new(
                 s.span,
-                format!("{} {s} is not defined", self.1),
+                format!("{} {s} is not defined", self.label),
             ))
         }
     }
     fn new(label: &'static str) -> Self {
-        Self(BTreeMap::new(), label)
-    }
-}
-
-#[derive(Debug, PartialEq)]
-struct IdGen<T>(usize, PhantomData<T>);
-impl<T: Id> IdGen<T> {
-    fn new() -> Self {
-        Self(0, PhantomData)
-    }
-    fn gen(&mut self) -> T {
-        let id = self.0;
-        self.0 += 1;
-        id.into()
+        Self {
+            x: BTreeMap::new(),
+            label,
+        }
     }
 }
 
@@ -666,89 +650,24 @@ impl<V: Clone> MapExt<&'static str, Spanned<V>> for BTreeMap<&'static str, Spann
     }
 }
 
-#[derive(PartialEq, Debug)]
-struct Rule {
-    /// Facts to check before running action
-    premises: Vec<(RelationId, Vec<Variable>, Variable)>,
-    /// Facts to add when action is triggered
-    actions: Vec<(RelationId, Vec<Variable>, Variable)>,
-    /// Variables to unify when action is triggered
-    join: Vec<(Variable, Variable)>,
-    /// (`type`, `global_id`, `name`)
-    variables: TVec<Variable, (TypeId, Option<GlobalId>, &'static str)>,
-}
-
 /// Global parsing state
 #[derive(Debug, PartialEq)]
 struct Parser {
     rulesets: BTreeMap<Str, ()>,
 
-    // TODO: BTreeMap -> TVec
     functions: TVec<RelationId, FunctionData>,
     function_possible_ids: BTreeMap<Str, Vec<RelationId>>,
-    function_id_gen: IdGen<RelationId>,
 
-    types: BTreeMap<TypeId, TypeData>,
+    types: TVec<TypeId, TypeData>,
     type_ids: StringIds<TypeId>,
 
-    /// "database index" for `global_variable_info`
+    global_variables: TVec<GlobalId, GlobalVariableInfo>,
     global_variable_names: BTreeMap<Str, GlobalId>,
-    /// "database index" for `global_variable_info`
-    global_compute: BTreeMap<ComputeMethod, GlobalId>,
-    /// id -> metadata
-    global_variable_info: TVec<GlobalId, GlobalVariableInfo>,
+    compute_to_global: BTreeMap<ComputeMethod, GlobalId>,
 
-    initial: Vec<Initial>,
-
-    rules: Vec<Rule>,
-
-    rules2: Vec<hir::Rule>,
+    rules: Vec<hir::Rule>,
 }
 impl Parser {
-    // fn graphviz_rule(&mut self, rule: &Rule) {
-    //     let mut buf = String::new();
-    //     use std::fmt::Write;
-
-    //     macro_rules! w {
-    //         ($($arg:tt)*) => {
-    //             let _ = writeln!(&mut buf, $($arg)*);
-    //         }
-    //     }
-    //     w!("digraph G {{");
-    //     let rule_i = 0;
-    //     for (cluster_label, rule_offset, at) in [
-    //         ("premises", 0, &rule.premises),
-    //         ("action", rule.premises.len(), &rule.actions),
-    //     ] {
-    //         w!("subgraph cluster_{cluster_label} {{");
-    //         for (premise_i, (id, variables, ret)) in at.iter().enumerate() {
-    //             let premise_i = premise_i + rule_offset;
-    //             let function = &self.functions[id];
-    //             let function_name = *function.name;
-    //             let function_node_name = format!("{function_name}_{premise_i}");
-
-    //             w!("\"{function_node_name}\" [label=\"{function_name}\", shape=rect];");
-    //             for (arg_num, variable) in variables.iter().enumerate() {
-    //                 let variable_i = variable.0;
-
-    //                 let variable_name = rule.variables[*variable].2;
-    //                 let variable_node_name = format!("v{variable_name}");
-    //                 w!("\"{variable_node_name}\" [label = \"{variable_name}\"];");
-
-    //                 w!("\"{variable_node_name}\" -> \"{function_node_name}\";");
-    //             }
-
-    //             let variable_name = rule.variables[*ret].2;
-    //             let variable_node_name = format!("v{variable_name}");
-    //             w!("\"{variable_node_name}\" [label = \"{variable_name}\"];");
-    //             w!("\"{function_node_name}\" -> \"{variable_node_name}\";");
-    //         }
-    //         w!("}}");
-    //     }
-    //     w!("}}");
-    //     eprintln!("{buf}");
-    // }
-
     /// Add a global variable. Hashcons based on the compute method
     ///
     /// # Returns
@@ -776,12 +695,12 @@ impl Parser {
             }
         }
 
-        let new_id = GlobalId(self.global_compute.len());
+        let new_id = GlobalId(self.compute_to_global.len());
         let id = *self
-            .global_compute
+            .compute_to_global
             .entry(compute.clone())
             .or_insert_with(|| {
-                self.global_variable_info
+                self.global_variables
                     .push_expected(new_id, GlobalVariableInfo { ty, compute });
                 new_id
             });
@@ -798,16 +717,13 @@ impl Parser {
 
             functions: TVec::new(),
             function_possible_ids: BTreeMap::new(),
-            function_id_gen: IdGen::new(),
 
-            types: BTreeMap::new(),
+            types: TVec::new(),
             type_ids: StringIds::new("type"),
             global_variable_names: BTreeMap::new(),
-            global_variable_info: TVec::new(),
-            initial: Vec::new(),
-            global_compute: BTreeMap::new(),
+            global_variables: TVec::new(),
+            compute_to_global: BTreeMap::new(),
             rules: Vec::new(),
-            rules2: Vec::new(),
         };
         for builtin in BUILTIN_SORTS {
             let _ty = parser.add_sort(
@@ -841,7 +757,7 @@ impl Parser {
                 [name] => {
                     let name = name.atom("sort name")?;
                     let primitive = None;
-                    let _ = self.add_sort(name, primitive);
+                    let _: TypeId = self.add_sort(name, primitive)?;
                 }
                 [name, primitive] => {
                     let name = name.atom("sort name")?;
@@ -850,7 +766,7 @@ impl Parser {
                         .iter()
                         .map(|x| x.atom("sort primitive"))
                         .collect::<Result<Vec<_>, _>>()?;
-                    let _ = self.add_sort(name, Some(primitive));
+                    let _: TypeId = self.add_sort(name, Some(primitive))?;
                 }
                 _ => ret!("usage: (sort <name>) or (sort <name> (<collection> <args>*))"),
             },
@@ -1071,7 +987,7 @@ impl Parser {
 
     fn add_sort(&mut self, name: Str, primitive: Option<Vec<Str>>) -> syn::Result<TypeId> {
         let id = self.type_ids.add_unique(name)?;
-        self.types.insert(id, TypeData { name, primitive });
+        self.types.push_expected(id, TypeData { name, primitive });
         Ok(id)
     }
 
@@ -1131,20 +1047,20 @@ impl Parser {
     }
 }
 
-#[derive(Debug, Clone, PartialEq)]
-enum Initial {
-    /// make sure that this global is computed as this point.
-    /// only globals listed as `ComputeGlobal` may be referenced.
-    /// it is possible that there are request to compute the same
-    /// thing twice if the following occurs:
-    /// ```text
-    /// (let x (foobar a b))
-    /// (let y x)
-    /// ```
-    ComputeGlobal(GlobalId),
-    /// `ComputeGlobal` has been run on lhs and rhs
-    Union(GlobalId, GlobalId),
-}
+// #[derive(Debug, Clone, PartialEq)]
+// enum Initial {
+//     /// make sure that this global is computed as this point.
+//     /// only globals listed as `ComputeGlobal` may be referenced.
+//     /// it is possible that there are request to compute the same
+//     /// thing twice if the following occurs:
+//     /// ```text
+//     /// (let x (foobar a b))
+//     /// (let y x)
+//     /// ```
+//     ComputeGlobal(GlobalId),
+//     /// `ComputeGlobal` has been run on lhs and rhs
+//     Union(GlobalId, GlobalId),
+// }
 
 #[derive(Debug)]
 enum Action {
@@ -1178,7 +1094,7 @@ impl Parser {
                 }
                 Expr::Var(x) => {
                     let id = parser.global_variable_names.lookup(x, "global variable")?;
-                    (id, parser.global_variable_info[id].ty)
+                    (id, parser.global_variables[id].ty)
                 }
                 Expr::Call(name, args) => {
                     let possible_ids = parser.function_possible_ids.lookup(name, "function")?;
@@ -1237,7 +1153,7 @@ impl Parser {
             })
         }
         let (id, ty) = parse(self, expr)?;
-        let compute = self.global_variable_info[id].compute.clone();
+        let compute = self.global_variables[id].compute.clone();
         assert_eq!(id, self.add_global(Some(binding_name), ty, compute)?);
         Ok(())
     }
@@ -1352,10 +1268,13 @@ impl Parser {
                 todo!()
             })
             .collect();
+        _ = functions;
         todo!()
         // hir::Theory {
-        //     rules: self.rules2.clone(),
+        //     rules: self.rules.clone(),
         //     relations: functions,
+        //     name: "",
+        //     types: todo!(),
         // }
     }
 }
@@ -1388,11 +1307,16 @@ fn parse_options(
 
 mod compile_rule {
 
-    use super::{
-        replace, Action, BTreeMap, ComputeMethod, Expr, GlobalId, Literal, MapExt, Parser,
-        RelationId, Str, TVec, TypeId, TypeVarId, UFData, VariableId,
+    use std::{collections::BTreeMap, mem::replace};
+
+    use super::{Action, ComputeMethod, Expr, Literal, MapExt as _, Parser, Str};
+
+    use crate::{
+        hir,
+        ids::{GlobalId, RelationId, TypeId, TypeVarId, VariableId},
+        typed_vec::TVec,
+        union_find::UFData,
     };
-    use crate::hir;
 
     #[derive(Copy, Clone, PartialEq, Debug)]
     struct VariableInfo {
@@ -1438,7 +1362,7 @@ mod compile_rule {
             }
             Expr::Var(name) => {
                 if let Some(&global_id) = parser.global_variable_names.get(name) {
-                    let ty = parser.global_variable_info[global_id].ty;
+                    let ty = parser.global_variables[global_id].ty;
                     let typevar = types.push(Some(ty));
                     variables.push(VariableInfo {
                         label: Some(*name),
@@ -1472,42 +1396,39 @@ mod compile_rule {
                     })
                     .collect::<Result<_, _>>()?;
 
-                match **name {
-                    "=" => {
-                        for (a, b) in args.windows(2).map(|w| (w[0], w[1])) {
-                            let ta = variables[a].ty;
-                            let tb = variables[b].ty;
-                            let _: Option<(TypeVarId, TypeVarId)> = types
-                                .union_eq(ta, tb)
-                                .map_err(|()| syn::Error::new(name.span, "type mismatch"))?;
-                            unify.push(vec![a, b]);
-                        }
-                        let rval_ty = parser.literal_type(Literal::Unit);
-                        let rval_typevar = types.push(Some(rval_ty));
-                        variables.push(VariableInfo {
-                            label: None,
-                            global: None,
-                            ty: rval_typevar,
-                        })
+                if **name == "=" {
+                    for (a, b) in args.windows(2).map(|w| (w[0], w[1])) {
+                        let ta = variables[a].ty;
+                        let tb = variables[b].ty;
+                        let _: Option<(TypeVarId, TypeVarId)> = types
+                            .union_eq(ta, tb)
+                            .map_err(|()| syn::Error::new(name.span, "type mismatch"))?;
+                        unify.push(vec![a, b]);
                     }
-                    _ => {
-                        let rval_typevar = types.push(None);
-                        let rval = variables.push(VariableInfo {
-                            label: None,
-                            global: None,
-                            ty: rval_typevar,
-                        });
-                        let ids = parser
-                            .function_possible_ids
-                            .lookup(*name, "function call")?;
-                        calls.push(UnknownCall {
-                            name: **name,
-                            ids,
-                            args,
-                            rval,
-                        });
-                        rval
-                    }
+                    let rval_ty = parser.literal_type(Literal::Unit);
+                    let rval_typevar = types.push(Some(rval_ty));
+                    variables.push(VariableInfo {
+                        label: None,
+                        global: None,
+                        ty: rval_typevar,
+                    })
+                } else {
+                    let rval_typevar = types.push(None);
+                    let rval = variables.push(VariableInfo {
+                        label: None,
+                        global: None,
+                        ty: rval_typevar,
+                    });
+                    let ids = parser
+                        .function_possible_ids
+                        .lookup(*name, "function call")?;
+                    calls.push(UnknownCall {
+                        name: **name,
+                        ids,
+                        args,
+                        rval,
+                    });
+                    rval
                 }
             }
         })
@@ -1644,14 +1565,15 @@ mod compile_rule {
                 })
                 .collect();
 
+            _ = ruleset;
             let rule = hir::RuleArgs {
-                name: name.map(|x| *x).unwrap_or(""),
+                name: name.map_or("", |x| *x),
                 sort_vars: sort_constraints,
                 variables: variables
                     .iter()
                     .map(|VariableInfo { label, global, ty }| {
-                        let _ = global;
-                        (types[*ty].unwrap(), label.map(|x| *x).unwrap_or(""))
+                        let _: &Option<GlobalId> = global;
+                        (types[*ty].unwrap(), label.map_or("", |x| *x))
                     })
                     .collect(),
                 premise: premise_relations,
@@ -1662,7 +1584,7 @@ mod compile_rule {
             }
             .build();
 
-            self.rules2.push(rule);
+            self.rules.push(rule);
 
             Ok(())
         }

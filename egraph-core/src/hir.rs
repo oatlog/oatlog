@@ -1,15 +1,16 @@
 //! High-level intermediate representation
 //! Desugared, flattened rules.
 
-use std::collections::{HashMap, HashSet};
-use std::convert::identity;
-use std::mem::take;
+use std::{
+    collections::{HashMap, HashSet},
+    convert::identity,
+};
 
-use crate::ids::{GlobalId, RelationId, TypeId, VariableId};
-use crate::typed_vec::TVec;
-use crate::union_find::{UFData, Uninhabited, UF};
-
-use crate::ids::{ActionId, Id, PremiseId};
+use crate::{
+    ids::{ActionId, Id, PremiseId, RelationId, TypeId, VariableId},
+    typed_vec::TVec,
+    union_find::{UFData, UF},
+};
 
 /// Represents a theory (set of rules) with associated information
 #[derive(Clone, Eq, PartialEq, Ord, PartialOrd, Hash, Debug, Default)]
@@ -37,6 +38,7 @@ pub(crate) struct Relation {
 #[must_use]
 #[derive(Clone, Eq, PartialEq, Ord, PartialOrd, Hash, Debug, Default)]
 pub(crate) struct Rule {
+    pub(crate) name: &'static str,
     /// Requirements to trigger rule
     pub(crate) premise_relations: Vec<PremiseRelation>,
 
@@ -106,8 +108,6 @@ impl RuleArgs {
             action_unify: self_action_unify,
             delete: self_delete,
         } = self;
-        let name = self_name;
-
         let n = self_variables.len();
 
         let merge_premise: Vec<Vec<PremiseId>> = self_premise_unify
@@ -149,7 +149,7 @@ impl RuleArgs {
             .map(|(i, (ty, name))| {
                 let i = PremiseId(i);
                 (
-                    VariableMeta { ty, name },
+                    VariableMeta { name, ty },
                     in_premise.contains(&i).then_some(i),
                 )
             })
@@ -180,6 +180,7 @@ impl RuleArgs {
             unify,
             action_variables,
             premise_variables,
+            name: self_name,
         }
         .unify(UnifyArgs {
             merge_premise,
@@ -229,11 +230,7 @@ impl Rule {
         let action_relations: Vec<_>;
         {
             let mut merged_action_variables: UFData<ActionId, (VariableMeta, Option<PremiseId>)> =
-                self.action_variables
-                    .iter()
-                    .copied()
-                    .map(|(meta, link)| (meta, link))
-                    .collect();
+                self.action_variables.iter().copied().collect();
             for (a, b) in as_pairs(&merge_action, &identity) {
                 merged_action_variables.union_merge(a, b, |(am, al), (bm, bl)| {
                     let meta = VariableMeta::merge(am, bm);
@@ -246,7 +243,7 @@ impl Rule {
                         }
                     };
                     (meta, link)
-                })
+                });
             }
             let action_delete: HashSet<_> = action_delete
                 .into_iter()
@@ -286,7 +283,7 @@ impl Rule {
             merged_premise_variables = self.premise_variables.iter().copied().collect();
 
             for (a, b) in as_pairs(&merge_premise, &identity) {
-                merged_premise_variables.union_merge(a, b, |a, b| VariableMeta::merge(a, b))
+                merged_premise_variables.union_merge(a, b, VariableMeta::merge);
             }
 
             let premise_delete: HashSet<_> = premise_delete
@@ -338,11 +335,12 @@ impl Rule {
                             break;
                         }
                     }
-                    if !ok {
-                        // TODO: think about what to do here.
-                        // it might be ok to delete the action variable or set the link to none.
-                        panic!("deleted set of premise variables that action variable was referring to");
-                    }
+                    // TODO: think about what to do here.
+                    // it might be ok to delete the action variable or set the link to none.
+                    assert!(
+                        ok,
+                        "deleted set of premise variables that action variable was referring to"
+                    );
                 }
             }
             // fix unify
@@ -362,6 +360,7 @@ impl Rule {
             unify,
             action_variables,
             premise_variables,
+            name: self.name,
         }
         .normalize()
     }
@@ -377,15 +376,14 @@ impl Rule {
 
         // remove actions present in premise.
         self.action_relations.retain(|a| {
-            for p in self.premise_relations.iter() {
+            for p in &self.premise_relations {
                 if a.relation != p.relation || a.args.len() != p.args.len() {
                     continue;
                 }
                 let exists_in_premise = a.args.iter().zip(p.args.iter()).all(|(&a, &p)| {
                     self.action_variables[a]
                         .1
-                        .map(|s| self.unify.set(s).contains(&p))
-                        .unwrap_or(false)
+                        .map_or(false, |s| self.unify.set(s).contains(&p))
                 });
                 if exists_in_premise {
                     return false;
@@ -395,27 +393,27 @@ impl Rule {
         });
 
         // pointers to unify are canonical.
-        self.action_variables.iter_mut().for_each(|(_, a)| {
+        for (_, a) in self.action_variables.iter_mut() {
             if let Some(s) = a.as_mut() {
                 *s = self.unify.find(*s);
             }
-        })
+        }
     }
 
     fn normalize_id_changing(self) -> Self {
         // two action variables pointing to the same unify set are equivalent
         {
-            let mut group: HashMap<PremiseId, Vec<ActionId>> = HashMap::new();
+            let mut grouping: HashMap<PremiseId, Vec<ActionId>> = HashMap::new();
             for (a, (_, p)) in self.action_variables.iter_enumerate() {
                 if let Some(p) = p {
-                    group.entry(*p).or_default().push(a);
+                    grouping.entry(*p).or_default().push(a);
                 }
             }
-            let group: Vec<_> = group.values().cloned().filter(|x| x.len() > 1).collect();
-            if group.len() > 0 {
+            let grouping: Vec<_> = grouping.values().filter(|x| x.len() > 1).cloned().collect();
+            if !grouping.is_empty() {
                 return self.unify(UnifyArgs {
                     merge_premise: Vec::new(),
-                    merge_action: group,
+                    merge_action: grouping,
                     premise_delete: Vec::new(),
                     action_delete: Vec::new(),
                 });
@@ -430,7 +428,7 @@ impl Rule {
                 unused_action_variables.remove(x);
             }
             let unused_action_variables: Vec<_> = unused_action_variables.into_iter().collect();
-            if unused_action_variables.len() > 0 {
+            if !unused_action_variables.is_empty() {
                 return self.unify(UnifyArgs {
                     merge_premise: Vec::new(),
                     merge_action: Vec::new(),
@@ -445,7 +443,7 @@ impl Rule {
             // TODO: think about how to handle action variables referencing these
         }
 
-        return self;
+        self
     }
 }
 
