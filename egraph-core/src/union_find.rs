@@ -1,4 +1,5 @@
 use std::cell::Cell;
+use std::hash::Hash;
 use std::ops::{Index, IndexMut};
 
 use crate::ids::Id;
@@ -16,34 +17,21 @@ pub(crate) type UF<T> = UFData<T, ()>;
 /// Union Find with optional attached data.
 ///
 /// Indexing canonicalizes the index and returns the associated data for that index.
-#[derive(Clone, Debug)]
+/// Note that Eq, Hash is kinda broken because the data structure is not bit-equal when commuting
+/// edge additions.
+#[derive(Clone, Eq, PartialEq, Ord, PartialOrd, Debug, Default)]
 pub(crate) struct UFData<K: Id, V> {
     repr: Vec<Cell<K>>,
     data: Vec<V>,
+    sets: Vec<Vec<K>>,
 }
 impl<K: Id, V: Clone> UFData<K, V> {
     pub(crate) fn new_with_size(n: usize, default: V) -> Self {
         Self {
             repr: (0..n).map(K::from).map(Cell::new).collect(),
             data: vec![default; n],
+            sets: (0..n).map(K::from).map(|i| vec![i]).collect(),
         }
-    }
-}
-impl<K: Id, V: PartialEq> PartialEq for UFData<K, V> {
-    fn eq(&self, other: &Self) -> bool {
-        self.canonicalize();
-        other.canonicalize();
-
-        let Self {
-            repr: srepr,
-            data: sdata,
-        } = self;
-        let Self {
-            repr: orepr,
-            data: odata,
-        } = other;
-
-        srepr == orepr && odata == sdata
     }
 }
 
@@ -58,6 +46,7 @@ impl<K: Id, V> UFData<K, V> {
         Self {
             repr: vec![],
             data: vec![],
+            sets: vec![],
         }
     }
     pub(crate) fn find(&self, i: K) -> K {
@@ -68,6 +57,11 @@ impl<K: Id, V> UFData<K, V> {
             self.repr[i.into()].set(new_repr);
             new_repr
         }
+    }
+    /// The set that this element belongs to
+    pub(crate) fn set(&self, i: K) -> &[K] {
+        let i = self.find(i);
+        &self.sets[i.into()]
     }
 }
 impl<K: Id, V: Clone> UFData<K, V> {
@@ -83,6 +77,18 @@ impl<K: Id, V: Clone> UFData<K, V> {
         })
     }
 
+    pub(crate) fn iter_merged_sets(&self) -> impl Iterator<Item = &[K]> {
+        (0..self.repr.len()).filter_map(|i0| {
+            let i0 = i0.into();
+            let i = self.find(i0);
+            if i != i0 && self.sets[i.into()].len() > 1 {
+                None
+            } else {
+                Some(self.sets[i.into()].as_slice())
+            }
+        })
+    }
+
     /// Iterate all entries, including non-root.
     ///
     /// Iterator element is (id, find(id), find(id).value)
@@ -95,10 +101,11 @@ impl<K: Id, V: Clone> UFData<K, V> {
     }
 
     /// Add a new entry
-    pub(crate) fn add(&mut self, data: V) -> K {
+    pub(crate) fn push(&mut self, data: V) -> K {
         let id: K = self.repr.len().into();
         self.repr.push(Cell::new(id));
         self.data.push(data);
+        self.sets.push(vec![id]);
         id
     }
 
@@ -123,6 +130,11 @@ impl<K: Id, V: Clone> UFData<K, V> {
         // merge canceled if err
         let res = (merge)(a, b)?;
 
+        let mut new_set = Vec::new();
+        new_set.extend(self.sets[i.into()].clone());
+        new_set.extend(self.sets[j.into()].clone());
+        self.sets[j.into()] = new_set;
+
         self.data[j.into()] = res;
         self.repr[j.into()].set(i);
         Ok(Some((i, j)))
@@ -143,11 +155,18 @@ impl<T: Id> UF<T> {
     }
 }
 
+impl<K: Id, V: Hash> Hash for UFData<K, V> {
+    fn hash<H: std::hash::Hasher>(&self, state: &mut H) {
+        self.data.hash(state);
+        self.sets.hash(state);
+    }
+}
+
 impl<K: Id, V: Clone> FromIterator<V> for UFData<K, V> {
     fn from_iter<T: IntoIterator<Item = V>>(iter: T) -> Self {
         let mut uf = UFData::new();
         for x in iter {
-            uf.add(x);
+            uf.push(x);
         }
         uf
     }

@@ -1,6 +1,7 @@
 // TODO: ban retain_mut
 
-use crate::ids::{FunctionId, GlobalId, Id, TypeId, TypeVarId, Variable, VariableId};
+use crate::hir;
+use crate::ids::{GlobalId, Id, RelationId, TypeId, TypeVarId, Variable, VariableId};
 use crate::typed_vec::TVec;
 use crate::union_find::UFData;
 use educe::Educe;
@@ -588,7 +589,7 @@ struct GlobalVariableInfo {
 #[derive(Debug, Clone, PartialEq, Eq, Hash, Ord, PartialOrd)]
 enum ComputeMethod {
     Function {
-        function: FunctionId,
+        function: RelationId,
         args: Vec<GlobalId>,
     },
     Literal(Literal),
@@ -668,9 +669,9 @@ impl<V: Clone> MapExt<&'static str, Spanned<V>> for BTreeMap<&'static str, Spann
 #[derive(PartialEq, Debug)]
 struct Rule {
     /// Facts to check before running action
-    premises: Vec<(FunctionId, Vec<Variable>, Variable)>,
+    premises: Vec<(RelationId, Vec<Variable>, Variable)>,
     /// Facts to add when action is triggered
-    actions: Vec<(FunctionId, Vec<Variable>, Variable)>,
+    actions: Vec<(RelationId, Vec<Variable>, Variable)>,
     /// Variables to unify when action is triggered
     join: Vec<(Variable, Variable)>,
     /// (`type`, `global_id`, `name`)
@@ -683,9 +684,9 @@ struct Parser {
     rulesets: BTreeMap<Str, ()>,
 
     // TODO: BTreeMap -> TVec
-    functions: BTreeMap<FunctionId, FunctionData>,
-    function_possible_ids: BTreeMap<Str, Vec<FunctionId>>,
-    function_id_gen: IdGen<FunctionId>,
+    functions: TVec<RelationId, FunctionData>,
+    function_possible_ids: BTreeMap<Str, Vec<RelationId>>,
+    function_id_gen: IdGen<RelationId>,
 
     types: BTreeMap<TypeId, TypeData>,
     type_ids: StringIds<TypeId>,
@@ -701,7 +702,7 @@ struct Parser {
 
     rules: Vec<Rule>,
 
-    rules2: Vec<crate::hir::Rule>,
+    rules2: Vec<hir::Rule>,
 }
 impl Parser {
     // fn graphviz_rule(&mut self, rule: &Rule) {
@@ -781,7 +782,7 @@ impl Parser {
             .entry(compute.clone())
             .or_insert_with(|| {
                 self.global_variable_info
-                    .push(new_id, GlobalVariableInfo { ty, compute });
+                    .push_expected(new_id, GlobalVariableInfo { ty, compute });
                 new_id
             });
 
@@ -795,7 +796,7 @@ impl Parser {
         let mut parser = Parser {
             rulesets: BTreeMap::new(),
 
-            functions: BTreeMap::new(),
+            functions: TVec::new(),
             function_possible_ids: BTreeMap::new(),
             function_id_gen: IdGen::new(),
 
@@ -1088,18 +1089,14 @@ impl Parser {
                 .lookup(Str::with_placeholder(BUILTIN_UNIT))
                 .expect("unit type exists")
         });
-        let id = self.function_id_gen.gen();
+        let id = self.functions.push(FunctionData {
+            name,
+            inputs,
+            output,
+            merge,
+            cost,
+        });
         self.function_possible_ids.entry(name).or_default().push(id);
-        self.functions.insert(
-            id,
-            FunctionData {
-                name,
-                inputs,
-                output,
-                merge,
-                cost,
-            },
-        );
     }
 }
 
@@ -1195,7 +1192,7 @@ impl Parser {
                     let ids: Vec<_> = possible_ids
                         .iter()
                         .copied()
-                        .filter(|id| parser.functions[id].check_compatible(&arg_ty_opt, None))
+                        .filter(|id| parser.functions[*id].check_compatible(&arg_ty_opt, None))
                         .collect();
 
                     let inputs_ty_s = arg_ty
@@ -1210,7 +1207,7 @@ impl Parser {
                                 function: *id,
                                 args,
                             };
-                            let ty = parser.functions[id].output;
+                            let ty = parser.functions[*id].output;
                             (parser.add_global(None, ty, compute)?, ty)
                         }
                         [] => {
@@ -1252,8 +1249,8 @@ impl Parser {
             syn::Error::new(name.span, format!("type {name} defined here")),
         );
     }
-    fn err_function_defined_here(&mut self, id: FunctionId, err: &mut syn::Error) {
-        let function = &self.functions[&id];
+    fn err_function_defined_here(&mut self, id: RelationId, err: &mut syn::Error) {
+        let function = &self.functions[id];
         let inputs_ty_s = function
             .inputs
             .iter()
@@ -1340,6 +1337,27 @@ impl Parser {
     fn type_name(&self, ty: TypeId) -> Str {
         self.types[&ty].name
     }
+
+    pub(crate) fn emit_hir(&self) -> hir::Theory {
+        let unit_ty = self.literal_type(Literal::Unit);
+        let functions: TVec<RelationId, hir::Relation> = self
+            .functions
+            .iter()
+            .map(|function| {
+                let mut ty = function.inputs.clone();
+                if function.output != unit_ty {
+                    ty.push(function.output);
+                }
+                //hir::Function { ty }
+                todo!()
+            })
+            .collect();
+        todo!()
+        // hir::Theory {
+        //     rules: self.rules2.clone(),
+        //     relations: functions,
+        // }
+    }
 }
 
 fn parse_options(
@@ -1371,9 +1389,10 @@ fn parse_options(
 mod compile_rule {
 
     use super::{
-        replace, Action, BTreeMap, ComputeMethod, Expr, FunctionId, GlobalId, Literal, MapExt,
-        Parser, Str, TVec, TypeId, TypeVarId, UFData, VariableId,
+        replace, Action, BTreeMap, ComputeMethod, Expr, GlobalId, Literal, MapExt, Parser,
+        RelationId, Str, TVec, TypeId, TypeVarId, UFData, VariableId,
     };
+    use crate::hir;
 
     #[derive(Copy, Clone, PartialEq, Debug)]
     struct VariableInfo {
@@ -1386,13 +1405,13 @@ mod compile_rule {
 
     struct UnknownCall {
         name: &'static str,
-        ids: Vec<FunctionId>,
+        ids: Vec<RelationId>,
         args: Vec<VariableId>,
         rval: VariableId,
     }
 
     struct KnownCall {
-        id: FunctionId,
+        id: RelationId,
         args: Vec<VariableId>,
         rval: VariableId,
     }
@@ -1402,16 +1421,16 @@ mod compile_rule {
         variables: &mut TVec<VariableId, VariableInfo>,
         types: &mut UFData<TypeVarId, Option<TypeId>>,
         bound_variables: &mut BTreeMap<&'static str, VariableId>,
-        unify: &mut Vec<(VariableId, VariableId)>,
+        unify: &mut Vec<Vec<VariableId>>,
         expr: &Expr,
         calls: &mut Vec<UnknownCall>,
     ) -> syn::Result<VariableId> {
         Ok(match expr {
             Expr::Literal(literal) => {
                 let ty = parser.literal_type(**literal);
-                let typevar = types.add(Some(ty));
+                let typevar = types.push(Some(ty));
                 let global_id = parser.add_global(None, ty, ComputeMethod::Literal(**literal))?;
-                variables.add(VariableInfo {
+                variables.push(VariableInfo {
                     label: Some(literal.map_s(|s| &*s.to_string().leak())),
                     global: Some(global_id),
                     ty: typevar,
@@ -1420,16 +1439,16 @@ mod compile_rule {
             Expr::Var(name) => {
                 if let Some(&global_id) = parser.global_variable_names.get(name) {
                     let ty = parser.global_variable_info[global_id].ty;
-                    let typevar = types.add(Some(ty));
-                    variables.add(VariableInfo {
+                    let typevar = types.push(Some(ty));
+                    variables.push(VariableInfo {
                         label: Some(*name),
                         global: Some(global_id),
                         ty: typevar,
                     })
                 } else {
                     *bound_variables.entry(name).or_insert_with(|| {
-                        let typevar = types.add(None);
-                        variables.add(VariableInfo {
+                        let typevar = types.push(None);
+                        variables.push(VariableInfo {
                             label: Some(*name),
                             global: None,
                             ty: typevar,
@@ -1461,19 +1480,19 @@ mod compile_rule {
                             let _: Option<(TypeVarId, TypeVarId)> = types
                                 .union_eq(ta, tb)
                                 .map_err(|()| syn::Error::new(name.span, "type mismatch"))?;
-                            unify.push((a, b));
+                            unify.push(vec![a, b]);
                         }
                         let rval_ty = parser.literal_type(Literal::Unit);
-                        let rval_typevar = types.add(Some(rval_ty));
-                        variables.add(VariableInfo {
+                        let rval_typevar = types.push(Some(rval_ty));
+                        variables.push(VariableInfo {
                             label: None,
                             global: None,
                             ty: rval_typevar,
                         })
                     }
                     _ => {
-                        let rval_typevar = types.add(None);
-                        let rval = variables.add(VariableInfo {
+                        let rval_typevar = types.push(None);
+                        let rval = variables.push(VariableInfo {
                             label: None,
                             global: None,
                             ty: rval_typevar,
@@ -1505,8 +1524,9 @@ mod compile_rule {
             let mut variables: TVec<VariableId, VariableInfo> = TVec::new();
             let mut types: UFData<TypeVarId, Option<TypeId>> = UFData::new();
             let mut bound_variables: BTreeMap<&'static str, VariableId> = BTreeMap::new();
-            let mut premise_unify = Vec::new();
+            let mut premise_unify: Vec<Vec<VariableId>> = Vec::new();
             let mut premise_unknown = Vec::new();
+
             let sort_constraints = premises
                 .into_iter()
                 .map(|premise| {
@@ -1557,14 +1577,14 @@ mod compile_rule {
                          }| {
                             let at: Vec<_> = args.iter().map(|a| types[variables[*a].ty]).collect();
                             let rt = types[variables[*rval].ty];
-                            ids.retain(|id| self.functions[id].check_compatible(&at, rt));
+                            ids.retain(|id| self.functions[*id].check_compatible(&at, rt));
 
                             match ids.as_slice() {
                                 [] => {
                                     panic!("no function named {name} can be used here");
                                 }
                                 [id] => {
-                                    let function = &self.functions[id];
+                                    let function = &self.functions[*id];
                                     for (&var, &ty) in args.iter().zip(function.inputs.iter()) {
                                         let typevar = variables[var].ty;
                                         types[typevar] = Some(ty);
@@ -1599,7 +1619,7 @@ mod compile_rule {
 
             let unit_ty = self.literal_type(Literal::Unit);
             let to_delete: Vec<_> = variables
-                .iter()
+                .iter_enumerate()
                 .filter_map(|(i, info)| (types[info.ty].unwrap() == unit_ty).then_some(i))
                 .collect();
 
@@ -1610,7 +1630,7 @@ mod compile_rule {
                     if types[variables[rval].ty].unwrap() != unit_ty {
                         args.push(rval);
                     }
-                    crate::hir::Call { function: id, args }
+                    (id, args)
                 })
                 .collect();
             let action_relations: Vec<_> = action_calls
@@ -1620,30 +1640,30 @@ mod compile_rule {
                     if types[variables[rval].ty].unwrap() != unit_ty {
                         args.push(rval);
                     }
-                    crate::hir::Call { function: id, args }
+                    (id, args)
                 })
                 .collect();
 
-            let variables = variables
-                .iter()
-                .map(
-                    |(_, VariableInfo { label, global, ty })| crate::hir::VariableInfo {
-                        name: label.map(|x| *x),
-                        ty: types[*ty].unwrap(),
-                        global: *global,
-                    },
-                )
-                .collect();
-            let rule = crate::hir::Rule::new(
-                variables,
-                premise_relations,
+            let rule = hir::RuleArgs {
+                name: name.map(|x| *x).unwrap_or(""),
+                sort_vars: sort_constraints,
+                variables: variables
+                    .iter()
+                    .map(|VariableInfo { label, global, ty }| {
+                        let _ = global;
+                        (types[*ty].unwrap(), label.map(|x| *x).unwrap_or(""))
+                    })
+                    .collect(),
+                premise: premise_relations,
                 premise_unify,
-                sort_constraints,
-                action_relations,
+                action: action_relations,
                 action_unify,
-                to_delete,
-            );
+                delete: to_delete,
+            }
+            .build();
+
             self.rules2.push(rule);
+
             Ok(())
         }
     }

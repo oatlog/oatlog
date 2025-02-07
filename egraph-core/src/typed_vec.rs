@@ -5,18 +5,10 @@ use std::marker::PhantomData;
 use crate::ids::Id;
 
 /// Vec with typed indexes.
-#[derive(Clone, PartialEq, Eq)]
+#[derive(Clone, Eq, PartialEq, Ord, PartialOrd, Hash, Default)]
 pub(crate) struct TVec<K, V> {
     x: Vec<V>,
     _marker: PhantomData<K>,
-}
-impl<K, V> Default for TVec<K, V> {
-    fn default() -> Self {
-        Self {
-            x: Vec::new(),
-            _marker: PhantomData,
-        }
-    }
 }
 impl<K, V> Extend<V> for TVec<K, V> {
     fn extend<T: IntoIterator<Item = V>>(&mut self, iter: T) {
@@ -44,17 +36,27 @@ impl<K, V> TVec<K, V> {
     }
 }
 impl<K: Id, V> TVec<K, V> {
+    #[deprecated(note = "use iter()")]
     pub(crate) fn values(&self) -> impl Iterator<Item = &V> {
         self.x.iter()
     }
-    pub(crate) fn iter(&self) -> impl Iterator<Item = (K, &V)> {
+    pub(crate) fn iter(&self) -> impl Iterator<Item = &V> {
+        self.x.iter()
+    }
+    pub(crate) fn iter_mut(&mut self) -> impl Iterator<Item = &mut V> {
+        self.x.iter_mut()
+    }
+    pub(crate) fn enumerate(&self) -> impl Iterator<Item = K> {
+        (0..self.len()).map(K::from)
+    }
+    pub(crate) fn iter_enumerate(&self) -> impl Iterator<Item = (K, &V)> {
         (0..).map(K::from).zip(self.x.iter())
     }
-    pub(crate) fn push(&mut self, expected_id: K, v: V) {
+    pub(crate) fn push_expected(&mut self, expected_id: K, v: V) {
         assert_eq!(self.x.len(), expected_id.into());
         self.x.push(v);
     }
-    pub(crate) fn add(&mut self, v: V) -> K {
+    pub(crate) fn push(&mut self, v: V) -> K {
         let id = self.x.len().into();
         self.x.push(v);
         id
