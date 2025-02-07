@@ -999,6 +999,59 @@ set high bit = do not add enodes that evaluate to this.
 MEASURE: How many e-nodes are in e-classes that contain a Const?
 HYPOTHESIS: It is O(1) e-nodes.
 
+= Rule normalization is hard.
+
+- Rule normalization should commute with all other modifications, at least additions, such as adding a union/premise/action. so:
+$"normalize"("add"("edge", x)) = "add"("edge", "normalize"(x))$
+- Rule normalization should be unambigious.
+- Rule normalization should not remove "relevant" information.
+- It is not necessarily correct to unify an action and premise variable, since it creates an ambiguity.
+
+```
+a ----- b ----- c
+
+if a and c is in premise, and b in action we can either have:
+
+a ----- a ----- c
+or
+a ----- c ----- c
+
+correct thing might be something like:
+
+a ----- (a|c) ----- c
+```
+
+This can be solved by storing a UF in action:
+```rust
+pub(crate) struct Action {
+    relations: Vec<Call>,
+    unify: UF<VariableId>,
+}
+```
+
+To normalize already merged variables, we can "unmerge" them by introducing new variables, until variables mentioned in action are only mentioned in action.
+
+This suggests another representation is better:
+```rust
+struct Rule {
+    /// Requirements to trigger rule
+    premise_relations: Vec<(RelationId, Vec<PremiseId>)>,
+
+    /// Facts to add when rule is triggered.
+    action_relations: Vec<(RelationId, Vec<ActionId>)>,
+
+    /// premise variables to unify
+    unify: UF<PremiseId>,
+
+    /// Points to a set in `unify`.
+    /// If None, then a new e-class is created.
+    action_to_premise: TVec<ActionId, Option<PremiseId>>,
+}
+```
+
+Another way of seeing it is that after the action has run, the meaning of variables change, since they are unified, so it makes sense to separate them.
+
+
 = TODO READ
 Papers are just under the first author i looked at.
 I stopped adding authors after a while since this is just too many papers.
