@@ -44,7 +44,7 @@ impl<K, V> TVec<K, V> {
     }
 }
 impl<K: Id, V> TVec<K, V> {
-    pub(crate) fn values(&self) -> impl Iterator<Item=&V> {
+    pub(crate) fn values(&self) -> impl Iterator<Item = &V> {
         self.x.iter()
     }
     pub(crate) fn iter(&self) -> impl Iterator<Item = (K, &V)> {
