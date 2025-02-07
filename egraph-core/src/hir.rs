@@ -235,20 +235,18 @@ impl Rule {
                     .map(|(meta, link)| (meta, link))
                     .collect();
             for (a, b) in as_pairs(&merge_action, &identity) {
-                merged_action_variables
-                    .union_merge::<Uninhabited, _>(a, b, |(am, al), (bm, bl)| {
-                        let meta = VariableMeta::merge(am, bm);
-                        let link = match (al, bl) {
-                            (None, None) => None,
-                            (None, x @ Some(_)) | (x @ Some(_), None) => x,
-                            (Some(a), Some(b)) => {
-                                unify.union(a, b);
-                                Some(a)
-                            }
-                        };
-                        Ok((meta, link))
-                    })
-                    .unwrap();
+                merged_action_variables.union_merge(a, b, |(am, al), (bm, bl)| {
+                    let meta = VariableMeta::merge(am, bm);
+                    let link = match (al, bl) {
+                        (None, None) => None,
+                        (None, x @ Some(_)) | (x @ Some(_), None) => x,
+                        (Some(a), Some(b)) => {
+                            unify.union(a, b);
+                            Some(a)
+                        }
+                    };
+                    (meta, link)
+                })
             }
             let action_delete: HashSet<_> = action_delete
                 .into_iter()
@@ -288,9 +286,7 @@ impl Rule {
             merged_premise_variables = self.premise_variables.iter().copied().collect();
 
             for (a, b) in as_pairs(&merge_premise, &identity) {
-                merged_premise_variables
-                    .union_merge::<Uninhabited, _>(a, b, |a, b| Ok(VariableMeta::merge(a, b)))
-                    .unwrap();
+                merged_premise_variables.union_merge(a, b, |a, b| VariableMeta::merge(a, b))
             }
 
             let premise_delete: HashSet<_> = premise_delete

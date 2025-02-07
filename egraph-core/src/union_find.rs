@@ -77,6 +77,7 @@ impl<K: Id, V: Clone> UFData<K, V> {
         })
     }
 
+    /// Iterate the sets that contain > 1 element.
     pub(crate) fn iter_merged_sets(&self) -> impl Iterator<Item = &[K]> {
         (0..self.repr.len()).filter_map(|i0| {
             let i0 = i0.into();
@@ -114,7 +115,7 @@ impl<K: Id, V: Clone> UFData<K, V> {
     /// Merge returns a result, if Err, it means it is not possible to merge
     /// the two data values and the union is canceled
     ///
-    pub(crate) fn union_merge<E, F: Merge<V, E>>(
+    pub(crate) fn try_union_merge<E, F: FnMut(V, V) -> Result<V, E>>(
         &mut self,
         i: K,
         j: K,
@@ -139,17 +140,20 @@ impl<K: Id, V: Clone> UFData<K, V> {
         self.repr[j.into()].set(i);
         Ok(Some((i, j)))
     }
+    pub(crate) fn union_merge<F: FnMut(V, V) -> V>(&mut self, i: K, j: K, mut merge: F) {
+        let Ok(_) = self.try_union_merge::<Uninhabited, _>(i, j, |a, b| Ok(merge(a, b)));
+    }
 }
 
 impl<T: Id, D: Clone + Eq> UFData<T, D> {
     pub(crate) fn union_eq(&mut self, i: T, j: T) -> Result<Option<(T, T)>, ()> {
-        self.union_merge(i, j, |a, b| if a == b { Ok(a) } else { Err(()) })
+        self.try_union_merge(i, j, |a, b| if a == b { Ok(a) } else { Err(()) })
     }
 }
 
 impl<T: Id> UF<T> {
     pub(crate) fn union(&mut self, i: T, j: T) -> Option<(T, T)> {
-        let res: Result<_, Uninhabited> = self.union_merge(i, j, |(), ()| Ok(()));
+        let res: Result<_, Uninhabited> = self.try_union_merge(i, j, |(), ()| Ok(()));
         let Ok(res) = res;
         res
     }
