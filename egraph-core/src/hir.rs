@@ -2,9 +2,11 @@
 //! Desugared, flattened rules.
 
 use std::{
-    collections::{HashMap, HashSet},
+    collections::{BTreeMap, BTreeSet},
     convert::identity,
 };
+
+use itertools::Itertools as _;
 
 use crate::{
     ids::{ActionId, Id, PremiseId, RelationId, TypeId, VariableId},
@@ -62,6 +64,15 @@ pub(crate) struct VariableMeta {
     pub(crate) name: &'static str,
     pub(crate) ty: TypeId,
 }
+impl VariableMeta {
+    fn new(name: &'static str, ty: TypeId) -> Self {
+        if name.starts_with("__") {
+            Self { name: "", ty }
+        } else {
+            Self { name, ty }
+        }
+    }
+}
 
 #[derive(Clone, Eq, PartialEq, Ord, PartialOrd, Hash, Debug, Default)]
 pub(crate) struct ActionRelation {
@@ -75,6 +86,7 @@ pub(crate) struct PremiseRelation {
 }
 
 // pseudo-stable interface to create rule
+#[derive(Debug)]
 pub(crate) struct RuleArgs {
     /// Name of rule
     pub(crate) name: &'static str,
@@ -105,88 +117,70 @@ impl RuleArgs {
             premise: self_premise,
             premise_unify: self_premise_unify,
             action: self_action,
-            action_unify: self_action_unify,
+            action_unify: mut self_action_unify,
             delete: self_delete,
         } = self;
         let n = self_variables.len();
+        self_action_unify.extend(self_premise_unify.iter().cloned());
 
-        let merge_premise: Vec<Vec<PremiseId>> = self_premise_unify
-            .iter()
-            .map(|x| x.iter().copied().map(usize::from).map(PremiseId).collect())
+        let used_in_premise: BTreeSet<_> = self_sort_vars
+            .into_iter()
+            .chain(self_premise.iter().flat_map(|(_, x)| x.iter().copied()))
             .collect();
 
-        // since action variables correspond to premise variables, we also want to unify the
-        // corresponding action variables.
-        let merge_action: Vec<Vec<ActionId>> = self_premise_unify
+        let premise_relations = self_premise
             .iter()
-            .map(|x| x.iter().copied().map(usize::from).map(ActionId).collect())
-            .collect();
-
-        let mut unify: UF<PremiseId> = UF::new_with_size(n, ());
-        for (a, b) in as_pairs(&self_action_unify, &(|x| PremiseId(x.0))) {
-            unify.union(a, b);
-        }
-
-        let mut in_premise: HashSet<PremiseId> = HashSet::new();
-
-        let premise_variables: TVec<PremiseId, _> = self_variables
-            .iter()
-            .copied()
-            .map(|(ty, name)| VariableMeta { name, ty })
-            .collect();
-
-        in_premise.extend(self_sort_vars.into_iter().map(|x| PremiseId(x.0)));
-        in_premise.extend(
-            self_premise
-                .iter()
-                .flat_map(|(_, x)| x.iter().map(|x| PremiseId(x.0))),
-        );
-
-        let action_variables: TVec<ActionId, _> = self_variables
-            .iter()
-            .copied()
-            .enumerate()
-            .map(|(i, (ty, name))| {
-                let i = PremiseId(i);
-                (
-                    VariableMeta { name, ty },
-                    in_premise.contains(&i).then_some(i),
-                )
-            })
-            .collect();
-
-        let premise_relations: Vec<PremiseRelation> = self_premise
-            .iter()
-            .map(|(relation, args)| PremiseRelation {
-                relation: *relation,
+            .map(|(id, args)| PremiseRelation {
+                relation: *id,
                 args: args.iter().map(|x| PremiseId(x.0)).collect(),
             })
             .collect();
-
-        let action_relations: Vec<ActionRelation> = self_action
+        let action_relations = self_action
             .iter()
-            .map(|(relation, args)| ActionRelation {
-                relation: *relation,
+            .map(|(id, args)| ActionRelation {
+                relation: *id,
                 args: args.iter().map(|x| ActionId(x.0)).collect(),
             })
             .collect();
+        let mut unify = UF::new_with_size(n, ());
+        unify.union_groups(
+            self_action_unify
+                .iter()
+                .map(|x| x.iter().map(|x| PremiseId(x.0)).collect()),
+        );
 
-        let premise_delete: Vec<_> = self_delete.iter().map(|x| PremiseId(x.0)).collect();
-        let action_delete: Vec<_> = self_delete.iter().map(|x| ActionId(x.0)).collect();
+        let action_variables: TVec<ActionId, _> = self_variables
+            .iter_enumerate()
+            .map(|(i, (ty, name))| {
+                let meta = VariableMeta::new(*name, *ty);
+                let link = (used_in_premise.contains(&i)).then_some(PremiseId(i.0));
+                (meta, link)
+            })
+            .collect();
 
+        let premise_variables: TVec<PremiseId, _> = self_variables
+            .iter()
+            .map(|(ty, name)| VariableMeta::new(name, *ty))
+            .collect();
         Rule {
+            name: self_name,
             premise_relations,
             action_relations,
             unify,
             action_variables,
             premise_variables,
-            name: self_name,
         }
         .unify(UnifyArgs {
-            merge_premise,
-            merge_action,
-            premise_delete,
-            action_delete,
+            merge_premise: self_premise_unify
+                .iter()
+                .map(|x| x.iter().map(|x| PremiseId(x.0)).collect())
+                .collect(),
+            merge_action: self_action_unify
+                .iter()
+                .map(|x| x.iter().map(|x| ActionId(x.0)).collect())
+                .collect(),
+            premise_delete: self_delete.iter().map(|x| PremiseId(x.0)).collect(),
+            action_delete: self_delete.iter().map(|x| ActionId(x.0)).collect(),
         })
     }
 }
@@ -245,11 +239,11 @@ impl Rule {
                     (meta, link)
                 });
             }
-            let action_delete: HashSet<_> = action_delete
-                .into_iter()
-                .map(|x| merged_action_variables.find(x))
+            let action_delete: BTreeSet<_> = action_delete
+                .iter()
+                .map(|x| merged_action_variables.find(*x))
                 .collect();
-            let mut old_to_new = HashMap::new();
+            let mut old_to_new = BTreeMap::new();
             for (old_id, (meta, link)) in merged_action_variables.iter_roots() {
                 if !action_delete.contains(&old_id) {
                     let new_id = action_variables.push((meta, link));
@@ -271,7 +265,6 @@ impl Rule {
                 })
                 .collect();
         }
-        _ = action_relations;
 
         // premise
         let mut premise_variables: TVec<PremiseId, _> = TVec::new();
@@ -286,11 +279,11 @@ impl Rule {
                 merged_premise_variables.union_merge(a, b, VariableMeta::merge);
             }
 
-            let premise_delete: HashSet<_> = premise_delete
-                .into_iter()
-                .map(|x| merged_premise_variables.find(x))
+            let premise_delete: BTreeSet<_> = premise_delete
+                .iter()
+                .map(|x| merged_premise_variables.find(*x))
                 .collect();
-            premise_old_to_new = HashMap::new();
+            premise_old_to_new = BTreeMap::new();
             for (old_id, meta) in merged_premise_variables.iter_roots() {
                 if !premise_delete.contains(&old_id) {
                     let new_id = premise_variables.push(meta);
@@ -316,7 +309,6 @@ impl Rule {
                 })
                 .collect();
         }
-        _ = premise_relations;
         premise_map(PremiseId(0));
 
         {
@@ -375,6 +367,7 @@ impl Rule {
         self.action_relations.sort_dedup();
 
         // remove actions present in premise.
+        // TODO: think about weird edge cases.
         self.action_relations.retain(|a| {
             for p in &self.premise_relations {
                 if a.relation != p.relation || a.args.len() != p.args.len() {
@@ -403,7 +396,7 @@ impl Rule {
     fn normalize_id_changing(self) -> Self {
         // two action variables pointing to the same unify set are equivalent
         {
-            let mut grouping: HashMap<PremiseId, Vec<ActionId>> = HashMap::new();
+            let mut grouping: BTreeMap<PremiseId, Vec<ActionId>> = BTreeMap::new();
             for (a, (_, p)) in self.action_variables.iter_enumerate() {
                 if let Some(p) = p {
                     grouping.entry(*p).or_default().push(a);
@@ -422,7 +415,7 @@ impl Rule {
 
         // unused action variables are removed
         {
-            let mut unused_action_variables: HashSet<_> =
+            let mut unused_action_variables: BTreeSet<_> =
                 self.action_variables.enumerate().collect();
             for x in self.action_relations.iter().flat_map(|x| x.args.iter()) {
                 unused_action_variables.remove(x);
@@ -440,303 +433,160 @@ impl Rule {
 
         // unused premise variables are removed
         {
-            // TODO: think about how to handle action variables referencing these
+            // sets of variables that an action refers to.
+            // UF => disjoint
+            let used_sets: BTreeSet<_> = self
+                .action_variables
+                .iter()
+                .filter_map(|(_, link)| link.map(|link| self.unify.set(link)))
+                .collect();
+
+            let mut unused_premise: BTreeSet<PremiseId> =
+                self.premise_variables.enumerate().collect();
+            for PremiseRelation { relation: _, args } in &self.premise_relations {
+                for a in args {
+                    unused_premise.remove(a);
+                }
+            }
+            for set in used_sets {
+                let (unused, used): (Vec<PremiseId>, Vec<PremiseId>) =
+                    set.iter().partition(|&x| unused_premise.contains(x));
+                if used.is_empty() {
+                    unused_premise.remove(&unused[0]);
+                }
+            }
+            if !unused_premise.is_empty() {
+                return self.unify(UnifyArgs {
+                    merge_premise: Vec::new(),
+                    merge_action: Vec::new(),
+                    premise_delete: unused_premise.into_iter().collect(),
+                    action_delete: Vec::new(),
+                });
+            }
         }
 
         self
     }
+    fn action_dbg(&self, a: ActionId) -> String {
+        let x = self.action_variables[a].0.name;
+        if x.is_empty() {
+            format!("{a}")
+        } else {
+            x.to_string()
+        }
+    }
+    fn premise_dbg(&self, a: PremiseId) -> String {
+        let x = self.premise_variables[a].name;
+        if x.is_empty() {
+            format!("{a}")
+        } else {
+            x.to_string()
+        }
+    }
 }
 
-// impl VariableInfo {
-//     fn merge(
-//         Self {
-//             name: namea,
-//             ty: ta,
-//             global: globala,
-//         }: Self,
-//         Self {
-//             name: nameb,
-//             ty: tb,
-//             global: globalb,
-//         }: Self,
-//     ) -> Self {
-//         assert_eq!(ta, tb);
-//         assert_eq!(globala, globalb);
-//         Self {
-//             name: [namea, nameb]
-//                 .iter()
-//                 .copied()
-//                 .max_by_key(|x| x.len())
-//                 .unwrap(),
-//             ty: ta,
-//             global: globalb,
-//         }
-//     }
-// }
+impl Theory {
+    pub(crate) fn dbg_summary(&self) -> String {
+        use std::fmt::Write as _;
+        let mut buf = String::new();
 
-/*
-impl Rule {
-    // pub(crate) fn implicit_functionality(
-    //     name: &'static str,
-    //     id: RelationId,
-    //     inputs: &[TypeId],
-    //     outputs: TypeId,
-    // ) -> Rule {
-    //     todo!()
-    // }
-    /// Any variable mentioned in premise
-    // fn forall_variables(&self) -> impl Iterator<Item = VariableId> + use<'_> {
-    //     self.premise
-    //         .relations
-    //         .iter()
-    //         .flat_map(|c| c.args.iter())
-    //         .copied()
-    //         .chain(self.premise.sort.iter().copied())
-    // }
-    // pub(crate) fn new(
-    //     name: &'static str,
-    //     variables: Vec<VariableInfo>,
-    //     premise_relations: Vec<Call>,
-    //     premise_unify: Vec<(VariableId, VariableId)>,
-    //     premise_sort: Vec<VariableId>,
-    //     action_relations: Vec<Call>,
-    //     action_unify: Vec<(VariableId, VariableId)>,
-    //     delete: Vec<VariableId>,
-    // ) -> Self {
-    //     todo!()
-    //     // let premise = Premise {
-    //     //     relations: premise_relations,
-    //     //     sort: premise_sort,
-    //     // };
+        macro_rules! wln {
+            ($($arg:tt)*) => {
+                writeln!(&mut buf, $($arg)*).unwrap();
+            }
+        }
 
-    //     // let action = Action {
-    //     //     relations: action_relations,
-    //     //     unify: action_unify,
-    //     // };
+        wln!("Theory {:?}:", self.name);
+        wln!();
+        for Relation { name, ty } in self.relations.iter() {
+            wln!(
+                "{name}({})",
+                ty.iter().map(|t| self.types[*t].name).join(", ")
+            );
+        }
+        wln!();
 
-    //     // let rule = Rule {
-    //     //     name,
-    //     //     variables: variables.into_iter().collect(),
-    //     //     premise,
-    //     //     action,
-    //     // };
+        for rule in &self.rules {
+            let Rule {
+                name,
+                premise_relations,
+                action_relations,
+                unify,
+                action_variables,
+                premise_variables: _,
+            } = rule;
+            wln!("Rule {:?}:", name);
+            let premise = premise_relations
+                .iter()
+                .map(|PremiseRelation { relation, args }| {
+                    format!(
+                        "{}({})",
+                        self.relations[*relation].name,
+                        args.iter().map(|x| rule.premise_dbg(*x)).join(", ")
+                    )
+                })
+                .join(", ");
+            wln!("Premise: {premise}");
+            // assume normalized, so at most one action variable per set
+            let mut sets: BTreeMap<_, Vec<ActionId>> =
+                unify.iter_sets().map(|x| (x, vec![])).collect();
 
-    //     // rule.unify(&premise_unify, &delete)
-    // }
-    // fn unify(&self, merge: &[Vec<VariableId>], delete: &[VariableId]) -> Self {
-    //     todo!();
-    //     /*
-    //     let n = self.variables.len();
-    //     let mut keep: UFData<VariableId, (bool, VariableInfo)> =
-    //         self.variables.iter().map(|v| (true, *v)).collect();
-    //     for (a, b) in merge {
-    //         keep.union_merge::<Uninhabited, _>(*a, *b, |(_, va), (_, vb)| {
-    //             Ok((true, VariableInfo::merge(va, vb)))
-    //         })
-    //         .unwrap();
-    //     }
-    //     for i in delete {
-    //         keep[*i].0 = false;
-    //     }
-    //     // old -> option<new>
-    //     // None means to delete
-    //     let mut morphism: TVec<VariableId, Option<(VariableId, VariableInfo)>> =
-    //         TVec::new_with_size(n, None);
-    //     let mut new_variables: TVec<VariableId, VariableInfo> = TVec::new();
-    //     for (old_id, (keep, info)) in keep.iter_roots() {
-    //         if keep {
-    //             let new_id = new_variables.push(info);
-    //             morphism[old_id] = Some((new_id, info));
-    //         }
-    //     }
-    //     for (old, new, _) in keep.iter_all() {
-    //         morphism[old] = morphism[new];
-    //     }
+            for (a, (_, link)) in action_variables.iter_enumerate() {
+                if let Some(link) = link {
+                    let x = unify.set(*link);
+                    sets.get_mut(&x).unwrap().push(a);
+                }
+            }
+            let mut not_mentioned: BTreeSet<_> = action_variables.enumerate().collect();
+            for (set, link) in sets {
+                for l in &link {
+                    not_mentioned.remove(l);
+                }
+                if link.is_empty() {
+                    wln!(
+                        "__: {}",
+                        set.iter().map(|x| rule.premise_dbg(*x)).join(", ")
+                    );
+                } else {
+                    let link = link.iter().map(|x| rule.action_dbg(*x)).join(", ");
+                    wln!(
+                        "{link}: {}",
+                        set.iter().map(|x| rule.premise_dbg(*x)).join(", ")
+                    );
+                }
+            }
+            for x in not_mentioned {
+                wln!("{}: __", rule.action_dbg(x));
+            }
+            let insert = action_relations
+                .iter()
+                .map(|ActionRelation { relation, args }| {
+                    format!(
+                        "{}({})",
+                        self.relations[*relation].name,
+                        args.iter().map(|x| rule.action_dbg(*x)).join(", ")
+                    )
+                })
+                .join(", ");
+            wln!("Insert: {insert}");
 
-    //     Self {
-    //         name: self.name,
-    //         variables: new_variables,
-    //         premise: Premise {
-    //             relations: self
-    //                 .premise
-    //                 .relations
-    //                 .iter()
-    //                 .map(|Call { relation, args }| Call {
-    //                     relation: *relation,
-    //                     args: args.iter().map(|&x| morphism[x].unwrap().0).collect(),
-    //                 })
-    //                 .collect(),
-    //             sort: self
-    //                 .premise
-    //                 .sort
-    //                 .iter()
-    //                 .filter_map(|&x| morphism[x].map(|(x, _)| x))
-    //                 .collect(),
-    //         },
-    //         action: Action {
-    //             relations: self
-    //                 .action
-    //                 .relations
-    //                 .iter()
-    //                 .map(|Call { relation, args }| Call {
-    //                     relation: *relation,
-    //                     args: args.iter().map(|&x| morphism[x].unwrap().0).collect(),
-    //                 })
-    //                 .collect(),
-    //             unify: self
-    //                 .action
-    //                 .unify
-    //                 .iter()
-    //                 .filter_map(|(a, b)| {
-    //                     match (morphism[*a].map(|(x, _)| x), morphism[*b].map(|(x, _)| x)) {
-    //                         (None, None) => None,
-    //                         (None, Some(_)) | (Some(_), None) => panic!("what"),
-    //                         (Some(a), Some(b)) => Some((a, b)),
-    //                     }
-    //                 })
-    //                 .collect(),
-    //         },
-    //     }
-    //     .normalize()
-    //         */
-    // }
-    ///
-    ///
-    // fn normalize(&self) -> Self {
-    //     // TODO: add normalization passes
+            wln!();
+        }
 
-    //     let mut rule = self.clone();
-    //     rule.id_preserving_normalize();
-    //     rule.id_modifying_normalize()
-    // }
-
-    /// "trivial" normalization that does not change the meaning of variable ids.
-    // fn id_preserving_normalize(&mut self) {
-    //     // sort only needs to contain variables not mentioned in premise
-    //     {
-    //         let already_mentioned_in_premise: HashSet<_> = self
-    //             .premise
-    //             .relations
-    //             .iter()
-    //             .cloned()
-    //             .flat_map(|c| c.args)
-    //             .collect();
-    //         self.premise.sort.sort();
-    //         self.premise.sort.dedup();
-    //         self.premise
-    //             .sort
-    //             .retain(|x| already_mentioned_in_premise.contains(x));
-    //     }
-
-    //     // a premise relation is unique
-    //     {
-    //         self.premise.relations.sort();
-    //         self.premise.relations.dedup();
-    //     }
-
-    //     // actions only contain calls not in premise
-    //     {
-    //         let premise_relation_set: HashSet<_> = self.premise.relations.iter().cloned().collect();
-    //         self.action.relations.sort();
-    //         self.action.relations.dedup();
-    //         self.action
-    //             .relations
-    //             .retain(|x| !premise_relation_set.contains(x));
-    //     }
-
-    //     // action unify does not have cycles
-    //     // {
-    //     //     let mut action_uf: UF<VariableId> = UF::new_with_size(self.variables.len(), ());
-    //     //     for (a, b) in take(&mut self.action.unify) {
-    //     //         if action_uf.union(a, b).is_some() {
-    //     //             self.action.unify.push((a, b));
-    //     //         }
-    //     //     }
-    //     // }
-    // }
-    // fn id_modifying_normalize(mut self) -> Self {
-    //     // WANTED INVARIANT: permute_eq(a, b) => permute_eq(normalize(a), normalize(b))
-    //     // this is upheld by trivial_normalize, but violated by this:
-    //     //
-    //     // action unify should only contain variables mentioned in premise
-    //     // otherwise they can be merged
-    //     //
-    //     // NOTE: the resulting rule depends on iteration order:
-    //     //
-    //     // a ----- b ----- c
-    //     //
-    //     // if a and c is in premise, and b in action we can either have:
-    //     //
-    //     // a ----- a ----- c
-    //     // or
-    //     // a ----- c ----- c
-    //     //
-    //     // correct thing might be something like:
-    //     //
-    //     // a ----- (a|c) ----- c
-    //     //
-
-    //     // within a unify group, there is at most 1 variable only mentioned in action.
-    //     {
-    //         let premise_vars: HashSet<VariableId> = self.forall_variables().collect();
-    //         for set in self.action.unify.iter_merged_sets() {
-    //             let to_merge: Vec<_> = set
-    //                 .iter()
-    //                 .copied()
-    //                 .filter(|x| !premise_vars.contains(x))
-    //                 .collect();
-    //             if to_merge.len() > 1 {
-    //                 return self.unify(&[to_merge], &[]);
-    //             }
-    //         }
-    //     }
-
-    //     // variables never mentioned should be removed.
-    //     {
-    //         // NOTE: ignoring premise sort is intentional
-    //         let mut not_mentioned: HashSet<VariableId> =
-    //             (0..self.variables.len()).map(VariableId).collect();
-    //         for v in self.premise.relations.iter().flat_map(|c| c.args.iter()) {
-    //             not_mentioned.remove(v);
-    //         }
-    //         for v in self.action.relations.iter().flat_map(|c| c.args.iter()) {
-    //             not_mentioned.remove(v);
-    //         }
-    //         let not_mentioned: Vec<VariableId> = not_mentioned.into_iter().collect();
-    //         if not_mentioned.len() > 0 {
-    //             return self.unify(&[], &not_mentioned);
-    //         }
-    //     }
-
-    //     // variables mentioned in action should be separate and unify with variables in premise.
-    //     {
-    //         let premise_vars: HashSet<_> = self.forall_variables().collect();
-    //         for call in self.action.relations.iter_mut() {
-    //             for v in call.args.iter_mut() {
-    //                 if premise_vars.contains(&*v) {
-    //                     let info = self.variables[*v];
-    //                     let id = self.variables.push(info);
-
-    //                     todo!()
-    //                 }
-    //             }
-    //         }
-    //     }
-
-    //     self
-    // }
+        buf
+    }
 }
-*/
 
 impl VariableMeta {
     fn merge(a: VariableMeta, b: VariableMeta) -> VariableMeta {
         assert_eq!(a.ty, b.ty, "merged variables of different types");
         VariableMeta {
-            name: [a.name, b.name]
-                .iter()
-                .copied()
-                .max_by_key(|x| x.len())
-                .unwrap(),
+            name: {
+                match (a.name, b.name) {
+                    ("", x) | (x, "") => x,
+                    (a, b) => format!("{a}|{b}").leak(),
+                }
+            },
             ty: a.ty,
         }
     }

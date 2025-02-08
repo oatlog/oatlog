@@ -1,15 +1,15 @@
-use std::cell::Cell;
-use std::hash::Hash;
-use std::ops::{Index, IndexMut};
+use std::{
+    cell::Cell,
+    hash::Hash,
+    ops::{Index, IndexMut},
+};
+
+use itertools::Itertools as _;
 
 use crate::ids::Id;
 
 #[derive(Debug)]
 pub(crate) enum Uninhabited {}
-
-/// alias for a valid merge function.
-pub(crate) trait Merge<D, E>: FnMut(D, D) -> Result<D, E> {}
-impl<D, E, T: FnMut(D, D) -> Result<D, E>> Merge<D, E> for T {}
 
 /// Type alias for union-find without data.
 pub(crate) type UF<T> = UFData<T, ()>;
@@ -77,6 +77,12 @@ impl<K: Id, V: Clone> UFData<K, V> {
         })
     }
 
+    pub(crate) fn iter_sets(&self) -> impl Iterator<Item = &[K]> {
+        (0..self.repr.len())
+            .map(|i| self.sets[self.find(i.into()).into()].as_slice())
+            .unique()
+    }
+
     /// Iterate the sets that contain > 1 element.
     pub(crate) fn iter_merged_sets(&self) -> impl Iterator<Item = &[K]> {
         (0..self.repr.len()).filter_map(|i0| {
@@ -121,24 +127,24 @@ impl<K: Id, V: Clone> UFData<K, V> {
         j: K,
         mut merge: F,
     ) -> Result<Option<(K, K)>, E> {
-        let (i, j) = (self.find(i), self.find(j));
-        if i == j {
+        let (src, target) = (self.find(i), self.find(j));
+        if src == target {
             return Ok(None);
         }
-        let a = self.data[i.into()].clone();
-        let b = self.data[j.into()].clone();
+        let a = self.data[src.into()].clone();
+        let b = self.data[target.into()].clone();
 
         // merge canceled if err
         let res = (merge)(a, b)?;
 
         let mut new_set = Vec::new();
-        new_set.extend(self.sets[i.into()].clone());
-        new_set.extend(self.sets[j.into()].clone());
-        self.sets[j.into()] = new_set;
+        new_set.extend(self.sets[src.into()].clone());
+        new_set.extend(self.sets[target.into()].clone());
 
-        self.data[j.into()] = res;
-        self.repr[j.into()].set(i);
-        Ok(Some((i, j)))
+        self.sets[target.into()] = new_set;
+        self.data[target.into()] = res;
+        self.repr[src.into()].set(target);
+        Ok(Some((src, target)))
     }
     pub(crate) fn union_merge<F: FnMut(V, V) -> V>(&mut self, i: K, j: K, mut merge: F) {
         let Ok(_) = self.try_union_merge::<Uninhabited, _>(i, j, |a, b| Ok(merge(a, b)));
@@ -156,6 +162,13 @@ impl<T: Id> UF<T> {
         let res: Result<_, Uninhabited> = self.try_union_merge(i, j, |(), ()| Ok(()));
         let Ok(res) = res;
         res
+    }
+    pub(crate) fn union_groups(&mut self, iter: impl Iterator<Item = Vec<T>>) {
+        for x in iter {
+            for w in x.windows(2) {
+                self.union(w[0], w[1]);
+            }
+        }
     }
 }
 

@@ -3,7 +3,6 @@
 use std::{
     cmp::Ordering,
     collections::{btree_map::Entry, BTreeMap},
-    convert::TryFrom,
     fmt::{Debug, Display},
     hash::{Hash, Hasher},
     mem::take,
@@ -18,16 +17,6 @@ use crate::{
     ids::{GlobalId, Id, RelationId, TypeId},
     typed_vec::TVec,
 };
-
-// TODO: ban retain_mut
-
-/*
-macro_rules! error_span {
-    ($x:ident, $msg:literal) => {
-        return proc_macro2::TokenStream::from(quote_spanned!($x.span() => compile_error!($msg)))
-    }
-}
-*/
 
 #[rustfmt::skip]
 macro_rules! err_ {
@@ -169,15 +158,7 @@ impl<T> ResultExt for syn::Result<T> {
     }
 }
 
-#[must_use]
-pub fn compile_egraph(x: proc_macro2::TokenStream) -> proc_macro2::TokenStream {
-    let now = std::time::Instant::now();
-    let res = compile_egraph_inner(x).unwrap_or_else(|err| err.to_compile_error());
-    eprintln!("{:?}", now.elapsed());
-    res
-}
-
-fn compile_egraph_inner(x: proc_macro2::TokenStream) -> syn::Result<proc_macro2::TokenStream> {
+pub(crate) fn parse(x: proc_macro2::TokenStream) -> syn::Result<hir::Theory> {
     let mut parser = Parser::new();
     for token_tree in x {
         register_span!(token_tree.span());
@@ -206,8 +187,7 @@ fn compile_egraph_inner(x: proc_macro2::TokenStream) -> syn::Result<proc_macro2:
             }
         }
     }
-
-    Ok("".parse().unwrap())
+    Ok(parser.emit_hir())
 }
 
 #[derive(Copy, Clone, Debug, PartialEq, PartialOrd, Eq, Ord, Hash)]
@@ -855,6 +835,7 @@ impl Parser {
                 let [facts, actions, options @ ..] = args else {
                     ret!("usage: (rule (<fact>*) (<action>*) <option>*)");
                 };
+
                 let facts = facts
                     .list("rule facts")?
                     .iter()
@@ -910,8 +891,11 @@ impl Parser {
                     unimplemented!("subsume is not implemented");
                 }
                 let mut facts = extra_facts;
-                facts.push(lhs.clone());
-                self.add_rule(None, ruleset, facts, vec![Action::Union(lhs, rhs)])?;
+                let tmp_internal = Expr::Var(Spanned::new("__internal_eq", placeholder_span()));
+                let eq_sign = Spanned::new("=", placeholder_span());
+
+                facts.push(Expr::Call(eq_sign, vec![lhs.clone(), tmp_internal.clone()]));
+                self.add_rule(None, ruleset, facts, vec![Action::Union(tmp_internal, rhs)])?;
             }
             "birewrite" => {
                 let [lhs, rhs, options @ ..] = args else {
@@ -937,8 +921,12 @@ impl Parser {
                 }
                 for (lhs, rhs) in [(lhs.clone(), rhs.clone()), (rhs, lhs)] {
                     let mut facts = extra_facts.clone();
-                    facts.push(lhs.clone());
-                    self.add_rule(None, ruleset, facts, vec![Action::Union(lhs, rhs)])?;
+
+                    let tmp_internal = Expr::Var(Spanned::new("__internal_eq", placeholder_span()));
+                    let eq_sign = Spanned::new("=", placeholder_span());
+
+                    facts.push(Expr::Call(eq_sign, vec![lhs.clone(), tmp_internal.clone()]));
+                    self.add_rule(None, ruleset, facts, vec![Action::Union(tmp_internal, rhs)])?;
                 }
             }
             "include" => {
@@ -1046,21 +1034,6 @@ impl Parser {
         })
     }
 }
-
-// #[derive(Debug, Clone, PartialEq)]
-// enum Initial {
-//     /// make sure that this global is computed as this point.
-//     /// only globals listed as `ComputeGlobal` may be referenced.
-//     /// it is possible that there are request to compute the same
-//     /// thing twice if the following occurs:
-//     /// ```text
-//     /// (let x (foobar a b))
-//     /// (let y x)
-//     /// ```
-//     ComputeGlobal(GlobalId),
-//     /// `ComputeGlobal` has been run on lhs and rhs
-//     Union(GlobalId, GlobalId),
-// }
 
 #[derive(Debug)]
 enum Action {
@@ -1264,18 +1237,23 @@ impl Parser {
                 if function.output != unit_ty {
                     ty.push(function.output);
                 }
-                //hir::Function { ty }
-                todo!()
+                hir::Relation {
+                    name: *function.name,
+                    ty,
+                }
             })
             .collect();
-        _ = functions;
-        todo!()
-        // hir::Theory {
-        //     rules: self.rules.clone(),
-        //     relations: functions,
-        //     name: "",
-        //     types: todo!(),
-        // }
+        let types: TVec<TypeId, hir::Type> = self
+            .types
+            .iter()
+            .map(|t| hir::Type { name: *t.name })
+            .collect();
+        hir::Theory {
+            rules: self.rules.clone(),
+            relations: functions,
+            name: "",
+            types,
+        }
     }
 }
 
@@ -1467,14 +1445,14 @@ mod compile_rule {
             let mut action_unknown = Vec::new();
 
             for action in actions {
-                let expr = pseudo_parse_action(action);
+                let action = pseudo_parse_action(action);
                 let _: VariableId = parse_expr(
                     self,
                     &mut variables,
                     &mut types,
                     &mut bound_variables,
                     &mut action_unify,
-                    &expr,
+                    &action,
                     &mut action_unknown,
                 )?;
             }
@@ -1488,7 +1466,6 @@ mod compile_rule {
                     (&mut premise_calls, &mut premise_unknown),
                     (&mut action_calls, &mut action_unknown),
                 ] {
-                    // TODO: ban retain_mut
                     unknown.retain_mut(
                         |UnknownCall {
                              name,
