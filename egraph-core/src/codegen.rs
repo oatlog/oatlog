@@ -359,7 +359,7 @@ pub fn codegen(theory: &Theory) -> TokenStream {
         Vec<_>,
     ) = theory
         .types
-        .values()
+        .iter()
         .map(|type_| {
             let type_ty = ident::type_ty(type_);
             let type_all = ident::type_all(type_);
@@ -391,7 +391,7 @@ pub fn codegen(theory: &Theory) -> TokenStream {
                 },
                 quote! {
                     pub fn #type_new(&mut self) -> #type_ty {
-                        let x = self.#type_uf.add();
+                        let x = self.#type_uf.push();
                         self.#type_all.insert(x);
                         self.#type_new.insert(x);
                         x
@@ -412,7 +412,7 @@ pub fn codegen(theory: &Theory) -> TokenStream {
         })
         .multiunzip();
 
-    let relations = theory.relations.values().map(|rel| {
+    let relations = theory.relations.iter().map(|rel| {
         let rel_ty = ident::rel_ty(rel);
         quote! {
             struct #rel_ty {
@@ -430,7 +430,7 @@ pub fn codegen(theory: &Theory) -> TokenStream {
         relation_insertions,
     ): (Vec<_>, Vec<_>, Vec<_>, Vec<_>, Vec<_>) = theory
         .relations
-        .values()
+        .iter()
         .map(|rel| {
             let rel_ty = ident::rel_ty(rel);
             let rel_var = ident::rel_var(rel);
@@ -482,7 +482,7 @@ pub fn codegen(theory: &Theory) -> TokenStream {
         .multiunzip();
     let (global_fields, global_fields_creation): (Vec<_>, Vec<_>) = theory
         .globals
-        .values()
+        .iter()
         .map(|global| {
             let global_var = ident::var_var(global);
             let global_ty = ident::type_ty(&theory.types[global.type_]);
@@ -628,12 +628,12 @@ mod test {
         let mut relations = TVec::new();
         let mut rule_variables = TVec::new();
 
-        let el = types.add(TypeData { name: "El" });
-        let le = relations.add(RelationData {
+        let el = types.push(TypeData { name: "El" });
+        let le = relations.push(RelationData {
             name: "Le",
             param_types: vec![el, el],
         });
-        let x = rule_variables.add(VariableData {
+        let x = rule_variables.push(VariableData {
             name: "x",
             type_: el,
         });
@@ -737,7 +737,7 @@ mod test {
                         }
                     }
                     pub fn el_new(&mut self) -> El {
-                        let x = self.el_uf.add();
+                        let x = self.el_uf.push();
                         self.el_all.insert(x);
                         self.el_new.insert(x);
                         x

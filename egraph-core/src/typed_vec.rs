@@ -33,10 +33,6 @@ impl<K, V> TVec<K, V> {
 }
 
 impl<K: Id, V> TVec<K, V> {
-    #[deprecated(note = "use iter()")]
-    pub(crate) fn values(&self) -> impl Iterator<Item = &V> {
-        self.x.iter()
-    }
     pub(crate) fn iter(&self) -> impl Iterator<Item = &V> {
         self.x.iter()
     }
@@ -62,10 +58,6 @@ impl<K: Id, V> TVec<K, V> {
         let id = self.x.len().into();
         self.x.push(v);
         id
-    }
-    #[deprecated(note = "use push()")]
-    pub(crate) fn add(&mut self, v: V) -> K {
-        self.push(v)
     }
 }
 
