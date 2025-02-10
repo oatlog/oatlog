@@ -435,16 +435,20 @@ e-graphs (aegraphs) that make it miss out on potential optimizations @cranelift_
 
 === Union-find (1964)
 
-Union-find @unionfindoriginal @fastunionfind, $"U"$ is a data structure used for efficiently merging and checking if elements belong
-to the same set. This is useful when implementing an e-graph to canonicalize e-classes. Initially,
-all sets are distinct:
+Union-find or disjoint-sets @unionfindoriginal @fastunionfind is a data structure used for
+efficiently merging sets and checking if elements belong to the same set. This is useful when
+implementing an e-graph to canonicalize e-classes. The initial instance $U$ represents all sets
+being distinct. Then
+
 - $"find"("U", v)$ returns a _representative_ element for the set that $v$ belongs to. Iff
-  $"find"("U", u) = "find"("U", v)$ then $u$ and $v$ belong to th' same set.
+  $"find"("U", u) = "find"("U", v)$ then $u$ and $v$ belong to the same set.
 - $"U"' = "union"("U", u, v)$ merges#footnote[by mutating U in-place] the two sets that $u$ and $v$.
   After running union, $"find"("U"', u) = "find"("U"', v)$.
 
-Both operations run in almost $O(1)$.  Outside the context of e-graphs, union find is for example used to implement Kruskal's minimum spanning tree algorithm for checking if two vertices belong to different components.
-@union-find-impl shows an example implementation of union-find.
+Both operations run in almost $O(1)$.  Outside the context of e-graphs, Union-find can be seen as
+solving the problem of answering queries on whether nodes in a graph are in the same component,
+while new edges are being added. This is used to implement Kruskal's minimum spanning tree
+  algorithm. @union-find-impl shows an example implementation of union-find.
 
 #figure(
     ```rust
@@ -645,23 +649,35 @@ Our goal can be further clarified by stating what we are not doing.
 
 == Evaluation
 
-Defining a good single metric for
-benchmarking is unfortunately nontrivial and taking inspiration from previous work @egg @egglog, we
-plan to combine measuring
+Our evaluation will involve us answering the following questions for regarding our engine:
+
+- Is it correct?
+- Is it faster in general, and if so by how much?
+- Is it slower in some scenarios? If so, how common and how large is the slowdown?
+- Does it generalize to real apps?
+
+Due to our engine being compatible with egglog @egglog, we can piggy-back on its test suite of 93
+tests. These should be sufficient to serve as a primary test of our engine's correctness.
+Additionally, as many of them are also used to regression test egglog's performance, we should also
+be able to use them for most of our benchmarking. The breadth of the tests should indicate the sorts
+of theories where our engine performs better and worse in performance terms.
+
+Benchmarking against engines other than egglog, such as egg @egg and eqlog @eqlog, will be done on a
+best-effort basis and be secondary to the comparison with egglog. While there are semantic
+differences that exclude many tests, we aim to implement a compiler from the egglog language to the
+eqlog language in order to facilitate benchmarks against eqlog.
+
+Defining a good single metric for benchmarking is unfortunately nontrivial and taking inspiration
+from previous work @egg @egglog, we plan to combine measuring
 - e-nodes created per second, between engines implementing the same ruleset with similar scheduling,
   since this implies roughly the same e-nodes (semantically) are created,
-- time until convergence for small theories with finite closure,
-- and time required for equivalent optimization as measured by specific program synthesis applications
+- time until convergence for small theories with finite closure, and
+- time required for equivalent optimization as measured by specific program synthesis applications
   such as Herbie @herbie.
 
-As we aim to support theories specified in the egglog language @egglog, we can piggy-back on test cases and
-applications that are already written. We aim to primarily verify correctness and benchmark by using
-the egglog test suite, supplemented with larger e-graph applications that already have
-implementations in the egglog language @egglogHerbie as an end-to-end case study in the usability
-and performance of our engine.
-
-//#todo[Matti: Please explain thoroughly what kind of environment you are using for running the
-// experiments (both hardware and software) (reproducibility, hardware/software, nix)]
+This last avenue, to consider full EqSat applications, is made feasible by existing implementations
+in the egglog language @egglogHerbie and serves as an end-to-end case study in the usability and
+performance of our engine outside the microbenchmark context.
 
 == Environment
 
@@ -671,8 +687,8 @@ source. We expect our dependencies to be roughly
 - an x86_64 system running a recent Linux kernel,
 - nix,
 - a Rust toolchain,
-- profiling tools such as perf @perf,
-- and egglog, eqlog for benchmarking
+- profiling tools such as perf @perf, and
+- egglog, eqlog for benchmarking
 
 Crucially we do not expect to rely on external solvers, we do not expect to incorporate unfree code,
 and we expect the performance of our e-graph engine to rely almost entirely on our code and the Rust
@@ -690,12 +706,12 @@ language @egglog and generates Rust code for an e-graph engine with the optimize
 The main focus is on optimizing the run time of the generated e-graph engine, with the time to
 compile the theory into generated code being less important.  In terms of features, we are aiming to
 implement a similar feature set to egglog @egglog. That roughly includes
-- Declaring sorts
-- Declaring functions
-- Defining rules that match e-nodes using premises and that apply actions
+- Declaring sorts.
+- Declaring functions.
+- Defining rules that match e-nodes using premises and that apply actions.
 - Premises that implicitly declare e-class variables and constrain those variables by requiring
-  e-nodes using those e-classes
-- Actions that add e-nodes, create new e-classes and unify existing e-classes
+  e-nodes using those e-classes.
+- Actions that add e-nodes, create new e-classes and unify existing e-classes.
 
 The final thesis will specify the exact language our code implements.
 @library-usage shows an example of what using our library could look like.
@@ -741,8 +757,8 @@ algorithmically optimal solutions @optimaljoin @relationalematching @fastextract
 This means we should not focus on finding better algorithms for these same problems, but instead
 focus on
 - constant factor improvements,
-- improvements on practical, average cases using heuristics,
-- and leveraging these component algorithms as well as possible.
+- improvements on practical, average cases using heuristics, and
+- leveraging these component algorithms as well as possible.
 
 == Merging rules
 
