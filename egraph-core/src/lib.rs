@@ -61,8 +61,8 @@ mod test {
             Rule "":
             Premise: Add(a, b, e)
             a: a
-            b: b
             e: e
+            b: b
             Insert: Add(b, a, e)
 
         "#]];
@@ -85,12 +85,12 @@ mod test {
             Mul(Math, Math, Math)
 
             Rule "":
-            Premise: Add(a, b, p2), Mul(p2, c, p4)
+            Premise: Add(a, b, p4), Mul(p4, c, p2)
             a: a
             b: b
-            __: p2
+            a5: p2
             c: c
-            a5: p4
+            __: p4
             a3: __
             a4: __
             Insert: Add(a3, a4, a5), Mul(a, c, a3), Mul(b, c, a4)
@@ -114,8 +114,8 @@ mod test {
 
             Rule "":
             Premise: Add(a, b, c), Add(a, b, d)
-            __: a
             __: b
+            __: a
             __: c, d
             Insert: 
 

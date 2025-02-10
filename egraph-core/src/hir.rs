@@ -4,12 +4,13 @@
 use std::{
     collections::{BTreeMap, BTreeSet},
     convert::identity,
+    hash::Hash,
 };
 
 use itertools::Itertools as _;
 
 use crate::{
-    ids::{ActionId, Id, PremiseId, RelationId, TypeId, VariableId},
+    ids::{ActionId, Id, PremiseId, RelationId, RuleId, TypeId, VariableId},
     typed_vec::TVec,
     union_find::{UFData, UF},
 };
@@ -359,11 +360,11 @@ impl Rule {
     fn normalize(&self) -> Self {
         let mut rule = self.clone();
         rule.normalize_id_preserving();
-        rule.normalize_id_changing()
+        rule.normalize_id_changing().canonical_permutation()
     }
     fn normalize_id_preserving(&mut self) {
-        // no duplicate actions/premises
-        self.premise_relations.sort_dedup();
+        // no duplicate actions
+        // (duplicate premises removed later)
         self.action_relations.sort_dedup();
 
         // remove actions present in premise.
@@ -467,6 +468,7 @@ impl Rule {
 
         self
     }
+    #[cfg(test)]
     fn action_dbg(&self, a: ActionId) -> String {
         let x = self.action_variables[a].0.name;
         if x.is_empty() {
@@ -475,6 +477,7 @@ impl Rule {
             x.to_string()
         }
     }
+    #[cfg(test)]
     fn premise_dbg(&self, a: PremiseId) -> String {
         let x = self.premise_variables[a].name;
         if x.is_empty() {
@@ -483,9 +486,118 @@ impl Rule {
             x.to_string()
         }
     }
+    /// redorder premises into a canonical order
+    fn canonical_permutation(&self) -> Self {
+        // is self contained in other?
+        // TODO: ignores "forall" variables.
+        use std::hash::{DefaultHasher, Hash, Hasher as _};
+
+        let n = self.premise_variables.len();
+        let mut local_initial: TVec<PremiseId, BTreeMap<(RelationId, usize), usize>> =
+            TVec::new_with_size(n, BTreeMap::new());
+
+        for PremiseRelation { relation, args } in &self.premise_relations {
+            for (i, a) in args.iter().enumerate() {
+                *local_initial[*a].entry((*relation, i)).or_default() += 1;
+            }
+        }
+
+        let mut local_hashes: TVec<PremiseId, DefaultHasher> = local_initial
+            .into_iter()
+            .map(|x| {
+                let mut hasher = DefaultHasher::new();
+                x.hash(&mut hasher);
+                hasher
+            })
+            .collect();
+
+        let mut local_structure: TVec<PremiseId, BTreeMap<(RelationId, usize, usize, u64), usize>> =
+            TVec::new_with_size(n, BTreeMap::new());
+
+        for _ in 0..10 {
+            for PremiseRelation { relation, args } in &self.premise_relations {
+                for (i1, a1) in args.iter().enumerate() {
+                    for (i2, a2) in args.iter().enumerate() {
+                        *local_structure[*a1]
+                            .entry((*relation, i1, i2, local_hashes[a2].finish()))
+                            .or_default() += 1;
+                    }
+                }
+            }
+
+            for (hash, structure) in local_hashes.iter_mut().zip(local_structure.iter_mut()) {
+                structure.hash(hash);
+                structure.clear();
+            }
+        }
+
+        let hashes: TVec<PremiseId, u64> = local_hashes.into_iter().map(|x| x.finish()).collect();
+
+        let mut permutation: TVec<PremiseId, PremiseId> = hashes.enumerate().collect();
+        permutation
+            .inner()
+            .sort_by_key(|x| (self.premise_variables[x].ty, hashes[x]));
+
+        let mut rule = self.permute_premise(permutation);
+        rule.premise_relations.sort_dedup();
+        rule
+    }
+    fn permute_premise(&self, permutation: TVec<PremiseId, PremiseId>) -> Self {
+        let premise_relations = self
+            .premise_relations
+            .iter()
+            .map(|PremiseRelation { relation, args }| PremiseRelation {
+                relation: *relation,
+                args: args.into_iter().map(|x| permutation[x]).collect(),
+            })
+            .collect();
+        let mut unify: UF<PremiseId> = UF::new_with_size(self.premise_variables.len(), ());
+        for (a, b, _) in self.unify.iter_all() {
+            unify.union(a, b);
+        }
+        let action_variables: TVec<ActionId, _> = self
+            .action_variables
+            .iter()
+            .map(|(m, p)| {
+                if let Some(p) = p {
+                    (m.clone(), Some(permutation[*p]))
+                } else {
+                    (m.clone(), *p)
+                }
+            })
+            .collect();
+
+        let mut premise_variables =
+            TVec::new_with_size(self.premise_variables.len(), VariableMeta::default());
+        for (i, m) in self.premise_variables.iter_enumerate() {
+            premise_variables[permutation[i]] = m.clone();
+        }
+
+        Rule {
+            name: self.name,
+            premise_relations,
+            action_relations: self.action_relations.clone(),
+            unify,
+            action_variables,
+            premise_variables,
+        }
+    }
+    /// Will be equal if premises are equal modulo variable permutation and normalization worked
+    /// correctly.
+    fn premise_memento(&self) -> PremiseMemento {
+        (
+            self.premise_variables
+                .iter()
+                .map(|x| x.ty)
+                .collect::<Vec<_>>(),
+            self.premise_relations.clone(),
+        )
+    }
 }
+type PremiseMemento = (Vec<TypeId>, Vec<PremiseRelation>);
 
 impl Theory {
+    #[cfg(test)]
     pub(crate) fn dbg_summary(&self) -> String {
         use std::fmt::Write as _;
         let mut buf = String::new();
@@ -574,6 +686,23 @@ impl Theory {
         }
 
         buf
+    }
+    fn optimize(&self) -> Self {
+        let rules: TVec<RuleId, Rule> = self.rules.iter().cloned().collect();
+
+        // for each rule we need to maintain a map from original premiseids to the current
+        // premiseids.
+        //
+        // for each optimization, the amount of constraints should be monotonically increasing.
+        // this is needed to make sure variables only merge.
+        // transformation is TVec<PremiseId, PremiseId>
+        //
+        // The only ways to make normalization remove a variable is if an action variable or
+        // premise relation is removed, therefore if the only applied action is to merge variables,
+        // then premise variables will never be removed.
+        //
+
+        todo!()
     }
 }
 

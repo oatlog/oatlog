@@ -66,6 +66,9 @@ impl<K: Id, V> TVec<K, V> {
     pub(crate) fn new_side<V2: Default + Clone>(&self) -> TVec<K, V2> {
         TVec::new_with_size(self.len(), Default::default())
     }
+    pub(crate) fn inner(&mut self) -> &mut Vec<V> {
+        &mut self.x
+    }
 }
 
 impl<K: Id, V> std::ops::Index<K> for TVec<K, V> {
@@ -102,5 +105,14 @@ impl<K, V> FromIterator<V> for TVec<K, V> {
 impl<K, V> Extend<V> for TVec<K, V> {
     fn extend<T: IntoIterator<Item = V>>(&mut self, iter: T) {
         self.x.extend(iter);
+    }
+}
+impl<K, V> IntoIterator for TVec<K, V> {
+    type Item = V;
+
+    type IntoIter = <Vec<V> as IntoIterator>::IntoIter;
+
+    fn into_iter(self) -> Self::IntoIter {
+        self.x.into_iter()
     }
 }
