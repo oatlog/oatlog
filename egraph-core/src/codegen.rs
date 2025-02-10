@@ -5,6 +5,7 @@ use crate::{
 use itertools::MultiUnzip;
 use proc_macro2::TokenStream;
 use quote::quote;
+use std::collections::{BTreeMap, BTreeSet};
 
 /// Data such as type and function names are technically unnecessary but used for more readable
 /// generated code. A compiler is far less performance sensitive than an interpreter (although the
@@ -41,6 +42,15 @@ struct RelationData {
     param_types: Vec<TypeId>,
     // TODO: merge
     // TODO: builtin indices
+}
+impl RelationData {
+    fn unique_types(&self) -> impl Iterator<Item = TypeId> {
+        self.param_types
+            .iter()
+            .copied()
+            .collect::<BTreeSet<TypeId>>()
+            .into_iter()
+    }
 }
 /// Note that global variables are represented as functions with signature `() -> T`, and these
 /// functions can in effect be coerced to global variables by calling them.
@@ -95,7 +105,14 @@ enum VariableWithStatus {
     Bound(VariableId),
     Unbound(VariableId),
 }
+trait Relation {
+    type Row;
+    fn new() -> Self;
+    fn clear_new(&mut self);
+    fn insert(&mut self, rows: &[Self::Row]);
+}
 #[derive(PartialEq, Eq, PartialOrd, Ord, Clone, Copy)]
+#[repr(usize)]
 enum Priority {
     /// Highest priority, insertions caused by UF join. Bounded O(N).
     Canonicalizing,
@@ -152,6 +169,9 @@ mod ident {
     }
     pub fn type_iter(ty: &TypeData) -> Ident {
         format_ident!("{}_iter", ty.name.to_snake_case())
+    }
+    pub fn type_remove_uprooted(ty: &TypeData) -> Ident {
+        format_ident!("{}_remove_uprooted", ty.name.to_snake_case())
     }
 
     pub fn rel_ty(rel: &RelationData) -> Ident {
@@ -414,9 +434,41 @@ pub fn codegen(theory: &Theory) -> TokenStream {
 
     let relations = theory.relations.iter().map(|rel| {
         let rel_ty = ident::rel_ty(rel);
+        let remove_uprooted = rel.unique_types().map(|type_| {
+            let type_ = &theory.types[type_];
+            let type_ty = ident::type_ty(type_);
+            let type_remove_uprooted = ident::type_remove_uprooted(type_);
+            quote! {
+                fn #type_remove_uprooted(uprooted: &[#type_ty]) {
+                    todo!()
+                }
+            }
+        });
+        let params = rel
+            .param_types
+            .iter()
+            .map(|type_| ident::type_ty(&theory.types[type_]));
         quote! {
             struct #rel_ty {
                 _todo: (),
+            }
+            impl Relation for #rel_ty {
+                type Row = (#(#params,)*);
+                fn new() -> Self {
+                    todo!()
+                }
+                fn clear_new(&mut self) {
+                    todo!()
+                }
+                fn insert(&mut self, rows: &[Self::Row]) {
+                    todo!()
+                }
+            }
+            impl #rel_ty {
+                fn indexed_iter_todo_thingy(&self) {
+                    todo!()
+                }
+                #(#remove_uprooted)*
             }
         }
     });
@@ -449,7 +501,7 @@ pub fn codegen(theory: &Theory) -> TokenStream {
                 .zip(ident::arguments())
                 .map(|(ty, arg)| quote! {#arg: #ty})
                 .collect::<Vec<_>>();
-            let args = ident::arguments().take(columns.len());
+            let args = ident::arguments().take(columns.len()).collect::<Vec<_>>();
             (
                 quote! {
                     #rel_var: #rel_ty,
@@ -473,7 +525,7 @@ pub fn codegen(theory: &Theory) -> TokenStream {
                         self.#rel_insert_with_priority(Priority::Canonicalizing, #(#args),*)
                     }
                     fn #rel_insert_with_priority(&mut self, priority: Priority, #(#params),*) {
-                        todo!()
+                        self.#rel_insertions[priority as usize].push(#(#args,)*);
                     }
                 },
                 rel_insertions,
@@ -508,6 +560,56 @@ pub fn codegen(theory: &Theory) -> TokenStream {
                 )
             })
         });
+    let type_remove_uprooted = {
+        let mut by_type: TVec<TypeId, (Vec<&VariableData>, Vec<&RelationData>)> =
+            theory.types.new_side();
+        for global in theory.globals.iter() {
+            by_type[global.type_].0.push(global);
+        }
+        for relation in theory.relations.iter() {
+            for type_ in relation.unique_types() {
+                by_type[type_].1.push(relation);
+            }
+        }
+        by_type
+            .into_iter_enumerate()
+            .map(|(type_, (globals, relations))| {
+                let type_ = &theory.types[type_];
+                let type_uf = ident::type_uf(type_);
+                let type_remove_uprooted = ident::type_remove_uprooted(type_);
+                let type_uprooted = ident::type_uprooted(type_);
+
+                let global_var = globals.into_iter().map(ident::var_var);
+                let rel_remove_uprooted = relations.iter().map(|rel| {
+                    let rel_var = ident::rel_var(rel);
+                    let rel_insertions = ident::rel_insertions(rel);
+                    let (col, canon_col): (Vec<_>, Vec<_>) = rel
+                        .param_types
+                        .iter()
+                        .zip(ident::arguments())
+                        .map(|(col_type, col_arg)| {
+                            let col_type = &theory.types[col_type];
+                            let col_type_uf = ident::type_uf(&col_type);
+                            (col_arg.clone(), quote!(self.#col_type_uf.find(#col_arg)))
+                        })
+                        .unzip();
+                    quote! {
+                        self.#rel_insertions[Priority::Canonicalizing as usize].extend(
+                            self.#rel_var
+                                .#type_remove_uprooted(&self.#type_uprooted)
+                                .map(|(#(#col),*)| (#(#canon_col),*) )
+                        );
+                    }
+                });
+                quote! {
+                    if !self.#type_uprooted.is_empty() {
+                        #(self.#global_var = self.#type_uf.find(self.#global_var);)*
+                        #(#rel_remove_uprooted)*
+                        self.#type_uprooted.clear();
+                    }
+                }
+            })
+    };
 
     quote! {
         #(#types)*
@@ -528,12 +630,8 @@ pub fn codegen(theory: &Theory) -> TokenStream {
                 #(#type_fields_clear_new)*
                 #(#relation_fields_clear_new)*
             }
-            fn has_uprooted(&self) -> bool {
-                // remember global vars may be uprooted
-                todo!()
-            }
             fn remove_uprooted(&mut self) {
-                todo!()
+                #(#type_remove_uprooted)*
             }
             fn lowest_insertion_priority(&self) -> Option<Priority> {
                 for priority in Priority::LIST {
@@ -567,10 +665,10 @@ pub fn codegen(theory: &Theory) -> TokenStream {
                     }
                     self.rules();
                     self.clear_new();
-                    if self.has_uprooted() {
-                        // remove uprooted, enqueue for insertion with lowest priority
-                        self.remove_uprooted();
-                    }
+
+                    // remove uprooted, enqueue for insertion with lowest priority
+                    self.remove_uprooted();
+
                     if let Some(priority) = self.lowest_insertion_priority() {
                         // apply all insertions of lowest non-empty priority class
                         self.apply_insertions_up_to(priority);
@@ -665,6 +763,26 @@ mod test {
                 struct LeRelation {
                     _todo: (),
                 }
+                impl Relation for LeRelation {
+                    type Row = (El, El);
+                    fn new() -> Self {
+                        todo!()
+                    }
+                    fn clear_new(&mut self) {
+                        todo!()
+                    }
+                    fn insert(&mut self, rows: &[Self::Row]) {
+                        todo!()
+                    }
+                }
+                impl LeRelation {
+                    fn indexed_iter_todo_thingy(&self) {
+                        todo!()
+                    }
+                    fn el_remove_uprooted(uprooted: &[El]) {
+                        todo!()
+                    }
+                }
                 pub struct SemilatticeTheory {
                     el_all: BTreeSet<El>,
                     el_new: BTreeSet<El>,
@@ -685,11 +803,15 @@ mod test {
                         self.el_new.clear();
                         self.le_relation.clear_new();
                     }
-                    fn has_uprooted(&self) -> bool {
-                        todo!()
-                    }
                     fn remove_uprooted(&mut self) {
-                        todo!()
+                        if !self.el_uprooted.is_empty() {
+                            self.le_insertions[Priority::Canonicalizing as usize].extend(
+                                self.le_relation
+                                    .el_remove_uprooted(&self.el_uprooted)
+                                    .map(|(arg0, arg1)| (self.el_uf.find(arg0), self.el_uf.find(arg1))),
+                            );
+                            self.el_uprooted.clear();
+                        }
                     }
                     fn lowest_insertion_priority(&self) -> Option<Priority> {
                         for priority in Priority::LIST {
@@ -726,9 +848,7 @@ mod test {
                             }
                             self.rules();
                             self.clear_new();
-                            if self.has_uprooted() {
-                                self.remove_uprooted();
-                            }
+                            self.remove_uprooted();
                             if let Some(priority) = self.lowest_insertion_priority() {
                                 self.apply_insertions_up_to(priority);
                             } else {
@@ -763,7 +883,7 @@ mod test {
                         self.le_insert_with_priority(Priority::Canonicalizing, arg0, arg1)
                     }
                     fn le_insert_with_priority(&mut self, priority: Priority, arg0: El, arg1: El) {
-                        todo!()
+                        self.le_insertions[priority as usize].push(arg0, arg1);
                     }
                 }
             "#]],

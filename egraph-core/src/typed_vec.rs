@@ -50,6 +50,10 @@ impl<K: Id, V> TVec<K, V> {
     pub(crate) fn iter_mut_enumerate(&mut self) -> impl Iterator<Item = (K, &mut V)> {
         (0..).map(K::from).zip(self.x.iter_mut())
     }
+    /// `.into_iter().enumerate()` with typed indexes
+    pub(crate) fn into_iter_enumerate(self) -> impl Iterator<Item = (K, V)> {
+        (0..).map(K::from).zip(self.x.into_iter())
+    }
     pub(crate) fn push_expected(&mut self, expected_id: K, v: V) {
         assert_eq!(self.x.len(), expected_id.into());
         self.x.push(v);
@@ -58,6 +62,9 @@ impl<K: Id, V> TVec<K, V> {
         let id = self.x.len().into();
         self.x.push(v);
         id
+    }
+    pub(crate) fn new_side<V2: Default + Clone>(&self) -> TVec<K, V2> {
+        TVec::new_with_size(self.len(), Default::default())
     }
 }
 
