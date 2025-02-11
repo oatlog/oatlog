@@ -1,0 +1,8 @@
+https://inciteful.xyz/p?ids%5B%5D=W4387673978&ids%5B%5D=W3195156963&ids%5B%5D=W3207460439&ids%5B%5D=W2152397470&ids%5B%5D=W3190844266&ids%5B%5D=W4403223198&ids%5B%5D=W4387674126&ids%5B%5D=W4403223400&ids%5B%5D=W3117137355&ids%5B%5D=W4205872049&ids%5B%5D=W4379536906
+
+Title,Link,Tags,Comment
+Better Together: Unifying Datalog and Equality Saturation,https://dl.acm.org/doi/10.1145/3591239,USEFUL,Original egglog paper
+Design and Implementation of the LogicBlox System,https://dl.acm.org/doi/abs/10.1145/2723372.2742796,REFERENCE,datalog engine that supports lattice computations.
+Equality Saturation Theory Exploration à la Carte,https://dl.acm.org/doi/abs/10.1145/3622834,UNRELATED,user guided rewrite rule generation
+Bring Your Own Data Structures to Datalog,https://dl.acm.org/doi/abs/10.1145/3622840,USEFUL,custom acceleration structures for datalog programs.
+
