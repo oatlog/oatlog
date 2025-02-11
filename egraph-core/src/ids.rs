@@ -51,3 +51,4 @@ id_wrap!(GlobalId, "g", "id for a global variable");
 id_wrap!(TypeId, "t", "id for a type");
 id_wrap!(TypeVarId, "x", "id for a type variable");
 id_wrap!(RuleId, "y", "id for a rule");
+id_wrap!(ColumnId, "c", "id for a column");

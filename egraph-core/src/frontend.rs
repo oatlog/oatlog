@@ -1,5 +1,7 @@
 //! Frontend, parse source text into HIR.
 
+#![allow(clippy::zero_sized_map_values, reason = "MapExt trait usage")]
+
 use std::{
     cmp::Ordering,
     collections::{btree_map::Entry, BTreeMap},
@@ -10,11 +12,12 @@ use std::{
 };
 
 use educe::Educe;
+use itertools::Itertools as _;
 use proc_macro2::{Delimiter, Span, TokenTree};
 
 use crate::{
     hir,
-    ids::{GlobalId, Id, RelationId, TypeId},
+    ids::{GlobalId, Id, RelationId, TypeId, VariableId},
     typed_vec::TVec,
 };
 
@@ -389,6 +392,12 @@ struct TypeData {
     /// List if something like (Vec i64)
     primitive: Option<Vec<Str>>,
 }
+impl TypeData {
+    fn is_primitive(&self) -> bool {
+        // TODO: make sure i64 is actually primitive.
+        self.primitive.is_some()
+    }
+}
 
 /// A declared function
 /// output is unit if it is a relation
@@ -645,7 +654,8 @@ struct Parser {
     global_variable_names: BTreeMap<Str, GlobalId>,
     compute_to_global: BTreeMap<ComputeMethod, GlobalId>,
 
-    rules: Vec<hir::Rule>,
+    symbolic_rules: Vec<hir::SymbolicRule>,
+    implicit_rules: Vec<hir::ImplicitRule>,
 }
 impl Parser {
     /// Add a global variable. Hashcons based on the compute method
@@ -703,7 +713,8 @@ impl Parser {
             global_variable_names: BTreeMap::new(),
             global_variables: TVec::new(),
             compute_to_global: BTreeMap::new(),
-            rules: Vec::new(),
+            symbolic_rules: Vec::new(),
+            implicit_rules: Vec::new(),
         };
         for builtin in BUILTIN_SORTS {
             let _ty = parser.add_sort(
@@ -779,7 +790,7 @@ impl Parser {
                         .map(|x| self.type_ids.lookup(x.atom("input type")?))
                         .collect::<syn::Result<Vec<_>>>()?;
 
-                    self.add_function(function_name, inputs, Some(output_type), None, cost);
+                    self.add_function(function_name, &inputs, Some(output_type), None, cost)?;
                 }
             }
             "datatype*" => ret!("\"datatype*\" unimplemented, unclear what this does"),
@@ -796,7 +807,7 @@ impl Parser {
                     [(":no_merge", [])] => None,
                     _ => ret!("missing merge options (:merge <expr>) or (:no_merge)"),
                 };
-                self.add_function(name, inputs, Some(output), merge, None);
+                self.add_function(name, &inputs, Some(output), merge.as_ref(), None)?;
             }
             "constructor" => {
                 let [name, inputs, output, options @ ..] = args else {
@@ -812,7 +823,7 @@ impl Parser {
                     [] => (),
                     _ => ret!("missing merge options (:merge <expr>) or (:no_merge)"),
                 };
-                self.add_function(name, inputs, Some(output), None, cost);
+                self.add_function(name, &inputs, Some(output), None, cost)?;
             }
             "relation" => {
                 let [name, inputs] = args else {
@@ -820,7 +831,7 @@ impl Parser {
                 };
                 let name = name.atom("relation name")?;
                 let inputs = self.parse_inputs(inputs)?;
-                self.add_function(name, inputs, None, None, None);
+                self.add_function(name, &inputs, None, None, None)?;
             }
 
             "ruleset" => {
@@ -982,25 +993,153 @@ impl Parser {
     fn add_function(
         &mut self,
         name: Str,
-        inputs: Vec<TypeId>,
+        inputs: &[TypeId],
         output: Option<TypeId>,
-        merge: Option<Expr>,
+        merge: Option<&Expr>,
         // None means it can not be extracted
         cost: Option<u64>,
-    ) {
-        let output = output.unwrap_or_else(|| {
+    ) -> syn::Result<()> {
+        // output is some => functional dependency
+        // merge is some => lattice
+        // merge is none, output is eqsort => unification.
+        // merge is none, output is primitive => panic.
+
+        let output_or_unit = output.unwrap_or_else(|| {
             self.type_ids
                 .lookup(Str::with_placeholder(BUILTIN_UNIT))
                 .expect("unit type exists")
         });
-        let id = self.functions.push(FunctionData {
+        let relation_id = self.functions.push(FunctionData {
             name,
-            inputs,
-            output,
-            merge,
+            inputs: inputs.to_owned(),
+            output: output_or_unit,
+            merge: merge.cloned(),
             cost,
         });
-        self.function_possible_ids.entry(name).or_default().push(id);
+
+        if let Some(output) = output {
+            // some output => functional dependency exists.
+
+            let rule = if let Some(merge) = &merge {
+                // TODO: do a sort of constant propagation by promoting more function calls to
+                // globals.
+                let mut variables: TVec<VariableId, (TypeId, Option<GlobalId>)> = TVec::new();
+                let mut ops = Vec::new();
+                let old = variables.push((output, None));
+                let new = variables.push((output, None));
+                let res = self.parse_lattice_expr(old, new, merge, &mut variables, &mut ops)?;
+                hir::ImplicitRule::new_lattice(relation_id, inputs.len(), old, new, res, ops, variables)
+            } else if self.types[output].is_primitive() {
+                // unify primitive => panic if disagree
+                hir::ImplicitRule::new_panic(relation_id, inputs.len())
+            } else {
+                // eqsort type => unification
+                hir::ImplicitRule::new_unify(relation_id, inputs.len())
+            };
+            self.implicit_rules.push(rule);
+        }
+
+        self.function_possible_ids
+            .entry(name)
+            .or_default()
+            .push(relation_id);
+        Ok(())
+    }
+
+    fn parse_lattice_expr(
+        &mut self,
+        old: VariableId,
+        new: VariableId,
+        expr: &Expr,
+        variables: &mut TVec<VariableId, (TypeId, Option<GlobalId>)>,
+        ops: &mut Vec<(RelationId, Vec<VariableId>)>,
+    ) -> syn::Result<VariableId> {
+        Ok(match expr {
+            Expr::Literal(spanned) => {
+                let literal = **spanned;
+                let ty = self.literal_type(literal);
+                let global_id = self.add_global(None, ty, ComputeMethod::Literal(literal))?;
+                variables.push((ty, Some(global_id)))
+            }
+            Expr::Var(spanned) => {
+                match **spanned {
+                    "old" => old,
+                    "new" => new,
+                    _ => {
+                        let msg = format!("only variables old or new are allowed in a merge expression, not \"{}\"", **spanned);
+                        return Err(syn::Error::new(spanned.span, msg));
+                    }
+                }
+            }
+            Expr::Call(name, args) => {
+                let args = args
+                    .iter()
+                    .map(|expr| self.parse_lattice_expr(old, new, expr, variables, ops))
+                    .collect::<Result<Vec<_>, _>>()?;
+
+                let possible_ids = &self.function_possible_ids.lookup(*name, "function")?;
+                let args_ty: Vec<_> = args.iter().map(|v| variables[*v].0).collect();
+
+                let args_ty_pat: Vec<_> = args_ty.iter().copied().map(Some).collect();
+
+                let args_ty_s = args_ty.iter().map(|ty| *self.types[ty].name).join(" ");
+
+                let possible_ids: Vec<_> = possible_ids
+                    .iter()
+                    .copied()
+                    .filter(|x| self.functions[x].check_compatible(&args_ty_pat, None))
+                    .collect();
+                match possible_ids.as_slice() {
+                    [id] => {
+                        let id = *id;
+                        let function = &self.functions[id];
+                        let ty = function.output;
+
+                        if let Some(all_globals) = args
+                            .iter()
+                            .map(|&x| variables[x].1)
+                            .collect::<Option<Vec<_>>>()
+                        {
+                            // we can turn it into a global.
+                            let global_id = self.add_global(
+                                None,
+                                ty,
+                                ComputeMethod::Function {
+                                    function: id,
+                                    args: all_globals,
+                                },
+                            )?;
+                            variables.push((ty, Some(global_id)))
+                        } else {
+                            // we need to evaluate the expression (expression depends on old and new)
+                            let res_id = variables.push((ty, None));
+                            ops.push((id, args));
+                            res_id
+                        }
+                    }
+                    [] => {
+                        let mut err = syn::Error::new(
+                            name.span,
+                            format!("{name} has no variant for fn({args_ty_s}) -> _"),
+                        );
+                        for id in possible_ids {
+                            self.err_function_defined_here(id, &mut err);
+                        }
+                        return Err(err);
+                    }
+                    [..] => {
+                        let mut err = syn::Error::new(
+                            name.span,
+                            format!("{name} multiple possible variants for fn({args_ty_s}) -> _"),
+                        );
+                        for id in possible_ids {
+                            self.err_function_defined_here(id, &mut err);
+                        }
+                        return Err(err);
+                    }
+                }
+            }
+        })
     }
 }
 
@@ -1249,10 +1388,11 @@ impl Parser {
             .map(|t| hir::Type { name: *t.name })
             .collect();
         hir::Theory {
-            rules: self.rules.clone(),
+            symbolic_rules: self.symbolic_rules.clone(),
             relations: functions,
             name: "",
             types,
+            implicit_rules: self.implicit_rules.clone(),
         }
     }
 }
@@ -1561,7 +1701,7 @@ mod compile_rule {
             }
             .build();
 
-            self.rules.push(rule);
+            self.symbolic_rules.push(rule);
 
             Ok(())
         }

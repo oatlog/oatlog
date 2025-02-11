@@ -7,13 +7,93 @@ use std::{
     hash::Hash,
 };
 
+#[cfg(test)]
 use itertools::Itertools as _;
 
 use crate::{
-    ids::{ActionId, Id, PremiseId, RelationId, RuleId, TypeId, VariableId},
+    ids::{ActionId, ColumnId, GlobalId, Id, PremiseId, RelationId, TypeId, VariableId},
     typed_vec::TVec,
     union_find::{UFData, UF},
 };
+
+// unify can not read lattice variable.
+
+/// Lattice and Unification style implicit functionality
+///
+/// Rules that can be applied through an entry API on a table.
+/// We can assume that these are always applied.
+///
+/// After rules complete, there must only be one possible value for the entry.
+/// So the rule must "write" to all columns not mentioned in `on` to actually guarantee that the
+/// conflict is resolved.
+///
+/// If there is not a conflict, the rule is not run at all.
+///
+/// TODO: add optimization pass to turn symbolic rules to implicit rules.
+#[derive(Clone, Eq, PartialEq, Ord, PartialOrd, Hash, Debug, Default)]
+pub(crate) struct ImplicitRule {
+    pub(crate) relation: RelationId,
+    /// If there is something in the database with the same values for these columns, trigger the rule.
+    pub(crate) on: Vec<ColumnId>,
+    /// If there is a conflict, resolve it with this method.
+    pub(crate) ty: ImplicitRuleAction,
+}
+impl ImplicitRule {
+    pub(crate) fn new_unify(relation: RelationId, inputs: usize) -> Self {
+        let on = (0..inputs).map(ColumnId).collect();
+        let ty = ImplicitRuleAction::Unification;
+        Self { relation, on, ty }
+    }
+    pub(crate) fn new_panic(relation: RelationId, inputs: usize) -> Self {
+        let on = (0..inputs).map(ColumnId).collect();
+        let ty = ImplicitRuleAction::Panic;
+        Self { relation, on, ty }
+    }
+    pub(crate) fn new_lattice(
+        relation: RelationId,
+        inputs: usize,
+        old: VariableId,
+        new: VariableId,
+        res: VariableId,
+        ops: Vec<(RelationId, Vec<VariableId>)>,
+        variables: TVec<VariableId, (TypeId, Option<GlobalId>)>,
+    ) -> Self {
+        let on = (0..inputs).map(ColumnId).collect();
+        let out_col = ColumnId(inputs + 1);
+        let ty = ImplicitRuleAction::Lattice {
+            ops,
+            variables,
+            old: vec![(old, out_col)],
+            new: vec![(new, out_col)],
+            res: vec![(res, out_col)],
+        };
+        Self { relation, on, ty }
+    }
+}
+
+#[derive(Clone, Eq, PartialEq, Ord, PartialOrd, Hash, Debug, Default)]
+pub(crate) enum ImplicitRuleAction {
+    /// Panics if values do not match.
+    #[default]
+    Panic,
+    /// Unifies all columns not mentioned in `on`
+    Unification,
+    /// Run computation to figure out what to write.
+    Lattice {
+        /// call these functions in this order.
+        /// panic if result is empty.
+        ops: Vec<(RelationId, Vec<VariableId>)>,
+        /// Mostly here to insert literals.
+        /// Reading literals should occur first.
+        variables: TVec<VariableId, (TypeId, Option<GlobalId>)>,
+        /// existing output value in a table.
+        old: Vec<(VariableId, ColumnId)>,
+        /// output value we want to write.
+        new: Vec<(VariableId, ColumnId)>,
+        /// what `VariableId` to write to the column
+        res: Vec<(VariableId, ColumnId)>,
+    },
+}
 
 /// Represents a theory (set of rules) with associated information
 #[derive(Clone, Eq, PartialEq, Ord, PartialOrd, Hash, Debug, Default)]
@@ -21,7 +101,8 @@ pub(crate) struct Theory {
     /// Name of final struct
     pub(crate) name: &'static str,
     pub(crate) types: TVec<TypeId, Type>,
-    pub(crate) rules: Vec<Rule>,
+    pub(crate) symbolic_rules: Vec<SymbolicRule>,
+    pub(crate) implicit_rules: Vec<ImplicitRule>,
     pub(crate) relations: TVec<RelationId, Relation>,
 }
 
@@ -36,11 +117,12 @@ pub(crate) struct Relation {
     pub(crate) name: &'static str,
     /// Types of columns
     pub(crate) ty: Vec<TypeId>,
+    // TODO: primitive functions.
 }
 
 #[must_use]
 #[derive(Clone, Eq, PartialEq, Ord, PartialOrd, Hash, Debug, Default)]
-pub(crate) struct Rule {
+pub(crate) struct SymbolicRule {
     pub(crate) name: &'static str,
     /// Requirements to trigger rule
     pub(crate) premise_relations: Vec<PremiseRelation>,
@@ -107,7 +189,7 @@ pub(crate) struct RuleArgs {
     pub(crate) delete: Vec<VariableId>,
 }
 impl RuleArgs {
-    pub(crate) fn build(self) -> Rule {
+    pub(crate) fn build(self) -> SymbolicRule {
         // general strategy is to initially make a VariableId correspond to both a PremiseId and an
         // ActionId and then normalize to get rid of the useless variables.
 
@@ -163,7 +245,7 @@ impl RuleArgs {
             .iter()
             .map(|(ty, name)| VariableMeta::new(name, *ty))
             .collect();
-        Rule {
+        SymbolicRule {
             name: self_name,
             premise_relations,
             action_relations,
@@ -209,7 +291,7 @@ struct UnifyArgs {
     action_delete: Vec<ActionId>,
 }
 
-impl Rule {
+impl SymbolicRule {
     fn unify(
         &self,
         UnifyArgs {
@@ -218,7 +300,7 @@ impl Rule {
             premise_delete,
             action_delete,
         }: UnifyArgs,
-    ) -> Rule {
+    ) -> SymbolicRule {
         // action
         let mut unify = self.unify.clone();
         let mut action_variables: TVec<ActionId, _> = TVec::new();
@@ -347,7 +429,7 @@ impl Rule {
             }
             unify = new_unify;
         }
-        Rule {
+        SymbolicRule {
             premise_relations,
             action_relations,
             unify,
@@ -490,7 +572,7 @@ impl Rule {
     fn canonical_permutation(&self) -> Self {
         // is self contained in other?
         // TODO: ignores "forall" variables.
-        use std::hash::{DefaultHasher, Hash, Hasher as _};
+        use std::hash::{DefaultHasher, Hash as _, Hasher as _};
 
         let n = self.premise_variables.len();
         let mut local_initial: TVec<PremiseId, BTreeMap<(RelationId, usize), usize>> =
@@ -538,21 +620,21 @@ impl Rule {
             .inner()
             .sort_by_key(|x| (self.premise_variables[x].ty, hashes[x]));
 
-        let mut rule = self.permute_premise(permutation);
+        let mut rule = self.permute_premise(&permutation);
         rule.premise_relations.sort_dedup();
         rule
     }
-    fn permute_premise(&self, permutation: TVec<PremiseId, PremiseId>) -> Self {
+    fn permute_premise(&self, permutation: &TVec<PremiseId, PremiseId>) -> Self {
         let premise_relations = self
             .premise_relations
             .iter()
             .map(|PremiseRelation { relation, args }| PremiseRelation {
                 relation: *relation,
-                args: args.into_iter().map(|x| permutation[x]).collect(),
+                args: args.iter().map(|x| permutation[x]).collect(),
             })
             .collect();
         let mut unify: UF<PremiseId> = UF::new_with_size(self.premise_variables.len(), ());
-        for (a, b, _) in self.unify.iter_all() {
+        for (a, b, ()) in self.unify.iter_all() {
             unify.union(a, b);
         }
         let action_variables: TVec<ActionId, _> = self
@@ -560,9 +642,9 @@ impl Rule {
             .iter()
             .map(|(m, p)| {
                 if let Some(p) = p {
-                    (m.clone(), Some(permutation[*p]))
+                    (*m, Some(permutation[*p]))
                 } else {
-                    (m.clone(), *p)
+                    (*m, *p)
                 }
             })
             .collect();
@@ -570,10 +652,10 @@ impl Rule {
         let mut premise_variables =
             TVec::new_with_size(self.premise_variables.len(), VariableMeta::default());
         for (i, m) in self.premise_variables.iter_enumerate() {
-            premise_variables[permutation[i]] = m.clone();
+            premise_variables[permutation[i]] = *m;
         }
 
-        Rule {
+        SymbolicRule {
             name: self.name,
             premise_relations,
             action_relations: self.action_relations.clone(),
@@ -582,19 +664,7 @@ impl Rule {
             premise_variables,
         }
     }
-    /// Will be equal if premises are equal modulo variable permutation and normalization worked
-    /// correctly.
-    fn premise_memento(&self) -> PremiseMemento {
-        (
-            self.premise_variables
-                .iter()
-                .map(|x| x.ty)
-                .collect::<Vec<_>>(),
-            self.premise_relations.clone(),
-        )
-    }
 }
-type PremiseMemento = (Vec<TypeId>, Vec<PremiseRelation>);
 
 impl Theory {
     #[cfg(test)]
@@ -618,8 +688,8 @@ impl Theory {
         }
         wln!();
 
-        for rule in &self.rules {
-            let Rule {
+        for rule in &self.symbolic_rules {
+            let SymbolicRule {
                 name,
                 premise_relations,
                 action_relations,
@@ -687,22 +757,9 @@ impl Theory {
 
         buf
     }
+    /// simplify across rules.
     fn optimize(&self) -> Self {
-        let rules: TVec<RuleId, Rule> = self.rules.iter().cloned().collect();
-
-        // for each rule we need to maintain a map from original premiseids to the current
-        // premiseids.
-        //
-        // for each optimization, the amount of constraints should be monotonically increasing.
-        // this is needed to make sure variables only merge.
-        // transformation is TVec<PremiseId, PremiseId>
-        //
-        // The only ways to make normalization remove a variable is if an action variable or
-        // premise relation is removed, therefore if the only applied action is to merge variables,
-        // then premise variables will never be removed.
-        //
-
-        todo!()
+        self.clone()
     }
 }
 
