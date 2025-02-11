@@ -999,6 +999,8 @@ set high bit = do not add enodes that evaluate to this.
 MEASURE: How many e-nodes are in e-classes that contain a Const?
 HYPOTHESIS: It is O(1) e-nodes.
 
+Subsume can be implemented in an easier way by also storing subsumed rows in a separate array and canonicalizing it when extraction starts to figure out what rows to ignore.
+
 = Rule normalization is hard.
 
 - Rule normalization should commute with all other modifications, at least additions, such as adding a union/premise/action. so:
@@ -1051,6 +1053,121 @@ struct Rule {
 
 Another way of seeing it is that after the action has run, the meaning of variables change, since they are unified, so it makes sense to separate them.
 
+
+= Kinds of relations
+
+== User defined
+- Relation `any+ -> ()`, no implicit functionality
+    - like symbolic without ifunc
+- Symbolic `any+ -> eclass`, implicit functionality, merge with unification
+    - relation with ifunc
+- Lattice `any+ -> !eclass`, implicit functionality, merge with expression of builtins
+    - unification in IR, but depends on relevant functions to get merge function.
+- Global `() -> any`, user defined through let expressions.
+    - like builtin
+
+== Built-in functions (possibly user defined through rust code)
+- Builtin `any* -> any?`
+- has pre-defined indexes emulating a database.
+- no merge.
+
+
+= Sorts
+== Eclass sorts
+- can be unified
+
+== Primitive sorts
+- can not unify.
+
+== Collection sorts
+- can not directly unify.
+- can tell the database that two primitves are equal.
+
+
+```rust
+enum FunctionKind {
+    Symbolic,
+    Lattice {
+        merge: MergeFunc,
+    }
+    Builtin {
+        indexes: Vec<Index>,
+        // eg MathVecContext
+        context: syn::ItemStruct,
+    }
+}
+
+struct Index {
+    // builtin functions might be optimized by having fewer indexes.
+    // cost of maintaining this index.
+    cost: u64,
+    by: Vec<usize>,
+    implementation: syn::ExprPath,
+}
+```
+
+```rust
+struct MathVecContext(/* immutable datastructure management */);
+impl MathVecContext {
+    fn add_math_unify(&mut self, unify: Vec<(Math, Math)>) -> Vec<(MathVec, MathVec)> { /* ... */}
+    fn new() -> Self { /* ... */ }
+}
+struct MathVec(u64);
+impl MathVec {
+    fn vec_push_0_1(ctx: &mut MathVecContext, vec: MathVec, elem: Math) -> MathVec { /* ... */ }
+}
+```
+
+We could solve unification with lattices by making the output columns of lattices a separate type (subtype) and making lattices just emit unification for them.
+
+(function upper_bound (Math) i64)
+// ->
+(relation upper_bound (Math i64_upper_bound)
+
+This does not really work since it's not a unification, just because `upper_bound(3,5) = 5` does not mean we can replace all `upper_bound(3)` with `upper_bound(5)`.
+
+= Lattice properties
+We call it a lattice, but user only provides join, so it is actually a semilattice.
+
+
+- There is some partial order of all elements.
+- $a and a = a$
+- $a and b = b and a$
+- $a and (b and c) = (a and b) and c$
+- $a and b$ must return an object greater than or equal to $a$ and $b$
+    - math: must be upper bound but we don't care about that.
+
+
+= Index selection
+Given that our query plan is done, we can create the minimal set of (btree) indexes in "O(n^2 * m)" where m is the arity of the relation and n is the number of queries, in practice n,m <100 for datalog programs, so it is perfectly fine.
+See "Automatic index selection for large-scale datalog computation (2018)"
+
+It is kinda solved with maximum matching, so it might be possible to do online so that earlier stages can use number of indexes as a cost metric.
+
+= HIR optimization
+
+We want to make rules more restrictive and minimize the number of rules.
+Given some ordering of the rules, we can apply rules to rules and merge when they become equal through union-find.
+"Applying rules to rules" will only modify the premise of a rule.
+
+Checking if rules are equal is exponential, but solvable in linear time given an ordering of the premises, so essentially only exponential in the most common query type.
+
+There is a sort-of symmetry between the problem of index selection and linear rule subset merging.
+The symmetry violation is because we form a trie.
+
+If we translate into a trie structure, do we actually care if two rules are equal?
+
+= Bijective functions/reducing number of tables
+
+Sub is just an alias for Add with a permutation of columns.
+This can be used to optimize away tables.
+Bijectivity can be identified from rules.
+
+Mul/Div and Sqr/Sqrt has additional constraints so it would only be injective/surjective.
+
+= In-place modification for implicit rules
+
+If we know that the "key" part of the btree is unique, then in-place mutation of the "value" part is safe (in terms of reordering).
 
 = TODO READ
 Papers are just under the first author i looked at.
