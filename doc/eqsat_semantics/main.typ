@@ -31,3 +31,12 @@ these tree automata do not have any final state.
 "It is folklore that E-graphs represent equivalences of terms."
 
 The chase procedure.
+
+
+
+
+= Equality Saturation Theory Exploration à la Carte
+User guided automated rewrite rule generation
+
+
+
