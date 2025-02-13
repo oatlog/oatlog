@@ -56,13 +56,14 @@ mod test {
         let expected = expect![[r#"
             Theory "":
 
+            Math(Math)
             Add(Math, Math, Math)
 
             Rule "":
             Premise: Add(a, b, e)
             a: a
-            e: e
             b: b
+            e: e
             Insert: Add(b, a, e)
 
         "#]];
@@ -81,16 +82,17 @@ mod test {
         let expected = expect![[r#"
             Theory "":
 
+            Math(Math)
             Add(Math, Math, Math)
             Mul(Math, Math, Math)
 
             Rule "":
-            Premise: Add(a, b, p4), Mul(p4, c, p2)
+            Premise: Add(a, b, p2), Mul(p2, c, p4)
             a: a
             b: b
-            a5: p2
+            __: p2
             c: c
-            __: p4
+            a5: p4
             a3: __
             a4: __
             Insert: Add(a3, a4, a5), Mul(a, c, a3), Mul(b, c, a4)
@@ -110,18 +112,55 @@ mod test {
         let expected = expect![[r#"
             Theory "":
 
+            Math(Math)
             Add(Math, Math, Math)
 
             Rule "":
             Premise: Add(a, b, c), Add(a, b, d)
-            __: b
             __: a
+            __: b
             __: c, d
             Insert: 
 
         "#]];
         check(code, expected);
     }
+
+
+    #[test]
+    fn hir_global() {
+        let code = "(
+            (datatype Math
+                (Mul Math Math)
+                (Add Math Math)
+                (Const i64)
+            )
+            (let one (Const 1))
+            (rewrite (Add one b) (Add b a))
+
+        )";
+        let expected = expect![[r#"
+            Theory "":
+
+            Math(Math)
+            Mul(Math, Math, Math)
+            Add(Math, Math, Math)
+            Const(i64, Math)
+            g0(i64)
+            g1(Math)
+
+            Rule "":
+            Premise: g1(one), Add(one, b, p2)
+            __: one
+            b: b
+            a2: p2
+            a: __
+            Insert: Add(b, a, a2)
+
+        "#]];
+        check(code, expected);
+    }
+
 
     fn check(code: &str, expected: expect_test::Expect) {
         let hir = frontend::parse(code.parse().unwrap()).unwrap();

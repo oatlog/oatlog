@@ -17,7 +17,7 @@ use proc_macro2::{Delimiter, Span, TokenTree};
 
 use crate::{
     hir,
-    ids::{GlobalId, Id, RelationId, TypeId, VariableId},
+    ids::{ColumnId, GlobalId, Id, RelationId, TypeId, VariableId},
     typed_vec::TVec,
 };
 
@@ -394,7 +394,7 @@ struct TypeData {
 }
 impl TypeData {
     fn is_primitive(&self) -> bool {
-        // TODO: make sure i64 is actually primitive.
+        // TODO: make sure i64 and similar is actually primitive.
         self.primitive.is_some()
     }
 }
@@ -405,7 +405,7 @@ impl TypeData {
 #[educe(PartialEq)]
 struct FunctionData {
     name: Str,
-    inputs: Vec<TypeId>,
+    inputs: TVec<ColumnId, TypeId>,
     // for variadic functions, possibly do the following:
     // varadic : Option<TypeId>
     /// Unit if relation
@@ -644,11 +644,17 @@ impl<V: Clone> MapExt<&'static str, Spanned<V>> for BTreeMap<&'static str, Spann
 struct Parser {
     rulesets: BTreeMap<Str, ()>,
 
-    functions: TVec<RelationId, FunctionData>,
+    functions: TVec<RelationId, Option<FunctionData>>,
     function_possible_ids: BTreeMap<Str, Vec<RelationId>>,
+
+    hir_relations: TVec<RelationId, hir::Relation>,
 
     types: TVec<TypeId, TypeData>,
     type_ids: StringIds<TypeId>,
+
+    // TODO: global_to_function
+    global_to_function: BTreeMap<GlobalId, RelationId>,
+    type_to_forall: BTreeMap<TypeId, RelationId>,
 
     global_variables: TVec<GlobalId, GlobalVariableInfo>,
     global_variable_names: BTreeMap<Str, GlobalId>,
@@ -686,20 +692,34 @@ impl Parser {
         }
 
         let new_id = GlobalId(self.compute_to_global.len());
-        let id = *self
+        let mut is_new_id = false;
+        let global_id = *self
             .compute_to_global
             .entry(compute.clone())
             .or_insert_with(|| {
+                is_new_id = true;
                 self.global_variables
                     .push_expected(new_id, GlobalVariableInfo { ty, compute });
                 new_id
             });
-
-        if let Some(name) = name {
-            self.global_variable_names.insert(name, id);
+        if is_new_id {
+            let relation_id = self.functions.push(None);
+            self.hir_relations.push_expected(
+                relation_id,
+                hir::Relation::global(
+                    name.map(|x| *x).unwrap_or(global_id.to_string().leak()),
+                    global_id,
+                    ty,
+                ),
+            );
+            self.global_to_function.insert(global_id, relation_id);
         }
 
-        Ok(id)
+        if let Some(name) = name {
+            self.global_variable_names.insert(name, global_id);
+        }
+
+        Ok(global_id)
     }
     fn new() -> Self {
         let mut parser = Parser {
@@ -715,6 +735,9 @@ impl Parser {
             compute_to_global: BTreeMap::new(),
             symbolic_rules: Vec::new(),
             implicit_rules: Vec::new(),
+            hir_relations: TVec::new(),
+            global_to_function: BTreeMap::new(),
+            type_to_forall: BTreeMap::new(),
         };
         for builtin in BUILTIN_SORTS {
             let _ty = parser.add_sort(
@@ -985,9 +1008,21 @@ impl Parser {
     }
 
     fn add_sort(&mut self, name: Str, primitive: Option<Vec<Str>>) -> syn::Result<TypeId> {
-        let id = self.type_ids.add_unique(name)?;
-        self.types.push_expected(id, TypeData { name, primitive });
-        Ok(id)
+        let type_id = self.type_ids.add_unique(name)?;
+        self.types.push_expected(
+            type_id,
+            TypeData {
+                name,
+                primitive: primitive.clone(),
+            },
+        );
+        if primitive.is_none() {
+            let relation_id = self.functions.push(None);
+            self.hir_relations
+                .push_expected(relation_id, hir::Relation::forall(*name, type_id));
+            self.type_to_forall.insert(type_id, relation_id);
+        }
+        Ok(type_id)
     }
 
     fn add_function(
@@ -1009,13 +1044,20 @@ impl Parser {
                 .lookup(Str::with_placeholder(BUILTIN_UNIT))
                 .expect("unit type exists")
         });
-        let relation_id = self.functions.push(FunctionData {
+        let relation_id = self.functions.push(Some(FunctionData {
             name,
-            inputs: inputs.to_owned(),
+            inputs: inputs.into_iter().copied().collect(),
             output: output_or_unit,
             merge: merge.cloned(),
             cost,
-        });
+        }));
+
+        let mut columns: TVec<ColumnId, TypeId> = inputs.iter().copied().collect();
+        if let Some(output) = output {
+            let _: ColumnId = columns.push(output);
+        }
+        self.hir_relations
+            .push_expected(relation_id, hir::Relation::table(*name, columns));
 
         if let Some(output) = output {
             // some output => functional dependency exists.
@@ -1028,7 +1070,15 @@ impl Parser {
                 let old = variables.push((output, None));
                 let new = variables.push((output, None));
                 let res = self.parse_lattice_expr(old, new, merge, &mut variables, &mut ops)?;
-                hir::ImplicitRule::new_lattice(relation_id, inputs.len(), old, new, res, ops, variables)
+                hir::ImplicitRule::new_lattice(
+                    relation_id,
+                    inputs.len(),
+                    old,
+                    new,
+                    res,
+                    ops,
+                    variables,
+                )
             } else if self.types[output].is_primitive() {
                 // unify primitive => panic if disagree
                 hir::ImplicitRule::new_panic(relation_id, inputs.len())
@@ -1087,12 +1137,17 @@ impl Parser {
                 let possible_ids: Vec<_> = possible_ids
                     .iter()
                     .copied()
-                    .filter(|x| self.functions[x].check_compatible(&args_ty_pat, None))
+                    .filter(|x| {
+                        self.functions[x]
+                            .as_ref()
+                            .unwrap()
+                            .check_compatible(&args_ty_pat, None)
+                    })
                     .collect();
                 match possible_ids.as_slice() {
                     [id] => {
                         let id = *id;
-                        let function = &self.functions[id];
+                        let function = &self.functions[id].as_ref().unwrap();
                         let ty = function.output;
 
                         if let Some(all_globals) = args
@@ -1220,7 +1275,12 @@ impl Parser {
                     let ids: Vec<_> = possible_ids
                         .iter()
                         .copied()
-                        .filter(|id| parser.functions[*id].check_compatible(&arg_ty_opt, None))
+                        .filter(|id| {
+                            parser.functions[*id]
+                                .as_ref()
+                                .unwrap()
+                                .check_compatible(&arg_ty_opt, None)
+                        })
                         .collect();
 
                     let inputs_ty_s = arg_ty
@@ -1235,7 +1295,7 @@ impl Parser {
                                 function: *id,
                                 args,
                             };
-                            let ty = parser.functions[*id].output;
+                            let ty = parser.functions[*id].as_ref().unwrap().output;
                             (parser.add_global(None, ty, compute)?, ty)
                         }
                         [] => {
@@ -1278,7 +1338,7 @@ impl Parser {
         );
     }
     fn err_function_defined_here(&mut self, id: RelationId, err: &mut syn::Error) {
-        let function = &self.functions[id];
+        let function = &self.functions[id].as_ref().unwrap();
         let inputs_ty_s = function
             .inputs
             .iter()
@@ -1367,21 +1427,9 @@ impl Parser {
     }
 
     pub(crate) fn emit_hir(&self) -> hir::Theory {
-        let unit_ty = self.literal_type(Literal::Unit);
-        let functions: TVec<RelationId, hir::Relation> = self
-            .functions
-            .iter()
-            .map(|function| {
-                let mut ty = function.inputs.clone();
-                if function.output != unit_ty {
-                    ty.push(function.output);
-                }
-                hir::Relation {
-                    name: *function.name,
-                    ty,
-                }
-            })
-            .collect();
+        dbg!(&self);
+        assert_eq!(self.functions.len(), self.hir_relations.len());
+        let functions = self.hir_relations.clone();
         let types: TVec<TypeId, hir::Type> = self
             .types
             .iter()
@@ -1482,11 +1530,20 @@ mod compile_rule {
                 if let Some(&global_id) = parser.global_variable_names.get(name) {
                     let ty = parser.global_variables[global_id].ty;
                     let typevar = types.push(Some(ty));
-                    variables.push(VariableInfo {
+                    let variable_id = variables.push(VariableInfo {
                         label: Some(*name),
                         global: Some(global_id),
                         ty: typevar,
-                    })
+                    });
+
+                    calls.push(UnknownCall {
+                        name,
+                        ids: vec![parser.global_to_function[&global_id]],
+                        args: vec![],
+                        rval: variable_id,
+                    });
+
+                    variable_id
                 } else {
                     *bound_variables.entry(name).or_insert_with(|| {
                         let typevar = types.push(None);
@@ -1615,20 +1672,27 @@ mod compile_rule {
                          }| {
                             let at: Vec<_> = args.iter().map(|a| types[variables[*a].ty]).collect();
                             let rt = types[variables[*rval].ty];
-                            ids.retain(|id| self.functions[*id].check_compatible(&at, rt));
+                            ids.retain(|id| {
+                                // NOTE: we assume type constraints where added earlier.
+                                self.functions[*id]
+                                    .as_ref()
+                                    .map(|function| function.check_compatible(&at, rt))
+                                    .unwrap_or(true)
+                            });
 
                             match ids.as_slice() {
                                 [] => {
                                     panic!("no function named {name} can be used here");
                                 }
                                 [id] => {
-                                    let function = &self.functions[*id];
-                                    for (&var, &ty) in args.iter().zip(function.inputs.iter()) {
-                                        let typevar = variables[var].ty;
-                                        types[typevar] = Some(ty);
+                                    if let Some(function) = self.functions[*id].as_ref() {
+                                        for (&var, &ty) in args.iter().zip(function.inputs.iter()) {
+                                            let typevar = variables[var].ty;
+                                            types[typevar] = Some(ty);
+                                        }
+                                        let rval_typevar = variables[*rval].ty;
+                                        types[rval_typevar] = Some(function.output);
                                     }
-                                    let rval_typevar = variables[*rval].ty;
-                                    types[rval_typevar] = Some(function.output);
 
                                     known.push(KnownCall {
                                         id: *id,

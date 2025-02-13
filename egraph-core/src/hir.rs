@@ -5,6 +5,8 @@ use std::{
     collections::{BTreeMap, BTreeSet},
     convert::identity,
     hash::Hash,
+    iter,
+    mem::replace,
 };
 
 #[cfg(test)]
@@ -108,16 +110,80 @@ pub(crate) struct Theory {
 
 #[derive(Copy, Clone, Eq, PartialEq, Ord, PartialOrd, Hash, Debug, Default)]
 pub(crate) struct Type {
+    /// Name of type (sort Math) -> "Math"
     pub(crate) name: &'static str,
 }
 
+/// All relations have some notion of "new" and "all"
+/// "new" is never indexed, only iteration is possible.
+/// "all" is sometimes indexed.
 #[derive(Clone, Eq, PartialEq, Ord, PartialOrd, Hash, Debug, Default)]
 pub(crate) struct Relation {
     /// name from egglog (eg Add)
     pub(crate) name: &'static str,
     /// Types of columns
-    pub(crate) ty: Vec<TypeId>,
-    // TODO: primitive functions.
+    pub(crate) columns: TVec<ColumnId, TypeId>,
+    pub(crate) ty: RelationTy,
+}
+impl Relation {
+    pub(crate) fn table(name: &'static str, columns: TVec<ColumnId, TypeId>) -> Self {
+        Self {
+            name,
+            columns,
+            ty: RelationTy::Table,
+        }
+    }
+    pub(crate) fn forall(name: &'static str, ty: TypeId) -> Self {
+        let columns = iter::once(ty).collect();
+        Self {
+            name,
+            columns,
+            ty: RelationTy::Forall { ty },
+        }
+    }
+    pub(crate) fn global(name: &'static str, id: GlobalId, ty: TypeId) -> Self {
+        let columns = iter::once(ty).collect();
+        Self {
+            name,
+            columns,
+            ty: RelationTy::Global { id },
+        }
+    }
+}
+
+#[derive(Clone, Eq, PartialEq, Ord, PartialOrd, Hash, Debug, Default)]
+pub(crate) enum RelationTy {
+    /// Same as other relation but referring to the "new" part of it.
+    /// Only supports iteration
+    NewOf { id: RelationId },
+    /// An actual table with arbitrarily many indexes.
+    /// Supports inserts, iteration, lookup for arbitrary indexes
+    /// The only type that might be extractable.
+    #[default]
+    Table,
+    /// Points to another relation along with a permutation of variables.
+    /// Will be desugared
+    Alias {
+        permutation: TVec<ColumnId, ColumnId>,
+        other: RelationId,
+    },
+    /// Global variable.
+    /// Special because it always succeeds and has zero cost.
+    /// Supports lookup/iteration
+    Global { id: GlobalId },
+    /// Externally defined, predefined set of indexes.
+    /// Supports inserts, iteration, lookup for some indexes.
+    Primitive {
+        // context: ComtextId,
+        // indexes: Vec<(Vec<ColumnId>, path_to_function)>,
+    },
+    /// Conceptually a database view for everything with this type
+    /// Points to relations and relevant columns? (fine assuming we do not create more
+    /// relations)
+    /// Supports iteration (lookup desugars to no-op)
+    Forall { ty: TypeId },
+    // desugars to a table + insert/delete rules.
+    // MaterializedView {/* ... */}
 }
 
 #[must_use]
@@ -202,7 +268,7 @@ impl RuleArgs {
             action: self_action,
             action_unify: mut self_action_unify,
             delete: self_delete,
-        } = self;
+        } = dbg!(self);
         let n = self_variables.len();
         self_action_unify.extend(self_premise_unify.iter().cloned());
 
@@ -442,7 +508,7 @@ impl SymbolicRule {
     fn normalize(&self) -> Self {
         let mut rule = self.clone();
         rule.normalize_id_preserving();
-        rule.normalize_id_changing().canonical_permutation()
+        rule.normalize_id_changing()//.canonical_permutation()
     }
     fn normalize_id_preserving(&mut self) {
         // no duplicate actions
@@ -635,7 +701,7 @@ impl SymbolicRule {
             .collect();
         let mut unify: UF<PremiseId> = UF::new_with_size(self.premise_variables.len(), ());
         for (a, b, ()) in self.unify.iter_all() {
-            unify.union(a, b);
+            unify.union(permutation[a], permutation[a]);
         }
         let action_variables: TVec<ActionId, _> = self
             .action_variables
@@ -680,7 +746,10 @@ impl Theory {
 
         wln!("Theory {:?}:", self.name);
         wln!();
-        for Relation { name, ty } in self.relations.iter() {
+        for Relation {
+            name, columns: ty, ..
+        } in self.relations.iter()
+        {
             wln!(
                 "{name}({})",
                 ty.iter().map(|t| self.types[*t].name).join(", ")
@@ -757,9 +826,168 @@ impl Theory {
 
         buf
     }
-    /// simplify across rules.
-    fn optimize(&self) -> Self {
-        self.clone()
+    pub(crate) fn emit_low_level_ir(&self) {
+        /// Ordered from bad to good.
+        #[derive(Copy, Clone, Ord, PartialOrd, PartialEq, Eq)]
+        enum RelationScore {
+            /// not connected or current indexing not possible
+            Unviable,
+            /// sum of the degrees of the variables
+            ManyVariables { count: u64 },
+            /// FD/primitive will cause relation to output a tiny (typically single row) result
+            Tiny,
+            /// This reads from the "new" part in semi-naive evaluation.
+            New,
+            /// All variables are bound.
+            Constraint,
+        }
+
+        // TODO: handle forall, it should be turned into a relation that acts like a view
+        // instead.
+
+        const NEW: usize = 1 << 63;
+
+        // hack to flag relations as semi-naive and create one rule per semi-naive.
+        // if high bit is set it means that the relation is "new" instead of "all"
+        // this should not escape out of this function.
+        let rules = self.symbolic_rules.iter().flat_map(|rule| {
+            (0..rule.premise_relations.len()).map(|i| {
+                let mut rule = rule.clone();
+                rule.premise_relations[i].relation.0 |= NEW;
+                rule
+            })
+        });
+
+        #[derive(Copy, Clone, Ord, PartialOrd, PartialEq, Eq)]
+        enum Query {
+            /// Check if there are ANY tuples matching given bound variables.
+            /// This does not introduce variables.
+            /// Can compile to an if statement.
+            CheckViable,
+            /// Iterate all matching tuples given bound variables.
+            /// This introduces variables.
+            /// Can compile to a for loop.
+            Iterate,
+        }
+
+        for rule in rules {
+            let mut remaining_constraints = rule.premise_relations.clone();
+            let mut bound = TVec::new_with_size(rule.premise_variables.len(), false);
+            let mut variable_cardinality = TVec::new_with_size(rule.premise_variables.len(), 0);
+
+            let mut query_plan = Vec::new();
+
+            // let mut query_plan = Vec::new();
+
+            for &a in remaining_constraints.iter().flat_map(|x| x.args.iter()) {
+                variable_cardinality[a] += 1;
+            }
+
+            // TODO: mark all globals as bound. They should just be "executed" immediately
+            // anyways.
+
+            let mut newly_bound = Vec::new();
+            while !remaining_constraints.is_empty() {
+                let (idx, score) = remaining_constraints
+                    .iter()
+                    .map(|PremiseRelation { relation, args }| {
+                        use RelationScore::*;
+                        if relation.0 & NEW != 0 {
+                            // new is always supported.
+                            return New;
+                        }
+
+                        let bound_args: Vec<_> = args.iter().map(|&x| bound[x]).collect();
+
+                        // relations need to be connected with some variable.
+                        if !bound.iter().any(|&x| x) {
+                            return Unviable;
+                        }
+
+                        // indexing must be possible.
+                        let Some(tiny_result) = self.tiny_result(*relation, &bound_args) else {
+                            return Unviable;
+                        };
+
+                        // prefer relations with all variables bound.
+                        if bound.iter().all(|&x| x) {
+                            return Constraint;
+                        }
+
+                        if tiny_result {
+                            Tiny
+                        } else {
+                            // prefer relations with significant variables.
+                            ManyVariables {
+                                count: args.iter().map(|&x| variable_cardinality[x]).sum(),
+                            }
+                        }
+                    })
+                    .enumerate()
+                    .max_by_key(|(_, x)| *x)
+                    .unwrap();
+
+                let query = match score {
+                    RelationScore::Unviable => {
+                        panic!("no relation is viable, either incoherent graph or no schedule is possible assuming index viability is monotonic");
+                    }
+                    RelationScore::Constraint => Query::CheckViable,
+                    RelationScore::ManyVariables { .. }
+                    | RelationScore::Tiny
+                    | RelationScore::New => Query::Iterate,
+                };
+                let relation = remaining_constraints.swap_remove(idx);
+
+                if let Query::Iterate = query {
+                    // for WCOJ we need to make sure that we have applied all constraints before
+                    // introducing another variable.
+                    remaining_constraints.retain(|relation| {
+                        let bound_args: Vec<_> = relation
+                            .args
+                            .iter()
+                            .map(|x| bound[*x] || newly_bound.contains(x))
+                            .collect();
+                        if relation.args.iter().any(|x| newly_bound.contains(x)) {
+                            if self.is_viable(relation.relation, &bound_args) {
+                                if relation
+                                    .args
+                                    .iter()
+                                    .all(|x| bound[*x] || newly_bound.contains(x))
+                                {
+                                    query_plan.push((Query::CheckViable, relation.clone()));
+                                    // if all the variables are now bound, we do not need to
+                                    // iterate it again later.
+                                    return false;
+                                } else {
+                                    query_plan.push((Query::CheckViable, relation.clone()));
+                                }
+                            }
+                        }
+                        true
+                    });
+                }
+
+                query_plan.push((query, relation.clone()));
+
+                newly_bound.clear();
+                for &x in relation.args.iter() {
+                    if !replace(&mut bound[x], true) {
+                        newly_bound.push(x);
+                    }
+                }
+            }
+        }
+    }
+    /// None -> indexing/lookup not possible
+    /// Some(true) -> output cardinality is 1 or 0
+    /// Some(false) -> indexing supported
+    fn tiny_result(&self, id: RelationId, bound: &[bool]) -> Option<bool> {
+        todo!()
+    }
+
+    /// Is this indexed lookup possible?
+    fn is_viable(&self, id: RelationId, bound: &[bool]) -> bool {
+        self.tiny_result(id, bound).is_some()
     }
 }
 
