@@ -284,24 +284,24 @@ and SQL.
     columns: (auto, auto, auto, 1fr),
     table.header(
       table.cell(colspan: 4, [*Approximate nomenclature guide*]),
-      [*egglog*], [*eqlog*], [*database*], [*comment*]
+      [*egglog*], [*eqlog*], [*datalog*], [*database*], [*comment*]
     ),
-    [rule], [rule], [query],
+    [rule], [rule], [rule], [query],
     [],
-    [predicate], [if stmt], [join+where],
+    [predicate], [if stmt], [body containing atoms], [join+where],
     [logical premise],
-    [action], [then stmt], [insert/unify],
+    [action], [then stmt], [head], [insert/unify],
     [logical consequence],
-    [function], [function], [table],
+    [function], [function], [], [table],
     [e.g. `Add: Math * Math -> Math`],
-    [e-node], [tuple], [row/tuple],
+    [e-node], [tuple], [], [row/tuple],
     [represents a small computation, e.g. `Add(a,b) = c`],
-    [e-class], [element], [cell element],
+    [e-class], [element], [], [cell element],
     [represents a set of equivalent expressions],
-    [sort], [type], [],
+    [sort], [type], [], [],
     [e.g. `Math`],
   ),
-  caption: [Comparison of egglog, eqlog, and relational database terminology.]
+  caption: [Comparison of egglog, eqlog, datalog, and relational database terminology.]
 ) <rosetta-table>
 
 
