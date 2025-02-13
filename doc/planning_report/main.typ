@@ -651,21 +651,27 @@ Our goal can be further clarified by stating what we are not doing.
 
 Our evaluation will involve us answering the following questions for regarding our engine:
 
-- Is it correct?
-- Is it faster in general, and if so by how much?
-- Is it slower in some scenarios? If so, how common and how large is the slowdown?
-- Does it generalize to real apps?
++ Is it correct?
++ Is it faster in general, and if so by how much?
++ Is it slower in some scenarios? If so, how common and how large is the slowdown?
++ Does it generalize to real apps?
 
 Due to our engine being compatible with egglog @egglog, we can piggy-back on its test suite of 93
-tests. These should be sufficient to serve as a primary test of our engine's correctness.
-Additionally, as many of them are also used to regression test egglog's performance, we should also
-be able to use them for most of our benchmarking. The breadth of the tests should indicate the sorts
-of theories where our engine performs better and worse in performance terms.
+tests. We verify the engine's correctness primarily through these tests; any difference between the
+semantics assumed by the tests and those specified in our report will not be machine-checked as we
+have no plan to do any formal verification (1). Additionally, as many of them are also used to
+regression test egglog's performance, we should also be able to use them for most of our
+benchmarking (2). The breadth of the tests should indicate the sorts of theories where our engine
+experiences a slowdown (3).
+
+The last avenue, to consider full EqSat applications, is made feasible by existing implementations
+in the egglog language @egglogHerbie and serves as an end-to-end case study in the usability and
+performance of our engine outside the microbenchmark context (4).
 
 Benchmarking against engines other than egglog, such as egg @egg and eqlog @eqlog, will be done on a
 best-effort basis and be secondary to the comparison with egglog. While there are semantic
-differences that exclude many tests, we aim to implement a compiler from the egglog language to the
-eqlog language in order to facilitate benchmarks against eqlog.
+differences that could exclude many tests, we aim to implement a compiler from the egglog language
+to the eqlog language in order to facilitate benchmarks against eqlog.
 
 Defining a good single metric for benchmarking is unfortunately nontrivial and taking inspiration
 from previous work @egg @egglog, we plan to combine measuring
@@ -674,10 +680,6 @@ from previous work @egg @egglog, we plan to combine measuring
 - time until convergence for small theories with finite closure, and
 - time required for equivalent optimization as measured by specific program synthesis applications
   such as Herbie @herbie.
-
-This last avenue, to consider full EqSat applications, is made feasible by existing implementations
-in the egglog language @egglogHerbie and serves as an end-to-end case study in the usability and
-performance of our engine outside the microbenchmark context.
 
 == Environment
 
