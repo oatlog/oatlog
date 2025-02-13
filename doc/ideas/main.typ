@@ -1292,6 +1292,18 @@ If we discover that the rules essentially state that two relations are aliases o
 
 The point of that is to make old/new semi-naive and a bunch of other parts of the compiler simpler.
 
+
+= Merging relations
+
+Relations with the same primary key where *something* is inserted for all keys, such as lattices can be merged.
+This can be merged with the "forall" for the relevant type.
+
+
+= Early exit if action happened
+
+If the only action is a single insert, then a "premise" can be added if all variables are known and it does not exist in the database.
+
+
 = TODO READ
 Papers are just under the first author i looked at.
 I stopped adding authors after a while since this is just too many papers.
