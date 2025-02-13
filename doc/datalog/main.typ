@@ -71,6 +71,19 @@ AttributeConstraint := { None, Equal, Inequal }
 == MinIndexSelection (algorithm 2)
 
 
+
+== Query planning
+https://souffle-lang.github.io/pdf/lopstr2022.pdf
+
+Run program for a bit to collect cardinality estimations, then recompile.
+
+Shows and example of a query running 6000x faster after recompile.
+
+*Offline* feedback-directed strategy consisting of a profiling and join ordering stage.
+
+
+
+
 = Query containment
 https://pages.cs.wisc.edu/~paris/cs838-s16/lecture-notes/lecture2.pdf
 
@@ -82,7 +95,6 @@ In other words, "are these queries equivalent or contained in each-other?"
 homomorphism = variable mapping, that still makes the thing equivalent (variable merge ok).
 
 - all minimal queries are the same modulo variable renames.
-
 
 
 

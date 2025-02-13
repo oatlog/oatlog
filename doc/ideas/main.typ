@@ -1161,13 +1161,136 @@ If we translate into a trie structure, do we actually care if two rules are equa
 
 Sub is just an alias for Add with a permutation of columns.
 This can be used to optimize away tables.
-Bijectivity can be identified from rules.
+Bijectivity can be identified from rules, eg:
+
+```
+(rule (= c (Add a b) (= b (Sub c a))
+(rule (= c (Sub a b) (= a (Add b c))
+```
 
 Mul/Div and Sqr/Sqrt has additional constraints so it would only be injective/surjective.
+
+A complication with this is that extraction becomes a bit weird and is probably more likely to accidentally create cycles or something.
+This can maybe be solved by un-merging the table into separate add and sub table before extraction.
 
 = In-place modification for implicit rules
 
 If we know that the "key" part of the btree is unique, then in-place mutation of the "value" part is safe (in terms of reordering).
+
+= Start of rules with new instead of all
+
+Rules should always start with the smallest relation, in the case of semi-naive, this is probably the "new" part of any relation and therefore,
+in the rule trie, there will basically always be rules sharing the first "iterate new in relation".
+
+= Query planning
+
+From a variable ordering, we can order the premises.
+From a premise ordering, we know what order variables are introduced in and can create a variable ordering and introduce relevant filters.
+
+So, if we want, we can either pick a variable ordering or a premise ordering.
+
+Since we have established that essentially arbitrary query plans can trivially become worst-case optimal, we want to prick a query plan with the least cost.
+
+```
+# query: A(x, y), B(x, z), C(x, w)
+for (x, y) in A:
+    if x not in C: # <- semi-join
+        continue
+    for z in B(x):
+        for w in C(x):
+            emit(x,y,z,w)
+```
+
+```
+# query: A(x, y), B(y, z), C(z, x)
+for (x, y) in A:
+    if x not in C: # <- semi-join
+        continue
+    for z in B(y):
+        if (z, x) not in C: # <- semi-join
+            continue
+        emit(x, y, z)
+```
+
+How can we make a cost estimate of a query plan?
+
+Some relations are more expensive to query than others.
+- Globals/constants have cost 0
+- Primitive functions sometimes have cost essentially zero.
+- Relations with functional dependency have output cardinality 1 for some queries.
+- Some relations are simply bigger than others (old vs new)
+- Some relations have restricted indexes (primitives).
+
+
+
+Can we reasonably model cost as cardinality estimation?
+```
+# query: A(x, y), B(y, z), C(z, x)
+for (x, y) in A:             # += |A| * index_iter_A
+    if x not in C:           # += |A| * index_lookup_C
+        continue
+    for z in B(y):           # += |AC_join_x| + |AC_join_x| * |B(y)|
+        if (z, x) not in C:  #
+            continue
+        emit(x, y, z)        #
+```
+This is hard...
+
+Given some indexing on a relation we want some size estimate, I think these are reasonable:
+- Exactly 1 (functional dependency, selecting a primary key).
+- Only created through user input.
+- Created with terminating rules.
+- Created with non-terminating rules.
+
+
+
+
+Theory is bad. Just do heuristics. Most queries are at most like 6 relations, just do greedy for big stuff.
+
+Heuristic: we want to pick high-arity variables first? - greedy
+
+Heuristic: we want to pick high-arity relations first? - greedy
+
+Heuristic: we want to pick small relations first? - greedy
+
+Heuristic: we want the joins to form a search tree in the query graph (no separate components that are then joined)? - greedy
+
+Heuristic: we want more if-statements earlier? - implicit
+
+
+Full heuristic:
++ First relation is what is currently "new" (semi-naive)
+// ----------------------------------------------------------
++ Relation must support current lookup (primitive relations).
++ Relation must be connected to one of the bound variables.
++ Relation should be as small as possible (depends on indexing context).
++ Relation should add as many constraints as possible (many high arity variables).
+// ------------------------------- non-local barrier --------------------------------
++ Relation should minimize the total number of indexes with respect to what the other rules have picked.
++ Relation should be similar to what other rules would have picked here (trie).
++ (maybe) Relation should be easy to compute (prioritize arithmetic over btree lookup)
+
+
+= Materialized views are easy to maintain.
+
+We might discover that we sometimes want materialized views.
+Assuming the size of the database increases monotonically, these can just be implemented with rules and extra tables:
+```
+(relation AddMul (Math Math Math Math))
+(rule ((= a (Mul b (Add c d)))) ((AddMul a b c d)))
+```
+So materialized views can exploit semi-naive and remain efficient.
+
+
+= Relaxing what a relation means in the IR
+
+A global is just a special relation with zero cost.
+
+A forall is essentially a query on a view, so it makes sense to have a "relation" for Math in the IR.
+
+If we discover that the rules essentially state that two relations are aliases of each-other (Add/Sub), then keep the Sub relation but make it just point to the add relation.
+
+The point of that is to make old/new semi-naive and a bunch of other parts of the compiler simpler.
 
 = TODO READ
 Papers are just under the first author i looked at.

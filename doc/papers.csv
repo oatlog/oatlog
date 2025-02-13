@@ -5,4 +5,5 @@ Better Together: Unifying Datalog and Equality Saturation,https://dl.acm.org/doi
 Design and Implementation of the LogicBlox System,https://dl.acm.org/doi/abs/10.1145/2723372.2742796,REFERENCE,datalog engine that supports lattice computations.
 Equality Saturation Theory Exploration à la Carte,https://dl.acm.org/doi/abs/10.1145/3622834,UNRELATED,user guided rewrite rule generation
 Bring Your Own Data Structures to Datalog,https://dl.acm.org/doi/abs/10.1145/3622840,USEFUL,custom acceleration structures for datalog programs.
-
+Optimizing Datalog for the GPU,https://www.semanticscholar.org/paper/Optimizing-Datalog-for-the-GPU-Sun-Shovon/5397b713fe186604f9f78beace54a4bf91c34fa1,,potentially useful GPU datastructures for CPU SIMD
+EmptyHeaded: Boolean Algebra Based Graph Processing,https://www.researchgate.net/profile/Christopher-Aberger/publication/273388180_EmptyHeaded_Boolean_Algebra_Based_Graph_Processing/links/55520de408ae6fd2d81d3fa9/EmptyHeaded-Boolean-Algebra-Based-Graph-Processing.pdf,,SIMD graph DB with bitset stuff
