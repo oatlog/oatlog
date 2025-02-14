@@ -16,8 +16,6 @@ use std::collections::{BTreeMap, BTreeSet};
 // only applicable as part of culling rules which will mismatch later, but query planning handles
 // this by placing the iteration over `new` first. Rules that run a few times in sequence, at
 // startup, seem useful though.)
-//
-// TODO:
 #[derive(Debug)]
 struct Theory {
     name: &'static str,
@@ -26,8 +24,8 @@ struct Theory {
     globals: TVec<GlobalId, VariableData>,
     rule_variables: TVec<VariableId, VariableData>,
     /// `RuleTrie`s run once on theory creation.
-    rule_tries_startup: Vec<RuleTrie>,
-    rule_tries: Vec<RuleTrie>,
+    rule_tries_startup: &'static [RuleTrie],
+    rule_tries: &'static [RuleTrie],
 }
 
 #[derive(Debug)]
@@ -40,8 +38,8 @@ struct TypeData {
 struct RelationData {
     name: &'static str,
     param_types: Vec<TypeId>,
+    indices: Vec<IndexData>,
     // TODO: merge
-    // TODO: builtin indices
 }
 impl RelationData {
     fn unique_types(&self) -> impl Iterator<Item = TypeId> {
@@ -52,6 +50,12 @@ impl RelationData {
             .into_iter()
     }
 }
+#[derive(Debug)]
+struct IndexData {
+    perm: Vec<usize>,
+    unique_prefix_len: usize,
+}
+
 /// Note that global variables are represented as functions with signature `() -> T`, and these
 /// functions can in effect be coerced to global variables by calling them.
 // TODO: Implement globals. Maybe as variables directly?
@@ -66,50 +70,64 @@ struct VariableData {
     type_: TypeId,
 }
 // TODO: maybe revisit at some point at turn into a DAG, if there are common subtrees
-#[derive(Debug)]
+#[derive(Debug, Clone, Copy)]
 struct RuleTrie {
     meta: Option<&'static str>,
     atom: RuleAtom,
-    then: Vec<RuleTrie>,
+    then: &'static [RuleTrie],
 }
-#[derive(Debug)]
+#[derive(Debug, Clone, Copy)]
 enum RuleAtom {
-    /// Bind previously unbound variable by iterating through all known elements.
-    Forall(VariableId),
-    /// Indexed join with relation, mix of bound and unbound columns.
+    // ==== PREMISES ====
+    /// Iterate (all)/(all new) elements of a type.
+    Forall {
+        variable: VariableId,
+        new: bool,
+    },
+    /// Iterate all new tuples in a relation (requires all unbound variables).
+    PremiseNew {
+        relation: RelationId,
+        args: &'static [VariableId],
+    },
+    /// Indexed join with relation, binding any previously unbound variables.
     Premise {
         relation: RelationId,
-        args: Vec<VariableWithStatus>,
+        args: &'static [VariableId],
     },
-    /// Bind previously unbound variable to value of a global.
+    /// Proceed only if at least one row matching the `args` pattern exists in `relation`.
+    PremiseAny {
+        relation: RelationId,
+        args: &'static [Option<VariableId>],
+    },
+    /// Proceed only if all insertions are already present and all equates are already equal.
+    RequireNotAllPresent(&'static [Action]),
+    /// Bind unbound variable to global, or proceed only if bound variable matches global.
     LoadGlobal {
         global: GlobalId,
         variable: VariableId,
+        new: bool,
     },
-    /// Action. Create unbound variables and insert tuple.
+
+    // ==== ACTIONS ====
+    Action(Action),
+    /// Panic in the generated rust code.
+    Panic(&'static str),
+}
+#[derive(Debug, Clone, Copy)]
+enum Action {
+    /// Insert tuple, creating any variables that are unbound.
     Insert {
         relation: RelationId,
-        args: Vec<VariableWithStatus>,
+        args: &'static [VariableId],
     },
-    /// Action. Equate two bound variables.
+    /// Equate two bound variables.
     Equate(VariableId, VariableId),
-    /// Trie branch depending on existence of any tuple satisfying pattern.
-    If {
-        relation: RelationId,
-        args: Vec<Option<VariableId>>,
-        else_: Vec<RuleTrie>,
-    },
 }
-#[derive(Debug)]
-enum VariableWithStatus {
-    Bound(VariableId),
-    Unbound(VariableId),
-}
+
 trait Relation {
     type Row;
     fn new() -> Self;
     fn clear_new(&mut self);
-    fn insert(&mut self, rows: &[Self::Row]);
 }
 #[derive(PartialEq, Eq, PartialOrd, Ord, Clone, Copy)]
 #[repr(usize)]
@@ -161,6 +179,12 @@ mod ident {
     pub fn type_uprooted(ty: &TypeData) -> Ident {
         format_ident!("{}_uprooted", ty.name.to_snake_case())
     }
+    pub fn type_uprooted_self(ty: &TypeData) -> Ident {
+        format_ident!("{}_uprooted_self", ty.name.to_snake_case())
+    }
+    pub fn type_uprooted_others(ty: &TypeData) -> Ident {
+        format_ident!("{}_uprooted_others", ty.name.to_snake_case())
+    }
     pub fn type_equate(ty: &TypeData) -> Ident {
         format_ident!("{}_equate", ty.name.to_snake_case())
     }
@@ -169,6 +193,9 @@ mod ident {
     }
     pub fn type_iter(ty: &TypeData) -> Ident {
         format_ident!("{}_iter", ty.name.to_snake_case())
+    }
+    pub fn type_iter_new(ty: &TypeData) -> Ident {
+        format_ident!("{}_iter_new", ty.name.to_snake_case())
     }
     pub fn type_remove_uprooted(ty: &TypeData) -> Ident {
         format_ident!("{}_remove_uprooted", ty.name.to_snake_case())
@@ -208,176 +235,273 @@ mod ident {
     }
 }
 
-fn codegen_rule_trie<'a>(
-    types: &TVec<TypeId, TypeData>,
-    relations: &TVec<RelationId, RelationData>,
-    globals: &TVec<GlobalId, VariableData>,
-    variables: &TVec<VariableId, VariableData>,
-    RuleTrie { meta, atom, then }: &'a RuleTrie,
+struct CodegenRuleTrieCtx<'a> {
+    types: &'a TVec<TypeId, TypeData>,
+    relations: &'a TVec<RelationId, RelationData>,
+    globals: &'a TVec<GlobalId, VariableData>,
+    variables: &'a TVec<VariableId, VariableData>,
+
+    variables_bound: &'a mut TVec<VariableId, bool>,
     scoped: bool,
-    priority: Priority,
-) -> TokenStream {
-    let inner = |inner: &'a [RuleTrie], scoped: bool, new_priority: Option<Priority>| {
-        let fully_scoped = scoped && inner.len() <= 1;
-        inner.iter().map(move |trie| {
-            codegen_rule_trie(
-                types,
-                relations,
-                globals,
-                variables,
-                trie,
-                fully_scoped,
-                new_priority.unwrap_or(priority),
-            )
-        })
-    };
+    priority_cap: Priority,
+}
 
-    let content = match atom {
-        RuleAtom::Forall(x) => {
-            let type_iter = ident::type_iter(&types[variables[x].type_]);
-            let x = ident::var_var(&variables[x]);
-            let inner = inner(&then, true, None);
-            quote! {
-                for #x in self.#type_iter() {
-                    #(#inner)*
-                }
-            }
-        }
-        RuleAtom::Premise { relation, args } => {
-            let relation = ident::rel_var(&relations[relation]);
-            let index_iter = "todo_indexed_iter_function_here";
-            let mut known = vec![];
-            let mut unknown = vec![];
-            for arg in args {
-                match arg {
-                    VariableWithStatus::Bound(var) => known.push(ident::var_var(&variables[var])),
-                    VariableWithStatus::Unbound(var) => {
-                        unknown.push(ident::var_var(&variables[var]))
-                    }
-                }
-            }
-            let inner = inner(&then, true, None);
-            quote! {
-                for (#(#unknown),*) in self.#relation.#index_iter(#(#known),*) {
-                    #(#inner)*
-                }
-            }
-        }
-        RuleAtom::LoadGlobal { global, variable } => {
-            assert_eq!(variables[variable].type_, globals[global].type_);
+impl<'a> CodegenRuleTrieCtx<'a> {
+    fn type_of(&self, x: VariableId) -> &TypeData {
+        &self.types[self.variables[x].type_]
+    }
+    fn var_of(&self, x: VariableId) -> &VariableData {
+        &self.variables[x]
+    }
+    fn is_bound(&self, x: VariableId) -> bool {
+        self.variables_bound[x]
+    }
+    fn bind_var(&mut self, x: VariableId) {
+        assert!(!self.variables_bound[x]);
+        self.variables_bound[x] = true;
+    }
+    fn unbind_var(&mut self, x: VariableId) {
+        assert!(self.variables_bound[x]);
+        self.variables_bound[x] = false;
+    }
 
-            let x = ident::var_var(&variables[variable]);
-            let global = ident::var_var(&globals[global]);
-
-            let inner = inner(&then, false, None);
-            let ret = quote! {
-                let #x = self.#global;
-                #(#inner)*
-            };
-            if scoped {
-                ret
-            } else {
-                quote! {{ret}}
-            }
-        }
-        RuleAtom::Insert { relation, args } => {
-            let rel_insert_with_priority = ident::rel_insert_with_priority(&relations[relation]);
-            let mut declare_unknown = Vec::new();
-            let mut args_var = Vec::new();
-            for arg in args {
-                match arg {
-                    VariableWithStatus::Bound(x) => {
-                        args_var.push(ident::var_var(&variables[x]));
-                    }
-                    VariableWithStatus::Unbound(x) => {
-                        let type_ = variables[x].type_;
-                        let x = ident::var_var(&variables[x]);
-                        args_var.push(x.clone());
-                        let type_new = ident::type_new(&types[type_]);
-
-                        declare_unknown.push(quote! {let #x = self.#type_new();})
-                    }
-                }
-            }
-            let new_priority = priority.max(if declare_unknown.is_empty() {
-                Priority::Surjective
-            } else {
-                Priority::Nonsurjective
-            });
-            let inner = inner(&then, false, Some(new_priority));
-            let ret = quote! {
-                #(#declare_unknown)*
-                self.#rel_insert_with_priority(#new_priority, #(#args_var),*);
-                #(#inner)*
-            };
-            if scoped {
-                ret
-            } else {
-                quote! {{ret}}
-            }
-        }
-        RuleAtom::Equate(a, b) => {
-            let VariableData { name: a, type_: ta } = variables[a];
-            let VariableData { name: b, type_: tb } = variables[b];
-            assert_eq!(ta, tb);
-            let type_equate = ident::type_equate(&types[ta]);
-            let inner = inner(&then, false, None);
-            let ret = quote! {
-                self.#type_equate(#a, #b);
-                #(#inner)*
-            };
-            if scoped {
-                ret
-            } else {
-                quote! {{ret}}
-            }
-        }
-        RuleAtom::If {
-            relation: _,
-            args,
-            else_,
-        } => {
-            let rel_get_indexed = "todo_rel_get_indexed_here";
-            let args = args
-                .iter()
-                .copied()
-                .filter_map(std::convert::identity)
-                .map(|x| variables[x].name);
-            let then = inner(&then, true, None);
-            let else_ = inner(&else_, true, None);
-            quote! {
-                if #rel_get_indexed(#(#args),*) {
-                    #(#then)*
+    fn codegen_all(&mut self, tries: &[RuleTrie], isolated_scope: bool) -> TokenStream {
+        let old_scoped = self.scoped;
+        self.scoped = isolated_scope && tries.len() <= 1;
+        let ret = tries.iter().map(|trie| self.codegen(*trie)).collect();
+        self.scoped = old_scoped;
+        ret
+    }
+    fn codegen(&mut self, RuleTrie { meta, atom, then }: RuleTrie) -> TokenStream {
+        let content = match atom {
+            RuleAtom::Forall { variable: x, new } => {
+                let type_iter = if new {
+                    ident::type_iter_new(self.type_of(x))
                 } else {
-                    #(#else_)*
+                    ident::type_iter(self.type_of(x))
+                };
+                let xx = ident::var_var(self.var_of(x));
+                self.bind_var(x);
+                let inner = self.codegen_all(then, true);
+                self.unbind_var(x);
+                quote! {
+                    for #xx in self.#type_iter() {
+                        #inner
+                    }
                 }
             }
-        }
-    };
+            RuleAtom::PremiseNew { relation, args } => {
+                let relation = ident::rel_var(&self.relations[relation]);
+                let vars: Vec<_> = args
+                    .iter()
+                    .map(|&arg| {
+                        assert!(!self.is_bound(arg));
+                        self.bind_var(arg);
+                        ident::var_var(self.var_of(arg))
+                    })
+                    .collect();
+                let inner = self.codegen_all(then, true);
+                args.iter().for_each(|&arg| self.unbind_var(arg));
+                quote! {
+                    for (#(#vars),*) in self.#relation.iter_new() {
+                        #inner
+                    }
+                }
+            }
+            RuleAtom::Premise { relation, args } => {
+                let relation = ident::rel_var(&self.relations[relation]);
+                let index_iter = "todo_indexed_iter_function_here";
+                let mut bound = vec![];
+                let mut unbound = vec![];
+                let mut unbound_vars = vec![];
+                for &arg in args {
+                    match self.is_bound(arg) {
+                        true => bound.push(ident::var_var(self.var_of(arg))),
+                        false => {
+                            self.bind_var(arg);
+                            unbound_vars.push(arg);
+                            unbound.push(ident::var_var(self.var_of(arg)))
+                        }
+                    }
+                }
+                let inner = self.codegen_all(then, true);
+                unbound_vars
+                    .into_iter()
+                    .for_each(|arg| self.unbind_var(arg));
+                quote! {
+                    for (#(#unbound),*) in self.#relation.#index_iter(#(#bound),*) {
+                        #inner
+                    }
+                }
+            }
+            RuleAtom::PremiseAny { relation, args } => {
+                let relation = ident::rel_var(&self.relations[relation]);
+                let index_iter = "todo_indexed_iter_function_here";
+                let inner = self.codegen_all(then, true);
+                let bound = args
+                    .iter()
+                    .copied()
+                    .filter_map(std::convert::identity)
+                    .filter(|&arg| self.is_bound(arg))
+                    .map(|arg| ident::var_var(self.var_of(arg)));
+                quote! {
+                    if self.#relation.#index_iter(#(#bound),*).next().is_some() {
+                        #inner
+                    }
+                }
+            }
+            RuleAtom::RequireNotAllPresent(actions) => {
+                let inner = self.codegen_all(then, true);
+                let cond = actions.iter().map(|&action| match action {
+                    Action::Insert { relation, args } => {
+                        let relation = ident::rel_var(&self.relations[relation]);
+                        let index_iter = "todo_indexed_iter_function_here";
+                        let bound = args.iter().map(|&arg| {
+                            assert!(self.is_bound(arg));
+                            ident::var_var(self.var_of(arg))
+                        });
+                        quote! { self.#relation.#index_iter(#(#bound),*).next().is_some() }
+                    }
+                    Action::Equate(a, b) => {
+                        assert_eq!(self.var_of(a).type_, self.var_of(b).type_);
+                        let type_uf = ident::type_uf(self.type_of(a));
+                        let a = ident::var_var(self.var_of(a));
+                        let b = ident::var_var(self.var_of(b));
+                        quote! { self.#type_uf.same(#a, #b) }
+                    }
+                });
+                quote! {
+                    if !(#(#cond)&&*) {
+                        #inner
+                    }
+                }
+            }
+            RuleAtom::LoadGlobal {
+                global,
+                variable,
+                new,
+            } => {
+                assert_eq!(self.variables[variable].type_, self.globals[global].type_);
 
-    let comment = if let Some(meta) = meta {
-        // These doc comments will be ignored when `egraph-core` is used as a proc macro, but are
-        // nevertheless useful when pretty printing the generated code for e.g. tests.
+                let x = ident::var_var(&self.var_of(variable));
+                let global = ident::var_var(&self.globals[global]);
+
+                self.bind_var(variable);
+                let ret = if new {
+                    let inner = self.codegen_all(then, true);
+                    quote! {
+                        if let (#x, true) = self.#global {
+                            #inner
+                        }
+                    }
+                } else {
+                    let inner = self.codegen_all(then, false);
+                    let ret = quote! {
+                        let #x = self.#global.0;
+                        #inner
+                    };
+                    if self.scoped {
+                        ret
+                    } else {
+                        quote! {{ret}}
+                    }
+                };
+                self.unbind_var(variable);
+                ret
+            }
+            RuleAtom::Action(Action::Insert { relation, args }) => {
+                let rel_insert_with_priority =
+                    ident::rel_insert_with_priority(&self.relations[relation]);
+                let mut declare_unknown = Vec::new();
+                let mut args_var = Vec::new();
+                let mut unbound_vars = Vec::new();
+                for &arg in args {
+                    match self.is_bound(arg) {
+                        true => {
+                            args_var.push(ident::var_var(self.var_of(arg)));
+                        }
+                        false => {
+                            self.bind_var(arg);
+                            unbound_vars.push(arg);
+                            let x = ident::var_var(self.var_of(arg));
+                            args_var.push(x.clone());
+                            let type_new = ident::type_new(self.type_of(arg));
+
+                            declare_unknown.push(quote! {let #x = self.#type_new();})
+                        }
+                    }
+                }
+
+                let new_priority_cap = self.priority_cap.max(if declare_unknown.is_empty() {
+                    Priority::Surjective
+                } else {
+                    Priority::Nonsurjective
+                });
+
+                let old_proprity_cap = self.priority_cap;
+                self.priority_cap = new_priority_cap;
+                let inner = self.codegen_all(then, false);
+                self.priority_cap = old_proprity_cap;
+
+                unbound_vars.iter().for_each(|&arg| self.unbind_var(arg));
+
+                let ret = quote! {
+                    #(#declare_unknown)*
+                    self.#rel_insert_with_priority(#new_priority_cap, #(#args_var),*);
+                    #inner
+                };
+                if self.scoped {
+                    ret
+                } else {
+                    quote! {{ret}}
+                }
+            }
+            RuleAtom::Action(Action::Equate(a, b)) => {
+                assert_eq!(self.var_of(a).type_, self.var_of(b).type_);
+                let type_equate = ident::type_equate(self.type_of(a));
+                let a = ident::var_var(self.var_of(a));
+                let b = ident::var_var(self.var_of(b));
+                let inner = self.codegen_all(then, false);
+                let ret = quote! {
+                    self.#type_equate(#a, #b);
+                    #inner
+                };
+                if self.scoped {
+                    ret
+                } else {
+                    quote! {{ret}}
+                }
+            }
+            RuleAtom::Panic(msg) => quote! {
+                panic!("explicit rule panic: {}", #msg)
+            },
+        };
+
+        let comment = if let Some(meta) = meta {
+            // These doc comments will be ignored when `egraph-core` is used as a proc macro, but are
+            // nevertheless useful when pretty printing the generated code for e.g. tests.
+            quote! {
+                #[doc=#meta]
+            }
+        } else {
+            quote!()
+        };
         quote! {
-            #[doc=#meta]
+            #comment
+            #content
         }
-    } else {
-        quote!()
-    };
-    quote! {
-        #comment
-        #content
     }
 }
 
 pub fn codegen(theory: &Theory) -> TokenStream {
-    let (types, type_fields, type_fields_creation, type_fields_clear_new, type_functions): (
-        Vec<_>,
-        Vec<_>,
-        Vec<_>,
-        Vec<_>,
-        Vec<_>,
-    ) = theory
+    let (
+        types,
+        type_fields,
+        type_fields_creation,
+        type_uprooted,
+        type_fields_clear_new,
+        type_functions,
+    ): (Vec<_>, Vec<_>, Vec<_>, Vec<_>, Vec<_>, Vec<_>) = theory
         .types
         .iter()
         .map(|type_| {
@@ -405,6 +529,9 @@ pub fn codegen(theory: &Theory) -> TokenStream {
                     #type_new: BTreeSet::new(),
                     #type_uf: UnionFind::new(),
                     #type_uprooted: Vec::new(),
+                },
+                quote! {
+                    self.#type_uprooted
                 },
                 quote! {
                     self.#type_new.clear();
@@ -448,6 +575,24 @@ pub fn codegen(theory: &Theory) -> TokenStream {
             .param_types
             .iter()
             .map(|type_| ident::type_ty(&theory.types[type_]));
+
+        let (type_uprooted_self, type_uprooted_others, type_uf, type_): (
+            Vec<_>,
+            Vec<_>,
+            Vec<_>,
+            Vec<_>,
+        ) = rel
+            .unique_types()
+            .map(|type_| {
+                let type_ = &theory.types[type_];
+                (
+                    ident::type_uprooted_self(type_),
+                    ident::type_uprooted_others(type_),
+                    ident::type_uf(type_),
+                    ident::type_ty(type_),
+                )
+            })
+            .multiunzip();
         quote! {
             struct #rel_ty {
                 _todo: (),
@@ -460,15 +605,22 @@ pub fn codegen(theory: &Theory) -> TokenStream {
                 fn clear_new(&mut self) {
                     todo!()
                 }
-                fn insert(&mut self, rows: &[Self::Row]) {
-                    todo!()
-                }
             }
             impl #rel_ty {
                 fn indexed_iter_todo_thingy(&self) {
                     todo!()
                 }
                 #(#remove_uprooted)*
+                fn bulk_update<'a>(
+                    instructions: impl 'a + Iterator<Item = (Math, Math)>,
+                    #(
+                        #type_uprooted_self: &mut Vec<#type_>,
+                        #type_uprooted_others: impl 'a + Iterator<Item = #type_>,
+                        #type_uf: &mut UnionFind<#type_>,
+                    )*
+                ) {
+                    todo!()
+                }
             }
         }
     });
@@ -540,75 +692,108 @@ pub fn codegen(theory: &Theory) -> TokenStream {
             let global_ty = ident::type_ty(&theory.types[global.type_]);
             let type_new = ident::type_new(&theory.types[global.type_]);
             (
-                quote!(#global_var: #global_ty),
-                quote!(#global_var: self.#type_new()),
+                quote!(#global_var: (#global_ty, bool)),
+                quote!(#global_var: (self.#type_new(), true)),
             )
         })
         .unzip();
 
     let [startup_rule_contents, rule_contents] = [&theory.rule_tries_startup, &theory.rule_tries]
         .map(|rule_tries| {
-            rule_tries.iter().map(|rule_trie| {
-                codegen_rule_trie(
-                    &theory.types,
-                    &theory.relations,
-                    &theory.globals,
-                    &theory.rule_variables,
-                    &rule_trie,
-                    theory.rule_tries.len() == 1,
-                    Priority::MIN,
-                )
-            })
-        });
-    let type_remove_uprooted = {
-        let mut by_type: TVec<TypeId, (Vec<&VariableData>, Vec<&RelationData>)> =
-            theory.types.new_side();
-        for global in theory.globals.iter() {
-            by_type[global.type_].0.push(global);
-        }
-        for relation in theory.relations.iter() {
-            for type_ in relation.unique_types() {
-                by_type[type_].1.push(relation);
-            }
-        }
-        by_type
-            .into_iter_enumerate()
-            .map(|(type_, (globals, relations))| {
-                let type_ = &theory.types[type_];
-                let type_uf = ident::type_uf(type_);
-                let type_remove_uprooted = ident::type_remove_uprooted(type_);
-                let type_uprooted = ident::type_uprooted(type_);
+            CodegenRuleTrieCtx {
+                types: &theory.types,
+                relations: &theory.relations,
+                globals: &theory.globals,
+                variables: &theory.rule_variables,
 
-                let global_var = globals.into_iter().map(ident::var_var);
-                let rel_remove_uprooted = relations.iter().map(|rel| {
-                    let rel_var = ident::rel_var(rel);
-                    let rel_insertions = ident::rel_insertions(rel);
-                    let (col, canon_col): (Vec<_>, Vec<_>) = rel
-                        .param_types
-                        .iter()
-                        .zip(ident::arguments())
-                        .map(|(col_type, col_arg)| {
-                            let col_type = &theory.types[col_type];
-                            let col_type_uf = ident::type_uf(&col_type);
-                            (col_arg.clone(), quote!(self.#col_type_uf.find(#col_arg)))
-                        })
-                        .unzip();
-                    quote! {
-                        self.#rel_insertions[Priority::Canonicalizing as usize].extend(
-                            self.#rel_var
-                                .#type_remove_uprooted(&self.#type_uprooted)
-                                .map(|(#(#col),*)| (#(#canon_col),*) )
-                        );
-                    }
-                });
-                quote! {
-                    if !self.#type_uprooted.is_empty() {
-                        #(self.#global_var = self.#type_uf.find(self.#global_var);)*
-                        #(#rel_remove_uprooted)*
-                        self.#type_uprooted.clear();
-                    }
-                }
+                variables_bound: &mut theory.rule_variables.new_side(),
+                scoped: true,
+                priority_cap: Priority::MIN,
+            }
+            .codegen_all(rule_tries, true)
+        });
+    let reroot_and_apply_insertions_up_to = {
+        let mut type_num_relations: TVec<TypeId, usize> = theory.types.new_side();
+        let (
+            rel_type_uprooted,
+            rel_type_uprooted_self,
+            rel_type_uprooted_others,
+            rel_type_idx,
+            rel_type_uf,
+        ): (
+            Vec<Vec<proc_macro2::Ident>>,
+            Vec<Vec<proc_macro2::Ident>>,
+            Vec<Vec<proc_macro2::Ident>>,
+            Vec<Vec<usize>>,
+            Vec<Vec<proc_macro2::Ident>>,
+        ) = theory
+            .relations
+            .iter()
+            .map(|rel| {
+                rel.unique_types()
+                    .map(|ty| {
+                        let idx = type_num_relations[ty];
+                        type_num_relations[ty] += 1;
+                        let ty = &theory.types[ty];
+                        (
+                            ident::type_uprooted(ty),
+                            ident::type_uprooted_self(ty),
+                            ident::type_uprooted_others(ty),
+                            idx,
+                            ident::type_uf(ty),
+                        )
+                    })
+                    .multiunzip()
             })
+            .multiunzip();
+        let type_num_relations = type_num_relations.into_inner();
+
+        let type_uprooted = theory
+            .types
+            .iter()
+            .map(ident::type_uprooted)
+            .collect::<Vec<_>>();
+
+        let rel_insertions = theory.relations.iter().map(ident::rel_insertions);
+        let rel_var = theory.relations.iter().map(ident::rel_var);
+
+        let global_var = theory.globals.iter().map(ident::var_var);
+        let global_type_uf = theory
+            .globals
+            .iter()
+            .map(|g| ident::type_uf(&theory.types[&g.type_]));
+
+        quote! {
+            let mut ins_limit = usize::MAX;
+            #(
+                let #type_uprooted = [Vec::new(); #type_num_relations + 1];
+                #type_uprooted[0] = mem::take(self.#type_uprooted);
+            )*
+            // round robin relations until fixpoint
+            while ins_limit > 0 || #(!#type_uprooted.iter().all(|v| v.is_empty()))||* {
+                #(
+                    #(
+                        let (
+                            #rel_type_uprooted_self,
+                            #rel_type_uprooted_others
+                        ) = uprooted_self_and_others(&mut #rel_type_uprooted, #rel_type_idx + 1);
+                    )*
+                    let insertions = self.#rel_insertions[..=(priority as usize)].iter().flatten().copied();
+                    self.#rel_var.bulk_update(
+                        insertions.take(ins_limit),
+                        #(
+                            #rel_type_uprooted_self,
+                            #rel_type_uprooted_others.get(),
+                            &mut self.#rel_type_uf
+                        )*
+                    );
+                )*
+                ins_limit = 0;
+                #(#type_uprooted[0].clear();)*
+            }
+
+            #(self.#global_var = self.#global_type_uf.find_tagged(self.#global_var.0);)*
+        }
     };
 
     quote! {
@@ -621,19 +806,19 @@ pub fn codegen(theory: &Theory) -> TokenStream {
         }
         impl #theory_ty {
             fn startup_rules(&mut self) {
-                #(#startup_rule_contents)*
+                #startup_rule_contents
             }
             fn rules(&mut self) {
-                #(#rule_contents)*
+                #rule_contents
             }
             fn clear_new(&mut self) {
                 #(#type_fields_clear_new)*
                 #(#relation_fields_clear_new)*
             }
-            fn remove_uprooted(&mut self) {
-                #(#type_remove_uprooted)*
-            }
             fn lowest_insertion_priority(&self) -> Option<Priority> {
+                if #(!#type_uprooted.is_empty())||* {
+                    return Some(Priority::Canonicalizing);
+                }
                 for priority in Priority::LIST {
                     let pnum = priority as usize;
                     if #(!#relation_insertions[pnum].is_empty())||* {
@@ -642,8 +827,8 @@ pub fn codegen(theory: &Theory) -> TokenStream {
                 }
                 None
             }
-            fn apply_insertions_up_to(&mut self, priority: Priority) {
-                todo!()
+            fn reroot_and_apply_insertions_up_to(&mut self, priority: Priority) {
+                #reroot_and_apply_insertions_up_to
             }
             pub fn new() -> Self {
                 let mut ret = Self {
@@ -656,7 +841,7 @@ pub fn codegen(theory: &Theory) -> TokenStream {
                 ret
             }
             pub fn canonicalize(&mut self) {
-                self.apply_insertions_up_to(Priority::MAX);
+                self.reroot_and_apply_insertions_up_to(Priority::MAX);
             }
             pub fn close_until(&mut self, condition: impl Fn(&Self) -> bool) -> bool {
                 loop {
@@ -666,12 +851,9 @@ pub fn codegen(theory: &Theory) -> TokenStream {
                     self.rules();
                     self.clear_new();
 
-                    // remove uprooted, enqueue for insertion with lowest priority
-                    self.remove_uprooted();
-
                     if let Some(priority) = self.lowest_insertion_priority() {
                         // apply all insertions of lowest non-empty priority class
-                        self.apply_insertions_up_to(priority);
+                        self.reroot_and_apply_insertions_up_to(priority);
                     } else {
                         // nothing to insert, has converged
                         return false;
@@ -730,6 +912,7 @@ mod test {
         let le = relations.push(RelationData {
             name: "Le",
             param_types: vec![el, el],
+            indices: vec![],
         });
         let x = rule_variables.push(VariableData {
             name: "x",
@@ -742,19 +925,22 @@ mod test {
             relations,
             globals: TVec::new(),
             rule_variables,
-            rule_tries_startup: vec![],
-            rule_tries: vec![RuleTrie {
+            rule_tries_startup: Vec::leak(vec![]),
+            rule_tries: Vec::leak(vec![RuleTrie {
                 meta: Some("reflexivity"),
-                atom: RuleAtom::Forall(x),
-                then: vec![RuleTrie {
+                atom: RuleAtom::Forall {
+                    variable: x,
+                    new: true,
+                },
+                then: Vec::leak(vec![RuleTrie {
                     meta: None,
-                    atom: RuleAtom::Insert {
+                    atom: RuleAtom::Action(Action::Insert {
                         relation: le,
-                        args: vec![VariableWithStatus::Bound(x), VariableWithStatus::Bound(x)],
-                    },
-                    then: vec![],
-                }],
-            }],
+                        args: Vec::leak(vec![x, x]),
+                    }),
+                    then: &[],
+                }]),
+            }]),
         };
         check(
             codegen(&theory),
@@ -771,15 +957,20 @@ mod test {
                     fn clear_new(&mut self) {
                         todo!()
                     }
-                    fn insert(&mut self, rows: &[Self::Row]) {
-                        todo!()
-                    }
                 }
                 impl LeRelation {
                     fn indexed_iter_todo_thingy(&self) {
                         todo!()
                     }
                     fn el_remove_uprooted(uprooted: &[El]) {
+                        todo!()
+                    }
+                    fn bulk_update<'a>(
+                        instructions: impl 'a + Iterator<Item = (Math, Math)>,
+                        el_uprooted_self: &mut Vec<El>,
+                        el_uprooted_others: impl 'a + Iterator<Item = El>,
+                        el_uf: &mut UnionFind<El>,
+                    ) {
                         todo!()
                     }
                 }
@@ -795,7 +986,7 @@ mod test {
                     fn startup_rules(&mut self) {}
                     fn rules(&mut self) {
                         #[doc = "reflexivity"]
-                        for x in self.el_iter() {
+                        for x in self.el_iter_new() {
                             self.le_insert_with_priority(Priority::Surjective, x, x);
                         }
                     }
@@ -803,17 +994,10 @@ mod test {
                         self.el_new.clear();
                         self.le_relation.clear_new();
                     }
-                    fn remove_uprooted(&mut self) {
-                        if !self.el_uprooted.is_empty() {
-                            self.le_insertions[Priority::Canonicalizing as usize].extend(
-                                self.le_relation
-                                    .el_remove_uprooted(&self.el_uprooted)
-                                    .map(|(arg0, arg1)| (self.el_uf.find(arg0), self.el_uf.find(arg1))),
-                            );
-                            self.el_uprooted.clear();
-                        }
-                    }
                     fn lowest_insertion_priority(&self) -> Option<Priority> {
+                        if !self.el_uprooted.is_empty() {
+                            return Some(Priority::Canonicalizing);
+                        }
                         for priority in Priority::LIST {
                             let pnum = priority as usize;
                             if !le_insertions[pnum].is_empty() {
@@ -822,8 +1006,26 @@ mod test {
                         }
                         None
                     }
-                    fn apply_insertions_up_to(&mut self, priority: Priority) {
-                        todo!()
+                    fn reroot_and_apply_insertions_up_to(&mut self, priority: Priority) {
+                        let mut ins_limit = usize::MAX;
+                        let el_uprooted = [Vec::new(); 1usize + 1];
+                        el_uprooted[0] = mem::take(self.el_uprooted);
+                        while ins_limit > 0 || !el_uprooted.iter().all(|v| v.is_empty()) {
+                            let (el_uprooted_self, el_uprooted_others) =
+                                uprooted_self_and_others(&mut el_uprooted, 0usize + 1);
+                            let insertions = self.le_insertions[..=(priority as usize)]
+                                .iter()
+                                .flatten()
+                                .copied();
+                            self.le_relation.bulk_update(
+                                insertions.take(ins_limit),
+                                el_uprooted_self,
+                                el_uprooted_others.get(),
+                                &mut self.el_uf,
+                            );
+                            ins_limit = 0;
+                            el_uprooted[0].clear();
+                        }
                     }
                     pub fn new() -> Self {
                         let mut ret = Self {
@@ -839,7 +1041,7 @@ mod test {
                         ret
                     }
                     pub fn canonicalize(&mut self) {
-                        self.apply_insertions_up_to(Priority::MAX);
+                        self.reroot_and_apply_insertions_up_to(Priority::MAX);
                     }
                     pub fn close_until(&mut self, condition: impl Fn(&Self) -> bool) -> bool {
                         loop {
@@ -848,9 +1050,8 @@ mod test {
                             }
                             self.rules();
                             self.clear_new();
-                            self.remove_uprooted();
                             if let Some(priority) = self.lowest_insertion_priority() {
-                                self.apply_insertions_up_to(priority);
+                                self.reroot_and_apply_insertions_up_to(priority);
                             } else {
                                 return false;
                             }

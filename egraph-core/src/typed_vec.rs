@@ -69,6 +69,9 @@ impl<K: Id, V> TVec<K, V> {
     pub(crate) fn inner(&mut self) -> &mut Vec<V> {
         &mut self.x
     }
+    pub(crate) fn into_inner(self) -> Vec<V> {
+        self.x
+    }
 }
 
 impl<K: Id, V> std::ops::Index<K> for TVec<K, V> {

@@ -2,6 +2,7 @@ mod codegen;
 mod frontend;
 mod hir;
 mod ids;
+mod todo;
 mod typed_vec;
 mod union_find;
 
