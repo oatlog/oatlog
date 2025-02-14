@@ -127,7 +127,6 @@ mod test {
         check(code, expected);
     }
 
-
     #[test]
     fn hir_global() {
         let code = "(
@@ -162,9 +161,9 @@ mod test {
         check(code, expected);
     }
 
-
     fn check(code: &str, expected: expect_test::Expect) {
         let hir = frontend::parse(code.parse().unwrap()).unwrap();
+        let (hir, _) = hir.emit_low_level_ir();
         expected.assert_eq(&hir.dbg_summary());
     }
 }

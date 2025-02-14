@@ -119,3 +119,13 @@ impl<K, V> IntoIterator for TVec<K, V> {
         self.x.into_iter()
     }
 }
+
+impl<'a, K, V> IntoIterator for &'a TVec<K, V> {
+    type Item = &'a V;
+
+    type IntoIter = <&'a Vec<V> as IntoIterator>::IntoIter;
+
+    fn into_iter(self) -> Self::IntoIter {
+        self.x.iter()
+    }
+}
