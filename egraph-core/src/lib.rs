@@ -3,8 +3,16 @@ mod frontend;
 mod hir;
 mod ids;
 mod todo;
+mod todo2;
+mod todo3;
+pub mod todo4;
 mod typed_vec;
 mod union_find;
+mod compute_index;
+mod runtime;
+
+// TODO: just here to temporarily get rid of bogus dead-code warning.
+pub use codegen::codegen;
 
 #[must_use]
 pub fn compile_str(s: &str) -> String {

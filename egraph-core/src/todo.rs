@@ -13,6 +13,7 @@ struct UnionFind<T> {
 trait Eclass: Clone + Copy + PartialEq + Eq {}
 impl<T: Eclass> UnionFind<T> {
     /// returning uprooted
+    /// TODO: smaller to larger.
     fn union(&mut self, a: T, b: T) -> Option<T> {
         todo!()
     }
@@ -38,7 +39,7 @@ struct NegRelation {
     //new_0_1: BTreeMap<u32, u32>,
     //new_1_0: BTreeMap<u32, u32>,
     new: Vec<(u32, u32)>,
-    // TODO: AFTER REMOVING A ROW (3,4) due to canonicalizing 3, WE MUST ALSO
+    // TODO: AFTER REMOVING A ROW (3,4) due to canonicalizing 3, WE MUST ALSO REMOVE (3, 4) from 4
     math_index: HashMap<Math, Vec<(Math, Math)>>,
 }
 const MATH_REFERRERS: usize = 3;

@@ -52,3 +52,9 @@ id_wrap!(TypeId, "t", "id for a type");
 id_wrap!(TypeVarId, "x", "id for a type variable");
 id_wrap!(RuleId, "y", "id for a rule");
 id_wrap!(ColumnId, "c", "id for a column");
+id_wrap!(IndexId, "ir", "reference to an index");
+id_wrap!(
+    IndexUsageId,
+    "ir",
+    "reference to something that requires an index"
+);
