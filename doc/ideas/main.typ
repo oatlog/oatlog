@@ -1304,6 +1304,189 @@ This can be merged with the "forall" for the relevant type.
 If the only action is a single insert, then a "premise" can be added if all variables are known and it does not exist in the database.
 
 
+= Compact back-indexes
+
+If columns contain types (A, B, C) then the back references would look like:
+```rust
+struct Relation {
+    back_a: BTreeMap<A, Vec<(A, B, C)>>
+    back_b: BTreeMap<B, Vec<(A, B, C)>>
+    back_c: BTreeMap<C, Vec<(A, B, C)>>
+}
+```
+But the stored rows contain redundant information since we know that if A=3 then the rows all look like (3, B, C), so that column can be skipped in the back-indexes.
+```rust
+struct Relation {
+    back_a: BTreeMap<A, Vec<(B, C)>>
+    back_b: BTreeMap<B, Vec<(A, C)>>
+    back_c: BTreeMap<C, Vec<(A, B)>>
+}
+```
+If columns contain types (A, B, B) then we can still optimize, if we are ok with back-indexes being per-column:
+
+```rust
+struct Relation {
+    back_a: BTreeMap<A, Vec<(A, B, B)>>
+    back_b: BTreeMap<B, Vec<(A, B, B)>>
+}
+
+struct Relation {
+    back_a: BTreeMap<A, Vec<(B, B)>>
+    back_b0: BTreeMap<B, Vec<(A, B)>>
+    back_b1: BTreeMap<B, Vec<(A, B)>>
+}
+```
+
+
+= Fixpoint scheduling of bulk inserts
+
+Implicit functionality makes it possible for inserts to generate unifications, and if we want to resolve all unifications, we have to iterate until a fixed point.
+
+But it's hard to track what uproots have been completed for each relation.
+
+Therefore, we make the uproot array append-only and treat indexes as generational ids.
+Each relation keeps track of up to what index it has processed.
+
+
+= btree with implicit functionality
+If we know that the btree stores `(A, B, C) -> (D, E)` then if the indexing order allows it we should use:
+```rust
+let index: BTreeMap<(A, B, C), (D, E)>;
+let index: BTreeMap<(A, B, D, C), (E)>;
+let index: BTreeMap<(A, E, B, C), (D)>;
+/* ... etc ... */
+```
+and use a b+ tree, so that `(D, E)` does not pollute cache.
+
+
+= back-indexes per type or per column or global?
+
+global:
+- less things to look at when re-canonicalizing.
+- maybe contains more redundant information.
+
+per-column:
+- sort-of compresses since we can omit that column in the list.
+- assuming rows do not contain the same e-class twice, this is more space efficient, probably.
+
+Why do we need back-indexes in the first place?
+Well we need a index from Eclass to row, but isn't that just what the main indexes are?
+
+Fundamentally, a reverse index is just any -> row, and the others are just row.
+
+
+MODEL: (A, B, C). All e-classes unique.
+
+
+A -> (B, C), B -> (A, C), C -> (A, B)
+
+elems = 3 * 3 * enodes.
+
+
+(A, B, C), (B, A, C), (C, A, B)
+
+elems = 3 * 3 * enodes
+
+
+ANY -> (A, B, C)
+
+elems = 3 * unique = 3 * 3 * enodes + overhead
+
+
+Conclusion: all unique <=> random noise, bad model.
+
+
+MODEL: (A, B, C), all e-classes exist 9 times.
+
+A -> (B, C), B -> (A, C), C -> (A, B)
+
+3 * (1/3 * 1/9 * enodes + 2/3 * enodes)
+
+(A, B, C), (B, A, C), (C, A, B)
+
+elems = 3 * 3 * enodes
+
+ANY -> (A, B, C)
+
+elems = 3 * 3 * enodes + overhead/9
+
+
+Leaning towards just including indexes for every column, because it is simpler.
+Back-indexes in general are kinda error prone.
+
+
+= Multiple indexes for the same operation
+
+Sometimes the same iteration can be implemented with multiple indexes, eg:
+
+```rust
+struct Relation {
+    index_0_1_2: BTreeMap<(Math, Math, Math)>,
+    index_0_2_1: BTreeMap<(Math, Math, Math)>,
+    /* ... */
+}
+impl Relation {
+    fn iter_0(&self, x0: Math) -> impl Iterator<Item = (Math)> + use<'_> {
+        self.index_0_1_2
+            .range((x0, Math(0), Math(0))..(x0, Math(u32::MAX), Math(u32::MAX)))
+            .map(|(x1, x2)| (x0, x1, x2))
+    }
+    fn iter_0(&self, x0: Math) -> impl Iterator<Item = (Math)> + use<'_> {
+        self.index_0_2_1
+            .range((x0, Math(0), Math(0))..(x0, Math(u32::MAX), Math(u32::MAX)))
+            .map(|(x2, x1)| (x0, x1, x2))
+    }
+    /* ... */
+}
+```
+
+So for a given ordering of premises or variable ordering, there is still more to optimize.
+
+= Apply rule to rule failiure case.
+
+```
+(Add a b c) (Add b a c) ...
+
+with commutativity we can derive:
+
+(Add a b c) (Add b a c)
+
+so we can remove them, and oops:
+
+...
+
+```
+This chain of logic is flawed, but seems sound.
+
+= META-optimizaiton
+
+For each part of our solution, question if it needs to be there, strong motivation if so.
+We have identified many such things so far so it will likely be the case in the final product (eg need for indexing "new").
+
+- Does it need to be there?
+- Can it be replaced with something simpler?
+- Can we merge separate systems to do multiple things?
+- Can it be simplified?
+
+We have assumed: new/all instead of new/old, btree instead of trie or other tree datastructure even though back-indexes are like one-layer tries.
+
+= Trie vs btree is not a binary choice
+
+```rust
+// (A, B, C, D)
+let map: HashMap<A, HashMap<B, HashMap<C, Vec<D>>>>;
+
+
+let map: BTreeMap<A, BTreeMap<B, BTreeMap<C, Vec<D>>>>;
+
+let map: BTreeMap<A, BTreeMap<B, BTreeSet<C, D>>>;
+
+let map: BTreeMap<A, BTreeSet<B, C, D>>; // column oriented back-index.
+
+let map: BTreeSet<A, B, C, D>;
+```
+
+
 = TODO READ
 Papers are just under the first author i looked at.
 I stopped adding authors after a while since this is just too many papers.
