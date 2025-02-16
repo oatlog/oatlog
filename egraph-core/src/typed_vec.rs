@@ -1,8 +1,8 @@
-use std::cmp::Eq;
-use std::fmt::Debug;
-use std::marker::PhantomData;
-
 use crate::ids::Id;
+
+use itertools::Itertools as _;
+
+use std::{cmp::Eq, fmt::Debug, marker::PhantomData};
 
 /// Vec with typed indexes.
 #[derive(Clone, Eq, PartialEq, Ord, PartialOrd, Hash, Default)]
@@ -63,7 +63,7 @@ impl<K: Id, V> TVec<K, V> {
         self.x.push(v);
         id
     }
-    pub(crate) fn new_side<V2: Default + Clone>(&self) -> TVec<K, V2> {
+    pub(crate) fn new_same_size<V2: Default + Clone>(&self) -> TVec<K, V2> {
         TVec::new_with_size(self.len(), Default::default())
     }
     pub(crate) fn inner(&mut self) -> &mut Vec<V> {
@@ -71,6 +71,35 @@ impl<K: Id, V> TVec<K, V> {
     }
     pub(crate) fn into_inner(self) -> Vec<V> {
         self.x
+    }
+    /// Collect values that arrive out-of-order
+    /// asserts that the ids are contiguous.
+    pub(crate) fn from_iter_unordered(iter: impl Iterator<Item = (K, V)>) -> Self {
+        iter.sorted_by_key(|(k, _)| *k)
+            .enumerate()
+            .map(|(expected_id, (current_id, value))| {
+                assert_eq!(K::from(expected_id), current_id);
+                value
+            })
+            .collect()
+    }
+}
+impl<K: Id> TVec<K, K> {
+    pub(crate) fn is_permutation(&self) -> bool {
+        let mut seen = self.new_same_size::<bool>();
+        for i in self.iter().copied() {
+            seen[i] = true;
+        }
+        let is_permutation = seen.iter().copied().all(std::convert::identity);
+        is_permutation
+    }
+    pub(crate) fn invert_permutation(&self) -> Self {
+        assert!(self.is_permutation(), "not a permutation: {self:?}");
+        let mut inverted = self.new_same_size::<K>();
+        for (i, e) in self.iter_enumerate() {
+            inverted[*e] = i;
+        }
+        inverted
     }
 }
 
@@ -119,7 +148,6 @@ impl<K, V> IntoIterator for TVec<K, V> {
         self.x.into_iter()
     }
 }
-
 impl<'a, K, V> IntoIterator for &'a TVec<K, V> {
     type Item = &'a V;
 

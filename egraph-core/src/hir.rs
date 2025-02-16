@@ -1,21 +1,21 @@
 //! High-level intermediate representation
 //! Desugared, flattened rules.
 
+use crate::{
+    ids::{ActionId, ColumnId, GlobalId, Id, PremiseId, RelationId, TypeId, VariableId},
+    typed_vec::TVec,
+    union_find::{UFData, UF},
+};
+
+#[cfg(test)]
+use itertools::Itertools as _;
+
 use std::{
     collections::{BTreeMap, BTreeSet},
     convert::identity,
     hash::Hash,
     iter,
     mem::replace,
-};
-
-#[cfg(test)]
-use itertools::Itertools as _;
-
-use crate::{
-    ids::{ActionId, ColumnId, GlobalId, Id, PremiseId, RelationId, TypeId, VariableId},
-    typed_vec::TVec,
-    union_find::{UFData, UF},
 };
 
 // unify can not read lattice variable.

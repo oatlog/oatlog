@@ -1,11 +1,15 @@
+// #![allow(unused, reason = "remove temporary warning noise")]
+
 use crate::{
     ids::{GlobalId, RelationId, TypeId, VariableId},
     typed_vec::TVec,
 };
-use itertools::MultiUnzip;
+
+use itertools::Itertools as _;
 use proc_macro2::TokenStream;
 use quote::quote;
-use std::collections::{BTreeMap, BTreeSet};
+
+use std::collections::BTreeSet;
 
 /// Data such as type and function names are technically unnecessary but used for more readable
 /// generated code. A compiler is far less performance sensitive than an interpreter (although the
@@ -17,7 +21,7 @@ use std::collections::{BTreeMap, BTreeSet};
 // this by placing the iteration over `new` first. Rules that run a few times in sequence, at
 // startup, seem useful though.)
 #[derive(Debug)]
-struct Theory {
+pub struct Theory {
     name: &'static str,
     types: TVec<TypeId, TypeData>,
     relations: TVec<RelationId, RelationData>,
@@ -46,7 +50,8 @@ impl RelationData {
         self.param_types
             .iter()
             .copied()
-            .collect::<BTreeSet<TypeId>>()
+            .unique()
+            .collect::<BTreeSet<_>>()
             .into_iter()
     }
 }
@@ -157,7 +162,7 @@ impl quote::ToTokens for Priority {
 
 mod ident {
     use super::{RelationData, Theory, TypeData, VariableData};
-    use heck::{ToPascalCase, ToSnakeCase};
+    use heck::{ToPascalCase as _, ToSnakeCase as _};
     use proc_macro2::Ident;
     use quote::format_ident;
 
@@ -246,7 +251,7 @@ struct CodegenRuleTrieCtx<'a> {
     priority_cap: Priority,
 }
 
-impl<'a> CodegenRuleTrieCtx<'a> {
+impl CodegenRuleTrieCtx<'_> {
     fn type_of(&self, x: VariableId) -> &TypeData {
         &self.types[self.variables[x].type_]
     }
@@ -315,13 +320,12 @@ impl<'a> CodegenRuleTrieCtx<'a> {
                 let mut unbound = vec![];
                 let mut unbound_vars = vec![];
                 for &arg in args {
-                    match self.is_bound(arg) {
-                        true => bound.push(ident::var_var(self.var_of(arg))),
-                        false => {
-                            self.bind_var(arg);
-                            unbound_vars.push(arg);
-                            unbound.push(ident::var_var(self.var_of(arg)))
-                        }
+                    if self.is_bound(arg) {
+                        bound.push(ident::var_var(self.var_of(arg)));
+                    } else {
+                        self.bind_var(arg);
+                        unbound_vars.push(arg);
+                        unbound.push(ident::var_var(self.var_of(arg)));
                     }
                 }
                 let inner = self.codegen_all(then, true);
@@ -341,7 +345,7 @@ impl<'a> CodegenRuleTrieCtx<'a> {
                 let bound = args
                     .iter()
                     .copied()
-                    .filter_map(std::convert::identity)
+                    .flatten()
                     .filter(|&arg| self.is_bound(arg))
                     .map(|arg| ident::var_var(self.var_of(arg)));
                 quote! {
@@ -383,7 +387,7 @@ impl<'a> CodegenRuleTrieCtx<'a> {
             } => {
                 assert_eq!(self.variables[variable].type_, self.globals[global].type_);
 
-                let x = ident::var_var(&self.var_of(variable));
+                let x = ident::var_var(self.var_of(variable));
                 let global = ident::var_var(&self.globals[global]);
 
                 self.bind_var(variable);
@@ -416,19 +420,16 @@ impl<'a> CodegenRuleTrieCtx<'a> {
                 let mut args_var = Vec::new();
                 let mut unbound_vars = Vec::new();
                 for &arg in args {
-                    match self.is_bound(arg) {
-                        true => {
-                            args_var.push(ident::var_var(self.var_of(arg)));
-                        }
-                        false => {
-                            self.bind_var(arg);
-                            unbound_vars.push(arg);
-                            let x = ident::var_var(self.var_of(arg));
-                            args_var.push(x.clone());
-                            let type_new = ident::type_new(self.type_of(arg));
+                    if self.is_bound(arg) {
+                        args_var.push(ident::var_var(self.var_of(arg)));
+                    } else {
+                        self.bind_var(arg);
+                        unbound_vars.push(arg);
+                        let x = ident::var_var(self.var_of(arg));
+                        args_var.push(x.clone());
+                        let type_new = ident::type_new(self.type_of(arg));
 
-                            declare_unknown.push(quote! {let #x = self.#type_new();})
-                        }
+                        declare_unknown.push(quote! {let #x = self.#type_new();});
                     }
                 }
 
@@ -646,7 +647,7 @@ pub fn codegen(theory: &Theory) -> TokenStream {
             let columns = rel
                 .param_types
                 .iter()
-                .map(|&_type| ident::type_ty(&theory.types[_type]))
+                .map(|&type_| ident::type_ty(&theory.types[type_]))
                 .collect::<Vec<_>>();
             let params = columns
                 .iter()
@@ -706,14 +707,14 @@ pub fn codegen(theory: &Theory) -> TokenStream {
                 globals: &theory.globals,
                 variables: &theory.rule_variables,
 
-                variables_bound: &mut theory.rule_variables.new_side(),
+                variables_bound: &mut theory.rule_variables.new_same_size(),
                 scoped: true,
                 priority_cap: Priority::MIN,
             }
             .codegen_all(rule_tries, true)
         });
     let reroot_and_apply_insertions_up_to = {
-        let mut type_num_relations: TVec<TypeId, usize> = theory.types.new_side();
+        let mut type_num_relations: TVec<TypeId, usize> = theory.types.new_same_size();
         let (
             rel_type_uprooted,
             rel_type_uprooted_self,
@@ -746,6 +747,7 @@ pub fn codegen(theory: &Theory) -> TokenStream {
                     .multiunzip()
             })
             .multiunzip();
+
         let type_num_relations = type_num_relations.into_inner();
 
         let type_uprooted = theory
@@ -871,7 +873,7 @@ mod test {
     use super::*;
     use expect_test::{expect, Expect};
     use std::{
-        io::Write,
+        io::Write as _,
         process::{Command, Output, Stdio},
     };
 
