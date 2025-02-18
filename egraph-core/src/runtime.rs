@@ -1,11 +1,35 @@
 //! "runtime" functions and types to be used by generated code.
-use std::marker::PhantomData;
+use std::{marker::PhantomData, mem::swap};
+
+trait Clear: Sized {
+    fn clear(&mut self);
+    /// set self to other and clear other without allocations
+    fn take_scratch(&mut self, other: &mut Self) {
+        self.clear();
+        swap(self, other);
+    }
+}
+impl<T> Clear for Vec<T> {
+    fn clear(&mut self) {
+        Vec::clear(self);
+    }
+}
 
 /// Must be produced from a [`UnionFind`]
 /// Trait to support wrapper types in [`UnionFind`]
-trait Eclass: Copy + Clone + Eq + PartialEq + Ord + PartialOrd {
+trait Eclass: RelationElement {
     fn new(value: u32) -> Self;
     fn inner(self) -> u32;
+}
+
+/// Handle to some type (eg sets)
+trait RelationElement: Copy + Clone + Eq + PartialEq + Ord + PartialOrd {
+    /// Minimum id value according to Ord
+    /// Used to implement range queries.
+    const MIN_ID: Self;
+    /// Maximum id value according to Ord
+    /// Used to implement range queries.
+    const MAX_ID: Self;
 }
 
 /// Wrapper type for a u32 to represent a typed e-class.
@@ -23,9 +47,12 @@ macro_rules! eclass_wrapper_ty {
                 self.0
             }
         }
+        impl RelationElement for $name {
+            const MIN_ID = Self(0);
+            const MAX_ID = Self(u32::MAX);
+        }
     };
 }
-
 
 /// The main union-find.
 /// Per eclass state.

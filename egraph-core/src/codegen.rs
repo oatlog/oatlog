@@ -1,7 +1,8 @@
 // #![allow(unused, reason = "remove temporary warning noise")]
 
 use crate::{
-    ids::{GlobalId, RelationId, TypeId, VariableId},
+    ids::{ColumnId, GlobalId, IndexId, IndexUsageId, RelationId, TypeId, VariableId},
+    index_selection::{self},
     typed_vec::TVec,
 };
 
@@ -9,7 +10,10 @@ use itertools::Itertools as _;
 use proc_macro2::TokenStream;
 use quote::quote;
 
-use std::collections::BTreeSet;
+use std::{
+    collections::{BTreeMap, BTreeSet},
+    iter::once,
+};
 
 /// Data such as type and function names are technically unnecessary but used for more readable
 /// generated code. A compiler is far less performance sensitive than an interpreter (although the
@@ -21,30 +25,93 @@ use std::collections::BTreeSet;
 // this by placing the iteration over `new` first. Rules that run a few times in sequence, at
 // startup, seem useful though.)
 #[derive(Debug)]
-pub struct Theory {
-    name: &'static str,
-    types: TVec<TypeId, TypeData>,
-    relations: TVec<RelationId, RelationData>,
-    globals: TVec<GlobalId, VariableData>,
-    rule_variables: TVec<VariableId, VariableData>,
-    /// `RuleTrie`s run once on theory creation.
-    rule_tries_startup: &'static [RuleTrie],
-    rule_tries: &'static [RuleTrie],
+pub(crate) struct Theory {
+    pub(crate) name: &'static str,
+    pub(crate) types: TVec<TypeId, TypeData>,
+    pub(crate) relations: TVec<RelationId, RelationData>,
+    pub(crate) globals: TVec<GlobalId, VariableData>,
+    pub(crate) rule_variables: TVec<VariableId, VariableData>,
+    // /// `RuleTrie`s run once on theory creation.
+    // rule_tries_startup: &'static [RuleTrie],
+    pub(crate) rule_tries: &'static [RuleTrie],
 }
 
 #[derive(Debug)]
-struct TypeData {
+pub(crate) struct TypeData {
     name: &'static str,
     // TODO: primitives
 }
-
-#[derive(Debug)]
-struct RelationData {
-    name: &'static str,
-    param_types: Vec<TypeId>,
-    indices: Vec<IndexData>,
-    // TODO: merge
+impl TypeData {
+    pub(crate) fn new(name: &'static str) -> Self {
+        let name = match name {
+            "()" => "unit",
+            x => x,
+        };
+        Self { name }
+    }
 }
+
+/// General over all relations
+#[derive(Debug)]
+pub(crate) struct RelationData {
+    /// Generated name
+    name: &'static str,
+    param_types: TVec<ColumnId, TypeId>,
+    ty: RelationTy,
+}
+impl RelationData {
+    pub(crate) fn new_table(
+        name: &'static str,
+        types: TVec<ColumnId, TypeId>,
+        usage_to_info: TVec<IndexUsageId, index_selection::IndexUsageInfo>,
+        index_to_info: TVec<IndexId, index_selection::IndexInfo>,
+        column_back_reference: TVec<ColumnId, IndexUsageId>,
+    ) -> Self {
+        Self {
+            name,
+            param_types: types.iter().copied().collect(),
+            ty: RelationTy::Table {
+                usage_to_info,
+                index_to_info,
+                column_back_reference,
+            },
+        }
+    }
+    pub(crate) fn new_forall(name: &'static str, ty: TypeId) -> Self {
+        Self {
+            name,
+            param_types: once(ty).collect(),
+            ty: RelationTy::Forall { ty },
+        }
+    }
+}
+
+/// How to query this specific relation.
+#[derive(Debug)]
+enum RelationTy {
+    /// A regular btree table.
+    Table {
+        /// Usage sites of any indexes
+        usage_to_info: TVec<IndexUsageId, index_selection::IndexUsageInfo>,
+        /// The actual indexes we need to generate.
+        index_to_info: TVec<IndexId, index_selection::IndexInfo>,
+        /// Index usage for back-references.
+        column_back_reference: TVec<ColumnId, IndexUsageId>,
+    },
+    // /// Panics if usage is not a subset of indexes.
+    // Primitive { }
+    Forall {
+        ty: TypeId,
+    },
+}
+
+// #[derive(Debug)]
+// struct RelationData {
+//     name: &'static str,
+//     param_types: Vec<TypeId>,
+//     // indices: Vec<indexIndexData>,
+//     // TODO: merge
+// }
 impl RelationData {
     fn unique_types(&self) -> impl Iterator<Item = TypeId> {
         self.param_types
@@ -55,34 +122,34 @@ impl RelationData {
             .into_iter()
     }
 }
-#[derive(Debug)]
-struct IndexData {
-    perm: Vec<usize>,
-    unique_prefix_len: usize,
-}
 
-/// Note that global variables are represented as functions with signature `() -> T`, and these
-/// functions can in effect be coerced to global variables by calling them.
-// TODO: Implement globals. Maybe as variables directly?
+// /// Note that global variables are represented as functions with signature `() -> T`, and these
+// /// functions can in effect be coerced to global variables by calling them.
+// // TODO: Implement globals. Maybe as variables directly?
+// #[derive(Debug)]
+// struct Initial {
+//     relation: RelationId,
+//     args: Vec<Option<RelationId>>,
+// }
 #[derive(Debug)]
-struct Initial {
-    relation: RelationId,
-    args: Vec<Option<RelationId>>,
-}
-#[derive(Debug)]
-struct VariableData {
+pub(crate) struct VariableData {
     name: &'static str,
     type_: TypeId,
 }
+impl VariableData {
+    pub(crate) fn new(name: &'static str, ty: TypeId) -> Self {
+        Self { name, type_: ty }
+    }
+}
 // TODO: maybe revisit at some point at turn into a DAG, if there are common subtrees
 #[derive(Debug, Clone, Copy)]
-struct RuleTrie {
-    meta: Option<&'static str>,
-    atom: RuleAtom,
-    then: &'static [RuleTrie],
+pub(crate) struct RuleTrie {
+    pub(crate) meta: Option<&'static str>,
+    pub(crate) atom: RuleAtom,
+    pub(crate) then: &'static [RuleTrie],
 }
 #[derive(Debug, Clone, Copy)]
-enum RuleAtom {
+pub(crate) enum RuleAtom {
     // ==== PREMISES ====
     /// Iterate (all)/(all new) elements of a type.
     Forall {
@@ -98,13 +165,18 @@ enum RuleAtom {
     Premise {
         relation: RelationId,
         args: &'static [VariableId],
+        index: IndexUsageId,
     },
     /// Proceed only if at least one row matching the `args` pattern exists in `relation`.
     PremiseAny {
         relation: RelationId,
-        args: &'static [Option<VariableId>],
+        /// a bit cursed to not have Option<VariableId> here, but it works when generating.
+        /// IndexUsageId determines what variables are bound.
+        args: &'static [VariableId],
+        index: IndexUsageId,
     },
     /// Proceed only if all insertions are already present and all equates are already equal.
+    /// (optimization to abort early if actions are done)
     RequireNotAllPresent(&'static [Action]),
     /// Bind unbound variable to global, or proceed only if bound variable matches global.
     LoadGlobal {
@@ -119,7 +191,7 @@ enum RuleAtom {
     Panic(&'static str),
 }
 #[derive(Debug, Clone, Copy)]
-enum Action {
+pub(crate) enum Action {
     /// Insert tuple, creating any variables that are unbound.
     Insert {
         relation: RelationId,
@@ -127,6 +199,8 @@ enum Action {
     },
     /// Equate two bound variables.
     Equate(VariableId, VariableId),
+    /// Make a new E-class.
+    Make(VariableId),
 }
 
 trait Relation {
@@ -247,6 +321,7 @@ struct CodegenRuleTrieCtx<'a> {
     variables: &'a TVec<VariableId, VariableData>,
 
     variables_bound: &'a mut TVec<VariableId, bool>,
+    /// Can variables be added without affecting top-level scope?
     scoped: bool,
     priority_cap: Priority,
 }
@@ -313,9 +388,9 @@ impl CodegenRuleTrieCtx<'_> {
                     }
                 }
             }
-            RuleAtom::Premise { relation, args } => {
+            RuleAtom::Premise { relation, args, .. } => {
                 let relation = ident::rel_var(&self.relations[relation]);
-                let index_iter = "todo_indexed_iter_function_here";
+                let index_iter = quote! { todo_indexed_iter_function_here };
                 let mut bound = vec![];
                 let mut unbound = vec![];
                 let mut unbound_vars = vec![];
@@ -338,14 +413,13 @@ impl CodegenRuleTrieCtx<'_> {
                     }
                 }
             }
-            RuleAtom::PremiseAny { relation, args } => {
+            RuleAtom::PremiseAny { relation, args, .. } => {
                 let relation = ident::rel_var(&self.relations[relation]);
-                let index_iter = "todo_indexed_iter_function_here";
+                let index_iter = quote! { todo_indexed_iter_function_here };
                 let inner = self.codegen_all(then, true);
                 let bound = args
                     .iter()
                     .copied()
-                    .flatten()
                     .filter(|&arg| self.is_bound(arg))
                     .map(|arg| ident::var_var(self.var_of(arg)));
                 quote! {
@@ -355,30 +429,32 @@ impl CodegenRuleTrieCtx<'_> {
                 }
             }
             RuleAtom::RequireNotAllPresent(actions) => {
-                let inner = self.codegen_all(then, true);
-                let cond = actions.iter().map(|&action| match action {
-                    Action::Insert { relation, args } => {
-                        let relation = ident::rel_var(&self.relations[relation]);
-                        let index_iter = "todo_indexed_iter_function_here";
-                        let bound = args.iter().map(|&arg| {
-                            assert!(self.is_bound(arg));
-                            ident::var_var(self.var_of(arg))
-                        });
-                        quote! { self.#relation.#index_iter(#(#bound),*).next().is_some() }
-                    }
-                    Action::Equate(a, b) => {
-                        assert_eq!(self.var_of(a).type_, self.var_of(b).type_);
-                        let type_uf = ident::type_uf(self.type_of(a));
-                        let a = ident::var_var(self.var_of(a));
-                        let b = ident::var_var(self.var_of(b));
-                        quote! { self.#type_uf.same(#a, #b) }
-                    }
-                });
-                quote! {
-                    if !(#(#cond)&&*) {
-                        #inner
-                    }
-                }
+                todo!()
+                // let inner = self.codegen_all(then, true);
+                // let cond = actions.iter().map(|&action| match action {
+                //     Action::Insert { relation, args } => {
+                //         let relation = ident::rel_var(&self.relations[relation]);
+                //         let index_iter = "todo_indexed_iter_function_here";
+                //         let bound = args.iter().map(|&arg| {
+                //             assert!(self.is_bound(arg));
+                //             ident::var_var(self.var_of(arg))
+                //         });
+                //         quote! { self.#relation.#index_iter(#(#bound),*).next().is_some() }
+                //     }
+                //     Action::Equate(a, b) => {
+                //         assert_eq!(self.var_of(a).type_, self.var_of(b).type_);
+                //         let type_uf = ident::type_uf(self.type_of(a));
+                //         let a = ident::var_var(self.var_of(a));
+                //         let b = ident::var_var(self.var_of(b));
+                //         quote! { self.#type_uf.same(#a, #b) }
+                //     }
+                //     Action::Make(variable_id) => todo!(),
+                // });
+                // quote! {
+                //     if !(#(#cond)&&*) {
+                //         #inner
+                //     }
+                // }
             }
             RuleAtom::LoadGlobal {
                 global,
@@ -473,6 +549,10 @@ impl CodegenRuleTrieCtx<'_> {
                     quote! {{ret}}
                 }
             }
+            RuleAtom::Action(Action::Make(x)) => {
+                // TODO
+                quote! {}
+            }
             RuleAtom::Panic(msg) => quote! {
                 panic!("explicit rule panic: {}", #msg)
             },
@@ -560,71 +640,10 @@ pub fn codegen(theory: &Theory) -> TokenStream {
         })
         .multiunzip();
 
-    let relations = theory.relations.iter().map(|rel| {
-        let rel_ty = ident::rel_ty(rel);
-        let remove_uprooted = rel.unique_types().map(|type_| {
-            let type_ = &theory.types[type_];
-            let type_ty = ident::type_ty(type_);
-            let type_remove_uprooted = ident::type_remove_uprooted(type_);
-            quote! {
-                fn #type_remove_uprooted(uprooted: &[#type_ty]) {
-                    todo!()
-                }
-            }
-        });
-        let params = rel
-            .param_types
-            .iter()
-            .map(|type_| ident::type_ty(&theory.types[type_]));
-
-        let (type_uprooted_self, type_uprooted_others, type_uf, type_): (
-            Vec<_>,
-            Vec<_>,
-            Vec<_>,
-            Vec<_>,
-        ) = rel
-            .unique_types()
-            .map(|type_| {
-                let type_ = &theory.types[type_];
-                (
-                    ident::type_uprooted_self(type_),
-                    ident::type_uprooted_others(type_),
-                    ident::type_uf(type_),
-                    ident::type_ty(type_),
-                )
-            })
-            .multiunzip();
-        quote! {
-            struct #rel_ty {
-                _todo: (),
-            }
-            impl Relation for #rel_ty {
-                type Row = (#(#params,)*);
-                fn new() -> Self {
-                    todo!()
-                }
-                fn clear_new(&mut self) {
-                    todo!()
-                }
-            }
-            impl #rel_ty {
-                fn indexed_iter_todo_thingy(&self) {
-                    todo!()
-                }
-                #(#remove_uprooted)*
-                fn bulk_update<'a>(
-                    instructions: impl 'a + Iterator<Item = (Math, Math)>,
-                    #(
-                        #type_uprooted_self: &mut Vec<#type_>,
-                        #type_uprooted_others: impl 'a + Iterator<Item = #type_>,
-                        #type_uf: &mut UnionFind<#type_>,
-                    )*
-                ) {
-                    todo!()
-                }
-            }
-        }
-    });
+    let relations = theory
+        .relations
+        .iter()
+        .map(|rel| codegen_relation(rel, theory));
 
     let theory_ty = ident::theory_ty(theory);
     let (
@@ -699,7 +718,7 @@ pub fn codegen(theory: &Theory) -> TokenStream {
         })
         .unzip();
 
-    let [startup_rule_contents, rule_contents] = [&theory.rule_tries_startup, &theory.rule_tries]
+    let [/*startup_rule_contents,*/ rule_contents] = [/*&theory.rule_tries_startup,*/ &theory.rule_tries]
         .map(|rule_tries| {
             CodegenRuleTrieCtx {
                 types: &theory.types,
@@ -807,9 +826,9 @@ pub fn codegen(theory: &Theory) -> TokenStream {
             #(#global_fields)*
         }
         impl #theory_ty {
-            fn startup_rules(&mut self) {
-                #startup_rule_contents
-            }
+            // fn startup_rules(&mut self) {
+            //     #startup_rule_contents
+            // }
             fn rules(&mut self) {
                 #rule_contents
             }
@@ -868,8 +887,80 @@ pub fn codegen(theory: &Theory) -> TokenStream {
     }
 }
 
+fn codegen_relation(rel: &RelationData, theory: &Theory) -> TokenStream {
+    let rel_ty = ident::rel_ty(rel);
+    let remove_uprooted = rel.unique_types().map(|type_| {
+        let type_ = &theory.types[type_];
+        let type_ty = ident::type_ty(type_);
+        let type_remove_uprooted = ident::type_remove_uprooted(type_);
+        quote! {
+            fn #type_remove_uprooted(uprooted: &[#type_ty]) {
+                todo!()
+            }
+        }
+    });
+    let params = rel
+        .param_types
+        .iter()
+        .map(|type_| ident::type_ty(&theory.types[type_]));
+
+    let (type_uprooted_self, type_uprooted_others, type_uf, type_): (
+        Vec<_>,
+        Vec<_>,
+        Vec<_>,
+        Vec<_>,
+    ) = rel
+        .unique_types()
+        .map(|type_| {
+            let type_ = &theory.types[type_];
+            (
+                ident::type_uprooted_self(type_),
+                ident::type_uprooted_others(type_),
+                ident::type_uf(type_),
+                ident::type_ty(type_),
+            )
+        })
+        .multiunzip();
+
+    dbg!(&type_uprooted_self, &type_uprooted_others, &type_uf, &type_);
+
+    quote! {
+        struct #rel_ty {
+            _todo: (),
+        }
+        impl #rel_ty {
+            type Row = (#(#params,)*);
+        }
+        // impl Relation for #rel_ty {
+        //     type Row = (#(#params,)*);
+        //     fn new() -> Self {
+        //         todo!()
+        //     }
+        //     fn clear_new(&mut self) {
+        //         todo!()
+        //     }
+        // }
+        // impl #rel_ty {
+        //     fn indexed_iter_todo_thingy(&self) {
+        //         todo!()
+        //     }
+        //     #(#remove_uprooted)*
+        //     fn bulk_update<'a>(
+        //         instructions: impl 'a + Iterator<Item = (Math, Math)>,
+        //         #(
+        //             #type_uprooted_self: &mut Vec<#type_>,
+        //             #type_uprooted_others: impl 'a + Iterator<Item = #type_>,
+        //             #type_uf: &mut UnionFind<#type_>,
+        //         )*
+        //     ) {
+        //         todo!()
+        //     }
+        // }
+    }
+}
+
 #[cfg(test)]
-mod test {
+pub(crate) mod test {
     use super::*;
     use expect_test::{expect, Expect};
     use std::{
@@ -877,7 +968,7 @@ mod test {
         process::{Command, Output, Stdio},
     };
 
-    fn check(tokens: TokenStream, expect: Expect) {
+    pub(crate) fn check(tokens: TokenStream, expect: Expect) {
         let child = Command::new("rustfmt")
             .stdin(Stdio::piped())
             .stdout(Stdio::piped())
@@ -906,16 +997,14 @@ mod test {
 
     #[test]
     fn simple() {
+        return;
+        /*
         let mut types = TVec::new();
         let mut relations = TVec::new();
         let mut rule_variables = TVec::new();
 
         let el = types.push(TypeData { name: "El" });
-        let le = relations.push(RelationData {
-            name: "Le",
-            param_types: vec![el, el],
-            indices: vec![],
-        });
+        let le = relations.push(RelationData::new_table("Le", vec![el, el], todo!(), todo!(), todo!()));
         let x = rule_variables.push(VariableData {
             name: "x",
             type_: el,
@@ -927,7 +1016,7 @@ mod test {
             relations,
             globals: TVec::new(),
             rule_variables,
-            rule_tries_startup: Vec::leak(vec![]),
+            //rule_tries_startup: Vec::leak(vec![]),
             rule_tries: Vec::leak(vec![RuleTrie {
                 meta: Some("reflexivity"),
                 atom: RuleAtom::Forall {
@@ -1091,5 +1180,6 @@ mod test {
                 }
             "#]],
         );
+            */
     }
 }

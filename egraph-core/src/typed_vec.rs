@@ -66,7 +66,10 @@ impl<K: Id, V> TVec<K, V> {
     pub(crate) fn new_same_size<V2: Default + Clone>(&self) -> TVec<K, V2> {
         TVec::new_with_size(self.len(), Default::default())
     }
-    pub(crate) fn inner(&mut self) -> &mut Vec<V> {
+    pub(crate) fn inner(&self) -> &Vec<V> {
+        &self.x
+    }
+    pub(crate) fn inner_mut(&mut self) -> &mut Vec<V> {
         &mut self.x
     }
     pub(crate) fn into_inner(self) -> Vec<V> {

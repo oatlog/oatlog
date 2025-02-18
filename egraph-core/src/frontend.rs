@@ -1427,7 +1427,6 @@ impl Parser {
     }
 
     pub(crate) fn emit_hir(&self) -> hir::Theory {
-        dbg!(&self);
         assert_eq!(self.functions.len(), self.hir_relations.len());
         let functions = self.hir_relations.clone();
         let types: TVec<TypeId, hir::Type> = self
