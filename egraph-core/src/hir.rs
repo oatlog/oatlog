@@ -968,7 +968,8 @@ pub(crate) mod query_planning {
                 | RelationTy::Global { .. }
                 | RelationTy::Primitive { .. } => unimplemented!("only table/forall implemented"),
                 RelationTy::Forall { ty } => {
-                    let codegen_relation = codegen::RelationData::new_forall(theory.types[ty].name, ty);
+                    let codegen_relation =
+                        codegen::RelationData::new_forall(theory.types[ty].name, ty);
                     codegen_relations.push_expected(relation_id, codegen_relation);
                 }
                 RelationTy::Table => {
@@ -982,13 +983,13 @@ pub(crate) mod query_planning {
                     let (usage_to_info, index_to_info) =
                         index_selection::index_selection(relation.columns.len(), uses);
 
-                    let codegen_relation = codegen::RelationData::new_table(
+                    let codegen_relation = dbg!(codegen::RelationData::new_table(
                         relation.name,
                         relation.columns.clone(),
                         usage_to_info,
                         index_to_info,
                         column_back_references,
-                    );
+                    ));
                     codegen_relations.push_expected(relation_id, codegen_relation);
                 }
             }

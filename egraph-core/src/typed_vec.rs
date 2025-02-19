@@ -87,6 +87,12 @@ impl<K: Id, V> TVec<K, V> {
             .collect()
     }
 }
+impl<K: Id, V: Clone> TVec<K, V> {
+    pub(crate) fn permute(&self, perm: &TVec<K, K>) -> Self {
+        assert!(perm.is_permutation());
+        self.enumerate().map(|i| self[perm[i]].clone()).collect()
+    }
+}
 impl<K: Id> TVec<K, K> {
     pub(crate) fn is_permutation(&self) -> bool {
         let mut seen = self.new_same_size::<bool>();

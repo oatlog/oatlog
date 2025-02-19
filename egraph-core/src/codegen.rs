@@ -79,7 +79,7 @@ impl RelationData {
     }
     pub(crate) fn new_forall(name: &'static str, ty: TypeId) -> Self {
         Self {
-            name,
+            name: format!("Forall{name}").leak(),
             param_types: once(ty).collect(),
             ty: RelationTy::Forall { ty },
         }
@@ -97,6 +97,8 @@ enum RelationTy {
         index_to_info: TVec<IndexId, index_selection::IndexInfo>,
         /// Index usage for back-references.
         column_back_reference: TVec<ColumnId, IndexUsageId>,
+        // implicit_rules: ...
+        // trigger_rules: ...
     },
     // /// Panics if usage is not a subset of indexes.
     // Primitive { }
@@ -236,7 +238,9 @@ impl quote::ToTokens for Priority {
 
 mod ident {
     use super::{RelationData, Theory, TypeData, VariableData};
+    use crate::{ids::ColumnId, index_selection};
     use heck::{ToPascalCase as _, ToSnakeCase as _};
+    use itertools::Itertools as _;
     use proc_macro2::Ident;
     use quote::format_ident;
 
@@ -279,7 +283,6 @@ mod ident {
     pub fn type_remove_uprooted(ty: &TypeData) -> Ident {
         format_ident!("{}_remove_uprooted", ty.name.to_snake_case())
     }
-
     pub fn rel_ty(rel: &RelationData) -> Ident {
         format_ident!("{}Relation", rel.name.to_pascal_case())
     }
@@ -301,16 +304,49 @@ mod ident {
     pub fn rel_insert_with_priority(rel: &RelationData) -> Ident {
         format_ident!("{}_insert_with_priority", rel.name.to_snake_case())
     }
-
     pub fn theory_ty(theory: &Theory) -> Ident {
         format_ident!("{}Theory", theory.name.to_pascal_case())
     }
     pub fn theory_delta_ty(theory: &Theory) -> Ident {
         format_ident!("{}Delta", theory.name.to_pascal_case())
     }
-
     pub fn arguments() -> impl Iterator<Item = Ident> {
         (0..).map(|i| format_ident!("arg{i}"))
+    }
+    pub fn index_all_field(index: &index_selection::IndexInfo) -> Ident {
+        let perm = index
+            .order
+            .iter()
+            .map(|ColumnId(x)| format!("{x}"))
+            .join("_");
+        format_ident!("all_index_{perm}")
+    }
+    pub fn index_all_iter(
+        usage: &index_selection::IndexUsageInfo,
+        index: &index_selection::IndexInfo,
+    ) -> Ident {
+        let index_perm = index
+            .order
+            .iter()
+            .map(|ColumnId(x)| format!("{x}"))
+            .join("_");
+        let prefix = format!("{}", usage.prefix);
+        format_ident!("iter{prefix}_{index_perm}")
+    }
+    pub fn index_all_check(
+        usage: &index_selection::IndexUsageInfo,
+        index: &index_selection::IndexInfo,
+    ) -> Ident {
+        let index_perm = index
+            .order
+            .iter()
+            .map(|ColumnId(x)| format!("{x}"))
+            .join("_");
+        let prefix = format!("{}", usage.prefix);
+        format_ident!("check{prefix}_{index_perm}")
+    }
+    pub fn column(c: ColumnId) -> Ident {
+        format_ident!("x{}", c.0)
     }
 }
 
@@ -818,144 +854,323 @@ pub fn codegen(theory: &Theory) -> TokenStream {
     };
 
     quote! {
-        #(#types)*
+        // #(#types)*
         #(#relations)*
-        pub struct #theory_ty {
-            #(#type_fields)*
-            #(#relation_fields)*
-            #(#global_fields)*
-        }
-        impl #theory_ty {
-            // fn startup_rules(&mut self) {
-            //     #startup_rule_contents
-            // }
-            fn rules(&mut self) {
-                #rule_contents
-            }
-            fn clear_new(&mut self) {
-                #(#type_fields_clear_new)*
-                #(#relation_fields_clear_new)*
-            }
-            fn lowest_insertion_priority(&self) -> Option<Priority> {
-                if #(!#type_uprooted.is_empty())||* {
-                    return Some(Priority::Canonicalizing);
-                }
-                for priority in Priority::LIST {
-                    let pnum = priority as usize;
-                    if #(!#relation_insertions[pnum].is_empty())||* {
-                        return Some(priority);
-                    }
-                }
-                None
-            }
-            fn reroot_and_apply_insertions_up_to(&mut self, priority: Priority) {
-                #reroot_and_apply_insertions_up_to
-            }
-            pub fn new() -> Self {
-                let mut ret = Self {
-                    #(#type_fields_creation)*
-                    #(#relation_fields_creation)*
-                    #(#global_fields_creation)*
-                };
-                ret.startup_rules();
-                ret.canonicalize();
-                ret
-            }
-            pub fn canonicalize(&mut self) {
-                self.reroot_and_apply_insertions_up_to(Priority::MAX);
-            }
-            pub fn close_until(&mut self, condition: impl Fn(&Self) -> bool) -> bool {
-                loop {
-                    if condition(self) {
-                        return true;
-                    }
-                    self.rules();
-                    self.clear_new();
+        // pub struct #theory_ty {
+        //     #(#type_fields)*
+        //     #(#relation_fields)*
+        //     #(#global_fields)*
+        // }
+        // impl #theory_ty {
+        //     // fn startup_rules(&mut self) {
+        //     //     #startup_rule_contents
+        //     // }
+        //     fn rules(&mut self) {
+        //         #rule_contents
+        //     }
+        //     fn clear_new(&mut self) {
+        //         #(#type_fields_clear_new)*
+        //         #(#relation_fields_clear_new)*
+        //     }
+        //     fn lowest_insertion_priority(&self) -> Option<Priority> {
+        //         if #(!#type_uprooted.is_empty())||* {
+        //             return Some(Priority::Canonicalizing);
+        //         }
+        //         for priority in Priority::LIST {
+        //             let pnum = priority as usize;
+        //             if #(!#relation_insertions[pnum].is_empty())||* {
+        //                 return Some(priority);
+        //             }
+        //         }
+        //         None
+        //     }
+        //     fn reroot_and_apply_insertions_up_to(&mut self, priority: Priority) {
+        //         #reroot_and_apply_insertions_up_to
+        //     }
+        //     pub fn new() -> Self {
+        //         let mut ret = Self {
+        //             #(#type_fields_creation)*
+        //             #(#relation_fields_creation)*
+        //             #(#global_fields_creation)*
+        //         };
+        //         ret.startup_rules();
+        //         ret.canonicalize();
+        //         ret
+        //     }
+        //     pub fn canonicalize(&mut self) {
+        //         self.reroot_and_apply_insertions_up_to(Priority::MAX);
+        //     }
+        //     pub fn close_until(&mut self, condition: impl Fn(&Self) -> bool) -> bool {
+        //         loop {
+        //             if condition(self) {
+        //                 return true;
+        //             }
+        //             self.rules();
+        //             self.clear_new();
 
-                    if let Some(priority) = self.lowest_insertion_priority() {
-                        // apply all insertions of lowest non-empty priority class
-                        self.reroot_and_apply_insertions_up_to(priority);
-                    } else {
-                        // nothing to insert, has converged
-                        return false;
-                    }
-                }
-            }
-            #(#type_functions)*
-            #(#relation_functions)*
-        }
+        //             if let Some(priority) = self.lowest_insertion_priority() {
+        //                 // apply all insertions of lowest non-empty priority class
+        //                 self.reroot_and_apply_insertions_up_to(priority);
+        //             } else {
+        //                 // nothing to insert, has converged
+        //                 return false;
+        //             }
+        //         }
+        //     }
+        //     #(#type_functions)*
+        //     #(#relation_functions)*
+        // }
     }
 }
 
 fn codegen_relation(rel: &RelationData, theory: &Theory) -> TokenStream {
+    // let remove_uprooted = rel.unique_types().map(|type_| {
+    //     let type_ = &theory.types[type_];
+    //     let type_ty = ident::type_ty(type_);
+    //     let type_remove_uprooted = ident::type_remove_uprooted(type_);
+    //     quote! {
+    //         fn #type_remove_uprooted(uprooted: &[#type_ty]) {
+    //             todo!()
+    //         }
+    //     }
+    // });
+    // let (type_uprooted_self, type_uprooted_others, type_uf, type_): (
+    //     Vec<_>,
+    //     Vec<_>,
+    //     Vec<_>,
+    //     Vec<_>,
+    // ) = rel
+    //     .unique_types()
+    //     .map(|type_| {
+    //         let type_ = &theory.types[type_];
+    //         (
+    //             ident::type_uprooted_self(type_),
+    //             ident::type_uprooted_others(type_),
+    //             ident::type_uf(type_),
+    //             ident::type_ty(type_),
+    //         )
+    //     })
+    //     .multiunzip();
+
     let rel_ty = ident::rel_ty(rel);
-    let remove_uprooted = rel.unique_types().map(|type_| {
-        let type_ = &theory.types[type_];
-        let type_ty = ident::type_ty(type_);
-        let type_remove_uprooted = ident::type_remove_uprooted(type_);
-        quote! {
-            fn #type_remove_uprooted(uprooted: &[#type_ty]) {
-                todo!()
-            }
-        }
-    });
     let params = rel
         .param_types
         .iter()
         .map(|type_| ident::type_ty(&theory.types[type_]));
 
-    let (type_uprooted_self, type_uprooted_others, type_uf, type_): (
-        Vec<_>,
-        Vec<_>,
-        Vec<_>,
-        Vec<_>,
-    ) = rel
-        .unique_types()
-        .map(|type_| {
-            let type_ = &theory.types[type_];
-            (
-                ident::type_uprooted_self(type_),
-                ident::type_uprooted_others(type_),
-                ident::type_uf(type_),
-                ident::type_ty(type_),
-            )
-        })
-        .multiunzip();
+    // dbg!(&type_uprooted_self, &type_uprooted_others, &type_uf, &type_);
+    match &rel.ty {
+        RelationTy::Forall { ty } => quote! {
+            // maybe integrate with union-find
+            struct #rel_ty {
+                _todo : (),
+            }
+        },
+        RelationTy::Table {
+            usage_to_info,
+            index_to_info,
+            column_back_reference,
+        } => {
+            let index_fields: Vec<_> = index_to_info
+                .iter()
+                .map(|x| {
+                    let attr_name = ident::index_all_field(x);
+                    let permuted_types = rel.param_types.permute(&x.order);
+                    let fields_ty = permuted_types
+                        .iter()
+                        .map(|x| ident::type_ty(&theory.types[*x]));
+                    quote! { #attr_name : BTreeSet<(#(#fields_ty),*)> }
+                })
+                .collect();
 
-    dbg!(&type_uprooted_self, &type_uprooted_others, &type_uf, &type_);
+            let cost = (index_to_info.len() * rel.param_types.len()) as u32;
 
-    quote! {
-        struct #rel_ty {
-            _todo: (),
+            let all_columns = rel.param_types.enumerate().map(ident::column).collect_vec();
+
+            let (iter_all, check_all): (Vec<_>, Vec<_>) = usage_to_info
+                .iter()
+                .unique()
+                .map(|usage_info| {
+                    let index_info = &index_to_info[usage_info.index];
+                    let index_field = ident::index_all_field(index_info);
+                    let args: Vec<_> = once(quote! { &self }).chain(
+                        index_info.order.inner()[0..usage_info.prefix]
+                            .iter()
+                            .copied()
+                            .map(|x| {
+                                let ident = ident::column(x);
+                                let ident_ty = ident::type_ty(&theory.types[rel.param_types[x]]);
+                                quote! { #ident : #ident_ty }
+                            }),
+                    ).collect();
+                    let iter_all_ident = ident::index_all_iter(usage_info, index_info);
+                    let iter_all = {
+                        let out_columns = index_info.order.inner()[usage_info.prefix..].iter().copied().map(ident::column);
+
+                        let out_ty = index_info.order.inner()[usage_info.prefix..]
+                            .iter()
+                            .copied()
+                            .map(|x| ident::type_ty(&theory.types[rel.param_types[x]]));
+
+                        let (range_from, range_to) : (Vec<TokenStream>, Vec<TokenStream>) = index_info.order.iter_enumerate().map(|(i, c)| {
+                            if i.0 < usage_info.prefix {
+                                let c = ident::column(*c);
+                                (quote! { #c }, quote! { #c })
+                            } else {
+                                let ty = ident::type_ty(&theory.types[rel.param_types[*c]]);
+                                (quote! { #ty (u32::MIN) }, quote! { #ty (u32::MAX) })
+                            }
+                        }).unzip();
+
+                        quote! {
+                            fn #iter_all_ident(#(#args),*) -> impl Iterator<Item = (#(#out_ty),*)> + use<'_> {
+                                self.#index_field
+                                    .range((#(#range_from),*)..=(#(#range_to),*))
+                                    .map(|(#(#all_columns),*)| (#(#out_columns),*))
+                            }
+                        }
+                    };
+                    let check_all = {
+                        let check_all_ident = ident::index_all_check(usage_info, index_info);
+                        let call_args = index_info.order.inner()[0..usage_info.prefix] .iter() .copied() .map(|x| { ident::column(x) });
+                        quote! {
+                            fn #check_all_ident(#(#args),*) -> bool {
+                                self.#iter_all_ident(#(#call_args),*).next().is_some()
+                            }
+                        }
+                    };
+                    (iter_all, check_all)
+                })
+                .unzip();
+
+            let update = {
+                let uf_all = rel
+                    .param_types
+                    .iter()
+                    .copied()
+                    .map(|x| ident::type_uf(&theory.types[x]))
+                    .collect_vec();
+
+                let uprooted_into_op_delete = {
+                    column_back_reference.iter_enumerate().map(|(c, usage)| {
+                        let usage_info = &usage_to_info[*usage];
+                        let index_info = &index_to_info[usage_info.index];
+                        let column = ident::column(c);
+                        let uproot = ident::type_uprooted(&theory.types[rel.param_types[c]]);
+
+                        let index_all_iter = ident::index_all_iter(usage_info, index_info);
+
+                        let other_columns = index_info.order.inner()[1..]
+                            .iter()
+                            .copied()
+                            .map(ident::column);
+
+                        quote! {
+                            for #column in #uproot.iter().copied() {
+                                for (#(#other_columns),*) in self.#index_all_iter(#column) {
+                                    op_delete.push((#(#all_columns),*));
+                                }
+                            }
+                        }
+                    })
+                };
+
+                let [first_index, other_indexes @ ..] = index_to_info.inner().as_slice() else {
+                    panic!("zero indexes?")
+                };
+                let first_index_order: Vec<_> = first_index
+                    .order
+                    .iter()
+                    .copied()
+                    .map(ident::column)
+                    .collect();
+                let first_index_ident = ident::index_all_field(first_index);
+                let other_indexes_order = other_indexes
+                    .iter()
+                    .map(|x| x.order.iter().copied().map(ident::column).collect_vec())
+                    .collect_vec();
+                let other_indexes_ident: Vec<_> =
+                    other_indexes.iter().map(ident::index_all_field).collect();
+
+                quote! {
+                    fn update(
+                        &mut self,
+                        // uproot_math
+                        // uf_math
+                        delta: &mut Vec<Self::Row>,
+                    ) {
+                        self.new.clear();
+                        let mut op_insert = take(delta);
+                        for (#(#all_columns),*) in op_insert.iter_mut() {
+                            #(*#all_columns = #uf_all.find(*#all_columns);)*
+                        }
+                        let mut op_delete = Vec::new();
+                        #(#uprooted_into_op_delete)*
+
+                        for (#(#all_columns),*) in op_delete {
+                            if self.#first_index_ident.remove(&(#(#first_index_order),*)) {
+                                #(self.#other_indexes_ident.remove(&(#(#other_indexes_order),*));)*
+                                #(#uf_all.dec_eclass(#all_columns, Self::COST);)*
+                                op_insert.push((#( #uf_all.find(#all_columns)),*));
+                            }
+                        }
+
+                        op_insert.retain(|&(#(#all_columns),*)| {
+                            // TODO: Implicit functionality/implicit rules to filter inserts.
+                            if !self.#first_index_ident.insert((#(#first_index_order),*)) {
+                                return false;
+                            }
+                            #( self.#other_indexes_ident.insert(( #(#other_indexes_order),*)); )*
+                            true
+                        });
+
+                        self.new = op_insert;
+                    }
+                }
+            };
+
+            quote! {
+                #[derive(Default)]
+                struct #rel_ty {
+                    new: Vec<Self::Row>,
+                    #(#index_fields,)*
+                }
+                impl #rel_ty {
+                    type Row = (#(#params),*);
+                    const COST: u32 = #cost;
+                    fn new() -> Self { Self::default() }
+                    fn iter_new(&self) -> impl Iterator<Item = Self::Row> + use<'_>{ self.new.iter().copied() }
+                    #(#iter_all)*
+                    #(#check_all)*
+                    #update
+                }
+                // impl Relation for #rel_ty {
+                //     type Row = (#(#params,)*);
+                //     fn new() -> Self {
+                //         todo!()
+                //     }
+                //     fn clear_new(&mut self) {
+                //         todo!()
+                //     }
+                // }
+                // impl #rel_ty {
+                //     fn indexed_iter_todo_thingy(&self) {
+                //         todo!()
+                //     }
+                //     #(#remove_uprooted)*
+                //     fn bulk_update<'a>(
+                //         instructions: impl 'a + Iterator<Item = (Math, Math)>,
+                //         #(
+                //             #type_uprooted_self: &mut Vec<#type_>,
+                //             #type_uprooted_others: impl 'a + Iterator<Item = #type_>,
+                //             #type_uf: &mut UnionFind<#type_>,
+                //         )*
+                //     ) {
+                //         todo!()
+                //     }
+                // }
+            }
         }
-        impl #rel_ty {
-            type Row = (#(#params,)*);
-        }
-        // impl Relation for #rel_ty {
-        //     type Row = (#(#params,)*);
-        //     fn new() -> Self {
-        //         todo!()
-        //     }
-        //     fn clear_new(&mut self) {
-        //         todo!()
-        //     }
-        // }
-        // impl #rel_ty {
-        //     fn indexed_iter_todo_thingy(&self) {
-        //         todo!()
-        //     }
-        //     #(#remove_uprooted)*
-        //     fn bulk_update<'a>(
-        //         instructions: impl 'a + Iterator<Item = (Math, Math)>,
-        //         #(
-        //             #type_uprooted_self: &mut Vec<#type_>,
-        //             #type_uprooted_others: impl 'a + Iterator<Item = #type_>,
-        //             #type_uf: &mut UnionFind<#type_>,
-        //         )*
-        //     ) {
-        //         todo!()
-        //     }
-        // }
     }
 }
 
@@ -975,11 +1190,13 @@ pub(crate) mod test {
             .stderr(Stdio::piped())
             .spawn()
             .expect("formatting with rustfmt inside unit test");
+        let tokens_s = tokens.to_string();
+        dbg!(&tokens_s);
         child
             .stdin
             .as_ref()
             .unwrap()
-            .write_all(tokens.to_string().as_bytes())
+            .write_all(tokens_s.as_bytes())
             .unwrap();
         let Output {
             status,

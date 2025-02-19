@@ -15,19 +15,19 @@ use std::collections::BTreeMap;
 // TODO: add some "maybe_contains" API.
 // TODO: bloom filters
 
-#[derive(Debug)]
+#[derive(Clone, Eq, PartialEq, Ord, PartialOrd, Hash, Debug)]
 pub(crate) struct IndexInfo {
     // index -> main
-    order: TVec<ColumnId, ColumnId>,
+    pub(crate) order: TVec<ColumnId, ColumnId>,
     // main -> index
-    perm: TVec<ColumnId, ColumnId>,
+    pub(crate) perm: TVec<ColumnId, ColumnId>,
 }
 
-#[derive(Debug)]
+#[derive(Clone, Eq, PartialEq, Ord, PartialOrd, Hash, Debug)]
 pub(crate) struct IndexUsageInfo {
     // of the selected index (btree), how many variables are used for the lookup?
-    prefix: usize,
-    index: IndexId,
+    pub(crate) prefix: usize,
+    pub(crate) index: IndexId,
 }
 
 // user:
