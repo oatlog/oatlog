@@ -35,6 +35,13 @@ pub trait RelationElement: Copy + Clone + Eq + PartialEq + Ord + PartialOrd {
 
 pub trait Relation { type Row; }
 
+/// To avoid many functions with a type suffix: `make_math`, `make_data`, ...
+pub trait EclassProvider<T: Eclass> {
+    fn make(&mut self) -> T;
+    fn find(&mut self, t: T) -> T;
+    fn union(&mut self, a: T, b: T);
+}
+
 /// Wrapper type for a u32 to represent a typed e-class.
 /// Emit this instead to make codegen a bit cleaner.
 #[macro_export]
@@ -59,7 +66,7 @@ macro_rules! eclass_wrapper_ty {
 
 /// The main union-find.
 /// Per eclass state.
-#[derive(Default)]
+#[derive(Debug, Default)]
 pub struct UnionFind<T> {
     // TODO: maybe merge repr and size.
     repr: Vec<u32>,
@@ -98,12 +105,14 @@ impl<T: Eclass> UnionFind<T> {
     pub fn union(&mut self, a: T, b: T) {
         let a = self.find_inner(a.inner());
         let b = self.find_inner(b.inner());
+        if a == b { return; }
         let (root, uprooted) = if self.size[a as usize] > self.size[b as usize] {
             (a, b)
         } else {
             (b, a)
         };
         self.repr[uprooted as usize] = self.repr[root as usize];
+        println!("uf-union: {uprooted:?} -> {root:?}");
         self.dirty.push(T::new(uprooted));
     }
     pub fn dirty(&mut self) -> &mut Vec<T> {

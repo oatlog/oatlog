@@ -231,7 +231,7 @@ mod test {
         let expected_codegen = expect![[r#"
             use egraph::runtime::*;
             use std::{collections::BTreeSet, mem::take};
-            #[derive(Copy, Clone, Eq, PartialEq, Ord, PartialOrd, Default)]
+            #[derive(Copy, Clone, Eq, PartialEq, Ord, PartialOrd, Default, Debug)]
             pub struct I64(u32);
             impl Eclass for I64 {
                 fn new(value: u32) -> Self {
@@ -245,7 +245,7 @@ mod test {
                 const MIN_ID: Self = Self(0);
                 const MAX_ID: Self = Self(u32::MAX);
             }
-            #[derive(Copy, Clone, Eq, PartialEq, Ord, PartialOrd, Default)]
+            #[derive(Copy, Clone, Eq, PartialEq, Ord, PartialOrd, Default, Debug)]
             pub struct F64(u32);
             impl Eclass for F64 {
                 fn new(value: u32) -> Self {
@@ -259,7 +259,7 @@ mod test {
                 const MIN_ID: Self = Self(0);
                 const MAX_ID: Self = Self(u32::MAX);
             }
-            #[derive(Copy, Clone, Eq, PartialEq, Ord, PartialOrd, Default)]
+            #[derive(Copy, Clone, Eq, PartialEq, Ord, PartialOrd, Default, Debug)]
             pub struct String(u32);
             impl Eclass for String {
                 fn new(value: u32) -> Self {
@@ -273,7 +273,7 @@ mod test {
                 const MIN_ID: Self = Self(0);
                 const MAX_ID: Self = Self(u32::MAX);
             }
-            #[derive(Copy, Clone, Eq, PartialEq, Ord, PartialOrd, Default)]
+            #[derive(Copy, Clone, Eq, PartialEq, Ord, PartialOrd, Default, Debug)]
             pub struct Bool(u32);
             impl Eclass for Bool {
                 fn new(value: u32) -> Self {
@@ -287,7 +287,7 @@ mod test {
                 const MIN_ID: Self = Self(0);
                 const MAX_ID: Self = Self(u32::MAX);
             }
-            #[derive(Copy, Clone, Eq, PartialEq, Ord, PartialOrd, Default)]
+            #[derive(Copy, Clone, Eq, PartialEq, Ord, PartialOrd, Default, Debug)]
             pub struct Unit(u32);
             impl Eclass for Unit {
                 fn new(value: u32) -> Self {
@@ -301,7 +301,7 @@ mod test {
                 const MIN_ID: Self = Self(0);
                 const MAX_ID: Self = Self(u32::MAX);
             }
-            #[derive(Copy, Clone, Eq, PartialEq, Ord, PartialOrd, Default)]
+            #[derive(Copy, Clone, Eq, PartialEq, Ord, PartialOrd, Default, Debug)]
             pub struct Math(u32);
             impl Eclass for Math {
                 fn new(value: u32) -> Self {
@@ -315,7 +315,7 @@ mod test {
                 const MIN_ID: Self = Self(0);
                 const MAX_ID: Self = Self(u32::MAX);
             }
-            #[derive(Default)]
+            #[derive(Debug, Default)]
             struct ForallMathRelation {
                 new: BTreeSet<<Self as Relation>::Row>,
                 all: BTreeSet<<Self as Relation>::Row>,
@@ -323,7 +323,7 @@ mod test {
             impl Relation for ForallMathRelation {
                 type Row = (Math);
             }
-            #[derive(Default)]
+            #[derive(Debug, Default)]
             struct MulRelation {
                 new: Vec<<Self as Relation>::Row>,
                 all_index_0_1_2: BTreeSet<(Math, Math, Math)>,
@@ -386,16 +386,19 @@ mod test {
                     }
                     let mut op_delete = Vec::new();
                     for x0 in math_uprooted.iter().copied() {
+                        println!("uproot: {:?}", x0);
                         for (x1, x2) in self.iter1_0_1_2(x0) {
                             op_delete.push((x0, x1, x2));
                         }
                     }
                     for x1 in math_uprooted.iter().copied() {
+                        println!("uproot: {:?}", x1);
                         for (x0, x2) in self.iter1_1_0_2(x1) {
                             op_delete.push((x0, x1, x2));
                         }
                     }
                     for x2 in math_uprooted.iter().copied() {
+                        println!("uproot: {:?}", x2);
                         for (x0, x1) in self.iter1_2_0_1(x2) {
                             op_delete.push((x0, x1, x2));
                         }
@@ -407,6 +410,7 @@ mod test {
                             math_uf.dec_eclass(x0, Self::COST);
                             math_uf.dec_eclass(x1, Self::COST);
                             math_uf.dec_eclass(x2, Self::COST);
+                            println!("delete: {:?}", [x0, x1, x2]);
                             op_insert.push((math_uf.find(x0), math_uf.find(x1), math_uf.find(x2)));
                         }
                     }
@@ -414,6 +418,10 @@ mod test {
                         if !self.all_index_0_1_2.insert((x0, x1, x2)) {
                             return false;
                         }
+                        println!("insert: {:?}", [x0, x1, x2]);
+                        math_uf.inc_eclass(x0, Self::COST);
+                        math_uf.inc_eclass(x1, Self::COST);
+                        math_uf.inc_eclass(x2, Self::COST);
                         self.all_index_1_0_2.insert((x1, x0, x2));
                         self.all_index_2_0_1.insert((x2, x0, x1));
                         true
@@ -421,7 +429,7 @@ mod test {
                     self.new = op_insert;
                 }
             }
-            #[derive(Default)]
+            #[derive(Debug, Default)]
             struct AddRelation {
                 new: Vec<<Self as Relation>::Row>,
                 all_index_0_1_2: BTreeSet<(Math, Math, Math)>,
@@ -484,16 +492,19 @@ mod test {
                     }
                     let mut op_delete = Vec::new();
                     for x0 in math_uprooted.iter().copied() {
+                        println!("uproot: {:?}", x0);
                         for (x1, x2) in self.iter1_0_1_2(x0) {
                             op_delete.push((x0, x1, x2));
                         }
                     }
                     for x1 in math_uprooted.iter().copied() {
+                        println!("uproot: {:?}", x1);
                         for (x0, x2) in self.iter1_1_0_2(x1) {
                             op_delete.push((x0, x1, x2));
                         }
                     }
                     for x2 in math_uprooted.iter().copied() {
+                        println!("uproot: {:?}", x2);
                         for (x0, x1) in self.iter1_2_0_1(x2) {
                             op_delete.push((x0, x1, x2));
                         }
@@ -505,6 +516,7 @@ mod test {
                             math_uf.dec_eclass(x0, Self::COST);
                             math_uf.dec_eclass(x1, Self::COST);
                             math_uf.dec_eclass(x2, Self::COST);
+                            println!("delete: {:?}", [x0, x1, x2]);
                             op_insert.push((math_uf.find(x0), math_uf.find(x1), math_uf.find(x2)));
                         }
                     }
@@ -512,6 +524,10 @@ mod test {
                         if !self.all_index_0_1_2.insert((x0, x1, x2)) {
                             return false;
                         }
+                        println!("insert: {:?}", [x0, x1, x2]);
+                        math_uf.inc_eclass(x0, Self::COST);
+                        math_uf.inc_eclass(x1, Self::COST);
+                        math_uf.inc_eclass(x2, Self::COST);
                         self.all_index_1_0_2.insert((x1, x0, x2));
                         self.all_index_2_0_1.insert((x2, x0, x1));
                         true
@@ -519,7 +535,7 @@ mod test {
                     self.new = op_insert;
                 }
             }
-            #[derive(Default)]
+            #[derive(Debug, Default)]
             pub struct Delta {
                 forall_math_relation_delta: Vec<<ForallMathRelation as Relation>::Row>,
                 mul_relation_delta: Vec<<MulRelation as Relation>::Row>,
@@ -541,7 +557,7 @@ mod test {
                     self.add_relation_delta.push(x);
                 }
             }
-            #[derive(Default)]
+            #[derive(Debug, Default)]
             pub struct Theory {
                 delta: Delta,
                 i64_uf: UnionFind<I64>,
@@ -559,8 +575,10 @@ mod test {
                     Self::default()
                 }
                 pub fn step(&mut self) {
+                    println!("step start");
                     self.apply_rules();
-                    self.clear_transient()
+                    self.clear_transient();
+                    println!("step end");
                 }
                 fn apply_rules(&mut self) {
                     for (a, b, p2) in self.add_relation.iter_new() {

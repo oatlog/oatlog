@@ -983,13 +983,13 @@ pub(crate) mod query_planning {
                     let (usage_to_info, index_to_info) =
                         index_selection::index_selection(relation.columns.len(), uses);
 
-                    let codegen_relation = dbg!(codegen::RelationData::new_table(
+                    let codegen_relation = codegen::RelationData::new_table(
                         relation.name,
                         relation.columns.clone(),
                         usage_to_info,
                         index_to_info,
                         column_back_references,
-                    ));
+                    );
                     codegen_relations.push_expected(relation_id, codegen_relation);
                 }
             }
@@ -1228,14 +1228,8 @@ pub(crate) mod query_planning {
                     score
                 })
                 .enumerate()
-                .inspect(|x| {
-                    dbg!(&*x);
-                })
                 .max_by_key(|(_, x)| *x)
                 .unwrap();
-            dbg!(idx, score);
-            dbg!(&remaining_constraints[idx]);
-            dbg!(&theory.relations[remaining_constraints[idx].relation]);
 
             let query = match score.0 {
                 NoQuery => panic!("could not find a query plan"),

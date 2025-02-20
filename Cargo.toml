@@ -3,16 +3,19 @@ members = [
     "egraph",
     "egraph-core",
     "egraph-macro",
+    "egraph-test",
     "examples/math",
 ]
 resolver = "2"
 
 [workspace.dependencies]
-clap = { version = "4", features = ["derive"]}
-educe = "0.6.0"
+egraph.path = "egraph"
 egraph-core.path = "egraph-core"
 egraph-macro.path = "egraph-macro"
-egraph.path = "egraph"
+egraph-test.path = "egraph-test"
+
+clap = { version = "4", features = ["derive"]}
+educe = "0.6.0"
 expect-test = "1"
 heck = "0.5"
 itertools = "0.14"

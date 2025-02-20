@@ -710,7 +710,7 @@ pub fn codegen(theory: &Theory) -> TokenStream {
             // TODO: Consider bitset if `type_all` is dense
             (
                 quote! {
-                    #[derive(Copy, Clone, Eq, PartialEq, Ord, PartialOrd, Default)]
+                    #[derive(Copy, Clone, Eq, PartialEq, Ord, PartialOrd, Default, Debug)]
                     pub struct #type_ty(u32);
                     impl Eclass for #type_ty {
                         fn new(value: u32) -> Self {
@@ -982,7 +982,7 @@ pub fn codegen(theory: &Theory) -> TokenStream {
             .unzip();
 
         quote! {
-            #[derive(Default)]
+            #[derive(Debug, Default)]
             pub struct Delta {
                 #(#delta_fields)*
             }
@@ -1050,7 +1050,7 @@ pub fn codegen(theory: &Theory) -> TokenStream {
         #(#types)*
         #(#relations)*
         #delta
-        #[derive(Default)]
+        #[derive(Debug, Default)]
         pub struct #theory_ty {
             delta: Delta,
             #(#uf_ident: #uf_ty,)*
@@ -1059,7 +1059,12 @@ pub fn codegen(theory: &Theory) -> TokenStream {
         }
         impl #theory_ty {
             pub fn new() -> Self { Self::default() }
-            pub fn step(&mut self) { self.apply_rules(); self.clear_transient() }
+            pub fn step(&mut self) { 
+                println!("step start");
+                self.apply_rules(); 
+                self.clear_transient();
+                println!("step end");
+            }
             fn apply_rules(&mut self) { #rule_contents }
             fn clear_transient(&mut self) { #clear_transient_contents }
         }
@@ -1178,7 +1183,7 @@ fn codegen_relation(rel: &RelationData, theory: &Theory) -> TokenStream {
     match &rel.ty {
         RelationTy::Forall { ty } => quote! {
             // maybe integrate with union-find
-            #[derive(Default)]
+            #[derive(Debug, Default)]
             struct #rel_ty {
                 new: BTreeSet<<Self as Relation>::Row>,
                 all: BTreeSet<<Self as Relation>::Row>,
@@ -1291,6 +1296,7 @@ fn codegen_relation(rel: &RelationData, theory: &Theory) -> TokenStream {
 
                         quote! {
                             for #column in #uproot.iter().copied() {
+                                println!("uproot: {:?}", #column);
                                 for (#(#other_columns),*) in self.#index_all_iter(#column) {
                                     op_delete.push((#(#all_columns),*));
                                 }
@@ -1346,6 +1352,7 @@ fn codegen_relation(rel: &RelationData, theory: &Theory) -> TokenStream {
                             if self.#first_index_ident.remove(&(#(#first_index_order),*)) {
                                 #(self.#other_indexes_ident.remove(&(#(#other_indexes_order),*));)*
                                 #(#uf_all.dec_eclass(#all_columns, Self::COST);)*
+                                println!("delete: {:?}", [#(#all_columns),*]);
                                 op_insert.push((#( #uf_all.find(#all_columns)),*));
                             }
                         }
@@ -1355,6 +1362,8 @@ fn codegen_relation(rel: &RelationData, theory: &Theory) -> TokenStream {
                             if !self.#first_index_ident.insert((#(#first_index_order),*)) {
                                 return false;
                             }
+                            println!("insert: {:?}", [#(#all_columns),*]);
+                            #(#uf_all.inc_eclass(#all_columns, Self::COST);)*
                             #( self.#other_indexes_ident.insert(( #(#other_indexes_order),*)); )*
                             true
                         });
@@ -1365,7 +1374,7 @@ fn codegen_relation(rel: &RelationData, theory: &Theory) -> TokenStream {
             };
 
             quote! {
-                #[derive(Default)]
+                #[derive(Debug, Default)]
                 struct #rel_ty {
                     new: Vec<<Self as Relation>::Row>,
                     #(#index_fields,)*

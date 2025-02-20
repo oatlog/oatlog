@@ -157,6 +157,14 @@ dependencies = [
 ]
 
 [[package]]
+name = "egraph-test"
+version = "0.1.0"
+dependencies = [
+ "egraph",
+ "expect-test",
+]
+
+[[package]]
 name = "either"
 version = "1.13.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
