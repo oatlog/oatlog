@@ -120,7 +120,7 @@ impl Eclass for Other { fn new(value: u32) -> Self { Self(value) } fn inner(self
 #[derive(Default)]
 struct Delta {
     // add rows
-    add_delta: Vec<(Math, Math, Math)>,
+    add_delta: Vec<(<AddRelation as Relation>::Row)>,
     // new math eclasses
     math_delta: Vec<Math>,
 }
@@ -133,6 +133,10 @@ impl Delta {
     fn insert_add(&mut self, x: (Math, Math, Math)) {
         self.add_delta.push(x);
     }
+}
+
+trait Relation {
+    type Row;
 }
 
 #[derive(Default)]
@@ -158,6 +162,9 @@ impl AddRelation {
     fn iter_1_2(&self, x0: Math, x2: Math) -> impl Iterator<Item = (Math)> { None.into_iter() }
     fn iter_1(&self, x1: Math) -> impl Iterator<Item = (Math, Math)> { None.into_iter() }
     fn iter_2(&self, x2: Math) -> impl Iterator<Item = (Math, Math)> { None.into_iter() }
+}
+impl Relation for AddRelation {
+    type Row = (Math, Math, Math);
 }
 impl AddRelation {
     fn update(
@@ -376,8 +383,8 @@ pub struct Egraph {
     // ======== PERSISTENT STATE =============
     add_relation: AddRelation,
 
-    // persisted because we can not clear it without invalidating new.
     // to be uprooted
+    // persisted because we can not clear it without invalidating new.
     math_uproot: Vec<Math>,
     other_uproot: Vec<Other>,
 

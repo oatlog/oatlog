@@ -1,7 +1,7 @@
 //! "runtime" functions and types to be used by generated code.
 use std::{marker::PhantomData, mem::swap};
 
-trait Clear: Sized {
+pub trait Clear: Sized {
     fn clear(&mut self);
     /// set self to other and clear other without allocations
     fn take_scratch(&mut self, other: &mut Self) {
@@ -17,13 +17,14 @@ impl<T> Clear for Vec<T> {
 
 /// Must be produced from a [`UnionFind`]
 /// Trait to support wrapper types in [`UnionFind`]
-trait Eclass: RelationElement {
+/// Essentially an object that "the engine" controls.
+pub trait Eclass: RelationElement {
     fn new(value: u32) -> Self;
     fn inner(self) -> u32;
 }
 
 /// Handle to some type (eg sets)
-trait RelationElement: Copy + Clone + Eq + PartialEq + Ord + PartialOrd {
+pub trait RelationElement: Copy + Clone + Eq + PartialEq + Ord + PartialOrd {
     /// Minimum id value according to Ord
     /// Used to implement range queries.
     const MIN_ID: Self;
@@ -32,13 +33,15 @@ trait RelationElement: Copy + Clone + Eq + PartialEq + Ord + PartialOrd {
     const MAX_ID: Self;
 }
 
+pub trait Relation { type Row; }
+
 /// Wrapper type for a u32 to represent a typed e-class.
 /// Emit this instead to make codegen a bit cleaner.
 #[macro_export]
 macro_rules! eclass_wrapper_ty {
     ($name:ident) => {
         #[derive(Copy, Clone, Eq, PartialEq, Ord, PartialOrd, Default)]
-        struct $name(u32);
+        pub struct $name(u32);
         impl Eclass for $name {
             fn new(value: u32) -> Self {
                 Self(value)
@@ -57,7 +60,7 @@ macro_rules! eclass_wrapper_ty {
 /// The main union-find.
 /// Per eclass state.
 #[derive(Default)]
-struct UnionFind<T> {
+pub struct UnionFind<T> {
     // TODO: maybe merge repr and size.
     repr: Vec<u32>,
     /// reprs that should be uprooted.
@@ -71,7 +74,7 @@ struct UnionFind<T> {
     // delta: Vec<T>,
 }
 impl<T: Eclass> UnionFind<T> {
-    fn new() -> Self {
+    pub fn new() -> Self {
         Self {
             repr: Vec::new(),
             dirty: Vec::new(),
@@ -79,10 +82,10 @@ impl<T: Eclass> UnionFind<T> {
             _marker: PhantomData,
         }
     }
-    fn find(&mut self, t: T) -> T {
+    pub fn find(&mut self, t: T) -> T {
         T::new(self.find_inner(t.inner()))
     }
-    fn find_inner(&mut self, i: u32) -> u32 {
+    pub fn find_inner(&mut self, i: u32) -> u32 {
         if self.repr[i as usize] == i {
             i
         } else {
@@ -92,7 +95,7 @@ impl<T: Eclass> UnionFind<T> {
         }
     }
     // returns uprooted
-    fn union(&mut self, a: T, b: T) {
+    pub fn union(&mut self, a: T, b: T) {
         let a = self.find_inner(a.inner());
         let b = self.find_inner(b.inner());
         let (root, uprooted) = if self.size[a as usize] > self.size[b as usize] {
@@ -103,11 +106,11 @@ impl<T: Eclass> UnionFind<T> {
         self.repr[uprooted as usize] = self.repr[root as usize];
         self.dirty.push(T::new(uprooted));
     }
-    fn dirty(&mut self) -> &mut Vec<T> {
+    pub fn dirty(&mut self) -> &mut Vec<T> {
         &mut self.dirty
     }
     /// INVARIANT: also add to delta
-    fn add_eclass(&mut self) -> T {
+    pub fn add_eclass(&mut self) -> T {
         let id = u32::try_from(self.repr.len()).expect("out of u32 ids");
         self.repr.push(id);
         self.size.push(1);
@@ -115,10 +118,10 @@ impl<T: Eclass> UnionFind<T> {
     }
     // inc/dec this possibly non-canonicalized e-class
     // can be no-op if not repr.
-    fn inc_eclass(&mut self, t: T, delta: u32) {
+    pub fn inc_eclass(&mut self, t: T, delta: u32) {
         self.size[t.inner() as usize] += delta;
     }
-    fn dec_eclass(&mut self, t: T, delta: u32) {
+    pub fn dec_eclass(&mut self, t: T, delta: u32) {
         self.size[t.inner() as usize] -= delta;
     }
 }

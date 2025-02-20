@@ -239,10 +239,12 @@ impl quote::ToTokens for Priority {
 mod ident {
     use super::{RelationData, Theory, TypeData, VariableData};
     use crate::{ids::ColumnId, index_selection};
+    use heck::ToSnakeCase;
     use heck::{ToPascalCase as _, ToSnakeCase as _};
     use itertools::Itertools as _;
     use proc_macro2::Ident;
-    use quote::format_ident;
+    use proc_macro2::TokenStream;
+    use quote::{format_ident, quote};
 
     pub fn var_var(var: &VariableData) -> Ident {
         format_ident!("{}", var.name.to_snake_case())
@@ -258,6 +260,10 @@ mod ident {
     }
     pub fn type_uf(ty: &TypeData) -> Ident {
         format_ident!("{}_uf", ty.name.to_snake_case())
+    }
+    pub fn type_ty_uf(ty: &TypeData) -> TokenStream {
+        let ty = type_ty(ty);
+        quote! { UnionFind<#ty> }
     }
     pub fn type_uprooted(ty: &TypeData) -> Ident {
         format_ident!("{}_uprooted", ty.name.to_snake_case())
@@ -348,6 +354,22 @@ mod ident {
     pub fn column(c: ColumnId) -> Ident {
         format_ident!("x{}", c.0)
     }
+    pub fn delta_ty(ty: &TypeData) -> Ident {
+        let x = ty.name.to_snake_case();
+        format_ident!("{x}_class_delta")
+    }
+    pub fn delta_row(rel: &RelationData) -> Ident {
+        let x = rel.name.to_snake_case();
+        format_ident!("{x}_relation_delta")
+    }
+    pub fn delta_insert_row(rel: &RelationData) -> Ident {
+        let x = rel.name.to_snake_case();
+        format_ident!("insert_{x}")
+    }
+    pub fn delta_make(ty: &TypeData) -> Ident {
+        let x = ty.name.to_snake_case();
+        format_ident!("make_{x}")
+    }
 }
 
 struct CodegenRuleTrieCtx<'a> {
@@ -424,47 +446,90 @@ impl CodegenRuleTrieCtx<'_> {
                     }
                 }
             }
-            RuleAtom::Premise { relation, args, .. } => {
-                let relation = ident::rel_var(&self.relations[relation]);
-                let index_iter = quote! { todo_indexed_iter_function_here };
-                let mut bound = vec![];
-                let mut unbound = vec![];
-                let mut unbound_vars = vec![];
-                for &arg in args {
-                    if self.is_bound(arg) {
-                        bound.push(ident::var_var(self.var_of(arg)));
-                    } else {
-                        self.bind_var(arg);
-                        unbound_vars.push(arg);
-                        unbound.push(ident::var_var(self.var_of(arg)));
-                    }
-                }
-                let inner = self.codegen_all(then, true);
-                unbound_vars
-                    .into_iter()
-                    .for_each(|arg| self.unbind_var(arg));
-                quote! {
-                    for (#(#unbound),*) in self.#relation.#index_iter(#(#bound),*) {
-                        #inner
+            RuleAtom::Premise {
+                relation,
+                args,
+                index,
+            } => {
+                let relation = &self.relations[relation];
+                match &relation.ty {
+                    RelationTy::Forall { .. } => todo!(),
+                    RelationTy::Table {
+                        usage_to_info,
+                        index_to_info,
+                        ..
+                    } => {
+                        let usage_info = &usage_to_info[index];
+                        let index_info = &index_to_info[usage_info.index];
+                        // for () in self.thing()
+                        let bound_columns = &index_info.order.inner()[0..usage_info.prefix]
+                            .iter()
+                            .copied()
+                            .map(|x| args[x.0])
+                            .collect_vec();
+                        let bound_columns_ = bound_columns
+                            .iter()
+                            .copied()
+                            .map(|x| ident::var_var(self.var_of(x)))
+                            .collect_vec();
+                        let new_columns = &index_info.order.inner()[usage_info.prefix..]
+                            .iter()
+                            .copied()
+                            .map(|x| args[x.0])
+                            .collect_vec();
+                        let new_columns_ = new_columns
+                            .iter()
+                            .copied()
+                            .map(|x| ident::var_var(self.var_of(x)))
+                            .collect_vec();
+
+                        let inner = {
+                            let mut bound = vec![];
+                            let mut unbound = vec![];
+                            let mut unbound_vars = vec![];
+                            for &arg in args {
+                                if self.is_bound(arg) {
+                                    bound.push(ident::var_var(self.var_of(arg)));
+                                } else {
+                                    self.bind_var(arg);
+                                    unbound_vars.push(arg);
+                                    unbound.push(ident::var_var(self.var_of(arg)));
+                                }
+                            }
+                            let inner = self.codegen_all(then, true);
+                            unbound_vars
+                                .into_iter()
+                                .for_each(|arg| self.unbind_var(arg));
+                            inner
+                        };
+
+                        let iter_ident = ident::index_all_iter(usage_info, index_info);
+                        let relation_ident = ident::rel_var(relation);
+                        quote! {
+                            for (#(#new_columns_),*) in self.#relation_ident.#iter_ident(#(#bound_columns_),*) {
+                                #inner
+                            }
+                        }
                     }
                 }
             }
-            RuleAtom::PremiseAny { relation, args, .. } => {
-                let relation = ident::rel_var(&self.relations[relation]);
-                let index_iter = quote! { todo_indexed_iter_function_here };
-                let inner = self.codegen_all(then, true);
-                let bound = args
-                    .iter()
-                    .copied()
-                    .filter(|&arg| self.is_bound(arg))
-                    .map(|arg| ident::var_var(self.var_of(arg)));
-                quote! {
-                    if self.#relation.#index_iter(#(#bound),*).next().is_some() {
-                        #inner
-                    }
-                }
+            RuleAtom::PremiseAny { .. } => {
+                todo!()
+                // let relation = ident::rel_var(&self.relations[relation]);
+                // let index_iter = quote! { todo_indexed_iter_function_here };
+                // let inner = self.codegen_all(then, true);
+                // let bound = args
+                //     .iter()
+                //     .copied()
+                //     .filter(|&arg| self.is_bound(arg))
+                //     .map(|arg| ident::var_var(self.var_of(arg)));
+                // quote! {
+                //     if self.#relation.#index_iter(#(#bound),*).next().is_some() {
+                //         #inner
+                //     }
+                // }
             }
-            RuleAtom::RequireNotAllPresent(actions) => {
+            RuleAtom::RequireNotAllPresent(..) => {
                 todo!()
                 // let inner = self.codegen_all(then, true);
                 // let cond = actions.iter().map(|&action| match action {
@@ -497,86 +562,93 @@ impl CodegenRuleTrieCtx<'_> {
                 variable,
                 new,
             } => {
-                assert_eq!(self.variables[variable].type_, self.globals[global].type_);
+                todo!()
+                // assert_eq!(self.variables[variable].type_, self.globals[global].type_);
 
-                let x = ident::var_var(self.var_of(variable));
-                let global = ident::var_var(&self.globals[global]);
+                // let x = ident::var_var(self.var_of(variable));
+                // let global = ident::var_var(&self.globals[global]);
 
-                self.bind_var(variable);
-                let ret = if new {
-                    let inner = self.codegen_all(then, true);
-                    quote! {
-                        if let (#x, true) = self.#global {
-                            #inner
-                        }
-                    }
-                } else {
-                    let inner = self.codegen_all(then, false);
-                    let ret = quote! {
-                        let #x = self.#global.0;
-                        #inner
-                    };
-                    if self.scoped {
-                        ret
-                    } else {
-                        quote! {{ret}}
-                    }
-                };
-                self.unbind_var(variable);
-                ret
+                // self.bind_var(variable);
+                // let ret = if new {
+                //     let inner = self.codegen_all(then, true);
+                //     quote! {
+                //         if let (#x, true) = self.#global {
+                //             #inner
+                //         }
+                //     }
+                // } else {
+                //     let inner = self.codegen_all(then, false);
+                //     let ret = quote! {
+                //         let #x = self.#global.0;
+                //         #inner
+                //     };
+                //     if self.scoped {
+                //         ret
+                //     } else {
+                //         quote! {{ret}}
+                //     }
+                // };
+                // self.unbind_var(variable);
+                // ret
             }
             RuleAtom::Action(Action::Insert { relation, args }) => {
-                let rel_insert_with_priority =
-                    ident::rel_insert_with_priority(&self.relations[relation]);
-                let mut declare_unknown = Vec::new();
-                let mut args_var = Vec::new();
-                let mut unbound_vars = Vec::new();
-                for &arg in args {
-                    if self.is_bound(arg) {
-                        args_var.push(ident::var_var(self.var_of(arg)));
-                    } else {
-                        self.bind_var(arg);
-                        unbound_vars.push(arg);
-                        let x = ident::var_var(self.var_of(arg));
-                        args_var.push(x.clone());
-                        let type_new = ident::type_new(self.type_of(arg));
+                // let rel_insert_with_priority =
+                //     ident::rel_insert_with_priority(&self.relations[relation]);
+                // let mut declare_unknown = Vec::new();
+                // let mut args_var = Vec::new();
+                // let mut unbound_vars = Vec::new();
+                // for &arg in args {
+                //     if self.is_bound(arg) {
+                //         args_var.push(ident::var_var(self.var_of(arg)));
+                //     } else {
+                //         self.bind_var(arg);
+                //         unbound_vars.push(arg);
+                //         let x = ident::var_var(self.var_of(arg));
+                //         args_var.push(x.clone());
+                //         let type_new = ident::type_new(self.type_of(arg));
 
-                        declare_unknown.push(quote! {let #x = self.#type_new();});
-                    }
-                }
+                //         declare_unknown.push(quote! {let #x = self.#type_new();});
+                //     }
+                // }
 
-                let new_priority_cap = self.priority_cap.max(if declare_unknown.is_empty() {
-                    Priority::Surjective
-                } else {
-                    Priority::Nonsurjective
-                });
+                // let new_priority_cap = self.priority_cap.max(if declare_unknown.is_empty() {
+                //     Priority::Surjective
+                // } else {
+                //     Priority::Nonsurjective
+                // });
 
-                let old_proprity_cap = self.priority_cap;
-                self.priority_cap = new_priority_cap;
-                let inner = self.codegen_all(then, false);
-                self.priority_cap = old_proprity_cap;
+                // let old_proprity_cap = self.priority_cap;
+                // self.priority_cap = new_priority_cap;
+                // let inner = self.codegen_all(then, false);
+                // self.priority_cap = old_proprity_cap;
 
-                unbound_vars.iter().for_each(|&arg| self.unbind_var(arg));
+                // unbound_vars.iter().for_each(|&arg| self.unbind_var(arg));
 
-                let ret = quote! {
-                    #(#declare_unknown)*
-                    self.#rel_insert_with_priority(#new_priority_cap, #(#args_var),*);
-                    #inner
-                };
-                if self.scoped {
-                    ret
-                } else {
-                    quote! {{ret}}
-                }
+                // let ret = quote! {
+                //     #(#declare_unknown)*
+                //     self.#rel_insert_with_priority(#new_priority_cap, #(#args_var),*);
+                //     #inner
+                // };
+                // if self.scoped {
+                //     ret
+                // } else {
+                //     quote! {{ret}}
+                // }
+
+                let relation = &self.relations[relation];
+                let insert_ident = ident::delta_insert_row(relation);
+                let row = args.iter().copied().map(|x| ident::var_var(self.var_of(x)));
+                quote! { self.delta.#insert_ident((#(#row),*)); }
             }
             RuleAtom::Action(Action::Equate(a, b)) => {
                 assert_eq!(self.var_of(a).type_, self.var_of(b).type_);
-                let type_equate = ident::type_equate(self.type_of(a));
+                let ty = self.type_of(a);
+                let uf_ident = ident::type_uf(ty);
                 let a = ident::var_var(self.var_of(a));
                 let b = ident::var_var(self.var_of(b));
                 let inner = self.codegen_all(then, false);
                 let ret = quote! {
-                    self.#type_equate(#a, #b);
+                    self.#uf_ident.union(#a, #b);
                     #inner
                 };
                 if self.scoped {
@@ -587,7 +659,12 @@ impl CodegenRuleTrieCtx<'_> {
             }
             RuleAtom::Action(Action::Make(x)) => {
                 // TODO
-                quote! {}
+
+                let ty = self.type_of(x);
+                let make = ident::delta_make(ty);
+                let uf = ident::type_uf(ty);
+                let var = ident::var_var(self.var_of(x));
+                quote! { let #var = self.delta.#make(&mut #uf); }
             }
             RuleAtom::Panic(msg) => quote! {
                 panic!("explicit rule panic: {}", #msg)
@@ -633,7 +710,20 @@ pub fn codegen(theory: &Theory) -> TokenStream {
             // TODO: Consider bitset if `type_all` is dense
             (
                 quote! {
+                    #[derive(Copy, Clone, Eq, PartialEq, Ord, PartialOrd, Default)]
                     pub struct #type_ty(u32);
+                    impl Eclass for #type_ty {
+                        fn new(value: u32) -> Self {
+                            Self(value)
+                        }
+                        fn inner(self) -> u32 {
+                            self.0
+                        }
+                    }
+                    impl RelationElement for #type_ty {
+                        const MIN_ID: Self = Self(0);
+                        const MAX_ID: Self = Self(u32::MAX);
+                    }
                 },
                 quote! {
                     #type_all: BTreeSet<#type_ty>,
@@ -853,9 +943,135 @@ pub fn codegen(theory: &Theory) -> TokenStream {
         }
     };
 
+    let delta = {
+        let (delta_functions, delta_fields): (Vec<_>, Vec<_>) = theory
+            .relations
+            .iter()
+            .map(|rel| {
+                let field = ident::delta_row(rel);
+                let relation_ty = ident::rel_ty(rel);
+                (
+                    match &rel.ty {
+                        RelationTy::Forall { ty } => {
+                            let ty = &theory.types[ty];
+                            let make_ident = ident::delta_make(ty);
+                            let uf_ident = ident::type_uf(ty);
+                            let uf_ty = ident::type_ty_uf(ty);
+                            let ty = ident::type_ty(ty);
+                            quote! {
+                                pub fn #make_ident(&mut self, #uf_ident: &mut #uf_ty) -> #ty {
+                                    let id = #uf_ident.add_eclass();
+                                    self.#field.push(id);
+                                    id
+                                }
+                            }
+                        }
+                        RelationTy::Table { .. } => {
+                            let insert_ident = ident::delta_insert_row(rel);
+
+                            quote! {
+                                pub fn #insert_ident(&mut self, x: <#relation_ty as Relation>::Row) {
+                                    self.#field.push(x);
+                                }
+                            }
+                        }
+                    },
+                    quote! { #field : Vec<<#relation_ty as Relation>::Row>, },
+                )
+            })
+            .unzip();
+
+        quote! {
+            #[derive(Default)]
+            pub struct Delta {
+                #(#delta_fields)*
+            }
+            impl Delta {
+                fn new() -> Self { Self::default() } 
+                #(#delta_functions)*
+            }
+        }
+    };
+
+    let (uf_ident, uf_ty, type_uprooted, all_types): (Vec<_>, Vec<_>, Vec<_>, Vec<_>) = theory
+        .types
+        .iter()
+        .map(|ty| (ident::type_uf(ty), ident::type_ty_uf(ty), ident::type_uprooted(ty), ident::type_ty(ty)))
+        .multiunzip();
+
+    let update = theory.relations.iter().map(|rel| match &rel.ty {
+        RelationTy::Table { .. } => {
+            let (uprooted, uf): (Vec<_>, Vec<_>) = rel
+                .unique_types()
+                .map(|ty| {
+                    let ty = &theory.types[ty];
+                    let uprooted = ident::type_uprooted(&ty);
+                    let uf = ident::type_uf(&ty);
+                    (uprooted, uf)
+                })
+                .collect();
+
+            let relation_ident = ident::rel_var(rel);
+            let delta_row = ident::delta_row(rel);
+
+            quote! {
+                self.#relation_ident.update( #(&#uprooted, &mut self.#uf,)* &mut self.delta.#delta_row);
+            }
+        }
+        RelationTy::Forall { ty } =>
+        /* todo: update forall */
+        {
+            quote! {let _ = "todo: update forall";}
+        }
+    });
+
+
+    let clear_transient_contents = {
+        // uproot
+        // update relations
+        //
+
+        quote! {
+            // take is here because it needs to be atomic because more dirt will be created in
+            // update.
+            #(let #type_uprooted = take(self.#uf_ident.dirty());)*
+            #(#update)*
+            // #(self.#type_uprooted.take_scratch(self.#uf_ident.dirty());)*
+        }
+    };
+
+
+    let (all_relations, relation_types): (Vec<_>, Vec<_>) = theory.relations.iter().map(|rel| (ident::rel_var(rel), ident::rel_ty(rel))).unzip();
+
+
     quote! {
-        // #(#types)*
+        use std::{collections::BTreeSet, mem::take};
+        use egraph::runtime::*;
+        #(#types)*
         #(#relations)*
+        #delta
+        #[derive(Default)]
+        pub struct #theory_ty {
+            delta: Delta,
+            #(#uf_ident: #uf_ty,)*
+            // #(#type_uprooted: Vec<#all_types>,)*
+            #(#all_relations: #relation_types,)*
+        }
+        impl #theory_ty {
+            pub fn new() -> Self { Self::default() }
+            pub fn step(&mut self) { self.apply_rules(); self.clear_transient() }
+            fn apply_rules(&mut self) { #rule_contents }
+            fn clear_transient(&mut self) { #clear_transient_contents }
+        }
+
+        // make insert functions "for free"
+        impl std::ops::Deref for #theory_ty {
+            type Target = Delta;
+            fn deref(&self) -> &Self::Target { &self.delta }
+        }
+        impl std::ops::DerefMut for #theory_ty {
+            fn deref_mut(&mut self) -> &mut Self::Target { &mut self.delta }
+        }
         // pub struct #theory_ty {
         //     #(#type_fields)*
         //     #(#relation_fields)*
@@ -962,8 +1178,13 @@ fn codegen_relation(rel: &RelationData, theory: &Theory) -> TokenStream {
     match &rel.ty {
         RelationTy::Forall { ty } => quote! {
             // maybe integrate with union-find
+            #[derive(Default)]
             struct #rel_ty {
-                _todo : (),
+                new: BTreeSet<<Self as Relation>::Row>,
+                all: BTreeSet<<Self as Relation>::Row>,
+            }
+            impl Relation for #rel_ty {
+                type Row = (#(#params),*);
             }
         },
         RelationTy::Table {
@@ -1022,11 +1243,14 @@ fn codegen_relation(rel: &RelationData, theory: &Theory) -> TokenStream {
                             }
                         }).unzip();
 
+                        let columns_index_order = index_info.order.iter().copied().map(ident::column);
+
                         quote! {
                             fn #iter_all_ident(#(#args),*) -> impl Iterator<Item = (#(#out_ty),*)> + use<'_> {
                                 self.#index_field
                                     .range((#(#range_from),*)..=(#(#range_to),*))
-                                    .map(|(#(#all_columns),*)| (#(#out_columns),*))
+                                    .copied()
+                                    .map(|(#(#columns_index_order),*)| (#(#out_columns),*))
                             }
                         }
                     };
@@ -1092,12 +1316,23 @@ fn codegen_relation(rel: &RelationData, theory: &Theory) -> TokenStream {
                 let other_indexes_ident: Vec<_> =
                     other_indexes.iter().map(ident::index_all_field).collect();
 
+                let type_args = rel.unique_types().map(|ty| {
+                    let ty = &theory.types[ty];
+                    let uf_field = ident::type_uf(ty);
+                    let uf_ty = ident::type_ty_uf(ty);
+                    let uproot_field = ident::type_uprooted(ty);
+                    let ty = ident::type_ty(ty);
+                    quote! {
+                        #uproot_field: &[#ty],
+                        #uf_field: &mut #uf_ty,
+                    }
+                });
+
                 quote! {
                     fn update(
                         &mut self,
-                        // uproot_math
-                        // uf_math
-                        delta: &mut Vec<Self::Row>,
+                        #(#type_args)*
+                        delta: &mut Vec<<Self as Relation>::Row>,
                     ) {
                         self.new.clear();
                         let mut op_insert = take(delta);
@@ -1132,14 +1367,17 @@ fn codegen_relation(rel: &RelationData, theory: &Theory) -> TokenStream {
             quote! {
                 #[derive(Default)]
                 struct #rel_ty {
-                    new: Vec<Self::Row>,
+                    new: Vec<<Self as Relation>::Row>,
                     #(#index_fields,)*
                 }
-                impl #rel_ty {
+                impl Relation for #rel_ty {
                     type Row = (#(#params),*);
+                }
+                impl #rel_ty {
                     const COST: u32 = #cost;
                     fn new() -> Self { Self::default() }
-                    fn iter_new(&self) -> impl Iterator<Item = Self::Row> + use<'_>{ self.new.iter().copied() }
+                    fn has_new(&self) -> bool { !self.new.is_empty() }
+                    fn iter_new(&self) -> impl Iterator<Item = <Self as Relation>::Row> + use<'_>{ self.new.iter().copied() }
                     #(#iter_all)*
                     #(#check_all)*
                     #update
