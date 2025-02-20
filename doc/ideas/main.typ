@@ -1471,7 +1471,7 @@ We have identified many such things so far so it will likely be the case in the 
 We have assumed: new/all instead of new/old, btree instead of trie or other tree datastructure even though back-indexes are like one-layer tries.
 
 = Trie vs btree is not a binary choice
-
+(see "brie")
 ```rust
 // (A, B, C, D)
 let map: HashMap<A, HashMap<B, HashMap<C, Vec<D>>>>;
@@ -1486,6 +1486,35 @@ let map: BTreeMap<A, BTreeSet<B, C, D>>; // column oriented back-index.
 let map: BTreeSet<A, B, C, D>;
 ```
 
+= Better internal APIs
+right now the rules generate this:
+```rust
+fn apply_rules(&mut self) {
+    for (a, b, p2) in self.add_relation.iter_new() {
+        for (c, p4) in self.mul_relation.iter1_0_1_2(p2) {
+            let a3 = self.delta.make_math(&mut math_uf);
+            let a4 = self.delta.make_math(&mut math_uf);
+            self.delta.insert_mul((a, c, a3));
+            self.delta.insert_mul((b, c, a4));
+            self.delta.insert_add((a3, a4, p4));
+        }
+    }
+}
+```
+We would want to avoid creating e-classes here.
+This suggest another api, where for an index we check if there is something there and take it, otherwise create a new e-class and insert.
+```rust
+fn apply_rules(&mut self) {
+    for (a, b, p2) in self.add_relation.iter_new() {
+        for (c, p4) in self.mul_relation.iter1_0_1_2(p2) {
+            // (pseudocode)
+            let a3 = self.delta.entry_mul((a, c, *));
+            let a4 = self.delta.entry_mul((b, c, *));
+            self.delta._add((a3, a4, p4));
+        }
+    }
+}
+```
 
 = TODO READ
 Papers are just under the first author i looked at.
