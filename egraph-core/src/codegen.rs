@@ -987,7 +987,7 @@ pub fn codegen(theory: &Theory) -> TokenStream {
                 #(#delta_fields)*
             }
             impl Delta {
-                fn new() -> Self { Self::default() } 
+                fn new() -> Self { Self::default() }
                 #(#delta_functions)*
             }
         }
@@ -996,7 +996,14 @@ pub fn codegen(theory: &Theory) -> TokenStream {
     let (uf_ident, uf_ty, type_uprooted, all_types): (Vec<_>, Vec<_>, Vec<_>, Vec<_>) = theory
         .types
         .iter()
-        .map(|ty| (ident::type_uf(ty), ident::type_ty_uf(ty), ident::type_uprooted(ty), ident::type_ty(ty)))
+        .map(|ty| {
+            (
+                ident::type_uf(ty),
+                ident::type_ty_uf(ty),
+                ident::type_uprooted(ty),
+                ident::type_ty(ty),
+            )
+        })
         .multiunzip();
 
     let update = theory.relations.iter().map(|rel| match &rel.ty {
@@ -1025,7 +1032,6 @@ pub fn codegen(theory: &Theory) -> TokenStream {
         }
     });
 
-
     let clear_transient_contents = {
         // uproot
         // update relations
@@ -1040,9 +1046,11 @@ pub fn codegen(theory: &Theory) -> TokenStream {
         }
     };
 
-
-    let (all_relations, relation_types): (Vec<_>, Vec<_>) = theory.relations.iter().map(|rel| (ident::rel_var(rel), ident::rel_ty(rel))).unzip();
-
+    let (all_relations, relation_types): (Vec<_>, Vec<_>) = theory
+        .relations
+        .iter()
+        .map(|rel| (ident::rel_var(rel), ident::rel_ty(rel)))
+        .unzip();
 
     quote! {
         use std::{collections::BTreeSet, mem::take};
@@ -1059,9 +1067,9 @@ pub fn codegen(theory: &Theory) -> TokenStream {
         }
         impl #theory_ty {
             pub fn new() -> Self { Self::default() }
-            pub fn step(&mut self) { 
+            pub fn step(&mut self) {
                 println!("step start");
-                self.apply_rules(); 
+                self.apply_rules();
                 self.clear_transient();
                 println!("step end");
             }

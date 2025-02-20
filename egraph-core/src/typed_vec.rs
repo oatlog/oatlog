@@ -39,7 +39,7 @@ impl<K: Id, V> TVec<K, V> {
     pub(crate) fn iter_mut(&mut self) -> impl Iterator<Item = &mut V> {
         self.x.iter_mut()
     }
-    pub(crate) fn enumerate(&self) -> impl Iterator<Item = K> {
+    pub(crate) fn enumerate(&self) -> impl Iterator<Item = K> + use<K, V> {
         (0..self.len()).map(K::from)
     }
     /// `.iter().enumerate()` with typed indexes

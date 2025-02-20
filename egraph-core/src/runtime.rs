@@ -33,7 +33,9 @@ pub trait RelationElement: Copy + Clone + Eq + PartialEq + Ord + PartialOrd {
     const MAX_ID: Self;
 }
 
-pub trait Relation { type Row; }
+pub trait Relation {
+    type Row;
+}
 
 /// To avoid many functions with a type suffix: `make_math`, `make_data`, ...
 pub trait EclassProvider<T: Eclass> {
@@ -105,7 +107,9 @@ impl<T: Eclass> UnionFind<T> {
     pub fn union(&mut self, a: T, b: T) {
         let a = self.find_inner(a.inner());
         let b = self.find_inner(b.inner());
-        if a == b { return; }
+        if a == b {
+            return;
+        }
         let (root, uprooted) = if self.size[a as usize] > self.size[b as usize] {
             (a, b)
         } else {
