@@ -39,6 +39,88 @@ And this is referencing the appendix: @theappendix.
 
 = Conclusion
 
+
+= Semi-Naive Evaluation
+Semi naive evaluation is a way to join relations where results only include possibly new information.
+In the context of Datalog, it avoids recomputing the same facts.
+Expressing it as (pseudo)-relational algebra makes it more clear.
+Lets say we want to join relations A, B and C, 
+where $times$ is a join, $union$ is the union of relations and $Delta$ is the change to a relation.
+$
+"all information" = A times B times C
+$
+But we only care about the new join results, and this can be represented by subtracting the join that already occurred from the full join of the new database.
+$
+"new information" subset &(A union Delta A) times &(B union Delta B) times &(C union Delta C) \
+        -& A times B times C
+$
+The expression can be expanded and we get $A times B times C$ that can be canceled out.
+
+#let hl(x) = text(fill: red, $#x$)
+
+//highlight(x)
+$
+"new information" subset 
+    &hl(A times B times C) union \
+    &Delta A times B times C union \
+    &(A union Delta A) times Delta B times C union \
+    &(A union Delta A) times (B union Delta B) times Delta C \
+    -& hl(A times B times C)
+$
+$
+"new information" subset 
+    &Delta A &times& B &times& C union \
+    &(A union Delta A) &times& Delta B &times& C union \
+    &(A union Delta A) &times& (B union Delta B) &times& Delta C \
+$
+To make the pattern more clear, $Delta X$ is written as "new", $X$ is written as "old" and $X union Delta X$ is written as all:
+$
+"new information" subset 
+    &"new" &times& "old" &times& "old" union \
+    &"all" &times& "new" &times& "old" union \
+    &"all" &times& "all" &times& "new" \
+$
+Implementing this directly would mean having separate relations for old, new possibly all.
+In pseudocode we get the following for $"all" times "new" times "old"$:
+```rust
+for _ in b_new(..) {
+    for _ in a_new(..) + a_old(..) {
+        for _ in c_old(..) {
+            ..
+        }
+    }
+}
+```
+This is more or less what eqlog and egglog does, but there are some problems with it.
+
++ we need indexes for "new"
++ we are forced to chain the iteration of "new" and "old" when iterating all, which introduces branching and reduces batching.
+
+But if we replace all iterations of "old" with "all":
+$
+"new information" subset 
+    &"new" &times& "all" &times& "all" union \
+    &"all" &times& "new" &times& "all" union \
+    &"all" &times& "all" &times& "new" \
+$
+Then we get rid of both the branch/batching issue and the indexes for "new".
+
+Now the database only needs to maintain a list of "new" and indexes for "all".
+The reason indexes for "new" is not required is that it is always more efficient to iterate through "new" first, so the pseudocode becomes:
+```rust
+for _ in b_new(..) {
+    for _ in a_all(..) {
+        for _ in c_old(..) {
+            ..
+        }
+    }
+}
+```
+
+
+
+
+
 #bibliography("refs.bib")
 #counter(heading).update(0)
 #set heading(numbering: "A.1", supplement: [Appendix])
