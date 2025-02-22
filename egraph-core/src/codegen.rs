@@ -192,6 +192,7 @@ pub(crate) enum RuleAtom {
     /// Panic in the generated rust code.
     Panic(&'static str),
 }
+
 #[derive(Debug, Clone, Copy)]
 pub(crate) enum Action {
     /// Insert tuple, creating any variables that are unbound.
@@ -453,7 +454,7 @@ impl CodegenRuleTrieCtx<'_> {
             } => {
                 let relation = &self.relations[relation];
                 match &relation.ty {
-                    RelationTy::Forall { .. } => todo!(),
+                    RelationTy::Forall { .. } => todo!("premise forall"),
                     RelationTy::Table {
                         usage_to_info,
                         index_to_info,
@@ -513,8 +514,44 @@ impl CodegenRuleTrieCtx<'_> {
                     }
                 }
             }
-            RuleAtom::PremiseAny { .. } => {
-                todo!()
+            RuleAtom::PremiseAny {
+                relation,
+                args,
+                index,
+            } => {
+                let relation = &self.relations[relation];
+                match &relation.ty {
+                    RelationTy::Forall { ty } => todo!(),
+                    RelationTy::Table {
+                        usage_to_info,
+                        index_to_info,
+                        column_back_reference,
+                    } => {
+                        let usage_info = &usage_to_info[index];
+                        let index_info = &index_to_info[usage_info.index];
+
+                        let bound_columns = &index_info.order.inner()[0..usage_info.prefix]
+                            .iter()
+                            .copied()
+                            .map(|x| args[x.0])
+                            .collect_vec();
+                        let bound_columns_ = bound_columns
+                            .iter()
+                            .copied()
+                            .map(|x| ident::var_var(self.var_of(x)))
+                            .collect_vec();
+
+                        let inner = self.codegen_all(then, true);
+
+                        let check_ident = ident::index_all_check(usage_info, index_info);
+                        let relation_ident = ident::rel_var(relation);
+                        quote! {
+                            if self.#relation_ident.#check_ident(#(#bound_columns_),*) {
+                                #inner
+                            }
+                        }
+                    }
+                }
                 // let relation = ident::rel_var(&self.relations[relation]);
                 // let index_iter = quote! { todo_indexed_iter_function_here };
                 // let inner = self.codegen_all(then, true);
@@ -530,7 +567,7 @@ impl CodegenRuleTrieCtx<'_> {
                 // }
             }
             RuleAtom::RequireNotAllPresent(..) => {
-                todo!()
+                todo!("require not all present")
                 // let inner = self.codegen_all(then, true);
                 // let cond = actions.iter().map(|&action| match action {
                 //     Action::Insert { relation, args } => {
@@ -562,7 +599,7 @@ impl CodegenRuleTrieCtx<'_> {
                 variable,
                 new,
             } => {
-                todo!()
+                todo!("load global")
                 // assert_eq!(self.variables[variable].type_, self.globals[global].type_);
 
                 // let x = ident::var_var(self.var_of(variable));
@@ -658,13 +695,11 @@ impl CodegenRuleTrieCtx<'_> {
                 }
             }
             RuleAtom::Action(Action::Make(x)) => {
-                // TODO
-
                 let ty = self.type_of(x);
                 let make = ident::delta_make(ty);
                 let uf = ident::type_uf(ty);
                 let var = ident::var_var(self.var_of(x));
-                quote! { let #var = self.delta.#make(&mut #uf); }
+                quote! { let #var = self.delta.#make(&mut self.#uf); }
             }
             RuleAtom::Panic(msg) => quote! {
                 panic!("explicit rule panic: {}", #msg)
@@ -844,8 +879,8 @@ pub fn codegen(theory: &Theory) -> TokenStream {
         })
         .unzip();
 
-    let [/*startup_rule_contents,*/ rule_contents] = [/*&theory.rule_tries_startup,*/ &theory.rule_tries]
-        .map(|rule_tries| {
+    let [/*startup_rule_contents,*/ rule_contents] =
+        [/*&theory.rule_tries_startup,*/ &theory.rule_tries].map(|rule_tries| {
             CodegenRuleTrieCtx {
                 types: &theory.types,
                 relations: &theory.relations,
@@ -1432,7 +1467,7 @@ fn codegen_relation(rel: &RelationData, theory: &Theory) -> TokenStream {
 #[cfg(test)]
 pub(crate) mod test {
     use super::*;
-    use expect_test::{expect, Expect};
+    use expect_test::{Expect, expect};
     use std::{
         io::Write as _,
         process::{Command, Output, Stdio},

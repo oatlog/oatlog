@@ -1,4 +1,7 @@
 //! "runtime" functions and types to be used by generated code.
+
+#![allow(unused_parens)]
+
 use std::{marker::PhantomData, mem::swap};
 
 pub trait Clear: Sized {
@@ -32,6 +35,84 @@ pub trait RelationElement: Copy + Clone + Eq + PartialEq + Ord + PartialOrd {
     /// Used to implement range queries.
     const MAX_ID: Self;
 }
+
+#[derive(Copy, Clone, Eq, PartialEq, Ord, PartialOrd)]
+struct Math(u32);
+impl RelationElement for Math {
+    const MIN_ID: Self = Math(0);
+    const MAX_ID: Self = Math(u32::MAX);
+}
+
+
+
+// impl RangeQuery<(Math, Math), (Math)> for BTreeSet<(Math, Math, Math)> {
+//     fn query(&self, t: (Math, Math)) -> impl Iterator<Item = (Math)> {
+//         self.range((t.0, t.1, Math::MIN_ID)..(t.0, t.1, Math::MAX_ID)).copied().map(|x| (x.2))
+//     }
+// }
+
+// impl<A, B, C> RangeQuery<(A, B), (C)> for BTreeSet<(A, B, C)>
+// where
+//     A: RelationElement,
+//     B: RelationElement,
+//     C: RelationElement,
+// {
+//     fn query(&self, t: (A, B)) -> impl Iterator<Item = (C)> {
+//         self.range((t.0, t.1, C::MIN_ID)..(t.0, t.1, C::MAX_ID))
+//             .copied()
+//             .map(|x| (x.2))
+//     }
+// }
+
+pub trait RangeQuery<T, V> {
+    fn query(&self, t: T) -> impl Iterator<Item = V>; // + use<'a, T, V, Self>;
+    fn check(&self, t: T) -> bool {
+        self.query(t).next().is_some()
+    }
+}
+mod range_query_impl {
+    use super::RangeQuery;
+    use super::RelationElement;
+    use std::collections::BTreeSet;
+    macro_rules! oh_no {
+        ( , $($name0:ident $digit0:tt)*) => {};
+        ( $($name0:ident $digit0:tt)*, ) => {};
+        ($($name0:ident $digit0:tt)* , $($name1:ident $digit1:tt)*) => {
+            impl<$($name0,)* $($name1),*> RangeQuery<($($name0,)*), ($($name1),*)> for BTreeSet<($($name0,)* $($name1),*)>
+            where
+                $($name0 : RelationElement,)*
+                $($name1 : RelationElement,)*
+            {
+                fn query(&self, t: ($($name0,)*)) -> impl Iterator<Item = ($($name1),*)> {
+                    self.range(($(t . $digit0,)* $($name1::MIN_ID,)*)..($(t . $digit0,)* $($name1::MIN_ID,)*))
+                        .copied()
+                        .map(|x| ($(x . $digit1),*))
+                }
+            }
+
+        };
+    }
+    macro_rules! what {
+        ($($name0:ident $digit0:tt)* , ) => {
+            oh_no!($($name0 $digit0)*,);
+        };
+        ($($name0:ident $digit0:tt)* , $name1:ident $digit1:tt $($name2:ident $digit2:tt)*) => {
+            oh_no!($($name0 $digit0)*, $name1 $digit1 $($name2 $digit2)*);
+            what!($($name0 $digit0)* $name1 $digit1, $($name2 $digit2)*);
+        }
+    }
+    macro_rules! why {
+        ($($name0:ident $digit0:tt)* , ) => {
+            what!(,$($name0 $digit0)*);
+        };
+        ($($name0:ident $digit0:tt)* , $name1:ident $digit1:tt $($name2:ident $digit2:tt)*) => {
+            what!(,$($name0 $digit0)*);
+            why!($($name0 $digit0)* $name1 $digit1, $($name2 $digit2)*);
+        };
+    }
+    why!(, A 0 B 1 C 2 D 3 E 4 F 5 G 6 H 7 I 8 J 9 K 10 L 11);
+}
+
 
 pub trait Relation {
     type Row;
