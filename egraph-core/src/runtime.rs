@@ -26,7 +26,7 @@ pub trait Eclass: RelationElement {
     fn inner(self) -> u32;
 }
 
-/// Handle to some type (eg sets)
+/// Some type that can be put in a relation.
 pub trait RelationElement: Copy + Clone + Eq + PartialEq + Ord + PartialOrd {
     /// Minimum id value according to Ord
     /// Used to implement range queries.
@@ -36,14 +36,23 @@ pub trait RelationElement: Copy + Clone + Eq + PartialEq + Ord + PartialOrd {
     const MAX_ID: Self;
 }
 
+// f64 not strictly required
+impl RelationElement for i64 {
+    const MIN_ID: Self = i64::MIN;
+    const MAX_ID: Self = i64::MAX;
+}
+
+impl RelationElement for bool {
+    const MIN_ID: Self = false;
+    const MAX_ID: Self = true;
+}
+
 #[derive(Copy, Clone, Eq, PartialEq, Ord, PartialOrd)]
 struct Math(u32);
 impl RelationElement for Math {
     const MIN_ID: Self = Math(0);
     const MAX_ID: Self = Math(u32::MAX);
 }
-
-
 
 // impl RangeQuery<(Math, Math), (Math)> for BTreeSet<(Math, Math, Math)> {
 //     fn query(&self, t: (Math, Math)) -> impl Iterator<Item = (Math)> {
@@ -112,7 +121,6 @@ mod range_query_impl {
     }
     why!(, A 0 B 1 C 2 D 3 E 4 F 5 G 6 H 7 I 8 J 9 K 10 L 11);
 }
-
 
 pub trait Relation {
     type Row;

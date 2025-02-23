@@ -225,6 +225,430 @@ mod test {
         let hir = frontend::parse(code.parse().unwrap()).unwrap();
         expected.assert_eq(&hir.dbg_summary());
     }
+
+    #[test]
+    fn test_primitives_simple() {
+        let code = "(
+            (datatype Math
+                (Mul Math Math)
+                (Add Math Math)
+                (Const i64)
+            )
+        )";
+        let expected_hir = expect![[r#"
+            Theory "":
+
+            Math(Math)
+            Mul(Math, Math, Math)
+            Add(Math, Math, Math)
+            Const(i64, Math)
+
+        "#]];
+        let expected_codegen = expect![[r#"
+            use egraph::runtime::*;
+            use std::{collections::BTreeSet, mem::take};
+            #[derive(Copy, Clone, Eq, PartialEq, Ord, PartialOrd, Default, Debug)]
+            pub struct Math(u32);
+            impl Eclass for Math {
+                fn new(value: u32) -> Self {
+                    Self(value)
+                }
+                fn inner(self) -> u32 {
+                    self.0
+                }
+            }
+            impl RelationElement for Math {
+                const MIN_ID: Self = Self(0);
+                const MAX_ID: Self = Self(u32::MAX);
+            }
+            #[derive(Debug, Default)]
+            struct ForallMathRelation {
+                new: BTreeSet<<Self as Relation>::Row>,
+                all: BTreeSet<<Self as Relation>::Row>,
+            }
+            impl Relation for ForallMathRelation {
+                type Row = (Math);
+            }
+            #[derive(Debug, Default)]
+            struct MulRelation {
+                new: Vec<<Self as Relation>::Row>,
+                all_index_0_1_2: BTreeSet<(Math, Math, Math)>,
+                all_index_1_0_2: BTreeSet<(Math, Math, Math)>,
+                all_index_2_0_1: BTreeSet<(Math, Math, Math)>,
+            }
+            impl Relation for MulRelation {
+                type Row = (Math, Math, Math);
+            }
+            impl MulRelation {
+                const COST: u32 = 9u32;
+                fn new() -> Self {
+                    Self::default()
+                }
+                fn has_new(&self) -> bool {
+                    !self.new.is_empty()
+                }
+                fn iter_new(&self) -> impl Iterator<Item = <Self as Relation>::Row> + use<'_> {
+                    self.new.iter().copied()
+                }
+                fn iter1_0_1_2(&self, x0: Math) -> impl Iterator<Item = (Math, Math)> + use<'_> {
+                    self.all_index_0_1_2
+                        .range((x0, Math::MIN_ID, Math::MIN_ID)..=(x0, Math::MAX_ID, Math::MAX_ID))
+                        .copied()
+                        .map(|(x0, x1, x2)| (x1, x2))
+                }
+                fn iter1_1_0_2(&self, x1: Math) -> impl Iterator<Item = (Math, Math)> + use<'_> {
+                    self.all_index_1_0_2
+                        .range((x1, Math::MIN_ID, Math::MIN_ID)..=(x1, Math::MAX_ID, Math::MAX_ID))
+                        .copied()
+                        .map(|(x1, x0, x2)| (x0, x2))
+                }
+                fn iter1_2_0_1(&self, x2: Math) -> impl Iterator<Item = (Math, Math)> + use<'_> {
+                    self.all_index_2_0_1
+                        .range((x2, Math::MIN_ID, Math::MIN_ID)..=(x2, Math::MAX_ID, Math::MAX_ID))
+                        .copied()
+                        .map(|(x2, x0, x1)| (x0, x1))
+                }
+                fn check1_0_1_2(&self, x0: Math) -> bool {
+                    self.iter1_0_1_2(x0).next().is_some()
+                }
+                fn check1_1_0_2(&self, x1: Math) -> bool {
+                    self.iter1_1_0_2(x1).next().is_some()
+                }
+                fn check1_2_0_1(&self, x2: Math) -> bool {
+                    self.iter1_2_0_1(x2).next().is_some()
+                }
+                fn update(
+                    &mut self,
+                    math_uprooted: &[Math],
+                    math_uf: &mut UnionFind<Math>,
+                    delta: &mut Vec<<Self as Relation>::Row>,
+                ) {
+                    self.new.clear();
+                    let mut op_insert = take(delta);
+                    for (x0, x1, x2) in op_insert.iter_mut() {
+                        *x0 = math_uf.find(*x0);
+                        *x1 = math_uf.find(*x1);
+                        *x2 = math_uf.find(*x2);
+                    }
+                    let mut op_delete = Vec::new();
+                    for x0 in math_uprooted.iter().copied() {
+                        println!("uproot: {:?}", x0);
+                        for (x1, x2) in self.iter1_0_1_2(x0) {
+                            op_delete.push((x0, x1, x2));
+                        }
+                    }
+                    for x1 in math_uprooted.iter().copied() {
+                        println!("uproot: {:?}", x1);
+                        for (x0, x2) in self.iter1_1_0_2(x1) {
+                            op_delete.push((x0, x1, x2));
+                        }
+                    }
+                    for x2 in math_uprooted.iter().copied() {
+                        println!("uproot: {:?}", x2);
+                        for (x0, x1) in self.iter1_2_0_1(x2) {
+                            op_delete.push((x0, x1, x2));
+                        }
+                    }
+                    for (x0, x1, x2) in op_delete {
+                        if self.all_index_0_1_2.remove(&(x0, x1, x2)) {
+                            self.all_index_1_0_2.remove(&(x1, x0, x2));
+                            self.all_index_2_0_1.remove(&(x2, x0, x1));
+                            math_uf.dec_eclass(x0, Self::COST);
+                            math_uf.dec_eclass(x1, Self::COST);
+                            math_uf.dec_eclass(x2, Self::COST);
+                            println!("delete: {:?}", [x0, x1, x2]);
+                            op_insert.push((math_uf.find(x0), math_uf.find(x1), math_uf.find(x2)));
+                        }
+                    }
+                    op_insert.retain(|&(x0, x1, x2)| {
+                        if !self.all_index_0_1_2.insert((x0, x1, x2)) {
+                            return false;
+                        }
+                        println!("insert: {:?}", [x0, x1, x2]);
+                        math_uf.inc_eclass(x0, Self::COST);
+                        math_uf.inc_eclass(x1, Self::COST);
+                        math_uf.inc_eclass(x2, Self::COST);
+                        self.all_index_1_0_2.insert((x1, x0, x2));
+                        self.all_index_2_0_1.insert((x2, x0, x1));
+                        true
+                    });
+                    self.new = op_insert;
+                }
+            }
+            #[derive(Debug, Default)]
+            struct AddRelation {
+                new: Vec<<Self as Relation>::Row>,
+                all_index_0_1_2: BTreeSet<(Math, Math, Math)>,
+                all_index_1_0_2: BTreeSet<(Math, Math, Math)>,
+                all_index_2_0_1: BTreeSet<(Math, Math, Math)>,
+            }
+            impl Relation for AddRelation {
+                type Row = (Math, Math, Math);
+            }
+            impl AddRelation {
+                const COST: u32 = 9u32;
+                fn new() -> Self {
+                    Self::default()
+                }
+                fn has_new(&self) -> bool {
+                    !self.new.is_empty()
+                }
+                fn iter_new(&self) -> impl Iterator<Item = <Self as Relation>::Row> + use<'_> {
+                    self.new.iter().copied()
+                }
+                fn iter1_0_1_2(&self, x0: Math) -> impl Iterator<Item = (Math, Math)> + use<'_> {
+                    self.all_index_0_1_2
+                        .range((x0, Math::MIN_ID, Math::MIN_ID)..=(x0, Math::MAX_ID, Math::MAX_ID))
+                        .copied()
+                        .map(|(x0, x1, x2)| (x1, x2))
+                }
+                fn iter1_1_0_2(&self, x1: Math) -> impl Iterator<Item = (Math, Math)> + use<'_> {
+                    self.all_index_1_0_2
+                        .range((x1, Math::MIN_ID, Math::MIN_ID)..=(x1, Math::MAX_ID, Math::MAX_ID))
+                        .copied()
+                        .map(|(x1, x0, x2)| (x0, x2))
+                }
+                fn iter1_2_0_1(&self, x2: Math) -> impl Iterator<Item = (Math, Math)> + use<'_> {
+                    self.all_index_2_0_1
+                        .range((x2, Math::MIN_ID, Math::MIN_ID)..=(x2, Math::MAX_ID, Math::MAX_ID))
+                        .copied()
+                        .map(|(x2, x0, x1)| (x0, x1))
+                }
+                fn check1_0_1_2(&self, x0: Math) -> bool {
+                    self.iter1_0_1_2(x0).next().is_some()
+                }
+                fn check1_1_0_2(&self, x1: Math) -> bool {
+                    self.iter1_1_0_2(x1).next().is_some()
+                }
+                fn check1_2_0_1(&self, x2: Math) -> bool {
+                    self.iter1_2_0_1(x2).next().is_some()
+                }
+                fn update(
+                    &mut self,
+                    math_uprooted: &[Math],
+                    math_uf: &mut UnionFind<Math>,
+                    delta: &mut Vec<<Self as Relation>::Row>,
+                ) {
+                    self.new.clear();
+                    let mut op_insert = take(delta);
+                    for (x0, x1, x2) in op_insert.iter_mut() {
+                        *x0 = math_uf.find(*x0);
+                        *x1 = math_uf.find(*x1);
+                        *x2 = math_uf.find(*x2);
+                    }
+                    let mut op_delete = Vec::new();
+                    for x0 in math_uprooted.iter().copied() {
+                        println!("uproot: {:?}", x0);
+                        for (x1, x2) in self.iter1_0_1_2(x0) {
+                            op_delete.push((x0, x1, x2));
+                        }
+                    }
+                    for x1 in math_uprooted.iter().copied() {
+                        println!("uproot: {:?}", x1);
+                        for (x0, x2) in self.iter1_1_0_2(x1) {
+                            op_delete.push((x0, x1, x2));
+                        }
+                    }
+                    for x2 in math_uprooted.iter().copied() {
+                        println!("uproot: {:?}", x2);
+                        for (x0, x1) in self.iter1_2_0_1(x2) {
+                            op_delete.push((x0, x1, x2));
+                        }
+                    }
+                    for (x0, x1, x2) in op_delete {
+                        if self.all_index_0_1_2.remove(&(x0, x1, x2)) {
+                            self.all_index_1_0_2.remove(&(x1, x0, x2));
+                            self.all_index_2_0_1.remove(&(x2, x0, x1));
+                            math_uf.dec_eclass(x0, Self::COST);
+                            math_uf.dec_eclass(x1, Self::COST);
+                            math_uf.dec_eclass(x2, Self::COST);
+                            println!("delete: {:?}", [x0, x1, x2]);
+                            op_insert.push((math_uf.find(x0), math_uf.find(x1), math_uf.find(x2)));
+                        }
+                    }
+                    op_insert.retain(|&(x0, x1, x2)| {
+                        if !self.all_index_0_1_2.insert((x0, x1, x2)) {
+                            return false;
+                        }
+                        println!("insert: {:?}", [x0, x1, x2]);
+                        math_uf.inc_eclass(x0, Self::COST);
+                        math_uf.inc_eclass(x1, Self::COST);
+                        math_uf.inc_eclass(x2, Self::COST);
+                        self.all_index_1_0_2.insert((x1, x0, x2));
+                        self.all_index_2_0_1.insert((x2, x0, x1));
+                        true
+                    });
+                    self.new = op_insert;
+                }
+            }
+            #[derive(Debug, Default)]
+            struct ConstRelation {
+                new: Vec<<Self as Relation>::Row>,
+                all_index_0_1: BTreeSet<(std::primitive::i64, Math)>,
+                all_index_1_0: BTreeSet<(Math, std::primitive::i64)>,
+            }
+            impl Relation for ConstRelation {
+                type Row = (std::primitive::i64, Math);
+            }
+            impl ConstRelation {
+                const COST: u32 = 4u32;
+                fn new() -> Self {
+                    Self::default()
+                }
+                fn has_new(&self) -> bool {
+                    !self.new.is_empty()
+                }
+                fn iter_new(&self) -> impl Iterator<Item = <Self as Relation>::Row> + use<'_> {
+                    self.new.iter().copied()
+                }
+                fn iter1_0_1(&self, x0: std::primitive::i64) -> impl Iterator<Item = (Math)> + use<'_> {
+                    self.all_index_0_1
+                        .range((x0, Math::MIN_ID)..=(x0, Math::MAX_ID))
+                        .copied()
+                        .map(|(x0, x1)| (x1))
+                }
+                fn iter1_1_0(&self, x1: Math) -> impl Iterator<Item = (std::primitive::i64)> + use<'_> {
+                    self.all_index_1_0
+                        .range((x1, std::primitive::i64::MIN_ID)..=(x1, std::primitive::i64::MAX_ID))
+                        .copied()
+                        .map(|(x1, x0)| (x0))
+                }
+                fn check1_0_1(&self, x0: std::primitive::i64) -> bool {
+                    self.iter1_0_1(x0).next().is_some()
+                }
+                fn check1_1_0(&self, x1: Math) -> bool {
+                    self.iter1_1_0(x1).next().is_some()
+                }
+                fn update(
+                    &mut self,
+                    math_uprooted: &[Math],
+                    math_uf: &mut UnionFind<Math>,
+                    delta: &mut Vec<<Self as Relation>::Row>,
+                ) {
+                    self.new.clear();
+                    let mut op_insert = take(delta);
+                    for (x0, x1) in op_insert.iter_mut() {
+                        *x0 = i64_uf.find(*x0);
+                        *x1 = math_uf.find(*x1);
+                    }
+                    let mut op_delete = Vec::new();
+                    for x0 in i64_uprooted.iter().copied() {
+                        println!("uproot: {:?}", x0);
+                        for (x1) in self.iter1_0_1(x0) {
+                            op_delete.push((x0, x1));
+                        }
+                    }
+                    for x1 in math_uprooted.iter().copied() {
+                        println!("uproot: {:?}", x1);
+                        for (x0) in self.iter1_1_0(x1) {
+                            op_delete.push((x0, x1));
+                        }
+                    }
+                    for (x0, x1) in op_delete {
+                        if self.all_index_0_1.remove(&(x0, x1)) {
+                            self.all_index_1_0.remove(&(x1, x0));
+                            i64_uf.dec_eclass(x0, Self::COST);
+                            math_uf.dec_eclass(x1, Self::COST);
+                            println!("delete: {:?}", [x0, x1]);
+                            op_insert.push((i64_uf.find(x0), math_uf.find(x1)));
+                        }
+                    }
+                    op_insert.retain(|&(x0, x1)| {
+                        if !self.all_index_0_1.insert((x0, x1)) {
+                            return false;
+                        }
+                        println!("insert: {:?}", [x0, x1]);
+                        i64_uf.inc_eclass(x0, Self::COST);
+                        math_uf.inc_eclass(x1, Self::COST);
+                        self.all_index_1_0.insert((x1, x0));
+                        true
+                    });
+                    self.new = op_insert;
+                }
+            }
+            #[derive(Debug, Default)]
+            pub struct Delta {
+                forall_math_relation_delta: Vec<<ForallMathRelation as Relation>::Row>,
+                mul_relation_delta: Vec<<MulRelation as Relation>::Row>,
+                add_relation_delta: Vec<<AddRelation as Relation>::Row>,
+                const_relation_delta: Vec<<ConstRelation as Relation>::Row>,
+            }
+            impl Delta {
+                fn new() -> Self {
+                    Self::default()
+                }
+                pub fn make_math(&mut self, math_uf: &mut UnionFind<Math>) -> Math {
+                    let id = math_uf.add_eclass();
+                    self.forall_math_relation_delta.push(id);
+                    id
+                }
+                pub fn insert_mul(&mut self, x: <MulRelation as Relation>::Row) {
+                    self.mul_relation_delta.push(x);
+                }
+                pub fn insert_add(&mut self, x: <AddRelation as Relation>::Row) {
+                    self.add_relation_delta.push(x);
+                }
+                pub fn insert_const(&mut self, x: <ConstRelation as Relation>::Row) {
+                    self.const_relation_delta.push(x);
+                }
+            }
+            #[derive(Debug, Default)]
+            pub struct Theory {
+                delta: Delta,
+                math_uf: UnionFind<Math>,
+                forall_math_relation: ForallMathRelation,
+                mul_relation: MulRelation,
+                add_relation: AddRelation,
+                const_relation: ConstRelation,
+            }
+            impl Theory {
+                pub fn new() -> Self {
+                    Self::default()
+                }
+                pub fn step(&mut self) {
+                    println!("step start");
+                    self.apply_rules();
+                    self.clear_transient();
+                    println!("step end");
+                }
+                fn apply_rules(&mut self) {}
+                fn clear_transient(&mut self) {
+                    let math_uprooted = take(self.math_uf.dirty());
+                    let _ = "todo: update forall";
+                    self.mul_relation.update(
+                        &math_uprooted,
+                        &mut self.math_uf,
+                        &mut self.delta.mul_relation_delta,
+                    );
+                    self.add_relation.update(
+                        &math_uprooted,
+                        &mut self.math_uf,
+                        &mut self.delta.add_relation_delta,
+                    );
+                    self.const_relation.update(
+                        &i64_uprooted,
+                        &mut self.i64_uf,
+                        &math_uprooted,
+                        &mut self.math_uf,
+                        &mut self.delta.const_relation_delta,
+                    );
+                }
+            }
+            impl std::ops::Deref for Theory {
+                type Target = Delta;
+                fn deref(&self) -> &Self::Target {
+                    &self.delta
+                }
+            }
+            impl std::ops::DerefMut for Theory {
+                fn deref_mut(&mut self) -> &mut Self::Target {
+                    &mut self.delta
+                }
+            }
+        "#]];
+        check_into_codegen(code, expected_hir, expected_codegen);
+    }
+
     #[test]
     fn triangle_join() {
         let code = "(
@@ -257,76 +681,6 @@ mod test {
         let expected_codegen = expect![[r#"
             use egraph::runtime::*;
             use std::{collections::BTreeSet, mem::take};
-            #[derive(Copy, Clone, Eq, PartialEq, Ord, PartialOrd, Default, Debug)]
-            pub struct I64(u32);
-            impl Eclass for I64 {
-                fn new(value: u32) -> Self {
-                    Self(value)
-                }
-                fn inner(self) -> u32 {
-                    self.0
-                }
-            }
-            impl RelationElement for I64 {
-                const MIN_ID: Self = Self(0);
-                const MAX_ID: Self = Self(u32::MAX);
-            }
-            #[derive(Copy, Clone, Eq, PartialEq, Ord, PartialOrd, Default, Debug)]
-            pub struct F64(u32);
-            impl Eclass for F64 {
-                fn new(value: u32) -> Self {
-                    Self(value)
-                }
-                fn inner(self) -> u32 {
-                    self.0
-                }
-            }
-            impl RelationElement for F64 {
-                const MIN_ID: Self = Self(0);
-                const MAX_ID: Self = Self(u32::MAX);
-            }
-            #[derive(Copy, Clone, Eq, PartialEq, Ord, PartialOrd, Default, Debug)]
-            pub struct String(u32);
-            impl Eclass for String {
-                fn new(value: u32) -> Self {
-                    Self(value)
-                }
-                fn inner(self) -> u32 {
-                    self.0
-                }
-            }
-            impl RelationElement for String {
-                const MIN_ID: Self = Self(0);
-                const MAX_ID: Self = Self(u32::MAX);
-            }
-            #[derive(Copy, Clone, Eq, PartialEq, Ord, PartialOrd, Default, Debug)]
-            pub struct Bool(u32);
-            impl Eclass for Bool {
-                fn new(value: u32) -> Self {
-                    Self(value)
-                }
-                fn inner(self) -> u32 {
-                    self.0
-                }
-            }
-            impl RelationElement for Bool {
-                const MIN_ID: Self = Self(0);
-                const MAX_ID: Self = Self(u32::MAX);
-            }
-            #[derive(Copy, Clone, Eq, PartialEq, Ord, PartialOrd, Default, Debug)]
-            pub struct Unit(u32);
-            impl Eclass for Unit {
-                fn new(value: u32) -> Self {
-                    Self(value)
-                }
-                fn inner(self) -> u32 {
-                    self.0
-                }
-            }
-            impl RelationElement for Unit {
-                const MIN_ID: Self = Self(0);
-                const MAX_ID: Self = Self(u32::MAX);
-            }
             #[derive(Copy, Clone, Eq, PartialEq, Ord, PartialOrd, Default, Debug)]
             pub struct Math(u32);
             impl Eclass for Math {
@@ -377,13 +731,13 @@ mod test {
                 }
                 fn iter1_1_0(&self, x1: Math) -> impl Iterator<Item = (Math)> + use<'_> {
                     self.all_index_1_0
-                        .range((x1, Math(u32::MIN))..=(x1, Math(u32::MAX)))
+                        .range((x1, Math::MIN_ID)..=(x1, Math::MAX_ID))
                         .copied()
                         .map(|(x1, x0)| (x0))
                 }
                 fn iter1_0_1(&self, x0: Math) -> impl Iterator<Item = (Math)> + use<'_> {
                     self.all_index_0_1
-                        .range((x0, Math(u32::MIN))..=(x0, Math(u32::MAX)))
+                        .range((x0, Math::MIN_ID)..=(x0, Math::MAX_ID))
                         .copied()
                         .map(|(x0, x1)| (x1))
                 }
@@ -465,13 +819,13 @@ mod test {
                 }
                 fn iter1_0_1(&self, x0: Math) -> impl Iterator<Item = (Math)> + use<'_> {
                     self.all_index_0_1
-                        .range((x0, Math(u32::MIN))..=(x0, Math(u32::MAX)))
+                        .range((x0, Math::MIN_ID)..=(x0, Math::MAX_ID))
                         .copied()
                         .map(|(x0, x1)| (x1))
                 }
                 fn iter1_1_0(&self, x1: Math) -> impl Iterator<Item = (Math)> + use<'_> {
                     self.all_index_1_0
-                        .range((x1, Math(u32::MIN))..=(x1, Math(u32::MAX)))
+                        .range((x1, Math::MIN_ID)..=(x1, Math::MAX_ID))
                         .copied()
                         .map(|(x1, x0)| (x0))
                 }
@@ -556,13 +910,13 @@ mod test {
                 }
                 fn iter1_1_0(&self, x1: Math) -> impl Iterator<Item = (Math)> + use<'_> {
                     self.all_index_1_0
-                        .range((x1, Math(u32::MIN))..=(x1, Math(u32::MAX)))
+                        .range((x1, Math::MIN_ID)..=(x1, Math::MAX_ID))
                         .copied()
                         .map(|(x1, x0)| (x0))
                 }
                 fn iter1_0_1(&self, x0: Math) -> impl Iterator<Item = (Math)> + use<'_> {
                     self.all_index_0_1
-                        .range((x0, Math(u32::MIN))..=(x0, Math(u32::MAX)))
+                        .range((x0, Math::MIN_ID)..=(x0, Math::MAX_ID))
                         .copied()
                         .map(|(x0, x1)| (x1))
                 }
@@ -645,19 +999,19 @@ mod test {
                 }
                 fn iter1_0_1_2(&self, x0: Math) -> impl Iterator<Item = (Math, Math)> + use<'_> {
                     self.all_index_0_1_2
-                        .range((x0, Math(u32::MIN), Math(u32::MIN))..=(x0, Math(u32::MAX), Math(u32::MAX)))
+                        .range((x0, Math::MIN_ID, Math::MIN_ID)..=(x0, Math::MAX_ID, Math::MAX_ID))
                         .copied()
                         .map(|(x0, x1, x2)| (x1, x2))
                 }
                 fn iter1_1_0_2(&self, x1: Math) -> impl Iterator<Item = (Math, Math)> + use<'_> {
                     self.all_index_1_0_2
-                        .range((x1, Math(u32::MIN), Math(u32::MIN))..=(x1, Math(u32::MAX), Math(u32::MAX)))
+                        .range((x1, Math::MIN_ID, Math::MIN_ID)..=(x1, Math::MAX_ID, Math::MAX_ID))
                         .copied()
                         .map(|(x1, x0, x2)| (x0, x2))
                 }
                 fn iter1_2_0_1(&self, x2: Math) -> impl Iterator<Item = (Math, Math)> + use<'_> {
                     self.all_index_2_0_1
-                        .range((x2, Math(u32::MIN), Math(u32::MIN))..=(x2, Math(u32::MAX), Math(u32::MAX)))
+                        .range((x2, Math::MIN_ID, Math::MIN_ID)..=(x2, Math::MAX_ID, Math::MAX_ID))
                         .copied()
                         .map(|(x2, x0, x1)| (x0, x1))
                 }
@@ -761,11 +1115,6 @@ mod test {
             #[derive(Debug, Default)]
             pub struct Theory {
                 delta: Delta,
-                i64_uf: UnionFind<I64>,
-                f64_uf: UnionFind<F64>,
-                string_uf: UnionFind<String>,
-                bool_uf: UnionFind<Bool>,
-                unit_uf: UnionFind<Unit>,
                 math_uf: UnionFind<Math>,
                 forall_math_relation: ForallMathRelation,
                 foo_relation: FooRelation,
@@ -813,11 +1162,6 @@ mod test {
                     }
                 }
                 fn clear_transient(&mut self) {
-                    let i64_uprooted = take(self.i64_uf.dirty());
-                    let f64_uprooted = take(self.f64_uf.dirty());
-                    let string_uprooted = take(self.string_uf.dirty());
-                    let bool_uprooted = take(self.bool_uf.dirty());
-                    let unit_uprooted = take(self.unit_uf.dirty());
                     let math_uprooted = take(self.math_uf.dirty());
                     let _ = "todo: update forall";
                     self.foo_relation.update(
@@ -890,76 +1234,6 @@ mod test {
             use egraph::runtime::*;
             use std::{collections::BTreeSet, mem::take};
             #[derive(Copy, Clone, Eq, PartialEq, Ord, PartialOrd, Default, Debug)]
-            pub struct I64(u32);
-            impl Eclass for I64 {
-                fn new(value: u32) -> Self {
-                    Self(value)
-                }
-                fn inner(self) -> u32 {
-                    self.0
-                }
-            }
-            impl RelationElement for I64 {
-                const MIN_ID: Self = Self(0);
-                const MAX_ID: Self = Self(u32::MAX);
-            }
-            #[derive(Copy, Clone, Eq, PartialEq, Ord, PartialOrd, Default, Debug)]
-            pub struct F64(u32);
-            impl Eclass for F64 {
-                fn new(value: u32) -> Self {
-                    Self(value)
-                }
-                fn inner(self) -> u32 {
-                    self.0
-                }
-            }
-            impl RelationElement for F64 {
-                const MIN_ID: Self = Self(0);
-                const MAX_ID: Self = Self(u32::MAX);
-            }
-            #[derive(Copy, Clone, Eq, PartialEq, Ord, PartialOrd, Default, Debug)]
-            pub struct String(u32);
-            impl Eclass for String {
-                fn new(value: u32) -> Self {
-                    Self(value)
-                }
-                fn inner(self) -> u32 {
-                    self.0
-                }
-            }
-            impl RelationElement for String {
-                const MIN_ID: Self = Self(0);
-                const MAX_ID: Self = Self(u32::MAX);
-            }
-            #[derive(Copy, Clone, Eq, PartialEq, Ord, PartialOrd, Default, Debug)]
-            pub struct Bool(u32);
-            impl Eclass for Bool {
-                fn new(value: u32) -> Self {
-                    Self(value)
-                }
-                fn inner(self) -> u32 {
-                    self.0
-                }
-            }
-            impl RelationElement for Bool {
-                const MIN_ID: Self = Self(0);
-                const MAX_ID: Self = Self(u32::MAX);
-            }
-            #[derive(Copy, Clone, Eq, PartialEq, Ord, PartialOrd, Default, Debug)]
-            pub struct Unit(u32);
-            impl Eclass for Unit {
-                fn new(value: u32) -> Self {
-                    Self(value)
-                }
-                fn inner(self) -> u32 {
-                    self.0
-                }
-            }
-            impl RelationElement for Unit {
-                const MIN_ID: Self = Self(0);
-                const MAX_ID: Self = Self(u32::MAX);
-            }
-            #[derive(Copy, Clone, Eq, PartialEq, Ord, PartialOrd, Default, Debug)]
             pub struct Math(u32);
             impl Eclass for Math {
                 fn new(value: u32) -> Self {
@@ -1005,25 +1279,25 @@ mod test {
                 }
                 fn iter1_0_1_2(&self, x0: Math) -> impl Iterator<Item = (Math, Math)> + use<'_> {
                     self.all_index_0_1_2
-                        .range((x0, Math(u32::MIN), Math(u32::MIN))..=(x0, Math(u32::MAX), Math(u32::MAX)))
+                        .range((x0, Math::MIN_ID, Math::MIN_ID)..=(x0, Math::MAX_ID, Math::MAX_ID))
                         .copied()
                         .map(|(x0, x1, x2)| (x1, x2))
                 }
                 fn iter2_0_2_1(&self, x0: Math, x2: Math) -> impl Iterator<Item = (Math)> + use<'_> {
                     self.all_index_0_2_1
-                        .range((x0, x2, Math(u32::MIN))..=(x0, x2, Math(u32::MAX)))
+                        .range((x0, x2, Math::MIN_ID)..=(x0, x2, Math::MAX_ID))
                         .copied()
                         .map(|(x0, x2, x1)| (x1))
                 }
                 fn iter1_2_0_1(&self, x2: Math) -> impl Iterator<Item = (Math, Math)> + use<'_> {
                     self.all_index_2_0_1
-                        .range((x2, Math(u32::MIN), Math(u32::MIN))..=(x2, Math(u32::MAX), Math(u32::MAX)))
+                        .range((x2, Math::MIN_ID, Math::MIN_ID)..=(x2, Math::MAX_ID, Math::MAX_ID))
                         .copied()
                         .map(|(x2, x0, x1)| (x0, x1))
                 }
                 fn iter1_1_0_2(&self, x1: Math) -> impl Iterator<Item = (Math, Math)> + use<'_> {
                     self.all_index_1_0_2
-                        .range((x1, Math(u32::MIN), Math(u32::MIN))..=(x1, Math(u32::MAX), Math(u32::MAX)))
+                        .range((x1, Math::MIN_ID, Math::MIN_ID)..=(x1, Math::MAX_ID, Math::MAX_ID))
                         .copied()
                         .map(|(x1, x0, x2)| (x0, x2))
                 }
@@ -1122,25 +1396,25 @@ mod test {
                 }
                 fn iter2_0_1_2(&self, x0: Math, x1: Math) -> impl Iterator<Item = (Math)> + use<'_> {
                     self.all_index_0_1_2
-                        .range((x0, x1, Math(u32::MIN))..=(x0, x1, Math(u32::MAX)))
+                        .range((x0, x1, Math::MIN_ID)..=(x0, x1, Math::MAX_ID))
                         .copied()
                         .map(|(x0, x1, x2)| (x2))
                 }
                 fn iter1_0_1_2(&self, x0: Math) -> impl Iterator<Item = (Math, Math)> + use<'_> {
                     self.all_index_0_1_2
-                        .range((x0, Math(u32::MIN), Math(u32::MIN))..=(x0, Math(u32::MAX), Math(u32::MAX)))
+                        .range((x0, Math::MIN_ID, Math::MIN_ID)..=(x0, Math::MAX_ID, Math::MAX_ID))
                         .copied()
                         .map(|(x0, x1, x2)| (x1, x2))
                 }
                 fn iter1_1_0_2(&self, x1: Math) -> impl Iterator<Item = (Math, Math)> + use<'_> {
                     self.all_index_1_0_2
-                        .range((x1, Math(u32::MIN), Math(u32::MIN))..=(x1, Math(u32::MAX), Math(u32::MAX)))
+                        .range((x1, Math::MIN_ID, Math::MIN_ID)..=(x1, Math::MAX_ID, Math::MAX_ID))
                         .copied()
                         .map(|(x1, x0, x2)| (x0, x2))
                 }
                 fn iter1_2_0_1(&self, x2: Math) -> impl Iterator<Item = (Math, Math)> + use<'_> {
                     self.all_index_2_0_1
-                        .range((x2, Math(u32::MIN), Math(u32::MIN))..=(x2, Math(u32::MAX), Math(u32::MAX)))
+                        .range((x2, Math::MIN_ID, Math::MIN_ID)..=(x2, Math::MAX_ID, Math::MAX_ID))
                         .copied()
                         .map(|(x2, x0, x1)| (x0, x1))
                 }
@@ -1239,11 +1513,6 @@ mod test {
             #[derive(Debug, Default)]
             pub struct Theory {
                 delta: Delta,
-                i64_uf: UnionFind<I64>,
-                f64_uf: UnionFind<F64>,
-                string_uf: UnionFind<String>,
-                bool_uf: UnionFind<Bool>,
-                unit_uf: UnionFind<Unit>,
                 math_uf: UnionFind<Math>,
                 forall_math_relation: ForallMathRelation,
                 mul_relation: MulRelation,
@@ -1295,11 +1564,6 @@ mod test {
                     }
                 }
                 fn clear_transient(&mut self) {
-                    let i64_uprooted = take(self.i64_uf.dirty());
-                    let f64_uprooted = take(self.f64_uf.dirty());
-                    let string_uprooted = take(self.string_uf.dirty());
-                    let bool_uprooted = take(self.bool_uf.dirty());
-                    let unit_uprooted = take(self.unit_uf.dirty());
                     let math_uprooted = take(self.math_uf.dirty());
                     let _ = "todo: update forall";
                     self.mul_relation.update(
@@ -1376,76 +1640,6 @@ mod test {
             use egraph::runtime::*;
             use std::{collections::BTreeSet, mem::take};
             #[derive(Copy, Clone, Eq, PartialEq, Ord, PartialOrd, Default, Debug)]
-            pub struct I64(u32);
-            impl Eclass for I64 {
-                fn new(value: u32) -> Self {
-                    Self(value)
-                }
-                fn inner(self) -> u32 {
-                    self.0
-                }
-            }
-            impl RelationElement for I64 {
-                const MIN_ID: Self = Self(0);
-                const MAX_ID: Self = Self(u32::MAX);
-            }
-            #[derive(Copy, Clone, Eq, PartialEq, Ord, PartialOrd, Default, Debug)]
-            pub struct F64(u32);
-            impl Eclass for F64 {
-                fn new(value: u32) -> Self {
-                    Self(value)
-                }
-                fn inner(self) -> u32 {
-                    self.0
-                }
-            }
-            impl RelationElement for F64 {
-                const MIN_ID: Self = Self(0);
-                const MAX_ID: Self = Self(u32::MAX);
-            }
-            #[derive(Copy, Clone, Eq, PartialEq, Ord, PartialOrd, Default, Debug)]
-            pub struct String(u32);
-            impl Eclass for String {
-                fn new(value: u32) -> Self {
-                    Self(value)
-                }
-                fn inner(self) -> u32 {
-                    self.0
-                }
-            }
-            impl RelationElement for String {
-                const MIN_ID: Self = Self(0);
-                const MAX_ID: Self = Self(u32::MAX);
-            }
-            #[derive(Copy, Clone, Eq, PartialEq, Ord, PartialOrd, Default, Debug)]
-            pub struct Bool(u32);
-            impl Eclass for Bool {
-                fn new(value: u32) -> Self {
-                    Self(value)
-                }
-                fn inner(self) -> u32 {
-                    self.0
-                }
-            }
-            impl RelationElement for Bool {
-                const MIN_ID: Self = Self(0);
-                const MAX_ID: Self = Self(u32::MAX);
-            }
-            #[derive(Copy, Clone, Eq, PartialEq, Ord, PartialOrd, Default, Debug)]
-            pub struct Unit(u32);
-            impl Eclass for Unit {
-                fn new(value: u32) -> Self {
-                    Self(value)
-                }
-                fn inner(self) -> u32 {
-                    self.0
-                }
-            }
-            impl RelationElement for Unit {
-                const MIN_ID: Self = Self(0);
-                const MAX_ID: Self = Self(u32::MAX);
-            }
-            #[derive(Copy, Clone, Eq, PartialEq, Ord, PartialOrd, Default, Debug)]
             pub struct Math(u32);
             impl Eclass for Math {
                 fn new(value: u32) -> Self {
@@ -1490,19 +1684,19 @@ mod test {
                 }
                 fn iter1_0_1_2(&self, x0: Math) -> impl Iterator<Item = (Math, Math)> + use<'_> {
                     self.all_index_0_1_2
-                        .range((x0, Math(u32::MIN), Math(u32::MIN))..=(x0, Math(u32::MAX), Math(u32::MAX)))
+                        .range((x0, Math::MIN_ID, Math::MIN_ID)..=(x0, Math::MAX_ID, Math::MAX_ID))
                         .copied()
                         .map(|(x0, x1, x2)| (x1, x2))
                 }
                 fn iter1_1_0_2(&self, x1: Math) -> impl Iterator<Item = (Math, Math)> + use<'_> {
                     self.all_index_1_0_2
-                        .range((x1, Math(u32::MIN), Math(u32::MIN))..=(x1, Math(u32::MAX), Math(u32::MAX)))
+                        .range((x1, Math::MIN_ID, Math::MIN_ID)..=(x1, Math::MAX_ID, Math::MAX_ID))
                         .copied()
                         .map(|(x1, x0, x2)| (x0, x2))
                 }
                 fn iter1_2_0_1(&self, x2: Math) -> impl Iterator<Item = (Math, Math)> + use<'_> {
                     self.all_index_2_0_1
-                        .range((x2, Math(u32::MIN), Math(u32::MIN))..=(x2, Math(u32::MAX), Math(u32::MAX)))
+                        .range((x2, Math::MIN_ID, Math::MIN_ID)..=(x2, Math::MAX_ID, Math::MAX_ID))
                         .copied()
                         .map(|(x2, x0, x1)| (x0, x1))
                 }
@@ -1596,19 +1790,19 @@ mod test {
                 }
                 fn iter1_2_0_1(&self, x2: Math) -> impl Iterator<Item = (Math, Math)> + use<'_> {
                     self.all_index_2_0_1
-                        .range((x2, Math(u32::MIN), Math(u32::MIN))..=(x2, Math(u32::MAX), Math(u32::MAX)))
+                        .range((x2, Math::MIN_ID, Math::MIN_ID)..=(x2, Math::MAX_ID, Math::MAX_ID))
                         .copied()
                         .map(|(x2, x0, x1)| (x0, x1))
                 }
                 fn iter1_0_1_2(&self, x0: Math) -> impl Iterator<Item = (Math, Math)> + use<'_> {
                     self.all_index_0_1_2
-                        .range((x0, Math(u32::MIN), Math(u32::MIN))..=(x0, Math(u32::MAX), Math(u32::MAX)))
+                        .range((x0, Math::MIN_ID, Math::MIN_ID)..=(x0, Math::MAX_ID, Math::MAX_ID))
                         .copied()
                         .map(|(x0, x1, x2)| (x1, x2))
                 }
                 fn iter1_1_0_2(&self, x1: Math) -> impl Iterator<Item = (Math, Math)> + use<'_> {
                     self.all_index_1_0_2
-                        .range((x1, Math(u32::MIN), Math(u32::MIN))..=(x1, Math(u32::MAX), Math(u32::MAX)))
+                        .range((x1, Math::MIN_ID, Math::MIN_ID)..=(x1, Math::MAX_ID, Math::MAX_ID))
                         .copied()
                         .map(|(x1, x0, x2)| (x0, x2))
                 }
@@ -1704,11 +1898,6 @@ mod test {
             #[derive(Debug, Default)]
             pub struct Theory {
                 delta: Delta,
-                i64_uf: UnionFind<I64>,
-                f64_uf: UnionFind<F64>,
-                string_uf: UnionFind<String>,
-                bool_uf: UnionFind<Bool>,
-                unit_uf: UnionFind<Unit>,
                 math_uf: UnionFind<Math>,
                 forall_math_relation: ForallMathRelation,
                 mul_relation: MulRelation,
@@ -1745,11 +1934,6 @@ mod test {
                     }
                 }
                 fn clear_transient(&mut self) {
-                    let i64_uprooted = take(self.i64_uf.dirty());
-                    let f64_uprooted = take(self.f64_uf.dirty());
-                    let string_uprooted = take(self.string_uf.dirty());
-                    let bool_uprooted = take(self.bool_uf.dirty());
-                    let unit_uprooted = take(self.unit_uf.dirty());
                     let math_uprooted = take(self.math_uf.dirty());
                     let _ = "todo: update forall";
                     self.mul_relation.update(

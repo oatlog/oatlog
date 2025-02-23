@@ -391,11 +391,8 @@ impl AddRelation {
         self.new.extend(op_insert);
     }
 
-    fn update_finalize(
-        &mut self,
-        math_uf: &mut UnionFind<Math>,
-    ) {
-        for (x0, x1,x2) in self.new.iter_mut() {
+    fn update_finalize(&mut self, math_uf: &mut UnionFind<Math>) {
+        for (x0, x1, x2) in self.new.iter_mut() {
             *x0 = math_uf.find(*x0);
             *x1 = math_uf.find(*x1);
             *x2 = math_uf.find(*x2);
@@ -403,7 +400,6 @@ impl AddRelation {
         self.new.sort();
         self.new.dedup();
     }
-
 }
 
 #[derive(Copy, Clone, Eq, PartialEq, Ord, PartialOrd, Default, Debug)]

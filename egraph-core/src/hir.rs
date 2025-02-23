@@ -5,9 +5,10 @@ use crate::{
     codegen::{self},
     ids::{ActionId, ColumnId, GlobalId, Id, PremiseId, RelationId, TypeId, VariableId},
     typed_vec::TVec,
-    union_find::{UFData, UF},
+    union_find::{UF, UFData},
 };
 
+use educe::Educe;
 #[cfg(test)]
 use itertools::Itertools as _;
 
@@ -113,6 +114,36 @@ pub(crate) struct Theory {
 pub(crate) struct Type {
     /// Name of type (sort Math) -> "Math"
     pub(crate) name: &'static str,
+    pub(crate) ty: TypeKind,
+}
+impl Type {
+    pub(crate) fn new_symbolic(name: &'static str) -> Self {
+        Self {
+            name,
+            ty: TypeKind::Symolic,
+        }
+    }
+    pub(crate) fn new_primitive(name: &'static str, type_path: &'static str) -> Self {
+        Self {
+            name,
+            ty: TypeKind::Primitive { type_path },
+        }
+    }
+}
+
+#[derive(Copy, Clone, Eq, PartialEq, Ord, PartialOrd, Hash, Debug, Default)]
+pub(crate) enum TypeKind {
+    /// can be unified by user
+    /// always a wrapper around a u32
+    #[default]
+    Symolic,
+    // /// can not be unified by user
+    // /// always a wrapper around a u32
+    // Collection {
+    //     manager: ...
+    // }
+    /// Some rust type that implements: `RelationElement` trait.
+    Primitive { type_path: &'static str },
 }
 
 /// All relations have some notion of "new" and "all"
@@ -964,9 +995,11 @@ pub(crate) mod query_planning {
             let relation = &theory.relations[relation_id];
             match relation.ty {
                 RelationTy::NewOf { .. } => continue,
-                RelationTy::Alias { .. }
-                | RelationTy::Global { .. }
-                | RelationTy::Primitive { .. } => unimplemented!("only table/forall implemented"),
+                RelationTy::Alias { .. } => unimplemented!("alias relations not implemented"),
+                RelationTy::Global { .. } => unimplemented!("globals not implemented"),
+                RelationTy::Primitive { .. } => {
+                    unimplemented!("primtive relations not implemented")
+                }
                 RelationTy::Forall { ty } => {
                     let codegen_relation =
                         codegen::RelationData::new_forall(theory.types[ty].name, ty);
@@ -998,7 +1031,12 @@ pub(crate) mod query_planning {
         let types = theory
             .types
             .iter()
-            .map(|x| codegen::TypeData::new(x.name))
+            .map(|x| match x.ty {
+                hir::TypeKind::Symolic => codegen::TypeData::new_symbolic(x.name),
+                hir::TypeKind::Primitive { type_path } => {
+                    codegen::TypeData::new_primitive(x.name, type_path)
+                }
+            })
             .collect();
 
         let codegen_theory = codegen::Theory {

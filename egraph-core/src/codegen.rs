@@ -10,10 +10,7 @@ use itertools::Itertools as _;
 use proc_macro2::TokenStream;
 use quote::quote;
 
-use std::{
-    collections::{BTreeMap, BTreeSet},
-    iter::once,
-};
+use std::{collections::BTreeSet, iter::once};
 
 /// Data such as type and function names are technically unnecessary but used for more readable
 /// generated code. A compiler is far less performance sensitive than an interpreter (although the
@@ -40,15 +37,37 @@ pub(crate) struct Theory {
 pub(crate) struct TypeData {
     name: &'static str,
     // TODO: primitives
+    ty: TypeKind,
 }
 impl TypeData {
-    pub(crate) fn new(name: &'static str) -> Self {
-        let name = match name {
-            "()" => "unit",
-            x => x,
-        };
-        Self { name }
+    pub(crate) fn is_symbolic(&self) -> bool {
+        matches!(self.ty, TypeKind::Symbolic)
     }
+    pub(crate) fn new_symbolic(name: &'static str) -> Self {
+        Self {
+            name,
+            ty: TypeKind::Symbolic,
+        }
+    }
+    pub(crate) fn new_primitive(name: &'static str, type_path: &'static str) -> Self {
+        match name {
+            "()" => Self {
+                name: "unit",
+                ty: TypeKind::Primitive {
+                    type_path: "THIS STRING SHOULD NOT APPEAR IN GENERATED CODE",
+                },
+            },
+            _ => Self {
+                name,
+                ty: TypeKind::Primitive { type_path },
+            },
+        }
+    }
+}
+#[derive(Debug)]
+pub(crate) enum TypeKind {
+    Symbolic,
+    Primitive { type_path: &'static str },
 }
 
 /// General over all relations
@@ -239,6 +258,7 @@ impl quote::ToTokens for Priority {
 
 mod ident {
     use super::{RelationData, Theory, TypeData, VariableData};
+    use crate::codegen::TypeKind;
     use crate::{ids::ColumnId, index_selection};
     use heck::ToSnakeCase;
     use heck::{ToPascalCase as _, ToSnakeCase as _};
@@ -247,79 +267,111 @@ mod ident {
     use proc_macro2::TokenStream;
     use quote::{format_ident, quote};
 
+    /// `a`
     pub fn var_var(var: &VariableData) -> Ident {
         format_ident!("{}", var.name.to_snake_case())
     }
-    pub fn type_ty(ty: &TypeData) -> Ident {
-        format_ident!("{}", ty.name.to_pascal_case())
+    /// `Math`, `std::primitive::i64`
+    pub fn type_ty(ty: &TypeData) -> TokenStream {
+        // todo!("primitive types");
+        match ty.ty {
+            TypeKind::Symbolic => {
+                let x = format_ident!("{}", ty.name.to_pascal_case());
+                quote! { #x }
+            }
+            TypeKind::Primitive { type_path } => type_path.parse().unwrap(),
+        }
     }
+    /// `math_new`
     pub fn type_new(ty: &TypeData) -> Ident {
         format_ident!("{}_new", ty.name.to_snake_case())
     }
+    /// `math_all`
     pub fn type_all(ty: &TypeData) -> Ident {
         format_ident!("{}_all", ty.name.to_snake_case())
     }
+    /// `math_uf`
     pub fn type_uf(ty: &TypeData) -> Ident {
         format_ident!("{}_uf", ty.name.to_snake_case())
     }
+    /// `UnionFind<Math>`
     pub fn type_ty_uf(ty: &TypeData) -> TokenStream {
         let ty = type_ty(ty);
         quote! { UnionFind<#ty> }
     }
+    /// `math_uprooted`
     pub fn type_uprooted(ty: &TypeData) -> Ident {
         format_ident!("{}_uprooted", ty.name.to_snake_case())
     }
+    /// `math_uprooted_self`
     pub fn type_uprooted_self(ty: &TypeData) -> Ident {
         format_ident!("{}_uprooted_self", ty.name.to_snake_case())
     }
+    /// `math_uprooted_others`
     pub fn type_uprooted_others(ty: &TypeData) -> Ident {
         format_ident!("{}_uprooted_others", ty.name.to_snake_case())
     }
+    /// `math_equate`
     pub fn type_equate(ty: &TypeData) -> Ident {
         format_ident!("{}_equate", ty.name.to_snake_case())
     }
+    /// `math_are_equal`
     pub fn type_are_equal(ty: &TypeData) -> Ident {
         format_ident!("{}_are_equal", ty.name.to_snake_case())
     }
+    /// `math_iter`
     pub fn type_iter(ty: &TypeData) -> Ident {
         format_ident!("{}_iter", ty.name.to_snake_case())
     }
+    /// `math_iter_new`
     pub fn type_iter_new(ty: &TypeData) -> Ident {
         format_ident!("{}_iter_new", ty.name.to_snake_case())
     }
+    /// `math_remove_uprooted`
     pub fn type_remove_uprooted(ty: &TypeData) -> Ident {
         format_ident!("{}_remove_uprooted", ty.name.to_snake_case())
     }
+    /// `MathRelation`, `AddRelation`
     pub fn rel_ty(rel: &RelationData) -> Ident {
         format_ident!("{}Relation", rel.name.to_pascal_case())
     }
+    /// `add_relation`
     pub fn rel_var(rel: &RelationData) -> Ident {
         format_ident!("{}_relation", rel.name.to_snake_case())
     }
+    /// `add_insertions`
     pub fn rel_insertions(rel: &RelationData) -> Ident {
         format_ident!("{}_insertions", rel.name.to_snake_case())
     }
+    /// `add`, `mul`
     pub fn rel_get(rel: &RelationData) -> Ident {
         format_ident!("{}", rel.name.to_snake_case())
     }
+    /// `add_iter`
     pub fn rel_iter(rel: &RelationData) -> Ident {
         format_ident!("{}_iter", rel.name.to_snake_case())
     }
+    /// `add_insert`
     pub fn rel_insert(rel: &RelationData) -> Ident {
         format_ident!("{}_insert", rel.name.to_snake_case())
     }
+    /// `add_insert_with_priority`
     pub fn rel_insert_with_priority(rel: &RelationData) -> Ident {
         format_ident!("{}_insert_with_priority", rel.name.to_snake_case())
     }
+    /// `SemilatticeTheory`
     pub fn theory_ty(theory: &Theory) -> Ident {
         format_ident!("{}Theory", theory.name.to_pascal_case())
     }
+    /// `SemilatticeDelta`
     pub fn theory_delta_ty(theory: &Theory) -> Ident {
         format_ident!("{}Delta", theory.name.to_pascal_case())
     }
+    /// `arg0`, `arg1`, `args2`...
     pub fn arguments() -> impl Iterator<Item = Ident> {
         (0..).map(|i| format_ident!("arg{i}"))
     }
+    /// `all_index_2_0_1`
     pub fn index_all_field(index: &index_selection::IndexInfo) -> Ident {
         let perm = index
             .order
@@ -328,6 +380,7 @@ mod ident {
             .join("_");
         format_ident!("all_index_{perm}")
     }
+    /// `iter2_2_0_1`
     pub fn index_all_iter(
         usage: &index_selection::IndexUsageInfo,
         index: &index_selection::IndexInfo,
@@ -340,6 +393,7 @@ mod ident {
         let prefix = format!("{}", usage.prefix);
         format_ident!("iter{prefix}_{index_perm}")
     }
+    /// `check2_2_0_1`
     pub fn index_all_check(
         usage: &index_selection::IndexUsageInfo,
         index: &index_selection::IndexInfo,
@@ -352,21 +406,26 @@ mod ident {
         let prefix = format!("{}", usage.prefix);
         format_ident!("check{prefix}_{index_perm}")
     }
+    /// `x2`
     pub fn column(c: ColumnId) -> Ident {
         format_ident!("x{}", c.0)
     }
+    /// `math_class_delta`
     pub fn delta_ty(ty: &TypeData) -> Ident {
         let x = ty.name.to_snake_case();
         format_ident!("{x}_class_delta")
     }
+    /// `add_relation_delta`
     pub fn delta_row(rel: &RelationData) -> Ident {
         let x = rel.name.to_snake_case();
         format_ident!("{x}_relation_delta")
     }
+    /// `insert_add`
     pub fn delta_insert_row(rel: &RelationData) -> Ident {
         let x = rel.name.to_snake_case();
         format_ident!("insert_{x}")
     }
+    /// `make_math`
     pub fn delta_make(ty: &TypeData) -> Ident {
         let x = ty.name.to_snake_case();
         format_ident!("make_{x}")
@@ -723,28 +782,14 @@ impl CodegenRuleTrieCtx<'_> {
 }
 
 pub fn codegen(theory: &Theory) -> TokenStream {
-    let (
-        types,
-        type_fields,
-        type_fields_creation,
-        type_uprooted,
-        type_fields_clear_new,
-        type_functions,
-    ): (Vec<_>, Vec<_>, Vec<_>, Vec<_>, Vec<_>, Vec<_>) = theory
+    let types: Vec<_> = theory
         .types
         .iter()
-        .map(|type_| {
-            let type_ty = ident::type_ty(type_);
-            let type_all = ident::type_all(type_);
-            let type_new = ident::type_new(type_);
-            let type_uf = ident::type_uf(type_);
-            let type_uprooted = ident::type_uprooted(type_);
-            let type_equate = ident::type_equate(type_);
-            let type_are_equal = ident::type_are_equal(type_);
-            let type_iter = ident::type_iter(type_);
-            // TODO: Consider bitset if `type_all` is dense
-            (
-                quote! {
+        .filter_map(|type_| match type_.ty {
+            TypeKind::Primitive { type_path: _ } => return None,
+            TypeKind::Symbolic => {
+                let type_ty = ident::type_ty(type_);
+                Some(quote! {
                     #[derive(Copy, Clone, Eq, PartialEq, Ord, PartialOrd, Default, Debug)]
                     pub struct #type_ty(u32);
                     impl Eclass for #type_ty {
@@ -759,223 +804,28 @@ pub fn codegen(theory: &Theory) -> TokenStream {
                         const MIN_ID: Self = Self(0);
                         const MAX_ID: Self = Self(u32::MAX);
                     }
-                },
-                quote! {
-                    #type_all: BTreeSet<#type_ty>,
-                    #type_new: BTreeSet<#type_ty>,
-                    #type_uf: UnionFind<#type_ty>,
-                    #type_uprooted: Vec<#type_ty>,
-                },
-                quote! {
-                    #type_all: BTreeSet::new(),
-                    #type_new: BTreeSet::new(),
-                    #type_uf: UnionFind::new(),
-                    #type_uprooted: Vec::new(),
-                },
-                quote! {
-                    self.#type_uprooted
-                },
-                quote! {
-                    self.#type_new.clear();
-                },
-                quote! {
-                    pub fn #type_new(&mut self) -> #type_ty {
-                        let x = self.#type_uf.push();
-                        self.#type_all.insert(x);
-                        self.#type_new.insert(x);
-                        x
-                    }
-                    pub fn #type_equate(&mut self, lhs: #type_ty, rhs: #type_ty) {
-                        if let Some(uprooted) = self.#type_uf.join(lhs, rhs) {
-                            self.#type_uprooted.push(uprooted);
-                        }
-                    }
-                    pub fn #type_are_equal(&mut self, lhs: #type_ty, rhs: #type_ty) -> bool {
-                        self.#type_uf.are_equal(lhs, rhs)
-                    }
-                    pub fn #type_iter(&self) -> impl '_ + Iterator<Item = #type_ty> {
-                        self.#type_all.iter().copied()
-                    }
-                },
-            )
+                })
+            }
         })
-        .multiunzip();
+        .collect();
 
     let relations = theory
         .relations
         .iter()
         .map(|rel| codegen_relation(rel, theory));
 
-    let theory_ty = ident::theory_ty(theory);
-    let (
-        relation_fields,
-        relation_fields_creation,
-        relation_fields_clear_new,
-        relation_functions,
-        relation_insertions,
-    ): (Vec<_>, Vec<_>, Vec<_>, Vec<_>, Vec<_>) = theory
-        .relations
-        .iter()
-        .map(|rel| {
-            let rel_ty = ident::rel_ty(rel);
-            let rel_var = ident::rel_var(rel);
-            let rel_insertions = ident::rel_insertions(rel);
-            let rel_get = ident::rel_get(rel);
-            let rel_iter = ident::rel_iter(rel);
-            let rel_insert = ident::rel_insert(rel);
-            let rel_insert_with_priority = ident::rel_insert_with_priority(rel);
-            let columns = rel
-                .param_types
-                .iter()
-                .map(|&type_| ident::type_ty(&theory.types[type_]))
-                .collect::<Vec<_>>();
-            let params = columns
-                .iter()
-                .zip(ident::arguments())
-                .map(|(ty, arg)| quote! {#arg: #ty})
-                .collect::<Vec<_>>();
-            let args = ident::arguments().take(columns.len()).collect::<Vec<_>>();
-            (
-                quote! {
-                    #rel_var: #rel_ty,
-                    #rel_insertions: [Vec<(#(#columns,)*)>; Priority::COUNT],
-                },
-                quote! {
-                    #rel_var: #rel_ty::new(),
-                    #rel_insertions: vec![Vec::new(); 3],
-                },
-                quote! {
-                    self.#rel_var.clear_new();
-                },
-                quote! {
-                    pub fn #rel_get(&mut self, #(#params),*) -> bool {
-                        todo!()
-                    }
-                    pub fn #rel_iter(&mut self) -> impl '_ + Iterator<Item = (#(#columns,)*)> {
-                        todo!()
-                    }
-                    pub fn #rel_insert(&mut self, #(#params),*) {
-                        self.#rel_insert_with_priority(Priority::Canonicalizing, #(#args),*)
-                    }
-                    fn #rel_insert_with_priority(&mut self, priority: Priority, #(#params),*) {
-                        self.#rel_insertions[priority as usize].push(#(#args,)*);
-                    }
-                },
-                rel_insertions,
-            )
-        })
-        .multiunzip();
-    let (global_fields, global_fields_creation): (Vec<_>, Vec<_>) = theory
-        .globals
-        .iter()
-        .map(|global| {
-            let global_var = ident::var_var(global);
-            let global_ty = ident::type_ty(&theory.types[global.type_]);
-            let type_new = ident::type_new(&theory.types[global.type_]);
-            (
-                quote!(#global_var: (#global_ty, bool)),
-                quote!(#global_var: (self.#type_new(), true)),
-            )
-        })
-        .unzip();
+    let rule_contents = {
+        CodegenRuleTrieCtx {
+            types: &theory.types,
+            relations: &theory.relations,
+            globals: &theory.globals,
+            variables: &theory.rule_variables,
 
-    let [/*startup_rule_contents,*/ rule_contents] =
-        [/*&theory.rule_tries_startup,*/ &theory.rule_tries].map(|rule_tries| {
-            CodegenRuleTrieCtx {
-                types: &theory.types,
-                relations: &theory.relations,
-                globals: &theory.globals,
-                variables: &theory.rule_variables,
-
-                variables_bound: &mut theory.rule_variables.new_same_size(),
-                scoped: true,
-                priority_cap: Priority::MIN,
-            }
-            .codegen_all(rule_tries, true)
-        });
-    let reroot_and_apply_insertions_up_to = {
-        let mut type_num_relations: TVec<TypeId, usize> = theory.types.new_same_size();
-        let (
-            rel_type_uprooted,
-            rel_type_uprooted_self,
-            rel_type_uprooted_others,
-            rel_type_idx,
-            rel_type_uf,
-        ): (
-            Vec<Vec<proc_macro2::Ident>>,
-            Vec<Vec<proc_macro2::Ident>>,
-            Vec<Vec<proc_macro2::Ident>>,
-            Vec<Vec<usize>>,
-            Vec<Vec<proc_macro2::Ident>>,
-        ) = theory
-            .relations
-            .iter()
-            .map(|rel| {
-                rel.unique_types()
-                    .map(|ty| {
-                        let idx = type_num_relations[ty];
-                        type_num_relations[ty] += 1;
-                        let ty = &theory.types[ty];
-                        (
-                            ident::type_uprooted(ty),
-                            ident::type_uprooted_self(ty),
-                            ident::type_uprooted_others(ty),
-                            idx,
-                            ident::type_uf(ty),
-                        )
-                    })
-                    .multiunzip()
-            })
-            .multiunzip();
-
-        let type_num_relations = type_num_relations.into_inner();
-
-        let type_uprooted = theory
-            .types
-            .iter()
-            .map(ident::type_uprooted)
-            .collect::<Vec<_>>();
-
-        let rel_insertions = theory.relations.iter().map(ident::rel_insertions);
-        let rel_var = theory.relations.iter().map(ident::rel_var);
-
-        let global_var = theory.globals.iter().map(ident::var_var);
-        let global_type_uf = theory
-            .globals
-            .iter()
-            .map(|g| ident::type_uf(&theory.types[&g.type_]));
-
-        quote! {
-            let mut ins_limit = usize::MAX;
-            #(
-                let #type_uprooted = [Vec::new(); #type_num_relations + 1];
-                #type_uprooted[0] = mem::take(self.#type_uprooted);
-            )*
-            // round robin relations until fixpoint
-            while ins_limit > 0 || #(!#type_uprooted.iter().all(|v| v.is_empty()))||* {
-                #(
-                    #(
-                        let (
-                            #rel_type_uprooted_self,
-                            #rel_type_uprooted_others
-                        ) = uprooted_self_and_others(&mut #rel_type_uprooted, #rel_type_idx + 1);
-                    )*
-                    let insertions = self.#rel_insertions[..=(priority as usize)].iter().flatten().copied();
-                    self.#rel_var.bulk_update(
-                        insertions.take(ins_limit),
-                        #(
-                            #rel_type_uprooted_self,
-                            #rel_type_uprooted_others.get(),
-                            &mut self.#rel_type_uf
-                        )*
-                    );
-                )*
-                ins_limit = 0;
-                #(#type_uprooted[0].clear();)*
-            }
-
-            #(self.#global_var = self.#global_type_uf.find_tagged(self.#global_var.0);)*
+            variables_bound: &mut theory.rule_variables.new_same_size(),
+            scoped: true,
+            priority_cap: Priority::MIN,
         }
+        .codegen_all(&theory.rule_tries, true)
     };
 
     let delta = {
@@ -1028,16 +878,17 @@ pub fn codegen(theory: &Theory) -> TokenStream {
         }
     };
 
-    let (uf_ident, uf_ty, type_uprooted, all_types): (Vec<_>, Vec<_>, Vec<_>, Vec<_>) = theory
+    // TODO: move to types stuff
+    let (uf_ident, uf_ty, type_uprooted): (Vec<_>, Vec<_>, Vec<_>) = theory
         .types
         .iter()
-        .map(|ty| {
-            (
+        .filter_map(|ty| match ty.ty {
+            TypeKind::Symbolic => Some((
                 ident::type_uf(ty),
                 ident::type_ty_uf(ty),
                 ident::type_uprooted(ty),
-                ident::type_ty(ty),
-            )
+            )),
+            TypeKind::Primitive { type_path: _ } => None,
         })
         .multiunzip();
 
@@ -1045,11 +896,16 @@ pub fn codegen(theory: &Theory) -> TokenStream {
         RelationTy::Table { .. } => {
             let (uprooted, uf): (Vec<_>, Vec<_>) = rel
                 .unique_types()
-                .map(|ty| {
+                .filter_map(|ty| {
                     let ty = &theory.types[ty];
-                    let uprooted = ident::type_uprooted(&ty);
-                    let uf = ident::type_uf(&ty);
-                    (uprooted, uf)
+                    match ty.ty {
+                        TypeKind::Primitive { type_path: _ } => None,
+                        TypeKind::Symbolic => {
+                            let uprooted = ident::type_uprooted(&ty);
+                            let uf = ident::type_uf(&ty);
+                            Some((uprooted, uf))
+                        },
+                    }
                 })
                 .collect();
 
@@ -1087,6 +943,8 @@ pub fn codegen(theory: &Theory) -> TokenStream {
         .map(|rel| (ident::rel_var(rel), ident::rel_ty(rel)))
         .unzip();
 
+    let theory_ty = ident::theory_ty(theory);
+
     quote! {
         use std::{collections::BTreeSet, mem::take};
         use egraph::runtime::*;
@@ -1097,7 +955,6 @@ pub fn codegen(theory: &Theory) -> TokenStream {
         pub struct #theory_ty {
             delta: Delta,
             #(#uf_ident: #uf_ty,)*
-            // #(#type_uprooted: Vec<#all_types>,)*
             #(#all_relations: #relation_types,)*
         }
         impl #theory_ty {
@@ -1120,111 +977,18 @@ pub fn codegen(theory: &Theory) -> TokenStream {
         impl std::ops::DerefMut for #theory_ty {
             fn deref_mut(&mut self) -> &mut Self::Target { &mut self.delta }
         }
-        // pub struct #theory_ty {
-        //     #(#type_fields)*
-        //     #(#relation_fields)*
-        //     #(#global_fields)*
-        // }
-        // impl #theory_ty {
-        //     // fn startup_rules(&mut self) {
-        //     //     #startup_rule_contents
-        //     // }
-        //     fn rules(&mut self) {
-        //         #rule_contents
-        //     }
-        //     fn clear_new(&mut self) {
-        //         #(#type_fields_clear_new)*
-        //         #(#relation_fields_clear_new)*
-        //     }
-        //     fn lowest_insertion_priority(&self) -> Option<Priority> {
-        //         if #(!#type_uprooted.is_empty())||* {
-        //             return Some(Priority::Canonicalizing);
-        //         }
-        //         for priority in Priority::LIST {
-        //             let pnum = priority as usize;
-        //             if #(!#relation_insertions[pnum].is_empty())||* {
-        //                 return Some(priority);
-        //             }
-        //         }
-        //         None
-        //     }
-        //     fn reroot_and_apply_insertions_up_to(&mut self, priority: Priority) {
-        //         #reroot_and_apply_insertions_up_to
-        //     }
-        //     pub fn new() -> Self {
-        //         let mut ret = Self {
-        //             #(#type_fields_creation)*
-        //             #(#relation_fields_creation)*
-        //             #(#global_fields_creation)*
-        //         };
-        //         ret.startup_rules();
-        //         ret.canonicalize();
-        //         ret
-        //     }
-        //     pub fn canonicalize(&mut self) {
-        //         self.reroot_and_apply_insertions_up_to(Priority::MAX);
-        //     }
-        //     pub fn close_until(&mut self, condition: impl Fn(&Self) -> bool) -> bool {
-        //         loop {
-        //             if condition(self) {
-        //                 return true;
-        //             }
-        //             self.rules();
-        //             self.clear_new();
-
-        //             if let Some(priority) = self.lowest_insertion_priority() {
-        //                 // apply all insertions of lowest non-empty priority class
-        //                 self.reroot_and_apply_insertions_up_to(priority);
-        //             } else {
-        //                 // nothing to insert, has converged
-        //                 return false;
-        //             }
-        //         }
-        //     }
-        //     #(#type_functions)*
-        //     #(#relation_functions)*
-        // }
     }
 }
 
 fn codegen_relation(rel: &RelationData, theory: &Theory) -> TokenStream {
-    // let remove_uprooted = rel.unique_types().map(|type_| {
-    //     let type_ = &theory.types[type_];
-    //     let type_ty = ident::type_ty(type_);
-    //     let type_remove_uprooted = ident::type_remove_uprooted(type_);
-    //     quote! {
-    //         fn #type_remove_uprooted(uprooted: &[#type_ty]) {
-    //             todo!()
-    //         }
-    //     }
-    // });
-    // let (type_uprooted_self, type_uprooted_others, type_uf, type_): (
-    //     Vec<_>,
-    //     Vec<_>,
-    //     Vec<_>,
-    //     Vec<_>,
-    // ) = rel
-    //     .unique_types()
-    //     .map(|type_| {
-    //         let type_ = &theory.types[type_];
-    //         (
-    //             ident::type_uprooted_self(type_),
-    //             ident::type_uprooted_others(type_),
-    //             ident::type_uf(type_),
-    //             ident::type_ty(type_),
-    //         )
-    //     })
-    //     .multiunzip();
-
     let rel_ty = ident::rel_ty(rel);
     let params = rel
         .param_types
         .iter()
         .map(|type_| ident::type_ty(&theory.types[type_]));
 
-    // dbg!(&type_uprooted_self, &type_uprooted_others, &type_uf, &type_);
     match &rel.ty {
-        RelationTy::Forall { ty } => quote! {
+        RelationTy::Forall { ty: _ } => quote! {
             // maybe integrate with union-find
             #[derive(Debug, Default)]
             struct #rel_ty {
@@ -1253,8 +1017,6 @@ fn codegen_relation(rel: &RelationData, theory: &Theory) -> TokenStream {
                 .collect();
 
             let cost = (index_to_info.len() * rel.param_types.len()) as u32;
-
-            let all_columns = rel.param_types.enumerate().map(ident::column).collect_vec();
 
             let (iter_all, check_all): (Vec<_>, Vec<_>) = usage_to_info
                 .iter()
@@ -1287,7 +1049,7 @@ fn codegen_relation(rel: &RelationData, theory: &Theory) -> TokenStream {
                                 (quote! { #c }, quote! { #c })
                             } else {
                                 let ty = ident::type_ty(&theory.types[rel.param_types[*c]]);
-                                (quote! { #ty (u32::MIN) }, quote! { #ty (u32::MAX) })
+                                (quote! { #ty :: MIN_ID }, quote! { #ty :: MAX_ID })
                             }
                         }).unzip();
 
@@ -1316,34 +1078,49 @@ fn codegen_relation(rel: &RelationData, theory: &Theory) -> TokenStream {
                 .unzip();
 
             let update = {
-                let uf_all = rel
+                let (all_columns_symbolic, uf_all_symbolic): (Vec<_>, Vec<_>) = rel
                     .param_types
-                    .iter()
-                    .copied()
-                    .map(|x| ident::type_uf(&theory.types[x]))
-                    .collect_vec();
+                    .iter_enumerate()
+                    .filter_map(|(i, ty)| {
+                        let ty = &theory.types[ty];
+                        match ty.ty {
+                            TypeKind::Primitive { type_path: _ } => None,
+                            TypeKind::Symbolic => Some((ident::column(i), ident::type_uf(ty))),
+                        }
+                    })
+                    .unzip();
+
+                let all_columns = rel.param_types.enumerate().map(ident::column).collect_vec();
 
                 let uprooted_into_op_delete = {
-                    column_back_reference.iter_enumerate().map(|(c, usage)| {
-                        let usage_info = &usage_to_info[*usage];
-                        let index_info = &index_to_info[usage_info.index];
-                        let column = ident::column(c);
-                        let uproot = ident::type_uprooted(&theory.types[rel.param_types[c]]);
+                    column_back_reference.iter_enumerate().filter_map(|(c, usage)| {
+                        let ty = rel.param_types[c];
+                        let ty = &theory.types[ty];
+                        match ty.ty {
+                            TypeKind::Primitive { type_path: _ } => None,
+                            TypeKind::Symbolic => {
+                                let usage_info = &usage_to_info[*usage];
+                                let index_info = &index_to_info[usage_info.index];
+                                let column = ident::column(c);
+                                let uproot = ident::type_uprooted(&theory.types[rel.param_types[c]]);
 
-                        let index_all_iter = ident::index_all_iter(usage_info, index_info);
+                                let index_all_iter = ident::index_all_iter(usage_info, index_info);
 
-                        let other_columns = index_info.order.inner()[1..]
-                            .iter()
-                            .copied()
-                            .map(ident::column);
+                                let other_columns = index_info.order.inner()[1..]
+                                    .iter()
+                                    .copied()
+                                    .map(ident::column);
 
-                        quote! {
-                            for #column in #uproot.iter().copied() {
-                                println!("uproot: {:?}", #column);
-                                for (#(#other_columns),*) in self.#index_all_iter(#column) {
-                                    op_delete.push((#(#all_columns),*));
-                                }
-                            }
+                                Some(quote! {
+                                    for #column in #uproot.iter().copied() {
+                                        println!("uproot: {:?}", #column);
+                                        for (#(#other_columns),*) in self.#index_all_iter(#column) {
+                                            op_delete.push((#(#all_columns),*));
+                                        }
+                                    }
+                                })
+
+                            },
                         }
                     })
                 };
@@ -1365,28 +1142,47 @@ fn codegen_relation(rel: &RelationData, theory: &Theory) -> TokenStream {
                 let other_indexes_ident: Vec<_> =
                     other_indexes.iter().map(ident::index_all_field).collect();
 
-                let type_args = rel.unique_types().map(|ty| {
+                let symbolic_type_args = rel.unique_types().filter_map(|ty| {
                     let ty = &theory.types[ty];
-                    let uf_field = ident::type_uf(ty);
-                    let uf_ty = ident::type_ty_uf(ty);
-                    let uproot_field = ident::type_uprooted(ty);
-                    let ty = ident::type_ty(ty);
-                    quote! {
-                        #uproot_field: &[#ty],
-                        #uf_field: &mut #uf_ty,
+                    match ty.ty {
+                        TypeKind::Primitive { type_path: _ } => return None,
+                        TypeKind::Symbolic => {
+                            let uf_field = ident::type_uf(ty);
+                            let uf_ty = ident::type_ty_uf(ty);
+                            let uproot_field = ident::type_uprooted(ty);
+                            let ty = ident::type_ty(ty);
+                            Some(quote! {
+                                #uproot_field: &[#ty],
+                                #uf_field: &mut #uf_ty,
+                            })
+                        }
                     }
                 });
+
+                let all_columns_canonicalized = {
+                    rel.param_types.iter_enumerate().map(|(i, x)| {
+                        let column = ident::column(i);
+                        let ty = &theory.types[x];
+                        match ty.ty {
+                            TypeKind::Primitive { type_path: _ } => quote! { #column },
+                            TypeKind::Symbolic => {
+                                let uf = ident::type_uf(ty);
+                                quote! { #uf.find( #column ) }
+                            }
+                        }
+                    })
+                };
 
                 quote! {
                     fn update(
                         &mut self,
-                        #(#type_args)*
+                        #(#symbolic_type_args)*
                         delta: &mut Vec<<Self as Relation>::Row>,
                     ) {
                         self.new.clear();
                         let mut op_insert = take(delta);
                         for (#(#all_columns),*) in op_insert.iter_mut() {
-                            #(*#all_columns = #uf_all.find(*#all_columns);)*
+                            #(*#all_columns_symbolic = #uf_all_symbolic.find(*#all_columns_symbolic);)*
                         }
                         let mut op_delete = Vec::new();
                         #(#uprooted_into_op_delete)*
@@ -1394,9 +1190,9 @@ fn codegen_relation(rel: &RelationData, theory: &Theory) -> TokenStream {
                         for (#(#all_columns),*) in op_delete {
                             if self.#first_index_ident.remove(&(#(#first_index_order),*)) {
                                 #(self.#other_indexes_ident.remove(&(#(#other_indexes_order),*));)*
-                                #(#uf_all.dec_eclass(#all_columns, Self::COST);)*
-                                println!("delete: {:?}", [#(#all_columns),*]);
-                                op_insert.push((#( #uf_all.find(#all_columns)),*));
+                                #(#uf_all_symbolic.dec_eclass(#all_columns_symbolic, Self::COST);)*
+                                println!("delete: {:?}", [#(#all_columns_symbolic),*]);
+                                op_insert.push((#(#all_columns_canonicalized),*));
                             }
                         }
 
@@ -1405,8 +1201,8 @@ fn codegen_relation(rel: &RelationData, theory: &Theory) -> TokenStream {
                             if !self.#first_index_ident.insert((#(#first_index_order),*)) {
                                 return false;
                             }
-                            println!("insert: {:?}", [#(#all_columns),*]);
-                            #(#uf_all.inc_eclass(#all_columns, Self::COST);)*
+                            println!("insert: {:?}", [#(#all_columns_symbolic),*]);
+                            #(#uf_all_symbolic.inc_eclass(#all_columns_symbolic, Self::COST);)*
                             #( self.#other_indexes_ident.insert(( #(#other_indexes_order),*)); )*
                             true
                         });
@@ -1434,31 +1230,6 @@ fn codegen_relation(rel: &RelationData, theory: &Theory) -> TokenStream {
                     #(#check_all)*
                     #update
                 }
-                // impl Relation for #rel_ty {
-                //     type Row = (#(#params,)*);
-                //     fn new() -> Self {
-                //         todo!()
-                //     }
-                //     fn clear_new(&mut self) {
-                //         todo!()
-                //     }
-                // }
-                // impl #rel_ty {
-                //     fn indexed_iter_todo_thingy(&self) {
-                //         todo!()
-                //     }
-                //     #(#remove_uprooted)*
-                //     fn bulk_update<'a>(
-                //         instructions: impl 'a + Iterator<Item = (Math, Math)>,
-                //         #(
-                //             #type_uprooted_self: &mut Vec<#type_>,
-                //             #type_uprooted_others: impl 'a + Iterator<Item = #type_>,
-                //             #type_uf: &mut UnionFind<#type_>,
-                //         )*
-                //     ) {
-                //         todo!()
-                //     }
-                // }
             }
         }
     }
@@ -1467,7 +1238,7 @@ fn codegen_relation(rel: &RelationData, theory: &Theory) -> TokenStream {
 #[cfg(test)]
 pub(crate) mod test {
     use super::*;
-    use expect_test::{Expect, expect};
+    use expect_test::Expect;
     use std::{
         io::Write as _,
         process::{Command, Output, Stdio},

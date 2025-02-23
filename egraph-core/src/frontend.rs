@@ -4,7 +4,7 @@
 
 use std::{
     cmp::Ordering,
-    collections::{btree_map::Entry, BTreeMap},
+    collections::{BTreeMap, btree_map::Entry},
     fmt::{Debug, Display},
     hash::{Hash, Hasher},
     mem::take,
@@ -264,10 +264,13 @@ fn byte_range(span: Span) -> std::ops::Range<usize> {
 impl SexpSpan {
     fn call(self, context: &'static str) -> syn::Result<(Str, &'static [SexpSpan])> {
         if let Sexp::List(
-            [SexpSpan {
-                span: _,
-                x: Sexp::Atom(function_name),
-            }, args @ ..],
+            [
+                SexpSpan {
+                    span: _,
+                    x: Sexp::Atom(function_name),
+                },
+                args @ ..,
+            ],
         ) = self.x
         {
             Ok((*function_name, args))
@@ -388,14 +391,15 @@ impl SexpSpan {
 #[derive(Debug, Clone, PartialEq)]
 struct TypeData {
     name: Str,
-    /// Something like `MyPrimitiveType`
-    /// List if something like (Vec i64)
-    primitive: Option<Vec<Str>>,
+    /// (Vec i64) -> ["Vec", "i64"]
+    collection: Option<Vec<Str>>,
+    /// i64 -> "std::primitive::i64"
+    primitive: Option<&'static str>,
 }
 impl TypeData {
-    fn is_primitive(&self) -> bool {
+    fn can_not_unify(&self) -> bool {
         // TODO: make sure i64 and similar is actually primitive.
-        self.primitive.is_some()
+        self.collection.is_some() || self.primitive.is_some()
     }
 }
 
@@ -545,12 +549,14 @@ const BUILTIN_STRING: &str = "String";
 const BUILTIN_BOOL: &str = "bool";
 const BUILTIN_UNIT: &str = "()";
 
-const BUILTIN_SORTS: [&str; 5] = [
-    BUILTIN_I64,
-    BUILTIN_F64,
-    BUILTIN_STRING,
-    BUILTIN_BOOL,
-    BUILTIN_UNIT,
+const BUILTIN_SORTS: [(&str, &str); 2] = [
+    (BUILTIN_I64, "std::primitive::i64"),
+    // TODO: we could trivially add more here for all sizes of ints/floats.
+    // (BUILTIN_F64, "std::primitive::f64"),
+    // TODO: explicitly intern all strings.
+    // (BUILTIN_STRING, "std::string::String"),
+    // (BUILTIN_BOOL, "std::primitive::bool"),
+    (BUILTIN_UNIT, "std::primitive::unit"),
 ];
 
 #[derive(Debug, Clone, PartialEq)]
@@ -739,11 +745,10 @@ impl Parser {
             global_to_function: BTreeMap::new(),
             type_to_forall: BTreeMap::new(),
         };
-        for builtin in BUILTIN_SORTS {
-            let _ty = parser.add_sort(
-                Str::with_placeholder(builtin),
-                Some(vec![Str::with_placeholder(builtin)]),
-            );
+        for (builtin, path) in BUILTIN_SORTS {
+            let _ty: TypeId = parser
+                .add_sort(Str::with_placeholder(builtin), None, Some(path))
+                .unwrap();
         }
 
         parser
@@ -770,17 +775,16 @@ impl Parser {
             "sort" => match args {
                 [name] => {
                     let name = name.atom("sort name")?;
-                    let primitive = None;
-                    let _: TypeId = self.add_sort(name, primitive)?;
+                    let _: TypeId = self.add_sort(name, None, None)?;
                 }
                 [name, primitive] => {
                     let name = name.atom("sort name")?;
-                    let primitive: Vec<_> = primitive
+                    let collection: Vec<_> = primitive
                         .list("sort")?
                         .iter()
                         .map(|x| x.atom("sort primitive"))
                         .collect::<Result<Vec<_>, _>>()?;
-                    let _: TypeId = self.add_sort(name, Some(primitive))?;
+                    let _: TypeId = self.add_sort(name, Some(collection), None)?;
                 }
                 _ => ret!("usage: (sort <name>) or (sort <name> (<collection> <args>*))"),
             },
@@ -788,21 +792,25 @@ impl Parser {
                 let [name, constructors @ ..] = args else {
                     ret!("usage: (datatype <name> <variant>*)");
                 };
-                let output_type = self.add_sort(name.atom("datatype")?, None)?;
+                let output_type = self.add_sort(name.atom("datatype")?, None, None)?;
                 for constructor in constructors {
                     let (function_name, args) = constructor.call("datatype constructor")?;
 
                     // TODO: should we have a default cost here?
                     let mut cost = Some(1);
                     let inputs = match args {
-                        [inputs @ .., SexpSpan {
-                            span: _,
-                            x:
-                                Sexp::Atom(Str {
-                                    x: ":cost",
-                                    span: _,
-                                }),
-                        }, c] => {
+                        [
+                            inputs @ ..,
+                            SexpSpan {
+                                span: _,
+                                x:
+                                    Sexp::Atom(Str {
+                                        x: ":cost",
+                                        span: _,
+                                    }),
+                            },
+                            c,
+                        ] => {
                             cost = Some(c.uint("constructor cost")?);
                             inputs
                         }
@@ -917,8 +925,10 @@ impl Parser {
                             for x in x {
                                 extra_facts.push(Parser::parse_expr(*x, &None)?);
                             }
-                        },
-                        _ => ret!("unknown option, supported: (:ruleset <ruleset>) (:subsume) (:when (<facts>))"),
+                        }
+                        _ => ret!(
+                            "unknown option, supported: (:ruleset <ruleset>) (:subsume) (:when (<facts>))"
+                        ),
                     }
                 }
                 if subsume {
@@ -988,7 +998,7 @@ impl Parser {
             }
             "run" | "run_schedule" | "simplify" | "query_extract" | "check" | "push" | "pop"
             | "print_stats" | "print_function" | "print_size" | "input" | "output" | "fail" => {
-                return unimplemented_msg
+                return unimplemented_msg;
             }
 
             _ => {
@@ -1007,16 +1017,24 @@ impl Parser {
             .collect()
     }
 
-    fn add_sort(&mut self, name: Str, primitive: Option<Vec<Str>>) -> syn::Result<TypeId> {
+    fn add_sort(
+        &mut self,
+        name: Str,
+        collection: Option<Vec<Str>>,
+        primitive: Option<&'static str>,
+    ) -> syn::Result<TypeId> {
         let type_id = self.type_ids.add_unique(name)?;
         self.types.push_expected(
             type_id,
             TypeData {
                 name,
-                primitive: primitive.clone(),
+                collection: collection.clone(),
+                primitive,
             },
         );
-        if primitive.is_none() {
+        // TODO: should collection types have a forall?
+        if collection.is_none() && primitive.is_none() {
+            dbg!(*name);
             let relation_id = self.functions.push(None);
             self.hir_relations
                 .push_expected(relation_id, hir::Relation::forall(*name, type_id));
@@ -1079,7 +1097,7 @@ impl Parser {
                     ops,
                     variables,
                 )
-            } else if self.types[output].is_primitive() {
+            } else if self.types[output].can_not_unify() {
                 // unify primitive => panic if disagree
                 hir::ImplicitRule::new_panic(relation_id, inputs.len())
             } else {
@@ -1111,16 +1129,17 @@ impl Parser {
                 let global_id = self.add_global(None, ty, ComputeMethod::Literal(literal))?;
                 variables.push((ty, Some(global_id)))
             }
-            Expr::Var(spanned) => {
-                match **spanned {
-                    "old" => old,
-                    "new" => new,
-                    _ => {
-                        let msg = format!("only variables old or new are allowed in a merge expression, not \"{}\"", **spanned);
-                        return Err(syn::Error::new(spanned.span, msg));
-                    }
+            Expr::Var(spanned) => match **spanned {
+                "old" => old,
+                "new" => new,
+                _ => {
+                    let msg = format!(
+                        "only variables old or new are allowed in a merge expression, not \"{}\"",
+                        **spanned
+                    );
+                    return Err(syn::Error::new(spanned.span, msg));
                 }
-            }
+            },
             Expr::Call(name, args) => {
                 let args = args
                     .iter()
@@ -1432,7 +1451,11 @@ impl Parser {
         let types: TVec<TypeId, hir::Type> = self
             .types
             .iter()
-            .map(|t| hir::Type { name: *t.name })
+            .map(|t| match (t.primitive, &t.collection) {
+                (_, Some(_)) => todo!("collection not implemented"),
+                (Some(primitive), _) => hir::Type::new_primitive(*t.name, primitive),
+                (None, None) => hir::Type::new_symbolic(*t.name),
+            })
             .collect();
         hir::Theory {
             symbolic_rules: self.symbolic_rules.clone(),

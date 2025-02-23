@@ -135,6 +135,14 @@ dependencies = [
 ]
 
 [[package]]
+name = "egraph-bench"
+version = "0.1.0"
+dependencies = [
+ "egraph",
+ "expect-test",
+]
+
+[[package]]
 name = "egraph-core"
 version = "0.1.0"
 dependencies = [

@@ -100,7 +100,7 @@ pub(crate) fn index_selection(
 
 #[cfg(test)]
 mod test {
-    use super::{index_selection, ColumnId, IndexUsageId};
+    use super::{ColumnId, IndexUsageId, index_selection};
     use crate::typed_vec::TVec;
     use expect_test::expect;
     use itertools::Itertools as _;
