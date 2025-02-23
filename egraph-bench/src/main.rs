@@ -1,6 +1,5 @@
 use egraph::*;
 
-
 // TODO: this is missing:
 // * globals
 // * rational numbers
@@ -10,7 +9,7 @@ compile_egraph!((
 (datatype Math
     (Diff Math Math)
     (Integral Math Math)
-    
+
     (Add Math Math)
     (Sub Math Math)
     (Mul Math Math)
@@ -18,10 +17,10 @@ compile_egraph!((
     (Pow Math Math)
     (Ln Math)
     (Sqrt Math)
-    
+
     (Sin Math)
     (Cos Math)
-    
+
     (Const i64)
     // (Const Rational)
     // (Var String)
@@ -61,5 +60,4 @@ compile_egraph!((
 (rewrite (Integral (Mul a b) x) (Sub (Mul a (Integral b x)) (Integral (Mul (Diff x a) (Integral b x)) x)))
 ));
 
-fn main() {
-}
+fn main() {}

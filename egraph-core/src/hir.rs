@@ -100,7 +100,7 @@ pub(crate) enum ImplicitRuleAction {
 }
 
 /// Represents a theory (set of rules) with associated information
-#[derive(Clone, Eq, PartialEq, Ord, PartialOrd, Hash, Debug, Default)]
+#[derive(Clone, Debug, Default)]
 pub(crate) struct Theory {
     /// Name of final struct
     pub(crate) name: &'static str,
@@ -120,7 +120,7 @@ impl Type {
     pub(crate) fn new_symbolic(name: &'static str) -> Self {
         Self {
             name,
-            ty: TypeKind::Symolic,
+            ty: TypeKind::Symbolic,
         }
     }
     pub(crate) fn new_primitive(name: &'static str, type_path: &'static str) -> Self {
@@ -136,7 +136,7 @@ pub(crate) enum TypeKind {
     /// can be unified by user
     /// always a wrapper around a u32
     #[default]
-    Symolic,
+    Symbolic,
     // /// can not be unified by user
     // /// always a wrapper around a u32
     // Collection {
@@ -226,7 +226,7 @@ pub(crate) enum RelationTy {
 }
 
 #[must_use]
-#[derive(Clone, Eq, PartialEq, Ord, PartialOrd, Hash, Debug, Default)]
+#[derive(Clone, Debug, Default)]
 pub(crate) struct SymbolicRule {
     pub(crate) name: &'static str,
     /// Requirements to trigger rule
@@ -452,7 +452,7 @@ impl SymbolicRule {
                 .map(|x| merged_action_variables.find(*x))
                 .collect();
             let mut old_to_new = BTreeMap::new();
-            for (old_id, (meta, link)) in merged_action_variables.iter_roots() {
+            for (old_id, &(meta, link)) in merged_action_variables.iter_roots() {
                 if !action_delete.contains(&old_id) {
                     let new_id = action_variables.push((meta, link));
                     old_to_new.insert(old_id, new_id);
@@ -492,7 +492,7 @@ impl SymbolicRule {
                 .map(|x| merged_premise_variables.find(*x))
                 .collect();
             premise_old_to_new = BTreeMap::new();
-            for (old_id, meta) in merged_premise_variables.iter_roots() {
+            for (old_id, &meta) in merged_premise_variables.iter_roots() {
                 if !premise_delete.contains(&old_id) {
                     let new_id = premise_variables.push(meta);
                     premise_old_to_new.insert(old_id, new_id);
@@ -693,7 +693,7 @@ impl SymbolicRule {
             x.to_string()
         }
     }
-    /// redorder premises into a canonical order
+    /// Reorder premises into a canonical order.
     fn canonical_permutation(&self) -> Self {
         // is self contained in other?
         // TODO: ignores "forall" variables.
@@ -967,7 +967,7 @@ pub(crate) mod query_planning {
     /// Returns `codegen::Theory` and `hir::Theory` since the `hir::Theory` is modified when
     /// emitted.
     /// TODO: emit implicit rules, trigger rules.
-    pub(crate) fn emit_codegen_theory(mut theory: Theory) -> (hir::Theory, codegen::Theory) {
+    pub(crate) fn emit_codegen_theory(mut theory: hir::Theory) -> (hir::Theory, codegen::Theory) {
         let non_new_relations = theory.relations.len();
         let old_to_new = theory.add_delta_relations_in_place();
         let rules = symbolic_rules_as_semi_naive(&theory.symbolic_rules, &old_to_new);
@@ -1032,7 +1032,7 @@ pub(crate) mod query_planning {
             .types
             .iter()
             .map(|x| match x.ty {
-                hir::TypeKind::Symolic => codegen::TypeData::new_symbolic(x.name),
+                hir::TypeKind::Symbolic => codegen::TypeData::new_symbolic(x.name),
                 hir::TypeKind::Primitive { type_path } => {
                     codegen::TypeData::new_primitive(x.name, type_path)
                 }
@@ -1054,7 +1054,7 @@ pub(crate) mod query_planning {
     fn generate_tries(
         rules: Vec<SymbolicRule>,
         codegen_variables: &mut TVec<VariableId, codegen::VariableData>,
-        theory: &Theory,
+        theory: &hir::Theory,
         table_uses: &mut TVec<RelationId, TVec<IndexUsageId, Vec<ColumnId>>>,
         tries: &mut Vec<RuleTrie>,
     ) {

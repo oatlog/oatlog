@@ -646,7 +646,7 @@ impl<V: Clone> MapExt<&'static str, Spanned<V>> for BTreeMap<&'static str, Spann
 }
 
 /// Global parsing state
-#[derive(Debug, PartialEq)]
+#[derive(Debug)]
 struct Parser {
     rulesets: BTreeMap<Str, ()>,
 

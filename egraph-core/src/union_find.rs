@@ -17,9 +17,8 @@ pub(crate) type UF<T> = UFData<T, ()>;
 /// Union Find with optional attached data.
 ///
 /// Indexing canonicalizes the index and returns the associated data for that index.
-/// Note that Eq, Hash is kinda broken because the data structure is not bit-equal when commuting
-/// edge additions.
-#[derive(Clone, Eq, PartialEq, Ord, PartialOrd, Debug, Default)]
+// TODO lgustafsson for emagnusson: Removed Eq, Hash etc because they weren't used anyway
+#[derive(Clone, Debug, Default)]
 pub(crate) struct UFData<K: Id, V> {
     repr: Vec<Cell<K>>,
     data: Vec<V>,
@@ -36,12 +35,6 @@ impl<K: Id, V: Clone> UFData<K, V> {
 }
 
 impl<K: Id, V> UFData<K, V> {
-    /// Make repr only contain canonical data.
-    fn canonicalize(&self) {
-        for i in 0..self.repr.len() {
-            let _: K = self.find(i.into());
-        }
-    }
     pub(crate) fn new() -> Self {
         Self {
             repr: vec![],
@@ -63,26 +56,23 @@ impl<K: Id, V> UFData<K, V> {
         let i = self.find(i);
         &self.sets[i.into()]
     }
-}
-impl<K: Id, V: Clone> UFData<K, V> {
+
     /// Iterate the root representatives and their data
-    pub(crate) fn iter_roots(&self) -> impl Iterator<Item = (K, V)> + use<'_, K, V> {
+    pub(crate) fn iter_roots(&self) -> impl Iterator<Item = (K, &V)> + use<'_, K, V> {
         (0..self.repr.len()).filter_map(|i0| {
             let i0 = i0.into();
             let i = self.find(i0);
             if i != i0 {
                 return None;
             }
-            Some((i, self.data[i.into()].clone()))
+            Some((i, &self.data[i.into()]))
         })
     }
-
     pub(crate) fn iter_sets(&self) -> impl Iterator<Item = &[K]> {
         (0..self.repr.len())
             .map(|i| self.sets[self.find(i.into()).into()].as_slice())
             .unique()
     }
-
     /// Iterate the sets that contain > 1 element.
     pub(crate) fn iter_merged_sets(&self) -> impl Iterator<Item = &[K]> {
         (0..self.repr.len()).filter_map(|i0| {
@@ -95,15 +85,14 @@ impl<K: Id, V: Clone> UFData<K, V> {
             }
         })
     }
-
     /// Iterate all entries, including non-root.
     ///
     /// Iterator element is (id, find(id), find(id).value)
-    pub(crate) fn iter_all(&self) -> impl Iterator<Item = (K, K, V)> + use<'_, K, V> {
+    pub(crate) fn iter_all(&self) -> impl Iterator<Item = (K, K, &V)> + use<'_, K, V> {
         (0..self.repr.len()).map(|i0| {
             let i0 = i0.into();
             let i = self.find(i0);
-            (i, i0, self.data[i.into()].clone())
+            (i, i0, &self.data[i.into()])
         })
     }
 
@@ -115,12 +104,12 @@ impl<K: Id, V: Clone> UFData<K, V> {
         self.sets.push(vec![id]);
         id
     }
-
+}
+impl<K: Id, V: Clone> UFData<K, V> {
     /// Union a and b, calls `merge` if a and b are different
     ///
     /// Merge returns a result, if Err, it means it is not possible to merge
     /// the two data values and the union is canceled
-    ///
     pub(crate) fn try_union_merge<E, F: FnMut(V, V) -> Result<V, E>>(
         &mut self,
         i: K,
@@ -169,13 +158,6 @@ impl<T: Id> UF<T> {
                 self.union(w[0], w[1]);
             }
         }
-    }
-}
-
-impl<K: Id, V: Hash> Hash for UFData<K, V> {
-    fn hash<H: std::hash::Hasher>(&self, state: &mut H) {
-        self.data.hash(state);
-        self.sets.hash(state);
     }
 }
 

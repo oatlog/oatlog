@@ -93,7 +93,7 @@ mod range_query_impl {
                 $($name1 : RelationElement,)*
             {
                 fn query(&self, t: ($($name0,)*)) -> impl Iterator<Item = ($($name1),*)> {
-                    self.range(($(t . $digit0,)* $($name1::MIN_ID,)*)..($(t . $digit0,)* $($name1::MIN_ID,)*))
+                    self.range(($(t . $digit0,)* $($name1::MIN_ID,)*)..($(t . $digit0,)* $($name1::MAX_ID,)*))
                         .copied()
                         .map(|x| ($(x . $digit1),*))
                 }
@@ -192,6 +192,7 @@ impl<T: Eclass> UnionFind<T> {
             root
         }
     }
+    // TODO lgustafsson for emagnusson: It doesn't.
     // returns uprooted
     pub fn union(&mut self, a: T, b: T) {
         let a = self.find_inner(a.inner());
@@ -218,11 +219,11 @@ impl<T: Eclass> UnionFind<T> {
         self.size.push(1);
         T::new(id)
     }
-    // inc/dec this possibly non-canonicalized e-class
-    // can be no-op if not repr.
+    /// Increment cost of uprooting this e-class. No-op if already uprooted.
     pub fn inc_eclass(&mut self, t: T, delta: u32) {
         self.size[t.inner() as usize] += delta;
     }
+    /// Decrement cost of uprooting this e-class. No-op if already uprooted.
     pub fn dec_eclass(&mut self, t: T, delta: u32) {
         self.size[t.inner() as usize] -= delta;
     }

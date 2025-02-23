@@ -1,14 +1,10 @@
-
-
-
 fn main() {
-
-        egraph::compile_egraph!((
-            (datatype Math
-             (Mul Math Math)
-             (Add Math Math)
-            )
-        ));
+    egraph::compile_egraph!((
+        (datatype Math
+         (Mul Math Math)
+         (Add Math Math)
+        )
+    ));
     /*
     // TODO: egglog has builtin include, so just use that.
     egraph::compile_egraph!((
