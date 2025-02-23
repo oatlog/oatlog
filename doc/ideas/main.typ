@@ -1516,6 +1516,199 @@ fn apply_rules(&mut self) {
 }
 ```
 
+
+= Indications of perfect primitive abstractions.
+If E-classes can be implemented in userspace.
+
+= Time to implement primitives.
+
+Types:
+```rust
+enum Ty {
+    /// Something that can be unified directly.
+    Eqsort,
+    /// Handle to a collection.
+    Handle,
+    /// Something literal.
+    Primitive,
+}
+```
+
+```
+type       | make T                      | unify T
+-----------|-----------------------------|----------
+Eqsort     | UnionFind<T>   (directly)   | union-find
+Handle     | Context object              | context object
+Primitive  |                             | panic
+```
+
+All the relation stuff on primitives (non-handle) is just trivial:
+```rust
+struct PrimitiveAddRelation;
+impl Relation for PrimitiveAddRelation {
+    type Row = (i64, i64, i64);
+}
+impl PrimitiveAddRelation {
+    fn iter2_0_1_2(&self, x0: i64, x1: i64) -> impl Iterator<Item = i64> {
+        x0.checked_add(x1).into_iter()
+    }
+    fn iter2_1_0_2(&self, x1: i64, x0: i64) -> impl Iterator<Item = i64> {
+        x1.checked_add(x0).into_iter()
+    }
+    fn iter2_2_0_1(&self, x2: i64, x0: i64) -> impl Iterator<Item = i64> {
+        x2.checked_sub(x0).into_iter()
+    }
+    fn iter2_2_1_0(&self, x2: i64, x1: i64) -> impl Iterator<Item = i64> {
+        x2.checked_sub(x1).into_iter()
+    }
+}
+```
+
+
+```rust
+// Eq not strictly required
+// !Copy would not make much sense to me but it is not strictly required.
+// Ord is required for range queries.
+trait RelationElement: Ord + Eq + Copy {
+    // for btree range queries.
+    const MIN_ID: Self,
+    const MAX_ID: Self,
+}
+// EqSort is always a wrapper around a u32.
+// The "context object" for an EqSort is union-find.
+trait EqSort: RelationElement {
+    fn from(x: u32) -> Self;
+    fn inner(self) -> u32;
+}
+// Handle is also always a u32 (hopefully fine), but will only be unified by a context object.
+trait Handle: RelationElement {
+    fn from(x: u32) -> Self;
+    fn inner(self) -> u32;
+}
+
+// Primitives are entirely opaque to the engine, eg i64
+trait Primitive: RelationElement {
+
+}
+```
+
+```rust
+
+struct MathVecHandle(u32);
+
+
+struct Theory {
+    // only unified by mathveccontext
+    uf_mathvec: UnionFind<MathVecHandle>,
+
+    delta: Delta,
+}
+
+
+// contains the actual data for many relations.
+struct MathVecContext {
+    // TODO: there are many other options, such as linked lists, or avoiding a Vec, by storing a table of [index, math, vec].
+    handle_to_vec: BTreeMap<MathVecHandle, Vec<Math>>,
+    vec_to_handle: BTreeMap<Vec<Math>, MathVecHandle>,
+    math_to_handle: BTreeMap<Math, Vec<MathVecHandle>>,
+
+
+    all_vec_push: BTreeMap<(MathVecHandle, Math), MathVecHandle>,
+
+    new_mathvec: Vec<MathVecHandle>,
+}
+
+// It is actually safe in a sense to mutate this in-place.
+struct Delta {
+    vec_push: Vec<
+}
+
+// relation 0
+// same as global.
+fn vec_new() -> MathVecHandle;
+
+// relation 1
+// index on 0,1 -> 2
+// indexed lookup creates vec.
+// we never explicitly "insert" to this relation.
+fn vec_push(vec: MathVecHandle, elem: Math) -> MathVecHandle /* single elem in practice */;
+
+// relation 2
+// index on 0,1 -> 2
+fn vec_index(vec: MathVecHandle, index: i64) -> Math /* single elem in practice */;
+
+
+// indexing can not *semantically* mutate the relation as query planning should be allowed to do arbitrary things.
+// If we can observe the arguments to a function, we can provide the argument in a bevy-like way.
+
+struct VecPushRelation;
+impl Relation for VecPushRelation {
+    type Row = (MathVecHandle, Math, MathVecHandle);
+}
+impl VecPushRelation {
+    fn iter_new(&self, ctx: &MathVecContext) -> impl Iterator<Item = <Self as Relation>::Row> + use<'_> {
+        /* idk what this does */
+    }
+    // MathVecContext needs interior mutability OR we can fail now and schedule an insert.
+    // If indexing actually mutated the database, it would not just be unsound in the borrow-checker sense but also just be iterator invalidation.
+    // So the only way to make it sound would be to make it return an iterator that did not use self.
+    fn iter2_0_1_2(
+        &self,
+        ctx: &MathVecContext,
+        uf_mathvec: &mut UnionFind<MathVec>,
+        delta: &mut Delta,
+        vec: MathVecHandle,
+        elem: Math,
+    ) -> impl Iterator<Item = (MathVecHandle)> /* remove this: + use<'_> */ {
+        let ctx: &mut MathVecContext = RefCell::something(ctx);
+
+        // this should be a "get or insert(into delta)" operation.
+
+
+        once(..)
+    }
+    fn update(
+        &mut self,
+        ctx: &mut MathVecContext,
+        math_uprooted: &[Math],
+        math_uf: &mut UnionFind<Math>,
+        // delta
+    ) {
+
+    }
+}
+
+
+
+
+```
+
+
+= How can we discover bugs?
+
+Because of the way semi-naive works, if we do not get all results, it is hard to debug.
+Specifically, there may be bugs in the way collections are implemented.
+Does egglog have old/new for collections? If not, they either have a bug or we do not understand how collections work.
+
+
+= "Entry api" impl
+
+```rust
+// for things that are supposed to return exactly one thing, perform an "get or default"
+// operation.
+fn entry2_0_1_2(&self, delta: &mut Delta, math_uf: &mut UnionFind<Math>, x0: Math, x1: Math) -> (Math) {
+    if let Some((_, _, x2)) = self.all_index_0_1_2.range((x0, x1, Math(0))..(x0, x1, Math(u32::MAX))).copied().next() {
+        return (x2);
+    }
+    let x2 = math_uf.add_eclass();
+    delta.forall_math_relation_delta.push(x2);
+    delta.add_relation_delta.push((x0, x1, x2));
+    return (x2)
+}
+```
+Will generate potentially many e-classes, but not if the result is already in the database.
+
+
 = TODO READ
 Papers are just under the first author i looked at.
 I stopped adding authors after a while since this is just too many papers.

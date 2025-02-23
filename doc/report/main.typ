@@ -39,12 +39,52 @@ And this is referencing the appendix: @theappendix.
 
 = Conclusion
 
+= Why on earth is a BTreeSet equivalent to an index?
+
+something something trie, logical physical indexes, flow.
+
+= Peeling the layers of abstraction from egglog.
+
+Conceptually, egglog stores __uninterpreted partial functions__.
+
+Thinking about uninterpreted partial functions is a bit abstract, so I think it helps to drop to the abstraction of a relation directly.
+
+For example, consider a partial function that performs addition, which we can represent as a table:
+#table(
+  columns: (1fr, auto, auto),
+  inset: 10pt,
+  align: horizon,
+  table.header(
+    [x], [y], [res],
+  ),
+  1,2,3
+  4,2,6
+  3,5,8
+)
+This is a partial function because it's domain is a subset of all pairs of natural numbers.
+But since these are uninterpreted, we do not have actual values, but instead E-classes:
+#table(
+  columns: (1fr, auto, auto),
+  inset: 10pt,
+  align: horizon,
+  table.header(
+    [x], [y], [res],
+  ),
+  a,b,c
+  d,b,f
+  c,e,g
+)
+For example, we can not really say anything about $a$ other than $"add"(a,b) = c$
+It is called a function because we have a functional dependency from (x,y) to res.
+In database terminology, we have a primary key on (x,y) for this relation.
+
+- sum types are not real
 
 = Semi-Naive Evaluation
 Semi naive evaluation is a way to join relations where results only include possibly new information.
 In the context of Datalog, it avoids recomputing the same facts.
 Expressing it as (pseudo)-relational algebra makes it more clear.
-Lets say we want to join relations A, B and C, 
+Lets say we want to join relations A, B and C,
 where $times$ is a join, $union$ is the union of relations and $Delta$ is the change to a relation.
 $
 "all information" = A times B times C
@@ -60,7 +100,7 @@ The expression can be expanded and we get $A times B times C$ that can be cancel
 
 //highlight(x)
 $
-"new information" subset 
+"new information" subset
     &hl(A times B times C) union \
     &Delta A times B times C union \
     &(A union Delta A) times Delta B times C union \
@@ -68,14 +108,14 @@ $
     -& hl(A times B times C)
 $
 $
-"new information" subset 
+"new information" subset
     &Delta A &times& B &times& C union \
     &(A union Delta A) &times& Delta B &times& C union \
     &(A union Delta A) &times& (B union Delta B) &times& Delta C \
 $
 To make the pattern more clear, $Delta X$ is written as "new", $X$ is written as "old" and $X union Delta X$ is written as all:
 $
-"new information" subset 
+"new information" subset
     &"new" &times& "old" &times& "old" union \
     &"all" &times& "new" &times& "old" union \
     &"all" &times& "all" &times& "new" \
@@ -98,7 +138,7 @@ This is more or less what eqlog and egglog does, but there are some problems wit
 
 But if we replace all iterations of "old" with "all":
 $
-"new information" subset 
+"new information" subset
     &"new" &times& "all" &times& "all" union \
     &"all" &times& "new" &times& "all" union \
     &"all" &times& "all" &times& "new" \
