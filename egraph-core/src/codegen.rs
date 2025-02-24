@@ -1226,8 +1226,9 @@ pub fn codegen(theory: &Theory) -> TokenStream {
                 theory
             }
             pub fn step(&mut self) {
-                println!("step start");
+                println!("apply rules");
                 self.apply_rules();
+                println!("clear transient");
                 self.clear_transient();
                 println!("step end");
             }
@@ -1383,7 +1384,6 @@ fn codegen_relation(rel: &RelationData, theory: &Theory) -> TokenStream {
 
                                 Some(quote! {
                                     for #column in #uproot.iter().copied() {
-                                        println!("uproot: {:?}", #column);
                                         for (#(#other_columns),*) in self.#index_all_iter(#column) {
                                             op_delete.push((#(#all_columns),*));
                                         }
@@ -1461,7 +1461,6 @@ fn codegen_relation(rel: &RelationData, theory: &Theory) -> TokenStream {
                             if self.#first_index_ident.remove(&(#(#first_index_order),*)) {
                                 #(self.#other_indexes_ident.remove(&(#(#other_indexes_order),*));)*
                                 #(#uf_all_symbolic.dec_eclass(#all_columns_symbolic, Self::COST);)*
-                                println!("delete: {:?}", [#(#all_columns_symbolic),*]);
                                 op_insert.push((#(#all_columns_canonicalized),*));
                             }
                         }
@@ -1471,7 +1470,6 @@ fn codegen_relation(rel: &RelationData, theory: &Theory) -> TokenStream {
                             if !self.#first_index_ident.insert((#(#first_index_order),*)) {
                                 return false;
                             }
-                            println!("insert: {:?}", [#(#all_columns_symbolic),*]);
                             #(#uf_all_symbolic.inc_eclass(#all_columns_symbolic, Self::COST);)*
                             #( self.#other_indexes_ident.insert(( #(#other_indexes_order),*)); )*
                             true

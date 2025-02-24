@@ -166,8 +166,39 @@ fn main() {
     let mut theory = Theory::new();
     dbg!(&theory);
 
+    use std::time::Instant;
+    let start = Instant::now();
     loop {
         theory.step();
         dbg!(theory.add_relation.all_index_0_1_2.len());
+        dbg!(theory.sub_relation.all_index_0_1_2.len());
+        dbg!(theory.mul_relation.all_index_0_1_2.len());
+        dbg!(theory.div_relation.all_index_0_1_2.len());
+        dbg!(theory.diff_relation.all_index_0_1_2.len());
+        dbg!(theory.integral_relation.all_index_0_1_2.len());
+        dbg!(theory.pow_relation.all_index_0_1_2.len());
+        dbg!(theory.ln_relation.all_index_0_1.len());
+        dbg!(theory.sqrt_relation.all_index_0_1.len());
+        dbg!(theory.sin_relation.all_index_0_1.len());
+        dbg!(theory.cos_relation.all_index_0_1.len());
+        dbg!(theory.const_relation.all_index_0_1.len());
+        dbg!(theory.fake_var_relation.all_index_0_1.len());
+
+        let total = [(theory.add_relation.all_index_0_1_2.len()),
+        (theory.sub_relation.all_index_0_1_2.len()),
+        (theory.mul_relation.all_index_0_1_2.len()),
+        (theory.div_relation.all_index_0_1_2.len()),
+        (theory.diff_relation.all_index_0_1_2.len()),
+        (theory.integral_relation.all_index_0_1_2.len()),
+        (theory.pow_relation.all_index_0_1_2.len()),
+        (theory.ln_relation.all_index_0_1.len()),
+        (theory.sqrt_relation.all_index_0_1.len()),
+        (theory.sin_relation.all_index_0_1.len()),
+        (theory.cos_relation.all_index_0_1.len()),
+        (theory.const_relation.all_index_0_1.len()),
+        (theory.fake_var_relation.all_index_0_1.len())].iter().copied().sum::<usize>();
+        dbg!(total);
+        dbg!(start.elapsed());
+
     }
 }

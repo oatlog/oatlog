@@ -329,6 +329,12 @@ mod test {
                             .copied()
                             .map(|(x1, x0, x2)| (x0, x2))
                     }
+                    fn iter2_0_1_2(&self, x0: Math, x1: Math) -> impl Iterator<Item = (Math)> + use<'_> {
+                        self.all_index_0_1_2
+                            .range((x0, x1, Math::MIN_ID)..=(x0, x1, Math::MAX_ID))
+                            .copied()
+                            .map(|(x0, x1, x2)| (x2))
+                    }
                     fn iter1_0_1_2(&self, x0: Math) -> impl Iterator<Item = (Math, Math)> + use<'_> {
                         self.all_index_0_1_2
                             .range((x0, Math::MIN_ID, Math::MIN_ID)..=(x0, Math::MAX_ID, Math::MAX_ID))
@@ -343,6 +349,9 @@ mod test {
                     }
                     fn check1_1_0_2(&self, x1: Math) -> bool {
                         self.iter1_1_0_2(x1).next().is_some()
+                    }
+                    fn check2_0_1_2(&self, x0: Math, x1: Math) -> bool {
+                        self.iter2_0_1_2(x0, x1).next().is_some()
                     }
                     fn check1_0_1_2(&self, x0: Math) -> bool {
                         self.iter1_0_1_2(x0).next().is_some()
@@ -365,19 +374,16 @@ mod test {
                         }
                         let mut op_delete = Vec::new();
                         for x0 in math_uprooted.iter().copied() {
-                            println!("uproot: {:?}", x0);
                             for (x1, x2) in self.iter1_0_1_2(x0) {
                                 op_delete.push((x0, x1, x2));
                             }
                         }
                         for x1 in math_uprooted.iter().copied() {
-                            println!("uproot: {:?}", x1);
                             for (x0, x2) in self.iter1_1_0_2(x1) {
                                 op_delete.push((x0, x1, x2));
                             }
                         }
                         for x2 in math_uprooted.iter().copied() {
-                            println!("uproot: {:?}", x2);
                             for (x0, x1) in self.iter1_2_0_1(x2) {
                                 op_delete.push((x0, x1, x2));
                             }
@@ -389,7 +395,6 @@ mod test {
                                 math_uf.dec_eclass(x0, Self::COST);
                                 math_uf.dec_eclass(x1, Self::COST);
                                 math_uf.dec_eclass(x2, Self::COST);
-                                println!("delete: {:?}", [x0, x1, x2]);
                                 op_insert.push((math_uf.find(x0), math_uf.find(x1), math_uf.find(x2)));
                             }
                         }
@@ -397,7 +402,6 @@ mod test {
                             if !self.all_index_0_1_2.insert((x0, x1, x2)) {
                                 return false;
                             }
-                            println!("insert: {:?}", [x0, x1, x2]);
                             math_uf.inc_eclass(x0, Self::COST);
                             math_uf.inc_eclass(x1, Self::COST);
                             math_uf.inc_eclass(x2, Self::COST);
@@ -429,6 +433,12 @@ mod test {
                     fn iter_new(&self) -> impl Iterator<Item = <Self as Relation>::Row> + use<'_> {
                         self.new.iter().copied()
                     }
+                    fn iter2_0_1_2(&self, x0: Math, x1: Math) -> impl Iterator<Item = (Math)> + use<'_> {
+                        self.all_index_0_1_2
+                            .range((x0, x1, Math::MIN_ID)..=(x0, x1, Math::MAX_ID))
+                            .copied()
+                            .map(|(x0, x1, x2)| (x2))
+                    }
                     fn iter1_0_1_2(&self, x0: Math) -> impl Iterator<Item = (Math, Math)> + use<'_> {
                         self.all_index_0_1_2
                             .range((x0, Math::MIN_ID, Math::MIN_ID)..=(x0, Math::MAX_ID, Math::MAX_ID))
@@ -446,6 +456,9 @@ mod test {
                             .range((x2, Math::MIN_ID, Math::MIN_ID)..=(x2, Math::MAX_ID, Math::MAX_ID))
                             .copied()
                             .map(|(x2, x0, x1)| (x0, x1))
+                    }
+                    fn check2_0_1_2(&self, x0: Math, x1: Math) -> bool {
+                        self.iter2_0_1_2(x0, x1).next().is_some()
                     }
                     fn check1_0_1_2(&self, x0: Math) -> bool {
                         self.iter1_0_1_2(x0).next().is_some()
@@ -471,19 +484,16 @@ mod test {
                         }
                         let mut op_delete = Vec::new();
                         for x0 in math_uprooted.iter().copied() {
-                            println!("uproot: {:?}", x0);
                             for (x1, x2) in self.iter1_0_1_2(x0) {
                                 op_delete.push((x0, x1, x2));
                             }
                         }
                         for x1 in math_uprooted.iter().copied() {
-                            println!("uproot: {:?}", x1);
                             for (x0, x2) in self.iter1_1_0_2(x1) {
                                 op_delete.push((x0, x1, x2));
                             }
                         }
                         for x2 in math_uprooted.iter().copied() {
-                            println!("uproot: {:?}", x2);
                             for (x0, x1) in self.iter1_2_0_1(x2) {
                                 op_delete.push((x0, x1, x2));
                             }
@@ -495,7 +505,6 @@ mod test {
                                 math_uf.dec_eclass(x0, Self::COST);
                                 math_uf.dec_eclass(x1, Self::COST);
                                 math_uf.dec_eclass(x2, Self::COST);
-                                println!("delete: {:?}", [x0, x1, x2]);
                                 op_insert.push((math_uf.find(x0), math_uf.find(x1), math_uf.find(x2)));
                             }
                         }
@@ -503,7 +512,6 @@ mod test {
                             if !self.all_index_0_1_2.insert((x0, x1, x2)) {
                                 return false;
                             }
-                            println!("insert: {:?}", [x0, x1, x2]);
                             math_uf.inc_eclass(x0, Self::COST);
                             math_uf.inc_eclass(x1, Self::COST);
                             math_uf.inc_eclass(x2, Self::COST);
@@ -565,7 +573,6 @@ mod test {
                         }
                         let mut op_delete = Vec::new();
                         for x1 in math_uprooted.iter().copied() {
-                            println!("uproot: {:?}", x1);
                             for (x0) in self.iter1_1_0(x1) {
                                 op_delete.push((x0, x1));
                             }
@@ -574,7 +581,6 @@ mod test {
                             if self.all_index_0_1.remove(&(x0, x1)) {
                                 self.all_index_1_0.remove(&(x1, x0));
                                 math_uf.dec_eclass(x1, Self::COST);
-                                println!("delete: {:?}", [x1]);
                                 op_insert.push((x0, math_uf.find(x1)));
                             }
                         }
@@ -582,7 +588,6 @@ mod test {
                             if !self.all_index_0_1.insert((x0, x1)) {
                                 return false;
                             }
-                            println!("insert: {:?}", [x1]);
                             math_uf.inc_eclass(x1, Self::COST);
                             self.all_index_1_0.insert((x1, x0));
                             true
@@ -664,8 +669,9 @@ mod test {
                         theory
                     }
                     pub fn step(&mut self) {
-                        println!("step start");
+                        println!("apply rules");
                         self.apply_rules();
+                        println!("clear transient");
                         self.clear_transient();
                         println!("step end");
                     }
@@ -719,6 +725,36 @@ mod test {
                                     let a0 = self.global_variables.global_i64[2usize];
                                     self.delta.insert_const((a0, p3));
                                 }
+                            }
+                        }
+                        for (p0, p1, p2) in self.mul_relation.iter_new() {
+                            for (p3) in self.mul_relation.iter2_0_1_2(p0, p1) {
+                                self.unification.math_uf.union(p3, p2);
+                            }
+                        }
+                        for (p0, p1, p3) in self.mul_relation.iter_new() {
+                            for (p2) in self.mul_relation.iter2_0_1_2(p0, p1) {
+                                self.unification.math_uf.union(p3, p2);
+                            }
+                        }
+                        for (p0, p1, p2) in self.add_relation.iter_new() {
+                            for (p3) in self.add_relation.iter2_0_1_2(p0, p1) {
+                                self.unification.math_uf.union(p3, p2);
+                            }
+                        }
+                        for (p0, p1, p3) in self.add_relation.iter_new() {
+                            for (p2) in self.add_relation.iter2_0_1_2(p0, p1) {
+                                self.unification.math_uf.union(p3, p2);
+                            }
+                        }
+                        for (p0, p1) in self.const_relation.iter_new() {
+                            for (p2) in self.const_relation.iter1_0_1(p0) {
+                                self.unification.math_uf.union(p2, p1);
+                            }
+                        }
+                        for (p0, p2) in self.const_relation.iter_new() {
+                            for (p1) in self.const_relation.iter1_0_1(p0) {
+                                self.unification.math_uf.union(p2, p1);
                             }
                         }
                     }
@@ -875,13 +911,11 @@ mod test {
                         }
                         let mut op_delete = Vec::new();
                         for x0 in math_uprooted.iter().copied() {
-                            println!("uproot: {:?}", x0);
                             for (x1) in self.iter1_0_1(x0) {
                                 op_delete.push((x0, x1));
                             }
                         }
                         for x1 in math_uprooted.iter().copied() {
-                            println!("uproot: {:?}", x1);
                             for (x0) in self.iter1_1_0(x1) {
                                 op_delete.push((x0, x1));
                             }
@@ -891,7 +925,6 @@ mod test {
                                 self.all_index_1_0.remove(&(x1, x0));
                                 math_uf.dec_eclass(x0, Self::COST);
                                 math_uf.dec_eclass(x1, Self::COST);
-                                println!("delete: {:?}", [x0, x1]);
                                 op_insert.push((math_uf.find(x0), math_uf.find(x1)));
                             }
                         }
@@ -899,7 +932,6 @@ mod test {
                             if !self.all_index_0_1.insert((x0, x1)) {
                                 return false;
                             }
-                            println!("insert: {:?}", [x0, x1]);
                             math_uf.inc_eclass(x0, Self::COST);
                             math_uf.inc_eclass(x1, Self::COST);
                             self.all_index_1_0.insert((x1, x0));
@@ -960,13 +992,11 @@ mod test {
                         }
                         let mut op_delete = Vec::new();
                         for x0 in math_uprooted.iter().copied() {
-                            println!("uproot: {:?}", x0);
                             for (x1) in self.iter1_0_1(x0) {
                                 op_delete.push((x0, x1));
                             }
                         }
                         for x1 in math_uprooted.iter().copied() {
-                            println!("uproot: {:?}", x1);
                             for (x0) in self.iter1_1_0(x1) {
                                 op_delete.push((x0, x1));
                             }
@@ -976,7 +1006,6 @@ mod test {
                                 self.all_index_1_0.remove(&(x1, x0));
                                 math_uf.dec_eclass(x0, Self::COST);
                                 math_uf.dec_eclass(x1, Self::COST);
-                                println!("delete: {:?}", [x0, x1]);
                                 op_insert.push((math_uf.find(x0), math_uf.find(x1)));
                             }
                         }
@@ -984,7 +1013,6 @@ mod test {
                             if !self.all_index_0_1.insert((x0, x1)) {
                                 return false;
                             }
-                            println!("insert: {:?}", [x0, x1]);
                             math_uf.inc_eclass(x0, Self::COST);
                             math_uf.inc_eclass(x1, Self::COST);
                             self.all_index_1_0.insert((x1, x0));
@@ -1054,13 +1082,11 @@ mod test {
                         }
                         let mut op_delete = Vec::new();
                         for x0 in math_uprooted.iter().copied() {
-                            println!("uproot: {:?}", x0);
                             for (x1) in self.iter1_0_1(x0) {
                                 op_delete.push((x0, x1));
                             }
                         }
                         for x1 in math_uprooted.iter().copied() {
-                            println!("uproot: {:?}", x1);
                             for (x0) in self.iter1_1_0(x1) {
                                 op_delete.push((x0, x1));
                             }
@@ -1070,7 +1096,6 @@ mod test {
                                 self.all_index_1_0.remove(&(x1, x0));
                                 math_uf.dec_eclass(x0, Self::COST);
                                 math_uf.dec_eclass(x1, Self::COST);
-                                println!("delete: {:?}", [x0, x1]);
                                 op_insert.push((math_uf.find(x0), math_uf.find(x1)));
                             }
                         }
@@ -1078,7 +1103,6 @@ mod test {
                             if !self.all_index_0_1.insert((x0, x1)) {
                                 return false;
                             }
-                            println!("insert: {:?}", [x0, x1]);
                             math_uf.inc_eclass(x0, Self::COST);
                             math_uf.inc_eclass(x1, Self::COST);
                             self.all_index_1_0.insert((x1, x0));
@@ -1150,19 +1174,16 @@ mod test {
                         }
                         let mut op_delete = Vec::new();
                         for x0 in math_uprooted.iter().copied() {
-                            println!("uproot: {:?}", x0);
                             for (x1, x2) in self.iter1_0_1_2(x0) {
                                 op_delete.push((x0, x1, x2));
                             }
                         }
                         for x1 in math_uprooted.iter().copied() {
-                            println!("uproot: {:?}", x1);
                             for (x0, x2) in self.iter1_1_0_2(x1) {
                                 op_delete.push((x0, x1, x2));
                             }
                         }
                         for x2 in math_uprooted.iter().copied() {
-                            println!("uproot: {:?}", x2);
                             for (x0, x1) in self.iter1_2_0_1(x2) {
                                 op_delete.push((x0, x1, x2));
                             }
@@ -1174,7 +1195,6 @@ mod test {
                                 math_uf.dec_eclass(x0, Self::COST);
                                 math_uf.dec_eclass(x1, Self::COST);
                                 math_uf.dec_eclass(x2, Self::COST);
-                                println!("delete: {:?}", [x0, x1, x2]);
                                 op_insert.push((math_uf.find(x0), math_uf.find(x1), math_uf.find(x2)));
                             }
                         }
@@ -1182,7 +1202,6 @@ mod test {
                             if !self.all_index_0_1_2.insert((x0, x1, x2)) {
                                 return false;
                             }
-                            println!("insert: {:?}", [x0, x1, x2]);
                             math_uf.inc_eclass(x0, Self::COST);
                             math_uf.inc_eclass(x1, Self::COST);
                             math_uf.inc_eclass(x2, Self::COST);
@@ -1257,8 +1276,9 @@ mod test {
                         theory
                     }
                     pub fn step(&mut self) {
-                        println!("step start");
+                        println!("apply rules");
                         self.apply_rules();
+                        println!("clear transient");
                         self.clear_transient();
                         println!("step end");
                     }
@@ -1428,6 +1448,12 @@ mod test {
                             .copied()
                             .map(|(x2, x0, x1)| (x0, x1))
                     }
+                    fn iter2_0_1_2(&self, x0: Math, x1: Math) -> impl Iterator<Item = (Math)> + use<'_> {
+                        self.all_index_0_1_2
+                            .range((x0, x1, Math::MIN_ID)..=(x0, x1, Math::MAX_ID))
+                            .copied()
+                            .map(|(x0, x1, x2)| (x2))
+                    }
                     fn iter1_1_0_2(&self, x1: Math) -> impl Iterator<Item = (Math, Math)> + use<'_> {
                         self.all_index_1_0_2
                             .range((x1, Math::MIN_ID, Math::MIN_ID)..=(x1, Math::MAX_ID, Math::MAX_ID))
@@ -1442,6 +1468,9 @@ mod test {
                     }
                     fn check1_2_0_1(&self, x2: Math) -> bool {
                         self.iter1_2_0_1(x2).next().is_some()
+                    }
+                    fn check2_0_1_2(&self, x0: Math, x1: Math) -> bool {
+                        self.iter2_0_1_2(x0, x1).next().is_some()
                     }
                     fn check1_1_0_2(&self, x1: Math) -> bool {
                         self.iter1_1_0_2(x1).next().is_some()
@@ -1461,19 +1490,16 @@ mod test {
                         }
                         let mut op_delete = Vec::new();
                         for x0 in math_uprooted.iter().copied() {
-                            println!("uproot: {:?}", x0);
                             for (x1, x2) in self.iter1_0_1_2(x0) {
                                 op_delete.push((x0, x1, x2));
                             }
                         }
                         for x1 in math_uprooted.iter().copied() {
-                            println!("uproot: {:?}", x1);
                             for (x0, x2) in self.iter1_1_0_2(x1) {
                                 op_delete.push((x0, x1, x2));
                             }
                         }
                         for x2 in math_uprooted.iter().copied() {
-                            println!("uproot: {:?}", x2);
                             for (x0, x1) in self.iter1_2_0_1(x2) {
                                 op_delete.push((x0, x1, x2));
                             }
@@ -1486,7 +1512,6 @@ mod test {
                                 math_uf.dec_eclass(x0, Self::COST);
                                 math_uf.dec_eclass(x1, Self::COST);
                                 math_uf.dec_eclass(x2, Self::COST);
-                                println!("delete: {:?}", [x0, x1, x2]);
                                 op_insert.push((math_uf.find(x0), math_uf.find(x1), math_uf.find(x2)));
                             }
                         }
@@ -1494,7 +1519,6 @@ mod test {
                             if !self.all_index_0_1_2.insert((x0, x1, x2)) {
                                 return false;
                             }
-                            println!("insert: {:?}", [x0, x1, x2]);
                             math_uf.inc_eclass(x0, Self::COST);
                             math_uf.inc_eclass(x1, Self::COST);
                             math_uf.inc_eclass(x2, Self::COST);
@@ -1578,19 +1602,16 @@ mod test {
                         }
                         let mut op_delete = Vec::new();
                         for x0 in math_uprooted.iter().copied() {
-                            println!("uproot: {:?}", x0);
                             for (x1, x2) in self.iter1_0_1_2(x0) {
                                 op_delete.push((x0, x1, x2));
                             }
                         }
                         for x1 in math_uprooted.iter().copied() {
-                            println!("uproot: {:?}", x1);
                             for (x0, x2) in self.iter1_1_0_2(x1) {
                                 op_delete.push((x0, x1, x2));
                             }
                         }
                         for x2 in math_uprooted.iter().copied() {
-                            println!("uproot: {:?}", x2);
                             for (x0, x1) in self.iter1_2_0_1(x2) {
                                 op_delete.push((x0, x1, x2));
                             }
@@ -1602,7 +1623,6 @@ mod test {
                                 math_uf.dec_eclass(x0, Self::COST);
                                 math_uf.dec_eclass(x1, Self::COST);
                                 math_uf.dec_eclass(x2, Self::COST);
-                                println!("delete: {:?}", [x0, x1, x2]);
                                 op_insert.push((math_uf.find(x0), math_uf.find(x1), math_uf.find(x2)));
                             }
                         }
@@ -1610,7 +1630,6 @@ mod test {
                             if !self.all_index_0_1_2.insert((x0, x1, x2)) {
                                 return false;
                             }
-                            println!("insert: {:?}", [x0, x1, x2]);
                             math_uf.inc_eclass(x0, Self::COST);
                             math_uf.inc_eclass(x1, Self::COST);
                             math_uf.inc_eclass(x2, Self::COST);
@@ -1675,8 +1694,9 @@ mod test {
                         theory
                     }
                     pub fn step(&mut self) {
-                        println!("step start");
+                        println!("apply rules");
                         self.apply_rules();
+                        println!("clear transient");
                         self.clear_transient();
                         println!("step end");
                     }
@@ -1712,6 +1732,26 @@ mod test {
                                         self.delta.insert_mul((a, a3, p5));
                                     }
                                 }
+                            }
+                        }
+                        for (p0, p1, p2) in self.mul_relation.iter_new() {
+                            for (p3) in self.mul_relation.iter2_0_1_2(p0, p1) {
+                                self.unification.math_uf.union(p3, p2);
+                            }
+                        }
+                        for (p0, p1, p3) in self.mul_relation.iter_new() {
+                            for (p2) in self.mul_relation.iter2_0_1_2(p0, p1) {
+                                self.unification.math_uf.union(p3, p2);
+                            }
+                        }
+                        for (p0, p1, p2) in self.add_relation.iter_new() {
+                            for (p3) in self.add_relation.iter2_0_1_2(p0, p1) {
+                                self.unification.math_uf.union(p3, p2);
+                            }
+                        }
+                        for (p0, p1, p3) in self.add_relation.iter_new() {
+                            for (p2) in self.add_relation.iter2_0_1_2(p0, p1) {
+                                self.unification.math_uf.union(p3, p2);
                             }
                         }
                     }
@@ -1843,6 +1883,12 @@ mod test {
                             .copied()
                             .map(|(x0, x1, x2)| (x1, x2))
                     }
+                    fn iter2_0_1_2(&self, x0: Math, x1: Math) -> impl Iterator<Item = (Math)> + use<'_> {
+                        self.all_index_0_1_2
+                            .range((x0, x1, Math::MIN_ID)..=(x0, x1, Math::MAX_ID))
+                            .copied()
+                            .map(|(x0, x1, x2)| (x2))
+                    }
                     fn iter1_1_0_2(&self, x1: Math) -> impl Iterator<Item = (Math, Math)> + use<'_> {
                         self.all_index_1_0_2
                             .range((x1, Math::MIN_ID, Math::MIN_ID)..=(x1, Math::MAX_ID, Math::MAX_ID))
@@ -1857,6 +1903,9 @@ mod test {
                     }
                     fn check1_0_1_2(&self, x0: Math) -> bool {
                         self.iter1_0_1_2(x0).next().is_some()
+                    }
+                    fn check2_0_1_2(&self, x0: Math, x1: Math) -> bool {
+                        self.iter2_0_1_2(x0, x1).next().is_some()
                     }
                     fn check1_1_0_2(&self, x1: Math) -> bool {
                         self.iter1_1_0_2(x1).next().is_some()
@@ -1879,19 +1928,16 @@ mod test {
                         }
                         let mut op_delete = Vec::new();
                         for x0 in math_uprooted.iter().copied() {
-                            println!("uproot: {:?}", x0);
                             for (x1, x2) in self.iter1_0_1_2(x0) {
                                 op_delete.push((x0, x1, x2));
                             }
                         }
                         for x1 in math_uprooted.iter().copied() {
-                            println!("uproot: {:?}", x1);
                             for (x0, x2) in self.iter1_1_0_2(x1) {
                                 op_delete.push((x0, x1, x2));
                             }
                         }
                         for x2 in math_uprooted.iter().copied() {
-                            println!("uproot: {:?}", x2);
                             for (x0, x1) in self.iter1_2_0_1(x2) {
                                 op_delete.push((x0, x1, x2));
                             }
@@ -1903,7 +1949,6 @@ mod test {
                                 math_uf.dec_eclass(x0, Self::COST);
                                 math_uf.dec_eclass(x1, Self::COST);
                                 math_uf.dec_eclass(x2, Self::COST);
-                                println!("delete: {:?}", [x0, x1, x2]);
                                 op_insert.push((math_uf.find(x0), math_uf.find(x1), math_uf.find(x2)));
                             }
                         }
@@ -1911,7 +1956,6 @@ mod test {
                             if !self.all_index_0_1_2.insert((x0, x1, x2)) {
                                 return false;
                             }
-                            println!("insert: {:?}", [x0, x1, x2]);
                             math_uf.inc_eclass(x0, Self::COST);
                             math_uf.inc_eclass(x1, Self::COST);
                             math_uf.inc_eclass(x2, Self::COST);
@@ -1949,6 +1993,12 @@ mod test {
                             .copied()
                             .map(|(x2, x0, x1)| (x0, x1))
                     }
+                    fn iter2_0_1_2(&self, x0: Math, x1: Math) -> impl Iterator<Item = (Math)> + use<'_> {
+                        self.all_index_0_1_2
+                            .range((x0, x1, Math::MIN_ID)..=(x0, x1, Math::MAX_ID))
+                            .copied()
+                            .map(|(x0, x1, x2)| (x2))
+                    }
                     fn iter1_0_1_2(&self, x0: Math) -> impl Iterator<Item = (Math, Math)> + use<'_> {
                         self.all_index_0_1_2
                             .range((x0, Math::MIN_ID, Math::MIN_ID)..=(x0, Math::MAX_ID, Math::MAX_ID))
@@ -1963,6 +2013,9 @@ mod test {
                     }
                     fn check1_2_0_1(&self, x2: Math) -> bool {
                         self.iter1_2_0_1(x2).next().is_some()
+                    }
+                    fn check2_0_1_2(&self, x0: Math, x1: Math) -> bool {
+                        self.iter2_0_1_2(x0, x1).next().is_some()
                     }
                     fn check1_0_1_2(&self, x0: Math) -> bool {
                         self.iter1_0_1_2(x0).next().is_some()
@@ -1985,19 +2038,16 @@ mod test {
                         }
                         let mut op_delete = Vec::new();
                         for x0 in math_uprooted.iter().copied() {
-                            println!("uproot: {:?}", x0);
                             for (x1, x2) in self.iter1_0_1_2(x0) {
                                 op_delete.push((x0, x1, x2));
                             }
                         }
                         for x1 in math_uprooted.iter().copied() {
-                            println!("uproot: {:?}", x1);
                             for (x0, x2) in self.iter1_1_0_2(x1) {
                                 op_delete.push((x0, x1, x2));
                             }
                         }
                         for x2 in math_uprooted.iter().copied() {
-                            println!("uproot: {:?}", x2);
                             for (x0, x1) in self.iter1_2_0_1(x2) {
                                 op_delete.push((x0, x1, x2));
                             }
@@ -2009,7 +2059,6 @@ mod test {
                                 math_uf.dec_eclass(x0, Self::COST);
                                 math_uf.dec_eclass(x1, Self::COST);
                                 math_uf.dec_eclass(x2, Self::COST);
-                                println!("delete: {:?}", [x0, x1, x2]);
                                 op_insert.push((math_uf.find(x0), math_uf.find(x1), math_uf.find(x2)));
                             }
                         }
@@ -2017,7 +2066,6 @@ mod test {
                             if !self.all_index_0_1_2.insert((x0, x1, x2)) {
                                 return false;
                             }
-                            println!("insert: {:?}", [x0, x1, x2]);
                             math_uf.inc_eclass(x0, Self::COST);
                             math_uf.inc_eclass(x1, Self::COST);
                             math_uf.inc_eclass(x2, Self::COST);
@@ -2082,8 +2130,9 @@ mod test {
                         theory
                     }
                     pub fn step(&mut self) {
-                        println!("step start");
+                        println!("apply rules");
                         self.apply_rules();
+                        println!("clear transient");
                         self.clear_transient();
                         println!("step end");
                     }
@@ -2104,6 +2153,26 @@ mod test {
                                 self.delta.insert_add((a3, a4, p4));
                                 self.delta.insert_mul((b, c, a4));
                                 self.delta.insert_mul((a, c, a3));
+                            }
+                        }
+                        for (p0, p1, p2) in self.mul_relation.iter_new() {
+                            for (p3) in self.mul_relation.iter2_0_1_2(p0, p1) {
+                                self.unification.math_uf.union(p3, p2);
+                            }
+                        }
+                        for (p0, p1, p3) in self.mul_relation.iter_new() {
+                            for (p2) in self.mul_relation.iter2_0_1_2(p0, p1) {
+                                self.unification.math_uf.union(p3, p2);
+                            }
+                        }
+                        for (p0, p1, p2) in self.add_relation.iter_new() {
+                            for (p3) in self.add_relation.iter2_0_1_2(p0, p1) {
+                                self.unification.math_uf.union(p3, p2);
+                            }
+                        }
+                        for (p0, p1, p3) in self.add_relation.iter_new() {
+                            for (p2) in self.add_relation.iter2_0_1_2(p0, p1) {
+                                self.unification.math_uf.union(p3, p2);
                             }
                         }
                     }

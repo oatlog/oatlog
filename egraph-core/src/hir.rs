@@ -73,6 +73,67 @@ impl ImplicitRule {
         };
         Self { relation, on, ty }
     }
+    fn to_symbolic(&self, relations: &TVec<RelationId, Relation>) -> Result<SymbolicRule, ()> {
+        Ok(match self.ty {
+            // TODO: impl panic like this maybe
+            ImplicitRuleAction::Panic => return Err(()),
+            // TODO: impl lattice like this maybe
+            ImplicitRuleAction::Lattice { .. } => return Err(()),
+            ImplicitRuleAction::Unification => {
+                let relation_ = &relations[self.relation];
+
+                let n = relation_.columns.len();
+
+                let mut premise_variables: TVec<PremiseId, VariableMeta> = TVec::new();
+
+                let mut unify: UF<PremiseId> = UF::new();
+
+                let first_args = (0..n)
+                    .map(ColumnId)
+                    .map(|i| {
+                        let id = unify.push(());
+                        premise_variables
+                            .push_expected(id, VariableMeta::new("", relation_.columns[i]));
+                        id
+                    })
+                    .collect::<TVec<ColumnId, PremiseId>>();
+
+                let second_args = (0..n)
+                    .map(ColumnId)
+                    .map(|i| {
+                        if self.on.contains(&i) {
+                            first_args[i]
+                        } else {
+                            let id = unify.push(());
+                            premise_variables
+                                .push_expected(id, VariableMeta::new("", relation_.columns[i]));
+                            unify.union(id, first_args[i]);
+                            id
+                        }
+                    })
+                    .collect::<TVec<ColumnId, PremiseId>>();
+
+                let name = "";
+                SymbolicRule {
+                    name,
+                    premise_relations: vec![
+                        PremiseRelation {
+                            args: first_args,
+                            relation: self.relation,
+                        },
+                        PremiseRelation {
+                            args: second_args,
+                            relation: self.relation,
+                        },
+                    ],
+                    action_relations: Vec::new(),
+                    unify,
+                    action_variables: TVec::new(),
+                    premise_variables,
+                }
+            }
+        })
+    }
 }
 
 #[derive(Clone, Eq, PartialEq, Ord, PartialOrd, Hash, Debug, Default)]
@@ -979,6 +1040,9 @@ pub(crate) mod query_planning {
     pub(crate) fn emit_codegen_theory(mut theory: hir::Theory) -> (hir::Theory, codegen::Theory) {
         let non_new_relations = theory.relations.len();
         let old_to_new = theory.add_delta_relations_in_place();
+        for implicit in theory.implicit_rules.iter() {
+            theory.symbolic_rules.push(implicit.to_symbolic(&theory.relations).unwrap())
+        }
         let rules = symbolic_rules_as_semi_naive(&theory.symbolic_rules, &old_to_new);
 
         let mut table_uses: TVec<RelationId, TVec<IndexUsageId, Vec<ColumnId>>> =

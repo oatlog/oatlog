@@ -215,7 +215,6 @@ impl<T: Eclass> UnionFind<T> {
             (b, a)
         };
         self.repr[uprooted as usize] = self.repr[root as usize];
-        println!("uf-union: {uprooted:?} -> {root:?}");
         self.dirty.push(T::new(uprooted));
     }
     pub fn dirty(&mut self) -> &mut Vec<T> {
