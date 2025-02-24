@@ -75,13 +75,6 @@ impl StringIntern {
     }
 }
 
-// struct GlobalVariables {
-//     // single flag because we crate all globals at once.
-//     new: bool,
-//     global_i64: Vec<i64>,
-//     global_string: Vec<IString>,
-// }
-
 pub trait RangeQuery<T, V> {
     fn query(&self, t: T) -> impl Iterator<Item = V>; // + use<'a, T, V, Self>;
     fn check(&self, t: T) -> bool {
@@ -201,8 +194,6 @@ impl<T: Eclass> UnionFind<T> {
             root
         }
     }
-    // TODO lgustafsson for emagnusson: It doesn't.
-    // returns uprooted
     pub fn union(&mut self, a: T, b: T) {
         let a = self.find_inner(a.inner());
         let b = self.find_inner(b.inner());

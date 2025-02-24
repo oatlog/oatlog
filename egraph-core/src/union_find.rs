@@ -17,7 +17,6 @@ pub(crate) type UF<T> = UFData<T, ()>;
 /// Union Find with optional attached data.
 ///
 /// Indexing canonicalizes the index and returns the associated data for that index.
-// TODO lgustafsson for emagnusson: Removed Eq, Hash etc because they weren't used anyway
 #[derive(Clone, Debug, Default)]
 pub(crate) struct UFData<K: Id, V> {
     repr: Vec<Cell<K>>,
