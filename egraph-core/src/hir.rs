@@ -1041,7 +1041,9 @@ pub(crate) mod query_planning {
         let non_new_relations = theory.relations.len();
         let old_to_new = theory.add_delta_relations_in_place();
         for implicit in theory.implicit_rules.iter() {
-            theory.symbolic_rules.push(implicit.to_symbolic(&theory.relations).unwrap())
+            theory
+                .symbolic_rules
+                .push(implicit.to_symbolic(&theory.relations).unwrap())
         }
         let rules = symbolic_rules_as_semi_naive(&theory.symbolic_rules, &old_to_new);
 

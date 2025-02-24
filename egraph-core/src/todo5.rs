@@ -334,32 +334,27 @@ impl AddRelation {
     fn clear_new(&mut self) {
         self.new.clear();
     }
-    fn update_safe(
-        &mut self,
-        math_uprooted: &[Math],
-        math_uf: &mut UnionFind<Math>,
-        delta: &mut Vec<<Self as Relation>::Row>,
-    ) {
-        let mut op_insert = take(delta);
+    fn update_safe(&mut self, uprooted: &Uprooted, uf: &mut Unification, delta: &mut Delta) {
+        let mut op_insert = take(&mut delta.add_relation_delta);
         for (x0, x1, x2) in op_insert.iter_mut() {
-            *x0 = math_uf.find(*x0);
-            *x1 = math_uf.find(*x1);
-            *x2 = math_uf.find(*x2);
+            *x0 = uf.math_uf.find(*x0);
+            *x1 = uf.math_uf.find(*x1);
+            *x2 = uf.math_uf.find(*x2);
         }
         let mut op_delete = Vec::new();
-        for x0 in math_uprooted.iter().copied() {
+        for x0 in uprooted.math_uprooted.iter().copied() {
             println!("uproot: {:?}", x0);
             for (x1, x2) in self.iter1_0_1_2(x0) {
                 op_delete.push((x0, x1, x2));
             }
         }
-        for x1 in math_uprooted.iter().copied() {
+        for x1 in uprooted.math_uprooted.iter().copied() {
             println!("uproot: {:?}", x1);
             for (x0, x2) in self.iter1_1_0_2(x1) {
                 op_delete.push((x0, x1, x2));
             }
         }
-        for x2 in math_uprooted.iter().copied() {
+        for x2 in uprooted.math_uprooted.iter().copied() {
             println!("uproot: {:?}", x2);
             for (x0, x1) in self.iter1_2_0_1(x2) {
                 op_delete.push((x0, x1, x2));
@@ -369,11 +364,15 @@ impl AddRelation {
             if self.all_index_0_1_2.remove(&(x0, x1, x2)) {
                 self.all_index_1_0_2.remove(&(x1, x0, x2));
                 self.all_index_2_0_1.remove(&(x2, x0, x1));
-                math_uf.dec_eclass(x0, Self::COST);
-                math_uf.dec_eclass(x1, Self::COST);
-                math_uf.dec_eclass(x2, Self::COST);
+                uf.math_uf.dec_eclass(x0, Self::COST);
+                uf.math_uf.dec_eclass(x1, Self::COST);
+                uf.math_uf.dec_eclass(x2, Self::COST);
                 println!("delete: {:?}", [x0, x1, x2]);
-                op_insert.push((math_uf.find(x0), math_uf.find(x1), math_uf.find(x2)));
+                op_insert.push((
+                    uf.math_uf.find(x0),
+                    uf.math_uf.find(x1),
+                    uf.math_uf.find(x2),
+                ));
             }
         }
         op_insert.retain(|&(x0, x1, x2)| {
@@ -381,9 +380,9 @@ impl AddRelation {
                 return false;
             }
             println!("insert: {:?}", [x0, x1, x2]);
-            math_uf.inc_eclass(x0, Self::COST);
-            math_uf.inc_eclass(x1, Self::COST);
-            math_uf.inc_eclass(x2, Self::COST);
+            uf.math_uf.inc_eclass(x0, Self::COST);
+            uf.math_uf.inc_eclass(x1, Self::COST);
+            uf.math_uf.inc_eclass(x2, Self::COST);
             self.all_index_1_0_2.insert((x1, x0, x2));
             self.all_index_2_0_1.insert((x2, x0, x1));
             true
@@ -400,6 +399,21 @@ impl AddRelation {
         self.new.sort();
         self.new.dedup();
     }
+}
+
+struct Uprooted {
+    math_uprooted: Vec<Math>,
+}
+impl Uprooted {
+    fn clear(&mut self) {
+        self.math_uprooted.clear();
+    }
+    fn swap_dirt(&mut self, unification: &mut Unification) {
+        std::mem::swap(&mut self.math_uprooted, unification.math_uf.dirty())
+    }
+}
+struct Unification {
+    math_uf: UnionFind<Math>,
 }
 
 #[derive(Copy, Clone, Eq, PartialEq, Ord, PartialOrd, Default, Debug)]
@@ -535,6 +549,13 @@ impl Delta {
     }
     pub fn insert_add(&mut self, x: <AddRelation as Relation>::Row) {
         self.add_relation_delta.push(x);
+    }
+    fn has_new(&self) -> bool {
+        let mut has_new = false;
+        has_new |= !self.forall_math_relation_delta.is_empty();
+        has_new |= !self.mul_relation_delta.is_empty();
+        has_new |= !self.add_relation_delta.is_empty();
+        has_new
     }
 }
 #[derive(Debug, Default)]

@@ -320,6 +320,9 @@ mod test {
                     fn has_new(&self) -> bool {
                         !self.new.is_empty()
                     }
+                    fn clear_new(&mut self) {
+                        self.new.clear();
+                    }
                     fn iter_new(&self) -> impl Iterator<Item = <Self as Relation>::Row> + use<'_> {
                         self.new.iter().copied()
                     }
@@ -359,31 +362,25 @@ mod test {
                     fn check1_2_0_1(&self, x2: Math) -> bool {
                         self.iter1_2_0_1(x2).next().is_some()
                     }
-                    fn update(
-                        &mut self,
-                        math_uprooted: &[Math],
-                        math_uf: &mut UnionFind<Math>,
-                        delta: &mut Vec<<Self as Relation>::Row>,
-                    ) {
-                        self.new.clear();
-                        let mut op_insert = take(delta);
+                    fn update(&mut self, uprooted: &Uprooted, uf: &mut Unification, delta: &mut Delta) {
+                        let mut op_insert = take(&mut delta.mul_relation_delta);
                         for (x0, x1, x2) in op_insert.iter_mut() {
-                            *x0 = math_uf.find(*x0);
-                            *x1 = math_uf.find(*x1);
-                            *x2 = math_uf.find(*x2);
+                            *x0 = uf.math_uf.find(*x0);
+                            *x1 = uf.math_uf.find(*x1);
+                            *x2 = uf.math_uf.find(*x2);
                         }
                         let mut op_delete = Vec::new();
-                        for x0 in math_uprooted.iter().copied() {
+                        for x0 in uprooted.math_uprooted.iter().copied() {
                             for (x1, x2) in self.iter1_0_1_2(x0) {
                                 op_delete.push((x0, x1, x2));
                             }
                         }
-                        for x1 in math_uprooted.iter().copied() {
+                        for x1 in uprooted.math_uprooted.iter().copied() {
                             for (x0, x2) in self.iter1_1_0_2(x1) {
                                 op_delete.push((x0, x1, x2));
                             }
                         }
-                        for x2 in math_uprooted.iter().copied() {
+                        for x2 in uprooted.math_uprooted.iter().copied() {
                             for (x0, x1) in self.iter1_2_0_1(x2) {
                                 op_delete.push((x0, x1, x2));
                             }
@@ -392,24 +389,35 @@ mod test {
                             if self.all_index_0_1_2.remove(&(x0, x1, x2)) {
                                 self.all_index_1_0_2.remove(&(x1, x0, x2));
                                 self.all_index_2_0_1.remove(&(x2, x0, x1));
-                                math_uf.dec_eclass(x0, Self::COST);
-                                math_uf.dec_eclass(x1, Self::COST);
-                                math_uf.dec_eclass(x2, Self::COST);
-                                op_insert.push((math_uf.find(x0), math_uf.find(x1), math_uf.find(x2)));
+                                uf.math_uf.dec_eclass(x0, Self::COST);
+                                uf.math_uf.dec_eclass(x1, Self::COST);
+                                uf.math_uf.dec_eclass(x2, Self::COST);
+                                op_insert.push((
+                                    uf.math_uf.find(x0),
+                                    uf.math_uf.find(x1),
+                                    uf.math_uf.find(x2),
+                                ));
                             }
                         }
                         op_insert.retain(|&(x0, x1, x2)| {
                             if !self.all_index_0_1_2.insert((x0, x1, x2)) {
                                 return false;
                             }
-                            math_uf.inc_eclass(x0, Self::COST);
-                            math_uf.inc_eclass(x1, Self::COST);
-                            math_uf.inc_eclass(x2, Self::COST);
+                            uf.math_uf.inc_eclass(x0, Self::COST);
+                            uf.math_uf.inc_eclass(x1, Self::COST);
+                            uf.math_uf.inc_eclass(x2, Self::COST);
                             self.all_index_1_0_2.insert((x1, x0, x2));
                             self.all_index_2_0_1.insert((x2, x0, x1));
                             true
                         });
-                        self.new = op_insert;
+                        self.new.extend(op_insert);
+                    }
+                    fn update_finalize(&mut self, uf: &mut Unification) {
+                        for (x0, x1, x2) in self.new.iter_mut() {
+                            *x0 = uf.math_uf.find(*x0);
+                            *x1 = uf.math_uf.find(*x1);
+                            *x2 = uf.math_uf.find(*x2);
+                        }
                     }
                 }
                 #[derive(Debug, Default)]
@@ -430,6 +438,9 @@ mod test {
                     fn has_new(&self) -> bool {
                         !self.new.is_empty()
                     }
+                    fn clear_new(&mut self) {
+                        self.new.clear();
+                    }
                     fn iter_new(&self) -> impl Iterator<Item = <Self as Relation>::Row> + use<'_> {
                         self.new.iter().copied()
                     }
@@ -469,31 +480,25 @@ mod test {
                     fn check1_2_0_1(&self, x2: Math) -> bool {
                         self.iter1_2_0_1(x2).next().is_some()
                     }
-                    fn update(
-                        &mut self,
-                        math_uprooted: &[Math],
-                        math_uf: &mut UnionFind<Math>,
-                        delta: &mut Vec<<Self as Relation>::Row>,
-                    ) {
-                        self.new.clear();
-                        let mut op_insert = take(delta);
+                    fn update(&mut self, uprooted: &Uprooted, uf: &mut Unification, delta: &mut Delta) {
+                        let mut op_insert = take(&mut delta.add_relation_delta);
                         for (x0, x1, x2) in op_insert.iter_mut() {
-                            *x0 = math_uf.find(*x0);
-                            *x1 = math_uf.find(*x1);
-                            *x2 = math_uf.find(*x2);
+                            *x0 = uf.math_uf.find(*x0);
+                            *x1 = uf.math_uf.find(*x1);
+                            *x2 = uf.math_uf.find(*x2);
                         }
                         let mut op_delete = Vec::new();
-                        for x0 in math_uprooted.iter().copied() {
+                        for x0 in uprooted.math_uprooted.iter().copied() {
                             for (x1, x2) in self.iter1_0_1_2(x0) {
                                 op_delete.push((x0, x1, x2));
                             }
                         }
-                        for x1 in math_uprooted.iter().copied() {
+                        for x1 in uprooted.math_uprooted.iter().copied() {
                             for (x0, x2) in self.iter1_1_0_2(x1) {
                                 op_delete.push((x0, x1, x2));
                             }
                         }
-                        for x2 in math_uprooted.iter().copied() {
+                        for x2 in uprooted.math_uprooted.iter().copied() {
                             for (x0, x1) in self.iter1_2_0_1(x2) {
                                 op_delete.push((x0, x1, x2));
                             }
@@ -502,24 +507,35 @@ mod test {
                             if self.all_index_0_1_2.remove(&(x0, x1, x2)) {
                                 self.all_index_1_0_2.remove(&(x1, x0, x2));
                                 self.all_index_2_0_1.remove(&(x2, x0, x1));
-                                math_uf.dec_eclass(x0, Self::COST);
-                                math_uf.dec_eclass(x1, Self::COST);
-                                math_uf.dec_eclass(x2, Self::COST);
-                                op_insert.push((math_uf.find(x0), math_uf.find(x1), math_uf.find(x2)));
+                                uf.math_uf.dec_eclass(x0, Self::COST);
+                                uf.math_uf.dec_eclass(x1, Self::COST);
+                                uf.math_uf.dec_eclass(x2, Self::COST);
+                                op_insert.push((
+                                    uf.math_uf.find(x0),
+                                    uf.math_uf.find(x1),
+                                    uf.math_uf.find(x2),
+                                ));
                             }
                         }
                         op_insert.retain(|&(x0, x1, x2)| {
                             if !self.all_index_0_1_2.insert((x0, x1, x2)) {
                                 return false;
                             }
-                            math_uf.inc_eclass(x0, Self::COST);
-                            math_uf.inc_eclass(x1, Self::COST);
-                            math_uf.inc_eclass(x2, Self::COST);
+                            uf.math_uf.inc_eclass(x0, Self::COST);
+                            uf.math_uf.inc_eclass(x1, Self::COST);
+                            uf.math_uf.inc_eclass(x2, Self::COST);
                             self.all_index_1_0_2.insert((x1, x0, x2));
                             self.all_index_2_0_1.insert((x2, x0, x1));
                             true
                         });
-                        self.new = op_insert;
+                        self.new.extend(op_insert);
+                    }
+                    fn update_finalize(&mut self, uf: &mut Unification) {
+                        for (x0, x1, x2) in self.new.iter_mut() {
+                            *x0 = uf.math_uf.find(*x0);
+                            *x1 = uf.math_uf.find(*x1);
+                            *x2 = uf.math_uf.find(*x2);
+                        }
                     }
                 }
                 #[derive(Debug, Default)]
@@ -538,6 +554,9 @@ mod test {
                     }
                     fn has_new(&self) -> bool {
                         !self.new.is_empty()
+                    }
+                    fn clear_new(&mut self) {
+                        self.new.clear();
                     }
                     fn iter_new(&self) -> impl Iterator<Item = <Self as Relation>::Row> + use<'_> {
                         self.new.iter().copied()
@@ -560,19 +579,13 @@ mod test {
                     fn check1_1_0(&self, x1: Math) -> bool {
                         self.iter1_1_0(x1).next().is_some()
                     }
-                    fn update(
-                        &mut self,
-                        math_uprooted: &[Math],
-                        math_uf: &mut UnionFind<Math>,
-                        delta: &mut Vec<<Self as Relation>::Row>,
-                    ) {
-                        self.new.clear();
-                        let mut op_insert = take(delta);
+                    fn update(&mut self, uprooted: &Uprooted, uf: &mut Unification, delta: &mut Delta) {
+                        let mut op_insert = take(&mut delta.const_relation_delta);
                         for (x0, x1) in op_insert.iter_mut() {
-                            *x1 = math_uf.find(*x1);
+                            *x1 = uf.math_uf.find(*x1);
                         }
                         let mut op_delete = Vec::new();
-                        for x1 in math_uprooted.iter().copied() {
+                        for x1 in uprooted.math_uprooted.iter().copied() {
                             for (x0) in self.iter1_1_0(x1) {
                                 op_delete.push((x0, x1));
                             }
@@ -580,19 +593,24 @@ mod test {
                         for (x0, x1) in op_delete {
                             if self.all_index_0_1.remove(&(x0, x1)) {
                                 self.all_index_1_0.remove(&(x1, x0));
-                                math_uf.dec_eclass(x1, Self::COST);
-                                op_insert.push((x0, math_uf.find(x1)));
+                                uf.math_uf.dec_eclass(x1, Self::COST);
+                                op_insert.push((x0, uf.math_uf.find(x1)));
                             }
                         }
                         op_insert.retain(|&(x0, x1)| {
                             if !self.all_index_0_1.insert((x0, x1)) {
                                 return false;
                             }
-                            math_uf.inc_eclass(x1, Self::COST);
+                            uf.math_uf.inc_eclass(x1, Self::COST);
                             self.all_index_1_0.insert((x1, x0));
                             true
                         });
-                        self.new = op_insert;
+                        self.new.extend(op_insert);
+                    }
+                    fn update_finalize(&mut self, uf: &mut Unification) {
+                        for (x0, x1) in self.new.iter_mut() {
+                            *x1 = uf.math_uf.find(*x1);
+                        }
                     }
                 }
                 #[derive(Debug, Default)]
@@ -606,8 +624,16 @@ mod test {
                     fn new() -> Self {
                         Self::default()
                     }
-                    pub fn make_math(&mut self, math_uf: &mut UnionFind<Math>) -> Math {
-                        let id = math_uf.add_eclass();
+                    fn has_new(&self) -> bool {
+                        let mut has_new = false;
+                        has_new |= !self.forall_math_relation_delta.is_empty();
+                        has_new |= !self.mul_relation_delta.is_empty();
+                        has_new |= !self.add_relation_delta.is_empty();
+                        has_new |= !self.const_relation_delta.is_empty();
+                        has_new
+                    }
+                    pub fn make_math(&mut self, uf: &mut Unification) -> Math {
+                        let id = uf.math_uf.add_eclass();
                         self.forall_math_relation_delta.push(id);
                         id
                     }
@@ -634,7 +660,7 @@ mod test {
                         self.global_i64.push(tmp);
                         let tmp = {
                             let tmp0 = self.global_i64[0usize];
-                            let tmp_res = unification.math_uf.add_eclass();
+                            let tmp_res = uf.math_uf.add_eclass();
                             delta.insert_const((tmp0, tmp_res));
                             tmp_res
                         };
@@ -646,13 +672,31 @@ mod test {
                     }
                 }
                 #[derive(Debug, Default)]
+                struct Uprooted {
+                    math_uprooted: Vec<Math>,
+                }
+                impl Uprooted {
+                    fn take_dirt(&mut self, uf: &mut Unification) {
+                        self.math_uprooted.clear();
+                        swap(&mut self.math_uprooted, &mut uf.math_uf.dirty());
+                    }
+                }
+                #[derive(Debug, Default)]
                 struct Unification {
                     math_uf: UnionFind<Math>,
+                }
+                impl Unification {
+                    fn has_new(&mut self) -> bool {
+                        let mut has_new = false;
+                        has_new |= !self.math_uf.dirty().is_empty();
+                        has_new
+                    }
                 }
                 #[derive(Debug, Default)]
                 pub struct Theory {
                     delta: Delta,
-                    unification: Unification,
+                    uf: Unification,
+                    uprooted: Uprooted,
                     global_variables: GlobalVariables,
                     forall_math_relation: ForallMathRelation,
                     mul_relation: MulRelation,
@@ -664,8 +708,9 @@ mod test {
                         let mut theory = Self::default();
                         theory
                             .global_variables
-                            .initialize(&mut theory.delta, &mut theory.unification);
+                            .initialize(&mut theory.delta, &mut theory.uf);
                         theory.clear_transient();
+                        theory.global_variables.new = true;
                         theory
                     }
                     pub fn step(&mut self) {
@@ -679,26 +724,26 @@ mod test {
                         if self.global_variables.new {
                             let one = self.global_variables.global_i64[1usize];
                             for (p1) in self.const_relation.iter1_0_1(one) {
-                                let x = self.delta.make_math(&mut self.unification.math_uf);
+                                let x = self.delta.make_math(&mut self.uf.math_uf);
                                 self.delta.insert_add((x, x, p1));
                             }
                         }
                         for (one, p1) in self.const_relation.iter_new() {
                             if one == self.global_variables.global_i64[1usize] {
-                                let x = self.delta.make_math(&mut self.unification.math_uf);
+                                let x = self.delta.make_math(&mut self.uf.math_uf);
                                 self.delta.insert_add((x, x, p1));
                             }
                         }
                         if self.global_variables.new {
                             let p0 = self.global_variables.global_i64[0usize];
                             for (p1) in self.const_relation.iter1_0_1(p0) {
-                                let z = self.delta.make_math(&mut self.unification.math_uf);
+                                let z = self.delta.make_math(&mut self.uf.math_uf);
                                 self.delta.insert_add((z, z, p1));
                             }
                         }
                         for (p0, p1) in self.const_relation.iter_new() {
                             if p0 == self.global_variables.global_i64[0usize] {
-                                let z = self.delta.make_math(&mut self.unification.math_uf);
+                                let z = self.delta.make_math(&mut self.uf.math_uf);
                                 self.delta.insert_add((z, z, p1));
                             }
                         }
@@ -729,54 +774,55 @@ mod test {
                         }
                         for (p0, p1, p2) in self.mul_relation.iter_new() {
                             for (p3) in self.mul_relation.iter2_0_1_2(p0, p1) {
-                                self.unification.math_uf.union(p3, p2);
+                                self.uf.math_uf.union(p3, p2);
                             }
                         }
                         for (p0, p1, p3) in self.mul_relation.iter_new() {
                             for (p2) in self.mul_relation.iter2_0_1_2(p0, p1) {
-                                self.unification.math_uf.union(p3, p2);
+                                self.uf.math_uf.union(p3, p2);
                             }
                         }
                         for (p0, p1, p2) in self.add_relation.iter_new() {
                             for (p3) in self.add_relation.iter2_0_1_2(p0, p1) {
-                                self.unification.math_uf.union(p3, p2);
+                                self.uf.math_uf.union(p3, p2);
                             }
                         }
                         for (p0, p1, p3) in self.add_relation.iter_new() {
                             for (p2) in self.add_relation.iter2_0_1_2(p0, p1) {
-                                self.unification.math_uf.union(p3, p2);
+                                self.uf.math_uf.union(p3, p2);
                             }
                         }
                         for (p0, p1) in self.const_relation.iter_new() {
                             for (p2) in self.const_relation.iter1_0_1(p0) {
-                                self.unification.math_uf.union(p2, p1);
+                                self.uf.math_uf.union(p2, p1);
                             }
                         }
                         for (p0, p2) in self.const_relation.iter_new() {
                             for (p1) in self.const_relation.iter1_0_1(p0) {
-                                self.unification.math_uf.union(p2, p1);
+                                self.uf.math_uf.union(p2, p1);
                             }
                         }
                     }
                     fn clear_transient(&mut self) {
-                        let math_uprooted = take(self.unification.math_uf.dirty());
-                        let _ = "todo: update forall";
-                        self.mul_relation.update(
-                            &math_uprooted,
-                            &mut self.unification.math_uf,
-                            &mut self.delta.mul_relation_delta,
-                        );
-                        self.add_relation.update(
-                            &math_uprooted,
-                            &mut self.unification.math_uf,
-                            &mut self.delta.add_relation_delta,
-                        );
-                        self.const_relation.update(
-                            &math_uprooted,
-                            &mut self.unification.math_uf,
-                            &mut self.delta.const_relation_delta,
-                        );
                         self.global_variables.new = false;
+                        self.mul_relation.clear_new();
+                        self.add_relation.clear_new();
+                        self.const_relation.clear_new();
+                        loop {
+                            self.uprooted.take_dirt(&mut self.uf);
+                            self.mul_relation
+                                .update(&self.uprooted, &mut self.uf, &mut self.delta);
+                            self.add_relation
+                                .update(&self.uprooted, &mut self.uf, &mut self.delta);
+                            self.const_relation
+                                .update(&self.uprooted, &mut self.uf, &mut self.delta);
+                            if !(self.uf.has_new() || self.delta.has_new()) {
+                                break;
+                            }
+                        }
+                        self.mul_relation.update_finalize(&mut self.uf);
+                        self.add_relation.update_finalize(&mut self.uf);
+                        self.const_relation.update_finalize(&mut self.uf);
                     }
                 }
                 impl std::ops::Deref for Theory {
@@ -867,6 +913,9 @@ mod test {
                     fn has_new(&self) -> bool {
                         !self.new.is_empty()
                     }
+                    fn clear_new(&mut self) {
+                        self.new.clear();
+                    }
                     fn iter_new(&self) -> impl Iterator<Item = <Self as Relation>::Row> + use<'_> {
                         self.new.iter().copied()
                     }
@@ -897,25 +946,19 @@ mod test {
                     fn check1_0_1(&self, x0: Math) -> bool {
                         self.iter1_0_1(x0).next().is_some()
                     }
-                    fn update(
-                        &mut self,
-                        math_uprooted: &[Math],
-                        math_uf: &mut UnionFind<Math>,
-                        delta: &mut Vec<<Self as Relation>::Row>,
-                    ) {
-                        self.new.clear();
-                        let mut op_insert = take(delta);
+                    fn update(&mut self, uprooted: &Uprooted, uf: &mut Unification, delta: &mut Delta) {
+                        let mut op_insert = take(&mut delta.foo_relation_delta);
                         for (x0, x1) in op_insert.iter_mut() {
-                            *x0 = math_uf.find(*x0);
-                            *x1 = math_uf.find(*x1);
+                            *x0 = uf.math_uf.find(*x0);
+                            *x1 = uf.math_uf.find(*x1);
                         }
                         let mut op_delete = Vec::new();
-                        for x0 in math_uprooted.iter().copied() {
+                        for x0 in uprooted.math_uprooted.iter().copied() {
                             for (x1) in self.iter1_0_1(x0) {
                                 op_delete.push((x0, x1));
                             }
                         }
-                        for x1 in math_uprooted.iter().copied() {
+                        for x1 in uprooted.math_uprooted.iter().copied() {
                             for (x0) in self.iter1_1_0(x1) {
                                 op_delete.push((x0, x1));
                             }
@@ -923,21 +966,27 @@ mod test {
                         for (x0, x1) in op_delete {
                             if self.all_index_0_1.remove(&(x0, x1)) {
                                 self.all_index_1_0.remove(&(x1, x0));
-                                math_uf.dec_eclass(x0, Self::COST);
-                                math_uf.dec_eclass(x1, Self::COST);
-                                op_insert.push((math_uf.find(x0), math_uf.find(x1)));
+                                uf.math_uf.dec_eclass(x0, Self::COST);
+                                uf.math_uf.dec_eclass(x1, Self::COST);
+                                op_insert.push((uf.math_uf.find(x0), uf.math_uf.find(x1)));
                             }
                         }
                         op_insert.retain(|&(x0, x1)| {
                             if !self.all_index_0_1.insert((x0, x1)) {
                                 return false;
                             }
-                            math_uf.inc_eclass(x0, Self::COST);
-                            math_uf.inc_eclass(x1, Self::COST);
+                            uf.math_uf.inc_eclass(x0, Self::COST);
+                            uf.math_uf.inc_eclass(x1, Self::COST);
                             self.all_index_1_0.insert((x1, x0));
                             true
                         });
-                        self.new = op_insert;
+                        self.new.extend(op_insert);
+                    }
+                    fn update_finalize(&mut self, uf: &mut Unification) {
+                        for (x0, x1) in self.new.iter_mut() {
+                            *x0 = uf.math_uf.find(*x0);
+                            *x1 = uf.math_uf.find(*x1);
+                        }
                     }
                 }
                 #[derive(Debug, Default)]
@@ -957,6 +1006,9 @@ mod test {
                     fn has_new(&self) -> bool {
                         !self.new.is_empty()
                     }
+                    fn clear_new(&mut self) {
+                        self.new.clear();
+                    }
                     fn iter_new(&self) -> impl Iterator<Item = <Self as Relation>::Row> + use<'_> {
                         self.new.iter().copied()
                     }
@@ -978,25 +1030,19 @@ mod test {
                     fn check1_1_0(&self, x1: Math) -> bool {
                         self.iter1_1_0(x1).next().is_some()
                     }
-                    fn update(
-                        &mut self,
-                        math_uprooted: &[Math],
-                        math_uf: &mut UnionFind<Math>,
-                        delta: &mut Vec<<Self as Relation>::Row>,
-                    ) {
-                        self.new.clear();
-                        let mut op_insert = take(delta);
+                    fn update(&mut self, uprooted: &Uprooted, uf: &mut Unification, delta: &mut Delta) {
+                        let mut op_insert = take(&mut delta.bar_relation_delta);
                         for (x0, x1) in op_insert.iter_mut() {
-                            *x0 = math_uf.find(*x0);
-                            *x1 = math_uf.find(*x1);
+                            *x0 = uf.math_uf.find(*x0);
+                            *x1 = uf.math_uf.find(*x1);
                         }
                         let mut op_delete = Vec::new();
-                        for x0 in math_uprooted.iter().copied() {
+                        for x0 in uprooted.math_uprooted.iter().copied() {
                             for (x1) in self.iter1_0_1(x0) {
                                 op_delete.push((x0, x1));
                             }
                         }
-                        for x1 in math_uprooted.iter().copied() {
+                        for x1 in uprooted.math_uprooted.iter().copied() {
                             for (x0) in self.iter1_1_0(x1) {
                                 op_delete.push((x0, x1));
                             }
@@ -1004,21 +1050,27 @@ mod test {
                         for (x0, x1) in op_delete {
                             if self.all_index_0_1.remove(&(x0, x1)) {
                                 self.all_index_1_0.remove(&(x1, x0));
-                                math_uf.dec_eclass(x0, Self::COST);
-                                math_uf.dec_eclass(x1, Self::COST);
-                                op_insert.push((math_uf.find(x0), math_uf.find(x1)));
+                                uf.math_uf.dec_eclass(x0, Self::COST);
+                                uf.math_uf.dec_eclass(x1, Self::COST);
+                                op_insert.push((uf.math_uf.find(x0), uf.math_uf.find(x1)));
                             }
                         }
                         op_insert.retain(|&(x0, x1)| {
                             if !self.all_index_0_1.insert((x0, x1)) {
                                 return false;
                             }
-                            math_uf.inc_eclass(x0, Self::COST);
-                            math_uf.inc_eclass(x1, Self::COST);
+                            uf.math_uf.inc_eclass(x0, Self::COST);
+                            uf.math_uf.inc_eclass(x1, Self::COST);
                             self.all_index_1_0.insert((x1, x0));
                             true
                         });
-                        self.new = op_insert;
+                        self.new.extend(op_insert);
+                    }
+                    fn update_finalize(&mut self, uf: &mut Unification) {
+                        for (x0, x1) in self.new.iter_mut() {
+                            *x0 = uf.math_uf.find(*x0);
+                            *x1 = uf.math_uf.find(*x1);
+                        }
                     }
                 }
                 #[derive(Debug, Default)]
@@ -1037,6 +1089,9 @@ mod test {
                     }
                     fn has_new(&self) -> bool {
                         !self.new.is_empty()
+                    }
+                    fn clear_new(&mut self) {
+                        self.new.clear();
                     }
                     fn iter_new(&self) -> impl Iterator<Item = <Self as Relation>::Row> + use<'_> {
                         self.new.iter().copied()
@@ -1068,25 +1123,19 @@ mod test {
                     fn check1_0_1(&self, x0: Math) -> bool {
                         self.iter1_0_1(x0).next().is_some()
                     }
-                    fn update(
-                        &mut self,
-                        math_uprooted: &[Math],
-                        math_uf: &mut UnionFind<Math>,
-                        delta: &mut Vec<<Self as Relation>::Row>,
-                    ) {
-                        self.new.clear();
-                        let mut op_insert = take(delta);
+                    fn update(&mut self, uprooted: &Uprooted, uf: &mut Unification, delta: &mut Delta) {
+                        let mut op_insert = take(&mut delta.baz_relation_delta);
                         for (x0, x1) in op_insert.iter_mut() {
-                            *x0 = math_uf.find(*x0);
-                            *x1 = math_uf.find(*x1);
+                            *x0 = uf.math_uf.find(*x0);
+                            *x1 = uf.math_uf.find(*x1);
                         }
                         let mut op_delete = Vec::new();
-                        for x0 in math_uprooted.iter().copied() {
+                        for x0 in uprooted.math_uprooted.iter().copied() {
                             for (x1) in self.iter1_0_1(x0) {
                                 op_delete.push((x0, x1));
                             }
                         }
-                        for x1 in math_uprooted.iter().copied() {
+                        for x1 in uprooted.math_uprooted.iter().copied() {
                             for (x0) in self.iter1_1_0(x1) {
                                 op_delete.push((x0, x1));
                             }
@@ -1094,21 +1143,27 @@ mod test {
                         for (x0, x1) in op_delete {
                             if self.all_index_0_1.remove(&(x0, x1)) {
                                 self.all_index_1_0.remove(&(x1, x0));
-                                math_uf.dec_eclass(x0, Self::COST);
-                                math_uf.dec_eclass(x1, Self::COST);
-                                op_insert.push((math_uf.find(x0), math_uf.find(x1)));
+                                uf.math_uf.dec_eclass(x0, Self::COST);
+                                uf.math_uf.dec_eclass(x1, Self::COST);
+                                op_insert.push((uf.math_uf.find(x0), uf.math_uf.find(x1)));
                             }
                         }
                         op_insert.retain(|&(x0, x1)| {
                             if !self.all_index_0_1.insert((x0, x1)) {
                                 return false;
                             }
-                            math_uf.inc_eclass(x0, Self::COST);
-                            math_uf.inc_eclass(x1, Self::COST);
+                            uf.math_uf.inc_eclass(x0, Self::COST);
+                            uf.math_uf.inc_eclass(x1, Self::COST);
                             self.all_index_1_0.insert((x1, x0));
                             true
                         });
-                        self.new = op_insert;
+                        self.new.extend(op_insert);
+                    }
+                    fn update_finalize(&mut self, uf: &mut Unification) {
+                        for (x0, x1) in self.new.iter_mut() {
+                            *x0 = uf.math_uf.find(*x0);
+                            *x1 = uf.math_uf.find(*x1);
+                        }
                     }
                 }
                 #[derive(Debug, Default)]
@@ -1128,6 +1183,9 @@ mod test {
                     }
                     fn has_new(&self) -> bool {
                         !self.new.is_empty()
+                    }
+                    fn clear_new(&mut self) {
+                        self.new.clear();
                     }
                     fn iter_new(&self) -> impl Iterator<Item = <Self as Relation>::Row> + use<'_> {
                         self.new.iter().copied()
@@ -1159,31 +1217,25 @@ mod test {
                     fn check1_2_0_1(&self, x2: Math) -> bool {
                         self.iter1_2_0_1(x2).next().is_some()
                     }
-                    fn update(
-                        &mut self,
-                        math_uprooted: &[Math],
-                        math_uf: &mut UnionFind<Math>,
-                        delta: &mut Vec<<Self as Relation>::Row>,
-                    ) {
-                        self.new.clear();
-                        let mut op_insert = take(delta);
+                    fn update(&mut self, uprooted: &Uprooted, uf: &mut Unification, delta: &mut Delta) {
+                        let mut op_insert = take(&mut delta.triangle_relation_delta);
                         for (x0, x1, x2) in op_insert.iter_mut() {
-                            *x0 = math_uf.find(*x0);
-                            *x1 = math_uf.find(*x1);
-                            *x2 = math_uf.find(*x2);
+                            *x0 = uf.math_uf.find(*x0);
+                            *x1 = uf.math_uf.find(*x1);
+                            *x2 = uf.math_uf.find(*x2);
                         }
                         let mut op_delete = Vec::new();
-                        for x0 in math_uprooted.iter().copied() {
+                        for x0 in uprooted.math_uprooted.iter().copied() {
                             for (x1, x2) in self.iter1_0_1_2(x0) {
                                 op_delete.push((x0, x1, x2));
                             }
                         }
-                        for x1 in math_uprooted.iter().copied() {
+                        for x1 in uprooted.math_uprooted.iter().copied() {
                             for (x0, x2) in self.iter1_1_0_2(x1) {
                                 op_delete.push((x0, x1, x2));
                             }
                         }
-                        for x2 in math_uprooted.iter().copied() {
+                        for x2 in uprooted.math_uprooted.iter().copied() {
                             for (x0, x1) in self.iter1_2_0_1(x2) {
                                 op_delete.push((x0, x1, x2));
                             }
@@ -1192,24 +1244,35 @@ mod test {
                             if self.all_index_0_1_2.remove(&(x0, x1, x2)) {
                                 self.all_index_1_0_2.remove(&(x1, x0, x2));
                                 self.all_index_2_0_1.remove(&(x2, x0, x1));
-                                math_uf.dec_eclass(x0, Self::COST);
-                                math_uf.dec_eclass(x1, Self::COST);
-                                math_uf.dec_eclass(x2, Self::COST);
-                                op_insert.push((math_uf.find(x0), math_uf.find(x1), math_uf.find(x2)));
+                                uf.math_uf.dec_eclass(x0, Self::COST);
+                                uf.math_uf.dec_eclass(x1, Self::COST);
+                                uf.math_uf.dec_eclass(x2, Self::COST);
+                                op_insert.push((
+                                    uf.math_uf.find(x0),
+                                    uf.math_uf.find(x1),
+                                    uf.math_uf.find(x2),
+                                ));
                             }
                         }
                         op_insert.retain(|&(x0, x1, x2)| {
                             if !self.all_index_0_1_2.insert((x0, x1, x2)) {
                                 return false;
                             }
-                            math_uf.inc_eclass(x0, Self::COST);
-                            math_uf.inc_eclass(x1, Self::COST);
-                            math_uf.inc_eclass(x2, Self::COST);
+                            uf.math_uf.inc_eclass(x0, Self::COST);
+                            uf.math_uf.inc_eclass(x1, Self::COST);
+                            uf.math_uf.inc_eclass(x2, Self::COST);
                             self.all_index_1_0_2.insert((x1, x0, x2));
                             self.all_index_2_0_1.insert((x2, x0, x1));
                             true
                         });
-                        self.new = op_insert;
+                        self.new.extend(op_insert);
+                    }
+                    fn update_finalize(&mut self, uf: &mut Unification) {
+                        for (x0, x1, x2) in self.new.iter_mut() {
+                            *x0 = uf.math_uf.find(*x0);
+                            *x1 = uf.math_uf.find(*x1);
+                            *x2 = uf.math_uf.find(*x2);
+                        }
                     }
                 }
                 #[derive(Debug, Default)]
@@ -1224,8 +1287,17 @@ mod test {
                     fn new() -> Self {
                         Self::default()
                     }
-                    pub fn make_math(&mut self, math_uf: &mut UnionFind<Math>) -> Math {
-                        let id = math_uf.add_eclass();
+                    fn has_new(&self) -> bool {
+                        let mut has_new = false;
+                        has_new |= !self.forall_math_relation_delta.is_empty();
+                        has_new |= !self.foo_relation_delta.is_empty();
+                        has_new |= !self.bar_relation_delta.is_empty();
+                        has_new |= !self.baz_relation_delta.is_empty();
+                        has_new |= !self.triangle_relation_delta.is_empty();
+                        has_new
+                    }
+                    pub fn make_math(&mut self, uf: &mut Unification) -> Math {
+                        let id = uf.math_uf.add_eclass();
                         self.forall_math_relation_delta.push(id);
                         id
                     }
@@ -1252,13 +1324,31 @@ mod test {
                     }
                 }
                 #[derive(Debug, Default)]
+                struct Uprooted {
+                    math_uprooted: Vec<Math>,
+                }
+                impl Uprooted {
+                    fn take_dirt(&mut self, uf: &mut Unification) {
+                        self.math_uprooted.clear();
+                        swap(&mut self.math_uprooted, &mut uf.math_uf.dirty());
+                    }
+                }
+                #[derive(Debug, Default)]
                 struct Unification {
                     math_uf: UnionFind<Math>,
+                }
+                impl Unification {
+                    fn has_new(&mut self) -> bool {
+                        let mut has_new = false;
+                        has_new |= !self.math_uf.dirty().is_empty();
+                        has_new
+                    }
                 }
                 #[derive(Debug, Default)]
                 pub struct Theory {
                     delta: Delta,
-                    unification: Unification,
+                    uf: Unification,
+                    uprooted: Uprooted,
                     global_variables: GlobalVariables,
                     forall_math_relation: ForallMathRelation,
                     foo_relation: FooRelation,
@@ -1271,8 +1361,9 @@ mod test {
                         let mut theory = Self::default();
                         theory
                             .global_variables
-                            .initialize(&mut theory.delta, &mut theory.unification);
+                            .initialize(&mut theory.delta, &mut theory.uf);
                         theory.clear_transient();
+                        theory.global_variables.new = true;
                         theory
                     }
                     pub fn step(&mut self) {
@@ -1312,29 +1403,29 @@ mod test {
                         }
                     }
                     fn clear_transient(&mut self) {
-                        let math_uprooted = take(self.unification.math_uf.dirty());
-                        let _ = "todo: update forall";
-                        self.foo_relation.update(
-                            &math_uprooted,
-                            &mut self.unification.math_uf,
-                            &mut self.delta.foo_relation_delta,
-                        );
-                        self.bar_relation.update(
-                            &math_uprooted,
-                            &mut self.unification.math_uf,
-                            &mut self.delta.bar_relation_delta,
-                        );
-                        self.baz_relation.update(
-                            &math_uprooted,
-                            &mut self.unification.math_uf,
-                            &mut self.delta.baz_relation_delta,
-                        );
-                        self.triangle_relation.update(
-                            &math_uprooted,
-                            &mut self.unification.math_uf,
-                            &mut self.delta.triangle_relation_delta,
-                        );
                         self.global_variables.new = false;
+                        self.foo_relation.clear_new();
+                        self.bar_relation.clear_new();
+                        self.baz_relation.clear_new();
+                        self.triangle_relation.clear_new();
+                        loop {
+                            self.uprooted.take_dirt(&mut self.uf);
+                            self.foo_relation
+                                .update(&self.uprooted, &mut self.uf, &mut self.delta);
+                            self.bar_relation
+                                .update(&self.uprooted, &mut self.uf, &mut self.delta);
+                            self.baz_relation
+                                .update(&self.uprooted, &mut self.uf, &mut self.delta);
+                            self.triangle_relation
+                                .update(&self.uprooted, &mut self.uf, &mut self.delta);
+                            if !(self.uf.has_new() || self.delta.has_new()) {
+                                break;
+                            }
+                        }
+                        self.foo_relation.update_finalize(&mut self.uf);
+                        self.bar_relation.update_finalize(&mut self.uf);
+                        self.baz_relation.update_finalize(&mut self.uf);
+                        self.triangle_relation.update_finalize(&mut self.uf);
                     }
                 }
                 impl std::ops::Deref for Theory {
@@ -1427,6 +1518,9 @@ mod test {
                     fn has_new(&self) -> bool {
                         !self.new.is_empty()
                     }
+                    fn clear_new(&mut self) {
+                        self.new.clear();
+                    }
                     fn iter_new(&self) -> impl Iterator<Item = <Self as Relation>::Row> + use<'_> {
                         self.new.iter().copied()
                     }
@@ -1475,31 +1569,25 @@ mod test {
                     fn check1_1_0_2(&self, x1: Math) -> bool {
                         self.iter1_1_0_2(x1).next().is_some()
                     }
-                    fn update(
-                        &mut self,
-                        math_uprooted: &[Math],
-                        math_uf: &mut UnionFind<Math>,
-                        delta: &mut Vec<<Self as Relation>::Row>,
-                    ) {
-                        self.new.clear();
-                        let mut op_insert = take(delta);
+                    fn update(&mut self, uprooted: &Uprooted, uf: &mut Unification, delta: &mut Delta) {
+                        let mut op_insert = take(&mut delta.mul_relation_delta);
                         for (x0, x1, x2) in op_insert.iter_mut() {
-                            *x0 = math_uf.find(*x0);
-                            *x1 = math_uf.find(*x1);
-                            *x2 = math_uf.find(*x2);
+                            *x0 = uf.math_uf.find(*x0);
+                            *x1 = uf.math_uf.find(*x1);
+                            *x2 = uf.math_uf.find(*x2);
                         }
                         let mut op_delete = Vec::new();
-                        for x0 in math_uprooted.iter().copied() {
+                        for x0 in uprooted.math_uprooted.iter().copied() {
                             for (x1, x2) in self.iter1_0_1_2(x0) {
                                 op_delete.push((x0, x1, x2));
                             }
                         }
-                        for x1 in math_uprooted.iter().copied() {
+                        for x1 in uprooted.math_uprooted.iter().copied() {
                             for (x0, x2) in self.iter1_1_0_2(x1) {
                                 op_delete.push((x0, x1, x2));
                             }
                         }
-                        for x2 in math_uprooted.iter().copied() {
+                        for x2 in uprooted.math_uprooted.iter().copied() {
                             for (x0, x1) in self.iter1_2_0_1(x2) {
                                 op_delete.push((x0, x1, x2));
                             }
@@ -1509,25 +1597,36 @@ mod test {
                                 self.all_index_0_2_1.remove(&(x0, x2, x1));
                                 self.all_index_1_0_2.remove(&(x1, x0, x2));
                                 self.all_index_2_0_1.remove(&(x2, x0, x1));
-                                math_uf.dec_eclass(x0, Self::COST);
-                                math_uf.dec_eclass(x1, Self::COST);
-                                math_uf.dec_eclass(x2, Self::COST);
-                                op_insert.push((math_uf.find(x0), math_uf.find(x1), math_uf.find(x2)));
+                                uf.math_uf.dec_eclass(x0, Self::COST);
+                                uf.math_uf.dec_eclass(x1, Self::COST);
+                                uf.math_uf.dec_eclass(x2, Self::COST);
+                                op_insert.push((
+                                    uf.math_uf.find(x0),
+                                    uf.math_uf.find(x1),
+                                    uf.math_uf.find(x2),
+                                ));
                             }
                         }
                         op_insert.retain(|&(x0, x1, x2)| {
                             if !self.all_index_0_1_2.insert((x0, x1, x2)) {
                                 return false;
                             }
-                            math_uf.inc_eclass(x0, Self::COST);
-                            math_uf.inc_eclass(x1, Self::COST);
-                            math_uf.inc_eclass(x2, Self::COST);
+                            uf.math_uf.inc_eclass(x0, Self::COST);
+                            uf.math_uf.inc_eclass(x1, Self::COST);
+                            uf.math_uf.inc_eclass(x2, Self::COST);
                             self.all_index_0_2_1.insert((x0, x2, x1));
                             self.all_index_1_0_2.insert((x1, x0, x2));
                             self.all_index_2_0_1.insert((x2, x0, x1));
                             true
                         });
-                        self.new = op_insert;
+                        self.new.extend(op_insert);
+                    }
+                    fn update_finalize(&mut self, uf: &mut Unification) {
+                        for (x0, x1, x2) in self.new.iter_mut() {
+                            *x0 = uf.math_uf.find(*x0);
+                            *x1 = uf.math_uf.find(*x1);
+                            *x2 = uf.math_uf.find(*x2);
+                        }
                     }
                 }
                 #[derive(Debug, Default)]
@@ -1547,6 +1646,9 @@ mod test {
                     }
                     fn has_new(&self) -> bool {
                         !self.new.is_empty()
+                    }
+                    fn clear_new(&mut self) {
+                        self.new.clear();
                     }
                     fn iter_new(&self) -> impl Iterator<Item = <Self as Relation>::Row> + use<'_> {
                         self.new.iter().copied()
@@ -1587,31 +1689,25 @@ mod test {
                     fn check1_2_0_1(&self, x2: Math) -> bool {
                         self.iter1_2_0_1(x2).next().is_some()
                     }
-                    fn update(
-                        &mut self,
-                        math_uprooted: &[Math],
-                        math_uf: &mut UnionFind<Math>,
-                        delta: &mut Vec<<Self as Relation>::Row>,
-                    ) {
-                        self.new.clear();
-                        let mut op_insert = take(delta);
+                    fn update(&mut self, uprooted: &Uprooted, uf: &mut Unification, delta: &mut Delta) {
+                        let mut op_insert = take(&mut delta.add_relation_delta);
                         for (x0, x1, x2) in op_insert.iter_mut() {
-                            *x0 = math_uf.find(*x0);
-                            *x1 = math_uf.find(*x1);
-                            *x2 = math_uf.find(*x2);
+                            *x0 = uf.math_uf.find(*x0);
+                            *x1 = uf.math_uf.find(*x1);
+                            *x2 = uf.math_uf.find(*x2);
                         }
                         let mut op_delete = Vec::new();
-                        for x0 in math_uprooted.iter().copied() {
+                        for x0 in uprooted.math_uprooted.iter().copied() {
                             for (x1, x2) in self.iter1_0_1_2(x0) {
                                 op_delete.push((x0, x1, x2));
                             }
                         }
-                        for x1 in math_uprooted.iter().copied() {
+                        for x1 in uprooted.math_uprooted.iter().copied() {
                             for (x0, x2) in self.iter1_1_0_2(x1) {
                                 op_delete.push((x0, x1, x2));
                             }
                         }
-                        for x2 in math_uprooted.iter().copied() {
+                        for x2 in uprooted.math_uprooted.iter().copied() {
                             for (x0, x1) in self.iter1_2_0_1(x2) {
                                 op_delete.push((x0, x1, x2));
                             }
@@ -1620,24 +1716,35 @@ mod test {
                             if self.all_index_0_1_2.remove(&(x0, x1, x2)) {
                                 self.all_index_1_0_2.remove(&(x1, x0, x2));
                                 self.all_index_2_0_1.remove(&(x2, x0, x1));
-                                math_uf.dec_eclass(x0, Self::COST);
-                                math_uf.dec_eclass(x1, Self::COST);
-                                math_uf.dec_eclass(x2, Self::COST);
-                                op_insert.push((math_uf.find(x0), math_uf.find(x1), math_uf.find(x2)));
+                                uf.math_uf.dec_eclass(x0, Self::COST);
+                                uf.math_uf.dec_eclass(x1, Self::COST);
+                                uf.math_uf.dec_eclass(x2, Self::COST);
+                                op_insert.push((
+                                    uf.math_uf.find(x0),
+                                    uf.math_uf.find(x1),
+                                    uf.math_uf.find(x2),
+                                ));
                             }
                         }
                         op_insert.retain(|&(x0, x1, x2)| {
                             if !self.all_index_0_1_2.insert((x0, x1, x2)) {
                                 return false;
                             }
-                            math_uf.inc_eclass(x0, Self::COST);
-                            math_uf.inc_eclass(x1, Self::COST);
-                            math_uf.inc_eclass(x2, Self::COST);
+                            uf.math_uf.inc_eclass(x0, Self::COST);
+                            uf.math_uf.inc_eclass(x1, Self::COST);
+                            uf.math_uf.inc_eclass(x2, Self::COST);
                             self.all_index_1_0_2.insert((x1, x0, x2));
                             self.all_index_2_0_1.insert((x2, x0, x1));
                             true
                         });
-                        self.new = op_insert;
+                        self.new.extend(op_insert);
+                    }
+                    fn update_finalize(&mut self, uf: &mut Unification) {
+                        for (x0, x1, x2) in self.new.iter_mut() {
+                            *x0 = uf.math_uf.find(*x0);
+                            *x1 = uf.math_uf.find(*x1);
+                            *x2 = uf.math_uf.find(*x2);
+                        }
                     }
                 }
                 #[derive(Debug, Default)]
@@ -1650,8 +1757,15 @@ mod test {
                     fn new() -> Self {
                         Self::default()
                     }
-                    pub fn make_math(&mut self, math_uf: &mut UnionFind<Math>) -> Math {
-                        let id = math_uf.add_eclass();
+                    fn has_new(&self) -> bool {
+                        let mut has_new = false;
+                        has_new |= !self.forall_math_relation_delta.is_empty();
+                        has_new |= !self.mul_relation_delta.is_empty();
+                        has_new |= !self.add_relation_delta.is_empty();
+                        has_new
+                    }
+                    pub fn make_math(&mut self, uf: &mut Unification) -> Math {
+                        let id = uf.math_uf.add_eclass();
                         self.forall_math_relation_delta.push(id);
                         id
                     }
@@ -1672,13 +1786,31 @@ mod test {
                     }
                 }
                 #[derive(Debug, Default)]
+                struct Uprooted {
+                    math_uprooted: Vec<Math>,
+                }
+                impl Uprooted {
+                    fn take_dirt(&mut self, uf: &mut Unification) {
+                        self.math_uprooted.clear();
+                        swap(&mut self.math_uprooted, &mut uf.math_uf.dirty());
+                    }
+                }
+                #[derive(Debug, Default)]
                 struct Unification {
                     math_uf: UnionFind<Math>,
+                }
+                impl Unification {
+                    fn has_new(&mut self) -> bool {
+                        let mut has_new = false;
+                        has_new |= !self.math_uf.dirty().is_empty();
+                        has_new
+                    }
                 }
                 #[derive(Debug, Default)]
                 pub struct Theory {
                     delta: Delta,
-                    unification: Unification,
+                    uf: Unification,
+                    uprooted: Uprooted,
                     global_variables: GlobalVariables,
                     forall_math_relation: ForallMathRelation,
                     mul_relation: MulRelation,
@@ -1689,8 +1821,9 @@ mod test {
                         let mut theory = Self::default();
                         theory
                             .global_variables
-                            .initialize(&mut theory.delta, &mut theory.unification);
+                            .initialize(&mut theory.delta, &mut theory.uf);
                         theory.clear_transient();
+                        theory.global_variables.new = true;
                         theory
                     }
                     pub fn step(&mut self) {
@@ -1705,7 +1838,7 @@ mod test {
                             if self.add_relation.check1_0_1_2(p2) {
                                 for (c, p4) in self.mul_relation.iter1_0_1_2(a) {
                                     for (p5) in self.add_relation.iter2_0_1_2(p2, p4) {
-                                        let a3 = self.delta.make_math(&mut self.unification.math_uf);
+                                        let a3 = self.delta.make_math(&mut self.uf.math_uf);
                                         self.delta.insert_add((b, c, a3));
                                         self.delta.insert_mul((a, a3, p5));
                                     }
@@ -1716,7 +1849,7 @@ mod test {
                             if self.mul_relation.check1_0_1_2(a) {
                                 for (p2, p5) in self.add_relation.iter1_1_0_2(p4) {
                                     for (b) in self.mul_relation.iter2_0_2_1(a, p2) {
-                                        let a3 = self.delta.make_math(&mut self.unification.math_uf);
+                                        let a3 = self.delta.make_math(&mut self.uf.math_uf);
                                         self.delta.insert_add((b, c, a3));
                                         self.delta.insert_mul((a, a3, p5));
                                     }
@@ -1727,7 +1860,7 @@ mod test {
                             if self.mul_relation.check1_2_0_1(p2) {
                                 for (a, c) in self.mul_relation.iter1_2_0_1(p4) {
                                     for (b) in self.mul_relation.iter2_0_2_1(a, p2) {
-                                        let a3 = self.delta.make_math(&mut self.unification.math_uf);
+                                        let a3 = self.delta.make_math(&mut self.uf.math_uf);
                                         self.delta.insert_add((b, c, a3));
                                         self.delta.insert_mul((a, a3, p5));
                                     }
@@ -1736,39 +1869,41 @@ mod test {
                         }
                         for (p0, p1, p2) in self.mul_relation.iter_new() {
                             for (p3) in self.mul_relation.iter2_0_1_2(p0, p1) {
-                                self.unification.math_uf.union(p3, p2);
+                                self.uf.math_uf.union(p3, p2);
                             }
                         }
                         for (p0, p1, p3) in self.mul_relation.iter_new() {
                             for (p2) in self.mul_relation.iter2_0_1_2(p0, p1) {
-                                self.unification.math_uf.union(p3, p2);
+                                self.uf.math_uf.union(p3, p2);
                             }
                         }
                         for (p0, p1, p2) in self.add_relation.iter_new() {
                             for (p3) in self.add_relation.iter2_0_1_2(p0, p1) {
-                                self.unification.math_uf.union(p3, p2);
+                                self.uf.math_uf.union(p3, p2);
                             }
                         }
                         for (p0, p1, p3) in self.add_relation.iter_new() {
                             for (p2) in self.add_relation.iter2_0_1_2(p0, p1) {
-                                self.unification.math_uf.union(p3, p2);
+                                self.uf.math_uf.union(p3, p2);
                             }
                         }
                     }
                     fn clear_transient(&mut self) {
-                        let math_uprooted = take(self.unification.math_uf.dirty());
-                        let _ = "todo: update forall";
-                        self.mul_relation.update(
-                            &math_uprooted,
-                            &mut self.unification.math_uf,
-                            &mut self.delta.mul_relation_delta,
-                        );
-                        self.add_relation.update(
-                            &math_uprooted,
-                            &mut self.unification.math_uf,
-                            &mut self.delta.add_relation_delta,
-                        );
                         self.global_variables.new = false;
+                        self.mul_relation.clear_new();
+                        self.add_relation.clear_new();
+                        loop {
+                            self.uprooted.take_dirt(&mut self.uf);
+                            self.mul_relation
+                                .update(&self.uprooted, &mut self.uf, &mut self.delta);
+                            self.add_relation
+                                .update(&self.uprooted, &mut self.uf, &mut self.delta);
+                            if !(self.uf.has_new() || self.delta.has_new()) {
+                                break;
+                            }
+                        }
+                        self.mul_relation.update_finalize(&mut self.uf);
+                        self.add_relation.update_finalize(&mut self.uf);
                     }
                 }
                 impl std::ops::Deref for Theory {
@@ -1874,6 +2009,9 @@ mod test {
                     fn has_new(&self) -> bool {
                         !self.new.is_empty()
                     }
+                    fn clear_new(&mut self) {
+                        self.new.clear();
+                    }
                     fn iter_new(&self) -> impl Iterator<Item = <Self as Relation>::Row> + use<'_> {
                         self.new.iter().copied()
                     }
@@ -1913,31 +2051,25 @@ mod test {
                     fn check1_2_0_1(&self, x2: Math) -> bool {
                         self.iter1_2_0_1(x2).next().is_some()
                     }
-                    fn update(
-                        &mut self,
-                        math_uprooted: &[Math],
-                        math_uf: &mut UnionFind<Math>,
-                        delta: &mut Vec<<Self as Relation>::Row>,
-                    ) {
-                        self.new.clear();
-                        let mut op_insert = take(delta);
+                    fn update(&mut self, uprooted: &Uprooted, uf: &mut Unification, delta: &mut Delta) {
+                        let mut op_insert = take(&mut delta.mul_relation_delta);
                         for (x0, x1, x2) in op_insert.iter_mut() {
-                            *x0 = math_uf.find(*x0);
-                            *x1 = math_uf.find(*x1);
-                            *x2 = math_uf.find(*x2);
+                            *x0 = uf.math_uf.find(*x0);
+                            *x1 = uf.math_uf.find(*x1);
+                            *x2 = uf.math_uf.find(*x2);
                         }
                         let mut op_delete = Vec::new();
-                        for x0 in math_uprooted.iter().copied() {
+                        for x0 in uprooted.math_uprooted.iter().copied() {
                             for (x1, x2) in self.iter1_0_1_2(x0) {
                                 op_delete.push((x0, x1, x2));
                             }
                         }
-                        for x1 in math_uprooted.iter().copied() {
+                        for x1 in uprooted.math_uprooted.iter().copied() {
                             for (x0, x2) in self.iter1_1_0_2(x1) {
                                 op_delete.push((x0, x1, x2));
                             }
                         }
-                        for x2 in math_uprooted.iter().copied() {
+                        for x2 in uprooted.math_uprooted.iter().copied() {
                             for (x0, x1) in self.iter1_2_0_1(x2) {
                                 op_delete.push((x0, x1, x2));
                             }
@@ -1946,24 +2078,35 @@ mod test {
                             if self.all_index_0_1_2.remove(&(x0, x1, x2)) {
                                 self.all_index_1_0_2.remove(&(x1, x0, x2));
                                 self.all_index_2_0_1.remove(&(x2, x0, x1));
-                                math_uf.dec_eclass(x0, Self::COST);
-                                math_uf.dec_eclass(x1, Self::COST);
-                                math_uf.dec_eclass(x2, Self::COST);
-                                op_insert.push((math_uf.find(x0), math_uf.find(x1), math_uf.find(x2)));
+                                uf.math_uf.dec_eclass(x0, Self::COST);
+                                uf.math_uf.dec_eclass(x1, Self::COST);
+                                uf.math_uf.dec_eclass(x2, Self::COST);
+                                op_insert.push((
+                                    uf.math_uf.find(x0),
+                                    uf.math_uf.find(x1),
+                                    uf.math_uf.find(x2),
+                                ));
                             }
                         }
                         op_insert.retain(|&(x0, x1, x2)| {
                             if !self.all_index_0_1_2.insert((x0, x1, x2)) {
                                 return false;
                             }
-                            math_uf.inc_eclass(x0, Self::COST);
-                            math_uf.inc_eclass(x1, Self::COST);
-                            math_uf.inc_eclass(x2, Self::COST);
+                            uf.math_uf.inc_eclass(x0, Self::COST);
+                            uf.math_uf.inc_eclass(x1, Self::COST);
+                            uf.math_uf.inc_eclass(x2, Self::COST);
                             self.all_index_1_0_2.insert((x1, x0, x2));
                             self.all_index_2_0_1.insert((x2, x0, x1));
                             true
                         });
-                        self.new = op_insert;
+                        self.new.extend(op_insert);
+                    }
+                    fn update_finalize(&mut self, uf: &mut Unification) {
+                        for (x0, x1, x2) in self.new.iter_mut() {
+                            *x0 = uf.math_uf.find(*x0);
+                            *x1 = uf.math_uf.find(*x1);
+                            *x2 = uf.math_uf.find(*x2);
+                        }
                     }
                 }
                 #[derive(Debug, Default)]
@@ -1984,6 +2127,9 @@ mod test {
                     fn has_new(&self) -> bool {
                         !self.new.is_empty()
                     }
+                    fn clear_new(&mut self) {
+                        self.new.clear();
+                    }
                     fn iter_new(&self) -> impl Iterator<Item = <Self as Relation>::Row> + use<'_> {
                         self.new.iter().copied()
                     }
@@ -2023,31 +2169,25 @@ mod test {
                     fn check1_1_0_2(&self, x1: Math) -> bool {
                         self.iter1_1_0_2(x1).next().is_some()
                     }
-                    fn update(
-                        &mut self,
-                        math_uprooted: &[Math],
-                        math_uf: &mut UnionFind<Math>,
-                        delta: &mut Vec<<Self as Relation>::Row>,
-                    ) {
-                        self.new.clear();
-                        let mut op_insert = take(delta);
+                    fn update(&mut self, uprooted: &Uprooted, uf: &mut Unification, delta: &mut Delta) {
+                        let mut op_insert = take(&mut delta.add_relation_delta);
                         for (x0, x1, x2) in op_insert.iter_mut() {
-                            *x0 = math_uf.find(*x0);
-                            *x1 = math_uf.find(*x1);
-                            *x2 = math_uf.find(*x2);
+                            *x0 = uf.math_uf.find(*x0);
+                            *x1 = uf.math_uf.find(*x1);
+                            *x2 = uf.math_uf.find(*x2);
                         }
                         let mut op_delete = Vec::new();
-                        for x0 in math_uprooted.iter().copied() {
+                        for x0 in uprooted.math_uprooted.iter().copied() {
                             for (x1, x2) in self.iter1_0_1_2(x0) {
                                 op_delete.push((x0, x1, x2));
                             }
                         }
-                        for x1 in math_uprooted.iter().copied() {
+                        for x1 in uprooted.math_uprooted.iter().copied() {
                             for (x0, x2) in self.iter1_1_0_2(x1) {
                                 op_delete.push((x0, x1, x2));
                             }
                         }
-                        for x2 in math_uprooted.iter().copied() {
+                        for x2 in uprooted.math_uprooted.iter().copied() {
                             for (x0, x1) in self.iter1_2_0_1(x2) {
                                 op_delete.push((x0, x1, x2));
                             }
@@ -2056,24 +2196,35 @@ mod test {
                             if self.all_index_0_1_2.remove(&(x0, x1, x2)) {
                                 self.all_index_1_0_2.remove(&(x1, x0, x2));
                                 self.all_index_2_0_1.remove(&(x2, x0, x1));
-                                math_uf.dec_eclass(x0, Self::COST);
-                                math_uf.dec_eclass(x1, Self::COST);
-                                math_uf.dec_eclass(x2, Self::COST);
-                                op_insert.push((math_uf.find(x0), math_uf.find(x1), math_uf.find(x2)));
+                                uf.math_uf.dec_eclass(x0, Self::COST);
+                                uf.math_uf.dec_eclass(x1, Self::COST);
+                                uf.math_uf.dec_eclass(x2, Self::COST);
+                                op_insert.push((
+                                    uf.math_uf.find(x0),
+                                    uf.math_uf.find(x1),
+                                    uf.math_uf.find(x2),
+                                ));
                             }
                         }
                         op_insert.retain(|&(x0, x1, x2)| {
                             if !self.all_index_0_1_2.insert((x0, x1, x2)) {
                                 return false;
                             }
-                            math_uf.inc_eclass(x0, Self::COST);
-                            math_uf.inc_eclass(x1, Self::COST);
-                            math_uf.inc_eclass(x2, Self::COST);
+                            uf.math_uf.inc_eclass(x0, Self::COST);
+                            uf.math_uf.inc_eclass(x1, Self::COST);
+                            uf.math_uf.inc_eclass(x2, Self::COST);
                             self.all_index_1_0_2.insert((x1, x0, x2));
                             self.all_index_2_0_1.insert((x2, x0, x1));
                             true
                         });
-                        self.new = op_insert;
+                        self.new.extend(op_insert);
+                    }
+                    fn update_finalize(&mut self, uf: &mut Unification) {
+                        for (x0, x1, x2) in self.new.iter_mut() {
+                            *x0 = uf.math_uf.find(*x0);
+                            *x1 = uf.math_uf.find(*x1);
+                            *x2 = uf.math_uf.find(*x2);
+                        }
                     }
                 }
                 #[derive(Debug, Default)]
@@ -2086,8 +2237,15 @@ mod test {
                     fn new() -> Self {
                         Self::default()
                     }
-                    pub fn make_math(&mut self, math_uf: &mut UnionFind<Math>) -> Math {
-                        let id = math_uf.add_eclass();
+                    fn has_new(&self) -> bool {
+                        let mut has_new = false;
+                        has_new |= !self.forall_math_relation_delta.is_empty();
+                        has_new |= !self.mul_relation_delta.is_empty();
+                        has_new |= !self.add_relation_delta.is_empty();
+                        has_new
+                    }
+                    pub fn make_math(&mut self, uf: &mut Unification) -> Math {
+                        let id = uf.math_uf.add_eclass();
                         self.forall_math_relation_delta.push(id);
                         id
                     }
@@ -2108,13 +2266,31 @@ mod test {
                     }
                 }
                 #[derive(Debug, Default)]
+                struct Uprooted {
+                    math_uprooted: Vec<Math>,
+                }
+                impl Uprooted {
+                    fn take_dirt(&mut self, uf: &mut Unification) {
+                        self.math_uprooted.clear();
+                        swap(&mut self.math_uprooted, &mut uf.math_uf.dirty());
+                    }
+                }
+                #[derive(Debug, Default)]
                 struct Unification {
                     math_uf: UnionFind<Math>,
+                }
+                impl Unification {
+                    fn has_new(&mut self) -> bool {
+                        let mut has_new = false;
+                        has_new |= !self.math_uf.dirty().is_empty();
+                        has_new
+                    }
                 }
                 #[derive(Debug, Default)]
                 pub struct Theory {
                     delta: Delta,
-                    unification: Unification,
+                    uf: Unification,
+                    uprooted: Uprooted,
                     global_variables: GlobalVariables,
                     forall_math_relation: ForallMathRelation,
                     mul_relation: MulRelation,
@@ -2125,8 +2301,9 @@ mod test {
                         let mut theory = Self::default();
                         theory
                             .global_variables
-                            .initialize(&mut theory.delta, &mut theory.unification);
+                            .initialize(&mut theory.delta, &mut theory.uf);
                         theory.clear_transient();
+                        theory.global_variables.new = true;
                         theory
                     }
                     pub fn step(&mut self) {
@@ -2139,8 +2316,8 @@ mod test {
                     fn apply_rules(&mut self) {
                         for (a, b, p2) in self.add_relation.iter_new() {
                             for (c, p4) in self.mul_relation.iter1_0_1_2(p2) {
-                                let a4 = self.delta.make_math(&mut self.unification.math_uf);
-                                let a3 = self.delta.make_math(&mut self.unification.math_uf);
+                                let a4 = self.delta.make_math(&mut self.uf.math_uf);
+                                let a3 = self.delta.make_math(&mut self.uf.math_uf);
                                 self.delta.insert_add((a3, a4, p4));
                                 self.delta.insert_mul((b, c, a4));
                                 self.delta.insert_mul((a, c, a3));
@@ -2148,8 +2325,8 @@ mod test {
                         }
                         for (p2, c, p4) in self.mul_relation.iter_new() {
                             for (a, b) in self.add_relation.iter1_2_0_1(p2) {
-                                let a4 = self.delta.make_math(&mut self.unification.math_uf);
-                                let a3 = self.delta.make_math(&mut self.unification.math_uf);
+                                let a4 = self.delta.make_math(&mut self.uf.math_uf);
+                                let a3 = self.delta.make_math(&mut self.uf.math_uf);
                                 self.delta.insert_add((a3, a4, p4));
                                 self.delta.insert_mul((b, c, a4));
                                 self.delta.insert_mul((a, c, a3));
@@ -2157,39 +2334,41 @@ mod test {
                         }
                         for (p0, p1, p2) in self.mul_relation.iter_new() {
                             for (p3) in self.mul_relation.iter2_0_1_2(p0, p1) {
-                                self.unification.math_uf.union(p3, p2);
+                                self.uf.math_uf.union(p3, p2);
                             }
                         }
                         for (p0, p1, p3) in self.mul_relation.iter_new() {
                             for (p2) in self.mul_relation.iter2_0_1_2(p0, p1) {
-                                self.unification.math_uf.union(p3, p2);
+                                self.uf.math_uf.union(p3, p2);
                             }
                         }
                         for (p0, p1, p2) in self.add_relation.iter_new() {
                             for (p3) in self.add_relation.iter2_0_1_2(p0, p1) {
-                                self.unification.math_uf.union(p3, p2);
+                                self.uf.math_uf.union(p3, p2);
                             }
                         }
                         for (p0, p1, p3) in self.add_relation.iter_new() {
                             for (p2) in self.add_relation.iter2_0_1_2(p0, p1) {
-                                self.unification.math_uf.union(p3, p2);
+                                self.uf.math_uf.union(p3, p2);
                             }
                         }
                     }
                     fn clear_transient(&mut self) {
-                        let math_uprooted = take(self.unification.math_uf.dirty());
-                        let _ = "todo: update forall";
-                        self.mul_relation.update(
-                            &math_uprooted,
-                            &mut self.unification.math_uf,
-                            &mut self.delta.mul_relation_delta,
-                        );
-                        self.add_relation.update(
-                            &math_uprooted,
-                            &mut self.unification.math_uf,
-                            &mut self.delta.add_relation_delta,
-                        );
                         self.global_variables.new = false;
+                        self.mul_relation.clear_new();
+                        self.add_relation.clear_new();
+                        loop {
+                            self.uprooted.take_dirt(&mut self.uf);
+                            self.mul_relation
+                                .update(&self.uprooted, &mut self.uf, &mut self.delta);
+                            self.add_relation
+                                .update(&self.uprooted, &mut self.uf, &mut self.delta);
+                            if !(self.uf.has_new() || self.delta.has_new()) {
+                                break;
+                            }
+                        }
+                        self.mul_relation.update_finalize(&mut self.uf);
+                        self.add_relation.update_finalize(&mut self.uf);
                     }
                 }
                 impl std::ops::Deref for Theory {

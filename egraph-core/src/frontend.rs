@@ -684,7 +684,6 @@ impl Parser {
         ty: TypeId,
         compute: ComputeMethod,
     ) -> syn::Result<GlobalId> {
-
         if let Some(name) = name {
             if let Entry::Occupied(entry) = self.global_variable_names.entry(name) {
                 let existing_span = entry.key().span;

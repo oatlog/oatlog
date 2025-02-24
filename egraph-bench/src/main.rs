@@ -42,10 +42,10 @@ compile_egraph!((
 // (rewrite (Mul a (Const (rational 0 1))) (Const (rational 0 1)))
 (rewrite (Mul a (Const 1)) a)
 // (rewrite (Mul a (Const (rational 1 1))) a)
-// 
+//
 // (rewrite (Sub a a) (Const (rational 0 1)))
 // (rewrite (Sub a a) (Const 0)) // TODO: crashes proc macro
-// 
+//
 (rewrite (Mul a (Add b c)) (Add (Mul a b) (Mul a c)))
 (rewrite (Add (Mul a b) (Mul a c)) (Mul a (Add b c)))
 
@@ -83,9 +83,8 @@ compile_egraph!((
 
 ));
 
-
 fn main() {
-    let s = 
+    let s =
 "(
 (datatype Math
     (Diff Math Math)
@@ -184,21 +183,25 @@ fn main() {
         dbg!(theory.const_relation.all_index_0_1.len());
         dbg!(theory.fake_var_relation.all_index_0_1.len());
 
-        let total = [(theory.add_relation.all_index_0_1_2.len()),
-        (theory.sub_relation.all_index_0_1_2.len()),
-        (theory.mul_relation.all_index_0_1_2.len()),
-        (theory.div_relation.all_index_0_1_2.len()),
-        (theory.diff_relation.all_index_0_1_2.len()),
-        (theory.integral_relation.all_index_0_1_2.len()),
-        (theory.pow_relation.all_index_0_1_2.len()),
-        (theory.ln_relation.all_index_0_1.len()),
-        (theory.sqrt_relation.all_index_0_1.len()),
-        (theory.sin_relation.all_index_0_1.len()),
-        (theory.cos_relation.all_index_0_1.len()),
-        (theory.const_relation.all_index_0_1.len()),
-        (theory.fake_var_relation.all_index_0_1.len())].iter().copied().sum::<usize>();
+        let total = [
+            (theory.add_relation.all_index_0_1_2.len()),
+            (theory.sub_relation.all_index_0_1_2.len()),
+            (theory.mul_relation.all_index_0_1_2.len()),
+            (theory.div_relation.all_index_0_1_2.len()),
+            (theory.diff_relation.all_index_0_1_2.len()),
+            (theory.integral_relation.all_index_0_1_2.len()),
+            (theory.pow_relation.all_index_0_1_2.len()),
+            (theory.ln_relation.all_index_0_1.len()),
+            (theory.sqrt_relation.all_index_0_1.len()),
+            (theory.sin_relation.all_index_0_1.len()),
+            (theory.cos_relation.all_index_0_1.len()),
+            (theory.const_relation.all_index_0_1.len()),
+            (theory.fake_var_relation.all_index_0_1.len()),
+        ]
+        .iter()
+        .copied()
+        .sum::<usize>();
         dbg!(total);
         dbg!(start.elapsed());
-
     }
 }

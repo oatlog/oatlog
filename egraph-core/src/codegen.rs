@@ -858,7 +858,7 @@ impl CodegenRuleTrieCtx<'_> {
                 let b = ident::var_var(self.var_of(b));
                 let inner = self.codegen_all(then, false);
                 let ret = quote! {
-                    self.unification.#uf_ident.union(#a, #b);
+                    self.uf.#uf_ident.union(#a, #b);
                     #inner
                 };
                 if self.scoped {
@@ -870,9 +870,8 @@ impl CodegenRuleTrieCtx<'_> {
             RuleAtom::Action(Action::Make(x)) => {
                 let ty = self.type_of(x);
                 let make = ident::delta_make(ty);
-                let uf = ident::type_uf(ty);
                 let var = ident::var_var(self.var_of(x));
-                quote! { let #var = self.delta.#make(&mut self.unification.#uf); }
+                quote! { let #var = self.delta.#make(&mut self.uf); }
             }
             RuleAtom::Panic(msg) => quote! {
                 panic!("explicit rule panic: {}", #msg)
@@ -957,7 +956,7 @@ fn codegen_globals(theory: &Theory) -> (TokenStream, TVec<GlobalId, usize>) {
                                 (
                                     tmp.clone(),
                                     quote! {
-                                        let #tmp = unification.#uf.add_eclass();
+                                        let #tmp = uf.#uf.add_eclass();
                                     },
                                 )
                             };
@@ -1009,7 +1008,7 @@ fn codegen_globals(theory: &Theory) -> (TokenStream, TVec<GlobalId, usize>) {
                 #(#fields_struct,)*
             }
             impl GlobalVariables {
-                fn initialize(&mut self, delta: &mut Delta, unification: &mut Unification) {
+                fn initialize(&mut self, delta: &mut Delta, uf: &mut Unification) {
                     self.new = true;
                     #(#compute_initial)*
                 }
@@ -1070,7 +1069,7 @@ pub fn codegen(theory: &Theory) -> TokenStream {
     };
 
     let delta = {
-        let (delta_functions, delta_fields): (Vec<_>, Vec<_>) = theory
+        let (delta_functions, delta_fields, delta_field_name): (Vec<_>, Vec<_>, Vec<_>) = theory
             .relations
             .iter()
             .filter_map(|rel| {
@@ -1082,16 +1081,16 @@ pub fn codegen(theory: &Theory) -> TokenStream {
                             let ty = &theory.types[ty];
                             let make_ident = ident::delta_make(ty);
                             let uf_ident = ident::type_uf(ty);
-                            let uf_ty = ident::type_ty_uf(ty);
                             let ty = ident::type_ty(ty);
                             (quote! {
-                                pub fn #make_ident(&mut self, #uf_ident: &mut #uf_ty) -> #ty {
-                                    let id = #uf_ident.add_eclass();
+                                pub fn #make_ident(&mut self, uf: &mut Unification) -> #ty {
+                                    let id = uf.#uf_ident.add_eclass();
                                     self.#field.push(id);
                                     id
                                 }
                             },
-                            quote! { #field : Vec<<#relation_ty as Relation>::Row>, }
+                            quote! { #field : Vec<<#relation_ty as Relation>::Row>, },
+                            field
                             )
                         }
                         RelationTy::Table { .. } => {
@@ -1103,12 +1102,13 @@ pub fn codegen(theory: &Theory) -> TokenStream {
                                     self.#field.push(x);
                                 }
                             },
-
-                            quote! { #field : Vec<<#relation_ty as Relation>::Row>, })
+                            quote! { #field : Vec<<#relation_ty as Relation>::Row>, },
+                            field
+                            )
                         }
                     })
             })
-            .unzip();
+            .multiunzip();
 
         quote! {
             #[derive(Debug, Default)]
@@ -1117,13 +1117,18 @@ pub fn codegen(theory: &Theory) -> TokenStream {
             }
             impl Delta {
                 fn new() -> Self { Self::default() }
+                fn has_new(&self) -> bool {
+                    let mut has_new = false;
+                    #(has_new |= !self.#delta_field_name.is_empty();)*
+                    has_new
+                }
                 #(#delta_functions)*
             }
         }
     };
 
     // TODO: move to types stuff
-    let (uf_ident, uf_ty, type_uprooted): (Vec<_>, Vec<_>, Vec<_>) = theory
+    let (uf_ident, uf_ty, type_uprooted, symbolic_ty): (Vec<_>, Vec<_>, Vec<_>, Vec<_>) = theory
         .types
         .iter()
         .filter_map(|ty| match ty.ty {
@@ -1131,58 +1136,50 @@ pub fn codegen(theory: &Theory) -> TokenStream {
                 ident::type_uf(ty),
                 ident::type_ty_uf(ty),
                 ident::type_uprooted(ty),
+                ident::type_ty(ty),
             )),
             TypeKind::Primitive { type_path: _ } => None,
         })
         .multiunzip();
 
-    let update = theory.relations.iter().filter_map(|rel| Some(match &rel.ty {
-        RelationTy::Global { .. } => return None,
-        RelationTy::Table { .. } => {
-            let (uprooted, uf): (Vec<_>, Vec<_>) = rel
-                .unique_types()
-                .filter_map(|ty| {
-                    let ty = &theory.types[ty];
-                    match ty.ty {
-                        TypeKind::Primitive { type_path: _ } => None,
-                        TypeKind::Symbolic => {
-                            let uprooted = ident::type_uprooted(&ty);
-                            let uf = ident::type_uf(&ty);
-                            Some((uprooted, uf))
-                        },
-                    }
-                })
-                .collect();
-
-            let relation_ident = ident::rel_var(rel);
-            let delta_row = ident::delta_row(rel);
-
-            quote! {
-                self.#relation_ident.update( #(&#uprooted, &mut self.unification.#uf,)* &mut self.delta.#delta_row);
-            }
-        }
-        RelationTy::Forall { ty } =>
-        {
-            // TODO: update forall 
-            quote! {let _ = "todo: update forall";}
-        }
-    }));
-
-    let update = update.chain(once(quote! {
-        self.global_variables.new = false;
-    }));
-
     let clear_transient_contents = {
+        let (update, relation_ident) : (Vec<_>, Vec<_>) = theory.relations.iter().filter_map(|rel| Some(match &rel.ty {
+            RelationTy::Global { .. } => return None,
+            RelationTy::Table { .. } => {
+                let relation_ident = ident::rel_var(rel);
+                (quote! {
+                    self.#relation_ident.update(&self.uprooted, &mut self.uf, &mut self.delta);
+                },
+                relation_ident
+                )
+            }
+            RelationTy::Forall { ty } => {
+                let relation_ident = ident::rel_var(rel);
+                (quote! {
+                    self.#relation_ident.update(&self.uprooted, &mut self.uf, &mut self.delta);
+                },
+                relation_ident
+                )
+            }
+        })).collect();
+
         // uproot
         // update relations
         //
 
         quote! {
-            // take is here because it needs to be atomic because more dirt will be created in
-            // update.
-            #(let #type_uprooted = take(self.unification.#uf_ident.dirty());)*
-            #(#update)*
-            // #(self.#type_uprooted.take_scratch(self.#uf_ident.dirty());)*
+            self.global_variables.new = false;
+            #(self.#relation_ident.clear_new();)*
+            loop {
+                self.uprooted.take_dirt(&mut self.uf);
+                #(self.#relation_ident.update(&self.uprooted, &mut self.uf, &mut self.delta);)*
+
+                // do we have pending uproots or inserts?
+                if !dbg!(self.uf.has_new() || self.delta.has_new()) {
+                    break;
+                }
+            }
+            #(self.#relation_ident.update_finalize(&mut self.uf);)*
         }
     };
 
@@ -1208,21 +1205,40 @@ pub fn codegen(theory: &Theory) -> TokenStream {
         #delta
         #global_variables_decl
         #[derive(Debug, Default)]
+        struct Uprooted {
+            #(#type_uprooted : Vec<#symbolic_ty>,)*
+        }
+        impl Uprooted {
+            fn take_dirt(&mut self, uf: &mut Unification) {
+                #(self.#type_uprooted.clear();)*
+                #(swap(&mut self.#type_uprooted, &mut uf.#uf_ident.dirty());)*
+            }
+        }
+        #[derive(Debug, Default)]
         struct Unification {
             #(#uf_ident: #uf_ty,)*
+        }
+        impl Unification {
+            fn has_new(&mut self) -> bool {
+                let mut has_new = false;
+                #(has_new |= !self.#uf_ident.dirty().is_empty();)*
+                has_new
+            }
         }
         #[derive(Debug, Default)]
         pub struct #theory_ty {
             delta: Delta,
-            unification: Unification,
+            uf: Unification,
+            uprooted: Uprooted,
             global_variables: GlobalVariables,
             #(#stored_relations: #stored_relation_types,)*
         }
         impl #theory_ty {
             pub fn new() -> Self {
                 let mut theory = Self::default();
-                theory.global_variables.initialize(&mut theory.delta, &mut theory.unification);
+                theory.global_variables.initialize(&mut theory.delta, &mut theory.uf);
                 theory.clear_transient();
+                theory.global_variables.new = true;
                 theory
             }
             pub fn step(&mut self) {
@@ -1259,17 +1275,33 @@ fn codegen_relation(rel: &RelationData, theory: &Theory) -> TokenStream {
             // will codegen into a single big struct.
             quote! {}
         }
-        RelationTy::Forall { ty: _ } => quote! {
-            // maybe integrate with union-find
-            #[derive(Debug, Default)]
-            struct #rel_ty {
-                new: BTreeSet<<Self as Relation>::Row>,
-                all: BTreeSet<<Self as Relation>::Row>,
+        RelationTy::Forall { ty } => {
+            let delta_forall = ident::delta_row(rel);
+            quote! {
+                // maybe integrate with union-find
+
+                #[derive(Debug, Default)]
+                struct #rel_ty {
+                    new: BTreeSet<<Self as Relation>::Row>,
+                    all: BTreeSet<<Self as Relation>::Row>,
+                }
+                impl Relation for #rel_ty {
+                    type Row = (#(#params),*);
+                }
+                impl #rel_ty {
+                    fn update(
+                        &mut self,
+                        uprooted: &Uprooted,
+                        uf: &mut Unification,
+                        delta: &mut Delta
+                    ) {
+                        delta.#delta_forall.clear();
+                    }
+                    fn clear_new(&mut self) {  }
+                    fn update_finalize(&mut self, uf: &mut Unification) {  }
+                }
             }
-            impl Relation for #rel_ty {
-                type Row = (#(#params),*);
-            }
-        },
+        }
         RelationTy::Table {
             usage_to_info,
             index_to_info,
@@ -1383,7 +1415,7 @@ fn codegen_relation(rel: &RelationData, theory: &Theory) -> TokenStream {
                                     .map(ident::column);
 
                                 Some(quote! {
-                                    for #column in #uproot.iter().copied() {
+                                    for #column in uprooted.#uproot.iter().copied() {
                                         for (#(#other_columns),*) in self.#index_all_iter(#column) {
                                             op_delete.push((#(#all_columns),*));
                                         }
@@ -1412,23 +1444,6 @@ fn codegen_relation(rel: &RelationData, theory: &Theory) -> TokenStream {
                 let other_indexes_ident: Vec<_> =
                     other_indexes.iter().map(ident::index_all_field).collect();
 
-                let symbolic_type_args = rel.unique_types().filter_map(|ty| {
-                    let ty = &theory.types[ty];
-                    match ty.ty {
-                        TypeKind::Primitive { type_path: _ } => return None,
-                        TypeKind::Symbolic => {
-                            let uf_field = ident::type_uf(ty);
-                            let uf_ty = ident::type_ty_uf(ty);
-                            let uproot_field = ident::type_uprooted(ty);
-                            let ty = ident::type_ty(ty);
-                            Some(quote! {
-                                #uproot_field: &[#ty],
-                                #uf_field: &mut #uf_ty,
-                            })
-                        }
-                    }
-                });
-
                 let all_columns_canonicalized = {
                     rel.param_types.iter_enumerate().map(|(i, x)| {
                         let column = ident::column(i);
@@ -1437,22 +1452,24 @@ fn codegen_relation(rel: &RelationData, theory: &Theory) -> TokenStream {
                             TypeKind::Primitive { type_path: _ } => quote! { #column },
                             TypeKind::Symbolic => {
                                 let uf = ident::type_uf(ty);
-                                quote! { #uf.find( #column ) }
+                                quote! { uf.#uf.find( #column ) }
                             }
                         }
                     })
                 };
 
+                let delta_row = ident::delta_row(rel);
+
                 quote! {
                     fn update(
                         &mut self,
-                        #(#symbolic_type_args)*
-                        delta: &mut Vec<<Self as Relation>::Row>,
+                        uprooted: &Uprooted,
+                        uf: &mut Unification,
+                        delta: &mut Delta
                     ) {
-                        self.new.clear();
-                        let mut op_insert = take(delta);
+                        let mut op_insert = take(&mut delta.#delta_row);
                         for (#(#all_columns),*) in op_insert.iter_mut() {
-                            #(*#all_columns_symbolic = #uf_all_symbolic.find(*#all_columns_symbolic);)*
+                            #(*#all_columns_symbolic = uf.#uf_all_symbolic.find(*#all_columns_symbolic);)*
                         }
                         let mut op_delete = Vec::new();
                         #(#uprooted_into_op_delete)*
@@ -1460,7 +1477,7 @@ fn codegen_relation(rel: &RelationData, theory: &Theory) -> TokenStream {
                         for (#(#all_columns),*) in op_delete {
                             if self.#first_index_ident.remove(&(#(#first_index_order),*)) {
                                 #(self.#other_indexes_ident.remove(&(#(#other_indexes_order),*));)*
-                                #(#uf_all_symbolic.dec_eclass(#all_columns_symbolic, Self::COST);)*
+                                #(uf.#uf_all_symbolic.dec_eclass(#all_columns_symbolic, Self::COST);)*
                                 op_insert.push((#(#all_columns_canonicalized),*));
                             }
                         }
@@ -1470,12 +1487,21 @@ fn codegen_relation(rel: &RelationData, theory: &Theory) -> TokenStream {
                             if !self.#first_index_ident.insert((#(#first_index_order),*)) {
                                 return false;
                             }
-                            #(#uf_all_symbolic.inc_eclass(#all_columns_symbolic, Self::COST);)*
+                            #(uf.#uf_all_symbolic.inc_eclass(#all_columns_symbolic, Self::COST);)*
                             #( self.#other_indexes_ident.insert(( #(#other_indexes_order),*)); )*
                             true
                         });
 
-                        self.new = op_insert;
+                        self.new.extend(op_insert);
+                    }
+
+                    fn update_finalize(
+                        &mut self,
+                        uf: &mut Unification,
+                    ) {
+                        for (#(#all_columns),*) in self.new.iter_mut() {
+                            #(*#all_columns_symbolic = uf.#uf_all_symbolic.find(*#all_columns_symbolic);)*
+                        }
                     }
                 }
             };
@@ -1493,6 +1519,7 @@ fn codegen_relation(rel: &RelationData, theory: &Theory) -> TokenStream {
                     const COST: u32 = #cost;
                     fn new() -> Self { Self::default() }
                     fn has_new(&self) -> bool { !self.new.is_empty() }
+                    fn clear_new(&mut self) { self.new.clear(); }
                     fn iter_new(&self) -> impl Iterator<Item = <Self as Relation>::Row> + use<'_>{ self.new.iter().copied() }
                     #(#iter_all)*
                     #(#check_all)*

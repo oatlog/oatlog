@@ -2,9 +2,9 @@
 
 #![allow(unused_parens)]
 
-pub use std::{collections::BTreeSet, mem::take};
+pub use std::{collections::BTreeSet, mem::swap, mem::take};
 
-use std::{collections::BTreeMap, marker::PhantomData, mem::swap};
+use std::{collections::BTreeMap, marker::PhantomData};
 
 pub trait Clear: Sized {
     fn clear(&mut self);
