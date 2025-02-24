@@ -21,15 +21,15 @@ mod test {
 
         impl EclassProvider<Math> for Theory {
             fn make(&mut self) -> Math {
-                self.delta.make_math(&mut self.math_uf)
+                self.delta.make_math(&mut self.unification.math_uf)
             }
 
             fn find(&mut self, t: Math) -> Math {
-                self.math_uf.find(t)
+                self.unification.math_uf.find(t)
             }
 
             fn union(&mut self, a: Math, b: Math) {
-                self.math_uf.union(a, b)
+                self.unification.math_uf.union(a, b)
             }
         }
 

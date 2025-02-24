@@ -58,3 +58,8 @@ id_wrap!(
     "ir",
     "reference to something that requires an index"
 );
+impl IndexUsageId {
+    pub(crate) fn bogus() -> Self {
+        IndexUsageId(usize::MAX)
+    }
+}

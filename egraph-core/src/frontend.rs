@@ -16,7 +16,7 @@ use itertools::Itertools as _;
 use proc_macro2::{Delimiter, Span, TokenTree};
 
 use crate::{
-    hir,
+    codegen, hir,
     ids::{ColumnId, GlobalId, Id, RelationId, TypeId, VariableId},
     typed_vec::TVec,
 };
@@ -547,7 +547,7 @@ const BUILTIN_I64: &str = "i64";
 const BUILTIN_F64: &str = "f64";
 const BUILTIN_STRING: &str = "String";
 const BUILTIN_BOOL: &str = "bool";
-const BUILTIN_UNIT: &str = "()";
+const BUILTIN_UNIT: &str = "()"; // TODO: "()" -> "unit" to avoid fixup in backend.
 
 const BUILTIN_SORTS: [(&str, &str); 2] = [
     (BUILTIN_I64, "std::primitive::i64"),
@@ -658,8 +658,7 @@ struct Parser {
     types: TVec<TypeId, TypeData>,
     type_ids: StringIds<TypeId>,
 
-    // TODO: global_to_function
-    global_to_function: BTreeMap<GlobalId, RelationId>,
+    global_to_function: TVec<GlobalId, RelationId>,
     type_to_forall: BTreeMap<TypeId, RelationId>,
 
     global_variables: TVec<GlobalId, GlobalVariableInfo>,
@@ -685,6 +684,7 @@ impl Parser {
         ty: TypeId,
         compute: ComputeMethod,
     ) -> syn::Result<GlobalId> {
+
         if let Some(name) = name {
             if let Entry::Occupied(entry) = self.global_variable_names.entry(name) {
                 let existing_span = entry.key().span;
@@ -718,7 +718,8 @@ impl Parser {
                     ty,
                 ),
             );
-            self.global_to_function.insert(global_id, relation_id);
+            self.global_to_function
+                .push_expected(global_id, relation_id);
         }
 
         if let Some(name) = name {
@@ -742,7 +743,7 @@ impl Parser {
             symbolic_rules: Vec::new(),
             implicit_rules: Vec::new(),
             hir_relations: TVec::new(),
-            global_to_function: BTreeMap::new(),
+            global_to_function: TVec::new(),
             type_to_forall: BTreeMap::new(),
         };
         for (builtin, path) in BUILTIN_SORTS {
@@ -1169,22 +1170,24 @@ impl Parser {
                         let function = &self.functions[id].as_ref().unwrap();
                         let ty = function.output;
 
-                        if let Some(all_globals) = args
-                            .iter()
-                            .map(|&x| variables[x].1)
-                            .collect::<Option<Vec<_>>>()
+                        // TODO: is this optimization sound?
+                        // if let Some(all_globals) = args
+                        //     .iter()
+                        //     .map(|&x| variables[x].1)
+                        //     .collect::<Option<Vec<_>>>()
+                        // {
+                        //     // we can turn it into a global.
+                        //     let global_id = self.add_global(
+                        //         None,
+                        //         ty,
+                        //         ComputeMethod::Function {
+                        //             function: id,
+                        //             args: all_globals,
+                        //         },
+                        //     )?;
+                        //     variables.push((ty, Some(global_id)))
+                        // } else
                         {
-                            // we can turn it into a global.
-                            let global_id = self.add_global(
-                                None,
-                                ty,
-                                ComputeMethod::Function {
-                                    function: id,
-                                    args: all_globals,
-                                },
-                            )?;
-                            variables.push((ty, Some(global_id)))
-                        } else {
                             // we need to evaluate the expression (expression depends on old and new)
                             let res_id = variables.push((ty, None));
                             ops.push((id, args));
@@ -1463,6 +1466,20 @@ impl Parser {
             name: "",
             types,
             implicit_rules: self.implicit_rules.clone(),
+            global_types: self.global_variables.iter().map(|i| i.ty).collect(),
+            global_compute: self
+                .global_variables
+                .iter()
+                .map(|x| match &x.compute {
+                    ComputeMethod::Literal(Literal::I64(x)) => codegen::GlobalCompute::new_i64(*x),
+                    ComputeMethod::Function { function, args } => {
+                        codegen::GlobalCompute::new_call(*function, &*args)
+                    }
+
+                    _ => panic!("only literal ints are implemented for globals"),
+                })
+                .collect(),
+            global_to_relation: self.global_to_function.clone(),
         }
     }
 }
@@ -1511,7 +1528,7 @@ mod compile_rule {
         /// ONLY for debug
         /// sometimes a literal
         label: Option<Str>,
-        global: Option<GlobalId>,
+        // global: Option<GlobalId>,
         ty: TypeVarId,
     }
 
@@ -1542,11 +1559,24 @@ mod compile_rule {
                 let ty = parser.literal_type(**literal);
                 let typevar = types.push(Some(ty));
                 let global_id = parser.add_global(None, ty, ComputeMethod::Literal(**literal))?;
-                variables.push(VariableInfo {
-                    label: Some(literal.map_s(|s| &*s.to_string().leak())),
-                    global: Some(global_id),
+
+                let name = literal.map_s(|s| "");
+
+                let variable_id = variables.push(VariableInfo {
+                    label: Some(name),
                     ty: typevar,
-                })
+                });
+
+                let relation_id = parser.global_to_function[&global_id];
+
+                calls.push(UnknownCall {
+                    name: *name,
+                    ids: vec![relation_id],
+                    args: vec![],
+                    rval: variable_id,
+                });
+
+                variable_id
             }
             Expr::Var(name) => {
                 if let Some(&global_id) = parser.global_variable_names.get(name) {
@@ -1554,13 +1584,14 @@ mod compile_rule {
                     let typevar = types.push(Some(ty));
                     let variable_id = variables.push(VariableInfo {
                         label: Some(*name),
-                        global: Some(global_id),
                         ty: typevar,
                     });
 
+                    let relation_id = parser.global_to_function[&global_id];
+
                     calls.push(UnknownCall {
                         name,
-                        ids: vec![parser.global_to_function[&global_id]],
+                        ids: vec![relation_id],
                         args: vec![],
                         rval: variable_id,
                     });
@@ -1571,7 +1602,6 @@ mod compile_rule {
                         let typevar = types.push(None);
                         variables.push(VariableInfo {
                             label: Some(*name),
-                            global: None,
                             ty: typevar,
                         })
                     })
@@ -1606,14 +1636,12 @@ mod compile_rule {
                     let rval_typevar = types.push(Some(rval_ty));
                     variables.push(VariableInfo {
                         label: None,
-                        global: None,
                         ty: rval_typevar,
                     })
                 } else {
                     let rval_typevar = types.push(None);
                     let rval = variables.push(VariableInfo {
                         label: None,
-                        global: None,
                         ty: rval_typevar,
                     });
                     let ids = parser
@@ -1774,8 +1802,7 @@ mod compile_rule {
                 sort_vars: sort_constraints,
                 variables: variables
                     .iter()
-                    .map(|VariableInfo { label, global, ty }| {
-                        let _: &Option<GlobalId> = global;
+                    .map(|VariableInfo { label, ty }| {
                         (types[*ty].unwrap(), label.map_or("", |x| *x))
                     })
                     .collect(),

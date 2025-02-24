@@ -2,7 +2,9 @@
 
 #![allow(unused_parens)]
 
-use std::{marker::PhantomData, mem::swap};
+pub use std::{collections::BTreeSet, mem::take};
+
+use std::{collections::BTreeMap, marker::PhantomData, mem::swap};
 
 pub trait Clear: Sized {
     fn clear(&mut self);
@@ -48,29 +50,36 @@ impl RelationElement for bool {
 }
 
 #[derive(Copy, Clone, Eq, PartialEq, Ord, PartialOrd)]
-struct Math(u32);
-impl RelationElement for Math {
-    const MIN_ID: Self = Math(0);
-    const MAX_ID: Self = Math(u32::MAX);
+pub struct IString(u32);
+impl RelationElement for IString {
+    const MIN_ID: Self = IString(u32::MIN);
+    const MAX_ID: Self = IString(u32::MAX);
 }
 
-// impl RangeQuery<(Math, Math), (Math)> for BTreeSet<(Math, Math, Math)> {
-//     fn query(&self, t: (Math, Math)) -> impl Iterator<Item = (Math)> {
-//         self.range((t.0, t.1, Math::MIN_ID)..(t.0, t.1, Math::MAX_ID)).copied().map(|x| (x.2))
-//     }
-// }
+/// Only to be used for initial inserts, so performance does not really matter.
+#[derive(Default)]
+struct StringIntern {
+    to_id: BTreeMap<String, IString>,
+    to_string: BTreeMap<IString, String>,
+}
+impl StringIntern {
+    fn new() -> Self {
+        Self::default()
+    }
+    fn intern(&mut self, s: String) -> IString {
+        let next_id = IString(u32::try_from(self.to_id.len()).unwrap());
+        *self.to_id.entry(s.clone()).or_insert_with(|| {
+            self.to_string.insert(next_id, s);
+            next_id
+        })
+    }
+}
 
-// impl<A, B, C> RangeQuery<(A, B), (C)> for BTreeSet<(A, B, C)>
-// where
-//     A: RelationElement,
-//     B: RelationElement,
-//     C: RelationElement,
-// {
-//     fn query(&self, t: (A, B)) -> impl Iterator<Item = (C)> {
-//         self.range((t.0, t.1, C::MIN_ID)..(t.0, t.1, C::MAX_ID))
-//             .copied()
-//             .map(|x| (x.2))
-//     }
+// struct GlobalVariables {
+//     // single flag because we crate all globals at once.
+//     new: bool,
+//     global_i64: Vec<i64>,
+//     global_string: Vec<IString>,
 // }
 
 pub trait RangeQuery<T, V> {

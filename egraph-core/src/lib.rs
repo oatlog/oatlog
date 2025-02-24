@@ -24,6 +24,13 @@ pub fn compile_str(source: &str) -> String {
     compile(source.parse().unwrap()).to_string()
 }
 
+pub fn compile_to_str_dbg(s: &str) -> String {
+    let tokens = s.parse().unwrap();
+    let compiled = compile(tokens);
+    let formatted = codegen::format_tokens(compiled);
+    formatted
+}
+
 #[must_use]
 pub fn compile(source: proc_macro2::TokenStream) -> proc_macro2::TokenStream {
     force_backtrace(|| {
@@ -40,35 +47,39 @@ pub fn compile(source: proc_macro2::TokenStream) -> proc_macro2::TokenStream {
 /// Force panic message to include a backtrace. Proc macros are hard to debug.
 /// (kinda cursed)
 fn force_backtrace<T, F: FnOnce() -> T + std::panic::UnwindSafe>(f: F) -> T {
-    use std::sync::Mutex;
-    static BACKTRACE: Mutex<String> = Mutex::new(String::new());
+    if true {
+        f()
+    } else {
+        use std::sync::Mutex;
+        static BACKTRACE: Mutex<String> = Mutex::new(String::new());
 
-    let old_hook = std::panic::take_hook();
+        let old_hook = std::panic::take_hook();
 
-    std::panic::set_hook(Box::new(|_| {
-        let capture = std::backtrace::Backtrace::force_capture().to_string();
-        let mut handle = BACKTRACE.lock().unwrap();
-        *handle = capture;
-        drop(handle);
-    }));
-    match std::panic::catch_unwind(f) {
-        Ok(ok) => {
-            std::panic::set_hook(old_hook);
-            ok
-        }
-        Err(err) => {
-            std::panic::set_hook(old_hook);
-            let panic_information = match err.downcast::<String>() {
-                Ok(s) => *s,
-                Err(err) => match err.downcast::<&str>() {
-                    Ok(s) => s.to_string(),
-                    Err(_err) => format!("unknown panic payload"),
-                },
-            };
+        std::panic::set_hook(Box::new(|_| {
+            let capture = std::backtrace::Backtrace::force_capture().to_string();
+            let mut handle = BACKTRACE.lock().unwrap();
+            *handle = capture;
+            drop(handle);
+        }));
+        match std::panic::catch_unwind(f) {
+            Ok(ok) => {
+                std::panic::set_hook(old_hook);
+                ok
+            }
+            Err(err) => {
+                std::panic::set_hook(old_hook);
+                let panic_information = match err.downcast::<String>() {
+                    Ok(s) => *s,
+                    Err(err) => match err.downcast::<&str>() {
+                        Ok(s) => s.to_string(),
+                        Err(_err) => format!("unknown panic payload"),
+                    },
+                };
 
-            let backtrace: String = std::mem::take(&mut *BACKTRACE.lock().unwrap());
+                let backtrace: String = std::mem::take(&mut *BACKTRACE.lock().unwrap());
 
-            panic!("{panic_information}\nBacktrace:\n{backtrace}");
+                panic!("{panic_information}\nBacktrace:\n{backtrace}");
+            }
         }
     }
 }
@@ -77,8 +88,6 @@ fn force_backtrace<T, F: FnOnce() -> T + std::panic::UnwindSafe>(f: F) -> T {
 mod test {
     use super::*;
     use expect_test::expect;
-
-    // (rewrite (Add (Mul a b) (Mul a c)) (Mul a (Add b c)))
 
     #[test]
     fn hir_commutative() {
@@ -174,7 +183,6 @@ mod test {
     }
 
     #[test]
-    #[should_panic]
     fn hir_global() {
         Steps {
             code: "(
@@ -183,8 +191,8 @@ mod test {
                     (Add Math Math)
                     (Const i64)
                 )
-                (let one (Const 1))
-                (rewrite (Add one b) (Add b a))
+            (let one 1)
+            (rewrite (Const one) (Add b a))
 
             )",
             expected_hir: Some(expect![[r#"
@@ -195,13 +203,12 @@ mod test {
                 Add(Math, Math, Math)
                 Const(i64, Math)
                 g0(i64)
-                g1(Math)
 
                 Rule "":
-                Premise: g1(one), Add(one, b, p2)
+                Premise: g0(one), Const(one, p1)
                 __: one
-                b: b
-                a2: p2
+                a2: p1
+                b: __
                 a: __
                 Insert: Add(b, a, a2)
 
@@ -210,6 +217,11 @@ mod test {
             expected_codegen: None,
         }
         .check();
+    }
+
+    fn check_hir(code: &str, expected: expect_test::Expect) {
+        let hir = frontend::parse(code.parse().unwrap()).unwrap();
+        expected.assert_eq(&hir.dbg_summary());
     }
 
     #[test]
@@ -221,6 +233,13 @@ mod test {
                     (Add Math Math)
                     (Const i64)
                 )
+
+            (let two (Const 2))
+            (let one 1)
+            (rewrite (Const one) (Add x x))
+            (rewrite (Const 2) (Add z z))
+
+            (rewrite (Mul a (Const 0)) (Const 0))
             )",
             expected_hir :Some( expect![[r#"
                 Theory "":
@@ -229,12 +248,38 @@ mod test {
                 Mul(Math, Math, Math)
                 Add(Math, Math, Math)
                 Const(i64, Math)
+                g0(i64)
+                g1(Math)
+                g2(i64)
+                g3(i64)
+
+                Rule "":
+                Premise: g2(one), Const(one, p1)
+                __: one
+                a1: p1
+                x: __
+                Insert: Add(x, x, a1)
+
+                Rule "":
+                Premise: g0(p0), Const(p0, p1)
+                __: p0
+                a1: p1
+                z: __
+                Insert: Add(z, z, a1)
+
+                Rule "":
+                Premise: g3(p1), Const(p1, p2), Mul(a, p2, p3)
+                __: a
+                __: p1
+                __: p2
+                a1: p3
+                a0: __
+                Insert: Const(a0, a1), g3(a0)
 
             "#]]),
             expected_lir: None,
             expected_codegen : Some(expect![[r#"
                 use egraph::runtime::*;
-                use std::{collections::BTreeSet, mem::take};
                 #[derive(Copy, Clone, Eq, PartialEq, Ord, PartialOrd, Default, Debug)]
                 pub struct Math(u32);
                 impl Eclass for Math {
@@ -278,17 +323,17 @@ mod test {
                     fn iter_new(&self) -> impl Iterator<Item = <Self as Relation>::Row> + use<'_> {
                         self.new.iter().copied()
                     }
-                    fn iter1_0_1_2(&self, x0: Math) -> impl Iterator<Item = (Math, Math)> + use<'_> {
-                        self.all_index_0_1_2
-                            .range((x0, Math::MIN_ID, Math::MIN_ID)..=(x0, Math::MAX_ID, Math::MAX_ID))
-                            .copied()
-                            .map(|(x0, x1, x2)| (x1, x2))
-                    }
                     fn iter1_1_0_2(&self, x1: Math) -> impl Iterator<Item = (Math, Math)> + use<'_> {
                         self.all_index_1_0_2
                             .range((x1, Math::MIN_ID, Math::MIN_ID)..=(x1, Math::MAX_ID, Math::MAX_ID))
                             .copied()
                             .map(|(x1, x0, x2)| (x0, x2))
+                    }
+                    fn iter1_0_1_2(&self, x0: Math) -> impl Iterator<Item = (Math, Math)> + use<'_> {
+                        self.all_index_0_1_2
+                            .range((x0, Math::MIN_ID, Math::MIN_ID)..=(x0, Math::MAX_ID, Math::MAX_ID))
+                            .copied()
+                            .map(|(x0, x1, x2)| (x1, x2))
                     }
                     fn iter1_2_0_1(&self, x2: Math) -> impl Iterator<Item = (Math, Math)> + use<'_> {
                         self.all_index_2_0_1
@@ -296,11 +341,11 @@ mod test {
                             .copied()
                             .map(|(x2, x0, x1)| (x0, x1))
                     }
-                    fn check1_0_1_2(&self, x0: Math) -> bool {
-                        self.iter1_0_1_2(x0).next().is_some()
-                    }
                     fn check1_1_0_2(&self, x1: Math) -> bool {
                         self.iter1_1_0_2(x1).next().is_some()
+                    }
+                    fn check1_0_1_2(&self, x0: Math) -> bool {
+                        self.iter1_0_1_2(x0).next().is_some()
                     }
                     fn check1_2_0_1(&self, x2: Math) -> bool {
                         self.iter1_2_0_1(x2).next().is_some()
@@ -571,10 +616,39 @@ mod test {
                         self.const_relation_delta.push(x);
                     }
                 }
+                #[derive(Default, Debug)]
+                struct GlobalVariables {
+                    new: bool,
+                    global_i64: Vec<std::primitive::i64>,
+                    global_math: Vec<Math>,
+                }
+                impl GlobalVariables {
+                    fn initialize(&mut self, delta: &mut Delta, unification: &mut Unification) {
+                        self.new = true;
+                        let tmp = { 2i64 };
+                        self.global_i64.push(tmp);
+                        let tmp = {
+                            let tmp0 = self.global_i64[0usize];
+                            let tmp_res = unification.math_uf.add_eclass();
+                            delta.insert_const((tmp0, tmp_res));
+                            tmp_res
+                        };
+                        self.global_math.push(tmp);
+                        let tmp = { 1i64 };
+                        self.global_i64.push(tmp);
+                        let tmp = { 0i64 };
+                        self.global_i64.push(tmp);
+                    }
+                }
+                #[derive(Debug, Default)]
+                struct Unification {
+                    math_uf: UnionFind<Math>,
+                }
                 #[derive(Debug, Default)]
                 pub struct Theory {
                     delta: Delta,
-                    math_uf: UnionFind<Math>,
+                    unification: Unification,
+                    global_variables: GlobalVariables,
                     forall_math_relation: ForallMathRelation,
                     mul_relation: MulRelation,
                     add_relation: AddRelation,
@@ -582,7 +656,12 @@ mod test {
                 }
                 impl Theory {
                     pub fn new() -> Self {
-                        Self::default()
+                        let mut theory = Self::default();
+                        theory
+                            .global_variables
+                            .initialize(&mut theory.delta, &mut theory.unification);
+                        theory.clear_transient();
+                        theory
                     }
                     pub fn step(&mut self) {
                         println!("step start");
@@ -590,25 +669,78 @@ mod test {
                         self.clear_transient();
                         println!("step end");
                     }
-                    fn apply_rules(&mut self) {}
+                    fn apply_rules(&mut self) {
+                        if self.global_variables.new {
+                            let one = self.global_variables.global_i64[1usize];
+                            for (p1) in self.const_relation.iter1_0_1(one) {
+                                let x = self.delta.make_math(&mut self.unification.math_uf);
+                                self.delta.insert_add((x, x, p1));
+                            }
+                        }
+                        for (one, p1) in self.const_relation.iter_new() {
+                            if one == self.global_variables.global_i64[1usize] {
+                                let x = self.delta.make_math(&mut self.unification.math_uf);
+                                self.delta.insert_add((x, x, p1));
+                            }
+                        }
+                        if self.global_variables.new {
+                            let p0 = self.global_variables.global_i64[0usize];
+                            for (p1) in self.const_relation.iter1_0_1(p0) {
+                                let z = self.delta.make_math(&mut self.unification.math_uf);
+                                self.delta.insert_add((z, z, p1));
+                            }
+                        }
+                        for (p0, p1) in self.const_relation.iter_new() {
+                            if p0 == self.global_variables.global_i64[0usize] {
+                                let z = self.delta.make_math(&mut self.unification.math_uf);
+                                self.delta.insert_add((z, z, p1));
+                            }
+                        }
+                        if self.global_variables.new {
+                            let p1 = self.global_variables.global_i64[2usize];
+                            for (p2) in self.const_relation.iter1_0_1(p1) {
+                                for (a, p3) in self.mul_relation.iter1_1_0_2(p2) {
+                                    let a0 = self.global_variables.global_i64[2usize];
+                                    self.delta.insert_const((a0, p3));
+                                }
+                            }
+                        }
+                        for (p1, p2) in self.const_relation.iter_new() {
+                            if p1 == self.global_variables.global_i64[2usize] {
+                                for (a, p3) in self.mul_relation.iter1_1_0_2(p2) {
+                                    let a0 = self.global_variables.global_i64[2usize];
+                                    self.delta.insert_const((a0, p3));
+                                }
+                            }
+                        }
+                        for (a, p2, p3) in self.mul_relation.iter_new() {
+                            for (p1) in self.const_relation.iter1_1_0(p2) {
+                                if p1 == self.global_variables.global_i64[2usize] {
+                                    let a0 = self.global_variables.global_i64[2usize];
+                                    self.delta.insert_const((a0, p3));
+                                }
+                            }
+                        }
+                    }
                     fn clear_transient(&mut self) {
-                        let math_uprooted = take(self.math_uf.dirty());
+                        let math_uprooted = take(self.unification.math_uf.dirty());
                         let _ = "todo: update forall";
                         self.mul_relation.update(
                             &math_uprooted,
-                            &mut self.math_uf,
+                            &mut self.unification.math_uf,
                             &mut self.delta.mul_relation_delta,
                         );
                         self.add_relation.update(
                             &math_uprooted,
-                            &mut self.math_uf,
+                            &mut self.unification.math_uf,
                             &mut self.delta.add_relation_delta,
                         );
                         self.const_relation.update(
                             &math_uprooted,
-                            &mut self.math_uf,
+                            &mut self.unification.math_uf,
                             &mut self.delta.const_relation_delta,
                         );
+                        self.global_variables.new = false;
                     }
                 }
                 impl std::ops::Deref for Theory {
@@ -660,7 +792,6 @@ mod test {
             expected_lir: None,
             expected_codegen: Some(expect![[r#"
                 use egraph::runtime::*;
-                use std::{collections::BTreeSet, mem::take};
                 #[derive(Copy, Clone, Eq, PartialEq, Ord, PartialOrd, Default, Debug)]
                 pub struct Math(u32);
                 impl Eclass for Math {
@@ -1092,10 +1223,24 @@ mod test {
                         self.triangle_relation_delta.push(x);
                     }
                 }
+                #[derive(Default, Debug)]
+                struct GlobalVariables {
+                    new: bool,
+                }
+                impl GlobalVariables {
+                    fn initialize(&mut self, delta: &mut Delta, unification: &mut Unification) {
+                        self.new = true;
+                    }
+                }
+                #[derive(Debug, Default)]
+                struct Unification {
+                    math_uf: UnionFind<Math>,
+                }
                 #[derive(Debug, Default)]
                 pub struct Theory {
                     delta: Delta,
-                    math_uf: UnionFind<Math>,
+                    unification: Unification,
+                    global_variables: GlobalVariables,
                     forall_math_relation: ForallMathRelation,
                     foo_relation: FooRelation,
                     bar_relation: BarRelation,
@@ -1104,7 +1249,12 @@ mod test {
                 }
                 impl Theory {
                     pub fn new() -> Self {
-                        Self::default()
+                        let mut theory = Self::default();
+                        theory
+                            .global_variables
+                            .initialize(&mut theory.delta, &mut theory.unification);
+                        theory.clear_transient();
+                        theory
                     }
                     pub fn step(&mut self) {
                         println!("step start");
@@ -1142,28 +1292,29 @@ mod test {
                         }
                     }
                     fn clear_transient(&mut self) {
-                        let math_uprooted = take(self.math_uf.dirty());
+                        let math_uprooted = take(self.unification.math_uf.dirty());
                         let _ = "todo: update forall";
                         self.foo_relation.update(
                             &math_uprooted,
-                            &mut self.math_uf,
+                            &mut self.unification.math_uf,
                             &mut self.delta.foo_relation_delta,
                         );
                         self.bar_relation.update(
                             &math_uprooted,
-                            &mut self.math_uf,
+                            &mut self.unification.math_uf,
                             &mut self.delta.bar_relation_delta,
                         );
                         self.baz_relation.update(
                             &math_uprooted,
-                            &mut self.math_uf,
+                            &mut self.unification.math_uf,
                             &mut self.delta.baz_relation_delta,
                         );
                         self.triangle_relation.update(
                             &math_uprooted,
-                            &mut self.math_uf,
+                            &mut self.unification.math_uf,
                             &mut self.delta.triangle_relation_delta,
                         );
+                        self.global_variables.new = false;
                     }
                 }
                 impl std::ops::Deref for Theory {
@@ -1215,7 +1366,6 @@ mod test {
             expected_lir: None,
             expected_codegen : Some(expect![[r#"
                 use egraph::runtime::*;
-                use std::{collections::BTreeSet, mem::take};
                 #[derive(Copy, Clone, Eq, PartialEq, Ord, PartialOrd, Default, Debug)]
                 pub struct Math(u32);
                 impl Eclass for Math {
@@ -1493,17 +1643,36 @@ mod test {
                         self.add_relation_delta.push(x);
                     }
                 }
+                #[derive(Default, Debug)]
+                struct GlobalVariables {
+                    new: bool,
+                }
+                impl GlobalVariables {
+                    fn initialize(&mut self, delta: &mut Delta, unification: &mut Unification) {
+                        self.new = true;
+                    }
+                }
+                #[derive(Debug, Default)]
+                struct Unification {
+                    math_uf: UnionFind<Math>,
+                }
                 #[derive(Debug, Default)]
                 pub struct Theory {
                     delta: Delta,
-                    math_uf: UnionFind<Math>,
+                    unification: Unification,
+                    global_variables: GlobalVariables,
                     forall_math_relation: ForallMathRelation,
                     mul_relation: MulRelation,
                     add_relation: AddRelation,
                 }
                 impl Theory {
                     pub fn new() -> Self {
-                        Self::default()
+                        let mut theory = Self::default();
+                        theory
+                            .global_variables
+                            .initialize(&mut theory.delta, &mut theory.unification);
+                        theory.clear_transient();
+                        theory
                     }
                     pub fn step(&mut self) {
                         println!("step start");
@@ -1516,9 +1685,9 @@ mod test {
                             if self.add_relation.check1_0_1_2(p2) {
                                 for (c, p4) in self.mul_relation.iter1_0_1_2(a) {
                                     for (p5) in self.add_relation.iter2_0_1_2(p2, p4) {
-                                        let a3 = self.delta.make_math(&mut self.math_uf);
-                                        self.delta.insert_mul((a, a3, p5));
+                                        let a3 = self.delta.make_math(&mut self.unification.math_uf);
                                         self.delta.insert_add((b, c, a3));
+                                        self.delta.insert_mul((a, a3, p5));
                                     }
                                 }
                             }
@@ -1527,9 +1696,9 @@ mod test {
                             if self.mul_relation.check1_0_1_2(a) {
                                 for (p2, p5) in self.add_relation.iter1_1_0_2(p4) {
                                     for (b) in self.mul_relation.iter2_0_2_1(a, p2) {
-                                        let a3 = self.delta.make_math(&mut self.math_uf);
-                                        self.delta.insert_mul((a, a3, p5));
+                                        let a3 = self.delta.make_math(&mut self.unification.math_uf);
                                         self.delta.insert_add((b, c, a3));
+                                        self.delta.insert_mul((a, a3, p5));
                                     }
                                 }
                             }
@@ -1538,27 +1707,28 @@ mod test {
                             if self.mul_relation.check1_2_0_1(p2) {
                                 for (a, c) in self.mul_relation.iter1_2_0_1(p4) {
                                     for (b) in self.mul_relation.iter2_0_2_1(a, p2) {
-                                        let a3 = self.delta.make_math(&mut self.math_uf);
-                                        self.delta.insert_mul((a, a3, p5));
+                                        let a3 = self.delta.make_math(&mut self.unification.math_uf);
                                         self.delta.insert_add((b, c, a3));
+                                        self.delta.insert_mul((a, a3, p5));
                                     }
                                 }
                             }
                         }
                     }
                     fn clear_transient(&mut self) {
-                        let math_uprooted = take(self.math_uf.dirty());
+                        let math_uprooted = take(self.unification.math_uf.dirty());
                         let _ = "todo: update forall";
                         self.mul_relation.update(
                             &math_uprooted,
-                            &mut self.math_uf,
+                            &mut self.unification.math_uf,
                             &mut self.delta.mul_relation_delta,
                         );
                         self.add_relation.update(
                             &math_uprooted,
-                            &mut self.math_uf,
+                            &mut self.unification.math_uf,
                             &mut self.delta.add_relation_delta,
                         );
+                        self.global_variables.new = false;
                     }
                 }
                 impl std::ops::Deref for Theory {
@@ -1624,7 +1794,6 @@ mod test {
             expected_lir: None,
             expected_codegen: Some(expect![[r#"
                 use egraph::runtime::*;
-                use std::{collections::BTreeSet, mem::take};
                 #[derive(Copy, Clone, Eq, PartialEq, Ord, PartialOrd, Default, Debug)]
                 pub struct Math(u32);
                 impl Eclass for Math {
@@ -1881,17 +2050,36 @@ mod test {
                         self.add_relation_delta.push(x);
                     }
                 }
+                #[derive(Default, Debug)]
+                struct GlobalVariables {
+                    new: bool,
+                }
+                impl GlobalVariables {
+                    fn initialize(&mut self, delta: &mut Delta, unification: &mut Unification) {
+                        self.new = true;
+                    }
+                }
+                #[derive(Debug, Default)]
+                struct Unification {
+                    math_uf: UnionFind<Math>,
+                }
                 #[derive(Debug, Default)]
                 pub struct Theory {
                     delta: Delta,
-                    math_uf: UnionFind<Math>,
+                    unification: Unification,
+                    global_variables: GlobalVariables,
                     forall_math_relation: ForallMathRelation,
                     mul_relation: MulRelation,
                     add_relation: AddRelation,
                 }
                 impl Theory {
                     pub fn new() -> Self {
-                        Self::default()
+                        let mut theory = Self::default();
+                        theory
+                            .global_variables
+                            .initialize(&mut theory.delta, &mut theory.unification);
+                        theory.clear_transient();
+                        theory
                     }
                     pub fn step(&mut self) {
                         println!("step start");
@@ -1902,36 +2090,37 @@ mod test {
                     fn apply_rules(&mut self) {
                         for (a, b, p2) in self.add_relation.iter_new() {
                             for (c, p4) in self.mul_relation.iter1_0_1_2(p2) {
-                                let a3 = self.delta.make_math(&mut self.math_uf);
-                                let a4 = self.delta.make_math(&mut self.math_uf);
-                                self.delta.insert_mul((a, c, a3));
-                                self.delta.insert_mul((b, c, a4));
+                                let a4 = self.delta.make_math(&mut self.unification.math_uf);
+                                let a3 = self.delta.make_math(&mut self.unification.math_uf);
                                 self.delta.insert_add((a3, a4, p4));
+                                self.delta.insert_mul((b, c, a4));
+                                self.delta.insert_mul((a, c, a3));
                             }
                         }
                         for (p2, c, p4) in self.mul_relation.iter_new() {
                             for (a, b) in self.add_relation.iter1_2_0_1(p2) {
-                                let a3 = self.delta.make_math(&mut self.math_uf);
-                                let a4 = self.delta.make_math(&mut self.math_uf);
-                                self.delta.insert_mul((a, c, a3));
-                                self.delta.insert_mul((b, c, a4));
+                                let a4 = self.delta.make_math(&mut self.unification.math_uf);
+                                let a3 = self.delta.make_math(&mut self.unification.math_uf);
                                 self.delta.insert_add((a3, a4, p4));
+                                self.delta.insert_mul((b, c, a4));
+                                self.delta.insert_mul((a, c, a3));
                             }
                         }
                     }
                     fn clear_transient(&mut self) {
-                        let math_uprooted = take(self.math_uf.dirty());
+                        let math_uprooted = take(self.unification.math_uf.dirty());
                         let _ = "todo: update forall";
                         self.mul_relation.update(
                             &math_uprooted,
-                            &mut self.math_uf,
+                            &mut self.unification.math_uf,
                             &mut self.delta.mul_relation_delta,
                         );
                         self.add_relation.update(
                             &math_uprooted,
-                            &mut self.math_uf,
+                            &mut self.unification.math_uf,
                             &mut self.delta.add_relation_delta,
                         );
+                        self.global_variables.new = false;
                     }
                 }
                 impl std::ops::Deref for Theory {

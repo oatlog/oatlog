@@ -89,6 +89,7 @@ pub(crate) enum ImplicitRuleAction {
         ops: Vec<(RelationId, Vec<VariableId>)>,
         /// Mostly here to insert literals.
         /// Reading literals should occur first.
+        /// TODO: use globalid relation directly.
         variables: TVec<VariableId, (TypeId, Option<GlobalId>)>,
         /// existing output value in a table.
         old: Vec<(VariableId, ColumnId)>,
@@ -108,6 +109,9 @@ pub(crate) struct Theory {
     pub(crate) symbolic_rules: Vec<SymbolicRule>,
     pub(crate) implicit_rules: Vec<ImplicitRule>,
     pub(crate) relations: TVec<RelationId, Relation>,
+    pub(crate) global_compute: TVec<GlobalId, crate::codegen::GlobalCompute>,
+    pub(crate) global_types: TVec<GlobalId, TypeId>,
+    pub(crate) global_to_relation: TVec<GlobalId, RelationId>,
 }
 
 #[derive(Copy, Clone, Eq, PartialEq, Ord, PartialOrd, Hash, Debug, Default)]
@@ -805,6 +809,7 @@ impl Theory {
     #[cfg(test)]
     pub(crate) fn dbg_summary(&self) -> String {
         use std::fmt::Write as _;
+
         let mut buf = String::new();
 
         macro_rules! wln {
@@ -908,7 +913,11 @@ pub(crate) mod query_planning {
         index_selection,
         typed_vec::TVec,
     };
-    use std::{collections::BTreeMap, convert::identity, mem::replace};
+    use std::{
+        collections::{BTreeMap, BTreeSet},
+        convert::identity,
+        mem::replace,
+    };
 
     #[derive(Copy, Clone, Eq, PartialEq, Ord, PartialOrd, Hash, Debug, Default)]
     enum Query {
@@ -996,7 +1005,11 @@ pub(crate) mod query_planning {
             match relation.ty {
                 RelationTy::NewOf { .. } => continue,
                 RelationTy::Alias { .. } => unimplemented!("alias relations not implemented"),
-                RelationTy::Global { .. } => unimplemented!("globals not implemented"),
+                RelationTy::Global { id } => {
+                    let ty = theory.global_types[id];
+                    let codegen_relation = codegen::RelationData::new_global(None, ty, id);
+                    codegen_relations.push_expected(relation_id, codegen_relation);
+                }
                 RelationTy::Primitive { .. } => {
                     unimplemented!("primtive relations not implemented")
                 }
@@ -1043,7 +1056,8 @@ pub(crate) mod query_planning {
             name: "",
             types,
             relations: codegen_relations,
-            globals: TVec::new(),
+            global_compute: theory.global_compute.clone(),
+            global_types: theory.global_types.clone(),
             rule_variables: codegen_variables,
             rule_tries: tries.leak(),
         };
@@ -1087,22 +1101,18 @@ pub(crate) mod query_planning {
             //       "calling" a function should sometimes result in an indexed lookup instead of
             //       an insert.
 
-            // make e-classes
-            codegen_actions.extend(rule.action_variables.iter_enumerate().filter_map(
-                |(id, (_meta, link))| {
-                    link.is_none()
-                        .then_some(codegen::Action::Make(action_to_codegen[id]))
-                },
-            ));
-
-            codegen_actions.extend(rule.unify.iter_all().filter_map(|(i0, i, ())| {
-                (i != i0).then_some(codegen::Action::Equate(
-                    premise_to_codegen[i],
-                    premise_to_codegen[i0],
-                ))
-            }));
-
+            let mut extra_bound_action_variables: BTreeSet<ActionId> = BTreeSet::new();
             codegen_actions.extend(rule.action_relations.iter().map(|relation| {
+                match &theory.relations[relation.relation].ty {
+                    RelationTy::Forall { .. }
+                    | RelationTy::NewOf { .. }
+                    | RelationTy::Alias { .. } => panic!(),
+                    RelationTy::Primitive {} => todo!(),
+                    RelationTy::Global { .. } => {
+                        extra_bound_action_variables.insert(relation.args.inner()[0]);
+                    }
+                    RelationTy::Table => {}
+                };
                 codegen::Action::Insert {
                     relation: relation.relation,
                     args: relation
@@ -1114,6 +1124,21 @@ pub(crate) mod query_planning {
                         .leak(),
                 }
             }));
+
+            codegen_actions.extend(rule.unify.iter_all().filter_map(|(i0, i, ())| {
+                (i != i0).then_some(codegen::Action::Equate(
+                    premise_to_codegen[i],
+                    premise_to_codegen[i0],
+                ))
+            }));
+
+            codegen_actions.extend(rule.action_variables.iter_enumerate().filter_map(
+                |(id, (_meta, link))| {
+                    (link.is_none() && !extra_bound_action_variables.contains(&id))
+                        .then_some(codegen::Action::Make(action_to_codegen[id]))
+                },
+            ));
+            codegen_actions.reverse();
 
             let mut trie = codegen_actions
                 .into_iter()
@@ -1159,7 +1184,18 @@ pub(crate) mod query_planning {
                     ) => {
                         panic!("should have been desugared")
                     }
-                    (_, RelationTy::Global { id: _ }) => todo!("global not implemented"),
+                    (Query::Iterate, RelationTy::Global { id }) => codegen::RuleAtom::Premise {
+                        relation,
+                        args,
+                        index: IndexUsageId::bogus(),
+                    },
+                    (Query::CheckViable, RelationTy::Global { id }) => {
+                        codegen::RuleAtom::PremiseAny {
+                            relation,
+                            args,
+                            index: IndexUsageId::bogus(),
+                        }
+                    }
                     (_, RelationTy::Primitive {}) => todo!("primitive not implemented"),
                     (Query::Iterate, RelationTy::Forall { ty: _ }) => {
                         todo!("forall not implemented")
