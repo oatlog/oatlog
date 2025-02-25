@@ -1709,6 +1709,195 @@ fn entry2_0_1_2(&self, delta: &mut Delta, math_uf: &mut UnionFind<Math>, x0: Mat
 Will generate potentially many e-classes, but not if the result is already in the database.
 
 
+
+= Current accidental E-node explosion.
+
+Let's say we have an `Add(a, b, res)` table and have the following in our delta:
+```
+0, 1, 2
+0, 1, 3
+0, 1, 4
+```
+We insert this into our table, and since these are unique our new-table becomes:
+```
+0, 1, 2
+0, 1, 3
+0, 1, 4
+```
+Well, that duplication is not necessary, but the implicit functionality rule will surely fix it (foreshadowing) and adds the following equalites to the e-graph:
+```
+2 = 3 = 4
+```
+We have the following rule (consequence from bi-rewrite of distributive):
+```
+(rule ((= res (Add a b))) ((= x (Add a b)) (= y (Add a b)))
+```
+This adds two new enodes and two new e-classes.
+This should obviously (foreshadowing) not be a problem since the extra enodes will unify through implicit functionality.
+The following is added to the delta:
+```
+0, 1, 5
+0, 1, 6
+0, 1, 7
+0, 1, 8
+0, 1, 9
+0, 1, 10
+```
+Oh no, our delta doubled in size, and the canonicalization, will not save us since we only applied `2 = 3 = 4`.
+
+=> Inhibiting rules by delaying their inserts does not work. OR implicit functionality must be applied on inserts immediately for the database to work correctly.
+
+So eqlog solves this by making separate inserts for creating e-classes (MeetArgs).
+
+= "Actions" in eqlog
+
+```rust
+// Entry thing with functional dependency
+if let Some(res) = add_relation.query((a,b)) {
+    /* ... */
+} else {
+    schedule_make_add(a, b);
+}
+```
+
+```rust
+// Insert with all arguments known
+schedule_add_insert(a, b, res);
+```
+
+= B-tree implementation
+
+stdlib
+```rust
+pub struct BTreeMap<K, V, A> {
+    root: Option<Root<K, V>>,
+    length: usize,
+    pub(super) alloc: ManuallyDrop<A>,
+}
+// type depends on height
+type Root = union { InternalNode, LeafNode }
+type Node = union { InternalNode, LeafNode }
+
+
+// #[repr(C)]
+struct InternalNode<K, V> {
+    data: LeafNode<K, V>,
+    edges: [MaybeUninit<BoxedNode<K, V>>; 2 * B],
+}
+
+// for some reason, len is u16 instead of u8, when it can be at most 12.
+
+struct LeafNode<K, V> {
+    parent: Option<NonNull<InternalNode<K, V>>>,
+    parent_idx: MaybeUninit<u16>,
+    len: u16,
+    keys: [MaybeUninit<K>; CAPACITY],
+    vals: [MaybeUninit<V>; CAPACITY],
+}
+
+
+struct LeafNode<K, V> {
+    parent: Option<NonNull<InternalNode<K, V>>
+}
+```
+
+ours?:
+```rust
+struct BTreeSet<K: Copy> {
+    height: usize,
+    root: Option<u32>,
+    internal_nodes: Vec<InternalNode<K>>,
+    free_internal_nodes: Vec<u32>,
+    leaf_nodes: Vec<LeafNode<K>>,
+    free_leaf_nodes: Vec<u32>,
+}
+struct InternalNode<K: Copy> {
+    inner: LeafNode<K>,
+    edges: [u32; CAPACITY],
+}
+struct LeafNode<K: Copy> {
+    parent: Option<u32>,
+    len: u8,
+    keys: [K, CAPACITY],
+}
+```
+
+
+
+
+Fork stdlib btree.
+std btree is very complicated (in the borrowchk sense) and has a ton of invariants.
+we can kind of skip all of that if we only store `Copy` types and use 32 bit ids.
+
+== Allocation
+Slab allocation (bump allocator with free list)
+It should basically be a `Vec<Option<Node>>` with 32 bit indexes.
+This would be bad for stdlib btree because i think it uses pointers internally.
+
+== Branching factor
+Hyperparameter that we pick through testing.
+We may want to pick it based on cache size or something.
+
+== Range queries
+For range queries we do not actually care about the order that we get the elements.
+It might make sense to iterate through the current node completely and then iterate through all the children.
+
+== Node ordering
+if size(Node) << size(cacheline) then the order that nodes are laid out in memory matters, it might be possible to reorder the nodes slightly to get better performance.
+
+== Value ordering
+Splay trees work essentially as a LRU cache, maybe we could reorder values so that more commonly accessed values are at the top?
+
+== Prefetching
+When doing a range query that touches a node, it makes sense to prefetch it's children.
+
+
+= Pre-allocating everything
+Assuming everything that we allocate is essentially a Vec, we could let page faults trigger allocations instead of a branch.
+This puts pressure on the TLB (cache) though, but whatever.
+TLB: https://lwn.net/Articles/379748/
+
+It might be reasonable to pre-allocate everything and have strict upper bounds.
+
+= New action API
+```rust
+// 1
+math_uf.unify(a, b);
+
+// 2
+// codegen could be made in multiple ways, get or continue needs special consideration
+let res = add_relation.get(a, b).unwrap_or_else(|| {
+    delta.make_add(a, b)
+});
+
+
+// 3
+delta.insert_add(a, b, res);
+
+
+// 4 (maybe)
+let res = math_uf.make_eclass();
+
+```
+
+```rust
+enum Action {
+    // ====== Does not make E-classes (surjective) ======
+    Equate(VariableId, VariableId),
+    Insert { relation: RelationId, args: &'static [VariableId] },
+
+
+    // ====== Makes new E-classes (non-surjective) ======
+    Entry {
+        relation: RelationId,
+        args: &'static [VariableId],
+        result: VariableId,
+    },
+    Make(VariableId),
+}
+```
+
+
 = TODO READ
 Papers are just under the first author i looked at.
 I stopped adding authors after a while since this is just too many papers.
