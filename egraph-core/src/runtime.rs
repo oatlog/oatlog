@@ -15,6 +15,7 @@ pub trait Clear: Sized {
     }
 }
 impl<T> Clear for Vec<T> {
+    #[inline]
     fn clear(&mut self) {
         Vec::clear(self);
     }
@@ -63,9 +64,11 @@ struct StringIntern {
     to_string: BTreeMap<IString, String>,
 }
 impl StringIntern {
+    #[inline]
     fn new() -> Self {
         Self::default()
     }
+    #[inline]
     fn intern(&mut self, s: String) -> IString {
         let next_id = IString(u32::try_from(self.to_id.len()).unwrap());
         *self.to_id.entry(s.clone()).or_insert_with(|| {
@@ -94,6 +97,7 @@ mod range_query_impl {
                 $($name0 : RelationElement,)*
                 $($name1 : RelationElement,)*
             {
+                #[inline]
                 fn query(&self, t: ($($name0,)*)) -> impl Iterator<Item = ($($name1),*)> {
                     self.range(($(t . $digit0,)* $($name1::MIN_ID,)*)..($(t . $digit0,)* $($name1::MAX_ID,)*))
                         .copied()
@@ -159,7 +163,7 @@ macro_rules! eclass_wrapper_ty {
 
 /// The main union-find.
 /// Per eclass state.
-#[derive(Debug, Default)]
+#[derive(Default)]
 pub struct UnionFind<T> {
     // TODO: maybe merge repr and size.
     repr: Vec<u32>,
@@ -173,7 +177,19 @@ pub struct UnionFind<T> {
     // new: Vec<T>,
     // delta: Vec<T>,
 }
+impl<T> std::fmt::Debug for UnionFind<T> {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        writeln!(f)?;
+        for i in 0..self.repr.len() {
+            let repr = self.repr[i];
+            let size = self.size[i];
+            writeln!(f, "{i}: {repr}({size})")?;
+        }
+        Ok(())
+    }
+}
 impl<T: Eclass> UnionFind<T> {
+    #[inline]
     pub fn new() -> Self {
         Self {
             repr: Vec::new(),
@@ -182,9 +198,11 @@ impl<T: Eclass> UnionFind<T> {
             _marker: PhantomData,
         }
     }
+    #[inline]
     pub fn find(&mut self, t: T) -> T {
         T::new(self.find_inner(t.inner()))
     }
+    #[inline]
     pub fn find_inner(&mut self, i: u32) -> u32 {
         if self.repr[i as usize] == i {
             i
@@ -194,6 +212,7 @@ impl<T: Eclass> UnionFind<T> {
             root
         }
     }
+    #[inline]
     pub fn union(&mut self, a: T, b: T) {
         let a = self.find_inner(a.inner());
         let b = self.find_inner(b.inner());
@@ -208,20 +227,23 @@ impl<T: Eclass> UnionFind<T> {
         self.repr[uprooted as usize] = self.repr[root as usize];
         self.dirty.push(T::new(uprooted));
     }
+    #[inline]
     pub fn dirty(&mut self) -> &mut Vec<T> {
         &mut self.dirty
     }
-    /// INVARIANT: also add to delta
+    #[inline]
     pub fn add_eclass(&mut self) -> T {
         let id = u32::try_from(self.repr.len()).expect("out of u32 ids");
         self.repr.push(id);
         self.size.push(1);
         T::new(id)
     }
+    #[inline]
     /// Increment cost of uprooting this e-class. No-op if already uprooted.
     pub fn inc_eclass(&mut self, t: T, delta: u32) {
         self.size[t.inner() as usize] += delta;
     }
+    #[inline]
     /// Decrement cost of uprooting this e-class. No-op if already uprooted.
     pub fn dec_eclass(&mut self, t: T, delta: u32) {
         self.size[t.inner() as usize] -= delta;

@@ -1464,12 +1464,8 @@ pub(crate) mod query_planning {
                     bound.iter().all(|x| !x).then_some(false)
                 }
                 RelationTy::Table => {
-                    if relation.columns.len() == bound.len() {
-                        Some(true)
-                    } else {
-                        // TODO: check implicit rules to see if we are matching a primary key.
-                        Some(false)
-                    }
+                    // TODO: check implicit rules to see if we are matching a primary key.
+                    Some(false)
                 }
                 RelationTy::Alias { .. } => todo!("alias not implemented"),
                 RelationTy::Global { .. } => Some(true),

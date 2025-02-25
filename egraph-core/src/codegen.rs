@@ -267,22 +267,25 @@ pub(crate) enum RuleAtom {
 
 #[derive(Debug, Clone, Copy)]
 pub(crate) enum Action {
-    /// Insert tuple, creating any variables that are unbound.
+    /// Insert tuple with bound variables
     Insert {
         relation: RelationId,
         args: &'static [VariableId],
     },
     /// Equate two bound variables.
     Equate(VariableId, VariableId),
+    // /// Insert into a relation with a functional dependency
+    // /// Returns existing e-class or creates a new e-class.
+    // Entry {
+    //     relation: RelationId,
+    //     args: &'static [VariableId],
+    //     result: VariableId,
+    //     index: IndexUsageId,
+    // },
     /// Make a new E-class.
     Make(VariableId),
 }
 
-trait Relation {
-    type Row;
-    fn new() -> Self;
-    fn clear_new(&mut self);
-}
 #[derive(PartialEq, Eq, PartialOrd, Ord, Clone, Copy)]
 #[repr(usize)]
 enum Priority {
@@ -334,6 +337,10 @@ mod ident {
             }
             TypeKind::Primitive { type_path } => type_path.parse().unwrap(),
         }
+    }
+    /// `math`
+    pub fn type_name(ty: &TypeData) -> Ident {
+        format_ident!("{}", ty.name.to_snake_case())
     }
     pub fn type_global(ty: &TypeData) -> Ident {
         format_ident!("global_{}", ty.name.to_snake_case())
@@ -1037,6 +1044,11 @@ pub fn codegen(theory: &Theory) -> TokenStream {
                             self.0
                         }
                     }
+                    impl std::fmt::Display for #type_ty {
+                        fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> Result<(), std::fmt::Error> {
+                            self.0.fmt(f)
+                        }
+                    }
                     impl RelationElement for #type_ty {
                         const MIN_ID: Self = Self(0);
                         const MAX_ID: Self = Self(u32::MAX);
@@ -1142,7 +1154,7 @@ pub fn codegen(theory: &Theory) -> TokenStream {
         })
         .multiunzip();
 
-    let clear_transient_contents = {
+    let clear_transient = {
         let (update, relation_ident) : (Vec<_>, Vec<_>) = theory.relations.iter().filter_map(|rel| Some(match &rel.ty {
             RelationTy::Global { .. } => return None,
             RelationTy::Table { .. } => {
@@ -1168,18 +1180,38 @@ pub fn codegen(theory: &Theory) -> TokenStream {
         //
 
         quote! {
-            self.global_variables.new = false;
-            #(self.#relation_ident.clear_new();)*
-            loop {
-                self.uprooted.take_dirt(&mut self.uf);
-                #(self.#relation_ident.update(&self.uprooted, &mut self.uf, &mut self.delta);)*
+            fn clear_transient(&mut self) {  
+                self.global_variables.new = false;
+                #(self.#relation_ident.clear_new();)*
+                if dbg!(self.uf.has_new()) {
+                    // bogus delta to delay inserts
+                    let mut delta = Delta::default();
+                    dbg!("SKIPPING INSERTS");
+                    
+                    loop {
+                        self.uprooted.take_dirt(&mut self.uf);
+                        #(self.#relation_ident.update(&self.uprooted, &mut self.uf, &mut delta);)*
 
-                // do we have pending uproots or inserts?
-                if !dbg!(self.uf.has_new() || self.delta.has_new()) {
-                    break;
+                        // do we have pending uproots or inserts?
+                        if !dbg!(self.uf.has_new()) {
+                            break;
+                        }
+                    }
+
+                } else {
+                    dbg!("DOING INSERTS");
+                    loop {
+                        self.uprooted.take_dirt(&mut self.uf);
+                        #(self.#relation_ident.update(&self.uprooted, &mut self.uf, &mut self.delta);)*
+
+                        // do we have pending uproots or inserts?
+                        if !dbg!(self.uf.has_new() || self.delta.has_new()) {
+                            break;
+                        }
+                    }
                 }
+                #(self.#relation_ident.update_finalize(&mut self.uf);)*
             }
-            #(self.#relation_ident.update_finalize(&mut self.uf);)*
         }
     };
 
@@ -1249,7 +1281,14 @@ pub fn codegen(theory: &Theory) -> TokenStream {
                 println!("step end");
             }
             fn apply_rules(&mut self) { #rule_contents }
-            fn clear_transient(&mut self) { #clear_transient_contents }
+            fn emit_graphviz(&self) -> String {
+                let mut buf = String::new();
+                buf.push_str("digraph G {");
+                #(self.#stored_relations.emit_graphviz(&mut buf);)*
+                buf.push_str("}");
+                buf
+            }
+            #clear_transient
         }
 
         // make insert functions "for free"
@@ -1299,6 +1338,7 @@ fn codegen_relation(rel: &RelationData, theory: &Theory) -> TokenStream {
                     }
                     fn clear_new(&mut self) {  }
                     fn update_finalize(&mut self, uf: &mut Unification) {  }
+                    fn emit_graphviz(&self, buf: &mut String) { }
                 }
             }
         }
@@ -1460,6 +1500,10 @@ fn codegen_relation(rel: &RelationData, theory: &Theory) -> TokenStream {
 
                 let delta_row = ident::delta_row(rel);
 
+                let relation_name = ident::rel_get(rel).to_string();
+
+                let column_types = rel.param_types.iter().copied().map(|ty| ident::type_name(&theory.types[ty]).to_string());
+
                 quote! {
                     fn update(
                         &mut self,
@@ -1501,6 +1545,14 @@ fn codegen_relation(rel: &RelationData, theory: &Theory) -> TokenStream {
                     ) {
                         for (#(#all_columns),*) in self.new.iter_mut() {
                             #(*#all_columns_symbolic = uf.#uf_all_symbolic.find(*#all_columns_symbolic);)*
+                        }
+                        self.new.sort();
+                        self.new.dedup();
+                    }
+                    fn emit_graphviz(&self, buf: &mut String) {
+                        use std::fmt::Write;
+                        for (i, (#(#first_index_order),*)) in self.#first_index_ident.iter().copied().enumerate() {
+                            #(write!(buf, "{}{i} -> {}{};", #relation_name, #column_types, #first_index_order);)*
                         }
                     }
                 }
