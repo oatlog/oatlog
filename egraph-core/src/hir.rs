@@ -168,7 +168,7 @@ pub(crate) struct Theory {
     pub(crate) name: &'static str,
     pub(crate) types: TVec<TypeId, Type>,
     pub(crate) symbolic_rules: Vec<SymbolicRule>,
-    pub(crate) implicit_rules: Vec<ImplicitRule>,
+    pub(crate) implicit_rules: BTreeMap<RelationId, Vec<ImplicitRule>>,
     pub(crate) relations: TVec<RelationId, Relation>,
     pub(crate) global_compute: TVec<GlobalId, crate::codegen::GlobalCompute>,
     pub(crate) global_types: TVec<GlobalId, TypeId>,
@@ -969,7 +969,10 @@ pub(crate) mod query_planning {
     //! All query plan *choices* occur here.
     use crate::{
         codegen::{self, RuleTrie},
-        hir::{self, ActionId, PremiseId, PremiseRelation, RelationTy, SymbolicRule, Theory},
+        hir::{
+            self, ActionId, ImplicitRule, PremiseId, PremiseRelation, RelationTy, SymbolicRule,
+            Theory,
+        },
         ids::{ColumnId, IndexUsageId, RelationId, VariableId},
         index_selection,
         typed_vec::TVec,
@@ -1040,11 +1043,13 @@ pub(crate) mod query_planning {
     pub(crate) fn emit_codegen_theory(mut theory: hir::Theory) -> (hir::Theory, codegen::Theory) {
         let non_new_relations = theory.relations.len();
         let old_to_new = theory.add_delta_relations_in_place();
-        for implicit in theory.implicit_rules.iter() {
-            theory
-                .symbolic_rules
-                .push(implicit.to_symbolic(&theory.relations).unwrap())
-        }
+
+        // for implicit in theory.implicit_rules.iter() {
+        //     theory
+        //         .symbolic_rules
+        //         .push(implicit.to_symbolic(&theory.relations).unwrap())
+        // }
+
         let rules = symbolic_rules_as_semi_naive(&theory.symbolic_rules, &old_to_new);
 
         let mut table_uses: TVec<RelationId, TVec<IndexUsageId, Vec<ColumnId>>> =
@@ -1092,6 +1097,30 @@ pub(crate) mod query_planning {
                         .enumerate()
                         .map(|i| uses.push(vec![i]))
                         .collect();
+
+                    let implicit_rules = theory.implicit_rules.get(&relation_id).map_or(
+                        Vec::new(),
+                        |implicit_rules| {
+                            implicit_rules
+                                .iter()
+                                .map(|ImplicitRule { relation, on, ty }| match ty {
+                                    hir::ImplicitRuleAction::Lattice {
+                                        ops,
+                                        variables,
+                                        old,
+                                        new,
+                                        res,
+                                    } => todo!(),
+                                    hir::ImplicitRuleAction::Panic => todo!(),
+                                    hir::ImplicitRuleAction::Unification => {
+                                        let index = uses.push(on.clone());
+                                        codegen::ImplicitRule::new_union(index)
+                                    }
+                                })
+                                .collect()
+                        },
+                    );
+
                     let (usage_to_info, index_to_info) =
                         index_selection::index_selection(relation.columns.len(), uses);
 
@@ -1101,6 +1130,7 @@ pub(crate) mod query_planning {
                         usage_to_info,
                         index_to_info,
                         column_back_references,
+                        implicit_rules,
                     );
                     codegen_relations.push_expected(relation_id, codegen_relation);
                 }

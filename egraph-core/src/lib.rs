@@ -413,6 +413,14 @@ mod test {
                             }
                         }
                         op_insert.retain(|&(x0, x1, x2)| {
+                            if let Some(y2) = self.iter2_0_1_2(x0, x1).next() {
+                                let mut should_trigger = false;
+                                should_trigger |= y2 != x2;
+                                if should_trigger {
+                                    uf.math_uf.union(y2, x2);
+                                    return false;
+                                }
+                            }
                             if !self.all_index_0_1_2.insert((x0, x1, x2)) {
                                 return false;
                             }
@@ -541,6 +549,14 @@ mod test {
                             }
                         }
                         op_insert.retain(|&(x0, x1, x2)| {
+                            if let Some(y2) = self.iter2_0_1_2(x0, x1).next() {
+                                let mut should_trigger = false;
+                                should_trigger |= y2 != x2;
+                                if should_trigger {
+                                    uf.math_uf.union(y2, x2);
+                                    return false;
+                                }
+                            }
                             if !self.all_index_0_1_2.insert((x0, x1, x2)) {
                                 return false;
                             }
@@ -640,6 +656,14 @@ mod test {
                             }
                         }
                         op_insert.retain(|&(x0, x1)| {
+                            if let Some(y1) = self.iter1_0_1(x0).next() {
+                                let mut should_trigger = false;
+                                should_trigger |= y1 != x1;
+                                if should_trigger {
+                                    uf.math_uf.union(y1, x1);
+                                    return false;
+                                }
+                            }
                             if !self.all_index_0_1.insert((x0, x1)) {
                                 return false;
                             }
@@ -765,12 +789,10 @@ mod test {
                         theory
                     }
                     pub fn step(&mut self) {
-                        println!("apply rules");
                         self.apply_rules();
-                        println!("clear transient");
                         self.clear_transient();
-                        println!("step end");
                     }
+                    #[inline(never)]
                     fn apply_rules(&mut self) {
                         if self.global_variables.new {
                             let one = self.global_variables.global_i64[1usize];
@@ -835,44 +857,25 @@ mod test {
                         buf.push_str("}");
                         buf
                     }
+                    #[inline(never)]
                     fn clear_transient(&mut self) {
                         self.global_variables.new = false;
                         self.forall_math_relation.clear_new();
                         self.mul_relation.clear_new();
                         self.add_relation.clear_new();
                         self.const_relation.clear_new();
-                        if dbg!(self.uf.has_new()) {
-                            let mut delta = Delta::default();
-                            dbg!("SKIPPING INSERTS");
-                            loop {
-                                self.uprooted.take_dirt(&mut self.uf);
-                                self.forall_math_relation
-                                    .update(&self.uprooted, &mut self.uf, &mut delta);
-                                self.mul_relation
-                                    .update(&self.uprooted, &mut self.uf, &mut delta);
-                                self.add_relation
-                                    .update(&self.uprooted, &mut self.uf, &mut delta);
-                                self.const_relation
-                                    .update(&self.uprooted, &mut self.uf, &mut delta);
-                                if !dbg!(self.uf.has_new()) {
-                                    break;
-                                }
-                            }
-                        } else {
-                            dbg!("DOING INSERTS");
-                            loop {
-                                self.uprooted.take_dirt(&mut self.uf);
-                                self.forall_math_relation
-                                    .update(&self.uprooted, &mut self.uf, &mut self.delta);
-                                self.mul_relation
-                                    .update(&self.uprooted, &mut self.uf, &mut self.delta);
-                                self.add_relation
-                                    .update(&self.uprooted, &mut self.uf, &mut self.delta);
-                                self.const_relation
-                                    .update(&self.uprooted, &mut self.uf, &mut self.delta);
-                                if !dbg!(self.uf.has_new() || self.delta.has_new()) {
-                                    break;
-                                }
+                        loop {
+                            self.uprooted.take_dirt(&mut self.uf);
+                            self.forall_math_relation
+                                .update(&self.uprooted, &mut self.uf, &mut self.delta);
+                            self.mul_relation
+                                .update(&self.uprooted, &mut self.uf, &mut self.delta);
+                            self.add_relation
+                                .update(&self.uprooted, &mut self.uf, &mut self.delta);
+                            self.const_relation
+                                .update(&self.uprooted, &mut self.uf, &mut self.delta);
+                            if !(self.uf.has_new() || self.delta.has_new()) {
+                                break;
                             }
                         }
                         self.forall_math_relation.update_finalize(&mut self.uf);
@@ -1473,12 +1476,10 @@ mod test {
                         theory
                     }
                     pub fn step(&mut self) {
-                        println!("apply rules");
                         self.apply_rules();
-                        println!("clear transient");
                         self.clear_transient();
-                        println!("step end");
                     }
+                    #[inline(never)]
                     fn apply_rules(&mut self) {
                         for (a, b) in self.foo_relation.iter_new() {
                             if self.baz_relation.check1_1_0(a) {
@@ -1519,6 +1520,7 @@ mod test {
                         buf.push_str("}");
                         buf
                     }
+                    #[inline(never)]
                     fn clear_transient(&mut self) {
                         self.global_variables.new = false;
                         self.forall_math_relation.clear_new();
@@ -1526,42 +1528,20 @@ mod test {
                         self.bar_relation.clear_new();
                         self.baz_relation.clear_new();
                         self.triangle_relation.clear_new();
-                        if dbg!(self.uf.has_new()) {
-                            let mut delta = Delta::default();
-                            dbg!("SKIPPING INSERTS");
-                            loop {
-                                self.uprooted.take_dirt(&mut self.uf);
-                                self.forall_math_relation
-                                    .update(&self.uprooted, &mut self.uf, &mut delta);
-                                self.foo_relation
-                                    .update(&self.uprooted, &mut self.uf, &mut delta);
-                                self.bar_relation
-                                    .update(&self.uprooted, &mut self.uf, &mut delta);
-                                self.baz_relation
-                                    .update(&self.uprooted, &mut self.uf, &mut delta);
-                                self.triangle_relation
-                                    .update(&self.uprooted, &mut self.uf, &mut delta);
-                                if !dbg!(self.uf.has_new()) {
-                                    break;
-                                }
-                            }
-                        } else {
-                            dbg!("DOING INSERTS");
-                            loop {
-                                self.uprooted.take_dirt(&mut self.uf);
-                                self.forall_math_relation
-                                    .update(&self.uprooted, &mut self.uf, &mut self.delta);
-                                self.foo_relation
-                                    .update(&self.uprooted, &mut self.uf, &mut self.delta);
-                                self.bar_relation
-                                    .update(&self.uprooted, &mut self.uf, &mut self.delta);
-                                self.baz_relation
-                                    .update(&self.uprooted, &mut self.uf, &mut self.delta);
-                                self.triangle_relation
-                                    .update(&self.uprooted, &mut self.uf, &mut self.delta);
-                                if !dbg!(self.uf.has_new() || self.delta.has_new()) {
-                                    break;
-                                }
+                        loop {
+                            self.uprooted.take_dirt(&mut self.uf);
+                            self.forall_math_relation
+                                .update(&self.uprooted, &mut self.uf, &mut self.delta);
+                            self.foo_relation
+                                .update(&self.uprooted, &mut self.uf, &mut self.delta);
+                            self.bar_relation
+                                .update(&self.uprooted, &mut self.uf, &mut self.delta);
+                            self.baz_relation
+                                .update(&self.uprooted, &mut self.uf, &mut self.delta);
+                            self.triangle_relation
+                                .update(&self.uprooted, &mut self.uf, &mut self.delta);
+                            if !(self.uf.has_new() || self.delta.has_new()) {
+                                break;
                             }
                         }
                         self.forall_math_relation.update_finalize(&mut self.uf);
@@ -1764,6 +1744,14 @@ mod test {
                             }
                         }
                         op_insert.retain(|&(x0, x1, x2)| {
+                            if let Some(y2) = self.iter2_0_1_2(x0, x1).next() {
+                                let mut should_trigger = false;
+                                should_trigger |= y2 != x2;
+                                if should_trigger {
+                                    uf.math_uf.union(y2, x2);
+                                    return false;
+                                }
+                            }
                             if !self.all_index_0_1_2.insert((x0, x1, x2)) {
                                 return false;
                             }
@@ -1893,6 +1881,14 @@ mod test {
                             }
                         }
                         op_insert.retain(|&(x0, x1, x2)| {
+                            if let Some(y2) = self.iter2_0_1_2(x0, x1).next() {
+                                let mut should_trigger = false;
+                                should_trigger |= y2 != x2;
+                                if should_trigger {
+                                    uf.math_uf.union(y2, x2);
+                                    return false;
+                                }
+                            }
                             if !self.all_index_0_1_2.insert((x0, x1, x2)) {
                                 return false;
                             }
@@ -2003,12 +1999,10 @@ mod test {
                         theory
                     }
                     pub fn step(&mut self) {
-                        println!("apply rules");
                         self.apply_rules();
-                        println!("clear transient");
                         self.clear_transient();
-                        println!("step end");
                     }
+                    #[inline(never)]
                     fn apply_rules(&mut self) {
                         for (a, b, p2) in self.mul_relation.iter_new() {
                             if self.add_relation.check1_0_1_2(p2) {
@@ -2053,39 +2047,22 @@ mod test {
                         buf.push_str("}");
                         buf
                     }
+                    #[inline(never)]
                     fn clear_transient(&mut self) {
                         self.global_variables.new = false;
                         self.forall_math_relation.clear_new();
                         self.mul_relation.clear_new();
                         self.add_relation.clear_new();
-                        if dbg!(self.uf.has_new()) {
-                            let mut delta = Delta::default();
-                            dbg!("SKIPPING INSERTS");
-                            loop {
-                                self.uprooted.take_dirt(&mut self.uf);
-                                self.forall_math_relation
-                                    .update(&self.uprooted, &mut self.uf, &mut delta);
-                                self.mul_relation
-                                    .update(&self.uprooted, &mut self.uf, &mut delta);
-                                self.add_relation
-                                    .update(&self.uprooted, &mut self.uf, &mut delta);
-                                if !dbg!(self.uf.has_new()) {
-                                    break;
-                                }
-                            }
-                        } else {
-                            dbg!("DOING INSERTS");
-                            loop {
-                                self.uprooted.take_dirt(&mut self.uf);
-                                self.forall_math_relation
-                                    .update(&self.uprooted, &mut self.uf, &mut self.delta);
-                                self.mul_relation
-                                    .update(&self.uprooted, &mut self.uf, &mut self.delta);
-                                self.add_relation
-                                    .update(&self.uprooted, &mut self.uf, &mut self.delta);
-                                if !dbg!(self.uf.has_new() || self.delta.has_new()) {
-                                    break;
-                                }
+                        loop {
+                            self.uprooted.take_dirt(&mut self.uf);
+                            self.forall_math_relation
+                                .update(&self.uprooted, &mut self.uf, &mut self.delta);
+                            self.mul_relation
+                                .update(&self.uprooted, &mut self.uf, &mut self.delta);
+                            self.add_relation
+                                .update(&self.uprooted, &mut self.uf, &mut self.delta);
+                            if !(self.uf.has_new() || self.delta.has_new()) {
+                                break;
                             }
                         }
                         self.forall_math_relation.update_finalize(&mut self.uf);
@@ -2289,6 +2266,14 @@ mod test {
                             }
                         }
                         op_insert.retain(|&(x0, x1, x2)| {
+                            if let Some(y2) = self.iter2_0_1_2(x0, x1).next() {
+                                let mut should_trigger = false;
+                                should_trigger |= y2 != x2;
+                                if should_trigger {
+                                    uf.math_uf.union(y2, x2);
+                                    return false;
+                                }
+                            }
                             if !self.all_index_0_1_2.insert((x0, x1, x2)) {
                                 return false;
                             }
@@ -2417,6 +2402,14 @@ mod test {
                             }
                         }
                         op_insert.retain(|&(x0, x1, x2)| {
+                            if let Some(y2) = self.iter2_0_1_2(x0, x1).next() {
+                                let mut should_trigger = false;
+                                should_trigger |= y2 != x2;
+                                if should_trigger {
+                                    uf.math_uf.union(y2, x2);
+                                    return false;
+                                }
+                            }
                             if !self.all_index_0_1_2.insert((x0, x1, x2)) {
                                 return false;
                             }
@@ -2527,12 +2520,10 @@ mod test {
                         theory
                     }
                     pub fn step(&mut self) {
-                        println!("apply rules");
                         self.apply_rules();
-                        println!("clear transient");
                         self.clear_transient();
-                        println!("step end");
                     }
+                    #[inline(never)]
                     fn apply_rules(&mut self) {
                         for (a, b, p2) in self.add_relation.iter_new() {
                             for (c, p4) in self.mul_relation.iter1_0_1_2(p2) {
@@ -2562,39 +2553,22 @@ mod test {
                         buf.push_str("}");
                         buf
                     }
+                    #[inline(never)]
                     fn clear_transient(&mut self) {
                         self.global_variables.new = false;
                         self.forall_math_relation.clear_new();
                         self.mul_relation.clear_new();
                         self.add_relation.clear_new();
-                        if dbg!(self.uf.has_new()) {
-                            let mut delta = Delta::default();
-                            dbg!("SKIPPING INSERTS");
-                            loop {
-                                self.uprooted.take_dirt(&mut self.uf);
-                                self.forall_math_relation
-                                    .update(&self.uprooted, &mut self.uf, &mut delta);
-                                self.mul_relation
-                                    .update(&self.uprooted, &mut self.uf, &mut delta);
-                                self.add_relation
-                                    .update(&self.uprooted, &mut self.uf, &mut delta);
-                                if !dbg!(self.uf.has_new()) {
-                                    break;
-                                }
-                            }
-                        } else {
-                            dbg!("DOING INSERTS");
-                            loop {
-                                self.uprooted.take_dirt(&mut self.uf);
-                                self.forall_math_relation
-                                    .update(&self.uprooted, &mut self.uf, &mut self.delta);
-                                self.mul_relation
-                                    .update(&self.uprooted, &mut self.uf, &mut self.delta);
-                                self.add_relation
-                                    .update(&self.uprooted, &mut self.uf, &mut self.delta);
-                                if !dbg!(self.uf.has_new() || self.delta.has_new()) {
-                                    break;
-                                }
+                        loop {
+                            self.uprooted.take_dirt(&mut self.uf);
+                            self.forall_math_relation
+                                .update(&self.uprooted, &mut self.uf, &mut self.delta);
+                            self.mul_relation
+                                .update(&self.uprooted, &mut self.uf, &mut self.delta);
+                            self.add_relation
+                                .update(&self.uprooted, &mut self.uf, &mut self.delta);
+                            if !(self.uf.has_new() || self.delta.has_new()) {
+                                break;
                             }
                         }
                         self.forall_math_relation.update_finalize(&mut self.uf);

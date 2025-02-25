@@ -666,7 +666,7 @@ struct Parser {
     compute_to_global: BTreeMap<ComputeMethod, GlobalId>,
 
     symbolic_rules: Vec<hir::SymbolicRule>,
-    implicit_rules: Vec<hir::ImplicitRule>,
+    implicit_rules: BTreeMap<RelationId, Vec<hir::ImplicitRule>>,
 }
 impl Parser {
     /// Add a global variable. Hashcons based on the compute method
@@ -740,7 +740,7 @@ impl Parser {
             global_variables: TVec::new(),
             compute_to_global: BTreeMap::new(),
             symbolic_rules: Vec::new(),
-            implicit_rules: Vec::new(),
+            implicit_rules: BTreeMap::new(),
             hir_relations: TVec::new(),
             global_to_function: TVec::new(),
             type_to_forall: BTreeMap::new(),
@@ -1104,7 +1104,7 @@ impl Parser {
                 // eqsort type => unification
                 hir::ImplicitRule::new_unify(relation_id, inputs.len())
             };
-            self.implicit_rules.push(rule);
+            self.implicit_rules.entry(relation_id).or_default().push(rule);
         }
 
         self.function_possible_ids

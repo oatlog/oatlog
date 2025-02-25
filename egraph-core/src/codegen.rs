@@ -37,6 +37,28 @@ pub(crate) struct Theory {
     pub(crate) rule_tries: &'static [RuleTrie],
 }
 
+// implicit: TVec<RelationId, Vec<ImplicitRule>>
+// applied on *inserts*
+#[derive(Clone, Debug)]
+pub(crate) struct ImplicitRule {
+    index: IndexUsageId,
+    ty: ImplicitRuleTy,
+}
+impl ImplicitRule {
+    pub(crate) fn new_union(index: IndexUsageId) -> Self {
+        Self {
+            index,
+            ty: ImplicitRuleTy::Union,
+        }
+    }
+}
+#[derive(Clone, Debug)]
+enum ImplicitRuleTy {
+    Union,
+    // Panic,
+    // Lattice { .. },
+}
+
 #[derive(Debug)]
 pub(crate) struct TypeData {
     name: &'static str,
@@ -89,6 +111,7 @@ impl RelationData {
         usage_to_info: TVec<IndexUsageId, index_selection::IndexUsageInfo>,
         index_to_info: TVec<IndexId, index_selection::IndexInfo>,
         column_back_reference: TVec<ColumnId, IndexUsageId>,
+        implicit_rules: Vec<ImplicitRule>,
     ) -> Self {
         Self {
             name,
@@ -97,6 +120,7 @@ impl RelationData {
                 usage_to_info,
                 index_to_info,
                 column_back_reference,
+                implicit_rules,
             },
         }
     }
@@ -128,7 +152,7 @@ enum RelationTy {
         index_to_info: TVec<IndexId, index_selection::IndexInfo>,
         /// Index usage for back-references.
         column_back_reference: TVec<ColumnId, IndexUsageId>,
-        // implicit_rules: ...
+        implicit_rules: Vec<ImplicitRule>,
         // trigger_rules: ...
     },
     Forall {
@@ -473,6 +497,10 @@ mod ident {
     pub fn column(c: ColumnId) -> Ident {
         format_ident!("x{}", c.0)
     }
+    /// `y2`
+    pub fn column_alt(c: ColumnId) -> Ident {
+        format_ident!("y{}", c.0)
+    }
     /// `math_class_delta`
     pub fn delta_ty(ty: &TypeData) -> Ident {
         let x = ty.name.to_snake_case();
@@ -702,6 +730,7 @@ impl CodegenRuleTrieCtx<'_> {
                         usage_to_info,
                         index_to_info,
                         column_back_reference,
+                        implicit_rules,
                     } => {
                         let usage_info = &usage_to_info[index];
                         let index_info = &index_to_info[usage_info.index];
@@ -925,6 +954,7 @@ fn codegen_globals(theory: &Theory) -> (TokenStream, TVec<GlobalId, usize>) {
                             usage_to_info,
                             index_to_info,
                             column_back_reference,
+                            implicit_rules,
                         } => {
                             // TODO: this just assumes that the last type in the relation is the output and also an eqsort.
 
@@ -1180,34 +1210,17 @@ pub fn codegen(theory: &Theory) -> TokenStream {
         //
 
         quote! {
-            fn clear_transient(&mut self) {  
+            #[inline(never)]
+            fn clear_transient(&mut self) {
                 self.global_variables.new = false;
                 #(self.#relation_ident.clear_new();)*
-                if dbg!(self.uf.has_new()) {
-                    // bogus delta to delay inserts
-                    let mut delta = Delta::default();
-                    dbg!("SKIPPING INSERTS");
-                    
-                    loop {
-                        self.uprooted.take_dirt(&mut self.uf);
-                        #(self.#relation_ident.update(&self.uprooted, &mut self.uf, &mut delta);)*
+                loop {
+                    self.uprooted.take_dirt(&mut self.uf);
+                    #(self.#relation_ident.update(&self.uprooted, &mut self.uf, &mut self.delta);)*
 
-                        // do we have pending uproots or inserts?
-                        if !dbg!(self.uf.has_new()) {
-                            break;
-                        }
-                    }
-
-                } else {
-                    dbg!("DOING INSERTS");
-                    loop {
-                        self.uprooted.take_dirt(&mut self.uf);
-                        #(self.#relation_ident.update(&self.uprooted, &mut self.uf, &mut self.delta);)*
-
-                        // do we have pending uproots or inserts?
-                        if !dbg!(self.uf.has_new() || self.delta.has_new()) {
-                            break;
-                        }
+                    // do we have pending uproots or inserts?
+                    if !(self.uf.has_new() || self.delta.has_new()) {
+                        break;
                     }
                 }
                 #(self.#relation_ident.update_finalize(&mut self.uf);)*
@@ -1274,12 +1287,10 @@ pub fn codegen(theory: &Theory) -> TokenStream {
                 theory
             }
             pub fn step(&mut self) {
-                println!("apply rules");
                 self.apply_rules();
-                println!("clear transient");
                 self.clear_transient();
-                println!("step end");
             }
+            #[inline(never)]
             fn apply_rules(&mut self) { #rule_contents }
             fn emit_graphviz(&self) -> String {
                 let mut buf = String::new();
@@ -1346,6 +1357,7 @@ fn codegen_relation(rel: &RelationData, theory: &Theory) -> TokenStream {
             usage_to_info,
             index_to_info,
             column_back_reference,
+            implicit_rules,
         } => {
             let index_fields: Vec<_> = index_to_info
                 .iter()
@@ -1502,7 +1514,61 @@ fn codegen_relation(rel: &RelationData, theory: &Theory) -> TokenStream {
 
                 let relation_name = ident::rel_get(rel).to_string();
 
-                let column_types = rel.param_types.iter().copied().map(|ty| ident::type_name(&theory.types[ty]).to_string());
+                let column_types = rel
+                    .param_types
+                    .iter()
+                    .copied()
+                    .map(|ty| ident::type_name(&theory.types[ty]).to_string());
+
+                let implict_rules_impl = {
+                    implicit_rules
+                        .iter()
+                        .map(|ImplicitRule { index, ty }| match ty {
+                            ImplicitRuleTy::Union => {
+                                let usage_info = &usage_to_info[index];
+                                let index_info = &index_to_info[usage_info.index];
+
+                                let bound_columns = &index_info.order.inner()[0..usage_info.prefix]
+                                    .iter()
+                                    .copied()
+                                    .collect_vec();
+                                let bound_columns_ = bound_columns
+                                    .iter()
+                                    .copied()
+                                    .map(ident::column)
+                                    .collect_vec();
+                                let new_columns = &index_info.order.inner()[usage_info.prefix..]
+                                    .iter()
+                                    .copied()
+                                    .collect_vec();
+                                let new_columns_ =
+                                    new_columns.iter().copied().map(ident::column).collect_vec();
+                                let new_columns_alt_ = new_columns
+                                    .iter()
+                                    .copied()
+                                    .map(ident::column_alt)
+                                    .collect_vec();
+
+                                let iter_ident = ident::index_all_iter(usage_info, index_info);
+
+                                let new_columns_uf = new_columns.iter().copied().map(|x| ident::type_uf(&theory.types[rel.param_types[x]])).collect_vec();
+
+                                quote! {
+                                    if let Some(#(#new_columns_alt_),*) = self.#iter_ident(#(#bound_columns_),*).next() {
+                                        let mut should_trigger = false;
+                                        #(should_trigger |= #new_columns_alt_ != #new_columns_;)*
+                                        if should_trigger {
+                                            #(
+                                                uf.#new_columns_uf.union(#new_columns_alt_, #new_columns_);
+                                            )*
+                                            return false;
+                                        }
+                                    }
+                                }
+                            }
+                        })
+                        .collect_vec()
+                };
 
                 quote! {
                     fn update(
@@ -1527,7 +1593,10 @@ fn codegen_relation(rel: &RelationData, theory: &Theory) -> TokenStream {
                         }
 
                         op_insert.retain(|&(#(#all_columns),*)| {
-                            // TODO: Implicit functionality/implicit rules to filter inserts.
+                            #(#implict_rules_impl)*
+                            // TODO: this becomes infallible if there are implicit rules
+                            // if there is a single implicit rule, we might just want to merge
+                            // insert with the query.
                             if !self.#first_index_ident.insert((#(#first_index_order),*)) {
                                 return false;
                             }
