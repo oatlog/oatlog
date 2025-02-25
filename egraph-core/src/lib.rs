@@ -290,6 +290,11 @@ mod test {
                         self.0
                     }
                 }
+                impl std::fmt::Display for Math {
+                    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> Result<(), std::fmt::Error> {
+                        self.0.fmt(f)
+                    }
+                }
                 impl RelationElement for Math {
                     const MIN_ID: Self = Self(0);
                     const MAX_ID: Self = Self(u32::MAX);
@@ -301,6 +306,14 @@ mod test {
                 }
                 impl Relation for ForallMathRelation {
                     type Row = (Math);
+                }
+                impl ForallMathRelation {
+                    fn update(&mut self, uprooted: &Uprooted, uf: &mut Unification, delta: &mut Delta) {
+                        delta.forall_math_relation_delta.clear();
+                    }
+                    fn clear_new(&mut self) {}
+                    fn update_finalize(&mut self, uf: &mut Unification) {}
+                    fn emit_graphviz(&self, buf: &mut String) {}
                 }
                 #[derive(Debug, Default)]
                 struct MulRelation {
@@ -332,12 +345,6 @@ mod test {
                             .copied()
                             .map(|(x1, x0, x2)| (x0, x2))
                     }
-                    fn iter2_0_1_2(&self, x0: Math, x1: Math) -> impl Iterator<Item = (Math)> + use<'_> {
-                        self.all_index_0_1_2
-                            .range((x0, x1, Math::MIN_ID)..=(x0, x1, Math::MAX_ID))
-                            .copied()
-                            .map(|(x0, x1, x2)| (x2))
-                    }
                     fn iter1_0_1_2(&self, x0: Math) -> impl Iterator<Item = (Math, Math)> + use<'_> {
                         self.all_index_0_1_2
                             .range((x0, Math::MIN_ID, Math::MIN_ID)..=(x0, Math::MAX_ID, Math::MAX_ID))
@@ -350,17 +357,23 @@ mod test {
                             .copied()
                             .map(|(x2, x0, x1)| (x0, x1))
                     }
+                    fn iter2_0_1_2(&self, x0: Math, x1: Math) -> impl Iterator<Item = (Math)> + use<'_> {
+                        self.all_index_0_1_2
+                            .range((x0, x1, Math::MIN_ID)..=(x0, x1, Math::MAX_ID))
+                            .copied()
+                            .map(|(x0, x1, x2)| (x2))
+                    }
                     fn check1_1_0_2(&self, x1: Math) -> bool {
                         self.iter1_1_0_2(x1).next().is_some()
-                    }
-                    fn check2_0_1_2(&self, x0: Math, x1: Math) -> bool {
-                        self.iter2_0_1_2(x0, x1).next().is_some()
                     }
                     fn check1_0_1_2(&self, x0: Math) -> bool {
                         self.iter1_0_1_2(x0).next().is_some()
                     }
                     fn check1_2_0_1(&self, x2: Math) -> bool {
                         self.iter1_2_0_1(x2).next().is_some()
+                    }
+                    fn check2_0_1_2(&self, x0: Math, x1: Math) -> bool {
+                        self.iter2_0_1_2(x0, x1).next().is_some()
                     }
                     fn update(&mut self, uprooted: &Uprooted, uf: &mut Unification, delta: &mut Delta) {
                         let mut op_insert = take(&mut delta.mul_relation_delta);
@@ -418,6 +431,16 @@ mod test {
                             *x1 = uf.math_uf.find(*x1);
                             *x2 = uf.math_uf.find(*x2);
                         }
+                        self.new.sort();
+                        self.new.dedup();
+                    }
+                    fn emit_graphviz(&self, buf: &mut String) {
+                        use std::fmt::Write;
+                        for (i, (x0, x1, x2)) in self.all_index_0_1_2.iter().copied().enumerate() {
+                            write!(buf, "{}{i} -> {}{};", "mul", "math", x0);
+                            write!(buf, "{}{i} -> {}{};", "mul", "math", x1);
+                            write!(buf, "{}{i} -> {}{};", "mul", "math", x2);
+                        }
                     }
                 }
                 #[derive(Debug, Default)]
@@ -444,12 +467,6 @@ mod test {
                     fn iter_new(&self) -> impl Iterator<Item = <Self as Relation>::Row> + use<'_> {
                         self.new.iter().copied()
                     }
-                    fn iter2_0_1_2(&self, x0: Math, x1: Math) -> impl Iterator<Item = (Math)> + use<'_> {
-                        self.all_index_0_1_2
-                            .range((x0, x1, Math::MIN_ID)..=(x0, x1, Math::MAX_ID))
-                            .copied()
-                            .map(|(x0, x1, x2)| (x2))
-                    }
                     fn iter1_0_1_2(&self, x0: Math) -> impl Iterator<Item = (Math, Math)> + use<'_> {
                         self.all_index_0_1_2
                             .range((x0, Math::MIN_ID, Math::MIN_ID)..=(x0, Math::MAX_ID, Math::MAX_ID))
@@ -468,8 +485,11 @@ mod test {
                             .copied()
                             .map(|(x2, x0, x1)| (x0, x1))
                     }
-                    fn check2_0_1_2(&self, x0: Math, x1: Math) -> bool {
-                        self.iter2_0_1_2(x0, x1).next().is_some()
+                    fn iter2_0_1_2(&self, x0: Math, x1: Math) -> impl Iterator<Item = (Math)> + use<'_> {
+                        self.all_index_0_1_2
+                            .range((x0, x1, Math::MIN_ID)..=(x0, x1, Math::MAX_ID))
+                            .copied()
+                            .map(|(x0, x1, x2)| (x2))
                     }
                     fn check1_0_1_2(&self, x0: Math) -> bool {
                         self.iter1_0_1_2(x0).next().is_some()
@@ -479,6 +499,9 @@ mod test {
                     }
                     fn check1_2_0_1(&self, x2: Math) -> bool {
                         self.iter1_2_0_1(x2).next().is_some()
+                    }
+                    fn check2_0_1_2(&self, x0: Math, x1: Math) -> bool {
+                        self.iter2_0_1_2(x0, x1).next().is_some()
                     }
                     fn update(&mut self, uprooted: &Uprooted, uf: &mut Unification, delta: &mut Delta) {
                         let mut op_insert = take(&mut delta.add_relation_delta);
@@ -536,6 +559,16 @@ mod test {
                             *x1 = uf.math_uf.find(*x1);
                             *x2 = uf.math_uf.find(*x2);
                         }
+                        self.new.sort();
+                        self.new.dedup();
+                    }
+                    fn emit_graphviz(&self, buf: &mut String) {
+                        use std::fmt::Write;
+                        for (i, (x0, x1, x2)) in self.all_index_0_1_2.iter().copied().enumerate() {
+                            write!(buf, "{}{i} -> {}{};", "add", "math", x0);
+                            write!(buf, "{}{i} -> {}{};", "add", "math", x1);
+                            write!(buf, "{}{i} -> {}{};", "add", "math", x2);
+                        }
                     }
                 }
                 #[derive(Debug, Default)]
@@ -567,6 +600,12 @@ mod test {
                             .copied()
                             .map(|(x0, x1)| (x1))
                     }
+                    fn iter2_0_1(&self, x0: std::primitive::i64, x1: Math) -> impl Iterator<Item = ()> + use<'_> {
+                        self.all_index_0_1
+                            .range((x0, x1)..=(x0, x1))
+                            .copied()
+                            .map(|(x0, x1)| ())
+                    }
                     fn iter1_1_0(&self, x1: Math) -> impl Iterator<Item = (std::primitive::i64)> + use<'_> {
                         self.all_index_1_0
                             .range((x1, std::primitive::i64::MIN_ID)..=(x1, std::primitive::i64::MAX_ID))
@@ -575,6 +614,9 @@ mod test {
                     }
                     fn check1_0_1(&self, x0: std::primitive::i64) -> bool {
                         self.iter1_0_1(x0).next().is_some()
+                    }
+                    fn check2_0_1(&self, x0: std::primitive::i64, x1: Math) -> bool {
+                        self.iter2_0_1(x0, x1).next().is_some()
                     }
                     fn check1_1_0(&self, x1: Math) -> bool {
                         self.iter1_1_0(x1).next().is_some()
@@ -610,6 +652,15 @@ mod test {
                     fn update_finalize(&mut self, uf: &mut Unification) {
                         for (x0, x1) in self.new.iter_mut() {
                             *x1 = uf.math_uf.find(*x1);
+                        }
+                        self.new.sort();
+                        self.new.dedup();
+                    }
+                    fn emit_graphviz(&self, buf: &mut String) {
+                        use std::fmt::Write;
+                        for (i, (x0, x1)) in self.all_index_0_1.iter().copied().enumerate() {
+                            write!(buf, "{}{i} -> {}{};", "const", "i64", x0);
+                            write!(buf, "{}{i} -> {}{};", "const", "math", x1);
                         }
                     }
                 }
@@ -654,7 +705,7 @@ mod test {
                     global_math: Vec<Math>,
                 }
                 impl GlobalVariables {
-                    fn initialize(&mut self, delta: &mut Delta, unification: &mut Unification) {
+                    fn initialize(&mut self, delta: &mut Delta, uf: &mut Unification) {
                         self.new = true;
                         let tmp = { 2i64 };
                         self.global_i64.push(tmp);
@@ -724,26 +775,26 @@ mod test {
                         if self.global_variables.new {
                             let one = self.global_variables.global_i64[1usize];
                             for (p1) in self.const_relation.iter1_0_1(one) {
-                                let x = self.delta.make_math(&mut self.uf.math_uf);
+                                let x = self.delta.make_math(&mut self.uf);
                                 self.delta.insert_add((x, x, p1));
                             }
                         }
                         for (one, p1) in self.const_relation.iter_new() {
                             if one == self.global_variables.global_i64[1usize] {
-                                let x = self.delta.make_math(&mut self.uf.math_uf);
+                                let x = self.delta.make_math(&mut self.uf);
                                 self.delta.insert_add((x, x, p1));
                             }
                         }
                         if self.global_variables.new {
                             let p0 = self.global_variables.global_i64[0usize];
                             for (p1) in self.const_relation.iter1_0_1(p0) {
-                                let z = self.delta.make_math(&mut self.uf.math_uf);
+                                let z = self.delta.make_math(&mut self.uf);
                                 self.delta.insert_add((z, z, p1));
                             }
                         }
                         for (p0, p1) in self.const_relation.iter_new() {
                             if p0 == self.global_variables.global_i64[0usize] {
-                                let z = self.delta.make_math(&mut self.uf.math_uf);
+                                let z = self.delta.make_math(&mut self.uf);
                                 self.delta.insert_add((z, z, p1));
                             }
                         }
@@ -765,61 +816,66 @@ mod test {
                             }
                         }
                         for (a, p2, p3) in self.mul_relation.iter_new() {
-                            for (p1) in self.const_relation.iter1_1_0(p2) {
-                                if p1 == self.global_variables.global_i64[2usize] {
+                            if self.const_relation.check1_1_0(p2) {
+                                let p1 = self.global_variables.global_i64[2usize];
+                                if self.const_relation.check2_0_1(p1, p2) {
                                     let a0 = self.global_variables.global_i64[2usize];
                                     self.delta.insert_const((a0, p3));
                                 }
                             }
                         }
-                        for (p0, p1, p2) in self.mul_relation.iter_new() {
-                            for (p3) in self.mul_relation.iter2_0_1_2(p0, p1) {
-                                self.uf.math_uf.union(p3, p2);
-                            }
-                        }
-                        for (p0, p1, p3) in self.mul_relation.iter_new() {
-                            for (p2) in self.mul_relation.iter2_0_1_2(p0, p1) {
-                                self.uf.math_uf.union(p3, p2);
-                            }
-                        }
-                        for (p0, p1, p2) in self.add_relation.iter_new() {
-                            for (p3) in self.add_relation.iter2_0_1_2(p0, p1) {
-                                self.uf.math_uf.union(p3, p2);
-                            }
-                        }
-                        for (p0, p1, p3) in self.add_relation.iter_new() {
-                            for (p2) in self.add_relation.iter2_0_1_2(p0, p1) {
-                                self.uf.math_uf.union(p3, p2);
-                            }
-                        }
-                        for (p0, p1) in self.const_relation.iter_new() {
-                            for (p2) in self.const_relation.iter1_0_1(p0) {
-                                self.uf.math_uf.union(p2, p1);
-                            }
-                        }
-                        for (p0, p2) in self.const_relation.iter_new() {
-                            for (p1) in self.const_relation.iter1_0_1(p0) {
-                                self.uf.math_uf.union(p2, p1);
-                            }
-                        }
+                    }
+                    fn emit_graphviz(&self) -> String {
+                        let mut buf = String::new();
+                        buf.push_str("digraph G {");
+                        self.forall_math_relation.emit_graphviz(&mut buf);
+                        self.mul_relation.emit_graphviz(&mut buf);
+                        self.add_relation.emit_graphviz(&mut buf);
+                        self.const_relation.emit_graphviz(&mut buf);
+                        buf.push_str("}");
+                        buf
                     }
                     fn clear_transient(&mut self) {
                         self.global_variables.new = false;
+                        self.forall_math_relation.clear_new();
                         self.mul_relation.clear_new();
                         self.add_relation.clear_new();
                         self.const_relation.clear_new();
-                        loop {
-                            self.uprooted.take_dirt(&mut self.uf);
-                            self.mul_relation
-                                .update(&self.uprooted, &mut self.uf, &mut self.delta);
-                            self.add_relation
-                                .update(&self.uprooted, &mut self.uf, &mut self.delta);
-                            self.const_relation
-                                .update(&self.uprooted, &mut self.uf, &mut self.delta);
-                            if !(self.uf.has_new() || self.delta.has_new()) {
-                                break;
+                        if dbg!(self.uf.has_new()) {
+                            let mut delta = Delta::default();
+                            dbg!("SKIPPING INSERTS");
+                            loop {
+                                self.uprooted.take_dirt(&mut self.uf);
+                                self.forall_math_relation
+                                    .update(&self.uprooted, &mut self.uf, &mut delta);
+                                self.mul_relation
+                                    .update(&self.uprooted, &mut self.uf, &mut delta);
+                                self.add_relation
+                                    .update(&self.uprooted, &mut self.uf, &mut delta);
+                                self.const_relation
+                                    .update(&self.uprooted, &mut self.uf, &mut delta);
+                                if !dbg!(self.uf.has_new()) {
+                                    break;
+                                }
+                            }
+                        } else {
+                            dbg!("DOING INSERTS");
+                            loop {
+                                self.uprooted.take_dirt(&mut self.uf);
+                                self.forall_math_relation
+                                    .update(&self.uprooted, &mut self.uf, &mut self.delta);
+                                self.mul_relation
+                                    .update(&self.uprooted, &mut self.uf, &mut self.delta);
+                                self.add_relation
+                                    .update(&self.uprooted, &mut self.uf, &mut self.delta);
+                                self.const_relation
+                                    .update(&self.uprooted, &mut self.uf, &mut self.delta);
+                                if !dbg!(self.uf.has_new() || self.delta.has_new()) {
+                                    break;
+                                }
                             }
                         }
+                        self.forall_math_relation.update_finalize(&mut self.uf);
                         self.mul_relation.update_finalize(&mut self.uf);
                         self.add_relation.update_finalize(&mut self.uf);
                         self.const_relation.update_finalize(&mut self.uf);
@@ -884,6 +940,11 @@ mod test {
                         self.0
                     }
                 }
+                impl std::fmt::Display for Math {
+                    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> Result<(), std::fmt::Error> {
+                        self.0.fmt(f)
+                    }
+                }
                 impl RelationElement for Math {
                     const MIN_ID: Self = Self(0);
                     const MAX_ID: Self = Self(u32::MAX);
@@ -895,6 +956,14 @@ mod test {
                 }
                 impl Relation for ForallMathRelation {
                     type Row = (Math);
+                }
+                impl ForallMathRelation {
+                    fn update(&mut self, uprooted: &Uprooted, uf: &mut Unification, delta: &mut Delta) {
+                        delta.forall_math_relation_delta.clear();
+                    }
+                    fn clear_new(&mut self) {}
+                    fn update_finalize(&mut self, uf: &mut Unification) {}
+                    fn emit_graphviz(&self, buf: &mut String) {}
                 }
                 #[derive(Debug, Default)]
                 struct FooRelation {
@@ -987,6 +1056,15 @@ mod test {
                             *x0 = uf.math_uf.find(*x0);
                             *x1 = uf.math_uf.find(*x1);
                         }
+                        self.new.sort();
+                        self.new.dedup();
+                    }
+                    fn emit_graphviz(&self, buf: &mut String) {
+                        use std::fmt::Write;
+                        for (i, (x0, x1)) in self.all_index_0_1.iter().copied().enumerate() {
+                            write!(buf, "{}{i} -> {}{};", "foo", "math", x0);
+                            write!(buf, "{}{i} -> {}{};", "foo", "math", x1);
+                        }
                     }
                 }
                 #[derive(Debug, Default)]
@@ -1070,6 +1148,15 @@ mod test {
                         for (x0, x1) in self.new.iter_mut() {
                             *x0 = uf.math_uf.find(*x0);
                             *x1 = uf.math_uf.find(*x1);
+                        }
+                        self.new.sort();
+                        self.new.dedup();
+                    }
+                    fn emit_graphviz(&self, buf: &mut String) {
+                        use std::fmt::Write;
+                        for (i, (x0, x1)) in self.all_index_0_1.iter().copied().enumerate() {
+                            write!(buf, "{}{i} -> {}{};", "bar", "math", x0);
+                            write!(buf, "{}{i} -> {}{};", "bar", "math", x1);
                         }
                     }
                 }
@@ -1163,6 +1250,15 @@ mod test {
                         for (x0, x1) in self.new.iter_mut() {
                             *x0 = uf.math_uf.find(*x0);
                             *x1 = uf.math_uf.find(*x1);
+                        }
+                        self.new.sort();
+                        self.new.dedup();
+                    }
+                    fn emit_graphviz(&self, buf: &mut String) {
+                        use std::fmt::Write;
+                        for (i, (x0, x1)) in self.all_index_0_1.iter().copied().enumerate() {
+                            write!(buf, "{}{i} -> {}{};", "baz", "math", x0);
+                            write!(buf, "{}{i} -> {}{};", "baz", "math", x1);
                         }
                     }
                 }
@@ -1273,6 +1369,16 @@ mod test {
                             *x1 = uf.math_uf.find(*x1);
                             *x2 = uf.math_uf.find(*x2);
                         }
+                        self.new.sort();
+                        self.new.dedup();
+                    }
+                    fn emit_graphviz(&self, buf: &mut String) {
+                        use std::fmt::Write;
+                        for (i, (x0, x1, x2)) in self.all_index_0_1_2.iter().copied().enumerate() {
+                            write!(buf, "{}{i} -> {}{};", "triangle", "math", x0);
+                            write!(buf, "{}{i} -> {}{};", "triangle", "math", x1);
+                            write!(buf, "{}{i} -> {}{};", "triangle", "math", x2);
+                        }
                     }
                 }
                 #[derive(Debug, Default)]
@@ -1319,7 +1425,7 @@ mod test {
                     new: bool,
                 }
                 impl GlobalVariables {
-                    fn initialize(&mut self, delta: &mut Delta, unification: &mut Unification) {
+                    fn initialize(&mut self, delta: &mut Delta, uf: &mut Unification) {
                         self.new = true;
                     }
                 }
@@ -1402,26 +1508,63 @@ mod test {
                             }
                         }
                     }
+                    fn emit_graphviz(&self) -> String {
+                        let mut buf = String::new();
+                        buf.push_str("digraph G {");
+                        self.forall_math_relation.emit_graphviz(&mut buf);
+                        self.foo_relation.emit_graphviz(&mut buf);
+                        self.bar_relation.emit_graphviz(&mut buf);
+                        self.baz_relation.emit_graphviz(&mut buf);
+                        self.triangle_relation.emit_graphviz(&mut buf);
+                        buf.push_str("}");
+                        buf
+                    }
                     fn clear_transient(&mut self) {
                         self.global_variables.new = false;
+                        self.forall_math_relation.clear_new();
                         self.foo_relation.clear_new();
                         self.bar_relation.clear_new();
                         self.baz_relation.clear_new();
                         self.triangle_relation.clear_new();
-                        loop {
-                            self.uprooted.take_dirt(&mut self.uf);
-                            self.foo_relation
-                                .update(&self.uprooted, &mut self.uf, &mut self.delta);
-                            self.bar_relation
-                                .update(&self.uprooted, &mut self.uf, &mut self.delta);
-                            self.baz_relation
-                                .update(&self.uprooted, &mut self.uf, &mut self.delta);
-                            self.triangle_relation
-                                .update(&self.uprooted, &mut self.uf, &mut self.delta);
-                            if !(self.uf.has_new() || self.delta.has_new()) {
-                                break;
+                        if dbg!(self.uf.has_new()) {
+                            let mut delta = Delta::default();
+                            dbg!("SKIPPING INSERTS");
+                            loop {
+                                self.uprooted.take_dirt(&mut self.uf);
+                                self.forall_math_relation
+                                    .update(&self.uprooted, &mut self.uf, &mut delta);
+                                self.foo_relation
+                                    .update(&self.uprooted, &mut self.uf, &mut delta);
+                                self.bar_relation
+                                    .update(&self.uprooted, &mut self.uf, &mut delta);
+                                self.baz_relation
+                                    .update(&self.uprooted, &mut self.uf, &mut delta);
+                                self.triangle_relation
+                                    .update(&self.uprooted, &mut self.uf, &mut delta);
+                                if !dbg!(self.uf.has_new()) {
+                                    break;
+                                }
+                            }
+                        } else {
+                            dbg!("DOING INSERTS");
+                            loop {
+                                self.uprooted.take_dirt(&mut self.uf);
+                                self.forall_math_relation
+                                    .update(&self.uprooted, &mut self.uf, &mut self.delta);
+                                self.foo_relation
+                                    .update(&self.uprooted, &mut self.uf, &mut self.delta);
+                                self.bar_relation
+                                    .update(&self.uprooted, &mut self.uf, &mut self.delta);
+                                self.baz_relation
+                                    .update(&self.uprooted, &mut self.uf, &mut self.delta);
+                                self.triangle_relation
+                                    .update(&self.uprooted, &mut self.uf, &mut self.delta);
+                                if !dbg!(self.uf.has_new() || self.delta.has_new()) {
+                                    break;
+                                }
                             }
                         }
+                        self.forall_math_relation.update_finalize(&mut self.uf);
                         self.foo_relation.update_finalize(&mut self.uf);
                         self.bar_relation.update_finalize(&mut self.uf);
                         self.baz_relation.update_finalize(&mut self.uf);
@@ -1487,6 +1630,11 @@ mod test {
                         self.0
                     }
                 }
+                impl std::fmt::Display for Math {
+                    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> Result<(), std::fmt::Error> {
+                        self.0.fmt(f)
+                    }
+                }
                 impl RelationElement for Math {
                     const MIN_ID: Self = Self(0);
                     const MAX_ID: Self = Self(u32::MAX);
@@ -1498,6 +1646,14 @@ mod test {
                 }
                 impl Relation for ForallMathRelation {
                     type Row = (Math);
+                }
+                impl ForallMathRelation {
+                    fn update(&mut self, uprooted: &Uprooted, uf: &mut Unification, delta: &mut Delta) {
+                        delta.forall_math_relation_delta.clear();
+                    }
+                    fn clear_new(&mut self) {}
+                    fn update_finalize(&mut self, uf: &mut Unification) {}
+                    fn emit_graphviz(&self, buf: &mut String) {}
                 }
                 #[derive(Debug, Default)]
                 struct MulRelation {
@@ -1542,17 +1698,17 @@ mod test {
                             .copied()
                             .map(|(x2, x0, x1)| (x0, x1))
                     }
-                    fn iter2_0_1_2(&self, x0: Math, x1: Math) -> impl Iterator<Item = (Math)> + use<'_> {
-                        self.all_index_0_1_2
-                            .range((x0, x1, Math::MIN_ID)..=(x0, x1, Math::MAX_ID))
-                            .copied()
-                            .map(|(x0, x1, x2)| (x2))
-                    }
                     fn iter1_1_0_2(&self, x1: Math) -> impl Iterator<Item = (Math, Math)> + use<'_> {
                         self.all_index_1_0_2
                             .range((x1, Math::MIN_ID, Math::MIN_ID)..=(x1, Math::MAX_ID, Math::MAX_ID))
                             .copied()
                             .map(|(x1, x0, x2)| (x0, x2))
+                    }
+                    fn iter2_0_1_2(&self, x0: Math, x1: Math) -> impl Iterator<Item = (Math)> + use<'_> {
+                        self.all_index_0_1_2
+                            .range((x0, x1, Math::MIN_ID)..=(x0, x1, Math::MAX_ID))
+                            .copied()
+                            .map(|(x0, x1, x2)| (x2))
                     }
                     fn check1_0_1_2(&self, x0: Math) -> bool {
                         self.iter1_0_1_2(x0).next().is_some()
@@ -1563,11 +1719,11 @@ mod test {
                     fn check1_2_0_1(&self, x2: Math) -> bool {
                         self.iter1_2_0_1(x2).next().is_some()
                     }
-                    fn check2_0_1_2(&self, x0: Math, x1: Math) -> bool {
-                        self.iter2_0_1_2(x0, x1).next().is_some()
-                    }
                     fn check1_1_0_2(&self, x1: Math) -> bool {
                         self.iter1_1_0_2(x1).next().is_some()
+                    }
+                    fn check2_0_1_2(&self, x0: Math, x1: Math) -> bool {
+                        self.iter2_0_1_2(x0, x1).next().is_some()
                     }
                     fn update(&mut self, uprooted: &Uprooted, uf: &mut Unification, delta: &mut Delta) {
                         let mut op_insert = take(&mut delta.mul_relation_delta);
@@ -1626,6 +1782,16 @@ mod test {
                             *x0 = uf.math_uf.find(*x0);
                             *x1 = uf.math_uf.find(*x1);
                             *x2 = uf.math_uf.find(*x2);
+                        }
+                        self.new.sort();
+                        self.new.dedup();
+                    }
+                    fn emit_graphviz(&self, buf: &mut String) {
+                        use std::fmt::Write;
+                        for (i, (x0, x1, x2)) in self.all_index_0_1_2.iter().copied().enumerate() {
+                            write!(buf, "{}{i} -> {}{};", "mul", "math", x0);
+                            write!(buf, "{}{i} -> {}{};", "mul", "math", x1);
+                            write!(buf, "{}{i} -> {}{};", "mul", "math", x2);
                         }
                     }
                 }
@@ -1745,6 +1911,16 @@ mod test {
                             *x1 = uf.math_uf.find(*x1);
                             *x2 = uf.math_uf.find(*x2);
                         }
+                        self.new.sort();
+                        self.new.dedup();
+                    }
+                    fn emit_graphviz(&self, buf: &mut String) {
+                        use std::fmt::Write;
+                        for (i, (x0, x1, x2)) in self.all_index_0_1_2.iter().copied().enumerate() {
+                            write!(buf, "{}{i} -> {}{};", "add", "math", x0);
+                            write!(buf, "{}{i} -> {}{};", "add", "math", x1);
+                            write!(buf, "{}{i} -> {}{};", "add", "math", x2);
+                        }
                     }
                 }
                 #[derive(Debug, Default)]
@@ -1781,7 +1957,7 @@ mod test {
                     new: bool,
                 }
                 impl GlobalVariables {
-                    fn initialize(&mut self, delta: &mut Delta, unification: &mut Unification) {
+                    fn initialize(&mut self, delta: &mut Delta, uf: &mut Unification) {
                         self.new = true;
                     }
                 }
@@ -1838,7 +2014,7 @@ mod test {
                             if self.add_relation.check1_0_1_2(p2) {
                                 for (c, p4) in self.mul_relation.iter1_0_1_2(a) {
                                     for (p5) in self.add_relation.iter2_0_1_2(p2, p4) {
-                                        let a3 = self.delta.make_math(&mut self.uf.math_uf);
+                                        let a3 = self.delta.make_math(&mut self.uf);
                                         self.delta.insert_add((b, c, a3));
                                         self.delta.insert_mul((a, a3, p5));
                                     }
@@ -1849,7 +2025,7 @@ mod test {
                             if self.mul_relation.check1_0_1_2(a) {
                                 for (p2, p5) in self.add_relation.iter1_1_0_2(p4) {
                                     for (b) in self.mul_relation.iter2_0_2_1(a, p2) {
-                                        let a3 = self.delta.make_math(&mut self.uf.math_uf);
+                                        let a3 = self.delta.make_math(&mut self.uf);
                                         self.delta.insert_add((b, c, a3));
                                         self.delta.insert_mul((a, a3, p5));
                                     }
@@ -1860,48 +2036,59 @@ mod test {
                             if self.mul_relation.check1_2_0_1(p2) {
                                 for (a, c) in self.mul_relation.iter1_2_0_1(p4) {
                                     for (b) in self.mul_relation.iter2_0_2_1(a, p2) {
-                                        let a3 = self.delta.make_math(&mut self.uf.math_uf);
+                                        let a3 = self.delta.make_math(&mut self.uf);
                                         self.delta.insert_add((b, c, a3));
                                         self.delta.insert_mul((a, a3, p5));
                                     }
                                 }
                             }
                         }
-                        for (p0, p1, p2) in self.mul_relation.iter_new() {
-                            for (p3) in self.mul_relation.iter2_0_1_2(p0, p1) {
-                                self.uf.math_uf.union(p3, p2);
-                            }
-                        }
-                        for (p0, p1, p3) in self.mul_relation.iter_new() {
-                            for (p2) in self.mul_relation.iter2_0_1_2(p0, p1) {
-                                self.uf.math_uf.union(p3, p2);
-                            }
-                        }
-                        for (p0, p1, p2) in self.add_relation.iter_new() {
-                            for (p3) in self.add_relation.iter2_0_1_2(p0, p1) {
-                                self.uf.math_uf.union(p3, p2);
-                            }
-                        }
-                        for (p0, p1, p3) in self.add_relation.iter_new() {
-                            for (p2) in self.add_relation.iter2_0_1_2(p0, p1) {
-                                self.uf.math_uf.union(p3, p2);
-                            }
-                        }
+                    }
+                    fn emit_graphviz(&self) -> String {
+                        let mut buf = String::new();
+                        buf.push_str("digraph G {");
+                        self.forall_math_relation.emit_graphviz(&mut buf);
+                        self.mul_relation.emit_graphviz(&mut buf);
+                        self.add_relation.emit_graphviz(&mut buf);
+                        buf.push_str("}");
+                        buf
                     }
                     fn clear_transient(&mut self) {
                         self.global_variables.new = false;
+                        self.forall_math_relation.clear_new();
                         self.mul_relation.clear_new();
                         self.add_relation.clear_new();
-                        loop {
-                            self.uprooted.take_dirt(&mut self.uf);
-                            self.mul_relation
-                                .update(&self.uprooted, &mut self.uf, &mut self.delta);
-                            self.add_relation
-                                .update(&self.uprooted, &mut self.uf, &mut self.delta);
-                            if !(self.uf.has_new() || self.delta.has_new()) {
-                                break;
+                        if dbg!(self.uf.has_new()) {
+                            let mut delta = Delta::default();
+                            dbg!("SKIPPING INSERTS");
+                            loop {
+                                self.uprooted.take_dirt(&mut self.uf);
+                                self.forall_math_relation
+                                    .update(&self.uprooted, &mut self.uf, &mut delta);
+                                self.mul_relation
+                                    .update(&self.uprooted, &mut self.uf, &mut delta);
+                                self.add_relation
+                                    .update(&self.uprooted, &mut self.uf, &mut delta);
+                                if !dbg!(self.uf.has_new()) {
+                                    break;
+                                }
+                            }
+                        } else {
+                            dbg!("DOING INSERTS");
+                            loop {
+                                self.uprooted.take_dirt(&mut self.uf);
+                                self.forall_math_relation
+                                    .update(&self.uprooted, &mut self.uf, &mut self.delta);
+                                self.mul_relation
+                                    .update(&self.uprooted, &mut self.uf, &mut self.delta);
+                                self.add_relation
+                                    .update(&self.uprooted, &mut self.uf, &mut self.delta);
+                                if !dbg!(self.uf.has_new() || self.delta.has_new()) {
+                                    break;
+                                }
                             }
                         }
+                        self.forall_math_relation.update_finalize(&mut self.uf);
                         self.mul_relation.update_finalize(&mut self.uf);
                         self.add_relation.update_finalize(&mut self.uf);
                     }
@@ -1979,6 +2166,11 @@ mod test {
                         self.0
                     }
                 }
+                impl std::fmt::Display for Math {
+                    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> Result<(), std::fmt::Error> {
+                        self.0.fmt(f)
+                    }
+                }
                 impl RelationElement for Math {
                     const MIN_ID: Self = Self(0);
                     const MAX_ID: Self = Self(u32::MAX);
@@ -1990,6 +2182,14 @@ mod test {
                 }
                 impl Relation for ForallMathRelation {
                     type Row = (Math);
+                }
+                impl ForallMathRelation {
+                    fn update(&mut self, uprooted: &Uprooted, uf: &mut Unification, delta: &mut Delta) {
+                        delta.forall_math_relation_delta.clear();
+                    }
+                    fn clear_new(&mut self) {}
+                    fn update_finalize(&mut self, uf: &mut Unification) {}
+                    fn emit_graphviz(&self, buf: &mut String) {}
                 }
                 #[derive(Debug, Default)]
                 struct MulRelation {
@@ -2021,12 +2221,6 @@ mod test {
                             .copied()
                             .map(|(x0, x1, x2)| (x1, x2))
                     }
-                    fn iter2_0_1_2(&self, x0: Math, x1: Math) -> impl Iterator<Item = (Math)> + use<'_> {
-                        self.all_index_0_1_2
-                            .range((x0, x1, Math::MIN_ID)..=(x0, x1, Math::MAX_ID))
-                            .copied()
-                            .map(|(x0, x1, x2)| (x2))
-                    }
                     fn iter1_1_0_2(&self, x1: Math) -> impl Iterator<Item = (Math, Math)> + use<'_> {
                         self.all_index_1_0_2
                             .range((x1, Math::MIN_ID, Math::MIN_ID)..=(x1, Math::MAX_ID, Math::MAX_ID))
@@ -2039,17 +2233,23 @@ mod test {
                             .copied()
                             .map(|(x2, x0, x1)| (x0, x1))
                     }
+                    fn iter2_0_1_2(&self, x0: Math, x1: Math) -> impl Iterator<Item = (Math)> + use<'_> {
+                        self.all_index_0_1_2
+                            .range((x0, x1, Math::MIN_ID)..=(x0, x1, Math::MAX_ID))
+                            .copied()
+                            .map(|(x0, x1, x2)| (x2))
+                    }
                     fn check1_0_1_2(&self, x0: Math) -> bool {
                         self.iter1_0_1_2(x0).next().is_some()
-                    }
-                    fn check2_0_1_2(&self, x0: Math, x1: Math) -> bool {
-                        self.iter2_0_1_2(x0, x1).next().is_some()
                     }
                     fn check1_1_0_2(&self, x1: Math) -> bool {
                         self.iter1_1_0_2(x1).next().is_some()
                     }
                     fn check1_2_0_1(&self, x2: Math) -> bool {
                         self.iter1_2_0_1(x2).next().is_some()
+                    }
+                    fn check2_0_1_2(&self, x0: Math, x1: Math) -> bool {
+                        self.iter2_0_1_2(x0, x1).next().is_some()
                     }
                     fn update(&mut self, uprooted: &Uprooted, uf: &mut Unification, delta: &mut Delta) {
                         let mut op_insert = take(&mut delta.mul_relation_delta);
@@ -2107,6 +2307,16 @@ mod test {
                             *x1 = uf.math_uf.find(*x1);
                             *x2 = uf.math_uf.find(*x2);
                         }
+                        self.new.sort();
+                        self.new.dedup();
+                    }
+                    fn emit_graphviz(&self, buf: &mut String) {
+                        use std::fmt::Write;
+                        for (i, (x0, x1, x2)) in self.all_index_0_1_2.iter().copied().enumerate() {
+                            write!(buf, "{}{i} -> {}{};", "mul", "math", x0);
+                            write!(buf, "{}{i} -> {}{};", "mul", "math", x1);
+                            write!(buf, "{}{i} -> {}{};", "mul", "math", x2);
+                        }
                     }
                 }
                 #[derive(Debug, Default)]
@@ -2139,12 +2349,6 @@ mod test {
                             .copied()
                             .map(|(x2, x0, x1)| (x0, x1))
                     }
-                    fn iter2_0_1_2(&self, x0: Math, x1: Math) -> impl Iterator<Item = (Math)> + use<'_> {
-                        self.all_index_0_1_2
-                            .range((x0, x1, Math::MIN_ID)..=(x0, x1, Math::MAX_ID))
-                            .copied()
-                            .map(|(x0, x1, x2)| (x2))
-                    }
                     fn iter1_0_1_2(&self, x0: Math) -> impl Iterator<Item = (Math, Math)> + use<'_> {
                         self.all_index_0_1_2
                             .range((x0, Math::MIN_ID, Math::MIN_ID)..=(x0, Math::MAX_ID, Math::MAX_ID))
@@ -2157,17 +2361,23 @@ mod test {
                             .copied()
                             .map(|(x1, x0, x2)| (x0, x2))
                     }
+                    fn iter2_0_1_2(&self, x0: Math, x1: Math) -> impl Iterator<Item = (Math)> + use<'_> {
+                        self.all_index_0_1_2
+                            .range((x0, x1, Math::MIN_ID)..=(x0, x1, Math::MAX_ID))
+                            .copied()
+                            .map(|(x0, x1, x2)| (x2))
+                    }
                     fn check1_2_0_1(&self, x2: Math) -> bool {
                         self.iter1_2_0_1(x2).next().is_some()
-                    }
-                    fn check2_0_1_2(&self, x0: Math, x1: Math) -> bool {
-                        self.iter2_0_1_2(x0, x1).next().is_some()
                     }
                     fn check1_0_1_2(&self, x0: Math) -> bool {
                         self.iter1_0_1_2(x0).next().is_some()
                     }
                     fn check1_1_0_2(&self, x1: Math) -> bool {
                         self.iter1_1_0_2(x1).next().is_some()
+                    }
+                    fn check2_0_1_2(&self, x0: Math, x1: Math) -> bool {
+                        self.iter2_0_1_2(x0, x1).next().is_some()
                     }
                     fn update(&mut self, uprooted: &Uprooted, uf: &mut Unification, delta: &mut Delta) {
                         let mut op_insert = take(&mut delta.add_relation_delta);
@@ -2225,6 +2435,16 @@ mod test {
                             *x1 = uf.math_uf.find(*x1);
                             *x2 = uf.math_uf.find(*x2);
                         }
+                        self.new.sort();
+                        self.new.dedup();
+                    }
+                    fn emit_graphviz(&self, buf: &mut String) {
+                        use std::fmt::Write;
+                        for (i, (x0, x1, x2)) in self.all_index_0_1_2.iter().copied().enumerate() {
+                            write!(buf, "{}{i} -> {}{};", "add", "math", x0);
+                            write!(buf, "{}{i} -> {}{};", "add", "math", x1);
+                            write!(buf, "{}{i} -> {}{};", "add", "math", x2);
+                        }
                     }
                 }
                 #[derive(Debug, Default)]
@@ -2261,7 +2481,7 @@ mod test {
                     new: bool,
                 }
                 impl GlobalVariables {
-                    fn initialize(&mut self, delta: &mut Delta, unification: &mut Unification) {
+                    fn initialize(&mut self, delta: &mut Delta, uf: &mut Unification) {
                         self.new = true;
                     }
                 }
@@ -2316,8 +2536,8 @@ mod test {
                     fn apply_rules(&mut self) {
                         for (a, b, p2) in self.add_relation.iter_new() {
                             for (c, p4) in self.mul_relation.iter1_0_1_2(p2) {
-                                let a4 = self.delta.make_math(&mut self.uf.math_uf);
-                                let a3 = self.delta.make_math(&mut self.uf.math_uf);
+                                let a4 = self.delta.make_math(&mut self.uf);
+                                let a3 = self.delta.make_math(&mut self.uf);
                                 self.delta.insert_add((a3, a4, p4));
                                 self.delta.insert_mul((b, c, a4));
                                 self.delta.insert_mul((a, c, a3));
@@ -2325,48 +2545,59 @@ mod test {
                         }
                         for (p2, c, p4) in self.mul_relation.iter_new() {
                             for (a, b) in self.add_relation.iter1_2_0_1(p2) {
-                                let a4 = self.delta.make_math(&mut self.uf.math_uf);
-                                let a3 = self.delta.make_math(&mut self.uf.math_uf);
+                                let a4 = self.delta.make_math(&mut self.uf);
+                                let a3 = self.delta.make_math(&mut self.uf);
                                 self.delta.insert_add((a3, a4, p4));
                                 self.delta.insert_mul((b, c, a4));
                                 self.delta.insert_mul((a, c, a3));
                             }
                         }
-                        for (p0, p1, p2) in self.mul_relation.iter_new() {
-                            for (p3) in self.mul_relation.iter2_0_1_2(p0, p1) {
-                                self.uf.math_uf.union(p3, p2);
-                            }
-                        }
-                        for (p0, p1, p3) in self.mul_relation.iter_new() {
-                            for (p2) in self.mul_relation.iter2_0_1_2(p0, p1) {
-                                self.uf.math_uf.union(p3, p2);
-                            }
-                        }
-                        for (p0, p1, p2) in self.add_relation.iter_new() {
-                            for (p3) in self.add_relation.iter2_0_1_2(p0, p1) {
-                                self.uf.math_uf.union(p3, p2);
-                            }
-                        }
-                        for (p0, p1, p3) in self.add_relation.iter_new() {
-                            for (p2) in self.add_relation.iter2_0_1_2(p0, p1) {
-                                self.uf.math_uf.union(p3, p2);
-                            }
-                        }
+                    }
+                    fn emit_graphviz(&self) -> String {
+                        let mut buf = String::new();
+                        buf.push_str("digraph G {");
+                        self.forall_math_relation.emit_graphviz(&mut buf);
+                        self.mul_relation.emit_graphviz(&mut buf);
+                        self.add_relation.emit_graphviz(&mut buf);
+                        buf.push_str("}");
+                        buf
                     }
                     fn clear_transient(&mut self) {
                         self.global_variables.new = false;
+                        self.forall_math_relation.clear_new();
                         self.mul_relation.clear_new();
                         self.add_relation.clear_new();
-                        loop {
-                            self.uprooted.take_dirt(&mut self.uf);
-                            self.mul_relation
-                                .update(&self.uprooted, &mut self.uf, &mut self.delta);
-                            self.add_relation
-                                .update(&self.uprooted, &mut self.uf, &mut self.delta);
-                            if !(self.uf.has_new() || self.delta.has_new()) {
-                                break;
+                        if dbg!(self.uf.has_new()) {
+                            let mut delta = Delta::default();
+                            dbg!("SKIPPING INSERTS");
+                            loop {
+                                self.uprooted.take_dirt(&mut self.uf);
+                                self.forall_math_relation
+                                    .update(&self.uprooted, &mut self.uf, &mut delta);
+                                self.mul_relation
+                                    .update(&self.uprooted, &mut self.uf, &mut delta);
+                                self.add_relation
+                                    .update(&self.uprooted, &mut self.uf, &mut delta);
+                                if !dbg!(self.uf.has_new()) {
+                                    break;
+                                }
+                            }
+                        } else {
+                            dbg!("DOING INSERTS");
+                            loop {
+                                self.uprooted.take_dirt(&mut self.uf);
+                                self.forall_math_relation
+                                    .update(&self.uprooted, &mut self.uf, &mut self.delta);
+                                self.mul_relation
+                                    .update(&self.uprooted, &mut self.uf, &mut self.delta);
+                                self.add_relation
+                                    .update(&self.uprooted, &mut self.uf, &mut self.delta);
+                                if !dbg!(self.uf.has_new() || self.delta.has_new()) {
+                                    break;
+                                }
                             }
                         }
+                        self.forall_math_relation.update_finalize(&mut self.uf);
                         self.mul_relation.update_finalize(&mut self.uf);
                         self.add_relation.update_finalize(&mut self.uf);
                     }
