@@ -6,7 +6,7 @@ on:
       - 'flake.lock'
       - 'flake.nix'
 jobs:
-  tests:
+  mk-report:
     runs-on: ubuntu-latest
     steps:
     - uses: actions/checkout@v4
@@ -26,7 +26,7 @@ jobs:
       with:
         tag_name: ${{ github.ref }}
         release_name: Report draft ${{ github.ref }}
-        draft: false
+        draft: true
         prerelease: false
 
     - uses: actions/upload-release-asset@v1
