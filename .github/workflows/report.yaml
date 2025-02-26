@@ -2,6 +2,7 @@ name: "report-ci"
 on:
   push:
     paths:
+      - '.github/workflows/report.yaml'
       - 'doc/report/**'
       - 'flake.lock'
       - 'flake.nix'
