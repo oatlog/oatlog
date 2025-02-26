@@ -59,6 +59,10 @@
           default = egraph;
           egraph = cargoNix.workspaceMembers.egraph.build;
           math = cargoNix.workspaceMembers.math.build;
+          mk-report = pkgs.writeShellScriptBin "mk-report" ''
+            set -v
+            ${lib.getExe pkgs.typst} compile ./doc/report/main.typ report.pdf
+          '';
         };
       });
 }

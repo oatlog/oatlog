@@ -1,0 +1,39 @@
+name: "report-ci"
+on:
+  push:
+    paths:
+      - 'doc/report/**'
+      - 'flake.lock'
+      - 'flake.nix'
+jobs:
+  tests:
+    runs-on: ubuntu-latest
+    steps:
+    - uses: actions/checkout@v4
+      with:
+        submodules: true
+
+    - uses: cachix/install-nix-action@v27
+      with:
+        github_access_token: ${{ secrets.GITHUB_TOKEN }}
+
+    - run: nix run .#mk-report
+
+    - id: create_release
+      uses: actions/create-release@v1
+      env:
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      with:
+        tag_name: ${{ github.ref }}
+        release_name: Report draft ${{ github.ref }}
+        draft: false
+        prerelease: false
+
+    - uses: actions/upload-release-asset@v1
+      env:
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      with:
+        upload_url: ${{ steps.create_release.outputs.upload_url }}
+        asset_path: ./report.pdf
+        asset_name: report.pdf
+        asset_content_type: pdf

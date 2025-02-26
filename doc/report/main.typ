@@ -57,9 +57,9 @@ For example, consider a partial function that performs addition, which we can re
   table.header(
     [x], [y], [res],
   ),
-  1,2,3
-  4,2,6
-  3,5,8
+  [1],[2],[3],
+  [4],[2],[6],
+  [3],[5],[8],
 )
 This is a partial function because it's domain is a subset of all pairs of natural numbers.
 But since these are uninterpreted, we do not have actual values, but instead E-classes:
@@ -70,9 +70,9 @@ But since these are uninterpreted, we do not have actual values, but instead E-c
   table.header(
     [x], [y], [res],
   ),
-  a,b,c
-  d,b,f
-  c,e,g
+  [a],[b],[c],
+  [d],[b],[f],
+  [c],[e],[g],
 )
 For example, we can not really say anything about $a$ other than $"add"(a,b) = c$
 It is called a function because we have a functional dependency from (x,y) to res.

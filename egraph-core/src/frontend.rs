@@ -1104,7 +1104,10 @@ impl Parser {
                 // eqsort type => unification
                 hir::ImplicitRule::new_unify(relation_id, inputs.len())
             };
-            self.implicit_rules.entry(relation_id).or_default().push(rule);
+            self.implicit_rules
+                .entry(relation_id)
+                .or_default()
+                .push(rule);
         }
 
         self.function_possible_ids

@@ -6,14 +6,12 @@ use egraph::*;
 // * strings
 // * plain action just inserts.
 
-
-
 // (rewrite (Integral (Sin x) x) (Mul (Const -1) (Cos x))) // TODO: negative numbers
 // (rewrite (Sub a b) (Add a (Mul (Const (-1)) b))) // TODO: negative numbers
 // (rewrite (Sub a a) (Const 0)) // TODO: crashes proc macro
 // (rewrite (Diff x (Cos x)) (Mul (Const -1) (Sin x))) // TODO: negative numbers
-    // (Const Rational)
-    // (Var String)
+// (Const Rational)
+// (Var String)
 
 compile_egraph!((
 (datatype Math
@@ -78,47 +76,43 @@ compile_egraph!((
 // (let gg5 (Mul (Add (Const 1) (Const 2)) (Const 3)))
 // (let gg5 (Mul (Add (Const 1) (Const 2)) (Const 3)))
 
-// (let gg 
-// 
-//         (Mul 
-//             (FakeVar 2) 
-//             (Add 
-//                 (FakeVar 1) 
+// (let gg
+//
+//         (Mul
+//             (FakeVar 2)
+//             (Add
+//                 (FakeVar 1)
 //                 (FakeVar 2)
 //             )
-//         ) 
-// 
+//         )
+//
 //  )
 
-// (let gg 
-//     (Add 
-//         (Mul 
-//             (FakeVar 2) 
-//             (Add 
-//                 (FakeVar 1) 
+// (let gg
+//     (Add
+//         (Mul
+//             (FakeVar 2)
+//             (Add
+//                 (FakeVar 1)
 //                 (FakeVar 2)
 //             )
-//         ) 
-//         (Sub 
-//             (Add 
-//                 (FakeVar 1) 
-//                 (Const 2)) 
-//             (Add 
-//                 (FakeVar 1) 
+//         )
+//         (Sub
+//             (Add
+//                 (FakeVar 1)
+//                 (Const 2))
+//             (Add
+//                 (FakeVar 1)
 //                 (FakeVar 1)
 //             )
 //         )
-// 
+//
 //     )
 // )
 ));
 
-
-
-
 fn main() {
-    let s =
-"(
+    let s = "(
 (datatype Math
     (Add Math Math)
     (Mul Math Math)
@@ -151,7 +145,6 @@ fn main() {
 
     use std::time::Instant;
     let start = Instant::now();
-
 
     let mut step = 0;
     for _ in 0..25 {
