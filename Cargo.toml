@@ -26,6 +26,16 @@ quote = "1.0"
 regex = "1.11.1"
 syn = "2.0.96"
 
+[profile.release]
+lto = "fat"
+opt-level = 3
+codegen-units = 1
+debug = true
+
+[rust]
+debuginfo-level = 1
+
+
 [workspace.lints.rust]
 unsafe_code = "deny" # override to allow per file
 unknown_lints = "deny"

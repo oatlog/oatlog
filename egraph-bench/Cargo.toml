@@ -12,7 +12,5 @@ expect-test.workspace = true
 [lints]
 workspace = true
 
-[profile.release]
-lto = "fat"
-opt-level = 3
-codegen-units = 1
+
+
