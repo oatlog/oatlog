@@ -202,7 +202,7 @@ Fractional edge cover:
 Vector $u$, for $H(q)$ assign weights to edges such that for each variable the sum of weights is more than 1.
 
 $
-|q(I)| <= prod_(j=1) N_j^(u_j)
+|q(I)| <= product_(j=1) N_j^(u_j)
 $
 
 Solving for the minimal bound can be done by taking the logarithm and doing linear programming.

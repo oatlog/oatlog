@@ -89,7 +89,7 @@ https://pages.cs.wisc.edu/~paris/cs838-s16/lecture-notes/lecture2.pdf
 
 In other words, "are these queries equivalent or contained in each-other?"
 
-- $q_1 eqiv q_2 <=> forall I, q_1(I) = q_2(I)$
+- $q_1 equiv q_2 <=> forall I, q_1(I) = q_2(I)$
 - $q_1 subset.eq q_2 <=> forall I, q_1(I) subset.eq q_2(I)$
 
 homomorphism = variable mapping, that still makes the thing equivalent (variable merge ok).

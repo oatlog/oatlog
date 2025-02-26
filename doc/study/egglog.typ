@@ -117,7 +117,7 @@ cli.rs
 
 ```
 
-generated symbols start with "__" and is configurable. (set_reserved_symbol)
+generated symbols start with "\_\_" and is configurable. (set_reserved_symbol)
 
 fact directory: Pathbuf
 
@@ -125,7 +125,7 @@ semi-naive optimization flag?
 
 
 unionfind.rs is just regular union-find, with following extra
-* iterate dirty ids
+- iterate dirty ids
 
 Vec<Cell> just convenient.
 
@@ -315,7 +315,7 @@ GJ = Global Join ?
 
 
 
-https://github.com/frankmcsherry/blog/blob/master/posts/2018-05-19.md
+`https://github.com/frankmcsherry/blog/blob/master/posts/2018-05-19.md`
 
 
 
@@ -387,11 +387,11 @@ table is sorted by timestamp, which is why binary search is used. Why is there n
                 - `run_schedule`: run a sequence of rulesets, rebuild each time.
                     - `step_rules`
                         - `SearchResult` is semantically a `Vec<Vec<Value>>`, but flattened into a `Vec<Value>`. `did_match` flag because some rules have zero variables.
-                        - `search_rules: `(&mut EGraph, ruleset)` to `SearchResult` (map from rule to list of matches)
+                        - `search_rules`: `(&mut EGraph, ruleset)` to `SearchResult` (map from rule to list of matches)
                             - `run_query`: `(&mut EGraph, CompiledQuery, f)` calls `f(values)` on each match. 
                                 - Timestamps are used to make things seminaive. They are used to filter what is new. This way, some rules can run very rarely and still "catch up" on all the changes so far.
                                 - Timestamp constraints are essentially the following:
-                                    - `<--   4 atoms    -->` 
+                                    - `< -   4 atoms    - >` 
                                     - `[new, all, all, all]`
                                     - `[old, new, all, all]`
                                     - `[old, old, new, all]`
@@ -485,7 +485,7 @@ egglog is a fixpoint reasoning system.
 Datalog:
 - incremental execution
 - cooperating analyses
-- lattice-based reasoning <-- primitives?
+- lattice-based reasoning $<--$ primitives?
 
 Eqset:
 - term rewriting

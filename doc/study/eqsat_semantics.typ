@@ -8,7 +8,7 @@ Should we be using it for query optimization?
 Fixpoint semantics of equality saturation based on tree automata.
 
 
-Given equalites between terms $t_1, t_2$, check if that implies $t_1 eqiv t_2$ .
+Given equalites between terms $t_1, t_2$, check if that implies $t_1 equiv t_2$ .
 
 Nelson introduced e-graphs
 https://scottmcpeak.com/nelson-verification.pdf

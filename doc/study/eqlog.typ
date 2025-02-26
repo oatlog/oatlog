@@ -10,7 +10,7 @@ RHL is Datalog with:
 RHL theory is:
 - A set $S$ of sorts
 - A set $R$ of relations
-- Arites $r: s_1 times s_2 times ... times s_n$ $foralll r in R$, 
+- Arites $r: s_1 times s_2 times ... times s_n$ $forall r in R$, 
 - A set of sequents/rules/axiom, in the form $F -> G$ where
     - $F, G$ are conjunctions $phi_1 and phi_2 and ... and phi_n$ of atoms $phi_i$
 
@@ -31,7 +31,7 @@ RHL also has:
 Equality atoms in the premise can be eliminated by merging variables.
 
 The _functionality axiom_ (implicit functionality?)
-$ f(v_1, ..., v_n, u) and f(v_1, ..., v_n, w) implies u equiv w $
+$ f(v_1, ..., v_n, u) and f(v_1, ..., v_n, w) ==> u equiv w $
 
 RHL extends datalog by allowing variables to be introduced in the conclusion.
 Variables that only appear in the conclusion are implicitly existentially qualified.
@@ -67,7 +67,7 @@ Optimizations
 Two graphs:
 $ G = (V,E) $ for input data and $ G' = (V, E') $ for output data, sharing vertices $V$.
 A morphism $ f : (V_1, E_1) -> (V_2, E_2) $ between graphs is a map $ f: V_1 -> V_2 $ that preserves the edge relation.
-$(u, v) in E_1 implies (f(u), f(v)) in E_2$ (.
+$(u, v) in E_1 ==> (f(u), f(v)) in E_2$ (.
 
 == Small object argument (external from paper)
 strong sets := sets of morphisms for which injectivity coincides with orthogonality.
