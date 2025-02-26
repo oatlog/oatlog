@@ -1917,13 +1917,13 @@ https://dl.acm.org/doi/10.1145/3589295
 DONE: Better Together: Unifying Datalog and Equality Saturation
 https://dl.acm.org/doi/10.1145/3591239
 
-babble: Learning Better Abstractions with E-Graphs and Anti-unification
+DONE: babble: Learning Better Abstractions with E-Graphs and Anti-unification
 https://dl.acm.org/doi/10.1145/3571207
 
 DONE: Relational e-matching (introduces usage of database instead of top-down e-matching)
 https://dl.acm.org/doi/10.1145/3498696
 
-Rewrite rule inference using equality saturation (create rewrite rules using egraphs)
+DONE: Rewrite rule inference using equality saturation (create rewrite rules using egraphs)
 https://dl.acm.org/doi/10.1145/3485496
 
 egg: Fast and extensible equality saturation
@@ -1987,10 +1987,10 @@ https://dl.acm.org/doi/10.1145/3472391
 A Dichotomy for the Generalized Model Counting Problem for Unions of Conjunctive Queries
 https://dl.acm.org/doi/10.1145/3452021.3458313
 
-Technical Perspective for: Query Games in Databases
+DONE: Technical Perspective for: Query Games in Databases
 https://dl.acm.org/doi/10.1145/3471485.3471503
 
-SPORES: sum-product optimization via relational equality saturation for large scale linear algebra (maybe the sum sets thing we want?)
+DONE: SPORES: sum-product optimization via relational equality saturation for large scale linear algebra 
 https://dl.acm.org/doi/10.14778/3407790.3407799
 
 Probabilistic Databases for All
