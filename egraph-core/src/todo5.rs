@@ -246,6 +246,12 @@ impl AddRelation {
         delta.add_relation_delta.push((x0, x1, x2));
         return (x2);
     }
+    fn iter2_0_1_2(&self, x0: Math, x1: Math) -> impl Iterator<Item = (Math)> + use<'_> {
+        self.all_index_0_1_2
+            .range((x0, x1, Math(u32::MIN))..=(x0, x1, Math(u32::MAX)))
+            .copied()
+            .map(|(x0, x1, x2)| (x2))
+    }
     fn iter1_0_1_2(&self, x0: Math) -> impl Iterator<Item = (Math, Math)> + use<'_> {
         self.all_index_0_1_2
             .range((x0, Math(u32::MIN), Math(u32::MIN))..=(x0, Math(u32::MAX), Math(u32::MAX)))
@@ -398,6 +404,234 @@ impl AddRelation {
         }
         self.new.sort();
         self.new.dedup();
+    }
+
+    fn update_better1(&mut self, uprooted: &Uprooted, uf: &mut Unification, delta: &mut Delta) {
+        let mut op_insert = take(&mut delta.add_relation_delta);
+        for (x0, x1, x2) in op_insert.iter_mut() {
+            *x0 = uf.math_uf.find(*x0);
+            *x1 = uf.math_uf.find(*x1);
+            *x2 = uf.math_uf.find(*x2);
+        }
+
+        // we really just want a drain here
+        let mut op_delete1 = Vec::new();
+        for x0 in uprooted.math_uprooted.iter().copied() {
+            for (x1, x2) in self.iter1_0_1_2(x0) {
+                op_delete1.push((x0, x1, x2));
+            }
+        }
+        let mut op_delete2 = Vec::new();
+        for x1 in uprooted.math_uprooted.iter().copied() {
+            for (x0, x2) in self.iter1_1_0_2(x1) {
+                op_delete2.push((x0, x1, x2));
+            }
+        }
+        let mut op_delete3 = Vec::new();
+        for x2 in uprooted.math_uprooted.iter().copied() {
+            for (x0, x1) in self.iter1_2_0_1(x2) {
+                op_delete3.push((x0, x1, x2));
+            }
+        }
+        // use first index as indicator for what is in the database
+        for (x0, x1, x2) in op_delete1 {
+            // if self.all_index_0_1_2.remove(&(x0, x1, x2)) {
+            self.all_index_1_0_2.remove(&(x1, x0, x2));
+            self.all_index_2_0_1.remove(&(x2, x0, x1));
+            uf.math_uf.dec_eclass(x0, Self::COST);
+            uf.math_uf.dec_eclass(x1, Self::COST);
+            uf.math_uf.dec_eclass(x2, Self::COST);
+            op_insert.push((
+                uf.math_uf.find(x0),
+                uf.math_uf.find(x1),
+                uf.math_uf.find(x2),
+            ));
+            // }
+        }
+        for (x0, x1, x2) in op_delete2 {
+            if self.all_index_0_1_2.remove(&(x0, x1, x2)) {
+                // self.all_index_1_0_2.remove(&(x1, x0, x2));
+                self.all_index_2_0_1.remove(&(x2, x0, x1));
+                uf.math_uf.dec_eclass(x0, Self::COST);
+                uf.math_uf.dec_eclass(x1, Self::COST);
+                uf.math_uf.dec_eclass(x2, Self::COST);
+                op_insert.push((
+                    uf.math_uf.find(x0),
+                    uf.math_uf.find(x1),
+                    uf.math_uf.find(x2),
+                ));
+            }
+        }
+        for (x0, x1, x2) in op_delete3 {
+            if self.all_index_0_1_2.remove(&(x0, x1, x2)) {
+                self.all_index_1_0_2.remove(&(x1, x0, x2));
+                // self.all_index_2_0_1.remove(&(x2, x0, x1));
+                uf.math_uf.dec_eclass(x0, Self::COST);
+                uf.math_uf.dec_eclass(x1, Self::COST);
+                uf.math_uf.dec_eclass(x2, Self::COST);
+                op_insert.push((
+                    uf.math_uf.find(x0),
+                    uf.math_uf.find(x1),
+                    uf.math_uf.find(x2),
+                ));
+            }
+        }
+        op_insert.retain(|&(x0, x1, x2)| {
+            if let Some(y2) = self.iter2_0_1_2(x0, x1).next() {
+                let mut should_trigger = false;
+                should_trigger |= y2 != x2;
+                if should_trigger {
+                    uf.math_uf.union(y2, x2);
+                    return false;
+                }
+            }
+            if !self.all_index_0_1_2.insert((x0, x1, x2)) {
+                return false;
+            }
+            uf.math_uf.inc_eclass(x0, Self::COST);
+            uf.math_uf.inc_eclass(x1, Self::COST);
+            uf.math_uf.inc_eclass(x2, Self::COST);
+            self.all_index_1_0_2.insert((x1, x0, x2));
+            self.all_index_2_0_1.insert((x2, x0, x1));
+            true
+        });
+        self.new.extend(op_insert);
+    }
+
+    fn update_better2(&mut self, uprooted: &Uprooted, uf: &mut Unification, delta: &mut Delta) {
+        let mut op_insert = take(&mut delta.add_relation_delta);
+        for (x0, x1, x2) in op_insert.iter_mut() {
+            *x0 = uf.math_uf.find(*x0);
+            *x1 = uf.math_uf.find(*x1);
+            *x2 = uf.math_uf.find(*x2);
+        }
+
+        // we really just want a drain here
+        // use first index as indicator for what is in the database
+
+        let mut op_delete1 = Vec::new();
+        for x0 in uprooted.math_uprooted.iter().copied() {
+            // pretend this is drain
+            for (x1, x2) in {
+                self.all_index_0_1_2
+                    .range(
+                        (x0, Math(u32::MIN), Math(u32::MIN))..=(x0, Math(u32::MAX), Math(u32::MAX)),
+                    )
+                    .copied()
+                    .map(|(x0, x1, x2)| (x1, x2))
+            } {
+                op_delete1.push((x0, x1, x2));
+            }
+        }
+        for (x0, x1, x2) in op_delete1.iter().copied() {
+            // batch remove
+            self.all_index_1_0_2.remove(&(x1, x0, x2));
+        }
+        for (x0, x1, x2) in op_delete1.iter().copied() {
+            // batch remove
+            self.all_index_2_0_1.remove(&(x2, x0, x1));
+        }
+        for (x0, x1, x2) in op_delete1.iter().copied() {
+            uf.math_uf.dec_eclass(x0, Self::COST);
+            uf.math_uf.dec_eclass(x1, Self::COST);
+            uf.math_uf.dec_eclass(x2, Self::COST);
+            op_insert.push((
+                uf.math_uf.find(x0),
+                uf.math_uf.find(x1),
+                uf.math_uf.find(x2),
+            ));
+        }
+
+        // batch remove
+        let mut op_delete2 = Vec::new();
+        for x1 in uprooted.math_uprooted.iter().copied() {
+            for (x0, x2) in {
+                self.all_index_1_0_2
+                    .range(
+                        (x1, Math(u32::MIN), Math(u32::MIN))..=(x1, Math(u32::MAX), Math(u32::MAX)),
+                    )
+                    .copied()
+                    .map(|(x1, x0, x2)| (x0, x2))
+            } {
+                op_delete2.push((x0, x1, x2));
+            }
+        }
+        op_delete2.retain(|(x0, x1, x2)| {
+            // batch
+            self.all_index_0_1_2.remove(&(*x0, *x1, *x2))
+        });
+        for (x0, x1, x2) in op_delete2.iter().copied() {
+            // batch remove
+            self.all_index_2_0_1.remove(&(x2, x0, x1));
+        }
+        for (x0, x1, x2) in op_delete2.iter().copied() {
+            uf.math_uf.dec_eclass(x0, Self::COST);
+            uf.math_uf.dec_eclass(x1, Self::COST);
+            uf.math_uf.dec_eclass(x2, Self::COST);
+            op_insert.push((
+                uf.math_uf.find(x0),
+                uf.math_uf.find(x1),
+                uf.math_uf.find(x2),
+            ));
+        }
+
+        let mut op_delete3 = Vec::new();
+        for x2 in uprooted.math_uprooted.iter().copied() {
+            // pretend this is drain
+            for (x0, x1) in {
+                self.all_index_2_0_1
+                    .range(
+                        (x2, Math(u32::MIN), Math(u32::MIN))..=(x2, Math(u32::MAX), Math(u32::MAX)),
+                    )
+                    .copied()
+                    .map(|(x2, x0, x1)| (x0, x1))
+            } {
+                op_delete3.push((x0, x1, x2));
+            }
+        }
+
+        op_delete3.retain(|(x0, x1, x2)| {
+            // batch
+            self.all_index_0_1_2.remove(&(*x0, *x1, *x2))
+        });
+
+        for (x0, x1, x2) in op_delete3.iter().copied() {
+            self.all_index_1_0_2.remove(&(x1, x0, x2));
+        }
+
+        for (x0, x1, x2) in op_delete3.iter().copied() {
+            uf.math_uf.dec_eclass(x0, Self::COST);
+            uf.math_uf.dec_eclass(x1, Self::COST);
+            uf.math_uf.dec_eclass(x2, Self::COST);
+            op_insert.push((
+                uf.math_uf.find(x0),
+                uf.math_uf.find(x1),
+                uf.math_uf.find(x2),
+            ));
+        }
+
+        op_insert.retain(|&(x0, x1, x2)| {
+            if let Some(y2) = self.iter2_0_1_2(x0, x1).next() {
+                let mut should_trigger = false;
+                should_trigger |= y2 != x2;
+                if should_trigger {
+                    uf.math_uf.union(y2, x2);
+                    return false;
+                }
+                return false; // this has the side effect of filtering duplicates.
+            }
+
+            self.all_index_0_1_2.insert((x0, x1, x2));
+            self.all_index_1_0_2.insert((x1, x0, x2));
+            self.all_index_2_0_1.insert((x2, x0, x1));
+
+            uf.math_uf.inc_eclass(x0, Self::COST);
+            uf.math_uf.inc_eclass(x1, Self::COST);
+            uf.math_uf.inc_eclass(x2, Self::COST);
+
+            true
+        });
+        self.new.extend(op_insert);
     }
 }
 
