@@ -61,7 +61,8 @@
           math = cargoNix.workspaceMembers.math.build;
           mk-report = pkgs.writeShellScriptBin "mk-report" ''
             set -v
-            ${lib.getExe pkgs.typst} compile ./doc/report/main.typ report.pdf
+            ${lib.getExe pkgs.typst} compile ./doc/report/main.typ report.pdf \
+              --font-path ${pkgs.newcomputermodern}
           '';
         };
       });
