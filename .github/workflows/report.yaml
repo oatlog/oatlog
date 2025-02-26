@@ -20,21 +20,8 @@ jobs:
 
     - run: nix run .#mk-report
 
-    - id: create_release
-      uses: actions/create-release@v1
+    - run: |
+        gh release delete latest-report-draft --yes --cleanup-tag || true
+        gh release create latest-report-draft --prerelease ./report.pdf
       env:
-        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-      with:
-        tag_name: latest-report-draft
-        release_name: Latest report draft
-        draft: false
-        prerelease: true
-
-    - uses: actions/upload-release-asset@v1
-      env:
-        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-      with:
-        upload_url: ${{ steps.create_release.outputs.upload_url }}
-        asset_path: ./report.pdf
-        asset_name: report.pdf
-        asset_content_type: pdf
+        GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
