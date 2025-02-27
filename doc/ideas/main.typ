@@ -936,7 +936,7 @@ If our query is Add, Add, Mul and it is isomorphic with swapping the adds, then 
 = Magic Sets
 https://inst.eecs.berkeley.edu/~cs294-260/sp24/2024-02-05-datalog#semi-naive-evaluation
 
-We want to steer the evaluation to prove a specific thing (kinda from BFS to A*).
+We want to steer the evaluation to prove a specific thing (kinda from BFS to A-star).
 For example prove path(23, 42).
 
 https://inst.eecs.berkeley.edu/~cs294-260/sp24/2024-02-21-datalog-fp
@@ -1139,7 +1139,7 @@ We call it a lattice, but user only provides join, so it is actually a semilatti
 
 
 = Index selection
-Given that our query plan is done, we can create the minimal set of (btree) indexes in "O(n^2 * m)" where m is the arity of the relation and n is the number of queries, in practice n,m <100 for datalog programs, so it is perfectly fine.
+Given that our query plan is done, we can create the minimal set of (btree) indexes in $O(n^2 * m)$ where m is the arity of the relation and n is the number of queries, in practice $n,m <100$ for datalog programs, so it is perfectly fine.
 See "Automatic index selection for large-scale datalog computation (2018)"
 
 It is kinda solved with maximum matching, so it might be possible to do online so that earlier stages can use number of indexes as a cost metric.
@@ -1374,6 +1374,7 @@ Well we need a index from Eclass to row, but isn't that just what the main index
 
 Fundamentally, a reverse index is just any -> row, and the others are just row.
 
+```
 
 MODEL: (A, B, C). All e-classes unique.
 
@@ -1409,7 +1410,7 @@ elems = 3 * 3 * enodes
 ANY -> (A, B, C)
 
 elems = 3 * 3 * enodes + overhead/9
-
+```
 
 Leaning towards just including indexes for every column, because it is simpler.
 Back-indexes in general are kinda error prone.
@@ -1926,13 +1927,13 @@ https://dl.acm.org/doi/10.1145/3498696
 DONE: Rewrite rule inference using equality saturation (create rewrite rules using egraphs)
 https://dl.acm.org/doi/10.1145/3485496
 
-egg: Fast and extensible equality saturation
+DONE: egg: Fast and extensible equality saturation
 https://dl.acm.org/doi/10.1145/3434304
 
-Practical and Flexible Equality Saturation
+DONE: Practical and Flexible Equality Saturation
 https://dl.acm.org/doi/book/10.5555/AAI28541239
 
-Synthesizing structured CAD models with equality saturation and inverse transformations
+DONE: Synthesizing structured CAD models with equality saturation and inverse transformations
 https://dl.acm.org/doi/10.1145/3385412.3386012
 
 == Yisu Remy Wang (papers done, co-authors done)
@@ -1951,7 +1952,7 @@ https://dl.acm.org/profile/81100357807
 Pessimistic Cardinality Estimation
 https://dl.acm.org/doi/10.1145/3712311.3712313
 
-Insert-Only versus Insert-Delete in Dynamic Query Evaluation
+DONE: Insert-Only versus Insert-Delete in Dynamic Query Evaluation
 https://dl.acm.org/doi/10.1145/3695837
 
 Join Size Bounds using lp-Norms on Degree Sequences
@@ -1963,7 +1964,7 @@ https://dl.acm.org/doi/10.1145/3651147
 From Shapley Value to Model Counting and Back
 https://dl.acm.org/doi/10.1145/3651142
 
-Optimizing Nested Recursive Queries
+DONE: Optimizing Nested Recursive Queries
 https://dl.acm.org/doi/10.1145/3639271
 
 Technical Perspective: Accurate Summary-based Cardinality Estimation Through the Lens of Cardinality Estimation Graphs
@@ -2002,7 +2003,7 @@ https://dl.acm.org/doi/10.1007/s00778-019-00582-9
 Pessimistic Cardinality Estimation: Tighter Upper Bounds for Intermediate Join Cardinalities
 https://dl.acm.org/doi/10.1145/3299869.3319894
 
-Algorithmic Aspects of Parallel Query Processing
+DONE: Algorithmic Aspects of Parallel Query Processing
 https://dl.acm.org/doi/10.1145/3183713.3197388
 
 BREAK
@@ -2102,17 +2103,17 @@ https://dl.acm.org/doi/10.1145/3517804.3524156
 Instance Optimal Join Size Estimation
 https://dl.acm.org/doi/10.1016/j.procs.2021.11.019
 
-Functional Aggregate Queries with Additive Inequalities
+Functional Aggregate Queries with Additive Inequalities (category theory)
 https://dl.acm.org/doi/10.1145/3426865
 
-Juggling Functions Inside a Database
+DONE: Juggling Functions Inside a Database (category theory)
 https://dl.acm.org/doi/10.1145/3093754.3093757
 
 Joins via Geometric Resolutions: Worst Case and Beyond
 https://dl.acm.org/doi/10.1145/2967101
 https://dl.acm.org/doi/10.1145/2745754.2745776
 
-Computing Join Queries with Functional Dependencies
+DONE: Computing Join Queries with Functional Dependencies
 https://dl.acm.org/doi/10.1145/2902251.2902289
 
 FAQ: Questions Asked Frequently
@@ -2137,7 +2138,7 @@ https://dl.acm.org/doi/10.1145/3180143
 Beyond worst-case analysis for joins with minesweeper
 https://dl.acm.org/doi/10.1145/2594538.2594547
 
-Skew strikes back: new developments in the theory of join algorithms
+DONE: Skew strikes back: new developments in the theory of join algorithms (2014)
 https://dl.acm.org/doi/10.1145/2590989.2590991
 
 
@@ -2206,16 +2207,16 @@ https://dl.acm.org/doi/10.1145/3068612
 == Amir Shaikhha
 https://dl.acm.org/profile/99658630539
 
-Fine-Tuning Data Structures for Query Processing
+DONE: Fine-Tuning Data Structures for Query Processing
 https://dl.acm.org/doi/10.1145/3579990.3580016
 
-Functional collection programming with semi-ring dictionaries
+DONE: Functional collection programming with semi-ring dictionaries
 https://dl.acm.org/doi/10.1145/3527333
 
-Building Efficient Query Engines in a High-Level Language
+DONE: Building Efficient Query Engines in a High-Level Language
 https://dl.acm.org/doi/10.1145/3183653
 
-How to Architect a Query Compiler
+DONE: How to Architect a Query Compiler
 https://dl.acm.org/doi/10.1145/2882903.2915244
 
 
@@ -2293,4 +2294,16 @@ https://dl.acm.org/profile/99660480412
 https://dl.acm.org/profile/99660345884
 
 
+== extra
 
+Magic Sets and Other Strange Ways to Implement Logic Programs (1985)
+https://dl.acm.org/doi/pdf/10.1145/6012.15399
+
+Implementation of Magic-sets in a Relational Database System (1994)
+https://dl.acm.org/doi/abs/10.1145/191843.191860
+
+Magic is Relevant (1990)
+https://dl.acm.org/doi/abs/10.1145/93605.98734
+
+Vectorization vs. Compilation in Query Execution
+https://dl.acm.org/doi/pdf/10.1145/1995441.1995446

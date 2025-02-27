@@ -300,4 +300,204 @@ SafeBound is an upper bound that respects constraints.
 
 
 
+= Insert-Only versus Insert-Delete in Dynamic Query Evaluation
+For the problem of: for each insert, what are the new tuples.
+Provides bounds.
+
+
+
+= Optimizing Nested Recursive Queries
+
+Recursive queries are essentially turing complete.
+
+= Algorithmic Aspects of Parallel Query Processing
+Query processing on distributed systems.
+
+= Juggling Functions Inside a Database (2017)
+Given a database of input functions construct a new function.
+
+Use a database to do non-database things.
+InsideOut is a query rewriter.
+
+= Skew strikes back: new developments in the theory of join algorithms (2014)
+Summary of AGM bound.
+We can solve triangle queries with WCOJ AND by separating handling of "heavy" and "light" nodes.
+
+
+= How to Architect a Query Compiler (2016)
+Use multiple IR to make it more manageable instead of doing everything in one step.
+
+Template expander: for each AST node, emit something pre-defined.
+
+Query interpreter: for each AST node, call something pre-defined.
+
+All-ish query compilers are template expanders at heart (paraphrased).
+
+Template expanders have the following problems:
+- combinatorial explosition to make everything compatible with everything.
+- optimizations need to consider all cases.
+
+
+Multi-level IR has two kinds of transformations:
+- optimizations
+- lowerings
+    - expands code size
+    - trade off between search space and granularity of DSL.
+
+
+Join reordering are feasible in high-level IR and regalloc in low level IR.
+
+
+Proposed IR levels:
+- Physical Query Plan
+- Data-structure aware DSL
+- C program
+
+
+optimizations:
+- loop fusion.
+
+Expressibility principle:
+Any $"DSL"(n)$ should be expressible in $"DSL"(n-1)$.
+($"DSL"(n-1)$ does not need to be expressible in $"DSL"(n)$).
+
+transformations:
+- optimization: $"DSL"(n)$ to $"DSL"(n)$
+- lowering: $"DSL"(n)$ to $"DSL"(n-1)$
+
+Source language is always higher level than the target language.
+
+Optimizations are subject to the phase ordering problem.
+Current solution is to apply transformations until a fixed point is reached.
+
+
+Transformation cohesion principle:
+Between a pair of DSLs there is a unique path of lowerings between them (lowering graph is a tree).
+
+
+
+Types of DSLs
+- Declarative
+    - Specification of results
+    - Small search space
+    - Optimizations are more impactful.
+- Imperative
+    - Details about how to compute results are explicit.
+    - Data structures
+    - Predictable performance
+
+Dataflow is better than AST.
+
+Encode dataflow information by converting to a canonical representation.
+
+
+= Building Efficient Query Engines in a High-Level Language (2014)
+USEFUL AND CATEGORY THEORY??
+
+instead of having iterator APIs, we should work with "consumer/producer" models
+
+- Pull model
+    - Parents call next to get a single tuple.
+- Push model
+    - Child calls next on parent to give it a tuple.
+
+= Functional Collection Programming with Semi-ring Dictionaries (2022)
+
+Semi-ring dictionaries are purely functional collections that subsume sets, multisets, arrays, vectors and matrices.
+
+Can merge LA and DB optimizations.
+
+$ Q(a, c) = "count"((a,d), R_1(a, b) join R_2(b, c) join R_3 (c, d)) $
+$ N(i, l) = sum ((j,k), M_1(i, j) dot R_2(j, k) dot R_3 (k, l)) $
+We can materialize part of this operation, by moving the aggregates around.
+
+In other words, relations and tensors are connected (known).
+
+Actually the datastructures have a connection.
+
+```rust
+type Row = u32;
+type Col = u32;
+
+type Value = ..;
+
+struct SparseMatrix {
+    num_rows: u32,
+    num_cols: u32,
+    by_row: BTreeMap<(Row, Col), Value>,
+    by_col: BTreeMap<(Col, Row), Value>,
+}
+impl SparseMatrix {
+    fn iter_row(&self, row: Row) -> impl Iterator<Item = ((Row, Col), Value)> {
+        self.by_row.range((row, Col(0))..=(row, Col(u32::MAX))).copied()
+    }
+    // iter_col is symmetric
+    fn insert(&mut self, row: Row, col: Col, value: Value) {
+        by_row.insert((row, col), value);
+        by_col.insert((col, row), value);
+    }
+}
+```
+
+Csr is kinda just a dense packed 2-level trie.
+
+A btree can be seen as a sparse matrix.
+
+An actual Csr should be amazing for range queries actually.
+
+If we put everything in a big list, we can still get prefix indexes by having indexes into positions in the list.
+
+Optimizations:
+- Loop fusion
+    - deforestation
+- Loop Hoisting
+    - Joins are distributive.
+    - They can be factored out.
+
+
+== Data layout representations
+=== Curryed/Flat
+btreeset index/nested hashmap/trie
+${( a , b ) -> c}$ can become $ {a -> {b -> c}}$
+"Factorized representation" is the database term for currying a relation based in an order of their attributes.
+
+Curried matrices can have a row as a key and a dictionary as a value, so a matrix becomes ${"int" -> {"int" -> S}}$.
+
+=== Sparse/Dense
+`dense_int` can be used to use array for implementing collections.
+
+
+= Fine-Tuning Data Structures for Query Processing (2023)
+USEFUL
+
+Problem: pick right datastructures automatically for query processing.
+Uses ML :(
+
+The IR is based on dictionaries.
+It automatically infers the cost models for alternate implementations of a query.
+
+It uses machine learning and program reasoning.
+It profiles dictionary operations on each machine.
+It statically analyzes the statements to estimate whole-program execution time.
+
+It is based on nested dictionaries (tries).
+
+== per-operation cost 
+per-operation, we use ML to generate cost.
+cares about ordered/unordered.
+```
+eg 
+
+Add(x, _, _) joined with Mul(_, _, x)
+
+will provide x's in-order
+```
+
+
+== program reasoning
+lookup costs and cardinally estimation can be combined to create a reasonable cost model.
+
+given a query plan, we can select datastructures and give a cost estimate.
+
+
 
