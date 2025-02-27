@@ -1,6 +1,4 @@
-#import "mastery-chs/lib.typ" : template, appendices
-
-//#set text(font: "DejaVu Sans")
+#import "mastery-chs/lib.typ" : template
 
 #let department = "Department of Computer Science and Engineering"
 #show: template.with(
