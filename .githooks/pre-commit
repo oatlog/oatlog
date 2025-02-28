@@ -1,5 +1,6 @@
 #!/usr/bin/env bash
 
 rg 'TODO \w+ for \w+'
+rg 'TODO \w+:'
 
 cargo fmt --check
