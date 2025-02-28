@@ -8,3 +8,13 @@ something like this:
 `blocks[h0(data)] & h1234(data) == h1234(data)`
 
 each access is guaranteed to only access a single cache line.
+
+
+= Bloom filters (blog)
+https://florian.github.io/bloom-filters/
+
+We can do set operations on bloom filters.
+Counting bloom filters allow removal.
+
+
+

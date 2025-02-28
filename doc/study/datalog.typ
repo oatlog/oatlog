@@ -97,4 +97,11 @@ homomorphism = variable mapping, that still makes the thing equivalent (variable
 - all minimal queries are the same modulo variable renames.
 
 
+= Convergence of datalog over (Pre-) Semirings (something about recursive queries)
+
+When do datalog models converge when there are recursive queries?
+
+Lattice computations, if there is a partial order does not necessarily converge.
+A simple counterexample is just a counter.
+
 

@@ -482,11 +482,11 @@ It statically analyzes the statements to estimate whole-program execution time.
 
 It is based on nested dictionaries (tries).
 
-== per-operation cost 
+== per-operation cost
 per-operation, we use ML to generate cost.
 cares about ordered/unordered.
 ```
-eg 
+eg
 
 Add(x, _, _) joined with Mul(_, _, x)
 
@@ -499,5 +499,186 @@ lookup costs and cardinally estimation can be combined to create a reasonable co
 
 given a query plan, we can select datastructures and give a cost estimate.
 
+
+
+
+
+= Free Join: Unifying Worst-Case Optimal and Traditional Joins (2023)
+https://dl.acm.org/doi/10.1145/3665252.3665259
+NOTE: there is an explainer video for this.
+
+Binary joins are faster than WCOJ, so we want to integrate the performance of them into WCOJ.
+
+Some DBMSs use WCOJ for cyclic queries and binary joins for trees.
+
+Free join unifies the paradigms.
+
+Presents a datastructure that unifies hash tables and tries (rediscovered brie).
+
+Column oriented layout, vectorization and query optimization has provided constant-factor
+improvements.
+
+Algorithm takes a binary join plan and produces equivalent faster code.
+
+COLT: column-oriented lazy-trie (egglog thing)
+
+
+Current design space:
+- Binary joins two relations on all attributes.
+- Generic joins all relations on single attributes.
+
+(Ergo, we should allow adding multiple variables at once in our query planner)
+
+Uses binary join plans from DuckDB.
+
+"Key bottleneck for generic join is building the trie" (they seem to have a very different
+interpretation of how generic join works.)
+
+Generic join is less sensitive to bad query plans than free join.
+
+Free join can be vectorized.
+
+
+Idea: binary join is "$O(N^2 / 10^6)$", WCOJ is "$O(N)$"
+Hybrid: "$O("min"(N^2 / 10^6, N))$"
+Unified: "$O(N / 10^6)$"
+
+Subatoms: R(x, y, z) to R(x, y), R(z) is one-level trie, R(x), R(y), R(z) is a full trie.
+
+Greedily move if statements earlier.
+
+contribution:
++ Free Join
++ Binary join to free join
++ COLT data structure
++ Vectorized free joins
++ Experiments
+
+
+Bag semantics: fixed schema with duplicates.
+
+System also has support for select(filter), project(remove rows) and aggregations.
+
+Cyclic queries in the alpha-acyclic sense.
+
+$ Q(x, y, z) = R(x, y), S(y, z), T(z, x) $
+
+The standard way to process a binary join tree is to decompose it into left-deep trees (linked list
+joins).
+
+Left deep join plans can be executed using pipelining (nested loops).
+
+== Free join
+
+Generalized Hash Trie (GHT)
+
+```rust
+trait GHT {
+    fn iter() -> impl Iterator<Item = Tuple>;
+    fn get(key: Tuple) -> Option<&dyn GHT>;
+}
+```
+
+GHT is a tree where leaves are vectors and internal nodes are hashmaps.
+
+A subatom is an atom containing a subset of the variables of another atom.
+
+R(x, y, z) could be split into subatoms R(x, y), R(z)
+
+A free join plan for a conjunctive query is
+`Vec<Vec<Subatom>>` = `Vec<Vec<(Vec<Variable>, RelationId)>>`.
+
+Eg:
+$ R(x, a), S(x, b), T(x, c) $
+$ [[R(x,a), S(x)], [S(b), T(x)], [T(c)]] $
+
+Means:
++ Iterate R(x, a), probe S using x.
++ Iterate b in S(x), probe T using x.
++ Iterate c in T(x).
+
+Introduce means iterate, not introduce means probe.
+
+Another plan:
+
+$ [[R(x), S(x), T(x)], [S(b)], [T(c)]] $
+
+This correspons to generic join plan $x, a, b, c$
+
+Valid plan means: for each layer, iterate (at most?) one relation, probe others.
+
+There must be cover atoms covering all variables, marked with prime:
+
+$ [[R'(x,a), S(x)], [S'(b), T(x)], [T'(c)]] $
+$ [[R(x), S(x), T(x)], [S(b)], [T(c)]] $
+
+
+Invalid because iterating (x, a) does not produce (x, b).
+$ [[R(x, a), S(x, b)]] $
+
+More intuitive: firs thing in list means iterate.
+
+
+$ [[R(x,a), S(x)], [S(b), T(x)], [T(c)]] $
+has GHT schema
+- R: $[(x, a)]$
+- S: $[(x), (b)]$
+- T: $[(x), (c)]$
+
+== COLT
+
+A lazily constructed trie.
+
+== Query planning
+
+Use binary join plan and transform it into free join.
+
+Good cardinally estimation is crucial.
+
+== Runtime
+
+Batch size of 1000 worked well, something something vectorization.
+
+
+= The Design and Implementation of Modern Column-Oriented Database Systems
+(book, not accessible through google scholar)
+http://dx.doi.org/10.1561/1900000024
+
+Vectorized means next() return N tuples instead of one, 1000 is typical to fit in L1.
+The idea is to have a balance between full materialization and cache behavior of pull based.
+
+Output is in SOA format.
+
+- Vectorization makes sense for interpreters.
+- Reasonable cache locality
+- Can use compiler optimizations better.
+- Can perform checks like "Is buffer full" per block instead of per tuple
+- Performance counters per-block have less overhead.
+    - Allow for adaptive execution.
+
+=> it might make sense for the b-tree nodes to internally store tuples in an AOS way instead of a
+SOA way, for example:
+
+```rust
+struct BTreeNode {
+    keys: [(i64, Math, u8); 16],
+}
+// vs
+struct BTreeNode {
+    key_i64: [i64; 16],
+    key_math: [Math; 16],
+    key_u8: [u8; 16],
+}
+```
+
+== Compression
+Column-oriented databases make more sense for compression.
+
+- Run-length encoding.
+- Bit-vector encoding.
+- Dictionary (interning strings)
+- Frame-of-reference, groups of values might be near, so store offsets from base value
+
+Algorithms can be written to operate on compressed data directly
 
 

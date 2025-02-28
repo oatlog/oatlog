@@ -1899,6 +1899,156 @@ enum Action {
 ```
 
 
+= Cardinality estimation with functional dependencies.
+
+For example for Add, we know it is bijective if we fix one of the arguments, this means that *any* query that uses two arguments have cardinality of one.
+
+
+= Reasoning about duplicate actions
+
+Per-rule join will always produce unique composite tuples. The only way for a query to produce
+duplicates is if project is involved, but our queries do not support that. However, the individual
+actions that are triggered are essentially a series of project operations.
+
+
+= Pull/Push based iteration.
+(some query planning paper mentioned pull/push iteration)
+
+
+```rust
+// pull based
+for (p0, p1) in add.iter(p2) {
+    for (p3, p4) in mul.iter(p1) {
+        for (p5) in sqrt.iter(p3) {
+            emit(..);
+        }
+    }
+}
+// push based
+add.iter(p2, |(p0, p1)| {
+    mul.iter(p1, |(p3, p4)| {
+        sqrt.iter(p3, |p5| {
+            emit(..);
+        });
+    });
+});
+```
+
+Push has the advantage of requiring zero iteration state, but has the disadvantage of having to call
+functions. Push essentially acts the same as a generator.
+
+In terms of codegen, there is nothing stopping us from mixing pull and push based iterators. I think
+the inner loop "obviously" benefits from push-based iteration since it will just constantly pull.
+
+```rust
+// This should be strictly better, right?
+for (p0, p1) in add.iter(p2) {
+    for (p3, p4) in mul.iter(p1) {
+        sqrt.iter(p3, |p5| {
+            emit();
+        });
+    }
+}
+```
+
+The dual to an iterator is called an "aggregator"
+`https://lptk.github.io/programming/2018/03/02/a-dual-to-iterator.html`
+
+```rust
+pub trait Iterator {
+    type Item;
+    fn next(&mut self) -> Option<Self::Item>;
+}
+pub trait Aggregator {
+    type Item;
+    fn apply(&mut self, f: impl FnMut(Item));
+    fn filter(self, pred: impl FnMut(&Item) -> bool) -> impl Aggregator<Item = Item>;
+    fn map<B>(self, f: impl FnMut(Item) -> B) -> impl Aggregator<Item = B>;
+}
+
+
+```
+
+Blog:
+https://justinjaffray.com/query-engines-push-vs.-pull/
+
+Supposedly, push based query engines both have better cache efficiency because it removes control
+flow from tight loops.
+And supposedly it enables DAG shaped query plans (this makes sense, it is a function call).
+
+Actually, if everything is a function call, we sort-of get a free ABI, right?
+
+
+- Push-based has the benefit of working better with multi-outputs, since an iterator is invalidated
+  if used by multiple consumers.
+- Pull based has to keep intermediate results around if used by multiple consumers. Producers force
+  consumers to take ownership.
+
+
+Translation
+- Pull to Push: polling state.
+- Push to Pull: materialization.
+
+
+TODO: snowflake paper?
+
+= icache concern is probably not warranted.
+
+`BTreeMap::remove` is 700 bytes.
+
+If I computed correctly, I have 64 KiB of L1i cache.
+
+Assuming the remove function is the same size as the iterate function, we clearly have room to
+aggressively inline all query functions.
+
+= Pseudo-Free join impl
+
+`Query: a * c + b * c`
+
+`Mul(a, c, d), Mul(b, c, e), Add(d, e, f)`
+
+Relabel relations:
+
+$ R(a, c, d), S(b, c, e), T(d, e, f) $
+
+
+Semi-naive:
+- New R $ [[R'(a, c, d), T(d), S(c)], [S(b, e), T(e)], [T(f)]] $
+- New R $ [[R'(a, c, d), T(d)], [S(b, c, e)], [T(e, f)]] $
+
+Tree-queries are obvious.
+
+Triangle query:
+
+$ R(x, y), S(y, z), T(z, x) $
+
+new R:
+
+$ [[R'(x, y), S(y), T(x)], [S(z)], [T(z)]] $
+$ [[R'(x, y), T(x)], [S(y, z)], [T(z)]] $
+
+```rust
+for (x, y) in R' {
+    if T(x) {
+        for (z) in S(y) {
+            if T(x, z) {
+                emit();
+            }
+        }
+    }
+}
+```
+
+
+
+
+
+= TODO research
+
+- More info about DB term for curried indexes.
+
+- DONE: Column oriented database joins, vectorized execution.
+
 = TODO READ
 Papers are just under the first author i looked at.
 I stopped adding authors after a while since this is just too many papers.
@@ -1939,7 +2089,7 @@ https://dl.acm.org/doi/10.1145/3385412.3386012
 == Yisu Remy Wang (papers done, co-authors done)
 https://dl.acm.org/profile/99660535337
 
-Convergence of datalog over (Pre-) Semirings (something about recursive queries)
+DONE: Convergence of datalog over (Pre-) Semirings (something about recursive queries)
 https://dl.acm.org/doi/10.1145/3643027
 https://dl.acm.org/doi/10.1145/3604437.3604454
 
@@ -1991,7 +2141,7 @@ https://dl.acm.org/doi/10.1145/3452021.3458313
 DONE: Technical Perspective for: Query Games in Databases
 https://dl.acm.org/doi/10.1145/3471485.3471503
 
-DONE: SPORES: sum-product optimization via relational equality saturation for large scale linear algebra 
+DONE: SPORES: sum-product optimization via relational equality saturation for large scale linear algebra
 https://dl.acm.org/doi/10.14778/3407790.3407799
 
 Probabilistic Databases for All
@@ -2307,3 +2457,12 @@ https://dl.acm.org/doi/abs/10.1145/93605.98734
 
 Vectorization vs. Compilation in Query Execution
 https://dl.acm.org/doi/pdf/10.1145/1995441.1995446
+
+DONE: The Design and Implementation of Modern Column-Oriented Database Systems
+
+https://www.hytradboi.com/2025#program
+
+https://www.philipzucker.com/rewrite_rules/
+
+https://github.com/philzook58/egglog-rec
+
