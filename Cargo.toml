@@ -5,7 +5,7 @@ members = [
     "egraph-macro",
     "egraph-test",
     "egraph-bench",
-    "examples/math",
+    "examples/math", "comparative-test",
 ]
 resolver = "2"
 
@@ -16,15 +16,18 @@ egraph-macro.path = "egraph-macro"
 egraph-test.path = "egraph-test"
 egraph-bench.path = "egraph-bench"
 
+ariadne = "0.5"
 clap = { version = "4", features = ["derive"]}
-educe = "0.6.0"
+educe = "0.6"
+egglog = "0.4"
+eqlog-runtime = "0.8"
 expect-test = "1"
 heck = "0.5"
 itertools = "0.14"
-proc-macro2 = { version = "1.0", features = ["span-locations"] }
-quote = "1.0"
-regex = "1.11.1"
-syn = "2.0.96"
+proc-macro2 = { version = "1", features = ["span-locations"] }
+quote = "1"
+regex = "1"
+syn = "2"
 
 [profile.release]
 lto = "fat"
@@ -194,5 +197,3 @@ unused_trait_names = "warn"
 #use_debug = "warn"
 verbose_file_reads = "warn"
 #wildcard_enum_match_arm = "warn"
-
-

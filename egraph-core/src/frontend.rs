@@ -176,7 +176,21 @@ pub(crate) fn parse(x: proc_macro2::TokenStream) -> syn::Result<hir::Theory> {
                     }
                     Delimiter::Brace => ret!("importing rust code unimplemented"),
                     Delimiter::Bracket => ret!("brace not expected"),
-                    Delimiter::None => unreachable!(),
+                    Delimiter::None => {
+                        let trees: Vec<TokenTree> = stream.into_iter().collect();
+                        if trees.len() != 1 {
+                            return ret!("unexpected input 1");
+                        }
+                        let TokenTree::Literal(literal) = trees.into_iter().next().unwrap() else {
+                            return ret!("unexpected input 2");
+                        };
+                        let syn::Lit::Str(literal) = syn::Lit::new(literal) else {
+                            return ret!("unexpected input 3");
+                        };
+                        let stream = literal_to_tokenstream_strip_comments(&literal.value())?;
+                        parser.parse_egglog(stream)?;
+                    }
+                    Delimiter::None => ret!("expected delimiter"),
                 }
             }
             TokenTree::Ident(ident) => ret!(ident.span(), "unexpected literal"),
@@ -184,13 +198,27 @@ pub(crate) fn parse(x: proc_macro2::TokenStream) -> syn::Result<hir::Theory> {
             TokenTree::Literal(literal) => {
                 let x = syn::Lit::new(literal);
                 match x {
-                    syn::Lit::Str(_) => ret!(x.span(), "reading files unimplemented"),
+                    syn::Lit::Str(literal) => {
+                        let stream = literal_to_tokenstream_strip_comments(&literal.value())?;
+                        parser.parse_egglog(stream)?
+                    }
                     _ => ret!(x.span(), "expected a string literal"),
                 }
             }
         }
     }
-    Ok(parser.emit_hir())
+    return Ok(parser.emit_hir());
+}
+
+fn literal_to_tokenstream_strip_comments(literal: &str) -> syn::Result<proc_macro2::TokenStream> {
+    let tokens: proc_macro2::TokenStream = literal
+        .lines()
+        .filter(|line| !line.trim_start().starts_with(";") && !line.trim_start().starts_with("//"))
+        .collect::<Vec<&str>>()
+        .join("\n")
+        .parse()
+        .unwrap();
+    Ok(tokens)
 }
 
 #[derive(Copy, Clone, Debug, PartialEq, PartialOrd, Eq, Ord, Hash)]
@@ -554,7 +582,7 @@ const BUILTIN_SORTS: [(&str, &str); 2] = [
     // TODO: we could trivially add more here for all sizes of ints/floats.
     // (BUILTIN_F64, "std::primitive::f64"),
     // TODO: explicitly intern all strings.
-    // (BUILTIN_STRING, "std::string::String"),
+    //(BUILTIN_STRING, "egraph::runtime::IString"),
     // (BUILTIN_BOOL, "std::primitive::bool"),
     (BUILTIN_UNIT, "std::primitive::unit"),
 ];
@@ -990,14 +1018,17 @@ impl Parser {
                     )
                 })?;
 
-                let stream = content.parse::<proc_macro2::TokenStream>().unwrap();
+                let stream = literal_to_tokenstream_strip_comments(&content)?;
                 self.parse_egglog(stream).add_err(syn::Error::new(
                     span,
                     format!("while parsing \"{filepath}\""),
                 ))?;
             }
-            "run" | "run_schedule" | "simplify" | "query_extract" | "check" | "push" | "pop"
-            | "print_stats" | "print_function" | "print_size" | "input" | "output" | "fail" => {
+            "run" | "check" => {
+                // skip run and check
+            }
+            "run_schedule" | "simplify" | "query_extract" | "push" | "pop" | "print_stats"
+            | "print_function" | "print_size" | "input" | "output" | "fail" => {
                 return unimplemented_msg;
             }
 
@@ -1273,7 +1304,7 @@ impl Parser {
             .lookup(Str::with_placeholder(name))
             .expect("builtin types defined")
     }
-    fn add_toplevel_binding(&mut self, binding_name: Str, expr: Expr) -> syn::Result<()> {
+    fn add_toplevel_binding(&mut self, binding_name: Option<Str>, expr: Expr) -> syn::Result<()> {
         // only performs forward type inference.
         fn parse(parser: &mut Parser, expr: Expr) -> syn::Result<(GlobalId, TypeId)> {
             Ok(match expr {
@@ -1350,7 +1381,7 @@ impl Parser {
         }
         let (id, ty) = parse(self, expr)?;
         let compute = self.global_variables[id].compute.clone();
-        assert_eq!(id, self.add_global(Some(binding_name), ty, compute)?);
+        assert_eq!(id, self.add_global(binding_name, ty, compute)?);
         Ok(())
     }
 
@@ -1404,7 +1435,7 @@ impl Parser {
                     // "expansion" is recursive, so we need to detect cycles when expanding
                     local_bindings.insert_unique(name, expr, "local binding")?;
                 } else {
-                    self.add_toplevel_binding(name, expr)?;
+                    self.add_toplevel_binding(Some(name), expr)?;
                 }
                 None
             }
@@ -1437,10 +1468,12 @@ impl Parser {
 
             "delete" | "subsume" | "panic" | "extract" => return unimplemented_msg,
             _ => {
+                let expr = Parser::parse_expr(x, local_bindings)?;
                 if local_bindings.is_some() {
-                    Some(Action::Expr(Parser::parse_expr(x, local_bindings)?))
+                    Some(Action::Expr(expr))
                 } else {
-                    ret!("arbitrary expressions as actions not allowed on toplevel")
+                    self.add_toplevel_binding(None, expr)?;
+                    None
                 }
             }
         })

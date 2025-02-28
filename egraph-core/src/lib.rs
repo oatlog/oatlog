@@ -21,26 +21,54 @@ mod todo5;
 
 #[must_use]
 pub fn compile_str(source: &str) -> String {
-    compile(source.parse().unwrap()).to_string()
-}
-
-pub fn compile_to_str_dbg(s: &str) -> String {
-    let tokens = s.parse().unwrap();
-    let compiled = compile(tokens);
-    let formatted = codegen::format_tokens(compiled);
-    formatted
+    // Outside the proc macro context, we
+    // - run rustfmt on the output
+    // - render any errors manually
+    let source = source
+        .lines()
+        .filter(|line| !line.trim_start().starts_with(";") && !line.trim_start().starts_with("//"))
+        .collect::<Vec<&str>>()
+        .join("\n");
+    let input: proc_macro2::TokenStream = source.parse().unwrap();
+    match compile_impl(quote::quote! {(#input)}) {
+        Ok(generated_code) => codegen::format_tokens(generated_code),
+        //Err(err) => format!("{err}"),
+        Err(errors) => {
+            let errors: Vec<syn::Error> = errors.into_iter().collect();
+            let mut ret = Vec::new();
+            ariadne::Report::build(
+                ariadne::ReportKind::Error,
+                ("foo", errors[0].span().byte_range()),
+            )
+            .with_message(errors[0].clone())
+            .with_labels(
+                errors[1..].iter().map(|err| {
+                    ariadne::Label::new(("foo", err.span().byte_range())).with_message(err)
+                }),
+            )
+            .finish()
+            .write(ariadne::sources(Some(("foo", source))), &mut ret)
+            .unwrap();
+            String::from_utf8_lossy(ret.as_slice()).to_string()
+        }
+    }
 }
 
 #[must_use]
 pub fn compile(source: proc_macro2::TokenStream) -> proc_macro2::TokenStream {
+    // In a proc macro context, errors are surfaced using `compile_error!`
+    match compile_impl(source) {
+        Ok(output) => output,
+        Err(err) => err.to_compile_error(),
+    }
+}
+
+fn compile_impl(source: proc_macro2::TokenStream) -> syn::Result<proc_macro2::TokenStream> {
     force_backtrace(|| {
-        let hir = match frontend::parse(source) {
-            Ok(hir) => hir,
-            Err(err) => return err.to_compile_error(),
-        };
+        let hir = frontend::parse(source)?;
         let (_, codegen) = hir::query_planning::emit_codegen_theory(hir);
         let generated_tokens = codegen::codegen(&codegen);
-        generated_tokens
+        Ok(generated_tokens)
     })
 }
 
@@ -173,7 +201,7 @@ mod test {
                 __: a
                 __: b
                 __: c, d
-                Insert: 
+                Insert:
 
             "#]]),
             expected_lir: None,

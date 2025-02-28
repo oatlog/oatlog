@@ -64,6 +64,7 @@ pub(crate) struct TypeData {
     name: &'static str,
     // TODO: primitives
     ty: TypeKind,
+    zero_sized: bool,
 }
 impl TypeData {
     pub(crate) fn is_symbolic(&self) -> bool {
@@ -73,6 +74,7 @@ impl TypeData {
         Self {
             name,
             ty: TypeKind::Symbolic,
+            zero_sized: false,
         }
     }
     pub(crate) fn new_primitive(name: &'static str, type_path: &'static str) -> Self {
@@ -80,14 +82,19 @@ impl TypeData {
             "()" => Self {
                 name: "unit",
                 ty: TypeKind::Primitive {
-                    type_path: "THIS STRING SHOULD NOT APPEAR IN GENERATED CODE",
+                    type_path: "THIS_STRING_SHOULD_NOT_APPEAR_IN_GENERATED_CODE",
                 },
+                zero_sized: true,
             },
             _ => Self {
                 name,
                 ty: TypeKind::Primitive { type_path },
+                zero_sized: false,
             },
         }
+    }
+    fn is_zero_sized(&self) -> bool {
+        self.zero_sized
     }
 }
 #[derive(Debug)]
@@ -1020,20 +1027,30 @@ fn codegen_globals(theory: &Theory) -> (TokenStream, TVec<GlobalId, usize>) {
             let field = ident::type_global(ty_);
 
             assigned_indexes.push_expected(global_id, idx);
-            quote! {
-                let tmp = { #expr };
-                self.#field.push(tmp);
+            if ty_.is_zero_sized() {
+                quote! {
+                    { #expr };
+                }
+            } else {
+                quote! {
+                    let tmp = { #expr };
+                    self.#field.push(tmp);
+                }
             }
         })
         .collect();
 
     let (fields_struct, fields): (Vec<_>, Vec<_>) = map
         .iter()
-        .map(|(ty, _)| {
+        .filter_map(|(ty, _)| {
             let ty_ = &theory.types[ty];
-            let field = ident::type_global(ty_);
-            let typ = ident::type_ty(ty_);
-            (quote! { #field : Vec<#typ> }, field)
+            if ty_.is_zero_sized() {
+                None
+            } else {
+                let field = ident::type_global(ty_);
+                let typ = ident::type_ty(ty_);
+                Some((quote! { #field : Vec<#typ> }, field))
+            }
         })
         .unzip();
 
@@ -1299,6 +1316,9 @@ pub fn codegen(theory: &Theory) -> TokenStream {
                 buf.push_str("}");
                 buf
             }
+            fn get_total_relation_entry_count(&self) -> usize {
+                [#((self.#stored_relations.len())),*].iter().copied().sum::<usize>()
+            }
             #clear_transient
         }
 
@@ -1350,6 +1370,9 @@ fn codegen_relation(rel: &RelationData, theory: &Theory) -> TokenStream {
                     fn clear_new(&mut self) {  }
                     fn update_finalize(&mut self, uf: &mut Unification) {  }
                     fn emit_graphviz(&self, buf: &mut String) { }
+                    fn len(&self) -> usize {
+                        self.all.len()
+                    }
                 }
             }
         }
@@ -1621,11 +1644,13 @@ fn codegen_relation(rel: &RelationData, theory: &Theory) -> TokenStream {
                     fn emit_graphviz(&self, buf: &mut String) {
                         use std::fmt::Write;
                         for (i, (#(#first_index_order),*)) in self.#first_index_ident.iter().copied().enumerate() {
-                            #(write!(buf, "{}{i} -> {}{};", #relation_name, #column_types, #first_index_order);)*
+                            #(write!(buf, "{}{i} -> {}{};", #relation_name, #column_types, #first_index_order).unwrap();)*
                         }
                     }
                 }
             };
+
+            let some_index_field = ident::index_all_field(index_to_info.iter().next().unwrap());
 
             quote! {
                 #[derive(Debug, Default)]
@@ -1645,6 +1670,9 @@ fn codegen_relation(rel: &RelationData, theory: &Theory) -> TokenStream {
                     #(#iter_all)*
                     #(#check_all)*
                     #update
+                    fn len(&self) -> usize {
+                        self.#some_index_field.len()
+                    }
                 }
             }
         }
