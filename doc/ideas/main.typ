@@ -2040,6 +2040,129 @@ for (x, y) in R' {
 ```
 
 
+To restrict our search space, we know that a good query plan must:
++ Perform filtering as early as possible.
++ Minimize constraints on indexes
+    - do not perform unnecessary checks
+    - (global opt) minimize total number of indexes.
+
+
+
+Simple algorithm (triangle query):
+$ R(x, y), S(y, z), T(z, x) $
+
++ Pick and arbitrary order to do the join
+    - $ [T, R, S] $
++ Introduce all variables immediately and filter greedily.
+    - $ [[T(z, x), R(x), S(z)], [R(y), S(y)]] $
++ Do not perform unnecessary checks
+    - $ [[T(z, x), S(z)], [R(x, y), S(y)]] $
+
+We do not want to do this:
+    - $ [[T(z, x), S(z, y)], [R(x, y)]] $
+Because this would be a cross join between T and S, however, if we knew that there was a functional dependency $z -> y$ OR $z -> x$ this would be a really good optimization.
+
+I actually am not entirely sure what the sub-arrays mean, it kind of means that we have have groups that are internally unordered.
+
+If tries are used in b-trees then curried lookups are no longer zero cost. 
+
+
+= Building forall into UF
+
+Each forall relation can just maintain a single index (usize) into the UF to split what is considered new and old.
+
+UF can maintain an index based linked list that it removes from when elements are uprooted.
+
+Path compression is possible with `Vec<Cell<u32>>`.
+
+We need to consider iterator invalidation.
+
+Maybe the linked list could be updated in a bulk way by iterating uprooted in clear transient?
+
+
+= Introducing projection.
+
+If at some point we no longer need a variable, we can introduce a project and do DP to avoid continuing if we have seen this state before.
+
+= Inverse bloom filter.
+
+A bloom filter can give false positives, but sometimes we only want false negatives (projection DP).
+
+We can do this multiple ways. 
+The "most correct" thing might be a LRU cache.
+But we can also implement it as a hashtable that always overwrites entries.
+
+Note that if we use a hashset, in the presence of functional dependencies, we can store a set of keys that cover the set of attributes we care about.
+
+Eg if we have attributes
+$ [A, B, C, D, E] $
+With functional dependencies
+$ (D, E) -> B $
+$ (A, B) -> C $
+Which provide the following:
+$ (A, D, E) -> (A, B, C, D, E) $
+We can replace:
+```rust
+HashSet<(A, B, C, D, E)>
+```
+with:
+```rust
+HashSet<(A, D, E)>
+```
+Additionally, some kind of compression might make sense.
+
+
+= Query containment linked list is just a harder version of index selection.
+
+Queries can contain each other.
+
+If we do not want tries, we can still make sure that a query contained in another.
+
+This becomes the index selection problem, which can be solved with flow.
+
+
+= We do care about queries being equal, *after seminaive*
+
+Users are very unlikely to provide identical queries.
+
+But semi-naive makes it very likely, and therefore we should care about query equivalence.
+
+
+= Commutativity of optimizations and semi-naive
+
+```rust
+// We have some equivalent ways to write a query.
+fn variants(q: Query) -> Set<Query>;
+
+// And we can introduce semi-naive to a query
+fn semi_naive(q: Query) -> Set<Query>;
+
+// We would like to assume that
+// Which is true assuming semi_naive and variants commute
+variants(semi_naive(variants(q))) == variants(semi_naive(q));
+
+// introducing query plans
+fn query_plan(q: Query) -> Set<QueryPlan>;
+
+// final pipeline
+query_plan(variants(semi_naive(q)));
+
+// queries    - pick all
+// semi_naive - pick all
+// variants   - pick one
+// query_plan - pick one
+
+// so problem can be simplified to
+
+// queries/semi_naive    - pick all
+// variants/query_plan   - pick one
+
+
+// THEORY: equal query plan => equal variant?
+
+// Within one original query we probably want to compare semi-naive, and then merge globally
+```
+
 
 
 
@@ -2048,6 +2171,10 @@ for (x, y) in R' {
 - More info about DB term for curried indexes.
 
 - DONE: Column oriented database joins, vectorized execution.
+
+- Existing query planners to partially embed eg postgres.
+
+- "False positive only"- bloom filter, because implicit selects in our query means that we might add the same action twice.
 
 = TODO READ
 Papers are just under the first author i looked at.
@@ -2465,4 +2592,17 @@ https://www.hytradboi.com/2025#program
 https://www.philipzucker.com/rewrite_rules/
 
 https://github.com/philzook58/egglog-rec
+
+DONEISH: Building a query compiler (WIP)
+https://pi3.informatik.uni-mannheim.de/~moer/querycompiler.pdf
+
+DONE: Exploiting Functional Dependence in Query Optimization
+
+Cuckoo Filter: Practically Better Than Bloom (bloom filter with delete)
+https://www.cs.cmu.edu/~dga/papers/cuckoo-conext2014.pdf
+
+https://cstheory.stackexchange.com/questions/6596/a-probabilistic-set-with-no-false-positives
+
+https://www.somethingsimilar.com/2012/05/21/the-opposite-of-a-bloom-filter/
+
 

@@ -392,7 +392,6 @@ Encode dataflow information by converting to a canonical representation.
 
 
 = Building Efficient Query Engines in a High-Level Language (2014)
-USEFUL AND CATEGORY THEORY??
 
 instead of having iterator APIs, we should work with "consumer/producer" models
 
@@ -402,6 +401,7 @@ instead of having iterator APIs, we should work with "consumer/producer" models
     - Child calls next on parent to give it a tuple.
 
 = Functional Collection Programming with Semi-ring Dictionaries (2022)
+USEFUL AND CATEGORY THEORY??
 
 Semi-ring dictionaries are purely functional collections that subsume sets, multisets, arrays, vectors and matrices.
 
@@ -681,4 +681,119 @@ Column-oriented databases make more sense for compression.
 
 Algorithms can be written to operate on compressed data directly
 
+
+
+
+Example
+
+
+
+```rust
+trait GHT {
+    fn iter() -> impl Iterator<Item = Tuple>;
+    fn get(key: Tuple) -> Option<&dyn GHT>;
+}
+```
+$ R'(x, y), S(y, z), T(z, x) $
+
+$ [[R'(x, y), T(x)], [S(y, z), T(z)]] $
+
+```rust
+// ===============================
+for (x. a) in R.new() {
+
+    let T_x = T.get(x);
+
+    let Some(_) = T_x.iter().next() else { continue; }
+// ================================
+    for (z) in S.get(y).iter() {
+        let Some(_) = T_x.get(z).iter().next() else { continue; }
+    }
+}
+```
+
+= Building a query compiler (WIP 2025)
+https://pi3.informatik.uni-mannheim.de/~moer/querycompiler.pdf
+https://lobste.rs/s/abs9fe/building_query_compilers
+
+We can do query planning with DP, but have some restrictions to reduce the search space.
+
+- Push down (towards leaves) selections (=> filter as early as possible)
+- Avoid cross products (=> graph is connected)
+    - Cross products are only needed if graph is not connected.
+- Generate only left-deep trees (all joins become "linked list" joins).
+- Perform grouping last.
+
+Problem is NP for simple cost functions but query sizes are small.
+
+
+== Functional dependencies
+Relation $R$ with $A_1, A_2 subset "attr"(R)$ satisfies functional dependency.
+Note that $A_1, A_2$ are *sets* of attributes.
+$ f : A_1 -> A_2 $
+If for all tuples $t_1, t_2 in R$  
+$ t_1.A_1 = t_2.A_1 => t_1.A_2 = t_2.A_2 $
+Functional dependency is essentially logical implication.
+
+The functional dependencies can be found from schema, specifically key constraints and check conditions (paraphrased, references "Exploiting Functional Dependence in Query Optimization")
+
+Additional constraints can be introduced by the following algebraic operations (complete set, Armstrong's axioms)
++ $ X subset Y => Y -> X $ 
++ $ (X union Z) subset (Y union Z) => (Y union Z) -> (X union Z) $
++ $ X -> Y and Y -> Z => X -> Z $
+
+$A$ is a *super key* of R if
+$ A subset "attr"(R)$
+
+
+$A$ is a *key* of R if no subset of $A$ is a *super key*.
+
+
+== Algebra for Sets, Bags/multisets and Sequences
+
+To fully capture semantics SQL and similar, set semantics have to be expanded.
+
+All collections are finite.
+
+- Sets: have the obvious algebraic properties.
+- Bags: or multisets, allow duplicates. a map to a count
+    - intermediate queries are basically bags, so their algebraic properties might be useful.
+    - A subset of the laws for sets apply to bags.
+- Sequence: ordered, allow duplicates.
+
+
+== Query equivalence, containment, minimization, factorization
+$q(d)$ is the result of query $q$ on database $d$.
+
+$ q_1 equiv q_2 <=> forall d, q_1(d) = q_2(d) $
+
+Query containment problem is checking if $ q_1(d) subset q_2(d) $
+
+Query equivalence problem is checking if $ q_1(d) equiv q_2(d) $
+
+=== Set semantics, conjunctive queries
+
+Equality can be eliminated by merging variables.
+
+This can not be done by inequality operators ($<, >, <=, >=, !=$
+
+Query containment and minimization for conjunctive queries without inequality ops is NP.
+
+Unions of conjunctive queries can be minimized by pairwise containment.
+
+
+
+= Exploiting Functional Dependence in Query Optimization (2001, book)
+
+== Functional dependencies as constraints
+- inclusion dependencies
+- functional dependencies
+
+- column constraint
+    - `Check (EmpId Between 1 and 100)`
+    - Unique
+        - Primary key
+        - Unique indexes
+        - Unique constraints
+- table constraint definitions
 

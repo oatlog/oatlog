@@ -387,7 +387,13 @@ all queries are known up-front, so datalog engines can spend more resources on o
 and selecting optimal indexes and index data-structures.
 
 
-== Why on earth is a BTreeSet equivalent to an index?
+== Curried indexes
+
+
+
+
+@factor_db
+
 
 something something trie, logical physical indexes, flow.
 
