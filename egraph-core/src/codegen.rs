@@ -1317,7 +1317,7 @@ pub fn codegen(theory: &Theory) -> TokenStream {
                 buf
             }
             fn get_total_relation_entry_count(&self) -> usize {
-                [#((self.#stored_relations.len())),*].iter().copied().sum::<usize>()
+                [#(self.#stored_relations.len()),*].iter().copied().sum::<usize>()
             }
             #clear_transient
         }

@@ -4,4 +4,7 @@ version = "0.1.0"
 edition = "2021"
 
 [dependencies]
-egraph.path = "../../egraph"
+egraph.workspace = true
+
+[lints]
+workspace = true

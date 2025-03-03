@@ -112,35 +112,6 @@ compile_egraph!((
 ));
 
 fn main() {
-    let s = "(
-(datatype Math
-    (Add Math Math)
-    (Mul Math Math)
-    (Const i64)
-    (FakeVar i64)
-)
-(rewrite (Mul a (Add b c)) (Add (Mul a b) (Mul a c)))
-(rewrite (Add (Mul a b) (Mul a c)) (Mul a (Add b c)))
-(let gg 
-
-        (Mul 
-            (FakeVar 2) 
-            (Add 
-                (FakeVar 1) 
-                (FakeVar 2)
-            )
-        ) 
-
- )
-
-
-
-    )";
-
-    //let s = egraph::compile_to_str_dbg(s);
-    //println!("{s}");
-    //return;
-
     let mut theory = Theory::new();
 
     use std::time::Instant;

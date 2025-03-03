@@ -21,18 +21,22 @@ mod todo5;
 
 #[must_use]
 pub fn compile_str(source: &str) -> String {
-    // Outside the proc macro context, we
-    // - run rustfmt on the output
-    // - render any errors manually
     let source = source
         .lines()
         .filter(|line| !line.trim_start().starts_with(";") && !line.trim_start().starts_with("//"))
         .collect::<Vec<&str>>()
         .join("\n");
+    // TODO Rework `compile_dbg` handle comments. Its error reports should refer to pre-filtered source.
     let input: proc_macro2::TokenStream = source.parse().unwrap();
-    match compile_impl(quote::quote! {(#input)}) {
-        Ok(generated_code) => codegen::format_tokens(generated_code),
-        //Err(err) => format!("{err}"),
+    codegen::format_tokens(compile(quote::quote! {(#input)}))
+}
+
+#[must_use]
+pub fn compile(input: proc_macro2::TokenStream) -> proc_macro2::TokenStream {
+    let source = input.to_string();
+    let full_span = input.clone().into_iter().next().unwrap().span();
+    match compile_impl(input) {
+        Ok(generated_code) => generated_code,
         Err(errors) => {
             let errors: Vec<syn::Error> = errors.into_iter().collect();
             let mut ret = Vec::new();
@@ -40,26 +44,22 @@ pub fn compile_str(source: &str) -> String {
                 ariadne::ReportKind::Error,
                 ("foo", errors[0].span().byte_range()),
             )
-            .with_message(errors[0].clone())
-            .with_labels(
-                errors[1..].iter().map(|err| {
-                    ariadne::Label::new(("foo", err.span().byte_range())).with_message(err)
-                }),
+            .with_config(
+                ariadne::Config::new()
+                    .with_color(false)
+                    .with_index_type(ariadne::IndexType::Byte),
             )
+            .with_message(errors[0].clone())
+            .with_labels(errors.iter().map(|err| {
+                dbg!(err.span().byte_range());
+                ariadne::Label::new(("foo", err.span().byte_range())).with_message(err)
+            }))
             .finish()
             .write(ariadne::sources(Some(("foo", source))), &mut ret)
             .unwrap();
-            String::from_utf8_lossy(ret.as_slice()).to_string()
+            let msg = String::from_utf8_lossy(ret.as_slice()).to_string();
+            syn::Error::new(full_span, msg).to_compile_error()
         }
-    }
-}
-
-#[must_use]
-pub fn compile(source: proc_macro2::TokenStream) -> proc_macro2::TokenStream {
-    // In a proc macro context, errors are surfaced using `compile_error!`
-    match compile_impl(source) {
-        Ok(output) => output,
-        Err(err) => err.to_compile_error(),
     }
 }
 
@@ -201,7 +201,7 @@ mod test {
                 __: a
                 __: b
                 __: c, d
-                Insert:
+                Insert: 
 
             "#]]),
             expected_lir: None,
@@ -342,6 +342,9 @@ mod test {
                     fn clear_new(&mut self) {}
                     fn update_finalize(&mut self, uf: &mut Unification) {}
                     fn emit_graphviz(&self, buf: &mut String) {}
+                    fn len(&self) -> usize {
+                        self.all.len()
+                    }
                 }
                 #[derive(Debug, Default)]
                 struct MulRelation {
@@ -473,10 +476,13 @@ mod test {
                     fn emit_graphviz(&self, buf: &mut String) {
                         use std::fmt::Write;
                         for (i, (x0, x1, x2)) in self.all_index_0_1_2.iter().copied().enumerate() {
-                            write!(buf, "{}{i} -> {}{};", "mul", "math", x0);
-                            write!(buf, "{}{i} -> {}{};", "mul", "math", x1);
-                            write!(buf, "{}{i} -> {}{};", "mul", "math", x2);
+                            write!(buf, "{}{i} -> {}{};", "mul", "math", x0).unwrap();
+                            write!(buf, "{}{i} -> {}{};", "mul", "math", x1).unwrap();
+                            write!(buf, "{}{i} -> {}{};", "mul", "math", x2).unwrap();
                         }
+                    }
+                    fn len(&self) -> usize {
+                        self.all_index_0_1_2.len()
                     }
                 }
                 #[derive(Debug, Default)]
@@ -609,10 +615,13 @@ mod test {
                     fn emit_graphviz(&self, buf: &mut String) {
                         use std::fmt::Write;
                         for (i, (x0, x1, x2)) in self.all_index_0_1_2.iter().copied().enumerate() {
-                            write!(buf, "{}{i} -> {}{};", "add", "math", x0);
-                            write!(buf, "{}{i} -> {}{};", "add", "math", x1);
-                            write!(buf, "{}{i} -> {}{};", "add", "math", x2);
+                            write!(buf, "{}{i} -> {}{};", "add", "math", x0).unwrap();
+                            write!(buf, "{}{i} -> {}{};", "add", "math", x1).unwrap();
+                            write!(buf, "{}{i} -> {}{};", "add", "math", x2).unwrap();
                         }
+                    }
+                    fn len(&self) -> usize {
+                        self.all_index_0_1_2.len()
                     }
                 }
                 #[derive(Debug, Default)]
@@ -711,9 +720,12 @@ mod test {
                     fn emit_graphviz(&self, buf: &mut String) {
                         use std::fmt::Write;
                         for (i, (x0, x1)) in self.all_index_0_1.iter().copied().enumerate() {
-                            write!(buf, "{}{i} -> {}{};", "const", "i64", x0);
-                            write!(buf, "{}{i} -> {}{};", "const", "math", x1);
+                            write!(buf, "{}{i} -> {}{};", "const", "i64", x0).unwrap();
+                            write!(buf, "{}{i} -> {}{};", "const", "math", x1).unwrap();
                         }
+                    }
+                    fn len(&self) -> usize {
+                        self.all_index_0_1.len()
                     }
                 }
                 #[derive(Debug, Default)]
@@ -885,6 +897,17 @@ mod test {
                         buf.push_str("}");
                         buf
                     }
+                    fn get_total_relation_entry_count(&self) -> usize {
+                        [
+                            self.forall_math_relation.len(),
+                            self.mul_relation.len(),
+                            self.add_relation.len(),
+                            self.const_relation.len(),
+                        ]
+                        .iter()
+                        .copied()
+                        .sum::<usize>()
+                    }
                     #[inline(never)]
                     fn clear_transient(&mut self) {
                         self.global_variables.new = false;
@@ -995,6 +1018,9 @@ mod test {
                     fn clear_new(&mut self) {}
                     fn update_finalize(&mut self, uf: &mut Unification) {}
                     fn emit_graphviz(&self, buf: &mut String) {}
+                    fn len(&self) -> usize {
+                        self.all.len()
+                    }
                 }
                 #[derive(Debug, Default)]
                 struct FooRelation {
@@ -1093,9 +1119,12 @@ mod test {
                     fn emit_graphviz(&self, buf: &mut String) {
                         use std::fmt::Write;
                         for (i, (x0, x1)) in self.all_index_0_1.iter().copied().enumerate() {
-                            write!(buf, "{}{i} -> {}{};", "foo", "math", x0);
-                            write!(buf, "{}{i} -> {}{};", "foo", "math", x1);
+                            write!(buf, "{}{i} -> {}{};", "foo", "math", x0).unwrap();
+                            write!(buf, "{}{i} -> {}{};", "foo", "math", x1).unwrap();
                         }
+                    }
+                    fn len(&self) -> usize {
+                        self.all_index_0_1.len()
                     }
                 }
                 #[derive(Debug, Default)]
@@ -1186,9 +1215,12 @@ mod test {
                     fn emit_graphviz(&self, buf: &mut String) {
                         use std::fmt::Write;
                         for (i, (x0, x1)) in self.all_index_0_1.iter().copied().enumerate() {
-                            write!(buf, "{}{i} -> {}{};", "bar", "math", x0);
-                            write!(buf, "{}{i} -> {}{};", "bar", "math", x1);
+                            write!(buf, "{}{i} -> {}{};", "bar", "math", x0).unwrap();
+                            write!(buf, "{}{i} -> {}{};", "bar", "math", x1).unwrap();
                         }
+                    }
+                    fn len(&self) -> usize {
+                        self.all_index_0_1.len()
                     }
                 }
                 #[derive(Debug, Default)]
@@ -1288,9 +1320,12 @@ mod test {
                     fn emit_graphviz(&self, buf: &mut String) {
                         use std::fmt::Write;
                         for (i, (x0, x1)) in self.all_index_0_1.iter().copied().enumerate() {
-                            write!(buf, "{}{i} -> {}{};", "baz", "math", x0);
-                            write!(buf, "{}{i} -> {}{};", "baz", "math", x1);
+                            write!(buf, "{}{i} -> {}{};", "baz", "math", x0).unwrap();
+                            write!(buf, "{}{i} -> {}{};", "baz", "math", x1).unwrap();
                         }
+                    }
+                    fn len(&self) -> usize {
+                        self.all_index_0_1.len()
                     }
                 }
                 #[derive(Debug, Default)]
@@ -1406,10 +1441,13 @@ mod test {
                     fn emit_graphviz(&self, buf: &mut String) {
                         use std::fmt::Write;
                         for (i, (x0, x1, x2)) in self.all_index_0_1_2.iter().copied().enumerate() {
-                            write!(buf, "{}{i} -> {}{};", "triangle", "math", x0);
-                            write!(buf, "{}{i} -> {}{};", "triangle", "math", x1);
-                            write!(buf, "{}{i} -> {}{};", "triangle", "math", x2);
+                            write!(buf, "{}{i} -> {}{};", "triangle", "math", x0).unwrap();
+                            write!(buf, "{}{i} -> {}{};", "triangle", "math", x1).unwrap();
+                            write!(buf, "{}{i} -> {}{};", "triangle", "math", x2).unwrap();
                         }
+                    }
+                    fn len(&self) -> usize {
+                        self.all_index_0_1_2.len()
                     }
                 }
                 #[derive(Debug, Default)]
@@ -1548,6 +1586,18 @@ mod test {
                         buf.push_str("}");
                         buf
                     }
+                    fn get_total_relation_entry_count(&self) -> usize {
+                        [
+                            self.forall_math_relation.len(),
+                            self.foo_relation.len(),
+                            self.bar_relation.len(),
+                            self.baz_relation.len(),
+                            self.triangle_relation.len(),
+                        ]
+                        .iter()
+                        .copied()
+                        .sum::<usize>()
+                    }
                     #[inline(never)]
                     fn clear_transient(&mut self) {
                         self.global_variables.new = false;
@@ -1662,6 +1712,9 @@ mod test {
                     fn clear_new(&mut self) {}
                     fn update_finalize(&mut self, uf: &mut Unification) {}
                     fn emit_graphviz(&self, buf: &mut String) {}
+                    fn len(&self) -> usize {
+                        self.all.len()
+                    }
                 }
                 #[derive(Debug, Default)]
                 struct MulRelation {
@@ -1805,10 +1858,13 @@ mod test {
                     fn emit_graphviz(&self, buf: &mut String) {
                         use std::fmt::Write;
                         for (i, (x0, x1, x2)) in self.all_index_0_1_2.iter().copied().enumerate() {
-                            write!(buf, "{}{i} -> {}{};", "mul", "math", x0);
-                            write!(buf, "{}{i} -> {}{};", "mul", "math", x1);
-                            write!(buf, "{}{i} -> {}{};", "mul", "math", x2);
+                            write!(buf, "{}{i} -> {}{};", "mul", "math", x0).unwrap();
+                            write!(buf, "{}{i} -> {}{};", "mul", "math", x1).unwrap();
+                            write!(buf, "{}{i} -> {}{};", "mul", "math", x2).unwrap();
                         }
+                    }
+                    fn len(&self) -> usize {
+                        self.all_index_0_1_2.len()
                     }
                 }
                 #[derive(Debug, Default)]
@@ -1941,10 +1997,13 @@ mod test {
                     fn emit_graphviz(&self, buf: &mut String) {
                         use std::fmt::Write;
                         for (i, (x0, x1, x2)) in self.all_index_0_1_2.iter().copied().enumerate() {
-                            write!(buf, "{}{i} -> {}{};", "add", "math", x0);
-                            write!(buf, "{}{i} -> {}{};", "add", "math", x1);
-                            write!(buf, "{}{i} -> {}{};", "add", "math", x2);
+                            write!(buf, "{}{i} -> {}{};", "add", "math", x0).unwrap();
+                            write!(buf, "{}{i} -> {}{};", "add", "math", x1).unwrap();
+                            write!(buf, "{}{i} -> {}{};", "add", "math", x2).unwrap();
                         }
+                    }
+                    fn len(&self) -> usize {
+                        self.all_index_0_1_2.len()
                     }
                 }
                 #[derive(Debug, Default)]
@@ -2075,6 +2134,16 @@ mod test {
                         buf.push_str("}");
                         buf
                     }
+                    fn get_total_relation_entry_count(&self) -> usize {
+                        [
+                            self.forall_math_relation.len(),
+                            self.mul_relation.len(),
+                            self.add_relation.len(),
+                        ]
+                        .iter()
+                        .copied()
+                        .sum::<usize>()
+                    }
                     #[inline(never)]
                     fn clear_transient(&mut self) {
                         self.global_variables.new = false;
@@ -2195,6 +2264,9 @@ mod test {
                     fn clear_new(&mut self) {}
                     fn update_finalize(&mut self, uf: &mut Unification) {}
                     fn emit_graphviz(&self, buf: &mut String) {}
+                    fn len(&self) -> usize {
+                        self.all.len()
+                    }
                 }
                 #[derive(Debug, Default)]
                 struct MulRelation {
@@ -2326,10 +2398,13 @@ mod test {
                     fn emit_graphviz(&self, buf: &mut String) {
                         use std::fmt::Write;
                         for (i, (x0, x1, x2)) in self.all_index_0_1_2.iter().copied().enumerate() {
-                            write!(buf, "{}{i} -> {}{};", "mul", "math", x0);
-                            write!(buf, "{}{i} -> {}{};", "mul", "math", x1);
-                            write!(buf, "{}{i} -> {}{};", "mul", "math", x2);
+                            write!(buf, "{}{i} -> {}{};", "mul", "math", x0).unwrap();
+                            write!(buf, "{}{i} -> {}{};", "mul", "math", x1).unwrap();
+                            write!(buf, "{}{i} -> {}{};", "mul", "math", x2).unwrap();
                         }
+                    }
+                    fn len(&self) -> usize {
+                        self.all_index_0_1_2.len()
                     }
                 }
                 #[derive(Debug, Default)]
@@ -2462,10 +2537,13 @@ mod test {
                     fn emit_graphviz(&self, buf: &mut String) {
                         use std::fmt::Write;
                         for (i, (x0, x1, x2)) in self.all_index_0_1_2.iter().copied().enumerate() {
-                            write!(buf, "{}{i} -> {}{};", "add", "math", x0);
-                            write!(buf, "{}{i} -> {}{};", "add", "math", x1);
-                            write!(buf, "{}{i} -> {}{};", "add", "math", x2);
+                            write!(buf, "{}{i} -> {}{};", "add", "math", x0).unwrap();
+                            write!(buf, "{}{i} -> {}{};", "add", "math", x1).unwrap();
+                            write!(buf, "{}{i} -> {}{};", "add", "math", x2).unwrap();
                         }
+                    }
+                    fn len(&self) -> usize {
+                        self.all_index_0_1_2.len()
                     }
                 }
                 #[derive(Debug, Default)]
@@ -2580,6 +2658,16 @@ mod test {
                         self.add_relation.emit_graphviz(&mut buf);
                         buf.push_str("}");
                         buf
+                    }
+                    fn get_total_relation_entry_count(&self) -> usize {
+                        [
+                            self.forall_math_relation.len(),
+                            self.mul_relation.len(),
+                            self.add_relation.len(),
+                        ]
+                        .iter()
+                        .copied()
+                        .sum::<usize>()
                     }
                     #[inline(never)]
                     fn clear_transient(&mut self) {
