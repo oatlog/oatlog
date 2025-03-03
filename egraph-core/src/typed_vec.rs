@@ -46,14 +46,6 @@ impl<K: Id, V> TVec<K, V> {
     pub(crate) fn iter_enumerate(&self) -> impl Iterator<Item = (K, &V)> {
         (0..).map(K::from).zip(self.x.iter())
     }
-    /// `.iter_mut().enumerate()` with typed indexes
-    pub(crate) fn iter_mut_enumerate(&mut self) -> impl Iterator<Item = (K, &mut V)> {
-        (0..).map(K::from).zip(self.x.iter_mut())
-    }
-    /// `.into_iter().enumerate()` with typed indexes
-    pub(crate) fn into_iter_enumerate(self) -> impl Iterator<Item = (K, V)> {
-        (0..).map(K::from).zip(self.x.into_iter())
-    }
     pub(crate) fn push_expected(&mut self, expected_id: K, v: V) {
         assert_eq!(self.x.len(), expected_id.into());
         self.x.push(v);
@@ -71,9 +63,6 @@ impl<K: Id, V> TVec<K, V> {
     }
     pub(crate) fn inner_mut(&mut self) -> &mut Vec<V> {
         &mut self.x
-    }
-    pub(crate) fn into_inner(self) -> Vec<V> {
-        self.x
     }
     /// Collect values that arrive out-of-order
     /// asserts that the ids are contiguous.

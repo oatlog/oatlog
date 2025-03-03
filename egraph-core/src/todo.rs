@@ -84,7 +84,7 @@ impl NegRelation {
         loop {
             let math_self_uprooted_offset = math_self_uprooted.len();
 
-            for (insertion, a, b) in ops_insertions_else_removals.iter_mut() {
+            for (insertion, a, b) in &mut ops_insertions_else_removals {
                 if !*insertion {
                     continue;
                 }
@@ -118,13 +118,12 @@ impl NegRelation {
             ));
             if new_ops_insertions_else_removals.is_empty() {
                 break;
-            } else {
-                mem::swap(
-                    &mut new_ops_insertions_else_removals,
-                    &mut ops_insertions_else_removals,
-                );
-                new_ops_insertions_else_removals.clear();
             }
+            mem::swap(
+                &mut new_ops_insertions_else_removals,
+                &mut ops_insertions_else_removals,
+            );
+            new_ops_insertions_else_removals.clear();
         }
     }
 }
@@ -159,7 +158,10 @@ fn batch_api(
 struct Others<'a, T>(&'a [Vec<T>], &'a [Vec<T>]);
 impl<'a, T: Copy> Others<'a, T> {
     fn is_empty(&self) -> bool {
-        self.0.iter().chain(self.1.iter()).all(|v| v.is_empty())
+        self.0
+            .iter()
+            .chain(self.1.iter())
+            .all(std::vec::Vec::is_empty)
     }
     fn get(self) -> impl 'a + Iterator<Item = T> {
         self.0.iter().chain(self.1.iter()).flatten().copied()

@@ -1,4 +1,5 @@
 mod test {
+    #[cfg(test)]
     mod test_simple_math {
         use egraph::runtime::EclassProvider;
 
@@ -29,7 +30,7 @@ mod test {
             }
 
             fn union(&mut self, a: Math, b: Math) {
-                self.uf.math_uf.union(a, b)
+                self.uf.math_uf.union(a, b);
             }
         }
 
@@ -74,7 +75,7 @@ mod test {
     }
     mod test_advanced_math {
 
-        use egraph::runtime::EclassProvider;
+        use egraph::runtime::EclassProvider as _;
 
         egraph::compile_egraph!((
             (datatype Math

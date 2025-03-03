@@ -70,14 +70,14 @@ pub(crate) fn index_selection(
         columns_to_uses.entry(order).or_default().push((i, prefix));
     }
     let index_info: TVec<IndexId, IndexInfo> = columns_to_uses
-        .iter()
-        .map(|(order, _)| {
+        .keys()
+        .map(|order| {
             let perm = order.invert_permutation();
-            let index_info = IndexInfo {
+
+            IndexInfo {
                 order: order.clone(),
                 perm,
-            };
-            index_info
+            }
         })
         .collect();
     let index_usage_to_index: TVec<IndexUsageId, IndexUsageInfo> =
@@ -114,7 +114,7 @@ mod test {
                 .map(|x| x.into_iter().map(ColumnId).collect())
                 .collect();
         let (logical_to_physical, physical_indexes) = index_selection(columns, &uses);
-        expect![[r#"
+        expect![["
             [
                 IndexUsageInfo {
                     prefix: 1,
@@ -141,14 +141,14 @@ mod test {
                     index: ir4,
                 },
             ]
-        "#]]
+        "]]
         .assert_debug_eq(&logical_to_physical);
-        expect![[r#"
+        expect![["
             0 1 2 3
             1 0 2 3
             1 3 0 2
             2 0 1 3
-            3 0 1 2"#]]
+            3 0 1 2"]]
         .assert_eq(
             &physical_indexes
                 .iter()

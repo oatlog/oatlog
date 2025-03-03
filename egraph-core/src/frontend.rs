@@ -179,18 +179,17 @@ pub(crate) fn parse(x: proc_macro2::TokenStream) -> syn::Result<hir::Theory> {
                     Delimiter::None => {
                         let trees: Vec<TokenTree> = stream.into_iter().collect();
                         if trees.len() != 1 {
-                            return ret!("unexpected input 1");
+                            ret!("unexpected input 1");
                         }
                         let TokenTree::Literal(literal) = trees.into_iter().next().unwrap() else {
-                            return ret!("unexpected input 2");
+                            ret!("unexpected input 2");
                         };
                         let syn::Lit::Str(literal) = syn::Lit::new(literal) else {
-                            return ret!("unexpected input 3");
+                            ret!("unexpected input 3");
                         };
                         let stream = literal_to_tokenstream_strip_comments(&literal.value())?;
                         parser.parse_egglog(stream)?;
                     }
-                    Delimiter::None => ret!("expected delimiter"),
                 }
             }
             TokenTree::Ident(ident) => ret!(ident.span(), "unexpected literal"),
@@ -200,24 +199,23 @@ pub(crate) fn parse(x: proc_macro2::TokenStream) -> syn::Result<hir::Theory> {
                 match x {
                     syn::Lit::Str(literal) => {
                         let stream = literal_to_tokenstream_strip_comments(&literal.value())?;
-                        parser.parse_egglog(stream)?
+                        parser.parse_egglog(stream)?;
                     }
                     _ => ret!(x.span(), "expected a string literal"),
                 }
             }
         }
     }
-    return Ok(parser.emit_hir());
+    Ok(parser.emit_hir())
 }
 
 fn literal_to_tokenstream_strip_comments(literal: &str) -> syn::Result<proc_macro2::TokenStream> {
     let tokens: proc_macro2::TokenStream = literal
         .lines()
-        .filter(|line| !line.trim_start().starts_with(";") && !line.trim_start().starts_with("//"))
+        .filter(|line| !line.trim_start().starts_with(';') && !line.trim_start().starts_with("//"))
         .collect::<Vec<&str>>()
         .join("\n")
-        .parse()
-        .unwrap();
+        .parse()?;
     Ok(tokens)
 }
 
@@ -421,7 +419,7 @@ struct TypeData {
     name: Str,
     /// (Vec i64) -> ["Vec", "i64"]
     collection: Option<Vec<Str>>,
-    /// i64 -> "std::primitive::i64"
+    /// i64 -> `std::primitive::i64`
     primitive: Option<&'static str>,
 }
 impl TypeData {
@@ -1065,7 +1063,6 @@ impl Parser {
         );
         // TODO: should collection types have a forall?
         if collection.is_none() && primitive.is_none() {
-            dbg!(*name);
             let relation_id = self.functions.push(None);
             self.hir_relations
                 .push_expected(relation_id, hir::Relation::forall(*name, type_id));
@@ -1095,7 +1092,7 @@ impl Parser {
         });
         let relation_id = self.functions.push(Some(FunctionData {
             name,
-            inputs: inputs.into_iter().copied().collect(),
+            inputs: inputs.iter().copied().collect(),
             output: output_or_unit,
             merge: merge.cloned(),
             cost,
@@ -1508,7 +1505,7 @@ impl Parser {
                 .map(|x| match &x.compute {
                     ComputeMethod::Literal(Literal::I64(x)) => codegen::GlobalCompute::new_i64(*x),
                     ComputeMethod::Function { function, args } => {
-                        codegen::GlobalCompute::new_call(*function, &*args)
+                        codegen::GlobalCompute::new_call(*function, args)
                     }
 
                     _ => panic!("only literal ints are implemented for globals"),
@@ -1553,7 +1550,7 @@ mod compile_rule {
 
     use crate::{
         hir,
-        ids::{GlobalId, RelationId, TypeId, TypeVarId, VariableId},
+        ids::{RelationId, TypeId, TypeVarId, VariableId},
         typed_vec::TVec,
         union_find::UFData,
     };
@@ -1761,8 +1758,7 @@ mod compile_rule {
                                 // NOTE: we assume type constraints where added earlier.
                                 self.functions[*id]
                                     .as_ref()
-                                    .map(|function| function.check_compatible(&at, rt))
-                                    .unwrap_or(true)
+                                    .is_none_or(|function| function.check_compatible(&at, rt))
                             });
 
                             match ids.as_slice() {

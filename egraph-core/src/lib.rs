@@ -23,12 +23,12 @@ mod todo5;
 pub fn compile_str(source: &str) -> String {
     let source = source
         .lines()
-        .filter(|line| !line.trim_start().starts_with(";") && !line.trim_start().starts_with("//"))
+        .filter(|line| !line.trim_start().starts_with(';') && !line.trim_start().starts_with("//"))
         .collect::<Vec<&str>>()
         .join("\n");
     // TODO Rework `compile_dbg` handle comments. Its error reports should refer to pre-filtered source.
     let input: proc_macro2::TokenStream = source.parse().unwrap();
-    codegen::format_tokens(compile(quote::quote! {(#input)}))
+    codegen::format_tokens(&compile(quote::quote! {(#input)}))
 }
 
 #[must_use]
@@ -100,7 +100,7 @@ fn force_backtrace<T, F: FnOnce() -> T + std::panic::UnwindSafe>(f: F) -> T {
                     Ok(s) => *s,
                     Err(err) => match err.downcast::<&str>() {
                         Ok(s) => s.to_string(),
-                        Err(_err) => format!("unknown panic payload"),
+                        Err(_err) => "unknown panic payload".to_string(),
                     },
                 };
 
@@ -201,7 +201,6 @@ mod test {
                 __: a
                 __: b
                 __: c, d
-                Insert: 
 
             "#]]),
             expected_lir: None,
@@ -2185,24 +2184,6 @@ mod test {
 
     #[test]
     fn test_into_codegen() {
-        let _code = "(
-            (datatype Math
-                (Mul Math Math)
-                (Add Math Math)
-            )
-            (rule ((= e (Add a b) )) ((= e (Add b a))))
-            (rewrite (Mul (Add a b) c) (Add (Mul a c) (Mul b c)))
-        )";
-        let _code = "(
-            (sort Zeroth)
-            (sort First)
-            (sort Second)
-
-            (relation Add (Zeroth First Second))
-
-            (rule ((Add a b c) (Add d b e)) ((= c e)))
-            (rule ((Add b a c) (Add b d e)) ((= c e)))
-        )";
         Steps {
             code: "(
                 (datatype Math (Mul Math Math) (Add Math Math))
@@ -2719,16 +2700,19 @@ mod test {
             let input_tokens = self.code.parse().unwrap();
 
             let hir = frontend::parse(input_tokens).unwrap();
-            self.expected_hir
-                .map(|exp| exp.assert_eq(&hir.dbg_summary()));
+            if let Some(exp) = self.expected_hir {
+                exp.assert_eq(&hir.dbg_summary())
+            }
 
             let (_, codegen) = hir::query_planning::emit_codegen_theory(hir);
-            self.expected_lir
-                .map(|exp| exp.assert_eq(&format!("{codegen:#?}")));
+            if let Some(exp) = self.expected_lir {
+                exp.assert_eq(&format!("{codegen:#?}"))
+            }
 
             let output_tokens = codegen::codegen(&codegen);
-            self.expected_codegen
-                .map(|exp| codegen::test::check(output_tokens, exp));
+            if let Some(exp) = self.expected_codegen {
+                codegen::test::check(output_tokens, exp)
+            }
         }
     }
 }

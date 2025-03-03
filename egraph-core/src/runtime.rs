@@ -190,6 +190,7 @@ impl<T> std::fmt::Debug for UnionFind<T> {
 }
 impl<T: Eclass> UnionFind<T> {
     #[inline]
+    #[must_use]
     pub fn new() -> Self {
         Self {
             repr: Vec::new(),

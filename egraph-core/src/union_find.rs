@@ -1,10 +1,7 @@
 use std::{
     cell::Cell,
-    hash::Hash,
     ops::{Index, IndexMut},
 };
-
-use itertools::Itertools as _;
 
 use crate::ids::Id;
 
@@ -67,10 +64,11 @@ impl<K: Id, V> UFData<K, V> {
             Some((i, &self.data[i.into()]))
         })
     }
+    #[cfg(test)]
     pub(crate) fn iter_sets(&self) -> impl Iterator<Item = &[K]> {
         (0..self.repr.len())
-            .map(|i| self.sets[self.find(i.into()).into()].as_slice())
-            .unique()
+            .filter(|&i| i == self.find(i.into()).into())
+            .map(|i| self.sets[i].as_slice())
     }
     /// Iterate the sets that contain > 1 element.
     pub(crate) fn iter_merged_sets(&self) -> impl Iterator<Item = &[K]> {

@@ -1,7 +1,8 @@
-#![allow(unused)]
 #![allow(dead_code)]
 #![allow(private_interfaces)]
-use crate::runtime::*;
+use crate::runtime::{
+    Clear as _, Eclass, EclassProvider as _, RangeQuery as _, Relation, RelationElement, UnionFind,
+};
 use std::{collections::BTreeSet, mem::take};
 #[derive(Copy, Clone, Eq, PartialEq, Ord, PartialOrd, Default, Debug)]
 pub struct I64(u32);
@@ -106,7 +107,7 @@ impl Relation for MulRelation {
     type Row = (Math, Math, Math);
 }
 impl MulRelation {
-    const COST: u32 = 9u32;
+    const COST: u32 = 9_u32;
     fn new() -> Self {
         Self::default()
     }
@@ -151,26 +152,26 @@ impl MulRelation {
     ) {
         self.new.clear();
         let mut op_insert = take(delta);
-        for (x0, x1, x2) in op_insert.iter_mut() {
+        for (x0, x1, x2) in &mut op_insert {
             *x0 = math_uf.find(*x0);
             *x1 = math_uf.find(*x1);
             *x2 = math_uf.find(*x2);
         }
         let mut op_delete = Vec::new();
         for x0 in math_uprooted.iter().copied() {
-            println!("uproot: {:?}", x0);
+            println!("uproot: {x0:?}");
             for (x1, x2) in self.iter1_0_1_2(x0) {
                 op_delete.push((x0, x1, x2));
             }
         }
         for x1 in math_uprooted.iter().copied() {
-            println!("uproot: {:?}", x1);
+            println!("uproot: {x1:?}");
             for (x0, x2) in self.iter1_1_0_2(x1) {
                 op_delete.push((x0, x1, x2));
             }
         }
         for x2 in math_uprooted.iter().copied() {
-            println!("uproot: {:?}", x2);
+            println!("uproot: {x2:?}");
             for (x0, x1) in self.iter1_2_0_1(x2) {
                 op_delete.push((x0, x1, x2));
             }
@@ -212,7 +213,7 @@ impl Relation for AddRelation {
     type Row = (Math, Math, Math);
 }
 impl AddRelation {
-    const COST: u32 = 9u32;
+    const COST: u32 = 9_u32;
     fn new() -> Self {
         Self::default()
     }
@@ -244,7 +245,7 @@ impl AddRelation {
         let x2 = math_uf.add_eclass();
         delta.forall_math_relation_delta.push(x2);
         delta.add_relation_delta.push((x0, x1, x2));
-        return (x2);
+        (x2)
     }
     fn iter2_0_1_2(&self, x0: Math, x1: Math) -> impl Iterator<Item = (Math)> + use<'_> {
         self.all_index_0_1_2
@@ -281,26 +282,26 @@ impl AddRelation {
     ) {
         self.new.clear();
         let mut op_insert = take(delta);
-        for (x0, x1, x2) in op_insert.iter_mut() {
+        for (x0, x1, x2) in &mut op_insert {
             *x0 = math_uf.find(*x0);
             *x1 = math_uf.find(*x1);
             *x2 = math_uf.find(*x2);
         }
         let mut op_delete = Vec::new();
         for x0 in math_uprooted.iter().copied() {
-            println!("uproot: {:?}", x0);
+            println!("uproot: {x0:?}");
             for (x1, x2) in self.iter1_0_1_2(x0) {
                 op_delete.push((x0, x1, x2));
             }
         }
         for x1 in math_uprooted.iter().copied() {
-            println!("uproot: {:?}", x1);
+            println!("uproot: {x1:?}");
             for (x0, x2) in self.iter1_1_0_2(x1) {
                 op_delete.push((x0, x1, x2));
             }
         }
         for x2 in math_uprooted.iter().copied() {
-            println!("uproot: {:?}", x2);
+            println!("uproot: {x2:?}");
             for (x0, x1) in self.iter1_2_0_1(x2) {
                 op_delete.push((x0, x1, x2));
             }
@@ -342,26 +343,26 @@ impl AddRelation {
     }
     fn update_safe(&mut self, uprooted: &Uprooted, uf: &mut Unification, delta: &mut Delta) {
         let mut op_insert = take(&mut delta.add_relation_delta);
-        for (x0, x1, x2) in op_insert.iter_mut() {
+        for (x0, x1, x2) in &mut op_insert {
             *x0 = uf.math_uf.find(*x0);
             *x1 = uf.math_uf.find(*x1);
             *x2 = uf.math_uf.find(*x2);
         }
         let mut op_delete = Vec::new();
         for x0 in uprooted.math_uprooted.iter().copied() {
-            println!("uproot: {:?}", x0);
+            println!("uproot: {x0:?}");
             for (x1, x2) in self.iter1_0_1_2(x0) {
                 op_delete.push((x0, x1, x2));
             }
         }
         for x1 in uprooted.math_uprooted.iter().copied() {
-            println!("uproot: {:?}", x1);
+            println!("uproot: {x1:?}");
             for (x0, x2) in self.iter1_1_0_2(x1) {
                 op_delete.push((x0, x1, x2));
             }
         }
         for x2 in uprooted.math_uprooted.iter().copied() {
-            println!("uproot: {:?}", x2);
+            println!("uproot: {x2:?}");
             for (x0, x1) in self.iter1_2_0_1(x2) {
                 op_delete.push((x0, x1, x2));
             }
@@ -397,7 +398,7 @@ impl AddRelation {
     }
 
     fn update_finalize(&mut self, math_uf: &mut UnionFind<Math>) {
-        for (x0, x1, x2) in self.new.iter_mut() {
+        for (x0, x1, x2) in &mut self.new {
             *x0 = math_uf.find(*x0);
             *x1 = math_uf.find(*x1);
             *x2 = math_uf.find(*x2);
@@ -408,7 +409,7 @@ impl AddRelation {
 
     fn update_better1(&mut self, uprooted: &Uprooted, uf: &mut Unification, delta: &mut Delta) {
         let mut op_insert = take(&mut delta.add_relation_delta);
-        for (x0, x1, x2) in op_insert.iter_mut() {
+        for (x0, x1, x2) in &mut op_insert {
             *x0 = uf.math_uf.find(*x0);
             *x1 = uf.math_uf.find(*x1);
             *x2 = uf.math_uf.find(*x2);
@@ -500,7 +501,7 @@ impl AddRelation {
 
     fn update_better2(&mut self, uprooted: &Uprooted, uf: &mut Unification, delta: &mut Delta) {
         let mut op_insert = take(&mut delta.add_relation_delta);
-        for (x0, x1, x2) in op_insert.iter_mut() {
+        for (x0, x1, x2) in &mut op_insert {
             *x0 = uf.math_uf.find(*x0);
             *x1 = uf.math_uf.find(*x1);
             *x2 = uf.math_uf.find(*x2);
@@ -643,7 +644,7 @@ impl Uprooted {
         self.math_uprooted.clear();
     }
     fn swap_dirt(&mut self, unification: &mut Unification) {
-        std::mem::swap(&mut self.math_uprooted, unification.math_uf.dirty())
+        std::mem::swap(&mut self.math_uprooted, unification.math_uf.dirty());
     }
 }
 struct Unification {
@@ -707,7 +708,7 @@ impl MathSetContext {
             // handle_to_set
             self.handle_to_set.remove(&handle);
             // math_to_handles
-            for x in set.iter() {
+            for x in &set {
                 self.math_to_handles.remove(x);
             }
             // set_insert
@@ -729,7 +730,7 @@ impl Relation for MathSetInsert {
 }
 impl MathSetInsert {
     fn new() -> Self {
-        Self::default()
+        Self
     }
     // mutation here is fine since it is not observable?
     // iterator invalidation due to mutation impossible because of use<>.

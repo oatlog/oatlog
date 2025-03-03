@@ -1,4 +1,5 @@
-use egraph::*;
+use egraph::compile_egraph;
+use std::time::Instant;
 
 // TODO: this is missing:
 // * globals
@@ -114,7 +115,6 @@ compile_egraph!((
 fn main() {
     let mut theory = Theory::new();
 
-    use std::time::Instant;
     let start = Instant::now();
 
     let mut step = 0;

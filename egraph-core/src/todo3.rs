@@ -16,7 +16,7 @@ trait Clear: Sized {
 }
 impl<T> Clear for Vec<T> {
     fn clear(&mut self) {
-        Vec::clear(self)
+        Vec::clear(self);
     }
 }
 
@@ -89,7 +89,7 @@ impl Math {
 #[rustfmt::skip]
 impl From<u32> for Math { fn from(value: u32) -> Self { Self(value) } }
 #[rustfmt::skip]
-impl Into<u32> for Math { fn into(self) -> u32 { self.0 } }
+impl From<Math> for u32 { fn from(val: Math) -> Self { val.0 } }
 impl Eclass for Math {
     fn new(value: u32) -> Self {
         todo!()
@@ -109,7 +109,7 @@ impl Other {
 #[rustfmt::skip]
 impl From<u32> for Other { fn from(value: u32) -> Self { Self(value) } }
 #[rustfmt::skip]
-impl Into<u32> for Other { fn into(self) -> u32 { self.0 } }
+impl From<Other> for u32 { fn from(val: Other) -> Self { val.0 } }
 impl Eclass for Other {
     fn new(value: u32) -> Self {
         todo!()
@@ -322,8 +322,8 @@ impl Egraph {
 
         // collect newly uprooted.
 
-        self.math_uproot.take_scratch(&mut self.uf_math.dirty());
-        self.other_uproot.take_scratch(&mut self.uf_other.dirty());
+        self.math_uproot.take_scratch(self.uf_math.dirty());
+        self.other_uproot.take_scratch(self.uf_other.dirty());
     }
     fn apply_rules(&mut self) {
         // bi-directional implicit functionality

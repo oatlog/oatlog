@@ -177,7 +177,7 @@ impl AddRelation {
 
         let mut op_insert = take(delta);
 
-        for (x0, x1, x2) in op_insert.iter_mut() {
+        for (x0, x1, x2) in &mut op_insert {
             *x0 = uf_math.find(*x0);
             *x1 = uf_math.find(*x1);
             *x2 = uf_math.find(*x2);

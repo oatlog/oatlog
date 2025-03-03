@@ -8,7 +8,6 @@ use crate::{
     union_find::{UF, UFData},
 };
 
-use educe::Educe;
 #[cfg(test)]
 use itertools::Itertools as _;
 
@@ -34,7 +33,7 @@ use std::{
 /// If there is not a conflict, the rule is not run at all.
 ///
 /// TODO: add optimization pass to turn symbolic rules to implicit rules.
-#[derive(Clone, Eq, PartialEq, Ord, PartialOrd, Hash, Debug, Default)]
+#[derive(Clone, Eq, PartialEq, Ord, PartialOrd, Hash, Debug)]
 pub(crate) struct ImplicitRule {
     pub(crate) relation: RelationId,
     /// If there is something in the database with the same values for these columns, trigger the rule.
@@ -73,6 +72,7 @@ impl ImplicitRule {
         };
         Self { relation, on, ty }
     }
+    #[allow(unused)]
     fn to_symbolic(&self, relations: &TVec<RelationId, Relation>) -> Result<SymbolicRule, ()> {
         Ok(match self.ty {
             // TODO: impl panic like this maybe
@@ -136,10 +136,9 @@ impl ImplicitRule {
     }
 }
 
-#[derive(Clone, Eq, PartialEq, Ord, PartialOrd, Hash, Debug, Default)]
+#[derive(Clone, Eq, PartialEq, Ord, PartialOrd, Hash, Debug)]
 pub(crate) enum ImplicitRuleAction {
     /// Panics if values do not match.
-    #[default]
     Panic,
     /// Unifies all columns not mentioned in `on`
     Unification,
@@ -162,7 +161,7 @@ pub(crate) enum ImplicitRuleAction {
 }
 
 /// Represents a theory (set of rules) with associated information
-#[derive(Clone, Debug, Default)]
+#[derive(Clone, Debug)]
 pub(crate) struct Theory {
     /// Name of final struct
     pub(crate) name: &'static str,
@@ -172,10 +171,11 @@ pub(crate) struct Theory {
     pub(crate) relations: TVec<RelationId, Relation>,
     pub(crate) global_compute: TVec<GlobalId, crate::codegen::GlobalCompute>,
     pub(crate) global_types: TVec<GlobalId, TypeId>,
+    #[allow(unused)]
     pub(crate) global_to_relation: TVec<GlobalId, RelationId>,
 }
 
-#[derive(Copy, Clone, Eq, PartialEq, Ord, PartialOrd, Hash, Debug, Default)]
+#[derive(Copy, Clone, Eq, PartialEq, Ord, PartialOrd, Hash, Debug)]
 pub(crate) struct Type {
     /// Name of type (sort Math) -> "Math"
     pub(crate) name: &'static str,
@@ -196,11 +196,10 @@ impl Type {
     }
 }
 
-#[derive(Copy, Clone, Eq, PartialEq, Ord, PartialOrd, Hash, Debug, Default)]
+#[derive(Copy, Clone, Eq, PartialEq, Ord, PartialOrd, Hash, Debug)]
 pub(crate) enum TypeKind {
     /// can be unified by user
     /// always a wrapper around a u32
-    #[default]
     Symbolic,
     // /// can not be unified by user
     // /// always a wrapper around a u32
@@ -214,7 +213,7 @@ pub(crate) enum TypeKind {
 /// All relations have some notion of "new" and "all"
 /// "new" is never indexed, only iteration is possible.
 /// "all" is sometimes indexed.
-#[derive(Clone, Eq, PartialEq, Ord, PartialOrd, Hash, Debug, Default)]
+#[derive(Clone, Eq, PartialEq, Ord, PartialOrd, Hash, Debug)]
 pub(crate) struct Relation {
     /// name from egglog (eg Add)
     pub(crate) name: &'static str,
@@ -255,7 +254,7 @@ impl Relation {
     }
 }
 
-#[derive(Clone, Eq, PartialEq, Ord, PartialOrd, Hash, Debug, Default)]
+#[derive(Clone, Eq, PartialEq, Ord, PartialOrd, Hash, Debug)]
 pub(crate) enum RelationTy {
     /// Same as other relation but referring to the "new" part of it.
     /// Only supports iteration
@@ -263,10 +262,10 @@ pub(crate) enum RelationTy {
     /// An actual table with arbitrarily many indexes.
     /// Supports inserts, iteration, lookup for arbitrary indexes
     /// The only type that might be extractable.
-    #[default]
     Table,
     /// Points to another relation along with a permutation of variables.
     /// Will be desugared
+    #[allow(unused)]
     Alias {
         permutation: TVec<ColumnId, ColumnId>,
         other: RelationId,
@@ -277,6 +276,7 @@ pub(crate) enum RelationTy {
     Global { id: GlobalId },
     /// Externally defined, predefined set of indexes.
     /// Supports inserts, iteration, lookup for some indexes.
+    #[allow(unused)]
     Primitive {
         // context: ComtextId,
         // indexes: Vec<(Vec<ColumnId>, path_to_function)>,
@@ -291,7 +291,7 @@ pub(crate) enum RelationTy {
 }
 
 #[must_use]
-#[derive(Clone, Debug, Default)]
+#[derive(Clone, Debug)]
 pub(crate) struct SymbolicRule {
     pub(crate) name: &'static str,
     /// Requirements to trigger rule
@@ -312,14 +312,14 @@ pub(crate) struct SymbolicRule {
     pub(crate) premise_variables: TVec<PremiseId, VariableMeta>,
 }
 
-#[derive(Copy, Clone, Eq, PartialEq, Ord, PartialOrd, Hash, Debug, Default)]
+#[derive(Copy, Clone, Eq, PartialEq, Ord, PartialOrd, Hash, Debug)]
 pub(crate) struct VariableMeta {
     pub(crate) name: &'static str,
     pub(crate) ty: TypeId,
 }
 impl VariableMeta {
     fn into_codegen(&self, id: impl Display) -> codegen::VariableData {
-        let name = if self.name == "" {
+        let name = if self.name.is_empty() {
             id.to_string().leak()
         } else {
             self.name
@@ -347,12 +347,12 @@ impl VariableMeta {
     }
 }
 
-#[derive(Clone, Eq, PartialEq, Ord, PartialOrd, Hash, Debug, Default)]
+#[derive(Clone, Eq, PartialEq, Ord, PartialOrd, Hash, Debug)]
 pub(crate) struct ActionRelation {
     pub(crate) relation: RelationId,
     pub(crate) args: TVec<ColumnId, ActionId>,
 }
-#[derive(Clone, Eq, PartialEq, Ord, PartialOrd, Hash, Debug, Default)]
+#[derive(Clone, Eq, PartialEq, Ord, PartialOrd, Hash, Debug)]
 pub(crate) struct PremiseRelation {
     pub(crate) relation: RelationId,
     pub(crate) args: TVec<ColumnId, PremiseId>,
@@ -365,7 +365,7 @@ pub(crate) struct RuleArgs {
     pub(crate) name: &'static str,
     /// Flag these variables as part of the premise even if not explicitly mentioned.
     pub(crate) sort_vars: Vec<VariableId>,
-    /// Set of variables with their types and names (default = "")
+    /// Set of variables with their types and names
     pub(crate) variables: TVec<VariableId, (TypeId, &'static str)>,
     /// If true, triggers action
     pub(crate) premise: Vec<(RelationId, Vec<VariableId>)>,
@@ -425,7 +425,7 @@ impl RuleArgs {
         let action_variables: TVec<ActionId, _> = self_variables
             .iter_enumerate()
             .map(|(i, (ty, name))| {
-                let meta = VariableMeta::new(*name, *ty);
+                let meta = VariableMeta::new(name, *ty);
                 let link = (used_in_premise.contains(&i)).then_some(PremiseId(i.0));
                 (meta, link)
             })
@@ -649,7 +649,7 @@ impl SymbolicRule {
                 let exists_in_premise = a.args.iter().zip(p.args.iter()).all(|(&a, &p)| {
                     self.action_variables[a]
                         .1
-                        .map_or(false, |s| self.unify.set(s).contains(&p))
+                        .is_some_and(|s| self.unify.set(s).contains(&p))
                 });
                 if exists_in_premise {
                     return false;
@@ -759,6 +759,7 @@ impl SymbolicRule {
         }
     }
     /// Reorder premises into a canonical order.
+    #[allow(unused)]
     fn canonical_permutation(&self) -> Self {
         // is self contained in other?
         // TODO: ignores "forall" variables.
@@ -825,7 +826,7 @@ impl SymbolicRule {
             .collect();
         let mut unify: UF<PremiseId> = UF::new_with_size(self.premise_variables.len(), ());
         for (a, b, ()) in self.unify.iter_all() {
-            unify.union(permutation[a], permutation[a]);
+            unify.union(permutation[a], permutation[b]);
         }
         let action_variables: TVec<ActionId, _> = self
             .action_variables
@@ -839,11 +840,15 @@ impl SymbolicRule {
             })
             .collect();
 
-        let mut premise_variables =
-            TVec::new_with_size(self.premise_variables.len(), VariableMeta::default());
-        for (i, m) in self.premise_variables.iter_enumerate() {
-            premise_variables[permutation[i]] = *m;
+        let mut inv_permutation = permutation.clone();
+        for (a, &b) in permutation.iter_enumerate() {
+            inv_permutation[b] = a;
         }
+        let premise_variables: TVec<PremiseId, VariableMeta> = self
+            .premise_variables
+            .enumerate()
+            .map(|k| self.premise_variables[inv_permutation[k]])
+            .collect();
 
         SymbolicRule {
             name: self.name,
@@ -954,16 +959,15 @@ impl Theory {
                     )
                 })
                 .join(", ");
-            wln!("Insert: {insert}");
+            if !insert.is_empty() {
+                wln!("Insert: {insert}");
+            }
 
             wln!();
         }
 
         buf
     }
-}
-mod hir_to_codegen {
-    //! Transform hir::Theory to codegen::Theory.
 }
 pub(crate) mod query_planning {
     //! All query plan *choices* occur here.
@@ -983,14 +987,13 @@ pub(crate) mod query_planning {
         mem::replace,
     };
 
-    #[derive(Copy, Clone, Eq, PartialEq, Ord, PartialOrd, Hash, Debug, Default)]
+    #[derive(Copy, Clone, Eq, PartialEq, Ord, PartialOrd, Hash, Debug)]
     enum Query {
         /// DOES NOT INTRODUCE VARIABLES. Check if there are ANY tuples matching given
         /// bound variables. Can compile to an if statement.
         CheckViable,
         /// INTRODUCES VARIABLES. Iterate all matching tuples given bound variables.
         /// Can compile to a for loop.
-        #[default]
         Iterate,
     }
 
@@ -1103,20 +1106,20 @@ pub(crate) mod query_planning {
                         |implicit_rules| {
                             implicit_rules
                                 .iter()
-                                .map(|ImplicitRule { relation, on, ty }| match ty {
-                                    hir::ImplicitRuleAction::Lattice {
-                                        ops,
-                                        variables,
-                                        old,
-                                        new,
-                                        res,
-                                    } => todo!(),
-                                    hir::ImplicitRuleAction::Panic => todo!(),
-                                    hir::ImplicitRuleAction::Unification => {
-                                        let index = uses.push(on.clone());
-                                        codegen::ImplicitRule::new_union(index)
-                                    }
-                                })
+                                .map(
+                                    |ImplicitRule {
+                                         relation: _,
+                                         on,
+                                         ty,
+                                     }| match ty {
+                                        hir::ImplicitRuleAction::Lattice { .. }
+                                        | hir::ImplicitRuleAction::Panic => todo!(),
+                                        hir::ImplicitRuleAction::Unification => {
+                                            let index = uses.push(on.clone());
+                                            codegen::ImplicitRule::new_union(index)
+                                        }
+                                    },
+                                )
                                 .collect()
                         },
                     );
@@ -1149,7 +1152,7 @@ pub(crate) mod query_planning {
             .collect();
 
         let codegen_theory = codegen::Theory {
-            name: "",
+            name: theory.name,
             types,
             relations: codegen_relations,
             global_compute: theory.global_compute.clone(),
@@ -1280,12 +1283,12 @@ pub(crate) mod query_planning {
                     ) => {
                         panic!("should have been desugared")
                     }
-                    (Query::Iterate, RelationTy::Global { id }) => codegen::RuleAtom::Premise {
+                    (Query::Iterate, RelationTy::Global { id: _ }) => codegen::RuleAtom::Premise {
                         relation,
                         args,
                         index: IndexUsageId::bogus(),
                     },
-                    (Query::CheckViable, RelationTy::Global { id }) => {
+                    (Query::CheckViable, RelationTy::Global { id: _ }) => {
                         codegen::RuleAtom::PremiseAny {
                             relation,
                             args,
@@ -1394,8 +1397,7 @@ pub(crate) mod query_planning {
                         None => score = NoQuery,
                     }
 
-                    let score = (score, connected);
-                    score
+                    (score, connected)
                 })
                 .enumerate()
                 .max_by_key(|(_, x)| *x)
@@ -1418,17 +1420,16 @@ pub(crate) mod query_planning {
                         .map(|x| currently_bound[*x] || newly_bound.contains(x))
                         .collect();
                     // only apply constraints if we actually got any newly bound
-                    if relation.args.iter().any(|x| newly_bound.contains(x)) {
-                        if theory.is_viable(relation.relation, &bound) {
-                            if bound.iter().copied().all(identity) {
-                                query_plan.push((Query::CheckViable, relation.clone(), bound));
-                                // if all the variables are now bound, we do not need to
-                                // iterate it again later.
-                                return false;
-                            } else {
-                                query_plan.push((Query::CheckViable, relation.clone(), bound));
-                            }
+                    if relation.args.iter().any(|x| newly_bound.contains(x))
+                        && theory.is_viable(relation.relation, &bound)
+                    {
+                        if bound.iter().copied().all(identity) {
+                            query_plan.push((Query::CheckViable, relation.clone(), bound));
+                            // if all the variables are now bound, we do not need to
+                            // iterate it again later.
+                            return false;
                         }
+                        query_plan.push((Query::CheckViable, relation.clone(), bound));
                     }
                     true
                 });
@@ -1471,8 +1472,6 @@ pub(crate) mod query_planning {
 
     impl Theory {
         /// INVARIANT: call this exactly once.
-
-        /// INVARIANT: call this exactly once.
         fn add_delta_relations_in_place(&mut self) -> BTreeMap<RelationId, RelationId> {
             self.relations
                 .enumerate()
@@ -1510,6 +1509,8 @@ pub(crate) mod query_planning {
         }
 
         /// Apply implicit rules and promote to implicit rules.
+        // TODO: Implement this
+        #[allow(unused)]
         fn optimize(&self) -> Self {
             self.clone()
         }

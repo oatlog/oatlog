@@ -1,7 +1,7 @@
 use clap::Parser;
 use std::{
     fs,
-    io::{self, Read, Write},
+    io::{self, Read as _, Write as _},
     path::PathBuf,
 };
 
@@ -19,13 +19,12 @@ struct Cli {
 fn main() {
     let cli = Cli::parse();
 
-    let input = match cli.input {
-        Some(path) => fs::read_to_string(path).unwrap(),
-        None => {
-            let mut input = String::new();
-            io::stdin().lock().read_to_string(&mut input).unwrap();
-            input
-        }
+    let input = if let Some(path) = cli.input {
+        fs::read_to_string(path).unwrap()
+    } else {
+        let mut input = String::new();
+        io::stdin().lock().read_to_string(&mut input).unwrap();
+        input
     };
 
     let output = egraph::compile_str(&input);
