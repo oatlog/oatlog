@@ -2,6 +2,7 @@
 
 #![allow(unused_parens)]
 
+pub use std::hash::Hash;
 pub use std::{collections::BTreeSet, mem::swap, mem::take};
 
 use std::{collections::BTreeMap, marker::PhantomData};
@@ -29,8 +30,21 @@ pub trait Eclass: RelationElement {
     fn inner(self) -> u32;
 }
 
+impl RelationElement for u32 {
+    const MAX_ID: Self = 0;
+    const MIN_ID: Self = 0;
+}
+impl Eclass for u32 {
+    fn new(x: u32) -> u32 {
+        x
+    }
+    fn inner(self) -> u32 {
+        self
+    }
+}
+
 /// Some type that can be put in a relation.
-pub trait RelationElement: Copy + Clone + Eq + PartialEq + Ord + PartialOrd {
+pub trait RelationElement: Copy + Clone + Eq + PartialEq + Ord + PartialOrd + Hash + Eq {
     /// Minimum id value according to Ord
     /// Used to implement range queries.
     const MIN_ID: Self;
@@ -50,7 +64,7 @@ impl RelationElement for bool {
     const MAX_ID: Self = true;
 }
 
-#[derive(Copy, Clone, Eq, PartialEq, Ord, PartialOrd)]
+#[derive(Copy, Clone, Eq, PartialEq, Ord, PartialOrd, Hash)]
 pub struct IString(u32);
 impl RelationElement for IString {
     const MIN_ID: Self = IString(u32::MIN);
@@ -143,21 +157,23 @@ pub trait EclassProvider<T: Eclass> {
 /// Emit this instead to make codegen a bit cleaner.
 #[macro_export]
 macro_rules! eclass_wrapper_ty {
-    ($name:ident) => {
-        #[derive(Copy, Clone, Eq, PartialEq, Ord, PartialOrd, Default)]
-        pub struct $name(u32);
-        impl Eclass for $name {
-            fn new(value: u32) -> Self {
-                Self(value)
+    ($($name:ident),*) => {
+        $(
+            #[derive(Copy, Clone, Eq, PartialEq, Ord, PartialOrd, Default, Hash)]
+            pub struct $name(u32);
+            impl Eclass for $name {
+                fn new(value: u32) -> Self {
+                    Self(value)
+                }
+                fn inner(self) -> u32 {
+                    self.0
+                }
             }
-            fn inner(self) -> u32 {
-                self.0
+            impl RelationElement for $name {
+                const MIN_ID: Self = Self(0);
+                const MAX_ID: Self = Self(u32::MAX);
             }
-        }
-        impl RelationElement for $name {
-            const MIN_ID = Self(0);
-            const MAX_ID = Self(u32::MAX);
-        }
+        )*
     };
 }
 

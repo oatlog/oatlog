@@ -28,6 +28,7 @@ proc-macro2 = { version = "1", features = ["span-locations"] }
 quote = "1"
 regex = "1"
 syn = "2"
+smallvec = { version = "1.14.0", features = ["union"] }
 
 [profile.release]
 lto = "fat"

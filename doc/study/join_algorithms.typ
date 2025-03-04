@@ -625,9 +625,31 @@ has GHT schema
 - S: $[(x), (b)]$
 - T: $[(x), (c)]$
 
+
+
+== Execution
+=== Build-phase
+Compute what GHTs are needed. They depending on how GHTs will be used:
+
+`Map<A, Map<B, Map<C, Vec<()>>>>`
+
+as an optimization the last vec can be promoted:
+
+`Map<A, Map<B, Vec<C>>>`
+
+Note that A, B, C are *groups* of variables.
+
+=== Join-phase
+
+Cover is iterated, others act as filters.
+
+
 == COLT
 
 A lazily constructed trie.
+
+Start from zero indexing and maintain row numbers.
+
 
 == Query planning
 
@@ -796,4 +818,39 @@ Unions of conjunctive queries can be minimized by pairwise containment.
         - Unique indexes
         - Unique constraints
 - table constraint definitions
+
+
+
+
+= TreeTracker Join: Simple, Optimal, Fast
+For acyclic queries.
+More efficient semi-joins.
+
+I don't get it.
+
+= Predicate Transfer: Efficient Pre-Filtering on Multi-Join Queries
+Known: we can use bloom filters for semi-joins.
+
+This is just random heuristics to try to filter all tables early.
+
+
+= Debunking the Myth of Join Ordering: Toward Robust SQL Analytics
+With proper filtering arbitrary join orderings have the same complexity.
+(isn't this known??)
+
+= Robust query processing: A survey
+Full text annoying to access. Probably not many new interesting things.
+
+= Modern Techniques For Querying Graph-structured databases
+Full text annoying to access. Probably not many new interesting things.
+
+
+= Optimizing Queries with Many-to-Many Joins
+Presents a cost model that is actually understandable.
+
+Needs:
+- match probability
+- fanout
+
+
 

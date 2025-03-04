@@ -2064,7 +2064,7 @@ Because this would be a cross join between T and S, however, if we knew that the
 
 I actually am not entirely sure what the sub-arrays mean, it kind of means that we have have groups that are internally unordered.
 
-If tries are used in b-trees then curried lookups are no longer zero cost. 
+If tries are used in b-trees then curried lookups are no longer zero cost.
 
 
 = Building forall into UF
@@ -2088,7 +2088,7 @@ If at some point we no longer need a variable, we can introduce a project and do
 
 A bloom filter can give false positives, but sometimes we only want false negatives (projection DP).
 
-We can do this multiple ways. 
+We can do this multiple ways.
 The "most correct" thing might be a LRU cache.
 But we can also implement it as a hashtable that always overwrites entries.
 
@@ -2163,8 +2163,180 @@ query_plan(variants(semi_naive(q)));
 // Within one original query we probably want to compare semi-naive, and then merge globally
 ```
 
+= Definition of a query plan with pseudo- free join
+
+```rust
+let query_plan: Vec<Vec<SubAtom>>;
+```
+Partial order of sub-atoms.
+
+Add atoms in some order and aggressively move constraints upwards.
+Exploit FD to introduce variables even earlier.
 
 
+= Thinking formally about early-bailout.
+
+premise:
+$ Q_1(x_1), Q_2(x_2) $
+action:
+$ A_1(y_1), A_2(y_2), z_1 = z_2, z_3 = z_4 $
+logical expression
+$ Q_1(x_1) and Q_2(x_2) and not (A_1(y_1) and A_2(y_2) and z_1 = z_2 and z_3 = z_4) $
+$ Q_1(x_1) and Q_2(x_2) and (not A_1(y_1) or not A_2(y_2) or z_1 != z_2 or z_3 != z_4) $
+
+
+= Strange tries
+
+Assume we are using tries.
+
+The tries for A, B, C, D and  B, A, C, D can share a suffix.
+
+So when iterating the first trie, there could be a lookup on the second trie.
+
+Alternatively:
+
+```
+A -> B -> C -> D
+B -> A -> C -> D
+
+can be done with
+
+A -> B -> C -> D
+B -> A
+```
+
+Additionally, if the underlying database is sorted along one ordering we can exploit that.
+
+
+```
+A -> B -> C -> D (DB order)
+B -> A -> C -> D
+
+can be done with
+
+DB order
+B -> A
+```
+
+There is a datastructure called "set trie" that can quickly iterate subsets and supersets.
+
+// There is a datastructure called hash array mapped trie https://en.wikipedia.org/wiki/Hash_array_mapped_trie.
+
+
+Suffix trees exist but they are probably not relevant https://en.wikipedia.org/wiki/Suffix_tree.
+
+
+
+```
+both
+A -> B -> C
+A -> C -> B
+
+     o
+     |
+     A
+     |
+     o
+    / \
+   B   C
+  /     \
+ o       o
+
+```
+
+For a trie, are we *guaranteed* that no one will want to iterate while we update?
+If so, it will be sound to maintain a single array and partition it, so we only reference (with indexes) to it.
+
+This starts to smell like a lazy radix sort + add hashmap lazily.
+
+
+We can store all levels of the trie in the same map by doing this:
+
+```rust
+
+let trie: HashMap<(NodeId, char), Node>;
+
+let root = Node { id: 0 }
+
+struct Node {
+    id: u32,
+    // level is implicit in NodeId
+}
+
+
+// instead of
+struct Trie {
+    map: HashMap<char, Trie>,
+}
+
+```
+
+A problem with this is that we need dynamically sized keys (i64 vs u32).
+Dynamically sized keys are solveable though.
+
+I think it is kind-of fair for us to switch to i32.
+
+Like, if someone really needs big integers, there is bigint for that.
+
+
+In an absurd way, we could support both A -> B -> C -> D and A -> B -> D -> C with this system.
+```rust
+enum Column {
+    A,
+    B,
+    C,
+    D,
+}
+
+let trie: HashMap<(NodeId, char, Column), Node>;
+```
+
+
+
+```rust
+
+let trie: HashMap<(NodeId, char), Node>;
+
+// shared node ids is fine because we would get OOM before running out of ids.
+// (1 << 32) * (4 * 3) / 1024 / 1024 / 1024 = 48 GiB.
+let root_a = Node { id: 0 }
+let root_b = Node { id: 1 }
+let root_c = Node { id: 2 }
+let root_d = Node { id: 3 }
+
+struct Node {
+    // level is implicit
+    id: u32,
+    // (optional to maintain) range of
+    start: u32,
+    end: u32,
+}
+
+```
+
+This system is mostly equivalent to:
+
+```rust
+let trie: HashMap<NodeId, HashMap<char, Node>>;
+```
+
+= Reasoning about growth patterns.
+
+Assuming non termination, we either have (probably):
+- linear increase in database size.
+    - eg factorial or something.
+- exponential increase in database size.
+    - rule that triggers itself.
+
+For linear we do not really care about performance.
+
+Ergo, it's probably fine to assume exponential growth when thinking about performance.
+
+This justifies re-creating indexes.
+
+Another option is to dynamically pick between maintaining indexes and re-creating them.
+
+In other words, if all our queries run in less than $O(N)$, then re-using indexes is better in terms of complexity theory.
 
 = TODO research
 
@@ -2189,7 +2361,7 @@ https://dl.acm.org/doi/10.1145/3665252.3665259
 Equality Saturation Theory Exploration à la Carte
 https://dl.acm.org/doi/10.1145/3622834
 
-Free Join: Unifying Worst-Case Optimal and Traditional Joins
+DONE: Free Join: Unifying Worst-Case Optimal and Traditional Joins
 https://dl.acm.org/doi/10.1145/3589295
 
 DONE: Better Together: Unifying Datalog and Equality Saturation
@@ -2571,6 +2743,10 @@ https://dl.acm.org/profile/99660480412
 https://dl.acm.org/profile/99660345884
 
 
+
+== Yisu Remy Wang
+TODO: wrote a bunch of join papers
+
 == extra
 
 Magic Sets and Other Strange Ways to Implement Logic Programs (1985)
@@ -2604,5 +2780,58 @@ https://www.cs.cmu.edu/~dga/papers/cuckoo-conext2014.pdf
 https://cstheory.stackexchange.com/questions/6596/a-probabilistic-set-with-no-false-positives
 
 https://www.somethingsimilar.com/2012/05/21/the-opposite-of-a-bloom-filter/
+
+Robust Join Processing with Diamond Hardened Joins
+
+Flan: an expressive and efficient datalog compiler for program analysis
+
+DONE: Robust query processing: A survey
+
+DONE: Modern Techniques For Querying Graph-structured databases
+
+DONE: Predicate Transfer: Efficient Pre-Filtering on Multi-Join Queries
+
+DONE: Debunking the Myth of Join Ordering: Toward Robust SQL Analytics
+
+Optimizing Queries with Many-to-Many joins
+
+Dynamically Exploiting Factorized Representations
+
+Column-Oriented Datalog on the GPU
+
+Space & Time Efficient Leapfrog Triejoin
+
+STARTED: TreeTracker Join: Simple, Optimal, Fast
+
+Partition Constraints for Conjunctive Queries: Bounds and Worst-Case Optimal Joins
+
+Optimizing Datalog for the GPU
+
+Compilation techniques, algorithms, and data structures for efficient and expressive data processing systems
+
+Relational Programming
+
+Efficient Evaluation of Conjunctive Regular Path Queries Using Multi-way Joins
+
+https://uwplse.org/2023/11/14/Eqsat-theory-i.html
+
+https://uwplse.org/2024/02/05/Eqsat-theory-ii.html
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 

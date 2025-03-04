@@ -4,7 +4,7 @@ use crate::runtime::{
     Clear as _, Eclass, EclassProvider as _, RangeQuery as _, Relation, RelationElement, UnionFind,
 };
 use std::{collections::BTreeSet, mem::take};
-#[derive(Copy, Clone, Eq, PartialEq, Ord, PartialOrd, Default, Debug)]
+#[derive(Copy, Clone, Eq, PartialEq, Ord, PartialOrd, Default, Debug, Hash)]
 pub struct I64(u32);
 impl Eclass for I64 {
     fn new(value: u32) -> Self {
@@ -18,7 +18,7 @@ impl RelationElement for I64 {
     const MIN_ID: Self = Self(0);
     const MAX_ID: Self = Self(u32::MAX);
 }
-#[derive(Copy, Clone, Eq, PartialEq, Ord, PartialOrd, Default, Debug)]
+#[derive(Copy, Clone, Eq, PartialEq, Ord, PartialOrd, Default, Debug, Hash)]
 pub struct F64(u32);
 impl Eclass for F64 {
     fn new(value: u32) -> Self {
@@ -32,7 +32,7 @@ impl RelationElement for F64 {
     const MIN_ID: Self = Self(0);
     const MAX_ID: Self = Self(u32::MAX);
 }
-#[derive(Copy, Clone, Eq, PartialEq, Ord, PartialOrd, Default, Debug)]
+#[derive(Copy, Clone, Eq, PartialEq, Ord, PartialOrd, Default, Debug, Hash)]
 pub struct String(u32);
 impl Eclass for String {
     fn new(value: u32) -> Self {
@@ -46,7 +46,7 @@ impl RelationElement for String {
     const MIN_ID: Self = Self(0);
     const MAX_ID: Self = Self(u32::MAX);
 }
-#[derive(Copy, Clone, Eq, PartialEq, Ord, PartialOrd, Default, Debug)]
+#[derive(Copy, Clone, Eq, PartialEq, Ord, PartialOrd, Default, Debug, Hash)]
 pub struct Bool(u32);
 impl Eclass for Bool {
     fn new(value: u32) -> Self {
@@ -60,7 +60,7 @@ impl RelationElement for Bool {
     const MIN_ID: Self = Self(0);
     const MAX_ID: Self = Self(u32::MAX);
 }
-#[derive(Copy, Clone, Eq, PartialEq, Ord, PartialOrd, Default, Debug)]
+#[derive(Copy, Clone, Eq, PartialEq, Ord, PartialOrd, Default, Debug, Hash)]
 pub struct Unit(u32);
 impl Eclass for Unit {
     fn new(value: u32) -> Self {
@@ -74,7 +74,7 @@ impl RelationElement for Unit {
     const MIN_ID: Self = Self(0);
     const MAX_ID: Self = Self(u32::MAX);
 }
-#[derive(Copy, Clone, Eq, PartialEq, Ord, PartialOrd, Default, Debug)]
+#[derive(Copy, Clone, Eq, PartialEq, Ord, PartialOrd, Default, Debug, Hash)]
 pub struct Math(u32);
 impl Eclass for Math {
     fn new(value: u32) -> Self {
@@ -651,7 +651,7 @@ struct Unification {
     math_uf: UnionFind<Math>,
 }
 
-#[derive(Copy, Clone, Eq, PartialEq, Ord, PartialOrd, Default, Debug)]
+#[derive(Copy, Clone, Eq, PartialEq, Ord, PartialOrd, Default, Debug, Hash)]
 pub struct MathSet(u32);
 impl Eclass for MathSet {
     fn new(value: u32) -> Self {

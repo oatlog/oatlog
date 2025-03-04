@@ -18,6 +18,8 @@ mod todo3;
 pub mod todo4;
 #[allow(unused)]
 mod todo5;
+#[allow(unused)]
+mod todo_join;
 
 #[must_use]
 pub fn compile_str(source: &str) -> String {

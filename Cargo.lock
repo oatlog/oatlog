@@ -305,6 +305,7 @@ dependencies = [
  "proc-macro2",
  "quote",
  "regex",
+ "smallvec",
  "syn 2.0.98",
 ]
 

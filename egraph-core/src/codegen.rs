@@ -61,6 +61,10 @@ pub(crate) struct TypeData {
     name: &'static str,
     // TODO: primitives
     ty: TypeKind,
+    // TODO erik for loke: Unit is only really used as a placeholder thing in the frontend and
+    // assuming everything works correctly it should be removed in the frontend.
+    //
+    // Do we expect actual user provided ZSTs?
     zero_sized: bool,
 }
 impl TypeData {
@@ -997,7 +1001,7 @@ pub fn codegen(theory: &Theory) -> TokenStream {
             TypeKind::Symbolic => {
                 let type_ty = ident::type_ty(type_);
                 Some(quote! {
-                    #[derive(Copy, Clone, Eq, PartialEq, Ord, PartialOrd, Default, Debug)]
+                    #[derive(Copy, Clone, Eq, PartialEq, Ord, PartialOrd, Default, Debug, Hash)]
                     pub struct #type_ty(u32);
                     impl Eclass for #type_ty {
                         fn new(value: u32) -> Self {

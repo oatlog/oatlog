@@ -12,6 +12,7 @@ proc-macro2.workspace = true
 quote.workspace = true
 regex.workspace = true
 syn.workspace = true
+smallvec.workspace = true
 
 [dev-dependencies]
 expect-test.workspace = true
