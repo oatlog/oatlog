@@ -34,6 +34,15 @@ compile_egraph!((
     (Var String)
 )
 
+
+(rewrite (Integral (Sin x) x) (Mul (Const -1) (Cos x)))
+(rewrite (Sub a b) (Add a (Mul (Const -1) b)))
+
+// (rewrite (Sub a a) (Const 0)) // TODO: crashes proc macro, maybe because same variable was used
+// twice?
+
+(rewrite (Diff x (Cos x)) (Mul (Const -1) (Sin x)))
+
 (rewrite (Add a b) (Add b a))
 (rewrite (Mul a b) (Mul b a))
 (rewrite (Add a (Add b c)) (Add (Add a b) c))

@@ -248,9 +248,42 @@ mod test {
         .check();
     }
 
-    fn check_hir(code: &str, expected: expect_test::Expect) {
-        let hir = frontend::parse(code.parse().unwrap()).unwrap();
-        expected.assert_eq(&hir.dbg_summary());
+    #[test]
+    fn test_negative_i64_tokens() {
+        Steps {
+            code : "(
+                (datatype Math
+                    (Mul Math Math)
+                    (Add Math Math)
+                    (Sub Math Math)
+                    (Const i64)
+                )
+                (let neg_two (Const -2))
+                (rewrite (Const -1) (Const -1))
+            )",
+            expected_hir: Some(expect![[r#"
+                Theory "":
+
+                Math(Math)
+                Mul(Math, Math, Math)
+                Add(Math, Math, Math)
+                Sub(Math, Math, Math)
+                Const(i64, Math)
+                g0(i64)
+                g1(Math)
+                g2(i64)
+
+                Rule "":
+                Premise: g2(p0), Const(p0, p1)
+                __: p0
+                a1: p1
+                a0: __
+                Insert: Const(a0, a1), g2(a0)
+
+            "#]]),
+            expected_lir: None,
+            expected_codegen: None,
+        }.check();
     }
 
     #[test]

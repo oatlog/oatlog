@@ -16,7 +16,9 @@ use itertools::Itertools as _;
 use proc_macro2::{Delimiter, Span, TokenTree};
 
 use crate::{
-    codegen, hir, ids::{ColumnId, GlobalId, Id, RelationId, TypeId, VariableId},  typed_vec::TVec
+    codegen, hir,
+    ids::{ColumnId, GlobalId, Id, RelationId, TypeId, VariableId},
+    typed_vec::TVec,
 };
 
 #[rustfmt::skip]
@@ -369,7 +371,6 @@ impl SexpSpan {
                 TokenTree::Ident(ident) => {
                     let text = ident.to_string();
                     let span = ident.span();
-
                     add_partial!(text, span);
                 }
                 TokenTree::Punct(punct) => {
@@ -385,24 +386,46 @@ impl SexpSpan {
                         x: Sexp::List(Self::parse_stream(group.stream())?.leak()),
                     });
                 }
-                TokenTree::Literal(x) => {
-                    end_token!();
-                    let x = syn::Lit::new(x);
-                    v.push(SexpSpan {
-                        span: x.span(),
-                        x: Sexp::Literal(Spanned::new(
-                            match &x {
-                                syn::Lit::Str(x) => Literal::String(&*x.value().leak()),
-                                syn::Lit::Int(x) => Literal::I64(x.base10_parse().unwrap()),
-                                syn::Lit::Float(x) => {
-                                    Literal::F64(OrdF64(x.base10_parse().unwrap()))
-                                }
-                                syn::Lit::Bool(lit_bool) => Literal::Bool(lit_bool.value()),
-                                _ => ret_!(x.span(), "unexpected literal"),
-                            },
-                            x.span(),
-                        )),
-                    });
+                TokenTree::Literal(rustc_lit) => {
+                    let syn_lit = syn::Lit::new(rustc_lit);
+                    let span = syn_lit.span();
+                    let x = Sexp::Literal(Spanned::new(
+                        match &syn_lit {
+                            syn::Lit::Str(x) => {
+                                end_token!();
+                                Literal::String(&*x.value().leak())
+                            }
+                            syn::Lit::Int(x) => {
+                                let text: String = x.base10_parse::<i64>()?.to_string();
+                                add_partial!(text, span);
+                                let Some((_, span, text)) = take(&mut partial) else {
+                                    panic!();
+                                };
+                                Literal::I64(
+                                    text.parse()
+                                        .map_err(|_| syn::Error::new(span, "invalid i64"))?,
+                                )
+                            }
+                            syn::Lit::Float(x) => {
+                                let text: String = x.base10_parse::<f64>()?.to_string();
+                                add_partial!(text, span);
+                                let Some((_, span, text)) = take(&mut partial) else {
+                                    panic!();
+                                };
+                                Literal::F64(OrdF64(
+                                    text.parse()
+                                        .map_err(|_| syn::Error::new(span, "invalid f64"))?,
+                                ))
+                            }
+                            syn::Lit::Bool(lit_bool) => {
+                                end_token!();
+                                Literal::Bool(lit_bool.value())
+                            }
+                            _ => ret_!(syn_lit.span(), "unexpected literal"),
+                        },
+                        syn_lit.span(),
+                    ));
+                    v.push(SexpSpan { span, x });
                 }
             }
         }
@@ -780,6 +803,7 @@ impl Parser {
 
     fn parse_egglog(&mut self, stream: proc_macro2::TokenStream) -> syn::Result<()> {
         let sexp = SexpSpan::parse_stream(stream)?;
+        dbg!(&sexp);
         for sexp in sexp {
             self.parse_toplevel(sexp).add_err(syn::Error::new(
                 sexp.span,
@@ -1503,7 +1527,9 @@ impl Parser {
                 .iter()
                 .map(|x| match &x.compute {
                     ComputeMethod::Literal(Literal::I64(x)) => codegen::GlobalCompute::new_i64(*x),
-                    ComputeMethod::Literal(Literal::String(x)) => codegen::GlobalCompute::new_string((*x).to_owned(), &mut interner),
+                    ComputeMethod::Literal(Literal::String(x)) => {
+                        codegen::GlobalCompute::new_string((*x).to_owned(), &mut interner)
+                    }
                     ComputeMethod::Function { function, args } => {
                         codegen::GlobalCompute::new_call(*function, args)
                     }
