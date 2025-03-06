@@ -33,6 +33,19 @@
 // ==== A subsubsection
 
 
+TODO: complain about concrete thing, LLVM, very clearly show that phase ordering is bad, use text from proposal.
+
+
+
+```rust
+loop {
+    opt_a();
+    opt_b();
+    opt_c();
+    if fixpoint { break; }
+}
+```
+
 // from planning report
 A traditional optimizing compiler applies optimization passes sequentially and destructively, in
 such a way that earlier passes may perform rewrites that both unlock and inhibit other optimizations
@@ -142,6 +155,29 @@ and faculty time for this project is outweighed by its research value.
 
 
 = Background <thesection>
+
+- intro
+    - what is egglog
+    - why view e-graphs as relational databases
+- rule pre-processing
+    - semi-naive
+- query planning
+- query implementation/index implementation ("runtime stuff")
+- misc
+    - functional dependency/implicit functionality axiom.
+    - termination/scheduling
+    - union-find
+    - cannicalization
+        - why eager?
+
+
+- (main)
+    - our irs
+        - (optimizations)
+        - formal definition
+    - implementation
+        - we are making a macro
+        - architecture diagram of IRs.
 
 META: what is egraph, then why is e-graph database, then how is database implemented/optimize database.
 
@@ -261,7 +297,7 @@ Thinking about uninterpreted partial functions is a bit abstract, so I think it 
 
 For example, consider a partial function that performs addition, which we can represent as a table:
 #table(
-  columns: (1fr, auto, auto),
+  columns: (auto, auto, auto),
   inset: 10pt,
   align: horizon,
   table.header(
@@ -274,7 +310,7 @@ For example, consider a partial function that performs addition, which we can re
 This is a partial function because it's domain is a subset of all pairs of natural numbers.
 But since these are uninterpreted, we do not have actual values, but instead E-classes:
 #table(
-  columns: (1fr, auto, auto),
+  columns: (auto, auto, auto),
   inset: 10pt,
   align: horizon,
   table.header(
@@ -344,7 +380,7 @@ pseudocode we get the following for $"all" join "new" join "old"$:
 
 ```rust
 for _ in b_new(..) {
-    for _ in a_new(..) + a_old(..) {
+    for _ in concat(a_new(..), a_old(..)) {
         for _ in c_old(..) {
             ..
         }
@@ -398,6 +434,7 @@ and selecting optimal indexes and index data-structures.
 something something trie, logical physical indexes, flow.
 
 == Data structure selection
+
 We currently care about the following operations for (trie-like) indexes:
 - *insert*: Insert a list of $M$ tuples.
 - (*trigger*: Insert a list of $M$ tuples or perform action if something is in the database.)
@@ -493,6 +530,7 @@ rule distributive_law {
 ```
 
 == Rust
+
 The above could be transformed into something like this Rust pseudocode,
 ```rust
 for (t0, c, e) in tables.mul.iter() {
