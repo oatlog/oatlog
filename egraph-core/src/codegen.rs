@@ -66,6 +66,8 @@ pub(crate) struct TypeData {
     // assuming everything works correctly it should be removed in the frontend.
     //
     // Do we expect actual user provided ZSTs?
+    //
+    // loke: Agree this can be desugared. We should get `comparative-test/path_union` passing somehow and delete this.
     zero_sized: bool,
 }
 impl TypeData {
