@@ -1253,6 +1253,7 @@ mod colt2 {
         /// # Safety
         ///
         /// Only sound if no other shared references exist, and single thread.
+        #[allow(clippy::mut_from_ref)]
         unsafe fn get_mut(&self) -> &mut QMapInner<A, B> {
             let ptr: *mut QMapInner<A, B> = self.0.get();
             let mut_ref: &mut QMapInner<A, B> = unsafe { &mut *ptr };

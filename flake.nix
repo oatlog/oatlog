@@ -18,18 +18,26 @@
       let
         pkgs = import inputs.nixpkgs {
           inherit system;
-          overlays =
-            [ inputs.rust-overlay.overlays.default ];
+          overlays = [ inputs.rust-overlay.overlays.default ];
         };
 
         lib = pkgs.lib;
 
-        cargoNix = import ./Cargo.nix { inherit pkgs; };
+        rust-stable = pkgs.rust-bin.stable.latest.default;
+
+        cargoNix = import ./Cargo.nix {
+          inherit pkgs;
+          buildRustCrateForPkgs = crate:
+            pkgs.buildRustCrate.override {
+              rustc = rust-stable;
+              cargo = rust-stable;
+            };
+        };
       in {
         formatter = pkgs.writeShellApplication {
           name = "format";
           runtimeInputs =
-            [ pkgs.rust-bin.stable.latest.default pkgs.nixfmt-classic ];
+            [ rust-stable pkgs.nixfmt-classic ];
           text = ''
             set -v
             cargo fmt --all
@@ -40,8 +48,8 @@
           nativeBuildInputs = let p = pkgs;
           in [
             p.bashInteractive
-            p.crate2nix
-            (p.rust-bin.stable.latest.default.override {
+            (p.crate2nix.override { cargo = rust-stable; })
+            (rust-stable.override {
               extensions = [ "rust-src" "rust-analyzer" ];
             })
           ];
@@ -53,16 +61,26 @@
           '';
         };
 
-        checks.default = cargoNix.workspaceMembers.egraph.build.override { runTests = true; };
+        checks.default =
+          cargoNix.workspaceMembers.egraph.build.override { runTests = true; };
 
         packages = rec {
           default = egraph;
           egraph = cargoNix.workspaceMembers.egraph.build;
           math = cargoNix.workspaceMembers.math.build;
-          mk-report = pkgs.writeShellScriptBin "mk-report" ''
+        };
+        apps = builtins.mapAttrs (k: v: {
+          type = "app";
+          program = "${pkgs.writeShellScript k v}";
+        }) {
+          mk-report = ''
             set -v
             ${lib.getExe pkgs.typst} compile ./doc/report/main.typ report.pdf \
               --font-path ${pkgs.newcomputermodern}
+          '';
+          cargo = ''
+            set -v
+            ${rust-stable}/bin/cargo "$@"
           '';
         };
       });
