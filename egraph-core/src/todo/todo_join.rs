@@ -260,7 +260,6 @@ mod trie_index {
         for a in [Element(0)] {
             let Some(root_a_bc) = ({
                 if !root__abc.lazy.replace(true) {
-
                     // NOTE: if we are at the innermost level, we can inline data into the array.
                     // Actually, the steps for sorting and trie insertion should be separate.
 

@@ -126,9 +126,9 @@ mod test {
 
                 Rule "":
                 Premise: Add(a, b, e)
+                e: e
                 a: a
                 b: b
-                e: e
                 Insert: Add(b, a, e)
 
             "#]]),
@@ -161,10 +161,10 @@ mod test {
                 b: b
                 __: p2
                 c: c
-                a5: p4
-                a3: __
+                a3: p4
                 a4: __
-                Insert: Add(a3, a4, a5), Mul(a, c, a3), Mul(b, c, a4)
+                a5: __
+                Insert: Add(a4, a5, a3), Mul(a, c, a4), Mul(b, c, a5)
 
             "#]]),
             expected_lir: None,
@@ -226,10 +226,10 @@ mod test {
                 Rule "":
                 Premise: g0(one), Const(one, p1)
                 __: one
-                a2: p1
+                a0: p1
                 b: __
                 a: __
-                Insert: Add(b, a, a2)
+                Insert: Add(b, a, a0)
 
             "#]]),
             expected_lir: None,
@@ -241,7 +241,7 @@ mod test {
     #[test]
     fn test_negative_i64_tokens() {
         Steps {
-            code : "(
+            code: "(
                 (datatype Math
                     (Mul Math Math)
                     (Add Math Math)
@@ -266,14 +266,15 @@ mod test {
                 Rule "":
                 Premise: g2(p0), Const(p0, p1)
                 __: p0
-                a1: p1
-                a0: __
-                Insert: Const(a0, a1), g2(a0)
+                a0: p1
+                a1: __
+                Insert: Const(a1, a0), g2(a1)
 
             "#]]),
             expected_lir: None,
             expected_codegen: None,
-        }.check();
+        }
+        .check();
     }
 
     #[test]
@@ -313,32 +314,32 @@ mod test {
                 Rule "":
                 Premise: g2(one), Const(one, p1)
                 __: one
-                a1: p1
+                a0: p1
                 x: __
-                Insert: Add(x, x, a1)
+                Insert: Add(x, x, a0)
 
                 Rule "":
                 Premise: g0(p0), Const(p0, p1)
                 __: p0
-                a1: p1
+                a0: p1
                 z: __
-                Insert: Add(z, z, a1)
+                Insert: Add(z, z, a0)
 
                 Rule "":
                 Premise: g3(p0), Var(p0, p1)
                 __: p0
-                a1: p1
-                a0: __
-                Insert: Var(a0, a1), g4(a0)
+                a0: p1
+                a1: __
+                Insert: Var(a1, a0), g4(a1)
 
                 Rule "":
                 Premise: g5(p1), Const(p1, p2), Mul(a, p2, p3)
                 __: a
                 __: p1
                 __: p2
-                a1: p3
-                a0: __
-                Insert: Const(a0, a1), g5(a0)
+                a0: p3
+                a1: __
+                Insert: Const(a1, a0), g5(a1)
 
             "#]]),
             expected_lir: None,
@@ -1005,30 +1006,30 @@ mod test {
                         if self.global_variables.new {
                             let p0 = self.global_variables.global_string[0usize];
                             for (p1) in self.var_relation.iter1_0_1(p0) {
-                                let a0 = self.global_variables.global_string[1usize];
-                                self.delta.insert_var((a0, p1));
+                                let a1 = self.global_variables.global_string[1usize];
+                                self.delta.insert_var((a1, p1));
                             }
                         }
                         for (p0, p1) in self.var_relation.iter_new() {
                             if p0 == self.global_variables.global_string[0usize] {
-                                let a0 = self.global_variables.global_string[1usize];
-                                self.delta.insert_var((a0, p1));
+                                let a1 = self.global_variables.global_string[1usize];
+                                self.delta.insert_var((a1, p1));
                             }
                         }
                         if self.global_variables.new {
                             let p1 = self.global_variables.global_i64[2usize];
                             for (p2) in self.const_relation.iter1_0_1(p1) {
                                 for (a, p3) in self.mul_relation.iter1_1_0_2(p2) {
-                                    let a0 = self.global_variables.global_i64[2usize];
-                                    self.delta.insert_const((a0, p3));
+                                    let a1 = self.global_variables.global_i64[2usize];
+                                    self.delta.insert_const((a1, p3));
                                 }
                             }
                         }
                         for (p1, p2) in self.const_relation.iter_new() {
                             if p1 == self.global_variables.global_i64[2usize] {
                                 for (a, p3) in self.mul_relation.iter1_1_0_2(p2) {
-                                    let a0 = self.global_variables.global_i64[2usize];
-                                    self.delta.insert_const((a0, p3));
+                                    let a1 = self.global_variables.global_i64[2usize];
+                                    self.delta.insert_const((a1, p3));
                                 }
                             }
                         }
@@ -1036,8 +1037,8 @@ mod test {
                             if self.const_relation.check1_1_0(p2) {
                                 let p1 = self.global_variables.global_i64[2usize];
                                 if self.const_relation.check2_0_1(p1, p2) {
-                                    let a0 = self.global_variables.global_i64[2usize];
-                                    self.delta.insert_const((a0, p3));
+                                    let a1 = self.global_variables.global_i64[2usize];
+                                    self.delta.insert_const((a1, p3));
                                 }
                             }
                         }
@@ -1831,9 +1832,9 @@ mod test {
                 __: p2
                 c: c
                 __: p4
-                a4: p5
-                a3: __
-                Insert: Mul(a, a3, a4), Add(b, c, a3)
+                a3: p5
+                a4: __
+                Insert: Mul(a, a4, a3), Add(b, c, a4)
 
             "#]]),
             expected_lir: None,
@@ -2256,9 +2257,9 @@ mod test {
                             if self.add_relation.check1_0_1_2(p2) {
                                 for (c, p4) in self.mul_relation.iter1_0_1_2(a) {
                                     for (p5) in self.add_relation.iter2_0_1_2(p2, p4) {
-                                        let a3 = self.delta.make_math(&mut self.uf);
-                                        self.delta.insert_add((b, c, a3));
-                                        self.delta.insert_mul((a, a3, p5));
+                                        let a4 = self.delta.make_math(&mut self.uf);
+                                        self.delta.insert_add((b, c, a4));
+                                        self.delta.insert_mul((a, a4, p5));
                                     }
                                 }
                             }
@@ -2267,9 +2268,9 @@ mod test {
                             if self.mul_relation.check1_0_1_2(a) {
                                 for (p2, p5) in self.add_relation.iter1_1_0_2(p4) {
                                     for (b) in self.mul_relation.iter2_0_2_1(a, p2) {
-                                        let a3 = self.delta.make_math(&mut self.uf);
-                                        self.delta.insert_add((b, c, a3));
-                                        self.delta.insert_mul((a, a3, p5));
+                                        let a4 = self.delta.make_math(&mut self.uf);
+                                        self.delta.insert_add((b, c, a4));
+                                        self.delta.insert_mul((a, a4, p5));
                                     }
                                 }
                             }
@@ -2278,9 +2279,9 @@ mod test {
                             if self.mul_relation.check1_2_0_1(p2) {
                                 for (a, c) in self.mul_relation.iter1_2_0_1(p4) {
                                     for (b) in self.mul_relation.iter2_0_2_1(a, p2) {
-                                        let a3 = self.delta.make_math(&mut self.uf);
-                                        self.delta.insert_add((b, c, a3));
-                                        self.delta.insert_mul((a, a3, p5));
+                                        let a4 = self.delta.make_math(&mut self.uf);
+                                        self.delta.insert_add((b, c, a4));
+                                        self.delta.insert_mul((a, a4, p5));
                                     }
                                 }
                             }
@@ -2364,10 +2365,10 @@ mod test {
                 b: b
                 __: p2
                 c: c
-                a5: p4
-                a3: __
+                a3: p4
                 a4: __
-                Insert: Mul(a, c, a3), Mul(b, c, a4), Add(a3, a4, a5)
+                a5: __
+                Insert: Mul(a, c, a4), Mul(b, c, a5), Add(a4, a5, a3)
 
             "#]]),
             expected_lir: None,
@@ -2776,20 +2777,20 @@ mod test {
                     fn apply_rules(&mut self) {
                         for (a, b, p2) in self.add_relation.iter_new() {
                             for (c, p4) in self.mul_relation.iter1_0_1_2(p2) {
+                                let a5 = self.delta.make_math(&mut self.uf);
                                 let a4 = self.delta.make_math(&mut self.uf);
-                                let a3 = self.delta.make_math(&mut self.uf);
-                                self.delta.insert_add((a3, a4, p4));
-                                self.delta.insert_mul((b, c, a4));
-                                self.delta.insert_mul((a, c, a3));
+                                self.delta.insert_add((a4, a5, p4));
+                                self.delta.insert_mul((b, c, a5));
+                                self.delta.insert_mul((a, c, a4));
                             }
                         }
                         for (p2, c, p4) in self.mul_relation.iter_new() {
                             for (a, b) in self.add_relation.iter1_2_0_1(p2) {
+                                let a5 = self.delta.make_math(&mut self.uf);
                                 let a4 = self.delta.make_math(&mut self.uf);
-                                let a3 = self.delta.make_math(&mut self.uf);
-                                self.delta.insert_add((a3, a4, p4));
-                                self.delta.insert_mul((b, c, a4));
-                                self.delta.insert_mul((a, c, a3));
+                                self.delta.insert_add((a4, a5, p4));
+                                self.delta.insert_mul((b, c, a5));
+                                self.delta.insert_mul((a, c, a4));
                             }
                         }
                     }

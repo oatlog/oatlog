@@ -71,7 +71,7 @@ impl RelationElement for IString {
     const MAX_ID: Self = IString(u32::MAX);
 }
 impl std::fmt::Display for IString {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> Result<(),std::fmt::Error> {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> Result<(), std::fmt::Error> {
         use std::fmt::Write;
         write!(f, "{self:?}")
     }
