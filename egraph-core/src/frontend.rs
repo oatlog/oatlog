@@ -803,7 +803,6 @@ impl Parser {
 
     fn parse_egglog(&mut self, stream: proc_macro2::TokenStream) -> syn::Result<()> {
         let sexp = SexpSpan::parse_stream(stream)?;
-        dbg!(&sexp);
         for sexp in sexp {
             self.parse_toplevel(sexp).add_err(syn::Error::new(
                 sexp.span,
