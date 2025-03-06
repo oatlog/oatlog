@@ -80,7 +80,8 @@
           '';
           cargo = ''
             set -v
-            ${rust-stable}/bin/cargo "$@"
+            PATH="${rust-stable}/bin:$PATH"
+            cargo "$@"
           '';
         };
       });
