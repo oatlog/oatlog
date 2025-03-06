@@ -11,6 +11,7 @@ use std::{
     ops::{Deref, DerefMut, FnMut},
 };
 
+use derive_more::From;
 use educe::Educe;
 use itertools::Itertools as _;
 use proc_macro2::{Delimiter, Span, TokenTree};
@@ -147,6 +148,147 @@ macro_rules! register_span {
             ($span2:expr, $a0:literal, $a1:tt, $a2:tt, $a3:tt, $a4:tt, $a5:tt, $a6:tt, $a7:tt, $a8:tt, $a9:tt, $a10:tt, $a11:tt, $a12:tt) => { return Err(syn::Error::new($span2, format!($a0, $a1, $a2, $a3, $a4, $a5, $a6, $a7, $a8, $a9, $a10, $a11, $a12))) };
         }
     };
+}
+
+/// Span with extra information.
+#[derive(Copy, Clone)]
+struct QSpan {
+    span: Span,
+    /// Output of `TokenStream.to_string`.
+    text_compact: &'static str,
+}
+
+/// almost the same as syn::Error, but with the ability to handle multiple files.
+#[derive(Clone)]
+struct MagicError {
+    messages: Vec<MaybeResolved>,
+}
+impl MagicError {
+    fn resolve(self, filename: Option<&'static str>, source_text: Option<&'static str>) -> Self {
+        let mut x = self;
+        x.messages
+            .iter_mut()
+            .for_each(|x| x.resolve(filename, source_text));
+        x
+    }
+    fn concat(self, other: Self) -> Self {
+        let mut x = self;
+        x.push(other);
+        x
+    }
+    fn push(&mut self, other: Self) {
+        self.messages.extend(other.messages);
+    }
+    fn span(span: QSpan, message: &'static str) -> Self {
+        Self::new(Some(span), message)
+    }
+    fn err(message: &'static str) -> Self {
+        Self::new(None, message)
+    }
+    fn new(span: Option<QSpan>, message: &'static str) -> Self {
+        Self {
+            messages: vec![MaybeResolved::Plain {
+                message: message,
+                span,
+            }],
+        }
+    }
+    fn to_compile_error(
+        &self,
+        filename: Option<&'static str>,
+        source_text: Option<&'static str>,
+    ) -> proc_macro2::TokenStream {
+        let error = self.clone().resolve(filename, source_text);
+        use quote::quote;
+        let mut stream = quote! {};
+        // syn::Error::to_compile_error(&self);
+        // let (start, end) = match self.span.get() {
+        //     Some(range) => (range.start, range.end),
+        //     None => (Span::call_site(), Span::call_site()),
+        // };
+        // ::core::compile_error!($message)
+        for msg in error.messages {
+            let MaybeResolved::Resolved {
+                filename,
+                source_text,
+                message,
+                span,
+            } = msg
+            else {
+                panic!();
+            };
+
+            if let Some(filename) = filename {
+                let source_text = source_text.unwrap();
+
+                let byte_range = if let Some(span) = span {
+                    byte_range(span.span)
+                } else {
+                    0..0
+                };
+                let mut buf = Vec::new();
+                ariadne::Report::build(ariadne::ReportKind::Error, (filename, byte_range))
+                    .with_config(
+                        ariadne::Config::new()
+                            .with_color(false)
+                            .with_index_type(ariadne::IndexType::Byte),
+                    )
+                    .with_message(message)
+                    .finish()
+                    .write(ariadne::sources(Some((filename, source_text))), &mut buf)
+                    .unwrap();
+                let msg = String::from_utf8(buf).unwrap();
+                stream.extend(quote! { ::core::compile_error!(#msg) });
+            } else {
+                let err = quote! { ::core::compile_error!(#message) };
+                stream.extend(if let Some(span) = span {
+                    err.into_iter()
+                        .map(|mut x| {
+                            x.set_span(span.span);
+                            x
+                        })
+                        .collect()
+                } else {
+                    err
+                });
+            }
+        }
+
+        stream
+    }
+}
+
+#[derive(Clone)]
+enum MaybeResolved {
+    Plain {
+        message: &'static str,
+        span: Option<QSpan>,
+    },
+    Resolved {
+        // None => toplevel, emit actual spans.
+        filename: Option<&'static str>,
+        /// Source text of entire file.
+        source_text: Option<&'static str>,
+
+        message: &'static str,
+        span: Option<QSpan>,
+    },
+}
+impl MaybeResolved {
+    fn resolve(&mut self, filename: Option<&'static str>, source_text: Option<&'static str>) {
+        match self {
+            MaybeResolved::Resolved { .. } => {}
+            MaybeResolved::Plain { message, span } => {
+                let span = span.clone();
+                *self = Self::Resolved {
+                    message,
+                    filename,
+                    source_text,
+                    span,
+                }
+            }
+        }
+    }
 }
 
 trait ResultExt {

@@ -16,7 +16,7 @@ egraph-macro.path = "egraph-macro"
 egraph-test.path = "egraph-test"
 egraph-bench.path = "egraph-bench"
 
-ariadne = "0.5"
+ariadne = { version = "0.5", features = ["auto-color"] }
 clap = { version = "4", features = ["derive"]}
 educe = "0.6"
 egglog = "0.4"
