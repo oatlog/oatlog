@@ -841,23 +841,15 @@ impl SymbolicRule {
             })
             .collect();
 
-        let mut inv_permutation = permutation.clone();
-        for (a, &b) in permutation.iter_enumerate() {
-            inv_permutation[b] = a;
-        }
-        let premise_variables: TVec<PremiseId, VariableMeta> = self
-            .premise_variables
-            .enumerate()
-            .map(|k| self.premise_variables[inv_permutation[k]])
-            .collect();
-
         SymbolicRule {
             name: self.name,
             premise_relations,
             action_relations: self.action_relations.clone(),
             unify,
             action_variables,
-            premise_variables,
+            premise_variables: self
+                .premise_variables
+                .permute(&permutation.invert_permutation()),
         }
     }
 }

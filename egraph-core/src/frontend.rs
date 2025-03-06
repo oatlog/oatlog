@@ -1619,7 +1619,7 @@ mod compile_rule {
                 let typevar = types.push(Some(ty));
                 let global_id = parser.add_global(None, ty, ComputeMethod::Literal(**literal))?;
 
-                let name = literal.map_s(|s| "");
+                let name = literal.map_s(|_| "");
 
                 let variable_id = variables.push(VariableInfo {
                     label: Some(name),

@@ -1,7 +1,5 @@
 use crate::ids::Id;
-
 use itertools::Itertools as _;
-
 use std::{cmp::Eq, fmt::Debug, marker::PhantomData};
 
 /// Vec with typed indexes.
@@ -20,7 +18,7 @@ impl<K: Id, V: Clone> TVec<K, V> {
         }
     }
 }
-impl<K, V> TVec<K, V> {
+impl<K: Id, V> TVec<K, V> {
     pub(crate) fn new() -> Self {
         Self {
             x: Vec::new(),
@@ -30,9 +28,6 @@ impl<K, V> TVec<K, V> {
     pub(crate) fn len(&self) -> usize {
         self.x.len()
     }
-}
-
-impl<K: Id, V> TVec<K, V> {
     pub(crate) fn iter(&self) -> impl Iterator<Item = &V> {
         self.x.iter()
     }
@@ -78,8 +73,10 @@ impl<K: Id, V> TVec<K, V> {
 }
 impl<K: Id, V: Clone> TVec<K, V> {
     pub(crate) fn permute(&self, perm: &TVec<K, K>) -> Self {
-        assert!(perm.is_permutation());
-        self.enumerate().map(|i| self[perm[i]].clone()).collect()
+        let inv_perm = perm.invert_permutation();
+        self.enumerate()
+            .map(|i| self[inv_perm[i]].clone())
+            .collect()
     }
 }
 impl<K: Id> TVec<K, K> {
@@ -125,19 +122,19 @@ impl<K, V: Debug> Debug for TVec<K, V> {
         self.x.fmt(f)
     }
 }
-impl<K, V> FromIterator<V> for TVec<K, V> {
+impl<K: Id, V> FromIterator<V> for TVec<K, V> {
     fn from_iter<T: IntoIterator<Item = V>>(iter: T) -> Self {
         let mut x = Self::new();
         x.extend(iter);
         x
     }
 }
-impl<K, V> Extend<V> for TVec<K, V> {
+impl<K: Id, V> Extend<V> for TVec<K, V> {
     fn extend<T: IntoIterator<Item = V>>(&mut self, iter: T) {
         self.x.extend(iter);
     }
 }
-impl<K, V> IntoIterator for TVec<K, V> {
+impl<K: Id, V> IntoIterator for TVec<K, V> {
     type Item = V;
 
     type IntoIter = <Vec<V> as IntoIterator>::IntoIter;
@@ -146,7 +143,7 @@ impl<K, V> IntoIterator for TVec<K, V> {
         self.x.into_iter()
     }
 }
-impl<'a, K, V> IntoIterator for &'a TVec<K, V> {
+impl<'a, K: Id, V> IntoIterator for &'a TVec<K, V> {
     type Item = &'a V;
 
     type IntoIter = <&'a Vec<V> as IntoIterator>::IntoIter;

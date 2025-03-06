@@ -10,16 +10,6 @@ pub mod runtime;
 
 #[allow(unused)]
 mod todo;
-#[allow(unused)]
-mod todo2;
-#[allow(unused)]
-mod todo3;
-#[allow(unused)]
-pub mod todo4;
-#[allow(unused)]
-mod todo5;
-#[allow(unused)]
-mod todo_join;
 
 #[must_use]
 pub fn compile_str(source: &str) -> String {
