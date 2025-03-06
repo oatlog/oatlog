@@ -6,6 +6,7 @@ use crate::{
     typed_vec::TVec,
 };
 
+use derive_more::From;
 use itertools::Itertools as _;
 use proc_macro2::TokenStream;
 use quote::{format_ident, quote};
@@ -170,7 +171,7 @@ enum RelationTy {
     },
 }
 
-#[derive(Clone, Eq, PartialEq, Ord, PartialOrd, Hash, Debug)]
+#[derive(Clone, Eq, PartialEq, Ord, PartialOrd, Hash, Debug, From)]
 pub(crate) enum GlobalCompute {
     Literal(Literal),
     // "call" some function
@@ -181,7 +182,10 @@ pub(crate) enum GlobalCompute {
 }
 impl GlobalCompute {
     pub(crate) fn new_i64(x: i64) -> Self {
-        Self::Literal(Literal::I64(x))
+        Self::Literal(x.into())
+    }
+    pub(crate) fn new_string(s: String, intern: &mut crate::runtime::StringIntern) -> Self {
+        Self::Literal(intern.intern(s).into())
     }
     pub(crate) fn new_call(relation: RelationId, args: &[GlobalId]) -> Self {
         Self::Compute {
@@ -195,10 +199,10 @@ impl Default for GlobalCompute {
         Self::Literal(Literal::default())
     }
 }
-#[derive(Clone, Eq, PartialEq, Ord, PartialOrd, Hash, Debug)]
+#[derive(Clone, Eq, PartialEq, Ord, PartialOrd, Hash, Debug, From)]
 pub(crate) enum Literal {
     I64(i64),
-    // String(crate::runtime::IString),
+    String(crate::runtime::IString),
 }
 impl Default for Literal {
     fn default() -> Self {
@@ -872,6 +876,10 @@ fn codegen_globals(theory: &Theory) -> (TokenStream, TVec<GlobalId, usize>) {
             let expr = match compute {
                 GlobalCompute::Literal(Literal::I64(x)) => {
                     quote! { #x }
+                }
+                GlobalCompute::Literal(Literal::String(x)) => {
+                    let x = x.0;
+                    quote! { IString ( #x ) }
                 }
                 // i guess create eclass and do an insert and make implicit functionality fix it
                 // later.

@@ -31,7 +31,7 @@ compile_egraph!((
     (Cos Math)
 
     (Const i64)
-    (FakeVar i64)
+    (Var String)
 )
 
 (rewrite (Add a b) (Add b a))
@@ -58,21 +58,21 @@ compile_egraph!((
 (rewrite (Integral (Mul a b) x) (Sub (Mul a (Integral b x)) (Integral (Mul (Diff x a) (Integral b x)) x)))
 
 
-// (Integral (Ln (FakeVar 1)) (FakeVar 1))
-// (Integral (Add (FakeVar 1) (Cos (FakeVar 1))) (FakeVar 1))
-// (Integral (Mul (Cos (FakeVar 1)) (FakeVar 1)) (FakeVar 1))
-// (Diff (FakeVar 1) (Add (Const 1) (Mul (Const 2) (FakeVar 1))))
-// (Diff (FakeVar 1) (Sub (Pow (FakeVar 1) (Const 3)) (Mul (Const 7) (Pow (FakeVar 1) (Const 2)))))
-// (Add (Mul (FakeVar 2) (Add (FakeVar 1) (FakeVar 2))) (Sub (Add (FakeVar 1) (Const 2)) (Add (FakeVar 1) (FakeVar 1))))
-// (Div (Const 1) (Sub (Div (Add (Const 1) (Sqrt (FakeVar 3))) (Const 2)) (Div (Sub (Const 1) (Sqrt (FakeVar 3))) (Const 2))))
+// (Integral (Ln (Var "x")) (Var "x"))
+// (Integral (Add (Var "x") (Cos (Var "x"))) (Var "x"))
+// (Integral (Mul (Cos (Var "x")) (Var "x")) (Var "x"))
+// (Diff (Var "x") (Add (Const 1) (Mul (Const 2) (Var "x"))))
+// (Diff (Var "x") (Sub (Pow (Var "x") (Const 3)) (Mul (Const 7) (Pow (Var "x") (Const 2)))))
+// (Add (Mul (Var "y") (Add (Var "x") (Var "y"))) (Sub (Add (Var "x") (Const 2)) (Add (Var "x") (Var "x"))))
+// (Div (Const 1) (Sub (Div (Add (Const 1) (Sqrt (Var "z"))) (Const 2)) (Div (Sub (Const 1) (Sqrt (Var "z"))) (Const 2))))
 
-(let gg0 (Integral (Ln (FakeVar 1)) (FakeVar 1)))
-(let gg1 (Integral (Add (FakeVar 1) (Cos (FakeVar 1))) (FakeVar 1)))
-(let gg2 (Integral (Mul (Cos (FakeVar 1)) (FakeVar 1)) (FakeVar 1)))
-(let gg3 (Diff (FakeVar 1) (Add (Const 1) (Mul (Const 2) (FakeVar 1)))))
-(let gg4 (Diff (FakeVar 1) (Sub (Pow (FakeVar 1) (Const 3)) (Mul (Const 7) (Pow (FakeVar 1) (Const 2))))))
-(let gg5 (Add (Mul (FakeVar 2) (Add (FakeVar 1) (FakeVar 2))) (Sub (Add (FakeVar 1) (Const 2)) (Add (FakeVar 1) (FakeVar 1)))))
-(let gg6 (Div (Const 1) (Sub (Div (Add (Const 1) (Sqrt (FakeVar 3))) (Const 2)) (Div (Sub (Const 1) (Sqrt (FakeVar 3))) (Const 2)))))
+(let gg0 (Integral (Ln (Var "x")) (Var "x")))
+(let gg1 (Integral (Add (Var "x") (Cos (Var "x"))) (Var "x")))
+(let gg2 (Integral (Mul (Cos (Var "x")) (Var "x")) (Var "x")))
+(let gg3 (Diff (Var "x") (Add (Const 1) (Mul (Const 2) (Var "x")))))
+(let gg4 (Diff (Var "x") (Sub (Pow (Var "x") (Const 3)) (Mul (Const 7) (Pow (Var "x") (Const 2))))))
+(let gg5 (Add (Mul (Var "y") (Add (Var "x") (Var "y"))) (Sub (Add (Var "x") (Const 2)) (Add (Var "x") (Var "x")))))
+(let gg6 (Div (Const 1) (Sub (Div (Add (Const 1) (Sqrt (Var "z"))) (Const 2)) (Div (Sub (Const 1) (Sqrt (Var "z"))) (Const 2)))))
 
 // (let gg5 (Mul (Add (Const 1) (Const 2)) (Const 3)))
 // (let gg5 (Mul (Add (Const 1) (Const 2)) (Const 3)))
@@ -80,10 +80,10 @@ compile_egraph!((
 // (let gg
 //
 //         (Mul
-//             (FakeVar 2)
+//             (Var "y")
 //             (Add
-//                 (FakeVar 1)
-//                 (FakeVar 2)
+//                 (Var "x")
+//                 (Var "y")
 //             )
 //         )
 //
@@ -92,19 +92,19 @@ compile_egraph!((
 // (let gg
 //     (Add
 //         (Mul
-//             (FakeVar 2)
+//             (Var "y")
 //             (Add
-//                 (FakeVar 1)
-//                 (FakeVar 2)
+//                 (Var "x")
+//                 (Var "y")
 //             )
 //         )
 //         (Sub
 //             (Add
-//                 (FakeVar 1)
+//                 (Var "x")
 //                 (Const 2))
 //             (Add
-//                 (FakeVar 1)
-//                 (FakeVar 1)
+//                 (Var "x")
+//                 (Var "x")
 //             )
 //         )
 //
@@ -134,7 +134,7 @@ fn main() {
         dbg!(theory.sin_relation.all_index_0_1.len());
         dbg!(theory.cos_relation.all_index_0_1.len());
         dbg!(theory.const_relation.all_index_0_1.len());
-        dbg!(theory.fake_var_relation.all_index_0_1.len());
+        dbg!(theory.var_relation.all_index_0_1.len());
 
         let total = [
             (theory.add_relation.all_index_0_1_2.len()),
@@ -149,7 +149,7 @@ fn main() {
             (theory.sin_relation.all_index_0_1.len()),
             (theory.cos_relation.all_index_0_1.len()),
             (theory.const_relation.all_index_0_1.len()),
-            (theory.fake_var_relation.all_index_0_1.len()),
+            (theory.var_relation.all_index_0_1.len()),
         ]
         .iter()
         .copied()

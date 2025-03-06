@@ -173,6 +173,7 @@ pub(crate) struct Theory {
     pub(crate) global_types: TVec<GlobalId, TypeId>,
     #[allow(unused)]
     pub(crate) global_to_relation: TVec<GlobalId, RelationId>,
+    pub(crate) interner: crate::runtime::StringIntern,
 }
 
 #[derive(Copy, Clone, Eq, PartialEq, Ord, PartialOrd, Hash, Debug)]

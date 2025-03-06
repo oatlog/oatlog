@@ -16,9 +16,7 @@ use itertools::Itertools as _;
 use proc_macro2::{Delimiter, Span, TokenTree};
 
 use crate::{
-    codegen, hir,
-    ids::{ColumnId, GlobalId, Id, RelationId, TypeId, VariableId},
-    typed_vec::TVec,
+    codegen, hir, ids::{ColumnId, GlobalId, Id, RelationId, TypeId, VariableId},  typed_vec::TVec
 };
 
 #[rustfmt::skip]
@@ -575,13 +573,13 @@ const BUILTIN_STRING: &str = "String";
 const BUILTIN_BOOL: &str = "bool";
 const BUILTIN_UNIT: &str = "()"; // TODO: "()" -> "unit" to avoid fixup in backend.
 
-const BUILTIN_SORTS: [(&str, &str); 2] = [
+const BUILTIN_SORTS: [(&str, &str); 3] = [
     (BUILTIN_I64, "std::primitive::i64"),
     // TODO: we could trivially add more here for all sizes of ints/floats.
     // (BUILTIN_F64, "std::primitive::f64"),
     // TODO: explicitly intern all strings.
-    //(BUILTIN_STRING, "egraph::runtime::IString"),
     // (BUILTIN_BOOL, "std::primitive::bool"),
+    (BUILTIN_STRING, "egraph::runtime::IString"),
     (BUILTIN_UNIT, "std::primitive::unit"),
 ];
 
@@ -1492,6 +1490,7 @@ impl Parser {
                 (None, None) => hir::Type::new_symbolic(*t.name),
             })
             .collect();
+        let mut interner = crate::runtime::StringIntern::new();
         hir::Theory {
             symbolic_rules: self.symbolic_rules.clone(),
             relations: functions,
@@ -1504,6 +1503,7 @@ impl Parser {
                 .iter()
                 .map(|x| match &x.compute {
                     ComputeMethod::Literal(Literal::I64(x)) => codegen::GlobalCompute::new_i64(*x),
+                    ComputeMethod::Literal(Literal::String(x)) => codegen::GlobalCompute::new_string((*x).to_owned(), &mut interner),
                     ComputeMethod::Function { function, args } => {
                         codegen::GlobalCompute::new_call(*function, args)
                     }
@@ -1512,6 +1512,7 @@ impl Parser {
                 })
                 .collect(),
             global_to_relation: self.global_to_function.clone(),
+            interner,
         }
     }
 }

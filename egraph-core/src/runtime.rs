@@ -64,31 +64,40 @@ impl RelationElement for bool {
     const MAX_ID: Self = true;
 }
 
-#[derive(Copy, Clone, Eq, PartialEq, Ord, PartialOrd, Hash)]
-pub struct IString(u32);
+#[derive(Copy, Clone, Eq, PartialEq, Ord, PartialOrd, Hash, Debug)]
+pub struct IString(pub u32);
 impl RelationElement for IString {
     const MIN_ID: Self = IString(u32::MIN);
     const MAX_ID: Self = IString(u32::MAX);
 }
+impl std::fmt::Display for IString {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> Result<(),std::fmt::Error> {
+        use std::fmt::Write;
+        write!(f, "{self:?}")
+    }
+}
 
 /// Only to be used for initial inserts, so performance does not really matter.
-#[derive(Default)]
-struct StringIntern {
+#[derive(Clone, Eq, PartialEq, Ord, PartialOrd, Hash, Debug, Default)]
+pub struct StringIntern {
     to_id: BTreeMap<String, IString>,
     to_string: BTreeMap<IString, String>,
 }
 impl StringIntern {
     #[inline]
-    fn new() -> Self {
+    pub fn new() -> Self {
         Self::default()
     }
     #[inline]
-    fn intern(&mut self, s: String) -> IString {
+    pub fn intern(&mut self, s: String) -> IString {
         let next_id = IString(u32::try_from(self.to_id.len()).unwrap());
         *self.to_id.entry(s.clone()).or_insert_with(|| {
             self.to_string.insert(next_id, s);
             next_id
         })
+    }
+    pub fn lookup(&self, i: IString) -> &str {
+        &self.to_string[&i]
     }
 }
 

@@ -261,12 +261,14 @@ mod test {
                     (Mul Math Math)
                     (Add Math Math)
                     (Const i64)
+                    (Var String)
                 )
 
             (let two (Const 2))
             (let one 1)
             (rewrite (Const one) (Add x x))
             (rewrite (Const 2) (Add z z))
+            (rewrite (Var \"x\") (Var \"y\"))
 
             (rewrite (Mul a (Const 0)) (Const 0))
             )",
@@ -277,10 +279,13 @@ mod test {
                 Mul(Math, Math, Math)
                 Add(Math, Math, Math)
                 Const(i64, Math)
+                Var(String, Math)
                 g0(i64)
                 g1(Math)
                 g2(i64)
-                g3(i64)
+                g3(String)
+                g4(String)
+                g5(i64)
 
                 Rule "":
                 Premise: g2(one), Const(one, p1)
@@ -297,19 +302,26 @@ mod test {
                 Insert: Add(z, z, a1)
 
                 Rule "":
-                Premise: g3(p1), Const(p1, p2), Mul(a, p2, p3)
+                Premise: g3(p0), Var(p0, p1)
+                __: p0
+                a1: p1
+                a0: __
+                Insert: Var(a0, a1), g4(a0)
+
+                Rule "":
+                Premise: g5(p1), Const(p1, p2), Mul(a, p2, p3)
                 __: a
                 __: p1
                 __: p2
                 a1: p3
                 a0: __
-                Insert: Const(a0, a1), g3(a0)
+                Insert: Const(a0, a1), g5(a0)
 
             "#]]),
             expected_lir: None,
             expected_codegen : Some(expect![[r#"
                 use egraph::runtime::*;
-                #[derive(Copy, Clone, Eq, PartialEq, Ord, PartialOrd, Default, Debug)]
+                #[derive(Copy, Clone, Eq, PartialEq, Ord, PartialOrd, Default, Debug, Hash)]
                 pub struct Math(u32);
                 impl Eclass for Math {
                     fn new(value: u32) -> Self {
@@ -730,11 +742,107 @@ mod test {
                     }
                 }
                 #[derive(Debug, Default)]
+                struct VarRelation {
+                    new: Vec<<Self as Relation>::Row>,
+                    all_index_0_1: BTreeSet<(egraph::runtime::IString, Math)>,
+                    all_index_1_0: BTreeSet<(Math, egraph::runtime::IString)>,
+                }
+                impl Relation for VarRelation {
+                    type Row = (egraph::runtime::IString, Math);
+                }
+                impl VarRelation {
+                    const COST: u32 = 4u32;
+                    fn new() -> Self {
+                        Self::default()
+                    }
+                    fn has_new(&self) -> bool {
+                        !self.new.is_empty()
+                    }
+                    fn clear_new(&mut self) {
+                        self.new.clear();
+                    }
+                    fn iter_new(&self) -> impl Iterator<Item = <Self as Relation>::Row> + use<'_> {
+                        self.new.iter().copied()
+                    }
+                    fn iter1_0_1(&self, x0: egraph::runtime::IString) -> impl Iterator<Item = (Math)> + use<'_> {
+                        self.all_index_0_1
+                            .range((x0, Math::MIN_ID)..=(x0, Math::MAX_ID))
+                            .copied()
+                            .map(|(x0, x1)| (x1))
+                    }
+                    fn iter1_1_0(&self, x1: Math) -> impl Iterator<Item = (egraph::runtime::IString)> + use<'_> {
+                        self.all_index_1_0
+                            .range((x1, egraph::runtime::IString::MIN_ID)..=(x1, egraph::runtime::IString::MAX_ID))
+                            .copied()
+                            .map(|(x1, x0)| (x0))
+                    }
+                    fn check1_0_1(&self, x0: egraph::runtime::IString) -> bool {
+                        self.iter1_0_1(x0).next().is_some()
+                    }
+                    fn check1_1_0(&self, x1: Math) -> bool {
+                        self.iter1_1_0(x1).next().is_some()
+                    }
+                    fn update(&mut self, uprooted: &Uprooted, uf: &mut Unification, delta: &mut Delta) {
+                        let mut op_insert = take(&mut delta.var_relation_delta);
+                        for (x0, x1) in op_insert.iter_mut() {
+                            *x1 = uf.math_uf.find(*x1);
+                        }
+                        let mut op_delete = Vec::new();
+                        for x1 in uprooted.math_uprooted.iter().copied() {
+                            for (x0) in self.iter1_1_0(x1) {
+                                op_delete.push((x0, x1));
+                            }
+                        }
+                        for (x0, x1) in op_delete {
+                            if self.all_index_0_1.remove(&(x0, x1)) {
+                                self.all_index_1_0.remove(&(x1, x0));
+                                uf.math_uf.dec_eclass(x1, Self::COST);
+                                op_insert.push((x0, uf.math_uf.find(x1)));
+                            }
+                        }
+                        op_insert.retain(|&(x0, x1)| {
+                            if let Some(y1) = self.iter1_0_1(x0).next() {
+                                let mut should_trigger = false;
+                                should_trigger |= y1 != x1;
+                                if should_trigger {
+                                    uf.math_uf.union(y1, x1);
+                                    return false;
+                                }
+                            }
+                            if !self.all_index_0_1.insert((x0, x1)) {
+                                return false;
+                            }
+                            uf.math_uf.inc_eclass(x1, Self::COST);
+                            self.all_index_1_0.insert((x1, x0));
+                            true
+                        });
+                        self.new.extend(op_insert);
+                    }
+                    fn update_finalize(&mut self, uf: &mut Unification) {
+                        for (x0, x1) in self.new.iter_mut() {
+                            *x1 = uf.math_uf.find(*x1);
+                        }
+                        self.new.sort();
+                        self.new.dedup();
+                    }
+                    fn emit_graphviz(&self, buf: &mut String) {
+                        use std::fmt::Write;
+                        for (i, (x0, x1)) in self.all_index_0_1.iter().copied().enumerate() {
+                            write!(buf, "{}{i} -> {}{};", "var", "string", x0).unwrap();
+                            write!(buf, "{}{i} -> {}{};", "var", "math", x1).unwrap();
+                        }
+                    }
+                    fn len(&self) -> usize {
+                        self.all_index_0_1.len()
+                    }
+                }
+                #[derive(Debug, Default)]
                 pub struct Delta {
                     forall_math_relation_delta: Vec<<ForallMathRelation as Relation>::Row>,
                     mul_relation_delta: Vec<<MulRelation as Relation>::Row>,
                     add_relation_delta: Vec<<AddRelation as Relation>::Row>,
                     const_relation_delta: Vec<<ConstRelation as Relation>::Row>,
+                    var_relation_delta: Vec<<VarRelation as Relation>::Row>,
                 }
                 impl Delta {
                     fn new() -> Self {
@@ -746,6 +854,7 @@ mod test {
                         has_new |= !self.mul_relation_delta.is_empty();
                         has_new |= !self.add_relation_delta.is_empty();
                         has_new |= !self.const_relation_delta.is_empty();
+                        has_new |= !self.var_relation_delta.is_empty();
                         has_new
                     }
                     pub fn make_math(&mut self, uf: &mut Unification) -> Math {
@@ -762,11 +871,15 @@ mod test {
                     pub fn insert_const(&mut self, x: <ConstRelation as Relation>::Row) {
                         self.const_relation_delta.push(x);
                     }
+                    pub fn insert_var(&mut self, x: <VarRelation as Relation>::Row) {
+                        self.var_relation_delta.push(x);
+                    }
                 }
                 #[derive(Default, Debug)]
                 struct GlobalVariables {
                     new: bool,
                     global_i64: Vec<std::primitive::i64>,
+                    global_string: Vec<egraph::runtime::IString>,
                     global_math: Vec<Math>,
                 }
                 impl GlobalVariables {
@@ -783,6 +896,10 @@ mod test {
                         self.global_math.push(tmp);
                         let tmp = { 1i64 };
                         self.global_i64.push(tmp);
+                        let tmp = { IString(0u32) };
+                        self.global_string.push(tmp);
+                        let tmp = { IString(1u32) };
+                        self.global_string.push(tmp);
                         let tmp = { 0i64 };
                         self.global_i64.push(tmp);
                     }
@@ -818,6 +935,7 @@ mod test {
                     mul_relation: MulRelation,
                     add_relation: AddRelation,
                     const_relation: ConstRelation,
+                    var_relation: VarRelation,
                 }
                 impl Theory {
                     pub fn new() -> Self {
@@ -862,6 +980,19 @@ mod test {
                             }
                         }
                         if self.global_variables.new {
+                            let p0 = self.global_variables.global_string[0usize];
+                            for (p1) in self.var_relation.iter1_0_1(p0) {
+                                let a0 = self.global_variables.global_string[1usize];
+                                self.delta.insert_var((a0, p1));
+                            }
+                        }
+                        for (p0, p1) in self.var_relation.iter_new() {
+                            if p0 == self.global_variables.global_string[0usize] {
+                                let a0 = self.global_variables.global_string[1usize];
+                                self.delta.insert_var((a0, p1));
+                            }
+                        }
+                        if self.global_variables.new {
                             let p1 = self.global_variables.global_i64[2usize];
                             for (p2) in self.const_relation.iter1_0_1(p1) {
                                 for (a, p3) in self.mul_relation.iter1_1_0_2(p2) {
@@ -895,6 +1026,7 @@ mod test {
                         self.mul_relation.emit_graphviz(&mut buf);
                         self.add_relation.emit_graphviz(&mut buf);
                         self.const_relation.emit_graphviz(&mut buf);
+                        self.var_relation.emit_graphviz(&mut buf);
                         buf.push_str("}");
                         buf
                     }
@@ -904,6 +1036,7 @@ mod test {
                             self.mul_relation.len(),
                             self.add_relation.len(),
                             self.const_relation.len(),
+                            self.var_relation.len(),
                         ]
                         .iter()
                         .copied()
@@ -916,6 +1049,7 @@ mod test {
                         self.mul_relation.clear_new();
                         self.add_relation.clear_new();
                         self.const_relation.clear_new();
+                        self.var_relation.clear_new();
                         loop {
                             self.uprooted.take_dirt(&mut self.uf);
                             self.forall_math_relation
@@ -926,6 +1060,8 @@ mod test {
                                 .update(&self.uprooted, &mut self.uf, &mut self.delta);
                             self.const_relation
                                 .update(&self.uprooted, &mut self.uf, &mut self.delta);
+                            self.var_relation
+                                .update(&self.uprooted, &mut self.uf, &mut self.delta);
                             if !(self.uf.has_new() || self.delta.has_new()) {
                                 break;
                             }
@@ -934,6 +1070,7 @@ mod test {
                         self.mul_relation.update_finalize(&mut self.uf);
                         self.add_relation.update_finalize(&mut self.uf);
                         self.const_relation.update_finalize(&mut self.uf);
+                        self.var_relation.update_finalize(&mut self.uf);
                     }
                 }
                 impl std::ops::Deref for Theory {
@@ -985,7 +1122,7 @@ mod test {
             expected_lir: None,
             expected_codegen: Some(expect![[r#"
                 use egraph::runtime::*;
-                #[derive(Copy, Clone, Eq, PartialEq, Ord, PartialOrd, Default, Debug)]
+                #[derive(Copy, Clone, Eq, PartialEq, Ord, PartialOrd, Default, Debug, Hash)]
                 pub struct Math(u32);
                 impl Eclass for Math {
                     fn new(value: u32) -> Self {
@@ -1679,7 +1816,7 @@ mod test {
             expected_lir: None,
             expected_codegen : Some(expect![[r#"
                 use egraph::runtime::*;
-                #[derive(Copy, Clone, Eq, PartialEq, Ord, PartialOrd, Default, Debug)]
+                #[derive(Copy, Clone, Eq, PartialEq, Ord, PartialOrd, Default, Debug, Hash)]
                 pub struct Math(u32);
                 impl Eclass for Math {
                     fn new(value: u32) -> Self {
@@ -2213,7 +2350,7 @@ mod test {
             expected_lir: None,
             expected_codegen: Some(expect![[r#"
                 use egraph::runtime::*;
-                #[derive(Copy, Clone, Eq, PartialEq, Ord, PartialOrd, Default, Debug)]
+                #[derive(Copy, Clone, Eq, PartialEq, Ord, PartialOrd, Default, Debug, Hash)]
                 pub struct Math(u32);
                 impl Eclass for Math {
                     fn new(value: u32) -> Self {

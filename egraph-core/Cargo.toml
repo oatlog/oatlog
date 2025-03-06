@@ -13,6 +13,7 @@ quote.workspace = true
 regex.workspace = true
 syn.workspace = true
 smallvec.workspace = true
+derive_more.workspace = true
 
 [dev-dependencies]
 expect-test.workspace = true
