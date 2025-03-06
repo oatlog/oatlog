@@ -1180,6 +1180,12 @@ pub fn codegen(theory: &Theory) -> TokenStream {
     let theory_ty = ident::theory_ty(theory);
     let theory_delta_ty = ident::theory_delta_ty(theory);
 
+    let get_total_relation_entry_count_body = if stored_relations.is_empty() {
+        quote! {0}
+    } else {
+        quote! {[#(self.#stored_relations.len()),*].iter().copied().sum::<usize>()}
+    };
+
     quote! {
         use egraph::runtime::*;
         #(#symbolic_type_declarations)*
@@ -1237,7 +1243,7 @@ pub fn codegen(theory: &Theory) -> TokenStream {
                 buf
             }
             fn get_total_relation_entry_count(&self) -> usize {
-                [#(self.#stored_relations.len()),*].iter().copied().sum::<usize>()
+                #get_total_relation_entry_count_body
             }
             #clear_transient
         }

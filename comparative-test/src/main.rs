@@ -4,6 +4,8 @@ fn main() {
 
 macro_rules! comparative_test {
     ($egglog_source_literal:expr) => {
+        std::env::set_current_dir(concat!(env!("CARGO_MANIFEST_DIR"), "/..")).unwrap();
+
         egraph::compile_egraph!($egglog_source_literal);
         let mut theory = Theory::new();
 
@@ -115,7 +117,10 @@ macro_rules! egglog_test {
 //egglog_test!(set, r#"(include "comparative-test/egglog-testsuite/set.egg")"#);
 //egglog_test!(set_sort_function, r#"(include "comparative-test/egglog-testsuite/set_sort_function.egg")"#);
 //egglog_test!(stratified, r#"(include "comparative-test/egglog-testsuite/stratified.egg")"#);
-//egglog_test!(string, r#"(include "comparative-test/egglog-testsuite/string.egg")"#);
+egglog_test!(
+    string,
+    r#"(include "comparative-test/egglog-testsuite/string.egg")"#
+);
 //egglog_test!(string_quotes, r#"(include "comparative-test/egglog-testsuite/string_quotes.egg")"#);
 //egglog_test!(subsume, r#"(include "comparative-test/egglog-testsuite/subsume.egg")"#);
 //egglog_test!(test_combined, r#"(include "comparative-test/egglog-testsuite/test-combined.egg")"#);
