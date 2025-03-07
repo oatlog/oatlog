@@ -24,7 +24,7 @@ eqlog-runtime = "0.8"
 expect-test = "1"
 heck = "0.5"
 itertools = "0.14"
-proc-macro2 = { version = "1", features = ["span-locations"] }
+proc-macro2 = { version = "1", features = ["span-locations"], default-features = false }
 quote = "1"
 regex = "1"
 syn = "2"

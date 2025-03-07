@@ -13,49 +13,21 @@ mod todo;
 
 #[must_use]
 pub fn compile_str(source: &str) -> String {
-    let source = source
-        .lines()
-        .filter(|line| !line.trim_start().starts_with(';') && !line.trim_start().starts_with("//"))
-        .collect::<Vec<&str>>()
-        .join("\n");
     // TODO Rework `compile_dbg` handle comments. Its error reports should refer to pre-filtered source.
+    let source = frontend::strip_comments(source);
     let input: proc_macro2::TokenStream = source.parse().unwrap();
     codegen::format_tokens(&compile(quote::quote! {(#input)}))
 }
 
 #[must_use]
 pub fn compile(input: proc_macro2::TokenStream) -> proc_macro2::TokenStream {
-    let source = input.to_string();
-    let full_span = input.clone().into_iter().next().unwrap().span();
     match compile_impl(input) {
         Ok(generated_code) => generated_code,
-        Err(errors) => {
-            let errors: Vec<syn::Error> = errors.into_iter().collect();
-            let mut ret = Vec::new();
-            ariadne::Report::build(
-                ariadne::ReportKind::Error,
-                ("foo", errors[0].span().byte_range()),
-            )
-            .with_config(
-                ariadne::Config::new()
-                    .with_color(false)
-                    .with_index_type(ariadne::IndexType::Byte),
-            )
-            .with_message(errors[0].clone())
-            .with_labels(errors.iter().map(|err| {
-                dbg!(err.span().byte_range());
-                ariadne::Label::new(("foo", err.span().byte_range())).with_message(err)
-            }))
-            .finish()
-            .write(ariadne::sources(Some(("foo", source))), &mut ret)
-            .unwrap();
-            let msg = String::from_utf8_lossy(ret.as_slice()).to_string();
-            syn::Error::new(full_span, msg).to_compile_error()
-        }
+        Err(errors) => errors.to_compile_error(None, None),
     }
 }
 
-fn compile_impl(source: proc_macro2::TokenStream) -> syn::Result<proc_macro2::TokenStream> {
+fn compile_impl(source: proc_macro2::TokenStream) -> frontend::MResult<proc_macro2::TokenStream> {
     force_backtrace(|| {
         let hir = frontend::parse(source)?;
         let (_, codegen) = hir::query_planning::emit_codegen_theory(hir);

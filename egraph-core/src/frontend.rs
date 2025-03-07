@@ -8,10 +8,9 @@ use std::{
     fmt::{Debug, Display},
     hash::{Hash, Hasher},
     mem::take,
-    ops::{Deref, DerefMut, FnMut},
+    ops::{Deref, DerefMut, FnMut, Range},
 };
 
-use derive_more::From;
 use educe::Educe;
 use itertools::Itertools as _;
 use proc_macro2::{Delimiter, Span, TokenTree};
@@ -23,144 +22,189 @@ use crate::{
 };
 
 #[rustfmt::skip]
+macro_rules! bare_ {
+    ($span2:expr, $a0:literal) => { MError::new($span2, format!($a0)) };
+    ($span2:expr, $a0:literal, $a1:tt) => { MError::new($span2, format!($a0, $a1)) };
+    ($span2:expr, $a0:literal, $a1:tt, $a2:tt) => { MError::new($span2, format!($a0, $a1, $a2)) };
+    ($span2:expr, $a0:literal, $a1:tt, $a2:tt, $a3:tt) => { MError::new($span2, format!($a0, $a1, $a2, $a3)) };
+    ($span2:expr, $a0:literal, $a1:tt, $a2:tt, $a3:tt, $a4:tt) => { MError::new($span2, format!($a0, $a1, $a2, $a3, $a4)) };
+    ($span2:expr, $a0:literal, $a1:tt, $a2:tt, $a3:tt, $a4:tt, $a5:tt) => { MError::new($span2, format!($a0, $a1, $a2, $a3, $a4, $a5)) };
+    ($span2:expr, $a0:literal, $a1:tt, $a2:tt, $a3:tt, $a4:tt, $a5:tt, $a6:tt) => { MError::new($span2, format!($a0, $a1, $a2, $a3, $a4, $a5, $a6)) };
+    ($span2:expr, $a0:literal, $a1:tt, $a2:tt, $a3:tt, $a4:tt, $a5:tt, $a6:tt, $a7:tt) => { MError::new($span2, format!($a0, $a1, $a2, $a3, $a4, $a5, $a6, $a7)) };
+    ($span2:expr, $a0:literal, $a1:tt, $a2:tt, $a3:tt, $a4:tt, $a5:tt, $a6:tt, $a7:tt, $a8:tt) => { MError::new($span2, format!($a0, $a1, $a2, $a3, $a4, $a5, $a6, $a7, $a8)) };
+    ($span2:expr, $a0:literal, $a1:tt, $a2:tt, $a3:tt, $a4:tt, $a5:tt, $a6:tt, $a7:tt, $a8:tt, $a9:tt) => { MError::new($span2, format!($a0, $a1, $a2, $a3, $a4, $a5, $a6, $a7, $a8, $a9)) };
+    ($span2:expr, $a0:literal, $a1:tt, $a2:tt, $a3:tt, $a4:tt, $a5:tt, $a6:tt, $a7:tt, $a8:tt, $a9:tt, $a10:tt) => { MError::new($span2, format!($a0, $a1, $a2, $a3, $a4, $a5, $a6, $a7, $a8, $a9, $a10)) };
+    ($span2:expr, $a0:literal, $a1:tt, $a2:tt, $a3:tt, $a4:tt, $a5:tt, $a6:tt, $a7:tt, $a8:tt, $a9:tt, $a10:tt, $a11:tt) => { MError::new($span2, format!($a0, $a1, $a2, $a3, $a4, $a5, $a6, $a7, $a8, $a9, $a10, $a11)) };
+    ($span2:expr, $a0:literal, $a1:tt, $a2:tt, $a3:tt, $a4:tt, $a5:tt, $a6:tt, $a7:tt, $a8:tt, $a9:tt, $a10:tt, $a11:tt, $a12:tt) => { MError::new($span2, format!($a0, $a1, $a2, $a3, $a4, $a5, $a6, $a7, $a8, $a9, $a10, $a11, $a12)) };
+}
+#[rustfmt::skip]
 macro_rules! err_ {
-    ($span2:expr, $a0:literal) => { Err(syn::Error::new($span2, format!($a0))) };
-    ($span2:expr, $a0:literal, $a1:tt) => { Err(syn::Error::new($span2, format!($a0, $a1))) };
-    ($span2:expr, $a0:literal, $a1:tt, $a2:tt) => { Err(syn::Error::new($span2, format!($a0, $a1, $a2))) };
-    ($span2:expr, $a0:literal, $a1:tt, $a2:tt, $a3:tt) => { Err(syn::Error::new($span2, format!($a0, $a1, $a2, $a3))) };
-    ($span2:expr, $a0:literal, $a1:tt, $a2:tt, $a3:tt, $a4:tt) => { Err(syn::Error::new($span2, format!($a0, $a1, $a2, $a3, $a4))) };
-    ($span2:expr, $a0:literal, $a1:tt, $a2:tt, $a3:tt, $a4:tt, $a5:tt) => { Err(syn::Error::new($span2, format!($a0, $a1, $a2, $a3, $a4, $a5))) };
-    ($span2:expr, $a0:literal, $a1:tt, $a2:tt, $a3:tt, $a4:tt, $a5:tt, $a6:tt) => { Err(syn::Error::new($span2, format!($a0, $a1, $a2, $a3, $a4, $a5, $a6))) };
-    ($span2:expr, $a0:literal, $a1:tt, $a2:tt, $a3:tt, $a4:tt, $a5:tt, $a6:tt, $a7:tt) => { Err(syn::Error::new($span2, format!($a0, $a1, $a2, $a3, $a4, $a5, $a6, $a7))) };
-    ($span2:expr, $a0:literal, $a1:tt, $a2:tt, $a3:tt, $a4:tt, $a5:tt, $a6:tt, $a7:tt, $a8:tt) => { Err(syn::Error::new($span2, format!($a0, $a1, $a2, $a3, $a4, $a5, $a6, $a7, $a8))) };
-    ($span2:expr, $a0:literal, $a1:tt, $a2:tt, $a3:tt, $a4:tt, $a5:tt, $a6:tt, $a7:tt, $a8:tt, $a9:tt) => { Err(syn::Error::new($span2, format!($a0, $a1, $a2, $a3, $a4, $a5, $a6, $a7, $a8, $a9))) };
-    ($span2:expr, $a0:literal, $a1:tt, $a2:tt, $a3:tt, $a4:tt, $a5:tt, $a6:tt, $a7:tt, $a8:tt, $a9:tt, $a10:tt) => { Err(syn::Error::new($span2, format!($a0, $a1, $a2, $a3, $a4, $a5, $a6, $a7, $a8, $a9, $a10))) };
-    ($span2:expr, $a0:literal, $a1:tt, $a2:tt, $a3:tt, $a4:tt, $a5:tt, $a6:tt, $a7:tt, $a8:tt, $a9:tt, $a10:tt, $a11:tt) => { Err(syn::Error::new($span2, format!($a0, $a1, $a2, $a3, $a4, $a5, $a6, $a7, $a8, $a9, $a10, $a11))) };
-    ($span2:expr, $a0:literal, $a1:tt, $a2:tt, $a3:tt, $a4:tt, $a5:tt, $a6:tt, $a7:tt, $a8:tt, $a9:tt, $a10:tt, $a11:tt, $a12:tt) => { Err(syn::Error::new($span2, format!($a0, $a1, $a2, $a3, $a4, $a5, $a6, $a7, $a8, $a9, $a10, $a11, $a12))) };
+    ($span2:expr, $a0:literal) => { Err(MError::new($span2, format!($a0))) };
+    ($span2:expr, $a0:literal, $a1:tt) => { Err(MError::new($span2, format!($a0, $a1))) };
+    ($span2:expr, $a0:literal, $a1:tt, $a2:tt) => { Err(MError::new($span2, format!($a0, $a1, $a2))) };
+    ($span2:expr, $a0:literal, $a1:tt, $a2:tt, $a3:tt) => { Err(MError::new($span2, format!($a0, $a1, $a2, $a3))) };
+    ($span2:expr, $a0:literal, $a1:tt, $a2:tt, $a3:tt, $a4:tt) => { Err(MError::new($span2, format!($a0, $a1, $a2, $a3, $a4))) };
+    ($span2:expr, $a0:literal, $a1:tt, $a2:tt, $a3:tt, $a4:tt, $a5:tt) => { Err(MError::new($span2, format!($a0, $a1, $a2, $a3, $a4, $a5))) };
+    ($span2:expr, $a0:literal, $a1:tt, $a2:tt, $a3:tt, $a4:tt, $a5:tt, $a6:tt) => { Err(MError::new($span2, format!($a0, $a1, $a2, $a3, $a4, $a5, $a6))) };
+    ($span2:expr, $a0:literal, $a1:tt, $a2:tt, $a3:tt, $a4:tt, $a5:tt, $a6:tt, $a7:tt) => { Err(MError::new($span2, format!($a0, $a1, $a2, $a3, $a4, $a5, $a6, $a7))) };
+    ($span2:expr, $a0:literal, $a1:tt, $a2:tt, $a3:tt, $a4:tt, $a5:tt, $a6:tt, $a7:tt, $a8:tt) => { Err(MError::new($span2, format!($a0, $a1, $a2, $a3, $a4, $a5, $a6, $a7, $a8))) };
+    ($span2:expr, $a0:literal, $a1:tt, $a2:tt, $a3:tt, $a4:tt, $a5:tt, $a6:tt, $a7:tt, $a8:tt, $a9:tt) => { Err(MError::new($span2, format!($a0, $a1, $a2, $a3, $a4, $a5, $a6, $a7, $a8, $a9))) };
+    ($span2:expr, $a0:literal, $a1:tt, $a2:tt, $a3:tt, $a4:tt, $a5:tt, $a6:tt, $a7:tt, $a8:tt, $a9:tt, $a10:tt) => { Err(MError::new($span2, format!($a0, $a1, $a2, $a3, $a4, $a5, $a6, $a7, $a8, $a9, $a10))) };
+    ($span2:expr, $a0:literal, $a1:tt, $a2:tt, $a3:tt, $a4:tt, $a5:tt, $a6:tt, $a7:tt, $a8:tt, $a9:tt, $a10:tt, $a11:tt) => { Err(MError::new($span2, format!($a0, $a1, $a2, $a3, $a4, $a5, $a6, $a7, $a8, $a9, $a10, $a11))) };
+    ($span2:expr, $a0:literal, $a1:tt, $a2:tt, $a3:tt, $a4:tt, $a5:tt, $a6:tt, $a7:tt, $a8:tt, $a9:tt, $a10:tt, $a11:tt, $a12:tt) => { Err(MError::new($span2, format!($a0, $a1, $a2, $a3, $a4, $a5, $a6, $a7, $a8, $a9, $a10, $a11, $a12))) };
 }
 #[rustfmt::skip]
 macro_rules! ret_ {
-    ($span2:expr, $a0:literal) => { return Err(syn::Error::new($span2, format!($a0))) };
-    ($span2:expr, $a0:literal, $a1:tt) => { return Err(syn::Error::new($span2, format!($a0, $a1))) };
-    ($span2:expr, $a0:literal, $a1:tt, $a2:tt) => { return Err(syn::Error::new($span2, format!($a0, $a1, $a2))) };
-    ($span2:expr, $a0:literal, $a1:tt, $a2:tt, $a3:tt) => { return Err(syn::Error::new($span2, format!($a0, $a1, $a2, $a3))) };
-    ($span2:expr, $a0:literal, $a1:tt, $a2:tt, $a3:tt, $a4:tt) => { return Err(syn::Error::new($span2, format!($a0, $a1, $a2, $a3, $a4))) };
-    ($span2:expr, $a0:literal, $a1:tt, $a2:tt, $a3:tt, $a4:tt, $a5:tt) => { return Err(syn::Error::new($span2, format!($a0, $a1, $a2, $a3, $a4, $a5))) };
-    ($span2:expr, $a0:literal, $a1:tt, $a2:tt, $a3:tt, $a4:tt, $a5:tt, $a6:tt) => { return Err(syn::Error::new($span2, format!($a0, $a1, $a2, $a3, $a4, $a5, $a6))) };
-    ($span2:expr, $a0:literal, $a1:tt, $a2:tt, $a3:tt, $a4:tt, $a5:tt, $a6:tt, $a7:tt) => { return Err(syn::Error::new($span2, format!($a0, $a1, $a2, $a3, $a4, $a5, $a6, $a7))) };
-    ($span2:expr, $a0:literal, $a1:tt, $a2:tt, $a3:tt, $a4:tt, $a5:tt, $a6:tt, $a7:tt, $a8:tt) => { return Err(syn::Error::new($span2, format!($a0, $a1, $a2, $a3, $a4, $a5, $a6, $a7, $a8))) };
-    ($span2:expr, $a0:literal, $a1:tt, $a2:tt, $a3:tt, $a4:tt, $a5:tt, $a6:tt, $a7:tt, $a8:tt, $a9:tt) => { return Err(syn::Error::new($span2, format!($a0, $a1, $a2, $a3, $a4, $a5, $a6, $a7, $a8, $a9))) };
-    ($span2:expr, $a0:literal, $a1:tt, $a2:tt, $a3:tt, $a4:tt, $a5:tt, $a6:tt, $a7:tt, $a8:tt, $a9:tt, $a10:tt) => { return Err(syn::Error::new($span2, format!($a0, $a1, $a2, $a3, $a4, $a5, $a6, $a7, $a8, $a9, $a10))) };
-    ($span2:expr, $a0:literal, $a1:tt, $a2:tt, $a3:tt, $a4:tt, $a5:tt, $a6:tt, $a7:tt, $a8:tt, $a9:tt, $a10:tt, $a11:tt) => { return Err(syn::Error::new($span2, format!($a0, $a1, $a2, $a3, $a4, $a5, $a6, $a7, $a8, $a9, $a10, $a11))) };
-    ($span2:expr, $a0:literal, $a1:tt, $a2:tt, $a3:tt, $a4:tt, $a5:tt, $a6:tt, $a7:tt, $a8:tt, $a9:tt, $a10:tt, $a11:tt, $a12:tt) => { return Err(syn::Error::new($span2, format!($a0, $a1, $a2, $a3, $a4, $a5, $a6, $a7, $a8, $a9, $a10, $a11, $a12))) };
+    ($span2:expr, $a0:literal) => { return Err(MError::new($span2, format!($a0))) };
+    ($span2:expr, $a0:literal, $a1:tt) => { return Err(MError::new($span2, format!($a0, $a1))) };
+    ($span2:expr, $a0:literal, $a1:tt, $a2:tt) => { return Err(MError::new($span2, format!($a0, $a1, $a2))) };
+    ($span2:expr, $a0:literal, $a1:tt, $a2:tt, $a3:tt) => { return Err(MError::new($span2, format!($a0, $a1, $a2, $a3))) };
+    ($span2:expr, $a0:literal, $a1:tt, $a2:tt, $a3:tt, $a4:tt) => { return Err(MError::new($span2, format!($a0, $a1, $a2, $a3, $a4))) };
+    ($span2:expr, $a0:literal, $a1:tt, $a2:tt, $a3:tt, $a4:tt, $a5:tt) => { return Err(MError::new($span2, format!($a0, $a1, $a2, $a3, $a4, $a5))) };
+    ($span2:expr, $a0:literal, $a1:tt, $a2:tt, $a3:tt, $a4:tt, $a5:tt, $a6:tt) => { return Err(MError::new($span2, format!($a0, $a1, $a2, $a3, $a4, $a5, $a6))) };
+    ($span2:expr, $a0:literal, $a1:tt, $a2:tt, $a3:tt, $a4:tt, $a5:tt, $a6:tt, $a7:tt) => { return Err(MError::new($span2, format!($a0, $a1, $a2, $a3, $a4, $a5, $a6, $a7))) };
+    ($span2:expr, $a0:literal, $a1:tt, $a2:tt, $a3:tt, $a4:tt, $a5:tt, $a6:tt, $a7:tt, $a8:tt) => { return Err(MError::new($span2, format!($a0, $a1, $a2, $a3, $a4, $a5, $a6, $a7, $a8))) };
+    ($span2:expr, $a0:literal, $a1:tt, $a2:tt, $a3:tt, $a4:tt, $a5:tt, $a6:tt, $a7:tt, $a8:tt, $a9:tt) => { return Err(MError::new($span2, format!($a0, $a1, $a2, $a3, $a4, $a5, $a6, $a7, $a8, $a9))) };
+    ($span2:expr, $a0:literal, $a1:tt, $a2:tt, $a3:tt, $a4:tt, $a5:tt, $a6:tt, $a7:tt, $a8:tt, $a9:tt, $a10:tt) => { return Err(MError::new($span2, format!($a0, $a1, $a2, $a3, $a4, $a5, $a6, $a7, $a8, $a9, $a10))) };
+    ($span2:expr, $a0:literal, $a1:tt, $a2:tt, $a3:tt, $a4:tt, $a5:tt, $a6:tt, $a7:tt, $a8:tt, $a9:tt, $a10:tt, $a11:tt) => { return Err(MError::new($span2, format!($a0, $a1, $a2, $a3, $a4, $a5, $a6, $a7, $a8, $a9, $a10, $a11))) };
+    ($span2:expr, $a0:literal, $a1:tt, $a2:tt, $a3:tt, $a4:tt, $a5:tt, $a6:tt, $a7:tt, $a8:tt, $a9:tt, $a10:tt, $a11:tt, $a12:tt) => { return Err(MError::new($span2, format!($a0, $a1, $a2, $a3, $a4, $a5, $a6, $a7, $a8, $a9, $a10, $a11, $a12))) };
 }
 
 #[rustfmt::skip]
 macro_rules! register_span {
+    (, $x:ident) => {
+        register_span!(Some(QSpan::new($x.span(), $x.clone().to_string())))
+    };
     ($span:expr) => {
         // repeated stuff because nested varadic macros do not seem to work that well.
         let _span = $span;
 
+
         #[allow(unused)]
         macro_rules! bare {
-            ($a0:literal) => { syn::Error::new(_span, format!($a0)) };
-            ($a0:literal, $a1:tt) => { syn::Error::new(_span, format!($a0, $a1)) };
-            ($a0:literal, $a1:tt, $a2:tt) => { syn::Error::new(_span, format!($a0, $a1, $a2)) };
-            ($a0:literal, $a1:tt, $a2:tt, $a3:tt) => { syn::Error::new(_span, format!($a0, $a1, $a2, $a3)) };
-            ($a0:literal, $a1:tt, $a2:tt, $a3:tt, $a4:tt) => { syn::Error::new(_span, format!($a0, $a1, $a2, $a3, $a4)) };
-            ($a0:literal, $a1:tt, $a2:tt, $a3:tt, $a4:tt, $a5:tt) => { syn::Error::new(_span, format!($a0, $a1, $a2, $a3, $a4, $a5)) };
-            ($a0:literal, $a1:tt, $a2:tt, $a3:tt, $a4:tt, $a5:tt, $a6:tt) => { syn::Error::new(_span, format!($a0, $a1, $a2, $a3, $a4, $a5, $a6)) };
-            ($a0:literal, $a1:tt, $a2:tt, $a3:tt, $a4:tt, $a5:tt, $a6:tt, $a7:tt) => { syn::Error::new(_span, format!($a0, $a1, $a2, $a3, $a4, $a5, $a6, $a7)) };
-            ($a0:literal, $a1:tt, $a2:tt, $a3:tt, $a4:tt, $a5:tt, $a6:tt, $a7:tt, $a8:tt) => { syn::Error::new(_span, format!($a0, $a1, $a2, $a3, $a4, $a5, $a6, $a7, $a8)) };
-            ($a0:literal, $a1:tt, $a2:tt, $a3:tt, $a4:tt, $a5:tt, $a6:tt, $a7:tt, $a8:tt, $a9:tt) => { syn::Error::new(_span, format!($a0, $a1, $a2, $a3, $a4, $a5, $a6, $a7, $a8, $a9)) };
-            ($a0:literal, $a1:tt, $a2:tt, $a3:tt, $a4:tt, $a5:tt, $a6:tt, $a7:tt, $a8:tt, $a9:tt, $a10:tt) => { syn::Error::new(_span, format!($a0, $a1, $a2, $a3, $a4, $a5, $a6, $a7, $a8, $a9, $a10)) };
-            ($a0:literal, $a1:tt, $a2:tt, $a3:tt, $a4:tt, $a5:tt, $a6:tt, $a7:tt, $a8:tt, $a9:tt, $a10:tt, $a11:tt) => { syn::Error::new(_span, format!($a0, $a1, $a2, $a3, $a4, $a5, $a6, $a7, $a8, $a9, $a10, $a11)) };
-            ($a0:literal, $a1:tt, $a2:tt, $a3:tt, $a4:tt, $a5:tt, $a6:tt, $a7:tt, $a8:tt, $a9:tt, $a10:tt, $a11:tt, $a12:tt) => { syn::Error::new(_span, format!($a0, $a1, $a2, $a3, $a4, $a5, $a6, $a7, $a8, $a9, $a10, $a11, $a12)) };
-            ($span2:expr, $a0:literal) => { syn::Error::new($span2, format!($a0)) };
-            ($span2:expr, $a0:literal, $a1:tt) => { syn::Error::new($span2, format!($a0, $a1)) };
-            ($span2:expr, $a0:literal, $a1:tt, $a2:tt) => { syn::Error::new($span2, format!($a0, $a1, $a2)) };
-            ($span2:expr, $a0:literal, $a1:tt, $a2:tt, $a3:tt) => { syn::Error::new($span2, format!($a0, $a1, $a2, $a3)) };
-            ($span2:expr, $a0:literal, $a1:tt, $a2:tt, $a3:tt, $a4:tt) => { syn::Error::new($span2, format!($a0, $a1, $a2, $a3, $a4)) };
-            ($span2:expr, $a0:literal, $a1:tt, $a2:tt, $a3:tt, $a4:tt, $a5:tt) => { syn::Error::new($span2, format!($a0, $a1, $a2, $a3, $a4, $a5)) };
-            ($span2:expr, $a0:literal, $a1:tt, $a2:tt, $a3:tt, $a4:tt, $a5:tt, $a6:tt) => { syn::Error::new($span2, format!($a0, $a1, $a2, $a3, $a4, $a5, $a6)) };
-            ($span2:expr, $a0:literal, $a1:tt, $a2:tt, $a3:tt, $a4:tt, $a5:tt, $a6:tt, $a7:tt) => { syn::Error::new($span2, format!($a0, $a1, $a2, $a3, $a4, $a5, $a6, $a7)) };
-            ($span2:expr, $a0:literal, $a1:tt, $a2:tt, $a3:tt, $a4:tt, $a5:tt, $a6:tt, $a7:tt, $a8:tt) => { syn::Error::new($span2, format!($a0, $a1, $a2, $a3, $a4, $a5, $a6, $a7, $a8)) };
-            ($span2:expr, $a0:literal, $a1:tt, $a2:tt, $a3:tt, $a4:tt, $a5:tt, $a6:tt, $a7:tt, $a8:tt, $a9:tt) => { syn::Error::new($span2, format!($a0, $a1, $a2, $a3, $a4, $a5, $a6, $a7, $a8, $a9)) };
-            ($span2:expr, $a0:literal, $a1:tt, $a2:tt, $a3:tt, $a4:tt, $a5:tt, $a6:tt, $a7:tt, $a8:tt, $a9:tt, $a10:tt) => { syn::Error::new($span2, format!($a0, $a1, $a2, $a3, $a4, $a5, $a6, $a7, $a8, $a9, $a10)) };
-            ($span2:expr, $a0:literal, $a1:tt, $a2:tt, $a3:tt, $a4:tt, $a5:tt, $a6:tt, $a7:tt, $a8:tt, $a9:tt, $a10:tt, $a11:tt) => { syn::Error::new($span2, format!($a0, $a1, $a2, $a3, $a4, $a5, $a6, $a7, $a8, $a9, $a10, $a11)) };
-            ($span2:expr, $a0:literal, $a1:tt, $a2:tt, $a3:tt, $a4:tt, $a5:tt, $a6:tt, $a7:tt, $a8:tt, $a9:tt, $a10:tt, $a11:tt, $a12:tt) => { syn::Error::new($span2, format!($a0, $a1, $a2, $a3, $a4, $a5, $a6, $a7, $a8, $a9, $a10, $a11, $a12)) };
+            ($a0:literal) => { MError::new(_span, format!($a0)) };
+            ($a0:literal, $a1:tt) => { MError::new(_span, format!($a0, $a1)) };
+            ($a0:literal, $a1:tt, $a2:tt) => { MError::new(_span, format!($a0, $a1, $a2)) };
+            ($a0:literal, $a1:tt, $a2:tt, $a3:tt) => { MError::new(_span, format!($a0, $a1, $a2, $a3)) };
+            ($a0:literal, $a1:tt, $a2:tt, $a3:tt, $a4:tt) => { MError::new(_span, format!($a0, $a1, $a2, $a3, $a4)) };
+            ($a0:literal, $a1:tt, $a2:tt, $a3:tt, $a4:tt, $a5:tt) => { MError::new(_span, format!($a0, $a1, $a2, $a3, $a4, $a5)) };
+            ($a0:literal, $a1:tt, $a2:tt, $a3:tt, $a4:tt, $a5:tt, $a6:tt) => { MError::new(_span, format!($a0, $a1, $a2, $a3, $a4, $a5, $a6)) };
+            ($a0:literal, $a1:tt, $a2:tt, $a3:tt, $a4:tt, $a5:tt, $a6:tt, $a7:tt) => { MError::new(_span, format!($a0, $a1, $a2, $a3, $a4, $a5, $a6, $a7)) };
+            ($a0:literal, $a1:tt, $a2:tt, $a3:tt, $a4:tt, $a5:tt, $a6:tt, $a7:tt, $a8:tt) => { MError::new(_span, format!($a0, $a1, $a2, $a3, $a4, $a5, $a6, $a7, $a8)) };
+            ($a0:literal, $a1:tt, $a2:tt, $a3:tt, $a4:tt, $a5:tt, $a6:tt, $a7:tt, $a8:tt, $a9:tt) => { MError::new(_span, format!($a0, $a1, $a2, $a3, $a4, $a5, $a6, $a7, $a8, $a9)) };
+            ($a0:literal, $a1:tt, $a2:tt, $a3:tt, $a4:tt, $a5:tt, $a6:tt, $a7:tt, $a8:tt, $a9:tt, $a10:tt) => { MError::new(_span, format!($a0, $a1, $a2, $a3, $a4, $a5, $a6, $a7, $a8, $a9, $a10)) };
+            ($a0:literal, $a1:tt, $a2:tt, $a3:tt, $a4:tt, $a5:tt, $a6:tt, $a7:tt, $a8:tt, $a9:tt, $a10:tt, $a11:tt) => { MError::new(_span, format!($a0, $a1, $a2, $a3, $a4, $a5, $a6, $a7, $a8, $a9, $a10, $a11)) };
+            ($a0:literal, $a1:tt, $a2:tt, $a3:tt, $a4:tt, $a5:tt, $a6:tt, $a7:tt, $a8:tt, $a9:tt, $a10:tt, $a11:tt, $a12:tt) => { MError::new(_span, format!($a0, $a1, $a2, $a3, $a4, $a5, $a6, $a7, $a8, $a9, $a10, $a11, $a12)) };
+            ($span2:expr, $a0:literal) => { MError::new($span2, format!($a0)) };
+            ($span2:expr, $a0:literal, $a1:tt) => { MError::new($span2, format!($a0, $a1)) };
+            ($span2:expr, $a0:literal, $a1:tt, $a2:tt) => { MError::new($span2, format!($a0, $a1, $a2)) };
+            ($span2:expr, $a0:literal, $a1:tt, $a2:tt, $a3:tt) => { MError::new($span2, format!($a0, $a1, $a2, $a3)) };
+            ($span2:expr, $a0:literal, $a1:tt, $a2:tt, $a3:tt, $a4:tt) => { MError::new($span2, format!($a0, $a1, $a2, $a3, $a4)) };
+            ($span2:expr, $a0:literal, $a1:tt, $a2:tt, $a3:tt, $a4:tt, $a5:tt) => { MError::new($span2, format!($a0, $a1, $a2, $a3, $a4, $a5)) };
+            ($span2:expr, $a0:literal, $a1:tt, $a2:tt, $a3:tt, $a4:tt, $a5:tt, $a6:tt) => { MError::new($span2, format!($a0, $a1, $a2, $a3, $a4, $a5, $a6)) };
+            ($span2:expr, $a0:literal, $a1:tt, $a2:tt, $a3:tt, $a4:tt, $a5:tt, $a6:tt, $a7:tt) => { MError::new($span2, format!($a0, $a1, $a2, $a3, $a4, $a5, $a6, $a7)) };
+            ($span2:expr, $a0:literal, $a1:tt, $a2:tt, $a3:tt, $a4:tt, $a5:tt, $a6:tt, $a7:tt, $a8:tt) => { MError::new($span2, format!($a0, $a1, $a2, $a3, $a4, $a5, $a6, $a7, $a8)) };
+            ($span2:expr, $a0:literal, $a1:tt, $a2:tt, $a3:tt, $a4:tt, $a5:tt, $a6:tt, $a7:tt, $a8:tt, $a9:tt) => { MError::new($span2, format!($a0, $a1, $a2, $a3, $a4, $a5, $a6, $a7, $a8, $a9)) };
+            ($span2:expr, $a0:literal, $a1:tt, $a2:tt, $a3:tt, $a4:tt, $a5:tt, $a6:tt, $a7:tt, $a8:tt, $a9:tt, $a10:tt) => { MError::new($span2, format!($a0, $a1, $a2, $a3, $a4, $a5, $a6, $a7, $a8, $a9, $a10)) };
+            ($span2:expr, $a0:literal, $a1:tt, $a2:tt, $a3:tt, $a4:tt, $a5:tt, $a6:tt, $a7:tt, $a8:tt, $a9:tt, $a10:tt, $a11:tt) => { MError::new($span2, format!($a0, $a1, $a2, $a3, $a4, $a5, $a6, $a7, $a8, $a9, $a10, $a11)) };
+            ($span2:expr, $a0:literal, $a1:tt, $a2:tt, $a3:tt, $a4:tt, $a5:tt, $a6:tt, $a7:tt, $a8:tt, $a9:tt, $a10:tt, $a11:tt, $a12:tt) => { MError::new($span2, format!($a0, $a1, $a2, $a3, $a4, $a5, $a6, $a7, $a8, $a9, $a10, $a11, $a12)) };
         }
         #[allow(unused)]
         macro_rules! err {
-            ($a0:literal) => { Err(syn::Error::new(_span, format!($a0))) };
-            ($a0:literal, $a1:tt) => { Err(syn::Error::new(_span, format!($a0, $a1))) };
-            ($a0:literal, $a1:tt, $a2:tt) => { Err(syn::Error::new(_span, format!($a0, $a1, $a2))) };
-            ($a0:literal, $a1:tt, $a2:tt, $a3:tt) => { Err(syn::Error::new(_span, format!($a0, $a1, $a2, $a3))) };
-            ($a0:literal, $a1:tt, $a2:tt, $a3:tt, $a4:tt) => { Err(syn::Error::new(_span, format!($a0, $a1, $a2, $a3, $a4))) };
-            ($a0:literal, $a1:tt, $a2:tt, $a3:tt, $a4:tt, $a5:tt) => { Err(syn::Error::new(_span, format!($a0, $a1, $a2, $a3, $a4, $a5))) };
-            ($a0:literal, $a1:tt, $a2:tt, $a3:tt, $a4:tt, $a5:tt, $a6:tt) => { Err(syn::Error::new(_span, format!($a0, $a1, $a2, $a3, $a4, $a5, $a6))) };
-            ($a0:literal, $a1:tt, $a2:tt, $a3:tt, $a4:tt, $a5:tt, $a6:tt, $a7:tt) => { Err(syn::Error::new(_span, format!($a0, $a1, $a2, $a3, $a4, $a5, $a6, $a7))) };
-            ($a0:literal, $a1:tt, $a2:tt, $a3:tt, $a4:tt, $a5:tt, $a6:tt, $a7:tt, $a8:tt) => { Err(syn::Error::new(_span, format!($a0, $a1, $a2, $a3, $a4, $a5, $a6, $a7, $a8))) };
-            ($a0:literal, $a1:tt, $a2:tt, $a3:tt, $a4:tt, $a5:tt, $a6:tt, $a7:tt, $a8:tt, $a9:tt) => { Err(syn::Error::new(_span, format!($a0, $a1, $a2, $a3, $a4, $a5, $a6, $a7, $a8, $a9))) };
-            ($a0:literal, $a1:tt, $a2:tt, $a3:tt, $a4:tt, $a5:tt, $a6:tt, $a7:tt, $a8:tt, $a9:tt, $a10:tt) => { Err(syn::Error::new(_span, format!($a0, $a1, $a2, $a3, $a4, $a5, $a6, $a7, $a8, $a9, $a10))) };
-            ($a0:literal, $a1:tt, $a2:tt, $a3:tt, $a4:tt, $a5:tt, $a6:tt, $a7:tt, $a8:tt, $a9:tt, $a10:tt, $a11:tt) => { Err(syn::Error::new(_span, format!($a0, $a1, $a2, $a3, $a4, $a5, $a6, $a7, $a8, $a9, $a10, $a11))) };
-            ($a0:literal, $a1:tt, $a2:tt, $a3:tt, $a4:tt, $a5:tt, $a6:tt, $a7:tt, $a8:tt, $a9:tt, $a10:tt, $a11:tt, $a12:tt) => { Err(syn::Error::new(_span, format!($a0, $a1, $a2, $a3, $a4, $a5, $a6, $a7, $a8, $a9, $a10, $a11, $a12))) };
-            ($span2:expr, $a0:literal) => { Err(syn::Error::new($span2, format!($a0))) };
-            ($span2:expr, $a0:literal, $a1:tt) => { Err(syn::Error::new($span2, format!($a0, $a1))) };
-            ($span2:expr, $a0:literal, $a1:tt, $a2:tt) => { Err(syn::Error::new($span2, format!($a0, $a1, $a2))) };
-            ($span2:expr, $a0:literal, $a1:tt, $a2:tt, $a3:tt) => { Err(syn::Error::new($span2, format!($a0, $a1, $a2, $a3))) };
-            ($span2:expr, $a0:literal, $a1:tt, $a2:tt, $a3:tt, $a4:tt) => { Err(syn::Error::new($span2, format!($a0, $a1, $a2, $a3, $a4))) };
-            ($span2:expr, $a0:literal, $a1:tt, $a2:tt, $a3:tt, $a4:tt, $a5:tt) => { Err(syn::Error::new($span2, format!($a0, $a1, $a2, $a3, $a4, $a5))) };
-            ($span2:expr, $a0:literal, $a1:tt, $a2:tt, $a3:tt, $a4:tt, $a5:tt, $a6:tt) => { Err(syn::Error::new($span2, format!($a0, $a1, $a2, $a3, $a4, $a5, $a6))) };
-            ($span2:expr, $a0:literal, $a1:tt, $a2:tt, $a3:tt, $a4:tt, $a5:tt, $a6:tt, $a7:tt) => { Err(syn::Error::new($span2, format!($a0, $a1, $a2, $a3, $a4, $a5, $a6, $a7))) };
-            ($span2:expr, $a0:literal, $a1:tt, $a2:tt, $a3:tt, $a4:tt, $a5:tt, $a6:tt, $a7:tt, $a8:tt) => { Err(syn::Error::new($span2, format!($a0, $a1, $a2, $a3, $a4, $a5, $a6, $a7, $a8))) };
-            ($span2:expr, $a0:literal, $a1:tt, $a2:tt, $a3:tt, $a4:tt, $a5:tt, $a6:tt, $a7:tt, $a8:tt, $a9:tt) => { Err(syn::Error::new($span2, format!($a0, $a1, $a2, $a3, $a4, $a5, $a6, $a7, $a8, $a9))) };
-            ($span2:expr, $a0:literal, $a1:tt, $a2:tt, $a3:tt, $a4:tt, $a5:tt, $a6:tt, $a7:tt, $a8:tt, $a9:tt, $a10:tt) => { Err(syn::Error::new($span2, format!($a0, $a1, $a2, $a3, $a4, $a5, $a6, $a7, $a8, $a9, $a10))) };
-            ($span2:expr, $a0:literal, $a1:tt, $a2:tt, $a3:tt, $a4:tt, $a5:tt, $a6:tt, $a7:tt, $a8:tt, $a9:tt, $a10:tt, $a11:tt) => { Err(syn::Error::new($span2, format!($a0, $a1, $a2, $a3, $a4, $a5, $a6, $a7, $a8, $a9, $a10, $a11))) };
-            ($span2:expr, $a0:literal, $a1:tt, $a2:tt, $a3:tt, $a4:tt, $a5:tt, $a6:tt, $a7:tt, $a8:tt, $a9:tt, $a10:tt, $a11:tt, $a12:tt) => { Err(syn::Error::new($span2, format!($a0, $a1, $a2, $a3, $a4, $a5, $a6, $a7, $a8, $a9, $a10, $a11, $a12))) };
+            ($a0:literal) => { Err(MError::new(_span, format!($a0))) };
+            ($a0:literal, $a1:tt) => { Err(MError::new(_span, format!($a0, $a1))) };
+            ($a0:literal, $a1:tt, $a2:tt) => { Err(MError::new(_span, format!($a0, $a1, $a2))) };
+            ($a0:literal, $a1:tt, $a2:tt, $a3:tt) => { Err(MError::new(_span, format!($a0, $a1, $a2, $a3))) };
+            ($a0:literal, $a1:tt, $a2:tt, $a3:tt, $a4:tt) => { Err(MError::new(_span, format!($a0, $a1, $a2, $a3, $a4))) };
+            ($a0:literal, $a1:tt, $a2:tt, $a3:tt, $a4:tt, $a5:tt) => { Err(MError::new(_span, format!($a0, $a1, $a2, $a3, $a4, $a5))) };
+            ($a0:literal, $a1:tt, $a2:tt, $a3:tt, $a4:tt, $a5:tt, $a6:tt) => { Err(MError::new(_span, format!($a0, $a1, $a2, $a3, $a4, $a5, $a6))) };
+            ($a0:literal, $a1:tt, $a2:tt, $a3:tt, $a4:tt, $a5:tt, $a6:tt, $a7:tt) => { Err(MError::new(_span, format!($a0, $a1, $a2, $a3, $a4, $a5, $a6, $a7))) };
+            ($a0:literal, $a1:tt, $a2:tt, $a3:tt, $a4:tt, $a5:tt, $a6:tt, $a7:tt, $a8:tt) => { Err(MError::new(_span, format!($a0, $a1, $a2, $a3, $a4, $a5, $a6, $a7, $a8))) };
+            ($a0:literal, $a1:tt, $a2:tt, $a3:tt, $a4:tt, $a5:tt, $a6:tt, $a7:tt, $a8:tt, $a9:tt) => { Err(MError::new(_span, format!($a0, $a1, $a2, $a3, $a4, $a5, $a6, $a7, $a8, $a9))) };
+            ($a0:literal, $a1:tt, $a2:tt, $a3:tt, $a4:tt, $a5:tt, $a6:tt, $a7:tt, $a8:tt, $a9:tt, $a10:tt) => { Err(MError::new(_span, format!($a0, $a1, $a2, $a3, $a4, $a5, $a6, $a7, $a8, $a9, $a10))) };
+            ($a0:literal, $a1:tt, $a2:tt, $a3:tt, $a4:tt, $a5:tt, $a6:tt, $a7:tt, $a8:tt, $a9:tt, $a10:tt, $a11:tt) => { Err(MError::new(_span, format!($a0, $a1, $a2, $a3, $a4, $a5, $a6, $a7, $a8, $a9, $a10, $a11))) };
+            ($a0:literal, $a1:tt, $a2:tt, $a3:tt, $a4:tt, $a5:tt, $a6:tt, $a7:tt, $a8:tt, $a9:tt, $a10:tt, $a11:tt, $a12:tt) => { Err(MError::new(_span, format!($a0, $a1, $a2, $a3, $a4, $a5, $a6, $a7, $a8, $a9, $a10, $a11, $a12))) };
+            ($span2:expr, $a0:literal) => { Err(MError::new($span2, format!($a0))) };
+            ($span2:expr, $a0:literal, $a1:tt) => { Err(MError::new($span2, format!($a0, $a1))) };
+            ($span2:expr, $a0:literal, $a1:tt, $a2:tt) => { Err(MError::new($span2, format!($a0, $a1, $a2))) };
+            ($span2:expr, $a0:literal, $a1:tt, $a2:tt, $a3:tt) => { Err(MError::new($span2, format!($a0, $a1, $a2, $a3))) };
+            ($span2:expr, $a0:literal, $a1:tt, $a2:tt, $a3:tt, $a4:tt) => { Err(MError::new($span2, format!($a0, $a1, $a2, $a3, $a4))) };
+            ($span2:expr, $a0:literal, $a1:tt, $a2:tt, $a3:tt, $a4:tt, $a5:tt) => { Err(MError::new($span2, format!($a0, $a1, $a2, $a3, $a4, $a5))) };
+            ($span2:expr, $a0:literal, $a1:tt, $a2:tt, $a3:tt, $a4:tt, $a5:tt, $a6:tt) => { Err(MError::new($span2, format!($a0, $a1, $a2, $a3, $a4, $a5, $a6))) };
+            ($span2:expr, $a0:literal, $a1:tt, $a2:tt, $a3:tt, $a4:tt, $a5:tt, $a6:tt, $a7:tt) => { Err(MError::new($span2, format!($a0, $a1, $a2, $a3, $a4, $a5, $a6, $a7))) };
+            ($span2:expr, $a0:literal, $a1:tt, $a2:tt, $a3:tt, $a4:tt, $a5:tt, $a6:tt, $a7:tt, $a8:tt) => { Err(MError::new($span2, format!($a0, $a1, $a2, $a3, $a4, $a5, $a6, $a7, $a8))) };
+            ($span2:expr, $a0:literal, $a1:tt, $a2:tt, $a3:tt, $a4:tt, $a5:tt, $a6:tt, $a7:tt, $a8:tt, $a9:tt) => { Err(MError::new($span2, format!($a0, $a1, $a2, $a3, $a4, $a5, $a6, $a7, $a8, $a9))) };
+            ($span2:expr, $a0:literal, $a1:tt, $a2:tt, $a3:tt, $a4:tt, $a5:tt, $a6:tt, $a7:tt, $a8:tt, $a9:tt, $a10:tt) => { Err(MError::new($span2, format!($a0, $a1, $a2, $a3, $a4, $a5, $a6, $a7, $a8, $a9, $a10))) };
+            ($span2:expr, $a0:literal, $a1:tt, $a2:tt, $a3:tt, $a4:tt, $a5:tt, $a6:tt, $a7:tt, $a8:tt, $a9:tt, $a10:tt, $a11:tt) => { Err(MError::new($span2, format!($a0, $a1, $a2, $a3, $a4, $a5, $a6, $a7, $a8, $a9, $a10, $a11))) };
+            ($span2:expr, $a0:literal, $a1:tt, $a2:tt, $a3:tt, $a4:tt, $a5:tt, $a6:tt, $a7:tt, $a8:tt, $a9:tt, $a10:tt, $a11:tt, $a12:tt) => { Err(MError::new($span2, format!($a0, $a1, $a2, $a3, $a4, $a5, $a6, $a7, $a8, $a9, $a10, $a11, $a12))) };
         }
+        #[allow(unused)]
         macro_rules! ret {
-            ($a0:literal) => { return Err(syn::Error::new(_span, format!($a0))) };
-            ($a0:literal, $a1:tt) => { return Err(syn::Error::new(_span, format!($a0, $a1))) };
-            ($a0:literal, $a1:tt, $a2:tt) => { return Err(syn::Error::new(_span, format!($a0, $a1, $a2))) };
-            ($a0:literal, $a1:tt, $a2:tt, $a3:tt) => { return Err(syn::Error::new(_span, format!($a0, $a1, $a2, $a3))) };
-            ($a0:literal, $a1:tt, $a2:tt, $a3:tt, $a4:tt) => { return Err(syn::Error::new(_span, format!($a0, $a1, $a2, $a3, $a4))) };
-            ($a0:literal, $a1:tt, $a2:tt, $a3:tt, $a4:tt, $a5:tt) => { return Err(syn::Error::new(_span, format!($a0, $a1, $a2, $a3, $a4, $a5))) };
-            ($a0:literal, $a1:tt, $a2:tt, $a3:tt, $a4:tt, $a5:tt, $a6:tt) => { return Err(syn::Error::new(_span, format!($a0, $a1, $a2, $a3, $a4, $a5, $a6))) };
-            ($a0:literal, $a1:tt, $a2:tt, $a3:tt, $a4:tt, $a5:tt, $a6:tt, $a7:tt) => { return Err(syn::Error::new(_span, format!($a0, $a1, $a2, $a3, $a4, $a5, $a6, $a7))) };
-            ($a0:literal, $a1:tt, $a2:tt, $a3:tt, $a4:tt, $a5:tt, $a6:tt, $a7:tt, $a8:tt) => { return Err(syn::Error::new(_span, format!($a0, $a1, $a2, $a3, $a4, $a5, $a6, $a7, $a8))) };
-            ($a0:literal, $a1:tt, $a2:tt, $a3:tt, $a4:tt, $a5:tt, $a6:tt, $a7:tt, $a8:tt, $a9:tt) => { return Err(syn::Error::new(_span, format!($a0, $a1, $a2, $a3, $a4, $a5, $a6, $a7, $a8, $a9))) };
-            ($a0:literal, $a1:tt, $a2:tt, $a3:tt, $a4:tt, $a5:tt, $a6:tt, $a7:tt, $a8:tt, $a9:tt, $a10:tt) => { return Err(syn::Error::new(_span, format!($a0, $a1, $a2, $a3, $a4, $a5, $a6, $a7, $a8, $a9, $a10))) };
-            ($a0:literal, $a1:tt, $a2:tt, $a3:tt, $a4:tt, $a5:tt, $a6:tt, $a7:tt, $a8:tt, $a9:tt, $a10:tt, $a11:tt) => { return Err(syn::Error::new(_span, format!($a0, $a1, $a2, $a3, $a4, $a5, $a6, $a7, $a8, $a9, $a10, $a11))) };
-            ($a0:literal, $a1:tt, $a2:tt, $a3:tt, $a4:tt, $a5:tt, $a6:tt, $a7:tt, $a8:tt, $a9:tt, $a10:tt, $a11:tt, $a12:tt) => { return Err(syn::Error::new(_span, format!($a0, $a1, $a2, $a3, $a4, $a5, $a6, $a7, $a8, $a9, $a10, $a11, $a12))) };
-            ($span2:expr, $a0:literal) => { return Err(syn::Error::new($span2, format!($a0))) };
-            ($span2:expr, $a0:literal, $a1:tt) => { return Err(syn::Error::new($span2, format!($a0, $a1))) };
-            ($span2:expr, $a0:literal, $a1:tt, $a2:tt) => { return Err(syn::Error::new($span2, format!($a0, $a1, $a2))) };
-            ($span2:expr, $a0:literal, $a1:tt, $a2:tt, $a3:tt) => { return Err(syn::Error::new($span2, format!($a0, $a1, $a2, $a3))) };
-            ($span2:expr, $a0:literal, $a1:tt, $a2:tt, $a3:tt, $a4:tt) => { return Err(syn::Error::new($span2, format!($a0, $a1, $a2, $a3, $a4))) };
-            ($span2:expr, $a0:literal, $a1:tt, $a2:tt, $a3:tt, $a4:tt, $a5:tt) => { return Err(syn::Error::new($span2, format!($a0, $a1, $a2, $a3, $a4, $a5))) };
-            ($span2:expr, $a0:literal, $a1:tt, $a2:tt, $a3:tt, $a4:tt, $a5:tt, $a6:tt) => { return Err(syn::Error::new($span2, format!($a0, $a1, $a2, $a3, $a4, $a5, $a6))) };
-            ($span2:expr, $a0:literal, $a1:tt, $a2:tt, $a3:tt, $a4:tt, $a5:tt, $a6:tt, $a7:tt) => { return Err(syn::Error::new($span2, format!($a0, $a1, $a2, $a3, $a4, $a5, $a6, $a7))) };
-            ($span2:expr, $a0:literal, $a1:tt, $a2:tt, $a3:tt, $a4:tt, $a5:tt, $a6:tt, $a7:tt, $a8:tt) => { return Err(syn::Error::new($span2, format!($a0, $a1, $a2, $a3, $a4, $a5, $a6, $a7, $a8))) };
-            ($span2:expr, $a0:literal, $a1:tt, $a2:tt, $a3:tt, $a4:tt, $a5:tt, $a6:tt, $a7:tt, $a8:tt, $a9:tt) => { return Err(syn::Error::new($span2, format!($a0, $a1, $a2, $a3, $a4, $a5, $a6, $a7, $a8, $a9))) };
-            ($span2:expr, $a0:literal, $a1:tt, $a2:tt, $a3:tt, $a4:tt, $a5:tt, $a6:tt, $a7:tt, $a8:tt, $a9:tt, $a10:tt) => { return Err(syn::Error::new($span2, format!($a0, $a1, $a2, $a3, $a4, $a5, $a6, $a7, $a8, $a9, $a10))) };
-            ($span2:expr, $a0:literal, $a1:tt, $a2:tt, $a3:tt, $a4:tt, $a5:tt, $a6:tt, $a7:tt, $a8:tt, $a9:tt, $a10:tt, $a11:tt) => { return Err(syn::Error::new($span2, format!($a0, $a1, $a2, $a3, $a4, $a5, $a6, $a7, $a8, $a9, $a10, $a11))) };
-            ($span2:expr, $a0:literal, $a1:tt, $a2:tt, $a3:tt, $a4:tt, $a5:tt, $a6:tt, $a7:tt, $a8:tt, $a9:tt, $a10:tt, $a11:tt, $a12:tt) => { return Err(syn::Error::new($span2, format!($a0, $a1, $a2, $a3, $a4, $a5, $a6, $a7, $a8, $a9, $a10, $a11, $a12))) };
+            ($a0:literal) => { return Err(MError::new(_span, format!($a0))) };
+            ($a0:literal, $a1:tt) => { return Err(MError::new(_span, format!($a0, $a1))) };
+            ($a0:literal, $a1:tt, $a2:tt) => { return Err(MError::new(_span, format!($a0, $a1, $a2))) };
+            ($a0:literal, $a1:tt, $a2:tt, $a3:tt) => { return Err(MError::new(_span, format!($a0, $a1, $a2, $a3))) };
+            ($a0:literal, $a1:tt, $a2:tt, $a3:tt, $a4:tt) => { return Err(MError::new(_span, format!($a0, $a1, $a2, $a3, $a4))) };
+            ($a0:literal, $a1:tt, $a2:tt, $a3:tt, $a4:tt, $a5:tt) => { return Err(MError::new(_span, format!($a0, $a1, $a2, $a3, $a4, $a5))) };
+            ($a0:literal, $a1:tt, $a2:tt, $a3:tt, $a4:tt, $a5:tt, $a6:tt) => { return Err(MError::new(_span, format!($a0, $a1, $a2, $a3, $a4, $a5, $a6))) };
+            ($a0:literal, $a1:tt, $a2:tt, $a3:tt, $a4:tt, $a5:tt, $a6:tt, $a7:tt) => { return Err(MError::new(_span, format!($a0, $a1, $a2, $a3, $a4, $a5, $a6, $a7))) };
+            ($a0:literal, $a1:tt, $a2:tt, $a3:tt, $a4:tt, $a5:tt, $a6:tt, $a7:tt, $a8:tt) => { return Err(MError::new(_span, format!($a0, $a1, $a2, $a3, $a4, $a5, $a6, $a7, $a8))) };
+            ($a0:literal, $a1:tt, $a2:tt, $a3:tt, $a4:tt, $a5:tt, $a6:tt, $a7:tt, $a8:tt, $a9:tt) => { return Err(MError::new(_span, format!($a0, $a1, $a2, $a3, $a4, $a5, $a6, $a7, $a8, $a9))) };
+            ($a0:literal, $a1:tt, $a2:tt, $a3:tt, $a4:tt, $a5:tt, $a6:tt, $a7:tt, $a8:tt, $a9:tt, $a10:tt) => { return Err(MError::new(_span, format!($a0, $a1, $a2, $a3, $a4, $a5, $a6, $a7, $a8, $a9, $a10))) };
+            ($a0:literal, $a1:tt, $a2:tt, $a3:tt, $a4:tt, $a5:tt, $a6:tt, $a7:tt, $a8:tt, $a9:tt, $a10:tt, $a11:tt) => { return Err(MError::new(_span, format!($a0, $a1, $a2, $a3, $a4, $a5, $a6, $a7, $a8, $a9, $a10, $a11))) };
+            ($a0:literal, $a1:tt, $a2:tt, $a3:tt, $a4:tt, $a5:tt, $a6:tt, $a7:tt, $a8:tt, $a9:tt, $a10:tt, $a11:tt, $a12:tt) => { return Err(MError::new(_span, format!($a0, $a1, $a2, $a3, $a4, $a5, $a6, $a7, $a8, $a9, $a10, $a11, $a12))) };
+            ($span2:expr, $a0:literal) => { return Err(MError::new($span2, format!($a0))) };
+            ($span2:expr, $a0:literal, $a1:tt) => { return Err(MError::new($span2, format!($a0, $a1))) };
+            ($span2:expr, $a0:literal, $a1:tt, $a2:tt) => { return Err(MError::new($span2, format!($a0, $a1, $a2))) };
+            ($span2:expr, $a0:literal, $a1:tt, $a2:tt, $a3:tt) => { return Err(MError::new($span2, format!($a0, $a1, $a2, $a3))) };
+            ($span2:expr, $a0:literal, $a1:tt, $a2:tt, $a3:tt, $a4:tt) => { return Err(MError::new($span2, format!($a0, $a1, $a2, $a3, $a4))) };
+            ($span2:expr, $a0:literal, $a1:tt, $a2:tt, $a3:tt, $a4:tt, $a5:tt) => { return Err(MError::new($span2, format!($a0, $a1, $a2, $a3, $a4, $a5))) };
+            ($span2:expr, $a0:literal, $a1:tt, $a2:tt, $a3:tt, $a4:tt, $a5:tt, $a6:tt) => { return Err(MError::new($span2, format!($a0, $a1, $a2, $a3, $a4, $a5, $a6))) };
+            ($span2:expr, $a0:literal, $a1:tt, $a2:tt, $a3:tt, $a4:tt, $a5:tt, $a6:tt, $a7:tt) => { return Err(MError::new($span2, format!($a0, $a1, $a2, $a3, $a4, $a5, $a6, $a7))) };
+            ($span2:expr, $a0:literal, $a1:tt, $a2:tt, $a3:tt, $a4:tt, $a5:tt, $a6:tt, $a7:tt, $a8:tt) => { return Err(MError::new($span2, format!($a0, $a1, $a2, $a3, $a4, $a5, $a6, $a7, $a8))) };
+            ($span2:expr, $a0:literal, $a1:tt, $a2:tt, $a3:tt, $a4:tt, $a5:tt, $a6:tt, $a7:tt, $a8:tt, $a9:tt) => { return Err(MError::new($span2, format!($a0, $a1, $a2, $a3, $a4, $a5, $a6, $a7, $a8, $a9))) };
+            ($span2:expr, $a0:literal, $a1:tt, $a2:tt, $a3:tt, $a4:tt, $a5:tt, $a6:tt, $a7:tt, $a8:tt, $a9:tt, $a10:tt) => { return Err(MError::new($span2, format!($a0, $a1, $a2, $a3, $a4, $a5, $a6, $a7, $a8, $a9, $a10))) };
+            ($span2:expr, $a0:literal, $a1:tt, $a2:tt, $a3:tt, $a4:tt, $a5:tt, $a6:tt, $a7:tt, $a8:tt, $a9:tt, $a10:tt, $a11:tt) => { return Err(MError::new($span2, format!($a0, $a1, $a2, $a3, $a4, $a5, $a6, $a7, $a8, $a9, $a10, $a11))) };
+            ($span2:expr, $a0:literal, $a1:tt, $a2:tt, $a3:tt, $a4:tt, $a5:tt, $a6:tt, $a7:tt, $a8:tt, $a9:tt, $a10:tt, $a11:tt, $a12:tt) => { return Err(MError::new($span2, format!($a0, $a1, $a2, $a3, $a4, $a5, $a6, $a7, $a8, $a9, $a10, $a11, $a12))) };
         }
+
+
+        #[allow(unused)]
+        macro_rules! syn {
+            ($x:expr) => {
+                bare!("{}", ($x.to_string()))
+            };
+        }
+
     };
 }
 
 /// Span with extra information.
-#[derive(Copy, Clone)]
+#[derive(Copy, Clone, Debug)]
 struct QSpan {
     span: Span,
     /// Output of `TokenStream.to_string`.
     text_compact: &'static str,
+    // TODO: include filename to make referring to identifiers in other files correct.
+}
+impl QSpan {
+    fn new(span: Span, text_compact: String) -> Self {
+        Self {
+            span,
+            text_compact: text_compact.leak(),
+        }
+    }
+    fn from_tree<T: syn::spanned::Spanned + std::fmt::Display>(x: &T) -> Self {
+        QSpan::new(x.span(), format!("{}", x))
+    }
 }
 
+pub type MError = MagicError;
+pub type MResult<T> = std::result::Result<T, MError>;
+
 /// almost the same as syn::Error, but with the ability to handle multiple files.
-#[derive(Clone)]
-struct MagicError {
+#[derive(Clone, Debug)]
+pub struct MagicError {
     messages: Vec<MaybeResolved>,
 }
 impl MagicError {
@@ -179,25 +223,26 @@ impl MagicError {
     fn push(&mut self, other: Self) {
         self.messages.extend(other.messages);
     }
-    fn span(span: QSpan, message: &'static str) -> Self {
+    fn span(span: QSpan, message: String) -> Self {
         Self::new(Some(span), message)
     }
-    fn err(message: &'static str) -> Self {
+    fn err(message: String) -> Self {
         Self::new(None, message)
     }
-    fn new(span: Option<QSpan>, message: &'static str) -> Self {
+    fn new(span: Option<QSpan>, message: String) -> Self {
         Self {
             messages: vec![MaybeResolved::Plain {
-                message: message,
+                message: message.leak(),
                 span,
             }],
         }
     }
-    fn to_compile_error(
+    pub(crate) fn to_compile_error(
         &self,
         filename: Option<&'static str>,
         source_text: Option<&'static str>,
     ) -> proc_macro2::TokenStream {
+        dbg!(&self);
         let error = self.clone().resolve(filename, source_text);
         use quote::quote;
         let mut stream = quote! {};
@@ -207,10 +252,13 @@ impl MagicError {
         //     None => (Span::call_site(), Span::call_site()),
         // };
         // ::core::compile_error!($message)
+
+        let mut extra_text = String::new();
+
         for msg in error.messages {
             let MaybeResolved::Resolved {
                 filename,
-                source_text,
+                source_text: _,
                 message,
                 span,
             } = msg
@@ -219,28 +267,15 @@ impl MagicError {
             };
 
             if let Some(filename) = filename {
-                let source_text = source_text.unwrap();
-
-                let byte_range = if let Some(span) = span {
-                    byte_range(span.span)
+                let msg = if let Some(span) = span {
+                    format!("{filename}: {message}\n{}\n\n", span.text_compact)
                 } else {
-                    0..0
+                    format!("{filename}: {message}\n\n")
                 };
-                let mut buf = Vec::new();
-                ariadne::Report::build(ariadne::ReportKind::Error, (filename, byte_range))
-                    .with_config(
-                        ariadne::Config::new()
-                            .with_color(false)
-                            .with_index_type(ariadne::IndexType::Byte),
-                    )
-                    .with_message(message)
-                    .finish()
-                    .write(ariadne::sources(Some((filename, source_text))), &mut buf)
-                    .unwrap();
-                let msg = String::from_utf8(buf).unwrap();
-                stream.extend(quote! { ::core::compile_error!(#msg) });
+
+                extra_text.push_str(&msg);
             } else {
-                let err = quote! { ::core::compile_error!(#message) };
+                let err = quote! { ::core::compile_error!(#message); };
                 stream.extend(if let Some(span) = span {
                     err.into_iter()
                         .map(|mut x| {
@@ -253,12 +288,19 @@ impl MagicError {
                 });
             }
         }
+        if !extra_text.is_empty() {
+            let err = quote! { ::core::compile_error!(#extra_text); };
+            stream.extend(err.into_iter().map(|mut x| {
+                x.set_span(Span::call_site());
+                x
+            }));
+        }
 
         stream
     }
 }
 
-#[derive(Clone)]
+#[derive(Clone, Debug)]
 enum MaybeResolved {
     Plain {
         message: &'static str,
@@ -292,21 +334,18 @@ impl MaybeResolved {
 }
 
 trait ResultExt {
-    fn add_err(self, syn_err: syn::Error) -> Self;
+    fn add_err(self, syn_err: MError) -> Self;
 }
-impl<T> ResultExt for syn::Result<T> {
-    fn add_err(self, new_err: syn::Error) -> Self {
-        self.map_err(|mut err| {
-            syn::Error::combine(&mut err, new_err);
-            err
-        })
+impl<T> ResultExt for MResult<T> {
+    fn add_err(self, new_err: MError) -> Self {
+        self.map_err(|err| err.concat(new_err))
     }
 }
 
-pub(crate) fn parse(x: proc_macro2::TokenStream) -> syn::Result<hir::Theory> {
+pub(crate) fn parse(x: proc_macro2::TokenStream) -> MResult<hir::Theory> {
     let mut parser = Parser::new();
     for token_tree in x {
-        register_span!(token_tree.span());
+        register_span!(,token_tree);
 
         match token_tree {
             TokenTree::Group(group) => {
@@ -334,7 +373,9 @@ pub(crate) fn parse(x: proc_macro2::TokenStream) -> syn::Result<hir::Theory> {
                     }
                 }
             }
-            TokenTree::Ident(ident) => ret!(ident.span(), "unexpected literal"),
+            TokenTree::Ident(_) => {
+                ret!("unexpected identifier, surround your egglog code in parenthesis")
+            }
             TokenTree::Punct(_) => (),
             TokenTree::Literal(literal) => {
                 let x = syn::Lit::new(literal);
@@ -343,7 +384,7 @@ pub(crate) fn parse(x: proc_macro2::TokenStream) -> syn::Result<hir::Theory> {
                         let stream = literal_to_tokenstream_strip_comments(&literal.value())?;
                         parser.parse_egglog(stream)?;
                     }
-                    _ => ret!(x.span(), "expected a string literal"),
+                    _ => ret!("expected a string literal"),
                 }
             }
         }
@@ -351,14 +392,18 @@ pub(crate) fn parse(x: proc_macro2::TokenStream) -> syn::Result<hir::Theory> {
     Ok(parser.emit_hir())
 }
 
-fn literal_to_tokenstream_strip_comments(literal: &str) -> syn::Result<proc_macro2::TokenStream> {
-    let tokens: proc_macro2::TokenStream = literal
-        .lines()
-        .filter(|line| !line.trim_start().starts_with(';') && !line.trim_start().starts_with("//"))
-        .collect::<Vec<&str>>()
-        .join("\n")
-        .parse()?;
-    Ok(tokens)
+pub fn strip_comments(literal: &str) -> String {
+    literal.replace(";", "// ")
+    // literal
+    //     .lines()
+    //     .filter(|line| !line.trim_start().starts_with(';') && !line.trim_start().starts_with("//"))
+    //     .collect::<Vec<&str>>()
+    //     .join("\n")
+}
+fn literal_to_tokenstream_strip_comments(literal: &str) -> MResult<proc_macro2::TokenStream> {
+    strip_comments(literal)
+        .parse()
+        .map_err(|e| bare_!(None, "{e}"))
 }
 
 #[derive(Copy, Clone, Debug, PartialEq, PartialOrd, Eq, Ord, Hash)]
@@ -423,14 +468,14 @@ static BYTE_RANGE_REGEX: std::sync::LazyLock<regex::Regex> =
 // NOTE: This works around that `proc_macro2::Span::byte_range` is for proc-macro contexts only
 // valid on nightly. Luckily the `Debug` implementation on stable (although doing this is unstable
 // itself) has the correct range.
-fn byte_range(span: Span) -> std::ops::Range<usize> {
+fn byte_range(span: Span) -> Range<usize> {
     let s = format!("{span:?}");
     let caps = BYTE_RANGE_REGEX.captures(&s).unwrap();
     caps.get(1).unwrap().as_str().parse().unwrap()..caps.get(2).unwrap().as_str().parse().unwrap()
 }
 
 impl SexpSpan {
-    fn call(self, context: &'static str) -> syn::Result<(Str, &'static [SexpSpan])> {
+    fn call(self, context: &'static str) -> MResult<(Str, &'static [SexpSpan])> {
         if let Sexp::List(
             [
                 SexpSpan {
@@ -446,21 +491,21 @@ impl SexpSpan {
             err_!(self.span, "{context}: expected call")
         }
     }
-    fn atom(self, context: &'static str) -> syn::Result<Str> {
+    fn atom(self, context: &'static str) -> MResult<Str> {
         if let Sexp::Atom(x) = self.x {
             Ok(x)
         } else {
             err_!(self.span, "{context}: expected atom")
         }
     }
-    fn list(self, context: &'static str) -> syn::Result<&'static [SexpSpan]> {
+    fn list(self, context: &'static str) -> MResult<&'static [SexpSpan]> {
         if let Sexp::List(x) = self.x {
             Ok(x)
         } else {
             err_!(self.span, "{context}: expected list")
         }
     }
-    fn uint(self, context: &'static str) -> syn::Result<u64> {
+    fn uint(self, context: &'static str) -> MResult<u64> {
         register_span!(self.span);
         let Sexp::Literal(x) = self.x else {
             ret!("{context}: expected an int literal")
@@ -469,7 +514,7 @@ impl SexpSpan {
         u64::try_from(x.i64().map_err(|()| bare!("{context}; expected int"))?)
             .map_err(|_| bare!("{context}: expected positive int"))
     }
-    fn string(self, context: &'static str) -> syn::Result<&'static str> {
+    fn string(self, context: &'static str) -> MResult<&'static str> {
         register_span!(self.span);
         let Sexp::Literal(x) = self.x else {
             ret!("{context}: expected a string literal");
@@ -479,22 +524,23 @@ impl SexpSpan {
         };
         Ok(x)
     }
-    fn parse_stream(stream: proc_macro2::TokenStream) -> syn::Result<Vec<SexpSpan>> {
+    fn parse_stream(stream: proc_macro2::TokenStream) -> MResult<Vec<SexpSpan>> {
         let mut v: Vec<SexpSpan> = Vec::new();
-        let mut partial: Option<(usize, Span, String)> = None;
+        let mut partial: Option<(usize, QSpan, String)> = None;
         macro_rules! end_token {
             () => {
                 if let Some((_, span, text)) = take(&mut partial) {
+                    let text = text.leak();
                     v.push(SexpSpan {
-                        span,
-                        x: Sexp::Atom(Spanned::new(text.leak(), span)),
+                        span: Some(span),
+                        x: Sexp::Atom(Spanned::new(text, Some(span))),
                     });
                 }
             };
         }
         macro_rules! add_partial {
             ($text:ident, $span:ident) => {
-                let range = byte_range($span);
+                let range = byte_range($span.span);
                 match partial {
                     Some((end, existing_span, mut existing_text)) if end == range.start => {
                         existing_text.push_str(&$text);
@@ -509,28 +555,27 @@ impl SexpSpan {
             };
         }
         for tt in stream {
+            let span = QSpan::from_tree(&tt);
+            register_span!(Some(span));
             match tt {
                 TokenTree::Ident(ident) => {
                     let text = ident.to_string();
-                    let span = ident.span();
                     add_partial!(text, span);
                 }
                 TokenTree::Punct(punct) => {
                     let text = punct.as_char().to_string();
-                    let span = punct.span();
                     add_partial!(text, span);
                 }
                 TokenTree::Group(group) => {
                     end_token!();
                     // ignore delimiter so that it's fine to also use () [] or {} for parenthesis.
                     v.push(SexpSpan {
-                        span: group.span(),
+                        span: Some(QSpan::from_tree(&group)),
                         x: Sexp::List(Self::parse_stream(group.stream())?.leak()),
                     });
                 }
                 TokenTree::Literal(rustc_lit) => {
                     let syn_lit = syn::Lit::new(rustc_lit);
-                    let span = syn_lit.span();
                     let x = Sexp::Literal(Spanned::new(
                         match &syn_lit {
                             syn::Lit::Str(x) => {
@@ -538,36 +583,37 @@ impl SexpSpan {
                                 Literal::String(&*x.value().leak())
                             }
                             syn::Lit::Int(x) => {
-                                let text: String = x.base10_parse::<i64>()?.to_string();
+                                let text: String =
+                                    x.base10_parse::<i64>().map_err(|e| syn!(e))?.to_string();
                                 add_partial!(text, span);
-                                let Some((_, span, text)) = take(&mut partial) else {
+                                let Some((_, _, text)) = take(&mut partial) else {
                                     panic!();
                                 };
-                                Literal::I64(
-                                    text.parse()
-                                        .map_err(|_| syn::Error::new(span, "invalid i64"))?,
-                                )
+                                Literal::I64(text.parse().map_err(|_| bare!("invalid i64"))?)
                             }
                             syn::Lit::Float(x) => {
-                                let text: String = x.base10_parse::<f64>()?.to_string();
+                                let text: String =
+                                    x.base10_parse::<f64>().map_err(|e| syn!(e))?.to_string();
                                 add_partial!(text, span);
-                                let Some((_, span, text)) = take(&mut partial) else {
+                                let Some((_, _, text)) = take(&mut partial) else {
                                     panic!();
                                 };
                                 Literal::F64(OrdF64(
-                                    text.parse()
-                                        .map_err(|_| syn::Error::new(span, "invalid f64"))?,
+                                    text.parse().map_err(|_| bare!("invalid f64"))?,
                                 ))
                             }
                             syn::Lit::Bool(lit_bool) => {
                                 end_token!();
                                 Literal::Bool(lit_bool.value())
                             }
-                            _ => ret_!(syn_lit.span(), "unexpected literal"),
+                            _ => ret!("unexpected literal"),
                         },
-                        syn_lit.span(),
+                        Some(span),
                     ));
-                    v.push(SexpSpan { span, x });
+                    v.push(SexpSpan {
+                        span: Some(span),
+                        x,
+                    });
                 }
             }
         }
@@ -665,14 +711,11 @@ struct Spanned<T> {
     #[educe(Eq(ignore))]
     #[educe(Ord(ignore))]
     #[educe(Hash(ignore))]
-    span: Span,
+    span: Option<QSpan>,
 }
 impl<T> Spanned<T> {
-    fn new(x: T, span: Span) -> Self {
+    fn new(x: T, span: Option<QSpan>) -> Self {
         Self { x, span }
-    }
-    fn with_placeholder(x: T) -> Self {
-        Self::new(x, placeholder_span())
     }
     fn map_s<V, F: FnMut(T) -> V>(self, mut f: F) -> Spanned<V> {
         Spanned::new(f(self.x), self.span)
@@ -708,20 +751,17 @@ struct StringIds<T> {
     label: &'static str,
 }
 impl<T: Id> StringIds<T> {
-    fn add_unique(&mut self, s: Str) -> syn::Result<T> {
+    fn add_unique(&mut self, s: Str) -> MResult<T> {
         let id = self.x.len().into();
         self.x
             .insert_unique(s.x, Spanned::new(id, s.span), self.label)?;
         Ok(id)
     }
-    fn lookup(&self, s: Str) -> syn::Result<T> {
+    fn lookup(&self, s: Str) -> MResult<T> {
         if let Some(value) = self.x.get(s.x) {
             Ok(**value)
         } else {
-            Err(syn::Error::new(
-                s.span,
-                format!("{} {s} is not defined", self.label),
-            ))
+            err_!(s.span, "{} {s} is not defined", (self.label))
         }
     }
     fn new(label: &'static str) -> Self {
@@ -765,27 +805,22 @@ enum ComputeMethod {
 
 fn already_defined(
     identifier: &'static str,
-    old: Span,
-    new: Span,
+    old: Option<QSpan>,
+    new: Option<QSpan>,
     context: &'static str,
-) -> syn::Error {
-    let mut err = syn::Error::new(new, format!("{context} {identifier} already defined"));
-    syn::Error::combine(
-        &mut err,
-        syn::Error::new(
-            old,
-            format!("{context} {identifier} originally defined here"),
-        ),
-    );
-    err
+) -> MError {
+    bare_!(new, "{context} {identifier} already defined").concat(bare_!(
+        old,
+        "{context} {identifier} originally defined here"
+    ))
 }
 
 trait MapExt<K, V> {
-    fn insert_unique(&mut self, k: K, v: V, context: &'static str) -> syn::Result<V>;
-    fn lookup(&mut self, k: K, context: &'static str) -> syn::Result<V>;
+    fn insert_unique(&mut self, k: K, v: V, context: &'static str) -> MResult<V>;
+    fn lookup(&mut self, k: K, context: &'static str) -> MResult<V>;
 }
 impl<V: Clone> MapExt<Str, V> for BTreeMap<Str, V> {
-    fn insert_unique(&mut self, k: Str, v: V, context: &'static str) -> syn::Result<V> {
+    fn insert_unique(&mut self, k: Str, v: V, context: &'static str) -> MResult<V> {
         use std::collections::btree_map::Entry;
         match self.entry(k) {
             Entry::Vacant(entry) => {
@@ -796,12 +831,9 @@ impl<V: Clone> MapExt<Str, V> for BTreeMap<Str, V> {
         }
     }
 
-    fn lookup(&mut self, k: Str, context: &'static str) -> syn::Result<V> {
+    fn lookup(&mut self, k: Str, context: &'static str) -> MResult<V> {
         match self.entry(k) {
-            Entry::Vacant(entry) => Err(syn::Error::new(
-                entry.key().span,
-                format!("{context} {k} is not defined"),
-            )),
+            Entry::Vacant(entry) => err_!(entry.key().span, "{context} {k} is not defined"),
             Entry::Occupied(entry) => Ok(entry.get().clone()),
         }
     }
@@ -812,7 +844,7 @@ impl<V: Clone> MapExt<&'static str, Spanned<V>> for BTreeMap<&'static str, Spann
         k: &'static str,
         v: Spanned<V>,
         context: &'static str,
-    ) -> syn::Result<Spanned<V>> {
+    ) -> MResult<Spanned<V>> {
         use std::collections::btree_map::Entry;
         match self.entry(k) {
             Entry::Vacant(entry) => {
@@ -823,12 +855,9 @@ impl<V: Clone> MapExt<&'static str, Spanned<V>> for BTreeMap<&'static str, Spann
         }
     }
 
-    fn lookup(&mut self, k: &'static str, context: &'static str) -> syn::Result<Spanned<V>> {
+    fn lookup(&mut self, k: &'static str, context: &'static str) -> MResult<Spanned<V>> {
         match self.entry(k) {
-            Entry::Vacant(_) => Err(syn::Error::new(
-                placeholder_span(),
-                format!("{context} {k} is not defined"),
-            )),
+            Entry::Vacant(_) => err_!(None, "{context} {k} is not defined"),
             Entry::Occupied(entry) => Ok(entry.get().clone()),
         }
     }
@@ -872,7 +901,7 @@ impl Parser {
         name: Option<Str>,
         ty: TypeId,
         compute: ComputeMethod,
-    ) -> syn::Result<GlobalId> {
+    ) -> MResult<GlobalId> {
         if let Some(name) = name {
             if let Entry::Occupied(entry) = self.global_variable_names.entry(name) {
                 let existing_span = entry.key().span;
@@ -936,25 +965,23 @@ impl Parser {
         };
         for (builtin, path) in BUILTIN_SORTS {
             let _ty: TypeId = parser
-                .add_sort(Str::with_placeholder(builtin), None, Some(path))
+                .add_sort(Spanned::new(builtin, None), None, Some(path))
                 .unwrap();
         }
 
         parser
     }
 
-    fn parse_egglog(&mut self, stream: proc_macro2::TokenStream) -> syn::Result<()> {
+    fn parse_egglog(&mut self, stream: proc_macro2::TokenStream) -> MResult<()> {
         let sexp = SexpSpan::parse_stream(stream)?;
         for sexp in sexp {
-            self.parse_toplevel(sexp).add_err(syn::Error::new(
-                sexp.span,
-                "while parsing this toplevel expression".to_string(),
-            ))?;
+            self.parse_toplevel(sexp)
+                .add_err(bare_!(sexp.span, "while parsing this toplevel expression"))?;
         }
         Ok(())
     }
 
-    fn parse_toplevel(&mut self, x: SexpSpan) -> syn::Result<()> {
+    fn parse_toplevel(&mut self, x: SexpSpan) -> MResult<()> {
         register_span!(x.span);
         let (function_name, args) = x.call("toplevel")?;
 
@@ -1008,13 +1035,12 @@ impl Parser {
                     let inputs = inputs
                         .iter()
                         .map(|x| self.type_ids.lookup(x.atom("input type")?))
-                        .collect::<syn::Result<Vec<_>>>()?;
+                        .collect::<MResult<Vec<_>>>()?;
 
                     self.add_function(function_name, &inputs, Some(output_type), None, cost)?;
                 }
             }
             "datatype*" => ret!("\"datatype*\" unimplemented, unclear what this does"),
-
             "function" => {
                 let [name, inputs, output, options @ ..] = args else {
                     ret!("usage: (function <name> (<input sort>*) <output sort> <option>");
@@ -1124,8 +1150,8 @@ impl Parser {
                     unimplemented!("subsume is not implemented");
                 }
                 let mut facts = extra_facts;
-                let tmp_internal = Expr::Var(Spanned::new("__internal_eq", placeholder_span()));
-                let eq_sign = Spanned::new("=", placeholder_span());
+                let tmp_internal = Expr::Var(Spanned::new("__internal_eq", None));
+                let eq_sign = Spanned::new("=", None);
 
                 facts.push(Expr::Call(eq_sign, vec![lhs.clone(), tmp_internal.clone()]));
                 self.add_rule(None, ruleset, facts, vec![Action::Union(tmp_internal, rhs)])?;
@@ -1155,8 +1181,8 @@ impl Parser {
                 for (lhs, rhs) in [(lhs.clone(), rhs.clone()), (rhs, lhs)] {
                     let mut facts = extra_facts.clone();
 
-                    let tmp_internal = Expr::Var(Spanned::new("__internal_eq", placeholder_span()));
-                    let eq_sign = Spanned::new("=", placeholder_span());
+                    let tmp_internal = Expr::Var(Spanned::new("__internal_eq", None));
+                    let eq_sign = Spanned::new("=", None);
 
                     facts.push(Expr::Call(eq_sign, vec![lhs.clone(), tmp_internal.clone()]));
                     self.add_rule(None, ruleset, facts, vec![Action::Union(tmp_internal, rhs)])?;
@@ -1172,18 +1198,17 @@ impl Parser {
 
                 let working_directory = std::env::current_dir().unwrap();
 
-                let content = std::fs::read_to_string(filepath).map_err(|e| {
-                    syn::Error::new(
-                        span,
-                        format!("{e}, working directory is {working_directory:?}"),
-                    )
-                })?;
+                let content = std::fs::read_to_string(filepath)
+                    .map_err(|e| bare_!(span, "{e}, working directory is {working_directory:?}"))?;
 
-                let stream = literal_to_tokenstream_strip_comments(&content)?;
-                self.parse_egglog(stream).add_err(syn::Error::new(
-                    span,
-                    format!("while parsing \"{filepath}\""),
-                ))?;
+                let content = &*strip_comments(&content).leak();
+
+                let stream = literal_to_tokenstream_strip_comments(content)?;
+
+                self.parse_egglog(stream).map_err(|mut e| {
+                    e.push(bare_!(span, "while reading {filepath}"));
+                    e.resolve(Some(filepath), Some(content))
+                })?;
             }
             "run" | "check" => {
                 // skip run and check
@@ -1201,7 +1226,7 @@ impl Parser {
         Ok(())
     }
 
-    fn parse_inputs(&self, inputs: &'static SexpSpan) -> syn::Result<Vec<TypeId>> {
+    fn parse_inputs(&self, inputs: &'static SexpSpan) -> MResult<Vec<TypeId>> {
         inputs
             .list("input types")?
             .iter()
@@ -1214,7 +1239,7 @@ impl Parser {
         name: Str,
         collection: Option<Vec<Str>>,
         primitive: Option<&'static str>,
-    ) -> syn::Result<TypeId> {
+    ) -> MResult<TypeId> {
         let type_id = self.type_ids.add_unique(name)?;
         self.types.push_expected(
             type_id,
@@ -1242,7 +1267,7 @@ impl Parser {
         merge: Option<&Expr>,
         // None means it can not be extracted
         cost: Option<u64>,
-    ) -> syn::Result<()> {
+    ) -> MResult<()> {
         // output is some => functional dependency
         // merge is some => lattice
         // merge is none, output is eqsort => unification.
@@ -1250,7 +1275,7 @@ impl Parser {
 
         let output_or_unit = output.unwrap_or_else(|| {
             self.type_ids
-                .lookup(Str::with_placeholder(BUILTIN_UNIT))
+                .lookup(Str::new(BUILTIN_UNIT, None))
                 .expect("unit type exists")
         });
         let relation_id = self.functions.push(Some(FunctionData {
@@ -1315,7 +1340,7 @@ impl Parser {
         expr: &Expr,
         variables: &mut TVec<VariableId, (TypeId, Option<GlobalId>)>,
         ops: &mut Vec<(RelationId, Vec<VariableId>)>,
-    ) -> syn::Result<VariableId> {
+    ) -> MResult<VariableId> {
         Ok(match expr {
             Expr::Literal(spanned) => {
                 let literal = **spanned;
@@ -1327,11 +1352,11 @@ impl Parser {
                 "old" => old,
                 "new" => new,
                 _ => {
-                    let msg = format!(
+                    ret_!(
+                        spanned.span,
                         "only variables old or new are allowed in a merge expression, not \"{}\"",
-                        **spanned
-                    );
-                    return Err(syn::Error::new(spanned.span, msg));
+                        (**spanned)
+                    )
                 }
             },
             Expr::Call(name, args) => {
@@ -1388,19 +1413,17 @@ impl Parser {
                         }
                     }
                     [] => {
-                        let mut err = syn::Error::new(
-                            name.span,
-                            format!("{name} has no variant for fn({args_ty_s}) -> _"),
-                        );
+                        let mut err =
+                            bare_!(name.span, "{name} has no variant for fn({args_ty_s}) -> _");
                         for id in possible_ids {
                             self.err_function_defined_here(id, &mut err);
                         }
                         return Err(err);
                     }
                     [..] => {
-                        let mut err = syn::Error::new(
+                        let mut err = bare_!(
                             name.span,
-                            format!("{name} multiple possible variants for fn({args_ty_s}) -> _"),
+                            "{name} multiple possible variants for fn({args_ty_s}) -> _"
                         );
                         for id in possible_ids {
                             self.err_function_defined_here(id, &mut err);
@@ -1420,10 +1443,7 @@ enum Expr {
     Call(Str, Vec<Expr>),
 }
 impl Parser {
-    fn parse_expr(
-        x: SexpSpan,
-        local_bindings: &Option<&mut BTreeMap<Str, Expr>>,
-    ) -> syn::Result<Expr> {
+    fn parse_expr(x: SexpSpan, local_bindings: &Option<&mut BTreeMap<Str, Expr>>) -> MResult<Expr> {
         Ok(match x.x {
             Sexp::Literal(x) => Expr::Literal(x),
             Sexp::Atom(x) => local_bindings
@@ -1461,12 +1481,12 @@ impl Parser {
             Literal::Unit => BUILTIN_UNIT,
         };
         self.type_ids
-            .lookup(Str::with_placeholder(name))
+            .lookup(Str::new(name, None))
             .expect("builtin types defined")
     }
-    fn add_toplevel_binding(&mut self, binding_name: Option<Str>, expr: Expr) -> syn::Result<()> {
+    fn add_toplevel_binding(&mut self, binding_name: Option<Str>, expr: Expr) -> MResult<()> {
         // only performs forward type inference.
-        fn parse(parser: &mut Parser, expr: Expr) -> syn::Result<(GlobalId, TypeId)> {
+        fn parse(parser: &mut Parser, expr: Expr) -> MResult<(GlobalId, TypeId)> {
             Ok(match expr {
                 Expr::Literal(x) => {
                     let compute = ComputeMethod::Literal(*x);
@@ -1514,9 +1534,9 @@ impl Parser {
                             (parser.add_global(None, ty, compute)?, ty)
                         }
                         [] => {
-                            let mut err = syn::Error::new(
+                            let mut err = bare_!(
                                 name.span,
-                                format!("{name} has no variant for fn({inputs_ty_s}) -> _"),
+                                "{name} has no variant for fn({inputs_ty_s}) -> _"
                             );
                             for id in possible_ids {
                                 parser.err_function_defined_here(id, &mut err);
@@ -1524,11 +1544,9 @@ impl Parser {
                             return Err(err);
                         }
                         _ => {
-                            let mut err = syn::Error::new(
+                            let mut err = bare_!(
                                 name.span,
-                                format!(
-                                    "{name} multiple possible variants for fn({inputs_ty_s}) -> _"
-                                ),
+                                "{name} multiple possible variants for fn({inputs_ty_s}) -> _"
                             );
                             for id in ids {
                                 parser.err_function_defined_here(id, &mut err);
@@ -1545,14 +1563,11 @@ impl Parser {
         Ok(())
     }
 
-    fn err_type_defined_here(&mut self, id: TypeId, err: &mut syn::Error) {
+    fn err_type_defined_here(&mut self, id: TypeId, err: &mut MError) {
         let name = self.type_name(id);
-        syn::Error::combine(
-            err,
-            syn::Error::new(name.span, format!("type {name} defined here")),
-        );
+        err.push(bare_!(name.span, "type {name} defined here"));
     }
-    fn err_function_defined_here(&mut self, id: RelationId, err: &mut syn::Error) {
+    fn err_function_defined_here(&mut self, id: RelationId, err: &mut MError) {
         let function = &self.functions[id].as_ref().unwrap();
         let inputs_ty_s = function
             .inputs
@@ -1562,13 +1577,10 @@ impl Parser {
             .join(" ");
         let output_ty_s = *self.types[&function.output].name;
         let name = &function.name;
-        syn::Error::combine(
-            err,
-            syn::Error::new(
-                name.span,
-                format!("{name} defined here fn({inputs_ty_s}) -> {output_ty_s}"),
-            ),
-        );
+        err.push(bare_!(
+            name.span,
+            "{name} defined here fn({inputs_ty_s}) -> {output_ty_s}"
+        ));
     }
     fn parse_action(
         &mut self,
@@ -1577,7 +1589,7 @@ impl Parser {
         // Some =>
         // &mut Option<&mut T> because Option<&mut T> is !Copy
         local_bindings: &mut Option<&mut BTreeMap<Str, Expr>>,
-    ) -> syn::Result<Option<Action>> {
+    ) -> MResult<Option<Action>> {
         let (function_name, args) = x.call("action is a function call")?;
         register_span!(x.span);
 
@@ -1684,9 +1696,7 @@ impl Parser {
     }
 }
 
-fn parse_options(
-    mut s: &'static [SexpSpan],
-) -> syn::Result<Vec<(&'static str, &'static [SexpSpan])>> {
+fn parse_options(mut s: &'static [SexpSpan]) -> MResult<Vec<(&'static str, &'static [SexpSpan])>> {
     fn is_option(opt: &SexpSpan) -> bool {
         if let Sexp::Atom(opt) = opt.x {
             opt.starts_with(':')
@@ -1714,7 +1724,7 @@ mod compile_rule {
 
     use std::{collections::BTreeMap, mem::replace};
 
-    use super::{Action, ComputeMethod, Expr, Literal, MapExt as _, Parser, Str};
+    use super::{Action, ComputeMethod, Expr, Literal, MError, MResult, MapExt as _, Parser, Str};
 
     use crate::{
         hir,
@@ -1753,7 +1763,7 @@ mod compile_rule {
         unify: &mut Vec<Vec<VariableId>>,
         expr: &Expr,
         calls: &mut Vec<UnknownCall>,
-    ) -> syn::Result<VariableId> {
+    ) -> MResult<VariableId> {
         Ok(match expr {
             Expr::Literal(literal) => {
                 let ty = parser.literal_type(**literal);
@@ -1829,7 +1839,7 @@ mod compile_rule {
                         let tb = variables[b].ty;
                         let _: Option<(TypeVarId, TypeVarId)> = types
                             .union_eq(ta, tb)
-                            .map_err(|()| syn::Error::new(name.span, "type mismatch"))?;
+                            .map_err(|()| bare_!(name.span, "type mismatch"))?;
                         unify.push(vec![a, b]);
                     }
                     let rval_ty = parser.literal_type(Literal::Unit);
@@ -1866,7 +1876,7 @@ mod compile_rule {
             ruleset: Option<Str>,
             premises: Vec<Expr>,
             actions: Vec<Action>,
-        ) -> syn::Result<()> {
+        ) -> MResult<()> {
             let mut variables: TVec<VariableId, VariableInfo> = TVec::new();
             let mut types: UFData<TypeVarId, Option<TypeId>> = UFData::new();
             let mut bound_variables: BTreeMap<&'static str, VariableId> = BTreeMap::new();
@@ -2022,7 +2032,7 @@ mod compile_rule {
     fn pseudo_parse_action(action: Action) -> Expr {
         match action {
             Action::Expr(expr) => expr,
-            Action::Union(a, b) => Expr::Call(Str::with_placeholder("="), vec![a, b]),
+            Action::Union(a, b) => Expr::Call(Str::new("=", None), vec![a, b]),
         }
     }
 }
