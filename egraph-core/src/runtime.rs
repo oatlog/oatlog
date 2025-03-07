@@ -44,7 +44,9 @@ impl Eclass for u32 {
 }
 
 /// Some type that can be put in a relation.
-pub trait RelationElement: Copy + Clone + Eq + PartialEq + Ord + PartialOrd + Hash + Eq {
+pub trait RelationElement:
+    Copy + Clone + Eq + PartialEq + Ord + PartialOrd + Default + Hash
+{
     /// Minimum id value according to Ord
     /// Used to implement range queries.
     const MIN_ID: Self;
@@ -64,18 +66,50 @@ impl RelationElement for bool {
     const MAX_ID: Self = true;
 }
 
-#[derive(Copy, Clone, Eq, PartialEq, Ord, PartialOrd, Hash, Debug)]
-pub struct IString(pub u32);
-impl RelationElement for IString {
-    const MIN_ID: Self = IString(u32::MIN);
-    const MAX_ID: Self = IString(u32::MAX);
+#[macro_export]
+macro_rules! relation_element_wrapper_ty {
+    ($($name:ident),*) => {
+        $(
+            #[derive(Copy, Clone, Eq, PartialEq, Ord, PartialOrd, Default, Hash, Debug)]
+            pub struct $name(pub u32);
+
+            impl RelationElement for $name {
+                const MIN_ID: Self = Self(0);
+                const MAX_ID: Self = Self(u32::MAX);
+            }
+
+            impl std::fmt::Display for $name {
+                fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> Result<(), std::fmt::Error> {
+                    write!(f, "{self:?}")
+                }
+            }
+        )*
+    };
 }
-impl std::fmt::Display for IString {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> Result<(), std::fmt::Error> {
-        use std::fmt::Write;
-        write!(f, "{self:?}")
-    }
+
+/// Wrapper type for a u32 to represent a typed e-class.
+/// Emit this instead to make codegen a bit cleaner.
+#[macro_export]
+macro_rules! eclass_wrapper_ty {
+    ($($name:ident),*) => {
+        relation_element_wrapper_ty!($($name),*);
+        $(
+            impl Eclass for $name {
+                fn new(value: u32) -> Self {
+                    Self(value)
+                }
+                fn inner(self) -> u32 {
+                    self.0
+                }
+            }
+        )*
+    };
 }
+
+pub use eclass_wrapper_ty;
+pub use relation_element_wrapper_ty;
+
+relation_element_wrapper_ty!(IString);
 
 /// Only to be used for initial inserts, so performance does not really matter.
 #[derive(Clone, Eq, PartialEq, Ord, PartialOrd, Hash, Debug, Default)]
@@ -160,30 +194,6 @@ pub trait EclassProvider<T: Eclass> {
     fn make(&mut self) -> T;
     fn find(&mut self, t: T) -> T;
     fn union(&mut self, a: T, b: T);
-}
-
-/// Wrapper type for a u32 to represent a typed e-class.
-/// Emit this instead to make codegen a bit cleaner.
-#[macro_export]
-macro_rules! eclass_wrapper_ty {
-    ($($name:ident),*) => {
-        $(
-            #[derive(Copy, Clone, Eq, PartialEq, Ord, PartialOrd, Default, Hash)]
-            pub struct $name(u32);
-            impl Eclass for $name {
-                fn new(value: u32) -> Self {
-                    Self(value)
-                }
-                fn inner(self) -> u32 {
-                    self.0
-                }
-            }
-            impl RelationElement for $name {
-                const MIN_ID: Self = Self(0);
-                const MAX_ID: Self = Self(u32::MAX);
-            }
-        )*
-    };
 }
 
 /// The main union-find.

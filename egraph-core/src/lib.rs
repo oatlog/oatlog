@@ -317,25 +317,7 @@ mod test {
             expected_lir: None,
             expected_codegen : Some(expect![[r#"
                 use egraph::runtime::*;
-                #[derive(Copy, Clone, Eq, PartialEq, Ord, PartialOrd, Default, Debug, Hash)]
-                pub struct Math(u32);
-                impl Eclass for Math {
-                    fn new(value: u32) -> Self {
-                        Self(value)
-                    }
-                    fn inner(self) -> u32 {
-                        self.0
-                    }
-                }
-                impl std::fmt::Display for Math {
-                    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> Result<(), std::fmt::Error> {
-                        self.0.fmt(f)
-                    }
-                }
-                impl RelationElement for Math {
-                    const MIN_ID: Self = Self(0);
-                    const MAX_ID: Self = Self(u32::MAX);
-                }
+                eclass_wrapper_ty!(Math);
                 #[derive(Debug, Default)]
                 struct ForallMathRelation {
                     new: BTreeSet<<Self as Relation>::Row>,
@@ -1118,25 +1100,7 @@ mod test {
             expected_lir: None,
             expected_codegen: Some(expect![[r#"
                 use egraph::runtime::*;
-                #[derive(Copy, Clone, Eq, PartialEq, Ord, PartialOrd, Default, Debug, Hash)]
-                pub struct Math(u32);
-                impl Eclass for Math {
-                    fn new(value: u32) -> Self {
-                        Self(value)
-                    }
-                    fn inner(self) -> u32 {
-                        self.0
-                    }
-                }
-                impl std::fmt::Display for Math {
-                    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> Result<(), std::fmt::Error> {
-                        self.0.fmt(f)
-                    }
-                }
-                impl RelationElement for Math {
-                    const MIN_ID: Self = Self(0);
-                    const MAX_ID: Self = Self(u32::MAX);
-                }
+                eclass_wrapper_ty!(Math);
                 #[derive(Debug, Default)]
                 struct ForallMathRelation {
                     new: BTreeSet<<Self as Relation>::Row>,
@@ -1812,25 +1776,7 @@ mod test {
             expected_lir: None,
             expected_codegen : Some(expect![[r#"
                 use egraph::runtime::*;
-                #[derive(Copy, Clone, Eq, PartialEq, Ord, PartialOrd, Default, Debug, Hash)]
-                pub struct Math(u32);
-                impl Eclass for Math {
-                    fn new(value: u32) -> Self {
-                        Self(value)
-                    }
-                    fn inner(self) -> u32 {
-                        self.0
-                    }
-                }
-                impl std::fmt::Display for Math {
-                    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> Result<(), std::fmt::Error> {
-                        self.0.fmt(f)
-                    }
-                }
-                impl RelationElement for Math {
-                    const MIN_ID: Self = Self(0);
-                    const MAX_ID: Self = Self(u32::MAX);
-                }
+                eclass_wrapper_ty!(Math);
                 #[derive(Debug, Default)]
                 struct ForallMathRelation {
                     new: BTreeSet<<Self as Relation>::Row>,
@@ -2346,25 +2292,7 @@ mod test {
             expected_lir: None,
             expected_codegen: Some(expect![[r#"
                 use egraph::runtime::*;
-                #[derive(Copy, Clone, Eq, PartialEq, Ord, PartialOrd, Default, Debug, Hash)]
-                pub struct Math(u32);
-                impl Eclass for Math {
-                    fn new(value: u32) -> Self {
-                        Self(value)
-                    }
-                    fn inner(self) -> u32 {
-                        self.0
-                    }
-                }
-                impl std::fmt::Display for Math {
-                    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> Result<(), std::fmt::Error> {
-                        self.0.fmt(f)
-                    }
-                }
-                impl RelationElement for Math {
-                    const MIN_ID: Self = Self(0);
-                    const MAX_ID: Self = Self(u32::MAX);
-                }
+                eclass_wrapper_ty!(Math);
                 #[derive(Debug, Default)]
                 struct ForallMathRelation {
                     new: BTreeSet<<Self as Relation>::Row>,

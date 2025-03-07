@@ -1,7 +1,3 @@
-fn main() {
-    println!("Hello, world!");
-}
-
 macro_rules! comparative_test {
     ($egglog_source_literal:expr) => {
         std::env::set_current_dir(concat!(env!("CARGO_MANIFEST_DIR"), "/..")).unwrap();

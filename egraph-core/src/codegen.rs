@@ -1011,25 +1011,7 @@ pub fn codegen(theory: &Theory) -> TokenStream {
             TypeKind::Symbolic => {
                 let type_ty = ident::type_ty(type_);
                 Some(quote! {
-                    #[derive(Copy, Clone, Eq, PartialEq, Ord, PartialOrd, Default, Debug, Hash)]
-                    pub struct #type_ty(u32);
-                    impl Eclass for #type_ty {
-                        fn new(value: u32) -> Self {
-                            Self(value)
-                        }
-                        fn inner(self) -> u32 {
-                            self.0
-                        }
-                    }
-                    impl std::fmt::Display for #type_ty {
-                        fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> Result<(), std::fmt::Error> {
-                            self.0.fmt(f)
-                        }
-                    }
-                    impl RelationElement for #type_ty {
-                        const MIN_ID: Self = Self(0);
-                        const MAX_ID: Self = Self(u32::MAX);
-                    }
+                    eclass_wrapper_ty!(#type_ty);
                 })
             }
         })

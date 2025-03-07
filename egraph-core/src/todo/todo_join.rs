@@ -7,6 +7,7 @@
 #![allow(non_snake_case)]
 use crate::{
     eclass_wrapper_ty,
+    relation_element_wrapper_ty,
     ids::{RelationId, VariableId},
     runtime::*,
 };
