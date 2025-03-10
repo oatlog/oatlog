@@ -882,6 +882,7 @@ struct Parser {
     global_variables: TVec<GlobalId, GlobalVariableInfo>,
     global_variable_names: BTreeMap<Str, GlobalId>,
     compute_to_global: BTreeMap<ComputeMethod, GlobalId>,
+    initial: Vec<codegen::Initial>,
 
     symbolic_rules: Vec<hir::SymbolicRule>,
     implicit_rules: BTreeMap<RelationId, Vec<hir::ImplicitRule>>,
@@ -962,6 +963,7 @@ impl Parser {
             hir_relations: TVec::new(),
             global_to_function: TVec::new(),
             type_to_forall: BTreeMap::new(),
+            initial: Vec::new(),
         };
         for (builtin, path) in BUILTIN_SORTS {
             let _ty: TypeId = parser

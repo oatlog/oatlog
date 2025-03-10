@@ -5,6 +5,7 @@ mod ids;
 mod index_selection;
 mod typed_vec;
 mod union_find;
+mod query_planning;
 
 pub mod runtime;
 
@@ -30,7 +31,7 @@ pub fn compile(input: proc_macro2::TokenStream) -> proc_macro2::TokenStream {
 fn compile_impl(source: proc_macro2::TokenStream) -> frontend::MResult<proc_macro2::TokenStream> {
     force_backtrace(|| {
         let hir = frontend::parse(source)?;
-        let (_, codegen) = hir::query_planning::emit_codegen_theory(hir);
+        let (_, codegen) = query_planning::emit_codegen_theory(hir);
         let generated_tokens = codegen::codegen(&codegen);
         Ok(generated_tokens)
     })
@@ -2767,7 +2768,7 @@ mod test {
                 exp.assert_eq(&hir.dbg_summary())
             }
 
-            let (_, codegen) = hir::query_planning::emit_codegen_theory(hir);
+            let (_, codegen) = query_planning::emit_codegen_theory(hir);
             if let Some(exp) = self.expected_lir {
                 exp.assert_eq(&format!("{codegen:#?}"))
             }

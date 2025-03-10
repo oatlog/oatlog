@@ -35,6 +35,36 @@ pub(crate) struct Theory {
     pub(crate) rule_tries: &'static [RuleTrie],
 }
 
+#[derive(Debug)]
+pub(crate) enum Initial {
+    Run {
+        steps: usize,
+    },
+    ComputeGlobal {
+        id: GlobalId,
+        compute: GlobalCompute,
+    },
+    // assert that rule matches database.
+    // Check {
+    //     ...
+    // }
+    // assert that rule does not match the database.
+    // Fail {
+    //     ...
+    // }
+}
+impl Initial {
+    fn run(steps: usize) -> Self {
+        Self::Run { steps }
+    }
+    fn global_literal(id: GlobalId, literal: Literal) -> Self {
+        todo!()
+    }
+    fn global_call(id: GlobalId, relation: RelationId, args: Vec<GlobalId>) -> Self {
+        todo!()
+    }
+}
+
 // implicit: TVec<RelationId, Vec<ImplicitRule>>
 // applied on *inserts*
 #[derive(Clone, Debug)]
@@ -266,9 +296,9 @@ pub(crate) enum RuleAtom {
         /// usage depends on relationty
         index: IndexUsageId,
     },
-    /// Proceed only if all insertions are already present and all equates are already equal.
-    /// (optimization to abort early if actions are done)
-    RequireNotAllPresent(&'static [Action]),
+    // /// Proceed only if all insertions are already present and all equates are already equal.
+    // /// (optimization to abort early if actions are done)
+    // RequireNotAllPresent(&'static [Action]),
     // /// Bind unbound variable to global, or proceed only if bound variable matches global.
     // LoadGlobal {
     //     global: GlobalId,
@@ -694,34 +724,34 @@ impl CodegenRuleTrieCtx<'_> {
                     }
                 }
             }
-            RuleAtom::RequireNotAllPresent(..) => {
-                todo!("require not all present")
-                // let inner = self.codegen_all(then, true);
-                // let cond = actions.iter().map(|&action| match action {
-                //     Action::Insert { relation, args } => {
-                //         let relation = ident::rel_var(&self.relations[relation]);
-                //         let index_iter = "todo_indexed_iter_function_here";
-                //         let bound = args.iter().map(|&arg| {
-                //             assert!(self.is_bound(arg));
-                //             ident::var_var(self.var_of(arg))
-                //         });
-                //         quote! { self.#relation.#index_iter(#(#bound),*).next().is_some() }
-                //     }
-                //     Action::Equate(a, b) => {
-                //         assert_eq!(self.var_of(a).type_, self.var_of(b).type_);
-                //         let type_uf = ident::type_uf(self.type_of(a));
-                //         let a = ident::var_var(self.var_of(a));
-                //         let b = ident::var_var(self.var_of(b));
-                //         quote! { self.#type_uf.same(#a, #b) }
-                //     }
-                //     Action::Make(variable_id) => todo!(),
-                // });
-                // quote! {
-                //     if !(#(#cond)&&*) {
-                //         #inner
-                //     }
-                // }
-            }
+            // RuleAtom::RequireNotAllPresent(..) => {
+            //     todo!("require not all present")
+            //     // let inner = self.codegen_all(then, true);
+            //     // let cond = actions.iter().map(|&action| match action {
+            //     //     Action::Insert { relation, args } => {
+            //     //         let relation = ident::rel_var(&self.relations[relation]);
+            //     //         let index_iter = "todo_indexed_iter_function_here";
+            //     //         let bound = args.iter().map(|&arg| {
+            //     //             assert!(self.is_bound(arg));
+            //     //             ident::var_var(self.var_of(arg))
+            //     //         });
+            //     //         quote! { self.#relation.#index_iter(#(#bound),*).next().is_some() }
+            //     //     }
+            //     //     Action::Equate(a, b) => {
+            //     //         assert_eq!(self.var_of(a).type_, self.var_of(b).type_);
+            //     //         let type_uf = ident::type_uf(self.type_of(a));
+            //     //         let a = ident::var_var(self.var_of(a));
+            //     //         let b = ident::var_var(self.var_of(b));
+            //     //         quote! { self.#type_uf.same(#a, #b) }
+            //     //     }
+            //     //     Action::Make(variable_id) => todo!(),
+            //     // });
+            //     // quote! {
+            //     //     if !(#(#cond)&&*) {
+            //     //         #inner
+            //     //     }
+            //     // }
+            // }
             // RuleAtom::LoadGlobal {
             //     global,
             //     variable,
