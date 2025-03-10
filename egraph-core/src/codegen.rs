@@ -11,7 +11,7 @@ use itertools::Itertools as _;
 use proc_macro2::TokenStream;
 use quote::{format_ident, quote};
 
-use std::{collections::BTreeMap, iter};
+use std::{collections::BTreeMap, iter, iter::once};
 
 /// Data such as type and function names are technically unnecessary but used for more readable
 /// generated code. A compiler is far less performance sensitive than an interpreter (although the
@@ -33,17 +33,16 @@ pub(crate) struct Theory {
     // /// `RuleTrie`s run once on theory creation.
     // rule_tries_startup: &'static [RuleTrie],
     pub(crate) rule_tries: &'static [RuleTrie],
+    pub(crate) initial: Vec<Initial>,
 }
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub(crate) enum Initial {
-    Run {
-        steps: usize,
-    },
-    ComputeGlobal {
-        id: GlobalId,
-        compute: GlobalCompute,
-    },
+    Run { steps: usize },
+    // ComputeGlobal {
+    //     id: GlobalId,
+    //     compute: GlobalCompute,
+    // },
     // assert that rule matches database.
     // Check {
     //     ...
@@ -54,15 +53,15 @@ pub(crate) enum Initial {
     // }
 }
 impl Initial {
-    fn run(steps: usize) -> Self {
+    pub(crate) fn run(steps: usize) -> Self {
         Self::Run { steps }
     }
-    fn global_literal(id: GlobalId, literal: Literal) -> Self {
-        todo!()
-    }
-    fn global_call(id: GlobalId, relation: RelationId, args: Vec<GlobalId>) -> Self {
-        todo!()
-    }
+    // fn global_literal(id: GlobalId, literal: Literal) -> Self {
+    //     todo!()
+    // }
+    // fn global_call(id: GlobalId, relation: RelationId, args: Vec<GlobalId>) -> Self {
+    //     todo!()
+    // }
 }
 
 // implicit: TVec<RelationId, Vec<ImplicitRule>>
@@ -954,15 +953,19 @@ fn codegen_globals(theory: &Theory) -> (TokenStream, TVec<GlobalId, usize>) {
                             let (last, last_compute) = {
                                 let ty = theory.global_types[global_id];
                                 let ty_ = &theory.types[ty];
-                                let tmp = format_ident!("tmp_res");
+                                if ty_.zero_sized {
+                                    (vec![], quote! {})
+                                } else {
+                                    let tmp = format_ident!("tmp_res");
 
-                                let uf = ident::type_uf(ty_);
-                                (
-                                    tmp.clone(),
-                                    quote! {
-                                        let #tmp = uf.#uf.add_eclass();
-                                    },
-                                )
+                                    let uf = ident::type_uf(ty_);
+                                    (
+                                        vec![quote! { #tmp }],
+                                        quote! {
+                                            let #tmp = uf.#uf.add_eclass();
+                                        },
+                                    )
+                                }
                             };
 
                             let insert_ident = ident::delta_insert_row(relation_);
@@ -970,8 +973,8 @@ fn codegen_globals(theory: &Theory) -> (TokenStream, TVec<GlobalId, usize>) {
                             quote! {
                                 #(#compute_row)*
                                 #last_compute
-                                delta.#insert_ident((#(#row,)* #last));
-                                #last
+                                delta.#insert_ident((#(#row),* #(, #last)*));
+                                #(#last)*
                             }
                         }
                         RelationTy::Forall { .. } => todo!(),
@@ -1200,6 +1203,12 @@ pub fn codegen(theory: &Theory) -> TokenStream {
         quote! {[#(self.#stored_relations.len()),*].iter().copied().sum::<usize>()}
     };
 
+    let theory_initial = {
+        theory.initial.iter().map(|x| match x {
+            Initial::Run { steps } => quote! { for _ in 0..#steps { theory.step() }},
+        })
+    };
+
     quote! {
         use egraph::runtime::*;
         #(#symbolic_type_declarations)*
@@ -1241,6 +1250,7 @@ pub fn codegen(theory: &Theory) -> TokenStream {
                 theory.global_variables.initialize(&mut theory.delta, &mut theory.uf);
                 theory.clear_transient();
                 theory.global_variables.new = true;
+                #(#theory_initial)*
                 theory
             }
             pub fn step(&mut self) {

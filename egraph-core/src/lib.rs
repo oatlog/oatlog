@@ -14,8 +14,9 @@ mod todo;
 
 #[must_use]
 pub fn compile_str(source: &str) -> String {
-    // TODO Rework `compile_dbg` handle comments. Its error reports should refer to pre-filtered source.
-    let source = frontend::strip_comments(source);
+
+    // TODO: call Sexp::parse_string instead of Sexp::parse_stream
+
     let input: proc_macro2::TokenStream = source.parse().unwrap();
     codegen::format_tokens(&compile(quote::quote! {(#input)}))
 }
@@ -246,6 +247,272 @@ mod test {
             "#]]),
             expected_lir: None,
             expected_codegen: None,
+        }
+        .check();
+    }
+
+
+    #[test]
+    fn initial() {
+        Steps {
+            code: "(
+                (datatype Math
+                    (Const i64)
+                )
+                (run 42)
+            )",
+            expected_hir: Some(expect![[r#"
+                Theory "":
+
+                Math(Math)
+                Const(i64, Math)
+
+            "#]]),
+            expected_lir: None,
+            expected_codegen: Some(expect![[r#"
+                use egraph::runtime::*;
+                eclass_wrapper_ty!(Math);
+                #[derive(Debug, Default)]
+                struct ForallMathRelation {
+                    new: BTreeSet<<Self as Relation>::Row>,
+                    all: BTreeSet<<Self as Relation>::Row>,
+                }
+                impl Relation for ForallMathRelation {
+                    type Row = (Math);
+                }
+                impl ForallMathRelation {
+                    fn update(&mut self, uprooted: &Uprooted, uf: &mut Unification, delta: &mut Delta) {
+                        delta.forall_math_relation_delta.clear();
+                    }
+                    fn clear_new(&mut self) {}
+                    fn update_finalize(&mut self, uf: &mut Unification) {}
+                    fn emit_graphviz(&self, buf: &mut String) {}
+                    fn len(&self) -> usize {
+                        self.all.len()
+                    }
+                }
+                #[derive(Debug, Default)]
+                struct ConstRelation {
+                    new: Vec<<Self as Relation>::Row>,
+                    all_index_0_1: BTreeSet<(std::primitive::i64, Math)>,
+                    all_index_1_0: BTreeSet<(Math, std::primitive::i64)>,
+                }
+                impl Relation for ConstRelation {
+                    type Row = (std::primitive::i64, Math);
+                }
+                impl ConstRelation {
+                    const COST: u32 = 4u32;
+                    fn new() -> Self {
+                        Self::default()
+                    }
+                    fn has_new(&self) -> bool {
+                        !self.new.is_empty()
+                    }
+                    fn clear_new(&mut self) {
+                        self.new.clear();
+                    }
+                    fn iter_new(&self) -> impl Iterator<Item = <Self as Relation>::Row> + use<'_> {
+                        self.new.iter().copied()
+                    }
+                    fn iter1_0_1(&self, x0: std::primitive::i64) -> impl Iterator<Item = (Math)> + use<'_> {
+                        self.all_index_0_1
+                            .range((x0, Math::MIN_ID)..=(x0, Math::MAX_ID))
+                            .copied()
+                            .map(|(x0, x1)| (x1))
+                    }
+                    fn iter1_1_0(&self, x1: Math) -> impl Iterator<Item = (std::primitive::i64)> + use<'_> {
+                        self.all_index_1_0
+                            .range((x1, std::primitive::i64::MIN_ID)..=(x1, std::primitive::i64::MAX_ID))
+                            .copied()
+                            .map(|(x1, x0)| (x0))
+                    }
+                    fn check1_0_1(&self, x0: std::primitive::i64) -> bool {
+                        self.iter1_0_1(x0).next().is_some()
+                    }
+                    fn check1_1_0(&self, x1: Math) -> bool {
+                        self.iter1_1_0(x1).next().is_some()
+                    }
+                    fn update(&mut self, uprooted: &Uprooted, uf: &mut Unification, delta: &mut Delta) {
+                        let mut op_insert = take(&mut delta.const_relation_delta);
+                        for (x0, x1) in op_insert.iter_mut() {
+                            *x1 = uf.math_uf.find(*x1);
+                        }
+                        let mut op_delete = Vec::new();
+                        for x1 in uprooted.math_uprooted.iter().copied() {
+                            for (x0) in self.iter1_1_0(x1) {
+                                op_delete.push((x0, x1));
+                            }
+                        }
+                        for (x0, x1) in op_delete {
+                            if self.all_index_0_1.remove(&(x0, x1)) {
+                                self.all_index_1_0.remove(&(x1, x0));
+                                uf.math_uf.dec_eclass(x1, Self::COST);
+                                op_insert.push((x0, uf.math_uf.find(x1)));
+                            }
+                        }
+                        op_insert.retain(|&(x0, x1)| {
+                            if let Some(y1) = self.iter1_0_1(x0).next() {
+                                let mut should_trigger = false;
+                                should_trigger |= y1 != x1;
+                                if should_trigger {
+                                    uf.math_uf.union(y1, x1);
+                                    return false;
+                                }
+                            }
+                            if !self.all_index_0_1.insert((x0, x1)) {
+                                return false;
+                            }
+                            uf.math_uf.inc_eclass(x1, Self::COST);
+                            self.all_index_1_0.insert((x1, x0));
+                            true
+                        });
+                        self.new.extend(op_insert);
+                    }
+                    fn update_finalize(&mut self, uf: &mut Unification) {
+                        for (x0, x1) in self.new.iter_mut() {
+                            *x1 = uf.math_uf.find(*x1);
+                        }
+                        self.new.sort();
+                        self.new.dedup();
+                    }
+                    fn emit_graphviz(&self, buf: &mut String) {
+                        use std::fmt::Write;
+                        for (i, (x0, x1)) in self.all_index_0_1.iter().copied().enumerate() {
+                            write!(buf, "{}{i} -> {}{};", "const", "i64", x0).unwrap();
+                            write!(buf, "{}{i} -> {}{};", "const", "math", x1).unwrap();
+                        }
+                    }
+                    fn len(&self) -> usize {
+                        self.all_index_0_1.len()
+                    }
+                }
+                #[derive(Debug, Default)]
+                pub struct Delta {
+                    forall_math_relation_delta: Vec<<ForallMathRelation as Relation>::Row>,
+                    const_relation_delta: Vec<<ConstRelation as Relation>::Row>,
+                }
+                impl Delta {
+                    fn new() -> Self {
+                        Self::default()
+                    }
+                    fn has_new(&self) -> bool {
+                        let mut has_new = false;
+                        has_new |= !self.forall_math_relation_delta.is_empty();
+                        has_new |= !self.const_relation_delta.is_empty();
+                        has_new
+                    }
+                    pub fn make_math(&mut self, uf: &mut Unification) -> Math {
+                        let id = uf.math_uf.add_eclass();
+                        self.forall_math_relation_delta.push(id);
+                        id
+                    }
+                    pub fn insert_const(&mut self, x: <ConstRelation as Relation>::Row) {
+                        self.const_relation_delta.push(x);
+                    }
+                }
+                #[derive(Default, Debug)]
+                struct GlobalVariables {
+                    new: bool,
+                }
+                impl GlobalVariables {
+                    fn initialize(&mut self, delta: &mut Delta, uf: &mut Unification) {
+                        self.new = true;
+                    }
+                }
+                #[derive(Debug, Default)]
+                struct Uprooted {
+                    math_uprooted: Vec<Math>,
+                }
+                impl Uprooted {
+                    fn take_dirt(&mut self, uf: &mut Unification) {
+                        self.math_uprooted.clear();
+                        swap(&mut self.math_uprooted, &mut uf.math_uf.dirty());
+                    }
+                }
+                #[derive(Debug, Default)]
+                struct Unification {
+                    math_uf: UnionFind<Math>,
+                }
+                impl Unification {
+                    fn has_new(&mut self) -> bool {
+                        let mut has_new = false;
+                        has_new |= !self.math_uf.dirty().is_empty();
+                        has_new
+                    }
+                }
+                #[derive(Debug, Default)]
+                pub struct Theory {
+                    delta: Delta,
+                    uf: Unification,
+                    uprooted: Uprooted,
+                    global_variables: GlobalVariables,
+                    forall_math_relation: ForallMathRelation,
+                    const_relation: ConstRelation,
+                }
+                impl Theory {
+                    pub fn new() -> Self {
+                        let mut theory = Self::default();
+                        theory
+                            .global_variables
+                            .initialize(&mut theory.delta, &mut theory.uf);
+                        theory.clear_transient();
+                        theory.global_variables.new = true;
+                        for _ in 0..42usize {
+                            theory.step()
+                        }
+                        theory
+                    }
+                    pub fn step(&mut self) {
+                        self.apply_rules();
+                        self.clear_transient();
+                    }
+                    #[inline(never)]
+                    fn apply_rules(&mut self) {}
+                    fn emit_graphviz(&self) -> String {
+                        let mut buf = String::new();
+                        buf.push_str("digraph G {");
+                        self.forall_math_relation.emit_graphviz(&mut buf);
+                        self.const_relation.emit_graphviz(&mut buf);
+                        buf.push_str("}");
+                        buf
+                    }
+                    fn get_total_relation_entry_count(&self) -> usize {
+                        [self.forall_math_relation.len(), self.const_relation.len()]
+                            .iter()
+                            .copied()
+                            .sum::<usize>()
+                    }
+                    #[inline(never)]
+                    fn clear_transient(&mut self) {
+                        self.global_variables.new = false;
+                        self.forall_math_relation.clear_new();
+                        self.const_relation.clear_new();
+                        loop {
+                            self.uprooted.take_dirt(&mut self.uf);
+                            self.forall_math_relation
+                                .update(&self.uprooted, &mut self.uf, &mut self.delta);
+                            self.const_relation
+                                .update(&self.uprooted, &mut self.uf, &mut self.delta);
+                            if !(self.uf.has_new() || self.delta.has_new()) {
+                                break;
+                            }
+                        }
+                        self.forall_math_relation.update_finalize(&mut self.uf);
+                        self.const_relation.update_finalize(&mut self.uf);
+                    }
+                }
+                impl std::ops::Deref for Theory {
+                    type Target = Delta;
+                    fn deref(&self) -> &Self::Target {
+                        &self.delta
+                    }
+                }
+                impl std::ops::DerefMut for Theory {
+                    fn deref_mut(&mut self) -> &mut Self::Target {
+                        &mut self.delta
+                    }
+                }
+            "#]]),
         }
         .check();
     }

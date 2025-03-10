@@ -1,7 +1,7 @@
 ; proofs of connectivity are paths
 (datatype Proof
   (Trans i64 Proof)
-  (Edge i64 i64))
+  (Edge_x i64 i64))
 
 ; We enhance the path relation to carry a proof field
 (relation path (i64 i64 Proof))
@@ -12,7 +12,7 @@
 (edge 1 3)
 
 (rule ((edge x y))  
-      ((path x y (Edge x y))))
+      ((path x y (Edge_x x y))))
 (rule ((edge x y) (path y z p))  
       ((path x z (Trans x p))))
 
@@ -22,7 +22,7 @@
       ((union p1 p2)))
 
 (run 3)
-(check (path 3 1 (Trans 3 (Edge 2 1))))
+(check (path 3 1 (Trans 3 (Edge_x 2 1))))
 ; Would prefer being able to check
 ;(check (path 1 2 _))
 ; or extract

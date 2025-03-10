@@ -197,6 +197,13 @@ impl QSpan {
     fn from_tree<T: syn::spanned::Spanned + std::fmt::Display>(x: &T) -> Self {
         QSpan::new(x.span(), format!("{}", x))
     }
+    fn with_text(&self, s: &[&'static str]) -> Self {
+        let s: String = s.iter().copied().join(" ");
+        Self {
+            span: self.span,
+            text_compact: &*s.leak(),
+        }
+    }
 }
 
 pub type MError = MagicError;
@@ -344,67 +351,65 @@ impl<T> ResultExt for MResult<T> {
 
 pub(crate) fn parse(x: proc_macro2::TokenStream) -> MResult<hir::Theory> {
     let mut parser = Parser::new();
-    for token_tree in x {
-        register_span!(,token_tree);
 
-        match token_tree {
-            TokenTree::Group(group) => {
-                let delim = group.delimiter();
-                let stream = group.stream();
-                match delim {
-                    Delimiter::Parenthesis => {
-                        parser.parse_egglog(stream)?;
-                    }
-                    Delimiter::Brace => ret!("importing rust code unimplemented"),
-                    Delimiter::Bracket => ret!("brace not expected"),
-                    Delimiter::None => {
-                        let trees: Vec<TokenTree> = stream.into_iter().collect();
-                        if trees.len() != 1 {
-                            ret!("unexpected input 1");
+    fn parse(x: proc_macro2::TokenStream, parser: &mut Parser) -> Result<(), MagicError> {
+        Ok(for token_tree in x {
+            register_span!(,token_tree);
+
+            let span = QSpan::from_tree(&token_tree);
+            match token_tree {
+                TokenTree::Group(group) => {
+                    let delim = group.delimiter();
+                    let stream = group.stream();
+                    match delim {
+                        Delimiter::Parenthesis => {
+                            parser.parse_egglog(SexpSpan::parse_stream(stream)?)?;
                         }
-                        let TokenTree::Literal(literal) = trees.into_iter().next().unwrap() else {
-                            ret!("unexpected input 2");
-                        };
-                        let syn::Lit::Str(literal) = syn::Lit::new(literal) else {
-                            ret!("unexpected input 3");
-                        };
-                        let stream = literal_to_tokenstream_strip_comments(&literal.value())?;
-                        parser.parse_egglog(stream)?;
+                        Delimiter::Brace => ret!("importing rust code unimplemented"),
+                        Delimiter::Bracket => ret!("brace not expected"),
+                        Delimiter::None => {
+                            parse(stream, parser)?;
+                        }
+                    }
+                }
+                TokenTree::Ident(_) => {
+                    ret!("unexpected identifier, surround your egglog code in parenthesis")
+                }
+                TokenTree::Punct(_) => (),
+                TokenTree::Literal(literal) => {
+                    let x = syn::Lit::new(literal);
+                    match x {
+                        syn::Lit::Str(literal) => {
+                            // TODO: add error context information
+                            // let content = &*strip_comments(&literal.value()).leak();
+                            let content = literal.value().leak();
+                            parser.parse_egglog(SexpSpan::parse_string(Some(span), &*content)?)?;
+                        }
+                        _ => ret!("expected a string literal"),
                     }
                 }
             }
-            TokenTree::Ident(_) => {
-                ret!("unexpected identifier, surround your egglog code in parenthesis")
-            }
-            TokenTree::Punct(_) => (),
-            TokenTree::Literal(literal) => {
-                let x = syn::Lit::new(literal);
-                match x {
-                    syn::Lit::Str(literal) => {
-                        let stream = literal_to_tokenstream_strip_comments(&literal.value())?;
-                        parser.parse_egglog(stream)?;
-                    }
-                    _ => ret!("expected a string literal"),
-                }
-            }
-        }
+        })
     }
+
+    parse(x, &mut parser)?;
+
     Ok(parser.emit_hir())
 }
 
-pub fn strip_comments(literal: &str) -> String {
-    literal.replace(";", "// ")
-    // literal
-    //     .lines()
-    //     .filter(|line| !line.trim_start().starts_with(';') && !line.trim_start().starts_with("//"))
-    //     .collect::<Vec<&str>>()
-    //     .join("\n")
-}
-fn literal_to_tokenstream_strip_comments(literal: &str) -> MResult<proc_macro2::TokenStream> {
-    strip_comments(literal)
-        .parse()
-        .map_err(|e| bare_!(None, "{e}"))
-}
+// pub fn strip_comments(literal: &str) -> String {
+//     literal.replace(";", "// ")
+//     // literal
+//     //     .lines()
+//     //     .filter(|line| !line.trim_start().starts_with(';') && !line.trim_start().starts_with("//"))
+//     //     .collect::<Vec<&str>>()
+//     //     .join("\n")
+// }
+// fn literal_to_tokenstream_strip_comments(literal: &str) -> MResult<proc_macro2::TokenStream> {
+//     strip_comments(literal)
+//         .parse()
+//         .map_err(|e| bare_!(None, "{e}"))
+// }
 
 #[derive(Copy, Clone, Debug, PartialEq, PartialOrd, Eq, Ord, Hash)]
 enum Literal {
@@ -523,6 +528,90 @@ impl SexpSpan {
             ret!("{context}: expected a string literal");
         };
         Ok(x)
+    }
+    fn parse_string(span: Option<QSpan>, s: &'static str) -> MResult<Vec<SexpSpan>> {
+        let mut tokens = Vec::new();
+        let mut s = s;
+        while let Some(first) = s.get(0..1) {
+            match first {
+                "(" | ")" => {
+                    tokens.push(first);
+                    s = &s[1..];
+                    continue;
+                }
+                " " | "\t" | "\n" => {
+                    s = &s[1..];
+                    continue;
+                }
+                ";" => {
+                    if let Some(idx) = s.find('\n') {
+                        s = &s[idx..];
+                    } else {
+                        s = &s[1..];
+                    }
+                    continue;
+                }
+                _ => {}
+            }
+
+            if let Some(end_idx) = s.find([' ', '\t', '\n', '(', ')', ';']) {
+                tokens.push(&s[0..end_idx]);
+                s = &s[end_idx..];
+                continue;
+            }
+            ret_!(None, "toplevel atom");
+        }
+        fn parse<'a>(
+            span: Option<QSpan>,
+            mut s: &'a [&'static str],
+        ) -> MResult<(Vec<SexpSpan>, &'a [&'static str])> {
+            let mut atoms = vec![];
+            while let Some((&first, mut rest)) = s.split_first() {
+                let token_span = span.map(|x| x.with_text(&[first]));
+                let literal =
+                    |x| SexpSpan::new(Sexp::Literal(Spanned::new(x, token_span)), token_span);
+                let elem = {
+                    match first {
+                        "(" => {
+                            let (atoms, rest2) = parse(span, rest)?;
+                            let Some((&")", rest2)) = rest2.split_first() else {
+                                ret_!(None, "unbalanced parenthesis");
+                            };
+                            rest = rest2;
+                            let list_span =
+                                span.map(|x| x.with_text(&s[0..(s.len() - rest2.len())]));
+                            SexpSpan::new(Sexp::List(&*atoms.leak()), list_span)
+                        }
+                        ")" => break,
+                        "true" => literal(Literal::Bool(true)),
+                        "false" => literal(Literal::Bool(false)),
+                        _ if first.parse::<i64>().is_ok() => {
+                            literal(Literal::I64(first.parse::<i64>().unwrap()))
+                        }
+                        _ if first.parse::<f64>().is_ok()
+                            && !matches!(first, "infinity" | "INFINITY") =>
+                        {
+                            literal(Literal::F64(OrdF64(first.parse::<f64>().unwrap())))
+                        }
+                        _ if first.starts_with('"') && first.ends_with('"') => {
+                            let s = first;
+                            let n = s.len();
+                            literal(Literal::String(&s[1..(n - 1)]))
+                        }
+                        _ => SexpSpan::new(Sexp::Atom(Spanned::new(first, token_span)), token_span),
+                    }
+                };
+                atoms.push(elem);
+                s = rest;
+            }
+            Ok((atoms, s))
+        }
+
+        let (parsed, rest) = parse(span, &tokens)?;
+        if !rest.is_empty() {
+            ret_!(None, "unbalanced parenthesis");
+        }
+        Ok(parsed)
     }
     fn parse_stream(stream: proc_macro2::TokenStream) -> MResult<Vec<SexpSpan>> {
         let mut v: Vec<SexpSpan> = Vec::new();
@@ -782,7 +871,6 @@ const BUILTIN_SORTS: [(&str, &str); 3] = [
     (BUILTIN_I64, "std::primitive::i64"),
     // TODO: we could trivially add more here for all sizes of ints/floats.
     // (BUILTIN_F64, "std::primitive::f64"),
-    // TODO: explicitly intern all strings.
     // (BUILTIN_BOOL, "std::primitive::bool"),
     (BUILTIN_STRING, "egraph::runtime::IString"),
     (BUILTIN_UNIT, "std::primitive::unit"),
@@ -974,8 +1062,7 @@ impl Parser {
         parser
     }
 
-    fn parse_egglog(&mut self, stream: proc_macro2::TokenStream) -> MResult<()> {
-        let sexp = SexpSpan::parse_stream(stream)?;
+    fn parse_egglog(&mut self, sexp: Vec<SexpSpan>) -> MResult<()> {
         for sexp in sexp {
             self.parse_toplevel(sexp)
                 .add_err(bare_!(sexp.span, "while parsing this toplevel expression"))?;
@@ -1052,7 +1139,7 @@ impl Parser {
                 let output = self.type_ids.lookup(output.atom("function output")?)?;
                 let merge = match parse_options(options)?.as_slice() {
                     [(":merge", [expr])] => Some(Parser::parse_expr(*expr, &None)?),
-                    [(":no_merge", [])] => None,
+                    [(":no-merge" | ":no_merge", [])] => None,
                     _ => ret!("missing merge options (:merge <expr>) or (:no_merge)"),
                 };
                 self.add_function(name, &inputs, Some(output), merge.as_ref(), None)?;
@@ -1203,20 +1290,37 @@ impl Parser {
                 let content = std::fs::read_to_string(filepath)
                     .map_err(|e| bare_!(span, "{e}, working directory is {working_directory:?}"))?;
 
-                let content = &*strip_comments(&content).leak();
+                let content = &*content.leak();
 
-                let stream = literal_to_tokenstream_strip_comments(content)?;
+                // let content = &*strip_comments(&content).leak();
 
-                self.parse_egglog(stream).map_err(|mut e| {
-                    e.push(bare_!(span, "while reading {filepath}"));
-                    e.resolve(Some(filepath), Some(content))
-                })?;
+                self.parse_egglog(SexpSpan::parse_string(span, content)?)
+                    .map_err(|mut e| {
+                        e.push(bare_!(span, "while reading {filepath}"));
+                        e.resolve(Some(filepath), Some(content))
+                    })?;
             }
-            "run" | "check" => {
-                // skip run and check
+            "run" => {
+                let [steps] = args else {
+                    ret!("usage: (run <steps>)")
+                };
+                let steps = steps.uint("steps")?.try_into().unwrap();
+                self.initial.push(codegen::Initial::run(steps));
             }
-            "run_schedule" | "simplify" | "query_extract" | "push" | "pop" | "print_stats"
-            | "print_function" | "print_size" | "input" | "output" | "fail" => {
+            "check" => {
+                // skip check
+            }
+            "fail" => {
+                // skip fail
+            }
+            "print-function" => {
+                // skip print function
+            }
+            "print-size" => {
+                // skip print size
+            }
+            "run-schedule" | "simplify" | "query-extract" | "push" | "pop" | "print-stats"
+            | "input" | "output" => {
                 return unimplemented_msg;
             }
 
@@ -1670,6 +1774,7 @@ impl Parser {
             })
             .collect();
         let mut interner = crate::runtime::StringIntern::new();
+        let unit_ty = self.literal_type(Literal::Unit);
         hir::Theory {
             symbolic_rules: self.symbolic_rules.clone(),
             relations: functions,
@@ -1694,6 +1799,7 @@ impl Parser {
                 .collect(),
             global_to_relation: self.global_to_function.clone(),
             interner,
+            initial: self.initial.clone(),
         }
     }
 }

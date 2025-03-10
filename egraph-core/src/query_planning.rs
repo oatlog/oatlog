@@ -184,6 +184,7 @@ pub(crate) fn emit_codegen_theory(mut theory: hir::Theory) -> (hir::Theory, code
         global_types: theory.global_types.clone(),
         rule_variables: codegen_variables,
         rule_tries: tries.leak(),
+        initial: theory.initial.clone(),
     };
 
     (theory, codegen_theory)

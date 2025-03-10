@@ -174,6 +174,7 @@ pub(crate) struct Theory {
     #[allow(unused)]
     pub(crate) global_to_relation: TVec<GlobalId, RelationId>,
     pub(crate) interner: crate::runtime::StringIntern,
+    pub(crate) initial: Vec<codegen::Initial>,
 }
 
 #[derive(Copy, Clone, Eq, PartialEq, Ord, PartialOrd, Hash, Debug)]
