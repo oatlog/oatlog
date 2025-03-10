@@ -102,7 +102,9 @@ impl<K: Id, V> UFData<K, V> {
     ///
     /// Merge returns a result, if Err, it means it is not possible to merge
     /// the two data values and the union is canceled
-    fn try_union_merge<E, F: FnMut(V, V) -> Result<V, (E, V, V)>>(
+    // TODO erik for loke: I don't get why the user provided merge function needs to
+    // provide `target_value`, src_value`.
+    pub(crate) fn try_union_merge<E, F: FnMut(V, V) -> Result<V, (E, V, V)>>(
         &mut self,
         i: K,
         j: K,
@@ -116,6 +118,10 @@ impl<K: Id, V> UFData<K, V> {
         if target_keys.len() < src_keys.len() {
             (target, src) = (src, target);
         }
+        // TODO erik for loke: do we *need* a placeholder here? Can't we just do the lookup again
+        // later?
+        // The way it is written, it looks like the Err path mutates the collection, (even though
+        // it does not).
         let placeholder = || UFElement::Child {
             parent: Cell::new(K::from(usize::MAX)),
         };

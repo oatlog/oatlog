@@ -1832,7 +1832,9 @@ mod compile_rule {
 
     use std::{collections::BTreeMap, mem::replace};
 
-    use super::{Action, ComputeMethod, Expr, Literal, MError, MResult, MapExt as _, Parser, Str};
+    use super::{
+        Action, ComputeMethod, Expr, Literal, MError, MResult, MapExt as _, Parser, QSpan, Str,
+    };
 
     use crate::{
         hir,
@@ -1840,6 +1842,16 @@ mod compile_rule {
         typed_vec::TVec,
         union_find::UFData,
     };
+
+    fn type_mismatch_msg(parser: &Parser, loc: Option<QSpan>, a: TypeId, b: TypeId) -> MError {
+        let a = parser.type_name(a);
+        let b = parser.type_name(b);
+
+        let mut err = bare_!(loc, "Type mismatch: {a} != {b}");
+        err.push(bare_!(a.span, "{a} defined here:"));
+        err.push(bare_!(b.span, "{b} defined here:"));
+        err
+    }
 
     #[derive(Copy, Clone, PartialEq, Debug)]
     struct VariableInfo {
@@ -1946,8 +1958,16 @@ mod compile_rule {
                         let ta = variables[a].ty;
                         let tb = variables[b].ty;
                         let _: Option<(TypeVarId, TypeVarId)> = types
-                            .union_eq(ta, tb)
-                            .map_err(|()| bare_!(name.span, "type mismatch"))?;
+                            .try_union_merge(ta, tb, |a, b| match (a, b) {
+                                (None, None) => Ok(None),
+                                (None, Some(x)) | (Some(x), None) => Ok(Some(x)),
+                                (Some(a), Some(b)) if a == b => Ok(Some(a)),
+                                (Some(a), Some(b)) => Err((
+                                    type_mismatch_msg(parser, name.span, a, b),
+                                    Some(a),
+                                    Some(b),
+                                )),
+                            })?;
                         unify.push(vec![a, b]);
                     }
                     let rval_ty = parser.literal_type(Literal::Unit);

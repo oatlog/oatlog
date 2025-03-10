@@ -39,14 +39,14 @@ macro_rules! egglog_test {
 mod tests {
 // egglog_test!(antiunify, r#"(include "comparative-test/egglog-testsuite/antiunify.egg")"#);// needs primitive functions
 // egglog_test!(array, r#"(include "comparative-test/egglog-testsuite/array.egg")"#);// needs panic (does not use vec)
-// egglog_test!(bdd, r#"(include "comparative-test/egglog-testsuite/bdd.egg")"#);// fails typecheck
+// egglog_test!(bdd, r#"(include "comparative-test/egglog-testsuite/bdd.egg")"#);// primitive functions
 egglog_test!(before_proofs, r#"(include "comparative-test/egglog-testsuite/before-proofs.egg")"#);
 // egglog_test!(bignum, r#"(include "comparative-test/egglog-testsuite/bignum.egg")"#);// needs bignum
 egglog_test!(birewrite, r#"(include "comparative-test/egglog-testsuite/birewrite.egg")"#);
 egglog_test!(bitwise, r#"(include "comparative-test/egglog-testsuite/bitwise.egg")"#);
 // egglog_test!(bool_, r#"(include "comparative-test/egglog-testsuite/bool.egg")"#);// bool not implemented
-// egglog_test!(calc, r#"(include "comparative-test/egglog-testsuite/calc.egg")"#);// fails typecheck
-// egglog_test!(combinators, r#"(include "comparative-test/egglog-testsuite/combinators.egg")"#);// fails typecheck
+// egglog_test!(calc, r#"(include "comparative-test/egglog-testsuite/calc.egg")"#);// push/pop
+// egglog_test!(combinators, r#"(include "comparative-test/egglog-testsuite/combinators.egg")"#);// !=
 // egglog_test!(combined_nested, r#"(include "comparative-test/egglog-testsuite/combined-nested.egg")"#);// needs unstable-combine-ruleset (won't implement)
 // egglog_test!(container_rebuild, r#"(include "comparative-test/egglog-testsuite/container-rebuild.egg")"#);// needs push/pop
 // egglog_test!(cyk, r#"(include "comparative-test/egglog-testsuite/cyk.egg")"#);// needs primitive functions
@@ -72,7 +72,7 @@ egglog_test!(i64, r#"(include "comparative-test/egglog-testsuite/i64.egg")"#);
 // egglog_test!(knapsack, r#"(include "comparative-test/egglog-testsuite/knapsack.egg")"#);// needs primitive functions
 // egglog_test!(lambda, r#"(include "comparative-test/egglog-testsuite/lambda.egg")"#);//needs sets
 // egglog_test!(levenshtein_distance, r#"(include "comparative-test/egglog-testsuite/levenshtein-distance.egg")"#);// needs primitive functions
-// egglog_test!(list, r#"(include "comparative-test/egglog-testsuite/list.egg")"#);// fails typecheck
+// egglog_test!(list, r#"(include "comparative-test/egglog-testsuite/list.egg")"#);// primitive functions
 // egglog_test!(looking_up_global, r#"(include "comparative-test/egglog-testsuite/looking_up_global.egg")"#);// panics on a todo!()?
 // egglog_test!(looking_up_nonconstructor_in_rewrite_good, r#"(include "comparative-test/egglog-testsuite/looking_up_nonconstructor_in_rewrite_good.egg")"#);//primitive functions
 // egglog_test!(map, r#"(include "comparative-test/egglog-testsuite/map.egg")"#);// needs map collections
@@ -93,15 +93,15 @@ egglog_test!(primitives, r#"(include "comparative-test/egglog-testsuite/primitiv
 // egglog_test!(push_pop, r#"(include "comparative-test/egglog-testsuite/push-pop.egg")"#);//push, pop, merge
 // egglog_test!(rat_pow_eval, r#"(include "comparative-test/egglog-testsuite/rat-pow-eval.egg")"#);// rational
 // egglog_test!(repro_define, r#"(include "comparative-test/egglog-testsuite/repro-define.egg")"#);// compile syntax error
-// egglog_test!(repro_desugar_143, r#"(include "comparative-test/egglog-testsuite/repro-desugar-143.egg")"#);// type error
+// egglog_test!(repro_desugar_143, r#"(include "comparative-test/egglog-testsuite/repro-desugar-143.egg")"#);// primitive function
 // egglog_test!(repro_empty_query, r#"(include "comparative-test/egglog-testsuite/repro-empty-query.egg")"#);// merge
 // egglog_test!(repro_equal_constant2, r#"(include "comparative-test/egglog-testsuite/repro-equal-constant2.egg")"#);// merge
 // egglog_test!(repro_equal_constant, r#"(include "comparative-test/egglog-testsuite/repro-equal-constant.egg")"#);// merge
 egglog_test!(repro_noteqbug, r#"(include "comparative-test/egglog-testsuite/repro-noteqbug.egg")"#);
 // egglog_test!(repro_primitive_query, r#"(include "comparative-test/egglog-testsuite/repro-primitive-query.egg")"#);// impl panic
-// egglog_test!(repro_querybug2, r#"(include "comparative-test/egglog-testsuite/repro-querybug2.egg")"#);// type error
+egglog_test!(repro_querybug2, r#"(include "comparative-test/egglog-testsuite/repro-querybug2.egg")"#);// type error
 // egglog_test!(repro_querybug3, r#"(include "comparative-test/egglog-testsuite/repro-querybug3.egg")"#);// set primitive
-// egglog_test!(repro_querybug4, r#"(include "comparative-test/egglog-testsuite/repro-querybug4.egg")"#);// type error
+egglog_test!(repro_querybug4, r#"(include "comparative-test/egglog-testsuite/repro-querybug4.egg")"#);// type error
 // egglog_test!(repro_querybug, r#"(include "comparative-test/egglog-testsuite/repro-querybug.egg")"#);// codegen syntax error
 // egglog_test!(repro_should_saturate, r#"(include "comparative-test/egglog-testsuite/repro-should-saturate.egg")"#);// merge
 // egglog_test!(repro_silly_panic, r#"(include "comparative-test/egglog-testsuite/repro-silly-panic.egg")"#);// fails internal assertions
@@ -109,8 +109,8 @@ egglog_test!(repro_noteqbug, r#"(include "comparative-test/egglog-testsuite/repr
 // egglog_test!(repro_unsound, r#"(include "comparative-test/egglog-testsuite/repro-unsound.egg")"#);// fails assert
 egglog_test!(repro_unsound_htutorial, r#"(include "comparative-test/egglog-testsuite/repro-unsound-htutorial.egg")"#);
 // egglog_test!(repro_vec_unequal, r#"(include "comparative-test/egglog-testsuite/repro-vec-unequal.egg")"#);//needs vec
-// egglog_test!(resolution, r#"(include "comparative-test/egglog-testsuite/resolution.egg")"#);// type error
-// egglog_test!(rw_analysis, r#"(include "comparative-test/egglog-testsuite/rw-analysis.egg")"#);// type error
+// egglog_test!(resolution, r#"(include "comparative-test/egglog-testsuite/resolution.egg")"#);// type error(bool)
+// egglog_test!(rw_analysis, r#"(include "comparative-test/egglog-testsuite/rw-analysis.egg")"#);// !=
 // egglog_test!(schedule_demo, r#"(include "comparative-test/egglog-testsuite/schedule-demo.egg")"#);//primitive functions
 // egglog_test!(set, r#"(include "comparative-test/egglog-testsuite/set.egg")"#);// set-length primitive function
 egglog_test!(set_sort_function, r#"(include "comparative-test/egglog-testsuite/set_sort_function.egg")"#);
@@ -122,12 +122,12 @@ egglog_test!(string, r#"(include "comparative-test/egglog-testsuite/string.egg")
 // egglog_test!(test_combined_steps, r#"(include "comparative-test/egglog-testsuite/test-combined-steps.egg")"#);// primitive functions
 // egglog_test!(towers_of_hanoi, r#"(include "comparative-test/egglog-testsuite/towers-of-hanoi.egg")"#);// merge 
 // egglog_test!(tricky_type_checking, r#"(include "comparative-test/egglog-testsuite/tricky-type-checking.egg")"#); // push/pop
-// egglog_test!(typecheck, r#"(include "comparative-test/egglog-testsuite/typecheck.egg")"#); // type error
+// egglog_test!(typecheck, r#"(include "comparative-test/egglog-testsuite/typecheck.egg")"#); // !=
 // egglog_test!(type_constraints_tests, r#"(include "comparative-test/egglog-testsuite/type-constraints-tests.egg")"#); // impl vec
 // egglog_test!(typeinfer, r#"(include "comparative-test/egglog-testsuite/typeinfer.egg")"#);// primitive functions
 // egglog_test!(unification_points_to, r#"(include "comparative-test/egglog-testsuite/unification-points-to.egg")"#); // slicing OOB
 // egglog_test!(unify, r#"(include "comparative-test/egglog-testsuite/unify.egg")"#); // toplevel atom
 // egglog_test!(unstable_fn, r#"(include "comparative-test/egglog-testsuite/unstable-fn.egg")"#);// primitive functions
-// egglog_test!(until, r#"(include "comparative-test/egglog-testsuite/until.egg")"#); // type error
-// egglog_test!(vec, r#"(include "comparative-test/egglog-testsuite/vec.egg")"#);// collections
+// egglog_test!(until, r#"(include "comparative-test/egglog-testsuite/until.egg")"#); // run until
+// egglog_test!(vec, r#"(include "comparative-test/egglog-testsuite/vec.egg")"#); // collections
 }
