@@ -73,6 +73,7 @@ impl<K: Id, V> TVec<K, V> {
 }
 impl<K: Id, V: Clone> TVec<K, V> {
     pub(crate) fn permute(&self, perm: &TVec<K, K>) -> Self {
+        assert_eq!(self.len(), perm.len());
         let inv_perm = perm.invert_permutation();
         self.enumerate()
             .map(|i| self[inv_perm[i]].clone())

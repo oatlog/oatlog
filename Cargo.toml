@@ -5,17 +5,18 @@ members = [
     "egraph-macro",
     "egraph-test",
     "egraph-bench",
-    "examples/math", "comparative-test",
+    "examples/math",
+    "comparative-test",
 ]
 resolver = "2"
 
 [workspace.dependencies]
-comparative-test.path = "comparative-test"
 egraph.path = "egraph"
 egraph-core.path = "egraph-core"
 egraph-macro.path = "egraph-macro"
 egraph-test.path = "egraph-test"
 egraph-bench.path = "egraph-bench"
+comparative-test.path = "comparative-test"
 
 ariadne = { version = "0.5", features = ["auto-color"] }
 clap = { version = "4", features = ["derive"]}

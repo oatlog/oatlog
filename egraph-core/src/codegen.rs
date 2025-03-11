@@ -1337,7 +1337,13 @@ fn codegen_relation(rel: &RelationData, theory: &Theory) -> TokenStream {
                 .iter()
                 .map(|x| {
                     let attr_name = ident::index_all_field(x);
-                    let permuted_types = rel.param_types.permute(&x.order);
+                    // rel.param_types.permute(&x.order);
+                    let permuted_types: TVec<ColumnId, TypeId> = x
+                        .order
+                        .iter()
+                        .copied()
+                        .map(|x| rel.param_types[x])
+                        .collect();
                     let fields_ty = permuted_types
                         .iter()
                         .map(|x| ident::type_ty(&theory.types[*x]));

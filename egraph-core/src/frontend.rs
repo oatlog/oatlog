@@ -348,6 +348,12 @@ impl<T> ResultExt for MResult<T> {
         self.map_err(|err| err.concat(new_err))
     }
 }
+pub(crate) fn parse_str(s: &'static str) -> MResult<hir::Theory> {
+    let mut parser = Parser::new();
+    let span = QSpan::new(Span::call_site(), s.to_string());
+    parser.parse_egglog(SexpSpan::parse_string(Some(span), s)?)?;
+    Ok(parser.emit_hir())
+}
 
 pub(crate) fn parse(x: proc_macro2::TokenStream) -> MResult<hir::Theory> {
     let mut parser = Parser::new();
@@ -1146,7 +1152,7 @@ impl Parser {
             }
             "constructor" => {
                 let [name, inputs, output, options @ ..] = args else {
-                    ret!("usage: (constructor <name> (<input sort>*) <output sort> <option>?");
+                    ret!("usage: (constructor <name> (<input sort>*) <output sort> <option>?)");
                 };
                 let name = name.atom("constructor name")?;
                 let inputs = self.parse_inputs(inputs)?;

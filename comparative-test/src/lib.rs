@@ -77,7 +77,7 @@ egglog_test!(i64, r#"(include "comparative-test/egglog-testsuite/i64.egg")"#);
 // egglog_test!(lambda, r#"(include "comparative-test/egglog-testsuite/lambda.egg")"#);//needs sets
 // egglog_test!(levenshtein_distance, r#"(include "comparative-test/egglog-testsuite/levenshtein-distance.egg")"#);// needs primitive functions
 // egglog_test!(list, r#"(include "comparative-test/egglog-testsuite/list.egg")"#);// primitive functions
-// egglog_test!(looking_up_global, r#"(include "comparative-test/egglog-testsuite/looking_up_global.egg")"#);// panics on a todo!()?
+egglog_test!(looking_up_global, r#"(include "comparative-test/egglog-testsuite/looking_up_global.egg")"#);// panics on a todo!()?
 // egglog_test!(looking_up_nonconstructor_in_rewrite_good, r#"(include "comparative-test/egglog-testsuite/looking_up_nonconstructor_in_rewrite_good.egg")"#);//primitive functions
 // egglog_test!(map, r#"(include "comparative-test/egglog-testsuite/map.egg")"#);// needs map collections
 // egglog_test!(math, r#"(include "comparative-test/egglog-testsuite/math.egg")"#);// needs primitive functions
@@ -91,7 +91,7 @@ egglog_test!(i64, r#"(include "comparative-test/egglog-testsuite/i64.egg")"#);
 egglog_test!(path, r#"(include "comparative-test/egglog-testsuite/path.egg")"#);
 // egglog_test!(pathproof, r#"(include "comparative-test/egglog-testsuite/pathproof.egg")"#);// something is wrong with the permutation
 egglog_test!(path_union, r#"(include "comparative-test/egglog-testsuite/path-union.egg")"#);
-// egglog_test!(points_to, r#"(include "comparative-test/egglog-testsuite/points-to.egg")"#);// compiled code error
+egglog_test!(points_to, r#"(include "comparative-test/egglog-testsuite/points-to.egg")"#);
 egglog_test!(primitives, r#"(include "comparative-test/egglog-testsuite/primitives.egg")"#);
 // egglog_test!(prims, r#"(include "comparative-test/egglog-testsuite/prims.egg")"#);//merge
 // egglog_test!(push_pop, r#"(include "comparative-test/egglog-testsuite/push-pop.egg")"#);//push, pop, merge
