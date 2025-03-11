@@ -36,8 +36,7 @@
       in {
         formatter = pkgs.writeShellApplication {
           name = "format";
-          runtimeInputs =
-            [ rust-stable pkgs.nixfmt-classic ];
+          runtimeInputs = [ rust-stable pkgs.nixfmt-classic ];
           text = ''
             set -v
             cargo fmt --all
