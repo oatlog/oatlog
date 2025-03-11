@@ -335,7 +335,7 @@ impl VariableMeta {
             Self { name, ty }
         }
     }
-    fn merge(a: VariableMeta, b: VariableMeta) -> VariableMeta {
+    fn merge(a: &VariableMeta, b: &VariableMeta) -> VariableMeta {
         assert_eq!(a.ty, b.ty, "merged variables of different types");
         VariableMeta {
             name: {
@@ -501,8 +501,8 @@ impl SymbolicRule {
             let mut merged_action_variables: UFData<ActionId, (VariableMeta, Option<PremiseId>)> =
                 self.action_variables.iter().copied().collect();
             for (a, b) in as_pairs(&merge_action, &identity) {
-                merged_action_variables.union_merge(a, b, |(am, al), (bm, bl)| {
-                    let meta = VariableMeta::merge(am, bm);
+                merged_action_variables.union_merge(a, b, |&(am, al), &(bm, bl)| {
+                    let meta = VariableMeta::merge(&am, &bm);
                     let link = match (al, bl) {
                         (None, None) => None,
                         (None, x @ Some(_)) | (x @ Some(_), None) => x,

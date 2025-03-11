@@ -23,6 +23,20 @@ enum UFElement<K: Id, V> {
     Root { value: V, set: Vec<K> },
     Child { parent: Cell<K> },
 }
+impl<K: Id, V> UFElement<K, V> {
+    fn get_root(&self) -> (&V, &Vec<K>) {
+        match self {
+            Self::Root { value, set } => (value, set),
+            Self::Child { .. } => unreachable!(),
+        }
+    }
+    fn mut_root(&mut self) -> (&mut V, &mut Vec<K>) {
+        match self {
+            Self::Root { value, set } => (value, set),
+            Self::Child { .. } => unreachable!(),
+        }
+    }
+}
 impl<K: Id, V: Clone> UFData<K, V> {
     pub(crate) fn new_with_size(n: usize, default: V) -> Self {
         Self {
@@ -102,13 +116,11 @@ impl<K: Id, V> UFData<K, V> {
     ///
     /// Merge returns a result, if Err, it means it is not possible to merge
     /// the two data values and the union is canceled
-    // TODO erik for loke: I don't get why the user provided merge function needs to
-    // provide `target_value`, src_value`.
-    pub(crate) fn try_union_merge<E, F: FnMut(V, V) -> Result<V, (E, V, V)>>(
+    pub(crate) fn try_union_merge<E>(
         &mut self,
         i: K,
         j: K,
-        mut merge: F,
+        mut merge: impl FnMut(&V, &V) -> Result<V, E>,
     ) -> Result<Option<(K, K)>, E> {
         let ((mut target, _, target_keys), (mut src, _, src_keys)) =
             (self.find_root(i), self.find_root(j));
@@ -118,62 +130,30 @@ impl<K: Id, V> UFData<K, V> {
         if target_keys.len() < src_keys.len() {
             (target, src) = (src, target);
         }
-        // TODO erik for loke: do we *need* a placeholder here? Can't we just do the lookup again
-        // later?
-        // The way it is written, it looks like the Err path mutates the collection, (even though
-        // it does not).
-        let placeholder = || UFElement::Child {
-            parent: Cell::new(K::from(usize::MAX)),
-        };
-        let UFElement::Root {
-            value: target_value,
-            set: mut target_set,
-        } = mem::replace(&mut self.inner[target.into()], placeholder())
-        else {
-            unreachable!()
-        };
-        let UFElement::Root {
-            value: src_value,
-            set: src_set,
-        } = mem::replace(&mut self.inner[src.into()], placeholder())
-        else {
-            unreachable!()
-        };
-        match merge(target_value, src_value) {
+        let (target_value, _) = self.inner[target.into()].get_root();
+        let (src_value, _) = self.inner[src.into()].get_root();
+        match merge(&target_value, &src_value) {
             Ok(value) => {
-                self.inner[target.into()] = UFElement::Root {
-                    value,
-                    set: {
-                        target_set.extend(src_set);
-                        target_set
+                let mut src_item = mem::replace(
+                    &mut self.inner[src.into()],
+                    UFElement::Child {
+                        parent: Cell::new(target),
                     },
-                };
-                self.inner[src.into()] = UFElement::Child {
-                    parent: Cell::new(target),
-                };
+                );
+
+                let (target_value, target_set) = self.inner[target.into()].mut_root();
+                *target_value = value;
+
+                let (_, src_set) = src_item.mut_root();
+                target_set.extend(mem::take(src_set));
+
                 Ok(Some((target, src)))
             }
-            Err((err, target_value, src_value)) => {
-                self.inner[target.into()] = UFElement::Root {
-                    value: target_value,
-                    set: target_set,
-                };
-                self.inner[src.into()] = UFElement::Root {
-                    value: src_value,
-                    set: src_set,
-                };
-                Err(err)
-            }
+            Err(err) => Err(err),
         }
     }
-    pub(crate) fn union_merge<F: FnMut(V, V) -> V>(&mut self, i: K, j: K, mut merge: F) {
-        let Ok(_) = self.try_union_merge::<Uninhabited, _>(i, j, |a, b| Ok(merge(a, b)));
-    }
-}
-
-impl<K: Id, V: Eq> UFData<K, V> {
-    pub(crate) fn union_eq(&mut self, i: K, j: K) -> Result<Option<(K, K)>, ()> {
-        self.try_union_merge(i, j, |a, b| if a == b { Ok(a) } else { Err(((), a, b)) })
+    pub(crate) fn union_merge(&mut self, i: K, j: K, mut merge: impl FnMut(&V, &V) -> V) {
+        let Ok(_) = self.try_union_merge::<Uninhabited>(i, j, |a, b| Ok(merge(a, b)));
     }
 }
 

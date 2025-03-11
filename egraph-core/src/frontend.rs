@@ -1957,16 +1957,14 @@ mod compile_rule {
                     for (a, b) in args.windows(2).map(|w| (w[0], w[1])) {
                         let ta = variables[a].ty;
                         let tb = variables[b].ty;
-                        let _: Option<(TypeVarId, TypeVarId)> = types
-                            .try_union_merge(ta, tb, |a, b| match (a, b) {
+                        let _: Option<(TypeVarId, TypeVarId)> =
+                            types.try_union_merge(ta, tb, |&a, &b| match (a, b) {
                                 (None, None) => Ok(None),
                                 (None, Some(x)) | (Some(x), None) => Ok(Some(x)),
                                 (Some(a), Some(b)) if a == b => Ok(Some(a)),
-                                (Some(a), Some(b)) => Err((
-                                    type_mismatch_msg(parser, name.span, a, b),
-                                    Some(a),
-                                    Some(b),
-                                )),
+                                (Some(a), Some(b)) => {
+                                    Err(type_mismatch_msg(parser, name.span, a, b))
+                                }
                             })?;
                         unify.push(vec![a, b]);
                     }

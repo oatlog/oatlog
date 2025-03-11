@@ -3,9 +3,9 @@ mod frontend;
 mod hir;
 mod ids;
 mod index_selection;
+mod query_planning;
 mod typed_vec;
 mod union_find;
-mod query_planning;
 
 pub mod runtime;
 
@@ -14,7 +14,6 @@ mod todo;
 
 #[must_use]
 pub fn compile_str(source: &str) -> String {
-
     // TODO: call Sexp::parse_string instead of Sexp::parse_stream
 
     let input: proc_macro2::TokenStream = source.parse().unwrap();
@@ -250,7 +249,6 @@ mod test {
         }
         .check();
     }
-
 
     #[test]
     fn initial() {
