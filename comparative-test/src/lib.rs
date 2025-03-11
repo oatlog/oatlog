@@ -13,9 +13,13 @@ macro_rules! comparative_test {
             println!("egglog msg: {msg}");
         }
 
-        for _ in 0..10 {
+        for i in 0..10 {
             dbg!(egglog.num_tuples(), theory.get_total_relation_entry_count());
-            assert_eq!(egglog.num_tuples(), theory.get_total_relation_entry_count());
+            assert_eq!(
+                egglog.num_tuples(),
+                theory.get_total_relation_entry_count(),
+                "egglog vs our tuple count mismatch in iteration {i}"
+            );
 
             theory.step();
 
@@ -120,7 +124,7 @@ egglog_test!(string, r#"(include "comparative-test/egglog-testsuite/string.egg")
 // egglog_test!(subsume, r#"(include "comparative-test/egglog-testsuite/subsume.egg")"#);// impl subsume
 // egglog_test!(test_combined, r#"(include "comparative-test/egglog-testsuite/test-combined.egg")"#); // unstable-combine-ruleset
 // egglog_test!(test_combined_steps, r#"(include "comparative-test/egglog-testsuite/test-combined-steps.egg")"#);// primitive functions
-// egglog_test!(towers_of_hanoi, r#"(include "comparative-test/egglog-testsuite/towers-of-hanoi.egg")"#);// merge 
+// egglog_test!(towers_of_hanoi, r#"(include "comparative-test/egglog-testsuite/towers-of-hanoi.egg")"#);// merge
 // egglog_test!(tricky_type_checking, r#"(include "comparative-test/egglog-testsuite/tricky-type-checking.egg")"#); // push/pop
 // egglog_test!(typecheck, r#"(include "comparative-test/egglog-testsuite/typecheck.egg")"#); // !=
 // egglog_test!(type_constraints_tests, r#"(include "comparative-test/egglog-testsuite/type-constraints-tests.egg")"#); // impl vec
