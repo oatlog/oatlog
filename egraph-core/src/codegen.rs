@@ -11,7 +11,7 @@ use itertools::Itertools as _;
 use proc_macro2::TokenStream;
 use quote::{format_ident, quote};
 
-use std::{collections::BTreeMap, iter, iter::once};
+use std::{collections::BTreeMap, iter};
 
 /// Data such as type and function names are technically unnecessary but used for more readable
 /// generated code. A compiler is far less performance sensitive than an interpreter (although the

@@ -23,51 +23,11 @@ use crate::{
 
 #[rustfmt::skip]
 macro_rules! bare_ {
-    ($span2:expr, $a0:literal) => { MError::new($span2, format!($a0)) };
-    ($span2:expr, $a0:literal, $a1:tt) => { MError::new($span2, format!($a0, $a1)) };
-    ($span2:expr, $a0:literal, $a1:tt, $a2:tt) => { MError::new($span2, format!($a0, $a1, $a2)) };
-    ($span2:expr, $a0:literal, $a1:tt, $a2:tt, $a3:tt) => { MError::new($span2, format!($a0, $a1, $a2, $a3)) };
-    ($span2:expr, $a0:literal, $a1:tt, $a2:tt, $a3:tt, $a4:tt) => { MError::new($span2, format!($a0, $a1, $a2, $a3, $a4)) };
-    ($span2:expr, $a0:literal, $a1:tt, $a2:tt, $a3:tt, $a4:tt, $a5:tt) => { MError::new($span2, format!($a0, $a1, $a2, $a3, $a4, $a5)) };
-    ($span2:expr, $a0:literal, $a1:tt, $a2:tt, $a3:tt, $a4:tt, $a5:tt, $a6:tt) => { MError::new($span2, format!($a0, $a1, $a2, $a3, $a4, $a5, $a6)) };
-    ($span2:expr, $a0:literal, $a1:tt, $a2:tt, $a3:tt, $a4:tt, $a5:tt, $a6:tt, $a7:tt) => { MError::new($span2, format!($a0, $a1, $a2, $a3, $a4, $a5, $a6, $a7)) };
-    ($span2:expr, $a0:literal, $a1:tt, $a2:tt, $a3:tt, $a4:tt, $a5:tt, $a6:tt, $a7:tt, $a8:tt) => { MError::new($span2, format!($a0, $a1, $a2, $a3, $a4, $a5, $a6, $a7, $a8)) };
-    ($span2:expr, $a0:literal, $a1:tt, $a2:tt, $a3:tt, $a4:tt, $a5:tt, $a6:tt, $a7:tt, $a8:tt, $a9:tt) => { MError::new($span2, format!($a0, $a1, $a2, $a3, $a4, $a5, $a6, $a7, $a8, $a9)) };
-    ($span2:expr, $a0:literal, $a1:tt, $a2:tt, $a3:tt, $a4:tt, $a5:tt, $a6:tt, $a7:tt, $a8:tt, $a9:tt, $a10:tt) => { MError::new($span2, format!($a0, $a1, $a2, $a3, $a4, $a5, $a6, $a7, $a8, $a9, $a10)) };
-    ($span2:expr, $a0:literal, $a1:tt, $a2:tt, $a3:tt, $a4:tt, $a5:tt, $a6:tt, $a7:tt, $a8:tt, $a9:tt, $a10:tt, $a11:tt) => { MError::new($span2, format!($a0, $a1, $a2, $a3, $a4, $a5, $a6, $a7, $a8, $a9, $a10, $a11)) };
-    ($span2:expr, $a0:literal, $a1:tt, $a2:tt, $a3:tt, $a4:tt, $a5:tt, $a6:tt, $a7:tt, $a8:tt, $a9:tt, $a10:tt, $a11:tt, $a12:tt) => { MError::new($span2, format!($a0, $a1, $a2, $a3, $a4, $a5, $a6, $a7, $a8, $a9, $a10, $a11, $a12)) };
+    ($span2:expr, $a0:literal $(, $a:tt)*) => { MError::new($span2, format!($a0 $(,$a)*)) };
 }
 #[rustfmt::skip]
 macro_rules! err_ {
-    ($span2:expr, $a0:literal) => { Err(MError::new($span2, format!($a0))) };
-    ($span2:expr, $a0:literal, $a1:tt) => { Err(MError::new($span2, format!($a0, $a1))) };
-    ($span2:expr, $a0:literal, $a1:tt, $a2:tt) => { Err(MError::new($span2, format!($a0, $a1, $a2))) };
-    ($span2:expr, $a0:literal, $a1:tt, $a2:tt, $a3:tt) => { Err(MError::new($span2, format!($a0, $a1, $a2, $a3))) };
-    ($span2:expr, $a0:literal, $a1:tt, $a2:tt, $a3:tt, $a4:tt) => { Err(MError::new($span2, format!($a0, $a1, $a2, $a3, $a4))) };
-    ($span2:expr, $a0:literal, $a1:tt, $a2:tt, $a3:tt, $a4:tt, $a5:tt) => { Err(MError::new($span2, format!($a0, $a1, $a2, $a3, $a4, $a5))) };
-    ($span2:expr, $a0:literal, $a1:tt, $a2:tt, $a3:tt, $a4:tt, $a5:tt, $a6:tt) => { Err(MError::new($span2, format!($a0, $a1, $a2, $a3, $a4, $a5, $a6))) };
-    ($span2:expr, $a0:literal, $a1:tt, $a2:tt, $a3:tt, $a4:tt, $a5:tt, $a6:tt, $a7:tt) => { Err(MError::new($span2, format!($a0, $a1, $a2, $a3, $a4, $a5, $a6, $a7))) };
-    ($span2:expr, $a0:literal, $a1:tt, $a2:tt, $a3:tt, $a4:tt, $a5:tt, $a6:tt, $a7:tt, $a8:tt) => { Err(MError::new($span2, format!($a0, $a1, $a2, $a3, $a4, $a5, $a6, $a7, $a8))) };
-    ($span2:expr, $a0:literal, $a1:tt, $a2:tt, $a3:tt, $a4:tt, $a5:tt, $a6:tt, $a7:tt, $a8:tt, $a9:tt) => { Err(MError::new($span2, format!($a0, $a1, $a2, $a3, $a4, $a5, $a6, $a7, $a8, $a9))) };
-    ($span2:expr, $a0:literal, $a1:tt, $a2:tt, $a3:tt, $a4:tt, $a5:tt, $a6:tt, $a7:tt, $a8:tt, $a9:tt, $a10:tt) => { Err(MError::new($span2, format!($a0, $a1, $a2, $a3, $a4, $a5, $a6, $a7, $a8, $a9, $a10))) };
-    ($span2:expr, $a0:literal, $a1:tt, $a2:tt, $a3:tt, $a4:tt, $a5:tt, $a6:tt, $a7:tt, $a8:tt, $a9:tt, $a10:tt, $a11:tt) => { Err(MError::new($span2, format!($a0, $a1, $a2, $a3, $a4, $a5, $a6, $a7, $a8, $a9, $a10, $a11))) };
-    ($span2:expr, $a0:literal, $a1:tt, $a2:tt, $a3:tt, $a4:tt, $a5:tt, $a6:tt, $a7:tt, $a8:tt, $a9:tt, $a10:tt, $a11:tt, $a12:tt) => { Err(MError::new($span2, format!($a0, $a1, $a2, $a3, $a4, $a5, $a6, $a7, $a8, $a9, $a10, $a11, $a12))) };
-}
-#[rustfmt::skip]
-macro_rules! ret_ {
-    ($span2:expr, $a0:literal) => { return Err(MError::new($span2, format!($a0))) };
-    ($span2:expr, $a0:literal, $a1:tt) => { return Err(MError::new($span2, format!($a0, $a1))) };
-    ($span2:expr, $a0:literal, $a1:tt, $a2:tt) => { return Err(MError::new($span2, format!($a0, $a1, $a2))) };
-    ($span2:expr, $a0:literal, $a1:tt, $a2:tt, $a3:tt) => { return Err(MError::new($span2, format!($a0, $a1, $a2, $a3))) };
-    ($span2:expr, $a0:literal, $a1:tt, $a2:tt, $a3:tt, $a4:tt) => { return Err(MError::new($span2, format!($a0, $a1, $a2, $a3, $a4))) };
-    ($span2:expr, $a0:literal, $a1:tt, $a2:tt, $a3:tt, $a4:tt, $a5:tt) => { return Err(MError::new($span2, format!($a0, $a1, $a2, $a3, $a4, $a5))) };
-    ($span2:expr, $a0:literal, $a1:tt, $a2:tt, $a3:tt, $a4:tt, $a5:tt, $a6:tt) => { return Err(MError::new($span2, format!($a0, $a1, $a2, $a3, $a4, $a5, $a6))) };
-    ($span2:expr, $a0:literal, $a1:tt, $a2:tt, $a3:tt, $a4:tt, $a5:tt, $a6:tt, $a7:tt) => { return Err(MError::new($span2, format!($a0, $a1, $a2, $a3, $a4, $a5, $a6, $a7))) };
-    ($span2:expr, $a0:literal, $a1:tt, $a2:tt, $a3:tt, $a4:tt, $a5:tt, $a6:tt, $a7:tt, $a8:tt) => { return Err(MError::new($span2, format!($a0, $a1, $a2, $a3, $a4, $a5, $a6, $a7, $a8))) };
-    ($span2:expr, $a0:literal, $a1:tt, $a2:tt, $a3:tt, $a4:tt, $a5:tt, $a6:tt, $a7:tt, $a8:tt, $a9:tt) => { return Err(MError::new($span2, format!($a0, $a1, $a2, $a3, $a4, $a5, $a6, $a7, $a8, $a9))) };
-    ($span2:expr, $a0:literal, $a1:tt, $a2:tt, $a3:tt, $a4:tt, $a5:tt, $a6:tt, $a7:tt, $a8:tt, $a9:tt, $a10:tt) => { return Err(MError::new($span2, format!($a0, $a1, $a2, $a3, $a4, $a5, $a6, $a7, $a8, $a9, $a10))) };
-    ($span2:expr, $a0:literal, $a1:tt, $a2:tt, $a3:tt, $a4:tt, $a5:tt, $a6:tt, $a7:tt, $a8:tt, $a9:tt, $a10:tt, $a11:tt) => { return Err(MError::new($span2, format!($a0, $a1, $a2, $a3, $a4, $a5, $a6, $a7, $a8, $a9, $a10, $a11))) };
-    ($span2:expr, $a0:literal, $a1:tt, $a2:tt, $a3:tt, $a4:tt, $a5:tt, $a6:tt, $a7:tt, $a8:tt, $a9:tt, $a10:tt, $a11:tt, $a12:tt) => { return Err(MError::new($span2, format!($a0, $a1, $a2, $a3, $a4, $a5, $a6, $a7, $a8, $a9, $a10, $a11, $a12))) };
+    ($span2:expr, $a0:literal $(, $a:tt)*) => { Err(MError::new($span2, format!($a0 $(,$a)*))) };
 }
 
 #[rustfmt::skip]
@@ -79,7 +39,6 @@ macro_rules! register_span {
         // repeated stuff because nested varadic macros do not seem to work that well.
         let _span = $span;
 
-
         #[allow(unused)]
         macro_rules! bare {
             ($a0:literal) => { MError::new(_span, format!($a0)) };
@@ -89,25 +48,6 @@ macro_rules! register_span {
             ($a0:literal, $a1:tt, $a2:tt, $a3:tt, $a4:tt) => { MError::new(_span, format!($a0, $a1, $a2, $a3, $a4)) };
             ($a0:literal, $a1:tt, $a2:tt, $a3:tt, $a4:tt, $a5:tt) => { MError::new(_span, format!($a0, $a1, $a2, $a3, $a4, $a5)) };
             ($a0:literal, $a1:tt, $a2:tt, $a3:tt, $a4:tt, $a5:tt, $a6:tt) => { MError::new(_span, format!($a0, $a1, $a2, $a3, $a4, $a5, $a6)) };
-            ($a0:literal, $a1:tt, $a2:tt, $a3:tt, $a4:tt, $a5:tt, $a6:tt, $a7:tt) => { MError::new(_span, format!($a0, $a1, $a2, $a3, $a4, $a5, $a6, $a7)) };
-            ($a0:literal, $a1:tt, $a2:tt, $a3:tt, $a4:tt, $a5:tt, $a6:tt, $a7:tt, $a8:tt) => { MError::new(_span, format!($a0, $a1, $a2, $a3, $a4, $a5, $a6, $a7, $a8)) };
-            ($a0:literal, $a1:tt, $a2:tt, $a3:tt, $a4:tt, $a5:tt, $a6:tt, $a7:tt, $a8:tt, $a9:tt) => { MError::new(_span, format!($a0, $a1, $a2, $a3, $a4, $a5, $a6, $a7, $a8, $a9)) };
-            ($a0:literal, $a1:tt, $a2:tt, $a3:tt, $a4:tt, $a5:tt, $a6:tt, $a7:tt, $a8:tt, $a9:tt, $a10:tt) => { MError::new(_span, format!($a0, $a1, $a2, $a3, $a4, $a5, $a6, $a7, $a8, $a9, $a10)) };
-            ($a0:literal, $a1:tt, $a2:tt, $a3:tt, $a4:tt, $a5:tt, $a6:tt, $a7:tt, $a8:tt, $a9:tt, $a10:tt, $a11:tt) => { MError::new(_span, format!($a0, $a1, $a2, $a3, $a4, $a5, $a6, $a7, $a8, $a9, $a10, $a11)) };
-            ($a0:literal, $a1:tt, $a2:tt, $a3:tt, $a4:tt, $a5:tt, $a6:tt, $a7:tt, $a8:tt, $a9:tt, $a10:tt, $a11:tt, $a12:tt) => { MError::new(_span, format!($a0, $a1, $a2, $a3, $a4, $a5, $a6, $a7, $a8, $a9, $a10, $a11, $a12)) };
-            ($span2:expr, $a0:literal) => { MError::new($span2, format!($a0)) };
-            ($span2:expr, $a0:literal, $a1:tt) => { MError::new($span2, format!($a0, $a1)) };
-            ($span2:expr, $a0:literal, $a1:tt, $a2:tt) => { MError::new($span2, format!($a0, $a1, $a2)) };
-            ($span2:expr, $a0:literal, $a1:tt, $a2:tt, $a3:tt) => { MError::new($span2, format!($a0, $a1, $a2, $a3)) };
-            ($span2:expr, $a0:literal, $a1:tt, $a2:tt, $a3:tt, $a4:tt) => { MError::new($span2, format!($a0, $a1, $a2, $a3, $a4)) };
-            ($span2:expr, $a0:literal, $a1:tt, $a2:tt, $a3:tt, $a4:tt, $a5:tt) => { MError::new($span2, format!($a0, $a1, $a2, $a3, $a4, $a5)) };
-            ($span2:expr, $a0:literal, $a1:tt, $a2:tt, $a3:tt, $a4:tt, $a5:tt, $a6:tt) => { MError::new($span2, format!($a0, $a1, $a2, $a3, $a4, $a5, $a6)) };
-            ($span2:expr, $a0:literal, $a1:tt, $a2:tt, $a3:tt, $a4:tt, $a5:tt, $a6:tt, $a7:tt) => { MError::new($span2, format!($a0, $a1, $a2, $a3, $a4, $a5, $a6, $a7)) };
-            ($span2:expr, $a0:literal, $a1:tt, $a2:tt, $a3:tt, $a4:tt, $a5:tt, $a6:tt, $a7:tt, $a8:tt) => { MError::new($span2, format!($a0, $a1, $a2, $a3, $a4, $a5, $a6, $a7, $a8)) };
-            ($span2:expr, $a0:literal, $a1:tt, $a2:tt, $a3:tt, $a4:tt, $a5:tt, $a6:tt, $a7:tt, $a8:tt, $a9:tt) => { MError::new($span2, format!($a0, $a1, $a2, $a3, $a4, $a5, $a6, $a7, $a8, $a9)) };
-            ($span2:expr, $a0:literal, $a1:tt, $a2:tt, $a3:tt, $a4:tt, $a5:tt, $a6:tt, $a7:tt, $a8:tt, $a9:tt, $a10:tt) => { MError::new($span2, format!($a0, $a1, $a2, $a3, $a4, $a5, $a6, $a7, $a8, $a9, $a10)) };
-            ($span2:expr, $a0:literal, $a1:tt, $a2:tt, $a3:tt, $a4:tt, $a5:tt, $a6:tt, $a7:tt, $a8:tt, $a9:tt, $a10:tt, $a11:tt) => { MError::new($span2, format!($a0, $a1, $a2, $a3, $a4, $a5, $a6, $a7, $a8, $a9, $a10, $a11)) };
-            ($span2:expr, $a0:literal, $a1:tt, $a2:tt, $a3:tt, $a4:tt, $a5:tt, $a6:tt, $a7:tt, $a8:tt, $a9:tt, $a10:tt, $a11:tt, $a12:tt) => { MError::new($span2, format!($a0, $a1, $a2, $a3, $a4, $a5, $a6, $a7, $a8, $a9, $a10, $a11, $a12)) };
         }
         #[allow(unused)]
         macro_rules! err {
@@ -118,64 +58,13 @@ macro_rules! register_span {
             ($a0:literal, $a1:tt, $a2:tt, $a3:tt, $a4:tt) => { Err(MError::new(_span, format!($a0, $a1, $a2, $a3, $a4))) };
             ($a0:literal, $a1:tt, $a2:tt, $a3:tt, $a4:tt, $a5:tt) => { Err(MError::new(_span, format!($a0, $a1, $a2, $a3, $a4, $a5))) };
             ($a0:literal, $a1:tt, $a2:tt, $a3:tt, $a4:tt, $a5:tt, $a6:tt) => { Err(MError::new(_span, format!($a0, $a1, $a2, $a3, $a4, $a5, $a6))) };
-            ($a0:literal, $a1:tt, $a2:tt, $a3:tt, $a4:tt, $a5:tt, $a6:tt, $a7:tt) => { Err(MError::new(_span, format!($a0, $a1, $a2, $a3, $a4, $a5, $a6, $a7))) };
-            ($a0:literal, $a1:tt, $a2:tt, $a3:tt, $a4:tt, $a5:tt, $a6:tt, $a7:tt, $a8:tt) => { Err(MError::new(_span, format!($a0, $a1, $a2, $a3, $a4, $a5, $a6, $a7, $a8))) };
-            ($a0:literal, $a1:tt, $a2:tt, $a3:tt, $a4:tt, $a5:tt, $a6:tt, $a7:tt, $a8:tt, $a9:tt) => { Err(MError::new(_span, format!($a0, $a1, $a2, $a3, $a4, $a5, $a6, $a7, $a8, $a9))) };
-            ($a0:literal, $a1:tt, $a2:tt, $a3:tt, $a4:tt, $a5:tt, $a6:tt, $a7:tt, $a8:tt, $a9:tt, $a10:tt) => { Err(MError::new(_span, format!($a0, $a1, $a2, $a3, $a4, $a5, $a6, $a7, $a8, $a9, $a10))) };
-            ($a0:literal, $a1:tt, $a2:tt, $a3:tt, $a4:tt, $a5:tt, $a6:tt, $a7:tt, $a8:tt, $a9:tt, $a10:tt, $a11:tt) => { Err(MError::new(_span, format!($a0, $a1, $a2, $a3, $a4, $a5, $a6, $a7, $a8, $a9, $a10, $a11))) };
-            ($a0:literal, $a1:tt, $a2:tt, $a3:tt, $a4:tt, $a5:tt, $a6:tt, $a7:tt, $a8:tt, $a9:tt, $a10:tt, $a11:tt, $a12:tt) => { Err(MError::new(_span, format!($a0, $a1, $a2, $a3, $a4, $a5, $a6, $a7, $a8, $a9, $a10, $a11, $a12))) };
-            ($span2:expr, $a0:literal) => { Err(MError::new($span2, format!($a0))) };
-            ($span2:expr, $a0:literal, $a1:tt) => { Err(MError::new($span2, format!($a0, $a1))) };
-            ($span2:expr, $a0:literal, $a1:tt, $a2:tt) => { Err(MError::new($span2, format!($a0, $a1, $a2))) };
-            ($span2:expr, $a0:literal, $a1:tt, $a2:tt, $a3:tt) => { Err(MError::new($span2, format!($a0, $a1, $a2, $a3))) };
-            ($span2:expr, $a0:literal, $a1:tt, $a2:tt, $a3:tt, $a4:tt) => { Err(MError::new($span2, format!($a0, $a1, $a2, $a3, $a4))) };
-            ($span2:expr, $a0:literal, $a1:tt, $a2:tt, $a3:tt, $a4:tt, $a5:tt) => { Err(MError::new($span2, format!($a0, $a1, $a2, $a3, $a4, $a5))) };
-            ($span2:expr, $a0:literal, $a1:tt, $a2:tt, $a3:tt, $a4:tt, $a5:tt, $a6:tt) => { Err(MError::new($span2, format!($a0, $a1, $a2, $a3, $a4, $a5, $a6))) };
-            ($span2:expr, $a0:literal, $a1:tt, $a2:tt, $a3:tt, $a4:tt, $a5:tt, $a6:tt, $a7:tt) => { Err(MError::new($span2, format!($a0, $a1, $a2, $a3, $a4, $a5, $a6, $a7))) };
-            ($span2:expr, $a0:literal, $a1:tt, $a2:tt, $a3:tt, $a4:tt, $a5:tt, $a6:tt, $a7:tt, $a8:tt) => { Err(MError::new($span2, format!($a0, $a1, $a2, $a3, $a4, $a5, $a6, $a7, $a8))) };
-            ($span2:expr, $a0:literal, $a1:tt, $a2:tt, $a3:tt, $a4:tt, $a5:tt, $a6:tt, $a7:tt, $a8:tt, $a9:tt) => { Err(MError::new($span2, format!($a0, $a1, $a2, $a3, $a4, $a5, $a6, $a7, $a8, $a9))) };
-            ($span2:expr, $a0:literal, $a1:tt, $a2:tt, $a3:tt, $a4:tt, $a5:tt, $a6:tt, $a7:tt, $a8:tt, $a9:tt, $a10:tt) => { Err(MError::new($span2, format!($a0, $a1, $a2, $a3, $a4, $a5, $a6, $a7, $a8, $a9, $a10))) };
-            ($span2:expr, $a0:literal, $a1:tt, $a2:tt, $a3:tt, $a4:tt, $a5:tt, $a6:tt, $a7:tt, $a8:tt, $a9:tt, $a10:tt, $a11:tt) => { Err(MError::new($span2, format!($a0, $a1, $a2, $a3, $a4, $a5, $a6, $a7, $a8, $a9, $a10, $a11))) };
-            ($span2:expr, $a0:literal, $a1:tt, $a2:tt, $a3:tt, $a4:tt, $a5:tt, $a6:tt, $a7:tt, $a8:tt, $a9:tt, $a10:tt, $a11:tt, $a12:tt) => { Err(MError::new($span2, format!($a0, $a1, $a2, $a3, $a4, $a5, $a6, $a7, $a8, $a9, $a10, $a11, $a12))) };
         }
-        #[allow(unused)]
-        macro_rules! ret {
-            ($a0:literal) => { return Err(MError::new(_span, format!($a0))) };
-            ($a0:literal, $a1:tt) => { return Err(MError::new(_span, format!($a0, $a1))) };
-            ($a0:literal, $a1:tt, $a2:tt) => { return Err(MError::new(_span, format!($a0, $a1, $a2))) };
-            ($a0:literal, $a1:tt, $a2:tt, $a3:tt) => { return Err(MError::new(_span, format!($a0, $a1, $a2, $a3))) };
-            ($a0:literal, $a1:tt, $a2:tt, $a3:tt, $a4:tt) => { return Err(MError::new(_span, format!($a0, $a1, $a2, $a3, $a4))) };
-            ($a0:literal, $a1:tt, $a2:tt, $a3:tt, $a4:tt, $a5:tt) => { return Err(MError::new(_span, format!($a0, $a1, $a2, $a3, $a4, $a5))) };
-            ($a0:literal, $a1:tt, $a2:tt, $a3:tt, $a4:tt, $a5:tt, $a6:tt) => { return Err(MError::new(_span, format!($a0, $a1, $a2, $a3, $a4, $a5, $a6))) };
-            ($a0:literal, $a1:tt, $a2:tt, $a3:tt, $a4:tt, $a5:tt, $a6:tt, $a7:tt) => { return Err(MError::new(_span, format!($a0, $a1, $a2, $a3, $a4, $a5, $a6, $a7))) };
-            ($a0:literal, $a1:tt, $a2:tt, $a3:tt, $a4:tt, $a5:tt, $a6:tt, $a7:tt, $a8:tt) => { return Err(MError::new(_span, format!($a0, $a1, $a2, $a3, $a4, $a5, $a6, $a7, $a8))) };
-            ($a0:literal, $a1:tt, $a2:tt, $a3:tt, $a4:tt, $a5:tt, $a6:tt, $a7:tt, $a8:tt, $a9:tt) => { return Err(MError::new(_span, format!($a0, $a1, $a2, $a3, $a4, $a5, $a6, $a7, $a8, $a9))) };
-            ($a0:literal, $a1:tt, $a2:tt, $a3:tt, $a4:tt, $a5:tt, $a6:tt, $a7:tt, $a8:tt, $a9:tt, $a10:tt) => { return Err(MError::new(_span, format!($a0, $a1, $a2, $a3, $a4, $a5, $a6, $a7, $a8, $a9, $a10))) };
-            ($a0:literal, $a1:tt, $a2:tt, $a3:tt, $a4:tt, $a5:tt, $a6:tt, $a7:tt, $a8:tt, $a9:tt, $a10:tt, $a11:tt) => { return Err(MError::new(_span, format!($a0, $a1, $a2, $a3, $a4, $a5, $a6, $a7, $a8, $a9, $a10, $a11))) };
-            ($a0:literal, $a1:tt, $a2:tt, $a3:tt, $a4:tt, $a5:tt, $a6:tt, $a7:tt, $a8:tt, $a9:tt, $a10:tt, $a11:tt, $a12:tt) => { return Err(MError::new(_span, format!($a0, $a1, $a2, $a3, $a4, $a5, $a6, $a7, $a8, $a9, $a10, $a11, $a12))) };
-            ($span2:expr, $a0:literal) => { return Err(MError::new($span2, format!($a0))) };
-            ($span2:expr, $a0:literal, $a1:tt) => { return Err(MError::new($span2, format!($a0, $a1))) };
-            ($span2:expr, $a0:literal, $a1:tt, $a2:tt) => { return Err(MError::new($span2, format!($a0, $a1, $a2))) };
-            ($span2:expr, $a0:literal, $a1:tt, $a2:tt, $a3:tt) => { return Err(MError::new($span2, format!($a0, $a1, $a2, $a3))) };
-            ($span2:expr, $a0:literal, $a1:tt, $a2:tt, $a3:tt, $a4:tt) => { return Err(MError::new($span2, format!($a0, $a1, $a2, $a3, $a4))) };
-            ($span2:expr, $a0:literal, $a1:tt, $a2:tt, $a3:tt, $a4:tt, $a5:tt) => { return Err(MError::new($span2, format!($a0, $a1, $a2, $a3, $a4, $a5))) };
-            ($span2:expr, $a0:literal, $a1:tt, $a2:tt, $a3:tt, $a4:tt, $a5:tt, $a6:tt) => { return Err(MError::new($span2, format!($a0, $a1, $a2, $a3, $a4, $a5, $a6))) };
-            ($span2:expr, $a0:literal, $a1:tt, $a2:tt, $a3:tt, $a4:tt, $a5:tt, $a6:tt, $a7:tt) => { return Err(MError::new($span2, format!($a0, $a1, $a2, $a3, $a4, $a5, $a6, $a7))) };
-            ($span2:expr, $a0:literal, $a1:tt, $a2:tt, $a3:tt, $a4:tt, $a5:tt, $a6:tt, $a7:tt, $a8:tt) => { return Err(MError::new($span2, format!($a0, $a1, $a2, $a3, $a4, $a5, $a6, $a7, $a8))) };
-            ($span2:expr, $a0:literal, $a1:tt, $a2:tt, $a3:tt, $a4:tt, $a5:tt, $a6:tt, $a7:tt, $a8:tt, $a9:tt) => { return Err(MError::new($span2, format!($a0, $a1, $a2, $a3, $a4, $a5, $a6, $a7, $a8, $a9))) };
-            ($span2:expr, $a0:literal, $a1:tt, $a2:tt, $a3:tt, $a4:tt, $a5:tt, $a6:tt, $a7:tt, $a8:tt, $a9:tt, $a10:tt) => { return Err(MError::new($span2, format!($a0, $a1, $a2, $a3, $a4, $a5, $a6, $a7, $a8, $a9, $a10))) };
-            ($span2:expr, $a0:literal, $a1:tt, $a2:tt, $a3:tt, $a4:tt, $a5:tt, $a6:tt, $a7:tt, $a8:tt, $a9:tt, $a10:tt, $a11:tt) => { return Err(MError::new($span2, format!($a0, $a1, $a2, $a3, $a4, $a5, $a6, $a7, $a8, $a9, $a10, $a11))) };
-            ($span2:expr, $a0:literal, $a1:tt, $a2:tt, $a3:tt, $a4:tt, $a5:tt, $a6:tt, $a7:tt, $a8:tt, $a9:tt, $a10:tt, $a11:tt, $a12:tt) => { return Err(MError::new($span2, format!($a0, $a1, $a2, $a3, $a4, $a5, $a6, $a7, $a8, $a9, $a10, $a11, $a12))) };
-        }
-
-
         #[allow(unused)]
         macro_rules! syn {
             ($x:expr) => {
                 bare!("{}", ($x.to_string()))
             };
         }
-
     };
 }
 
@@ -229,12 +118,6 @@ impl MagicError {
     }
     fn push(&mut self, other: Self) {
         self.messages.extend(other.messages);
-    }
-    fn span(span: QSpan, message: String) -> Self {
-        Self::new(Some(span), message)
-    }
-    fn err(message: String) -> Self {
-        Self::new(None, message)
     }
     fn new(span: Option<QSpan>, message: String) -> Self {
         Self {
@@ -356,14 +239,13 @@ pub(crate) fn parse_str(s: &'static str) -> MResult<hir::Theory> {
 }
 
 pub(crate) fn parse(x: proc_macro2::TokenStream) -> MResult<hir::Theory> {
-    let mut parser = Parser::new();
-
     fn parse(x: proc_macro2::TokenStream, parser: &mut Parser) -> Result<(), MagicError> {
         Ok(for token_tree in x {
             register_span!(,token_tree);
 
             let span = QSpan::from_tree(&token_tree);
             match token_tree {
+                // compile_egraph!(((datatype Math (Add Math Math) (Sub Math Math))))
                 TokenTree::Group(group) => {
                     let delim = group.delimiter();
                     let stream = group.stream();
@@ -371,17 +253,15 @@ pub(crate) fn parse(x: proc_macro2::TokenStream) -> MResult<hir::Theory> {
                         Delimiter::Parenthesis => {
                             parser.parse_egglog(SexpSpan::parse_stream(stream)?)?;
                         }
-                        Delimiter::Brace => ret!("importing rust code unimplemented"),
-                        Delimiter::Bracket => ret!("brace not expected"),
+                        Delimiter::Brace => return err!("importing rust code unimplemented"),
+                        Delimiter::Bracket => return err!("brace not expected"),
                         Delimiter::None => {
+                            // Invisible delimiters due to declarative macro invocation
                             parse(stream, parser)?;
                         }
                     }
                 }
-                TokenTree::Ident(_) => {
-                    ret!("unexpected identifier, surround your egglog code in parenthesis")
-                }
-                TokenTree::Punct(_) => (),
+                // compile_egraph!("(datatype Math (Add Math Math) (Sub Math Math))")
                 TokenTree::Literal(literal) => {
                     let x = syn::Lit::new(literal);
                     match x {
@@ -391,31 +271,23 @@ pub(crate) fn parse(x: proc_macro2::TokenStream) -> MResult<hir::Theory> {
                             let content = literal.value().leak();
                             parser.parse_egglog(SexpSpan::parse_string(Some(span), &*content)?)?;
                         }
-                        _ => ret!("expected a string literal"),
+                        _ => return err!("expected a string literal"),
                     }
+                }
+                TokenTree::Ident(_) | TokenTree::Punct(_) => {
+                    return err!(
+                        "expected egglog source code string literal or code wrapped in parenthesis, \
+                        unexpected macro input `{token_tree}`"
+                    );
                 }
             }
         })
     }
 
+    let mut parser = Parser::new();
     parse(x, &mut parser)?;
-
     Ok(parser.emit_hir())
 }
-
-// pub fn strip_comments(literal: &str) -> String {
-//     literal.replace(";", "// ")
-//     // literal
-//     //     .lines()
-//     //     .filter(|line| !line.trim_start().starts_with(';') && !line.trim_start().starts_with("//"))
-//     //     .collect::<Vec<&str>>()
-//     //     .join("\n")
-// }
-// fn literal_to_tokenstream_strip_comments(literal: &str) -> MResult<proc_macro2::TokenStream> {
-//     strip_comments(literal)
-//         .parse()
-//         .map_err(|e| bare_!(None, "{e}"))
-// }
 
 #[derive(Copy, Clone, Debug, PartialEq, PartialOrd, Eq, Ord, Hash)]
 enum Literal {
@@ -519,7 +391,7 @@ impl SexpSpan {
     fn uint(self, context: &'static str) -> MResult<u64> {
         register_span!(self.span);
         let Sexp::Literal(x) = self.x else {
-            ret!("{context}: expected an int literal")
+            return err!("{context}: expected an int literal");
         };
 
         u64::try_from(x.i64().map_err(|()| bare!("{context}; expected int"))?)
@@ -528,10 +400,10 @@ impl SexpSpan {
     fn string(self, context: &'static str) -> MResult<&'static str> {
         register_span!(self.span);
         let Sexp::Literal(x) = self.x else {
-            ret!("{context}: expected a string literal");
+            return err!("{context}: expected a string literal");
         };
         let Literal::String(x) = x.x else {
-            ret!("{context}: expected a string literal");
+            return err!("{context}: expected a string literal");
         };
         Ok(x)
     }
@@ -565,7 +437,7 @@ impl SexpSpan {
                 s = &s[end_idx..];
                 continue;
             }
-            ret_!(None, "toplevel atom");
+            return err_!(None, "toplevel atom");
         }
         fn parse<'a>(
             span: Option<QSpan>,
@@ -581,7 +453,7 @@ impl SexpSpan {
                         "(" => {
                             let (atoms, rest2) = parse(span, rest)?;
                             let Some((&")", rest2)) = rest2.split_first() else {
-                                ret_!(None, "unbalanced parenthesis");
+                                return err_!(None, "unbalanced parenthesis");
                             };
                             rest = rest2;
                             let list_span =
@@ -615,7 +487,7 @@ impl SexpSpan {
 
         let (parsed, rest) = parse(span, &tokens)?;
         if !rest.is_empty() {
-            ret_!(None, "unbalanced parenthesis");
+            return err_!(None, "unbalanced parenthesis");
         }
         Ok(parsed)
     }
@@ -701,7 +573,7 @@ impl SexpSpan {
                                 end_token!();
                                 Literal::Bool(lit_bool.value())
                             }
-                            _ => ret!("unexpected literal"),
+                            _ => return err!("unexpected literal"),
                         },
                         Some(span),
                     ));
@@ -727,25 +599,26 @@ struct TypeData {
     primitive: Option<&'static str>,
 }
 impl TypeData {
-    fn can_not_unify(&self) -> bool {
+    fn can_unify(&self) -> bool {
         // TODO: make sure i64 and similar is actually primitive.
-        self.collection.is_some() || self.primitive.is_some()
+        self.collection.is_none() && self.primitive.is_none()
     }
 }
 
 /// A declared function
-/// output is unit if it is a relation
-#[derive(Debug, Clone, Educe)]
-#[educe(PartialEq)]
+#[derive(Debug, Clone)]
 struct FunctionData {
     name: Str,
     inputs: TVec<ColumnId, TypeId>,
-    // for variadic functions, possibly do the following:
-    // varadic : Option<TypeId>
-    /// Unit if relation
+
+    /// Relations are represented as functions returning `Unit`.
     output: TypeId,
-    // kind: FunctionKind,
+
+    // NOTE: for variadic functions, possibly do the following:
+    // variadic : Option<TypeId>
+    #[allow(unused)]
     merge: Option<Expr>,
+    #[allow(unused)]
     cost: Option<u64>,
 }
 impl FunctionData {
@@ -768,33 +641,18 @@ impl FunctionData {
         true
     }
 }
-// # Function taxonomy
-//
-// |Name       |Signature                 |Impl    |Merge        |
-// |-----------|--------------------------|--------|-------------|
-// |Builtin    |primitive     -> primitive|rust    |no assignment|
-// |Property   |nonprim/mixed -> primitive|relation|builtins     |
-// |Constructor|primitive     -> nonprim  |relation|unification  |
-// |Symbolic   |nonprim/mixed -> nonprim  |relation|unification  |
-//
-// Collections such as sets are like primitives in that they have builtin e.g. union ops.
-// Collections may have special cases yet to figure out.
-// enum FunctionKind {
-//     Builtin {
-//         /// Something like `MyPrimitiveType::my_function`
-//         impl_: syn::ExprPath,
-//     },
-//     Property {
-//         /// Something like `i64::max`
-//         merge: syn::ExprPath,
-//     },
-//     Constructor,
-//     Symbolic,
-// }
-
-// Span -> Enum(placeholder, Span) so eq can be implemented
-fn placeholder_span() -> Span {
-    Span::call_site()
+#[derive(Clone)]
+enum FunctionKind {
+    Constructor {
+        output: TypeId,
+        // None means it can not be extracted
+        cost: Option<u64>,
+    },
+    Function {
+        output: TypeId,
+        merge: Option<Expr>,
+    },
+    Relation,
 }
 
 /// Including span information in a way that makes it act like a T
@@ -840,7 +698,7 @@ impl<T> DerefMut for Spanned<T> {
 }
 type Str = Spanned<&'static str>;
 
-#[derive(Debug, PartialEq)]
+#[derive(Debug)]
 struct StringIds<T> {
     x: BTreeMap<&'static str, Spanned<T>>,
     label: &'static str,
@@ -886,6 +744,7 @@ const BUILTIN_SORTS: [(&str, &str); 3] = [
 struct GlobalVariableInfo {
     ty: TypeId,
     compute: ComputeMethod,
+    relation_id: RelationId,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Hash, Ord, PartialOrd)]
@@ -960,112 +819,111 @@ impl<V: Clone> MapExt<&'static str, Spanned<V>> for BTreeMap<&'static str, Spann
 /// Global parsing state
 #[derive(Debug)]
 struct Parser {
+    /// Not yet implemented, sets of rules executed together.
     rulesets: BTreeMap<Str, ()>,
 
-    functions: TVec<RelationId, Option<FunctionData>>,
+    /// Multiple functions may have identical names. Call-sites are disambiguated
+    /// using type information, similar to C++ overloading.
     function_possible_ids: BTreeMap<Str, Vec<RelationId>>,
 
-    hir_relations: TVec<RelationId, hir::Relation>,
+    /// Functions have a language-level component `FunctionData` useful
+    /// for e.g. type checking, and a hir-level component.
+    ///
+    /// Some relations, such as those implementing global variables, lack `FunctionData`.
+    relations_hir_and_func: TVec<RelationId, (hir::Relation, Option<FunctionData>)>,
 
+    /// Type data, containing additional info for primitives (and TODO collections).
     types: TVec<TypeId, TypeData>,
+    /// Mapping type names to `TypeId`.
     type_ids: StringIds<TypeId>,
 
-    global_to_function: TVec<GlobalId, RelationId>,
+    /// Every type has a forall relation containing all its instances.
     type_to_forall: BTreeMap<TypeId, RelationId>,
 
+    /// Global variables are initialized at theory creation and can be accessed from all rules.
     global_variables: TVec<GlobalId, GlobalVariableInfo>,
+    /// Global variables with different names but computed identically are mapped to a single `GlobalId`.
     global_variable_names: BTreeMap<Str, GlobalId>,
+    /// Global variables are merged if they are computed identically.
     compute_to_global: BTreeMap<ComputeMethod, GlobalId>,
+    /// Instructions to execute upon theory creation.
     initial: Vec<codegen::Initial>,
 
+    /// Rules written explicitly.
     symbolic_rules: Vec<hir::SymbolicRule>,
+    /// Rules derived from functional dependency within relations.
     implicit_rules: BTreeMap<RelationId, Vec<hir::ImplicitRule>>,
 }
 impl Parser {
-    /// Add a global variable. Hashcons based on the compute method
-    ///
-    /// # Returns
-    ///
-    /// (possibly new) global id
-    ///
-    /// # Errors
-    ///
-    /// If global symbol is already defined with that name
-    fn add_global(
-        &mut self,
-        name: Option<Str>,
-        ty: TypeId,
-        compute: ComputeMethod,
-    ) -> MResult<GlobalId> {
-        if let Some(name) = name {
-            if let Entry::Occupied(entry) = self.global_variable_names.entry(name) {
-                let existing_span = entry.key().span;
-                return Err(already_defined(
-                    name.x,
-                    existing_span,
-                    name.span,
-                    "global variable",
-                ));
-            }
-        }
-
-        let new_id = GlobalId(self.compute_to_global.len());
-        let mut is_new_id = false;
-        let global_id = *self
-            .compute_to_global
-            .entry(compute.clone())
-            .or_insert_with(|| {
-                is_new_id = true;
-                self.global_variables
-                    .push_expected(new_id, GlobalVariableInfo { ty, compute });
-                new_id
-            });
-        if is_new_id {
-            let relation_id = self.functions.push(None);
-            self.hir_relations.push_expected(
-                relation_id,
-                hir::Relation::global(
-                    name.map(|x| *x).unwrap_or(global_id.to_string().leak()),
-                    global_id,
-                    ty,
-                ),
-            );
-            self.global_to_function
-                .push_expected(global_id, relation_id);
-        }
-
-        if let Some(name) = name {
-            self.global_variable_names.insert(name, global_id);
-        }
-
-        Ok(global_id)
-    }
     fn new() -> Self {
         let mut parser = Parser {
-            rulesets: BTreeMap::new(),
-
-            functions: TVec::new(),
+            compute_to_global: BTreeMap::new(),
             function_possible_ids: BTreeMap::new(),
-
-            types: TVec::new(),
-            type_ids: StringIds::new("type"),
             global_variable_names: BTreeMap::new(),
             global_variables: TVec::new(),
-            compute_to_global: BTreeMap::new(),
-            symbolic_rules: Vec::new(),
             implicit_rules: BTreeMap::new(),
-            hir_relations: TVec::new(),
-            global_to_function: TVec::new(),
-            type_to_forall: BTreeMap::new(),
             initial: Vec::new(),
+            relations_hir_and_func: TVec::new(),
+            rulesets: BTreeMap::new(),
+            symbolic_rules: Vec::new(),
+            type_ids: StringIds::new("type"),
+            type_to_forall: BTreeMap::new(),
+            types: TVec::new(),
         };
         for (builtin, path) in BUILTIN_SORTS {
             let _ty: TypeId = parser
                 .add_sort(Spanned::new(builtin, None), None, Some(path))
                 .unwrap();
         }
-
         parser
+    }
+
+    pub(crate) fn emit_hir(&self) -> hir::Theory {
+        let types: TVec<TypeId, hir::Type> = self
+            .types
+            .iter()
+            .map(|t| match (t.primitive, &t.collection) {
+                (_, Some(_)) => todo!("collection not implemented"),
+                (Some(primitive), None) => hir::Type::new_primitive(*t.name, primitive),
+                (None, None) => hir::Type::new_symbolic(*t.name),
+            })
+            .collect();
+        let mut interner = crate::runtime::StringIntern::new();
+        hir::Theory {
+            symbolic_rules: self.symbolic_rules.clone(),
+            relations: self
+                .relations_hir_and_func
+                .iter()
+                .map(|(hir, _)| hir)
+                .cloned()
+                .collect(),
+            name: "",
+            types,
+            implicit_rules: self.implicit_rules.clone(),
+            global_types: self.global_variables.iter().map(|i| i.ty).collect(),
+            global_to_relation: self
+                .global_variables
+                .iter()
+                .map(|i| i.relation_id)
+                .collect(),
+            global_compute: self
+                .global_variables
+                .iter()
+                .map(|x| match &x.compute {
+                    ComputeMethod::Literal(Literal::I64(x)) => codegen::GlobalCompute::new_i64(*x),
+                    ComputeMethod::Literal(Literal::String(x)) => {
+                        codegen::GlobalCompute::new_string((*x).to_owned(), &mut interner)
+                    }
+                    ComputeMethod::Function { function, args } => {
+                        codegen::GlobalCompute::new_call(*function, args)
+                    }
+
+                    _ => panic!("only literal ints are implemented for globals"),
+                })
+                .collect(),
+            interner,
+            initial: self.initial.clone(),
+        }
     }
 
     fn parse_egglog(&mut self, sexp: Vec<SexpSpan>) -> MResult<()> {
@@ -1097,13 +955,13 @@ impl Parser {
                         .collect::<Result<Vec<_>, _>>()?;
                     let _: TypeId = self.add_sort(name, Some(collection), None)?;
                 }
-                _ => ret!("usage: (sort <name>) or (sort <name> (<collection> <args>*))"),
+                _ => return err!("usage: (sort <name>) or (sort <name> (<collection> <args>*))"),
             },
             "datatype" => {
                 let [name, constructors @ ..] = args else {
-                    ret!("usage: (datatype <name> <variant>*)");
+                    return err!("usage: (datatype <name> <variant>*)");
                 };
-                let output_type = self.add_sort(name.atom("datatype")?, None, None)?;
+                let output = self.add_sort(name.atom("datatype")?, None, None)?;
                 for constructor in constructors {
                     let (function_name, args) = constructor.call("datatype constructor")?;
 
@@ -1132,13 +990,17 @@ impl Parser {
                         .map(|x| self.type_ids.lookup(x.atom("input type")?))
                         .collect::<MResult<Vec<_>>>()?;
 
-                    self.add_function(function_name, &inputs, Some(output_type), None, cost)?;
+                    self.add_function(
+                        function_name,
+                        &inputs,
+                        FunctionKind::Constructor { output, cost },
+                    )?;
                 }
             }
-            "datatype*" => ret!("\"datatype*\" unimplemented, unclear what this does"),
+            "datatype*" => return err!("\"datatype*\" unimplemented, unclear what this does"),
             "function" => {
                 let [name, inputs, output, options @ ..] = args else {
-                    ret!("usage: (function <name> (<input sort>*) <output sort> <option>");
+                    return err!("usage: (function <name> (<input sort>*) <output sort> <option>");
                 };
                 let name = name.atom("function name")?;
                 let inputs = self.parse_inputs(inputs)?;
@@ -1146,13 +1008,13 @@ impl Parser {
                 let merge = match parse_options(options)?.as_slice() {
                     [(":merge", [expr])] => Some(Parser::parse_expr(*expr, &None)?),
                     [(":no-merge" | ":no_merge", [])] => None,
-                    _ => ret!("missing merge options (:merge <expr>) or (:no_merge)"),
+                    _ => return err!("missing merge options (:merge <expr>) or (:no_merge)"),
                 };
-                self.add_function(name, &inputs, Some(output), merge.as_ref(), None)?;
+                self.add_function(name, &inputs, FunctionKind::Function { output, merge })?;
             }
             "constructor" => {
                 let [name, inputs, output, options @ ..] = args else {
-                    ret!("usage: (constructor <name> (<input sort>*) <output sort> <option>?)");
+                    return err!("usage: (constructor <name> (<input sort>*) <output sort> <option>?)");
                 };
                 let name = name.atom("constructor name")?;
                 let inputs = self.parse_inputs(inputs)?;
@@ -1162,22 +1024,22 @@ impl Parser {
                     [(":cost", [c])] => cost = Some(c.uint("constructor cost value")?),
                     [(":unextractable", [])] => cost = None,
                     [] => (),
-                    _ => ret!("missing merge options (:merge <expr>) or (:no_merge)"),
+                    _ => return err!("missing merge options (:merge <expr>) or (:no_merge)"),
                 };
-                self.add_function(name, &inputs, Some(output), None, cost)?;
+                self.add_function(name, &inputs, FunctionKind::Constructor { output, cost })?;
             }
             "relation" => {
                 let [name, inputs] = args else {
-                    ret!("usage: (relation <name> (<input sort>*))");
+                    return err!("usage: (relation <name> (<input sort>*))");
                 };
                 let name = name.atom("relation name")?;
                 let inputs = self.parse_inputs(inputs)?;
-                self.add_function(name, &inputs, None, None, None)?;
+                self.add_function(name, &inputs, FunctionKind::Relation)?;
             }
 
             "ruleset" => {
                 let [name] = args else {
-                    ret!("usage: (ruleset <name>)");
+                    return err!("usage: (ruleset <name>)");
                 };
                 self.rulesets
                     .insert_unique(name.atom("ruleset name")?, (), "ruleset")?;
@@ -1185,7 +1047,7 @@ impl Parser {
 
             "rule" => {
                 let [facts, actions, options @ ..] = args else {
-                    ret!("usage: (rule (<fact>*) (<action>*) <option>*)");
+                    return err!("usage: (rule (<fact>*) (<action>*) <option>*)");
                 };
 
                 let facts = facts
@@ -1206,7 +1068,11 @@ impl Parser {
                     match opt {
                         (":ruleset", [x]) => ruleset = Some(x.atom("ruleset name")?),
                         (":name", [x]) => name = Some(x.atom("rule name")?),
-                        _ => ret!("unknown option, supported: (:ruleset <ruleset>) (:name <name>)"),
+                        _ => {
+                            return err!(
+                                "unknown option, supported: (:ruleset <ruleset>) (:name <name>)"
+                            );
+                        }
                     }
                 }
                 self.add_rule(
@@ -1218,7 +1084,7 @@ impl Parser {
             }
             "rewrite" => {
                 let [lhs, rhs, options @ ..] = args else {
-                    ret!("usage: (rewrite <lhs expr> <rhs expr> <option>*)");
+                    return err!("usage: (rewrite <lhs expr> <rhs expr> <option>*)");
                 };
                 let lhs = Parser::parse_expr(*lhs, &None)?;
                 let rhs = Parser::parse_expr(*rhs, &None)?;
@@ -1236,9 +1102,11 @@ impl Parser {
                                 extra_facts.push(Parser::parse_expr(*x, &None)?);
                             }
                         }
-                        _ => ret!(
-                            "unknown option, supported: (:ruleset <ruleset>) (:subsume) (:when (<facts>))"
-                        ),
+                        _ => {
+                            return err!(
+                                "unknown option, supported: (:ruleset <ruleset>) (:subsume) (:when (<facts>))"
+                            );
+                        }
                     }
                 }
                 if subsume {
@@ -1253,7 +1121,7 @@ impl Parser {
             }
             "birewrite" => {
                 let [lhs, rhs, options @ ..] = args else {
-                    ret!("usage (birewrite <expr> <expr> <option>*)");
+                    return err!("usage (birewrite <expr> <expr> <option>*)");
                 };
                 let lhs = Parser::parse_expr(*lhs, &None)?;
                 let rhs = Parser::parse_expr(*rhs, &None)?;
@@ -1268,9 +1136,11 @@ impl Parser {
                                 extra_facts.push(Parser::parse_expr(*x, &None)?);
                             }
                         }
-                        _ => ret!(
-                            "unknown option, supported: (:ruleset <ruleset>) (:when (<facts>))"
-                        ),
+                        _ => {
+                            return err!(
+                                "unknown option, supported: (:ruleset <ruleset>) (:when (<facts>))"
+                            );
+                        }
                     }
                 }
                 for (lhs, rhs) in [(lhs.clone(), rhs.clone()), (rhs, lhs)] {
@@ -1286,7 +1156,7 @@ impl Parser {
             "include" => {
                 // TODO: strip ; comments
                 let [filepath] = args else {
-                    ret!("usage (include \"<filepath>\")");
+                    return err!("usage (include \"<filepath>\")");
                 };
                 let filepath = filepath.string("filepath")?;
                 let span = x.span;
@@ -1308,22 +1178,22 @@ impl Parser {
             }
             "run" => {
                 let [steps] = args else {
-                    ret!("usage: (run <steps>)")
+                    return err!("usage: (run <steps>)");
                 };
                 let steps = steps.uint("steps")?.try_into().unwrap();
                 self.initial.push(codegen::Initial::run(steps));
             }
             "check" => {
-                // skip check
+                // NOTE: skip check
             }
             "fail" => {
-                // skip fail
+                // NOTE: skip fail
             }
             "print-function" => {
-                // skip print function
+                // NOTE: skip print function
             }
             "print-size" => {
-                // skip print size
+                // NOTE: skip print size
             }
             "run-schedule" | "simplify" | "query-extract" | "push" | "pop" | "print-stats"
             | "input" | "output" => {
@@ -1334,7 +1204,6 @@ impl Parser {
                 self.parse_action(x, &mut None)?;
             }
         }
-
         Ok(())
     }
 
@@ -1363,59 +1232,122 @@ impl Parser {
         );
         // TODO: should collection types have a forall?
         if collection.is_none() && primitive.is_none() {
-            let relation_id = self.functions.push(None);
-            self.hir_relations
-                .push_expected(relation_id, hir::Relation::forall(*name, type_id));
+            let relation_id = self
+                .relations_hir_and_func
+                .push((hir::Relation::forall(*name, type_id), None));
             self.type_to_forall.insert(type_id, relation_id);
         }
         Ok(type_id)
     }
 
-    fn add_function(
+    /// Add new global variable, anonymous if missing name.
+    /// Hashcons based on compute method.
+    /// Error if name collision.
+    fn add_global(
         &mut self,
-        name: Str,
-        inputs: &[TypeId],
-        output: Option<TypeId>,
-        merge: Option<&Expr>,
-        // None means it can not be extracted
-        cost: Option<u64>,
-    ) -> MResult<()> {
-        // output is some => functional dependency
+        name: Option<Str>,
+        ty: TypeId,
+        compute: ComputeMethod,
+    ) -> MResult<GlobalId> {
+        // Duplicate global variable names forbidden
+        if let Some(name) = name {
+            if let Entry::Occupied(entry) = self.global_variable_names.entry(name) {
+                let existing_span = entry.key().span;
+                return Err(already_defined(
+                    name.x,
+                    existing_span,
+                    name.span,
+                    "global variable",
+                ));
+            }
+        }
+
+        let new_id = GlobalId(self.compute_to_global.len());
+        let global_id = *self
+            .compute_to_global
+            .entry(compute.clone())
+            .or_insert_with(|| {
+                // Create relation and variable info for global variable
+                let relation_id = self.relations_hir_and_func.push((
+                    hir::Relation::global(
+                        name.map_or_else(|| &*new_id.to_string().leak(), |x| *x),
+                        new_id,
+                        ty,
+                    ),
+                    None,
+                ));
+                self.global_variables.push_expected(
+                    new_id,
+                    GlobalVariableInfo {
+                        ty,
+                        compute,
+                        relation_id,
+                    },
+                );
+
+                new_id
+            });
+
+        if let Some(name) = name {
+            self.global_variable_names.insert(name, global_id);
+        }
+
+        Ok(global_id)
+    }
+
+    fn add_function(&mut self, name: Str, inputs: &[TypeId], kind: FunctionKind) -> MResult<()> {
+        // output is none => no implicit rule for functional dependency
         // merge is some => lattice
         // merge is none, output is eqsort => unification.
         // merge is none, output is primitive => panic.
 
+        let (output, merge, cost) = match kind.clone() {
+            FunctionKind::Constructor { output, cost } => (Some(output), None, cost),
+            FunctionKind::Function { output, merge } => (Some(output), merge, None),
+            FunctionKind::Relation => (None, None, None),
+        };
         let output_or_unit = output.unwrap_or_else(|| {
             self.type_ids
                 .lookup(Str::new(BUILTIN_UNIT, None))
                 .expect("unit type exists")
         });
-        let relation_id = self.functions.push(Some(FunctionData {
-            name,
-            inputs: inputs.iter().copied().collect(),
-            output: output_or_unit,
-            merge: merge.cloned(),
-            cost,
-        }));
 
-        let mut columns: TVec<ColumnId, TypeId> = inputs.iter().copied().collect();
-        if let Some(output) = output {
-            let _: ColumnId = columns.push(output);
-        }
-        self.hir_relations
-            .push_expected(relation_id, hir::Relation::table(*name, columns));
+        let columns: TVec<ColumnId, TypeId> = inputs.iter().copied().chain(output).collect();
 
-        if let Some(output) = output {
-            // some output => functional dependency exists.
+        let relation_id = self.relations_hir_and_func.push((
+            hir::Relation::table(*name, columns),
+            Some(FunctionData {
+                name,
+                inputs: inputs.iter().copied().collect(),
+                output: output_or_unit,
+                merge,
+                cost,
+            }),
+        ));
 
-            let rule = if let Some(merge) = &merge {
+        let implicit_rule = match kind {
+            FunctionKind::Constructor { output, cost: _ }
+            | FunctionKind::Function {
+                output,
+                merge: None,
+            } => Some(if self.types[output].can_unify() {
+                // eqsort type => unification
+                hir::ImplicitRule::new_unify(relation_id, inputs.len())
+            } else {
+                // unify primitive => panic if disagree
+                hir::ImplicitRule::new_panic(relation_id, inputs.len())
+            }),
+            FunctionKind::Function {
+                output,
+                merge: Some(merge),
+            } => Some({
                 // TODO: do a sort of constant propagation by promoting more function calls to
                 // globals.
                 let mut variables: TVec<VariableId, (TypeId, Option<GlobalId>)> = TVec::new();
                 let mut ops = Vec::new();
                 let old = variables.push((output, None));
                 let new = variables.push((output, None));
-                let res = self.parse_lattice_expr(old, new, merge, &mut variables, &mut ops)?;
+                let res = self.parse_lattice_expr(old, new, &merge, &mut variables, &mut ops)?;
                 hir::ImplicitRule::new_lattice(
                     relation_id,
                     inputs.len(),
@@ -1425,17 +1357,14 @@ impl Parser {
                     ops,
                     variables,
                 )
-            } else if self.types[output].can_not_unify() {
-                // unify primitive => panic if disagree
-                hir::ImplicitRule::new_panic(relation_id, inputs.len())
-            } else {
-                // eqsort type => unification
-                hir::ImplicitRule::new_unify(relation_id, inputs.len())
-            };
+            }),
+            FunctionKind::Relation => None,
+        };
+        if let Some(implicit_rule) = implicit_rule {
             self.implicit_rules
                 .entry(relation_id)
                 .or_default()
-                .push(rule);
+                .push(implicit_rule);
         }
 
         self.function_possible_ids
@@ -1464,11 +1393,11 @@ impl Parser {
                 "old" => old,
                 "new" => new,
                 _ => {
-                    ret_!(
+                    return err_!(
                         spanned.span,
                         "only variables old or new are allowed in a merge expression, not \"{}\"",
                         (**spanned)
-                    )
+                    );
                 }
             },
             Expr::Call(name, args) => {
@@ -1488,7 +1417,8 @@ impl Parser {
                     .iter()
                     .copied()
                     .filter(|x| {
-                        self.functions[x]
+                        self.relations_hir_and_func[x]
+                            .1
                             .as_ref()
                             .unwrap()
                             .check_compatible(&args_ty_pat, None)
@@ -1497,7 +1427,7 @@ impl Parser {
                 match possible_ids.as_slice() {
                     [id] => {
                         let id = *id;
-                        let function = &self.functions[id].as_ref().unwrap();
+                        let function = &self.relations_hir_and_func[id].1.as_ref().unwrap();
                         let ty = function.output;
 
                         // TODO: is this optimization sound?
@@ -1623,7 +1553,8 @@ impl Parser {
                         .iter()
                         .copied()
                         .filter(|id| {
-                            parser.functions[*id]
+                            parser.relations_hir_and_func[*id]
+                                .1
                                 .as_ref()
                                 .unwrap()
                                 .check_compatible(&arg_ty_opt, None)
@@ -1642,7 +1573,11 @@ impl Parser {
                                 function: *id,
                                 args,
                             };
-                            let ty = parser.functions[*id].as_ref().unwrap().output;
+                            let ty = parser.relations_hir_and_func[*id]
+                                .1
+                                .as_ref()
+                                .unwrap()
+                                .output;
                             (parser.add_global(None, ty, compute)?, ty)
                         }
                         [] => {
@@ -1680,7 +1615,7 @@ impl Parser {
         err.push(bare_!(name.span, "type {name} defined here"));
     }
     fn err_function_defined_here(&mut self, id: RelationId, err: &mut MError) {
-        let function = &self.functions[id].as_ref().unwrap();
+        let function = &self.relations_hir_and_func[id].1.as_ref().unwrap();
         let inputs_ty_s = function
             .inputs
             .iter()
@@ -1709,7 +1644,7 @@ impl Parser {
         Ok(match *function_name {
             "let" => {
                 let [name, expr] = args else {
-                    ret!("usage: (let <name> <expr>)")
+                    return err!("usage: (let <name> <expr>)");
                 };
                 let name = name.atom("let binding name")?;
 
@@ -1726,7 +1661,7 @@ impl Parser {
             // set function to a result
             "set" => {
                 let [call, res] = args else {
-                    ret!("usage: (set (<table name> <expr>*) <expr>)")
+                    return err!("usage: (set (<table name> <expr>*) <expr>)");
                 };
                 let (function_name, args) = call.call("table + inputs to set to")?;
                 let args = args
@@ -1743,7 +1678,7 @@ impl Parser {
             // mark two eclasses as equal
             "union" => {
                 let [lhs, rhs] = args else {
-                    ret!("usage: (union <lhs expr> <rhs expr>)")
+                    return err!("usage: (union <lhs expr> <rhs expr>)");
                 };
                 let lhs = Parser::parse_expr(*lhs, local_bindings)?;
                 let rhs = Parser::parse_expr(*rhs, local_bindings)?;
@@ -1766,69 +1701,32 @@ impl Parser {
     fn type_name(&self, ty: TypeId) -> Str {
         self.types[&ty].name
     }
-
-    pub(crate) fn emit_hir(&self) -> hir::Theory {
-        assert_eq!(self.functions.len(), self.hir_relations.len());
-        let functions = self.hir_relations.clone();
-        let types: TVec<TypeId, hir::Type> = self
-            .types
-            .iter()
-            .map(|t| match (t.primitive, &t.collection) {
-                (_, Some(_)) => todo!("collection not implemented"),
-                (Some(primitive), _) => hir::Type::new_primitive(*t.name, primitive),
-                (None, None) => hir::Type::new_symbolic(*t.name),
-            })
-            .collect();
-        let mut interner = crate::runtime::StringIntern::new();
-        let unit_ty = self.literal_type(Literal::Unit);
-        hir::Theory {
-            symbolic_rules: self.symbolic_rules.clone(),
-            relations: functions,
-            name: "",
-            types,
-            implicit_rules: self.implicit_rules.clone(),
-            global_types: self.global_variables.iter().map(|i| i.ty).collect(),
-            global_compute: self
-                .global_variables
-                .iter()
-                .map(|x| match &x.compute {
-                    ComputeMethod::Literal(Literal::I64(x)) => codegen::GlobalCompute::new_i64(*x),
-                    ComputeMethod::Literal(Literal::String(x)) => {
-                        codegen::GlobalCompute::new_string((*x).to_owned(), &mut interner)
-                    }
-                    ComputeMethod::Function { function, args } => {
-                        codegen::GlobalCompute::new_call(*function, args)
-                    }
-
-                    _ => panic!("only literal ints are implemented for globals"),
-                })
-                .collect(),
-            global_to_relation: self.global_to_function.clone(),
-            interner,
-            initial: self.initial.clone(),
-        }
-    }
 }
 
+/// Returns `Vec<(option, option arguments)>`, where options are atoms starting with `:`.
 fn parse_options(mut s: &'static [SexpSpan]) -> MResult<Vec<(&'static str, &'static [SexpSpan])>> {
-    fn is_option(opt: &SexpSpan) -> bool {
+    fn as_option(opt: &SexpSpan) -> Option<&'static str> {
         if let Sexp::Atom(opt) = opt.x {
-            opt.starts_with(':')
+            if opt.starts_with(':') {
+                Some(*opt)
+            } else {
+                None
+            }
         } else {
-            false
+            None
         }
     }
     let mut out = Vec::new();
     while let [opt, rest @ ..] = s {
-        let opt = opt.atom("expected option")?;
+        let opt = as_option(opt).ok_or_else(|| bare_!(opt.span, "expected option"))?;
         let mut i = 0;
         while let Some(x) = rest.get(i) {
-            if is_option(x) {
+            if as_option(x).is_some() {
                 break;
             }
             i += 1;
         }
-        out.push((*opt, &rest[..i]));
+        out.push((opt, &rest[..i]));
         s = &rest[i..];
     }
     Ok(out)
@@ -1903,7 +1801,7 @@ mod compile_rule {
                     ty: typevar,
                 });
 
-                let relation_id = parser.global_to_function[&global_id];
+                let relation_id = parser.global_variables[&global_id].relation_id;
 
                 calls.push(UnknownCall {
                     name: *name,
@@ -1923,7 +1821,7 @@ mod compile_rule {
                         ty: typevar,
                     });
 
-                    let relation_id = parser.global_to_function[&global_id];
+                    let relation_id = parser.global_variables[&global_id].relation_id;
 
                     calls.push(UnknownCall {
                         name,
@@ -2066,7 +1964,8 @@ mod compile_rule {
                             let rt = types[variables[*rval].ty];
                             ids.retain(|id| {
                                 // NOTE: we assume type constraints where added earlier.
-                                self.functions[*id]
+                                self.relations_hir_and_func[*id]
+                                    .1
                                     .as_ref()
                                     .is_none_or(|function| function.check_compatible(&at, rt))
                             });
@@ -2076,7 +1975,9 @@ mod compile_rule {
                                     panic!("no function named {name} can be used here");
                                 }
                                 [id] => {
-                                    if let Some(function) = self.functions[*id].as_ref() {
+                                    if let Some(function) =
+                                        self.relations_hir_and_func[*id].1.as_ref()
+                                    {
                                         for (&var, &ty) in args.iter().zip(function.inputs.iter()) {
                                             let typevar = variables[var].ty;
                                             types[typevar] = Some(ty);

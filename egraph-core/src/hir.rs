@@ -172,6 +172,7 @@ pub(crate) struct Theory {
     pub(crate) global_compute: TVec<GlobalId, crate::codegen::GlobalCompute>,
     pub(crate) global_types: TVec<GlobalId, TypeId>,
     #[allow(unused)]
+    /// NOTE: This may be useful if global variables are queried at run time
     pub(crate) global_to_relation: TVec<GlobalId, RelationId>,
     pub(crate) interner: crate::runtime::StringIntern,
     pub(crate) initial: Vec<codegen::Initial>,
