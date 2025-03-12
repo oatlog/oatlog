@@ -1684,8 +1684,7 @@ impl Parser {
                 let rhs = Parser::parse_expr(*rhs, local_bindings)?;
                 Some(Action::Union(lhs, rhs))
             }
-
-            "delete" | "subsume" | "panic" | "extract" => return unimplemented_msg,
+            "delete" | "subsume" | "panic" | "extract" | "change" => return unimplemented_msg,
             _ => {
                 let expr = Parser::parse_expr(x, local_bindings)?;
                 if local_bindings.is_some() {

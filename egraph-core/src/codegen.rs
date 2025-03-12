@@ -78,11 +78,17 @@ impl ImplicitRule {
             ty: ImplicitRuleTy::Union,
         }
     }
+    pub(crate) fn new_panic(index: IndexUsageId) -> Self {
+        Self {
+            index,
+            ty: ImplicitRuleTy::Panic,
+        }
+    }
 }
 #[derive(Clone, Debug)]
 enum ImplicitRuleTy {
     Union,
-    // Panic,
+    Panic,
     // Lattice { .. },
 }
 
@@ -129,7 +135,9 @@ impl TypeData {
 }
 #[derive(Debug)]
 pub(crate) enum TypeKind {
+    /// Has union-find
     Symbolic,
+    /// Does not have union-find
     Primitive { type_path: &'static str },
 }
 
@@ -973,7 +981,7 @@ fn codegen_globals(theory: &Theory) -> (TokenStream, TVec<GlobalId, usize>) {
                             quote! {
                                 #(#compute_row)*
                                 #last_compute
-                                delta.#insert_ident((#(#row),* #(, #last)*));
+                                delta.#insert_ident((#(#row,)* #(#last)*));
                                 #(#last)*
                             }
                         }
@@ -1503,46 +1511,50 @@ fn codegen_relation(rel: &RelationData, theory: &Theory) -> TokenStream {
                 let implict_rules_impl = {
                     implicit_rules
                         .iter()
-                        .map(|ImplicitRule { index, ty }| match ty {
-                            ImplicitRuleTy::Union => {
-                                let usage_info = &usage_to_info[index];
-                                let index_info = &index_to_info[usage_info.index];
+                        .map(|ImplicitRule { index, ty }| {
 
-                                let bound_columns = &index_info.order.inner()[0..usage_info.prefix]
-                                    .iter()
-                                    .copied()
-                                    .collect_vec();
-                                let bound_columns_ = bound_columns
-                                    .iter()
-                                    .copied()
-                                    .map(ident::column)
-                                    .collect_vec();
-                                let new_columns = &index_info.order.inner()[usage_info.prefix..]
-                                    .iter()
-                                    .copied()
-                                    .collect_vec();
-                                let new_columns_ =
-                                    new_columns.iter().copied().map(ident::column).collect_vec();
-                                let new_columns_alt_ = new_columns
-                                    .iter()
-                                    .copied()
-                                    .map(ident::column_alt)
-                                    .collect_vec();
+                            let usage_info = &usage_to_info[index];
+                            let index_info = &index_to_info[usage_info.index];
 
-                                let iter_ident = ident::index_all_iter(usage_info, index_info);
+                            let bound_columns = &index_info.order.inner()[0..usage_info.prefix]
+                                .iter()
+                                .copied()
+                                .collect_vec();
+                            let bound_columns_ = bound_columns
+                                .iter()
+                                .copied()
+                                .map(ident::column)
+                                .collect_vec();
+                            let new_columns = &index_info.order.inner()[usage_info.prefix..]
+                                .iter()
+                                .copied()
+                                .collect_vec();
+                            let new_columns_ =
+                                new_columns.iter().copied().map(ident::column).collect_vec();
+                            let new_columns_alt_ = new_columns
+                                .iter()
+                                .copied()
+                                .map(ident::column_alt)
+                                .collect_vec();
+                            let iter_ident = ident::index_all_iter(usage_info, index_info);
 
-                                let new_columns_uf = new_columns.iter().copied().map(|x| ident::type_uf(&theory.types[rel.param_types[x]])).collect_vec();
+                            let action = match ty {
+                                ImplicitRuleTy::Union => {
+                                    let new_columns_uf = new_columns.iter().copied().map(|x| ident::type_uf(&theory.types[rel.param_types[x]])).collect_vec();
+                                    quote! {
+                                        #( uf.#new_columns_uf.union(#new_columns_alt_, #new_columns_); )*
+                                        return false;
+                                    }
+                                }
+                                ImplicitRuleTy::Panic => quote! { panic!("{} != {}", (#(#new_columns_alt_),*), (#(#new_columns_),*)); },
+                            };
 
-                                quote! {
-                                    if let Some(#(#new_columns_alt_),*) = self.#iter_ident(#(#bound_columns_),*).next() {
-                                        let mut should_trigger = false;
-                                        #(should_trigger |= #new_columns_alt_ != #new_columns_;)*
-                                        if should_trigger {
-                                            #(
-                                                uf.#new_columns_uf.union(#new_columns_alt_, #new_columns_);
-                                            )*
-                                            return false;
-                                        }
+                            quote! {
+                                if let Some(#(#new_columns_alt_),*) = self.#iter_ident(#(#bound_columns_),*).next() {
+                                    let mut should_trigger = false;
+                                    #(should_trigger |= #new_columns_alt_ != #new_columns_;)*
+                                    if should_trigger {
+                                        #action
                                     }
                                 }
                             }

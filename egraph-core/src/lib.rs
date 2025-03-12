@@ -255,6 +255,205 @@ mod test {
     }
 
     #[test]
+    fn codegen_panic_merge() {
+        Steps {
+            // (let x (f))
+            //
+            // (function g () i64 :no-merge)
+            // (fail (let y (g)))
+            code: r#"
+                (function f () i64 :no-merge)
+                (set (f) 0)
+            "#,
+            expected_hir: Some(expect![[r#"
+                Theory "":
+
+                f(i64)
+
+            "#]]),
+            expected_lir: None,
+            expected_codegen: Some(expect![[r#"
+                use egraph::runtime::*;
+                #[derive(Debug, Default)]
+                struct FRelation {
+                    new: Vec<<Self as Relation>::Row>,
+                    all_index_0: BTreeSet<(std::primitive::i64)>,
+                }
+                impl Relation for FRelation {
+                    type Row = (std::primitive::i64);
+                }
+                impl FRelation {
+                    const COST: u32 = 1u32;
+                    fn new() -> Self {
+                        Self::default()
+                    }
+                    fn has_new(&self) -> bool {
+                        !self.new.is_empty()
+                    }
+                    fn clear_new(&mut self) {
+                        self.new.clear();
+                    }
+                    fn iter_new(&self) -> impl Iterator<Item = <Self as Relation>::Row> + use<'_> {
+                        self.new.iter().copied()
+                    }
+                    fn iter1_0(&self, x0: std::primitive::i64) -> impl Iterator<Item = ()> + use<'_> {
+                        self.all_index_0.range((x0)..=(x0)).copied().map(|(x0)| ())
+                    }
+                    fn iter0_0(&self) -> impl Iterator<Item = (std::primitive::i64)> + use<'_> {
+                        self.all_index_0
+                            .range((std::primitive::i64::MIN_ID)..=(std::primitive::i64::MAX_ID))
+                            .copied()
+                            .map(|(x0)| (x0))
+                    }
+                    fn check1_0(&self, x0: std::primitive::i64) -> bool {
+                        self.iter1_0(x0).next().is_some()
+                    }
+                    fn check0_0(&self) -> bool {
+                        self.iter0_0().next().is_some()
+                    }
+                    fn update(&mut self, uprooted: &Uprooted, uf: &mut Unification, delta: &mut Delta) {
+                        let mut op_insert = take(&mut delta.f_relation_delta);
+                        for (x0) in op_insert.iter_mut() {}
+                        let mut op_delete = Vec::new();
+                        for (x0) in op_delete {
+                            if self.all_index_0.remove(&(x0)) {
+                                op_insert.push((x0));
+                            }
+                        }
+                        op_insert.retain(|&(x0)| {
+                            if let Some(y0) = self.iter0_0().next() {
+                                let mut should_trigger = false;
+                                should_trigger |= y0 != x0;
+                                if should_trigger {
+                                    panic!("{} != {}", (y0), (x0));
+                                }
+                            }
+                            if !self.all_index_0.insert((x0)) {
+                                return false;
+                            }
+                            true
+                        });
+                        self.new.extend(op_insert);
+                    }
+                    fn update_finalize(&mut self, uf: &mut Unification) {
+                        for (x0) in self.new.iter_mut() {}
+                        self.new.sort();
+                        self.new.dedup();
+                    }
+                    fn emit_graphviz(&self, buf: &mut String) {
+                        use std::fmt::Write;
+                        for (i, (x0)) in self.all_index_0.iter().copied().enumerate() {
+                            write!(buf, "{}{i} -> {}{};", "f", "i64", x0).unwrap();
+                        }
+                    }
+                    fn len(&self) -> usize {
+                        self.all_index_0.len()
+                    }
+                }
+                #[derive(Debug, Default)]
+                pub struct Delta {
+                    f_relation_delta: Vec<<FRelation as Relation>::Row>,
+                }
+                impl Delta {
+                    fn new() -> Self {
+                        Self::default()
+                    }
+                    fn has_new(&self) -> bool {
+                        let mut has_new = false;
+                        has_new |= !self.f_relation_delta.is_empty();
+                        has_new
+                    }
+                    pub fn insert_f(&mut self, x: <FRelation as Relation>::Row) {
+                        self.f_relation_delta.push(x);
+                    }
+                }
+                #[derive(Default, Debug)]
+                struct GlobalVariables {
+                    new: bool,
+                }
+                impl GlobalVariables {
+                    fn initialize(&mut self, delta: &mut Delta, uf: &mut Unification) {
+                        self.new = true;
+                    }
+                }
+                #[derive(Debug, Default)]
+                struct Uprooted {}
+                impl Uprooted {
+                    fn take_dirt(&mut self, uf: &mut Unification) {}
+                }
+                #[derive(Debug, Default)]
+                struct Unification {}
+                impl Unification {
+                    fn has_new(&mut self) -> bool {
+                        let mut has_new = false;
+                        has_new
+                    }
+                }
+                #[derive(Debug, Default)]
+                pub struct Theory {
+                    delta: Delta,
+                    uf: Unification,
+                    uprooted: Uprooted,
+                    global_variables: GlobalVariables,
+                    f_relation: FRelation,
+                }
+                impl Theory {
+                    pub fn new() -> Self {
+                        let mut theory = Self::default();
+                        theory
+                            .global_variables
+                            .initialize(&mut theory.delta, &mut theory.uf);
+                        theory.clear_transient();
+                        theory.global_variables.new = true;
+                        theory
+                    }
+                    pub fn step(&mut self) {
+                        self.apply_rules();
+                        self.clear_transient();
+                    }
+                    #[inline(never)]
+                    fn apply_rules(&mut self) {}
+                    fn emit_graphviz(&self) -> String {
+                        let mut buf = String::new();
+                        buf.push_str("digraph G {");
+                        self.f_relation.emit_graphviz(&mut buf);
+                        buf.push_str("}");
+                        buf
+                    }
+                    fn get_total_relation_entry_count(&self) -> usize {
+                        [self.f_relation.len()].iter().copied().sum::<usize>()
+                    }
+                    #[inline(never)]
+                    fn clear_transient(&mut self) {
+                        self.global_variables.new = false;
+                        self.f_relation.clear_new();
+                        loop {
+                            self.uprooted.take_dirt(&mut self.uf);
+                            self.f_relation
+                                .update(&self.uprooted, &mut self.uf, &mut self.delta);
+                            if !(self.uf.has_new() || self.delta.has_new()) {
+                                break;
+                            }
+                        }
+                        self.f_relation.update_finalize(&mut self.uf);
+                    }
+                }
+                impl std::ops::Deref for Theory {
+                    type Target = Delta;
+                    fn deref(&self) -> &Self::Target {
+                        &self.delta
+                    }
+                }
+                impl std::ops::DerefMut for Theory {
+                    fn deref_mut(&mut self) -> &mut Self::Target {
+                        &mut self.delta
+                    }
+                }
+            "#]]),
+        }.check();
+    }
+
+    #[test]
     fn codegen_bug1() {
         Steps {
             code: r#"

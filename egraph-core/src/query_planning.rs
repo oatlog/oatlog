@@ -138,8 +138,11 @@ pub(crate) fn emit_codegen_theory(mut theory: hir::Theory) -> (hir::Theory, code
                                          on,
                                          ty,
                                      }| match ty {
-                                        hir::ImplicitRuleAction::Lattice { .. }
-                                        | hir::ImplicitRuleAction::Panic => todo!("implement panic merge"),
+                                        hir::ImplicitRuleAction::Lattice { .. } => todo!("implement lattice merge"),
+                                        hir::ImplicitRuleAction::Panic => {
+                                            let index = uses.push(on.clone());
+                                            codegen::ImplicitRule::new_panic(index)
+                                        }
                                         hir::ImplicitRuleAction::Unification => {
                                             let index = uses.push(on.clone());
                                             codegen::ImplicitRule::new_union(index)
