@@ -66,7 +66,6 @@ impl Initial {
 #[derive(Debug)]
 pub(crate) struct TypeData {
     pub name: &'static str,
-    // TODO: primitives
     pub kind: TypeKind,
 }
 impl TypeData {
@@ -248,7 +247,6 @@ impl VariableData {
         Self { name, type_: ty }
     }
 }
-// TODO: maybe revisit at some point at turn into a DAG, if there are common subtrees
 #[derive(Debug, Clone, Copy)]
 pub(crate) struct RuleTrie {
     pub(crate) meta: Option<&'static str>,

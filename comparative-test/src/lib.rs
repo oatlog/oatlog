@@ -64,7 +64,7 @@ egglog_test!(bitwise, r#"(include "comparative-test/egglog-testsuite/bitwise.egg
 // egglog_test!(eqsolve, r#"(include "comparative-test/egglog-testsuite/eqsolve.egg")"#);//primitive functions
 egglog_test!(f64, r#"(include "comparative-test/egglog-testsuite/f64.egg")"#);
 // egglog_test!(fail_wrong_assertion, r#"(include "comparative-test/egglog-testsuite/fail_wrong_assertion.egg")"#);//primtive functions
-// egglog_test!(fibonacci_demand, r#"(include "comparative-test/egglog-testsuite/demand.egg")"#);needs egglog lib files
+// egglog_test!(fibonacci_demand, r#"(include "comparative-test/egglog-testsuite/fibonacci-demand.egg")"#);//function call + is not defined
 // egglog_test!(fibonacci, r#"(include "comparative-test/egglog-testsuite/fibonacci.egg")"#);//primitive functions
 // egglog_test!(fusion, r#"(include "comparative-test/egglog-testsuite/fusion.egg")"#);//needs collections(sets)
 // egglog_test!(herbie, r#"(include "comparative-test/egglog-testsuite/herbie.egg")"#);//needs big-rational numbers
