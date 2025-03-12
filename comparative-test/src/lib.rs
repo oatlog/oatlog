@@ -1,3 +1,4 @@
+#[cfg(test)]
 macro_rules! comparative_test {
     ($egglog_source_literal:expr) => {
         std::env::set_current_dir(concat!(env!("CARGO_MANIFEST_DIR"), "/..")).unwrap();
@@ -28,6 +29,7 @@ macro_rules! comparative_test {
     };
 }
 
+#[cfg(test)]
 macro_rules! egglog_test {
     ($egglog_test_name:ident, $egglog_test_path:literal) => {
         #[test]
@@ -37,10 +39,9 @@ macro_rules! egglog_test {
     };
 }
 
-// TODO lgustafsson: Enable path-union below as soon as the unit type is supported in codegen
-
 #[rustfmt::skip]
-mod tests {
+#[cfg(test)]
+mod comparative_tests {
 // egglog_test!(antiunify, r#"(include "comparative-test/egglog-testsuite/antiunify.egg")"#);// needs primitive functions
 // egglog_test!(array, r#"(include "comparative-test/egglog-testsuite/array.egg")"#);// needs panic (does not use vec)
 // egglog_test!(bdd, r#"(include "comparative-test/egglog-testsuite/bdd.egg")"#);// primitive functions
