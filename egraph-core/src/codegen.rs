@@ -728,6 +728,8 @@ fn codegen_globals(theory: &Theory) -> (TokenStream, TVec<GlobalId, usize>) {
                                 let ty = theory.global_types[global_id];
                                 let ty_ = &theory.types[ty];
                                 if ty_.is_zero_sized() {
+                                    // Global inserts on relations are implemented as anonymous
+                                    // global variables of value unit. These should not receive e-classes.
                                     (vec![], quote! {})
                                 } else {
                                     let tmp = format_ident!("tmp_res");
@@ -744,6 +746,7 @@ fn codegen_globals(theory: &Theory) -> (TokenStream, TVec<GlobalId, usize>) {
 
                             let insert_ident = ident::delta_insert_row(relation_);
 
+                            // NOTE: Function outputs are in the last column.
                             quote! {
                                 #(#compute_row)*
                                 #last_compute

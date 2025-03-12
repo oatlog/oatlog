@@ -67,20 +67,12 @@ pub(crate) struct TypeData {
     pub name: &'static str,
     // TODO: primitives
     pub kind: TypeKind,
-    // TODO erik for loke: Unit is only really used as a placeholder thing in the frontend and
-    // assuming everything works correctly it should be removed in the frontend.
-    //
-    // Do we expect actual user provided ZSTs?
-    //
-    // loke: Agree this can be desugared. We should get `comparative-test/path_union` passing somehow and delete this.
-    zero_sized: bool,
 }
 impl TypeData {
     pub(crate) fn new_symbolic(name: &'static str) -> Self {
         Self {
             name,
             kind: TypeKind::Symbolic,
-            zero_sized: false,
         }
     }
     pub(crate) fn new_primitive(name: &'static str, type_path: &'static str) -> Self {
@@ -90,17 +82,15 @@ impl TypeData {
                 kind: TypeKind::Primitive {
                     type_path: "THIS_STRING_SHOULD_NOT_APPEAR_IN_GENERATED_CODE",
                 },
-                zero_sized: true,
             },
             _ => Self {
                 name,
                 kind: TypeKind::Primitive { type_path },
-                zero_sized: false,
             },
         }
     }
     pub fn is_zero_sized(&self) -> bool {
-        self.zero_sized
+        self.name == "unit"
     }
 }
 #[derive(Debug)]
