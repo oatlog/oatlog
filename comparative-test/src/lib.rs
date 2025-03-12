@@ -1,6 +1,6 @@
 #[cfg(test)]
 macro_rules! comparative_test {
-    ($egglog_source_literal:expr) => {
+    ($egglog_source_literal:expr, $expected:expr) => {
         std::env::set_current_dir(concat!(env!("CARGO_MANIFEST_DIR"), "/..")).unwrap();
 
         egraph::compile_egraph!($egglog_source_literal);
@@ -14,27 +14,34 @@ macro_rules! comparative_test {
             println!("egglog msg: {msg}");
         }
 
+        let e: expect_test::Expect = $expected;
         for i in 0..10 {
             dbg!(egglog.num_tuples(), theory.get_total_relation_entry_count());
-            assert_eq!(
-                egglog.num_tuples(),
-                theory.get_total_relation_entry_count(),
-                "egglog vs our tuple count mismatch in iteration {i}"
-            );
+
+            {
+                let egglog = egglog.num_tuples();
+                let us = theory.get_total_relation_entry_count();
+                if egglog != us {
+                    e.assert_eq(&format!("iter{i} {egglog}!={us}"));
+                    return;
+                }
+            }
 
             theory.step();
 
             egglog.parse_and_run_program(None, "(run 1)").unwrap();
         }
+        e.assert_eq("");
     };
 }
 
 #[cfg(test)]
 macro_rules! egglog_test {
-    ($egglog_test_name:ident, $egglog_test_path:literal) => {
+    ($egglog_test_name:ident, $egglog_test_path:literal, $expected:expr $(,$panic_msg:literal)?) => {
         #[test]
+        $(#[should_panic(expected = $panic_msg)])?
         fn $egglog_test_name() {
-            comparative_test!($egglog_test_path);
+            comparative_test!($egglog_test_path, $expected);
         }
     };
 }
@@ -42,13 +49,15 @@ macro_rules! egglog_test {
 #[rustfmt::skip]
 #[cfg(test)]
 mod comparative_tests {
+use expect_test::expect;
+
 // egglog_test!(antiunify, r#"(include "comparative-test/egglog-testsuite/antiunify.egg")"#);// needs primitive functions
 // egglog_test!(array, r#"(include "comparative-test/egglog-testsuite/array.egg")"#);// needs panic (does not use vec)
 // egglog_test!(bdd, r#"(include "comparative-test/egglog-testsuite/bdd.egg")"#);// primitive functions
-egglog_test!(before_proofs, r#"(include "comparative-test/egglog-testsuite/before-proofs.egg")"#);
+egglog_test!(before_proofs, r#"(include "comparative-test/egglog-testsuite/before-proofs.egg")"#, expect!["iter0 19!=36"]);
 // egglog_test!(bignum, r#"(include "comparative-test/egglog-testsuite/bignum.egg")"#);// needs bignum
-egglog_test!(birewrite, r#"(include "comparative-test/egglog-testsuite/birewrite.egg")"#);
-egglog_test!(bitwise, r#"(include "comparative-test/egglog-testsuite/bitwise.egg")"#);
+egglog_test!(birewrite, r#"(include "comparative-test/egglog-testsuite/birewrite.egg")"#, expect!["iter0 22!=14"]);
+egglog_test!(bitwise, r#"(include "comparative-test/egglog-testsuite/bitwise.egg")"#, expect![]);
 // egglog_test!(bool_, r#"(include "comparative-test/egglog-testsuite/bool.egg")"#);// bool not implemented
 // egglog_test!(calc, r#"(include "comparative-test/egglog-testsuite/calc.egg")"#);// push/pop
 // egglog_test!(combinators, r#"(include "comparative-test/egglog-testsuite/combinators.egg")"#);// !=
@@ -62,14 +71,14 @@ egglog_test!(bitwise, r#"(include "comparative-test/egglog-testsuite/bitwise.egg
 // egglog_test!(eqsat_basic, r#"(include "comparative-test/egglog-testsuite/eqsat-basic.egg")"#);// needs primitive functions
 // egglog_test!(eqsat_basic_multiset, r#"(include "comparative-test/egglog-testsuite/eqsat-basic-multiset.egg")"#);//datatype*
 // egglog_test!(eqsolve, r#"(include "comparative-test/egglog-testsuite/eqsolve.egg")"#);//primitive functions
-egglog_test!(f64, r#"(include "comparative-test/egglog-testsuite/f64.egg")"#);
+egglog_test!(f64, r#"(include "comparative-test/egglog-testsuite/f64.egg")"#, expect![]);
 // egglog_test!(fail_wrong_assertion, r#"(include "comparative-test/egglog-testsuite/fail_wrong_assertion.egg")"#);//primtive functions
 // egglog_test!(fibonacci_demand, r#"(include "comparative-test/egglog-testsuite/fibonacci-demand.egg")"#);//function call + is not defined
 // egglog_test!(fibonacci, r#"(include "comparative-test/egglog-testsuite/fibonacci.egg")"#);//primitive functions
 // egglog_test!(fusion, r#"(include "comparative-test/egglog-testsuite/fusion.egg")"#);//needs collections(sets)
 // egglog_test!(herbie, r#"(include "comparative-test/egglog-testsuite/herbie.egg")"#);//needs big-rational numbers
 // egglog_test!(herbie_tutorial, r#"(include "comparative-test/egglog-testsuite/herbie-tutorial.egg")"#);// needs big-rational numbers
-egglog_test!(i64, r#"(include "comparative-test/egglog-testsuite/i64.egg")"#);
+egglog_test!(i64, r#"(include "comparative-test/egglog-testsuite/i64.egg")"#, expect![]);
 // egglog_test!(include, r#"(include "comparative-test/egglog-testsuite/include.egg")"#);//needs updated paths
 // egglog_test!(integer_math, r#"(include "comparative-test/egglog-testsuite/integer_math.egg")"#);// needs !=
 // egglog_test!(intersection, r#"(include "comparative-test/egglog-testsuite/intersection.egg")"#);// needs query-extract
@@ -89,11 +98,11 @@ egglog_test!(i64, r#"(include "comparative-test/egglog-testsuite/i64.egg")"#);
 // egglog_test!(merge_saturates, r#"(include "comparative-test/egglog-testsuite/merge-saturates.egg")"#);// merge
 // egglog_test!(multiset, r#"(include "comparative-test/egglog-testsuite/multiset.egg")"#);// parse error?
 // egglog_test!(name_resolution, r#"(include "comparative-test/egglog-testsuite/name-resolution.egg")"#);//panic support
-egglog_test!(path, r#"(include "comparative-test/egglog-testsuite/path.egg")"#);
+egglog_test!(path, r#"(include "comparative-test/egglog-testsuite/path.egg")"#, expect![]);
 // egglog_test!(pathproof, r#"(include "comparative-test/egglog-testsuite/pathproof.egg")"#);// something is wrong with the permutation
-egglog_test!(path_union, r#"(include "comparative-test/egglog-testsuite/path-union.egg")"#);
-egglog_test!(points_to, r#"(include "comparative-test/egglog-testsuite/points-to.egg")"#);
-egglog_test!(primitives, r#"(include "comparative-test/egglog-testsuite/primitives.egg")"#);
+egglog_test!(path_union, r#"(include "comparative-test/egglog-testsuite/path-union.egg")"#, expect!["iter0 14!=12"]);
+egglog_test!(points_to, r#"(include "comparative-test/egglog-testsuite/points-to.egg")"#, expect![], "Global variables should have been desugared");
+egglog_test!(primitives, r#"(include "comparative-test/egglog-testsuite/primitives.egg")"#, expect![]);
 // egglog_test!(prims, r#"(include "comparative-test/egglog-testsuite/prims.egg")"#);//merge
 // egglog_test!(push_pop, r#"(include "comparative-test/egglog-testsuite/push-pop.egg")"#);//push, pop, merge
 // egglog_test!(rat_pow_eval, r#"(include "comparative-test/egglog-testsuite/rat-pow-eval.egg")"#);// rational
@@ -102,25 +111,25 @@ egglog_test!(primitives, r#"(include "comparative-test/egglog-testsuite/primitiv
 // egglog_test!(repro_empty_query, r#"(include "comparative-test/egglog-testsuite/repro-empty-query.egg")"#);// merge
 // egglog_test!(repro_equal_constant2, r#"(include "comparative-test/egglog-testsuite/repro-equal-constant2.egg")"#);// merge
 // egglog_test!(repro_equal_constant, r#"(include "comparative-test/egglog-testsuite/repro-equal-constant.egg")"#);// merge
-egglog_test!(repro_noteqbug, r#"(include "comparative-test/egglog-testsuite/repro-noteqbug.egg")"#);
+egglog_test!(repro_noteqbug, r#"(include "comparative-test/egglog-testsuite/repro-noteqbug.egg")"#, expect!["iter0 2!=0"]);
 // egglog_test!(repro_primitive_query, r#"(include "comparative-test/egglog-testsuite/repro-primitive-query.egg")"#);// impl panic
-egglog_test!(repro_querybug2, r#"(include "comparative-test/egglog-testsuite/repro-querybug2.egg")"#);// type error
+egglog_test!(repro_querybug2, r#"(include "comparative-test/egglog-testsuite/repro-querybug2.egg")"#, expect![]);// type error
 // egglog_test!(repro_querybug3, r#"(include "comparative-test/egglog-testsuite/repro-querybug3.egg")"#);// set primitive
-egglog_test!(repro_querybug4, r#"(include "comparative-test/egglog-testsuite/repro-querybug4.egg")"#);// type error
+egglog_test!(repro_querybug4, r#"(include "comparative-test/egglog-testsuite/repro-querybug4.egg")"#, expect![]);// type error
 // egglog_test!(repro_querybug, r#"(include "comparative-test/egglog-testsuite/repro-querybug.egg")"#);// codegen syntax error
 // egglog_test!(repro_should_saturate, r#"(include "comparative-test/egglog-testsuite/repro-should-saturate.egg")"#);// merge
 // egglog_test!(repro_silly_panic, r#"(include "comparative-test/egglog-testsuite/repro-silly-panic.egg")"#);// fails internal assertions
 // egglog_test!(repro_typechecking_schedule, r#"(include "comparative-test/egglog-testsuite/repro-typechecking-schedule.egg")"#);// index OOB
 // egglog_test!(repro_unsound, r#"(include "comparative-test/egglog-testsuite/repro-unsound.egg")"#);// fails assert
-egglog_test!(repro_unsound_htutorial, r#"(include "comparative-test/egglog-testsuite/repro-unsound-htutorial.egg")"#);
+egglog_test!(repro_unsound_htutorial, r#"(include "comparative-test/egglog-testsuite/repro-unsound-htutorial.egg")"#, expect!["iter0 5!=4"]);
 // egglog_test!(repro_vec_unequal, r#"(include "comparative-test/egglog-testsuite/repro-vec-unequal.egg")"#);//needs vec
 // egglog_test!(resolution, r#"(include "comparative-test/egglog-testsuite/resolution.egg")"#);// type error(bool)
 // egglog_test!(rw_analysis, r#"(include "comparative-test/egglog-testsuite/rw-analysis.egg")"#);// !=
 // egglog_test!(schedule_demo, r#"(include "comparative-test/egglog-testsuite/schedule-demo.egg")"#);//primitive functions
 // egglog_test!(set, r#"(include "comparative-test/egglog-testsuite/set.egg")"#);// set-length primitive function
-egglog_test!(set_sort_function, r#"(include "comparative-test/egglog-testsuite/set_sort_function.egg")"#);
+egglog_test!(set_sort_function, r#"(include "comparative-test/egglog-testsuite/set_sort_function.egg")"#, expect!["iter0 4!=0"]);
 // egglog_test!(stratified, r#"(include "comparative-test/egglog-testsuite/stratified.egg")"#);//running specific ruleset
-egglog_test!(string, r#"(include "comparative-test/egglog-testsuite/string.egg")"#);
+egglog_test!(string, r#"(include "comparative-test/egglog-testsuite/string.egg")"#, expect![]);
 // egglog_test!(string_quotes, r#"(include "comparative-test/egglog-testsuite/string_quotes.egg")"#);// input directive
 // egglog_test!(subsume, r#"(include "comparative-test/egglog-testsuite/subsume.egg")"#);// impl subsume
 // egglog_test!(test_combined, r#"(include "comparative-test/egglog-testsuite/test-combined.egg")"#); // unstable-combine-ruleset

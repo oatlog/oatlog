@@ -182,6 +182,7 @@ dependencies = [
  "egglog",
  "egraph",
  "eqlog-runtime",
+ "expect-test",
 ]
 
 [[package]]

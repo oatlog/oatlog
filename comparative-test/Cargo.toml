@@ -3,10 +3,11 @@ name = "comparative-test"
 version = "0.1.0"
 edition = "2024"
 
-[dependencies]
+[dev-dependencies]
 egglog.workspace = true
 egraph.workspace = true
 eqlog-runtime.workspace = true
+expect-test.workspace = true
 
 [lints]
 workspace = true
