@@ -1506,6 +1506,331 @@ impl Parser {
     }
 }
 
+mod egglog_ast {
+    use crate::frontend::Literal;
+    use crate::frontend::Spanned;
+    use crate::frontend::Str;
+
+    pub(crate) struct Program {
+        statements: Vec<Spanned<Statement>>,
+    }
+    pub(crate) enum Expr {
+        /// A literal.
+        /// ```egglog
+        /// 3
+        /// ```
+        Literal(Literal),
+        /// A variable.
+        /// ```egglog
+        /// a
+        /// ```
+        Var(Str),
+        /// A call expression.
+        /// ```egglog
+        /// (Add a (Const 3))
+        /// ```
+        /// Note that `check`, `=` and `!=` are considered functions.
+        Call(Str, Vec<Spanned<Expr>>),
+    }
+    pub(crate) enum Action {
+        /// Let expressions get or insert into the database and bind the result.
+        /// ```egglog
+        /// (let x (Add (Const 1) (Const 2)))
+        /// ```
+        /// becomes
+        /// ```ignore
+        /// let t0 = const_get_or_make(1);
+        /// let t1 = const_get_or_make(2);
+        /// let t2 = add_get_or_make(t0, t1);
+        ///
+        /// if toplevel {
+        ///     // insert into delta
+        ///     set_global("x", t2);
+        /// } else {
+        ///     set_local("x", t2);
+        /// }
+        /// ```
+        ///
+        /// If at toplevel, it desugars to a function from unit to an expr.
+        Let { name: Str, expr: Spanned<Expr> },
+        /// Set expressions perform inserts in the database.
+        /// This is needed for functions that do not return eqsorts.
+        /// ```egglog
+        /// ; (let a (Const 2))
+        ///
+        /// (set (evals-to a) 2)
+        /// ```
+        ///
+        /// ```ignore
+        /// // insert into delta
+        /// evals_to_insert(a, 2);
+        /// ```
+        Set {
+            expr: Spanned<Expr>,
+            result: Spanned<Expr>,
+        },
+        /// Panic expressions just panic with a message.
+        /// ```egglog
+        /// (panic "invariant broken")
+        /// ```
+        ///
+        /// ```ignore
+        /// panic!("invariant broken")
+        /// ```
+        Panic { message: Str },
+        /// Union expressions make two expressions equal in the global equality relation.
+        /// ```egglog
+        /// (union (Const 1) (Const 2))
+        /// ```
+        ///
+        /// ```ignore
+        /// let t0 = const_get_or_make(1);
+        /// let t1 = const_get_or_make(2);
+        /// uf_math.union(t0, t1);
+        /// ```
+        Union {
+            lhs: Spanned<Expr>,
+            rhs: Spanned<Expr>,
+        },
+        /// Expr just means to insert the expression into the database.
+        /// ```egglog
+        /// (Const 1)
+        /// ```
+        ///
+        /// ```ignore
+        /// const_get_or_make(1);
+        /// ```
+        ///
+        Expr(Expr),
+    }
+    pub(crate) enum Statement {
+        /// Unsupported.
+        SetOption { name: Str, value: Spanned<Expr> },
+        /// Declare a new sort.
+        /// ```egglog
+        /// (sort Math)
+        /// (sort MathVec (Vec Math))
+        /// ```
+        Sort {
+            name: Str,
+            primitive: Option<(Str, Vec<Spanned<Expr>>)>,
+        },
+        /// Declare a datatype.
+        /// ```egglog
+        /// (datatype Math
+        ///     (Add Math Math)
+        ///     (Mul Math Math)
+        ///     (Const i64)
+        /// )
+        /// ```
+        /// Desugars to:
+        /// ```egglog
+        /// (sort Math)
+        /// (constructor Add (Math Math))
+        /// (constructor Mul (Math Math))
+        /// (constructor Const (i64))
+        /// ```
+        Datatype {
+            name: Spanned<Str>,
+            variants: Vec<Spanned<Variant>>,
+        },
+        /// Create a set of mutually recursive datatypes.
+        /// ```egglog
+        /// (datatype*
+        ///     (Math
+        ///         (Add Math Math)
+        ///         (Sum MathVec)
+        ///         (B Bool)
+        ///     )
+        ///     (sort MathVec (Vec Math))
+        ///     (Bool
+        ///         (True)
+        ///         (False)
+        ///     )
+        /// )
+        /// ```
+        /// Desugars to (ignoring mutual recursion):
+        /// ```egglog
+        /// (datatype Math
+        ///     (Add (Math Math))
+        ///     (Sum MathVec)
+        ///     (B Bool)
+        /// )
+        /// (sort MathVec (Vec Math))
+        /// (datatype Bool
+        ///     (True)
+        ///     (False)
+        /// )
+        /// ```
+        /// Desugars to (ignoring mutual recursion):
+        /// ```egglog
+        /// (sort Math)
+        ///     (Add (Math Math))
+        ///     (Sum MathVec)
+        ///     (B Bool)
+        /// )
+        /// (sort MathVec (Vec Math))
+        /// (datatype Bool
+        ///     (True)
+        ///     (False)
+        /// )
+        /// ```
+        Datatypes {
+            name: Str,
+            datatypes: Vec<(Str, SubDatatypes)>,
+        },
+        /// Declare a constructor.
+        /// ```egglog
+        /// (constructor Add (Math Math))
+        /// ```
+        Constructor {
+            name: Str,
+            input: Vec<Str>,
+            output: Str,
+            cost: Option<u64>,
+            extractable: bool,
+        },
+        /// Declare a relation.
+        /// ```egglog
+        /// (relation Add (Math Math Math))
+        /// ```
+        Relation { name: Str, input: Vec<Str> },
+        /// Declare a function.
+        /// ```egglog
+        /// (function Add (Math Math) Math)
+        /// ```
+        Function {
+            name: Str,
+            input: Vec<Str>,
+            output: Str,
+            merge: Option<Expr>,
+        },
+        /// Declare a ruleset.
+        /// ```egglog
+        /// (ruleset "foo")
+        /// ```
+        AddRuleSet(Str),
+        /// Unimplemented
+        UnstableCombinedRuleset(Str, Vec<Str>),
+        /// Declare a rule
+        /// ```egglog
+        /// (rule ((= e (Add a b))) ((union e (Add a b))))
+        /// ```
+        Rule { name: Str, ruleset: Str, rule: Rule },
+        /// Declare a rewrite
+        /// ```egglog
+        /// (rewrite (Add a b) (Add b a))
+        /// ```
+        Rewrite(Str, Spanned<Rewrite>, Subsume),
+        /// Declare a bi-rewrite
+        /// ```egglog
+        /// (bi-rewrite (Mul (Add a b) c) (Add (Mul a c) (Mul b c)))
+        /// ```
+        /// Desugars to:
+        /// ```egglog
+        /// (rewrite (Mul (Add a b) c) (Add (Mul a c) (Mul b c)))
+        /// (rewrite (Add (Mul a c) (Mul b c)) (Mul (Add a b) c))
+        /// ```
+        BiRewrite(Str, Rewrite),
+        /// Run an arbitrary action
+        /// ```egglog
+        /// (let one (Const 1))
+        /// (let two (Const 2))
+        /// (union one two)
+        /// ```
+        Action(Action),
+        /// Run a schedule
+        /// ```egglog
+        /// (run 5)
+        /// ```
+        RunSchedule(RunSchedule),
+        /// Unsupported.
+        PrintOverallStatistics,
+        /// Unsupported.
+        Simplify {
+            expr: Spanned<Expr>,
+            schedule: Spanned<Schedule>,
+        },
+        /// Unsupported.
+        QueryExtract {
+            variants: usize,
+            expr: Spanned<Expr>,
+        },
+        /// Check if facts match database, otherwise panic.
+        /// ```egglog
+        /// (let one (Const 1))
+        /// (let two (Const 2))
+        /// (union one two)
+        /// (run 5)
+        /// (check (= one two))
+        /// ```
+        Check(Vec<Spanned<Fact>>),
+        /// Unsupported.
+        PrintFunction(Str, usize),
+        /// Unsupported.
+        Input { name: Str, file: Str },
+        /// Unsupported.
+        Output {
+            file: Str,
+            exprs: Vec<Spanned<Expr>>,
+        },
+        /// Unsupported.
+        /// (could easily add support for this by cloning the E-graph)
+        Push(usize),
+        /// Unsupported.
+        /// (could easily add support for this by cloning the E-graph)
+        Pop(usize),
+        ///
+        Fail(Expr),
+        /// Parse a file as a series of expressions.
+        /// ```egglog
+        /// (include "path.egg")
+        /// ```
+        /// Include is not performed eagerly to make the call tree match the include tree
+        /// to add context for errors.
+        /// The only difference between just including the file contents is the error messages.
+        Include(Str),
+    }
+    pub(crate) type Subsume = bool;
+    pub(crate) struct Schema {}
+    pub(crate) enum Schedule {
+        /// Run schedule until saturation.
+        Saturate(Box<RunSchedule>),
+        Run(RunConfig),
+    }
+    pub(crate) enum RunSchedule {
+        /// Run schedule until saturation.
+        Saturate(Box<RunSchedule>),
+        Run(RunConfig),
+    }
+    pub(crate) struct RunConfig {
+        ruleset: Option<Str>,
+        until: Fact,
+    }
+    pub(crate) enum Fact {
+        Eq(Expr, Expr),
+        Fact(Expr),
+    }
+    pub(crate) struct Rule {
+        body: Vec<Fact>,
+        head: Vec<Action>,
+    }
+    pub(crate) struct Rewrite {
+        lhs: Expr,
+        rhs: Expr,
+        conditions: Vec<Fact>,
+    }
+    pub(crate) enum SubDatatypes {
+        Variants(Vec<Variant>),
+        NewSort(Str, Vec<Expr>),
+    }
+    pub(crate) struct Variant {
+        name: Str,
+        types: Vec<Str>,
+        cost: Option<usize>,
+    }
+}
+
 #[derive(Debug)]
 enum Action {
     // never exists on toplevel
