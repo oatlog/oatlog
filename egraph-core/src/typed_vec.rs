@@ -59,6 +59,9 @@ impl<K: Id, V> TVec<K, V> {
     pub(crate) fn inner_mut(&mut self) -> &mut Vec<V> {
         &mut self.x
     }
+    pub(crate) fn map_values<'a, V2>(&'a self, f: impl FnMut(&'a V) -> V2) -> TVec<K, V2> {
+        self.iter().map(f).collect()
+    }
     /// Collect values that arrive out-of-order
     /// asserts that the ids are contiguous.
     pub(crate) fn from_iter_unordered(iter: impl Iterator<Item = (K, V)>) -> Self {
@@ -118,9 +121,9 @@ impl<K: Id, V> std::ops::IndexMut<K> for TVec<K, V> {
         &mut self.x[idx.into()]
     }
 }
-impl<K, V: Debug> Debug for TVec<K, V> {
+impl<K: Id + Debug, V: Debug> Debug for TVec<K, V> {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        self.x.fmt(f)
+        f.debug_map().entries(self.iter_enumerate()).finish()
     }
 }
 impl<K: Id, V> FromIterator<V> for TVec<K, V> {

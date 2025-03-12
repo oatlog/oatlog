@@ -31,12 +31,16 @@ macro_rules! id_wrap {
         }
         impl Debug for $i {
             fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-                write!(f, "{}{}", $dbg_prefix, self.0)
+                write!(f, "{self}")
             }
         }
         impl Display for $i {
             fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-                write!(f, "{}{}", $dbg_prefix, self.0)
+                if self.0 == usize::MAX {
+                    write!(f, "{}_bogus", $dbg_prefix)
+                } else {
+                    write!(f, "{}{}", $dbg_prefix, self.0)
+                }
             }
         }
     };
@@ -55,7 +59,7 @@ id_wrap!(ColumnId, "c", "id for a column");
 id_wrap!(IndexId, "ir", "reference to an index");
 id_wrap!(
     IndexUsageId,
-    "ir",
+    "iu",
     "reference to something that requires an index"
 );
 impl IndexUsageId {

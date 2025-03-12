@@ -28,11 +28,12 @@ pub(crate) struct Theory {
     pub(crate) rule_variables: TVec<VariableId, VariableData>,
     pub(crate) global_compute: TVec<GlobalId, GlobalCompute>,
     pub(crate) global_types: TVec<GlobalId, TypeId>,
-    // /// `RuleTrie`s run once on theory creation.
-    // rule_tries_startup: &'static [RuleTrie],
     pub(crate) rule_tries: &'static [RuleTrie],
     pub(crate) initial: Vec<Initial>,
 }
+// TODO global variables could be read as relations, not a special GlobalVar struct
+// TODO computing global variables at startup should be more dynamic, support Run(steps) between inits.
+// TODO RuleAtom simplification, e.g. PremiseNew
 
 #[derive(Debug, Clone)]
 pub(crate) enum Initial {
@@ -151,10 +152,10 @@ impl RelationData {
 pub enum RelationKind {
     /// A regular btree table.
     Table {
-        /// Usage sites of any indexes
-        usage_to_info: TVec<IndexUsageId, index_selection::IndexUsageInfo>,
         /// The actual indexes we need to generate.
         index_to_info: TVec<IndexId, index_selection::IndexInfo>,
+        /// Usage sites of any indexes
+        usage_to_info: TVec<IndexUsageId, index_selection::IndexUsageInfo>,
         /// Index usage for back-references.
         column_back_reference: TVec<ColumnId, IndexUsageId>,
         implicit_rules: Vec<ImplicitRule>,
@@ -318,4 +319,259 @@ pub(crate) enum Action {
     // },
     /// Make a new E-class.
     Make(VariableId),
+}
+
+impl Theory {
+    #[cfg(test)]
+    pub(crate) fn dbg_summary(&self) -> String {
+        return format!("{:#?}", Dbg(self));
+
+        use itertools::Itertools as _;
+        use std::{
+            collections::BTreeMap,
+            fmt::{Debug, Error, Formatter},
+        };
+        struct Dbg<'a, T>(&'a T);
+        struct NoAlt<'a, T>(&'a T);
+        impl<T: Debug> Debug for NoAlt<'_, T> {
+            fn fmt(&self, f: &mut Formatter<'_>) -> Result<(), Error> {
+                f.write_fmt(format_args!("{:?}", self.0))
+            }
+        }
+
+        impl Debug for Dbg<'_, Theory> {
+            fn fmt(&self, f: &mut Formatter<'_>) -> Result<(), Error> {
+                let Theory {
+                    name,
+                    types,
+                    relations,
+                    rule_variables,
+                    global_compute,
+                    global_types,
+                    rule_tries,
+                    initial,
+                } = self.0;
+                f.debug_struct("Theory")
+                    .field("name", name)
+                    .field(
+                        "types",
+                        &types
+                            .iter_enumerate()
+                            .map(|(type_id, TypeData { name, kind })| {
+                                let kind = match kind {
+                                    TypeKind::Symbolic => "[symbolic]",
+                                    TypeKind::Primitive { type_path } => *type_path,
+                                };
+                                (
+                                    DbgStr([type_id.to_string(), name.to_string()]),
+                                    DbgStr([kind.to_string()]),
+                                )
+                            })
+                            .collect::<BTreeMap<_, _>>(),
+                    )
+                    .field("relations", &relations.map_values(Dbg))
+                    .field(
+                        "rule_variables",
+                        &rule_variables
+                            .iter_enumerate()
+                            .map(|(variable_id, VariableData { name, type_ })| {
+                                (
+                                    DbgStr([variable_id.to_string(), name.to_string()]),
+                                    DbgStr([type_.to_string()]),
+                                )
+                            })
+                            .collect::<BTreeMap<_, _>>(),
+                    )
+                    .field("global_compute", global_compute)
+                    .field("global_types", global_types)
+                    .field(
+                        "rule_tries",
+                        &rule_tries.iter().map(Dbg).collect::<Vec<_>>(),
+                    )
+                    .field("initial", initial)
+                    .finish()
+            }
+        }
+        impl Debug for Dbg<'_, RelationData> {
+            fn fmt(&self, f: &mut Formatter<'_>) -> Result<(), Error> {
+                let RelationData {
+                    name,
+                    param_types,
+                    kind,
+                } = self.0;
+                f.debug_struct("RelationData")
+                    .field("name", name)
+                    .field("param_types", &NoAlt(param_types))
+                    .field("kind", &Dbg(kind))
+                    .finish()
+            }
+        }
+        impl Debug for Dbg<'_, RelationKind> {
+            fn fmt(&self, f: &mut Formatter<'_>) -> Result<(), Error> {
+                match self.0 {
+                    RelationKind::Table {
+                        index_to_info,
+                        usage_to_info,
+                        column_back_reference,
+                        implicit_rules,
+                    } => f
+                        .debug_struct("Table")
+                        .field(
+                            "index_to_info",
+                            &NoAlt(&index_to_info.map_values(
+                                |index_selection::IndexInfo { permuted_columns }| {
+                                    DbgStr([permuted_columns
+                                        .iter()
+                                        .map(|ColumnId(x)| format!("{x}"))
+                                        .join("_")])
+                                },
+                            )),
+                        )
+                        .field(
+                            "usage_to_info",
+                            &usage_to_info.map_values(
+                                |index_selection::IndexUsageInfo { prefix, index }| {
+                                    DbgStr([format!("{index}[..{prefix}]")])
+                                },
+                            ),
+                        )
+                        .field("column_back_reference", &NoAlt(&column_back_reference))
+                        .field(
+                            "implicit_rules",
+                            &implicit_rules
+                                .iter()
+                                .map(|ImplicitRule { index, ty }| {
+                                    DbgStr([index.to_string(), format!("{ty:?}")])
+                                })
+                                .collect_vec(),
+                        )
+                        .finish(),
+                    RelationKind::Forall { ty } => {
+                        write!(f, "{:?}", DbgStr(["Forall".to_string(), ty.to_string()]))
+                    }
+                    RelationKind::Global { id } => {
+                        write!(f, "{:?}", DbgStr(["Global".to_string(), id.to_string()]))
+                    }
+                }
+            }
+        }
+        impl Debug for Dbg<'_, RuleTrie> {
+            fn fmt(&self, f: &mut Formatter<'_>) -> Result<(), Error> {
+                let RuleTrie { meta, atom, then } = self.0;
+                if let Some(meta) = meta {
+                    writeln!(f, "meta: {meta:#?}")?;
+                }
+                write!(f, "atom: {:#?}", &Dbg(atom))?;
+                if !then.is_empty() {
+                    writeln!(f)?;
+                    write!(f, "then: {:#?}", &then.iter().map(Dbg).collect::<Vec<_>>())?;
+                }
+                Ok(())
+            }
+        }
+        impl Debug for Dbg<'_, RuleAtom> {
+            fn fmt(&self, f: &mut Formatter<'_>) -> Result<(), Error> {
+                match self.0 {
+                    RuleAtom::Forall { variable, new } => {
+                        write!(
+                            f,
+                            "{:?}",
+                            DbgStr([
+                                "Forall".to_string(),
+                                variable.to_string(),
+                                (if *new { "new" } else { "all" }).to_string()
+                            ])
+                        )
+                    }
+                    RuleAtom::PremiseNew { relation, args } => {
+                        write!(
+                            f,
+                            "{:?}",
+                            DbgStr([
+                                "PremiseNew".to_string(),
+                                format!("{relation}({})", args.iter().join(", "))
+                            ])
+                        )
+                    }
+                    RuleAtom::Premise {
+                        relation,
+                        args,
+                        index,
+                    } => {
+                        write!(
+                            f,
+                            "{:?}",
+                            DbgStr([
+                                "Premise".to_string(),
+                                format!("{relation}({})", args.iter().join(", ")),
+                                index.to_string()
+                            ])
+                        )
+                    }
+                    RuleAtom::PremiseAny {
+                        relation,
+                        args,
+                        index,
+                    } => {
+                        write!(
+                            f,
+                            "{:?}",
+                            DbgStr([
+                                "PremiseAny".to_string(),
+                                format!("{relation}({})", args.iter().join(", ")),
+                                index.to_string()
+                            ])
+                        )
+                    }
+                    RuleAtom::Action(Action::Insert { relation, args }) => {
+                        write!(
+                            f,
+                            "{:?}",
+                            DbgStr([
+                                "Action::Insert".to_string(),
+                                format!("{relation}({})", args.iter().join(", "))
+                            ])
+                        )
+                    }
+                    RuleAtom::Action(Action::Equate(a, b)) => {
+                        write!(
+                            f,
+                            "{:?}",
+                            DbgStr(["Action::Equate".to_string(), format!("{a}={b}")])
+                        )
+                    }
+                    RuleAtom::Action(Action::Make(e)) => {
+                        write!(
+                            f,
+                            "{:?}",
+                            DbgStr(["Action::Make".to_string(), e.to_string()])
+                        )
+                    }
+                    RuleAtom::Panic(msg) => {
+                        write!(f, "{:?}", DbgStr(["Panic".to_string(), msg.to_string()]))
+                    }
+                }
+            }
+        }
+
+        #[derive(PartialOrd, Ord, PartialEq, Eq)]
+        struct DbgStr<const N: usize>([String; N]);
+        impl<const N: usize> Debug for DbgStr<N> {
+            fn fmt(&self, f: &mut Formatter<'_>) -> Result<(), Error> {
+                if self.0.len() > 1 {
+                    write!(f, "[")?;
+                }
+                for (i, e) in self.0.iter().enumerate() {
+                    if i > 0 {
+                        write!(f, ", ")?;
+                    }
+                    write!(f, "{e}")?;
+                }
+                if self.0.len() > 1 {
+                    write!(f, "]")?;
+                }
+                Ok(())
+            }
+        }
+    }
 }

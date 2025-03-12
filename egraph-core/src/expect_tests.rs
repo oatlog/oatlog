@@ -15,7 +15,7 @@ impl Steps {
 
         let (_, lir) = crate::query_planning::emit_lir_theory(hir);
         if let Some(exp) = self.expected_lir {
-            exp.assert_eq(&format!("{lir:#?}"))
+            exp.assert_eq(&lir.dbg_summary())
         }
 
         let codegen = crate::codegen::codegen(&lir);
@@ -148,7 +148,120 @@ fn hir_global() {
             Insert: Add(b, a, a0)
 
         "#]]),
-        expected_lir: None,
+        expected_lir: Some(expect![[r#"
+            Theory {
+                name: "",
+                types: {
+                    [t0, i64]: std::primitive::i64,
+                    [t1, String]: egraph::runtime::IString,
+                    [t2, unit]: THIS_STRING_SHOULD_NOT_APPEAR_IN_GENERATED_CODE,
+                    [t3, Math]: [symbolic],
+                },
+                relations: {
+                    r0: RelationData {
+                        name: "ForallMath",
+                        param_types: {c0: t3},
+                        kind: [Forall, t3],
+                    },
+                    r1: RelationData {
+                        name: "Mul",
+                        param_types: {c0: t3, c1: t3, c2: t3},
+                        kind: Table {
+                            index_to_info: {ir0: 0_1_2, ir1: 1_0_2, ir2: 2_0_1},
+                            usage_to_info: {
+                                iu0: ir0[..1],
+                                iu1: ir1[..1],
+                                iu2: ir2[..1],
+                                iu3: ir0[..2],
+                            },
+                            column_back_reference: {c0: iu0, c1: iu1, c2: iu2},
+                            implicit_rules: [
+                                [iu3, Union],
+                            ],
+                        },
+                    },
+                    r2: RelationData {
+                        name: "Add",
+                        param_types: {c0: t3, c1: t3, c2: t3},
+                        kind: Table {
+                            index_to_info: {ir0: 0_1_2, ir1: 1_0_2, ir2: 2_0_1},
+                            usage_to_info: {
+                                iu0: ir0[..1],
+                                iu1: ir1[..1],
+                                iu2: ir2[..1],
+                                iu3: ir0[..2],
+                            },
+                            column_back_reference: {c0: iu0, c1: iu1, c2: iu2},
+                            implicit_rules: [
+                                [iu3, Union],
+                            ],
+                        },
+                    },
+                    r3: RelationData {
+                        name: "Const",
+                        param_types: {c0: t0, c1: t3},
+                        kind: Table {
+                            index_to_info: {ir0: 0_1, ir1: 1_0},
+                            usage_to_info: {
+                                iu0: ir0[..1],
+                                iu1: ir0[..1],
+                                iu2: ir1[..1],
+                                iu3: ir0[..1],
+                            },
+                            column_back_reference: {c0: iu1, c1: iu2},
+                            implicit_rules: [
+                                [iu3, Union],
+                            ],
+                        },
+                    },
+                    r4: RelationData {
+                        name: "g0",
+                        param_types: {c0: t0},
+                        kind: [Global, g0],
+                    },
+                },
+                rule_variables: {
+                    [v0, one]: t0,
+                    [v1, p1]: t3,
+                    [v2, b]: t3,
+                    [v3, a]: t3,
+                    [v4, one]: t0,
+                    [v5, p1]: t3,
+                    [v6, b]: t3,
+                    [v7, a]: t3,
+                },
+                global_compute: {
+                    g0: Literal(
+                        I64(
+                            1,
+                        ),
+                    ),
+                },
+                global_types: {
+                    g0: t0,
+                },
+                rule_tries: [
+                    atom: [PremiseNew, r4(v0)]
+                    then: [
+                        atom: [Premise, r3(v0, v1), iu0]
+                        then: [
+                            atom: [Action::Make, v3],
+                            atom: [Action::Make, v2],
+                            atom: [Action::Insert, r2(v2, v3, v1)],
+                        ],
+                    ],
+                    atom: [PremiseNew, r3(v4, v5)]
+                    then: [
+                        atom: [PremiseAny, r4(v4), iu_bogus]
+                        then: [
+                            atom: [Action::Make, v7],
+                            atom: [Action::Make, v6],
+                            atom: [Action::Insert, r2(v6, v7, v5)],
+                        ],
+                    ],
+                ],
+                initial: [],
+            }"#]]),
         expected_codegen: None,
     }
     .check();

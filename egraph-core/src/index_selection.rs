@@ -114,34 +114,34 @@ mod test {
                 .map(|x| x.into_iter().map(ColumnId).collect())
                 .collect();
         let (logical_to_physical, physical_indexes) = index_selection(columns, &uses);
-        expect![["
-            [
-                IndexUsageInfo {
+        expect![[r#"
+            {
+                iu0: IndexUsageInfo {
                     prefix: 1,
                     index: ir0,
                 },
-                IndexUsageInfo {
+                iu1: IndexUsageInfo {
                     prefix: 2,
                     index: ir0,
                 },
-                IndexUsageInfo {
+                iu2: IndexUsageInfo {
                     prefix: 1,
                     index: ir1,
                 },
-                IndexUsageInfo {
+                iu3: IndexUsageInfo {
                     prefix: 2,
                     index: ir2,
                 },
-                IndexUsageInfo {
+                iu4: IndexUsageInfo {
                     prefix: 1,
                     index: ir3,
                 },
-                IndexUsageInfo {
+                iu5: IndexUsageInfo {
                     prefix: 1,
                     index: ir4,
                 },
-            ]
-        "]]
+            }
+        "#]]
         .assert_debug_eq(&logical_to_physical);
         expect![["
             0 1 2 3
