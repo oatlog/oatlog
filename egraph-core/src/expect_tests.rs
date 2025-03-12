@@ -8,9 +8,7 @@ struct Steps {
 }
 impl Steps {
     fn check(self) {
-        let input_tokens = self.code.parse().unwrap();
-
-        let hir = crate::frontend::parse(input_tokens).unwrap();
+        let hir = crate::frontend::parse_str(self.code).unwrap();
         if let Some(exp) = self.expected_hir {
             exp.assert_eq(&hir.dbg_summary())
         }
@@ -30,12 +28,12 @@ impl Steps {
 #[test]
 fn hir_commutative() {
     Steps {
-        code: "(
+        code: r#"
             (datatype Math
                 (Add Math Math)
             )
             (rule ((= e (Add a b) )) ((= e (Add b a))))
-        )",
+        "#,
         expected_hir: Some(expect![[r#"
             Theory "":
 
@@ -59,13 +57,13 @@ fn hir_commutative() {
 #[test]
 fn hir_distributive() {
     Steps {
-        code: "(
+        code: r#"
             (datatype Math
                 (Add Math Math)
                 (Mul Math Math)
             )
             (rewrite (Mul (Add a b) c) (Add (Mul a c) (Mul b c)))
-        )",
+        "#,
         expected_hir: Some(expect![[r#"
             Theory "":
 
@@ -94,12 +92,12 @@ fn hir_distributive() {
 #[test]
 fn hir_userspace_implicit_functionality() {
     Steps {
-        code: "(
+        code: r#"
             (sort Math)
             (relation Add (Math Math Math))
 
             (rule ((Add a b c) (Add a b d)) ((= c d)))
-        )",
+        "#,
         expected_hir: Some(expect![[r#"
             Theory "":
 
@@ -122,16 +120,15 @@ fn hir_userspace_implicit_functionality() {
 #[test]
 fn hir_global() {
     Steps {
-        code: "(
+        code: r#"
             (datatype Math
                 (Mul Math Math)
                 (Add Math Math)
                 (Const i64)
             )
-        (let one 1)
-        (rewrite (Const one) (Add b a))
-
-        )",
+            (let one 1)
+            (rewrite (Const one) (Add b a))
+        "#,
         expected_hir: Some(expect![[r#"
             Theory "":
 
@@ -159,7 +156,7 @@ fn hir_global() {
 #[test]
 fn test_negative_i64_tokens() {
     Steps {
-        code: "(
+        code: r#"
             (datatype Math
                 (Mul Math Math)
                 (Add Math Math)
@@ -168,7 +165,7 @@ fn test_negative_i64_tokens() {
             )
             (let neg_two (Const -2))
             (rewrite (Const -1) (Const -1))
-        )",
+        "#,
         expected_hir: Some(expect![[r#"
             Theory "":
 
@@ -766,12 +763,12 @@ fn codegen_bug1() {
 #[test]
 fn initial() {
     Steps {
-        code: "(
+        code: r#"
             (datatype Math
                 (Const i64)
             )
             (run 42)
-        )",
+        "#,
         expected_hir: Some(expect![[r#"
             Theory "":
 
@@ -1031,7 +1028,7 @@ fn initial() {
 #[test]
 fn test_primitives_simple() {
     Steps {
-        code : "(
+        code: r#"
             (datatype Math
                 (Mul Math Math)
                 (Add Math Math)
@@ -1039,14 +1036,14 @@ fn test_primitives_simple() {
                 (Var String)
             )
 
-        (let two (Const 2))
-        (let one 1)
-        (rewrite (Const one) (Add x x))
-        (rewrite (Const 2) (Add z z))
-        (rewrite (Var \"x\") (Var \"y\"))
+            (let two (Const 2))
+            (let one 1)
+            (rewrite (Const one) (Add x x))
+            (rewrite (Const 2) (Add z z))
+            (rewrite (Var "x") (Var "y"))
 
-        (rewrite (Mul a (Const 0)) (Const 0))
-        )",
+            (rewrite (Mul a (Const 0)) (Const 0))
+        "#,
         expected_hir :Some( expect![[r#"
             Theory "":
 
@@ -1849,7 +1846,7 @@ fn test_primitives_simple() {
 #[test]
 fn triangle_join() {
     Steps {
-        code: "(
+        code: r#"
             (sort Math)
             (relation Foo (Math Math))
             (relation Bar (Math Math))
@@ -1858,7 +1855,7 @@ fn triangle_join() {
             (relation Triangle (Math Math Math))
 
             (rule ((Foo a b) (Bar b c) (Baz c a)) ((Triangle a b c)))
-        )",
+        "#,
         expected_hir: Some(expect![[r#"
             Theory "":
 
@@ -2526,13 +2523,13 @@ fn triangle_join() {
 fn edgecase0() {
     // needed a "PremiseAny"
     Steps {
-        code : "(
+        code: r#"
             (datatype Math
                 (Mul Math Math)
                 (Add Math Math)
             )
             (rewrite (Add (Mul a b) (Mul a c)) (Mul a (Add b c)))
-        )",
+        "#,
         expected_hir :Some( expect![[r#"
             Theory "":
 
@@ -3045,10 +3042,10 @@ fn edgecase0() {
 #[test]
 fn test_into_codegen() {
     Steps {
-        code: "(
+        code: r#"
             (datatype Math (Mul Math Math) (Add Math Math))
             (rewrite (Mul (Add a b) c) (Add (Mul a c) (Mul b c)))
-        )",
+        "#,
         expected_hir: Some(expect![[r#"
             Theory "":
 
