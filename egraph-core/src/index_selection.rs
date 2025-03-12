@@ -18,9 +18,7 @@ use std::collections::BTreeMap;
 #[derive(Clone, Eq, PartialEq, Ord, PartialOrd, Hash, Debug)]
 pub(crate) struct IndexInfo {
     // index -> main
-    pub(crate) order: TVec<ColumnId, ColumnId>,
-    // main -> index
-    pub(crate) perm: TVec<ColumnId, ColumnId>,
+    pub(crate) permuted_columns: TVec<ColumnId, ColumnId>,
 }
 
 #[derive(Clone, Eq, PartialEq, Ord, PartialOrd, Hash, Debug)]
@@ -53,42 +51,44 @@ pub(crate) fn index_selection(
     // what logical "primary keys" are needed.
     uses: &TVec<IndexUsageId, Vec<ColumnId>>,
 ) -> (TVec<IndexUsageId, IndexUsageInfo>, TVec<IndexId, IndexInfo>) {
-    let mut columns_to_uses: BTreeMap<TVec<ColumnId, ColumnId>, Vec<(IndexUsageId, usize)>> =
-        BTreeMap::new();
+    // Mapping (physical index) to (usage, prefix len).
+    let mut columns_to_uses: BTreeMap<IndexInfo, Vec<(IndexUsageId, usize)>> = BTreeMap::new();
 
-    for (i, c) in uses.iter_enumerate() {
-        let mut order: TVec<ColumnId, ColumnId> = c.iter().copied().collect();
-        let prefix = order.len();
-        assert!(order.inner_mut().is_sorted());
-        assert!(order.inner_mut().windows(2).all(|w| w[0] != w[1]));
-        for i in (0..columns).map(ColumnId) {
-            // pick an arbitrary order that matches requested
-            if !order.inner_mut().contains(&i) {
-                let _: ColumnId = order.push(i);
-            }
-        }
-        columns_to_uses.entry(order).or_default().push((i, prefix));
+    for (index_usage_id, used_columns) in uses.iter_enumerate() {
+        let prefix = used_columns.len();
+        // `order` satisfies that all columns present in `c` come before those that are not present.
+        // `order` is a valid physical index (one among many) implementing the logical index `c`.
+        let permuted_columns: TVec<ColumnId, ColumnId> = used_columns
+            .iter()
+            .copied()
+            .chain(
+                (0..columns)
+                    .map(ColumnId)
+                    .filter(|c| !used_columns.contains(c)),
+            )
+            .collect();
+
+        assert!(permuted_columns.inner()[..prefix].is_sorted());
+        assert!(
+            permuted_columns.inner()[..prefix]
+                .windows(2)
+                .all(|w| w[0] != w[1])
+        );
+        columns_to_uses
+            .entry(IndexInfo { permuted_columns })
+            .or_default()
+            .push((index_usage_id, prefix));
     }
-    let index_info: TVec<IndexId, IndexInfo> = columns_to_uses
-        .keys()
-        .map(|order| {
-            let perm = order.invert_permutation();
-
-            IndexInfo {
-                order: order.clone(),
-                perm,
-            }
-        })
-        .collect();
+    let index_info: TVec<IndexId, IndexInfo> = columns_to_uses.keys().cloned().collect();
     let index_usage_to_index: TVec<IndexUsageId, IndexUsageInfo> =
-        TVec::from_iter_unordered(columns_to_uses.iter().enumerate().flat_map(
-            |(i, (_, usage))| {
-                usage.iter().map(move |(usage, prefix)| {
+        TVec::from_iter_unordered(columns_to_uses.values().enumerate().flat_map(
+            |(index_id, usage)| {
+                usage.iter().map(move |&(index_usage_id, prefix)| {
                     (
-                        *usage,
+                        index_usage_id,
                         IndexUsageInfo {
-                            prefix: *prefix,
-                            index: IndexId(i),
+                            prefix,
+                            index: IndexId(index_id),
                         },
                     )
                 })
@@ -152,7 +152,7 @@ mod test {
         .assert_eq(
             &physical_indexes
                 .iter()
-                .map(|x| x.order.iter().map(|x| x.0).join(" "))
+                .map(|x| x.permuted_columns.iter().map(|x| x.0).join(" "))
                 .join("\n"),
         );
     }

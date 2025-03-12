@@ -1014,7 +1014,9 @@ impl Parser {
             }
             "constructor" => {
                 let [name, inputs, output, options @ ..] = args else {
-                    return err!("usage: (constructor <name> (<input sort>*) <output sort> <option>?)");
+                    return err!(
+                        "usage: (constructor <name> (<input sort>*) <output sort> <option>?)"
+                    );
                 };
                 let name = name.atom("constructor name")?;
                 let inputs = self.parse_inputs(inputs)?;

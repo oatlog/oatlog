@@ -20,7 +20,8 @@ impl Steps {
 
         let output_tokens = crate::codegen::codegen(&codegen);
         if let Some(exp) = self.expected_codegen {
-            crate::codegen::test::check(output_tokens, exp)
+            let formatted = crate::format_tokens(&output_tokens);
+            exp.assert_eq(&formatted);
         }
     }
 }

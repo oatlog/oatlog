@@ -20,7 +20,7 @@ pub fn compile_str(source: &str) -> String {
     // TODO: call Sexp::parse_string instead of Sexp::parse_stream
 
     let input: proc_macro2::TokenStream = source.parse().unwrap();
-    codegen::format_tokens(&compile(quote::quote! {(#input)}))
+    format_tokens(&compile(quote::quote! {(#input)}))
 }
 
 #[must_use]
@@ -78,4 +78,33 @@ fn force_backtrace<T, F: FnOnce() -> T + std::panic::UnwindSafe>(f: F) -> T {
             }
         }
     }
+}
+
+/// Format tokens using rustfmt, for use in expect tests or CLI
+fn format_tokens(tokens: &proc_macro2::TokenStream) -> String {
+    use std::{
+        io::Write as _,
+        process::{Command, Output, Stdio},
+    };
+    let child = Command::new("rustfmt")
+        .stdin(Stdio::piped())
+        .stdout(Stdio::piped())
+        .stderr(Stdio::piped())
+        .spawn()
+        .expect("formatting with rustfmt inside CLI or a unit test");
+    child
+        .stdin
+        .as_ref()
+        .unwrap()
+        .write_all(tokens.to_string().as_bytes())
+        .unwrap();
+    let Output {
+        status,
+        stdout,
+        stderr,
+    } = child.wait_with_output().unwrap();
+
+    assert!(stderr.is_empty(), "{}", String::from_utf8(stderr).unwrap());
+    assert_eq!(status.code(), Some(0));
+    String::from_utf8(stdout).unwrap()
 }

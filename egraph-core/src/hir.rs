@@ -19,6 +19,59 @@ use std::{
     iter,
 };
 
+/// Represents a theory (set of rules) with associated information
+#[derive(Clone, Debug)]
+pub(crate) struct Theory {
+    /// Name of final struct
+    pub(crate) name: &'static str,
+    pub(crate) types: TVec<TypeId, Type>,
+    pub(crate) symbolic_rules: Vec<SymbolicRule>,
+    pub(crate) implicit_rules: BTreeMap<RelationId, Vec<ImplicitRule>>,
+    pub(crate) relations: TVec<RelationId, Relation>,
+    pub(crate) global_compute: TVec<GlobalId, crate::codegen::GlobalCompute>,
+    pub(crate) global_types: TVec<GlobalId, TypeId>,
+    #[allow(unused)]
+    /// NOTE: This may be useful if global variables are queried at run time
+    pub(crate) global_to_relation: TVec<GlobalId, RelationId>,
+    pub(crate) interner: crate::runtime::StringIntern,
+    pub(crate) initial: Vec<codegen::Initial>,
+}
+
+#[derive(Copy, Clone, Eq, PartialEq, Ord, PartialOrd, Hash, Debug)]
+pub(crate) struct Type {
+    /// Name of type (sort Math) -> "Math"
+    pub(crate) name: &'static str,
+    pub(crate) ty: TypeKind,
+}
+impl Type {
+    pub(crate) fn new_symbolic(name: &'static str) -> Self {
+        Self {
+            name,
+            ty: TypeKind::Symbolic,
+        }
+    }
+    pub(crate) fn new_primitive(name: &'static str, type_path: &'static str) -> Self {
+        Self {
+            name,
+            ty: TypeKind::Primitive { type_path },
+        }
+    }
+}
+
+#[derive(Copy, Clone, Eq, PartialEq, Ord, PartialOrd, Hash, Debug)]
+pub(crate) enum TypeKind {
+    /// can be unified by user
+    /// always a wrapper around a u32
+    Symbolic,
+    // /// can not be unified by user
+    // /// always a wrapper around a u32
+    // Collection {
+    //     manager: ...
+    // }
+    /// Some rust type that implements: `RelationElement` trait.
+    Primitive { type_path: &'static str },
+}
+
 // unify can not read lattice variable.
 
 /// Lattice and Unification style implicit functionality
@@ -158,59 +211,6 @@ pub(crate) enum ImplicitRuleAction {
         /// what `VariableId` to write to the column
         res: Vec<(VariableId, ColumnId)>,
     },
-}
-
-/// Represents a theory (set of rules) with associated information
-#[derive(Clone, Debug)]
-pub(crate) struct Theory {
-    /// Name of final struct
-    pub(crate) name: &'static str,
-    pub(crate) types: TVec<TypeId, Type>,
-    pub(crate) symbolic_rules: Vec<SymbolicRule>,
-    pub(crate) implicit_rules: BTreeMap<RelationId, Vec<ImplicitRule>>,
-    pub(crate) relations: TVec<RelationId, Relation>,
-    pub(crate) global_compute: TVec<GlobalId, crate::codegen::GlobalCompute>,
-    pub(crate) global_types: TVec<GlobalId, TypeId>,
-    #[allow(unused)]
-    /// NOTE: This may be useful if global variables are queried at run time
-    pub(crate) global_to_relation: TVec<GlobalId, RelationId>,
-    pub(crate) interner: crate::runtime::StringIntern,
-    pub(crate) initial: Vec<codegen::Initial>,
-}
-
-#[derive(Copy, Clone, Eq, PartialEq, Ord, PartialOrd, Hash, Debug)]
-pub(crate) struct Type {
-    /// Name of type (sort Math) -> "Math"
-    pub(crate) name: &'static str,
-    pub(crate) ty: TypeKind,
-}
-impl Type {
-    pub(crate) fn new_symbolic(name: &'static str) -> Self {
-        Self {
-            name,
-            ty: TypeKind::Symbolic,
-        }
-    }
-    pub(crate) fn new_primitive(name: &'static str, type_path: &'static str) -> Self {
-        Self {
-            name,
-            ty: TypeKind::Primitive { type_path },
-        }
-    }
-}
-
-#[derive(Copy, Clone, Eq, PartialEq, Ord, PartialOrd, Hash, Debug)]
-pub(crate) enum TypeKind {
-    /// can be unified by user
-    /// always a wrapper around a u32
-    Symbolic,
-    // /// can not be unified by user
-    // /// always a wrapper around a u32
-    // Collection {
-    //     manager: ...
-    // }
-    /// Some rust type that implements: `RelationElement` trait.
-    Primitive { type_path: &'static str },
 }
 
 /// All relations have some notion of "new" and "all"
