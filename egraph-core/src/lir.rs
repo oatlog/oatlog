@@ -66,7 +66,7 @@ impl Initial {
 pub(crate) struct TypeData {
     pub name: &'static str,
     // TODO: primitives
-    pub ty: TypeKind,
+    pub kind: TypeKind,
     // TODO erik for loke: Unit is only really used as a placeholder thing in the frontend and
     // assuming everything works correctly it should be removed in the frontend.
     //
@@ -79,7 +79,7 @@ impl TypeData {
     pub(crate) fn new_symbolic(name: &'static str) -> Self {
         Self {
             name,
-            ty: TypeKind::Symbolic,
+            kind: TypeKind::Symbolic,
             zero_sized: false,
         }
     }
@@ -87,14 +87,14 @@ impl TypeData {
         match name {
             "()" => Self {
                 name: "unit",
-                ty: TypeKind::Primitive {
+                kind: TypeKind::Primitive {
                     type_path: "THIS_STRING_SHOULD_NOT_APPEAR_IN_GENERATED_CODE",
                 },
                 zero_sized: true,
             },
             _ => Self {
                 name,
-                ty: TypeKind::Primitive { type_path },
+                kind: TypeKind::Primitive { type_path },
                 zero_sized: false,
             },
         }
@@ -117,7 +117,7 @@ pub(crate) struct RelationData {
     /// Generated name
     pub name: &'static str,
     pub param_types: TVec<ColumnId, TypeId>,
-    pub ty: RelationTy,
+    pub kind: RelationKind,
 }
 impl RelationData {
     pub(crate) fn new_table(
@@ -131,7 +131,7 @@ impl RelationData {
         Self {
             name,
             param_types: types.iter().copied().collect(),
-            ty: RelationTy::Table {
+            kind: RelationKind::Table {
                 usage_to_info,
                 index_to_info,
                 column_back_reference,
@@ -143,7 +143,7 @@ impl RelationData {
         Self {
             name: format!("Forall{name}").leak(),
             param_types: iter::once(ty).collect(),
-            ty: RelationTy::Forall { ty },
+            kind: RelationKind::Forall { ty },
         }
     }
     pub(crate) fn new_global(name: Option<&'static str>, ty: TypeId, id: GlobalId) -> Self {
@@ -151,14 +151,14 @@ impl RelationData {
         Self {
             name,
             param_types: iter::once(ty).collect(),
-            ty: RelationTy::Global { id },
+            kind: RelationKind::Global { id },
         }
     }
 }
 
 /// How to query this specific relation.
 #[derive(Debug)]
-pub enum RelationTy {
+pub enum RelationKind {
     /// A regular btree table.
     Table {
         /// Usage sites of any indexes

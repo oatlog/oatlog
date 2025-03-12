@@ -2,7 +2,7 @@ use crate::{
     ids::{ColumnId, GlobalId, RelationId, TypeId, VariableId},
     lir::{
         Action, GlobalCompute, ImplicitRule, ImplicitRuleTy, Initial, Literal, RelationData,
-        RelationTy, RuleAtom, RuleTrie, Theory, TypeData, TypeKind, VariableData,
+        RelationKind, RuleAtom, RuleTrie, Theory, TypeData, TypeKind, VariableData,
     },
     typed_vec::TVec,
 };
@@ -15,7 +15,7 @@ pub fn codegen(theory: &Theory) -> TokenStream {
     let symbolic_type_declarations: Vec<_> = theory
         .types
         .iter()
-        .filter_map(|type_| match type_.ty {
+        .filter_map(|type_| match type_.kind {
             TypeKind::Primitive { type_path: _ } => None,
             TypeKind::Symbolic => {
                 let type_ty = ident::type_ty(type_);
@@ -55,9 +55,9 @@ pub fn codegen(theory: &Theory) -> TokenStream {
             .filter_map(|rel| {
                 let field = ident::delta_row(rel);
                 let relation_ty = ident::rel_ty(rel);
-                    Some(match &rel.ty {
-                        RelationTy::Global { .. } => return None,
-                        RelationTy::Forall { ty } => {
+                    Some(match &rel.kind {
+                        RelationKind::Global { .. } => return None,
+                        RelationKind::Forall { ty } => {
                             let ty = &theory.types[ty];
                             let make_ident = ident::delta_make(ty);
                             let uf_ident = ident::type_uf(ty);
@@ -73,7 +73,7 @@ pub fn codegen(theory: &Theory) -> TokenStream {
                             field
                             )
                         }
-                        RelationTy::Table { .. } => {
+                        RelationKind::Table { .. } => {
                             let insert_ident = ident::delta_insert_row(rel);
 
                             (
@@ -113,7 +113,7 @@ pub fn codegen(theory: &Theory) -> TokenStream {
     let (uf_ident, uf_ty, type_uprooted, symbolic_ty): (Vec<_>, Vec<_>, Vec<_>, Vec<_>) = theory
         .types
         .iter()
-        .filter_map(|ty| match ty.ty {
+        .filter_map(|ty| match ty.kind {
             TypeKind::Symbolic => Some((
                 ident::type_uf(ty),
                 ident::type_ty_uf(ty),
@@ -128,9 +128,11 @@ pub fn codegen(theory: &Theory) -> TokenStream {
         let relation_ident: Vec<_> = theory
             .relations
             .iter()
-            .filter_map(|rel| match &rel.ty {
-                RelationTy::Global { .. } => None,
-                RelationTy::Table { .. } | RelationTy::Forall { .. } => Some(ident::rel_var(rel)),
+            .filter_map(|rel| match &rel.kind {
+                RelationKind::Global { .. } => None,
+                RelationKind::Table { .. } | RelationKind::Forall { .. } => {
+                    Some(ident::rel_var(rel))
+                }
             })
             .collect();
 
@@ -161,11 +163,11 @@ pub fn codegen(theory: &Theory) -> TokenStream {
         .relations
         .iter()
         .filter_map(|rel| {
-            Some(match &rel.ty {
-                RelationTy::Table { .. } | RelationTy::Forall { .. } => {
+            Some(match &rel.kind {
+                RelationKind::Table { .. } | RelationKind::Forall { .. } => {
                     (ident::rel_var(rel), ident::rel_ty(rel))
                 }
-                RelationTy::Global { .. } => return None,
+                RelationKind::Global { .. } => return None,
             })
         })
         .unzip();
@@ -318,9 +320,9 @@ impl CodegenRuleTrieCtx<'_> {
             }
             RuleAtom::PremiseNew { relation, args } => {
                 let relation_ = &self.relations[relation];
-                match relation_.ty {
-                    RelationTy::Forall { .. } => todo!("forall new"),
-                    RelationTy::Global { id } => {
+                match relation_.kind {
+                    RelationKind::Forall { .. } => todo!("forall new"),
+                    RelationKind::Global { id } => {
                         let inner = self.codegen_all(then, true);
                         let var = args[0];
                         let ty = self.global_types[id];
@@ -336,7 +338,7 @@ impl CodegenRuleTrieCtx<'_> {
                             }
                         }
                     }
-                    RelationTy::Table { .. } => {
+                    RelationKind::Table { .. } => {
                         let relation = ident::rel_var(relation_);
                         let vars: Vec<_> = args
                             .iter()
@@ -362,8 +364,8 @@ impl CodegenRuleTrieCtx<'_> {
                 index,
             } => {
                 let relation = &self.relations[relation];
-                match &relation.ty {
-                    RelationTy::Global { id } => {
+                match &relation.kind {
+                    RelationKind::Global { id } => {
                         // assign global to variable.
                         let inner = self.codegen_all(then, true);
                         let var = args[0];
@@ -379,8 +381,8 @@ impl CodegenRuleTrieCtx<'_> {
                             #inner
                         }
                     }
-                    RelationTy::Forall { .. } => todo!("premise forall"),
-                    RelationTy::Table {
+                    RelationKind::Forall { .. } => todo!("premise forall"),
+                    RelationKind::Table {
                         usage_to_info,
                         index_to_info,
                         ..
@@ -445,8 +447,8 @@ impl CodegenRuleTrieCtx<'_> {
                 index,
             } => {
                 let relation = &self.relations[relation];
-                match &relation.ty {
-                    RelationTy::Global { id } => {
+                match &relation.kind {
+                    RelationKind::Global { id } => {
                         // check that global in old matches var
                         let inner = self.codegen_all(then, true);
                         let var = args[0];
@@ -461,8 +463,8 @@ impl CodegenRuleTrieCtx<'_> {
                             }
                         }
                     }
-                    RelationTy::Forall { .. } => todo!(),
-                    RelationTy::Table {
+                    RelationKind::Forall { .. } => todo!(),
+                    RelationKind::Table {
                         usage_to_info,
                         index_to_info,
                         column_back_reference: _,
@@ -603,14 +605,14 @@ impl CodegenRuleTrieCtx<'_> {
 
                 let relation = &self.relations[relation];
 
-                match &relation.ty {
-                    RelationTy::Forall { .. } => panic!(),
-                    RelationTy::Table { .. } => {
+                match &relation.kind {
+                    RelationKind::Forall { .. } => panic!(),
+                    RelationKind::Table { .. } => {
                         let insert_ident = ident::delta_insert_row(relation);
                         let row = args.iter().copied().map(|x| ident::var_var(self.var_of(x)));
                         quote! { self.delta.#insert_ident((#(#row),*)); }
                     }
-                    RelationTy::Global { id } => {
+                    RelationKind::Global { id } => {
                         let var = args[0];
                         let ty = self.global_types[id];
                         let ty_ = &self.types[ty];
@@ -689,9 +691,9 @@ fn codegen_globals(theory: &Theory) -> (TokenStream, TVec<GlobalId, usize>) {
                 // also make sure delta/uf is available for write
                 GlobalCompute::Compute { relation, args } => {
                     let relation_ = &theory.relations[relation];
-                    match &relation_.ty {
-                        RelationTy::Global { .. } => panic!(),
-                        RelationTy::Table {
+                    match &relation_.kind {
+                        RelationKind::Global { .. } => panic!(),
+                        RelationKind::Table {
                             usage_to_info: _,
                             index_to_info: _,
                             column_back_reference: _,
@@ -749,7 +751,7 @@ fn codegen_globals(theory: &Theory) -> (TokenStream, TVec<GlobalId, usize>) {
                                 #(#last)*
                             }
                         }
-                        RelationTy::Forall { .. } => todo!(),
+                        RelationKind::Forall { .. } => todo!(),
                     }
                 }
             };
@@ -815,12 +817,12 @@ fn codegen_relation(rel: &RelationData, theory: &Theory) -> TokenStream {
         .map(|type_| ident::type_ty(&theory.types[type_]));
     let theory_delta_ty = ident::theory_delta_ty(theory);
 
-    match &rel.ty {
-        RelationTy::Global { .. } => {
+    match &rel.kind {
+        RelationKind::Global { .. } => {
             // will codegen into a single big struct.
             quote! {}
         }
-        RelationTy::Forall { .. } => {
+        RelationKind::Forall { .. } => {
             let delta_forall = ident::delta_row(rel);
             quote! {
                 // maybe integrate with union-find
@@ -851,7 +853,7 @@ fn codegen_relation(rel: &RelationData, theory: &Theory) -> TokenStream {
                 }
             }
         }
-        RelationTy::Table {
+        RelationKind::Table {
             usage_to_info,
             index_to_info,
             column_back_reference,
@@ -942,7 +944,7 @@ fn codegen_relation(rel: &RelationData, theory: &Theory) -> TokenStream {
                     .iter_enumerate()
                     .filter_map(|(i, ty)| {
                         let ty = &theory.types[ty];
-                        match ty.ty {
+                        match ty.kind {
                             TypeKind::Primitive { type_path: _ } => None,
                             TypeKind::Symbolic => Some((ident::column(i), ident::type_uf(ty))),
                         }
@@ -955,7 +957,7 @@ fn codegen_relation(rel: &RelationData, theory: &Theory) -> TokenStream {
                     column_back_reference.iter_enumerate().filter_map(|(c, usage)| {
                         let ty = rel.param_types[c];
                         let ty = &theory.types[ty];
-                        match ty.ty {
+                        match ty.kind {
                             TypeKind::Primitive { type_path: _ } => None,
                             TypeKind::Symbolic => {
                                 let usage_info = &usage_to_info[*usage];
@@ -1010,7 +1012,7 @@ fn codegen_relation(rel: &RelationData, theory: &Theory) -> TokenStream {
                     rel.param_types.iter_enumerate().map(|(i, x)| {
                         let column = ident::column(i);
                         let ty = &theory.types[x];
-                        match ty.ty {
+                        match ty.kind {
                             TypeKind::Primitive { type_path: _ } => quote! { #column },
                             TypeKind::Symbolic => {
                                 let uf = ident::type_uf(ty);
@@ -1187,7 +1189,7 @@ mod ident {
     }
     /// `Math`, `std::primitive::i64`
     pub fn type_ty(ty: &TypeData) -> TokenStream {
-        match ty.ty {
+        match ty.kind {
             TypeKind::Symbolic => {
                 let x = format_ident!("{}", ty.name.to_pascal_case());
                 quote! { #x }
