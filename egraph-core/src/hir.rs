@@ -2,8 +2,8 @@
 //! Desugared, flattened rules.
 
 use crate::{
-    codegen::{self},
     ids::{ActionId, ColumnId, GlobalId, Id, PremiseId, RelationId, TypeId, VariableId},
+    lir,
     typed_vec::TVec,
     union_find::{UF, UFData},
 };
@@ -28,13 +28,13 @@ pub(crate) struct Theory {
     pub(crate) symbolic_rules: Vec<SymbolicRule>,
     pub(crate) implicit_rules: BTreeMap<RelationId, Vec<ImplicitRule>>,
     pub(crate) relations: TVec<RelationId, Relation>,
-    pub(crate) global_compute: TVec<GlobalId, crate::codegen::GlobalCompute>,
+    pub(crate) global_compute: TVec<GlobalId, crate::lir::GlobalCompute>,
     pub(crate) global_types: TVec<GlobalId, TypeId>,
     #[allow(unused)]
     /// NOTE: This may be useful if global variables are queried at run time
     pub(crate) global_to_relation: TVec<GlobalId, RelationId>,
     pub(crate) interner: crate::runtime::StringIntern,
-    pub(crate) initial: Vec<codegen::Initial>,
+    pub(crate) initial: Vec<lir::Initial>,
 }
 
 #[derive(Copy, Clone, Eq, PartialEq, Ord, PartialOrd, Hash, Debug)]
@@ -321,13 +321,13 @@ pub(crate) struct VariableMeta {
     pub(crate) ty: TypeId,
 }
 impl VariableMeta {
-    pub(crate) fn into_codegen(&self, id: impl Display) -> codegen::VariableData {
+    pub(crate) fn into_lir(&self, id: impl Display) -> lir::VariableData {
         let name = if self.name.is_empty() {
             id.to_string().leak()
         } else {
             self.name
         };
-        codegen::VariableData::new(name, self.ty)
+        lir::VariableData::new(name, self.ty)
     }
     fn new(name: &'static str, ty: TypeId) -> Self {
         if name.starts_with("__") {

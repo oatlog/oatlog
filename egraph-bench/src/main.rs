@@ -15,15 +15,12 @@ use std::time::Instant;
 // (Var String)
 
 mod codegen_err {
-     // egraph::compile_egraph!((
-     //     (sort T1)
-     //     (sort T2)
-     //     (sort T3)
-     //     (relation Foo (T1 T2 T3))
-     // ));
-
-
-
+    // egraph::compile_egraph!((
+    //     (sort T1)
+    //     (sort T2)
+    //     (sort T3)
+    //     (relation Foo (T1 T2 T3))
+    // ));
 }
 
 fn main() {}

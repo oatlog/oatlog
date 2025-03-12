@@ -13,14 +13,14 @@ impl Steps {
             exp.assert_eq(&hir.dbg_summary())
         }
 
-        let (_, codegen) = crate::query_planning::emit_codegen_theory(hir);
+        let (_, lir) = crate::query_planning::emit_lir_theory(hir);
         if let Some(exp) = self.expected_lir {
-            exp.assert_eq(&format!("{codegen:#?}"))
+            exp.assert_eq(&format!("{lir:#?}"))
         }
 
-        let output_tokens = crate::codegen::codegen(&codegen);
+        let codegen = crate::codegen::codegen(&lir);
         if let Some(exp) = self.expected_codegen {
-            let formatted = crate::format_tokens(&output_tokens);
+            let formatted = crate::format_tokens(&codegen);
             exp.assert_eq(&formatted);
         }
     }

@@ -1,498 +1,261 @@
-// #![allow(unused, reason = "remove temporary warning noise")]
-
 use crate::{
-    ids::{ColumnId, GlobalId, IndexId, IndexUsageId, RelationId, TypeId, VariableId},
-    index_selection::{self},
+    ids::{ColumnId, GlobalId, RelationId, TypeId, VariableId},
+    lir::{
+        Action, GlobalCompute, ImplicitRule, ImplicitRuleTy, Initial, Literal, RelationData,
+        RelationTy, RuleAtom, RuleTrie, Theory, TypeData, TypeKind, VariableData,
+    },
     typed_vec::TVec,
 };
-
-use derive_more::From;
 use itertools::Itertools as _;
 use proc_macro2::TokenStream;
 use quote::{format_ident, quote};
-
 use std::{collections::BTreeMap, iter};
 
-/// Data such as type and function names are technically unnecessary but used for more readable
-/// generated code. A compiler is far less performance sensitive than an interpreter (although the
-/// generated code is).
-//
-// TODO: Consider scheduling of rules differently often? (NOTE: all applicable rules must run
-// between an insertion and corresponding retirement. In practice, running differently often is
-// only applicable as part of culling rules which will mismatch later, but query planning handles
-// this by placing the iteration over `new` first. Rules that run a few times in sequence, at
-// startup, seem useful though.)
-#[derive(Debug)]
-pub(crate) struct Theory {
-    pub(crate) name: &'static str,
-    pub(crate) types: TVec<TypeId, TypeData>,
-    pub(crate) relations: TVec<RelationId, RelationData>,
-    pub(crate) rule_variables: TVec<VariableId, VariableData>,
-    pub(crate) global_compute: TVec<GlobalId, GlobalCompute>,
-    pub(crate) global_types: TVec<GlobalId, TypeId>,
-    // /// `RuleTrie`s run once on theory creation.
-    // rule_tries_startup: &'static [RuleTrie],
-    pub(crate) rule_tries: &'static [RuleTrie],
-    pub(crate) initial: Vec<Initial>,
-}
-
-#[derive(Debug, Clone)]
-pub(crate) enum Initial {
-    Run { steps: usize },
-    // ComputeGlobal {
-    //     id: GlobalId,
-    //     compute: GlobalCompute,
-    // },
-    // assert that rule matches database.
-    // Check {
-    //     ...
-    // }
-    // assert that rule does not match the database.
-    // Fail {
-    //     ...
-    // }
-}
-impl Initial {
-    pub(crate) fn run(steps: usize) -> Self {
-        Self::Run { steps }
-    }
-    // fn global_literal(id: GlobalId, literal: Literal) -> Self {
-    //     todo!()
-    // }
-    // fn global_call(id: GlobalId, relation: RelationId, args: Vec<GlobalId>) -> Self {
-    //     todo!()
-    // }
-}
-
-// implicit: TVec<RelationId, Vec<ImplicitRule>>
-// applied on *inserts*
-#[derive(Clone, Debug)]
-pub(crate) struct ImplicitRule {
-    index: IndexUsageId,
-    ty: ImplicitRuleTy,
-}
-impl ImplicitRule {
-    pub(crate) fn new_union(index: IndexUsageId) -> Self {
-        Self {
-            index,
-            ty: ImplicitRuleTy::Union,
-        }
-    }
-    pub(crate) fn new_panic(index: IndexUsageId) -> Self {
-        Self {
-            index,
-            ty: ImplicitRuleTy::Panic,
-        }
-    }
-}
-#[derive(Clone, Debug)]
-enum ImplicitRuleTy {
-    Union,
-    Panic,
-    // Lattice { .. },
-}
-
-#[derive(Debug)]
-pub(crate) struct TypeData {
-    name: &'static str,
-    // TODO: primitives
-    ty: TypeKind,
-    // TODO erik for loke: Unit is only really used as a placeholder thing in the frontend and
-    // assuming everything works correctly it should be removed in the frontend.
-    //
-    // Do we expect actual user provided ZSTs?
-    //
-    // loke: Agree this can be desugared. We should get `comparative-test/path_union` passing somehow and delete this.
-    zero_sized: bool,
-}
-impl TypeData {
-    pub(crate) fn new_symbolic(name: &'static str) -> Self {
-        Self {
-            name,
-            ty: TypeKind::Symbolic,
-            zero_sized: false,
-        }
-    }
-    pub(crate) fn new_primitive(name: &'static str, type_path: &'static str) -> Self {
-        match name {
-            "()" => Self {
-                name: "unit",
-                ty: TypeKind::Primitive {
-                    type_path: "THIS_STRING_SHOULD_NOT_APPEAR_IN_GENERATED_CODE",
-                },
-                zero_sized: true,
-            },
-            _ => Self {
-                name,
-                ty: TypeKind::Primitive { type_path },
-                zero_sized: false,
-            },
-        }
-    }
-    fn is_zero_sized(&self) -> bool {
-        self.zero_sized
-    }
-}
-#[derive(Debug)]
-pub(crate) enum TypeKind {
-    /// Has union-find
-    Symbolic,
-    /// Does not have union-find
-    Primitive { type_path: &'static str },
-}
-
-/// General over all relations
-#[derive(Debug)]
-pub(crate) struct RelationData {
-    /// Generated name
-    name: &'static str,
-    param_types: TVec<ColumnId, TypeId>,
-    ty: RelationTy,
-}
-impl RelationData {
-    pub(crate) fn new_table(
-        name: &'static str,
-        types: TVec<ColumnId, TypeId>,
-        usage_to_info: TVec<IndexUsageId, index_selection::IndexUsageInfo>,
-        index_to_info: TVec<IndexId, index_selection::IndexInfo>,
-        column_back_reference: TVec<ColumnId, IndexUsageId>,
-        implicit_rules: Vec<ImplicitRule>,
-    ) -> Self {
-        Self {
-            name,
-            param_types: types.iter().copied().collect(),
-            ty: RelationTy::Table {
-                usage_to_info,
-                index_to_info,
-                column_back_reference,
-                implicit_rules,
-            },
-        }
-    }
-    pub(crate) fn new_forall(name: &'static str, ty: TypeId) -> Self {
-        Self {
-            name: format!("Forall{name}").leak(),
-            param_types: iter::once(ty).collect(),
-            ty: RelationTy::Forall { ty },
-        }
-    }
-    pub(crate) fn new_global(name: Option<&'static str>, ty: TypeId, id: GlobalId) -> Self {
-        let name = name.unwrap_or(&*id.to_string().leak());
-        Self {
-            name,
-            param_types: iter::once(ty).collect(),
-            ty: RelationTy::Global { id },
-        }
-    }
-}
-
-/// How to query this specific relation.
-#[derive(Debug)]
-enum RelationTy {
-    /// A regular btree table.
-    Table {
-        /// Usage sites of any indexes
-        usage_to_info: TVec<IndexUsageId, index_selection::IndexUsageInfo>,
-        /// The actual indexes we need to generate.
-        index_to_info: TVec<IndexId, index_selection::IndexInfo>,
-        /// Index usage for back-references.
-        column_back_reference: TVec<ColumnId, IndexUsageId>,
-        implicit_rules: Vec<ImplicitRule>,
-        // trigger_rules: ...
-    },
-    Forall {
-        ty: TypeId,
-    },
-    // /// Panics if usage is not a subset of indexes.
-    // Primitive { }
-    Global {
-        id: GlobalId,
-    },
-}
-
-#[derive(Clone, Eq, PartialEq, Ord, PartialOrd, Hash, Debug, From)]
-pub(crate) enum GlobalCompute {
-    Literal(Literal),
-    // "call" some function
-    Compute {
-        relation: RelationId,
-        args: &'static [GlobalId],
-    },
-}
-impl GlobalCompute {
-    pub(crate) fn new_i64(x: i64) -> Self {
-        Self::Literal(x.into())
-    }
-    pub(crate) fn new_string(s: String, intern: &mut crate::runtime::StringIntern) -> Self {
-        Self::Literal(intern.intern(s).into())
-    }
-    pub(crate) fn new_call(relation: RelationId, args: &[GlobalId]) -> Self {
-        Self::Compute {
-            relation,
-            args: &*args.to_owned().leak(),
-        }
-    }
-}
-impl Default for GlobalCompute {
-    fn default() -> Self {
-        Self::Literal(Literal::default())
-    }
-}
-#[derive(Clone, Eq, PartialEq, Ord, PartialOrd, Hash, Debug, From)]
-pub(crate) enum Literal {
-    I64(i64),
-    String(crate::runtime::IString),
-}
-impl Default for Literal {
-    fn default() -> Self {
-        Self::I64(0)
-    }
-}
-
-// /// Note that global variables are represented as functions with signature `() -> T`, and these
-// /// functions can in effect be coerced to global variables by calling them.
-// // TODO: Implement globals. Maybe as variables directly?
-// #[derive(Debug)]
-// struct Initial {
-//     relation: RelationId,
-//     args: Vec<Option<RelationId>>,
-// }
-#[derive(Debug)]
-pub(crate) struct VariableData {
-    name: &'static str,
-    type_: TypeId,
-}
-impl VariableData {
-    pub(crate) fn new(name: &'static str, ty: TypeId) -> Self {
-        Self { name, type_: ty }
-    }
-}
-// TODO: maybe revisit at some point at turn into a DAG, if there are common subtrees
-#[derive(Debug, Clone, Copy)]
-pub(crate) struct RuleTrie {
-    pub(crate) meta: Option<&'static str>,
-    pub(crate) atom: RuleAtom,
-    pub(crate) then: &'static [RuleTrie],
-}
-#[derive(Debug, Clone, Copy)]
-pub(crate) enum RuleAtom {
-    // ==== PREMISES ====
-    /// Iterate (all)/(all new) elements of a type.
-    Forall {
-        variable: VariableId,
-        new: bool,
-    },
-    /// Iterate all new tuples in a relation (requires all unbound variables).
-    PremiseNew {
-        relation: RelationId,
-        args: &'static [VariableId],
-    },
-    /// Indexed join with relation, binding any previously unbound variables.
-    Premise {
-        relation: RelationId,
-        args: &'static [VariableId],
-        /// usage depends on relationty
-        index: IndexUsageId,
-    },
-    /// Proceed only if at least one row matching the `args` pattern exists in `relation`.
-    PremiseAny {
-        relation: RelationId,
-        /// a bit cursed to not have Option<VariableId> here, but it works when generating.
-        /// `IndexUsageId` determines what variables are bound.
-        args: &'static [VariableId],
-        /// usage depends on relationty
-        index: IndexUsageId,
-    },
-    // /// Proceed only if all insertions are already present and all equates are already equal.
-    // /// (optimization to abort early if actions are done)
-    // RequireNotAllPresent(&'static [Action]),
-    // /// Bind unbound variable to global, or proceed only if bound variable matches global.
-    // LoadGlobal {
-    //     global: GlobalId,
-    //     variable: VariableId,
-    //     new: bool,
-    // },
-
-    // ==== ACTIONS ====
-    Action(Action),
-    /// Panic in the generated rust code.
-    Panic(&'static str),
-}
-
-#[derive(Debug, Clone, Copy)]
-pub(crate) enum Action {
-    /// Insert tuple with bound variables
-    Insert {
-        relation: RelationId,
-        args: &'static [VariableId],
-    },
-    /// Equate two bound variables.
-    Equate(VariableId, VariableId),
-    // /// Insert into a relation with a functional dependency
-    // /// Returns existing e-class or creates a new e-class.
-    // Entry {
-    //     relation: RelationId,
-    //     args: &'static [VariableId],
-    //     result: VariableId,
-    //     index: IndexUsageId,
-    // },
-    /// Make a new E-class.
-    Make(VariableId),
-}
-
-#[derive(PartialEq, Eq, PartialOrd, Ord, Clone, Copy)]
-#[repr(usize)]
-enum Priority {
-    /// Highest priority, insertions caused by UF join. Bounded O(N).
-    Canonicalizing,
-    /// Medium priority, insertions that did not require new e-classes. Bounded O(N^arity).
-    Surjective,
-    /// Lowest priority, insertions using new e-classes. Potentially non-terminating.
-    Nonsurjective,
-}
-impl Priority {
-    const COUNT: usize = 3;
-    const LIST: [Self; Self::COUNT] = [Self::Canonicalizing, Self::Surjective, Self::Nonsurjective];
-    const MIN: Self = Self::LIST[0];
-    const MAX: Self = Self::LIST[Self::COUNT - 1];
-}
-impl quote::ToTokens for Priority {
-    fn to_tokens(&self, tokens: &mut TokenStream) {
-        match self {
-            Self::Canonicalizing => tokens.extend(quote!(Priority::Canonicalizing)),
-            Self::Surjective => tokens.extend(quote!(Priority::Surjective)),
-            Self::Nonsurjective => tokens.extend(quote!(Priority::Nonsurjective)),
-        }
-    }
-}
-
-mod ident {
-    use super::{RelationData, Theory, TypeData, VariableData};
-    use crate::{codegen::TypeKind, ids::ColumnId, index_selection};
-    use heck::{ToPascalCase as _, ToSnakeCase as _};
-    use itertools::Itertools as _;
-    use proc_macro2::{Ident, TokenStream};
-    use quote::{format_ident, quote};
-
-    /// `a`
-    pub fn var_var(var: &VariableData) -> Ident {
-        format_ident!("{}", var.name.to_snake_case())
-    }
-    /// `Math`, `std::primitive::i64`
-    pub fn type_ty(ty: &TypeData) -> TokenStream {
-        match ty.ty {
+pub fn codegen(theory: &Theory) -> TokenStream {
+    let symbolic_type_declarations: Vec<_> = theory
+        .types
+        .iter()
+        .filter_map(|type_| match type_.ty {
+            TypeKind::Primitive { type_path: _ } => None,
             TypeKind::Symbolic => {
-                let x = format_ident!("{}", ty.name.to_pascal_case());
-                quote! { #x }
+                let type_ty = ident::type_ty(type_);
+                Some(quote! {
+                    eclass_wrapper_ty!(#type_ty);
+                })
             }
-            TypeKind::Primitive { type_path } => type_path.parse().unwrap(),
+        })
+        .collect();
+
+    let (global_variables_decl, global_variables_map) = codegen_globals(theory);
+
+    let relations = theory
+        .relations
+        .iter()
+        .map(|rel| codegen_relation(rel, theory));
+
+    let rule_contents = {
+        CodegenRuleTrieCtx {
+            types: &theory.types,
+            relations: &theory.relations,
+            variables: &theory.rule_variables,
+
+            variables_bound: &mut theory.rule_variables.new_same_size(),
+            scoped: true,
+            priority_cap: Priority::MIN,
+            global_types: &theory.global_types,
+            global_idx: &global_variables_map,
         }
-    }
-    /// `math`
-    pub fn type_name(ty: &TypeData) -> Ident {
-        format_ident!("{}", ty.name.to_snake_case())
-    }
-    pub fn type_global(ty: &TypeData) -> Ident {
-        format_ident!("global_{}", ty.name.to_snake_case())
-    }
-    /// `math_uf`
-    pub fn type_uf(ty: &TypeData) -> Ident {
-        format_ident!("{}_uf", ty.name.to_snake_case())
-    }
-    /// `UnionFind<Math>`
-    pub fn type_ty_uf(ty: &TypeData) -> TokenStream {
-        let ty = type_ty(ty);
-        quote! { UnionFind<#ty> }
-    }
-    /// `math_uprooted`
-    pub fn type_uprooted(ty: &TypeData) -> Ident {
-        format_ident!("{}_uprooted", ty.name.to_snake_case())
-    }
-    /// `math_iter`
-    pub fn type_iter(ty: &TypeData) -> Ident {
-        format_ident!("{}_iter", ty.name.to_snake_case())
-    }
-    /// `math_iter_new`
-    pub fn type_iter_new(ty: &TypeData) -> Ident {
-        format_ident!("{}_iter_new", ty.name.to_snake_case())
-    }
-    /// `MathRelation`, `AddRelation`
-    pub fn rel_ty(rel: &RelationData) -> Ident {
-        format_ident!("{}Relation", rel.name.to_pascal_case())
-    }
-    /// `add_relation`
-    pub fn rel_var(rel: &RelationData) -> Ident {
-        format_ident!("{}_relation", rel.name.to_snake_case())
-    }
-    /// `add`, `mul`
-    pub fn rel_get(rel: &RelationData) -> Ident {
-        format_ident!("{}", rel.name.to_snake_case())
-    }
-    /// `SemilatticeTheory`
-    pub fn theory_ty(theory: &Theory) -> Ident {
-        format_ident!("{}Theory", theory.name.to_pascal_case())
-    }
-    /// `SemilatticeDelta`
-    pub fn theory_delta_ty(theory: &Theory) -> Ident {
-        format_ident!("{}Delta", theory.name.to_pascal_case())
-    }
-    /// `all_index_2_0_1`
-    pub fn index_all_field(index: &index_selection::IndexInfo) -> Ident {
-        let perm = index
-            .permuted_columns
+        .codegen_all(theory.rule_tries, true)
+    };
+
+    let delta = {
+        let (delta_functions, delta_fields, delta_field_name): (Vec<_>, Vec<_>, Vec<_>) = theory
+            .relations
             .iter()
-            .map(|ColumnId(x)| format!("{x}"))
-            .join("_");
-        format_ident!("all_index_{perm}")
-    }
-    /// `iter2_2_0_1`
-    pub fn index_all_iter(
-        usage: &index_selection::IndexUsageInfo,
-        index: &index_selection::IndexInfo,
-    ) -> Ident {
-        let index_perm = index
-            .permuted_columns
+            .filter_map(|rel| {
+                let field = ident::delta_row(rel);
+                let relation_ty = ident::rel_ty(rel);
+                    Some(match &rel.ty {
+                        RelationTy::Global { .. } => return None,
+                        RelationTy::Forall { ty } => {
+                            let ty = &theory.types[ty];
+                            let make_ident = ident::delta_make(ty);
+                            let uf_ident = ident::type_uf(ty);
+                            let ty = ident::type_ty(ty);
+                            (quote! {
+                                pub fn #make_ident(&mut self, uf: &mut Unification) -> #ty {
+                                    let id = uf.#uf_ident.add_eclass();
+                                    self.#field.push(id);
+                                    id
+                                }
+                            },
+                            quote! { #field : Vec<<#relation_ty as Relation>::Row>, },
+                            field
+                            )
+                        }
+                        RelationTy::Table { .. } => {
+                            let insert_ident = ident::delta_insert_row(rel);
+
+                            (
+                            quote! {
+                                pub fn #insert_ident(&mut self, x: <#relation_ty as Relation>::Row) {
+                                    self.#field.push(x);
+                                }
+                            },
+                            quote! { #field : Vec<<#relation_ty as Relation>::Row>, },
+                            field
+                            )
+                        }
+                    })
+            })
+            .multiunzip();
+
+        let theory_delta_ty = ident::theory_delta_ty(theory);
+
+        quote! {
+            #[derive(Debug, Default)]
+            pub struct #theory_delta_ty {
+                #(#delta_fields)*
+            }
+            impl #theory_delta_ty {
+                fn new() -> Self { Self::default() }
+                fn has_new(&self) -> bool {
+                    let mut has_new = false;
+                    #(has_new |= !self.#delta_field_name.is_empty();)*
+                    has_new
+                }
+                #(#delta_functions)*
+            }
+        }
+    };
+
+    // TODO: move to types stuff
+    let (uf_ident, uf_ty, type_uprooted, symbolic_ty): (Vec<_>, Vec<_>, Vec<_>, Vec<_>) = theory
+        .types
+        .iter()
+        .filter_map(|ty| match ty.ty {
+            TypeKind::Symbolic => Some((
+                ident::type_uf(ty),
+                ident::type_ty_uf(ty),
+                ident::type_uprooted(ty),
+                ident::type_ty(ty),
+            )),
+            TypeKind::Primitive { type_path: _ } => None,
+        })
+        .multiunzip();
+
+    let clear_transient = {
+        let relation_ident: Vec<_> = theory
+            .relations
             .iter()
-            .map(|ColumnId(x)| format!("{x}"))
-            .join("_");
-        let prefix = format!("{}", usage.prefix);
-        format_ident!("iter{prefix}_{index_perm}")
-    }
-    /// `check2_2_0_1`
-    pub fn index_all_check(
-        usage: &index_selection::IndexUsageInfo,
-        index: &index_selection::IndexInfo,
-    ) -> Ident {
-        let index_perm = index
-            .permuted_columns
-            .iter()
-            .map(|ColumnId(x)| format!("{x}"))
-            .join("_");
-        let prefix = format!("{}", usage.prefix);
-        format_ident!("check{prefix}_{index_perm}")
-    }
-    /// `x2`
-    pub fn column(c: ColumnId) -> Ident {
-        format_ident!("x{}", c.0)
-    }
-    /// `y2`
-    pub fn column_alt(c: ColumnId) -> Ident {
-        format_ident!("y{}", c.0)
-    }
-    /// `add_relation_delta`
-    pub fn delta_row(rel: &RelationData) -> Ident {
-        let x = rel.name.to_snake_case();
-        format_ident!("{x}_relation_delta")
-    }
-    /// `insert_add`
-    pub fn delta_insert_row(rel: &RelationData) -> Ident {
-        let x = rel.name.to_snake_case();
-        format_ident!("insert_{x}")
-    }
-    /// `make_math`
-    pub fn delta_make(ty: &TypeData) -> Ident {
-        let x = ty.name.to_snake_case();
-        format_ident!("make_{x}")
+            .filter_map(|rel| match &rel.ty {
+                RelationTy::Global { .. } => None,
+                RelationTy::Table { .. } | RelationTy::Forall { .. } => Some(ident::rel_var(rel)),
+            })
+            .collect();
+
+        // uproot
+        // update relations
+        //
+
+        quote! {
+            #[inline(never)]
+            fn clear_transient(&mut self) {
+                self.global_variables.new = false;
+                #(self.#relation_ident.clear_new();)*
+                loop {
+                    self.uprooted.take_dirt(&mut self.uf);
+                    #(self.#relation_ident.update(&self.uprooted, &mut self.uf, &mut self.delta);)*
+
+                    // do we have pending uproots or inserts?
+                    if !(self.uf.has_new() || self.delta.has_new()) {
+                        break;
+                    }
+                }
+                #(self.#relation_ident.update_finalize(&mut self.uf);)*
+            }
+        }
+    };
+
+    let (stored_relations, stored_relation_types): (Vec<_>, Vec<_>) = theory
+        .relations
+        .iter()
+        .filter_map(|rel| {
+            Some(match &rel.ty {
+                RelationTy::Table { .. } | RelationTy::Forall { .. } => {
+                    (ident::rel_var(rel), ident::rel_ty(rel))
+                }
+                RelationTy::Global { .. } => return None,
+            })
+        })
+        .unzip();
+
+    let theory_ty = ident::theory_ty(theory);
+    let theory_delta_ty = ident::theory_delta_ty(theory);
+
+    let get_total_relation_entry_count_body = if stored_relations.is_empty() {
+        quote! {0}
+    } else {
+        quote! {[#(self.#stored_relations.len()),*].iter().copied().sum::<usize>()}
+    };
+
+    let theory_initial = {
+        theory.initial.iter().map(|x| match x {
+            Initial::Run { steps } => quote! { for _ in 0..#steps { theory.step() }},
+        })
+    };
+
+    quote! {
+        use egraph::runtime::*;
+        #(#symbolic_type_declarations)*
+        #(#relations)*
+        #delta
+        #global_variables_decl
+        #[derive(Debug, Default)]
+        struct Uprooted {
+            #(#type_uprooted : Vec<#symbolic_ty>,)*
+        }
+        impl Uprooted {
+            fn take_dirt(&mut self, uf: &mut Unification) {
+                #(self.#type_uprooted.clear();)*
+                #(swap(&mut self.#type_uprooted, &mut uf.#uf_ident.dirty());)*
+            }
+        }
+        #[derive(Debug, Default)]
+        struct Unification {
+            #(#uf_ident: #uf_ty,)*
+        }
+        impl Unification {
+            fn has_new(&mut self) -> bool {
+                let mut has_new = false;
+                #(has_new |= !self.#uf_ident.dirty().is_empty();)*
+                has_new
+            }
+        }
+        #[derive(Debug, Default)]
+        pub struct #theory_ty {
+            delta: #theory_delta_ty,
+            uf: Unification,
+            uprooted: Uprooted,
+            global_variables: GlobalVariables,
+            #(#stored_relations: #stored_relation_types,)*
+        }
+        impl #theory_ty {
+            pub fn new() -> Self {
+                let mut theory = Self::default();
+                theory.global_variables.initialize(&mut theory.delta, &mut theory.uf);
+                theory.clear_transient();
+                theory.global_variables.new = true;
+                #(#theory_initial)*
+                theory
+            }
+            pub fn step(&mut self) {
+                self.apply_rules();
+                self.clear_transient();
+            }
+            #[inline(never)]
+            fn apply_rules(&mut self) { #rule_contents }
+            fn emit_graphviz(&self) -> String {
+                let mut buf = String::new();
+                buf.push_str("digraph G {");
+                #(self.#stored_relations.emit_graphviz(&mut buf);)*
+                buf.push_str("}");
+                buf
+            }
+            fn get_total_relation_entry_count(&self) -> usize {
+                #get_total_relation_entry_count_body
+            }
+            #clear_transient
+        }
+
+        // make insert functions "for free"
+        impl std::ops::Deref for #theory_ty {
+            type Target = #theory_delta_ty;
+            fn deref(&self) -> &Self::Target { &self.delta }
+        }
+        impl std::ops::DerefMut for #theory_ty {
+            fn deref_mut(&mut self) -> &mut Self::Target { &mut self.delta }
+        }
     }
 }
 
@@ -962,7 +725,7 @@ fn codegen_globals(theory: &Theory) -> (TokenStream, TVec<GlobalId, usize>) {
                             let (last, last_compute) = {
                                 let ty = theory.global_types[global_id];
                                 let ty_ = &theory.types[ty];
-                                if ty_.zero_sized {
+                                if ty_.is_zero_sized() {
                                     (vec![], quote! {})
                                 } else {
                                     let tmp = format_ident!("tmp_res");
@@ -1042,254 +805,6 @@ fn codegen_globals(theory: &Theory) -> (TokenStream, TVec<GlobalId, usize>) {
         },
         assigned_indexes,
     )
-}
-
-pub fn codegen(theory: &Theory) -> TokenStream {
-    let symbolic_type_declarations: Vec<_> = theory
-        .types
-        .iter()
-        .filter_map(|type_| match type_.ty {
-            TypeKind::Primitive { type_path: _ } => None,
-            TypeKind::Symbolic => {
-                let type_ty = ident::type_ty(type_);
-                Some(quote! {
-                    eclass_wrapper_ty!(#type_ty);
-                })
-            }
-        })
-        .collect();
-
-    let (global_variables_decl, global_variables_map) = codegen_globals(theory);
-
-    let relations = theory
-        .relations
-        .iter()
-        .map(|rel| codegen_relation(rel, theory));
-
-    let rule_contents = {
-        CodegenRuleTrieCtx {
-            types: &theory.types,
-            relations: &theory.relations,
-            variables: &theory.rule_variables,
-
-            variables_bound: &mut theory.rule_variables.new_same_size(),
-            scoped: true,
-            priority_cap: Priority::MIN,
-            global_types: &theory.global_types,
-            global_idx: &global_variables_map,
-        }
-        .codegen_all(theory.rule_tries, true)
-    };
-
-    let delta = {
-        let (delta_functions, delta_fields, delta_field_name): (Vec<_>, Vec<_>, Vec<_>) = theory
-            .relations
-            .iter()
-            .filter_map(|rel| {
-                let field = ident::delta_row(rel);
-                let relation_ty = ident::rel_ty(rel);
-                    Some(match &rel.ty {
-                        RelationTy::Global { .. } => return None,
-                        RelationTy::Forall { ty } => {
-                            let ty = &theory.types[ty];
-                            let make_ident = ident::delta_make(ty);
-                            let uf_ident = ident::type_uf(ty);
-                            let ty = ident::type_ty(ty);
-                            (quote! {
-                                pub fn #make_ident(&mut self, uf: &mut Unification) -> #ty {
-                                    let id = uf.#uf_ident.add_eclass();
-                                    self.#field.push(id);
-                                    id
-                                }
-                            },
-                            quote! { #field : Vec<<#relation_ty as Relation>::Row>, },
-                            field
-                            )
-                        }
-                        RelationTy::Table { .. } => {
-                            let insert_ident = ident::delta_insert_row(rel);
-
-                            (
-                            quote! {
-                                pub fn #insert_ident(&mut self, x: <#relation_ty as Relation>::Row) {
-                                    self.#field.push(x);
-                                }
-                            },
-                            quote! { #field : Vec<<#relation_ty as Relation>::Row>, },
-                            field
-                            )
-                        }
-                    })
-            })
-            .multiunzip();
-
-        let theory_delta_ty = ident::theory_delta_ty(theory);
-
-        quote! {
-            #[derive(Debug, Default)]
-            pub struct #theory_delta_ty {
-                #(#delta_fields)*
-            }
-            impl #theory_delta_ty {
-                fn new() -> Self { Self::default() }
-                fn has_new(&self) -> bool {
-                    let mut has_new = false;
-                    #(has_new |= !self.#delta_field_name.is_empty();)*
-                    has_new
-                }
-                #(#delta_functions)*
-            }
-        }
-    };
-
-    // TODO: move to types stuff
-    let (uf_ident, uf_ty, type_uprooted, symbolic_ty): (Vec<_>, Vec<_>, Vec<_>, Vec<_>) = theory
-        .types
-        .iter()
-        .filter_map(|ty| match ty.ty {
-            TypeKind::Symbolic => Some((
-                ident::type_uf(ty),
-                ident::type_ty_uf(ty),
-                ident::type_uprooted(ty),
-                ident::type_ty(ty),
-            )),
-            TypeKind::Primitive { type_path: _ } => None,
-        })
-        .multiunzip();
-
-    let clear_transient = {
-        let relation_ident: Vec<_> = theory
-            .relations
-            .iter()
-            .filter_map(|rel| match &rel.ty {
-                RelationTy::Global { .. } => None,
-                RelationTy::Table { .. } | RelationTy::Forall { .. } => Some(ident::rel_var(rel)),
-            })
-            .collect();
-
-        // uproot
-        // update relations
-        //
-
-        quote! {
-            #[inline(never)]
-            fn clear_transient(&mut self) {
-                self.global_variables.new = false;
-                #(self.#relation_ident.clear_new();)*
-                loop {
-                    self.uprooted.take_dirt(&mut self.uf);
-                    #(self.#relation_ident.update(&self.uprooted, &mut self.uf, &mut self.delta);)*
-
-                    // do we have pending uproots or inserts?
-                    if !(self.uf.has_new() || self.delta.has_new()) {
-                        break;
-                    }
-                }
-                #(self.#relation_ident.update_finalize(&mut self.uf);)*
-            }
-        }
-    };
-
-    let (stored_relations, stored_relation_types): (Vec<_>, Vec<_>) = theory
-        .relations
-        .iter()
-        .filter_map(|rel| {
-            Some(match &rel.ty {
-                RelationTy::Table { .. } | RelationTy::Forall { .. } => {
-                    (ident::rel_var(rel), ident::rel_ty(rel))
-                }
-                RelationTy::Global { .. } => return None,
-            })
-        })
-        .unzip();
-
-    let theory_ty = ident::theory_ty(theory);
-    let theory_delta_ty = ident::theory_delta_ty(theory);
-
-    let get_total_relation_entry_count_body = if stored_relations.is_empty() {
-        quote! {0}
-    } else {
-        quote! {[#(self.#stored_relations.len()),*].iter().copied().sum::<usize>()}
-    };
-
-    let theory_initial = {
-        theory.initial.iter().map(|x| match x {
-            Initial::Run { steps } => quote! { for _ in 0..#steps { theory.step() }},
-        })
-    };
-
-    quote! {
-        use egraph::runtime::*;
-        #(#symbolic_type_declarations)*
-        #(#relations)*
-        #delta
-        #global_variables_decl
-        #[derive(Debug, Default)]
-        struct Uprooted {
-            #(#type_uprooted : Vec<#symbolic_ty>,)*
-        }
-        impl Uprooted {
-            fn take_dirt(&mut self, uf: &mut Unification) {
-                #(self.#type_uprooted.clear();)*
-                #(swap(&mut self.#type_uprooted, &mut uf.#uf_ident.dirty());)*
-            }
-        }
-        #[derive(Debug, Default)]
-        struct Unification {
-            #(#uf_ident: #uf_ty,)*
-        }
-        impl Unification {
-            fn has_new(&mut self) -> bool {
-                let mut has_new = false;
-                #(has_new |= !self.#uf_ident.dirty().is_empty();)*
-                has_new
-            }
-        }
-        #[derive(Debug, Default)]
-        pub struct #theory_ty {
-            delta: #theory_delta_ty,
-            uf: Unification,
-            uprooted: Uprooted,
-            global_variables: GlobalVariables,
-            #(#stored_relations: #stored_relation_types,)*
-        }
-        impl #theory_ty {
-            pub fn new() -> Self {
-                let mut theory = Self::default();
-                theory.global_variables.initialize(&mut theory.delta, &mut theory.uf);
-                theory.clear_transient();
-                theory.global_variables.new = true;
-                #(#theory_initial)*
-                theory
-            }
-            pub fn step(&mut self) {
-                self.apply_rules();
-                self.clear_transient();
-            }
-            #[inline(never)]
-            fn apply_rules(&mut self) { #rule_contents }
-            fn emit_graphviz(&self) -> String {
-                let mut buf = String::new();
-                buf.push_str("digraph G {");
-                #(self.#stored_relations.emit_graphviz(&mut buf);)*
-                buf.push_str("}");
-                buf
-            }
-            fn get_total_relation_entry_count(&self) -> usize {
-                #get_total_relation_entry_count_body
-            }
-            #clear_transient
-        }
-
-        // make insert functions "for free"
-        impl std::ops::Deref for #theory_ty {
-            type Target = #theory_delta_ty;
-            fn deref(&self) -> &Self::Target { &self.delta }
-        }
-        impl std::ops::DerefMut for #theory_ty {
-            fn deref_mut(&mut self) -> &mut Self::Target { &mut self.delta }
-        }
-    }
 }
 
 fn codegen_relation(rel: &RelationData, theory: &Theory) -> TokenStream {
@@ -1651,6 +1166,165 @@ fn codegen_relation(rel: &RelationData, theory: &Theory) -> TokenStream {
                     }
                 }
             }
+        }
+    }
+}
+
+mod ident {
+    use crate::{
+        ids::ColumnId,
+        index_selection,
+        lir::{RelationData, Theory, TypeData, TypeKind, VariableData},
+    };
+    use heck::{ToPascalCase as _, ToSnakeCase as _};
+    use itertools::Itertools as _;
+    use proc_macro2::{Ident, TokenStream};
+    use quote::{format_ident, quote};
+
+    /// `a`
+    pub fn var_var(var: &VariableData) -> Ident {
+        format_ident!("{}", var.name.to_snake_case())
+    }
+    /// `Math`, `std::primitive::i64`
+    pub fn type_ty(ty: &TypeData) -> TokenStream {
+        match ty.ty {
+            TypeKind::Symbolic => {
+                let x = format_ident!("{}", ty.name.to_pascal_case());
+                quote! { #x }
+            }
+            TypeKind::Primitive { type_path } => type_path.parse().unwrap(),
+        }
+    }
+    /// `math`
+    pub fn type_name(ty: &TypeData) -> Ident {
+        format_ident!("{}", ty.name.to_snake_case())
+    }
+    pub fn type_global(ty: &TypeData) -> Ident {
+        format_ident!("global_{}", ty.name.to_snake_case())
+    }
+    /// `math_uf`
+    pub fn type_uf(ty: &TypeData) -> Ident {
+        format_ident!("{}_uf", ty.name.to_snake_case())
+    }
+    /// `UnionFind<Math>`
+    pub fn type_ty_uf(ty: &TypeData) -> TokenStream {
+        let ty = type_ty(ty);
+        quote! { UnionFind<#ty> }
+    }
+    /// `math_uprooted`
+    pub fn type_uprooted(ty: &TypeData) -> Ident {
+        format_ident!("{}_uprooted", ty.name.to_snake_case())
+    }
+    /// `math_iter`
+    pub fn type_iter(ty: &TypeData) -> Ident {
+        format_ident!("{}_iter", ty.name.to_snake_case())
+    }
+    /// `math_iter_new`
+    pub fn type_iter_new(ty: &TypeData) -> Ident {
+        format_ident!("{}_iter_new", ty.name.to_snake_case())
+    }
+    /// `MathRelation`, `AddRelation`
+    pub fn rel_ty(rel: &RelationData) -> Ident {
+        format_ident!("{}Relation", rel.name.to_pascal_case())
+    }
+    /// `add_relation`
+    pub fn rel_var(rel: &RelationData) -> Ident {
+        format_ident!("{}_relation", rel.name.to_snake_case())
+    }
+    /// `add`, `mul`
+    pub fn rel_get(rel: &RelationData) -> Ident {
+        format_ident!("{}", rel.name.to_snake_case())
+    }
+    /// `SemilatticeTheory`
+    pub fn theory_ty(theory: &Theory) -> Ident {
+        format_ident!("{}Theory", theory.name.to_pascal_case())
+    }
+    /// `SemilatticeDelta`
+    pub fn theory_delta_ty(theory: &Theory) -> Ident {
+        format_ident!("{}Delta", theory.name.to_pascal_case())
+    }
+    /// `all_index_2_0_1`
+    pub fn index_all_field(index: &index_selection::IndexInfo) -> Ident {
+        let perm = index
+            .permuted_columns
+            .iter()
+            .map(|ColumnId(x)| format!("{x}"))
+            .join("_");
+        format_ident!("all_index_{perm}")
+    }
+    /// `iter2_2_0_1`
+    pub fn index_all_iter(
+        usage: &index_selection::IndexUsageInfo,
+        index: &index_selection::IndexInfo,
+    ) -> Ident {
+        let index_perm = index
+            .permuted_columns
+            .iter()
+            .map(|ColumnId(x)| format!("{x}"))
+            .join("_");
+        let prefix = format!("{}", usage.prefix);
+        format_ident!("iter{prefix}_{index_perm}")
+    }
+    /// `check2_2_0_1`
+    pub fn index_all_check(
+        usage: &index_selection::IndexUsageInfo,
+        index: &index_selection::IndexInfo,
+    ) -> Ident {
+        let index_perm = index
+            .permuted_columns
+            .iter()
+            .map(|ColumnId(x)| format!("{x}"))
+            .join("_");
+        let prefix = format!("{}", usage.prefix);
+        format_ident!("check{prefix}_{index_perm}")
+    }
+    /// `x2`
+    pub fn column(c: ColumnId) -> Ident {
+        format_ident!("x{}", c.0)
+    }
+    /// `y2`
+    pub fn column_alt(c: ColumnId) -> Ident {
+        format_ident!("y{}", c.0)
+    }
+    /// `add_relation_delta`
+    pub fn delta_row(rel: &RelationData) -> Ident {
+        let x = rel.name.to_snake_case();
+        format_ident!("{x}_relation_delta")
+    }
+    /// `insert_add`
+    pub fn delta_insert_row(rel: &RelationData) -> Ident {
+        let x = rel.name.to_snake_case();
+        format_ident!("insert_{x}")
+    }
+    /// `make_math`
+    pub fn delta_make(ty: &TypeData) -> Ident {
+        let x = ty.name.to_snake_case();
+        format_ident!("make_{x}")
+    }
+}
+
+#[derive(PartialEq, Eq, PartialOrd, Ord, Clone, Copy)]
+#[repr(usize)]
+pub enum Priority {
+    /// Highest priority, insertions caused by UF join. Bounded O(N).
+    Canonicalizing,
+    /// Medium priority, insertions that did not require new e-classes. Bounded O(N^arity).
+    Surjective,
+    /// Lowest priority, insertions using new e-classes. Potentially non-terminating.
+    Nonsurjective,
+}
+impl Priority {
+    const COUNT: usize = 3;
+    const LIST: [Self; Self::COUNT] = [Self::Canonicalizing, Self::Surjective, Self::Nonsurjective];
+    const MIN: Self = Self::LIST[0];
+    const MAX: Self = Self::LIST[Self::COUNT - 1];
+}
+impl quote::ToTokens for Priority {
+    fn to_tokens(&self, tokens: &mut TokenStream) {
+        match self {
+            Self::Canonicalizing => tokens.extend(quote!(Priority::Canonicalizing)),
+            Self::Surjective => tokens.extend(quote!(Priority::Surjective)),
+            Self::Nonsurjective => tokens.extend(quote!(Priority::Nonsurjective)),
         }
     }
 }

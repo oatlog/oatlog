@@ -1,9 +1,8 @@
 //! All query plan *choices* occur here.
 use crate::{
-    codegen::{self, RuleTrie},
     hir::{self, ImplicitRule, PremiseRelation, RelationTy, SymbolicRule, Theory},
     ids::{ActionId, ColumnId, IndexUsageId, PremiseId, RelationId, VariableId},
-    index_selection,
+    index_selection, lir,
     typed_vec::TVec,
 };
 use std::{
@@ -65,10 +64,10 @@ enum RelationScore {
     New,
 }
 
-/// Returns `codegen::Theory` and `hir::Theory` since the `hir::Theory` is modified when
+/// Returns `lir::Theory` and `hir::Theory` since the `hir::Theory` is modified when
 /// emitted.
 /// TODO: emit implicit rules, trigger rules.
-pub(crate) fn emit_codegen_theory(mut theory: hir::Theory) -> (hir::Theory, codegen::Theory) {
+pub(crate) fn emit_lir_theory(mut theory: hir::Theory) -> (hir::Theory, lir::Theory) {
     let non_new_relations = theory.relations.len();
     let old_to_new = theory.add_delta_relations_in_place();
 
@@ -83,13 +82,13 @@ pub(crate) fn emit_codegen_theory(mut theory: hir::Theory) -> (hir::Theory, code
     let mut table_uses: TVec<RelationId, TVec<IndexUsageId, Vec<ColumnId>>> =
         TVec::new_with_size(non_new_relations, TVec::new());
 
-    let mut codegen_variables: TVec<VariableId, codegen::VariableData> = TVec::new();
+    let mut lir_variables: TVec<VariableId, lir::VariableData> = TVec::new();
 
-    let mut tries: Vec<RuleTrie> = Vec::new();
+    let mut tries: Vec<lir::RuleTrie> = Vec::new();
 
     generate_tries(
         rules,
-        &mut codegen_variables,
+        &mut lir_variables,
         &theory,
         &mut table_uses,
         &mut tries,
@@ -97,7 +96,7 @@ pub(crate) fn emit_codegen_theory(mut theory: hir::Theory) -> (hir::Theory, code
 
     // compute indexes for relations.
 
-    let mut codegen_relations: TVec<RelationId, codegen::RelationData> = TVec::new();
+    let mut lir_relations: TVec<RelationId, lir::RelationData> = TVec::new();
 
     for relation_id in theory.relations.enumerate() {
         let relation = &theory.relations[relation_id];
@@ -106,15 +105,15 @@ pub(crate) fn emit_codegen_theory(mut theory: hir::Theory) -> (hir::Theory, code
             RelationTy::Alias { .. } => unimplemented!("alias relations not implemented"),
             RelationTy::Global { id } => {
                 let ty = theory.global_types[id];
-                let codegen_relation = codegen::RelationData::new_global(None, ty, id);
-                codegen_relations.push_expected(relation_id, codegen_relation);
+                let lir_relation = lir::RelationData::new_global(None, ty, id);
+                lir_relations.push_expected(relation_id, lir_relation);
             }
             RelationTy::Primitive { .. } => {
                 unimplemented!("primtive relations not implemented")
             }
             RelationTy::Forall { ty } => {
-                let codegen_relation = codegen::RelationData::new_forall(theory.types[ty].name, ty);
-                codegen_relations.push_expected(relation_id, codegen_relation);
+                let lir_relation = lir::RelationData::new_forall(theory.types[ty].name, ty);
+                lir_relations.push_expected(relation_id, lir_relation);
             }
             RelationTy::Table => {
                 let uses = &mut table_uses[relation_id];
@@ -143,11 +142,11 @@ pub(crate) fn emit_codegen_theory(mut theory: hir::Theory) -> (hir::Theory, code
                                         }
                                         hir::ImplicitRuleAction::Panic => {
                                             let index = uses.push(on.clone());
-                                            codegen::ImplicitRule::new_panic(index)
+                                            lir::ImplicitRule::new_panic(index)
                                         }
                                         hir::ImplicitRuleAction::Unification => {
                                             let index = uses.push(on.clone());
-                                            codegen::ImplicitRule::new_union(index)
+                                            lir::ImplicitRule::new_union(index)
                                         }
                                     },
                                 )
@@ -157,7 +156,7 @@ pub(crate) fn emit_codegen_theory(mut theory: hir::Theory) -> (hir::Theory, code
                 let (usage_to_info, index_to_info) =
                     index_selection::index_selection(relation.columns.len(), uses);
 
-                let codegen_relation = codegen::RelationData::new_table(
+                let lir_relation = lir::RelationData::new_table(
                     relation.name,
                     relation.columns.clone(),
                     usage_to_info,
@@ -165,7 +164,7 @@ pub(crate) fn emit_codegen_theory(mut theory: hir::Theory) -> (hir::Theory, code
                     column_back_references,
                     implicit_rules,
                 );
-                codegen_relations.push_expected(relation_id, codegen_relation);
+                lir_relations.push_expected(relation_id, lir_relation);
             }
         }
     }
@@ -174,48 +173,48 @@ pub(crate) fn emit_codegen_theory(mut theory: hir::Theory) -> (hir::Theory, code
         .types
         .iter()
         .map(|x| match x.ty {
-            hir::TypeKind::Symbolic => codegen::TypeData::new_symbolic(x.name),
+            hir::TypeKind::Symbolic => lir::TypeData::new_symbolic(x.name),
             hir::TypeKind::Primitive { type_path } => {
-                codegen::TypeData::new_primitive(x.name, type_path)
+                lir::TypeData::new_primitive(x.name, type_path)
             }
         })
         .collect();
 
-    let codegen_theory = codegen::Theory {
+    let lir_theory = lir::Theory {
         name: theory.name,
         types,
-        relations: codegen_relations,
+        relations: lir_relations,
         global_compute: theory.global_compute.clone(),
         global_types: theory.global_types.clone(),
-        rule_variables: codegen_variables,
+        rule_variables: lir_variables,
         rule_tries: tries.leak(),
         initial: theory.initial.clone(),
     };
 
-    (theory, codegen_theory)
+    (theory, lir_theory)
 }
 
 fn generate_tries(
     rules: Vec<SymbolicRule>,
-    codegen_variables: &mut TVec<VariableId, codegen::VariableData>,
+    lir_variables: &mut TVec<VariableId, lir::VariableData>,
     theory: &hir::Theory,
     table_uses: &mut TVec<RelationId, TVec<IndexUsageId, Vec<ColumnId>>>,
-    tries: &mut Vec<RuleTrie>,
+    tries: &mut Vec<lir::RuleTrie>,
 ) {
     for rule in rules {
-        let premise_to_codegen: TVec<PremiseId, VariableId> = rule
+        let premise_to_lir: TVec<PremiseId, VariableId> = rule
             .premise_variables
             .iter_enumerate()
-            .map(|(id, meta)| codegen_variables.push(meta.into_codegen(id)))
+            .map(|(id, meta)| lir_variables.push(meta.into_lir(id)))
             .collect();
-        let action_to_codegen: TVec<ActionId, VariableId> = rule
+        let action_to_lir: TVec<ActionId, VariableId> = rule
             .action_variables
             .iter_enumerate()
             .map(|(id, (meta, link))| {
                 if let Some(link) = link {
-                    premise_to_codegen[link]
+                    premise_to_lir[link]
                 } else {
-                    codegen_variables.push(meta.into_codegen(id))
+                    lir_variables.push(meta.into_lir(id))
                 }
             })
             .collect();
@@ -225,14 +224,14 @@ fn generate_tries(
         // NOTE: we are constructing the rule trie in reverse.
         // reverse actions then reverse premises.
 
-        let mut codegen_actions: Vec<codegen::Action> = Vec::new();
+        let mut lir_actions: Vec<lir::Action> = Vec::new();
 
         // TODO: think about what happens with primitives here.
         //       "calling" a function should sometimes result in an indexed lookup instead of
         //       an insert.
 
         let mut extra_bound_action_variables: BTreeSet<ActionId> = BTreeSet::new();
-        codegen_actions.extend(rule.action_relations.iter().map(|relation| {
+        lir_actions.extend(rule.action_relations.iter().map(|relation| {
             match &theory.relations[relation.relation].ty {
                 RelationTy::Forall { .. } | RelationTy::NewOf { .. } | RelationTy::Alias { .. } => {
                     panic!()
@@ -243,38 +242,35 @@ fn generate_tries(
                 }
                 RelationTy::Table => {}
             };
-            codegen::Action::Insert {
+            lir::Action::Insert {
                 relation: relation.relation,
                 args: relation
                     .args
                     .iter()
                     .copied()
-                    .map(|x| action_to_codegen[x])
+                    .map(|x| action_to_lir[x])
                     .collect::<Vec<_>>()
                     .leak(),
             }
         }));
 
-        codegen_actions.extend(rule.unify.iter_all().filter_map(|(i0, i, ())| {
-            (i != i0).then_some(codegen::Action::Equate(
-                premise_to_codegen[i],
-                premise_to_codegen[i0],
-            ))
+        lir_actions.extend(rule.unify.iter_all().filter_map(|(i0, i, ())| {
+            (i != i0).then_some(lir::Action::Equate(premise_to_lir[i], premise_to_lir[i0]))
         }));
 
-        codegen_actions.extend(rule.action_variables.iter_enumerate().filter_map(
+        lir_actions.extend(rule.action_variables.iter_enumerate().filter_map(
             |(id, (_meta, link))| {
                 (link.is_none() && !extra_bound_action_variables.contains(&id))
-                    .then_some(codegen::Action::Make(action_to_codegen[id]))
+                    .then_some(lir::Action::Make(action_to_lir[id]))
             },
         ));
-        codegen_actions.reverse();
+        lir_actions.reverse();
 
-        let mut trie = codegen_actions
+        let mut trie = lir_actions
             .into_iter()
-            .map(|x| codegen::RuleTrie {
+            .map(|x| lir::RuleTrie {
                 meta: None,
-                atom: codegen::RuleAtom::Action(x),
+                atom: lir::RuleAtom::Action(x),
                 then: &[],
             })
             .collect::<Vec<_>>()
@@ -296,7 +292,7 @@ fn generate_tries(
                 .args
                 .iter()
                 .copied()
-                .map(|x| premise_to_codegen[x])
+                .map(|x| premise_to_lir[x])
                 .collect::<Vec<_>>()
                 .leak();
             let atom = match (query_ty, theory.relations[relation].ty.clone()) {
@@ -312,18 +308,16 @@ fn generate_tries(
                 ) => {
                     panic!("should have been desugared")
                 }
-                (Query::Iterate, RelationTy::Global { id: _ }) => codegen::RuleAtom::Premise {
+                (Query::Iterate, RelationTy::Global { id: _ }) => lir::RuleAtom::Premise {
                     relation,
                     args,
                     index: IndexUsageId::bogus(),
                 },
-                (Query::CheckViable, RelationTy::Global { id: _ }) => {
-                    codegen::RuleAtom::PremiseAny {
-                        relation,
-                        args,
-                        index: IndexUsageId::bogus(),
-                    }
-                }
+                (Query::CheckViable, RelationTy::Global { id: _ }) => lir::RuleAtom::PremiseAny {
+                    relation,
+                    args,
+                    index: IndexUsageId::bogus(),
+                },
                 (_, RelationTy::Primitive {}) => todo!("primitive not implemented"),
                 (Query::Iterate, RelationTy::Forall { ty: _ }) => {
                     todo!("forall not implemented")
@@ -333,21 +327,21 @@ fn generate_tries(
                 }
                 (Query::Iterate, RelationTy::NewOf { id }) => {
                     // TODO: look at what id is pointing to to handle for example globals.
-                    codegen::RuleAtom::PremiseNew { relation: id, args }
+                    lir::RuleAtom::PremiseNew { relation: id, args }
                 }
-                (Query::CheckViable, RelationTy::Table) => codegen::RuleAtom::PremiseAny {
+                (Query::CheckViable, RelationTy::Table) => lir::RuleAtom::PremiseAny {
                     relation,
                     args,
                     index: make_index_use(relation),
                 },
-                (Query::Iterate, RelationTy::Table) => codegen::RuleAtom::Premise {
+                (Query::Iterate, RelationTy::Table) => lir::RuleAtom::Premise {
                     relation,
                     args,
                     index: make_index_use(relation),
                 },
                 // Query::CheckViable => match theory.relations[relation].ty {
                 //     RelationTy::NewOf { id } => unreachable!("does not make sense"),
-                //     RelationTy::Table => codegen::RuleAtom::PremiseAny {
+                //     RelationTy::Table => lir::RuleAtom::PremiseAny {
                 //         relation,
                 //         args,
                 //         index,
@@ -360,13 +354,13 @@ fn generate_tries(
                 //     RelationTy::Forall { ty } => todo!(),
                 // },
 
-                // Query::Iterate => codegen::RuleAtom::Premise {
+                // Query::Iterate => lir::RuleAtom::Premise {
                 //     relation,
                 //     args,
                 //     index,
                 // },
             };
-            trie = vec![codegen::RuleTrie {
+            trie = vec![lir::RuleTrie {
                 meta: None,
                 atom,
                 then: trie,

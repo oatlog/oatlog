@@ -16,8 +16,9 @@ use itertools::Itertools as _;
 use proc_macro2::{Delimiter, Span, TokenTree};
 
 use crate::{
-    codegen, hir,
+    hir,
     ids::{ColumnId, GlobalId, Id, RelationId, TypeId, VariableId},
+    lir,
     typed_vec::TVec,
 };
 
@@ -847,7 +848,7 @@ struct Parser {
     /// Global variables are merged if they are computed identically.
     compute_to_global: BTreeMap<ComputeMethod, GlobalId>,
     /// Instructions to execute upon theory creation.
-    initial: Vec<codegen::Initial>,
+    initial: Vec<lir::Initial>,
 
     /// Rules written explicitly.
     symbolic_rules: Vec<hir::SymbolicRule>,
@@ -910,12 +911,12 @@ impl Parser {
                 .global_variables
                 .iter()
                 .map(|x| match &x.compute {
-                    ComputeMethod::Literal(Literal::I64(x)) => codegen::GlobalCompute::new_i64(*x),
+                    ComputeMethod::Literal(Literal::I64(x)) => lir::GlobalCompute::new_i64(*x),
                     ComputeMethod::Literal(Literal::String(x)) => {
-                        codegen::GlobalCompute::new_string((*x).to_owned(), &mut interner)
+                        lir::GlobalCompute::new_string((*x).to_owned(), &mut interner)
                     }
                     ComputeMethod::Function { function, args } => {
-                        codegen::GlobalCompute::new_call(*function, args)
+                        lir::GlobalCompute::new_call(*function, args)
                     }
 
                     _ => panic!("only literal ints are implemented for globals"),
@@ -1183,7 +1184,7 @@ impl Parser {
                     return err!("usage: (run <steps>)");
                 };
                 let steps = steps.uint("steps")?.try_into().unwrap();
-                self.initial.push(codegen::Initial::run(steps));
+                self.initial.push(lir::Initial::run(steps));
             }
             "check" => {
                 // NOTE: skip check

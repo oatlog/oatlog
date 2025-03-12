@@ -3,6 +3,7 @@ mod frontend;
 mod hir;
 mod ids;
 mod index_selection;
+mod lir;
 mod query_planning;
 mod typed_vec;
 mod union_find;
@@ -34,8 +35,8 @@ pub fn compile(input: proc_macro2::TokenStream) -> proc_macro2::TokenStream {
 fn compile_impl(source: proc_macro2::TokenStream) -> frontend::MResult<proc_macro2::TokenStream> {
     force_backtrace(|| {
         let hir = frontend::parse(source)?;
-        let (_, codegen) = query_planning::emit_codegen_theory(hir);
-        let generated_tokens = codegen::codegen(&codegen);
+        let (_, lir) = query_planning::emit_lir_theory(hir);
+        let generated_tokens = codegen::codegen(&lir);
         Ok(generated_tokens)
     })
 }
