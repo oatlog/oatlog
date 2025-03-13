@@ -205,7 +205,7 @@ fn generate_tries(
         let premise_to_lir: TVec<PremiseId, VariableId> = rule
             .premise_variables
             .iter_enumerate()
-            .map(|(id, meta)| lir_variables.push(meta.to_lir(id)))
+            .map(|(id, meta)| lir_variables.push(meta.into_lir(id)))
             .collect();
         let action_to_lir: TVec<ActionId, VariableId> = rule
             .action_variables
@@ -214,7 +214,7 @@ fn generate_tries(
                 if let Some(link) = link {
                     premise_to_lir[link]
                 } else {
-                    lir_variables.push(meta.to_lir(id))
+                    lir_variables.push(meta.into_lir(id))
                 }
             })
             .collect();

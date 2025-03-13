@@ -15,27 +15,31 @@ pub mod runtime;
 mod expect_tests;
 
 #[must_use]
-pub fn compile_str(source: &str) -> String {
-    // TODO: call Sexp::parse_string instead of Sexp::parse_stream
-
-    let input: proc_macro2::TokenStream = source.parse().unwrap();
-    format_tokens(&compile(quote::quote! {(#input)}))
+pub fn compile_str(input: &str) -> String {
+    let input = input.to_string().leak();
+    let output = compile_impl(frontend::parse_str_to_sexps(input));
+    format_tokens(&output)
 }
 
 #[must_use]
 pub fn compile(input: proc_macro2::TokenStream) -> proc_macro2::TokenStream {
-    match compile_impl(input) {
-        Ok(generated_code) => generated_code,
-        Err(errors) => errors.to_compile_error(None, None),
-    }
+    compile_impl(frontend::parse_to_sexps(input))
 }
 
-fn compile_impl(source: proc_macro2::TokenStream) -> frontend::MResult<proc_macro2::TokenStream> {
-    force_backtrace(|| {
-        let hir = frontend::parse(source)?;
+fn compile_impl(
+    sexps: frontend::MResult<Vec<Vec<frontend::SexpSpan>>>,
+) -> proc_macro2::TokenStream {
+    fn inner(
+        sexps: frontend::MResult<Vec<Vec<frontend::SexpSpan>>>,
+    ) -> frontend::MResult<proc_macro2::TokenStream> {
+        let hir = frontend::parse(sexps?)?;
         let (_, lir) = query_planning::emit_lir_theory(hir);
         let generated_tokens = codegen::codegen(&lir);
         Ok(generated_tokens)
+    }
+    force_backtrace(|| match inner(sexps) {
+        Ok(generated_tokens) => generated_tokens,
+        Err(errors) => errors.to_compile_error(None, None),
     })
 }
 

@@ -3,9 +3,9 @@
 use std::ops::{Deref, DerefMut, FnMut, Range};
 
 use educe::Educe;
-
 use itertools::Itertools as _;
 use proc_macro2::Span;
+use quote::quote;
 
 #[rustfmt::skip]
 macro_rules! bare_ {
@@ -85,7 +85,7 @@ impl QSpan {
         }
     }
     pub(crate) fn from_tree<T: syn::spanned::Spanned + std::fmt::Display>(x: &T) -> Self {
-        QSpan::new(x.span(), format!("{}", x))
+        QSpan::new(x.span(), format!("{x}"))
     }
     pub(crate) fn with_text(&self, s: &[&'static str]) -> Self {
         let s: String = s.iter().copied().join(" ");
@@ -99,7 +99,7 @@ impl QSpan {
 pub type MError = MagicError;
 pub type MResult<T> = std::result::Result<T, MError>;
 
-/// almost the same as syn::Error, but with the ability to handle multiple files.
+/// almost the same as `syn::Error`, but with the ability to handle multiple files.
 #[derive(Clone, Debug)]
 pub struct MagicError {
     messages: Vec<MaybeResolved>,
@@ -139,7 +139,6 @@ impl MagicError {
     ) -> proc_macro2::TokenStream {
         dbg!(&self);
         let error = self.clone().resolve(filename, source_text);
-        use quote::quote;
         let mut stream = quote! {};
 
         let mut extra_text = String::new();
@@ -210,7 +209,7 @@ impl MaybeResolved {
         match self {
             MaybeResolved::Resolved { .. } => {}
             MaybeResolved::Plain { message, span } => {
-                let span = span.clone();
+                let span = *span;
                 *self = Self::Resolved {
                     message,
                     filename,

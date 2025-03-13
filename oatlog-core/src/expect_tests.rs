@@ -8,7 +8,8 @@ struct Steps {
 }
 impl Steps {
     fn check(self) {
-        let hir = crate::frontend::parse_str(self.code).unwrap();
+        let sexps = crate::frontend::parse_str_to_sexps(self.code).unwrap();
+        let hir = crate::frontend::parse(sexps).unwrap();
         if let Some(exp) = self.expected_hir {
             exp.assert_eq(&hir.dbg_summary());
         }

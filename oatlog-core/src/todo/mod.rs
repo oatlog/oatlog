@@ -3,6 +3,7 @@
 //! This module contains experiments of what generated code could look like, and should be deleted
 //! as soon as we are happy with the codegen.
 
+#![allow(clippy::empty_structs_with_brackets)]
 #![allow(clippy::iter_over_hash_type)]
 #![allow(clippy::let_underscore_untyped)]
 #![allow(clippy::must_use_candidate)]

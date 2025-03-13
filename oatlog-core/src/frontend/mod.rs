@@ -3,12 +3,9 @@
 #![allow(clippy::zero_sized_map_values, reason = "MapExt trait usage")]
 
 use std::{
-    cmp::Ordering,
     collections::{BTreeMap, btree_map::Entry},
-    fmt::{Debug, Display},
-    hash::{Hash, Hasher},
-    mem::take,
-    ops::{Deref, DerefMut, FnMut, Range},
+    fmt::Debug,
+    hash::Hash,
 };
 
 use itertools::Itertools as _;
@@ -26,7 +23,8 @@ pub(crate) use span::MResult;
 use span::{MError, QSpan, Spanned, Str, bare_, err_, register_span};
 
 pub(crate) mod sexp;
-use sexp::{Literal, Sexp, SexpSpan};
+pub(crate) use sexp::SexpSpan;
+use sexp::{Literal, Sexp};
 
 trait ResultExt {
     fn add_err(self, syn_err: MError) -> Self;
@@ -36,70 +34,71 @@ impl<T> ResultExt for MResult<T> {
         self.map_err(|err| err.concat(new_err))
     }
 }
-pub(crate) fn parse_str(s: &'static str) -> MResult<hir::Theory> {
+pub(crate) fn parse(sexps: Vec<Vec<SexpSpan>>) -> MResult<hir::Theory> {
     let mut parser = Parser::new();
-    let span = QSpan::new(Span::call_site(), s.to_string());
-    parser.parse_egglog(SexpSpan::parse_string(Some(span), s)?)?;
+    for sexp in sexps {
+        parser.parse_egglog(sexp)?;
+    }
     Ok(parser.emit_hir())
 }
+pub(crate) fn parse_str_to_sexps(s: &'static str) -> MResult<Vec<Vec<SexpSpan>>> {
+    let span = QSpan::new(Span::call_site(), s.to_string());
+    let sexp = SexpSpan::parse_string(Some(span), s)?;
+    Ok(vec![sexp])
+}
 
-pub(crate) fn parse(x: proc_macro2::TokenStream) -> MResult<hir::Theory> {
-    fn parse(x: proc_macro2::TokenStream, parser: &mut Parser) -> MResult<()> {
-        Ok(for token_tree in x {
-            register_span!(,token_tree);
+pub(crate) fn parse_to_sexps(x: proc_macro2::TokenStream) -> MResult<Vec<Vec<SexpSpan>>> {
+    let sexps_many:MResult<Vec<Vec<Vec<SexpSpan>>>>  = x.into_iter().map(|token_tree: proc_macro2::TokenTree| -> MResult<Vec<Vec<SexpSpan>>> {
+        register_span!(,token_tree);
+        let span = QSpan::from_tree(&token_tree);
 
-            let span = QSpan::from_tree(&token_tree);
-            match token_tree {
-                // compile_egraph!(((datatype Math (Add Math Math) (Sub Math Math))))
-                TokenTree::Group(group) => {
-                    let delim = group.delimiter();
-                    let stream = group.stream();
-                    match delim {
-                        Delimiter::Parenthesis => {
-                            parser.parse_egglog(SexpSpan::parse_stream(stream)?)?;
-                        }
-                        Delimiter::Brace => return err!("importing rust code unimplemented"),
-                        Delimiter::Bracket => return err!("brace not expected"),
-                        Delimiter::None => {
-                            // Invisible delimiters due to declarative macro invocation
-                            parse(stream, parser)?;
-                        }
+        match token_tree {
+            // compile_egraph!(((datatype Math (Add Math Math) (Sub Math Math))))
+            TokenTree::Group(group) => {
+                let delim = group.delimiter();
+                let stream = group.stream();
+                match delim {
+                    Delimiter::Parenthesis => {
+                        Ok(vec![SexpSpan::parse_stream(stream)?])
                     }
-                }
-                // compile_egraph!("(datatype Math (Add Math Math) (Sub Math Math))")
-                TokenTree::Literal(literal) => {
-                    let x = syn::Lit::new(literal);
-                    match x {
-                        syn::Lit::Str(literal) => {
-                            // TODO: add error context information
-                            // let content = &*strip_comments(&literal.value()).leak();
-                            let content = literal.value().leak();
-                            parser.parse_egglog(SexpSpan::parse_string(Some(span), &*content)?)?;
-                        }
-                        _ => return err!("expected a string literal"),
+                    Delimiter::Brace => err!("importing rust code unimplemented"),
+                    Delimiter::Bracket => err!("brace not expected"),
+                    Delimiter::None => {
+                        // Invisible delimiters due to declarative macro invocation
+                        parse_to_sexps(stream)
                     }
-                }
-                TokenTree::Ident(_) | TokenTree::Punct(_) => {
-                    return err!(
-                        "expected egglog source code string literal or code wrapped in parenthesis, \
-                        unexpected macro input `{token_tree}`"
-                    );
                 }
             }
-        })
-    }
-
-    let mut parser = Parser::new();
-    parse(x, &mut parser)?;
-    Ok(parser.emit_hir())
+            // compile_egraph!("(datatype Math (Add Math Math) (Sub Math Math))")
+            TokenTree::Literal(literal) => {
+                let x = syn::Lit::new(literal);
+                match x {
+                    syn::Lit::Str(literal) => {
+                        // TODO: add error context information
+                        // let content = &*strip_comments(&literal.value()).leak();
+                        let content = literal.value().leak();
+                        Ok(vec![SexpSpan::parse_string(Some(span), &*content)?])
+                    }
+                    _ => err!("expected a string literal"),
+                }
+            }
+            TokenTree::Ident(_) | TokenTree::Punct(_) => {
+                err!(
+                    "expected egglog source code string literal or code wrapped in parenthesis, \
+                        unexpected macro input `{token_tree}`"
+                )
+            }
+        }
+    }).collect();
+    Ok(sexps_many?.concat())
 }
 
 #[derive(Debug, Clone, PartialEq)]
 struct TypeData {
     name: Str,
-    /// (Vec i64) -> ["Vec", "i64"]
+    /// `(Vec i64) -> ["Vec", "i64"]`
     collection: Option<Vec<Str>>,
-    /// i64 -> `std::primitive::i64`
+    /// `i64 -> std::primitive::i64`
     primitive: Option<&'static str>,
 }
 impl TypeData {
@@ -379,7 +378,9 @@ impl Parser {
                         lir::GlobalCompute::new_call(*function, args)
                     }
 
-                    _ => panic!("only literal ints are implemented for globals"),
+                    ComputeMethod::Literal(Literal::F64(_) | Literal::Bool(_) | Literal::Unit) => {
+                        panic!("only literal ints and strings are implemented for globals")
+                    }
                 })
                 .collect(),
             interner,
@@ -646,17 +647,8 @@ impl Parser {
                 let steps = steps.uint("steps")?.try_into().unwrap();
                 self.initial.push(lir::Initial::run(steps));
             }
-            "check" => {
-                // NOTE: skip check
-            }
-            "fail" => {
-                // NOTE: skip fail
-            }
-            "print-function" => {
-                // NOTE: skip print function
-            }
-            "print-size" => {
-                // NOTE: skip print size
+            "check" | "fail" | "print-function" | "print-size" => {
+                // NOTE: skipped
             }
             "run-schedule" | "simplify" | "query-extract" | "push" | "pop" | "print-stats"
             | "input" | "output" => {
@@ -1172,11 +1164,7 @@ impl Parser {
 fn parse_options(mut s: &'static [SexpSpan]) -> MResult<Vec<(&'static str, &'static [SexpSpan])>> {
     fn as_option(opt: &SexpSpan) -> Option<&'static str> {
         if let Sexp::Atom(opt) = opt.x {
-            if opt.starts_with(':') {
-                Some(*opt)
-            } else {
-                None
-            }
+            opt.starts_with(':').then_some(*opt)
         } else {
             None
         }
@@ -1202,7 +1190,7 @@ mod compile_rule {
 
     use super::{
         Action, ComputeMethod, Expr, Literal, MError, MResult, MapExt as _, Parser, QSpan, Str,
-        bare_, err_,
+        bare_,
     };
 
     use crate::{

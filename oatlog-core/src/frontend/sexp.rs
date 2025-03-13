@@ -105,6 +105,13 @@ impl SexpSpan {
             }
             return err_!(None, "toplevel atom");
         }
+
+        let (parsed, rest) = parse(span, &tokens)?;
+        if !rest.is_empty() {
+            return err_!(None, "unbalanced parenthesis");
+        }
+        return Ok(parsed);
+
         fn parse<'a>(
             span: Option<QSpan>,
             mut s: &'a [&'static str],
@@ -150,12 +157,6 @@ impl SexpSpan {
             }
             Ok((atoms, s))
         }
-
-        let (parsed, rest) = parse(span, &tokens)?;
-        if !rest.is_empty() {
-            return err_!(None, "unbalanced parenthesis");
-        }
-        Ok(parsed)
     }
     pub(crate) fn parse_stream(stream: proc_macro2::TokenStream) -> MResult<Vec<SexpSpan>> {
         let mut v: Vec<SexpSpan> = Vec::new();

@@ -62,6 +62,8 @@ missing_panics_doc = "allow"
 needless_pass_by_value = "allow"
 similar_names = "allow"
 too_many_lines = "allow"
+single_match_else = "allow"
+items_after_statements = "allow"
 
 
 # cargo

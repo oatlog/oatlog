@@ -1,5 +1,5 @@
 use crate::frontend::{
-    Literal, MError, MResult, QSpan, Sexp, SexpSpan, Spanned, Str, bare_, err_, register_span,
+    Literal, MError, MResult, QSpan, Sexp, SexpSpan, Spanned, Str, err_, register_span,
 };
 
 pub(crate) struct Program {
@@ -352,6 +352,7 @@ pub(crate) struct Variant {
 /// Moving usage to the start of the block makes it more usable as documentation.
 macro_rules! usage {
     ($($usage:literal,)* $body:block) => {{
+        #[allow(clippy::redundant_closure_call)]
         let tmp: MResult<_> = (|| Ok(spanned!($body)))();
         tmp.map_err(|err| {
             let usages = [$($usage),*];
@@ -372,6 +373,7 @@ macro_rules! pattern {
     ($list:expr, $([$($pattern:tt),*] => $body:block)*) => {
         match $list {
             $(
+                #[allow(clippy::redundant_at_rest_pattern)]
                 [$(pattern!(,$pattern)),*] => {
                     $(pattern!(,,$pattern);)*
                     $body
@@ -383,6 +385,7 @@ macro_rules! pattern {
     };
     ($list:expr, [$($pattern:tt),*]) => {
         #[allow(irrefutable_let_patterns)]
+        #[allow(clippy::redundant_at_rest_pattern)]
         let [$(pattern!(,$pattern)),*] = $list else {
             return err!("syntax error");
         };
@@ -490,11 +493,11 @@ macro_rules! options {
 
 pub(crate) fn parse_statement(x: SexpSpan) -> MResult<Spanned<Statement>> {
     register_span!(x.span);
-    let (function_name, args) = x.call("statment")?;
+    let (function_name, args) = x.call("statement")?;
     match *function_name {
         "set-option" => usage!("(set-option <name> <value>)", {
             pattern!(args, [(Atom name), (value parse_expr)]);
-            Statement::SetOption { name: name, value }
+            Statement::SetOption { name, value }
         }),
         "sort" => usage!("(sort <name> (<container sort> <argument sort>*)?)", {
             pattern!(args,
@@ -596,8 +599,8 @@ pub(crate) fn parse_statement(x: SexpSpan) -> MResult<Spanned<Statement>> {
                     }
                 );
                 let rewrite = Rewrite {
-                    lhs: lhs,
-                    rhs: rhs,
+                    lhs,
+                    rhs,
                     conditions,
                 };
 
@@ -624,8 +627,8 @@ pub(crate) fn parse_statement(x: SexpSpan) -> MResult<Spanned<Statement>> {
                     }
                 );
                 let rewrite = Rewrite {
-                    lhs: lhs,
-                    rhs: rhs,
+                    lhs,
+                    rhs,
                     conditions,
                 };
                 Statement::BiRewrite { ruleset, rewrite }
@@ -650,10 +653,10 @@ pub(crate) fn parse_statement(x: SexpSpan) -> MResult<Spanned<Statement>> {
         "query-extract" => usage!("(query-extract <:variants <uint>>? <expr>)", {
             pattern!(args,
                 [(String ":variants"), (Uint count), (expr parse_expr)] => {
-                    Statement::QueryExtract { variants: *count, expr: expr }
+                    Statement::QueryExtract { variants: *count, expr }
                 }
                 [(expr parse_expr)] => {
-                    Statement::QueryExtract { variants: 1, expr: expr }
+                    Statement::QueryExtract { variants: 1, expr }
                 }
             )
         }),
@@ -730,7 +733,7 @@ fn parse_action(x: SexpSpan) -> MResult<Spanned<Action>> {
         "delete" => usage!("(delete (<table name> <expr>*))", {
             pattern!(args, [(Atom table), (args @ .. parse_expr)]);
             Action::Change {
-                table: table,
+                table,
                 args,
                 change: Change::Delete,
             }
@@ -738,7 +741,7 @@ fn parse_action(x: SexpSpan) -> MResult<Spanned<Action>> {
         "subsume" => usage!("(subsume (<table name> <expr>*))", {
             pattern!(args, [(Atom table), (args @ .. parse_expr)]);
             Action::Change {
-                table: table,
+                table,
                 args,
                 change: Change::Subsume,
             }
@@ -784,7 +787,7 @@ fn parse_options(
         let mut res: Vec<(Str, Vec<SexpSpan>)> = vec![];
         for x in x {
             match **x {
-                Sexp::Atom(x) if x.starts_with(":") => {
+                Sexp::Atom(x) if x.starts_with(':') => {
                     res.push((x, vec![]));
                 }
                 _ => {
