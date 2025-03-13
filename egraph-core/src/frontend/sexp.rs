@@ -142,10 +142,7 @@ impl SexpSpan {
                             let n = s.len();
                             literal(Literal::String(&s[1..(n - 1)]))
                         }
-                        _ => SexpSpan::new(
-                            Sexp::Atom(Spanned::new(first, token_span)),
-                            token_span,
-                        ),
+                        _ => SexpSpan::new(Sexp::Atom(Spanned::new(first, token_span)), token_span),
                     }
                 };
                 atoms.push(elem);
@@ -306,4 +303,3 @@ impl Hash for OrdF64 {
         self.0.to_bits().hash(state);
     }
 }
-

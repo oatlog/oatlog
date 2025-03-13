@@ -274,7 +274,5 @@ static BYTE_RANGE_REGEX: std::sync::LazyLock<regex::Regex> =
 pub(crate) fn byte_range(span: Span) -> Range<usize> {
     let s = format!("{span:?}");
     let caps = BYTE_RANGE_REGEX.captures(&s).unwrap();
-    caps.get(1).unwrap().as_str().parse().unwrap()
-        ..caps.get(2).unwrap().as_str().parse().unwrap()
+    caps.get(1).unwrap().as_str().parse().unwrap()..caps.get(2).unwrap().as_str().parse().unwrap()
 }
-
