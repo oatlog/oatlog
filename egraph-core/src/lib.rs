@@ -5,6 +5,7 @@ mod ids;
 mod index_selection;
 mod lir;
 mod query_planning;
+mod todo;
 mod typed_vec;
 mod union_find;
 
@@ -12,9 +13,6 @@ pub mod runtime;
 
 #[cfg(test)]
 mod expect_tests;
-
-#[allow(unused)]
-mod todo;
 
 #[must_use]
 pub fn compile_str(source: &str) -> String {

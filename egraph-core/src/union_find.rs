@@ -59,7 +59,7 @@ impl<K: Id, V> UFData<K, V> {
     }
     fn find_root(&self, i: K) -> (K, &V, &[K]) {
         match &self.inner[i.into()] {
-            UFElement::Root { value, set } => (i, &value, &set),
+            UFElement::Root { value, set } => (i, value, set),
             UFElement::Child { parent } => {
                 let ret = self.find_root(parent.get());
                 parent.set(ret.0);
@@ -132,7 +132,7 @@ impl<K: Id, V> UFData<K, V> {
         }
         let (target_value, _) = self.inner[target.into()].get_root();
         let (src_value, _) = self.inner[src.into()].get_root();
-        match merge(&target_value, &src_value) {
+        match merge(target_value, src_value) {
             Ok(value) => {
                 let mut src_item = mem::replace(
                     &mut self.inner[src.into()],
@@ -185,7 +185,7 @@ impl<K: Id, V> Index<K> for UFData<K, V> {
     type Output = V;
 
     fn index(&self, i: K) -> &Self::Output {
-        &self.find_root(i).1
+        self.find_root(i).1
     }
 }
 impl<K: Id, V> IndexMut<K> for UFData<K, V> {

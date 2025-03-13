@@ -114,7 +114,7 @@ mod test {
                 .map(|x| x.into_iter().map(ColumnId).collect())
                 .collect();
         let (logical_to_physical, physical_indexes) = index_selection(columns, &uses);
-        expect![[r#"
+        expect![["
             {
                 iu0: IndexUsageInfo {
                     prefix: 1,
@@ -141,7 +141,7 @@ mod test {
                     index: ir4,
                 },
             }
-        "#]]
+        "]]
         .assert_debug_eq(&logical_to_physical);
         expect![["
             0 1 2 3

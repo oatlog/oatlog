@@ -10,12 +10,12 @@ impl Steps {
     fn check(self) {
         let hir = crate::frontend::parse_str(self.code).unwrap();
         if let Some(exp) = self.expected_hir {
-            exp.assert_eq(&hir.dbg_summary())
+            exp.assert_eq(&hir.dbg_summary());
         }
 
         let (_, lir) = crate::query_planning::emit_lir_theory(hir);
         if let Some(exp) = self.expected_lir {
-            exp.assert_eq(&lir.dbg_summary())
+            exp.assert_eq(&lir.dbg_summary());
         }
 
         let codegen = crate::codegen::codegen(&lir);
@@ -29,12 +29,12 @@ impl Steps {
 #[test]
 fn hir_commutative() {
     Steps {
-        code: r#"
+        code: "
             (datatype Math
                 (Add Math Math)
             )
             (rule ((= e (Add a b) )) ((= e (Add b a))))
-        "#,
+        ",
         expected_hir: Some(expect![[r#"
             Theory "":
 
@@ -58,13 +58,13 @@ fn hir_commutative() {
 #[test]
 fn hir_distributive() {
     Steps {
-        code: r#"
+        code: "
             (datatype Math
                 (Add Math Math)
                 (Mul Math Math)
             )
             (rewrite (Mul (Add a b) c) (Add (Mul a c) (Mul b c)))
-        "#,
+        ",
         expected_hir: Some(expect![[r#"
             Theory "":
 
@@ -93,12 +93,12 @@ fn hir_distributive() {
 #[test]
 fn hir_userspace_implicit_functionality() {
     Steps {
-        code: r#"
+        code: "
             (sort Math)
             (relation Add (Math Math Math))
 
             (rule ((Add a b c) (Add a b d)) ((= c d)))
-        "#,
+        ",
         expected_hir: Some(expect![[r#"
             Theory "":
 
@@ -121,7 +121,7 @@ fn hir_userspace_implicit_functionality() {
 #[test]
 fn hir_global() {
     Steps {
-        code: r#"
+        code: "
             (datatype Math
                 (Mul Math Math)
                 (Add Math Math)
@@ -129,7 +129,7 @@ fn hir_global() {
             )
             (let one 1)
             (rewrite (Const one) (Add b a))
-        "#,
+        ",
         expected_hir: Some(expect![[r#"
             Theory "":
 
@@ -270,7 +270,7 @@ fn hir_global() {
 #[test]
 fn test_negative_i64_tokens() {
     Steps {
-        code: r#"
+        code: "
             (datatype Math
                 (Mul Math Math)
                 (Add Math Math)
@@ -279,7 +279,7 @@ fn test_negative_i64_tokens() {
             )
             (let neg_two (Const -2))
             (rewrite (Const -1) (Const -1))
-        "#,
+        ",
         expected_hir: Some(expect![[r#"
             Theory "":
 
@@ -313,10 +313,10 @@ fn codegen_panic_merge() {
         //
         // (function g () i64 :no-merge)
         // (fail (let y (g)))
-        code: r#"
+        code: "
             (function f () i64 :no-merge)
             (set (f) 0)
-        "#,
+        ",
         expected_hir: Some(expect![[r#"
             Theory "":
 
@@ -509,12 +509,12 @@ fn codegen_panic_merge() {
 #[test]
 fn codegen_bug1() {
     Steps {
-        code: r#"
+        code: "
             (sort T0)
             (sort T1)
             (sort T2)
             (relation Foo (T0 T1 T2))
-        "#,
+        ",
         expected_hir: Some(expect![[r#"
             Theory "":
 
@@ -877,12 +877,12 @@ fn codegen_bug1() {
 #[test]
 fn initial() {
     Steps {
-        code: r#"
+        code: "
             (datatype Math
                 (Const i64)
             )
             (run 42)
-        "#,
+        ",
         expected_hir: Some(expect![[r#"
             Theory "":
 
@@ -1960,7 +1960,7 @@ fn test_primitives_simple() {
 #[test]
 fn triangle_join() {
     Steps {
-        code: r#"
+        code: "
             (sort Math)
             (relation Foo (Math Math))
             (relation Bar (Math Math))
@@ -1969,7 +1969,7 @@ fn triangle_join() {
             (relation Triangle (Math Math Math))
 
             (rule ((Foo a b) (Bar b c) (Baz c a)) ((Triangle a b c)))
-        "#,
+        ",
         expected_hir: Some(expect![[r#"
             Theory "":
 
@@ -2637,13 +2637,13 @@ fn triangle_join() {
 fn edgecase0() {
     // needed a "PremiseAny"
     Steps {
-        code: r#"
+        code: "
             (datatype Math
                 (Mul Math Math)
                 (Add Math Math)
             )
             (rewrite (Add (Mul a b) (Mul a c)) (Mul a (Add b c)))
-        "#,
+        ",
         expected_hir :Some( expect![[r#"
             Theory "":
 
@@ -3156,10 +3156,10 @@ fn edgecase0() {
 #[test]
 fn test_into_codegen() {
     Steps {
-        code: r#"
+        code: "
             (datatype Math (Mul Math Math) (Add Math Math))
             (rewrite (Mul (Add a b) c) (Add (Mul a c) (Mul b c)))
-        "#,
+        ",
         expected_hir: Some(expect![[r#"
             Theory "":
 

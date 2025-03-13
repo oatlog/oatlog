@@ -1,6 +1,3 @@
-#![allow(unused_parens, unused_variables)]
-#![allow(clippy::must_use_candidate, dead_code, reason = "noise until finished")]
-
 use std::{
     collections::BTreeSet,
     marker::PhantomData,

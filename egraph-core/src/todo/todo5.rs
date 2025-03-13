@@ -1,5 +1,3 @@
-#![allow(dead_code)]
-#![allow(private_interfaces)]
 use crate::runtime::{
     Clear as _, Eclass, EclassProvider as _, RangeQuery as _, Relation, RelationElement, UnionFind,
 };

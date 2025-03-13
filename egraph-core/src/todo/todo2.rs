@@ -1,5 +1,3 @@
-#![allow(unused_parens, unused_variables)]
-
 use std::{
     collections::{BTreeMap, BTreeSet},
     marker::PhantomData,
@@ -79,12 +77,12 @@ impl NegRelation {
 
     // insert into old and new if not already present
     fn insert(&mut self, x0: Math, x1: Other) {
-        if self.all_index_0_1.contains(&(x0,x1)) { 
-            return 
+        if self.all_index_0_1.contains(&(x0,x1)) {
+            return
         }
         self.all_index_0_1.insert((x0, x1));
         self.all_index_1_0.insert((x1, x0));
-                             
+
         self.back_refs_math.entry(x0).or_default().insert(x1);
         self.back_refs_other.entry(x1).or_default().insert(x0);
 
@@ -96,7 +94,7 @@ impl NegRelation {
         for x0 in uproot_math.iter().copied() {
             for x1 in self.back_refs_math.remove(&x0).into_iter().flatten() {
                 if let Some(entry) = self.back_refs_other.get_mut(&x1) { entry.remove(&x0); }
-                if !self.all_index_0_1.contains(&(x0, x1)) { 
+                if !self.all_index_0_1.contains(&(x0, x1)) {
                     // only a concern if back_refs has duplicates, which is only possible if the
                     // inner type is a vec instead of a set.
                     continue;

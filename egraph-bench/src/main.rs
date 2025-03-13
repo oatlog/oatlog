@@ -1,5 +1,8 @@
-use egraph::compile_egraph;
 use std::time::Instant;
+
+// TODO loke for erik: how much in this file is outdated?
+
+// TODO automated benchmarking
 
 // TODO: this is missing:
 // * globals

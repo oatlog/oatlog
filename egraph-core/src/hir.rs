@@ -248,6 +248,7 @@ impl Relation {
             ty: RelationTy::Global { id },
         }
     }
+    #[allow(clippy::wrong_self_convention)]
     pub(crate) fn new(&self, id: RelationId) -> Self {
         Self {
             name: format!("New{}", self.name).leak(),
@@ -321,7 +322,7 @@ pub(crate) struct VariableMeta {
     pub(crate) ty: TypeId,
 }
 impl VariableMeta {
-    pub(crate) fn into_lir(&self, id: impl Display) -> lir::VariableData {
+    pub(crate) fn to_lir(&self, id: impl Display) -> lir::VariableData {
         let name = if self.name.is_empty() {
             id.to_string().leak()
         } else {

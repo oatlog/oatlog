@@ -355,10 +355,10 @@ impl Theory {
                         "types",
                         &types
                             .iter_enumerate()
-                            .map(|(type_id, TypeData { name, kind })| {
+                            .map(|(type_id, &TypeData { name, ref kind })| {
                                 let kind = match kind {
                                     TypeKind::Symbolic => "[symbolic]",
-                                    TypeKind::Primitive { type_path } => *type_path,
+                                    TypeKind::Primitive { type_path } => type_path,
                                 };
                                 (
                                     DbgStr([type_id.to_string(), name.to_string()]),
@@ -372,7 +372,7 @@ impl Theory {
                         "rule_variables",
                         &rule_variables
                             .iter_enumerate()
-                            .map(|(variable_id, VariableData { name, type_ })| {
+                            .map(|(variable_id, &VariableData { name, type_ })| {
                                 (
                                     DbgStr([variable_id.to_string(), name.to_string()]),
                                     DbgStr([type_.to_string()]),
@@ -546,7 +546,7 @@ impl Theory {
                         )
                     }
                     RuleAtom::Panic(msg) => {
-                        write!(f, "{:?}", DbgStr(["Panic".to_string(), msg.to_string()]))
+                        write!(f, "{:?}", DbgStr(["Panic".to_string(), (*msg).to_string()]))
                     }
                 }
             }

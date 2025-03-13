@@ -119,6 +119,7 @@ pub struct StringIntern {
 }
 impl StringIntern {
     #[inline]
+    #[must_use]
     pub fn new() -> Self {
         Self::default()
     }
@@ -130,6 +131,7 @@ impl StringIntern {
             next_id
         })
     }
+    #[must_use]
     pub fn lookup(&self, i: IString) -> &str {
         &self.to_string[&i]
     }

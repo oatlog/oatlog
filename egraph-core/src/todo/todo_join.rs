@@ -1,15 +1,10 @@
 //! What could a free join-like impl look like?
 
-#![allow(unsafe_code)]
-#![allow(unused)]
-#![allow(dead_code)]
-#![allow(private_interfaces)]
-#![allow(non_snake_case)]
 use crate::{
     eclass_wrapper_ty,
     ids::{RelationId, VariableId},
     relation_element_wrapper_ty,
-    runtime::*,
+    runtime::{Eclass, EclassProvider, Hash, RelationElement, UnionFind},
 };
 use std::{
     cell::Cell,
@@ -43,7 +38,7 @@ type Set<T> = HashSet<T>;
 
 impl<A: RelationElement, B: TrieNode> Trie<A, B> {}
 mod query_plan {
-    use super::*;
+    use super::RelationId;
 
     struct Atom {
         relation: RelationId,
@@ -78,7 +73,7 @@ mod query_plan {
         }
         // set of variables *made avaliable by* this node
         fn avs(&self) -> u32 {
-            self.vs() | self.preceeding.as_ref().map(|x| x.avs()).unwrap_or(0)
+            self.vs() | self.preceeding.as_ref().map_or(0, |x| x.avs())
         }
     }
 
@@ -200,7 +195,10 @@ fn binary_search<A: RelationElement>(s: &[A], x: Range) -> Option<Range> {
 
 mod trie_index {
 
-    use super::*;
+    use super::{
+        Cell, Eclass, Hash, HashMap, RelationElement, eclass_wrapper_ty,
+        relation_element_wrapper_ty,
+    };
 
     // (nodeid is not an eclass, this is just a convenience thing)
     eclass_wrapper_ty!(NodeId, Element);
@@ -310,7 +308,9 @@ mod trie_index {
     }
 }
 mod theory7 {
-    use super::*;
+    use super::{
+        Eclass as _, EclassProvider as _, Entry, HashMap, Range, UnionFind, binary_search, emit,
+    };
     use smallvec::SmallVec;
 
     // NOTE: all row ids are unstable.
@@ -357,10 +357,10 @@ mod theory7 {
             let mut uprooted = Vec::new();
             for i in uproot.iter().copied().flat_map(|r| r.start..=r.end) {
                 // drain not needed because back_references will be reconstructed.
-                uprooted.extend(self.back_references[i as usize].iter().copied())
+                uprooted.extend(self.back_references[i as usize].iter().copied());
             }
             // sort-dedup is needed for in-place manipulation for reusing row-ids.
-            uprooted.sort();
+            uprooted.sort_unstable();
             uprooted.dedup();
 
             for i in uprooted.iter().copied() {
@@ -386,7 +386,7 @@ mod theory7 {
                     // doing in-place manipulation.
 
                     // we are guaranteed that this row is not canon.
-                    if !self.map.remove(&(a, b)).is_some() {
+                    if self.map.remove(&(a, b)).is_none() {
                         // this row was already deleted because not everything was removed from
                         // back_references
                         continue;
@@ -469,9 +469,9 @@ mod theory7 {
             let mut col_c = self.col_c.clone();
 
             for (i, k) in ordering.iter().copied().enumerate() {
-                col_a[i as usize] = self.col_a[k as usize];
-                col_b[i as usize] = self.col_b[k as usize];
-                col_c[i as usize] = self.col_c[k as usize];
+                col_a[i] = self.col_a[k as usize];
+                col_b[i] = self.col_b[k as usize];
+                col_c[i] = self.col_c[k as usize];
             }
 
             self.col_a = col_a;
@@ -494,12 +494,12 @@ mod theory7 {
                 self.back_references[self.col_c[i] as usize].push(i as u32);
             }
 
-            for (a, b, c) in self.new.iter_mut() {
+            for (a, b, c) in &mut self.new {
                 *a = uf.find(*a);
                 *b = uf.find(*b);
                 *c = uf.find(*c);
             }
-            self.new.sort();
+            self.new.sort_unstable();
             self.new.dedup();
         }
     }
@@ -544,7 +544,7 @@ mod theory7 {
     }
 }
 mod theory6 {
-    use super::*;
+    use super::{Eclass as _, EclassProvider as _, Entry, HashMap, UnionFind};
     use smallvec::SmallVec;
 
     // inclusive
@@ -599,10 +599,10 @@ mod theory6 {
             let mut uprooted = Vec::new();
             for i in uproot.iter().copied().flat_map(|r| r.start..=r.end) {
                 // drain not needed because back_references will be reconstructed.
-                uprooted.extend(self.back_references[i as usize].iter().copied())
+                uprooted.extend(self.back_references[i as usize].iter().copied());
             }
             // sort-dedup is needed for in-place manipulation for reusing row-ids.
-            uprooted.sort();
+            uprooted.sort_unstable();
             uprooted.dedup();
 
             for i in uprooted.iter().copied() {
@@ -628,7 +628,7 @@ mod theory6 {
                     // doing in-place manipulation.
 
                     // we are guaranteed that this row is not canon.
-                    if !self.map.remove(&(a, b)).is_some() {
+                    if self.map.remove(&(a, b)).is_none() {
                         // this row was already deleted because not everything was removed from
                         // back_references
                         continue;
@@ -711,9 +711,9 @@ mod theory6 {
             let mut col_c = self.col_c.clone();
 
             for (i, k) in ordering.iter().copied().enumerate() {
-                col_a[i as usize] = self.col_a[k as usize];
-                col_b[i as usize] = self.col_b[k as usize];
-                col_c[i as usize] = self.col_c[k as usize];
+                col_a[i] = self.col_a[k as usize];
+                col_b[i] = self.col_b[k as usize];
+                col_c[i] = self.col_c[k as usize];
             }
 
             self.col_a = col_a;
@@ -736,17 +736,17 @@ mod theory6 {
                 self.back_references[self.col_c[i] as usize].push(i as u32);
             }
 
-            for (a, b, c) in self.new.iter_mut() {
+            for (a, b, c) in &mut self.new {
                 *a = uf.find(*a);
                 *b = uf.find(*b);
                 *c = uf.find(*c);
             }
-            self.new.sort();
+            self.new.sort_unstable();
         }
     }
 }
 mod theory5 {
-    use super::*;
+    use super::{Eclass as _, EclassProvider as _, Entry, HashMap, UnionFind};
     use smallvec::SmallVec;
 
     // NOTE: all row ids are unstable.
@@ -788,10 +788,10 @@ mod theory5 {
         ) {
             let mut uprooted = Vec::new();
             for i in uproot.iter().copied() {
-                uprooted.extend(self.back_references[i as usize].drain(..))
+                uprooted.extend(self.back_references[i as usize].drain(..));
             }
             // sort-dedup is needed for in-place manipulation for reusing row-ids.
-            uprooted.sort();
+            uprooted.sort_unstable();
             uprooted.dedup();
 
             for i in uprooted.iter().copied() {
@@ -898,9 +898,9 @@ mod theory5 {
                 let mut col_c = self.col_c.clone();
 
                 for (i, k) in ordering.iter().copied().enumerate() {
-                    col_a[i as usize] = self.col_a[k as usize];
-                    col_b[i as usize] = self.col_b[k as usize];
-                    col_c[i as usize] = self.col_c[k as usize];
+                    col_a[i] = self.col_a[k as usize];
+                    col_b[i] = self.col_b[k as usize];
+                    col_c[i] = self.col_c[k as usize];
                 }
 
                 self.col_a = col_a;
@@ -916,17 +916,17 @@ mod theory5 {
                 self.deleted.fill(false);
             }
 
-            for (a, b, c) in self.new.iter_mut() {
+            for (a, b, c) in &mut self.new {
                 *a = uf.find(*a);
                 *b = uf.find(*b);
                 *c = uf.find(*c);
             }
-            self.new.sort();
+            self.new.sort_unstable();
         }
     }
 }
 mod theory4 {
-    use super::*;
+    use super::{Eclass as _, EclassProvider as _, Entry, HashMap, UnionFind};
     use smallvec::SmallVec;
 
     // NOTE: all row ids are unstable.
@@ -965,10 +965,10 @@ mod theory4 {
 
             let mut uprooted = Vec::new();
             for i in uproot.iter().copied() {
-                uprooted.extend(self.back_references[i as usize].drain(..))
+                uprooted.extend(self.back_references[i as usize].drain(..));
             }
             // sort-dedup is needed for in-place manipulation for reusing row-ids.
-            uprooted.sort();
+            uprooted.sort_unstable();
             uprooted.dedup();
 
             for i in uprooted.iter().copied() {
@@ -1070,7 +1070,7 @@ mod theory4 {
     }
 }
 mod theory3 {
-    use super::*;
+    use super::{Eclass as _, EclassProvider as _, Entry, HashMap, UnionFind};
     use smallvec::SmallVec;
 
     // NOTE: all row ids are unstable.
@@ -1102,9 +1102,9 @@ mod theory3 {
 
             let mut uprooted = Vec::new();
             for i in uproot.iter().copied() {
-                uprooted.extend(self.back_references[i as usize].drain(..))
+                uprooted.extend(self.back_references[i as usize].drain(..));
             }
-            uprooted.sort();
+            uprooted.sort_unstable();
             uprooted.dedup();
 
             for i in uprooted.iter().copied() {
@@ -1168,7 +1168,7 @@ mod theory3 {
     }
 }
 mod theory2 {
-    use super::*;
+    use super::{Eclass as _, EclassProvider as _, HashMap, SliceExt as _, UnionFind};
     use crate::typed_vec::TVec;
     use std::mem::size_of;
 
@@ -1177,10 +1177,10 @@ mod theory2 {
     // TODO: pointer tagging, arena allocation, minimal allocation size/alignment, 32 bit capacity
     // could add another element to the smallvec.
 
-    const _: () = if size_of::<Vec<u32>>() != size_of::<SmallVec<[u32; 4]>>() {
-        panic!()
+    const _: () = if size_of::<Vec<u32>>() == size_of::<SmallVec<[u32; 4]>>() {
+        ();
     } else {
-        ()
+        panic!()
     };
 
     // Add(Math, Math, Math)
@@ -1217,16 +1217,16 @@ mod theory2 {
         }
         fn uproot(&mut self, uproot: &[u32]) {
             let mut uprooted_rows = Vec::new();
-            for &i in uproot.iter() {
+            for &i in uproot {
                 uprooted_rows.extend(self.back_references[i as usize].drain(..));
             }
-            uprooted_rows.sort();
+            uprooted_rows.sort_unstable();
 
             let mut queue: &[u32] = &uprooted_rows;
 
             let mut next_delete = queue.pop_front().unwrap_or(u32::MAX);
 
-            let mut write_head = 0usize;
+            let mut write_head = 0_usize;
             for read_head in 0..self.col_a.len() {
                 if read_head as u32 == next_delete {
                     self.col_a[write_head] = self.col_a[read_head];
@@ -1237,7 +1237,9 @@ mod theory2 {
 }
 mod colt2 {
 
-    use super::*;
+    use super::{
+        Eclass, Hash, HashMap, RelationElement, eclass_wrapper_ty, relation_element_wrapper_ty,
+    };
 
     trait GHT {
         fn new(v: Vec<usize>) -> Self;
@@ -1269,7 +1271,7 @@ mod colt2 {
     }
 
     fn test() {
-        use itertools::Itertools;
+        use itertools::Itertools as _;
         eclass_wrapper_ty!(A, B, C, D, E);
 
         let n = 100;
@@ -1315,7 +1317,7 @@ mod colt2 {
                     for i in v.iter().copied() {
                         map.entry(column[i]).or_default().push(i);
                     }
-                    *self = QMapInner::Map(map.into_iter().map(|(k, v)| (k, B::new(v))).collect())
+                    *self = QMapInner::Map(map.into_iter().map(|(k, v)| (k, B::new(v))).collect());
                 }
             }
         }
@@ -1327,7 +1329,7 @@ mod colt2 {
     }
 }
 mod colt {
-    use super::*;
+    use super::{Eclass as _, Hash, HashMap};
 
     use std::cell::UnsafeCell;
 
@@ -1374,7 +1376,7 @@ mod colt {
                     for i in v.iter().copied() {
                         map.entry(column[i]).or_default().push(i);
                     }
-                    *self = QMap::Map(map.into_iter().map(|(k, v)| (k, B::new(v))).collect())
+                    *self = QMap::Map(map.into_iter().map(|(k, v)| (k, B::new(v))).collect());
                 }
             }
         }
@@ -1439,7 +1441,10 @@ mod colt {
 fn emit<T>(_: T) {}
 
 mod triangle_join {
-    use super::*;
+    use super::{
+        Eclass, Hash, Map, RelationElement, Set, eclass_wrapper_ty, emit,
+        relation_element_wrapper_ty,
+    };
     eclass_wrapper_ty!(X, Y, Z);
 
     // [[R'(x, y), T(x)], [S(y, z), T(z)]]
@@ -1452,7 +1457,7 @@ mod triangle_join {
         fn apply_rules(&self) {
             let Self { R_new, S, T } = self;
 
-            for &(x, y) in R_new.iter() {
+            for &(x, y) in R_new {
                 let Some(T_x) = T.get(&x) else {
                     continue;
                 };
@@ -1461,7 +1466,7 @@ mod triangle_join {
                 let Some(S_y) = S.get(&y) else {
                     continue;
                 };
-                for &z in S_y.iter() {
+                for &z in S_y {
                     let Some(_) = T_x.get(&z) else {
                         continue;
                     };
@@ -1491,7 +1496,10 @@ impl<A: RelationElement, B: RelationElement> Iter2 for Map<A, B> {
 // R(a, c, d), S(b, c, e), T(d, e, f)
 // this is secretly just a triangle join.
 mod distributive_law_inverse {
-    use super::*;
+    use super::{
+        Eclass, Hash, Iter2 as _, Map, RelationElement, eclass_wrapper_ty, emit,
+        relation_element_wrapper_ty,
+    };
 
     eclass_wrapper_ty!(A, B, C, D, E, F);
 
@@ -1511,7 +1519,7 @@ mod distributive_law_inverse {
         fn apply_rules(&self) {
             let Self { R_new, S, T } = self;
 
-            for &(a, c, d) in R_new.iter() {
+            for &(a, c, d) in R_new {
                 let Some((S_c)) = S.get(&c) else {
                     continue;
                 };
@@ -1533,7 +1541,10 @@ mod distributive_law_inverse {
 }
 
 mod star_join {
-    use super::*;
+    use super::{
+        Eclass, Hash, Map, RelationElement, Set, eclass_wrapper_ty, emit,
+        relation_element_wrapper_ty,
+    };
     eclass_wrapper_ty!(X, Y, Z, W);
 
     // R(x, y), S(x, z), T(x, w)
@@ -1547,15 +1558,15 @@ mod star_join {
     impl Db {
         fn apply_rules(&self) {
             let Self { R_new, S, T } = self;
-            for &(x, y) in R_new.iter() {
+            for &(x, y) in R_new {
                 let Some(S_x) = S.get(&x) else {
                     continue;
                 };
                 let Some(T_x) = T.get(&x) else {
                     continue;
                 };
-                for (&z) in S_x.iter() {
-                    for (&w) in T_x.iter() {
+                for (&z) in S_x {
+                    for (&w) in T_x {
                         emit((x, y, z, w));
                     }
                 }

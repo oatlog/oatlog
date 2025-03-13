@@ -95,7 +95,7 @@ impl QSpan {
         }
     }
     fn from_tree<T: syn::spanned::Spanned + std::fmt::Display>(x: &T) -> Self {
-        QSpan::new(x.span(), format!("{}", x))
+        QSpan::new(x.span(), format!("{x}"))
     }
     fn with_text(&self, s: &[&'static str]) -> Self {
         let s: String = s.iter().copied().join(" ");
@@ -109,7 +109,7 @@ impl QSpan {
 pub type MError = MagicError;
 pub type MResult<T> = std::result::Result<T, MError>;
 
-/// almost the same as syn::Error, but with the ability to handle multiple files.
+/// almost the same as `syn::Error`, but with the ability to handle multiple files.
 #[derive(Clone, Debug)]
 pub struct MagicError {
     messages: Vec<MaybeResolved>,
@@ -222,7 +222,7 @@ impl MaybeResolved {
         match self {
             MaybeResolved::Resolved { .. } => {}
             MaybeResolved::Plain { message, span } => {
-                let span = span.clone();
+                let span = *span;
                 *self = Self::Resolved {
                     message,
                     filename,
@@ -251,7 +251,7 @@ pub(crate) fn parse_str(s: &'static str) -> MResult<hir::Theory> {
 
 pub(crate) fn parse(x: proc_macro2::TokenStream) -> MResult<hir::Theory> {
     fn parse(x: proc_macro2::TokenStream, parser: &mut Parser) -> Result<(), MagicError> {
-        Ok(for token_tree in x {
+        for token_tree in x {
             register_span!(,token_tree);
 
             let span = QSpan::from_tree(&token_tree);
@@ -292,7 +292,8 @@ pub(crate) fn parse(x: proc_macro2::TokenStream) -> MResult<hir::Theory> {
                     );
                 }
             }
-        })
+        }
+        Ok(())
     }
 
     let mut parser = Parser::new();
@@ -1823,7 +1824,7 @@ mod egglog_ast {
         /// Unsupported.
         /// (could easily add support for this by cloning the E-graph)
         Pop(u64),
-        ///
+        /// TODO loke for erik: was an empty doc comment here, clippy failure
         Fail(Box<Spanned<Statement>>),
         /// Parse a file as a series of expressions.
         /// ```egglog
@@ -2623,11 +2624,7 @@ impl Parser {
 fn parse_options(mut s: &'static [SexpSpan]) -> MResult<Vec<(&'static str, &'static [SexpSpan])>> {
     fn as_option(opt: &SexpSpan) -> Option<&'static str> {
         if let Sexp::Atom(opt) = opt.x {
-            if opt.starts_with(':') {
-                Some(*opt)
-            } else {
-                None
-            }
+            opt.starts_with(':').then_some(*opt)
         } else {
             None
         }

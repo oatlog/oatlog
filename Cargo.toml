@@ -59,9 +59,11 @@ perf = { level = "warn", priority = -1 }
 style = { level = "warn", priority = -1 }
 
 pedantic = { level = "warn", priority = -1 }
-too_many_lines = "allow"
-similar_names = "allow"
+mismatching_type_param_order = "allow"
+missing_panics_doc = "allow"
 needless_pass_by_value = "allow"
+similar_names = "allow"
+too_many_lines = "allow"
 
 
 # cargo
@@ -134,7 +136,6 @@ let_underscore_untyped = "warn"
 #missing_inline_in_public_items = "warn"
 #missing_trait_methods = "warn"
 mixed_read_write_in_expression = "warn"
-mod_module_files = "warn"
 module_name_repetitions = "warn"
 #modulo_arithmetic = "warn"
 #multiple_inherent_impl = "warn"

@@ -1,5 +1,3 @@
-#![allow(unused_parens, unused_variables)]
-
 use std::{
     collections::{BTreeMap, BTreeSet},
     marker::PhantomData,
