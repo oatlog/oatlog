@@ -18,7 +18,7 @@ use std::time::Instant;
 // (Var String)
 
 mod codegen_err {
-    // egraph::compile_egraph!((
+    // oatlog::compile_egraph!((
     //     (sort T1)
     //     (sort T2)
     //     (sort T3)
@@ -30,7 +30,7 @@ fn main() {}
 
 mod math_test {
     use std::time::Instant;
-    egraph::compile_egraph!((
+    oatlog::compile_egraph!((
     (datatype Math
         (Diff Math Math)
         (Integral Math Math)

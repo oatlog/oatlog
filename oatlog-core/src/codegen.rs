@@ -188,7 +188,7 @@ pub fn codegen(theory: &Theory) -> TokenStream {
     };
 
     quote! {
-        use egraph::runtime::*;
+        use oatlog::runtime::*;
         #(#symbolic_type_declarations)*
         #(#relations)*
         #delta
@@ -654,7 +654,7 @@ impl CodegenRuleTrieCtx<'_> {
         };
 
         let comment = if let Some(meta) = meta {
-            // These doc comments will be ignored when `egraph-core` is used as a proc macro, but are
+            // These doc comments will be ignored when `oatlog-core` is used as a proc macro, but are
             // nevertheless useful when pretty printing the generated code for e.g. tests.
             quote! {
                 #[doc=#meta]

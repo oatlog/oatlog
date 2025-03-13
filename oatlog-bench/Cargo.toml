@@ -1,14 +1,13 @@
 [package]
-name = "egraph-test"
+name = "oatlog-bench"
 version = "0.1.0"
 edition = "2024"
 
 [dependencies]
-egraph.workspace = true
+oatlog.workspace = true
 
 [dev-dependencies]
 expect-test.workspace = true
 
 [lints]
 workspace = true
-

@@ -1,5 +1,5 @@
 fn main() {
-    egraph::compile_egraph!((
+    oatlog::compile_egraph!((
         (datatype Math
          (Mul Math Math)
          (Add Math Math)
@@ -7,7 +7,7 @@ fn main() {
     ));
     /*
     // TODO: egglog has builtin include, so just use that.
-    egraph::compile_egraph!((
+    oatlog::compile_egraph!((
             (datatype Math
                 (Mul Math Math)
                 (Add Math Math)

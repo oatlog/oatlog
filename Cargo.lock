@@ -180,9 +180,9 @@ name = "comparative-test"
 version = "0.1.0"
 dependencies = [
  "egglog",
- "egraph",
  "eqlog-runtime",
  "expect-test",
+ "oatlog",
 ]
 
 [[package]]
@@ -330,48 +330,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "egraph"
-version = "0.1.0"
-dependencies = [
- "clap",
- "egraph-core",
- "egraph-macro",
-]
-
-[[package]]
-name = "egraph-bench"
-version = "0.1.0"
-dependencies = [
- "egraph",
- "expect-test",
-]
-
-[[package]]
-name = "egraph-core"
-version = "0.1.0"
-dependencies = [
- "ariadne",
- "derive_more",
- "educe",
- "expect-test",
- "heck",
- "itertools",
- "proc-macro2",
- "quote",
- "regex",
- "smallvec",
- "syn 2.0.98",
-]
-
-[[package]]
-name = "egraph-macro"
-version = "0.1.0"
-dependencies = [
- "egraph-core",
- "proc-macro2",
-]
-
-[[package]]
 name = "egraph-serialize"
 version = "0.2.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -383,14 +341,6 @@ dependencies = [
  "ordered-float",
  "serde",
  "serde_json",
-]
-
-[[package]]
-name = "egraph-test"
-version = "0.1.0"
-dependencies = [
- "egraph",
- "expect-test",
 ]
 
 [[package]]
@@ -687,7 +637,7 @@ checksum = "30bde2b3dc3671ae49d8e2e9f044c7c005836e7a023ee57cffa25ab82764bb9e"
 name = "math"
 version = "0.1.0"
 dependencies = [
- "egraph",
+ "oatlog",
 ]
 
 [[package]]
@@ -767,6 +717,56 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "071dfc062690e90b734c0b2273ce72ad0ffa95f0c74596bc250dcfd960262841"
 dependencies = [
  "autocfg",
+]
+
+[[package]]
+name = "oatlog"
+version = "0.1.0"
+dependencies = [
+ "clap",
+ "oatlog-core",
+ "oatlog-macro",
+]
+
+[[package]]
+name = "oatlog-bench"
+version = "0.1.0"
+dependencies = [
+ "expect-test",
+ "oatlog",
+]
+
+[[package]]
+name = "oatlog-core"
+version = "0.1.0"
+dependencies = [
+ "ariadne",
+ "derive_more",
+ "educe",
+ "expect-test",
+ "heck",
+ "itertools",
+ "proc-macro2",
+ "quote",
+ "regex",
+ "smallvec",
+ "syn 2.0.98",
+]
+
+[[package]]
+name = "oatlog-macro"
+version = "0.1.0"
+dependencies = [
+ "oatlog-core",
+ "proc-macro2",
+]
+
+[[package]]
+name = "oatlog-test"
+version = "0.1.0"
+dependencies = [
+ "expect-test",
+ "oatlog",
 ]
 
 [[package]]

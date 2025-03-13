@@ -197,7 +197,7 @@ const BUILTIN_SORTS: [(&str, &str); 3] = [
     // TODO: we could trivially add more here for all sizes of ints/floats.
     // (BUILTIN_F64, "std::primitive::f64"),
     // (BUILTIN_BOOL, "std::primitive::bool"),
-    (BUILTIN_STRING, "egraph::runtime::IString"),
+    (BUILTIN_STRING, "oatlog::runtime::IString"),
     (BUILTIN_UNIT, "std::primitive::unit"),
 ];
 

@@ -1,9 +1,9 @@
 mod test {
     #[cfg(test)]
     mod test_simple_math {
-        use egraph::runtime::EclassProvider;
+        use oatlog::runtime::EclassProvider;
 
-        egraph::compile_egraph!((
+        oatlog::compile_egraph!((
             (datatype Math
                  (Mul Math Math)
                  (Add Math Math)
@@ -75,9 +75,9 @@ mod test {
     }
     mod test_advanced_math {
 
-        use egraph::runtime::EclassProvider as _;
+        use oatlog::runtime::EclassProvider as _;
 
-        egraph::compile_egraph!((
+        oatlog::compile_egraph!((
             (datatype Math
                 (Diff Math Math)
                 (Integral Math Math)

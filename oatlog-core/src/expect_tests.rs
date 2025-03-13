@@ -153,7 +153,7 @@ fn hir_global() {
                 name: "",
                 types: {
                     [t0, i64]: std::primitive::i64,
-                    [t1, String]: egraph::runtime::IString,
+                    [t1, String]: oatlog::runtime::IString,
                     [t2, unit]: THIS_STRING_SHOULD_NOT_APPEAR_IN_GENERATED_CODE,
                     [t3, Math]: [symbolic],
                 },
@@ -325,7 +325,7 @@ fn codegen_panic_merge() {
         "#]]),
         expected_lir: None,
         expected_codegen: Some(expect![[r#"
-            use egraph::runtime::*;
+            use oatlog::runtime::*;
             #[derive(Debug, Default)]
             struct FRelation {
                 new: Vec<<Self as Relation>::Row>,
@@ -526,7 +526,7 @@ fn codegen_bug1() {
         "#]]),
         expected_lir: None,
         expected_codegen: Some(expect![[r#"
-            use egraph::runtime::*;
+            use oatlog::runtime::*;
             eclass_wrapper_ty!(T0);
             eclass_wrapper_ty!(T1);
             eclass_wrapper_ty!(T2);
@@ -892,7 +892,7 @@ fn initial() {
         "#]]),
         expected_lir: None,
         expected_codegen: Some(expect![[r#"
-            use egraph::runtime::*;
+            use oatlog::runtime::*;
             eclass_wrapper_ty!(Math);
             #[derive(Debug, Default)]
             struct ForallMathRelation {
@@ -1206,7 +1206,7 @@ fn test_primitives_simple() {
         "#]]),
         expected_lir: None,
         expected_codegen : Some(expect![[r#"
-            use egraph::runtime::*;
+            use oatlog::runtime::*;
             eclass_wrapper_ty!(Math);
             #[derive(Debug, Default)]
             struct ForallMathRelation {
@@ -1612,11 +1612,11 @@ fn test_primitives_simple() {
             #[derive(Debug, Default)]
             struct VarRelation {
                 new: Vec<<Self as Relation>::Row>,
-                all_index_0_1: BTreeSet<(egraph::runtime::IString, Math)>,
-                all_index_1_0: BTreeSet<(Math, egraph::runtime::IString)>,
+                all_index_0_1: BTreeSet<(oatlog::runtime::IString, Math)>,
+                all_index_1_0: BTreeSet<(Math, oatlog::runtime::IString)>,
             }
             impl Relation for VarRelation {
-                type Row = (egraph::runtime::IString, Math);
+                type Row = (oatlog::runtime::IString, Math);
             }
             impl VarRelation {
                 const COST: u32 = 4u32;
@@ -1632,19 +1632,19 @@ fn test_primitives_simple() {
                 fn iter_new(&self) -> impl Iterator<Item = <Self as Relation>::Row> + use<'_> {
                     self.new.iter().copied()
                 }
-                fn iter1_0_1(&self, x0: egraph::runtime::IString) -> impl Iterator<Item = (Math)> + use<'_> {
+                fn iter1_0_1(&self, x0: oatlog::runtime::IString) -> impl Iterator<Item = (Math)> + use<'_> {
                     self.all_index_0_1
                         .range((x0, Math::MIN_ID)..=(x0, Math::MAX_ID))
                         .copied()
                         .map(|(x0, x1)| (x1))
                 }
-                fn iter1_1_0(&self, x1: Math) -> impl Iterator<Item = (egraph::runtime::IString)> + use<'_> {
+                fn iter1_1_0(&self, x1: Math) -> impl Iterator<Item = (oatlog::runtime::IString)> + use<'_> {
                     self.all_index_1_0
-                        .range((x1, egraph::runtime::IString::MIN_ID)..=(x1, egraph::runtime::IString::MAX_ID))
+                        .range((x1, oatlog::runtime::IString::MIN_ID)..=(x1, oatlog::runtime::IString::MAX_ID))
                         .copied()
                         .map(|(x1, x0)| (x0))
                 }
-                fn check1_0_1(&self, x0: egraph::runtime::IString) -> bool {
+                fn check1_0_1(&self, x0: oatlog::runtime::IString) -> bool {
                     self.iter1_0_1(x0).next().is_some()
                 }
                 fn check1_1_0(&self, x1: Math) -> bool {
@@ -1747,7 +1747,7 @@ fn test_primitives_simple() {
             struct GlobalVariables {
                 new: bool,
                 global_i64: Vec<std::primitive::i64>,
-                global_string: Vec<egraph::runtime::IString>,
+                global_string: Vec<oatlog::runtime::IString>,
                 global_math: Vec<Math>,
             }
             impl GlobalVariables {
@@ -1989,7 +1989,7 @@ fn triangle_join() {
         "#]]),
         expected_lir: None,
         expected_codegen: Some(expect![[r#"
-            use egraph::runtime::*;
+            use oatlog::runtime::*;
             eclass_wrapper_ty!(Math);
             #[derive(Debug, Default)]
             struct ForallMathRelation {
@@ -2665,7 +2665,7 @@ fn edgecase0() {
         "#]]),
         expected_lir: None,
         expected_codegen : Some(expect![[r#"
-            use egraph::runtime::*;
+            use oatlog::runtime::*;
             eclass_wrapper_ty!(Math);
             #[derive(Debug, Default)]
             struct ForallMathRelation {
@@ -3181,7 +3181,7 @@ fn test_into_codegen() {
         "#]]),
         expected_lir: None,
         expected_codegen: Some(expect![[r#"
-            use egraph::runtime::*;
+            use oatlog::runtime::*;
             eclass_wrapper_ty!(Math);
             #[derive(Debug, Default)]
             struct ForallMathRelation {

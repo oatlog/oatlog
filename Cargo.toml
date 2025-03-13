@@ -1,21 +1,21 @@
 [workspace]
 members = [
-    "egraph",
-    "egraph-core",
-    "egraph-macro",
-    "egraph-test",
-    "egraph-bench",
+    "oatlog",
+    "oatlog-core",
+    "oatlog-macro",
+    "oatlog-test",
+    "oatlog-bench",
     "examples/math",
     "comparative-test",
 ]
 resolver = "2"
 
 [workspace.dependencies]
-egraph.path = "egraph"
-egraph-core.path = "egraph-core"
-egraph-macro.path = "egraph-macro"
-egraph-test.path = "egraph-test"
-egraph-bench.path = "egraph-bench"
+oatlog.path = "oatlog"
+oatlog-core.path = "oatlog-core"
+oatlog-macro.path = "oatlog-macro"
+oatlog-test.path = "oatlog-test"
+oatlog-bench.path = "oatlog-bench"
 comparative-test.path = "comparative-test"
 
 ariadne = { version = "0.5", features = ["auto-color"] }

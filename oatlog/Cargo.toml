@@ -1,12 +1,12 @@
 [package]
-name = "egraph"
+name = "oatlog"
 version = "0.1.0"
 edition = "2024"
 
 [dependencies]
 clap.workspace = true
-egraph-core.workspace = true
-egraph-macro.workspace = true
+oatlog-core.workspace = true
+oatlog-macro.workspace = true
 
 [lints]
 workspace = true

@@ -27,7 +27,7 @@ fn main() {
         input
     };
 
-    let output = egraph::compile_str(&input);
+    let output = oatlog::compile_str(&input);
 
     match cli.output {
         Some(path) => fs::write(path, output).unwrap(),
