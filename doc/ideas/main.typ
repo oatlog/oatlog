@@ -2320,6 +2320,17 @@ This system is mostly equivalent to:
 let trie: HashMap<NodeId, HashMap<char, Node>>;
 ```
 
+= Controlling when rules run
+
+One approach is to prevent a rule from inserting things into the database, a problem with that is that all rules run unconditionally.
+
+Another approach is to never clear new, and make every rule keep a "pointer" to the index they should start reading at.
+
+When e-classes are invalidated, we would ideally want to remove from this list, otherwise we might generate things that are immediately removed because of canonicalization.
+
+With this approach, running arbitrary sets of rules just works, without involving any timestamps.
+
+
 = Reasoning about growth patterns.
 
 Assuming non termination, we either have (probably):
