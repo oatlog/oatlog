@@ -142,7 +142,28 @@ insertions, for memory locality and instruction-level parallelism.
 ) <rosetta-table>
 
 
+
+= Implementation
+== Internal Representations
+=== Egglog AST
+Either rust tokens or strings are parsed into s-expressions and then parsed into an egglog AST representing the source-level language without simplifications such as removing syntax sugar.
+
+=== HIR, High-level Intermediate Representation
+// === Query plan
+=== LIR, Low-level Intermediate Representation
+
+
+string or rust tokens -> Sexp -> egglog ast -> hir -> query plan -> lir -> rust code.
+
+
 = Background <thesection>
+
+
+
+
+
+- implementation stuff
+- user-facing stuff
 
 - intro
     - what is egglog
