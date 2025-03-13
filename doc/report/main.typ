@@ -2,8 +2,8 @@
 
 #let department = "Department of Computer Science and Engineering"
 #show: template.with(
-  title: "Compiled e-graphs with primitives",
-  subtitle: "Implementing a high-performance E-graph engine.",
+  title: "Oatlog: Ahead-of-time compiled e-graphs with primitives",
+  subtitle: "Implementing a high-performance e-graph engine",
   authors: ("Loke Gustafsson", "Erik Magnusson"),
   department: department,
   supervisor: ("Hazem Torfah", department),
@@ -140,18 +140,6 @@ insertions, for memory locality and instruction-level parallelism.
   ),
   caption: [Comparison of egglog, eqlog, datalog, and relational database terminology.]
 ) <rosetta-table>
-
-
-
-= Risk analysis and ethical considerations
-
-We do not think there are any severe ethical considerations for this project since no research
-participants are involved. However, the impact of the correctness of our engine is amplified by any
-users since user code correctness depends on our engine, so we need to be careful about correctness.
-One potential pitfall for us is that we implement semantics that are different from what the users
-expect or add unsound optimizations. It is therefore important that we specify our behavior and
-statically prevent bug classes in our compiler where possible. We think the cost in terms of our own
-and faculty time for this project is outweighed by its research value.
 
 
 = Background <thesection>
@@ -463,7 +451,18 @@ See @index-datastructures.
   ]
 ) <index-datastructures>
 
-= Name of our thing
+= Oatlog
+
+- Ahead of time compiled
+  - Consider and optimize rules together
+- Datalog
+
+TODO
+- User's perspective, egglog language (specify in background) and runtime API.
+- Architecture at a module level, what IRs.
+- Show and discuss the IRs
+- Discuss core algorithms
+- Discuss selected implementation details
 
 = Benchmarks
 
