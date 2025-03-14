@@ -873,6 +873,7 @@ dependencies = [
  "egglog",
  "expect-test",
  "oatlog",
+ "rayon",
 ]
 
 [[package]]

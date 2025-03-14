@@ -183,7 +183,7 @@ pub fn codegen(theory: &Theory) -> TokenStream {
 
     let theory_initial = {
         theory.initial.iter().map(|x| match x {
-            Initial::Run { steps } => quote! { for _ in 0..#steps { theory.step() }},
+            Initial::Run { steps } => quote! { for _ in 0..#steps { theory.step(); }},
         })
     };
 
@@ -231,9 +231,19 @@ pub fn codegen(theory: &Theory) -> TokenStream {
                 #(#theory_initial)*
                 theory
             }
-            pub fn step(&mut self) {
-                self.apply_rules();
-                self.clear_transient();
+            pub fn step(&mut self) -> [std::time::Duration; 2] {
+                [
+                    {
+                        let start = std::time::Instant::now();
+                        self.apply_rules();
+                        start.elapsed()
+                    },
+                    {
+                        let start = std::time::Instant::now();
+                        self.clear_transient();
+                        start.elapsed()
+                    },
+                ]
             }
             #[inline(never)]
             fn apply_rules(&mut self) { #rule_contents }
@@ -244,10 +254,10 @@ pub fn codegen(theory: &Theory) -> TokenStream {
                 buf.push_str("}");
                 buf
             }
-            fn get_total_relation_entry_count(&self) -> usize {
+            pub fn get_total_relation_entry_count(&self) -> usize {
                 #get_total_relation_entry_count_body
             }
-            fn get_relation_entry_count(&self) -> Vec<(&'static str, usize)> {
+            pub fn get_relation_entry_count(&self) -> Vec<(&'static str, usize)> {
                 [#((stringify!(#stored_relations), self.#stored_relations.len())),*].iter().copied().collect()
             }
             #clear_transient
@@ -985,7 +995,6 @@ fn codegen_relation(rel: &RelationData, theory: &Theory) -> TokenStream {
                                         }
                                     }
                                 })
-
                             },
                         }
                     })
@@ -1105,6 +1114,8 @@ fn codegen_relation(rel: &RelationData, theory: &Theory) -> TokenStream {
                         }
                         let mut op_delete = Vec::new();
                         #(#uprooted_into_op_delete)*
+
+                        // TODO: what happens if we just delete any non-canonical row?
 
                         for (#(#all_columns),*) in op_delete {
                             if self.#first_index_ident.remove(&(#(#first_index_order),*)) {

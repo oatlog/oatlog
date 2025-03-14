@@ -534,9 +534,19 @@ fn codegen_panic_merge() {
                     theory.global_variables.new = true;
                     theory
                 }
-                pub fn step(&mut self) {
-                    self.apply_rules();
-                    self.clear_transient();
+                pub fn step(&mut self) -> [std::time::Duration; 2] {
+                    [
+                        {
+                            let start = std::time::Instant::now();
+                            self.apply_rules();
+                            start.elapsed()
+                        },
+                        {
+                            let start = std::time::Instant::now();
+                            self.clear_transient();
+                            start.elapsed()
+                        },
+                    ]
                 }
                 #[inline(never)]
                 fn apply_rules(&mut self) {}
@@ -547,10 +557,10 @@ fn codegen_panic_merge() {
                     buf.push_str("}");
                     buf
                 }
-                fn get_total_relation_entry_count(&self) -> usize {
+                pub fn get_total_relation_entry_count(&self) -> usize {
                     [self.f_relation.len()].iter().copied().sum::<usize>()
                 }
-                fn get_relation_entry_count(&self) -> Vec<(&'static str, usize)> {
+                pub fn get_relation_entry_count(&self) -> Vec<(&'static str, usize)> {
                     [(stringify!(f_relation), self.f_relation.len())]
                         .iter()
                         .copied()
@@ -890,9 +900,19 @@ fn codegen_bug1() {
                     theory.global_variables.new = true;
                     theory
                 }
-                pub fn step(&mut self) {
-                    self.apply_rules();
-                    self.clear_transient();
+                pub fn step(&mut self) -> [std::time::Duration; 2] {
+                    [
+                        {
+                            let start = std::time::Instant::now();
+                            self.apply_rules();
+                            start.elapsed()
+                        },
+                        {
+                            let start = std::time::Instant::now();
+                            self.clear_transient();
+                            start.elapsed()
+                        },
+                    ]
                 }
                 #[inline(never)]
                 fn apply_rules(&mut self) {}
@@ -906,7 +926,7 @@ fn codegen_bug1() {
                     buf.push_str("}");
                     buf
                 }
-                fn get_total_relation_entry_count(&self) -> usize {
+                pub fn get_total_relation_entry_count(&self) -> usize {
                     [
                         self.forall_t0_relation.len(),
                         self.forall_t1_relation.len(),
@@ -917,7 +937,7 @@ fn codegen_bug1() {
                     .copied()
                     .sum::<usize>()
                 }
-                fn get_relation_entry_count(&self) -> Vec<(&'static str, usize)> {
+                pub fn get_relation_entry_count(&self) -> Vec<(&'static str, usize)> {
                     [
                         (
                             stringify!(forall_t0_relation),
@@ -1187,13 +1207,23 @@ fn initial() {
                     theory.clear_transient();
                     theory.global_variables.new = true;
                     for _ in 0..42usize {
-                        theory.step()
+                        theory.step();
                     }
                     theory
                 }
-                pub fn step(&mut self) {
-                    self.apply_rules();
-                    self.clear_transient();
+                pub fn step(&mut self) -> [std::time::Duration; 2] {
+                    [
+                        {
+                            let start = std::time::Instant::now();
+                            self.apply_rules();
+                            start.elapsed()
+                        },
+                        {
+                            let start = std::time::Instant::now();
+                            self.clear_transient();
+                            start.elapsed()
+                        },
+                    ]
                 }
                 #[inline(never)]
                 fn apply_rules(&mut self) {}
@@ -1205,13 +1235,13 @@ fn initial() {
                     buf.push_str("}");
                     buf
                 }
-                fn get_total_relation_entry_count(&self) -> usize {
+                pub fn get_total_relation_entry_count(&self) -> usize {
                     [self.forall_math_relation.len(), self.const_relation.len()]
                         .iter()
                         .copied()
                         .sum::<usize>()
                 }
-                fn get_relation_entry_count(&self) -> Vec<(&'static str, usize)> {
+                pub fn get_relation_entry_count(&self) -> Vec<(&'static str, usize)> {
                     [
                         (
                             stringify!(forall_math_relation),
@@ -1946,9 +1976,19 @@ fn test_primitives_simple() {
                     theory.global_variables.new = true;
                     theory
                 }
-                pub fn step(&mut self) {
-                    self.apply_rules();
-                    self.clear_transient();
+                pub fn step(&mut self) -> [std::time::Duration; 2] {
+                    [
+                        {
+                            let start = std::time::Instant::now();
+                            self.apply_rules();
+                            start.elapsed()
+                        },
+                        {
+                            let start = std::time::Instant::now();
+                            self.clear_transient();
+                            start.elapsed()
+                        },
+                    ]
                 }
                 #[inline(never)]
                 fn apply_rules(&mut self) {
@@ -2029,7 +2069,7 @@ fn test_primitives_simple() {
                     buf.push_str("}");
                     buf
                 }
-                fn get_total_relation_entry_count(&self) -> usize {
+                pub fn get_total_relation_entry_count(&self) -> usize {
                     [
                         self.forall_math_relation.len(),
                         self.mul_relation.len(),
@@ -2041,7 +2081,7 @@ fn test_primitives_simple() {
                     .copied()
                     .sum::<usize>()
                 }
-                fn get_relation_entry_count(&self) -> Vec<(&'static str, usize)> {
+                pub fn get_relation_entry_count(&self) -> Vec<(&'static str, usize)> {
                     [
                         (
                             stringify!(forall_math_relation),
@@ -2689,9 +2729,19 @@ fn triangle_join() {
                     theory.global_variables.new = true;
                     theory
                 }
-                pub fn step(&mut self) {
-                    self.apply_rules();
-                    self.clear_transient();
+                pub fn step(&mut self) -> [std::time::Duration; 2] {
+                    [
+                        {
+                            let start = std::time::Instant::now();
+                            self.apply_rules();
+                            start.elapsed()
+                        },
+                        {
+                            let start = std::time::Instant::now();
+                            self.clear_transient();
+                            start.elapsed()
+                        },
+                    ]
                 }
                 #[inline(never)]
                 fn apply_rules(&mut self) {
@@ -2734,7 +2784,7 @@ fn triangle_join() {
                     buf.push_str("}");
                     buf
                 }
-                fn get_total_relation_entry_count(&self) -> usize {
+                pub fn get_total_relation_entry_count(&self) -> usize {
                     [
                         self.forall_math_relation.len(),
                         self.foo_relation.len(),
@@ -2746,7 +2796,7 @@ fn triangle_join() {
                     .copied()
                     .sum::<usize>()
                 }
-                fn get_relation_entry_count(&self) -> Vec<(&'static str, usize)> {
+                pub fn get_relation_entry_count(&self) -> Vec<(&'static str, usize)> {
                     [
                         (
                             stringify!(forall_math_relation),
@@ -3240,9 +3290,19 @@ fn edgecase0() {
                     theory.global_variables.new = true;
                     theory
                 }
-                pub fn step(&mut self) {
-                    self.apply_rules();
-                    self.clear_transient();
+                pub fn step(&mut self) -> [std::time::Duration; 2] {
+                    [
+                        {
+                            let start = std::time::Instant::now();
+                            self.apply_rules();
+                            start.elapsed()
+                        },
+                        {
+                            let start = std::time::Instant::now();
+                            self.clear_transient();
+                            start.elapsed()
+                        },
+                    ]
                 }
                 #[inline(never)]
                 fn apply_rules(&mut self) {
@@ -3289,7 +3349,7 @@ fn edgecase0() {
                     buf.push_str("}");
                     buf
                 }
-                fn get_total_relation_entry_count(&self) -> usize {
+                pub fn get_total_relation_entry_count(&self) -> usize {
                     [
                         self.forall_math_relation.len(),
                         self.mul_relation.len(),
@@ -3299,7 +3359,7 @@ fn edgecase0() {
                     .copied()
                     .sum::<usize>()
                 }
-                fn get_relation_entry_count(&self) -> Vec<(&'static str, usize)> {
+                pub fn get_relation_entry_count(&self) -> Vec<(&'static str, usize)> {
                     [
                         (
                             stringify!(forall_math_relation),
@@ -3767,9 +3827,19 @@ fn test_into_codegen() {
                     theory.global_variables.new = true;
                     theory
                 }
-                pub fn step(&mut self) {
-                    self.apply_rules();
-                    self.clear_transient();
+                pub fn step(&mut self) -> [std::time::Duration; 2] {
+                    [
+                        {
+                            let start = std::time::Instant::now();
+                            self.apply_rules();
+                            start.elapsed()
+                        },
+                        {
+                            let start = std::time::Instant::now();
+                            self.clear_transient();
+                            start.elapsed()
+                        },
+                    ]
                 }
                 #[inline(never)]
                 fn apply_rules(&mut self) {
@@ -3801,7 +3871,7 @@ fn test_into_codegen() {
                     buf.push_str("}");
                     buf
                 }
-                fn get_total_relation_entry_count(&self) -> usize {
+                pub fn get_total_relation_entry_count(&self) -> usize {
                     [
                         self.forall_math_relation.len(),
                         self.mul_relation.len(),
@@ -3811,7 +3881,7 @@ fn test_into_codegen() {
                     .copied()
                     .sum::<usize>()
                 }
-                fn get_relation_entry_count(&self) -> Vec<(&'static str, usize)> {
+                pub fn get_relation_entry_count(&self) -> Vec<(&'static str, usize)> {
                     [
                         (
                             stringify!(forall_math_relation),

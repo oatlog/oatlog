@@ -5,8 +5,9 @@ edition = "2024"
 
 [dependencies]
 oatlog.workspace = true
-criterion.workspace = true
 egglog.workspace = true
+criterion.workspace = true
+rayon.workspace = true
 
 [dev-dependencies]
 expect-test.workspace = true

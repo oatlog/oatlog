@@ -1,3 +1,3 @@
 fn main() {
-    oatlog_bench::run_main();
+    oatlog_bench::run_main(4);
 }
