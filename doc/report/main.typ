@@ -150,9 +150,12 @@ insertions, for memory locality and instruction-level parallelism.
 
 = Implementation
 
+Oatlog is a rust proc-macro that takes in egglog code and generates rust code.
+See @codegen_example for an example of what the generated code looks like.
+
 == Rustc spans across files
 
-Proc-macros are provided spans, which are essentially byte ranges of the original source code. 
+Proc-macros are provided spans, which are essentially byte ranges of the original source code.
 However, when tokenizing arbitrary strings, spans are not provided.
 This is solved by in addition to parsing from rust tokens, we implement our own sexp parser and insert our own byte ranges.
 This has another problem, since our spans are not from rustc, our error locations are no longer correct.
@@ -224,6 +227,8 @@ LIR is a low-level description of the actual code that is to be generated.
         - architecture diagram of IRs.
 
 META: what is egraph, then why is e-graph database, then how is database implemented/optimize database.
+
+
 
 
 
@@ -507,6 +512,64 @@ See @index-datastructures.
   ]
 ) <index-datastructures>
 
+
+== Semi-Naive without running all rules all the time.
+
+NOTE: this is not implemented yet, right now all rules run at the same time.
+
+Given the previous definition of semi-naive evaluation, it's not obvious how to discard the *new* set before all rules have been run.
+
+One approach to disabling rules is to still run all rules, but instead wait with inserting the results of some rules into the database.
+This has the drawback of still computing the joins unconditionally.
+
+Another approach is to use timestamps for each element in the database and explicitly query for things that are new.
+This is what egglog does, but it is problematic because it increases memory usage and essentially makes queries iterate through all historical timestamps.
+
+Conceptually, our approach will be to store the new set in a push-only list, and make the rules store what index in these they are at. See @semi-something for a visualization of this.
+
+#figure(
+```
+  rule1    rule2
+    v        v
+[x, x, x, x, x, x, x, x]
+
+add y, z w:
+
+  rule1    rule2
+    v        v
+[x, x, x, x, x, x, x, x, y, z, w]
+
+run rule1:
+
+[x, x, x, x, x, x, x, x, y, z, w]
+    ^                          ^
+    |------rule1 new set-------|
+
+           rule2                rule1
+             v                    v
+[x, x, x, x, x, x, x, x, y, z, w]
+
+add a, b, c:
+
+           rule2                rule1
+             v                    v
+[x, x, x, x, x, x, x, x, y, z, w, a, b, c]
+
+run rule2:
+
+           rule2                rule1
+             v                    v
+[x, x, x, x, x, x, x, x, y, z, w, a, b, c]
+             ^                          ^
+             |------rule2 new set-------|
+```
+  ,
+  caption: [Staying semi-naive while running while not running all the rules at the same time.]
+) <semi-something>
+
+
+
+
 = Oatlog
 
 - Ahead of time compiled
@@ -627,3 +690,384 @@ SELECT
 INNER JOIN Mul ON Add.result = Mul.lhs;
 FROM Add
 ```
+
+
+= Example of generated code <codegen_example>
+
+The egglog code for this example, also implementing the distributive law:
+```egglog
+(datatype Math
+    (Mul Math Math)
+    (Add Math Math)
+)
+(rewrite (Mul (Add a b) c) (Add (Mul a c) (Mul b c)))
+```
+
+This is what the generated rust code looks like, the most relevant function to look at is `apply_rules` which performs the actual joins.
+Note that the generated code has been edited slightly to make it easier to read.
+```rust
+impl Theory {
+    fn apply_rules(&mut self) {
+        for (a, b, p2) in self.add_relation.iter_new() {
+            for (c, p4) in self.mul_relation.iter1_0_1_2(p2) {
+                let a5 = self.delta.make_math(&mut self.uf);
+                let a4 = self.delta.make_math(&mut self.uf);
+                self.delta.insert_add((a4, a5, p4));
+                self.delta.insert_mul((b, c, a5));
+                self.delta.insert_mul((a, c, a4));
+            }
+        }
+        for (p2, c, p4) in self.mul_relation.iter_new() {
+            for (a, b) in self.add_relation.iter1_2_0_1(p2) {
+                let a5 = self.delta.make_math(&mut self.uf);
+                let a4 = self.delta.make_math(&mut self.uf);
+                self.delta.insert_add((a4, a5, p4));
+                self.delta.insert_mul((b, c, a5));
+                self.delta.insert_mul((a, c, a4));
+            }
+        }
+    }
+    pub fn new() -> Self {
+        Self::default();
+    }
+    pub fn step(&mut self) {
+        self.apply_rules();
+        self.clear_transient();
+    }
+    fn clear_transient(&mut self) {
+        self.global_variables.new = false;
+        self.forall_math_relation.clear_new();
+        self.mul_relation.clear_new();
+        self.add_relation.clear_new();
+        loop {
+            self.uprooted.take_dirt(&mut self.uf);
+            self.forall_math_relation.update(&self.uprooted, &mut self.uf, &mut self.delta);
+            self.mul_relation.update(&self.uprooted, &mut self.uf, &mut self.delta);
+            self.add_relation.update(&self.uprooted, &mut self.uf, &mut self.delta);
+            if !(self.uf.has_new() || self.delta.has_new()) {
+                break;
+            }
+        }
+        self.forall_math_relation.update_finalize(&mut self.uf);
+        self.mul_relation.update_finalize(&mut self.uf);
+        self.add_relation.update_finalize(&mut self.uf);
+    }
+}
+#[derive(Debug, Default)]
+pub struct Theory {
+    delta: Delta,
+    uf: Unification,
+    uprooted: Uprooted,
+    mul_relation: MulRelation,
+    add_relation: AddRelation,
+}
+use oatlog::runtime::*;
+eclass_wrapper_ty!(Math);
+#[derive(Debug, Default)]
+struct MulRelation {
+    new: Vec<<Self as Relation>::Row>,
+    all_index_0_1_2: BTreeSet<(Math, Math, Math)>,
+    all_index_1_0_2: BTreeSet<(Math, Math, Math)>,
+    all_index_2_0_1: BTreeSet<(Math, Math, Math)>,
+}
+impl Relation for MulRelation {
+    type Row = (Math, Math, Math);
+}
+impl MulRelation {
+    const COST: u32 = 9u32;
+    fn new() -> Self {
+        Self::default()
+    }
+    fn has_new(&self) -> bool {
+        !self.new.is_empty()
+    }
+    fn clear_new(&mut self) {
+        self.new.clear();
+    }
+    fn iter_new(&self) -> impl Iterator<Item = <Self as Relation>::Row> + use<'_> {
+        self.new.iter().copied()
+    }
+    fn iter1_0_1_2(&self, x0: Math) -> impl Iterator<Item = (Math, Math)> + use<'_> {
+        self.all_index_0_1_2
+            .range((x0, Math::MIN_ID, Math::MIN_ID)..=(x0, Math::MAX_ID, Math::MAX_ID))
+            .copied()
+            .map(|(x0, x1, x2)| (x1, x2))
+    }
+    fn iter1_1_0_2(&self, x1: Math) -> impl Iterator<Item = (Math, Math)> + use<'_> {
+        self.all_index_1_0_2
+            .range((x1, Math::MIN_ID, Math::MIN_ID)..=(x1, Math::MAX_ID, Math::MAX_ID))
+            .copied()
+            .map(|(x1, x0, x2)| (x0, x2))
+    }
+    fn iter1_2_0_1(&self, x2: Math) -> impl Iterator<Item = (Math, Math)> + use<'_> {
+        self.all_index_2_0_1
+            .range((x2, Math::MIN_ID, Math::MIN_ID)..=(x2, Math::MAX_ID, Math::MAX_ID))
+            .copied()
+            .map(|(x2, x0, x1)| (x0, x1))
+    }
+    fn iter2_0_1_2(&self, x0: Math, x1: Math) -> impl Iterator<Item = (Math)> + use<'_> {
+        self.all_index_0_1_2
+            .range((x0, x1, Math::MIN_ID)..=(x0, x1, Math::MAX_ID))
+            .copied()
+            .map(|(x0, x1, x2)| (x2))
+    }
+    fn check1_0_1_2(&self, x0: Math) -> bool {
+        self.iter1_0_1_2(x0).next().is_some()
+    }
+    fn check1_1_0_2(&self, x1: Math) -> bool {
+        self.iter1_1_0_2(x1).next().is_some()
+    }
+    fn check1_2_0_1(&self, x2: Math) -> bool {
+        self.iter1_2_0_1(x2).next().is_some()
+    }
+    fn check2_0_1_2(&self, x0: Math, x1: Math) -> bool {
+        self.iter2_0_1_2(x0, x1).next().is_some()
+    }
+    fn update(&mut self, uprooted: &Uprooted, uf: &mut Unification, delta: &mut Delta) {
+        let mut op_insert = take(&mut delta.mul_relation_delta);
+        for (x0, x1, x2) in op_insert.iter_mut() {
+            *x0 = uf.math_uf.find(*x0);
+            *x1 = uf.math_uf.find(*x1);
+            *x2 = uf.math_uf.find(*x2);
+        }
+        let mut op_delete = Vec::new();
+        for x0 in uprooted.math_uprooted.iter().copied() {
+            for (x1, x2) in self.iter1_0_1_2(x0) {
+                op_delete.push((x0, x1, x2));
+            }
+        }
+        for x1 in uprooted.math_uprooted.iter().copied() {
+            for (x0, x2) in self.iter1_1_0_2(x1) {
+                op_delete.push((x0, x1, x2));
+            }
+        }
+        for x2 in uprooted.math_uprooted.iter().copied() {
+            for (x0, x1) in self.iter1_2_0_1(x2) {
+                op_delete.push((x0, x1, x2));
+            }
+        }
+        for (x0, x1, x2) in op_delete {
+            if self.all_index_0_1_2.remove(&(x0, x1, x2)) {
+                self.all_index_1_0_2.remove(&(x1, x0, x2));
+                self.all_index_2_0_1.remove(&(x2, x0, x1));
+                uf.math_uf.dec_eclass(x0, Self::COST);
+                uf.math_uf.dec_eclass(x1, Self::COST);
+                uf.math_uf.dec_eclass(x2, Self::COST);
+                op_insert.push((
+                    uf.math_uf.find(x0),
+                    uf.math_uf.find(x1),
+                    uf.math_uf.find(x2),
+                ));
+            }
+        }
+        op_insert.retain(|&(x0, x1, x2)| {
+            if let Some(y2) = self.iter2_0_1_2(x0, x1).next() {
+                let mut should_trigger = false;
+                should_trigger |= y2 != x2;
+                if should_trigger {
+                    uf.math_uf.union(y2, x2);
+                    return false;
+                }
+            }
+            if !self.all_index_0_1_2.insert((x0, x1, x2)) {
+                return false;
+            }
+            uf.math_uf.inc_eclass(x0, Self::COST);
+            uf.math_uf.inc_eclass(x1, Self::COST);
+            uf.math_uf.inc_eclass(x2, Self::COST);
+            self.all_index_1_0_2.insert((x1, x0, x2));
+            self.all_index_2_0_1.insert((x2, x0, x1));
+            true
+        });
+        self.new.extend(op_insert);
+    }
+    fn update_finalize(&mut self, uf: &mut Unification) {
+        for (x0, x1, x2) in self.new.iter_mut() {
+            *x0 = uf.math_uf.find(*x0);
+            *x1 = uf.math_uf.find(*x1);
+            *x2 = uf.math_uf.find(*x2);
+        }
+        self.new.sort();
+        self.new.dedup();
+    }
+}
+#[derive(Debug, Default)]
+struct AddRelation {
+    new: Vec<<Self as Relation>::Row>,
+    all_index_0_1_2: BTreeSet<(Math, Math, Math)>,
+    all_index_1_0_2: BTreeSet<(Math, Math, Math)>,
+    all_index_2_0_1: BTreeSet<(Math, Math, Math)>,
+}
+impl Relation for AddRelation {
+    type Row = (Math, Math, Math);
+}
+impl AddRelation {
+    const COST: u32 = 9u32;
+    fn new() -> Self {
+        Self::default()
+    }
+    fn has_new(&self) -> bool {
+        !self.new.is_empty()
+    }
+    fn clear_new(&mut self) {
+        self.new.clear();
+    }
+    fn iter_new(&self) -> impl Iterator<Item = <Self as Relation>::Row> + use<'_> {
+        self.new.iter().copied()
+    }
+    fn iter1_2_0_1(&self, x2: Math) -> impl Iterator<Item = (Math, Math)> + use<'_> {
+        self.all_index_2_0_1
+            .range((x2, Math::MIN_ID, Math::MIN_ID)..=(x2, Math::MAX_ID, Math::MAX_ID))
+            .copied()
+            .map(|(x2, x0, x1)| (x0, x1))
+    }
+    fn iter1_0_1_2(&self, x0: Math) -> impl Iterator<Item = (Math, Math)> + use<'_> {
+        self.all_index_0_1_2
+            .range((x0, Math::MIN_ID, Math::MIN_ID)..=(x0, Math::MAX_ID, Math::MAX_ID))
+            .copied()
+            .map(|(x0, x1, x2)| (x1, x2))
+    }
+    fn iter1_1_0_2(&self, x1: Math) -> impl Iterator<Item = (Math, Math)> + use<'_> {
+        self.all_index_1_0_2
+            .range((x1, Math::MIN_ID, Math::MIN_ID)..=(x1, Math::MAX_ID, Math::MAX_ID))
+            .copied()
+            .map(|(x1, x0, x2)| (x0, x2))
+    }
+    fn iter2_0_1_2(&self, x0: Math, x1: Math) -> impl Iterator<Item = (Math)> + use<'_> {
+        self.all_index_0_1_2
+            .range((x0, x1, Math::MIN_ID)..=(x0, x1, Math::MAX_ID))
+            .copied()
+            .map(|(x0, x1, x2)| (x2))
+    }
+    fn check1_2_0_1(&self, x2: Math) -> bool {
+        self.iter1_2_0_1(x2).next().is_some()
+    }
+    fn check1_0_1_2(&self, x0: Math) -> bool {
+        self.iter1_0_1_2(x0).next().is_some()
+    }
+    fn check1_1_0_2(&self, x1: Math) -> bool {
+        self.iter1_1_0_2(x1).next().is_some()
+    }
+    fn check2_0_1_2(&self, x0: Math, x1: Math) -> bool {
+        self.iter2_0_1_2(x0, x1).next().is_some()
+    }
+    fn update(&mut self, uprooted: &Uprooted, uf: &mut Unification, delta: &mut Delta) {
+        let mut op_insert = take(&mut delta.add_relation_delta);
+        for (x0, x1, x2) in op_insert.iter_mut() {
+            *x0 = uf.math_uf.find(*x0);
+            *x1 = uf.math_uf.find(*x1);
+            *x2 = uf.math_uf.find(*x2);
+        }
+        let mut op_delete = Vec::new();
+        for x0 in uprooted.math_uprooted.iter().copied() {
+            for (x1, x2) in self.iter1_0_1_2(x0) {
+                op_delete.push((x0, x1, x2));
+            }
+        }
+        for x1 in uprooted.math_uprooted.iter().copied() {
+            for (x0, x2) in self.iter1_1_0_2(x1) {
+                op_delete.push((x0, x1, x2));
+            }
+        }
+        for x2 in uprooted.math_uprooted.iter().copied() {
+            for (x0, x1) in self.iter1_2_0_1(x2) {
+                op_delete.push((x0, x1, x2));
+            }
+        }
+        for (x0, x1, x2) in op_delete {
+            if self.all_index_0_1_2.remove(&(x0, x1, x2)) {
+                self.all_index_1_0_2.remove(&(x1, x0, x2));
+                self.all_index_2_0_1.remove(&(x2, x0, x1));
+                uf.math_uf.dec_eclass(x0, Self::COST);
+                uf.math_uf.dec_eclass(x1, Self::COST);
+                uf.math_uf.dec_eclass(x2, Self::COST);
+                op_insert.push((
+                    uf.math_uf.find(x0),
+                    uf.math_uf.find(x1),
+                    uf.math_uf.find(x2),
+                ));
+            }
+        }
+        op_insert.retain(|&(x0, x1, x2)| {
+            if let Some(y2) = self.iter2_0_1_2(x0, x1).next() {
+                let mut should_trigger = false;
+                should_trigger |= y2 != x2;
+                if should_trigger {
+                    uf.math_uf.union(y2, x2);
+                    return false;
+                }
+            }
+            if !self.all_index_0_1_2.insert((x0, x1, x2)) {
+                return false;
+            }
+            uf.math_uf.inc_eclass(x0, Self::COST);
+            uf.math_uf.inc_eclass(x1, Self::COST);
+            uf.math_uf.inc_eclass(x2, Self::COST);
+            self.all_index_1_0_2.insert((x1, x0, x2));
+            self.all_index_2_0_1.insert((x2, x0, x1));
+            true
+        });
+        self.new.extend(op_insert);
+    }
+    fn update_finalize(&mut self, uf: &mut Unification) {
+        for (x0, x1, x2) in self.new.iter_mut() {
+            *x0 = uf.math_uf.find(*x0);
+            *x1 = uf.math_uf.find(*x1);
+            *x2 = uf.math_uf.find(*x2);
+        }
+        self.new.sort();
+        self.new.dedup();
+    }
+}
+#[derive(Debug, Default)]
+pub struct Delta {
+    forall_math_relation_delta: Vec<<ForallMathRelation as Relation>::Row>,
+    mul_relation_delta: Vec<<MulRelation as Relation>::Row>,
+    add_relation_delta: Vec<<AddRelation as Relation>::Row>,
+}
+impl Delta {
+    fn new() -> Self {
+        Self::default()
+    }
+    fn has_new(&self) -> bool {
+        let mut has_new = false;
+        has_new |= !self.forall_math_relation_delta.is_empty();
+        has_new |= !self.mul_relation_delta.is_empty();
+        has_new |= !self.add_relation_delta.is_empty();
+        has_new
+    }
+    pub fn make_math(&mut self, uf: &mut Unification) -> Math {
+        let id = uf.math_uf.add_eclass();
+        self.forall_math_relation_delta.push(id);
+        id
+    }
+    pub fn insert_mul(&mut self, x: <MulRelation as Relation>::Row) {
+        self.mul_relation_delta.push(x);
+    }
+    pub fn insert_add(&mut self, x: <AddRelation as Relation>::Row) {
+        self.add_relation_delta.push(x);
+    }
+}
+#[derive(Debug, Default)]
+struct Uprooted {
+    math_uprooted: Vec<Math>,
+}
+impl Uprooted {
+    fn take_dirt(&mut self, uf: &mut Unification) {
+        self.math_uprooted.clear();
+        swap(&mut self.math_uprooted, &mut uf.math_uf.dirty());
+    }
+}
+#[derive(Debug, Default)]
+struct Unification {
+    math_uf: UnionFind<Math>,
+}
+impl Unification {
+    fn has_new(&mut self) -> bool {
+        let mut has_new = false;
+        has_new |= !self.math_uf.dirty().is_empty();
+        has_new
+    }
+}
+```
+
