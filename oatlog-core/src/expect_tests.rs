@@ -269,6 +269,82 @@ fn hir_global() {
 }
 
 #[test]
+#[should_panic]
+// NOTE that `atom: [PremiseNew, r1(v0, v0, v1)]`
+// is incorrect, as PremiseNew cannot handle multiple variables
+// being identical. Requires codegen of an if-statement after.
+fn test_bind_variable_multiple_times() {
+    Steps {
+        code: "
+            (datatype Foo
+                (Same Foo Foo)
+            )
+            (rewrite (Same x x) x)
+        ",
+        expected_hir: Some(expect![[r#"
+            Theory "":
+
+            Foo(Foo)
+            Same(Foo, Foo, Foo)
+
+            Rule "":
+            Premise: Same(x, x, p1)
+            __: p1, x
+
+        "#]]),
+        expected_lir: Some(expect![[r#"
+            Theory {
+                name: "",
+                types: {
+                    [t0, i64]: std::primitive::i64,
+                    [t1, String]: oatlog::runtime::IString,
+                    [t2, unit]: THIS_STRING_SHOULD_NOT_APPEAR_IN_GENERATED_CODE,
+                    [t3, Foo]: [symbolic],
+                },
+                relations: {
+                    r0: RelationData {
+                        name: "ForallFoo",
+                        param_types: {c0: t3},
+                        kind: [Forall, t3],
+                    },
+                    r1: RelationData {
+                        name: "Same",
+                        param_types: {c0: t3, c1: t3, c2: t3},
+                        kind: Table {
+                            index_to_info: {ir0: 0_1_2, ir1: 1_0_2, ir2: 2_0_1},
+                            usage_to_info: {
+                                iu0: ir0[..1],
+                                iu1: ir1[..1],
+                                iu2: ir2[..1],
+                                iu3: ir0[..2],
+                            },
+                            column_back_reference: {c0: iu0, c1: iu1, c2: iu2},
+                            implicit_rules: [
+                                [iu3, Union],
+                            ],
+                        },
+                    },
+                },
+                rule_variables: {
+                    [v0, x]: t3,
+                    [v1, p1]: t3,
+                },
+                global_compute: {},
+                global_types: {},
+                rule_tries: [
+                    atom: [PremiseNew, r1(v0, v0, v1)]
+                    then: [
+                        atom: [Action::Equate, v1=v0],
+                    ],
+                ],
+                initial: [],
+            }"#]]),
+        expected_codegen: None,
+    }
+    .check();
+}
+
+#[test]
 fn test_negative_i64_tokens() {
     Steps {
         code: "
@@ -389,9 +465,7 @@ fn codegen_panic_merge() {
                     self.new.extend(op_insert);
                 }
                 fn update_finalize(&mut self, uf: &mut Unification) {
-                    for (x0) in self.new.iter_mut() {}
-                    self.new.sort();
-                    self.new.dedup();
+                    self.new.retain(|(x0)| true);
                 }
                 fn emit_graphviz(&self, buf: &mut String) {
                     use std::fmt::Write;
@@ -444,8 +518,8 @@ fn codegen_panic_merge() {
             }
             #[derive(Debug, Default)]
             pub struct Theory {
-                delta: Delta,
-                uf: Unification,
+                pub delta: Delta,
+                pub uf: Unification,
                 uprooted: Uprooted,
                 global_variables: GlobalVariables,
                 f_relation: FRelation,
@@ -475,6 +549,12 @@ fn codegen_panic_merge() {
                 }
                 fn get_total_relation_entry_count(&self) -> usize {
                     [self.f_relation.len()].iter().copied().sum::<usize>()
+                }
+                fn get_relation_entry_count(&self) -> Vec<(&'static str, usize)> {
+                    [(stringify!(f_relation), self.f_relation.len())]
+                        .iter()
+                        .copied()
+                        .collect()
                 }
                 #[inline(never)]
                 fn clear_transient(&mut self) {
@@ -686,13 +766,18 @@ fn codegen_bug1() {
                     self.new.extend(op_insert);
                 }
                 fn update_finalize(&mut self, uf: &mut Unification) {
-                    for (x0, x1, x2) in self.new.iter_mut() {
-                        *x0 = uf.t0_uf.find(*x0);
-                        *x1 = uf.t1_uf.find(*x1);
-                        *x2 = uf.t2_uf.find(*x2);
-                    }
-                    self.new.sort();
-                    self.new.dedup();
+                    self.new.retain(|(x0, x1, x2)| {
+                        if *x0 != uf.t0_uf.find(*x0) {
+                            return false;
+                        }
+                        if *x1 != uf.t1_uf.find(*x1) {
+                            return false;
+                        }
+                        if *x2 != uf.t2_uf.find(*x2) {
+                            return false;
+                        }
+                        true
+                    });
                 }
                 fn emit_graphviz(&self, buf: &mut String) {
                     use std::fmt::Write;
@@ -771,9 +856,9 @@ fn codegen_bug1() {
             }
             #[derive(Debug, Default)]
             struct Unification {
-                t0_uf: UnionFind<T0>,
-                t1_uf: UnionFind<T1>,
-                t2_uf: UnionFind<T2>,
+                pub t0_uf: UnionFind<T0>,
+                pub t1_uf: UnionFind<T1>,
+                pub t2_uf: UnionFind<T2>,
             }
             impl Unification {
                 fn has_new(&mut self) -> bool {
@@ -786,8 +871,8 @@ fn codegen_bug1() {
             }
             #[derive(Debug, Default)]
             pub struct Theory {
-                delta: Delta,
-                uf: Unification,
+                pub delta: Delta,
+                pub uf: Unification,
                 uprooted: Uprooted,
                 global_variables: GlobalVariables,
                 forall_t0_relation: ForallT0Relation,
@@ -831,6 +916,26 @@ fn codegen_bug1() {
                     .iter()
                     .copied()
                     .sum::<usize>()
+                }
+                fn get_relation_entry_count(&self) -> Vec<(&'static str, usize)> {
+                    [
+                        (
+                            stringify!(forall_t0_relation),
+                            self.forall_t0_relation.len(),
+                        ),
+                        (
+                            stringify!(forall_t1_relation),
+                            self.forall_t1_relation.len(),
+                        ),
+                        (
+                            stringify!(forall_t2_relation),
+                            self.forall_t2_relation.len(),
+                        ),
+                        (stringify!(foo_relation), self.foo_relation.len()),
+                    ]
+                    .iter()
+                    .copied()
+                    .collect()
                 }
                 #[inline(never)]
                 fn clear_transient(&mut self) {
@@ -992,11 +1097,12 @@ fn initial() {
                     self.new.extend(op_insert);
                 }
                 fn update_finalize(&mut self, uf: &mut Unification) {
-                    for (x0, x1) in self.new.iter_mut() {
-                        *x1 = uf.math_uf.find(*x1);
-                    }
-                    self.new.sort();
-                    self.new.dedup();
+                    self.new.retain(|(x0, x1)| {
+                        if *x1 != uf.math_uf.find(*x1) {
+                            return false;
+                        }
+                        true
+                    });
                 }
                 fn emit_graphviz(&self, buf: &mut String) {
                     use std::fmt::Write;
@@ -1054,7 +1160,7 @@ fn initial() {
             }
             #[derive(Debug, Default)]
             struct Unification {
-                math_uf: UnionFind<Math>,
+                pub math_uf: UnionFind<Math>,
             }
             impl Unification {
                 fn has_new(&mut self) -> bool {
@@ -1065,8 +1171,8 @@ fn initial() {
             }
             #[derive(Debug, Default)]
             pub struct Theory {
-                delta: Delta,
-                uf: Unification,
+                pub delta: Delta,
+                pub uf: Unification,
                 uprooted: Uprooted,
                 global_variables: GlobalVariables,
                 forall_math_relation: ForallMathRelation,
@@ -1104,6 +1210,18 @@ fn initial() {
                         .iter()
                         .copied()
                         .sum::<usize>()
+                }
+                fn get_relation_entry_count(&self) -> Vec<(&'static str, usize)> {
+                    [
+                        (
+                            stringify!(forall_math_relation),
+                            self.forall_math_relation.len(),
+                        ),
+                        (stringify!(const_relation), self.const_relation.len()),
+                    ]
+                    .iter()
+                    .copied()
+                    .collect()
                 }
                 #[inline(never)]
                 fn clear_transient(&mut self) {
@@ -1347,13 +1465,18 @@ fn test_primitives_simple() {
                     self.new.extend(op_insert);
                 }
                 fn update_finalize(&mut self, uf: &mut Unification) {
-                    for (x0, x1, x2) in self.new.iter_mut() {
-                        *x0 = uf.math_uf.find(*x0);
-                        *x1 = uf.math_uf.find(*x1);
-                        *x2 = uf.math_uf.find(*x2);
-                    }
-                    self.new.sort();
-                    self.new.dedup();
+                    self.new.retain(|(x0, x1, x2)| {
+                        if *x0 != uf.math_uf.find(*x0) {
+                            return false;
+                        }
+                        if *x1 != uf.math_uf.find(*x1) {
+                            return false;
+                        }
+                        if *x2 != uf.math_uf.find(*x2) {
+                            return false;
+                        }
+                        true
+                    });
                 }
                 fn emit_graphviz(&self, buf: &mut String) {
                     use std::fmt::Write;
@@ -1486,13 +1609,18 @@ fn test_primitives_simple() {
                     self.new.extend(op_insert);
                 }
                 fn update_finalize(&mut self, uf: &mut Unification) {
-                    for (x0, x1, x2) in self.new.iter_mut() {
-                        *x0 = uf.math_uf.find(*x0);
-                        *x1 = uf.math_uf.find(*x1);
-                        *x2 = uf.math_uf.find(*x2);
-                    }
-                    self.new.sort();
-                    self.new.dedup();
+                    self.new.retain(|(x0, x1, x2)| {
+                        if *x0 != uf.math_uf.find(*x0) {
+                            return false;
+                        }
+                        if *x1 != uf.math_uf.find(*x1) {
+                            return false;
+                        }
+                        if *x2 != uf.math_uf.find(*x2) {
+                            return false;
+                        }
+                        true
+                    });
                 }
                 fn emit_graphviz(&self, buf: &mut String) {
                     use std::fmt::Write;
@@ -1593,11 +1721,12 @@ fn test_primitives_simple() {
                     self.new.extend(op_insert);
                 }
                 fn update_finalize(&mut self, uf: &mut Unification) {
-                    for (x0, x1) in self.new.iter_mut() {
-                        *x1 = uf.math_uf.find(*x1);
-                    }
-                    self.new.sort();
-                    self.new.dedup();
+                    self.new.retain(|(x0, x1)| {
+                        if *x1 != uf.math_uf.find(*x1) {
+                            return false;
+                        }
+                        true
+                    });
                 }
                 fn emit_graphviz(&self, buf: &mut String) {
                     use std::fmt::Write;
@@ -1688,11 +1817,12 @@ fn test_primitives_simple() {
                     self.new.extend(op_insert);
                 }
                 fn update_finalize(&mut self, uf: &mut Unification) {
-                    for (x0, x1) in self.new.iter_mut() {
-                        *x1 = uf.math_uf.find(*x1);
-                    }
-                    self.new.sort();
-                    self.new.dedup();
+                    self.new.retain(|(x0, x1)| {
+                        if *x1 != uf.math_uf.find(*x1) {
+                            return false;
+                        }
+                        true
+                    });
                 }
                 fn emit_graphviz(&self, buf: &mut String) {
                     use std::fmt::Write;
@@ -1785,7 +1915,7 @@ fn test_primitives_simple() {
             }
             #[derive(Debug, Default)]
             struct Unification {
-                math_uf: UnionFind<Math>,
+                pub math_uf: UnionFind<Math>,
             }
             impl Unification {
                 fn has_new(&mut self) -> bool {
@@ -1796,8 +1926,8 @@ fn test_primitives_simple() {
             }
             #[derive(Debug, Default)]
             pub struct Theory {
-                delta: Delta,
-                uf: Unification,
+                pub delta: Delta,
+                pub uf: Unification,
                 uprooted: Uprooted,
                 global_variables: GlobalVariables,
                 forall_math_relation: ForallMathRelation,
@@ -1910,6 +2040,21 @@ fn test_primitives_simple() {
                     .iter()
                     .copied()
                     .sum::<usize>()
+                }
+                fn get_relation_entry_count(&self) -> Vec<(&'static str, usize)> {
+                    [
+                        (
+                            stringify!(forall_math_relation),
+                            self.forall_math_relation.len(),
+                        ),
+                        (stringify!(mul_relation), self.mul_relation.len()),
+                        (stringify!(add_relation), self.add_relation.len()),
+                        (stringify!(const_relation), self.const_relation.len()),
+                        (stringify!(var_relation), self.var_relation.len()),
+                    ]
+                    .iter()
+                    .copied()
+                    .collect()
                 }
                 #[inline(never)]
                 fn clear_transient(&mut self) {
@@ -2098,12 +2243,15 @@ fn triangle_join() {
                     self.new.extend(op_insert);
                 }
                 fn update_finalize(&mut self, uf: &mut Unification) {
-                    for (x0, x1) in self.new.iter_mut() {
-                        *x0 = uf.math_uf.find(*x0);
-                        *x1 = uf.math_uf.find(*x1);
-                    }
-                    self.new.sort();
-                    self.new.dedup();
+                    self.new.retain(|(x0, x1)| {
+                        if *x0 != uf.math_uf.find(*x0) {
+                            return false;
+                        }
+                        if *x1 != uf.math_uf.find(*x1) {
+                            return false;
+                        }
+                        true
+                    });
                 }
                 fn emit_graphviz(&self, buf: &mut String) {
                     use std::fmt::Write;
@@ -2194,12 +2342,15 @@ fn triangle_join() {
                     self.new.extend(op_insert);
                 }
                 fn update_finalize(&mut self, uf: &mut Unification) {
-                    for (x0, x1) in self.new.iter_mut() {
-                        *x0 = uf.math_uf.find(*x0);
-                        *x1 = uf.math_uf.find(*x1);
-                    }
-                    self.new.sort();
-                    self.new.dedup();
+                    self.new.retain(|(x0, x1)| {
+                        if *x0 != uf.math_uf.find(*x0) {
+                            return false;
+                        }
+                        if *x1 != uf.math_uf.find(*x1) {
+                            return false;
+                        }
+                        true
+                    });
                 }
                 fn emit_graphviz(&self, buf: &mut String) {
                     use std::fmt::Write;
@@ -2299,12 +2450,15 @@ fn triangle_join() {
                     self.new.extend(op_insert);
                 }
                 fn update_finalize(&mut self, uf: &mut Unification) {
-                    for (x0, x1) in self.new.iter_mut() {
-                        *x0 = uf.math_uf.find(*x0);
-                        *x1 = uf.math_uf.find(*x1);
-                    }
-                    self.new.sort();
-                    self.new.dedup();
+                    self.new.retain(|(x0, x1)| {
+                        if *x0 != uf.math_uf.find(*x0) {
+                            return false;
+                        }
+                        if *x1 != uf.math_uf.find(*x1) {
+                            return false;
+                        }
+                        true
+                    });
                 }
                 fn emit_graphviz(&self, buf: &mut String) {
                     use std::fmt::Write;
@@ -2419,13 +2573,18 @@ fn triangle_join() {
                     self.new.extend(op_insert);
                 }
                 fn update_finalize(&mut self, uf: &mut Unification) {
-                    for (x0, x1, x2) in self.new.iter_mut() {
-                        *x0 = uf.math_uf.find(*x0);
-                        *x1 = uf.math_uf.find(*x1);
-                        *x2 = uf.math_uf.find(*x2);
-                    }
-                    self.new.sort();
-                    self.new.dedup();
+                    self.new.retain(|(x0, x1, x2)| {
+                        if *x0 != uf.math_uf.find(*x0) {
+                            return false;
+                        }
+                        if *x1 != uf.math_uf.find(*x1) {
+                            return false;
+                        }
+                        if *x2 != uf.math_uf.find(*x2) {
+                            return false;
+                        }
+                        true
+                    });
                 }
                 fn emit_graphviz(&self, buf: &mut String) {
                     use std::fmt::Write;
@@ -2499,7 +2658,7 @@ fn triangle_join() {
             }
             #[derive(Debug, Default)]
             struct Unification {
-                math_uf: UnionFind<Math>,
+                pub math_uf: UnionFind<Math>,
             }
             impl Unification {
                 fn has_new(&mut self) -> bool {
@@ -2510,8 +2669,8 @@ fn triangle_join() {
             }
             #[derive(Debug, Default)]
             pub struct Theory {
-                delta: Delta,
-                uf: Unification,
+                pub delta: Delta,
+                pub uf: Unification,
                 uprooted: Uprooted,
                 global_variables: GlobalVariables,
                 forall_math_relation: ForallMathRelation,
@@ -2586,6 +2745,21 @@ fn triangle_join() {
                     .iter()
                     .copied()
                     .sum::<usize>()
+                }
+                fn get_relation_entry_count(&self) -> Vec<(&'static str, usize)> {
+                    [
+                        (
+                            stringify!(forall_math_relation),
+                            self.forall_math_relation.len(),
+                        ),
+                        (stringify!(foo_relation), self.foo_relation.len()),
+                        (stringify!(bar_relation), self.bar_relation.len()),
+                        (stringify!(baz_relation), self.baz_relation.len()),
+                        (stringify!(triangle_relation), self.triangle_relation.len()),
+                    ]
+                    .iter()
+                    .copied()
+                    .collect()
                 }
                 #[inline(never)]
                 fn clear_transient(&mut self) {
@@ -2818,13 +2992,18 @@ fn edgecase0() {
                     self.new.extend(op_insert);
                 }
                 fn update_finalize(&mut self, uf: &mut Unification) {
-                    for (x0, x1, x2) in self.new.iter_mut() {
-                        *x0 = uf.math_uf.find(*x0);
-                        *x1 = uf.math_uf.find(*x1);
-                        *x2 = uf.math_uf.find(*x2);
-                    }
-                    self.new.sort();
-                    self.new.dedup();
+                    self.new.retain(|(x0, x1, x2)| {
+                        if *x0 != uf.math_uf.find(*x0) {
+                            return false;
+                        }
+                        if *x1 != uf.math_uf.find(*x1) {
+                            return false;
+                        }
+                        if *x2 != uf.math_uf.find(*x2) {
+                            return false;
+                        }
+                        true
+                    });
                 }
                 fn emit_graphviz(&self, buf: &mut String) {
                     use std::fmt::Write;
@@ -2957,13 +3136,18 @@ fn edgecase0() {
                     self.new.extend(op_insert);
                 }
                 fn update_finalize(&mut self, uf: &mut Unification) {
-                    for (x0, x1, x2) in self.new.iter_mut() {
-                        *x0 = uf.math_uf.find(*x0);
-                        *x1 = uf.math_uf.find(*x1);
-                        *x2 = uf.math_uf.find(*x2);
-                    }
-                    self.new.sort();
-                    self.new.dedup();
+                    self.new.retain(|(x0, x1, x2)| {
+                        if *x0 != uf.math_uf.find(*x0) {
+                            return false;
+                        }
+                        if *x1 != uf.math_uf.find(*x1) {
+                            return false;
+                        }
+                        if *x2 != uf.math_uf.find(*x2) {
+                            return false;
+                        }
+                        true
+                    });
                 }
                 fn emit_graphviz(&self, buf: &mut String) {
                     use std::fmt::Write;
@@ -3027,7 +3211,7 @@ fn edgecase0() {
             }
             #[derive(Debug, Default)]
             struct Unification {
-                math_uf: UnionFind<Math>,
+                pub math_uf: UnionFind<Math>,
             }
             impl Unification {
                 fn has_new(&mut self) -> bool {
@@ -3038,8 +3222,8 @@ fn edgecase0() {
             }
             #[derive(Debug, Default)]
             pub struct Theory {
-                delta: Delta,
-                uf: Unification,
+                pub delta: Delta,
+                pub uf: Unification,
                 uprooted: Uprooted,
                 global_variables: GlobalVariables,
                 forall_math_relation: ForallMathRelation,
@@ -3114,6 +3298,19 @@ fn edgecase0() {
                     .iter()
                     .copied()
                     .sum::<usize>()
+                }
+                fn get_relation_entry_count(&self) -> Vec<(&'static str, usize)> {
+                    [
+                        (
+                            stringify!(forall_math_relation),
+                            self.forall_math_relation.len(),
+                        ),
+                        (stringify!(mul_relation), self.mul_relation.len()),
+                        (stringify!(add_relation), self.add_relation.len()),
+                    ]
+                    .iter()
+                    .copied()
+                    .collect()
                 }
                 #[inline(never)]
                 fn clear_transient(&mut self) {
@@ -3322,13 +3519,18 @@ fn test_into_codegen() {
                     self.new.extend(op_insert);
                 }
                 fn update_finalize(&mut self, uf: &mut Unification) {
-                    for (x0, x1, x2) in self.new.iter_mut() {
-                        *x0 = uf.math_uf.find(*x0);
-                        *x1 = uf.math_uf.find(*x1);
-                        *x2 = uf.math_uf.find(*x2);
-                    }
-                    self.new.sort();
-                    self.new.dedup();
+                    self.new.retain(|(x0, x1, x2)| {
+                        if *x0 != uf.math_uf.find(*x0) {
+                            return false;
+                        }
+                        if *x1 != uf.math_uf.find(*x1) {
+                            return false;
+                        }
+                        if *x2 != uf.math_uf.find(*x2) {
+                            return false;
+                        }
+                        true
+                    });
                 }
                 fn emit_graphviz(&self, buf: &mut String) {
                     use std::fmt::Write;
@@ -3461,13 +3663,18 @@ fn test_into_codegen() {
                     self.new.extend(op_insert);
                 }
                 fn update_finalize(&mut self, uf: &mut Unification) {
-                    for (x0, x1, x2) in self.new.iter_mut() {
-                        *x0 = uf.math_uf.find(*x0);
-                        *x1 = uf.math_uf.find(*x1);
-                        *x2 = uf.math_uf.find(*x2);
-                    }
-                    self.new.sort();
-                    self.new.dedup();
+                    self.new.retain(|(x0, x1, x2)| {
+                        if *x0 != uf.math_uf.find(*x0) {
+                            return false;
+                        }
+                        if *x1 != uf.math_uf.find(*x1) {
+                            return false;
+                        }
+                        if *x2 != uf.math_uf.find(*x2) {
+                            return false;
+                        }
+                        true
+                    });
                 }
                 fn emit_graphviz(&self, buf: &mut String) {
                     use std::fmt::Write;
@@ -3531,7 +3738,7 @@ fn test_into_codegen() {
             }
             #[derive(Debug, Default)]
             struct Unification {
-                math_uf: UnionFind<Math>,
+                pub math_uf: UnionFind<Math>,
             }
             impl Unification {
                 fn has_new(&mut self) -> bool {
@@ -3542,8 +3749,8 @@ fn test_into_codegen() {
             }
             #[derive(Debug, Default)]
             pub struct Theory {
-                delta: Delta,
-                uf: Unification,
+                pub delta: Delta,
+                pub uf: Unification,
                 uprooted: Uprooted,
                 global_variables: GlobalVariables,
                 forall_math_relation: ForallMathRelation,
@@ -3603,6 +3810,19 @@ fn test_into_codegen() {
                     .iter()
                     .copied()
                     .sum::<usize>()
+                }
+                fn get_relation_entry_count(&self) -> Vec<(&'static str, usize)> {
+                    [
+                        (
+                            stringify!(forall_math_relation),
+                            self.forall_math_relation.len(),
+                        ),
+                        (stringify!(mul_relation), self.mul_relation.len()),
+                        (stringify!(add_relation), self.add_relation.len()),
+                    ]
+                    .iter()
+                    .copied()
+                    .collect()
                 }
                 #[inline(never)]
                 fn clear_transient(&mut self) {

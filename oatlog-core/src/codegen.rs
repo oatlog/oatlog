@@ -205,7 +205,7 @@ pub fn codegen(theory: &Theory) -> TokenStream {
         }
         #[derive(Debug, Default)]
         struct Unification {
-            #(#uf_ident: #uf_ty,)*
+            #(pub #uf_ident: #uf_ty,)*
         }
         impl Unification {
             fn has_new(&mut self) -> bool {
@@ -216,8 +216,8 @@ pub fn codegen(theory: &Theory) -> TokenStream {
         }
         #[derive(Debug, Default)]
         pub struct #theory_ty {
-            delta: #theory_delta_ty,
-            uf: Unification,
+            pub delta: #theory_delta_ty,
+            pub uf: Unification,
             uprooted: Uprooted,
             global_variables: GlobalVariables,
             #(#stored_relations: #stored_relation_types,)*

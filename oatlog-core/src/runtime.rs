@@ -251,6 +251,10 @@ impl<T: Eclass> UnionFind<T> {
         }
     }
     #[inline]
+    pub fn are_equal(&mut self, a: T, b: T) -> bool {
+        self.find(a) == self.find(b)
+    }
+    #[inline]
     pub fn union(&mut self, a: T, b: T) {
         let a = self.find_inner(a.inner());
         let b = self.find_inner(b.inner());

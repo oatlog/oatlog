@@ -5,7 +5,7 @@ members = [
     "oatlog-macro",
     "oatlog-test",
     "oatlog-bench",
-    "examples/math",
+    "examples/quadratic-formula",
     "comparative-test",
 ]
 resolver = "2"
