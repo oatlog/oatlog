@@ -247,6 +247,9 @@ pub fn codegen(theory: &Theory) -> TokenStream {
             fn get_total_relation_entry_count(&self) -> usize {
                 #get_total_relation_entry_count_body
             }
+            fn get_relation_entry_count(&self) -> Vec<(&'static str, usize)> {
+                [#((stringify!(#stored_relations), self.#stored_relations.len())),*].iter().copied().collect()
+            }
             #clear_transient
         }
 
@@ -1131,11 +1134,14 @@ fn codegen_relation(rel: &RelationData, theory: &Theory) -> TokenStream {
                         &mut self,
                         uf: &mut Unification,
                     ) {
-                        for (#(#all_columns),*) in self.new.iter_mut() {
-                            #(*#all_columns_symbolic = uf.#uf_all_symbolic.find(*#all_columns_symbolic);)*
-                        }
-                        self.new.sort();
-                        self.new.dedup();
+                        self.new.retain(|(#(#all_columns),*)| {
+                            #(
+                                if *#all_columns_symbolic != uf.#uf_all_symbolic.find(*#all_columns_symbolic) {
+                                    return false;
+                                }
+                            )*
+                            true
+                        });
                     }
                     fn emit_graphviz(&self, buf: &mut String) {
                         use std::fmt::Write;

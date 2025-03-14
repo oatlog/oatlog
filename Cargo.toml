@@ -35,9 +35,6 @@ derive_more = { version = "2.0.1", features = ["full"] }
 criterion = "0.3"
 
 [profile.release]
-lto = "fat"
-opt-level = 3
-codegen-units = 1
 debug = true
 
 [workspace.lints.rust]
