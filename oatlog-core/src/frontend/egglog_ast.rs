@@ -43,10 +43,7 @@ pub(crate) enum Action {
     /// ```
     ///
     /// If at toplevel, it desugars to a function from unit to an expr.
-    Let {
-        name: Str,
-        expr: Spanned<Expr>,
-    },
+    Let { name: Str, expr: Spanned<Expr> },
     /// Set expressions perform inserts in the database.
     /// This is needed for functions that do not return eqsorts.
     /// ```egglog
@@ -72,9 +69,7 @@ pub(crate) enum Action {
     /// ```ignore
     /// panic!("invariant broken")
     /// ```
-    Panic {
-        message: Str,
-    },
+    Panic { message: Str },
     /// Union expressions make two expressions equal in the global equality relation.
     /// ```egglog
     /// (union (Const 1) (Const 2))
@@ -99,15 +94,14 @@ pub(crate) enum Action {
     /// ```
     ///
     Expr(Spanned<Expr>),
+    /// Unsupported.
     Change {
         table: Str,
         args: Vec<Spanned<Expr>>,
         change: Change,
     },
-    Extract {
-        expr: Spanned<Expr>,
-        variants: u64,
-    },
+    /// Unsupported.
+    Extract { expr: Spanned<Expr>, variants: u64 },
 }
 pub(crate) enum Change {
     Delete,
@@ -326,12 +320,15 @@ pub(crate) struct RunConfig {
     until: Option<Vec<Spanned<Fact>>>,
 }
 pub(crate) enum Fact {
-    // not equal?
+    /// The following expressions are equal.
     Eq(Spanned<Expr>, Spanned<Expr>),
+    /// The following expression exists in the database.
     Expr(Spanned<Expr>),
 }
 pub(crate) struct Rule {
+    /// When all facts match the database, the rule is triggered.
     body: Vec<Spanned<Fact>>,
+    /// When triggered, perform the following actions.
     head: Vec<Spanned<Action>>,
 }
 pub(crate) struct Rewrite {
@@ -491,7 +488,11 @@ macro_rules! options {
     }
 }
 
-pub(crate) fn parse_statement(x: SexpSpan) -> MResult<Spanned<Statement>> {
+pub(crate) fn parse_program(x: Vec<SexpSpan>) -> MResult<Vec<Spanned<Statement>>> {
+    x.into_iter().map(|x| parse_statement(x)).collect()
+}
+
+fn parse_statement(x: SexpSpan) -> MResult<Spanned<Statement>> {
     register_span!(x.span);
     let (function_name, args) = x.call("statement")?;
     match *function_name {
@@ -509,7 +510,7 @@ pub(crate) fn parse_statement(x: SexpSpan) -> MResult<Spanned<Statement>> {
             )
         }),
         "datatype" => usage!("(datatype name <variant>*)", {
-            pattern!(args, [(Atom name), (List variants parse_variant)]);
+            pattern!(args, [(Atom name), (variants @ .. parse_variant)]);
             Statement::Datatype { name, variants }
         }),
         "datatype*" => usage!("(datatype* <datatypes>*)", {
@@ -520,11 +521,11 @@ pub(crate) fn parse_statement(x: SexpSpan) -> MResult<Spanned<Statement>> {
             "(function <name> (<input sorts>*) <output sort> :merge <expr>)",
             "(function <name> (<input sorts>*) <output sort> :no-merge)",
             {
-                pattern!(args, [(Atom name), (List input (|x| x.str("sort"))), (Atom output), (options @ ..)]);
+                pattern!(args, [(Atom name), (List input (|x| x.atom("sort"))), (Atom output), (options @ ..)]);
                 let mut merge = None;
                 options!(options,
                     (":merge", [x]) => { merge = Some(parse_expr(*x)?); }
-                    ("no-merge", []) => {}
+                    (":no-merge", []) => {}
                 );
                 Statement::Function {
                     name,
@@ -539,7 +540,7 @@ pub(crate) fn parse_statement(x: SexpSpan) -> MResult<Spanned<Statement>> {
             "(constructor <name> (<input sort>*) <output sort> :cost <cost>)",
             "(constructor <name> (<input sort>*) <output sort> :unextractable)",
             {
-                pattern!(args, [(Atom name), (List input (|x| x.str("sort"))), (Atom output), (options @ ..)]);
+                pattern!(args, [(Atom name), (List input (|x| x.atom("sort"))), (Atom output), (options @ ..)]);
                 let mut cost = Some(1);
                 options!(options,
                     (":cost", [x]) => { cost = Some(x.uint("cost")?); }
@@ -554,7 +555,7 @@ pub(crate) fn parse_statement(x: SexpSpan) -> MResult<Spanned<Statement>> {
             }
         ),
         "relation" => usage!("(relation <name> (<input sort>*))", {
-            pattern!(args, [(Atom name), (List input (|x| x.str("sort")))]);
+            pattern!(args, [(Atom name), (List input (|x| x.atom("sort")))]);
             Statement::Relation { name, input }
         }),
         "ruleset" => usage!("(ruleset <name>)", {
@@ -660,8 +661,8 @@ pub(crate) fn parse_statement(x: SexpSpan) -> MResult<Spanned<Statement>> {
                 }
             )
         }),
-        "check" => usage!("(check (<fact>*))", {
-            pattern!(args, [(List facts parse_fact)]);
+        "check" => usage!("(check <fact>*)", {
+            pattern!(args, [(facts @ ..parse_fact)]);
             Statement::Check(facts)
         }),
         "push" => usage!("(push <count>?)", {

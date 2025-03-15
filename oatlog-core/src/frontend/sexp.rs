@@ -83,6 +83,14 @@ impl SexpSpan {
                     s = &s[1..];
                     continue;
                 }
+                "\"" => {
+                    let Some(end_idx) = (&s[1..]).find("\"") else {
+                        return err_!(None, "string lacks endding \"");
+                    };
+                    tokens.push(&s[0..(end_idx + 2)]);
+                    s = &s[(end_idx + 2)..];
+                    continue;
+                }
                 " " | "\t" | "\n" => {
                     s = &s[1..];
                     continue;
@@ -98,7 +106,7 @@ impl SexpSpan {
                 _ => {}
             }
 
-            if let Some(end_idx) = s.find([' ', '\t', '\n', '(', ')', ';']) {
+            if let Some(end_idx) = s.find([' ', '\t', '\n', '(', ')', ';', '"']) {
                 tokens.push(&s[0..end_idx]);
                 s = &s[end_idx..];
                 continue;

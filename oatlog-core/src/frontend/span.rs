@@ -162,7 +162,6 @@ impl MagicError {
         filename: Option<&'static str>,
         source_text: Option<&'static str>,
     ) -> proc_macro2::TokenStream {
-        dbg!(&self);
         let error = self.clone().resolve(filename, source_text);
         let mut stream = quote! {};
 

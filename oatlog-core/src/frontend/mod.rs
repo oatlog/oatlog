@@ -26,6 +26,8 @@ pub(crate) mod sexp;
 pub(crate) use sexp::SexpSpan;
 use sexp::{Literal, Sexp};
 
+mod egglog_ast;
+
 trait ResultExt {
     fn add_err(self, syn_err: MError) -> Self;
 }
@@ -390,6 +392,7 @@ impl Parser {
 
     // TODO erik: parse to AST + forward declarations here
     fn parse_egglog(&mut self, sexp: Vec<SexpSpan>, config: Configuration) -> MResult<()> {
+        egglog_ast::parse_program(sexp.clone())?;
         for sexp in sexp {
             self.parse_toplevel(sexp, config)
                 .add_err(bare_!(sexp.span, "while parsing this toplevel expression"))?;
@@ -968,9 +971,6 @@ impl Parser {
         })
     }
 }
-
-// TODO erik: move this and sexp to separate modules/files
-mod egglog_ast;
 
 #[derive(Debug)]
 enum Action {
