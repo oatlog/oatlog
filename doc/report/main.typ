@@ -25,35 +25,31 @@
 
 = Introduction
 
-// A reference @egglog.
-// This is referencing a section: @thesection.
-// And this is referencing the appendix: @theappendix.
-// == A subsection
-// === A subsubsection
-// ==== A subsubsection
+Modern software development depends on efficient and reliable compilers, which apply sophisticated
+optimizations to improve performance while enabling portability and abstraction. For example,
+autovectorization allows code to take advantage of SIMD hardware without using architecture-specific
+intrinsics, while function inlining eliminates the overhead of function calls, enabling higher-level
+abstractions without sacrificing speed. These optimizations not only enhance program execution and
+energy efficiency but also make it easier for developers to write clean, maintainable, and portable
+code.
 
+Implementing such a compiler is a complex task. In practice, there are a few large compiler backends
+that have received significant engineering effort and which are used across the industry to compile
+everything from database queries to GPU shaders. The foremost of these compiler backends is LLVM
+@llvm. Yet these compilers are typically difficult to modify while ensuring correctness and LLVM in
+particular struggles with the compilation-time and generated-code-quality trade-off.
 
-TODO: complain about concrete thing, LLVM, very clearly show that phase ordering is bad, use text from proposal.
-
-
-
-```rust
-loop {
-    opt_a();
-    opt_b();
-    opt_c();
-    if fixpoint { break; }
-}
-```
-
-// from planning report
 A traditional optimizing compiler applies optimization passes sequentially and destructively, in
 such a way that earlier passes may perform rewrites that both unlock and inhibit other optimizations
-later. The unlocking aspect is traditionally partially handled by running important passes multiple
-times, interleaved with others, but this is computationally inefficient and does not address the
-inherent order dependence of destructive rewrites. This is called the phase ordering problem.
-Additionally, ad-hoc passes, implemented as arbitrary transforms on the compiler's intermediate
-representation, are difficult to model formally and to prove correct.
+later #footnote[Concretely, unlocking could occur in the form of dead code elimination after
+function inlining while a simple example of inhibition would be constant folding the program
+`f(2*x+5+10); g(2*x+5)` into `f(2*x+15); g(2*x+5)`, preventing common subexpression elimination into
+`y=2*x+5; f(y+10); g(y)`.]. The unlocking aspect is traditionally partially handled by running
+important passes multiple times, interleaved with others, but this is computationally inefficient
+and does not address the inherent order dependence of destructive rewrites. This is called the phase
+ordering problem. Additionally, ad-hoc passes, implemented as arbitrary transforms on the compiler's
+intermediate representation, expressed in possibly thousands of lines of code, are difficult to
+model formally and to prove correct.
 
 The unlocking half of the issue can be avoided by replacing global rewrite passes with local
 rewrites. These local rewrites can be expressed within some framework that tracks dependencies and
@@ -69,6 +65,8 @@ However, peephole rewriting does not avoid the issue of destructive rewrites bei
 in the face of multiple potentially good but mutually incompatible rewrites. Since one rewrite can
 unlock other beneficial rewrites later, one cannot select them greedily. This could be handled with
 a slow backtracking search, but most compilers do this heuristically instead.
+
+== E-graphs and EqSat
 
 E-graphs and equality saturation (EqSat) are techniques that can be used to augment peephole
 rewriting to make it nondestructive. They allow multiple rewrites of a value, committing to one only
@@ -88,9 +86,9 @@ computations, and rewrite rules corresponding to logical deductions or optimizat
 are applied until reaching a fixpoint or until some other criterion is met. Rewrite rules pattern
 match on the existing e-graph and perform actions such as inserting new e-nodes and equating
 existing e-nodes (and hence their e-classes). When e-graphs are used for program synthesis or
-optimization, rather than automated theorem proving, it is called equality saturation (EqSat)
-@equalitysaturation. With equality saturation, there is a final extraction phase where one of the
-globally optimal expressions is selected.
+optimization, rather than automated theorem proving, we call this equality saturation (EqSat)
+@equalitysaturation. Additionally, in equality saturation, there is a final extraction phase where
+one of the globally optimal expressions is selected.
 
 E-graphs suffer from the combinatorial explosion resulting from trying to find every equivalent
 representation of the initial expression, despite it being reduced through their efficient
@@ -103,24 +101,38 @@ compiler backend Cranelift @cranelift is the only production compiler for genera
 know of that has incorporated e-graphs, but it has done so in the weaker form of acyclic e-graphs
 (aegraphs) due to performance problems of full e-graphs.
 
-Our thesis aims to contribute to faster e-graphs for EqSat, which would speed up many applications
-and bring EqSat for general-purpose compilers closer to being feasible.
+== Datalog and relational databases
 
-Recent developments @eqlog @egglog @relationalematching have unified e-graphs with datalog,
-unlocking incremental rule matching and bringing an order of magnitude speedup. The insight is that
-an e-graph engine is very similar to a relational database, with its ruleset being a schema and a
-set of queries that insert tuples representing e-nodes until reaching a fixed point.
+Datalog is a declarative logic programming language that reasons bottom-up in an architecture very
+similar to a relational database. Recent developments @eqlog @egglog @relationalematching have shown
+that adding indices to e-graph pattern-matching creates a very similar relational structure, to the
+point that e-graphs may be best thought of as datalog extended with a unification operation. This
+allows EqSat to leverage algorithms from datalog, in particular what is called a semi-naive join
+which is similar to using database triggers rather than running queries against the entire database.
+Incremental rule matching, together with indices and simple query planning, has brought an order of
+magnitude speedup to the recent e-graph engine egglog @egglog when compared to its predecessor egg
+@egg.
 
 Relational databases are a mature technology with rich theory and a wide breadth of implementations,
-providing many techniques that could be transferred to e-graphs. At the same time, e-graphs have
-unique requirements and have been understood as databases only recently. We believe the immaturity
-of e-graphs in this domain leaves significant improvements on the table.
+providing many techniques that could be transferred to e-graphs beyond those already incorporated
+into egg. At the same time, e-graphs have unique requirements and have been understood as databases
+only recently. This background is what motivated us to look at datalog-like e-graph implementation
+for this master's thesis.
 
-We aim to implement an e-graph engine with performance improving upon the state of the art,
-exploring techniques such as join implementation and query planning in addition to e-graph-specific
-rule preprocessing. We will combine this with general performance engineering in terms of leveraging
-code generation with compile-time ruleset specialization and optimizing, in particular indices and
-insertions, for memory locality and instruction-level parallelism.
+== Oatlog
+
+Our work introduces oatlog, a rewrite engine compatible with the egglog language @egglog. Like
+egglog, it can be seen as a datalog engine with support for unification. Unlike egglog, it compiles
+rules ahead-of-time (aot$#h(2pt)approx#h(2pt)$oat) which allows query planning and index selection
+to be optimized globally.
+
+Currently, as of the midpoint report, oatlog is slower than egglog and does not implement quite a
+few of egglog's features. Addressing this is our priority for the remainder of our master's thesis
+work.
+
+== This report
+
+TODO overview of upcoming sections
 
 
 #figure(
@@ -599,8 +611,6 @@ TODO
 #counter(heading).update(0)
 #set heading(numbering: "A.1", supplement: [Appendix])
 
-= Some appendix here <theappendix>
-
 = Distributive law example in many languages <rosettaexample>
 
 This appendix shows code implementing a rule for the distributive law, $(a + b) dot c = a dot c + b
@@ -1070,4 +1080,3 @@ impl Unification {
     }
 }
 ```
-
