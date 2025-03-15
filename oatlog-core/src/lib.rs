@@ -19,6 +19,23 @@ mod expect_tests;
 use frontend::MResult;
 use std::panic::UnwindSafe;
 
+pub fn try_compile(input: &str) -> Result<(), String> {
+    let input = Input::String(input.to_string().leak());
+    let config = Configuration {
+        file_not_found: FileNotFoundAction::EmitError,
+        panic_backtrace: BackTraceAction::ForceBacktraceErr,
+    };
+
+    match universal(input, config) {
+        Ok(_) => Ok(()),
+        Err(CompileError::Err(err)) => Err(err.to_error_message()),
+        Err(CompileError::Panic {
+            message,
+            backtrace: _,
+        }) => Err(format!("PANIC: {message}")),
+    }
+}
+
 #[must_use]
 pub fn compile_str(input: &str) -> String {
     let input = Input::String(input.to_string().leak());

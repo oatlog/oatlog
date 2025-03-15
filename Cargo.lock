@@ -217,6 +217,7 @@ dependencies = [
  "eqlog-runtime",
  "expect-test",
  "oatlog",
+ "paste",
 ]
 
 [[package]]
@@ -940,6 +941,12 @@ checksum = "608b6444acf7f5ea39e8bd06dd6037e34a4b5ddfb29ae840edad49ea798e9e79"
 dependencies = [
  "unicode-width",
 ]
+
+[[package]]
+name = "paste"
+version = "1.0.15"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "57c0d7b74b563b49d38dae00a0c37d4d6de9b432382b2892f0574ddcae73fd0a"
 
 [[package]]
 name = "pest"
