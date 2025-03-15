@@ -615,6 +615,7 @@ TODO
 
 = Benchmarks
 
+See @benchmarks-appendix
 
 = Conclusion
 
@@ -1098,3 +1099,24 @@ impl Unification {
     }
 }
 ```
+
+
+= Benchmarks <benchmarks-appendix>
+
+== Math
+
+#raw(read("../../oatlog-bench/input/math.egg"), lang: "egglog")
+
+#pagebreak()
+== Boolean adder
+
+#raw(read("../../oatlog-bench/input/boolean_adder.egg"), lang: "egglog")
+
+= Examples
+
+== Quadratic formula
+
+#raw(read("../../examples/quadratic-formula/src/main.rs"), lang: "rust")
+
+
+
