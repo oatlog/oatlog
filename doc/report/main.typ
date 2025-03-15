@@ -1,4 +1,4 @@
-#import "mastery-chs/lib.typ" : template
+#import "mastery-chs/lib.typ": template, flex-caption
 
 #let department = "Department of Computer Science and Engineering"
 #show: template.with(
@@ -140,17 +140,22 @@ TODO overview of upcoming sections
     columns: (auto, auto, auto, auto, auto),
     table.header(
       table.cell(colspan: 5, [*Approximate nomenclature guide*]),
-      [*egglog* ], [*eqlog*  ], [*datalog*            ], [*database*  ], [*comment*]
+      [*egglog* ],
+      [*eqlog* ],
+      [*datalog* ],
+      [*database* ],
+      [*comment*],
     ),
-      [rule     ], [rule     ], [rule                 ], [query       ], [],
-      [predicate], [if stmt  ], [body containing atoms], [join+where  ], [logical premise],
-      [action   ], [then stmt], [head                 ], [insert/unify], [logical consequence],
-      [function ], [function ], [                     ], [table       ], [e.g. `Add: Math * Math -> Math`],
-      [e-node   ], [tuple    ], [fact                 ], [row/tuple   ], [represents a small computation, e.g. `Add(a,b) = c`],
-      [e-class  ], [element  ], [                     ], [cell element], [represents a set of equivalent expressions],
-      [sort     ], [type     ], [type                 ], [type        ], [e.g. `Math`],
+
+    [rule ], [rule ], [rule ], [query ], [],
+    [predicate], [if stmt ], [body containing atoms], [join+where ], [logical premise],
+    [action ], [then stmt], [head ], [insert/unify], [logical consequence],
+    [function ], [function ], [ ], [table ], [e.g. `Add: Math * Math -> Math`],
+    [e-node ], [tuple ], [fact ], [row/tuple ], [represents a small computation, e.g. `Add(a,b) = c`],
+    [e-class ], [element ], [ ], [cell element], [represents a set of equivalent expressions],
+    [sort ], [type ], [type ], [type ], [e.g. `Math`],
   ),
-  caption: [Comparison of egglog, eqlog, datalog, and relational database terminology.]
+  caption: [Comparison of egglog, eqlog, datalog, and relational database terminology.],
 ) <rosetta-table>
 
 
@@ -216,27 +221,27 @@ LIR is a low-level description of the actual code that is to be generated.
 - user-facing stuff
 
 - intro
-    - what is egglog
-    - why view e-graphs as relational databases
+  - what is egglog
+  - why view e-graphs as relational databases
 - rule pre-processing
-    - semi-naive
+  - semi-naive
 - query planning
 - query implementation/index implementation ("runtime stuff")
 - misc
-    - functional dependency/implicit functionality axiom.
-    - termination/scheduling
-    - union-find
-    - cannicalization
-        - why eager?
+  - functional dependency/implicit functionality axiom.
+  - termination/scheduling
+  - union-find
+  - cannicalization
+    - why eager?
 
 
 - (main)
-    - our irs
-        - (optimizations)
-        - formal definition
-    - implementation
-        - we are making a macro
-        - architecture diagram of IRs.
+  - our irs
+    - (optimizations)
+    - formal definition
+  - implementation
+    - we are making a macro
+    - architecture diagram of IRs.
 
 META: what is egraph, then why is e-graph database, then how is database implemented/optimize database.
 
@@ -292,23 +297,25 @@ databases. @rosettaexample shows how an egglog rule can be transformed to eqlog,
 and SQL.
 
 #figure(
-    image("egraph_example.svg", width: 75%),
-    caption: [
-    Example of a bipartite-formulation e-graph that initially contains $(a + 2) dot c$.
-    The oval shapes are e-classes, representing a set of equivalent expressions, with incoming edges
-    denoting e-node members.
-    The rectangle shapes are e-nodes, which have e-classes as arguments.
-    The orange-colored edges and shapes are those added due to the applied rules.
-    ]
+  image("egraph_example.svg", width: 75%),
+  caption: flex-caption(
+    [Example of a bipartite-formulation e-graph that initially contains $(a + 2) dot c$.],
+    [
+      The oval shapes are e-classes, representing a set of equivalent expressions, with incoming edges
+      denoting e-node members.
+      The rectangle shapes are e-nodes, which have e-classes as arguments.
+      The orange-colored edges and shapes are those added due to the applied rules.
+    ],
+  ),
 ) <informal-egraph-figure>
 
 
 #figure(
-    image("egraph_cluster.svg", width: 60%),
-    caption: [
+  image("egraph_cluster.svg", width: 60%),
+  caption: [
     The same e-graph as in @informal-egraph-figure, but drawing e-classes as groups of e-nodes
     rather than as a bipartite graph.
-    ]
+  ],
 ) <informal-egraph-figure-non-bipartite>
 
 
@@ -362,11 +369,13 @@ For example, consider a partial function that performs addition, which we can re
   inset: 10pt,
   align: horizon,
   table.header(
-    [x], [y], [res],
+    [x],
+    [y],
+    [res],
   ),
-  [1],[2],[3],
-  [4],[2],[6],
-  [3],[5],[8],
+  [1], [2], [3],
+  [4], [2], [6],
+  [3], [5], [8],
 )
 This is a partial function because it's domain is a subset of all pairs of natural numbers.
 But since these are uninterpreted, we do not have actual values, but instead E-classes:
@@ -375,11 +384,14 @@ But since these are uninterpreted, we do not have actual values, but instead E-c
   inset: 10pt,
   align: horizon,
   table.header(
-    [x], [y], [res],
+    [x],
+    [y],
+    [res],
   ),
-  [a],[b],[c],
-  [d],[b],[f],
-  [c],[e],[g],
+
+  [a], [b], [c],
+  [d], [b], [f],
+  [c], [e], [g],
 )
 For example, we can not really say anything about $a$ other than $"add"(a,b) = c$
 It is called a function because we have a functional dependency from (x,y) to res.
@@ -395,15 +407,15 @@ information. In the context of Datalog, it avoids recomputing the same facts. Ex
 where $join$ is a join, $union$ is the union of relations and $Delta$ is the change to a relation.
 
 $
-"all information" = A join B join C
+  "all information" = A join B join C
 $
 
 But we only care about the new join results, and this can be represented by subtracting the join
 that already occurred from the full join of the new database.
 
 $
-"new information" subset &(A union Delta A) join  &(B union Delta B) join &(C union Delta C) \
-        -& A join B join C
+  "new information" subset &(A union Delta A) join &(B union Delta B) join &(C union Delta C) \
+  -& A join B join C
 $
 
 The expression can be expanded and we get $A join B join C$ that can be canceled out.
@@ -412,28 +424,28 @@ The expression can be expanded and we get $A join B join C$ that can be canceled
 
 //highlight(x)
 $
-"new information" subset
-    &hl(A join B join C) union \
-    &Delta A join B join C union \
-    &(A union Delta A) join Delta B join C union \
-    &(A union Delta A) join (B union Delta B) join Delta C \
-    -& hl(A join B join C)
+  "new information" subset
+  &hl(A join B join C) union \
+  &Delta A join B join C union \
+  &(A union Delta A) join Delta B join C union \
+  &(A union Delta A) join (B union Delta B) join Delta C \
+  -& hl(A join B join C)
 $
 $
-"new information" subset
-    &Delta A &join& B &join& C union \
-    &(A union Delta A) &join& Delta B &join& C union \
-    &(A union Delta A) &join& (B union Delta B) &join& Delta C \
+  "new information" subset
+  &Delta A &join& B &join& C union \
+  &(A union Delta A) &join& Delta B &join& C union \
+  &(A union Delta A) &join& (B union Delta B) &join& Delta C \
 $
 
 To make the pattern more clear, $Delta X$ is written as "new", $X$ is written as "old" and $X union
 Delta X$ is written as all:
 
 $
-"new information" subset
-    &"new" &join& "old" &join& "old" union \
-    &"all" &join& "new" &join& "old" union \
-    &"all" &join& "all" &join& "new" \
+  "new information" subset
+  &"new" &join& "old" &join& "old" union \
+  &"all" &join& "new" &join& "old" union \
+  &"all" &join& "all" &join& "new" \
 $
 
 Implementing this directly would mean having separate relations for old, new possibly all. In
@@ -456,10 +468,10 @@ This is more or less what eqlog and egglog does, but there are some problems wit
 
 But if we replace all iterations of "old" with "all":
 $
-"new information" subset
-    &"new" &join& "all" &join& "all" union \
-    &"all" &join& "new" &join& "all" union \
-    &"all" &join& "all" &join& "new" \
+  "new information" subset
+  &"new" &join& "all" &join& "all" union \
+  &"all" &join& "new" &join& "all" union \
+  &"all" &join& "all" &join& "new" \
 $
 Then we get rid of both the branch/batching issue and the indexes for "new".
 
@@ -509,19 +521,26 @@ See @index-datastructures.
   table(
     columns: (auto, auto, auto, auto, auto),
     table.header(
-      [*datastructure*], [*insert*     ], [*remove*     ], [*check*      ], [*range*]
+      [*datastructure*],
+      [*insert* ],
+      [*remove* ],
+      [*check* ],
+      [*range*],
     ),
-      [naive btreeset ], [$M dot log N$], [$M dot log N$], [$log N$      ], [$log N$],
-      [custom btreeset], [$M + log N$  ], [$M + log N$  ], [$log N$      ], [$log N$],
-      [sorted list    ], [$N + M$      ], [$N + M$      ], [$log N$      ], [$log N$],
-      [CSR/CSC        ], [$N + M + E$  ], [$N + M + E$  ], [$log sqrt(N)$], [$1$],
+
+    [naive btreeset ], [$M dot log N$], [$M dot log N$], [$log N$ ], [$log N$],
+    [custom btreeset], [$M + log N$ ], [$M + log N$ ], [$log N$ ], [$log N$],
+    [sorted list ], [$N + M$ ], [$N + M$ ], [$log N$ ], [$log N$],
+    [CSR/CSC ], [$N + M + E$ ], [$N + M + E$ ], [$log sqrt(N)$], [$1$],
   ),
-  caption: [
-      Big-O costs for various index data structures.
+  caption: flex-caption(
+    [Big-$O$ costs for various index data structures.],
+    [
       $N$ is the number of tuples, $E$ is the highest value stored in the relation.
       Range query ignores the $M$ term since it would be mandatory.
       Assuming relation with two columns containing random tuples.
-  ]
+    ],
+  ),
 ) <index-datastructures>
 
 
@@ -540,43 +559,42 @@ This is what egglog does, but it is problematic because it increases memory usag
 Conceptually, our approach will be to store the new set in a push-only list, and make the rules store what index in these they are at. See @semi-something for a visualization of this.
 
 #figure(
-```
-  rule1    rule2
-    v        v
-[x, x, x, x, x, x, x, x]
+  ```
+    rule1    rule2
+      v        v
+  [x, x, x, x, x, x, x, x]
 
-add y, z w:
+  add y, z w:
 
-  rule1    rule2
-    v        v
-[x, x, x, x, x, x, x, x, y, z, w]
+    rule1    rule2
+      v        v
+  [x, x, x, x, x, x, x, x, y, z, w]
 
-run rule1:
+  run rule1:
 
-[x, x, x, x, x, x, x, x, y, z, w]
-    ^                          ^
-    |------rule1 new set-------|
+  [x, x, x, x, x, x, x, x, y, z, w]
+      ^                          ^
+      |------rule1 new set-------|
 
-           rule2                rule1
-             v                    v
-[x, x, x, x, x, x, x, x, y, z, w]
+             rule2                rule1
+               v                    v
+  [x, x, x, x, x, x, x, x, y, z, w]
 
-add a, b, c:
+  add a, b, c:
 
-           rule2                rule1
-             v                    v
-[x, x, x, x, x, x, x, x, y, z, w, a, b, c]
+             rule2                rule1
+               v                    v
+  [x, x, x, x, x, x, x, x, y, z, w, a, b, c]
 
-run rule2:
+  run rule2:
 
-           rule2                rule1
-             v                    v
-[x, x, x, x, x, x, x, x, y, z, w, a, b, c]
-             ^                          ^
-             |------rule2 new set-------|
-```
-  ,
-  caption: [Staying semi-naive while running while not running all the rules at the same time.]
+             rule2                rule1
+               v                    v
+  [x, x, x, x, x, x, x, x, y, z, w, a, b, c]
+               ^                          ^
+               |------rule2 new set-------|
+  ```,
+  caption: [Staying semi-naive while running while not running all the rules at the same time.],
 ) <semi-something>
 
 

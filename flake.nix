@@ -47,6 +47,8 @@
           nativeBuildInputs = let p = pkgs;
           in [
             p.bashInteractive
+            p.tinymist
+            p.typstyle
             (p.crate2nix.override { cargo = rust-stable; })
             (rust-stable.override {
               extensions = [ "rust-src" "rust-analyzer" ];
