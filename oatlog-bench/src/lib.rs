@@ -1,7 +1,7 @@
 use std::hint::black_box;
 use std::time::{Duration, Instant};
 
-use criterion::{Criterion, measurement::WallTime, BenchmarkGroup};
+use criterion::{BenchmarkGroup, Criterion, measurement::WallTime};
 
 fn bench_serial(iters: u64, f: impl Fn()) -> Duration {
     let start = Instant::now();
@@ -14,15 +14,22 @@ fn bench_serial(iters: u64, f: impl Fn()) -> Duration {
 // benchmark using all cores in theory we get more data faster, but it might be less accurate.
 fn bench_parallel(iters: u64, f: impl Fn() + Sync) -> Duration {
     use rayon::prelude::*;
-    let duration = (0..iters).par_bridge().map(|_| {
-        let start = Instant::now();
-        f();
-        start.elapsed()
-    }).sum::<Duration>();
+    let duration = (0..iters)
+        .par_bridge()
+        .map(|_| {
+            let start = Instant::now();
+            f();
+            start.elapsed()
+        })
+        .sum::<Duration>();
     duration
 }
 
-fn bench_custom(group: &mut BenchmarkGroup<'_, WallTime>, name: &'static str, f: impl Fn() + Sync + Copy) {
+fn bench_custom(
+    group: &mut BenchmarkGroup<'_, WallTime>,
+    name: &'static str,
+    f: impl Fn() + Sync + Copy,
+) {
     group.bench_function(name, |b| {
         b.iter(|| {
             f();

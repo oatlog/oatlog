@@ -12,7 +12,7 @@ use itertools::Itertools as _;
 use proc_macro2::{Delimiter, Span, TokenTree};
 
 use crate::{
-    hir,
+    Configuration, FileNotFoundAction, hir,
     ids::{ColumnId, GlobalId, Id, RelationId, TypeId, VariableId},
     lir,
     typed_vec::TVec,
@@ -34,10 +34,10 @@ impl<T> ResultExt for MResult<T> {
         self.map_err(|err| err.concat(new_err))
     }
 }
-pub(crate) fn parse(sexps: Vec<Vec<SexpSpan>>) -> MResult<hir::Theory> {
+pub(crate) fn parse(sexps: Vec<Vec<SexpSpan>>, config: Configuration) -> MResult<hir::Theory> {
     let mut parser = Parser::new();
     for sexp in sexps {
-        parser.parse_egglog(sexp)?;
+        parser.parse_egglog(sexp, config)?;
     }
     Ok(parser.emit_hir())
 }
@@ -388,15 +388,16 @@ impl Parser {
         }
     }
 
-    fn parse_egglog(&mut self, sexp: Vec<SexpSpan>) -> MResult<()> {
+    // TODO erik: parse to AST + forward declarations here
+    fn parse_egglog(&mut self, sexp: Vec<SexpSpan>, config: Configuration) -> MResult<()> {
         for sexp in sexp {
-            self.parse_toplevel(sexp)
+            self.parse_toplevel(sexp, config)
                 .add_err(bare_!(sexp.span, "while parsing this toplevel expression"))?;
         }
         Ok(())
     }
 
-    fn parse_toplevel(&mut self, x: SexpSpan) -> MResult<()> {
+    fn parse_toplevel(&mut self, x: SexpSpan, config: Configuration) -> MResult<()> {
         register_span!(x.span);
         let (function_name, args) = x.call("toplevel")?;
 
@@ -627,14 +628,21 @@ impl Parser {
 
                 let working_directory = std::env::current_dir().unwrap();
 
-                let content = std::fs::read_to_string(filepath)
-                    .map_err(|e| bare_!(span, "{e}, working directory is {working_directory:?}"))?;
+                let content =
+                    std::fs::read_to_string(filepath).map_err(|e| match config.file_not_found {
+                        FileNotFoundAction::ImmediatePanic => {
+                            panic!("{e}, working directory is {working_directory:?}")
+                        }
+                        FileNotFoundAction::EmitError => {
+                            bare_!(span, "{e}, working directory is {working_directory:?}")
+                        }
+                    })?;
 
                 let content = &*content.leak();
 
                 // let content = &*strip_comments(&content).leak();
 
-                self.parse_egglog(SexpSpan::parse_string(span, content)?)
+                self.parse_egglog(SexpSpan::parse_string(span, content)?, config)
                     .map_err(|mut e| {
                         e.push(bare_!(span, "while reading {filepath}"));
                         e.resolve(Some(filepath), Some(content))

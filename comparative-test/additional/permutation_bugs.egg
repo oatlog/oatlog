@@ -1,0 +1,11 @@
+(sort T1)
+(sort T2)
+(sort T3)
+(sort T4)
+
+(constructor ImFun (T1 T2 T3) T4)
+
+(function PanicFun (T1 T2 T3) T4 :no-merge)
+
+
+

@@ -9,7 +9,8 @@ struct Steps {
 impl Steps {
     fn check(self) {
         let sexps = crate::frontend::parse_str_to_sexps(self.code).unwrap();
-        let hir = crate::frontend::parse(sexps).unwrap();
+        let config = crate::Configuration::default();
+        let hir = crate::frontend::parse(sexps, config).unwrap();
         if let Some(exp) = self.expected_hir {
             exp.assert_eq(&hir.dbg_summary());
         }

@@ -132,6 +132,31 @@ impl MagicError {
             }],
         }
     }
+    /// Format the error messages.
+    pub(crate) fn to_error_message(&self) -> String {
+        let error = self.clone().resolve(Some("toplevel"), None);
+        error
+            .messages
+            .into_iter()
+            .map(|x| {
+                let MaybeResolved::Resolved {
+                    filename: Some(filename),
+                    source_text: _,
+                    message,
+                    span,
+                } = x
+                else {
+                    unreachable!();
+                };
+                if let Some(span) = span {
+                    format!("{filename}: {message}\n{}\n\n", span.text_compact)
+                } else {
+                    format!("{filename}: {message}\n\n")
+                }
+            })
+            .collect::<String>()
+    }
+    /// Emit `compile_error!()` with best-effort span locations.
     pub(crate) fn to_compile_error(
         &self,
         filename: Option<&'static str>,
