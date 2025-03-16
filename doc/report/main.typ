@@ -168,7 +168,7 @@ work.
 
 = Background <thesection>
 
-#todo[TODO
+#todo[
   - E-graphs
     - Intro, what are they
     - Non-relational e-matching
@@ -178,41 +178,36 @@ work.
     - Datalog as a e-graph interface
   //  - Magic sets
   - Egglog language
+
+
+  - implementation stuff
+  - user-facing stuff
+
+  - intro
+    - what is egglog
+    - why view e-graphs as relational databases
+  - rule pre-processing
+    - semi-naive
+  - query planning
+  - query implementation/index implementation ("runtime stuff")
+  - misc
+    - functional dependency/implicit functionality axiom.
+    - termination/scheduling
+    - union-find
+    - cannicalization
+      - why eager?
+
+  - (main)
+    - our irs
+      - (optimizations)
+      - formal definition
+    - implementation
+      - we are making a macro
+      - architecture diagram of IRs.
+
+  META: what is egraph, then why is e-graph database, then how is database implemented/optimize database.
+
 ]
-
-
-
-
-- implementation stuff
-- user-facing stuff
-
-- intro
-  - what is egglog
-  - why view e-graphs as relational databases
-- rule pre-processing
-  - semi-naive
-- query planning
-- query implementation/index implementation ("runtime stuff")
-- misc
-  - functional dependency/implicit functionality axiom.
-  - termination/scheduling
-  - union-find
-  - cannicalization
-    - why eager?
-
-
-- (main)
-  - our irs
-    - (optimizations)
-    - formal definition
-  - implementation
-    - we are making a macro
-    - architecture diagram of IRs.
-
-META: what is egraph, then why is e-graph database, then how is database implemented/optimize database.
-
-
-
 
 
 == E-graphs
@@ -569,16 +564,17 @@ Conceptually, our approach will be to store the new set in a push-only list, and
 
 = Oatlog
 
-- Ahead of time compiled
-  - Consider and optimize rules together
-- Datalog
+#todo[
+  - Ahead of time compiled
+    - Consider and optimize rules together
+  - Datalog
 
-TODO
-- User's perspective, egglog language (specify in background) and runtime API.
-- Architecture at a module level, what IRs.
-- Show and discuss the IRs
-- Discuss core algorithms
-- Discuss selected implementation details
+  - User's perspective, egglog language (specify in background) and runtime API.
+  - Architecture at a module level, what IRs.
+  - Show and discuss the IRs
+  - Discuss core algorithms
+  - Discuss selected implementation details
+]
 
 
 == User facing, egglog language and oatlog library
