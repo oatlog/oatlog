@@ -608,6 +608,7 @@ Since oatlog is implemented using a proc-macro, errors result in rust compilatio
 However, doctests are separately compiled so we instead generate doctest to check that generated test code compiles.
 
 === Internal Representations
+
 ==== Egglog AST
 
 Either rust tokens or strings are parsed into s-expressions and then parsed into an egglog AST representing the source-level language without simplifications such as removing syntax sugar.
