@@ -279,7 +279,7 @@ pub(crate) enum Statement {
     /// Unsupported.
     PrintFunction(Str, u64),
     /// Unsupported
-    PrintSize(Str),
+    PrintSize(Option<Str>),
     /// Unsupported.
     Input { table: Str, file: Str },
     /// Unsupported.
@@ -514,7 +514,7 @@ fn parse_statement(x: SexpSpan) -> MResult<Spanned<Statement>> {
             Statement::Datatype { name, variants }
         }),
         "datatype*" => usage!("(datatype* <datatypes>*)", {
-            pattern!(args, [(List datatypes parse_subvariant)]);
+            pattern!(args, [(datatypes @ ..parse_subvariant)]);
             Statement::Datatypes { datatypes }
         }),
         "function" => usage!(
@@ -569,8 +569,8 @@ fn parse_statement(x: SexpSpan) -> MResult<Spanned<Statement>> {
                 let mut ruleset = None;
                 let mut name = None;
                 options!(options,
-                    (":ruleset", [x]) => { ruleset = Some(x.string("ruleset")?); }
-                    (":name", [x]) => { name = Some(x.string("name")?); }
+                    (":ruleset", [x]) => { ruleset = Some(*x.atom("ruleset")?); }
+                    (":name", [x]) => { name = Some(*x.atom("name")?); }
                 );
                 Statement::Rule {
                     name,
@@ -590,13 +590,11 @@ fn parse_statement(x: SexpSpan) -> MResult<Spanned<Statement>> {
                 let mut subsume = false;
                 let mut ruleset = None;
                 options!(options,
-                    (":ruleset", [x]) => { ruleset = Some(x.string("ruleset")?); }
+                    (":ruleset", [x]) => { ruleset = Some(*x.atom("ruleset")?); }
                     (":subsume", []) => { subsume = true; }
-                    ("when", cond) => {
-                        for fact in cond {
-                            let fact = parse_fact(*fact)?;
-                            conditions.push(fact);
-                        }
+                    (":when", conds) => {
+                        pattern!(conds, [(List conds parse_fact)]);
+                        conditions.extend(conds);
                     }
                 );
                 let rewrite = Rewrite {
@@ -613,18 +611,16 @@ fn parse_statement(x: SexpSpan) -> MResult<Spanned<Statement>> {
             }
         ),
         "birewrite" => usage!(
-            "(birewrite <from/to expr> <from/to expr> <option>*) where option = :ruleset <name>, :when (<cond>*)",
+            "(birewrite <from/to expr> <from/to expr> <option>*) where option = :ruleset <name>, :when <cond>*",
             {
                 pattern!(args, [(lhs parse_expr), (rhs parse_expr), (options @ ..)]);
                 let mut conditions = vec![];
                 let mut ruleset = None;
                 options!(options,
-                    (":ruleset", [x]) => { ruleset = Some(x.string("ruleset")?); }
-                    ("when", cond) => {
-                        for fact in cond {
-                            let fact = parse_fact(*fact)?;
-                            conditions.push(fact);
-                        }
+                    (":ruleset", [x]) => { ruleset = Some(*x.atom("ruleset")?); }
+                    (":when", conds) => {
+                        pattern!(conds, [(List conds parse_fact)]);
+                        conditions.extend(conds);
                     }
                 );
                 let rewrite = Rewrite {
@@ -653,7 +649,7 @@ fn parse_statement(x: SexpSpan) -> MResult<Spanned<Statement>> {
         }),
         "query-extract" => usage!("(query-extract <:variants <uint>>? <expr>)", {
             pattern!(args,
-                [(String ":variants"), (Uint count), (expr parse_expr)] => {
+                [(Atom ":variants"), (Uint count), (expr parse_expr)] => {
                     Statement::QueryExtract { variants: *count, expr }
                 }
                 [(expr parse_expr)] => {
@@ -683,8 +679,10 @@ fn parse_statement(x: SexpSpan) -> MResult<Spanned<Statement>> {
             Statement::PrintFunction(table_name, *rows)
         }),
         "print-size" => usage!("(print-size <table name>?)", {
-            pattern!(args, [(Atom table)]);
-            Statement::PrintSize(table)
+            pattern!(args,
+                 [(Atom table)] => { Statement::PrintSize(Some(table)) }
+                 [] => { Statement::PrintSize(None) }
+            )
         }),
         "input" => usage!("(input <table name> \"<file name>\")", {
             pattern!(args, [(Atom table), (String file)]);
@@ -732,6 +730,7 @@ fn parse_action(x: SexpSpan) -> MResult<Spanned<Action>> {
             }
         }),
         "delete" => usage!("(delete (<table name> <expr>*))", {
+            pattern!(args, [(List args)]);
             pattern!(args, [(Atom table), (args @ .. parse_expr)]);
             Action::Change {
                 table,
@@ -774,8 +773,10 @@ fn parse_expr(x: SexpSpan) -> MResult<Spanned<Expr>> {
         Sexp::Literal(literal) => Expr::Literal(*literal),
         Sexp::Atom(atom) => Expr::Var(atom),
         Sexp::List(list) => {
-            pattern!(list, [(Atom function_name), (args @ .. parse_expr)]);
-            Expr::Call(function_name, args)
+            pattern!(list,
+                [(Atom function_name), (args @ .. parse_expr)] => { Expr::Call(function_name, args) }
+                [] => { Expr::Literal(Literal::Unit) }
+            )
         }
     }))
 }
@@ -853,24 +854,46 @@ fn parse_schedule(x: SexpSpan) -> MResult<Spanned<Schedule>> {
         "(saturate <schedule>*)",
         "(seq <schedule>*)",
         "(repeat <count> <schedule>*)",
-        "(run <ruleset>? <count> <:until <facts>*>)",
+        "(run <ruleset>? <count>? <:until <facts>*>?)",
+        "<ruleset>",
         {
-            let (function_name, args) = x.call("schedule")?;
-            match *function_name {
-                "saturate" => {
-                    pattern!(args, [(List schedules parse_schedule)]);
-                    Schedule::Saturate(Box::new(Schedule::Sequence(schedules)))
+            if let Sexp::Atom(ruleset) = *x {
+                Schedule::Run(RunConfig {
+                    ruleset: Some(ruleset),
+                    until: None,
+                })
+            } else {
+                let (function_name, args) = x.call("schedule")?;
+                match *function_name {
+                    "saturate" => {
+                        usage!("(saturate <schedule>*)", {
+                            pattern!(args, [(schedules @ ..parse_schedule)]);
+                            Schedule::Saturate(Box::new(Schedule::Sequence(schedules)))
+                        })?
+                        .x
+                    }
+                    "seq" => {
+                        usage!("(seq <schedule>*)", {
+                            pattern!(args, [(schedules @ ..parse_schedule)]);
+                            Schedule::Sequence(schedules)
+                        })?
+                        .x
+                    }
+                    "repeat" => {
+                        usage!("(repeat <count> <schedule>*)", {
+                            pattern!(args, [(Uint count), (schedules @ .. parse_schedule)]);
+                            Schedule::Repeat(*count, Box::new(Schedule::Sequence(schedules)))
+                        })?
+                        .x
+                    }
+                    "run" => {
+                        usage!("(run <ruleset>? <count> <:until <facts>*>?)", {
+                            parse_run(span!(), args)?.x
+                        })?
+                        .x
+                    }
+                    _ => return err!("syntax error"),
                 }
-                "seq" => {
-                    pattern!(args, [(List schedules parse_schedule)]);
-                    Schedule::Sequence(schedules)
-                }
-                "repeat" => {
-                    pattern!(args, [(Uint count), (List schedules parse_schedule)]);
-                    Schedule::Repeat(*count, Box::new(Schedule::Sequence(schedules)))
-                }
-                "run" => parse_run(span!(), args)?.x,
-                _ => return err!("syntax error"),
             }
         }
     )
@@ -878,17 +901,29 @@ fn parse_schedule(x: SexpSpan) -> MResult<Spanned<Schedule>> {
 fn parse_run(span: Option<QSpan>, args: &[SexpSpan]) -> MResult<Spanned<Schedule>> {
     register_span!(span);
     let schedule = pattern!(args,
-        [(Atom ruleset), (Uint repeat), (Atom ":until"), (List until parse_fact)] => {
+        [(Atom ruleset), (Uint repeat), (Atom ":until"), (until @ .. parse_fact)] => {
             Schedule::Repeat(*repeat, Box::new(Schedule::Run(RunConfig { ruleset: Some(ruleset), until: Some(until) })))
         }
-        [(Uint repeat), (Atom ":until"), (List until parse_fact)] => {
+        [                (Uint repeat), (Atom ":until"), (until @ .. parse_fact)] => {
             Schedule::Repeat(*repeat, Box::new(Schedule::Run(RunConfig { ruleset: None, until: Some(until) })))
         }
-        [(Atom ruleset), (Uint repeat)] => {
+        [(Atom ruleset),                (Atom ":until"), (until @ .. parse_fact)] => {
+            Schedule::Run(RunConfig { ruleset: Some(ruleset), until: Some(until) })
+        }
+        [                               (Atom ":until"), (until @ .. parse_fact)] => {
+            Schedule::Run(RunConfig { ruleset: None, until: Some(until) })
+        }
+        [(Atom ruleset), (Uint repeat)                                          ] => {
             Schedule::Repeat(*repeat, Box::new(Schedule::Run(RunConfig { ruleset: Some(ruleset), until: None })))
         }
-        [(Uint repeat)] => {
+        [                (Uint repeat)                                          ] => {
             Schedule::Repeat(*repeat, Box::new(Schedule::Run(RunConfig { ruleset: None, until: None })))
+        }
+        [(Atom ruleset)                                                         ] => {
+            Schedule::Run(RunConfig { ruleset: Some(ruleset), until: None })
+        }
+        [                                                                       ] => {
+            Schedule::Run(RunConfig { ruleset: None, until: None })
         }
     );
     Ok(spanned!(schedule))

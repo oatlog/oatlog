@@ -1,2 +1,2 @@
-(include "tests/path.egg")
+(include "comparative-test/egglog-testsuite/path.egg")
 (check (path 1 3))
