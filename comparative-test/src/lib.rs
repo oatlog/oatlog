@@ -477,7 +477,7 @@ egglog_test!(nogenerate, herbie_tutorial, expect![[r#"
 
 "#]], r#"(include "comparative-test/egglog-testsuite/herbie-tutorial.egg")"#);// needs big-rational numbers
 egglog_test!(zrocorrect, i64, expect![], r#"(include "comparative-test/egglog-testsuite/i64.egg")"#);
-egglog_test!(zrocorrect, include, expect![], r#"(include "comparative-test/egglog-testsuite/include.egg")"#);//needs updated paths
+egglog_test!(allcorrect, include, expect![], r#"(include "comparative-test/egglog-testsuite/include.egg")"#);//needs updated paths
 egglog_test!(nogenerate, integer_math, expect![[r#"
     comparative-test/egglog-testsuite/integer_math.egg: function call != is not defined
     !=
