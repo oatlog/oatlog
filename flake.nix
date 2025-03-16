@@ -76,7 +76,8 @@
         }) {
           mk-report = ''
             set -v
-            ${lib.getExe pkgs.typst} compile ./doc/report/main.typ report.pdf \
+            make -C ./doc/report lint
+            ${lib.getExe pkgs.typst} compile ./doc/report/main.typ --root . report.pdf \
               --font-path ${pkgs.newcomputermodern}
           '';
           cargo = ''
