@@ -1,10 +1,13 @@
+//! AST that matches egglog exactly, so it includes things not supported by oatlog.
 use crate::frontend::{
     Literal, MError, MResult, QSpan, Sexp, SexpSpan, Spanned, Str, err_, register_span,
 };
 
+#[derive(Clone, Debug)]
 pub(crate) struct Program {
     statements: Vec<Spanned<Statement>>,
 }
+#[derive(Clone, Debug)]
 pub(crate) enum Expr {
     /// A literal.
     /// ```egglog
@@ -23,6 +26,7 @@ pub(crate) enum Expr {
     /// Note that `check`, `=` and `!=` are considered functions.
     Call(Str, Vec<Spanned<Expr>>),
 }
+#[derive(Clone, Debug)]
 pub(crate) enum Action {
     /// Let expressions get or insert into the database and bind the result.
     /// ```egglog
@@ -103,10 +107,12 @@ pub(crate) enum Action {
     /// Unsupported.
     Extract { expr: Spanned<Expr>, variants: u64 },
 }
+#[derive(Clone, Debug)]
 pub(crate) enum Change {
     Delete,
     Subsume,
 }
+#[derive(Clone, Debug)]
 pub(crate) enum Statement {
     /// Unsupported.
     SetOption { name: Str, value: Spanned<Expr> },
@@ -305,6 +311,7 @@ pub(crate) enum Statement {
     Include(Str),
 }
 pub(crate) type Subsume = bool;
+#[derive(Clone, Debug)]
 pub(crate) enum Schedule {
     /// Run schedule until saturation.
     Saturate(Box<Schedule>),
@@ -315,35 +322,41 @@ pub(crate) enum Schedule {
     /// Run a sequence of schedules.
     Sequence(Vec<Spanned<Schedule>>),
 }
+#[derive(Clone, Debug)]
 pub(crate) struct RunConfig {
-    ruleset: Option<Str>,
-    until: Option<Vec<Spanned<Fact>>>,
+    pub(crate) ruleset: Option<Str>,
+    pub(crate) until: Option<Vec<Spanned<Fact>>>,
 }
+#[derive(Clone, Debug)]
 pub(crate) enum Fact {
     /// The following expressions are equal.
     Eq(Spanned<Expr>, Spanned<Expr>),
     /// The following expression exists in the database.
     Expr(Spanned<Expr>),
 }
+#[derive(Clone, Debug)]
 pub(crate) struct Rule {
     /// When all facts match the database, the rule is triggered.
-    body: Vec<Spanned<Fact>>,
+    pub(crate) body: Vec<Spanned<Fact>>,
     /// When triggered, perform the following actions.
-    head: Vec<Spanned<Action>>,
+    pub(crate) head: Vec<Spanned<Action>>,
 }
+#[derive(Clone, Debug)]
 pub(crate) struct Rewrite {
-    lhs: Spanned<Expr>,
-    rhs: Spanned<Expr>,
-    conditions: Vec<Spanned<Fact>>,
+    pub(crate) lhs: Spanned<Expr>,
+    pub(crate) rhs: Spanned<Expr>,
+    pub(crate) conditions: Vec<Spanned<Fact>>,
 }
+#[derive(Clone, Debug)]
 pub(crate) enum SubDatatypes {
     Variants(Vec<Spanned<Variant>>),
     NewSort(Str, Vec<Spanned<Expr>>),
 }
+#[derive(Clone, Debug)]
 pub(crate) struct Variant {
-    name: Str,
-    types: Vec<Str>,
-    cost: Option<u64>,
+    pub(crate) name: Str,
+    pub(crate) types: Vec<Str>,
+    pub(crate) cost: Option<u64>,
 }
 /// Attach usage information context while allowing early return.
 /// Moving usage to the start of the block makes it more usable as documentation.

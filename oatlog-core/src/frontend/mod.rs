@@ -6,6 +6,7 @@ use std::{
     collections::{BTreeMap, btree_map::Entry},
     fmt::Debug,
     hash::Hash,
+    primitive,
 };
 
 use itertools::Itertools as _;
@@ -36,6 +37,16 @@ impl<T> ResultExt for MResult<T> {
         self.map_err(|err| err.concat(new_err))
     }
 }
+
+trait VecExt<A, B> {
+    fn mapf(&self, f: impl FnMut(A) -> MResult<B>) -> MResult<Vec<B>>;
+}
+impl<A: Clone, B> VecExt<A, B> for Vec<A> {
+    fn mapf(&self, f: impl FnMut(A) -> MResult<B>) -> MResult<Vec<B>> {
+        self.clone().into_iter().map(f).collect()
+    }
+}
+
 pub(crate) fn parse(sexps: Vec<Vec<SexpSpan>>, config: Configuration) -> MResult<hir::Theory> {
     let mut parser = Parser::new();
     for sexp in sexps {
@@ -665,7 +676,6 @@ impl Parser {
             | "input" | "output" => {
                 return unimplemented_msg;
             }
-
             _ => {
                 self.parse_action(x, &mut None)?;
             }
