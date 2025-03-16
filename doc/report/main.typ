@@ -652,7 +652,7 @@ match some part of the database. `Add`, `Mul` and `Const` represent tables where
 have columns for their inputs and their output and `Const` has a column for its value and a column
 for its output.
 
-```sexp
+```clojure
 (sort Math)
 (function Add (Math Math) Math)
 (function Mul (Math Math) Math)
@@ -672,7 +672,7 @@ for its output.
 
 Eqlog is similar, but the language is very desugared, it is almost just a query plan.
 It also lacks primitives, meaning it can not represent constants, primitive functions, etc.
-```
+```eqlog
 type Math;
 func add(Math, Math) -> Math;
 func mul(Math, Math) -> Math;
@@ -733,7 +733,7 @@ FROM Add
 = Example of generated code <codegen_example>
 
 The egglog code for this example, also implementing the distributive law:
-```egglog
+```clojure
 (datatype Math
     (Mul Math Math)
     (Add Math Math)
@@ -1115,12 +1115,12 @@ impl Unification {
 
 == Math
 
-#raw(read("../../oatlog-bench/input/math.egg"), lang: "egglog")
+#raw(read("../../oatlog-bench/input/math.egg"), lang: "clojure")
 
 #pagebreak()
 == Boolean adder
 
-#raw(read("../../oatlog-bench/input/boolean_adder.egg"), lang: "egglog")
+#raw(read("../../oatlog-bench/input/boolean_adder.egg"), lang: "clojure")
 
 = Examples
 
