@@ -1,4 +1,4 @@
-#import "mastery-chs/lib.typ": template, flex-caption
+#import "mastery-chs/lib.typ": template, appendices, flex-caption
 
 #let todo(msg) = {
   [#text(fill: red, weight: "bold", size: 12pt)[TODO #msg]]
@@ -632,16 +632,8 @@ See @benchmarks-appendix
 
 = Conclusion
 
-
-
-
-
-
-
-
 #bibliography("refs.bib")
-#counter(heading).update(0)
-#set heading(numbering: "A.1", supplement: [Appendix])
+#show: appendices
 
 = Distributive law example in many languages <rosettaexample>
 
