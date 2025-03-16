@@ -1,10 +1,10 @@
 #import "mastery-chs/lib.typ": template, appendices, flex-caption
 
 #let TODO(msg) = {
-  [#text(fill: red, weight: "bold", size: 12pt)[TODO #msg]]
+  [#text(fill: red, weight: "bold", size: 12pt)[TODO: #msg]]
 }
 #let NOTE(msg) = {
-  [#text(fill: blue, weight: "bold", size: 12pt)[TODO #msg]]
+  [#text(fill: blue, weight: "bold", size: 12pt)[NOTE: #msg]]
 }
 
 #show "naive": "naïve"
@@ -33,6 +33,8 @@
 
   ],
 )
+
+#set raw(syntaxes: "egglog.sublime-syntax")
 
 = Introduction
 
@@ -349,27 +351,29 @@ for _ in b_new(..) {
 @informal-theory-example shows an example EqSat theory specified in the egglog domain-specific
 language @egglog.
 
+#TODO[erik for loke: changed function to constructor, otherwise it is not valid egglog since function requires :merge or :no-merge. DUR]
+
 #figure(
-  ```
+  ```egglog
   (sort Math)
-  (function Add (Math Math) Math)
-  (function Sub (Math Math) Math)
-  (function Mul (Math Math) Math)
-  (function Div (Math Math) Math)
-  (function Pow (Math) Math)
-  (function Const (i64) Math)
-  (function Var (String) Math)
+  (constructor Add (Math Math) Math)
+  (constructor Sub (Math Math) Math)
+  (constructor Mul (Math Math) Math)
+  (constructor Div (Math Math) Math)
+  (constructor Pow (Math) Math)
+  (constructor Const (i64) Math)
+  (constructor Var (String) Math)
 
-  (rewrite (Add a b) (Add b a))                         // commutativity
-  (rewrite (Add a (Add b c)) (Add (Add a b) c))         // associativity
+  (rewrite (Add a b) (Add b a))                         ; commutativity
+  (rewrite (Add a (Add b c)) (Add (Add a b) c))         ; associativity
 
-  (rewrite (Mul a b) (Mul b a))                         // commutativity
-  (rewrite (Mul a (Mul b c)) (Mul (Mul a b) c))         // associativity
+  (rewrite (Mul a b) (Mul b a))                         ; commutativity
+  (rewrite (Mul a (Mul b c)) (Mul (Mul a b) c))         ; associativity
 
-  (rewrite (Mul (Add a b) c) (Add (Mul a c) (Mul b c))) // distributivity
+  (rewrite (Mul (Add a b) c) (Add (Mul a c) (Mul b c))) ; distributivity
 
-  (rewrite (Add x (Const 0)) x)                         // additive unit
-  (rewrite (Mul x (Const 1)) (x))                       // multiplicative unit
+  (rewrite (Add x (Const 0)) x)                         ; additive unit
+  (rewrite (Mul x (Const 1)) (x))                       ; multiplicative unit
   ```,
 
   caption: [
@@ -416,7 +420,7 @@ and SQL.
     [function ], [function ], [ ], [table ], [e.g. `Add: Math * Math -> Math`],
     [e-node ], [tuple ], [fact ], [row/tuple ], [represents a small computation, e.g. `Add(a,b) = c`],
     [e-class ], [element ], [ ], [cell element], [represents a set of equivalent expressions],
-    [sort ], [type ], [type ], [type ], [e.g. `Math`],
+    [sort ], [type ], [type ], [type ], [e.g. `Math`, `i64`],
   ),
   caption: [Comparison of egglog, eqlog, datalog, and relational database terminology.],
 ) <rosetta-table>
@@ -573,7 +577,7 @@ This section discusses Oatlog in detail, how it is used, what it can do and how 
 
 == Egglog-compatible external interface
 
-#TODO[]
+#TODO[erik for loke: Is this about callable generated functions or that we support the egglog language?]
 
 == Architecture and intermediate representations
 
@@ -581,7 +585,7 @@ Oatlog is a Rust proc-macro that takes in egglog code and generates Rust code.
 See @codegen_example for an example of what the generated code looks like.
 
 #TODO[Architecture figure, AST->Parser->HIR->??->LIR->Rust code->Rustc/LLVM->Runtime with runtime
-library]
+  library]
 
 === Egglog AST
 
@@ -594,7 +598,13 @@ The main purpose of HIR is for normalization and optimization. Here, a rule cons
 premises and a set of actions, where premises are conjunctive queries (joins) and actions are
 inserts and unifications. HIR is lowered into LIR and that process also performs query planning.
 
-// === Query plan
+=== QIR, Query-plan IR
+
+#NOTE[The current implementation is very ad-hoc and will be replaced by something similar to free-join, except entirely static (only a single cover)]
+
+Represents all the choices made to transform a conjunctive query to LIR, specifically the order of joins and how the joins are performed.
+Note that this IR only contains queries and other information, such as relation properties are lowered directly from HIR.
+
 === LIR, Low-level Intermediate Representation
 
 LIR is a low-level description of the actual code that is to be generated.
@@ -635,6 +645,8 @@ We compare the number of e-classes in egglog and oatlog to check if oatlog is li
 Right now, we fail most test because primitive functions are not implemented.
 Additionally, some tests are not very relevant for AOT compilation, for example extraction commands.
 
+For a list of currently passing tests, see @passingtests.
+
 = Conclusion
 
 #TODO[]
@@ -654,7 +666,7 @@ match some part of the database. `Add`, `Mul` and `Const` represent tables where
 have columns for their inputs and their output and `Const` has a column for its value and a column
 for its output.
 
-```clojure
+```egglog
 (sort Math)
 (function Add (Math Math) Math)
 (function Mul (Math Math) Math)
@@ -735,7 +747,7 @@ FROM Add
 = Example of generated code <codegen_example>
 
 The egglog code for this example, also implementing the distributive law:
-```clojure
+```egglog
 (datatype Math
     (Mul Math Math)
     (Add Math Math)
@@ -743,7 +755,7 @@ The egglog code for this example, also implementing the distributive law:
 (rewrite (Mul (Add a b) c) (Add (Mul a c) (Mul b c)))
 ```
 
-This is what the generated Rust code looks like, the most relevant function to look at is `apply_rules` which performs the actual joins.
+This is what the generated Rust code looks like, the most relevant functions to look at are `apply_rules` which performs the actual joins, `update` which computes congruence closure and `clear_transient` which triggers the calls to `update`.
 Note that the generated code has been edited slightly to make it easier to read.
 ```rust
 impl Theory {
@@ -1117,12 +1129,12 @@ impl Unification {
 
 == Math
 
-#raw(read("../../oatlog-bench/input/math.egg"), lang: "clojure")
+#raw(read("../../oatlog-bench/input/math.egg"), lang: "egglog")
 
 #pagebreak()
 == Boolean adder
 
-#raw(read("../../oatlog-bench/input/boolean_adder.egg"), lang: "clojure")
+#raw(read("../../oatlog-bench/input/boolean_adder.egg"), lang: "egglog")
 
 = Examples
 
@@ -1131,3 +1143,42 @@ impl Unification {
 == Quadratic formula
 
 #raw(read("../../examples/quadratic-formula/src/main.rs"), lang: "rust")
+
+= Passing egglog tests <passingtests>
+
+#NOTE[`(check <fact>)` is not yet implemented (since it is not vital for most use-cases and would require running rules out-of-order, which we also do not support yet.), we only compare the number of e-nodes for all the relations.]
+
+These are the currently passing tests from the egglog testsuite
+
+== birewrite
+
+#raw(read("../../comparative-test/egglog-testsuite/birewrite.egg"), lang: "egglog")
+
+== include
+
+#raw(read("../../comparative-test/egglog-testsuite/include.egg"), lang: "egglog")
+
+== path
+
+#raw(read("../../comparative-test/egglog-testsuite/path.egg"), lang: "egglog")
+
+== pathproof
+
+#raw(read("../../comparative-test/egglog-testsuite/pathproof.egg"), lang: "egglog")
+
+== repro_querybug2
+
+#raw(read("../../comparative-test/egglog-testsuite/repro-querybug2.egg"), lang: "egglog")
+
+== repro_querybug4
+
+#raw(read("../../comparative-test/egglog-testsuite/repro-querybug4.egg"), lang: "egglog")
+
+== repro_querybug
+
+#raw(read("../../comparative-test/egglog-testsuite/repro-querybug.egg"), lang: "egglog")
+
+== repro_unsound_htutorial
+
+#raw(read("../../comparative-test/egglog-testsuite/repro-unsound-htutorial.egg"), lang: "egglog")
+
