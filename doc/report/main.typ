@@ -4,6 +4,8 @@
   [#text(fill: red, weight: "bold", size: 12pt)[TODO #msg]]
 }
 
+#set document(title: [Oatlog])
+
 #let department = "Department of Computer Science and Engineering"
 #show: template.with(
   title: "Oatlog: Ahead-of-time compiled e-graphs with primitives",
