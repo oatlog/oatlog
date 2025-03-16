@@ -7,6 +7,8 @@
   [#text(fill: blue, weight: "bold", size: 12pt)[TODO #msg]]
 }
 
+#show "naive": "naïve"
+
 #set document(title: [Oatlog])
 
 #let department = "Department of Computer Science and Engineering"
