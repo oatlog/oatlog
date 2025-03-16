@@ -561,11 +561,8 @@ fn codegen_panic_merge() {
                 pub fn get_total_relation_entry_count(&self) -> usize {
                     [self.f_relation.len()].iter().copied().sum::<usize>()
                 }
-                pub fn get_relation_entry_count(&self) -> Vec<(&'static str, usize)> {
-                    [(stringify!(f_relation), self.f_relation.len())]
-                        .iter()
-                        .copied()
-                        .collect()
+                pub fn get_relation_entry_count(&self) -> std::collections::BTreeMap<&'static str, usize> {
+                    [("f", self.f_relation.len())].iter().copied().collect()
                 }
                 #[inline(never)]
                 fn clear_transient(&mut self) {
@@ -938,25 +935,8 @@ fn codegen_bug1() {
                     .copied()
                     .sum::<usize>()
                 }
-                pub fn get_relation_entry_count(&self) -> Vec<(&'static str, usize)> {
-                    [
-                        (
-                            stringify!(forall_t0_relation),
-                            self.forall_t0_relation.len(),
-                        ),
-                        (
-                            stringify!(forall_t1_relation),
-                            self.forall_t1_relation.len(),
-                        ),
-                        (
-                            stringify!(forall_t2_relation),
-                            self.forall_t2_relation.len(),
-                        ),
-                        (stringify!(foo_relation), self.foo_relation.len()),
-                    ]
-                    .iter()
-                    .copied()
-                    .collect()
+                pub fn get_relation_entry_count(&self) -> std::collections::BTreeMap<&'static str, usize> {
+                    [("Foo", self.foo_relation.len())].iter().copied().collect()
                 }
                 #[inline(never)]
                 fn clear_transient(&mut self) {
@@ -1242,17 +1222,11 @@ fn initial() {
                         .copied()
                         .sum::<usize>()
                 }
-                pub fn get_relation_entry_count(&self) -> Vec<(&'static str, usize)> {
-                    [
-                        (
-                            stringify!(forall_math_relation),
-                            self.forall_math_relation.len(),
-                        ),
-                        (stringify!(const_relation), self.const_relation.len()),
-                    ]
-                    .iter()
-                    .copied()
-                    .collect()
+                pub fn get_relation_entry_count(&self) -> std::collections::BTreeMap<&'static str, usize> {
+                    [("Const", self.const_relation.len())]
+                        .iter()
+                        .copied()
+                        .collect()
                 }
                 #[inline(never)]
                 fn clear_transient(&mut self) {
@@ -2082,16 +2056,12 @@ fn test_primitives_simple() {
                     .copied()
                     .sum::<usize>()
                 }
-                pub fn get_relation_entry_count(&self) -> Vec<(&'static str, usize)> {
+                pub fn get_relation_entry_count(&self) -> std::collections::BTreeMap<&'static str, usize> {
                     [
-                        (
-                            stringify!(forall_math_relation),
-                            self.forall_math_relation.len(),
-                        ),
-                        (stringify!(mul_relation), self.mul_relation.len()),
-                        (stringify!(add_relation), self.add_relation.len()),
-                        (stringify!(const_relation), self.const_relation.len()),
-                        (stringify!(var_relation), self.var_relation.len()),
+                        ("Mul", self.mul_relation.len()),
+                        ("Add", self.add_relation.len()),
+                        ("Const", self.const_relation.len()),
+                        ("Var", self.var_relation.len()),
                     ]
                     .iter()
                     .copied()
@@ -2797,16 +2767,12 @@ fn triangle_join() {
                     .copied()
                     .sum::<usize>()
                 }
-                pub fn get_relation_entry_count(&self) -> Vec<(&'static str, usize)> {
+                pub fn get_relation_entry_count(&self) -> std::collections::BTreeMap<&'static str, usize> {
                     [
-                        (
-                            stringify!(forall_math_relation),
-                            self.forall_math_relation.len(),
-                        ),
-                        (stringify!(foo_relation), self.foo_relation.len()),
-                        (stringify!(bar_relation), self.bar_relation.len()),
-                        (stringify!(baz_relation), self.baz_relation.len()),
-                        (stringify!(triangle_relation), self.triangle_relation.len()),
+                        ("Foo", self.foo_relation.len()),
+                        ("Bar", self.bar_relation.len()),
+                        ("Baz", self.baz_relation.len()),
+                        ("Triangle", self.triangle_relation.len()),
                     ]
                     .iter()
                     .copied()
@@ -3360,14 +3326,10 @@ fn edgecase0() {
                     .copied()
                     .sum::<usize>()
                 }
-                pub fn get_relation_entry_count(&self) -> Vec<(&'static str, usize)> {
+                pub fn get_relation_entry_count(&self) -> std::collections::BTreeMap<&'static str, usize> {
                     [
-                        (
-                            stringify!(forall_math_relation),
-                            self.forall_math_relation.len(),
-                        ),
-                        (stringify!(mul_relation), self.mul_relation.len()),
-                        (stringify!(add_relation), self.add_relation.len()),
+                        ("Mul", self.mul_relation.len()),
+                        ("Add", self.add_relation.len()),
                     ]
                     .iter()
                     .copied()
@@ -3882,14 +3844,10 @@ fn test_into_codegen() {
                     .copied()
                     .sum::<usize>()
                 }
-                pub fn get_relation_entry_count(&self) -> Vec<(&'static str, usize)> {
+                pub fn get_relation_entry_count(&self) -> std::collections::BTreeMap<&'static str, usize> {
                     [
-                        (
-                            stringify!(forall_math_relation),
-                            self.forall_math_relation.len(),
-                        ),
-                        (stringify!(mul_relation), self.mul_relation.len()),
-                        (stringify!(add_relation), self.add_relation.len()),
+                        ("Mul", self.mul_relation.len()),
+                        ("Add", self.add_relation.len()),
                     ]
                     .iter()
                     .copied()

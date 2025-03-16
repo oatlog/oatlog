@@ -170,7 +170,16 @@ pub fn codegen(theory: &Theory) -> TokenStream {
                 RelationKind::Global { .. } => return None,
             })
         })
-        .unzip();
+        .collect();
+
+    let (counted_stored_relations, counted_relations_names): (Vec<_>, Vec<_>) = theory
+        .relations
+        .iter()
+        .filter_map(|rel| match &rel.kind {
+            RelationKind::Table { .. } => Some((ident::rel_var(rel), rel.name)),
+            _ => None,
+        })
+        .collect();
 
     let theory_ty = ident::theory_ty(theory);
     let theory_delta_ty = ident::theory_delta_ty(theory);
@@ -257,8 +266,15 @@ pub fn codegen(theory: &Theory) -> TokenStream {
             pub fn get_total_relation_entry_count(&self) -> usize {
                 #get_total_relation_entry_count_body
             }
-            pub fn get_relation_entry_count(&self) -> Vec<(&'static str, usize)> {
-                [#((stringify!(#stored_relations), self.#stored_relations.len())),*].iter().copied().collect()
+            pub fn get_relation_entry_count(&self) -> std::collections::BTreeMap<&'static str, usize> {
+                [
+                    #(
+                        (
+                            #counted_relations_names,
+                            self.#counted_stored_relations.len()
+                        ),
+                    )*
+                ].iter().copied().collect()
             }
             #clear_transient
         }
@@ -1127,9 +1143,9 @@ fn codegen_relation(rel: &RelationData, theory: &Theory) -> TokenStream {
 
                         op_insert.retain(|&(#(#all_columns),*)| {
                             #(#implict_rules_impl)*
-                            // TODO: this becomes infallible if there are implicit rules
-                            // if there is a single implicit rule, we might just want to merge
-                            // insert with the query.
+                            // TODO: if there is an implicit rule, then we are guaranteed that rows
+                            // are not already in the database (and unique due to the filtering
+                            // from op_delete)
                             if !self.#first_index_ident.insert((#(#first_index_order),*)) {
                                 return false;
                             }

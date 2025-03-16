@@ -6,7 +6,6 @@ use std::{
     collections::{BTreeMap, btree_map::Entry},
     fmt::Debug,
     hash::Hash,
-    primitive,
 };
 
 use itertools::Itertools as _;
@@ -27,6 +26,8 @@ pub(crate) mod sexp;
 pub(crate) use sexp::SexpSpan;
 use sexp::{Literal, Sexp};
 
+// TODO: remove unused annotation when new ast is used.
+#[allow(unused)]
 mod egglog_ast;
 
 trait ResultExt {

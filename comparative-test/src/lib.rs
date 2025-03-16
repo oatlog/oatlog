@@ -1,3 +1,5 @@
+use std::collections::BTreeMap;
+
 #[derive(PartialEq, Eq, Debug)]
 #[cfg_attr(not(test), allow(unused))]
 enum Verdict {
@@ -7,9 +9,56 @@ enum Verdict {
     Panics,
 }
 
+fn compare_egglog_oatlog(
+    egglog: &mut egglog::EGraph,
+    oatlog_counts: BTreeMap<&'static str, usize>,
+    verdict: Verdict,
+    expected: Option<&expect_test::Expect>,
+) -> bool {
+    static EGGLOG_COUNT_REGEX: std::sync::LazyLock<regex::Regex> =
+        // std::sync::LazyLock::new(|| regex::Regex::new(r".*\(([0-9]+).*\.\.([0-9]+)\).*").unwrap());
+        std::sync::LazyLock::new(|| regex::Regex::new(r"(.*): ([0-9]+)").unwrap());
+    let egglog_counts: BTreeMap<_, _> = egglog
+        .parse_and_run_program(None, "(print-size)")
+        .unwrap()
+        .into_iter()
+        .flat_map(|msg| {
+            msg.lines()
+                .map(|msg| {
+                    let caps = EGGLOG_COUNT_REGEX.captures(msg.trim()).unwrap();
+                    let relation: String = caps.get(1).unwrap().as_str().to_owned();
+                    let count: usize = caps.get(2).unwrap().as_str().parse().unwrap();
+                    (relation, count)
+                })
+                .collect::<Vec<_>>()
+        })
+        .collect();
+
+    let mut any_mismatch = false;
+    let mismatch_msgs: String = oatlog_counts
+        .into_iter()
+        .filter_map(|(relation, count)| {
+            (count != egglog_counts[relation]).then(|| {
+                any_mismatch = true;
+                format!("{relation}: {} != {count}\n", egglog_counts[relation])
+            })
+        })
+        .collect();
+    if any_mismatch {
+        assert_eq!(verdict, Verdict::Mismatched, "expected mismatch");
+        if let Some(e) = expected {
+            e.assert_eq(&mismatch_msgs);
+        }
+    }
+    any_mismatch
+}
+
 #[cfg_attr(not(test), allow(unused))]
 macro_rules! comparative_test {
     ($egglog_source_literal:expr, $verdict:expr, $expected:expr) => {
+        comparative_test!($egglog_source_literal, $verdict, $expected, 10);
+    };
+    ($egglog_source_literal:expr, $verdict:expr, $expected:expr, $limit:expr) => {
         use crate::Verdict;
         let verdict: Verdict = $verdict;
         let expected: Option<expect_test::Expect> = $expected;
@@ -29,20 +78,29 @@ macro_rules! comparative_test {
             println!("egglog msg: {msg}");
         }
 
-        for i in 0..10 {
+        for _ in 0..$limit {
             dbg!(egglog.num_tuples(), theory.get_total_relation_entry_count());
 
-            {
-                let egglog = egglog.num_tuples();
-                let us = theory.get_total_relation_entry_count();
-                if egglog != us {
-                    assert_eq!(verdict, Verdict::Mismatched, "unexpected mismatch");
-                    if let Some(e) = &expected {
-                        e.assert_eq(&format!("iter{i} {egglog}!={us}"));
-                    }
-                    return;
-                }
+            let mismatched = crate::compare_egglog_oatlog(
+                &mut egglog,
+                theory.get_relation_entry_count(),
+                $verdict,
+                expected.as_ref(),
+            );
+            if mismatched {
+                return;
             }
+            // {
+            //     let egglog = egglog.num_tuples();
+            //     let us = theory.get_total_relation_entry_count();
+            //     if egglog != us {
+            //         assert_eq!(verdict, Verdict::Mismatched, "unexpected mismatch");
+            //         if let Some(e) = &expected {
+            //             e.assert_eq(&format!("iter{i} {egglog}!={us}"));
+            //         }
+            //         return;
+            //     }
+            // }
 
             theory.step();
 
@@ -50,11 +108,21 @@ macro_rules! comparative_test {
         }
 
         if egglog.num_tuples() == 0 {
-            assert_eq!(verdict, Verdict::ZeroCorrect);
+            assert_eq!(
+                verdict,
+                Verdict::ZeroCorrect,
+                "expected cardinality of zero"
+            );
+            expected.unwrap().assert_eq("");
         } else {
-            assert_eq!(verdict, Verdict::AllCorrect);
+            assert_eq!(verdict, Verdict::AllCorrect, "expected all correct");
+            let desc = theory
+                .get_relation_entry_count()
+                .into_iter()
+                .map(|(relation, count)| format!("{relation}: {count}\n"))
+                .collect::<String>();
+            expected.unwrap().assert_eq(&desc);
         }
-        expected.unwrap().assert_eq("");
     };
 }
 
@@ -106,32 +174,32 @@ macro_rules! egglog_test {
         }
     };
     // Both oatlog and egglog produce the same number of e-nodes and it is a non-zero number.
-    (allcorrect, $egglog_test_name:ident, $expected:expr, $egglog_test_path:literal) => {
+    (allcorrect, $egglog_test_name:ident, $expected:expr, $egglog_test_path:literal $(, limit = $limit:literal)?) => {
         #[test]
         fn $egglog_test_name() {
-            comparative_test!($egglog_test_path, Verdict::AllCorrect, Some($expected));
+            comparative_test!($egglog_test_path, Verdict::AllCorrect, Some($expected) $(, $limit)?);
         }
     };
     // Both oatlog and egglog produce zero e-nodes
-    (zrocorrect, $egglog_test_name:ident, $expected:expr, $egglog_test_path:literal) => {
+    (zrocorrect, $egglog_test_name:ident, $expected:expr, $egglog_test_path:literal $(, limit = $limit:literal)?) => {
         #[test]
         fn $egglog_test_name() {
-            comparative_test!($egglog_test_path, Verdict::ZeroCorrect, Some($expected));
+            comparative_test!($egglog_test_path, Verdict::ZeroCorrect, Some($expected) $(, $limit)?);
         }
     };
     // oatlog and egglog produce different numbers of e-nodes
-    (mismatched, $egglog_test_name:ident, $expected:expr, $egglog_test_path:literal) => {
+    (mismatched, $egglog_test_name:ident, $expected:expr, $egglog_test_path:literal $(, limit = $limit:literal)?) => {
         #[test]
         fn $egglog_test_name() {
-            comparative_test!($egglog_test_path, Verdict::Mismatched, Some($expected));
+            comparative_test!($egglog_test_path, Verdict::Mismatched, Some($expected) $(, $limit)?);
         }
     };
     // There is a runtime panic when running oatlog and egglog.
-    (does_panic, $egglog_test_name:ident, expect![$panic_msg:literal], $egglog_test_path:literal) => {
+    (does_panic, $egglog_test_name:ident, expect![$panic_msg:literal], $egglog_test_path:literal $(, limit = $limit:literal)?) => {
         #[test]
         #[should_panic(expected = $panic_msg)]
         fn $egglog_test_name() {
-            comparative_test!($egglog_test_path, Verdict::Panics, None);
+            comparative_test!($egglog_test_path, Verdict::Panics, None $(, $limit)?);
         }
     };
 }
@@ -192,7 +260,9 @@ egglog_test!(nogenerate, bdd, expect![[r#"
     ( include "comparative-test/egglog-testsuite/bdd.egg" )
 
 "#]], r#"(include "comparative-test/egglog-testsuite/bdd.egg")"#);// primitive functions
-egglog_test!(mismatched, before_proofs, expect!["iter0 19!=36"], r#"(include "comparative-test/egglog-testsuite/before-proofs.egg")"#);
+egglog_test!(mismatched, before_proofs, expect![[r#"
+    Add: 10 != 33
+"#]], r#"(include "comparative-test/egglog-testsuite/before-proofs.egg")"#); // REASON: clear transient not performed on check, so globals have not affected the database yet.
 egglog_test!(nogenerate, bignum, expect![[r#"
     comparative-test/egglog-testsuite/bignum.egg: function bigint is not defined
     bigint
@@ -207,7 +277,10 @@ egglog_test!(nogenerate, bignum, expect![[r#"
     ( include "comparative-test/egglog-testsuite/bignum.egg" )
 
 "#]], r#"(include "comparative-test/egglog-testsuite/bignum.egg")"#);// needs bignum
-egglog_test!(mismatched, birewrite, expect!["iter0 22!=14"], r#"(include "comparative-test/egglog-testsuite/birewrite.egg")"#);
+egglog_test!(allcorrect, birewrite, expect![[r#"
+    Add: 8
+    Lit: 6
+"#]], r#"(include "comparative-test/egglog-testsuite/birewrite.egg")"#);
 egglog_test!(zrocorrect, bitwise, expect![], r#"(include "comparative-test/egglog-testsuite/bitwise.egg")"#);
 egglog_test!(nogenerate, bool_, expect![[r#"
     comparative-test/egglog-testsuite/bool.egg: type bool is not defined
@@ -477,7 +550,10 @@ egglog_test!(nogenerate, herbie_tutorial, expect![[r#"
 
 "#]], r#"(include "comparative-test/egglog-testsuite/herbie-tutorial.egg")"#);// needs big-rational numbers
 egglog_test!(zrocorrect, i64, expect![], r#"(include "comparative-test/egglog-testsuite/i64.egg")"#);
-egglog_test!(allcorrect, include, expect![], r#"(include "comparative-test/egglog-testsuite/include.egg")"#);//needs updated paths
+egglog_test!(allcorrect, include, expect![[r#"
+    edge: 3
+    path: 6
+"#]], r#"(include "comparative-test/egglog-testsuite/include.egg")"#);//needs updated paths
 egglog_test!(nogenerate, integer_math, expect![[r#"
     comparative-test/egglog-testsuite/integer_math.egg: function call != is not defined
     !=
@@ -704,9 +780,19 @@ egglog_test!(nogenerate, name_resolution, expect![[r#"
     ( include "comparative-test/egglog-testsuite/name-resolution.egg" )
 
 "#]], r#"(include "comparative-test/egglog-testsuite/name-resolution.egg")"#);//panic support
-egglog_test!(allcorrect, path, expect![], r#"(include "comparative-test/egglog-testsuite/path.egg")"#);
-egglog_test!(mismatched, pathproof, expect!["iter2 33!=24"], r#"(include "comparative-test/egglog-testsuite/pathproof.egg")"#);// something is wrong with the permutation
-egglog_test!(mismatched, path_union, expect!["iter0 14!=12"], r#"(include "comparative-test/egglog-testsuite/path-union.egg")"#);
+egglog_test!(allcorrect, path, expect![[r#"
+    edge: 3
+    path: 6
+"#]], r#"(include "comparative-test/egglog-testsuite/path.egg")"#);
+egglog_test!(allcorrect, pathproof, expect![[r#"
+    Edge_x: 3
+    Trans: 9
+    edge: 3
+    path: 9
+"#]], r#"(include "comparative-test/egglog-testsuite/pathproof.egg")"#);// something is wrong with the permutation
+egglog_test!(mismatched, path_union, expect![[r#"
+    path: 6 != 4
+"#]], r#"(include "comparative-test/egglog-testsuite/path-union.egg")"#); // REASON: missing union top-level action.
 egglog_test!(does_panic, points_to, expect!["Global variables should have been desugared"], r#"(include "comparative-test/egglog-testsuite/points-to.egg")"#);
 egglog_test!(zrocorrect, primitives, expect![], r#"(include "comparative-test/egglog-testsuite/primitives.egg")"#);
 egglog_test!(nogenerate, prims, expect![[r#"
@@ -751,7 +837,9 @@ egglog_test!(nogenerate, rat_pow_eval, expect![[r#"
     ( include "comparative-test/egglog-testsuite/rat-pow-eval.egg" )
 
 "#]], r#"(include "comparative-test/egglog-testsuite/rat-pow-eval.egg")"#);// rational
-egglog_test!(mismatched, repro_define, expect!["iter0 6!=3"], r#"(include "comparative-test/egglog-testsuite/repro-define.egg")"#);// compile syntax error
+egglog_test!(mismatched, repro_define, expect![[r#"
+    S: 3 != 2
+"#]], r#"(include "comparative-test/egglog-testsuite/repro-define.egg")"#); // REASON: missing toplevel union
 egglog_test!(nogenerate, repro_desugar_143, expect![[r#"
     comparative-test/egglog-testsuite/repro-desugar-143.egg: function call + is not defined
     +
@@ -808,7 +896,9 @@ egglog_test!(nogenerate, repro_equal_constant, expect![[r#"
     ( include "comparative-test/egglog-testsuite/repro-equal-constant.egg" )
 
 "#]], r#"(include "comparative-test/egglog-testsuite/repro-equal-constant.egg")"#);// merge
-egglog_test!(mismatched, repro_noteqbug, expect!["iter0 2!=0"], r#"(include "comparative-test/egglog-testsuite/repro-noteqbug.egg")"#);
+egglog_test!(mismatched, repro_noteqbug, expect![[r#"
+    R: 2 != 0
+"#]], r#"(include "comparative-test/egglog-testsuite/repro-noteqbug.egg")"#); // REASON: toplevel union
 egglog_test!(nogenerate, repro_primitive_query, expect![[r#"
     comparative-test/egglog-testsuite/repro-primitive-query.egg: does not make sense for compiled
     ( panic "should not have matched" )
@@ -823,7 +913,10 @@ egglog_test!(nogenerate, repro_primitive_query, expect![[r#"
     ( include "comparative-test/egglog-testsuite/repro-primitive-query.egg" )
 
 "#]], r#"(include "comparative-test/egglog-testsuite/repro-primitive-query.egg")"#);// impl panic
-egglog_test!(allcorrect, repro_querybug2, expect![], r#"(include "comparative-test/egglog-testsuite/repro-querybug2.egg")"#);// type error
+egglog_test!(allcorrect, repro_querybug2, expect![[r#"
+    Num: 1
+    OtherNum: 1
+"#]], r#"(include "comparative-test/egglog-testsuite/repro-querybug2.egg")"#);// type error
 egglog_test!(nogenerate, repro_querybug3, expect![[r#"
     comparative-test/egglog-testsuite/repro-querybug3.egg: function set-intersect is not defined
     set-intersect
@@ -838,8 +931,15 @@ egglog_test!(nogenerate, repro_querybug3, expect![[r#"
     ( include "comparative-test/egglog-testsuite/repro-querybug3.egg" )
 
 "#]], r#"(include "comparative-test/egglog-testsuite/repro-querybug3.egg")"#);// set primitive
-egglog_test!(allcorrect, repro_querybug4, expect![], r#"(include "comparative-test/egglog-testsuite/repro-querybug4.egg")"#);// type error
-egglog_test!(mismatched, repro_querybug, expect!["iter0 6!=4"], r#"(include "comparative-test/egglog-testsuite/repro-querybug.egg")"#);// codegen syntax error
+egglog_test!(allcorrect, repro_querybug4, expect![[r#"
+    Num: 1
+    OtherNum: 1
+"#]], r#"(include "comparative-test/egglog-testsuite/repro-querybug4.egg")"#);// type error
+egglog_test!(allcorrect, repro_querybug, expect![[r#"
+    Cons: 1
+    EmptyConst: 1
+    eq: 2
+"#]], r#"(include "comparative-test/egglog-testsuite/repro-querybug.egg")"#);// codegen syntax error
 egglog_test!(nogenerate, repro_should_saturate, expect![[r#"
     comparative-test/egglog-testsuite/repro-should-saturate.egg: function min is not defined
     min
@@ -857,7 +957,13 @@ egglog_test!(nogenerate, repro_should_saturate, expect![[r#"
 egglog_test!(nogenerate, repro_silly_panic, expect!["PANIC: assertion failed: !self.is_bound(arg)"], r#"(include "comparative-test/egglog-testsuite/repro-silly-panic.egg")"#);// fails internal assertions
 egglog_test!(nogenerate, repro_typechecking_schedule, expect!["PANIC: index out of bounds: the len is 0 but the index is 0"], r#"(include "comparative-test/egglog-testsuite/repro-typechecking-schedule.egg")"#);// index OOB
 egglog_test!(nogenerate, repro_unsound, expect!["PANIC: assertion failed: !self.is_bound(arg)"], r#"(include "comparative-test/egglog-testsuite/repro-unsound.egg")"#);// fails assert
-egglog_test!(mismatched, repro_unsound_htutorial, expect!["iter0 5!=4"], r#"(include "comparative-test/egglog-testsuite/repro-unsound-htutorial.egg")"#);
+egglog_test!(allcorrect, repro_unsound_htutorial, expect![[r#"
+    Add: 1
+    Div: 0
+    Mul: 0
+    Num: 0
+    Var: 3
+"#]], r#"(include "comparative-test/egglog-testsuite/repro-unsound-htutorial.egg")"#);
 egglog_test!(nogenerate, repro_vec_unequal, expect![[r#"
     comparative-test/egglog-testsuite/repro-vec-unequal.egg: function vec-of is not defined
     vec-of
@@ -915,7 +1021,12 @@ egglog_test!(nogenerate, set, expect![[r#"
     ( include "comparative-test/egglog-testsuite/set.egg" )
 
 "#]], r#"(include "comparative-test/egglog-testsuite/set.egg")"#);// set-length primitive function
-egglog_test!(mismatched, set_sort_function, expect!["iter0 4!=0"], r#"(include "comparative-test/egglog-testsuite/set_sort_function.egg")"#);
+egglog_test!(mismatched, set_sort_function, expect![[r#"
+    bar: 1 != 0
+    baz: 1 != 0
+    quux: 1 != 0
+    qux: 1 != 0
+"#]], r#"(include "comparative-test/egglog-testsuite/set_sort_function.egg")"#); // REASON: function unit -> value not supported properly.
 egglog_test!(nogenerate, stratified, expect![[r#"
     comparative-test/egglog-testsuite/stratified.egg: usage: (run <steps>)
     ( run path-rules 1 )

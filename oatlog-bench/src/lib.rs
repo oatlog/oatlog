@@ -61,23 +61,19 @@ macro_rules! benchmarks {
             });
             group.finish();
         })*}
-        pub fn run_main(steps: usize) {$({
-            // println!("\nrunning {}: egglog\n", stringify!($name));
-            // let mut egglog = egglog::EGraph::default();
-            // let program = format!("{}\n(print-size)", $program);
-            // for msg in egglog.parse_and_run_program(None, &program).unwrap() {
-            //     println!("{msg}");
-            // }
-            println!("\nrunning {}: oatlog\n", stringify!($name));
-            let mut theory = $name::Theory::new();
-            for i in 0..steps {
-                let start = std::time::Instant::now();
-                dbg!(theory.step());
-                println!("completed {}/{} in {:?}", i+1, steps, start.elapsed());
+        pub fn run_main(_steps: usize) {$({
+            std::env::set_current_dir(concat!(env!("CARGO_MANIFEST_DIR"), "/..")).unwrap();
+            println!("\nrunning {}: egglog\n", stringify!($name));
+            let mut egglog = egglog::EGraph::default();
+            let program = format!("{}\n(print-size)", $program);
+            for msg in egglog.parse_and_run_program(None, &program).unwrap() {
+                println!("{msg}");
             }
-            // for (relation, count) in theory.get_relation_entry_count() {
-            //     println!("{relation}: {count}");
-            // }
+            println!("\nrunning {}: oatlog\n", stringify!($name));
+            let theory = $name::Theory::new();
+            for (relation, count) in theory.get_relation_entry_count() {
+                println!("{relation}: {count}");
+            }
         })*}
     }
 }

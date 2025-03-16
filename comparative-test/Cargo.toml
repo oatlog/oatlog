@@ -9,6 +9,7 @@ eqlog-runtime.workspace = true
 expect-test.workspace = true
 oatlog.workspace = true
 paste.workspace = true
+regex.workspace = true
 
 [lints]
 workspace = true

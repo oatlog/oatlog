@@ -218,6 +218,7 @@ dependencies = [
  "expect-test",
  "oatlog",
  "paste",
+ "regex",
 ]
 
 [[package]]
