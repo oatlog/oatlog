@@ -1,5 +1,9 @@
 #import "mastery-chs/lib.typ": template, flex-caption
 
+#let todo(msg) = {
+  [#text(fill: red, weight: "bold", size: 12pt)[TODO #msg]]
+}
+
 #let department = "Department of Computer Science and Engineering"
 #show: template.with(
   title: "Oatlog: Ahead-of-time compiled e-graphs with primitives",
@@ -132,7 +136,7 @@ work.
 
 == This report
 
-TODO overview of upcoming sections
+#todo[overview of upcoming sections]
 
 
 #figure(
@@ -160,59 +164,19 @@ TODO overview of upcoming sections
 
 
 
-= User facing, egglog language and oatlog library
-
-
-
-
-= Implementation
-
-Oatlog is a rust proc-macro that takes in egglog code and generates rust code.
-See @codegen_example for an example of what the generated code looks like.
-
-== Rustc spans across files
-
-Proc-macros are provided spans, which are essentially byte ranges of the original source code.
-However, when tokenizing arbitrary strings, spans are not provided.
-This is solved by in addition to parsing from rust tokens, we implement our own sexp parser and insert our own byte ranges.
-This has another problem, since our spans are not from rustc, our error locations are no longer correct.
-This is solved by implementing error context ourselves, so context information is part of the compile error but with a bogus rustc span.
-
-== Testing
-
-We run the entire egglog testsuite (93 tests) to validate oatlog.
-We compare the number of e-classes in egglog and oatlog to check if oatlog is likley producing the same result.
-
-Right now, we fail most test because primitive functions are not implemented.
-Additionally, some tests are not very relevant for AOT compilation, for example extraction commands.
-
-Since oatlog is implemented using a proc-macro, errors result in rust compilation errors, so normal rust test can not be used directly.
-However, doctests are separately compiled so we instead generate doctest to check that generated test code compiles.
-
-== Internal Representations
-=== Egglog AST
-
-Either rust tokens or strings are parsed into s-expressions and then parsed into an egglog AST representing the source-level language without simplifications such as removing syntax sugar.
-The egglog AST is parsed into HIR.
-
-=== HIR, High-level Intermediate Representation
-
-The main purpose of HIR is for normalization and optimization.
-Here, a rule consist of a set of premises and a set of actions, where premises are conjunctive queries (joins) and actions are inserts and unifications.
-HIR is lowered into LIR and that process also performs query planning.
-
-// === Query plan
-=== LIR, Low-level Intermediate Representation
-
-LIR is a low-level description of the actual code that is to be generated.
-
-
-
-// string or rust tokens -> Sexp -> egglog ast -> hir -> query plan -> lir -> rust code.
-
-
 = Background <thesection>
 
+#todo[TODO
+  - E-graphs
+    - Intro, what are they
+    - Non-relational e-matching
+    - E-graphs as relational databases
+  - Datalog
+    - Base language
+    - Datalog as a e-graph interface
+  //  - Magic sets
+  - Egglog language
+]
 
 
 
@@ -373,6 +337,7 @@ For example, consider a partial function that performs addition, which we can re
     [y],
     [res],
   ),
+
   [1], [2], [3],
   [4], [2], [6],
   [3], [5], [8],
@@ -613,6 +578,54 @@ TODO
 - Discuss core algorithms
 - Discuss selected implementation details
 
+
+== User facing, egglog language and oatlog library
+
+== Implementation
+
+Oatlog is a rust proc-macro that takes in egglog code and generates rust code.
+See @codegen_example for an example of what the generated code looks like.
+
+=== Rustc spans across files
+
+Proc-macros are provided spans, which are essentially byte ranges of the original source code.
+However, when tokenizing arbitrary strings, spans are not provided.
+This is solved by in addition to parsing from rust tokens, we implement our own sexp parser and insert our own byte ranges.
+This has another problem, since our spans are not from rustc, our error locations are no longer correct.
+This is solved by implementing error context ourselves, so context information is part of the compile error but with a bogus rustc span.
+
+=== Testing
+
+We run the entire egglog testsuite (93 tests) to validate oatlog.
+We compare the number of e-classes in egglog and oatlog to check if oatlog is likley producing the same result.
+
+Right now, we fail most test because primitive functions are not implemented.
+Additionally, some tests are not very relevant for AOT compilation, for example extraction commands.
+
+Since oatlog is implemented using a proc-macro, errors result in rust compilation errors, so normal rust test can not be used directly.
+However, doctests are separately compiled so we instead generate doctest to check that generated test code compiles.
+
+=== Internal Representations
+==== Egglog AST
+
+Either rust tokens or strings are parsed into s-expressions and then parsed into an egglog AST representing the source-level language without simplifications such as removing syntax sugar.
+The egglog AST is parsed into HIR.
+
+==== HIR, High-level Intermediate Representation
+
+The main purpose of HIR is for normalization and optimization.
+Here, a rule consist of a set of premises and a set of actions, where premises are conjunctive queries (joins) and actions are inserts and unifications.
+HIR is lowered into LIR and that process also performs query planning.
+
+// === Query plan
+==== LIR, Low-level Intermediate Representation
+
+LIR is a low-level description of the actual code that is to be generated.
+
+
+
+// string or rust tokens -> Sexp -> egglog ast -> hir -> query plan -> lir -> rust code.
+
 = Benchmarks
 
 See @benchmarks-appendix
@@ -659,6 +672,7 @@ for its output.
 ```
 
 == Eqlog
+
 Eqlog is similar, but the language is very desugared, it is almost just a query plan.
 It also lacks primitives, meaning it can not represent constants, primitive functions, etc.
 ```
@@ -1117,6 +1131,3 @@ impl Unification {
 == Quadratic formula
 
 #raw(read("../../examples/quadratic-formula/src/main.rs"), lang: "rust")
-
-
-
