@@ -1,7 +1,10 @@
 #import "mastery-chs/lib.typ": template, appendices, flex-caption
 
-#let todo(msg) = {
+#let TODO(msg) = {
   [#text(fill: red, weight: "bold", size: 12pt)[TODO #msg]]
+}
+#let NOTE(msg) = {
+  [#text(fill: blue, weight: "bold", size: 12pt)[TODO #msg]]
 }
 
 #set document(title: [Oatlog])
@@ -138,79 +141,9 @@ work.
 
 == This report
 
-#todo[overview of upcoming sections]
+#TODO[overview of upcoming sections]
 
-
-#figure(
-  table(
-    columns: (auto, auto, auto, auto, auto),
-    table.header(
-      table.cell(colspan: 5, [*Approximate nomenclature guide*]),
-      [*egglog* ],
-      [*eqlog* ],
-      [*datalog* ],
-      [*database* ],
-      [*comment*],
-    ),
-
-    [rule ], [rule ], [rule ], [query ], [],
-    [predicate], [if stmt ], [body containing atoms], [join+where ], [logical premise],
-    [action ], [then stmt], [head ], [insert/unify], [logical consequence],
-    [function ], [function ], [ ], [table ], [e.g. `Add: Math * Math -> Math`],
-    [e-node ], [tuple ], [fact ], [row/tuple ], [represents a small computation, e.g. `Add(a,b) = c`],
-    [e-class ], [element ], [ ], [cell element], [represents a set of equivalent expressions],
-    [sort ], [type ], [type ], [type ], [e.g. `Math`],
-  ),
-  caption: [Comparison of egglog, eqlog, datalog, and relational database terminology.],
-) <rosetta-table>
-
-
-
-= Background <thesection>
-
-#todo[
-  - E-graphs
-    - Intro, what are they
-    - Non-relational e-matching
-    - E-graphs as relational databases
-  - Datalog
-    - Base language
-    - Datalog as a e-graph interface
-  //  - Magic sets
-  - Egglog language
-
-
-  - implementation stuff
-  - user-facing stuff
-
-  - intro
-    - what is egglog
-    - why view e-graphs as relational databases
-  - rule pre-processing
-    - semi-naive
-  - query planning
-  - query implementation/index implementation ("runtime stuff")
-  - misc
-    - functional dependency/implicit functionality axiom.
-    - termination/scheduling
-    - union-find
-    - cannicalization
-      - why eager?
-
-  - (main)
-    - our irs
-      - (optimizations)
-      - formal definition
-    - implementation
-      - we are making a macro
-      - architecture diagram of IRs.
-
-  META: what is egraph, then why is e-graph database, then how is database implemented/optimize database.
-
-]
-
-
-== E-graphs
+= Conceptual background
 
 E-graphs are motivated by the observation that directed acyclic graphs (DAGs) of expressions can
 efficiently represent a nested expression with a common subexpression, like say $f(g(x), g(x))$, as
@@ -238,24 +171,8 @@ e-classes to e-nodes denoting being used as input in the e-node's operation. Ope
 are ordered from the point of view of the operation since not all operations are commutative.
 Finally, every e-node is a member of exactly one e-class and no e-class is empty.
 
-Rewrite rules look for subgraph "patterns", then once these match add new e-classes and e-nodes and join existing
-e-classes by vertex contraction. EqSat involves repeatedly applying a set of rewrite rules, then
-finally performing extraction, i.e. determining canonical e-nodes for respective e-classes such that
-the implied DAG of e-nodes has some minimal cost.
-
-A set of rewrite rules is called a theory, and these can be shown to converge to finite e-graphs
-under some conditions. Practically, many theories diverge and the EqSat rewriting phase is often
-performed until some timeout or until some other condition is met.
-
-Extraction, even when using a sum of static e-node costs as a cost function, is NP-hard, but there
-are both heuristics and algorithms that work well on some types of e-graphs @fastextract.
-
 @informal-egraph-figure shows an example e-graph represented as a bipartite graph.
 @informal-egraph-figure-non-bipartite shows the same e-graph, but drawing e-classes as groups of e-nodes.
-@informal-theory-example shows an example EqSat theory specified in the egglog domain-specific
-language @egglog. @rosetta-table shows different terminology and relates e-graphs to relational
-databases. @rosettaexample shows how an egglog rule can be transformed to eqlog, Rust,
-and SQL.
 
 #figure(
   image("egraph_example.svg", width: 75%),
@@ -270,7 +187,6 @@ and SQL.
   ),
 ) <informal-egraph-figure>
 
-
 #figure(
   image("egraph_cluster.svg", width: 60%),
   caption: [
@@ -279,46 +195,21 @@ and SQL.
   ],
 ) <informal-egraph-figure-non-bipartite>
 
+== Non-relational e-matching (what egg does)
 
+Rewrite rules look for subgraph "patterns", then once these match add new e-classes and e-nodes and join existing
+e-classes by vertex contraction. EqSat involves repeatedly applying a set of rewrite rules, then
+finally performing extraction, i.e. determining canonical e-nodes for respective e-classes such that
+the implied DAG of e-nodes has some minimal cost.
 
-#figure(
-  ```
-  (sort Math)
-  (function Add (Math Math) Math)
-  (function Sub (Math Math) Math)
-  (function Mul (Math Math) Math)
-  (function Div (Math Math) Math)
-  (function Pow (Math) Math)
-  (function Const (i64) Math)
-  (function Var (String) Math)
+A set of rewrite rules is called a theory, and these can be shown to converge to finite e-graphs
+under some conditions. Practically, many theories diverge and the EqSat rewriting phase is often
+performed until some timeout or until some other condition is met.
 
-  (rewrite (Add a b) (Add b a))                         // commutativity
-  (rewrite (Add a (Add b c)) (Add (Add a b) c))         // associativity
+Extraction, even when using a sum of static e-node costs as a cost function, is NP-hard, but there
+are both heuristics and algorithms that work well on some types of e-graphs @fastextract.
 
-  (rewrite (Mul a b) (Mul b a))                         // commutativity
-  (rewrite (Mul a (Mul b c)) (Mul (Mul a b) c))         // associativity
-
-  (rewrite (Mul (Add a b) c) (Add (Mul a c) (Mul b c))) // distributivity
-
-  (rewrite (Add x (Const 0)) x)                         // additive unit
-  (rewrite (Mul x (Const 1)) (x))                       // multiplicative unit
-  ```,
-
-  caption: [
-
-    A theory written in the egglog language. `Math` is essentially a sum type, where `Add`, `Sub`,
-    etc are constructors. Rewrites mean that if the left side matches, add the right side to the
-    database and unify it with the left side. Egglog semantics define running a set of rules as
-    using their left side patterns to figure out what right side actions to perform, then doing all
-    actions as a batch. Egglog defines a command `run <count>`, not shown here, that runs the set of
-    all rules some number of times or until convergence.
-
-  ],
-) <informal-theory-example>
-
-
-
-== Peeling the layers of abstraction from egglog. (storing functions in a database)
+== E-graphs as relational databases
 
 Conceptually, egglog stores _uninterpreted partial functions_.
 
@@ -361,7 +252,7 @@ In database terminology, we have a primary key on (x,y) for this relation.
 
 - sum types are not real
 
-== Semi-Naive Evaluation
+== Semi-naive evaluation
 
 Semi naive evaluation is a way to join relations where results only include possibly new
 information. In the context of Datalog, it avoids recomputing the same facts. Expressing it as
@@ -451,64 +342,118 @@ for _ in b_new(..) {
 }
 ```
 
+== Theory languages
+
+@informal-theory-example shows an example EqSat theory specified in the egglog domain-specific
+language @egglog.
+
+#figure(
+  ```
+  (sort Math)
+  (function Add (Math Math) Math)
+  (function Sub (Math Math) Math)
+  (function Mul (Math Math) Math)
+  (function Div (Math Math) Math)
+  (function Pow (Math) Math)
+  (function Const (i64) Math)
+  (function Var (String) Math)
+
+  (rewrite (Add a b) (Add b a))                         // commutativity
+  (rewrite (Add a (Add b c)) (Add (Add a b) c))         // associativity
+
+  (rewrite (Mul a b) (Mul b a))                         // commutativity
+  (rewrite (Mul a (Mul b c)) (Mul (Mul a b) c))         // associativity
+
+  (rewrite (Mul (Add a b) c) (Add (Mul a c) (Mul b c))) // distributivity
+
+  (rewrite (Add x (Const 0)) x)                         // additive unit
+  (rewrite (Mul x (Const 1)) (x))                       // multiplicative unit
+  ```,
+
+  caption: [
+    A theory written in the egglog language. `Math` is essentially a sum type, where `Add`, `Sub`,
+    etc are constructors. Rewrites mean that if the left side matches, add the right side to the
+    database and unify it with the left side. Egglog semantics define running a set of rules as
+    using their left side patterns to figure out what right side actions to perform, then doing all
+    actions as a batch. Egglog defines a command `run <count>`, not shown here, that runs the set of
+    all rules some number of times or until convergence.
+  ],
+) <informal-theory-example>
+
 == Design constraints for Datalog engines vs SQL databases.
 
 SQL databases need to be extremely dynamic since arbitrary new queries can be done, but for datalog
 all queries are known up-front, so datalog engines can spend more resources on optimizing queries
 and selecting optimal indexes and index data-structures.
 
+= Background <thesection>
 
-== Curried indexes
+#TODO[]
 
+== Nomenclature
 
-
-
-@factor_db
-
-
-something something trie, logical physical indexes, flow.
-
-== Data structure selection
-
-We currently care about the following operations for (trie-like) indexes:
-- *insert*: Insert a list of $M$ tuples.
-- (*trigger*: Insert a list of $M$ tuples or perform action if something is in the database.)
-- *remove*: Remove tuples matching list of $M$ tuples.
-- (*uproot*: Drain $M$ tuples where the first column matches set of size $K$.)
-- *check*: Is pattern in the database
-- *range*: Range query that iterates in some order.
-See @index-datastructures.
+@rosetta-table shows different terminology and relates e-graphs to relational
+databases. @rosettaexample shows how an egglog rule can be transformed to eqlog, Rust,
+and SQL.
 
 #figure(
   table(
     columns: (auto, auto, auto, auto, auto),
     table.header(
-      [*datastructure*],
-      [*insert* ],
-      [*remove* ],
-      [*check* ],
-      [*range*],
+      table.cell(colspan: 5, [*Approximate nomenclature guide*]),
+      [*egglog* ],
+      [*eqlog* ],
+      [*datalog* ],
+      [*database* ],
+      [*comment*],
     ),
 
-    [naive btreeset ], [$M dot log N$], [$M dot log N$], [$log N$ ], [$log N$],
-    [custom btreeset], [$M + log N$ ], [$M + log N$ ], [$log N$ ], [$log N$],
-    [sorted list ], [$N + M$ ], [$N + M$ ], [$log N$ ], [$log N$],
-    [CSR/CSC ], [$N + M + E$ ], [$N + M + E$ ], [$log sqrt(N)$], [$1$],
+    [rule ], [rule ], [rule ], [query ], [],
+    [predicate], [if stmt ], [body containing atoms], [join+where ], [logical premise],
+    [action ], [then stmt], [head ], [insert/unify], [logical consequence],
+    [function ], [function ], [ ], [table ], [e.g. `Add: Math * Math -> Math`],
+    [e-node ], [tuple ], [fact ], [row/tuple ], [represents a small computation, e.g. `Add(a,b) = c`],
+    [e-class ], [element ], [ ], [cell element], [represents a set of equivalent expressions],
+    [sort ], [type ], [type ], [type ], [e.g. `Math`],
   ),
-  caption: flex-caption(
-    [Big-$O$ costs for various index data structures.],
-    [
-      $N$ is the number of tuples, $E$ is the highest value stored in the relation.
-      Range query ignores the $M$ term since it would be mandatory.
-      Assuming relation with two columns containing random tuples.
-    ],
-  ),
-) <index-datastructures>
+  caption: [Comparison of egglog, eqlog, datalog, and relational database terminology.],
+) <rosetta-table>
 
+== Logic programming languages
 
-== Semi-Naive without running all rules all the time.
+#TODO[]
 
-NOTE: this is not implemented yet, right now all rules run at the same time.
+=== Datalog
+
+#TODO[]
+
+=== Egglog
+
+#TODO[]
+
+== Rule preprocessing
+
+#TODO[]
+
+=== Semi-naive evaluation
+
+#TODO[]
+
+=== Functional dependency
+
+#TODO[Also known as implicit functionality or primary key constraint]
+
+=== Magic sets
+
+#TODO[]
+
+== Rule scheduling and termination
+
+#TODO[Surjectivity and "syntactically new variables"]
+
+=== Semi-naive without running all rules all the time.
+
+#NOTE[this is not implemented yet, right now all rules run at the same time]
 
 Given the previous definition of semi-naive evaluation, it's not obvious how to discard the *new* set before all rules have been run.
 
@@ -559,77 +504,138 @@ Conceptually, our approach will be to store the new set in a push-only list, and
   caption: [Staying semi-naive while running while not running all the rules at the same time.],
 ) <semi-something>
 
+== Canonicalization
 
+#TODO[]
 
+=== Union-find
 
-= Oatlog
+#TODO[]
 
-#todo[
-  - Ahead of time compiled
-    - Consider and optimize rules together
-  - Datalog
+=== Egg, batched
 
-  - User's perspective, egglog language (specify in background) and runtime API.
-  - Architecture at a module level, what IRs.
-  - Show and discuss the IRs
-  - Discuss core algorithms
-  - Discuss selected implementation details
-]
+#TODO[]
 
+== Query planning
 
-== User facing, egglog language and oatlog library
+#TODO[]
 
-== Implementation
+== Index selection and implementation
 
-Oatlog is a rust proc-macro that takes in egglog code and generates rust code.
+#TODO[curried indexes, @factor_db. Something something trie, logical physical indexes, flow.]
+
+=== Data structure selection
+
+We currently care about the following operations for (trie-like) indexes:
+- *insert*: Insert a list of $M$ tuples.
+- (*trigger*: Insert a list of $M$ tuples or perform action if something is in the database.)
+- *remove*: Remove tuples matching list of $M$ tuples.
+- (*uproot*: Drain $M$ tuples where the first column matches set of size $K$.)
+- *check*: Is pattern in the database
+- *range*: Range query that iterates in some order.
+See @index-datastructures.
+
+#figure(
+  table(
+    columns: (auto, auto, auto, auto, auto),
+    table.header(
+      [*datastructure*],
+      [*insert* ],
+      [*remove* ],
+      [*check* ],
+      [*range*],
+    ),
+
+    [naive btreeset ], [$M dot log N$], [$M dot log N$], [$log N$ ], [$log N$],
+    [custom btreeset], [$M + log N$ ], [$M + log N$ ], [$log N$ ], [$log N$],
+    [sorted list ], [$N + M$ ], [$N + M$ ], [$log N$ ], [$log N$],
+    [CSR/CSC ], [$N + M + E$ ], [$N + M + E$ ], [$log sqrt(N)$], [$1$],
+  ),
+  caption: flex-caption(
+    [Big-$O$ costs for various index data structures.],
+    [
+      $N$ is the number of tuples, $E$ is the highest value stored in the relation.
+      Range query ignores the $M$ term since it would be mandatory.
+      Assuming relation with two columns containing random tuples.
+    ],
+  ),
+) <index-datastructures>
+
+== Extraction
+
+#TODO[]
+
+= Oatlog implementation
+
+This section discusses Oatlog in detail, how it is used, what it can do and how it is implemented.
+
+== Egglog-compatible external interface
+
+#TODO[]
+
+== Architecture and intermediate representations
+
+Oatlog is a Rust proc-macro that takes in egglog code and generates Rust code.
 See @codegen_example for an example of what the generated code looks like.
+
+#TODO[Architecture figure, AST->Parser->HIR->??->LIR->Rust code->Rustc/LLVM->Runtime with runtime
+library]
+
+=== Egglog AST
+
+Either Rust tokens or strings are parsed into S-expressions and then parsed into an egglog AST. The
+AST represents the source-level language without simplifications and does not remove syntax sugar.
+
+=== HIR, High-level Intermediate Representation
+
+The main purpose of HIR is for normalization and optimization. Here, a rule consist of a set of
+premises and a set of actions, where premises are conjunctive queries (joins) and actions are
+inserts and unifications. HIR is lowered into LIR and that process also performs query planning.
+
+// === Query plan
+=== LIR, Low-level Intermediate Representation
+
+LIR is a low-level description of the actual code that is to be generated.
+
+// string or Rust tokens -> Sexp -> egglog ast -> hir -> query plan -> lir -> Rust code.
+
+== Selected algorithms
+
+#TODO[]
+
+== Selected implementation details
+
+#TODO[]
 
 === Rustc spans across files
 
 Proc-macros are provided spans, which are essentially byte ranges of the original source code.
 However, when tokenizing arbitrary strings, spans are not provided.
-This is solved by in addition to parsing from rust tokens, we implement our own sexp parser and insert our own byte ranges.
+This is solved by in addition to parsing from Rust tokens, we implement our own sexp parser and insert our own byte ranges.
 This has another problem, since our spans are not from rustc, our error locations are no longer correct.
 This is solved by implementing error context ourselves, so context information is part of the compile error but with a bogus rustc span.
 
-=== Testing
+=== Testing infrastructure
+
+Since oatlog is implemented using a proc-macro, errors result in Rust compilation errors, so normal
+Rust test can not be used directly. However, doctests are separately compiled so we instead generate
+doctest to check that generated test code compiles.
+
+= Evaluation
+
+See @benchmarks-appendix for benchmark code.
+
+== Egglog test suite
 
 We run the entire egglog testsuite (93 tests) to validate oatlog.
-We compare the number of e-classes in egglog and oatlog to check if oatlog is likley producing the same result.
+We compare the number of e-classes in egglog and oatlog to check if oatlog is likely producing the same result.
 
 Right now, we fail most test because primitive functions are not implemented.
 Additionally, some tests are not very relevant for AOT compilation, for example extraction commands.
 
-Since oatlog is implemented using a proc-macro, errors result in rust compilation errors, so normal rust test can not be used directly.
-However, doctests are separately compiled so we instead generate doctest to check that generated test code compiles.
-
-=== Internal Representations
-
-==== Egglog AST
-
-Either rust tokens or strings are parsed into s-expressions and then parsed into an egglog AST representing the source-level language without simplifications such as removing syntax sugar.
-The egglog AST is parsed into HIR.
-
-==== HIR, High-level Intermediate Representation
-
-The main purpose of HIR is for normalization and optimization.
-Here, a rule consist of a set of premises and a set of actions, where premises are conjunctive queries (joins) and actions are inserts and unifications.
-HIR is lowered into LIR and that process also performs query planning.
-
-// === Query plan
-==== LIR, Low-level Intermediate Representation
-
-LIR is a low-level description of the actual code that is to be generated.
-
-
-
-// string or rust tokens -> Sexp -> egglog ast -> hir -> query plan -> lir -> rust code.
-
-= Benchmarks
-
-See @benchmarks-appendix
-
 = Conclusion
+
+#TODO[]
 
 #bibliography("refs.bib")
 #show: appendices
@@ -696,7 +702,6 @@ for (t0, c, e) in tables.mul.iter() {
 }
 ```
 
-
 == SQL
 
 Since the queries can be seen as database queries, we can express them as pseudo-SQL. The queries
@@ -725,7 +730,6 @@ INNER JOIN Mul ON Add.result = Mul.lhs;
 FROM Add
 ```
 
-
 = Example of generated code <codegen_example>
 
 The egglog code for this example, also implementing the distributive law:
@@ -737,7 +741,7 @@ The egglog code for this example, also implementing the distributive law:
 (rewrite (Mul (Add a b) c) (Add (Mul a c) (Mul b c)))
 ```
 
-This is what the generated rust code looks like, the most relevant function to look at is `apply_rules` which performs the actual joins.
+This is what the generated Rust code looks like, the most relevant function to look at is `apply_rules` which performs the actual joins.
 Note that the generated code has been edited slightly to make it easier to read.
 ```rust
 impl Theory {
@@ -1105,8 +1109,9 @@ impl Unification {
 }
 ```
 
-
 = Benchmarks <benchmarks-appendix>
+
+#TODO[]
 
 == Math
 
@@ -1118,6 +1123,8 @@ impl Unification {
 #raw(read("../../oatlog-bench/input/boolean_adder.egg"), lang: "egglog")
 
 = Examples
+
+#TODO[]
 
 == Quadratic formula
 
