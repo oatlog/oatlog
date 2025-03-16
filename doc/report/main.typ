@@ -8,8 +8,8 @@
 
 #let department = "Department of Computer Science and Engineering"
 #show: template.with(
-  title: "Oatlog: Ahead-of-time compiled e-graphs with primitives",
-  subtitle: "Implementing a high-performance e-graph engine",
+  title: [Oatlog: Ahead-of-time compiled #box[e-graphs] with primitives],
+  subtitle: [Implementing a high-performance #box[e-graph] engine],
   authors: ("Loke Gustafsson", "Erik Magnusson"),
   department: department,
   supervisor: ("Hazem Torfah", department),
