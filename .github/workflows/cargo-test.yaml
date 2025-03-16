@@ -1,6 +1,9 @@
 name: "cargo-test"
 on:
   push:
+    paths:
+      - '**'
+      - '!doc/**'
 jobs:
   cargo-clippy:
     runs-on: ubuntu-latest
