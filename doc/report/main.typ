@@ -21,16 +21,14 @@
   advisor: ("Alejandro Luque Cerpa", department),
   examiner: ("Matti Karppa", department),
   abstract: [
-
-    Abstract text about your project in Computer Science and Engineering
-
+    // Abstract text about your project in Computer Science and Engineering
+    #TODO[Write abstract]
   ],
   keywords: ("e-graphs", "equality saturation", "datalog", "program optimization", "rewrite rules"),
   acknowledgements: [
-
-    Here, you can say thank you to your supervisor(s), company advisors and other people that
-    supported you during your project.
-
+    // Here, you can say thank you to your supervisor(s), company advisors and other people that
+    // supported you during your project.
+    #TODO[Write acknowledgements]
   ],
 )
 
@@ -89,7 +87,7 @@ search would.
 E-graphs are data structures capable of compactly representing an exponential number of expressions
 evaluating to the same value, by letting operators take not other expressions but rather equivalence
 classes as input. An e-graph can be seen as a graph of e-nodes partitioned into e-classes, where
-e-nodes take e-classes as input. Concretely, the expressions $2a+b$ and $(a<<1)+b$ would be stored
+e-nodes take e-classes as input. Concretely, the expressions $(2a)+b$ and $(a<<1)+b$ would be stored
 as an addition taking as its left argument a reference to the equivalence class ${2a, a<<1}$, thus
 avoiding duplicated storage of any expression having $2a$ and therefore also $a<<1$ as possible
 subexpressions.
@@ -250,11 +248,101 @@ But since these are uninterpreted, we do not have actual values, but instead E-c
   [d], [b], [f],
   [c], [e], [g],
 )
-For example, we can not really say anything about $a$ other than $"add"(a,b) = c$
+For example, we can not really say anything about $a, b$ or $c$ other than $"add"(a,b) = c$.
 It is called a function because we have a functional dependency from (x,y) to res.
 In database terminology, we have a primary key on (x,y) for this relation.
 
-- sum types are not real
+Egglog also supports a form of sum types
+
+```egglog
+(datatype Math
+    (Add (Math Math))
+    (Mul (Math Math))
+    (Const (i64))
+)
+; desugars to:
+(sort Math)
+(constructor Add (Math Math) Math)
+(constructor Mul (Math Math) Math)
+(constructor Const (i64) Math)
+```
+
+This is analogous to sum types in other languages like Rust or Haskell, which could be written as:
+```rust
+enum Math {
+    Add(&Math, &Math),
+    Mul(&Math, &Math),
+    Const(i64),
+}
+```
+```haskell
+data Math =
+   Add Math Math |
+   Mul Math Math |
+   Const Int
+```
+
+Here, `Add`, `Mul`, `Const` are constructors for `Math`.
+
+But implementing Math like this would not work for several reasons, firstly we
+want the constructors to return e-classes, and take in e-classes, and secondly,
+sum types can not directly be stored in a relational database.
+
+This can be solved by creating a new table per constructor.
+Now, all e-classes are just integer ids, and exist implicitly in the tables.
+
+#grid(
+  columns: (auto, auto, auto),
+  rows: (auto, 60pt),
+  gutter: 3pt,
+  table(
+    columns: (auto, auto, auto),
+    inset: 10pt,
+    align: horizon,
+    table.header(
+      table.cell(colspan: 3, [*Add*]),
+      [x],
+      [y],
+      [res],
+    ),
+
+    [...], [...], [...],
+  ),
+  table(
+    columns: (auto, auto, auto),
+    inset: 10pt,
+    align: horizon,
+    table.header(
+      table.cell(colspan: 3, [*Mul*]),
+      [x],
+      [y],
+      [res],
+    ),
+
+    [...], [...], [...],
+  ),
+  table(
+    columns: (auto, auto),
+    inset: 10pt,
+    align: horizon,
+    table.header(
+      table.cell(colspan: 2, [*Const*]),
+      [x],
+      [res],
+    ),
+
+    [...], [...],
+  ),
+)
+
+To perform e-matching, we turn the pattern into a conjunctive query
+
+```egglog
+(Mul (Add a b) c)
+```
+becomes
+
+$"Mul"(t_0, c, t_1) join "Add"(a, b, t_0)$
 
 == Semi-naive evaluation
 
@@ -421,6 +509,7 @@ and SQL.
     [e-node ], [tuple ], [fact ], [row/tuple ], [represents a small computation, e.g. `Add(a,b) = c`],
     [e-class ], [element ], [ ], [cell element], [represents a set of equivalent expressions],
     [sort ], [type ], [type ], [type ], [e.g. `Math`, `i64`],
+    [functional dependency], [implicit functionality], [], [primary key constraint], [],
   ),
   caption: [Comparison of egglog, eqlog, datalog, and relational database terminology.],
 ) <rosetta-table>
