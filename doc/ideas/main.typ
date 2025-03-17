@@ -2349,6 +2349,82 @@ Another option is to dynamically pick between maintaining indexes and re-creatin
 
 In other words, if all our queries run in less than $O(N)$, then re-using indexes is better in terms of complexity theory.
 
+= Rule optimizations using e-graphs (self-hosted stuff)
+
+Metaprogram:
+```egglog
+
+(datatype FunctionId (MkFunctionId i64))
+(datatype VariableId (MkVariableId i64))
+
+(datatype PremiseAtom
+    (Ary0 (FunctionId))
+    (Ary1 (FunctionId VariableId))
+    (Ary2 (FunctionId VariableId VariableId))
+    (Ary3 (FunctionId VariableId VariableId VariableId))
+    (Ary4 (FunctionId VariableId VariableId VariableId VariableId))
+)
+
+(datatype Premise 
+    (Contains PremiseAtom)
+)
+
+(datatype ActionAtom
+    (Insert PremiseAtom)
+    (Make VariableId)
+    (Union VariableId VariableId)
+)
+
+(sort Action (Set ActionAtom))
+
+(datatype Rule (Impl Action Premise))
+
+(sort RuleSetSet (Set RuleSet))
+
+(function RuleSetSetIn (Rule) RuleSetSet)
+
+(datatype RuleSetId
+    (MkRuleSet (RuleSet))
+)
+
+
+(sort RelationNew)
+(datatype RelationNew 
+    (MkRelationNew ())
+)
+
+```
+
+Would it be sound to extract a RuleSet from this?
+
+
+```rust
+enum CompileMethod {
+    Optimized {
+        using: EgraphEngine
+    }
+    Unoptimized(),
+}
+
+enum EgraphEngine {
+    Egglog,
+    Oatlog,
+}
+
+fn compile(method: CompileMethod, program: Program) -> TokenStream;
+
+let v0 = compile(Unoptimized, metaprogram);
+
+let v1 = compile(Optimized { using: v0 }, metaprogram);
+
+// or directly
+
+let v1 = compile(Optimized { using: Egglog }, metaprogram);
+
+```
+Ergo, we can quite easily self-host if we are able to turn off optimizations.
+
+
 = TODO research
 
 - More info about DB term for curried indexes.

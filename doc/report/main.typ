@@ -33,6 +33,7 @@
 )
 
 #set raw(syntaxes: "egglog.sublime-syntax")
+#set raw(syntaxes: "datalog.sublime-syntax")
 
 = Introduction
 
@@ -528,37 +529,142 @@ and SQL.
 
 == Rule preprocessing
 
-#TODO[]
-
-=== Semi-naive evaluation
-
-#TODO[]
+Rule processing and optimization (at HIR level).
 
 === Functional dependency
 
-#TODO[Also known as implicit functionality or primary key constraint]
+Functional dependency, implicit functionality or primary key constraint can be formally described as:
+
+$ f(x) = a and f(x) = b => a = b $
+
+We can exploit functional dependency to simplify our rules, for example for this conjunctive query:
+
+$ "Add"(x, y, a), "Add"(x, y, b) $
+
+Here, we know that a = b because both atoms take (x,y) as input, so the query can be rewritten to:
+
+$ "Add"(x, y, a) $
+
+=== Semi-naive evaluation
+
+To enable semi-naive evaluation, copies of rules are created where each atom is switched to iterate new instead of all.
+
+$ R(x, y), S(y, z), T(z, x) $
+
+Becomes:
+
+$ R_"new" (x, y), S(y, z), T(z, x) $
+$ R(x, y), S_"new" (y, z), T(z, x) $
+$ R(x, y), S(y, z), T_"new" (z, x) $
+
+=== Merging rules (in HIR, not trie)
+
+#NOTE[Not implemented yet.]
+
+It is very rare that the user provides rules with identical premises, but with
+semi-naive we produce many very similar rules, that can potentially be merged.
+To merge rules, we compare the premise of the rules and if they are equal
+replace them with a rule that combines the actions of the original rules.
 
 === Magic sets
 
-#TODO[]
+#TODO[Since oatlog/egglog is a superset of datalog, this should be possible, right?]
+
+#TODO[we have not done this though, and it's unclear if it is useful, I guess rules can have a :magic annotation?]
+
+Magic sets are a way to get the performance of top-down evaluation using bottom-up evaluation.
+
+Top-down evaluation means starting from a goal and searching for facts until
+the starting facts are reached. Typically, Prolog uses Top-down evaluation
+#TODO[citation needed]. Bottom-up evaluation derives more facts from the
+starting facts until the goal facts are reached. Egglog and Oatlog use
+bottom-up evaluation.
+
+#TODO[I guess this only makes sense if we want to prove two expressions equal?]
+
+#TODO[I think a fundamental problem to apply this to e-graphs is how to add "magic bits" to the equality relation.]
+
+#TODO[I don't know if the code is actually correct.]
+
+```datalog
+path(x, z) :- edge(x, y), path(y, z).
+
+path(x, y) :- edge(x, y).
+
+edge(1, 2).
+edge(2, 3).
+edge(3, 4).
+edge(4, 5).
+% edge(..., ...).
+
+?- path(2, 5)
+```
+
+Here, bottom-up evaluation would derive paths between all pairs of nodes, but
+we only care about the path between 2 and 5. For this case, top-down evaluation
+is faster to evaluate the query.
+
+The original program can be modified so that top-down evaluation only computes
+facts relevant to the query.
+
+```datalog
+path(x, z) :- edge(x, y), path(y, z), magic_path(x, z).
+
+path(x, y) :- edge(x, y), magic_path(x, y).
+
+magic_path(x, z) :- edge(x, y), magic_path(y, z).
+
+edge(1, 2).
+edge(2, 3).
+edge(3, 4).
+edge(4, 5).
+edge(5, 6).
+% edge(..., ...).
+
+magic_path(2, 5).
+
+?- path(2, 5)
+```
+
+Here, `magic_path` contains all the potentially useful paths, and paths are
+only computed if they are potentially useful.
 
 == Rule scheduling and termination
 
+#TODO[]
+
+=== Surjectivity
+
 #TODO[Surjectivity and "syntactically new variables"]
+
+#TODO["no syntactically new variables" = epic <=> strong = deterministic]
+
+If a rule does not create any new e-classes it is called surjective @eqlog.
+A theory only containing surjective rules is guaranteed to terminate @eqlog.
+
+=== Running unifying rules to closure before running rules that introduce e-classes.
+
+#TODO[]
 
 === Semi-naive without running all rules all the time.
 
 #NOTE[this is not implemented yet, right now all rules run at the same time]
 
-Given the previous definition of semi-naive evaluation, it's not obvious how to discard the *new* set before all rules have been run.
+Given the previous definition of semi-naive evaluation, it's not obvious how to
+discard the *new* set before all rules have been run.
 
-One approach to disabling rules is to still run all rules, but instead wait with inserting the results of some rules into the database.
-This has the drawback of still computing the joins unconditionally.
+One approach to disabling rules is to still run all rules, but instead wait
+with inserting the results of some rules into the database. This has the
+drawback of still computing the joins unconditionally.
 
-Another approach is to use timestamps for each element in the database and explicitly query for things that are new.
-This is what egglog does, but it is problematic because it increases memory usage and essentially makes queries iterate through all historical timestamps.
+Another approach is to use timestamps for each element in the database and
+explicitly query for things that are new. This is what egglog does, but it is
+problematic because it increases memory usage and essentially makes queries
+iterate through all historical timestamps.
 
-Conceptually, our approach will be to store the new set in a push-only list, and make the rules store what index in these they are at. See @semi-something for a visualization of this.
+Conceptually, our approach will be to store the new set in a push-only list,
+and make the rules store what index in these they are at. See @semi-something
+for a visualization of this.
 
 #figure(
   ```
@@ -617,7 +723,15 @@ Conceptually, our approach will be to store the new set in a push-only list, and
 
 == Index selection and implementation
 
-#TODO[curried indexes, @factor_db. Something something trie, logical physical indexes, flow.]
+#TODO[@factor_db]
+
+#TODO[curried indexes, Something something trie, logical physical indexes, flow.]
+
+=== Curried indexes
+
+AKA factorized representation (DB theory) @relation_tensor
+
+@relation_tensor
 
 === Data structure selection
 
@@ -658,7 +772,12 @@ See @index-datastructures.
 
 == Extraction
 
-#TODO[]
+#NOTE[We have not implemented extraction yet.]
+
+Extraction is the process of selecting an expression from an e-graph.
+Doing so non-optimally is trivial, but selecting an optimal expression, even with simple cost functions is np-hard @extractnphard @fastextract @egraphcircuit.
+
+Many NP-hard graph algorithms can be done in polynomial time for a fixed treewidth, and this also applies to extraction, where it can be done linear time @fastextract @egraphcircuit.
 
 = Oatlog implementation
 
@@ -723,6 +842,10 @@ Rust test can not be used directly. However, doctests are separately compiled so
 doctest to check that generated test code compiles.
 
 = Evaluation
+
+#TODO[]
+
+== Benchmarks
 
 See @benchmarks-appendix for benchmark code.
 
@@ -1230,6 +1353,8 @@ impl Unification {
 #TODO[]
 
 == Quadratic formula
+
+// TODO erik for loke: we can parse negative numbers.
 
 #raw(read("../../examples/quadratic-formula/src/main.rs"), lang: "rust")
 
