@@ -481,6 +481,8 @@ SQL databases need to be extremely dynamic since arbitrary new queries can be do
 all queries are known up-front, so datalog engines can spend more resources on optimizing queries
 and selecting optimal indexes and index data-structures.
 
+That said, it's entirely possible to create an e-graph engine that uses SQL internally @egraph_sqlite.
+
 = Background <thesection>
 
 #TODO[]
