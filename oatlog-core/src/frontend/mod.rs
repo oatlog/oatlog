@@ -26,6 +26,8 @@ pub(crate) mod sexp;
 pub(crate) use sexp::SexpSpan;
 use sexp::{Literal, Sexp};
 
+pub(crate) mod primitive_mvp;
+
 // TODO: remove unused annotation when new ast is used.
 #[allow(unused)]
 mod egglog_ast;
