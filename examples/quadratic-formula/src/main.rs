@@ -3,7 +3,7 @@ oatlog::compile_egraph!((
      (Mul Math Math)
      (Add Math Math)
      (Sub Math Math)
-     (Neg Math) // Negative numbers cannot be parsed currently
+     (Neg Math)
      (Zero)
      (Sqrt Math)
     )

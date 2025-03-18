@@ -35,6 +35,34 @@
 #set raw(syntaxes: "egglog.sublime-syntax")
 #set raw(syntaxes: "datalog.sublime-syntax")
 
+#TODO[conceptual background: how things developed historically.]
+
+#TODO[background: frontend, mid-end, backend.]
+
+#TODO[make all tables figures, merge tables if needed.]
+
+#TODO[table linter.]
+
+#TODO[introduce relevant references]
+
+#TODO[Matti: §2.1 You should clarify the basic concepts (assume that the reader has basic knowledge of computer science, but has not heard anything about e-graphs); what are e-graphs, how are e-classes different from e-nodes, what does “extraction” mean, and so on. Think that your description should form a clear story that explains everything the reader needs to know to understand the remainder of the thesis.]
+
+#TODO[Matti: One thing for example that I was thinking about relating to above was when looking at Figure 1 was that it was not clear initially that constants would be e-nodes rather than e-classes, this is an example of things that should not surprise the reader]
+
+#TODO[Matti: Likewise you should expand and clarify what the connection between e-graphs and relational databases is, Table 1 looks rather incomprehensible as of now without this clarification]
+
+#TODO[Matti: Style and grammar things: in §2.2, it’s not clear what “their” refers to and there seems to be somewhat of a repetition in the text]
+
+#TODO[Matti: §2.2.1: I’m not very familiar with Rust code, but it seems to me that the code in Listing 2 is incorrect and should not compile (the function find in particular doesn’t make sense)]
+
+#TODO[Matti: Also the description is unclear (what elements are we talking about, what set are they elements of)]
+
+#TODO[Matti: Most importantly, what does it mean that something runs “in almost O(1)”? O(1) is a well-defined class of functions, so the function describing the running time either is or is not in O(1), it cannot “almost” be there (then it is not!); when using the big-O notation, please bear in mind that the statements actually do have a well-defined meaning and one cannot just informally throw it at things]
+
+#TODO[Matti: In general for §2.2, it is sometimes not entirely clear why certain references have been picked up and presented here, make sure that you tie all research presented here into your work for contextualizing your research: why this is important research to know and how it is different from your work]
+
+#TODO[Matti: §3.1 You talk about “practical performance on practical inputs”: how do you define practicality?]
+
 = Introduction
 
 Modern software development depends on efficient and reliable compilers, which apply sophisticated
@@ -864,6 +892,8 @@ doctest to check that generated test code compiles.
 
 == Benchmarks
 
+#TODO[Include actual benchmark results somehow]
+
 See @benchmarks-appendix for benchmark code.
 
 == Egglog test suite
@@ -976,6 +1006,10 @@ FROM Add
 ```
 
 = Example of generated code <codegen_example>
+
+#TODO[be more clear that this is a single example]
+
+#TODO[consider deleting everything but the most relevant information. Or a different appendix to show what tables generate to.]
 
 The egglog code for this example, also implementing the distributive law:
 ```egglog
@@ -1356,7 +1390,7 @@ impl Unification {
 
 = Benchmarks <benchmarks-appendix>
 
-#TODO[]
+#TODO[explain driver code]
 
 == Math
 

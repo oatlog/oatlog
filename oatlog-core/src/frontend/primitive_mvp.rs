@@ -17,12 +17,18 @@ simple_primitive! {
     #[prim_func(name = "+")]
     fn i64_add(a: i64, b: i64) -> impl Iterator<Item = i64> { once(a + b) }
 
+    // harder
+    // #[prim_func(name = "+", index = [345])]
+    // fn i64_add_3849(a: i64, b: i64) -> impl Iterator<Item = i64> { once(a + b) }
+
     #[prim_func(name = "+")]
     fn f64_add(a: f64, b: f64) -> impl Iterator<Item = f64> { once(a + b) }
 
     #[prim_func(name = "+")]
     fn i64_add_checked(a: i64, b: i64) -> impl Iterator<Item = i64> { a.checked_add(b).into_iter() }
 }
+
+// primitive functions => restrictions on variable ordering.
 
 struct Math(u32);
 type MathSet = Set<Math>;
@@ -48,6 +54,7 @@ struct SetId(u32 /*, PhantomData<T> */);
 // (check (= v1 v2))
 //
 
+// #[collection...]
 struct Set<T> {
     _marker: PhantomData<T>,
     sets: HashMap<SetId, HashSet<T>>,
@@ -66,14 +73,14 @@ impl<T: Copy> Set<T> {
     // args need to be something like "eclassprovider"
     fn update(/* ... */) {}
 
-    // #[prim_func(name = "set-contains", index2 = [0, 1]))]
-    fn set_contains2_0_1_2(&self, set: SetId, element: T) -> impl Iterator<Item = ()> {
+    // #[prim_func(name = "set-contains", index2 = [0, 1])]
+    fn set_contains2_0_1(&self, set: SetId, element: T) -> impl Iterator<Item = ()> {
         once(todo!())
     }
 
     // maybe makes it require new...
     // #[prim_func(name = "set-contains", index1 = [0, 1])]
-    fn set_contains1_0_1_2(&self, set: SetId) -> impl Iterator<Item = T> {
+    fn set_contains1_0_1(&self, set: SetId) -> impl Iterator<Item = T> {
         once(todo!())
     }
     
