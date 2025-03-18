@@ -41,9 +41,9 @@ Modern software development depends on efficient and reliable compilers, which a
 optimizations to improve performance while enabling portability and abstraction. For example,
 autovectorization allows code to take advantage of SIMD hardware without using architecture-specific
 intrinsics, while function inlining eliminates the overhead of function calls, enabling higher-level
-abstractions without sacrificing speed. These optimizations not only enhance program execution and
-energy efficiency but also make it easier for developers to write clean, maintainable, and portable
-code.
+abstractions without sacrificing performance. These optimizations not only enhance program execution
+and energy efficiency but also make it easier for developers to write clean, maintainable, and
+portable code.
 
 Implementing such a compiler is a complex task. In practice, there are a few large compiler backends
 that have received significant engineering effort and which are used across the industry to compile
@@ -165,7 +165,7 @@ E-graphs can be represented as graphs in multiple ways. In one formulation, hint
 terminology of e-nodes and e-classes, e-nodes are the nodes of the graph and e-classes are
 equivalence classes of nodes under an equivalence relation. Nodes are annotated by the primitive
 operation they perform on their inputs, like addition or bitshift. Unlike an actual graph, edges
-denoting inputs for use in operations, do not run from nodes to nodes but rather from e-classes to
+denoting inputs for use in operations do not run from nodes to nodes but rather from e-classes to
 (e-)nodes.
 
 E-graphs can also be represented as bipartite graphs with two types of nodes, e-classes and e-nodes.
@@ -198,7 +198,9 @@ Finally, every e-node is a member of exactly one e-class and no e-class is empty
   ],
 ) <informal-egraph-figure-non-bipartite>
 
-== Non-relational e-matching (what egg does)
+== Non-relational e-matching
+
+#TODO[expand upon this and upon how egg does things in general]
 
 Rewrite rules look for subgraph "patterns", then once these match add new e-classes and e-nodes and join existing
 e-classes by vertex contraction. EqSat involves repeatedly applying a set of rewrite rules, then
@@ -213,6 +215,8 @@ Extraction, even when using a sum of static e-node costs as a cost function, is 
 are both heuristics and algorithms that work well on some types of e-graphs @fastextract.
 
 == E-graphs as relational databases
+
+#TODO[go first principles, not through talking about egglog]
 
 Conceptually, egglog stores _uninterpreted partial functions_.
 
@@ -370,7 +374,7 @@ The expression can be expanded and we get $A join B join C$ that can be canceled
 
 //highlight(x)
 $
-  "new information" subset
+  "new information" =
   &hl(A join B join C) union \
   &Delta A join B join C union \
   &(A union Delta A) join Delta B join C union \
@@ -378,7 +382,7 @@ $
   -& hl(A join B join C)
 $
 $
-  "new information" subset
+  "new information" =
   &Delta A &join& B &join& C union \
   &(A union Delta A) &join& Delta B &join& C union \
   &(A union Delta A) &join& (B union Delta B) &join& Delta C \
@@ -388,7 +392,7 @@ To make the pattern more clear, $Delta X$ is written as "new", $X$ is written as
 Delta X$ is written as all:
 
 $
-  "new information" subset
+  "new information" =
   &"new" &join& "old" &join& "old" union \
   &"all" &join& "new" &join& "old" union \
   &"all" &join& "all" &join& "new" \
@@ -412,6 +416,9 @@ This is more or less what eqlog and egglog does, but there are some problems wit
 + we are forced to chain the iteration of "new" and "old" when iterating all, which introduces
   branching and reduces batching.
 
+#TODO[loke for erik: I thought deferred insertions break (non-surjective rules), and that this was the biggest
+  issue?]
+
 But if we replace all iterations of "old" with "all":
 $
   "new information" subset
@@ -422,8 +429,8 @@ $
 Then we get rid of both the branch/batching issue and the indexes for "new".
 
 Now the database only needs to maintain a list of "new" and indexes for "all". The reason indexes
-for "new" is not required is that it is always more efficient to iterate through "new" first, so the
-pseudocode becomes:
+for "new" is not required is that it is almost always more efficient to iterate through "new" first,
+so the pseudocode becomes:
 
 ```rust
 for _ in b_new(..) {
@@ -440,16 +447,11 @@ for _ in b_new(..) {
 @informal-theory-example shows an example EqSat theory specified in the egglog domain-specific
 language @egglog.
 
-#TODO[erik for loke: changed function to constructor, otherwise it is not valid egglog since function requires :merge or :no-merge. DUR]
-
 #figure(
   ```egglog
   (sort Math)
   (constructor Add (Math Math) Math)
-  (constructor Sub (Math Math) Math)
   (constructor Mul (Math Math) Math)
-  (constructor Div (Math Math) Math)
-  (constructor Pow (Math) Math)
   (constructor Const (i64) Math)
   (constructor Var (String) Math)
 
@@ -481,7 +483,8 @@ SQL databases need to be extremely dynamic since arbitrary new queries can be do
 all queries are known up-front, so datalog engines can spend more resources on optimizing queries
 and selecting optimal indexes and index data-structures.
 
-That said, it's entirely possible to create an e-graph engine that uses SQL internally @egraph_sqlite.
+That said, it's entirely possible to create an e-graph engine that uses SQL internally and in fact a
+prototype of egglog, egglite, was originally implemented on top of sqlite @egglite @egraph_sqlite.
 
 = Background <thesection>
 
@@ -489,9 +492,8 @@ That said, it's entirely possible to create an e-graph engine that uses SQL inte
 
 == Nomenclature
 
-@rosetta-table shows different terminology and relates e-graphs to relational
-databases. @rosettaexample shows how an egglog rule can be transformed to eqlog, Rust,
-and SQL.
+@rosetta-table shows different terminology and relates e-graphs to relational databases. We use
+these terms largely interchangeably depending on the context.
 
 #figure(
   table(
@@ -509,7 +511,7 @@ and SQL.
     [predicate], [if stmt ], [body containing atoms], [join+where ], [logical premise],
     [action ], [then stmt], [head ], [insert/unify], [logical consequence],
     [function ], [function ], [ ], [table ], [e.g. `Add: Math * Math -> Math`],
-    [e-node ], [tuple ], [fact ], [row/tuple ], [represents a small computation, e.g. `Add(a,b) = c`],
+    [e-node ], [tuple ], [fact ], [row], [represents a small computation, e.g. `Add(a,b) = c`],
     [e-class ], [element ], [ ], [cell element], [represents a set of equivalent expressions],
     [sort ], [type ], [type ], [type ], [e.g. `Math`, `i64`],
     [functional dependency], [implicit functionality], [], [primary key constraint], [],
@@ -518,6 +520,8 @@ and SQL.
 ) <rosetta-table>
 
 == Logic programming languages
+
+@rosettaexample shows how an egglog rule can be transformed to eqlog, Rust, and SQL.
 
 #TODO[]
 
@@ -535,36 +539,39 @@ Rule processing and optimization (at HIR level).
 
 === Functional dependency
 
-Functional dependency, implicit functionality or primary key constraint can be formally described as:
+A functional dependency, also known as implicit functionality or primary key constraint, can be
+formally described as:
 
 $ f(x) = a and f(x) = b => a = b $
 
-We can exploit functional dependency to simplify our rules, for example for this conjunctive query:
+This restricts what rows can reside in tables. It can also be exploited to simplify rules, such as
+in the case of this conjunctive query:
 
 $ "Add"(x, y, a), "Add"(x, y, b) $
 
-Here, we know that a = b because both atoms take (x,y) as input, so the query can be rewritten to:
+Here, we know that $a=b$ because both atoms take $(x,y)$ as input, so the query can be rewritten to:
 
 $ "Add"(x, y, a) $
 
 === Semi-naive evaluation
 
-To enable semi-naive evaluation, copies of rules are created where each atom is switched to iterate new instead of all.
+To enable semi-naive evaluation, naive rules are replaced with multiple more selective rules created
+from changing any single atom to iterate `new` instead of `all`. A rule
 
 $ R(x, y), S(y, z), T(z, x) $
 
-Becomes:
+becomes
 
 $ R_"new" (x, y), S(y, z), T(z, x) $
 $ R(x, y), S_"new" (y, z), T(z, x) $
-$ R(x, y), S(y, z), T_"new" (z, x) $
+$ R(x, y), S(y, z), T_"new" (z, x). $
 
 === Merging rules (in HIR, not trie)
 
 #NOTE[Not implemented yet.]
 
 It is very rare that the user provides rules with identical premises, but with
-semi-naive we produce many very similar rules, that can potentially be merged.
+semi-naive we produce many very similar rules that can potentially be merged.
 To merge rules, we compare the premise of the rules and if they are equal
 replace them with a rule that combines the actions of the original rules.
 
@@ -576,11 +583,10 @@ replace them with a rule that combines the actions of the original rules.
 
 Magic sets are a way to get the performance of top-down evaluation using bottom-up evaluation.
 
-Top-down evaluation means starting from a goal and searching for facts until
-the starting facts are reached. Typically, Prolog uses Top-down evaluation
-#TODO[citation needed]. Bottom-up evaluation derives more facts from the
-starting facts until the goal facts are reached. Egglog and Oatlog use
-bottom-up evaluation.
+Top-down evaluation means starting from a goal and searching for facts until the starting facts are
+reached. Typically, Prolog uses Top-down evaluation #TODO[citation needed]. Bottom-up evaluation
+derives more facts from the starting facts until the goal facts are reached. Datalog engines, as
+well as egglog and oatlog use bottom-up evaluation.
 
 #TODO[I guess this only makes sense if we want to prove two expressions equal?]
 
@@ -776,18 +782,25 @@ See @index-datastructures.
 
 #NOTE[We have not implemented extraction yet.]
 
-Extraction is the process of selecting an expression from an e-graph.
-Doing so non-optimally is trivial, but selecting an optimal expression, even with simple cost functions is np-hard @extractnphard @fastextract @egraphcircuit.
+Extraction is the process of selecting an expression from an e-graph. Doing so non-optimally is
+trivial, but selecting an optimal expression, even with simple cost functions is NP-hard
+@extractnphard @fastextract @egraphcircuit.
 
 Many NP-hard graph algorithms can be done in polynomial time for a fixed treewidth, and this also applies to extraction, where it can be done linear time @fastextract @egraphcircuit.
 
 = Oatlog implementation
 
-This section discusses Oatlog in detail, how it is used, what it can do and how it is implemented.
+This section discusses Oatlog in detail, including how it is used, what it can do and how it is
+implemented.
 
 == Egglog-compatible external interface
 
-#TODO[erik for loke: Is this about callable generated functions or that we support the egglog language?]
+#TODO[
+  erik for loke: Is this about callable generated functions or that we support the egglog language?
+
+  loke: Both, all of Oatlog as seen from the user perspective. The primary detail of which is being
+  egglog-compatible, hence having it in the suggested heading.
+]
 
 == Architecture and intermediate representations
 
@@ -831,6 +844,8 @@ LIR is a low-level description of the actual code that is to be generated.
 
 === Rustc spans across files
 
+#TODO[I think this is confusing for anyone unfamiliar with the code]
+
 Proc-macros are provided spans, which are essentially byte ranges of the original source code.
 However, when tokenizing arbitrary strings, spans are not provided.
 This is solved by in addition to parsing from Rust tokens, we implement our own sexp parser and insert our own byte ranges.
@@ -856,8 +871,10 @@ See @benchmarks-appendix for benchmark code.
 We run the entire egglog testsuite (93 tests) to validate oatlog.
 We compare the number of e-classes in egglog and oatlog to check if oatlog is likely producing the same result.
 
-Right now, we fail most test because primitive functions are not implemented.
-Additionally, some tests are not very relevant for AOT compilation, for example extraction commands.
+Right now, we fail most tests because primitive functions are not implemented. Additionally, some
+tests are not very relevant for AOT compilation and supporting them is not really desirable. An
+example of this are extraction commands, since egglog-language-level commands are run at Oatlog
+startup and Oatlog extraction is better handled using the run-time API.
 
 For a list of currently passing tests, see @passingtests.
 
@@ -1356,8 +1373,6 @@ impl Unification {
 
 == Quadratic formula
 
-// TODO erik for loke: we can parse negative numbers.
-
 #raw(read("../../examples/quadratic-formula/src/main.rs"), lang: "rust")
 
 = Passing egglog tests <passingtests>
@@ -1397,4 +1412,3 @@ These are the currently passing tests from the egglog testsuite
 == repro_unsound_htutorial
 
 #raw(read("../../comparative-test/egglog-testsuite/repro-unsound-htutorial.egg"), lang: "egglog")
-
