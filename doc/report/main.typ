@@ -1381,34 +1381,34 @@ impl Unification {
 
 These are the currently passing tests from the egglog testsuite
 
-== birewrite
+== `birewrite`
 
 #raw(read("../../comparative-test/egglog-testsuite/birewrite.egg"), lang: "egglog")
 
-== include
+== `include`
 
 #raw(read("../../comparative-test/egglog-testsuite/include.egg"), lang: "egglog")
 
-== path
+== `path`
 
 #raw(read("../../comparative-test/egglog-testsuite/path.egg"), lang: "egglog")
 
-== pathproof
+== `pathproof`
 
 #raw(read("../../comparative-test/egglog-testsuite/pathproof.egg"), lang: "egglog")
 
-== repro_querybug2
+== `repro_querybug2`
 
 #raw(read("../../comparative-test/egglog-testsuite/repro-querybug2.egg"), lang: "egglog")
 
-== repro_querybug4
+== `repro_querybug4`
 
 #raw(read("../../comparative-test/egglog-testsuite/repro-querybug4.egg"), lang: "egglog")
 
-== repro_querybug
+== `repro_querybug`
 
 #raw(read("../../comparative-test/egglog-testsuite/repro-querybug.egg"), lang: "egglog")
 
-== repro_unsound_htutorial
+== `repro_unsound_htutorial`
 
 #raw(read("../../comparative-test/egglog-testsuite/repro-unsound-htutorial.egg"), lang: "egglog")
