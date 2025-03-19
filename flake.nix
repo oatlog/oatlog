@@ -75,13 +75,14 @@
           program = "${pkgs.writeShellScript k v}";
         }) {
           mk-report = ''
-            set -v
+            set -v -e
+            PATH="${pkgs.ripgrep}/bin:$PATH"
             make -C ./doc/report lint dependencies
             ${lib.getExe pkgs.typst} compile ./doc/report/main.typ --root . report.pdf \
               --font-path ${pkgs.newcomputermodern}
           '';
           cargo = ''
-            set -v
+            set -v -e
             PATH="${rust-stable}/bin:$PATH"
             cargo "$@"
           '';
