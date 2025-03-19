@@ -572,8 +572,8 @@ impl Parser {
             egglog_ast::Statement::Action(action) => {
                 // TODO: can we dedup this for rule compilation?
                 {
-                    use ids::PremiseId;
                     use crate::union_find::UF;
+                    use ids::PremiseId;
                     use std::collections::BTreeSet;
 
                     enum InitialAction {
@@ -657,7 +657,6 @@ impl Parser {
                     // Unresolved:
                     // * merge + ssa might create cycles, which is bad. eg [a = f(b), b = f(a)]
                     // * merge + ssa might result in several ways to compute value.
-
                 }
                 match action.x {
                     egglog_ast::Action::Let { name, expr } => {
