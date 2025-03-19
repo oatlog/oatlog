@@ -1,0 +1,60 @@
+digraph G {
+    newrank=true;
+    rankdir="LR";
+    ranksep=0.3;
+    nodesep=0.3;
+
+    "egglog theory\n(Sorts, Functions, Rules)";
+
+    "egglog theory\n(Sorts, Functions, Rules)" -> "sexp";
+
+    subgraph cluster_frontend {
+        label = "frontend";
+        rank=same;
+        "sexp";
+        "egglog ast";
+        "Desugaring,\ntype checking,\netc" [shape=rect];
+
+        "sexp" -> "egglog ast";
+        "egglog ast" -> "Desugaring,\ntype checking,\netc";
+    }
+
+    "Desugaring,\ntype checking,\netc" -> "HIR";
+
+    subgraph cluster_midend {
+        label = "midend";
+        rank=same;
+        "HIR";
+        "Query planning" [shape=rect];
+        "Index selection" [shape=rect];
+
+        "HIR" -> "Query planning";
+        "Query planning" -> "Index selection";
+    }
+
+    "Index selection" -> "LIR";
+
+    subgraph cluster_backend {
+        label = "backend";
+        rank=same;
+        "LIR";
+        "generated code";
+
+        "LIR" -> "generated code";
+
+        //"determine indices" [shape=rect];
+        //"preprocess rules" [shape=rect];
+    }
+
+    "runtime library";
+    "usage code";
+    "final binary";
+
+    "generated code" -> "rustc";
+    "runtime library" -> "rustc";
+    "usage code" -> "rustc";
+
+    "rustc" -> "final binary"
+
+    "rustc" [shape=rect];
+}

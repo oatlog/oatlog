@@ -76,7 +76,7 @@
         }) {
           mk-report = ''
             set -v
-            make -C ./doc/report lint
+            make -C ./doc/report lint dependencies
             ${lib.getExe pkgs.typst} compile ./doc/report/main.typ --root . report.pdf \
               --font-path ${pkgs.newcomputermodern}
           '';

@@ -1,0 +1,58 @@
+digraph G {
+    graph [compound=true];
+    rankdir = "LR";
+
+    c_1 -> mul_2_c_1 [ltail=cluster_c_1];
+    lit2_1 -> mul_2_c_1 [ltail=cluster_lit2_1];
+    c_1 -> c_shift_1_1 [ltail=cluster_c_1];
+    lit1_1 -> c_shift_1_1 [ltail=cluster_lit1_1];
+    c_1 -> mul_a_c_1 [ltail=cluster_c_1];
+    a_1 -> mul_a_c_1 [ltail=cluster_a_1];
+    mul_a_c_1 -> add_dist_1 [ltail=cluster_mul_a_c_1];
+    mul_2_c_1 -> add_dist_1 [ltail=cluster_mul_2_c_1];
+    lit2_1 -> add_a_2_1 [ltail=cluster_lit2_1];
+    a_1 -> add_a_2_1 [ltail=cluster_a_1];
+    add_a_2_1 -> mul_c_1 [ltail=cluster_add_a_2_1];
+    c_1 -> mul_c_1 [ltail=cluster_c_1];
+
+    subgraph cluster_mul_2_c_1 {
+        style=rounded
+        mul_2_c_1 [shape=rect, label = "*"];
+        c_shift_1_1 [shape=rect, label = "<<"];
+    }
+    subgraph cluster_c_1 {
+        style=rounded
+        c_1 [shape=rect, label = "c"];
+    }
+    subgraph cluster_a_1 {
+        style=rounded
+        a_1 [shape=rect, label = "a"];
+    }
+    subgraph cluster_mul_a_c_1 {
+        style=rounded
+
+        mul_a_c_1 [shape=rect, label = "*"];
+    }
+    subgraph cluster_lit2_1 {
+        style=rounded
+
+        lit2_1 [shape=rect, label = "2"];
+    }
+    subgraph cluster_mul_c_1 {
+        style=rounded
+        mul_c_1 [shape=rect, label = "*"];
+        add_dist_1 [shape=rect, label = "+"];
+    }
+    subgraph cluster_add_a_2_1 {
+        style=rounded
+
+        add_a_2_1 [shape=rect, label = "+"];
+    }
+    subgraph cluster_lit1_1 {
+        style=rounded
+
+        lit1_1 [shape=rect, label = "1"];
+    }
+}
+
+

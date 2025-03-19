@@ -818,7 +818,7 @@ Many NP-hard graph algorithms can be done in polynomial time for a fixed treewid
 
 = Oatlog implementation
 
-This section discusses Oatlog in detail, including how it is used, what it can do and how it is
+This section discusses oatlog in detail, including how it is used, what it can do and how it is
 implemented.
 
 == Egglog-compatible external interface
@@ -847,68 +847,152 @@ either a string literal or an S-expression in the form of Rust tokens directly, 
       (rewrite (Mul (Add a b) c) (Add (Mul a c) (Mul b c)))
     ));
   ```,
-  caption: [#TODO[]],
+  caption: [Usage examples of `oatlog::compile_egraph!`.],
 ) <compile_egraph_invokation>
 
-Oatlog does not currently support all Egglog language constructs. @oatlog_egglog_compatibility shows
-an overview of feature support.
+We are planning to implement user-specified primitive functions by allowing Rust code to be written
+inline with the S-expressions.
 
-#{
-  let yes = table.cell()[yes]
-  let no = table.cell(fill: red.lighten(10%))[no]
-  let ignored = table.cell(fill: gray.lighten(30%))[ignored]
-  let wont = table.cell(fill: blue.lighten(20%))[Won't]
-  show figure: set block(breakable: true)
-  block(inset: 20pt, columns(2, [
-    #figure(
+Oatlog does not currently support all Egglog language constructs. @oatlog_egglog_compatibility shows
+an overview of language keywords that oatlog supports. Aside from this, oatlog currently lacks
+support for
+
++ #[Primitive functions, i.e. non-partial functions with exclusively primitive arguments and return
+    values, implemented as Rust functions directly such as `i64::add` or `i64::mul`.]
++ #[Lattice functions, i.e. partial functions returning primitives updated through `:merge`.]
++ #[Containers, such as sets and multisets containing EqSorts.]
+
+#figure(
+  {
+    let yes = table.cell()[yes]
+    let no = table.cell(fill: red.lighten(20%))[no]
+    let ignored = table.cell(fill: gray.lighten(30%))[ignored]
+    let wont = table.cell(fill: blue.lighten(40%))[won't]
+    grid(
+      columns: (1fr, 1fr),
       table(
-        columns: (auto, auto),
-        table.header[Egglog feature][Oatlog support],
-        [set-option], wont,
+        columns: (45%, 45%),
+        table.cell(colspan: 2)[Features desirable in oatlog],
+        [Egglog feature], [Oatlog support],
+
+        table.cell(colspan: 2)[Core],
+        [include], yes,
         [sort], yes,
         [datatype], yes,
-        [function], yes,
         [constructor], yes,
+        [function], yes,
         [relation], yes,
-        [ruleset], no,
+        [let], yes,
         [rule], yes,
         [rewrite], yes,
         [birewrite], yes,
-        [run], yes,
-        [simplify], no,
-        [query-extract], no,
-        [check], ignored,
-        [push], no,
-        [pop], no,
-        [print-stats], no,
-        [input], no,
-        [output], no,
-        [include], yes,
-        [fail], ignored,
-        [let], yes,
-        [set], no,
+
+        table.cell(colspan: 2)[Actions],
+        [union], yes,
+        [set], no, // function set output, for lattices
         [delete], no,
         [subsume], no,
-        [union], yes,
         [panic], no,
-        [extract], wont,
-      ),
-      caption: [Egglog language support in oatlog]
-    )
-    #label("oatlog_egglog_compatibility")
-  ]))
-}
 
-Finally, Oatlog has a run-time API that allows insertion and querying of rows and e-classes.
-#TODO[elaborate]
+        table.cell(colspan: 2)[Asserting],
+        [fail], ignored,
+        [check], ignored,
+      ),
+      table(
+        columns: (45%, 45%),
+        table.cell(colspan: 2)[Features more suitable to oatlog's run-time API],
+        [Egglog feature], [Oatlog support],
+
+        table.cell(colspan: 2)[Scheduling],
+        [set-option], wont,
+        [run], yes,
+        [run-schedule], no,
+        [ruleset], no,
+        [combined-ruleset], no,
+
+        table.cell(colspan: 2)[Push/Pop],
+        [push], no,
+        [pop], no,
+
+        table.cell(colspan: 2)[Statistics],
+        [print-stats], wont,
+        [print-function], wont,
+        [print-size], wont,
+
+        table.cell(colspan: 2)[Serialization],
+        [input], wont,
+        [output], wont,
+
+        table.cell(colspan: 2)[Extraction],
+        [extract], wont,
+        [query-extract], wont,
+        [simplify], wont,
+      ),
+    )
+  },
+  caption: {
+    let no = box(outset: 2pt, radius: 2pt, fill: red.lighten(20%))[no]
+    let ignored = box(outset: 2pt, radius: 2pt, fill: gray.lighten(30%))[ignored]
+    let wont = box(outset: 2pt, radius: 2pt, fill: blue.lighten(40%))[won't]
+    flex-caption(
+      [
+        Egglog support in oatlog, by language keyword.
+      ],
+      [
+        Rows marked #no could make sense to implement, at the very
+        least for unit tests. Rows marked #ignored are currently no-ops but should be implemented while
+        rows marked #wont are not sensible to implement outside a REPL.
+      ],
+    )
+  },
+) <oatlog_egglog_compatibility>
+
+Finally, oatlog has a run-time API that allows insertion and querying of rows and e-classes,
+realized through functions implemented on the `Theory` type in the code generated by the
+`oatlog::compile_egraph!` macro. This API is currently overly cumbersome, as can be seen from its
+use in @appendix_examples. @oatlog_runtime_api_features summarizes the currently
+implemented and unimplemented features of the oatlog run-time API.
+
+#figure(
+  {
+    let yes = table.cell()[yes]
+    let no = table.cell(fill: red.lighten(20%))[no]
+    table(
+      columns: (auto, auto),
+      [Run-time API feature], [Oatlog support],
+      [Creating e-classes], yes,
+      [Inserting e-nodes], yes,
+      [Unifying e-classes], yes,
+      [Applying all rules once], yes,
+      [Running rules to saturation], no,
+      [Checking equality], yes,
+      [Extraction], no,
+      [Row count per table], yes,
+    )
+  },
+  caption: {
+    let no = box(outset: 2pt, radius: 2pt, fill: red.lighten(20%))[no]
+    flex-caption(
+      [
+        Oatlog run-time API feature implementation status.
+      ],
+      [
+        Rows marked #no are not yet implemented.
+      ],
+    )
+  },
+) <oatlog_runtime_api_features>
 
 == Architecture and intermediate representations
 
-Oatlog is a Rust proc-macro that takes in egglog code and generates Rust code.
-See @codegen_example for an example of what the generated code looks like.
+Oatlog is a Rust proc-macro that takes in egglog code and generates Rust code. See @codegen_example
+for an example of what the generated code looks like. @oatlog-architecture shows an overview of
+Oatlog's internal architecture.
 
-#TODO[Architecture figure, AST->Parser->HIR->??->LIR->Rust code->Rustc/LLVM->Runtime with runtime
-  library]
+#figure(
+  image("architecture.svg"),
+  caption: [A coarse overview of the current oatlog architecture.],
+) <oatlog-architecture>
 
 === Egglog AST
 
@@ -923,10 +1007,12 @@ inserts and unifications. HIR is lowered into LIR and that process also performs
 
 === QIR, Query-plan IR
 
-#NOTE[The current implementation is very ad-hoc and will be replaced by something similar to free-join, except entirely static (only a single cover)]
+#NOTE[The current implementation is very ad-hoc and will be replaced by something similar to
+  free-join, except entirely static (only a single cover)]
 
-Represents all the choices made to transform a conjunctive query to LIR, specifically the order of joins and how the joins are performed.
-Note that this IR only contains queries and other information, such as relation properties are lowered directly from HIR.
+Represents all the choices made to transform a conjunctive query to LIR, specifically the order of
+joins and how the joins are performed. Note that this IR only contains queries and other
+information, such as relation properties are lowered directly from HIR.
 
 === LIR, Low-level Intermediate Representation
 
@@ -944,19 +1030,46 @@ LIR is a low-level description of the actual code that is to be generated.
 
 === Rustc spans across files
 
-#TODO[I think this is confusing for anyone unfamiliar with the code]
+Rust proc-macros work on Rust tokens which are annotated with spans that essentially are byte ranges
+of the original source code. However, if the proc-macro tokenizes additional strings through
+`proc_macro::TokenStream::from_str`, for example to implement the egglog `(include ..)`
+functionality, when tokenizing arbitrary strings, no such spans are provided.
 
-Proc-macros are provided spans, which are essentially byte ranges of the original source code.
-However, when tokenizing arbitrary strings, spans are not provided.
-This is solved by in addition to parsing from Rust tokens, we implement our own sexp parser and insert our own byte ranges.
-This has another problem, since our spans are not from rustc, our error locations are no longer correct.
-This is solved by implementing error context ourselves, so context information is part of the compile error but with a bogus rustc span.
+We solve this by both supporting parsing Rust tokens as well as tokenizing and parsing strings as
+sexp directly, inserting our own byte ranges. This has another problem, in that since our spans are
+not from rustc our error locations are no longer correct. This is solved by implementing displaying
+error contexts ourselves, so that context information is part of the compile error but with a bogus
+rustc span.
 
 === Testing infrastructure
 
-Since oatlog is implemented using a proc-macro, errors result in Rust compilation errors, so normal
-Rust test can not be used directly. However, doctests are separately compiled so we instead generate
-doctest to check that generated test code compiles.
+Since oatlog is implemented using a proc-macro, errors result in Rust compilation errors rather than
+single test failures. This means we require some mechanism to compile test cases separately.
+Luckily, Rust doctests do exactly this and so we use those for test cases expected to not compile.
+Overall, our comparative testing infrastructure (against egglog) can handle the 6 cases laid out in
+@oatlog_comparative_testing_conditions.
+
+#figure(
+  table(
+    columns: (auto, auto),
+    [Code], [Condition],
+    [`nogenerate`], [Oatlog is unable to generate code.],
+    [`no_compile`], [The generated code does not compile.],
+    [`does_panic`], [Runtime panic when running oatlog and egglog.],
+    [`mismatched`], [Oatlog and egglog produce different numbers of e-nodes],
+    [`zrocorrect`], [Oatlog and egglog produce zero e-nodes],
+    [`allcorrect`], [Oatlog and egglog produce the same non-zero number of e-nodes],
+  ),
+  caption: flex-caption(
+    [
+      Possible outcomes for comparative testing of oatlog and egglog.
+    ],
+    [
+      The `zrocorrect` verdict is broken out from `allcorrect` since oatlog ignores the `check`
+      command, which usually is used in those tests.
+    ],
+  ),
+) <oatlog_comparative_testing_conditions>
 
 = Evaluation
 
@@ -966,7 +1079,7 @@ doctest to check that generated test code compiles.
 
 #TODO[Include actual benchmark results somehow]
 
-See @benchmarks-appendix for benchmark code.
+See @appendix_benchmarks for benchmark code.
 
 == Egglog test suite
 
@@ -975,8 +1088,8 @@ We compare the number of e-classes in egglog and oatlog to check if oatlog is li
 
 Right now, we fail most tests because primitive functions are not implemented. Additionally, some
 tests are not very relevant for AOT compilation and supporting them is not really desirable. An
-example of this are extraction commands, since egglog-language-level commands are run at Oatlog
-startup and Oatlog extraction is better handled using the run-time API.
+example of this are extraction commands, since egglog-language-level commands are run at oatlog
+startup and oatlog extraction is better handled using the run-time API.
 
 For a list of currently passing tests, see @passingtests.
 
@@ -1460,7 +1573,7 @@ impl Unification {
 }
 ```
 
-= Benchmarks <benchmarks-appendix>
+= Benchmarks <appendix_benchmarks>
 
 #TODO[explain driver code]
 
@@ -1473,11 +1586,15 @@ impl Unification {
 
 #raw(read("../../oatlog-bench/input/boolean_adder.egg"), lang: "egglog")
 
-= Examples
+= Examples <appendix_examples>
 
-#TODO[]
+This appendix contains self-contained examples that use oatlog.
 
 == Quadratic formula
+
+This example proves that if $x = -b + sqrt(b^2 - c)$ then $x^2 + 2 b x + c = 0$. As can be seen from
+explicitly passing `&mut theory.uf` around, and having separate e-class creation and e-node
+insertion, the current run-time API is very unergonomic.
 
 #raw(read("../../examples/quadratic-formula/src/main.rs"), lang: "rust")
 

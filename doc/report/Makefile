@@ -1,7 +1,12 @@
-watch:
+watch: dependencies
 	typst watch main.typ --root ../..
 
-RG := rg --glob '!mastery-chs' --glob '!Makefile' --multiline
+dependencies: architecture.svg egraph_example.svg egraph_cluster.svg
+
+%.svg: %.dot
+	dot -Tsvg $^ > $@
+
+RG := rg --glob '!mastery-chs' --glob '*.typ' --multiline
 
 lint:
 	@if $(RG) '^=+ [^\n]+\n+='; \
@@ -12,5 +17,7 @@ lint:
 		then echo "ERROR: No two blank lines in a row please!"; exit 1; fi
 	@if $(RG) 's-expression'; \
 		then echo "ERROR: The S in S-expression should be capitalized!"; exit 1; fi
-	@if $(RG) --glob '*.typ' '[^`"]rust[^c]'; \
+	@if $(RG) '[^`"]rust[^c]'; \
 		then echo "ERROR: The R in Rust should be capitalized!"; exit 1; fi
+	@if $(RG) '[^= ] Oatlog'; \
+		then echo "ERROR: Only ever capitalize oatlog at the start of a sentence!"; exit 1; fi
