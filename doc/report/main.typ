@@ -38,10 +38,6 @@
 // #TODO[conceptual background: how things developed historically.]
 // #TODO[background: frontend, mid-end, backend.]
 
-#TODO[make all tables figures, merge tables if needed.]
-
-#TODO[table linter.]
-
 #TODO[introduce relevant references]
 
 #TODO[Matti: Style and grammar things: in §2.2, it’s not clear what “their” refers to and there seems to be somewhat of a repetition in the text]
@@ -240,42 +236,55 @@ are both heuristics and algorithms that work well on some types of e-graphs @fas
 
 Conceptually, egglog stores _uninterpreted partial functions_.
 
-Thinking about uninterpreted partial functions is a bit abstract, so I think it helps to drop to the abstraction of a relation directly.
+Thinking about uninterpreted partial functions is a bit abstract, so I think it helps to drop to the
+abstraction of a relation directly.
 
-For example, consider a partial function that performs addition, which we can represent as a table:
-#table(
-  columns: (auto, auto, auto),
-  inset: 10pt,
-  align: horizon,
-  table.header(
-    [x],
-    [y],
-    [res],
+For example, consider a partial function that performs addition, which we can represent as in
+@concept_table_concrete.
+
+#figure(
+  table(
+    columns: (auto, auto, auto),
+    inset: 10pt,
+    align: horizon,
+    table.header(
+      [x],
+      [y],
+      [res],
+    ),
+
+    [1], [2], [3],
+    [4], [2], [6],
+    [3], [5], [8],
   ),
+  caption: [Partial function represented as a table of concrete values.],
+) <concept_table_concrete>
 
-  [1], [2], [3],
-  [4], [2], [6],
-  [3], [5], [8],
-)
-This is a partial function because it's domain is a subset of all pairs of natural numbers.
-But since these are uninterpreted, we do not have actual values, but instead E-classes:
-#table(
-  columns: (auto, auto, auto),
-  inset: 10pt,
-  align: horizon,
-  table.header(
-    [x],
-    [y],
-    [res],
+This is a partial function because it's domain is a subset of all pairs of natural numbers. But
+since these are uninterpreted, we do not have actual values, but instead E-classes as in
+@concept_table_eclasses.
+
+#figure(
+  table(
+    columns: (auto, auto, auto),
+    inset: 10pt,
+    align: horizon,
+    table.header(
+      [x],
+      [y],
+      [res],
+    ),
+
+    [a], [b], [c],
+    [d], [b], [f],
+    [c], [e], [g],
   ),
+  caption: [Partial function represented as a table of e-classes.],
+) <concept_table_eclasses>
 
-  [a], [b], [c],
-  [d], [b], [f],
-  [c], [e], [g],
-)
-For example, we can not really say anything about $a, b$ or $c$ other than $"add"(a,b) = c$.
-It is called a function because we have a functional dependency from (x,y) to res.
-In database terminology, we have a primary key on (x,y) for this relation.
+For example, we can not really say anything about $a, b$ or $c$ other than $"add"(a,b) = c$. It is
+called a function because we have a functional dependency from (x,y) to res. In database
+terminology, we have a primary key on (x,y) for this relation.
 
 Egglog also supports a form of sum types
 

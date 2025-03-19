@@ -21,3 +21,7 @@ lint:
 		then echo "ERROR: The R in Rust should be capitalized!"; exit 1; fi
 	@if $(RG) '[^= ] Oatlog'; \
 		then echo "ERROR: Only ever capitalize oatlog at the start of a sentence!"; exit 1; fi
+	@if $(RG) '^#table'; \
+		then echo "ERROR: All tables should sit within figures!"; exit 1; fi
+	@if $(RG) '^#figure\(\n([^\)].*\n)+\)\n'; \
+		then echo "ERROR: All figures should be labelled!"; exit 1; fi
