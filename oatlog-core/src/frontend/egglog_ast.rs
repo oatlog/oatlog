@@ -8,7 +8,7 @@ pub(crate) struct Program {
     statements: Vec<Spanned<Statement>>,
 }
 #[derive(Clone, Debug)]
-pub(crate) enum Expr {
+pub(crate) enum GExpr<F /* Function */, V /* Variable */> {
     /// A literal.
     /// ```egglog
     /// 3
@@ -18,14 +18,18 @@ pub(crate) enum Expr {
     /// ```egglog
     /// a
     /// ```
-    Var(Str),
+    Var(V),
     /// A call expression.
     /// ```egglog
     /// (Add a (Const 3))
     /// ```
-    /// Note that `check`, `=` and `!=` are considered functions.
-    Call(Str, Vec<Spanned<Expr>>),
+    /// Note that `=` and `!=` are considered functions.
+    Call(F, Vec<Spanned<Self>>),
 }
+
+// pub(crate) type ResolvedExpr = GExpr<crate::ids::RelationId, crate::ids::VariableId>;
+
+pub(crate) type Expr = GExpr<Str, Str>;
 #[derive(Clone, Debug)]
 pub(crate) enum Action {
     /// Let expressions get or insert into the database and bind the result.
@@ -175,15 +179,14 @@ pub(crate) enum Statement {
     /// Desugars to (ignoring mutual recursion):
     /// ```egglog
     /// (sort Math)
-    ///     (Add (Math Math))
-    ///     (Sum MathVec)
-    ///     (B Bool)
-    /// )
+    /// (constructor Add (Math Math))
+    /// (constructor Sum MathVec)
+    /// (constructor B Bool)
+    /// 
     /// (sort MathVec (Vec Math))
-    /// (datatype Bool
-    ///     (True)
-    ///     (False)
-    /// )
+    /// (sort Bool)
+    /// (constructor True Bool)
+    /// (constructor False Bool)
     /// ```
     Datatypes {
         datatypes: Vec<Spanned<(Str, SubDatatypes)>>,
@@ -337,9 +340,9 @@ pub(crate) enum Fact {
 #[derive(Clone, Debug)]
 pub(crate) struct Rule {
     /// When all facts match the database, the rule is triggered.
-    pub(crate) body: Vec<Spanned<Fact>>,
+    pub(crate) facts: Vec<Spanned<Fact>>,
     /// When triggered, perform the following actions.
-    pub(crate) head: Vec<Spanned<Action>>,
+    pub(crate) actions: Vec<Spanned<Action>>,
 }
 #[derive(Clone, Debug)]
 pub(crate) struct Rewrite {
@@ -589,8 +592,8 @@ fn parse_statement(x: SexpSpan) -> MResult<Spanned<Statement>> {
                     name,
                     ruleset,
                     rule: Rule {
-                        body: facts,
-                        head: actions,
+                        facts: facts,
+                        actions: actions,
                     },
                 }
             }

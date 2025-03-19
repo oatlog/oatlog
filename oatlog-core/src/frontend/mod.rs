@@ -13,7 +13,7 @@ use proc_macro2::{Delimiter, Span, TokenTree};
 
 use crate::{
     Configuration, FileNotFoundAction, hir,
-    ids::{ColumnId, GlobalId, Id, RelationId, TypeId, VariableId},
+    ids::{self, ActionId, ColumnId, GlobalId, Id, RelationId, TypeId, VariableId},
     lir,
     typed_vec::TVec,
 };
@@ -53,7 +53,7 @@ impl<A: Clone, B> VecExt<A, B> for Vec<A> {
 pub(crate) fn parse(sexps: Vec<Vec<SexpSpan>>, config: Configuration) -> MResult<hir::Theory> {
     let mut parser = Parser::new();
     for sexp in sexps {
-        parser.parse_egglog(sexp, config)?;
+        parser.parse_egglog_sexp(sexp, config)?;
     }
     Ok(parser.emit_hir())
 }
@@ -405,16 +405,357 @@ impl Parser {
     }
 
     // TODO erik: parse to AST + forward declarations here
-    fn parse_egglog(&mut self, sexp: Vec<SexpSpan>, config: Configuration) -> MResult<()> {
+    fn parse_egglog_sexp(&mut self, sexp: Vec<SexpSpan>, config: Configuration) -> MResult<()> {
         egglog_ast::parse_program(sexp.clone())?;
         for sexp in sexp {
-            self.parse_toplevel(sexp, config)
+            self.parse_toplevel_sexp(sexp, config)
                 .add_err(bare_!(sexp.span, "while parsing this toplevel expression"))?;
         }
         Ok(())
     }
 
-    fn parse_toplevel(&mut self, x: SexpSpan, config: Configuration) -> MResult<()> {
+    fn parse_egglog_program(
+        &mut self,
+        program: Vec<Spanned<egglog_ast::Statement>>,
+        config: Configuration,
+    ) -> MResult<()> {
+        // TODO: forward declarations here.
+        for ast in program {
+            self.parse_egglog_ast(ast, config)?;
+        }
+        Ok(())
+    }
+
+    fn parse_egglog_ast(
+        &mut self,
+        ast: Spanned<egglog_ast::Statement>,
+        config: Configuration,
+    ) -> MResult<()> {
+        // TODO: emit warnings for things that are ignored such as printing.
+        register_span!(ast.span);
+        let refuse_msg = err!("will not implement, this only makes sense for an interpreter");
+        let unimplemented_msg = err!("not implemented yet");
+        match ast.x {
+            egglog_ast::Statement::SetOption { name, value } => return refuse_msg,
+            egglog_ast::Statement::Sort { name, primitive } => {
+                assert!(
+                    primitive.is_none(),
+                    "collection not supported yet: {primitive:?}"
+                );
+                let _: TypeId = self.add_sort(name, None, None)?;
+            }
+            egglog_ast::Statement::Datatype { name, variants } => {
+                let output = self.add_sort(name, None, None)?;
+                for egglog_ast::Variant { name, types, cost } in variants.into_iter().map(|x| x.x) {
+                    self.add_function(
+                        name,
+                        types
+                            .into_iter()
+                            .map(|x| self.type_ids.lookup(x))
+                            .collect::<MResult<Vec<TypeId>>>()?
+                            .leak(),
+                        FunctionKind::Constructor { output, cost },
+                    )?;
+                }
+            }
+            egglog_ast::Statement::Datatypes { datatypes } => {
+                return err!("TODO: forward declarations");
+            }
+            egglog_ast::Statement::Constructor {
+                name,
+                input,
+                output,
+                cost,
+            } => {
+                self.add_function(
+                    name,
+                    input
+                        .into_iter()
+                        .map(|x| self.type_ids.lookup(x))
+                        .collect::<MResult<Vec<TypeId>>>()?
+                        .leak(),
+                    FunctionKind::Constructor {
+                        output: self.type_ids.lookup(output)?,
+                        cost,
+                    },
+                )?;
+            }
+            egglog_ast::Statement::Relation { name, input } => {
+                self.add_function(
+                    name,
+                    input
+                        .into_iter()
+                        .map(|x| self.type_ids.lookup(x))
+                        .collect::<MResult<Vec<TypeId>>>()?
+                        .leak(),
+                    FunctionKind::Relation,
+                )?;
+            }
+            egglog_ast::Statement::Function {
+                name,
+                input,
+                output,
+                merge,
+            } => {
+                if merge.is_some() {
+                    return err!("lattice computations not implemented");
+                }
+                self.add_function(
+                    name,
+                    input
+                        .into_iter()
+                        .map(|x| self.type_ids.lookup(x))
+                        .collect::<MResult<Vec<TypeId>>>()?
+                        .leak(),
+                    FunctionKind::Function {
+                        output: self.type_ids.lookup(output)?,
+                        merge: None,
+                    },
+                )?;
+            }
+            egglog_ast::Statement::AddRuleSet(spanned) => {
+                self.rulesets.insert_unique(spanned, (), "ruleset")?;
+            }
+            egglog_ast::Statement::UnstableCombinedRuleset(spanned, vec) => {
+                return err!("unstable-combined-ruleset not implemented");
+            }
+            egglog_ast::Statement::Rule {
+                name,
+                ruleset,
+                rule,
+            } => {
+                let egglog_ast::Rule { facts, actions } = rule;
+                self.add_rule2(name, ruleset, facts, actions);
+            }
+            egglog_ast::Statement::Rewrite {
+                ruleset,
+                rewrite,
+                subsume,
+            } => {
+                if subsume {
+                    return err!("subsume not implemented");
+                }
+
+                let egglog_ast::Rewrite {
+                    lhs,
+                    rhs,
+                    conditions,
+                } = rewrite;
+
+                let mut facts = conditions;
+                facts.push(Spanned::new(egglog_ast::Fact::Expr(lhs.clone()), lhs.span));
+                let actions = vec![Spanned::new(
+                    egglog_ast::Action::Expr(rhs.clone()),
+                    rhs.span,
+                )];
+                self.add_rule2(None, ruleset, facts, actions);
+            }
+            egglog_ast::Statement::BiRewrite { ruleset, rewrite } => {
+                let egglog_ast::Rewrite {
+                    lhs,
+                    rhs,
+                    conditions,
+                } = rewrite;
+
+                for (lhs, rhs, mut facts) in [
+                    (lhs.clone(), rhs.clone(), conditions.clone()),
+                    (rhs, lhs, conditions),
+                ] {
+                    facts.push(Spanned::new(egglog_ast::Fact::Expr(lhs.clone()), lhs.span));
+                    let actions = vec![Spanned::new(
+                        egglog_ast::Action::Expr(rhs.clone()),
+                        rhs.span,
+                    )];
+                    self.add_rule2(None, ruleset, facts, actions);
+                }
+            }
+            egglog_ast::Statement::Action(action) => {
+                // TODO: can we dedup this for rule compilation?
+                {
+                    use ids::PremiseId;
+                    use crate::union_find::UF;
+                    use std::collections::BTreeSet;
+
+                    enum InitialAction {
+                        // function calls would read globals if needed.
+                        Union(Expr, Expr),
+                        // Let -> global or macro
+                        // initializes globals too
+                        // overwrites whatever was there before?
+                        // sets entire row.
+                        // triggers lattice computation
+                        // invalid/does not make sense on a constructor.
+                        Set(ids::RelationId, Vec<Expr>),
+                        // modification given *arguments*
+                        Change(ids::RelationId, Vec<Expr>, egglog_ast::Change),
+                        Panic,
+                        Push,
+                        Pop,
+                        // Check {
+                        //     should_fail: bool,
+                        //     rule_id: RuleSetId,
+                        // }
+                    }
+
+                    enum RuleAction {
+                        // replaced by having ActionId indirection.
+                        // Union(VariableId, VariableId),
+                        // either get value from relation, or insert into delta.
+                        EntryOrMake {
+                            relation: RelationId,
+                            // only includes arguments
+                            row: Vec<ActionId>,
+                            // write result here
+                            res: ActionId,
+                        },
+                        // triggers lattice computation
+                        Set {
+                            relation: RelationId,
+                            // includes arguments and result
+                            row: Vec<ActionId>,
+                        },
+                    }
+                    struct VariableMeta {}
+
+                    // TODO: is it sound to run uf.find() before inserting?
+                    enum ActionSSA {
+                        /// Copy value from premise
+                        Premise(PremiseId),
+                        /// Read from relation or make new e-class if not found.
+                        /// (can introduce non-termination)
+                        Entry {
+                            relation: RelationId,
+                            args: Vec<ActionId>,
+                        },
+                        /// Make new e-class
+                        /// (can introduce non-determinism)
+                        Make,
+                    }
+
+                    struct SymbolicRule2 {
+                        // ====== PREMISE ======
+                        conjunctive_query: BTreeSet<(RelationId, Vec<PremiseId>)>,
+
+                        // ====== ACTION ======
+                        ssa: TVec<ActionId, ActionSSA>,
+                        unify: UF<ActionId>,
+                        insert_rows: BTreeSet<(RelationId, Vec<ActionId>)>,
+
+                        // ====== METADATA ======
+                        name: &'static str,
+                        action_variables: TVec<ActionId, VariableMeta>,
+                        premise_variables: TVec<PremiseId, VariableMeta>,
+                    }
+                    // * entry behavior for different cases:
+                    //     * Primitive - (hopefully) infallible, so ok
+                    //     * Collection - (hopefully) infallible, so ok
+                    //     * Lattice/function - always fails to compile.
+                    //     * Constructor - just creates a new e-class if needed.
+                    //     * Global - compiles to function but ok because infallible.
+                    //
+
+                    // Unresolved:
+                    // * merge + ssa might create cycles, which is bad. eg [a = f(b), b = f(a)]
+                    // * merge + ssa might result in several ways to compute value.
+
+                }
+                match action.x {
+                    egglog_ast::Action::Let { name, expr } => {
+                        todo!("globals")
+                    }
+                    egglog_ast::Action::Set {
+                        table,
+                        args,
+                        result,
+                    } => todo!(),
+                    egglog_ast::Action::Panic { message } => todo!(),
+                    egglog_ast::Action::Union { lhs, rhs } => todo!(),
+                    egglog_ast::Action::Expr(spanned) => todo!("globals"),
+                    egglog_ast::Action::Change {
+                        table,
+                        args,
+                        change,
+                    } => return err!("change not supported yet"),
+                    egglog_ast::Action::Extract { expr, variants } => {
+                        return err!("extract not supported yet");
+                    }
+                }
+            }
+            egglog_ast::Statement::RunSchedule(schedule) => match schedule.x {
+                egglog_ast::Schedule::Repeat(repeat, inner) => match *inner {
+                    egglog_ast::Schedule::Run(egglog_ast::RunConfig {
+                        ruleset: None,
+                        until: None,
+                    }) => {
+                        self.initial.push(lir::Initial::run(repeat));
+                    }
+                    _ => return unimplemented_msg,
+                },
+                _ => return unimplemented_msg,
+            },
+            egglog_ast::Statement::PrintOverallStatistics => {
+                // ignored
+            }
+            egglog_ast::Statement::Simplify { expr, schedule } => return err!("not implemented"),
+            egglog_ast::Statement::QueryExtract { variants, expr } => {
+                return err!("not implemented");
+            }
+            egglog_ast::Statement::Check(vec) => {
+                // TODO: impl
+            }
+            egglog_ast::Statement::PrintFunction(spanned, _) => {
+                // ignored
+            }
+            egglog_ast::Statement::PrintSize(spanned) => {
+                // ignored
+            }
+            egglog_ast::Statement::Input { table, file } => {
+                // ignored
+                return refuse_msg;
+            }
+            egglog_ast::Statement::Output { file, exprs } => {
+                // ignored
+                return refuse_msg;
+            }
+            egglog_ast::Statement::Push(_) => {
+                // TODO: impl
+                return unimplemented_msg;
+            }
+            egglog_ast::Statement::Pop(_) => {
+                // TODO: impl
+                return unimplemented_msg;
+            }
+            egglog_ast::Statement::Fail(spanned) => {
+                // TODO: impl
+            }
+            egglog_ast::Statement::Include(filepath) => {
+                let working_directory = std::env::current_dir().unwrap();
+                let span = filepath.span;
+                let filepath = filepath.x;
+
+                let content =
+                    std::fs::read_to_string(filepath).map_err(|e| match config.file_not_found {
+                        FileNotFoundAction::ImmediatePanic => {
+                            panic!("error opeing {filepath}: {e}, working directory is {working_directory:?}")
+                        }
+                        FileNotFoundAction::EmitError => {
+                            bare_!(span, "error opeing {filepath}: {e}, working directory is {working_directory:?}")
+                        }
+                    })?;
+
+                let content = &*content.leak();
+
+                self.parse_egglog_sexp(SexpSpan::parse_string(span, content)?, config)
+                    .map_err(|mut e| {
+                        e.push(bare_!(span, "while reading {filepath}"));
+                        e.resolve(Some(filepath), Some(content))
+                    })?;
+            }
+        }
+        Ok(())
+    }
+
+    fn parse_toplevel_sexp(&mut self, x: SexpSpan, config: Configuration) -> MResult<()> {
         register_span!(x.span);
         let (function_name, args) = x.call("toplevel")?;
 
@@ -659,7 +1000,7 @@ impl Parser {
 
                 // let content = &*strip_comments(&content).leak();
 
-                self.parse_egglog(SexpSpan::parse_string(span, content)?, config)
+                self.parse_egglog_sexp(SexpSpan::parse_string(span, content)?, config)
                     .map_err(|mut e| {
                         e.push(bare_!(span, "while reading {filepath}"));
                         e.resolve(Some(filepath), Some(content))
@@ -1215,6 +1556,7 @@ mod compile_rule {
     };
 
     use crate::{
+        frontend::{egglog_ast, span},
         hir,
         ids::{RelationId, TypeId, TypeVarId, VariableId},
         typed_vec::TVec,
@@ -1374,6 +1716,16 @@ mod compile_rule {
     }
 
     impl Parser {
+        pub(super) fn add_rule2(
+            &mut self,
+            name: Option<&'static str>,
+            ruleset: Option<&'static str>,
+            facts: Vec<span::Spanned<egglog_ast::Fact>>,
+            actions: Vec<span::Spanned<egglog_ast::Action>>,
+        ) {
+            todo!()
+        }
+
         pub(super) fn add_rule(
             &mut self,
             name: Option<Str>,

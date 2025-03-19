@@ -37,7 +37,7 @@ pub(crate) struct Theory {
 
 #[derive(Debug, Clone)]
 pub(crate) enum Initial {
-    Run { steps: usize },
+    Run { steps: u64 },
     // ComputeGlobal {
     //     id: GlobalId,
     //     compute: GlobalCompute,
@@ -52,7 +52,7 @@ pub(crate) enum Initial {
     // }
 }
 impl Initial {
-    pub(crate) fn run(steps: usize) -> Self {
+    pub(crate) fn run(steps: u64) -> Self {
         Self::Run { steps }
     }
     // fn global_literal(id: GlobalId, literal: Literal) -> Self {

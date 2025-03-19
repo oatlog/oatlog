@@ -1187,7 +1187,7 @@ fn initial() {
                         .initialize(&mut theory.delta, &mut theory.uf);
                     theory.clear_transient();
                     theory.global_variables.new = true;
-                    for _ in 0..42usize {
+                    for _ in 0..42u64 {
                         theory.step();
                     }
                     theory

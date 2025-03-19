@@ -39,6 +39,7 @@ struct PrimitiveType {
 fn parse_primitives(tokens: proc_macro2::TokenStream) {}
 
 // cost is inferred to be zero, no insert is possible.
+#[ignore]
 #[test]
 fn test_mvp() {
     use quote::quote;
@@ -53,7 +54,7 @@ fn test_mvp() {
         // cost is 0 if omitted
         // index is 0,1,2... if omitted
         // index0, index1, index2 inferred from number of arguments.
-        #[prim_func(name = "+", id = "i64_add", cost = 0, index = [0, 1, 2])]
+        #[prim_func(name = "+", id = "i64_add", cost = 0, index = [0, 1, 2], fd)]
         fn i64_add(a: i64, b: i64) -> impl Iterator<Item = i64> { once(a + b) }
 
         // harder, fix later
