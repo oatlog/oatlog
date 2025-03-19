@@ -551,7 +551,7 @@ these terms largely interchangeably depending on the context.
 
 #TODO[]
 
-=== Egglog
+=== Egglog <language-egglog>
 
 #TODO[]
 
@@ -823,12 +823,84 @@ implemented.
 
 == Egglog-compatible external interface
 
-#TODO[
-  erik for loke: Is this about callable generated functions or that we support the egglog language?
+Oatlog is invoked as a Rust proc macro `oatlog::compile_egraph!`, to which the user can provide
+either a string literal or an S-expression in the form of Rust tokens directly, as seen in
+@compile_egraph_invokation. The input is parsed as a theory in the egglog language as specified in
+@language-egglog.
 
-  loke: Both, all of Oatlog as seen from the user perspective. The primary detail of which is being
-  egglog-compatible, hence having it in the suggested heading.
-]
+#figure(
+  ```rust
+    // Egglog as a string literal
+    oatlog::compile_egraph!("
+      (datatype Math
+        (Mul Math Math)
+        (Add Math Math)
+      )
+      (rewrite (Mul (Add a b) c) (Add (Mul a c) (Mul b c)))
+    ");
+    // Egglog as an S-expression of Rust tokens
+    oatlog::compile_egraph!((
+      (datatype Math
+        (Mul Math Math)
+        (Add Math Math)
+      )
+      (rewrite (Mul (Add a b) c) (Add (Mul a c) (Mul b c)))
+    ));
+  ```,
+  caption: [#TODO[]],
+) <compile_egraph_invokation>
+
+Oatlog does not currently support all Egglog language constructs. @oatlog_egglog_compatibility shows
+an overview of feature support.
+
+#{
+  let yes = table.cell()[yes]
+  let no = table.cell(fill: red.lighten(10%))[no]
+  let ignored = table.cell(fill: gray.lighten(30%))[ignored]
+  let wont = table.cell(fill: blue.lighten(20%))[Won't]
+  show figure: set block(breakable: true)
+  block(inset: 20pt, columns(2, [
+    #figure(
+      table(
+        columns: (auto, auto),
+        table.header[Egglog feature][Oatlog support],
+        [set-option], wont,
+        [sort], yes,
+        [datatype], yes,
+        [function], yes,
+        [constructor], yes,
+        [relation], yes,
+        [ruleset], no,
+        [rule], yes,
+        [rewrite], yes,
+        [birewrite], yes,
+        [run], yes,
+        [simplify], no,
+        [query-extract], no,
+        [check], ignored,
+        [push], no,
+        [pop], no,
+        [print-stats], no,
+        [input], no,
+        [output], no,
+        [include], yes,
+        [fail], ignored,
+        [let], yes,
+        [set], no,
+        [delete], no,
+        [subsume], no,
+        [union], yes,
+        [panic], no,
+        [extract], wont,
+      ),
+      caption: [Egglog language support in oatlog]
+    )
+    #label("oatlog_egglog_compatibility")
+  ]))
+}
+
+Finally, Oatlog has a run-time API that allows insertion and querying of rows and e-classes.
+#TODO[elaborate]
 
 == Architecture and intermediate representations
 
