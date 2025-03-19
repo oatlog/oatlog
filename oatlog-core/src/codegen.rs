@@ -11,6 +11,8 @@ use proc_macro2::TokenStream;
 use quote::{format_ident, quote};
 use std::{collections::BTreeMap, iter};
 
+// TODO: emit identifiers with correct spans.
+
 pub fn codegen(theory: &Theory) -> TokenStream {
     let symbolic_type_declarations: Vec<_> = theory
         .types

@@ -29,7 +29,7 @@ itertools = "0.14"
 proc-macro2 = { version = "1", features = ["span-locations"], default-features = false }
 quote = "1"
 regex = "1"
-syn = "2"
+syn = { version = "2", features = ["full", "extra-traits"] }
 smallvec = { version = "1.14.0", features = ["union"] }
 derive_more = { version = "2.0.1", features = ["full"] }
 criterion = "0.3"
