@@ -23,6 +23,8 @@
   abstract: [
     // Abstract text about your project in Computer Science and Engineering
     #TODO[Write abstract]
+
+    #TODO[We have made an egglog compatible e-graph engine]
   ],
   keywords: ("e-graphs", "equality saturation", "datalog", "program optimization", "rewrite rules"),
   acknowledgements: [
@@ -45,6 +47,12 @@
 #TODO[Matti: In general for §2.2, it is sometimes not entirely clear why certain references have been picked up and presented here, make sure that you tie all research presented here into your work for contextualizing your research: why this is important research to know and how it is different from your work]
 
 #TODO[Matti: §3.1 You talk about “practical performance on practical inputs”: how do you define practicality?]
+
+#TODO[sections for WCOJ, free join, ]
+
+#TODO[Alejandro: in general, try to maintain in every subsection of the introduction the structure of introducing a problem -> solving a problem]
+
+#TODO[Clearly present motivation for this work]
 
 = Introduction
 
@@ -91,10 +99,14 @@ a slow backtracking search, but most compilers do this heuristically instead.
 
 == E-graphs and EqSat
 
+#TODO[Alejandro: E-graphs and equality saturation (EqSat) are techniques implies E-graphs are a technique]
+
 E-graphs and equality saturation (EqSat) are techniques that can be used to augment peephole
 rewriting to make it nondestructive. They allow multiple rewrites of a value, committing to one only
 after all rewrites have been searched while not duplicating work post-branch as a backtracking
 search would.
+
+#TODO[Alejandro: confusing sentence "not other expressions but rather" -> "by letting operators take equivalence classes of expressions as inputs"]
 
 E-graphs are data structures capable of compactly representing an exponential number of expressions
 evaluating to the same value, by letting operators take not other expressions but rather equivalence
@@ -113,6 +125,8 @@ optimization, rather than automated theorem proving, we call this equality satur
 @equalitysaturation. Additionally, in equality saturation, there is a final extraction phase where
 one of the globally optimal expressions is selected.
 
+#TODO[Alejandro: is this the goal of the thesis? "While we have chosen optimizing compilers to illustrate their usefulness"]
+
 E-graphs suffer from the combinatorial explosion resulting from trying to find every equivalent
 representation of the initial expression, despite it being reduced through their efficient
 deduplication. This is a major problem in practice and currently severely limits what applications
@@ -125,6 +139,10 @@ know of that has incorporated e-graphs, but it has done so in the weaker form of
 (aegraphs) due to performance problems of full e-graphs.
 
 == Datalog and relational databases
+
+#TODO[Alejandro: instead of describing what datalog is, start with why you want to use it]
+
+#TODO[confusing sentence, refer to semi-naive section "semi-naive join which is similar to using database triggers"]
 
 Datalog is a declarative logic programming language that reasons bottom-up in an architecture very
 similar to a relational database. Recent developments @eqlog @egglog @relationalematching have shown
@@ -167,6 +185,10 @@ well as multiple expressions sharing a common subexpression, like say $f(g(x))$ 
 they can not efficiently deduplicate multiple identical consumers of different inputs, such as
 $f(g(x))$ and $f(h(x))$. This is problematic when exploring local rewrites for optimization or
 theorem proving purposes as these activities will create many similar expressions.
+
+#TODO[Alejandro: confusing sentence "it makes sense to instead introduce a notion of e-classes of equal e-nodes that e-nodes refer to rather than referring to other e-nodes directly."]
+
+#TODO[e-classes instead of e-class]
 
 One could address the deduplication problem by introducing a function-like abstraction, but this
 would still require some at least constant-sized top-level bookkeeping per expression. In the
@@ -217,6 +239,8 @@ Finally, every e-node is a member of exactly one e-class and no e-class is empty
 == Non-relational e-matching
 
 #TODO[expand upon this and upon how egg does things in general]
+
+#TODO[Alejandro: "“patterns”, then once these match add" -> "“patterns”. Once these match, they add"]
 
 Rewrite rules look for subgraph "patterns", then once these match add new e-classes and e-nodes and join existing
 e-classes by vertex contraction. EqSat involves repeatedly applying a set of rewrite rules, then
@@ -379,6 +403,8 @@ becomes
 $"Mul"(t_0, c, t_1) join "Add"(a, b, t_0)$
 
 == Semi-naive evaluation
+
+#TODO[Alejandro: way to join -> technique to join]
 
 Semi naive evaluation is a way to join relations where results only include possibly new
 information. In the context of Datalog, it avoids recomputing the same facts. Expressing it as
@@ -870,6 +896,7 @@ support for
     values, implemented as Rust functions directly such as `i64::add` or `i64::mul`.]
 + #[Lattice functions, i.e. partial functions returning primitives updated through `:merge`.]
 + #[Containers, such as sets and multisets containing EqSorts.]
++ #[Running arbitrary schedules.]
 
 #figure(
   {
@@ -888,6 +915,7 @@ support for
         [include], yes,
         [sort], yes,
         [datatype], yes,
+        [datatype\*], no,
         [constructor], yes,
         [function], yes,
         [relation], yes,
@@ -1018,6 +1046,8 @@ inserts and unifications. HIR is lowered into LIR and that process also performs
 
 #NOTE[The current implementation is very ad-hoc and will be replaced by something similar to
   free-join, except entirely static (only a single cover)]
+
+#TODO[We might need to explain free join]
 
 Represents all the choices made to transform a conjunctive query to LIR, specifically the order of
 joins and how the joins are performed. Note that this IR only contains queries and other
@@ -1247,19 +1277,16 @@ impl Theory {
     }
     fn clear_transient(&mut self) {
         self.global_variables.new = false;
-        self.forall_math_relation.clear_new();
         self.mul_relation.clear_new();
         self.add_relation.clear_new();
         loop {
             self.uprooted.take_dirt(&mut self.uf);
-            self.forall_math_relation.update(&self.uprooted, &mut self.uf, &mut self.delta);
             self.mul_relation.update(&self.uprooted, &mut self.uf, &mut self.delta);
             self.add_relation.update(&self.uprooted, &mut self.uf, &mut self.delta);
             if !(self.uf.has_new() || self.delta.has_new()) {
                 break;
             }
         }
-        self.forall_math_relation.update_finalize(&mut self.uf);
         self.mul_relation.update_finalize(&mut self.uf);
         self.add_relation.update_finalize(&mut self.uf);
     }
@@ -1532,7 +1559,6 @@ impl AddRelation {
 }
 #[derive(Debug, Default)]
 pub struct Delta {
-    forall_math_relation_delta: Vec<<ForallMathRelation as Relation>::Row>,
     mul_relation_delta: Vec<<MulRelation as Relation>::Row>,
     add_relation_delta: Vec<<AddRelation as Relation>::Row>,
 }
@@ -1542,14 +1568,12 @@ impl Delta {
     }
     fn has_new(&self) -> bool {
         let mut has_new = false;
-        has_new |= !self.forall_math_relation_delta.is_empty();
         has_new |= !self.mul_relation_delta.is_empty();
         has_new |= !self.add_relation_delta.is_empty();
         has_new
     }
     pub fn make_math(&mut self, uf: &mut Unification) -> Math {
         let id = uf.math_uf.add_eclass();
-        self.forall_math_relation_delta.push(id);
         id
     }
     pub fn insert_mul(&mut self, x: <MulRelation as Relation>::Row) {
