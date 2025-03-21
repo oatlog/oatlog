@@ -55,6 +55,8 @@ id_wrap!(GlobalId, "g", "id for a global variable");
 id_wrap!(TypeId, "t", "id for a type");
 id_wrap!(TypeVarId, "x", "id for a type variable");
 id_wrap!(RuleId, "y", "id for a rule");
+id_wrap!(RuleUsageId, "w", "id for a rule usage by a ruleset");
+id_wrap!(RuleSetId, "s", "id for a ruleset");
 id_wrap!(ColumnId, "c", "id for a column");
 id_wrap!(IndexId, "ir", "reference to an index");
 id_wrap!(
@@ -62,6 +64,7 @@ id_wrap!(
     "iu",
     "reference to something that requires an index"
 );
+
 impl IndexUsageId {
     pub(crate) fn bogus() -> Self {
         IndexUsageId(usize::MAX)

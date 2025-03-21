@@ -1,11 +1,13 @@
 //! Frontend, parse source text into HIR.
 
 #![allow(clippy::zero_sized_map_values, reason = "MapExt trait usage")]
+#![deny(unused_must_use)]
 
 use std::{
     collections::{BTreeMap, btree_map::Entry},
     fmt::Debug,
     hash::Hash,
+    primitive,
 };
 
 use itertools::Itertools as _;
@@ -136,7 +138,7 @@ struct FunctionData {
     // NOTE: for variadic functions, possibly do the following:
     // variadic : Option<TypeId>
     #[allow(unused)]
-    merge: Option<Expr>,
+    merge: Option<Spanned<Expr>>,
     #[allow(unused)]
     cost: Option<u64>,
 }
@@ -169,7 +171,7 @@ enum FunctionKind {
     },
     Function {
         output: TypeId,
-        merge: Option<Expr>,
+        merge: Option<Spanned<Expr>>,
     },
     Relation,
 }
@@ -406,10 +408,14 @@ impl Parser {
 
     // TODO erik: parse to AST + forward declarations here
     fn parse_egglog_sexp(&mut self, sexp: Vec<SexpSpan>, config: Configuration) -> MResult<()> {
-        egglog_ast::parse_program(sexp.clone())?;
-        for sexp in sexp {
-            self.parse_toplevel_sexp(sexp, config)
-                .add_err(bare_!(sexp.span, "while parsing this toplevel expression"))?;
+        if true {
+            let program = egglog_ast::parse_program(sexp.clone())?;
+            self.parse_egglog_program(program, config)?;
+        } else {
+            for sexp in sexp {
+                self.parse_toplevel_sexp(sexp, config)
+                    .add_err(bare_!(sexp.span, "while parsing this toplevel expression"))?;
+            }
         }
         Ok(())
     }
@@ -421,7 +427,9 @@ impl Parser {
     ) -> MResult<()> {
         // TODO: forward declarations here.
         for ast in program {
-            self.parse_egglog_ast(ast, config)?;
+            let span = ast.span.clone();
+            self.parse_egglog_ast(ast, config)
+                .add_err(bare_!(span, "while parsing this toplevel expression"))?;
         }
         Ok(())
     }
@@ -438,10 +446,9 @@ impl Parser {
         match ast.x {
             egglog_ast::Statement::SetOption { name, value } => return refuse_msg,
             egglog_ast::Statement::Sort { name, primitive } => {
-                assert!(
-                    primitive.is_none(),
-                    "collection not supported yet: {primitive:?}"
-                );
+                if let Some(primitive) = primitive {
+                    return err!("collections are not supported yet: {primitive:?}");
+                }
                 let _: TypeId = self.add_sort(name, None, None)?;
             }
             egglog_ast::Statement::Datatype { name, variants } => {
@@ -517,7 +524,7 @@ impl Parser {
                 self.rulesets.insert_unique(spanned, (), "ruleset")?;
             }
             egglog_ast::Statement::UnstableCombinedRuleset(spanned, vec) => {
-                return err!("unstable-combined-ruleset not implemented");
+                return unimplemented_msg;
             }
             egglog_ast::Statement::Rule {
                 name,
@@ -525,7 +532,7 @@ impl Parser {
                 rule,
             } => {
                 let egglog_ast::Rule { facts, actions } = rule;
-                self.add_rule2(name, ruleset, facts, actions);
+                self.add_rule2(name, ruleset, facts, actions)?;
             }
             egglog_ast::Statement::Rewrite {
                 ruleset,
@@ -543,12 +550,19 @@ impl Parser {
                 } = rewrite;
 
                 let mut facts = conditions;
-                facts.push(Spanned::new(egglog_ast::Fact::Expr(lhs.clone()), lhs.span));
+                let internal = spanned!("__internal_eq");
+                facts.push(Spanned::new(
+                    egglog_ast::Fact::Eq(lhs.clone(), spanned!(Expr::Var(internal))),
+                    lhs.span,
+                ));
                 let actions = vec![Spanned::new(
-                    egglog_ast::Action::Expr(rhs.clone()),
+                    egglog_ast::Action::Union {
+                        lhs: spanned!(Expr::Var(internal)),
+                        rhs: rhs.clone(),
+                    },
                     rhs.span,
                 )];
-                self.add_rule2(None, ruleset, facts, actions);
+                self.add_rule2(None, ruleset, facts, actions)?;
             }
             egglog_ast::Statement::BiRewrite { ruleset, rewrite } => {
                 let egglog_ast::Rewrite {
@@ -561,123 +575,47 @@ impl Parser {
                     (lhs.clone(), rhs.clone(), conditions.clone()),
                     (rhs, lhs, conditions),
                 ] {
-                    facts.push(Spanned::new(egglog_ast::Fact::Expr(lhs.clone()), lhs.span));
+                    let internal = spanned!("__internal_eq");
+                    facts.push(Spanned::new(
+                        egglog_ast::Fact::Eq(lhs.clone(), spanned!(Expr::Var(internal))),
+                        lhs.span,
+                    ));
                     let actions = vec![Spanned::new(
-                        egglog_ast::Action::Expr(rhs.clone()),
+                        egglog_ast::Action::Union {
+                            lhs: spanned!(Expr::Var(internal)),
+                            rhs: rhs.clone(),
+                        },
                         rhs.span,
                     )];
-                    self.add_rule2(None, ruleset, facts, actions);
+                    self.add_rule2(None, ruleset, facts, actions)?;
                 }
             }
             egglog_ast::Statement::Action(action) => {
-                // TODO: can we dedup this for rule compilation?
-                {
-                    use crate::union_find::UF;
-                    use ids::PremiseId;
-                    use std::collections::BTreeSet;
-
-                    enum InitialAction {
-                        // function calls would read globals if needed.
-                        Union(Expr, Expr),
-                        // Let -> global or macro
-                        // initializes globals too
-                        // overwrites whatever was there before?
-                        // sets entire row.
-                        // triggers lattice computation
-                        // invalid/does not make sense on a constructor.
-                        Set(ids::RelationId, Vec<Expr>),
-                        // modification given *arguments*
-                        Change(ids::RelationId, Vec<Expr>, egglog_ast::Change),
-                        Panic,
-                        Push,
-                        Pop,
-                        // Check {
-                        //     should_fail: bool,
-                        //     rule_id: RuleSetId,
-                        // }
-                    }
-
-                    enum RuleAction {
-                        // replaced by having ActionId indirection.
-                        // Union(VariableId, VariableId),
-                        // either get value from relation, or insert into delta.
-                        EntryOrMake {
-                            relation: RelationId,
-                            // only includes arguments
-                            row: Vec<ActionId>,
-                            // write result here
-                            res: ActionId,
-                        },
-                        // triggers lattice computation
-                        Set {
-                            relation: RelationId,
-                            // includes arguments and result
-                            row: Vec<ActionId>,
-                        },
-                    }
-                    struct VariableMeta {}
-
-                    // TODO: is it sound to run uf.find() before inserting?
-                    enum ActionSSA {
-                        /// Copy value from premise
-                        Premise(PremiseId),
-                        /// Read from relation or make new e-class if not found.
-                        /// (can introduce non-termination)
-                        Entry {
-                            relation: RelationId,
-                            args: Vec<ActionId>,
-                        },
-                        /// Make new e-class
-                        /// (can introduce non-determinism)
-                        Make,
-                    }
-
-                    struct SymbolicRule2 {
-                        // ====== PREMISE ======
-                        conjunctive_query: BTreeSet<(RelationId, Vec<PremiseId>)>,
-
-                        // ====== ACTION ======
-                        ssa: TVec<ActionId, ActionSSA>,
-                        unify: UF<ActionId>,
-                        insert_rows: BTreeSet<(RelationId, Vec<ActionId>)>,
-
-                        // ====== METADATA ======
-                        name: &'static str,
-                        action_variables: TVec<ActionId, VariableMeta>,
-                        premise_variables: TVec<PremiseId, VariableMeta>,
-                    }
-                    // * entry behavior for different cases:
-                    //     * Primitive - (hopefully) infallible, so ok
-                    //     * Collection - (hopefully) infallible, so ok
-                    //     * Lattice/function - always fails to compile.
-                    //     * Constructor - just creates a new e-class if needed.
-                    //     * Global - compiles to function but ok because infallible.
-                    //
-
-                    // Unresolved:
-                    // * merge + ssa might create cycles, which is bad. eg [a = f(b), b = f(a)]
-                    // * merge + ssa might result in several ways to compute value.
-                }
                 match action.x {
                     egglog_ast::Action::Let { name, expr } => {
-                        todo!("globals")
+                        self.add_toplevel_binding(Some(name), expr)?;
                     }
                     egglog_ast::Action::Set {
                         table,
                         args,
                         result,
-                    } => todo!(),
-                    egglog_ast::Action::Panic { message } => todo!(),
-                    egglog_ast::Action::Union { lhs, rhs } => todo!(),
-                    egglog_ast::Action::Expr(spanned) => todo!("globals"),
+                    } => {
+                        return unimplemented_msg;
+                    }
+                    egglog_ast::Action::Panic { message } => return unimplemented_msg,
+                    egglog_ast::Action::Union { lhs, rhs } => {
+                        // (unimplemented for toplevel)
+                        return unimplemented_msg;
+                    }
+                    egglog_ast::Action::Expr(expr) => {
+                        self.add_toplevel_binding(None, expr)?;
+                    }
                     egglog_ast::Action::Change {
                         table,
                         args,
                         change,
-                    } => return err!("change not supported yet"),
-                    egglog_ast::Action::Extract { expr, variants } => {
-                        return err!("extract not supported yet");
-                    }
+                    } => return unimplemented_msg,
+                    egglog_ast::Action::Extract { expr, variants } => return refuse_msg,
                 }
             }
             egglog_ast::Statement::RunSchedule(schedule) => match schedule.x {
@@ -709,11 +647,9 @@ impl Parser {
                 // ignored
             }
             egglog_ast::Statement::Input { table, file } => {
-                // ignored
                 return refuse_msg;
             }
             egglog_ast::Statement::Output { file, exprs } => {
-                // ignored
                 return refuse_msg;
             }
             egglog_ast::Statement::Push(_) => {
@@ -724,8 +660,9 @@ impl Parser {
                 // TODO: impl
                 return unimplemented_msg;
             }
-            egglog_ast::Statement::Fail(spanned) => {
+            egglog_ast::Statement::Fail(statement) => {
                 // TODO: impl
+                // ignored
             }
             egglog_ast::Statement::Include(filepath) => {
                 let working_directory = std::env::current_dir().unwrap();
@@ -938,8 +875,16 @@ impl Parser {
                 let tmp_internal = Expr::Var(Spanned::new("__internal_eq", None));
                 let eq_sign = Spanned::new("=", None);
 
-                facts.push(Expr::Call(eq_sign, vec![lhs.clone(), tmp_internal.clone()]));
-                self.add_rule(None, ruleset, facts, vec![Action::Union(tmp_internal, rhs)])?;
+                facts.push(spanned!(Expr::Call(
+                    eq_sign,
+                    vec![lhs.clone(), spanned!(tmp_internal.clone())],
+                )));
+                self.add_rule(
+                    None,
+                    ruleset,
+                    facts,
+                    vec![Action::Union(spanned!(tmp_internal), rhs)],
+                )?;
             }
             "birewrite" => {
                 let [lhs, rhs, options @ ..] = args else {
@@ -971,8 +916,16 @@ impl Parser {
                     let tmp_internal = Expr::Var(Spanned::new("__internal_eq", None));
                     let eq_sign = Spanned::new("=", None);
 
-                    facts.push(Expr::Call(eq_sign, vec![lhs.clone(), tmp_internal.clone()]));
-                    self.add_rule(None, ruleset, facts, vec![Action::Union(tmp_internal, rhs)])?;
+                    facts.push(spanned!(Expr::Call(
+                        eq_sign,
+                        vec![lhs.clone(), spanned!(tmp_internal.clone())],
+                    )));
+                    self.add_rule(
+                        None,
+                        ruleset,
+                        facts,
+                        vec![Action::Union(spanned!(tmp_internal), rhs)],
+                    )?;
                 }
             }
             "include" => {
@@ -1297,29 +1250,35 @@ impl Parser {
     }
 }
 
-#[derive(Debug, Clone, PartialEq)]
-enum Expr {
-    Literal(Spanned<Literal>),
-    Var(Str),
-    Call(Str, Vec<Expr>),
-}
+// #[derive(Debug, Clone, PartialEq)]
+// enum Expr {
+//     Literal(Spanned<Literal>),
+//     Var(Str),
+//     Call(Str, Vec<Expr>),
+// }
+
+use egglog_ast::Expr;
+
 impl Parser {
-    fn parse_expr(x: SexpSpan, local_bindings: &Option<&mut BTreeMap<Str, Expr>>) -> MResult<Expr> {
+    fn parse_expr(
+        x: SexpSpan,
+        local_bindings: &Option<&mut BTreeMap<Str, Spanned<Expr>>>,
+    ) -> MResult<Spanned<Expr>> {
+        register_span!(x.span);
         Ok(match x.x {
-            Sexp::Literal(x) => Expr::Literal(x),
+            Sexp::Literal(x) => spanned!(Expr::Literal(x)),
             Sexp::Atom(x) => local_bindings
                 .as_ref()
-                .and_then(|local_bindings| local_bindings.get(&x))
-                .cloned()
-                .unwrap_or(Expr::Var(x)),
-            Sexp::List([]) => Expr::Literal(Spanned::new(Literal::Unit, x.span)),
+                .and_then(|local_bindings| local_bindings.get(&x).cloned())
+                .unwrap_or(spanned!(Expr::Var(x))),
+            Sexp::List([]) => spanned!(Expr::Literal(Spanned::new(Literal::Unit, x.span))),
             Sexp::List(_) => {
                 let (function_name, args) = x.call("general call function name")?;
                 let args = args
                     .iter()
                     .map(|x| Self::parse_expr(*x, local_bindings))
                     .collect::<Result<Vec<_>, _>>()?;
-                Expr::Call(function_name, args)
+                spanned!(Expr::Call(function_name, args))
             }
         })
     }
@@ -1328,9 +1287,9 @@ impl Parser {
 #[derive(Debug)]
 enum Action {
     // never exists on toplevel
-    Expr(Expr),
+    Expr(Spanned<Expr>),
     // mark two things as equal. Possibly primitives => means insert
-    Union(Expr, Expr),
+    Union(Spanned<Expr>, Spanned<Expr>),
 }
 impl Parser {
     fn literal_type(&self, x: Literal) -> TypeId {
@@ -1345,10 +1304,14 @@ impl Parser {
             .lookup(Str::new(name, None))
             .expect("builtin types defined")
     }
-    fn add_toplevel_binding(&mut self, binding_name: Option<Str>, expr: Expr) -> MResult<()> {
+    fn add_toplevel_binding(
+        &mut self,
+        binding_name: Option<Str>,
+        expr: Spanned<Expr>,
+    ) -> MResult<()> {
         // only performs forward type inference.
-        fn parse(parser: &mut Parser, expr: Expr) -> MResult<(GlobalId, TypeId)> {
-            Ok(match expr {
+        fn parse(parser: &mut Parser, expr: Spanned<Expr>) -> MResult<(GlobalId, TypeId)> {
+            Ok(match expr.x {
                 Expr::Literal(x) => {
                     let compute = ComputeMethod::Literal(*x);
                     let ty = parser.literal_type(*x);
@@ -1454,7 +1417,7 @@ impl Parser {
         // None => toplevel
         // Some =>
         // &mut Option<&mut T> because Option<&mut T> is !Copy
-        local_bindings: &mut Option<&mut BTreeMap<Str, Expr>>,
+        local_bindings: &mut Option<&mut BTreeMap<Str, Spanned<Expr>>>,
     ) -> MResult<Option<Action>> {
         let (function_name, args) = x.call("action is a function call")?;
         register_span!(x.span);
@@ -1479,20 +1442,21 @@ impl Parser {
             }
             // set function to a result
             "set" => {
-                let [call, res] = args else {
-                    return err!("usage: (set (<table name> <expr>*) <expr>)");
-                };
-                let (function_name, args) = call.call("table + inputs to set to")?;
-                let args = args
-                    .iter()
-                    .map(|x| Parser::parse_expr(*x, local_bindings))
-                    .collect::<Result<Vec<_>, _>>()?;
+                todo!()
+                // let [call, res] = args else {
+                //     return err!("usage: (set (<table name> <expr>*) <expr>)");
+                // };
+                // let (function_name, args) = call.call("table + inputs to set to")?;
+                // let args = args
+                //     .iter()
+                //     .map(|x| Parser::parse_expr(*x, local_bindings))
+                //     .collect::<Result<Vec<_>, _>>()?;
 
-                // TODO: is this fine?
-                Some(Action::Union(
-                    Expr::Call(function_name, args),
-                    Parser::parse_expr(*res, local_bindings)?,
-                ))
+                // // TODO: is this fine?
+                // Some(Action::Union(
+                //     spanned!(Expr::Call(function_name, args)),
+                //     Parser::parse_expr(*res, local_bindings)?,
+                // ))
             }
             // mark two eclasses as equal
             "union" => {
@@ -1555,7 +1519,7 @@ mod compile_rule {
     };
 
     use crate::{
-        frontend::{egglog_ast, span},
+        frontend::{egglog_ast, register_span, span},
         hir,
         ids::{RelationId, TypeId, TypeVarId, VariableId},
         typed_vec::TVec,
@@ -1714,22 +1678,56 @@ mod compile_rule {
         })
     }
 
+    use crate::frontend::span::Spanned;
+
     impl Parser {
         pub(super) fn add_rule2(
             &mut self,
-            name: Option<&'static str>,
-            ruleset: Option<&'static str>,
-            facts: Vec<span::Spanned<egglog_ast::Fact>>,
-            actions: Vec<span::Spanned<egglog_ast::Action>>,
-        ) {
-            todo!()
+            name: Option<Str>,
+            ruleset: Option<Str>,
+            facts2: Vec<span::Spanned<egglog_ast::Fact>>,
+            actions2: Vec<span::Spanned<egglog_ast::Action>>,
+        ) -> MResult<()> {
+            let mut premises = Vec::new();
+            register_span!(None);
+            for facts in facts2 {
+                match facts.x {
+                    egglog_ast::Fact::Eq(e1, e2) => {
+                        premises.push(spanned!(Expr::Call(spanned!("="), vec![e1, e2])))
+                    }
+                    egglog_ast::Fact::Expr(e) => premises.push(e),
+                }
+            }
+
+            let actions: Vec<Action> = actions2
+                .into_iter()
+                .map(|action| match action.x {
+                    egglog_ast::Action::Let { name, expr } => todo!(),
+                    egglog_ast::Action::Set {
+                        table,
+                        args,
+                        result,
+                    } => todo!("set rule action"),
+                    egglog_ast::Action::Panic { message } => todo!("panic rule action"),
+                    egglog_ast::Action::Union { lhs, rhs } => Action::Union(lhs, rhs),
+                    egglog_ast::Action::Expr(e) => Action::Expr(e),
+                    egglog_ast::Action::Change {
+                        table,
+                        args,
+                        change,
+                    } => todo!("change rule action"),
+                    egglog_ast::Action::Extract { expr, variants } => todo!("extract rule action"),
+                })
+                .collect();
+
+            self.add_rule(name, ruleset, premises, actions)
         }
 
         pub(super) fn add_rule(
             &mut self,
             name: Option<Str>,
             ruleset: Option<Str>,
-            premises: Vec<Expr>,
+            premises: Vec<Spanned<Expr>>,
             actions: Vec<Action>,
         ) -> MResult<()> {
             let mut variables: TVec<VariableId, VariableInfo> = TVec::new();
@@ -1887,10 +1885,12 @@ mod compile_rule {
         }
     }
 
-    fn pseudo_parse_action(action: Action) -> Expr {
+    fn pseudo_parse_action(action: Action) -> Spanned<Expr> {
+        register_span!(None);
+
         match action {
             Action::Expr(expr) => expr,
-            Action::Union(a, b) => Expr::Call(Str::new("=", None), vec![a, b]),
+            Action::Union(a, b) => spanned!(Expr::Call(Str::new("=", None), vec![a, b])),
         }
     }
 }

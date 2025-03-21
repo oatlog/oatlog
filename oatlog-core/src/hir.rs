@@ -19,6 +19,206 @@ use std::{
     iter,
 };
 
+pub(crate) mod hir2 {
+
+    #![allow(unused)]
+
+    use crate::{
+        ids::{
+            ActionId, ColumnId, PremiseId, RelationId, RuleId, RuleSetId, RuleUsageId, TypeId,
+            VariableId,
+        },
+        typed_vec::TVec,
+        union_find::UF,
+    };
+
+    use std::collections::{BTreeMap, BTreeSet};
+
+    struct VariableMeta {
+        ty: TypeId,
+    }
+
+    // Add(a, b, c), Add(d, e, b);
+    //
+    //
+    // a,b -> c, b,c -> a, c,a -> b
+    //
+    // d,e -> b, e,b -> d, b,d -> e
+
+    // Trie opts that we are concerned about are just to remove redundant actions (and pick ideal
+    // actions). For inserts/entry we do best-effort. For unification we can keep a UF for each
+    // path in the tree.
+
+    // Entry means that there is not a single canonical way to write actions of a rule, but that is
+    // fine, assuming the merge works correctly.
+
+    pub(crate) struct SymbolicRule {
+        // ====== PREMISE ======
+        premise: Premise,
+
+        // ====== ACTION ======
+        action: Action,
+
+        // ====== METADATA ======
+        name: &'static str,
+        action_variables: TVec<ActionId, VariableMeta>,
+        premise_variables: TVec<PremiseId, VariableMeta>,
+
+        ids: BTreeSet<RuleId>,
+    }
+
+    pub(crate) struct Premise {
+        conjunctive_query: BTreeSet<(RelationId, Vec<PremiseId>)>,
+    }
+
+    // TODO: is it sound to run uf.find() before inserting?
+    pub(crate) enum ActionSsa {
+        /// Copy value from premise
+        Premise(PremiseId),
+        /// Read from relation or make new e-class if not found.
+        /// Note that use of entry means that there is not a single canonical representation for
+        /// actions.
+        ///
+        /// Entry implies the existence of an implicit rule.
+        ///
+        /// cost is 1 btree lookup.
+        Entry {
+            relation: RelationId,
+            args: Vec<ActionId>,
+        },
+    }
+
+    pub(crate) struct Action {
+        ssa: TVec<ActionId, Option<ActionSsa>>,
+        unify: UF<ActionId>,
+        insert_rows: BTreeSet<(RelationId, Vec<ActionId>)>,
+        /// For running checks, do we expect that this rule will trigger?
+        /// Merging with this enabled is tricky, so disable it.
+        /// We also can't run this action eagerly anymore.
+        /// ```text
+        /// let rule_ran = false;
+        /// for ... in ... {
+        ///     for ... in ... {
+        ///          rule_ran = true;
+        ///     }
+        /// }
+        /// ```
+        expect_trigger: Option<(bool, &'static str)>,
+        // change : subsume or delete
+    }
+
+    pub(crate) struct RuleSet {
+        rules: Vec<RuleUsageId>,
+    }
+
+    pub(crate) struct ImplicitRule {
+        relation: RelationId,
+        on: Vec<ColumnId>,
+        ty: ImplicitRuleAction,
+    }
+    pub(crate) enum ImplicitRuleAction {
+        Unify,
+        // not needed since :no-merge is equivalent to :merge new
+        // Panic,
+        Merge(BTreeMap<ColumnId, MergeExpr>),
+    }
+
+    // Assume: we implement lattice through just having a single memory location for the lattice
+    // value.
+    pub(crate) enum MergeExpr {
+        VarOld,
+        VarNew,
+        Call(RelationId, Vec<MergeExpr>),
+        Literal(crate::lir::Literal),
+    }
+
+    // the only cross-rule optimizations are from implicit to symbolic.
+
+    pub(crate) struct Theory {
+        rulesets: TVec<RuleSetId, RuleSet>,
+        /// None if deleted (promoted to symbolic)
+        rules: TVec<RuleId, Option<SymbolicRule>>,
+        implicit_rules: BTreeMap<RelationId, Vec<ImplicitRule>>,
+
+        // ===============================00
+        name: &'static str,
+        types: TVec<TypeId, Type>,
+        relations: TVec<RelationId, Relation>,
+    }
+
+    pub(crate) struct Relation {
+        name: &'static str,
+        columns: TVec<ColumnId, TypeId>,
+        ty: RelationTy,
+    }
+
+    pub(crate) enum RelationTy {
+        NewOf(RelationId),
+        // entry sometimes ok
+        Table,
+        // entry always ok (unless it returns an iterator and then we have problems)
+        Primitive(PrimitiveFunction),
+        // Alias { permutation: TVec<ColumnId, ColumnId>, other: RelationId }
+        // Global desugars to table.
+        // MaterializedView
+        // Forall (impl later)
+    }
+
+    pub(crate) struct PrimitiveFunction {
+        name: &'static str,
+        id: &'static str,
+        types: Vec<TypeId>,
+        /// compute column using other columns.
+        /// multiple return is implemented using multiple indexes.
+        indexes: BTreeMap<(ColumnId, Vec<ColumnId>), PrimitiveIndex>,
+    }
+
+    pub(crate) struct PrimitiveIndex {
+        // #ident(args..) calls function.
+        ident: &'static str,
+        cost: u64,
+    }
+
+    pub(crate) struct Type {
+        name: &'static str,
+        primitive: Option<&'static str>,
+    }
+
+    pub(crate) mod lir2 {
+        use crate::ids::*;
+        pub(crate) enum Expr {
+            Call(RelationId, Vec<Expr>),
+            Literal(crate::lir::Literal),
+        }
+        pub(crate) enum Initial {
+            Union(Expr, Expr),
+            Set(RelationId, Vec<Expr>),
+            Panic,
+            Push,
+            Pop,
+            Expr(Expr),
+            // Change(RelationId, Vec<Expr>,
+        }
+
+        // enum Change {
+        //     Subsume,
+        //     Delete,
+        // }
+    }
+
+    // * entry behavior for different cases:
+    //     * Primitive - (hopefully) infallible, so ok
+    //     * Collection - (hopefully) infallible, so ok
+    //     * Lattice/function - always fails to compile.
+    //     * Constructor - just creates a new e-class if needed.
+    //     * Global - compiles to function but ok because infallible.
+    //
+
+    // Unresolved:
+    // * merge + ssa might create cycles, which is bad. eg [a = f(b), b = f(a)]
+    // * merge + ssa might result in several ways to compute value.
+}
+
 /// Represents a theory (set of rules) with associated information
 #[derive(Clone, Debug)]
 pub(crate) struct Theory {

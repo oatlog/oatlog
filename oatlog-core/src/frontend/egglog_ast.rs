@@ -13,7 +13,7 @@ pub(crate) enum GExpr<F /* Function */, V /* Variable */> {
     /// ```egglog
     /// 3
     /// ```
-    Literal(Literal),
+    Literal(Spanned<Literal>),
     /// A variable.
     /// ```egglog
     /// a
@@ -182,7 +182,7 @@ pub(crate) enum Statement {
     /// (constructor Add (Math Math))
     /// (constructor Sum MathVec)
     /// (constructor B Bool)
-    /// 
+    ///
     /// (sort MathVec (Vec Math))
     /// (sort Bool)
     /// (constructor True Bool)
@@ -229,8 +229,8 @@ pub(crate) enum Statement {
     /// (rule ((= e (Add a b))) ((union e (Add a b))))
     /// ```
     Rule {
-        name: Option<&'static str>,
-        ruleset: Option<&'static str>,
+        name: Option<Str>,
+        ruleset: Option<Str>,
         rule: Rule,
     },
     /// Declare a rewrite
@@ -238,7 +238,7 @@ pub(crate) enum Statement {
     /// (rewrite (Add a b) (Add b a))
     /// ```
     Rewrite {
-        ruleset: Option<&'static str>,
+        ruleset: Option<Str>,
         rewrite: Rewrite,
         subsume: bool,
     },
@@ -252,7 +252,7 @@ pub(crate) enum Statement {
     /// (rewrite (Add (Mul a c) (Mul b c)) (Mul (Add a b) c))
     /// ```
     BiRewrite {
-        ruleset: Option<&'static str>,
+        ruleset: Option<Str>,
         rewrite: Rewrite,
     },
     /// Run an arbitrary action
@@ -585,8 +585,8 @@ fn parse_statement(x: SexpSpan) -> MResult<Spanned<Statement>> {
                 let mut ruleset = None;
                 let mut name = None;
                 options!(options,
-                    (":ruleset", [x]) => { ruleset = Some(*x.atom("ruleset")?); }
-                    (":name", [x]) => { name = Some(*x.atom("name")?); }
+                    (":ruleset", [x]) => { ruleset = Some(x.atom("ruleset")?); }
+                    (":name", [x]) => { name = Some(x.atom("name")?); }
                 );
                 Statement::Rule {
                     name,
@@ -606,7 +606,7 @@ fn parse_statement(x: SexpSpan) -> MResult<Spanned<Statement>> {
                 let mut subsume = false;
                 let mut ruleset = None;
                 options!(options,
-                    (":ruleset", [x]) => { ruleset = Some(*x.atom("ruleset")?); }
+                    (":ruleset", [x]) => { ruleset = Some(x.atom("ruleset")?); }
                     (":subsume", []) => { subsume = true; }
                     (":when", conds) => {
                         pattern!(conds, [(List conds parse_fact)]);
@@ -633,7 +633,7 @@ fn parse_statement(x: SexpSpan) -> MResult<Spanned<Statement>> {
                 let mut conditions = vec![];
                 let mut ruleset = None;
                 options!(options,
-                    (":ruleset", [x]) => { ruleset = Some(*x.atom("ruleset")?); }
+                    (":ruleset", [x]) => { ruleset = Some(x.atom("ruleset")?); }
                     (":when", conds) => {
                         pattern!(conds, [(List conds parse_fact)]);
                         conditions.extend(conds);
@@ -786,12 +786,12 @@ fn parse_action(x: SexpSpan) -> MResult<Spanned<Action>> {
 fn parse_expr(x: SexpSpan) -> MResult<Spanned<Expr>> {
     register_span!(x.span);
     Ok(spanned!(match *x {
-        Sexp::Literal(literal) => Expr::Literal(*literal),
+        Sexp::Literal(literal) => Expr::Literal(literal),
         Sexp::Atom(atom) => Expr::Var(atom),
         Sexp::List(list) => {
             pattern!(list,
                 [(Atom function_name), (args @ .. parse_expr)] => { Expr::Call(function_name, args) }
-                [] => { Expr::Literal(Literal::Unit) }
+                [] => { Expr::Literal(spanned!(Literal::Unit)) }
             )
         }
     }))

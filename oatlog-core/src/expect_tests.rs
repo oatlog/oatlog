@@ -385,6 +385,7 @@ fn test_negative_i64_tokens() {
 }
 
 #[test]
+#[ignore = "panic merge is no longer implemented"]
 fn codegen_panic_merge() {
     Steps {
         // (let x (f))

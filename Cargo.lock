@@ -888,6 +888,7 @@ dependencies = [
  "expect-test",
  "heck",
  "itertools 0.14.0",
+ "paste",
  "proc-macro2",
  "quote",
  "regex",

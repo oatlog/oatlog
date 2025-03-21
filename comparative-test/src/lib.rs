@@ -232,20 +232,7 @@ egglog_test!(nogenerate, antiunify, expect![[r#"
     ( include "comparative-test/egglog-testsuite/antiunify.egg" )
 
 "#]], r#"(include "comparative-test/egglog-testsuite/antiunify.egg")"#);// needs primitive functions
-egglog_test!(nogenerate, array, expect![[r#"
-    comparative-test/egglog-testsuite/array.egg: does not make sense for compiled
-    ( panic "query (neq x x) found something equal to itself" )
-
-    comparative-test/egglog-testsuite/array.egg: while parsing this toplevel expression
-    ( rule ( ( neq x x ) ) ( ( panic "query (neq x x) found something equal to itself" ) ) )
-
-    comparative-test/egglog-testsuite/array.egg: while reading comparative-test/egglog-testsuite/array.egg
-    ( include "comparative-test/egglog-testsuite/array.egg" )
-
-    toplevel: while parsing this toplevel expression
-    ( include "comparative-test/egglog-testsuite/array.egg" )
-
-"#]], r#"(include "comparative-test/egglog-testsuite/array.egg")"#);// needs panic (does not use vec)
+egglog_test!(nogenerate, array, expect!["PANIC: not yet implemented: panic rule action"], r#"(include "comparative-test/egglog-testsuite/array.egg")"#);// needs panic (does not use vec)
 egglog_test!(nogenerate, bdd, expect![[r#"
     comparative-test/egglog-testsuite/bdd.egg: function call < is not defined
     <
@@ -297,7 +284,7 @@ egglog_test!(nogenerate, bool_, expect![[r#"
 
 "#]], r#"(include "comparative-test/egglog-testsuite/bool.egg")"#);// bool not implemented
 egglog_test!(nogenerate, calc, expect![[r#"
-    comparative-test/egglog-testsuite/calc.egg: does not make sense for compiled
+    comparative-test/egglog-testsuite/calc.egg: not implemented yet
     ( push )
 
     comparative-test/egglog-testsuite/calc.egg: while parsing this toplevel expression
@@ -339,7 +326,7 @@ egglog_test!(nogenerate, combined_nested, expect![[r#"
 
 "#]], r#"(include "comparative-test/egglog-testsuite/combined-nested.egg")"#);// needs unstable-combine-ruleset (won't implement)
 egglog_test!(nogenerate, container_rebuild, expect![[r#"
-    comparative-test/egglog-testsuite/container-rebuild.egg: does not make sense for compiled
+    comparative-test/egglog-testsuite/container-rebuild.egg: not implemented yet
     ( push )
 
     comparative-test/egglog-testsuite/container-rebuild.egg: while parsing this toplevel expression
@@ -366,22 +353,9 @@ egglog_test!(nogenerate, cyk, expect![[r#"
     ( include "comparative-test/egglog-testsuite/cyk.egg" )
 
 "#]], r#"(include "comparative-test/egglog-testsuite/cyk.egg")"#);// needs primitive functions
-egglog_test!(nogenerate, cykjson, expect![[r#"
-    comparative-test/egglog-testsuite/cykjson.egg: function call + is not defined
-    +
-
-    comparative-test/egglog-testsuite/cykjson.egg: while parsing this toplevel expression
-    ( rule ( ( Prod a b c ) ( P p1 s b ) ( P p2 ( + s p1 ) c ) ) ( ( P ( + p1 p2 ) s a ) ) )
-
-    comparative-test/egglog-testsuite/cykjson.egg: while reading comparative-test/egglog-testsuite/cykjson.egg
-    ( include "comparative-test/egglog-testsuite/cykjson.egg" )
-
-    toplevel: while parsing this toplevel expression
-    ( include "comparative-test/egglog-testsuite/cykjson.egg" )
-
-"#]], r#"(include "comparative-test/egglog-testsuite/cykjson.egg")"#);// needs primitive functions
+egglog_test!(nogenerate, cykjson, expect!["PANIC: not yet implemented: set rule action"], r#"(include "comparative-test/egglog-testsuite/cykjson.egg")"#);// needs primitive functions
 egglog_test!(nogenerate, datatypes, expect![[r#"
-    comparative-test/egglog-testsuite/datatypes.egg: "datatype*" unimplemented, unclear what this does
+    comparative-test/egglog-testsuite/datatypes.egg: TODO: forward declarations
     ( datatype* ( Math ( Add Math Math ) ( Sum MathVec ) ( B Bool ) ) ( sort MathVec ( Vec Math ) ) ( Bool ( True ) ( False ) ) )
 
     comparative-test/egglog-testsuite/datatypes.egg: while parsing this toplevel expression
@@ -395,11 +369,11 @@ egglog_test!(nogenerate, datatypes, expect![[r#"
 
 "#]], r#"(include "comparative-test/egglog-testsuite/datatypes.egg")"#);//needs datatype*
 egglog_test!(nogenerate, delete, expect![[r#"
-    comparative-test/egglog-testsuite/delete.egg: does not make sense for compiled
-    ( delete ( foo 1 ) )
+    comparative-test/egglog-testsuite/delete.egg: not implemented yet
+    ( set ( foo 1 ) 7 )
 
     comparative-test/egglog-testsuite/delete.egg: while parsing this toplevel expression
-    ( delete ( foo 1 ) )
+    ( set ( foo 1 ) 7 )
 
     comparative-test/egglog-testsuite/delete.egg: while reading comparative-test/egglog-testsuite/delete.egg
     ( include "comparative-test/egglog-testsuite/delete.egg" )
@@ -409,11 +383,11 @@ egglog_test!(nogenerate, delete, expect![[r#"
 
 "#]], r#"(include "comparative-test/egglog-testsuite/delete.egg")"#);//needs delete
 egglog_test!(nogenerate, eggcc_extraction, expect![[r#"
-    comparative-test/egglog-testsuite/eggcc-extraction.egg: type f64 is not defined
-    f64
+    comparative-test/egglog-testsuite/eggcc-extraction.egg: collections are not supported yet: ("Vec", [Var("Operand")])
+    ( sort VecOperandBase ( Vec Operand ) )
 
     comparative-test/egglog-testsuite/eggcc-extraction.egg: while parsing this toplevel expression
-    ( constructor Float ( f64 ) Literal )
+    ( sort VecOperandBase ( Vec Operand ) )
 
     comparative-test/egglog-testsuite/eggcc-extraction.egg: while reading comparative-test/egglog-testsuite/eggcc-extraction.egg
     ( include "comparative-test/egglog-testsuite/eggcc-extraction.egg" )
@@ -437,7 +411,7 @@ egglog_test!(nogenerate, eqsat_basic, expect![[r#"
 
 "#]], r#"(include "comparative-test/egglog-testsuite/eqsat-basic.egg")"#);// needs primitive functions
 egglog_test!(nogenerate, eqsat_basic_multiset, expect![[r#"
-    comparative-test/egglog-testsuite/eqsat-basic-multiset.egg: "datatype*" unimplemented, unclear what this does
+    comparative-test/egglog-testsuite/eqsat-basic-multiset.egg: TODO: forward declarations
     ( datatype* ( Math ( Num i64 ) ( Var String ) ( Add Math Math ) ( Mul Math Math ) ( Product MathMultiSet ) ( Sum MathMultiSet ) ) ( sort MathToMath ( UnstableFn ( Math ) Math ) ) ( sort MathMultiSet ( MultiSet Math ) ) )
 
     comparative-test/egglog-testsuite/eqsat-basic-multiset.egg: while parsing this toplevel expression
@@ -466,8 +440,8 @@ egglog_test!(nogenerate, eqsolve, expect![[r#"
 "#]], r#"(include "comparative-test/egglog-testsuite/eqsolve.egg")"#);//primitive functions
 egglog_test!(zrocorrect, f64, expect![], r#"(include "comparative-test/egglog-testsuite/f64.egg")"#);
 egglog_test!(nogenerate, fail_wrong_assertion, expect![[r#"
-    comparative-test/egglog-testsuite/fail_wrong_assertion.egg: function min is not defined
-    min
+    comparative-test/egglog-testsuite/fail_wrong_assertion.egg: lattice computations not implemented
+    ( function f ( i64 ) i64 :merge ( min old new ) )
 
     comparative-test/egglog-testsuite/fail_wrong_assertion.egg: while parsing this toplevel expression
     ( function f ( i64 ) i64 :merge ( min old new ) )
@@ -494,11 +468,11 @@ egglog_test!(nogenerate, fibonacci_demand, expect![[r#"
 
 "#]], r#"(include "comparative-test/egglog-testsuite/fibonacci-demand.egg")"#);//function call + is not defined
 egglog_test!(nogenerate, fibonacci, expect![[r#"
-    comparative-test/egglog-testsuite/fibonacci.egg: function call + is not defined
-    +
+    comparative-test/egglog-testsuite/fibonacci.egg: not implemented yet
+    ( set ( fib 0 ) 0 )
 
     comparative-test/egglog-testsuite/fibonacci.egg: while parsing this toplevel expression
-    ( rule ( ( = f0 ( fib x ) ) ( = f1 ( fib ( + x 1 ) ) ) ) ( ( set ( fib ( + x 2 ) ) ( + f0 f1 ) ) ) )
+    ( set ( fib 0 ) 0 )
 
     comparative-test/egglog-testsuite/fibonacci.egg: while reading comparative-test/egglog-testsuite/fibonacci.egg
     ( include "comparative-test/egglog-testsuite/fibonacci.egg" )
@@ -508,11 +482,11 @@ egglog_test!(nogenerate, fibonacci, expect![[r#"
 
 "#]], r#"(include "comparative-test/egglog-testsuite/fibonacci.egg")"#);//primitive functions
 egglog_test!(nogenerate, fusion, expect![[r#"
-    comparative-test/egglog-testsuite/fusion.egg: function set-intersect is not defined
-    set-intersect
+    comparative-test/egglog-testsuite/fusion.egg: collections are not supported yet: ("Set", [Var("Var")])
+    ( sort StringSet ( Set Var ) )
 
     comparative-test/egglog-testsuite/fusion.egg: while parsing this toplevel expression
-    ( function freer ( Term ) StringSet :merge ( set-intersect old new ) )
+    ( sort StringSet ( Set Var ) )
 
     comparative-test/egglog-testsuite/fusion.egg: while reading comparative-test/egglog-testsuite/fusion.egg
     ( include "comparative-test/egglog-testsuite/fusion.egg" )
@@ -569,11 +543,11 @@ egglog_test!(nogenerate, integer_math, expect![[r#"
 
 "#]], r#"(include "comparative-test/egglog-testsuite/integer_math.egg")"#);// needs !=
 egglog_test!(nogenerate, intersection, expect![[r#"
-    comparative-test/egglog-testsuite/intersection.egg: does not make sense for compiled
-    ( query-extract :variants 5 t3 )
+    comparative-test/egglog-testsuite/intersection.egg: not implemented yet
+    ( union ( f a1 ) fb1 )
 
     comparative-test/egglog-testsuite/intersection.egg: while parsing this toplevel expression
-    ( query-extract :variants 5 t3 )
+    ( union ( f a1 ) fb1 )
 
     comparative-test/egglog-testsuite/intersection.egg: while reading comparative-test/egglog-testsuite/intersection.egg
     ( include "comparative-test/egglog-testsuite/intersection.egg" )
@@ -583,8 +557,8 @@ egglog_test!(nogenerate, intersection, expect![[r#"
 
 "#]], r#"(include "comparative-test/egglog-testsuite/intersection.egg")"#);// needs query-extract
 egglog_test!(nogenerate, interval, expect![[r#"
-    comparative-test/egglog-testsuite/interval.egg: function min is not defined
-    min
+    comparative-test/egglog-testsuite/interval.egg: lattice computations not implemented
+    ( function hi ( Math ) i64 :merge ( min old new ) )
 
     comparative-test/egglog-testsuite/interval.egg: while parsing this toplevel expression
     ( function hi ( Math ) i64 :merge ( min old new ) )
@@ -611,11 +585,11 @@ egglog_test!(nogenerate, knapsack, expect![[r#"
 
 "#]], r#"(include "comparative-test/egglog-testsuite/knapsack.egg")"#);// needs primitive functions
 egglog_test!(nogenerate, lambda, expect![[r#"
-    comparative-test/egglog-testsuite/lambda.egg: function set-intersect is not defined
-    set-intersect
+    comparative-test/egglog-testsuite/lambda.egg: collections are not supported yet: ("Set", [Var("VarType")])
+    ( sort StringSet ( Set VarType ) )
 
     comparative-test/egglog-testsuite/lambda.egg: while parsing this toplevel expression
-    ( function freer ( Term ) StringSet :merge ( set-intersect old new ) )
+    ( sort StringSet ( Set VarType ) )
 
     comparative-test/egglog-testsuite/lambda.egg: while reading comparative-test/egglog-testsuite/lambda.egg
     ( include "comparative-test/egglog-testsuite/lambda.egg" )
@@ -638,21 +612,21 @@ egglog_test!(nogenerate, levenshtein_distance, expect![[r#"
     ( include "comparative-test/egglog-testsuite/levenshtein-distance.egg" )
 
 "#]], r#"(include "comparative-test/egglog-testsuite/levenshtein-distance.egg")"#);// needs primitive functions
-egglog_test!(nogenerate, list, expect![[r#"
-    comparative-test/egglog-testsuite/list.egg: function call + is not defined
-    +
+egglog_test!(nogenerate, list, expect!["PANIC: not yet implemented: set rule action"], r#"(include "comparative-test/egglog-testsuite/list.egg")"#);// primitive functions
+egglog_test!(nogenerate, looking_up_global, expect![[r#"
+    comparative-test/egglog-testsuite/looking_up_global.egg: not implemented yet
+    ( set ( f ) 0 )
 
-    comparative-test/egglog-testsuite/list.egg: while parsing this toplevel expression
-    ( rule ( ( list-length-demand ( Cons head tail ) ) ( = ( list-length tail ) tail-length ) ) ( ( set ( list-length ( Cons head tail ) ) ( + tail-length 1 ) ) ) :ruleset list )
+    comparative-test/egglog-testsuite/looking_up_global.egg: while parsing this toplevel expression
+    ( set ( f ) 0 )
 
-    comparative-test/egglog-testsuite/list.egg: while reading comparative-test/egglog-testsuite/list.egg
-    ( include "comparative-test/egglog-testsuite/list.egg" )
+    comparative-test/egglog-testsuite/looking_up_global.egg: while reading comparative-test/egglog-testsuite/looking_up_global.egg
+    ( include "comparative-test/egglog-testsuite/looking_up_global.egg" )
 
     toplevel: while parsing this toplevel expression
-    ( include "comparative-test/egglog-testsuite/list.egg" )
+    ( include "comparative-test/egglog-testsuite/looking_up_global.egg" )
 
-"#]], r#"(include "comparative-test/egglog-testsuite/list.egg")"#);// primitive functions
-egglog_test!(no_compile, looking_up_global, expect![], r#"(include "comparative-test/egglog-testsuite/looking_up_global.egg")"#);// panics on a todo!()?
+"#]], r#"(include "comparative-test/egglog-testsuite/looking_up_global.egg")"#);// panics on a todo!()?
 egglog_test!(nogenerate, looking_up_nonconstructor_in_rewrite_good, expect![[r#"
     comparative-test/egglog-testsuite/looking_up_nonconstructor_in_rewrite_good.egg: function call + is not defined
     +
@@ -668,11 +642,11 @@ egglog_test!(nogenerate, looking_up_nonconstructor_in_rewrite_good, expect![[r#"
 
 "#]], r#"(include "comparative-test/egglog-testsuite/looking_up_nonconstructor_in_rewrite_good.egg")"#);//primitive functions
 egglog_test!(nogenerate, map, expect![[r#"
-    comparative-test/egglog-testsuite/map.egg: function map-insert is not defined
-    map-insert
+    comparative-test/egglog-testsuite/map.egg: collections are not supported yet: ("Map", [Var("i64"), Var("String")])
+    ( sort MyMap ( Map i64 String ) )
 
     comparative-test/egglog-testsuite/map.egg: while parsing this toplevel expression
-    ( let my_map1 ( map-insert ( map-empty ) 1 "one" ) )
+    ( sort MyMap ( Map i64 String ) )
 
     comparative-test/egglog-testsuite/map.egg: while reading comparative-test/egglog-testsuite/map.egg
     ( include "comparative-test/egglog-testsuite/map.egg" )
@@ -695,20 +669,7 @@ egglog_test!(nogenerate, math, expect![[r#"
     ( include "comparative-test/egglog-testsuite/math.egg" )
 
 "#]], r#"(include "comparative-test/egglog-testsuite/math.egg")"#);// needs primitive functions
-egglog_test!(nogenerate, math_microbenchmark, expect![[r#"
-    comparative-test/egglog-testsuite/math-microbenchmark.egg: does not make sense for compiled
-    ( print-stats )
-
-    comparative-test/egglog-testsuite/math-microbenchmark.egg: while parsing this toplevel expression
-    ( print-stats )
-
-    comparative-test/egglog-testsuite/math-microbenchmark.egg: while reading comparative-test/egglog-testsuite/math-microbenchmark.egg
-    ( include "comparative-test/egglog-testsuite/math-microbenchmark.egg" )
-
-    toplevel: while parsing this toplevel expression
-    ( include "comparative-test/egglog-testsuite/math-microbenchmark.egg" )
-
-"#]], r#"(include "comparative-test/egglog-testsuite/math-microbenchmark.egg")"#);// needs print-stats
+egglog_test!(nogenerate, math_microbenchmark, expect!["PANIC: assertion failed: !self.is_bound(arg)"], r#"(include "comparative-test/egglog-testsuite/math-microbenchmark.egg")"#);// needs print-stats
 egglog_test!(nogenerate, matrix, expect![[r#"
     comparative-test/egglog-testsuite/matrix.egg: function call * is not defined
     *
@@ -724,8 +685,8 @@ egglog_test!(nogenerate, matrix, expect![[r#"
 
 "#]], r#"(include "comparative-test/egglog-testsuite/matrix.egg")"#);// needs primitive functions
 egglog_test!(nogenerate, merge_during_rebuild, expect![[r#"
-    comparative-test/egglog-testsuite/merge-during-rebuild.egg: function min is not defined
-    min
+    comparative-test/egglog-testsuite/merge-during-rebuild.egg: lattice computations not implemented
+    ( function distance ( N N ) i64 :merge ( min old new ) )
 
     comparative-test/egglog-testsuite/merge-during-rebuild.egg: while parsing this toplevel expression
     ( function distance ( N N ) i64 :merge ( min old new ) )
@@ -737,10 +698,23 @@ egglog_test!(nogenerate, merge_during_rebuild, expect![[r#"
     ( include "comparative-test/egglog-testsuite/merge-during-rebuild.egg" )
 
 "#]], r#"(include "comparative-test/egglog-testsuite/merge-during-rebuild.egg")"#);// needs merge
-egglog_test!(nogenerate, merge_read, expect!["PANIC: not yet implemented: implement lattice merge"], r#"(include "comparative-test/egglog-testsuite/merge_read.egg")"#);// proc macro paniced
+egglog_test!(nogenerate, merge_read, expect![[r#"
+    comparative-test/egglog-testsuite/merge_read.egg: lattice computations not implemented
+    ( function bar ( ) i64 :merge ( foo ) )
+
+    comparative-test/egglog-testsuite/merge_read.egg: while parsing this toplevel expression
+    ( function bar ( ) i64 :merge ( foo ) )
+
+    comparative-test/egglog-testsuite/merge_read.egg: while reading comparative-test/egglog-testsuite/merge_read.egg
+    ( include "comparative-test/egglog-testsuite/merge_read.egg" )
+
+    toplevel: while parsing this toplevel expression
+    ( include "comparative-test/egglog-testsuite/merge_read.egg" )
+
+"#]], r#"(include "comparative-test/egglog-testsuite/merge_read.egg")"#);// proc macro paniced
 egglog_test!(nogenerate, merge_saturates, expect![[r#"
-    comparative-test/egglog-testsuite/merge-saturates.egg: function min is not defined
-    min
+    comparative-test/egglog-testsuite/merge-saturates.egg: lattice computations not implemented
+    ( function foo ( ) i64 :merge ( min old new ) )
 
     comparative-test/egglog-testsuite/merge-saturates.egg: while parsing this toplevel expression
     ( function foo ( ) i64 :merge ( min old new ) )
@@ -753,8 +727,8 @@ egglog_test!(nogenerate, merge_saturates, expect![[r#"
 
 "#]], r#"(include "comparative-test/egglog-testsuite/merge-saturates.egg")"#);// merge
 egglog_test!(nogenerate, multiset, expect![[r#"
-    comparative-test/egglog-testsuite/multiset.egg: sort primitive: expected atom
-    ( Math )
+    comparative-test/egglog-testsuite/multiset.egg: collections are not supported yet: ("UnstableFn", [Call("Math", []), Var("Math")])
+    ( sort MathToMath ( UnstableFn ( Math ) Math ) )
 
     comparative-test/egglog-testsuite/multiset.egg: while parsing this toplevel expression
     ( sort MathToMath ( UnstableFn ( Math ) Math ) )
@@ -767,11 +741,11 @@ egglog_test!(nogenerate, multiset, expect![[r#"
 
 "#]], r#"(include "comparative-test/egglog-testsuite/multiset.egg")"#);// parse error?
 egglog_test!(nogenerate, name_resolution, expect![[r#"
-    comparative-test/egglog-testsuite/name-resolution.egg: does not make sense for compiled
-    ( panic "ahhh" )
+    comparative-test/egglog-testsuite/name-resolution.egg: not implemented yet
+    ( union b c )
 
     comparative-test/egglog-testsuite/name-resolution.egg: while parsing this toplevel expression
-    ( rule ( ( = ( Num x ) ( Num y ) ) ( != x y ) ) ( ( panic "ahhh" ) ) )
+    ( union b c )
 
     comparative-test/egglog-testsuite/name-resolution.egg: while reading comparative-test/egglog-testsuite/name-resolution.egg
     ( include "comparative-test/egglog-testsuite/name-resolution.egg" )
@@ -790,14 +764,25 @@ egglog_test!(allcorrect, pathproof, expect![[r#"
     edge: 3
     path: 9
 "#]], r#"(include "comparative-test/egglog-testsuite/pathproof.egg")"#);// something is wrong with the permutation
-egglog_test!(mismatched, path_union, expect![[r#"
-    path: 6 != 4
+egglog_test!(nogenerate, path_union, expect![[r#"
+    comparative-test/egglog-testsuite/path-union.egg: not implemented yet
+    ( union ( mk 3 ) ( mk 5 ) )
+
+    comparative-test/egglog-testsuite/path-union.egg: while parsing this toplevel expression
+    ( union ( mk 3 ) ( mk 5 ) )
+
+    comparative-test/egglog-testsuite/path-union.egg: while reading comparative-test/egglog-testsuite/path-union.egg
+    ( include "comparative-test/egglog-testsuite/path-union.egg" )
+
+    toplevel: while parsing this toplevel expression
+    ( include "comparative-test/egglog-testsuite/path-union.egg" )
+
 "#]], r#"(include "comparative-test/egglog-testsuite/path-union.egg")"#); // REASON: missing union top-level action.
 egglog_test!(does_panic, points_to, expect!["Global variables should have been desugared"], r#"(include "comparative-test/egglog-testsuite/points-to.egg")"#);
 egglog_test!(zrocorrect, primitives, expect![], r#"(include "comparative-test/egglog-testsuite/primitives.egg")"#);
 egglog_test!(nogenerate, prims, expect![[r#"
-    comparative-test/egglog-testsuite/prims.egg: function max is not defined
-    max
+    comparative-test/egglog-testsuite/prims.egg: lattice computations not implemented
+    ( function vertex-included ( i64 ) i64 :merge ( max old new ) )
 
     comparative-test/egglog-testsuite/prims.egg: while parsing this toplevel expression
     ( function vertex-included ( i64 ) i64 :merge ( max old new ) )
@@ -810,8 +795,8 @@ egglog_test!(nogenerate, prims, expect![[r#"
 
 "#]], r#"(include "comparative-test/egglog-testsuite/prims.egg")"#);//merge
 egglog_test!(nogenerate, push_pop, expect![[r#"
-    comparative-test/egglog-testsuite/push-pop.egg: function max is not defined
-    max
+    comparative-test/egglog-testsuite/push-pop.egg: lattice computations not implemented
+    ( function foo ( ) i64 :merge ( max old new ) )
 
     comparative-test/egglog-testsuite/push-pop.egg: while parsing this toplevel expression
     ( function foo ( ) i64 :merge ( max old new ) )
@@ -837,15 +822,26 @@ egglog_test!(nogenerate, rat_pow_eval, expect![[r#"
     ( include "comparative-test/egglog-testsuite/rat-pow-eval.egg" )
 
 "#]], r#"(include "comparative-test/egglog-testsuite/rat-pow-eval.egg")"#);// rational
-egglog_test!(mismatched, repro_define, expect![[r#"
-    S: 3 != 2
+egglog_test!(nogenerate, repro_define, expect![[r#"
+    comparative-test/egglog-testsuite/repro-define.egg: not implemented yet
+    ( union two ( S ( S ( S Zero ) ) ) )
+
+    comparative-test/egglog-testsuite/repro-define.egg: while parsing this toplevel expression
+    ( union two ( S ( S ( S Zero ) ) ) )
+
+    comparative-test/egglog-testsuite/repro-define.egg: while reading comparative-test/egglog-testsuite/repro-define.egg
+    ( include "comparative-test/egglog-testsuite/repro-define.egg" )
+
+    toplevel: while parsing this toplevel expression
+    ( include "comparative-test/egglog-testsuite/repro-define.egg" )
+
 "#]], r#"(include "comparative-test/egglog-testsuite/repro-define.egg")"#); // REASON: missing toplevel union
 egglog_test!(nogenerate, repro_desugar_143, expect![[r#"
-    comparative-test/egglog-testsuite/repro-desugar-143.egg: function call + is not defined
-    +
+    comparative-test/egglog-testsuite/repro-desugar-143.egg: not implemented yet
+    ( set ( f 0 ) 0 )
 
     comparative-test/egglog-testsuite/repro-desugar-143.egg: while parsing this toplevel expression
-    ( rule ( ( f x ) ( = x y ) ( = z y ) ( = a ( f z ) ) ) ( ( set ( f ( + z 1 ) ) ( + a 1 ) ) ) )
+    ( set ( f 0 ) 0 )
 
     comparative-test/egglog-testsuite/repro-desugar-143.egg: while reading comparative-test/egglog-testsuite/repro-desugar-143.egg
     ( include "comparative-test/egglog-testsuite/repro-desugar-143.egg" )
@@ -855,8 +851,8 @@ egglog_test!(nogenerate, repro_desugar_143, expect![[r#"
 
 "#]], r#"(include "comparative-test/egglog-testsuite/repro-desugar-143.egg")"#);// primitive function
 egglog_test!(nogenerate, repro_empty_query, expect![[r#"
-    comparative-test/egglog-testsuite/repro-empty-query.egg: function min is not defined
-    min
+    comparative-test/egglog-testsuite/repro-empty-query.egg: lattice computations not implemented
+    ( function foo ( ) i64 :merge ( min old new ) )
 
     comparative-test/egglog-testsuite/repro-empty-query.egg: while parsing this toplevel expression
     ( function foo ( ) i64 :merge ( min old new ) )
@@ -869,8 +865,8 @@ egglog_test!(nogenerate, repro_empty_query, expect![[r#"
 
 "#]], r#"(include "comparative-test/egglog-testsuite/repro-empty-query.egg")"#);// merge
 egglog_test!(nogenerate, repro_equal_constant2, expect![[r#"
-    comparative-test/egglog-testsuite/repro-equal-constant2.egg: function min is not defined
-    min
+    comparative-test/egglog-testsuite/repro-equal-constant2.egg: lattice computations not implemented
+    ( function foo ( ) i64 :merge ( min old new ) )
 
     comparative-test/egglog-testsuite/repro-equal-constant2.egg: while parsing this toplevel expression
     ( function foo ( ) i64 :merge ( min old new ) )
@@ -883,8 +879,8 @@ egglog_test!(nogenerate, repro_equal_constant2, expect![[r#"
 
 "#]], r#"(include "comparative-test/egglog-testsuite/repro-equal-constant2.egg")"#);// merge
 egglog_test!(nogenerate, repro_equal_constant, expect![[r#"
-    comparative-test/egglog-testsuite/repro-equal-constant.egg: function min is not defined
-    min
+    comparative-test/egglog-testsuite/repro-equal-constant.egg: lattice computations not implemented
+    ( function foo ( ) i64 :merge ( min old new ) )
 
     comparative-test/egglog-testsuite/repro-equal-constant.egg: while parsing this toplevel expression
     ( function foo ( ) i64 :merge ( min old new ) )
@@ -896,33 +892,31 @@ egglog_test!(nogenerate, repro_equal_constant, expect![[r#"
     ( include "comparative-test/egglog-testsuite/repro-equal-constant.egg" )
 
 "#]], r#"(include "comparative-test/egglog-testsuite/repro-equal-constant.egg")"#);// merge
-egglog_test!(mismatched, repro_noteqbug, expect![[r#"
-    R: 2 != 0
-"#]], r#"(include "comparative-test/egglog-testsuite/repro-noteqbug.egg")"#); // REASON: toplevel union
-egglog_test!(nogenerate, repro_primitive_query, expect![[r#"
-    comparative-test/egglog-testsuite/repro-primitive-query.egg: does not make sense for compiled
-    ( panic "should not have matched" )
+egglog_test!(nogenerate, repro_noteqbug, expect![[r#"
+    comparative-test/egglog-testsuite/repro-noteqbug.egg: not implemented yet
+    ( union ( R 1 ) ( R 2 ) )
 
-    comparative-test/egglog-testsuite/repro-primitive-query.egg: while parsing this toplevel expression
-    ( rule ( ( Num ?a ) ( Num ?b ) ( = ( + ?a ?b ) 5 ) ) ( ( panic "should not have matched" ) ) )
+    comparative-test/egglog-testsuite/repro-noteqbug.egg: while parsing this toplevel expression
+    ( union ( R 1 ) ( R 2 ) )
 
-    comparative-test/egglog-testsuite/repro-primitive-query.egg: while reading comparative-test/egglog-testsuite/repro-primitive-query.egg
-    ( include "comparative-test/egglog-testsuite/repro-primitive-query.egg" )
+    comparative-test/egglog-testsuite/repro-noteqbug.egg: while reading comparative-test/egglog-testsuite/repro-noteqbug.egg
+    ( include "comparative-test/egglog-testsuite/repro-noteqbug.egg" )
 
     toplevel: while parsing this toplevel expression
-    ( include "comparative-test/egglog-testsuite/repro-primitive-query.egg" )
+    ( include "comparative-test/egglog-testsuite/repro-noteqbug.egg" )
 
-"#]], r#"(include "comparative-test/egglog-testsuite/repro-primitive-query.egg")"#);// impl panic
+"#]], r#"(include "comparative-test/egglog-testsuite/repro-noteqbug.egg")"#); // REASON: toplevel union
+egglog_test!(nogenerate, repro_primitive_query, expect!["PANIC: not yet implemented: panic rule action"], r#"(include "comparative-test/egglog-testsuite/repro-primitive-query.egg")"#);// impl panic
 egglog_test!(allcorrect, repro_querybug2, expect![[r#"
     Num: 1
     OtherNum: 1
 "#]], r#"(include "comparative-test/egglog-testsuite/repro-querybug2.egg")"#);// type error
 egglog_test!(nogenerate, repro_querybug3, expect![[r#"
-    comparative-test/egglog-testsuite/repro-querybug3.egg: function set-intersect is not defined
-    set-intersect
+    comparative-test/egglog-testsuite/repro-querybug3.egg: collections are not supported yet: ("Set", [Var("VarT")])
+    ( sort StringSet ( Set VarT ) )
 
     comparative-test/egglog-testsuite/repro-querybug3.egg: while parsing this toplevel expression
-    ( function freer ( Term ) StringSet :merge ( set-intersect old new ) )
+    ( sort StringSet ( Set VarT ) )
 
     comparative-test/egglog-testsuite/repro-querybug3.egg: while reading comparative-test/egglog-testsuite/repro-querybug3.egg
     ( include "comparative-test/egglog-testsuite/repro-querybug3.egg" )
@@ -941,8 +935,8 @@ egglog_test!(allcorrect, repro_querybug, expect![[r#"
     eq: 2
 "#]], r#"(include "comparative-test/egglog-testsuite/repro-querybug.egg")"#);// codegen syntax error
 egglog_test!(nogenerate, repro_should_saturate, expect![[r#"
-    comparative-test/egglog-testsuite/repro-should-saturate.egg: function min is not defined
-    min
+    comparative-test/egglog-testsuite/repro-should-saturate.egg: lattice computations not implemented
+    ( function MyMap ( ) i64 :merge ( min old new ) )
 
     comparative-test/egglog-testsuite/repro-should-saturate.egg: while parsing this toplevel expression
     ( function MyMap ( ) i64 :merge ( min old new ) )
@@ -965,11 +959,11 @@ egglog_test!(allcorrect, repro_unsound_htutorial, expect![[r#"
     Var: 3
 "#]], r#"(include "comparative-test/egglog-testsuite/repro-unsound-htutorial.egg")"#);
 egglog_test!(nogenerate, repro_vec_unequal, expect![[r#"
-    comparative-test/egglog-testsuite/repro-vec-unequal.egg: function vec-of is not defined
-    vec-of
+    comparative-test/egglog-testsuite/repro-vec-unequal.egg: collections are not supported yet: ("Vec", [Var("Math")])
+    ( sort MathVec ( Vec Math ) )
 
     comparative-test/egglog-testsuite/repro-vec-unequal.egg: while parsing this toplevel expression
-    ( let v1 ( vec-of ( Num 1 ) ( Num 2 ) ) )
+    ( sort MathVec ( Vec Math ) )
 
     comparative-test/egglog-testsuite/repro-vec-unequal.egg: while reading comparative-test/egglog-testsuite/repro-vec-unequal.egg
     ( include "comparative-test/egglog-testsuite/repro-vec-unequal.egg" )
@@ -978,7 +972,20 @@ egglog_test!(nogenerate, repro_vec_unequal, expect![[r#"
     ( include "comparative-test/egglog-testsuite/repro-vec-unequal.egg" )
 
 "#]], r#"(include "comparative-test/egglog-testsuite/repro-vec-unequal.egg")"#);//needs vec
-egglog_test!(no_compile, resolution, expect![], r#"(include "comparative-test/egglog-testsuite/resolution.egg")"#);// type error(bool)
+egglog_test!(nogenerate, resolution, expect![[r#"
+    comparative-test/egglog-testsuite/resolution.egg: not implemented yet
+    ( union ( negate False ) True )
+
+    comparative-test/egglog-testsuite/resolution.egg: while parsing this toplevel expression
+    ( union ( negate False ) True )
+
+    comparative-test/egglog-testsuite/resolution.egg: while reading comparative-test/egglog-testsuite/resolution.egg
+    ( include "comparative-test/egglog-testsuite/resolution.egg" )
+
+    toplevel: while parsing this toplevel expression
+    ( include "comparative-test/egglog-testsuite/resolution.egg" )
+
+"#]], r#"(include "comparative-test/egglog-testsuite/resolution.egg")"#);// type error(bool)
 egglog_test!(nogenerate, rw_analysis, expect![[r#"
     comparative-test/egglog-testsuite/rw-analysis.egg: function call != is not defined
     !=
@@ -1008,11 +1015,11 @@ egglog_test!(nogenerate, schedule_demo, expect![[r#"
 
 "#]], r#"(include "comparative-test/egglog-testsuite/schedule-demo.egg")"#);//primitive functions
 egglog_test!(nogenerate, set, expect![[r#"
-    comparative-test/egglog-testsuite/set.egg: function call set-length is not defined
-    set-length
+    comparative-test/egglog-testsuite/set.egg: collections are not supported yet: ("Set", [Var("i64")])
+    ( sort ISetBase ( Set i64 ) )
 
     comparative-test/egglog-testsuite/set.egg: while parsing this toplevel expression
-    ( rule ( ( IS x ) ( > ( set-length x ) 0 ) ) ( ( set ( ISet-get ( IS x ) 0 ) ( set-get x 0 ) ) ) )
+    ( sort ISetBase ( Set i64 ) )
 
     comparative-test/egglog-testsuite/set.egg: while reading comparative-test/egglog-testsuite/set.egg
     ( include "comparative-test/egglog-testsuite/set.egg" )
@@ -1021,14 +1028,22 @@ egglog_test!(nogenerate, set, expect![[r#"
     ( include "comparative-test/egglog-testsuite/set.egg" )
 
 "#]], r#"(include "comparative-test/egglog-testsuite/set.egg")"#);// set-length primitive function
-egglog_test!(mismatched, set_sort_function, expect![[r#"
-    bar: 1 != 0
-    baz: 1 != 0
-    quux: 1 != 0
-    qux: 1 != 0
+egglog_test!(nogenerate, set_sort_function, expect![[r#"
+    comparative-test/egglog-testsuite/set_sort_function.egg: not implemented yet
+    ( set ( bar ) ( baz ) )
+
+    comparative-test/egglog-testsuite/set_sort_function.egg: while parsing this toplevel expression
+    ( set ( bar ) ( baz ) )
+
+    comparative-test/egglog-testsuite/set_sort_function.egg: while reading comparative-test/egglog-testsuite/set_sort_function.egg
+    ( include "comparative-test/egglog-testsuite/set_sort_function.egg" )
+
+    toplevel: while parsing this toplevel expression
+    ( include "comparative-test/egglog-testsuite/set_sort_function.egg" )
+
 "#]], r#"(include "comparative-test/egglog-testsuite/set_sort_function.egg")"#); // REASON: function unit -> value not supported properly.
 egglog_test!(nogenerate, stratified, expect![[r#"
-    comparative-test/egglog-testsuite/stratified.egg: usage: (run <steps>)
+    comparative-test/egglog-testsuite/stratified.egg: not implemented yet
     ( run path-rules 1 )
 
     comparative-test/egglog-testsuite/stratified.egg: while parsing this toplevel expression
@@ -1043,7 +1058,7 @@ egglog_test!(nogenerate, stratified, expect![[r#"
 "#]], r#"(include "comparative-test/egglog-testsuite/stratified.egg")"#);//running specific ruleset
 egglog_test!(zrocorrect, string, expect![], r#"(include "comparative-test/egglog-testsuite/string.egg")"#);
 egglog_test!(nogenerate, string_quotes, expect![[r#"
-    comparative-test/egglog-testsuite/string_quotes.egg: does not make sense for compiled
+    comparative-test/egglog-testsuite/string_quotes.egg: will not implement, this only makes sense for an interpreter
     ( input f "tests/string_quotes.csv" )
 
     comparative-test/egglog-testsuite/string_quotes.egg: while parsing this toplevel expression
@@ -1056,7 +1071,20 @@ egglog_test!(nogenerate, string_quotes, expect![[r#"
     ( include "comparative-test/egglog-testsuite/string_quotes.egg" )
 
 "#]], r#"(include "comparative-test/egglog-testsuite/string_quotes.egg")"#);// input directive
-egglog_test!(nogenerate, subsume, expect!["PANIC: not implemented: subsume is not implemented"], r#"(include "comparative-test/egglog-testsuite/subsume.egg")"#);// impl subsume
+egglog_test!(nogenerate, subsume, expect![[r#"
+    comparative-test/egglog-testsuite/subsume.egg: subsume not implemented
+    ( rewrite ( Mul ( Num 3 ) x ) ( Add x ( Add x x ) ) :subsume )
+
+    comparative-test/egglog-testsuite/subsume.egg: while parsing this toplevel expression
+    ( rewrite ( Mul ( Num 3 ) x ) ( Add x ( Add x x ) ) :subsume )
+
+    comparative-test/egglog-testsuite/subsume.egg: while reading comparative-test/egglog-testsuite/subsume.egg
+    ( include "comparative-test/egglog-testsuite/subsume.egg" )
+
+    toplevel: while parsing this toplevel expression
+    ( include "comparative-test/egglog-testsuite/subsume.egg" )
+
+"#]], r#"(include "comparative-test/egglog-testsuite/subsume.egg")"#);// impl subsume
 egglog_test!(nogenerate, test_combined, expect![[r#"
     comparative-test/egglog-testsuite/test-combined.egg: function unstable-combined-ruleset is not defined
     unstable-combined-ruleset
@@ -1086,8 +1114,8 @@ egglog_test!(nogenerate, test_combined_steps, expect![[r#"
 
 "#]], r#"(include "comparative-test/egglog-testsuite/test-combined-steps.egg")"#);// primitive functions
 egglog_test!(nogenerate, towers_of_hanoi, expect![[r#"
-    comparative-test/egglog-testsuite/towers-of-hanoi.egg: function min is not defined
-    min
+    comparative-test/egglog-testsuite/towers-of-hanoi.egg: lattice computations not implemented
+    ( function Config ( Stack Stack Stack ) i64 :merge ( min old new ) )
 
     comparative-test/egglog-testsuite/towers-of-hanoi.egg: while parsing this toplevel expression
     ( function Config ( Stack Stack Stack ) i64 :merge ( min old new ) )
@@ -1100,7 +1128,7 @@ egglog_test!(nogenerate, towers_of_hanoi, expect![[r#"
 
 "#]], r#"(include "comparative-test/egglog-testsuite/towers-of-hanoi.egg")"#);// merge
 egglog_test!(nogenerate, tricky_type_checking, expect![[r#"
-    comparative-test/egglog-testsuite/tricky-type-checking.egg: does not make sense for compiled
+    comparative-test/egglog-testsuite/tricky-type-checking.egg: not implemented yet
     ( push )
 
     comparative-test/egglog-testsuite/tricky-type-checking.egg: while parsing this toplevel expression
@@ -1128,11 +1156,11 @@ egglog_test!(nogenerate, typecheck, expect![[r#"
 
 "#]], r#"(include "comparative-test/egglog-testsuite/typecheck.egg")"#); // !=
 egglog_test!(nogenerate, type_constraints_tests, expect![[r#"
-    comparative-test/egglog-testsuite/type-constraints-tests.egg: function call vec-of is not defined
-    vec-of
+    comparative-test/egglog-testsuite/type-constraints-tests.egg: collections are not supported yet: ("Vec", [Var("Operand")])
+    ( sort VecOperandBase ( Vec Operand ) )
 
     comparative-test/egglog-testsuite/type-constraints-tests.egg: while parsing this toplevel expression
-    ( rule ( ( = v1 ( vec-of ) ) ( = v2 ( VO v1 ) ) ( = v3 ( vec-of v2 ) ) ) ( ) )
+    ( sort VecOperandBase ( Vec Operand ) )
 
     comparative-test/egglog-testsuite/type-constraints-tests.egg: while reading comparative-test/egglog-testsuite/type-constraints-tests.egg
     ( include "comparative-test/egglog-testsuite/type-constraints-tests.egg" )
@@ -1142,11 +1170,11 @@ egglog_test!(nogenerate, type_constraints_tests, expect![[r#"
 
 "#]], r#"(include "comparative-test/egglog-testsuite/type-constraints-tests.egg")"#); // impl vec
 egglog_test!(nogenerate, typeinfer, expect![[r#"
-    comparative-test/egglog-testsuite/typeinfer.egg: function call + is not defined
-    +
+    comparative-test/egglog-testsuite/typeinfer.egg: collections are not supported yet: ("Set", [Var("Ident")])
+    ( sort QuantifiedVs ( Set Ident ) )
 
     comparative-test/egglog-testsuite/typeinfer.egg: while parsing this toplevel expression
-    ( rule ( ( = e ( App e1 e2 ) ) ( expr-size e1 s1 ) ( expr-size e2 s2 ) ) ( ( expr-size e ( + ( + s1 s2 ) 1 ) ) ) )
+    ( sort QuantifiedVs ( Set Ident ) )
 
     comparative-test/egglog-testsuite/typeinfer.egg: while reading comparative-test/egglog-testsuite/typeinfer.egg
     ( include "comparative-test/egglog-testsuite/typeinfer.egg" )
@@ -1156,7 +1184,7 @@ egglog_test!(nogenerate, typeinfer, expect![[r#"
 
 "#]], r#"(include "comparative-test/egglog-testsuite/typeinfer.egg")"#);// primitive functions
 egglog_test!(nogenerate, unification_points_to, expect![[r#"
-    comparative-test/egglog-testsuite/unification-points-to.egg: does not make sense for compiled
+    comparative-test/egglog-testsuite/unification-points-to.egg: not implemented
     ( query-extract :variants 100 ( AllocVar ( Expr "u" ) ) )
 
     comparative-test/egglog-testsuite/unification-points-to.egg: while parsing this toplevel expression
@@ -1191,7 +1219,7 @@ egglog_test!(nogenerate, unstable_fn, expect![[r#"
 
 "#]], r#"(include "comparative-test/egglog-testsuite/unstable-fn.egg")"#);// primitive functions
 egglog_test!(nogenerate, until, expect![[r#"
-    comparative-test/egglog-testsuite/until.egg: usage: (run <steps>)
+    comparative-test/egglog-testsuite/until.egg: not implemented yet
     ( run 10000 :until ( = A8 I ) )
 
     comparative-test/egglog-testsuite/until.egg: while parsing this toplevel expression
@@ -1204,7 +1232,20 @@ egglog_test!(nogenerate, until, expect![[r#"
     ( include "comparative-test/egglog-testsuite/until.egg" )
 
 "#]], r#"(include "comparative-test/egglog-testsuite/until.egg")"#); // run until
-egglog_test!(nogenerate, vec, expect!["PANIC: not yet implemented: collection not implemented"], r#"(include "comparative-test/egglog-testsuite/vec.egg")"#); // collections
+egglog_test!(nogenerate, vec, expect![[r#"
+    comparative-test/egglog-testsuite/vec.egg: collections are not supported yet: ("Vec", [Var("i64")])
+    ( sort IVec ( Vec i64 ) )
+
+    comparative-test/egglog-testsuite/vec.egg: while parsing this toplevel expression
+    ( sort IVec ( Vec i64 ) )
+
+    comparative-test/egglog-testsuite/vec.egg: while reading comparative-test/egglog-testsuite/vec.egg
+    ( include "comparative-test/egglog-testsuite/vec.egg" )
+
+    toplevel: while parsing this toplevel expression
+    ( include "comparative-test/egglog-testsuite/vec.egg" )
+
+"#]], r#"(include "comparative-test/egglog-testsuite/vec.egg")"#); // collections
 }
 
 mod additional {
