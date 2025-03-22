@@ -174,6 +174,7 @@ fn hir_global() {
                                 iu0: ir0[..1],
                                 iu1: ir1[..1],
                                 iu2: ir2[..1],
+                                iu3: ir0[..2],
                             },
                             column_back_reference: {c0: iu0, c1: iu1, c2: iu2},
                         },
@@ -187,6 +188,7 @@ fn hir_global() {
                                 iu0: ir0[..1],
                                 iu1: ir1[..1],
                                 iu2: ir2[..1],
+                                iu3: ir0[..2],
                             },
                             column_back_reference: {c0: iu0, c1: iu1, c2: iu2},
                         },
@@ -200,6 +202,7 @@ fn hir_global() {
                                 iu0: ir0[..1],
                                 iu1: ir0[..1],
                                 iu2: ir1[..1],
+                                iu3: ir0[..1],
                             },
                             column_back_reference: {c0: iu1, c1: iu2},
                         },
@@ -305,6 +308,7 @@ fn test_bind_variable_multiple_times() {
                                 iu0: ir0[..1],
                                 iu1: ir1[..1],
                                 iu2: ir2[..1],
+                                iu3: ir0[..2],
                             },
                             column_back_reference: {c0: iu0, c1: iu1, c2: iu2},
                         },
@@ -1043,6 +1047,20 @@ fn initial() {
                 fn check1_1_0(&self, x1: Math) -> bool {
                     self.iter1_1_0(x1).next().is_some()
                 }
+                fn entry1_0_1(
+                    &self,
+                    delta: &mut Delta,
+                    uf: &mut Unification,
+                    x0: std::primitive::i64,
+                ) -> (Math,) {
+                    if let Some((x1,)) = self.iter1_0_1(x0).next() {
+                        return (x1,);
+                    }
+                    let x1 = uf.math_uf.add_eclass();
+                    delta.forall_math_relation_delta.push((x1,));
+                    delta.const_relation_delta.push((x0, x1));
+                    (x1,)
+                }
                 fn update(&mut self, uprooted: &Uprooted, uf: &mut Unification, delta: &mut Delta) {
                     let mut inserts = take(&mut delta.const_relation_delta);
                     let orig_inserts = inserts.len();
@@ -1372,6 +1390,11 @@ fn test_primitives_simple() {
                         .range((Math::MIN_ID, Math::MIN_ID, x2)..=(Math::MAX_ID, Math::MAX_ID, x2))
                         .map(|(x0, x1, x2)| (x0, x1))
                 }
+                fn iter2_0_1_2(&self, x0: Math, x1: Math) -> impl Iterator<Item = (Math,)> + use<'_> {
+                    self.all_index_0_1_2
+                        .range((x0, x1, Math::MIN_ID)..=(x0, x1, Math::MAX_ID))
+                        .map(|(x0, x1, x2)| (x2,))
+                }
                 fn check1_1_0_2(&self, x1: Math) -> bool {
                     self.iter1_1_0_2(x1).next().is_some()
                 }
@@ -1380,6 +1403,18 @@ fn test_primitives_simple() {
                 }
                 fn check1_2_0_1(&self, x2: Math) -> bool {
                     self.iter1_2_0_1(x2).next().is_some()
+                }
+                fn check2_0_1_2(&self, x0: Math, x1: Math) -> bool {
+                    self.iter2_0_1_2(x0, x1).next().is_some()
+                }
+                fn entry2_0_1_2(&self, delta: &mut Delta, uf: &mut Unification, x0: Math, x1: Math) -> (Math,) {
+                    if let Some((x2,)) = self.iter2_0_1_2(x0, x1).next() {
+                        return (x2,);
+                    }
+                    let x2 = uf.math_uf.add_eclass();
+                    delta.forall_math_relation_delta.push((x2,));
+                    delta.mul_relation_delta.push((x0, x1, x2));
+                    (x2,)
                 }
                 fn update(&mut self, uprooted: &Uprooted, uf: &mut Unification, delta: &mut Delta) {
                     let mut inserts = take(&mut delta.mul_relation_delta);
@@ -1500,6 +1535,11 @@ fn test_primitives_simple() {
                         .range((Math::MIN_ID, Math::MIN_ID, x2)..=(Math::MAX_ID, Math::MAX_ID, x2))
                         .map(|(x0, x1, x2)| (x0, x1))
                 }
+                fn iter2_0_1_2(&self, x0: Math, x1: Math) -> impl Iterator<Item = (Math,)> + use<'_> {
+                    self.all_index_0_1_2
+                        .range((x0, x1, Math::MIN_ID)..=(x0, x1, Math::MAX_ID))
+                        .map(|(x0, x1, x2)| (x2,))
+                }
                 fn check1_0_1_2(&self, x0: Math) -> bool {
                     self.iter1_0_1_2(x0).next().is_some()
                 }
@@ -1508,6 +1548,18 @@ fn test_primitives_simple() {
                 }
                 fn check1_2_0_1(&self, x2: Math) -> bool {
                     self.iter1_2_0_1(x2).next().is_some()
+                }
+                fn check2_0_1_2(&self, x0: Math, x1: Math) -> bool {
+                    self.iter2_0_1_2(x0, x1).next().is_some()
+                }
+                fn entry2_0_1_2(&self, delta: &mut Delta, uf: &mut Unification, x0: Math, x1: Math) -> (Math,) {
+                    if let Some((x2,)) = self.iter2_0_1_2(x0, x1).next() {
+                        return (x2,);
+                    }
+                    let x2 = uf.math_uf.add_eclass();
+                    delta.forall_math_relation_delta.push((x2,));
+                    delta.add_relation_delta.push((x0, x1, x2));
+                    (x2,)
                 }
                 fn update(&mut self, uprooted: &Uprooted, uf: &mut Unification, delta: &mut Delta) {
                     let mut inserts = take(&mut delta.add_relation_delta);
@@ -1636,6 +1688,20 @@ fn test_primitives_simple() {
                 fn check1_1_0(&self, x1: Math) -> bool {
                     self.iter1_1_0(x1).next().is_some()
                 }
+                fn entry1_0_1(
+                    &self,
+                    delta: &mut Delta,
+                    uf: &mut Unification,
+                    x0: std::primitive::i64,
+                ) -> (Math,) {
+                    if let Some((x1,)) = self.iter1_0_1(x0).next() {
+                        return (x1,);
+                    }
+                    let x1 = uf.math_uf.add_eclass();
+                    delta.forall_math_relation_delta.push((x1,));
+                    delta.const_relation_delta.push((x0, x1));
+                    (x1,)
+                }
                 fn update(&mut self, uprooted: &Uprooted, uf: &mut Unification, delta: &mut Delta) {
                     let mut inserts = take(&mut delta.const_relation_delta);
                     let orig_inserts = inserts.len();
@@ -1727,6 +1793,20 @@ fn test_primitives_simple() {
                 }
                 fn check1_1_0(&self, x1: Math) -> bool {
                     self.iter1_1_0(x1).next().is_some()
+                }
+                fn entry1_0_1(
+                    &self,
+                    delta: &mut Delta,
+                    uf: &mut Unification,
+                    x0: oatlog::runtime::IString,
+                ) -> (Math,) {
+                    if let Some((x1,)) = self.iter1_0_1(x0).next() {
+                        return (x1,);
+                    }
+                    let x1 = uf.math_uf.add_eclass();
+                    delta.forall_math_relation_delta.push((x1,));
+                    delta.var_relation_delta.push((x0, x1));
+                    (x1,)
                 }
                 fn update(&mut self, uprooted: &Uprooted, uf: &mut Unification, delta: &mut Delta) {
                     let mut inserts = take(&mut delta.var_relation_delta);
@@ -2869,6 +2949,11 @@ fn edgecase0() {
                         .range((Math::MIN_ID, x1, Math::MIN_ID)..=(Math::MAX_ID, x1, Math::MAX_ID))
                         .map(|(x0, x1, x2)| (x0, x2))
                 }
+                fn iter2_0_1_2(&self, x0: Math, x1: Math) -> impl Iterator<Item = (Math,)> + use<'_> {
+                    self.all_index_0_1_2
+                        .range((x0, x1, Math::MIN_ID)..=(x0, x1, Math::MAX_ID))
+                        .map(|(x0, x1, x2)| (x2,))
+                }
                 fn check1_0_1_2(&self, x0: Math) -> bool {
                     self.iter1_0_1_2(x0).next().is_some()
                 }
@@ -2880,6 +2965,18 @@ fn edgecase0() {
                 }
                 fn check1_1_0_2(&self, x1: Math) -> bool {
                     self.iter1_1_0_2(x1).next().is_some()
+                }
+                fn check2_0_1_2(&self, x0: Math, x1: Math) -> bool {
+                    self.iter2_0_1_2(x0, x1).next().is_some()
+                }
+                fn entry2_0_1_2(&self, delta: &mut Delta, uf: &mut Unification, x0: Math, x1: Math) -> (Math,) {
+                    if let Some((x2,)) = self.iter2_0_1_2(x0, x1).next() {
+                        return (x2,);
+                    }
+                    let x2 = uf.math_uf.add_eclass();
+                    delta.forall_math_relation_delta.push((x2,));
+                    delta.mul_relation_delta.push((x0, x1, x2));
+                    (x2,)
                 }
                 fn update(&mut self, uprooted: &Uprooted, uf: &mut Unification, delta: &mut Delta) {
                     let mut inserts = take(&mut delta.mul_relation_delta);
@@ -3024,6 +3121,15 @@ fn edgecase0() {
                 }
                 fn check1_2_0_1(&self, x2: Math) -> bool {
                     self.iter1_2_0_1(x2).next().is_some()
+                }
+                fn entry2_0_1_2(&self, delta: &mut Delta, uf: &mut Unification, x0: Math, x1: Math) -> (Math,) {
+                    if let Some((x2,)) = self.iter2_0_1_2(x0, x1).next() {
+                        return (x2,);
+                    }
+                    let x2 = uf.math_uf.add_eclass();
+                    delta.forall_math_relation_delta.push((x2,));
+                    delta.add_relation_delta.push((x0, x1, x2));
+                    (x2,)
                 }
                 fn update(&mut self, uprooted: &Uprooted, uf: &mut Unification, delta: &mut Delta) {
                     let mut inserts = take(&mut delta.add_relation_delta);
@@ -3391,6 +3497,11 @@ fn test_into_codegen() {
                         .range((Math::MIN_ID, Math::MIN_ID, x2)..=(Math::MAX_ID, Math::MAX_ID, x2))
                         .map(|(x0, x1, x2)| (x0, x1))
                 }
+                fn iter2_0_1_2(&self, x0: Math, x1: Math) -> impl Iterator<Item = (Math,)> + use<'_> {
+                    self.all_index_0_1_2
+                        .range((x0, x1, Math::MIN_ID)..=(x0, x1, Math::MAX_ID))
+                        .map(|(x0, x1, x2)| (x2,))
+                }
                 fn check1_0_1_2(&self, x0: Math) -> bool {
                     self.iter1_0_1_2(x0).next().is_some()
                 }
@@ -3399,6 +3510,18 @@ fn test_into_codegen() {
                 }
                 fn check1_2_0_1(&self, x2: Math) -> bool {
                     self.iter1_2_0_1(x2).next().is_some()
+                }
+                fn check2_0_1_2(&self, x0: Math, x1: Math) -> bool {
+                    self.iter2_0_1_2(x0, x1).next().is_some()
+                }
+                fn entry2_0_1_2(&self, delta: &mut Delta, uf: &mut Unification, x0: Math, x1: Math) -> (Math,) {
+                    if let Some((x2,)) = self.iter2_0_1_2(x0, x1).next() {
+                        return (x2,);
+                    }
+                    let x2 = uf.math_uf.add_eclass();
+                    delta.forall_math_relation_delta.push((x2,));
+                    delta.mul_relation_delta.push((x0, x1, x2));
+                    (x2,)
                 }
                 fn update(&mut self, uprooted: &Uprooted, uf: &mut Unification, delta: &mut Delta) {
                     let mut inserts = take(&mut delta.mul_relation_delta);
@@ -3519,6 +3642,11 @@ fn test_into_codegen() {
                         .range((Math::MIN_ID, x1, Math::MIN_ID)..=(Math::MAX_ID, x1, Math::MAX_ID))
                         .map(|(x0, x1, x2)| (x0, x2))
                 }
+                fn iter2_0_1_2(&self, x0: Math, x1: Math) -> impl Iterator<Item = (Math,)> + use<'_> {
+                    self.all_index_0_1_2
+                        .range((x0, x1, Math::MIN_ID)..=(x0, x1, Math::MAX_ID))
+                        .map(|(x0, x1, x2)| (x2,))
+                }
                 fn check1_2_0_1(&self, x2: Math) -> bool {
                     self.iter1_2_0_1(x2).next().is_some()
                 }
@@ -3527,6 +3655,18 @@ fn test_into_codegen() {
                 }
                 fn check1_1_0_2(&self, x1: Math) -> bool {
                     self.iter1_1_0_2(x1).next().is_some()
+                }
+                fn check2_0_1_2(&self, x0: Math, x1: Math) -> bool {
+                    self.iter2_0_1_2(x0, x1).next().is_some()
+                }
+                fn entry2_0_1_2(&self, delta: &mut Delta, uf: &mut Unification, x0: Math, x1: Math) -> (Math,) {
+                    if let Some((x2,)) = self.iter2_0_1_2(x0, x1).next() {
+                        return (x2,);
+                    }
+                    let x2 = uf.math_uf.add_eclass();
+                    delta.forall_math_relation_delta.push((x2,));
+                    delta.add_relation_delta.push((x0, x1, x2));
+                    (x2,)
                 }
                 fn update(&mut self, uprooted: &Uprooted, uf: &mut Unification, delta: &mut Delta) {
                     let mut inserts = take(&mut delta.add_relation_delta);

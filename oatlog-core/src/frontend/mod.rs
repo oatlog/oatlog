@@ -1182,19 +1182,19 @@ mod compile_rule2 {
                     let _: VariableId = self.spans.push(span);
                     // TODO: when we can handle variable collisions, add a more descriptive name
                     // here.
-                    self.labels.push("");
+                    let _ = self.labels.push("");
                     self.flattened.push(FlatExpr::Literal(x.x))
                 }
                 Expr::Var(s) => *self.symbols.entry(*s).or_insert_with(|| {
                     let _: VariableId = self.spans.push(span);
-                    self.labels.push(**s);
+                    let _ = self.labels.push(**s);
                     self.flattened.push(FlatExpr::Var)
                 }),
                 Expr::Call(name, args) => {
                     let args: Vec<VariableId> =
                         args.iter().map(|expr| self.flatten(expr)).collect();
                     let _: VariableId = self.spans.push(span);
-                    self.labels.push("");
+                    let _ = self.labels.push("");
                     self.flattened.push(FlatExpr::Call(*name, args))
                 }
             }

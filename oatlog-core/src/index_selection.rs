@@ -96,7 +96,7 @@ pub(crate) fn index_selection(
         ty,
     } in implicit_rules
     {
-        let (_, merge) = columns_to_uses
+        let (usage, merge) = columns_to_uses
             .entry(permuted_columns_of_use(on))
             .or_default();
         assert!(merge.is_none(), "overlapping implicit rules");

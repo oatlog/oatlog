@@ -1,6 +1,6 @@
 use crate::{
     ids::{ColumnId, GlobalId, RelationId, TypeId, VariableId},
-    index_selection::{IndexInfo, MergeTy},
+    index_selection::{IndexInfo, IndexUsageInfo, MergeTy},
     lir::{
         Action, GlobalCompute, Initial, Literal, RelationData, RelationKind, RuleAtom, RuleTrie,
         Theory, TypeData, TypeKind, VariableData,
@@ -1066,6 +1066,111 @@ fn codegen_relation(
                     (iter_all, check_all)
                 })
                 .unzip();
+            let entry_all: Vec<_> = index_to_info
+                .iter_enumerate()
+                .filter_map(
+                    |(
+                        index_id,
+                        index_info @ IndexInfo {
+                            permuted_columns,
+                            primary_key_prefix_len,
+                            primary_key_violation_merge,
+                        },
+                    )| {
+                        match primary_key_violation_merge {
+                            MergeTy::Union => {}
+                            MergeTy::Panic => return None,
+                        }
+                        let entry_all_ident = ident::index_all_entry(index_info);
+                        let iter_all_ident = ident::index_all_iter(
+                            &IndexUsageInfo {
+                                prefix: *primary_key_prefix_len,
+                                index: index_id,
+                            },
+                            index_info,
+                        );
+                        let relation_delta = ident::delta_row(&rel);
+
+                        let col_symbs: Vec<_> = permuted_columns
+                            .iter()
+                            .map(|&c| ident::column(c))
+                            .collect_vec();
+                        let (col_symbs_key, col_symbs_key_ty): (Vec<_>, Vec<_>) = permuted_columns
+                            .iter_enumerate()
+                            .take(*primary_key_prefix_len)
+                            .map(|(i, &c)| {
+                                let ty = &theory.types[rel.param_types[i]];
+                                (ident::column(c), ident::type_ty(ty))
+                            })
+                            .collect();
+                        let (col_symbs_value, col_symbs_value_ty): (Vec<_>, Vec<_>) =
+                            permuted_columns
+                                .iter_enumerate()
+                                .skip(*primary_key_prefix_len)
+                                .map(|(i, &c)| {
+                                    let ty = &theory.types[rel.param_types[i]];
+                                    (ident::column(c), ident::type_ty(ty))
+                                })
+                                .unzip();
+                        let (
+                            col_symbs_value_symbolic,
+                            col_value_symbolic_uf,
+                            col_value_symbolic_forall_delta,
+                        ): (Vec<_>, Vec<_>, Vec<_>) = permuted_columns
+                            .iter_enumerate()
+                            .skip(*primary_key_prefix_len)
+                            .filter_map(|(i, &c)| {
+                                let ty_id = rel.param_types[i];
+                                let ty = &theory.types[ty_id];
+                                if matches!(ty.kind, TypeKind::Symbolic) {
+                                    // TODO loke: remove this stringly typed hack
+                                    let forall_name = format!("Forall{}", ty.name);
+                                    let forall = theory
+                                        .relations
+                                        .iter()
+                                        .find(|r| {
+                                            r.name == forall_name
+                                                && r.param_types.inner() == &[ty_id]
+                                        })
+                                        .unwrap();
+                                    let forall_delta = ident::delta_row(forall);
+                                    Some((ident::column(c), ident::type_uf(ty), forall_delta))
+                                } else {
+                                    None
+                                }
+                            })
+                            .collect();
+
+                        assert_eq!(
+                            col_symbs_value.len(),
+                            col_symbs_value_symbolic.len(),
+                            concat!(
+                                "relation entry functions cannot yet be generated with non-symbolic values",
+                                " (fine for now, must fix this to implement lattices)",
+                            )
+                        );
+
+                        Some(quote! {
+                            fn #entry_all_ident(
+                                &self,
+                                delta: &mut Delta,
+                                uf: &mut Unification,
+                                #(#col_symbs_key: #col_symbs_key_ty,)*
+                            ) -> (#(#col_symbs_value_ty,)*) {
+                                if let Some((#(#col_symbs_value,)*)) = self.#iter_all_ident(#(#col_symbs_key,)*).next() {
+                                    return (#(#col_symbs_value,)*);
+                                }
+                                #(
+                                    let #col_symbs_value_symbolic = uf.#col_value_symbolic_uf.add_eclass();
+                                    delta.#col_value_symbolic_forall_delta.push((#col_symbs_value_symbolic,));
+                                )*
+                                delta.#relation_delta.push((#(#col_symbs,)*));
+                                (#(#col_symbs_value,)*)
+                            }
+                        })
+                    },
+                )
+                .collect();
 
             let update = {
                 let indexes_merge_fn: Vec<_> = index_to_info
@@ -1271,6 +1376,7 @@ fn codegen_relation(
                     fn iter_new(&self) -> impl Iterator<Item = <Self as Relation>::Row> + use<'_>{ self.new.iter().copied() }
                     #(#iter_all)*
                     #(#check_all)*
+                    #(#entry_all)*
                     #update
                     fn len(&self) -> usize {
                         self.#some_index_field.len()
@@ -1394,6 +1500,16 @@ mod ident {
             .join("_");
         let prefix = format!("{}", usage.prefix);
         format_ident!("check{prefix}_{index_perm}")
+    }
+    /// `entry2_2_0_1`
+    pub fn index_all_entry(index: &IndexInfo) -> Ident {
+        let index_perm = index
+            .permuted_columns
+            .iter()
+            .map(|ColumnId(x)| format!("{x}"))
+            .join("_");
+        let pk_arity = format!("{}", index.primary_key_prefix_len);
+        format_ident!("entry{pk_arity}_{index_perm}")
     }
     /// `x2`
     pub fn column(c: ColumnId) -> Ident {

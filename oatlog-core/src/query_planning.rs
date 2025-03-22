@@ -124,6 +124,16 @@ pub(crate) fn emit_lir_theory(mut theory: hir::Theory) -> (hir::Theory, lir::The
                     .map(|i| uses.push(vec![i]))
                     .collect();
 
+                // Add index usages to guarantee existence of the `iter` functions called internally within `entry` functions.
+                theory
+                    .implicit_rules
+                    .get(&relation_id)
+                    .into_iter()
+                    .flatten()
+                    .for_each(|hir::ImplicitRule { on, .. }| {
+                        let _ = uses.push(on.clone());
+                    });
+
                 let (usage_to_info, index_to_info) = index_selection::index_selection(
                     relation.columns.len(),
                     uses,
