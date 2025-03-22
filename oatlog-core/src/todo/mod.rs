@@ -23,10 +23,6 @@
 #![allow(unused_parens)]
 #![allow(unused_variables)]
 
-mod todo1;
-mod todo2;
-mod todo3;
-mod todo4;
 mod todo5;
-mod todo6;
 mod todo_join;
+mod todo_scratch;
