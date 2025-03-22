@@ -1,7 +1,6 @@
 //! Frontend, parse source text into HIR.
 
 #![allow(clippy::zero_sized_map_values, reason = "MapExt trait usage")]
-#![deny(unused_must_use)]
 
 use std::{
     collections::{BTreeMap, btree_map::Entry},
