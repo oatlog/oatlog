@@ -7,7 +7,6 @@ use std::{
     collections::{BTreeMap, btree_map::Entry},
     fmt::Debug,
     hash::Hash,
-    primitive,
 };
 
 use itertools::Itertools as _;
@@ -15,7 +14,7 @@ use proc_macro2::{Delimiter, Span, TokenTree};
 
 use crate::{
     Configuration, FileNotFoundAction, hir,
-    ids::{self, ActionId, ColumnId, GlobalId, Id, RelationId, TypeId, VariableId},
+    ids::{ColumnId, GlobalId, Id, RelationId, TypeId, VariableId},
     lir,
     typed_vec::TVec,
 };
@@ -248,7 +247,7 @@ fn already_defined(
 
 trait MapExt<K, V> {
     fn insert_unique(&mut self, k: K, v: V, context: &'static str) -> MResult<V>;
-    fn lookup(&mut self, k: K, context: &'static str) -> MResult<V>;
+    fn lookup(&self, k: K, context: &'static str) -> MResult<V>;
 }
 impl<V: Clone> MapExt<Str, V> for BTreeMap<Str, V> {
     fn insert_unique(&mut self, k: Str, v: V, context: &'static str) -> MResult<V> {
@@ -262,10 +261,10 @@ impl<V: Clone> MapExt<Str, V> for BTreeMap<Str, V> {
         }
     }
 
-    fn lookup(&mut self, k: Str, context: &'static str) -> MResult<V> {
-        match self.entry(k) {
-            Entry::Vacant(entry) => err_!(entry.key().span, "{context} {k} is not defined"),
-            Entry::Occupied(entry) => Ok(entry.get().clone()),
+    fn lookup(&self, k: Str, context: &'static str) -> MResult<V> {
+        match self.get(&k) {
+            Some(x) => Ok(x.clone()),
+            None => err_!(k.span, "{context} {k} is not defined"),
         }
     }
 }
@@ -286,13 +285,16 @@ impl<V: Clone> MapExt<&'static str, Spanned<V>> for BTreeMap<&'static str, Spann
         }
     }
 
-    fn lookup(&mut self, k: &'static str, context: &'static str) -> MResult<Spanned<V>> {
-        match self.entry(k) {
-            Entry::Vacant(_) => err_!(None, "{context} {k} is not defined"),
-            Entry::Occupied(entry) => Ok(entry.get().clone()),
+    fn lookup(&self, k: &'static str, context: &'static str) -> MResult<Spanned<V>> {
+        match self.get(&k) {
+            Some(x) => Ok(x.clone()),
+            None => err_!(None, "{context} {k} is not defined"),
         }
     }
 }
+
+// TODO: turn (let) globals into regular functions
+// Make globals only contain literals and make codegen insert them directly.
 
 /// Global parsing state
 #[derive(Debug)]
@@ -420,7 +422,7 @@ impl Parser {
     ) -> MResult<()> {
         // TODO: forward declarations here.
         for ast in program {
-            let span = ast.span.clone();
+            let span = ast.span;
             self.parse_egglog_ast(ast, config)
                 .add_err(bare_!(span, "while parsing this toplevel expression"))?;
         }
@@ -525,7 +527,7 @@ impl Parser {
                 rule,
             } => {
                 let egglog_ast::Rule { facts, actions } = rule;
-                self.add_rule2(name, ruleset, facts, actions)?;
+                self.add_rule(name, ruleset, facts, actions)?;
             }
             egglog_ast::Statement::Rewrite {
                 ruleset,
@@ -555,7 +557,7 @@ impl Parser {
                     },
                     rhs.span,
                 )];
-                self.add_rule2(None, ruleset, facts, actions)?;
+                self.add_rule(None, ruleset, facts, actions)?;
             }
             egglog_ast::Statement::BiRewrite { ruleset, rewrite } => {
                 let egglog_ast::Rewrite {
@@ -580,7 +582,7 @@ impl Parser {
                         },
                         rhs.span,
                     )];
-                    self.add_rule2(None, ruleset, facts, actions)?;
+                    self.add_rule(None, ruleset, facts, actions)?;
                 }
             }
             egglog_ast::Statement::Action(action) => {
@@ -1089,6 +1091,335 @@ impl Parser {
     }
 }
 
+mod compile_rule2 {
+    use super::{
+        ComputeMethod, Expr, Literal, MError, MResult, MapExt as _, Parser, QSpan, Spanned, Str,
+        bare_, egglog_ast, register_span, span,
+    };
+
+    use std::collections::{BTreeMap, BTreeSet};
+
+    use crate::{
+        hir,
+        ids::{RelationId, TypeId, VariableId},
+        typed_vec::TVec,
+        union_find::UFData,
+    };
+
+    fn type_mismatch_msg(parser: &Parser, loc: Option<QSpan>, a: TypeId, b: TypeId) -> MError {
+        let a = parser.type_name(a);
+        let b = parser.type_name(b);
+
+        let mut err = bare_!(loc, "Type mismatch: {a} != {b}");
+        err.push(bare_!(a.span, "{a} defined here:"));
+        err.push(bare_!(b.span, "{b} defined here:"));
+        err
+    }
+
+    fn no_possible_function_msg(
+        parser: &Parser,
+        name: Str,
+        input: &[Option<TypeId>],
+        output: Option<TypeId>,
+    ) -> MError {
+        let input: Vec<_> = input
+            .iter()
+            .copied()
+            .map(|x| x.map_or("?", |x| *parser.type_name(x)))
+            .collect();
+        let output = output.map_or("?", |x| *parser.type_name(x));
+        bare_!(
+            name.span,
+            "No function named {name} can be used here with input {input:?} and output {output:?}"
+        )
+    }
+
+    fn ambigious_call_msg(
+        parser: &Parser,
+        name: Str,
+        ids: &[RelationId],
+        args: &[VariableId],
+        type_uf: &Types,
+        i: VariableId,
+    ) -> MError {
+        let input: Vec<_> = args
+            .iter()
+            .map(|&x| type_uf.0[x].map_or("?", |x| *parser.type_name(x)))
+            .collect();
+        let output = type_uf.0[i].map_or("?", |x| *parser.type_name(x));
+        let possible_function_names = ids
+            .iter()
+            .map(|&x| parser.relations_hir_and_func[x].1.as_ref().unwrap().name);
+        let mut err = bare_!(
+            name.span,
+            "ambigious call to {name}, with input {input:?} and output {output:?}"
+        );
+        for name in possible_function_names {
+            err.push(bare_!(name.span, "{name} defined here"));
+        }
+        err
+    }
+
+    enum FlatExpr {
+        Literal(Literal),
+        Call(Str, Vec<VariableId>),
+        Possible(Str, Vec<RelationId>, Vec<VariableId>),
+        Resolved(RelationId, Vec<VariableId>),
+        Var,
+    }
+
+    struct Flatten {
+        flattened: TVec<VariableId, FlatExpr>,
+        spans: TVec<VariableId, Option<QSpan>>,
+        labels: TVec<VariableId, &'static str>,
+        symbols: BTreeMap<Str, VariableId>,
+    }
+    impl Flatten {
+        fn flatten(&mut self, expr: &Spanned<Expr>) -> VariableId {
+            let span = expr.span;
+            match &expr.x {
+                Expr::Literal(x) => {
+                    let _: VariableId = self.spans.push(span);
+                    // TODO: when we can handle variable collisions, add a more descriptive name
+                    // here.
+                    self.labels.push("");
+                    self.flattened.push(FlatExpr::Literal(x.x))
+                }
+                Expr::Var(s) => *self.symbols.entry(*s).or_insert_with(|| {
+                    let _: VariableId = self.spans.push(span);
+                    self.labels.push(**s);
+                    self.flattened.push(FlatExpr::Var)
+                }),
+                Expr::Call(name, args) => {
+                    let args: Vec<VariableId> =
+                        args.iter().map(|expr| self.flatten(expr)).collect();
+                    let _: VariableId = self.spans.push(span);
+                    self.labels.push("");
+                    self.flattened.push(FlatExpr::Call(*name, args))
+                }
+            }
+        }
+    }
+
+    struct Types(UFData<VariableId, Option<TypeId>>);
+    impl Types {
+        fn set_type(
+            &mut self,
+            parser: &Parser,
+            spans: &TVec<VariableId, Option<QSpan>>,
+            i: VariableId,
+            t: TypeId,
+        ) -> MResult<()> {
+            match self.0[i] {
+                Some(old) if old == t => Ok(()),
+                None => Ok(()),
+                Some(old) => Err(type_mismatch_msg(parser, spans[i], old, t)),
+            }
+        }
+    }
+
+    fn compile(
+        parser: &mut Parser,
+        name: Option<Str>,
+        ruleset: Option<Str>,
+        facts: Vec<span::Spanned<egglog_ast::Fact>>,
+        actions: Vec<span::Spanned<egglog_ast::Action>>,
+    ) -> MResult<()> {
+        // TODO: turn into object.
+
+        let mut flat = Flatten {
+            flattened: TVec::new(),
+            spans: TVec::new(),
+            labels: TVec::new(),
+            symbols: BTreeMap::new(),
+        };
+
+        let mut premise_merge = vec![];
+        for fact in facts {
+            register_span!(fact.span);
+            match fact.x {
+                egglog_ast::Fact::Eq(e1, e2) => {
+                    let e1 = flat.flatten(&e1);
+                    let e2 = flat.flatten(&e2);
+                    premise_merge.push((e1, e2, span!()));
+                }
+                egglog_ast::Fact::Expr(expr) => {
+                    let _: VariableId = flat.flatten(&expr);
+                }
+            }
+        }
+        let n_fact = flat.flattened.len();
+        let mut action_union = vec![];
+        let mut promote_insert = BTreeSet::new();
+        for action in actions {
+            register_span!(action.span);
+            match action.x {
+                egglog_ast::Action::Let { name, expr } => {
+                    let id = flat.flatten(&expr);
+                    let _: VariableId =
+                        flat.symbols
+                            .insert_unique(name, id, "variable/let binding")?;
+                }
+                egglog_ast::Action::Set {
+                    table,
+                    args,
+                    result,
+                } => {
+                    let id: VariableId = flat.flatten(&spanned!(Expr::Call(table, args.clone())));
+                    // set means insert, so we promote it to insert after typechecking.
+                    promote_insert.insert(id);
+                    let res = flat.flatten(&result);
+                    premise_merge.push((id, res, span!()));
+                }
+                egglog_ast::Action::Panic { message } => return err!("panic not implemented"),
+                egglog_ast::Action::Union { lhs, rhs } => {
+                    let lhs = flat.flatten(&lhs);
+                    let rhs = flat.flatten(&rhs);
+                    action_union.push((lhs, rhs, span!()));
+                }
+                egglog_ast::Action::Expr(expr) => {
+                    let _: VariableId = flat.flatten(&expr);
+                }
+                egglog_ast::Action::Change {
+                    table,
+                    args,
+                    change,
+                } => return err!("change not implemented"),
+                egglog_ast::Action::Extract { expr, variants } => {
+                    return err!("extract action will not be implemented");
+                }
+            }
+        }
+        let Flatten {
+            mut flattened,
+            spans,
+            labels,
+            symbols,
+        } = flat;
+        let n = flattened.len();
+        let mut type_uf = Types(UFData::new_with_size(n, None));
+        for (a, b, span) in action_union
+            .iter()
+            .copied()
+            .chain(premise_merge.iter().copied())
+        {
+            type_uf.0.union_merge(a, b, |_, _| None);
+        }
+        loop {
+            let mut progress = false;
+            for (i, x) in flattened.iter_enumerate_mut() {
+                match x {
+                    FlatExpr::Resolved(..) | FlatExpr::Var => {}
+                    FlatExpr::Literal(literal) => {
+                        let ty = parser.literal_type(*literal);
+                        type_uf.set_type(parser, &spans, i, ty)?;
+                        let global_id =
+                            parser.add_global(None, ty, ComputeMethod::Literal(*literal))?;
+                        let relation_id = parser.global_variables[&global_id].relation_id;
+                        *x = FlatExpr::Resolved(relation_id, vec![]);
+                        progress = true;
+                    }
+                    FlatExpr::Call(name, args) => {
+                        let ids = parser
+                            .function_possible_ids
+                            .lookup(*name, "function call")?;
+
+                        *x = FlatExpr::Possible(*name, ids, args.clone());
+                        progress = true;
+                    }
+                    FlatExpr::Possible(name, ids, args) => {
+                        let inputs: Vec<_> = args.iter().copied().map(|i| type_uf.0[i]).collect();
+                        let output = type_uf.0[i];
+                        ids.retain(|&id| {
+                            // TODO: when is functiondata None?
+                            parser.relations_hir_and_func[id]
+                                .1
+                                .as_ref()
+                                .is_none_or(|f| f.check_compatible(&inputs, output))
+                        });
+
+                        match ids.as_slice() {
+                            [_, _, ..] => {}
+                            [] => {
+                                return Err(no_possible_function_msg(
+                                    parser, *name, &inputs, output,
+                                ));
+                            }
+                            &[id] => {
+                                if let Some(function) = parser.relations_hir_and_func[id].1.as_ref()
+                                {
+                                    for (&i, &t) in args.iter().zip(function.inputs.iter()) {
+                                        type_uf.set_type(parser, &spans, i, t)?;
+                                    }
+                                    type_uf.set_type(parser, &spans, i, function.output)?;
+                                }
+                                *x = FlatExpr::Resolved(id, args.clone());
+                                progress = true;
+                            }
+                        }
+                    }
+                }
+            }
+            if !progress {
+                break;
+            }
+        }
+        let mut conjunctive_query = Vec::new();
+        foreach_resolved(parser, &flattened, &type_uf, 0..n_fact, |i, f, args| {
+            conjunctive_query.push((f, args.clone(), i));
+        })?;
+        let mut inserts = Vec::new();
+        let mut entry = Vec::new();
+        foreach_resolved(parser, &flattened, &type_uf, n_fact..n, |i, f, args| {
+            let mut args = args.clone();
+            if promote_insert.contains(&i) {
+                args.push(i);
+                inserts.push((f, args));
+            } else {
+                entry.push((f, args, i));
+            }
+        })?;
+
+        // let rule = hir::RuleArgs {
+        //     name: name.map_or("", |x| *x),
+        //     sort_vars: (0..n_fact).map(VariableId).collect(),
+        //     variables: variables
+        //         .iter()
+        //         .map(|VariableInfo { label, ty }| (types[*ty].unwrap(), label.map_or("", |x| *x)))
+        //         .collect(),
+        //     premise: premise_relations,
+        //     premise_unify,
+        //     action: action_relations,
+        //     action_unify,
+        //     delete: to_delete,
+        // }
+        // .build();
+
+        Ok(())
+    }
+
+    fn foreach_resolved(
+        parser: &Parser,
+        flattened: &TVec<VariableId, FlatExpr>,
+        type_uf: &Types,
+        i: std::ops::Range<usize>,
+        mut f: impl FnMut(VariableId, RelationId, &Vec<VariableId>),
+    ) -> Result<(), span::MagicError> {
+        for i in i.map(VariableId) {
+            match &flattened[i] {
+                FlatExpr::Var => {}
+                FlatExpr::Literal(x) => unreachable!(),
+                FlatExpr::Call(spanned, vec) => unreachable!(),
+                FlatExpr::Possible(name, ids, args) => {
+                    return Err(ambigious_call_msg(parser, *name, ids, args, type_uf, i));
+                }
+                FlatExpr::Resolved(relation_id, args) => f(i, *relation_id, args),
+            }
+        }
+        Ok(())
+    }
+}
+
 mod compile_rule {
     use std::{collections::BTreeMap, mem::replace};
 
@@ -1260,7 +1591,7 @@ mod compile_rule {
     use crate::frontend::span::Spanned;
 
     impl Parser {
-        pub(super) fn add_rule2(
+        pub(super) fn add_rule(
             &mut self,
             name: Option<Str>,
             ruleset: Option<Str>,
@@ -1272,7 +1603,7 @@ mod compile_rule {
             for facts in facts2 {
                 match facts.x {
                     egglog_ast::Fact::Eq(e1, e2) => {
-                        premises.push(spanned!(Expr::Call(spanned!("="), vec![e1, e2])))
+                        premises.push(spanned!(Expr::Call(spanned!("="), vec![e1, e2])));
                     }
                     egglog_ast::Fact::Expr(e) => premises.push(e),
                 }
@@ -1299,16 +1630,6 @@ mod compile_rule {
                 })
                 .collect();
 
-            self.add_rule(name, ruleset, premises, actions)
-        }
-
-        pub(super) fn add_rule(
-            &mut self,
-            name: Option<Str>,
-            ruleset: Option<Str>,
-            premises: Vec<Spanned<Expr>>,
-            actions: Vec<Action>,
-        ) -> MResult<()> {
             let mut variables: TVec<VariableId, VariableInfo> = TVec::new();
             let mut types: UFData<TypeVarId, Option<TypeId>> = UFData::new();
             let mut bound_variables: BTreeMap<&'static str, VariableId> = BTreeMap::new();

@@ -1122,8 +1122,7 @@ Overall, our comparative testing infrastructure (against egglog) can handle the 
 
 === Relation taxonomy.
 
-
-
+#TODO[@function-taxonomy]
 
 #figure(
   table(
@@ -1146,9 +1145,7 @@ Overall, our comparative testing infrastructure (against egglog) can handle the 
       () means unit, \* means any, E means eclass, P means primitive.
     ],
   ),
-)
-
-
+) <function-taxonomy>
 
 = Evaluation
 

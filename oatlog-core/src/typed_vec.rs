@@ -41,6 +41,9 @@ impl<K: Id, V> TVec<K, V> {
     pub(crate) fn iter_enumerate(&self) -> impl Iterator<Item = (K, &V)> {
         (0..).map(K::from).zip(self.x.iter())
     }
+    pub(crate) fn iter_enumerate_mut(&mut self) -> impl Iterator<Item = (K, &mut V)> {
+        (0..).map(K::from).zip(self.x.iter_mut())
+    }
     pub(crate) fn push_expected(&mut self, expected_id: K, v: V) {
         assert_eq!(self.x.len(), expected_id.into());
         self.x.push(v);
