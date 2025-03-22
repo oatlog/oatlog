@@ -20,21 +20,22 @@ comparative-test.path = "comparative-test"
 
 ariadne = { version = "0.5", features = ["auto-color"] }
 clap = { version = "4", features = ["derive"]}
+criterion = "0.3"
+derive_more = { version = "2", features = ["full"] }
 educe = "0.6"
 egglog = "0.4"
 eqlog-runtime = "0.8"
 expect-test = "1"
 heck = "0.5"
 itertools = "0.14"
+paste = "1"
 proc-macro2 = { version = "1", features = ["span-locations"], default-features = false }
 quote = "1"
+rayon = "1"
 regex = "1"
+smallvec = { version = "1", features = ["union"] }
 syn = { version = "2", features = ["full", "extra-traits"] }
-smallvec = { version = "1.14.0", features = ["union"] }
-derive_more = { version = "2.0.1", features = ["full"] }
-criterion = "0.3"
-rayon = "1.10.0"
-paste = "1.0.15"
+voracious_radix_sort = "1"
 
 [profile.release]
 debug = true

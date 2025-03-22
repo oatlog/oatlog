@@ -29,6 +29,16 @@ pub trait IndexRow: PreReqs {
 #[macro_export]
 macro_rules! decl_row {
     // Helper macros kept inline to not need additional exported macros
+    (impl radixable for $name:ident<$($t_inner:ident),+>) => {};
+    (impl radixable for $name:ident<$($t_inner:ident),+> where $radix_key:ident = $inner:ident => $radix_impl:expr) => {
+        impl<$($t_inner : Eclass),*> $crate::runtime::Radixable<$radix_key> for $name<$($t_inner),*> {
+            type Key = $radix_key;
+            fn key(&self) -> $radix_key {
+                let $inner = self.inner;
+                $radix_impl
+            }
+        }
+    };
     (MIN $t_inner:ident $fc:expr) => {
         <$t_inner as RelationElement>::MIN_ID
     };
@@ -39,7 +49,13 @@ macro_rules! decl_row {
         $fc
     };
     /////
-    ($name:ident<$($t_inner:ident $($first:ident)?),+> ($($key:tt),*) ($($value:tt),*) ($($key_t:tt),*) ($($value_t:tt),*) fc=($fci:tt) ($fci_t:tt)) => {
+    (
+        $name:ident<$($t_inner:ident $($first:ident)?),+>
+        ($($key:tt),*) ($($value:tt),*)
+        ($($key_t:tt),*) ($($value_t:tt),*)
+        fc=($fci:tt) ($fci_t:tt)
+        $(where $radix_key:ident = $inner:ident => $radix_impl:expr)?
+    ) => {
         #[derive(Clone, Copy, PartialEq, Eq, Default, Debug)]
         #[repr(transparent)]
         pub struct $name<$($t_inner : RelationElement),*> {
@@ -109,6 +125,7 @@ macro_rules! decl_row {
                 self.inner.$fci
             }
         }
+        decl_row!(impl radixable for $name<$($t_inner),*> $(where $radix_key = $inner => $radix_impl)?);
         impl<$($t_inner : RelationElement),*> Ord for $name<$($t_inner),*> {
             fn cmp(&self, other: &Self) -> std::cmp::Ordering {
                 let permuted_inner = |s: &Self| ($(s.inner.$key,)* $(s.inner.$value,)*);

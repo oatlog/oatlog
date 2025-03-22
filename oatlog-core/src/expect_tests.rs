@@ -589,9 +589,9 @@ fn codegen_bug1() {
         expected_lir: None,
         expected_codegen: Some(expect![[r#"
             use oatlog::runtime::{self, *};
-            decl_row ! (Row3_0_1_2 < T0 first , T1 , T2 > (0 , 1 , 2) () (T0 , T1 , T2) () fc = (0) (T0));
-            decl_row ! (Row3_1_0_2 < T0 , T1 first , T2 > (1 , 0 , 2) () (T1 , T0 , T2) () fc = (1) (T1));
-            decl_row ! (Row3_2_0_1 < T0 , T1 , T2 first > (2 , 0 , 1) () (T2 , T0 , T1) () fc = (2) (T2));
+            decl_row ! (Row3_0_1_2 < T0 first , T1 , T2 > (0 , 1 , 2) () (T0 , T1 , T2) () fc = (0) (T0) where u128 = s => ((s . 0 . inner () as u128) << 64) + ((s . 1 . inner () as u128) << 32) + ((s . 2 . inner () as u128) << 0));
+            decl_row ! (Row3_1_0_2 < T0 , T1 first , T2 > (1 , 0 , 2) () (T1 , T0 , T2) () fc = (1) (T1) where u128 = s => ((s . 1 . inner () as u128) << 64) + ((s . 0 . inner () as u128) << 32) + ((s . 2 . inner () as u128) << 0));
+            decl_row ! (Row3_2_0_1 < T0 , T1 , T2 first > (2 , 0 , 1) () (T2 , T0 , T1) () fc = (2) (T2) where u128 = s => ((s . 2 . inner () as u128) << 64) + ((s . 0 . inner () as u128) << 32) + ((s . 1 . inner () as u128) << 0));
             eclass_wrapper_ty!(T0);
             eclass_wrapper_ty!(T1);
             eclass_wrapper_ty!(T2);
@@ -655,9 +655,9 @@ fn codegen_bug1() {
             #[derive(Debug, Default)]
             struct FooRelation {
                 new: Vec<<Self as Relation>::Row>,
-                all_index_0_1_2: IndexImpl<Row3_0_1_2<T0, T1, T2>>,
-                all_index_1_0_2: IndexImpl<Row3_1_0_2<T0, T1, T2>>,
-                all_index_2_0_1: IndexImpl<Row3_2_0_1<T0, T1, T2>>,
+                all_index_0_1_2: IndexImpl<RadixSortCtx<Row3_0_1_2<T0, T1, T2>, u128>>,
+                all_index_1_0_2: IndexImpl<RadixSortCtx<Row3_1_0_2<T0, T1, T2>, u128>>,
+                all_index_2_0_1: IndexImpl<RadixSortCtx<Row3_2_0_1<T0, T1, T2>, u128>>,
             }
             impl Relation for FooRelation {
                 type Row = (T0, T1, T2);
@@ -982,8 +982,8 @@ fn initial() {
         expected_lir: None,
         expected_codegen: Some(expect![[r#"
             use oatlog::runtime::{self, *};
-            decl_row ! (Row2_0 < T0 first , T1 > (0) (1) (T0) (T1) fc = (0) (T0));
-            decl_row ! (Row2_1_0 < T0 , T1 first > (1 , 0) () (T1 , T0) () fc = (1) (T1));
+            decl_row ! (Row2_0 < T0 first , T1 > (0) (1) (T0) (T1) fc = (0) (T0) where u64 = s => ((s . 0 . inner () as u64) << 32) + ((s . 1 . inner () as u64) << 0));
+            decl_row ! (Row2_1_0 < T0 , T1 first > (1 , 0) () (T1 , T0) () fc = (1) (T1) where u64 = s => ((s . 1 . inner () as u64) << 32) + ((s . 0 . inner () as u64) << 0));
             eclass_wrapper_ty!(Math);
             #[derive(Debug, Default)]
             struct ForallMathRelation {
@@ -1007,8 +1007,8 @@ fn initial() {
             #[derive(Debug, Default)]
             struct ConstRelation {
                 new: Vec<<Self as Relation>::Row>,
-                all_index_0_1: IndexImpl<Row2_0<std::primitive::i64, Math>>,
-                all_index_1_0: IndexImpl<Row2_1_0<std::primitive::i64, Math>>,
+                all_index_0_1: IndexImpl<StdSortCtx<Row2_0<std::primitive::i64, Math>>>,
+                all_index_1_0: IndexImpl<StdSortCtx<Row2_1_0<std::primitive::i64, Math>>>,
             }
             impl Relation for ConstRelation {
                 type Row = (std::primitive::i64, Math);
@@ -1308,11 +1308,11 @@ fn test_primitives_simple() {
         expected_lir: None,
         expected_codegen : Some(expect![[r#"
             use oatlog::runtime::{self, *};
-            decl_row ! (Row2_0 < T0 first , T1 > (0) (1) (T0) (T1) fc = (0) (T0));
-            decl_row ! (Row2_1_0 < T0 , T1 first > (1 , 0) () (T1 , T0) () fc = (1) (T1));
-            decl_row ! (Row3_0_1 < T0 first , T1 , T2 > (0 , 1) (2) (T0 , T1) (T2) fc = (0) (T0));
-            decl_row ! (Row3_1_0_2 < T0 , T1 first , T2 > (1 , 0 , 2) () (T1 , T0 , T2) () fc = (1) (T1));
-            decl_row ! (Row3_2_0_1 < T0 , T1 , T2 first > (2 , 0 , 1) () (T2 , T0 , T1) () fc = (2) (T2));
+            decl_row ! (Row2_0 < T0 first , T1 > (0) (1) (T0) (T1) fc = (0) (T0) where u64 = s => ((s . 0 . inner () as u64) << 32) + ((s . 1 . inner () as u64) << 0));
+            decl_row ! (Row2_1_0 < T0 , T1 first > (1 , 0) () (T1 , T0) () fc = (1) (T1) where u64 = s => ((s . 1 . inner () as u64) << 32) + ((s . 0 . inner () as u64) << 0));
+            decl_row ! (Row3_0_1 < T0 first , T1 , T2 > (0 , 1) (2) (T0 , T1) (T2) fc = (0) (T0) where u128 = s => ((s . 0 . inner () as u128) << 64) + ((s . 1 . inner () as u128) << 32) + ((s . 2 . inner () as u128) << 0));
+            decl_row ! (Row3_1_0_2 < T0 , T1 first , T2 > (1 , 0 , 2) () (T1 , T0 , T2) () fc = (1) (T1) where u128 = s => ((s . 1 . inner () as u128) << 64) + ((s . 0 . inner () as u128) << 32) + ((s . 2 . inner () as u128) << 0));
+            decl_row ! (Row3_2_0_1 < T0 , T1 , T2 first > (2 , 0 , 1) () (T2 , T0 , T1) () fc = (2) (T2) where u128 = s => ((s . 2 . inner () as u128) << 64) + ((s . 0 . inner () as u128) << 32) + ((s . 1 . inner () as u128) << 0));
             eclass_wrapper_ty!(Math);
             #[derive(Debug, Default)]
             struct ForallMathRelation {
@@ -1336,9 +1336,9 @@ fn test_primitives_simple() {
             #[derive(Debug, Default)]
             struct MulRelation {
                 new: Vec<<Self as Relation>::Row>,
-                all_index_0_1_2: IndexImpl<Row3_0_1<Math, Math, Math>>,
-                all_index_1_0_2: IndexImpl<Row3_1_0_2<Math, Math, Math>>,
-                all_index_2_0_1: IndexImpl<Row3_2_0_1<Math, Math, Math>>,
+                all_index_0_1_2: IndexImpl<RadixSortCtx<Row3_0_1<Math, Math, Math>, u128>>,
+                all_index_1_0_2: IndexImpl<RadixSortCtx<Row3_1_0_2<Math, Math, Math>, u128>>,
+                all_index_2_0_1: IndexImpl<RadixSortCtx<Row3_2_0_1<Math, Math, Math>, u128>>,
             }
             impl Relation for MulRelation {
                 type Row = (Math, Math, Math);
@@ -1464,9 +1464,9 @@ fn test_primitives_simple() {
             #[derive(Debug, Default)]
             struct AddRelation {
                 new: Vec<<Self as Relation>::Row>,
-                all_index_0_1_2: IndexImpl<Row3_0_1<Math, Math, Math>>,
-                all_index_1_0_2: IndexImpl<Row3_1_0_2<Math, Math, Math>>,
-                all_index_2_0_1: IndexImpl<Row3_2_0_1<Math, Math, Math>>,
+                all_index_0_1_2: IndexImpl<RadixSortCtx<Row3_0_1<Math, Math, Math>, u128>>,
+                all_index_1_0_2: IndexImpl<RadixSortCtx<Row3_1_0_2<Math, Math, Math>, u128>>,
+                all_index_2_0_1: IndexImpl<RadixSortCtx<Row3_2_0_1<Math, Math, Math>, u128>>,
             }
             impl Relation for AddRelation {
                 type Row = (Math, Math, Math);
@@ -1592,8 +1592,8 @@ fn test_primitives_simple() {
             #[derive(Debug, Default)]
             struct ConstRelation {
                 new: Vec<<Self as Relation>::Row>,
-                all_index_0_1: IndexImpl<Row2_0<std::primitive::i64, Math>>,
-                all_index_1_0: IndexImpl<Row2_1_0<std::primitive::i64, Math>>,
+                all_index_0_1: IndexImpl<StdSortCtx<Row2_0<std::primitive::i64, Math>>>,
+                all_index_1_0: IndexImpl<StdSortCtx<Row2_1_0<std::primitive::i64, Math>>>,
             }
             impl Relation for ConstRelation {
                 type Row = (std::primitive::i64, Math);
@@ -1692,8 +1692,8 @@ fn test_primitives_simple() {
             #[derive(Debug, Default)]
             struct VarRelation {
                 new: Vec<<Self as Relation>::Row>,
-                all_index_0_1: IndexImpl<Row2_0<oatlog::runtime::IString, Math>>,
-                all_index_1_0: IndexImpl<Row2_1_0<oatlog::runtime::IString, Math>>,
+                all_index_0_1: IndexImpl<StdSortCtx<Row2_0<oatlog::runtime::IString, Math>>>,
+                all_index_1_0: IndexImpl<StdSortCtx<Row2_1_0<oatlog::runtime::IString, Math>>>,
             }
             impl Relation for VarRelation {
                 type Row = (oatlog::runtime::IString, Math);
@@ -2087,11 +2087,11 @@ fn triangle_join() {
         expected_lir: None,
         expected_codegen: Some(expect![[r#"
             use oatlog::runtime::{self, *};
-            decl_row ! (Row2_0_1 < T0 first , T1 > (0 , 1) () (T0 , T1) () fc = (0) (T0));
-            decl_row ! (Row2_1_0 < T0 , T1 first > (1 , 0) () (T1 , T0) () fc = (1) (T1));
-            decl_row ! (Row3_0_1_2 < T0 first , T1 , T2 > (0 , 1 , 2) () (T0 , T1 , T2) () fc = (0) (T0));
-            decl_row ! (Row3_1_0_2 < T0 , T1 first , T2 > (1 , 0 , 2) () (T1 , T0 , T2) () fc = (1) (T1));
-            decl_row ! (Row3_2_0_1 < T0 , T1 , T2 first > (2 , 0 , 1) () (T2 , T0 , T1) () fc = (2) (T2));
+            decl_row ! (Row2_0_1 < T0 first , T1 > (0 , 1) () (T0 , T1) () fc = (0) (T0) where u64 = s => ((s . 0 . inner () as u64) << 32) + ((s . 1 . inner () as u64) << 0));
+            decl_row ! (Row2_1_0 < T0 , T1 first > (1 , 0) () (T1 , T0) () fc = (1) (T1) where u64 = s => ((s . 1 . inner () as u64) << 32) + ((s . 0 . inner () as u64) << 0));
+            decl_row ! (Row3_0_1_2 < T0 first , T1 , T2 > (0 , 1 , 2) () (T0 , T1 , T2) () fc = (0) (T0) where u128 = s => ((s . 0 . inner () as u128) << 64) + ((s . 1 . inner () as u128) << 32) + ((s . 2 . inner () as u128) << 0));
+            decl_row ! (Row3_1_0_2 < T0 , T1 first , T2 > (1 , 0 , 2) () (T1 , T0 , T2) () fc = (1) (T1) where u128 = s => ((s . 1 . inner () as u128) << 64) + ((s . 0 . inner () as u128) << 32) + ((s . 2 . inner () as u128) << 0));
+            decl_row ! (Row3_2_0_1 < T0 , T1 , T2 first > (2 , 0 , 1) () (T2 , T0 , T1) () fc = (2) (T2) where u128 = s => ((s . 2 . inner () as u128) << 64) + ((s . 0 . inner () as u128) << 32) + ((s . 1 . inner () as u128) << 0));
             eclass_wrapper_ty!(Math);
             #[derive(Debug, Default)]
             struct ForallMathRelation {
@@ -2115,8 +2115,8 @@ fn triangle_join() {
             #[derive(Debug, Default)]
             struct FooRelation {
                 new: Vec<<Self as Relation>::Row>,
-                all_index_0_1: IndexImpl<Row2_0_1<Math, Math>>,
-                all_index_1_0: IndexImpl<Row2_1_0<Math, Math>>,
+                all_index_0_1: IndexImpl<RadixSortCtx<Row2_0_1<Math, Math>, u64>>,
+                all_index_1_0: IndexImpl<RadixSortCtx<Row2_1_0<Math, Math>, u64>>,
             }
             impl Relation for FooRelation {
                 type Row = (Math, Math);
@@ -2222,8 +2222,8 @@ fn triangle_join() {
             #[derive(Debug, Default)]
             struct BarRelation {
                 new: Vec<<Self as Relation>::Row>,
-                all_index_0_1: IndexImpl<Row2_0_1<Math, Math>>,
-                all_index_1_0: IndexImpl<Row2_1_0<Math, Math>>,
+                all_index_0_1: IndexImpl<RadixSortCtx<Row2_0_1<Math, Math>, u64>>,
+                all_index_1_0: IndexImpl<RadixSortCtx<Row2_1_0<Math, Math>, u64>>,
             }
             impl Relation for BarRelation {
                 type Row = (Math, Math);
@@ -2321,8 +2321,8 @@ fn triangle_join() {
             #[derive(Debug, Default)]
             struct BazRelation {
                 new: Vec<<Self as Relation>::Row>,
-                all_index_0_1: IndexImpl<Row2_0_1<Math, Math>>,
-                all_index_1_0: IndexImpl<Row2_1_0<Math, Math>>,
+                all_index_0_1: IndexImpl<RadixSortCtx<Row2_0_1<Math, Math>, u64>>,
+                all_index_1_0: IndexImpl<RadixSortCtx<Row2_1_0<Math, Math>, u64>>,
             }
             impl Relation for BazRelation {
                 type Row = (Math, Math);
@@ -2428,9 +2428,9 @@ fn triangle_join() {
             #[derive(Debug, Default)]
             struct TriangleRelation {
                 new: Vec<<Self as Relation>::Row>,
-                all_index_0_1_2: IndexImpl<Row3_0_1_2<Math, Math, Math>>,
-                all_index_1_0_2: IndexImpl<Row3_1_0_2<Math, Math, Math>>,
-                all_index_2_0_1: IndexImpl<Row3_2_0_1<Math, Math, Math>>,
+                all_index_0_1_2: IndexImpl<RadixSortCtx<Row3_0_1_2<Math, Math, Math>, u128>>,
+                all_index_1_0_2: IndexImpl<RadixSortCtx<Row3_1_0_2<Math, Math, Math>, u128>>,
+                all_index_2_0_1: IndexImpl<RadixSortCtx<Row3_2_0_1<Math, Math, Math>, u128>>,
             }
             impl Relation for TriangleRelation {
                 type Row = (Math, Math, Math);
@@ -2800,10 +2800,10 @@ fn edgecase0() {
         expected_lir: None,
         expected_codegen : Some(expect![[r#"
             use oatlog::runtime::{self, *};
-            decl_row ! (Row3_0_1 < T0 first , T1 , T2 > (0 , 1) (2) (T0 , T1) (T2) fc = (0) (T0));
-            decl_row ! (Row3_0_2_1 < T0 first , T1 , T2 > (0 , 2 , 1) () (T0 , T2 , T1) () fc = (0) (T0));
-            decl_row ! (Row3_1_0_2 < T0 , T1 first , T2 > (1 , 0 , 2) () (T1 , T0 , T2) () fc = (1) (T1));
-            decl_row ! (Row3_2_0_1 < T0 , T1 , T2 first > (2 , 0 , 1) () (T2 , T0 , T1) () fc = (2) (T2));
+            decl_row ! (Row3_0_1 < T0 first , T1 , T2 > (0 , 1) (2) (T0 , T1) (T2) fc = (0) (T0) where u128 = s => ((s . 0 . inner () as u128) << 64) + ((s . 1 . inner () as u128) << 32) + ((s . 2 . inner () as u128) << 0));
+            decl_row ! (Row3_0_2_1 < T0 first , T1 , T2 > (0 , 2 , 1) () (T0 , T2 , T1) () fc = (0) (T0) where u128 = s => ((s . 0 . inner () as u128) << 64) + ((s . 2 . inner () as u128) << 32) + ((s . 1 . inner () as u128) << 0));
+            decl_row ! (Row3_1_0_2 < T0 , T1 first , T2 > (1 , 0 , 2) () (T1 , T0 , T2) () fc = (1) (T1) where u128 = s => ((s . 1 . inner () as u128) << 64) + ((s . 0 . inner () as u128) << 32) + ((s . 2 . inner () as u128) << 0));
+            decl_row ! (Row3_2_0_1 < T0 , T1 , T2 first > (2 , 0 , 1) () (T2 , T0 , T1) () fc = (2) (T2) where u128 = s => ((s . 2 . inner () as u128) << 64) + ((s . 0 . inner () as u128) << 32) + ((s . 1 . inner () as u128) << 0));
             eclass_wrapper_ty!(Math);
             #[derive(Debug, Default)]
             struct ForallMathRelation {
@@ -2827,10 +2827,10 @@ fn edgecase0() {
             #[derive(Debug, Default)]
             struct MulRelation {
                 new: Vec<<Self as Relation>::Row>,
-                all_index_0_1_2: IndexImpl<Row3_0_1<Math, Math, Math>>,
-                all_index_0_2_1: IndexImpl<Row3_0_2_1<Math, Math, Math>>,
-                all_index_1_0_2: IndexImpl<Row3_1_0_2<Math, Math, Math>>,
-                all_index_2_0_1: IndexImpl<Row3_2_0_1<Math, Math, Math>>,
+                all_index_0_1_2: IndexImpl<RadixSortCtx<Row3_0_1<Math, Math, Math>, u128>>,
+                all_index_0_2_1: IndexImpl<RadixSortCtx<Row3_0_2_1<Math, Math, Math>, u128>>,
+                all_index_1_0_2: IndexImpl<RadixSortCtx<Row3_1_0_2<Math, Math, Math>, u128>>,
+                all_index_2_0_1: IndexImpl<RadixSortCtx<Row3_2_0_1<Math, Math, Math>, u128>>,
             }
             impl Relation for MulRelation {
                 type Row = (Math, Math, Math);
@@ -2972,9 +2972,9 @@ fn edgecase0() {
             #[derive(Debug, Default)]
             struct AddRelation {
                 new: Vec<<Self as Relation>::Row>,
-                all_index_0_1_2: IndexImpl<Row3_0_1<Math, Math, Math>>,
-                all_index_1_0_2: IndexImpl<Row3_1_0_2<Math, Math, Math>>,
-                all_index_2_0_1: IndexImpl<Row3_2_0_1<Math, Math, Math>>,
+                all_index_0_1_2: IndexImpl<RadixSortCtx<Row3_0_1<Math, Math, Math>, u128>>,
+                all_index_1_0_2: IndexImpl<RadixSortCtx<Row3_1_0_2<Math, Math, Math>, u128>>,
+                all_index_2_0_1: IndexImpl<RadixSortCtx<Row3_2_0_1<Math, Math, Math>, u128>>,
             }
             impl Relation for AddRelation {
                 type Row = (Math, Math, Math);
@@ -3329,9 +3329,9 @@ fn test_into_codegen() {
         expected_lir: None,
         expected_codegen: Some(expect![[r#"
             use oatlog::runtime::{self, *};
-            decl_row ! (Row3_0_1 < T0 first , T1 , T2 > (0 , 1) (2) (T0 , T1) (T2) fc = (0) (T0));
-            decl_row ! (Row3_1_0_2 < T0 , T1 first , T2 > (1 , 0 , 2) () (T1 , T0 , T2) () fc = (1) (T1));
-            decl_row ! (Row3_2_0_1 < T0 , T1 , T2 first > (2 , 0 , 1) () (T2 , T0 , T1) () fc = (2) (T2));
+            decl_row ! (Row3_0_1 < T0 first , T1 , T2 > (0 , 1) (2) (T0 , T1) (T2) fc = (0) (T0) where u128 = s => ((s . 0 . inner () as u128) << 64) + ((s . 1 . inner () as u128) << 32) + ((s . 2 . inner () as u128) << 0));
+            decl_row ! (Row3_1_0_2 < T0 , T1 first , T2 > (1 , 0 , 2) () (T1 , T0 , T2) () fc = (1) (T1) where u128 = s => ((s . 1 . inner () as u128) << 64) + ((s . 0 . inner () as u128) << 32) + ((s . 2 . inner () as u128) << 0));
+            decl_row ! (Row3_2_0_1 < T0 , T1 , T2 first > (2 , 0 , 1) () (T2 , T0 , T1) () fc = (2) (T2) where u128 = s => ((s . 2 . inner () as u128) << 64) + ((s . 0 . inner () as u128) << 32) + ((s . 1 . inner () as u128) << 0));
             eclass_wrapper_ty!(Math);
             #[derive(Debug, Default)]
             struct ForallMathRelation {
@@ -3355,9 +3355,9 @@ fn test_into_codegen() {
             #[derive(Debug, Default)]
             struct MulRelation {
                 new: Vec<<Self as Relation>::Row>,
-                all_index_0_1_2: IndexImpl<Row3_0_1<Math, Math, Math>>,
-                all_index_1_0_2: IndexImpl<Row3_1_0_2<Math, Math, Math>>,
-                all_index_2_0_1: IndexImpl<Row3_2_0_1<Math, Math, Math>>,
+                all_index_0_1_2: IndexImpl<RadixSortCtx<Row3_0_1<Math, Math, Math>, u128>>,
+                all_index_1_0_2: IndexImpl<RadixSortCtx<Row3_1_0_2<Math, Math, Math>, u128>>,
+                all_index_2_0_1: IndexImpl<RadixSortCtx<Row3_2_0_1<Math, Math, Math>, u128>>,
             }
             impl Relation for MulRelation {
                 type Row = (Math, Math, Math);
@@ -3483,9 +3483,9 @@ fn test_into_codegen() {
             #[derive(Debug, Default)]
             struct AddRelation {
                 new: Vec<<Self as Relation>::Row>,
-                all_index_0_1_2: IndexImpl<Row3_0_1<Math, Math, Math>>,
-                all_index_1_0_2: IndexImpl<Row3_1_0_2<Math, Math, Math>>,
-                all_index_2_0_1: IndexImpl<Row3_2_0_1<Math, Math, Math>>,
+                all_index_0_1_2: IndexImpl<RadixSortCtx<Row3_0_1<Math, Math, Math>, u128>>,
+                all_index_1_0_2: IndexImpl<RadixSortCtx<Row3_1_0_2<Math, Math, Math>, u128>>,
+                all_index_2_0_1: IndexImpl<RadixSortCtx<Row3_2_0_1<Math, Math, Math>, u128>>,
             }
             impl Relation for AddRelation {
                 type Row = (Math, Math, Math);

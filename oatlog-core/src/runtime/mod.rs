@@ -9,12 +9,13 @@ pub use crate::{
     decl_row, eclass_wrapper_ty, relation_element_wrapper_ty,
     runtime::{
         generic::{Eclass, EclassProvider, RelationElement},
-        index::{Index, IndexImpl, dedup_suffix},
+        index::{Index, IndexImpl, RadixSortCtx, StdSortCtx, dedup_suffix},
         row::IndexRow,
         uf::UnionFind,
     },
 };
 pub use std::{hash::Hash, mem::swap, mem::take};
+pub use voracious_radix_sort::{RadixSort, Radixable};
 
 pub trait Clear: Sized {
     fn clear(&mut self);

@@ -220,21 +220,58 @@ pub fn codegen(theory: &Theory) -> TokenStream {
                     quote! { #t }
                 }
             });
-            let num_and_t = |i| (
-                proc_macro2::Literal::usize_unsuffixed(i),
-                format_ident!("T{i}")
-            );
-            let (keys, keys_t): (Vec<_>, Vec<_>) = permuted_columns.inner()[..primary_key_prefix_len]
+            let num_and_t = |i| {
+                (
+                    proc_macro2::Literal::usize_unsuffixed(i),
+                    format_ident!("T{i}"),
+                )
+            };
+            let (keys, keys_t): (Vec<_>, Vec<_>) = permuted_columns.inner()
+                [..primary_key_prefix_len]
                 .iter()
-                .map(|&ColumnId(i)| num_and_t(i)).collect();
-            let (values, values_t):(Vec<_>, Vec<_>) = permuted_columns.inner()[primary_key_prefix_len..]
+                .map(|&ColumnId(i)| num_and_t(i))
+                .collect();
+            let (values, values_t): (Vec<_>, Vec<_>) = permuted_columns.inner()
+                [primary_key_prefix_len..]
                 .iter()
                 .map(|&ColumnId(i)| num_and_t(i))
                 .collect();
             assert!(permuted_columns.inner()[primary_key_prefix_len..].is_sorted());
             let (fci, fci_t) = num_and_t(fc);
+            let radix_implementation = {
+                let ct = match permuted_columns.len() {
+                    0 => unreachable!(),
+                    1 => Some(quote! { u32 }),
+                    2 => Some(quote! { u64 }),
+                    3 | 4 => Some(quote! { u128 }),
+                    _ => None,
+                };
+                if let Some(ct) = ct {
+                    let ci: Vec<TokenStream> = permuted_columns
+                        .iter_enumerate()
+                        .map(|(ColumnId(i), &ColumnId(c))| {
+                            let idx = proc_macro2::Literal::usize_unsuffixed(c);
+                            let shift = proc_macro2::Literal::usize_unsuffixed(
+                                (permuted_columns.len() - 1 - i) * 32,
+                            );
+                            quote! {
+                                ((s.#idx.inner() as #ct) << #shift)
+                            }
+                        })
+                        .collect_vec();
+                    quote! { where #ct = s => #(#ci)+* }
+                } else {
+                    quote! {}
+                }
+            };
             quote! {
-                decl_row!(#row_name < #(#type_vars_with_first),*> (#(#keys),*)(#(#values),*) (#(#keys_t),*)(#(#values_t),*) fc=(#fci)(#fci_t));
+                decl_row!(
+                    #row_name < #(#type_vars_with_first),*>
+                    (#(#keys),*)(#(#values),*)
+                    (#(#keys_t),*)(#(#values_t),*)
+                    fc=(#fci)(#fci_t)
+                    #radix_implementation
+                );
             }
         },
     );
@@ -949,7 +986,23 @@ fn codegen_relation(
                     declare_rows
                         .entry(row_choice.clone())
                         .or_insert_with(|| index_info.clone());
-                    quote! { #attr_name : IndexImpl<#row_choice<#(#fields_ty,)*>> }
+                    if rel.param_types.len() <= 4
+                        && rel
+                            .param_types
+                            .iter()
+                            .all(|&ty| matches!(theory.types[ty].kind, TypeKind::Symbolic))
+                    {
+                let radix_key = match rel.param_types.len() {
+                    1 => quote! { u32 },
+                    2 => quote! { u64 },
+                    3 | 4 => quote! { u128 },
+                    _ => unreachable!(),
+                };
+
+                        quote! { #attr_name : IndexImpl<RadixSortCtx<#row_choice<#(#fields_ty,)*>, #radix_key>> }
+                    } else {
+                        quote! { #attr_name : IndexImpl<StdSortCtx<#row_choice<#(#fields_ty,)*>>> }
+                    }
                 })
                 .collect();
 

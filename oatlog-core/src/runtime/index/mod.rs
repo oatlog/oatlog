@@ -1,5 +1,5 @@
 use crate::runtime::IndexRow;
-use std::{collections::BTreeSet, ops::RangeInclusive};
+use std::{collections::BTreeSet, marker::PhantomData, ops::RangeInclusive};
 
 /// Conceptually a sorted set.
 ///
@@ -8,6 +8,7 @@ use std::{collections::BTreeSet, ops::RangeInclusive};
 /// up.
 pub trait Index {
     type Row: IndexRow;
+    type RowCtx: RowCtx<Row = Self::Row>;
 
     fn new() -> Self;
     fn len(&self) -> usize;
@@ -44,16 +45,47 @@ pub trait Index {
     );
 }
 
-//pub type IndexImpl<K> = BTreeSetIndex<K>;
-pub type IndexImpl<K> = SortedVec<K>;
+pub trait RowCtx: Default + std::fmt::Debug {
+    type Row: IndexRow;
+    fn sort(slice: &mut [Self::Row]);
+}
+#[derive(Default, Debug)]
+pub struct StdSortCtx<R: Ord>(PhantomData<*const R>);
+#[derive(Default, Debug)]
+pub struct RadixSortCtx<
+    R: Ord + Copy + voracious_radix_sort::Radixable<K>,
+    K: Default + std::fmt::Debug + voracious_radix_sort::RadixKey,
+>(PhantomData<*const (R, K)>);
+
+impl<R: IndexRow> RowCtx for StdSortCtx<R> {
+    type Row = R;
+    fn sort(slice: &mut [Self::Row]) {
+        slice.sort_unstable();
+    }
+}
+impl<
+    K: Default + std::fmt::Debug + voracious_radix_sort::RadixKey,
+    R: IndexRow + voracious_radix_sort::Radixable<K>,
+> RowCtx for RadixSortCtx<R, K>
+{
+    type Row = R;
+    fn sort(slice: &mut [Self::Row]) {
+        use voracious_radix_sort::RadixSort;
+        slice.voracious_sort();
+    }
+}
+
+//pub type IndexImpl<RC> = BTreeSetIndex<RC>;
+pub type IndexImpl<RC> = SortedVec<RC>;
 
 #[derive(Default, Debug)]
-pub struct BTreeSetIndex<R: IndexRow>(BTreeSet<R>);
-impl<R: IndexRow> Index for BTreeSetIndex<R> {
-    type Row = R;
+pub struct BTreeSetIndex<RC: RowCtx>(BTreeSet<RC::Row>, RC);
+impl<RC: RowCtx> Index for BTreeSetIndex<RC> {
+    type Row = RC::Row;
+    type RowCtx = RC;
 
     fn new() -> Self {
-        Self(BTreeSet::new())
+        Self(BTreeSet::new(), RC::default())
     }
     fn len(&self) -> usize {
         self.0.len()
@@ -66,7 +98,7 @@ impl<R: IndexRow> Index for BTreeSetIndex<R> {
         &self,
         r: RangeInclusive<<Self::Row as IndexRow>::Inner>,
     ) -> impl Iterator<Item = <Self::Row as IndexRow>::Inner> {
-        let r = R::new(*r.start())..=R::new(*r.end());
+        let r = Self::Row::new(*r.start())..=Self::Row::new(*r.end());
         self.0.range(r.clone()).map(move |ret| ret.inner())
     }
 
@@ -76,15 +108,15 @@ impl<R: IndexRow> Index for BTreeSetIndex<R> {
         mut on_delete: impl FnMut(&[<Self::Row as IndexRow>::Inner]),
     ) {
         for &uproot in uproots {
-            let range = R::col_val_range(uproot);
+            let range = Self::Row::col_val_range(uproot);
             for &row in self.0.range(range) {
-                on_delete(R::inner_slice(&[row]));
+                on_delete(Self::Row::inner_slice(&[row]));
             }
         }
     }
 
     fn delete_many(&mut self, deletions: &mut [<Self::Row as IndexRow>::Inner]) {
-        for d in R::from_inner_slice_mut(deletions) {
+        for d in Self::Row::from_inner_slice_mut(deletions) {
             self.0.remove(d);
         }
     }
@@ -93,7 +125,7 @@ impl<R: IndexRow> Index for BTreeSetIndex<R> {
         insertions: &mut Vec<<Self::Row as IndexRow>::Inner>,
         mut merge: impl FnMut(Self::Row, Self::Row) -> Self::Row,
     ) {
-        let insertions = R::from_inner_slice_mut(insertions);
+        let insertions = Self::Row::from_inner_slice_mut(insertions);
         // This is much slower than necessary, limited by the stable BTreeSet API.
         for &mut i in insertions {
             if self.0.contains(&i) {
@@ -117,14 +149,14 @@ impl<R: IndexRow> Index for BTreeSetIndex<R> {
         }
     }
 }
-
 #[derive(Default, Debug)]
-pub struct SortedVec<R>(Vec<R>);
-impl<R: IndexRow> Index for SortedVec<R> {
-    type Row = R;
+pub struct SortedVec<RC: RowCtx>(Vec<RC::Row>, RC);
+impl<RC: RowCtx> Index for SortedVec<RC> {
+    type Row = RC::Row;
+    type RowCtx = RC;
 
     fn new() -> Self {
-        Self(Vec::new())
+        Self(Vec::new(), RC::default())
     }
     fn len(&self) -> usize {
         self.0.len()
@@ -137,8 +169,8 @@ impl<R: IndexRow> Index for SortedVec<R> {
         &self,
         r: RangeInclusive<<Self::Row as IndexRow>::Inner>,
     ) -> impl Iterator<Item = <Self::Row as IndexRow>::Inner> {
-        let start = self.0.partition_point(|&k| k < R::new(*r.start()));
-        let end = self.0.partition_point(|&k| k < R::new(*r.end()));
+        let start = self.0.partition_point(|&k| k < Self::Row::new(*r.start()));
+        let end = self.0.partition_point(|&k| k < Self::Row::new(*r.end()));
         //println!("range len={} ans={}..{}", self.len(), start, end);
         self.0[start..end].iter().map(|r| r.inner())
     }
@@ -167,7 +199,7 @@ impl<R: IndexRow> Index for SortedVec<R> {
                 self.0.copy_within(cursor_input..i, cursor_output);
             }
             cursor_output += i - cursor_input;
-            on_delete(R::inner_slice(&self.0[i..j]));
+            on_delete(Self::Row::inner_slice(&self.0[i..j]));
             cursor_input = j;
         }
         let len = self.0.len();
@@ -180,8 +212,8 @@ impl<R: IndexRow> Index for SortedVec<R> {
 
     fn delete_many(&mut self, deletions: &mut [<Self::Row as IndexRow>::Inner]) {
         //println!("delete_many len={} deletions.len()={}", self.len(), deletions.len());
-        let deletions = R::from_inner_slice_mut(deletions);
-        deletions.sort_unstable();
+        let deletions = Self::Row::from_inner_slice_mut(deletions);
+        RC::sort(deletions);
         let mut deletions = deletions.iter().copied();
 
         let mut cursor_input = 0;
@@ -236,8 +268,9 @@ impl<R: IndexRow> Index for SortedVec<R> {
     ) {
         //println!("insert_many len={} insertions.len()={}", self.len(), insertions.len());
         self.0
-            .extend_from_slice(R::from_inner_slice_mut(insertions));
-        self.0.sort_unstable();
+            .extend_from_slice(Self::Row::from_inner_slice_mut(insertions));
+        //self.0.sort_unstable();
+        RC::sort(&mut self.0);
 
         let mut cursor_input = 0;
         let mut cursor_output = 0;
@@ -282,7 +315,7 @@ impl<R: IndexRow> Index for SortedVec<R> {
         self.0.truncate(cursor_output);
         if self.len() < insertions.len() {
             insertions.clear();
-            insertions.extend_from_slice(R::inner_slice(&self.0));
+            insertions.extend_from_slice(Self::Row::inner_slice(&self.0));
             //println!("insert_many shrunk insertions to insertions.len()={}", insertions.len());
         }
     }
