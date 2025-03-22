@@ -116,7 +116,6 @@ impl RelationData {
         usage_to_info: TVec<IndexUsageId, index_selection::IndexUsageInfo>,
         index_to_info: TVec<IndexId, index_selection::IndexInfo>,
         column_back_reference: TVec<ColumnId, IndexUsageId>,
-        implicit_rules: Vec<ImplicitRule>,
     ) -> Self {
         Self {
             name,
@@ -125,7 +124,6 @@ impl RelationData {
                 usage_to_info,
                 index_to_info,
                 column_back_reference,
-                implicit_rules,
             },
         }
     }
@@ -157,7 +155,6 @@ pub enum RelationKind {
         usage_to_info: TVec<IndexUsageId, index_selection::IndexUsageInfo>,
         /// Index usage for back-references.
         column_back_reference: TVec<ColumnId, IndexUsageId>,
-        implicit_rules: Vec<ImplicitRule>,
         // trigger_rules: ...
     },
     Forall {
@@ -168,34 +165,6 @@ pub enum RelationKind {
     Global {
         id: GlobalId,
     },
-}
-
-// implicit: TVec<RelationId, Vec<ImplicitRule>>
-// applied on *inserts*
-#[derive(Clone, Debug)]
-pub(crate) struct ImplicitRule {
-    pub index: IndexUsageId,
-    pub ty: ImplicitRuleTy,
-}
-impl ImplicitRule {
-    pub(crate) fn new_union(index: IndexUsageId) -> Self {
-        Self {
-            index,
-            ty: ImplicitRuleTy::Union,
-        }
-    }
-    pub(crate) fn new_panic(index: IndexUsageId) -> Self {
-        Self {
-            index,
-            ty: ImplicitRuleTy::Panic,
-        }
-    }
-}
-#[derive(Clone, Debug)]
-pub enum ImplicitRuleTy {
-    Union,
-    Panic,
-    // Lattice { .. },
 }
 
 #[derive(Clone, Eq, PartialEq, Ord, PartialOrd, Hash, Debug, From)]
@@ -324,6 +293,7 @@ impl Theory {
     pub(crate) fn dbg_summary(&self) -> String {
         return format!("{:#?}", Dbg(self));
 
+        use index_selection::MergeTy;
         use itertools::Itertools as _;
         use std::{
             collections::BTreeMap,
@@ -411,17 +381,32 @@ impl Theory {
                         index_to_info,
                         usage_to_info,
                         column_back_reference,
-                        implicit_rules,
                     } => f
                         .debug_struct("Table")
                         .field(
                             "index_to_info",
                             &NoAlt(&index_to_info.map_values(
-                                |index_selection::IndexInfo { permuted_columns }| {
-                                    DbgStr([permuted_columns
+                                |index_selection::IndexInfo {
+                                     permuted_columns,
+                                     primary_key_prefix_len,
+                                     primary_key_violation_merge,
+                                 }| {
+                                    let cols = permuted_columns
                                         .iter()
                                         .map(|ColumnId(x)| format!("{x}"))
-                                        .join("_")])
+                                        .join("_");
+                                    if *primary_key_prefix_len == permuted_columns.len() {
+                                        DbgStr([cols])
+                                    } else {
+                                        let merge = match primary_key_violation_merge {
+                                            MergeTy::Union => "union",
+                                            MergeTy::Panic => "panic",
+                                        };
+                                        let cols_and_merge = format!(
+                                            "{cols} conflict[..{primary_key_prefix_len}] => {merge}"
+                                        );
+                                        DbgStr([cols_and_merge])
+                                    }
                                 },
                             )),
                         )
@@ -434,15 +419,6 @@ impl Theory {
                             ),
                         )
                         .field("column_back_reference", &NoAlt(&column_back_reference))
-                        .field(
-                            "implicit_rules",
-                            &implicit_rules
-                                .iter()
-                                .map(|ImplicitRule { index, ty }| {
-                                    DbgStr([index.to_string(), format!("{ty:?}")])
-                                })
-                                .collect_vec(),
-                        )
                         .finish(),
                     RelationKind::Forall { ty } => {
                         write!(f, "{:?}", DbgStr(["Forall".to_string(), ty.to_string()]))

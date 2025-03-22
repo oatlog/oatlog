@@ -1,6 +1,6 @@
 //! All query plan *choices* occur here.
 use crate::{
-    hir::{self, ImplicitRule, PremiseRelation, RelationTy, SymbolicRule, Theory},
+    hir::{self, PremiseRelation, RelationTy, SymbolicRule, Theory},
     ids::{ActionId, ColumnId, IndexUsageId, PremiseId, RelationId, VariableId},
     index_selection, lir,
     typed_vec::TVec,
@@ -124,37 +124,14 @@ pub(crate) fn emit_lir_theory(mut theory: hir::Theory) -> (hir::Theory, lir::The
                     .map(|i| uses.push(vec![i]))
                     .collect();
 
-                let implicit_rules =
+                let (usage_to_info, index_to_info) = index_selection::index_selection(
+                    relation.columns.len(),
+                    uses,
                     theory
                         .implicit_rules
                         .get(&relation_id)
-                        .map_or(Vec::new(), |implicit_rules| {
-                            implicit_rules
-                                .iter()
-                                .map(
-                                    |ImplicitRule {
-                                         relation: _,
-                                         on,
-                                         ty,
-                                     }| match ty {
-                                        hir::ImplicitRuleAction::Lattice { .. } => {
-                                            todo!("implement lattice merge")
-                                        }
-                                        hir::ImplicitRuleAction::Panic => {
-                                            let index = uses.push(on.clone());
-                                            lir::ImplicitRule::new_panic(index)
-                                        }
-                                        hir::ImplicitRuleAction::Unification => {
-                                            let index = uses.push(on.clone());
-                                            lir::ImplicitRule::new_union(index)
-                                        }
-                                    },
-                                )
-                                .collect()
-                        });
-
-                let (usage_to_info, index_to_info) =
-                    index_selection::index_selection(relation.columns.len(), uses);
+                        .unwrap_or(&Vec::new()),
+                );
 
                 let lir_relation = lir::RelationData::new_table(
                     relation.name,
@@ -162,7 +139,6 @@ pub(crate) fn emit_lir_theory(mut theory: hir::Theory) -> (hir::Theory, lir::The
                     usage_to_info,
                     index_to_info,
                     column_back_references,
-                    implicit_rules,
                 );
                 lir_relations.push_expected(relation_id, lir_relation);
             }

@@ -47,6 +47,7 @@
           nativeBuildInputs = let p = pkgs;
           in [
             p.bashInteractive
+            p.cargo-flamegraph
             p.tinymist
             p.typstyle
             (p.crate2nix.override { cargo = rust-stable; })

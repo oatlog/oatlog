@@ -5,16 +5,15 @@ edition = "2024"
 
 [dependencies]
 ariadne.workspace = true
+derive_more.workspace = true
 educe.workspace = true
 heck.workspace = true
 itertools.workspace = true
 proc-macro2.workspace = true
 quote.workspace = true
 regex.workspace = true
-syn.workspace = true
 smallvec.workspace = true
-derive_more.workspace = true
-paste.workspace = true
+syn.workspace = true
 
 [dev-dependencies]
 expect-test.workspace = true

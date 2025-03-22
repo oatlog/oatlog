@@ -1,13 +1,14 @@
 use crate::{
     ids::{ColumnId, GlobalId, RelationId, TypeId, VariableId},
+    index_selection::{IndexInfo, MergeTy},
     lir::{
-        Action, GlobalCompute, ImplicitRule, ImplicitRuleTy, Initial, Literal, RelationData,
-        RelationKind, RuleAtom, RuleTrie, Theory, TypeData, TypeKind, VariableData,
+        Action, GlobalCompute, Initial, Literal, RelationData, RelationKind, RuleAtom, RuleTrie,
+        Theory, TypeData, TypeKind, VariableData,
     },
     typed_vec::TVec,
 };
 use itertools::Itertools as _;
-use proc_macro2::TokenStream;
+use proc_macro2::{Ident, TokenStream};
 use quote::{format_ident, quote};
 use std::{collections::BTreeMap, iter};
 
@@ -30,10 +31,13 @@ pub fn codegen(theory: &Theory) -> TokenStream {
 
     let (global_variables_decl, global_variables_map) = codegen_globals(theory);
 
+    let mut declare_rows = BTreeMap::new();
+
     let relations = theory
         .relations
         .iter()
-        .map(|rel| codegen_relation(rel, theory));
+        .map(|rel| codegen_relation(rel, theory, &mut declare_rows))
+        .collect_vec();
 
     let rule_contents = {
         CodegenRuleTrieCtx {
@@ -67,7 +71,7 @@ pub fn codegen(theory: &Theory) -> TokenStream {
                             (quote! {
                                 pub fn #make_ident(&mut self, uf: &mut Unification) -> #ty {
                                     let id = uf.#uf_ident.add_eclass();
-                                    self.#field.push(id);
+                                    self.#field.push((id,));
                                     id
                                 }
                             },
@@ -144,7 +148,7 @@ pub fn codegen(theory: &Theory) -> TokenStream {
 
         quote! {
             #[inline(never)]
-            fn clear_transient(&mut self) {
+            pub fn clear_transient(&mut self) {
                 self.global_variables.new = false;
                 #(self.#relation_ident.clear_new();)*
                 loop {
@@ -189,7 +193,7 @@ pub fn codegen(theory: &Theory) -> TokenStream {
     let get_total_relation_entry_count_body = if stored_relations.is_empty() {
         quote! {0}
     } else {
-        quote! {[#(self.#stored_relations.len()),*].iter().copied().sum::<usize>()}
+        quote! {[#(self.#stored_relations.len(),)*].into_iter().sum::<usize>()}
     };
 
     let theory_initial = {
@@ -198,8 +202,46 @@ pub fn codegen(theory: &Theory) -> TokenStream {
         })
     };
 
+    let declare_rows = declare_rows.into_iter().map(
+        |(
+            row_name,
+            IndexInfo {
+                permuted_columns,
+                primary_key_prefix_len,
+                primary_key_violation_merge: _,
+            },
+        )| {
+            let fc: usize = permuted_columns[ColumnId(0)].into();
+            let type_vars_with_first = (0..permuted_columns.len()).map(|i| {
+                let t = format_ident!("T{i}");
+                if i == fc {
+                    quote! { #t first }
+                } else {
+                    quote! { #t }
+                }
+            });
+            let num_and_t = |i| (
+                proc_macro2::Literal::usize_unsuffixed(i),
+                format_ident!("T{i}")
+            );
+            let (keys, keys_t): (Vec<_>, Vec<_>) = permuted_columns.inner()[..primary_key_prefix_len]
+                .iter()
+                .map(|&ColumnId(i)| num_and_t(i)).collect();
+            let (values, values_t):(Vec<_>, Vec<_>) = permuted_columns.inner()[primary_key_prefix_len..]
+                .iter()
+                .map(|&ColumnId(i)| num_and_t(i))
+                .collect();
+            assert!(permuted_columns.inner()[primary_key_prefix_len..].is_sorted());
+            let (fci, fci_t) = num_and_t(fc);
+            quote! {
+                decl_row!(#row_name < #(#type_vars_with_first),*> (#(#keys),*)(#(#values),*) (#(#keys_t),*)(#(#values_t),*) fc=(#fci)(#fci_t));
+            }
+        },
+    );
+
     quote! {
-        use oatlog::runtime::*;
+        use oatlog::runtime::{self, *};
+        #(#declare_rows)*
         #(#symbolic_type_declarations)*
         #(#relations)*
         #delta
@@ -212,6 +254,7 @@ pub fn codegen(theory: &Theory) -> TokenStream {
             fn take_dirt(&mut self, uf: &mut Unification) {
                 #(self.#type_uprooted.clear();)*
                 #(swap(&mut self.#type_uprooted, &mut uf.#uf_ident.dirty());)*
+                #(self.#type_uprooted.sort_unstable();)*
             }
         }
         #[derive(Debug, Default)]
@@ -257,7 +300,7 @@ pub fn codegen(theory: &Theory) -> TokenStream {
                 ]
             }
             #[inline(never)]
-            fn apply_rules(&mut self) { #rule_contents }
+            pub fn apply_rules(&mut self) { #rule_contents }
             fn emit_graphviz(&self) -> String {
                 let mut buf = String::new();
                 buf.push_str("digraph G {");
@@ -276,7 +319,7 @@ pub fn codegen(theory: &Theory) -> TokenStream {
                             self.#counted_stored_relations.len()
                         ),
                     )*
-                ].iter().copied().collect()
+                ].into_iter().collect()
             }
             #clear_transient
         }
@@ -382,7 +425,7 @@ impl CodegenRuleTrieCtx<'_> {
                         let inner = self.codegen_all(then, true);
                         args.iter().for_each(|&arg| self.unbind_var(arg));
                         quote! {
-                            for (#(#vars),*) in self.#relation.iter_new() {
+                            for (#(#vars,)*) in self.#relation.iter_new() {
                                 #inner
                             }
                         }
@@ -465,7 +508,7 @@ impl CodegenRuleTrieCtx<'_> {
                         let iter_ident = ident::index_all_iter(usage_info, index_info);
                         let relation_ident = ident::rel_var(relation);
                         quote! {
-                            for (#(#new_columns_),*) in self.#relation_ident.#iter_ident(#(#bound_columns_),*) {
+                            for (#(#new_columns_,)*) in self.#relation_ident.#iter_ident(#(#bound_columns_,)*) {
                                 #inner
                             }
                         }
@@ -499,7 +542,6 @@ impl CodegenRuleTrieCtx<'_> {
                         usage_to_info,
                         index_to_info,
                         column_back_reference: _,
-                        implicit_rules: _,
                     } => {
                         let usage_info = &usage_to_info[index];
                         let index_info = &index_to_info[usage_info.index];
@@ -521,7 +563,7 @@ impl CodegenRuleTrieCtx<'_> {
                         let check_ident = ident::index_all_check(usage_info, index_info);
                         let relation_ident = ident::rel_var(relation);
                         quote! {
-                            if self.#relation_ident.#check_ident(#(#bound_columns_),*) {
+                            if self.#relation_ident.#check_ident(#(#bound_columns_,)*) {
                                 #inner
                             }
                         }
@@ -539,7 +581,7 @@ impl CodegenRuleTrieCtx<'_> {
             //     //             assert!(self.is_bound(arg));
             //     //             ident::var_var(self.var_of(arg))
             //     //         });
-            //     //         quote! { self.#relation.#index_iter(#(#bound),*).next().is_some() }
+            //     //         quote! { self.#relation.#index_iter(#(#bound,)*).next().is_some() }
             //     //     }
             //     //     Action::Equate(a, b) => {
             //     //         assert_eq!(self.var_of(a).type_, self.var_of(b).type_);
@@ -625,7 +667,7 @@ impl CodegenRuleTrieCtx<'_> {
 
                 // let ret = quote! {
                 //     #(#declare_unknown)*
-                //     self.#rel_insert_with_priority(#new_priority_cap, #(#args_var),*);
+                //     self.#rel_insert_with_priority(#new_priority_cap, #(#args_var,)*);
                 //     #inner
                 // };
                 // if self.scoped {
@@ -641,7 +683,7 @@ impl CodegenRuleTrieCtx<'_> {
                     RelationKind::Table { .. } => {
                         let insert_ident = ident::delta_insert_row(relation);
                         let row = args.iter().copied().map(|x| ident::var_var(self.var_of(x)));
-                        quote! { self.delta.#insert_ident((#(#row),*)); }
+                        quote! { self.delta.#insert_ident((#(#row,)*)); }
                     }
                     RelationKind::Global { id } => {
                         let var = args[0];
@@ -728,7 +770,6 @@ fn codegen_globals(theory: &Theory) -> (TokenStream, TVec<GlobalId, usize>) {
                             usage_to_info: _,
                             index_to_info: _,
                             column_back_reference: _,
-                            implicit_rules: _,
                         } => {
                             // TODO: this just assumes that the last type in the relation is the output and also an eqsort.
 
@@ -781,7 +822,7 @@ fn codegen_globals(theory: &Theory) -> (TokenStream, TVec<GlobalId, usize>) {
                             quote! {
                                 #(#compute_row)*
                                 #last_compute
-                                delta.#insert_ident((#(#row,)* #(#last)*));
+                                delta.#insert_ident((#(#row,)* #(#last,)*));
                                 #(#last)*
                             }
                         }
@@ -843,7 +884,11 @@ fn codegen_globals(theory: &Theory) -> (TokenStream, TVec<GlobalId, usize>) {
     )
 }
 
-fn codegen_relation(rel: &RelationData, theory: &Theory) -> TokenStream {
+fn codegen_relation(
+    rel: &RelationData,
+    theory: &Theory,
+    declare_rows: &mut BTreeMap<Ident, IndexInfo>,
+) -> TokenStream {
     let rel_ty = ident::rel_ty(rel);
     let params = rel
         .param_types
@@ -863,11 +908,11 @@ fn codegen_relation(rel: &RelationData, theory: &Theory) -> TokenStream {
 
                 #[derive(Debug, Default)]
                 struct #rel_ty {
-                    new: BTreeSet<<Self as Relation>::Row>,
-                    all: BTreeSet<<Self as Relation>::Row>,
+                    new: std::collections::BTreeSet<<Self as Relation>::Row>,
+                    all: std::collections::BTreeSet<<Self as Relation>::Row>,
                 }
                 impl Relation for #rel_ty {
-                    type Row = (#(#params),*);
+                    type Row = (#(#params,)*);
                 }
                 impl #rel_ty {
                     fn update(
@@ -891,23 +936,20 @@ fn codegen_relation(rel: &RelationData, theory: &Theory) -> TokenStream {
             usage_to_info,
             index_to_info,
             column_back_reference,
-            implicit_rules,
         } => {
             let index_fields: Vec<_> = index_to_info
                 .iter()
-                .map(|x| {
-                    let attr_name = ident::index_all_field(x);
-                    // rel.param_types.permute(&x.order);
-                    let permuted_types: TVec<ColumnId, TypeId> = x
-                        .permuted_columns
+                .map(|index_info| {
+                    let attr_name = ident::index_all_field(index_info);
+                    let row_choice = ident::index_all_row(index_info);
+                    let fields_ty = rel
+                        .param_types
                         .iter()
-                        .copied()
-                        .map(|x| rel.param_types[x])
-                        .collect();
-                    let fields_ty = permuted_types
-                        .iter()
-                        .map(|x| ident::type_ty(&theory.types[*x]));
-                    quote! { #attr_name : BTreeSet<(#(#fields_ty),*)> }
+                        .map(|&ty| ident::type_ty(&theory.types[ty]));
+                    declare_rows
+                        .entry(row_choice.clone())
+                        .or_insert_with(|| index_info.clone());
+                    quote! { #attr_name : IndexImpl<#row_choice<#(#fields_ty,)*>> }
                 })
                 .collect();
 
@@ -938,24 +980,24 @@ fn codegen_relation(rel: &RelationData, theory: &Theory) -> TokenStream {
                             .copied()
                             .map(|x| ident::type_ty(&theory.types[rel.param_types[x]]));
 
-                        let (range_from, range_to) : (Vec<TokenStream>, Vec<TokenStream>) = index_info.permuted_columns.iter_enumerate().map(|(i, c)| {
-                            if i.0 < usage_info.prefix {
-                                let c = ident::column(*c);
-                                (quote! { #c }, quote! { #c })
+                        let col_placement = index_info.permuted_columns.invert_permutation();
+                        let (range_from, range_to) : (Vec<TokenStream>, Vec<TokenStream>) = col_placement.iter_enumerate().map(|(col, placement)| {
+                            if placement.0 < usage_info.prefix {
+                                let col = ident::column(col);
+                                (quote! { #col }, quote! { #col })
                             } else {
-                                let ty = ident::type_ty(&theory.types[rel.param_types[*c]]);
-                                (quote! { #ty :: MIN_ID }, quote! { #ty :: MAX_ID })
+                                let ty = ident::type_ty(&theory.types[rel.param_types[col]]);
+                                (quote! { #ty::MIN_ID }, quote! { #ty::MAX_ID })
                             }
                         }).unzip();
 
-                        let columns_index_order = index_info.permuted_columns.iter().copied().map(ident::column);
+                        let col_symbs = rel.param_types.enumerate().map(ident::column).collect_vec();
 
                         quote! {
-                            fn #iter_all_ident(#(#args),*) -> impl Iterator<Item = (#(#out_ty),*)> + use<'_> {
+                            fn #iter_all_ident(#(#args,)*) -> impl Iterator<Item = (#(#out_ty,)*)> + use<'_> {
                                 self.#index_field
-                                    .range((#(#range_from),*)..=(#(#range_to),*))
-                                    .copied()
-                                    .map(|(#(#columns_index_order),*)| (#(#out_columns),*))
+                                    .range((#(#range_from,)*)..=(#(#range_to,)*))
+                                    .map(|(#(#col_symbs,)*)| (#(#out_columns,)*))
                             }
                         }
                     };
@@ -963,8 +1005,8 @@ fn codegen_relation(rel: &RelationData, theory: &Theory) -> TokenStream {
                         let check_all_ident = ident::index_all_check(usage_info, index_info);
                         let call_args = index_info.permuted_columns.inner()[0..usage_info.prefix] .iter() .copied() .map(|x| { ident::column(x) });
                         quote! {
-                            fn #check_all_ident(#(#args),*) -> bool {
-                                self.#iter_all_ident(#(#call_args),*).next().is_some()
+                            fn #check_all_ident(#(#args,)*) -> bool {
+                                self.#iter_all_ident(#(#call_args,)*).next().is_some()
                             }
                         }
                     };
@@ -973,91 +1015,126 @@ fn codegen_relation(rel: &RelationData, theory: &Theory) -> TokenStream {
                 .unzip();
 
             let update = {
-                let (all_columns_symbolic, uf_all_symbolic): (Vec<_>, Vec<_>) = rel
+                let indexes_merge_fn: Vec<_> = index_to_info
+                    .iter()
+                    .map(
+                        |IndexInfo {
+                             permuted_columns,
+                             primary_key_prefix_len,
+                             primary_key_violation_merge,
+                         }| {
+                            let mut value_columns: Vec<ColumnId> = permuted_columns
+                                .iter()
+                                .copied()
+                                .skip(*primary_key_prefix_len)
+                                .collect();
+                            value_columns.sort();
+                            let col_uf: Vec<_> = value_columns
+                                .iter()
+                                .map(|col| {
+                                    let ty = rel.param_types[col];
+                                    let ty = &theory.types[ty];
+                                    ident::type_uf(ty)
+                                })
+                                .collect();
+                            let col_old: Vec<_> =
+                                value_columns.iter().copied().map(ident::column).collect();
+                            let col_new: Vec<_> = value_columns
+                                .iter()
+                                .copied()
+                                .map(ident::column_alt)
+                                .collect();
+                            match primary_key_violation_merge {
+                                MergeTy::Union => {
+                                    value_columns.iter().for_each(|col| {
+                                        let kind = &theory.types[&rel.param_types[col]].kind;
+                                        assert!(matches!(kind, TypeKind::Symbolic));
+                                    });
+                                    quote! {
+                                        |mut old, mut new| {
+                                            let (#(#col_old,)*) = old.value_mut();
+                                            let (#(#col_new,)*) = new.value_mut();
+                                            #(
+                                                uf.#col_uf.union_mut(#col_old, #col_new);
+                                            )*
+                                            old
+                                        }
+                                    }
+                                }
+                                MergeTy::Panic => {
+                                    quote! {
+                                        |mut old, mut new| {
+                                            let (#(#col_old,)*) = old.value_mut();
+                                            let (#(#col_new,)*) = new.value_mut();
+                                            panic!("panicking merge action")
+                                        }
+                                    }
+                                }
+                            }
+                        },
+                    )
+                    .collect();
+
+                let (indexes_backreferences, indexes_backreferences_uprooted): (Vec<_>, Vec<_>) =
+                    column_back_reference
+                        .iter_enumerate()
+                        .filter_map(|(c, usage)| {
+                            let ty = rel.param_types[c];
+                            let ty = &theory.types[ty];
+                            match ty.kind {
+                                TypeKind::Primitive { type_path: _ } => None,
+                                TypeKind::Symbolic => {
+                                    let usage_info = &usage_to_info[*usage];
+                                    let index_info = &index_to_info[usage_info.index];
+
+                                    let index_field = ident::index_all_field(index_info);
+                                    let index_col_uprooted =
+                                        ident::type_uprooted(&theory.types[rel.param_types[c]]);
+
+                                    Some((index_field, index_col_uprooted))
+                                }
+                            }
+                        })
+                        .collect();
+
+                let (first_index_ident, first_index_order): (Ident, Vec<_>) = {
+                    let [first_index, ..] = index_to_info.inner().as_slice() else {
+                        panic!("zero indexes?")
+                    };
+                    let first_index_order: Vec<_> = first_index
+                        .permuted_columns
+                        .iter()
+                        .copied()
+                        .map(ident::column)
+                        .collect();
+                    let first_index_ident = ident::index_all_field(first_index);
+                    (first_index_ident, first_index_order)
+                };
+
+                let (col_symbs_symbolic, col_num_symbolic, uf_all_symbolic): (
+                    Vec<_>,
+                    Vec<_>,
+                    Vec<_>,
+                ) = rel
                     .param_types
                     .iter_enumerate()
                     .filter_map(|(i, ty)| {
                         let ty = &theory.types[ty];
                         match ty.kind {
                             TypeKind::Primitive { type_path: _ } => None,
-                            TypeKind::Symbolic => Some((ident::column(i), ident::type_uf(ty))),
+                            TypeKind::Symbolic => Some((
+                                ident::column(i),
+                                proc_macro2::Literal::usize_unsuffixed(i.0),
+                                ident::type_uf(ty),
+                            )),
                         }
                     })
-                    .unzip();
-
-                let all_columns = rel.param_types.enumerate().map(ident::column).collect_vec();
-
-                let uprooted_into_op_delete = {
-                    column_back_reference.iter_enumerate().filter_map(|(c, usage)| {
-                        let ty = rel.param_types[c];
-                        let ty = &theory.types[ty];
-                        match ty.kind {
-                            TypeKind::Primitive { type_path: _ } => None,
-                            TypeKind::Symbolic => {
-                                let usage_info = &usage_to_info[*usage];
-                                let index_info = &index_to_info[usage_info.index];
-                                let column = ident::column(c);
-                                let uproot = ident::type_uprooted(&theory.types[rel.param_types[c]]);
-
-                                let index_all_iter = ident::index_all_iter(usage_info, index_info);
-
-                                let other_columns = index_info.permuted_columns.inner()[1..]
-                                    .iter()
-                                    .copied()
-                                    .map(ident::column);
-
-                                Some(quote! {
-                                    for #column in uprooted.#uproot.iter().copied() {
-                                        for (#(#other_columns),*) in self.#index_all_iter(#column) {
-                                            op_delete.push((#(#all_columns),*));
-                                        }
-                                    }
-                                })
-                            },
-                        }
-                    })
-                };
-
-                let [first_index, other_indexes @ ..] = index_to_info.inner().as_slice() else {
-                    panic!("zero indexes?")
-                };
-                let first_index_order: Vec<_> = first_index
-                    .permuted_columns
-                    .iter()
-                    .copied()
-                    .map(ident::column)
                     .collect();
-                let first_index_ident = ident::index_all_field(first_index);
-                let other_indexes_order = other_indexes
+
+                let indexes_all: Vec<_> = index_to_info
                     .iter()
-                    .map(|x| {
-                        x.permuted_columns
-                            .iter()
-                            .copied()
-                            .map(ident::column)
-                            .collect_vec()
-                    })
-                    .collect_vec();
-                let other_indexes_ident: Vec<_> =
-                    other_indexes.iter().map(ident::index_all_field).collect();
-
-                let all_columns_canonicalized = {
-                    rel.param_types.iter_enumerate().map(|(i, x)| {
-                        let column = ident::column(i);
-                        let ty = &theory.types[x];
-                        match ty.kind {
-                            TypeKind::Primitive { type_path: _ } => quote! { #column },
-                            TypeKind::Symbolic => {
-                                let uf = ident::type_uf(ty);
-                                quote! { uf.#uf.find( #column ) }
-                            }
-                        }
-                    })
-                };
-
-                let delta_row = ident::delta_row(rel);
-
-                let relation_name = ident::rel_get(rel).to_string();
+                    .map(|index_info| ident::index_all_field(index_info))
+                    .collect();
 
                 let column_types = rel
                     .param_types
@@ -1065,59 +1142,11 @@ fn codegen_relation(rel: &RelationData, theory: &Theory) -> TokenStream {
                     .copied()
                     .map(|ty| ident::type_name(&theory.types[ty]).to_string());
 
-                let implict_rules_impl = {
-                    implicit_rules
-                        .iter()
-                        .map(|ImplicitRule { index, ty }| {
+                let col_symbs = rel.param_types.enumerate().map(ident::column).collect_vec();
 
-                            let usage_info = &usage_to_info[index];
-                            let index_info = &index_to_info[usage_info.index];
+                let delta_row = ident::delta_row(rel);
 
-                            let bound_columns = &index_info.permuted_columns.inner()[0..usage_info.prefix]
-                                .iter()
-                                .copied()
-                                .collect_vec();
-                            let bound_columns_ = bound_columns
-                                .iter()
-                                .copied()
-                                .map(ident::column)
-                                .collect_vec();
-                            let new_columns = &index_info.permuted_columns.inner()[usage_info.prefix..]
-                                .iter()
-                                .copied()
-                                .collect_vec();
-                            let new_columns_ =
-                                new_columns.iter().copied().map(ident::column).collect_vec();
-                            let new_columns_alt_ = new_columns
-                                .iter()
-                                .copied()
-                                .map(ident::column_alt)
-                                .collect_vec();
-                            let iter_ident = ident::index_all_iter(usage_info, index_info);
-
-                            let action = match ty {
-                                ImplicitRuleTy::Union => {
-                                    let new_columns_uf = new_columns.iter().copied().map(|x| ident::type_uf(&theory.types[rel.param_types[x]])).collect_vec();
-                                    quote! {
-                                        #( uf.#new_columns_uf.union(#new_columns_alt_, #new_columns_); )*
-                                        return false;
-                                    }
-                                }
-                                ImplicitRuleTy::Panic => quote! { panic!("{} != {}", (#(#new_columns_alt_),*), (#(#new_columns_),*)); },
-                            };
-
-                            quote! {
-                                if let Some(#(#new_columns_alt_),*) = self.#iter_ident(#(#bound_columns_),*).next() {
-                                    let mut should_trigger = false;
-                                    #(should_trigger |= #new_columns_alt_ != #new_columns_;)*
-                                    if should_trigger {
-                                        #action
-                                    }
-                                }
-                            }
-                        })
-                        .collect_vec()
-                };
+                let relation_name = ident::rel_get(rel).to_string();
 
                 quote! {
                     fn update(
@@ -1126,46 +1155,35 @@ fn codegen_relation(rel: &RelationData, theory: &Theory) -> TokenStream {
                         uf: &mut Unification,
                         delta: &mut #theory_delta_ty
                     ) {
-                        let mut op_insert = take(&mut delta.#delta_row);
-                        for (#(#all_columns),*) in op_insert.iter_mut() {
-                            #(*#all_columns_symbolic = uf.#uf_all_symbolic.find(*#all_columns_symbolic);)*
-                        }
-                        let mut op_delete = Vec::new();
-                        #(#uprooted_into_op_delete)*
 
-                        // TODO: what happens if we just delete any non-canonical row?
-
-                        for (#(#all_columns),*) in op_delete {
-                            if self.#first_index_ident.remove(&(#(#first_index_order),*)) {
-                                #(self.#other_indexes_ident.remove(&(#(#other_indexes_order),*));)*
-                                #(uf.#uf_all_symbolic.dec_eclass(#all_columns_symbolic, Self::COST);)*
-                                op_insert.push((#(#all_columns_canonicalized),*));
-                            }
-                        }
-
-                        op_insert.retain(|&(#(#all_columns),*)| {
-                            #(#implict_rules_impl)*
-                            // TODO: if there is an implicit rule, then we are guaranteed that rows
-                            // are not already in the database (and unique due to the filtering
-                            // from op_delete)
-                            if !self.#first_index_ident.insert((#(#first_index_order),*)) {
-                                return false;
-                            }
-                            #(uf.#uf_all_symbolic.inc_eclass(#all_columns_symbolic, Self::COST);)*
-                            #( self.#other_indexes_ident.insert(( #(#other_indexes_order),*)); )*
-                            true
+                        let mut inserts = take(&mut delta.#delta_row);
+                        let orig_inserts = inserts.len();
+                        #(
+                            self.#indexes_backreferences.first_column_uproots(&uprooted.#indexes_backreferences_uprooted, |deleted_rows| inserts.extend(deleted_rows));
+                        )*
+                        inserts[orig_inserts..].sort_unstable();
+                        runtime::dedup_suffix(&mut inserts, orig_inserts);
+                        #(
+                            self.#indexes_all.delete_many(&mut inserts[orig_inserts..]);
+                        )*
+                        inserts.iter_mut().enumerate().for_each(|(i, old @ &mut (#(#col_symbs,)*))| {
+                            #(old.#col_num_symbolic = uf.#uf_all_symbolic.find(#col_symbs_symbolic);)*
                         });
-
-                        self.new.extend(op_insert);
+                        #(
+                            self.#indexes_all.insert_many(&mut inserts, #indexes_merge_fn);
+                        )*
+                        self.new.extend_from_slice(&inserts);
                     }
 
                     fn update_finalize(
                         &mut self,
                         uf: &mut Unification,
                     ) {
-                        self.new.retain(|(#(#all_columns),*)| {
+                        self.new.sort_unstable();
+                        self.new.dedup();
+                        self.new.retain(|(#(#col_symbs,)*)| {
                             #(
-                                if *#all_columns_symbolic != uf.#uf_all_symbolic.find(*#all_columns_symbolic) {
+                                if *#col_symbs_symbolic != uf.#uf_all_symbolic.find(*#col_symbs_symbolic) {
                                     return false;
                                 }
                             )*
@@ -1174,7 +1192,7 @@ fn codegen_relation(rel: &RelationData, theory: &Theory) -> TokenStream {
                     }
                     fn emit_graphviz(&self, buf: &mut String) {
                         use std::fmt::Write;
-                        for (i, (#(#first_index_order),*)) in self.#first_index_ident.iter().copied().enumerate() {
+                        for (i, (#(#first_index_order,)*)) in self.#first_index_ident.iter().enumerate() {
                             #(write!(buf, "{}{i} -> {}{};", #relation_name, #column_types, #first_index_order).unwrap();)*
                         }
                     }
@@ -1190,7 +1208,7 @@ fn codegen_relation(rel: &RelationData, theory: &Theory) -> TokenStream {
                     #(#index_fields,)*
                 }
                 impl Relation for #rel_ty {
-                    type Row = (#(#params),*);
+                    type Row = (#(#params,)*);
                 }
                 impl #rel_ty {
                     const COST: u32 = #cost;
@@ -1213,7 +1231,7 @@ fn codegen_relation(rel: &RelationData, theory: &Theory) -> TokenStream {
 mod ident {
     use crate::{
         ids::ColumnId,
-        index_selection,
+        index_selection::{IndexInfo, IndexUsageInfo},
         lir::{RelationData, Theory, TypeData, TypeKind, VariableData},
     };
     use heck::{ToPascalCase as _, ToSnakeCase as _};
@@ -1284,7 +1302,7 @@ mod ident {
         format_ident!("{}Delta", theory.name.to_pascal_case())
     }
     /// `all_index_2_0_1`
-    pub fn index_all_field(index: &index_selection::IndexInfo) -> Ident {
+    pub fn index_all_field(index: &IndexInfo) -> Ident {
         let perm = index
             .permuted_columns
             .iter()
@@ -1292,11 +1310,20 @@ mod ident {
             .join("_");
         format_ident!("all_index_{perm}")
     }
+    /// `Row3_2_0`
+    pub fn index_all_row(index: &IndexInfo) -> Ident {
+        let arity = index.permuted_columns.len();
+        let pk_arity = index.primary_key_prefix_len;
+        let primary_key_in_order = index
+            .permuted_columns
+            .iter()
+            .take(pk_arity)
+            .map(|ColumnId(x)| format!("_{x}"))
+            .join("");
+        format_ident!("Row{arity}{primary_key_in_order}")
+    }
     /// `iter2_2_0_1`
-    pub fn index_all_iter(
-        usage: &index_selection::IndexUsageInfo,
-        index: &index_selection::IndexInfo,
-    ) -> Ident {
+    pub fn index_all_iter(usage: &IndexUsageInfo, index: &IndexInfo) -> Ident {
         let index_perm = index
             .permuted_columns
             .iter()
@@ -1306,10 +1333,7 @@ mod ident {
         format_ident!("iter{prefix}_{index_perm}")
     }
     /// `check2_2_0_1`
-    pub fn index_all_check(
-        usage: &index_selection::IndexUsageInfo,
-        index: &index_selection::IndexInfo,
-    ) -> Ident {
+    pub fn index_all_check(usage: &IndexUsageInfo, index: &IndexInfo) -> Ident {
         let index_perm = index
             .permuted_columns
             .iter()

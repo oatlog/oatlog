@@ -1,10 +1,11 @@
 //! What could a free join-like impl look like?
 
 use crate::{
-    eclass_wrapper_ty,
     ids::{RelationId, VariableId},
-    relation_element_wrapper_ty,
-    runtime::{Eclass, EclassProvider, Hash, RelationElement, UnionFind},
+    runtime::{
+        Eclass, EclassProvider, Hash, RelationElement, UnionFind, eclass_wrapper_ty,
+        relation_element_wrapper_ty,
+    },
 };
 use std::{
     cell::Cell,

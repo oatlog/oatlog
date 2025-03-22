@@ -4,6 +4,7 @@
 #![allow(dead_code, reason = "temporary noise")]
 
 use crate::{
+    hir,
     ids::{ColumnId, IndexId, IndexUsageId},
     typed_vec::TVec,
 };
@@ -19,6 +20,14 @@ use std::collections::BTreeMap;
 pub(crate) struct IndexInfo {
     // index -> main
     pub(crate) permuted_columns: TVec<ColumnId, ColumnId>,
+    pub(crate) primary_key_prefix_len: usize,
+    pub(crate) primary_key_violation_merge: MergeTy,
+}
+#[derive(Clone, Eq, PartialEq, Ord, PartialOrd, Hash, Debug)]
+pub enum MergeTy {
+    Union,
+    Panic,
+    // Lattice { .. },
 }
 
 #[derive(Clone, Eq, PartialEq, Ord, PartialOrd, Hash, Debug)]
@@ -50,11 +59,15 @@ pub(crate) fn index_selection(
     columns: usize,
     // what logical "primary keys" are needed.
     uses: &TVec<IndexUsageId, Vec<ColumnId>>,
+    implicit_rules: &[hir::ImplicitRule],
 ) -> (TVec<IndexUsageId, IndexUsageInfo>, TVec<IndexId, IndexInfo>) {
     // Mapping (physical index) to (usage, prefix len).
-    let mut columns_to_uses: BTreeMap<IndexInfo, Vec<(IndexUsageId, usize)>> = BTreeMap::new();
+    let mut columns_to_uses: BTreeMap<
+        TVec<ColumnId, ColumnId>,
+        (Vec<(IndexUsageId, usize)>, Option<(usize, MergeTy)>),
+    > = BTreeMap::new();
 
-    for (index_usage_id, used_columns) in uses.iter_enumerate() {
+    let permuted_columns_of_use = |used_columns: &[ColumnId]| -> TVec<ColumnId, ColumnId> {
         let prefix = used_columns.len();
         // `order` satisfies that all columns present in `c` come before those that are not present.
         // `order` is a valid physical index (one among many) implementing the logical index `c`.
@@ -74,15 +87,56 @@ pub(crate) fn index_selection(
                 .windows(2)
                 .all(|w| w[0] != w[1])
         );
+        permuted_columns
+    };
+
+    for hir::ImplicitRule {
+        relation: _,
+        on,
+        ty,
+    } in implicit_rules
+    {
+        let (_, merge) = columns_to_uses
+            .entry(permuted_columns_of_use(on))
+            .or_default();
+        assert!(merge.is_none(), "overlapping implicit rules");
+        *merge = Some({
+            let primary_key_prefix_len = on.len();
+            let primary_key_violation_merge = match ty {
+                hir::ImplicitRuleAction::Panic => MergeTy::Panic,
+                hir::ImplicitRuleAction::Unification => MergeTy::Union,
+                hir::ImplicitRuleAction::Lattice { .. } => todo!("implement lattice merge"),
+            };
+            (primary_key_prefix_len, primary_key_violation_merge)
+        })
+    }
+    for (index_usage_id, used_columns) in uses.iter_enumerate() {
+        let prefix = used_columns.len();
+        let permuted_columns = permuted_columns_of_use(used_columns);
+
         columns_to_uses
-            .entry(IndexInfo { permuted_columns })
+            .entry(permuted_columns)
             .or_default()
+            .0
             .push((index_usage_id, prefix));
     }
-    let index_info: TVec<IndexId, IndexInfo> = columns_to_uses.keys().cloned().collect();
+
+    let index_info: TVec<IndexId, IndexInfo> = columns_to_uses
+        .iter()
+        .map(|(permuted_columns, (_, merge))| {
+            let (primary_key_prefix_len, primary_key_violation_merge) = merge
+                .clone()
+                .unwrap_or((permuted_columns.len(), MergeTy::Panic));
+            IndexInfo {
+                permuted_columns: permuted_columns.clone(),
+                primary_key_prefix_len,
+                primary_key_violation_merge,
+            }
+        })
+        .collect();
     let index_usage_to_index: TVec<IndexUsageId, IndexUsageInfo> =
         TVec::from_iter_unordered(columns_to_uses.values().enumerate().flat_map(
-            |(index_id, usage)| {
+            |(index_id, (usage, _))| {
                 usage.iter().map(move |&(index_usage_id, prefix)| {
                     (
                         index_usage_id,
@@ -113,7 +167,7 @@ mod test {
                 .into_iter()
                 .map(|x| x.into_iter().map(ColumnId).collect())
                 .collect();
-        let (logical_to_physical, physical_indexes) = index_selection(columns, &uses);
+        let (logical_to_physical, physical_indexes) = index_selection(columns, &uses, &[]);
         expect![["
             {
                 iu0: IndexUsageInfo {

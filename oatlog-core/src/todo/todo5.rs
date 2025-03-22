@@ -178,9 +178,6 @@ impl MulRelation {
             if self.all_index_0_1_2.remove(&(x0, x1, x2)) {
                 self.all_index_1_0_2.remove(&(x1, x0, x2));
                 self.all_index_2_0_1.remove(&(x2, x0, x1));
-                math_uf.dec_eclass(x0, Self::COST);
-                math_uf.dec_eclass(x1, Self::COST);
-                math_uf.dec_eclass(x2, Self::COST);
                 println!("delete: {:?}", [x0, x1, x2]);
                 op_insert.push((math_uf.find(x0), math_uf.find(x1), math_uf.find(x2)));
             }
@@ -190,9 +187,6 @@ impl MulRelation {
                 return false;
             }
             println!("insert: {:?}", [x0, x1, x2]);
-            math_uf.inc_eclass(x0, Self::COST);
-            math_uf.inc_eclass(x1, Self::COST);
-            math_uf.inc_eclass(x2, Self::COST);
             self.all_index_1_0_2.insert((x1, x0, x2));
             self.all_index_2_0_1.insert((x2, x0, x1));
             true
@@ -308,9 +302,6 @@ impl AddRelation {
             if self.all_index_0_1_2.remove(&(x0, x1, x2)) {
                 self.all_index_1_0_2.remove(&(x1, x0, x2));
                 self.all_index_2_0_1.remove(&(x2, x0, x1));
-                math_uf.dec_eclass(x0, Self::COST);
-                math_uf.dec_eclass(x1, Self::COST);
-                math_uf.dec_eclass(x2, Self::COST);
                 println!("delete: {:?}", [x0, x1, x2]);
                 op_insert.push((math_uf.find(x0), math_uf.find(x1), math_uf.find(x2)));
             }
@@ -320,9 +311,6 @@ impl AddRelation {
                 return false;
             }
             println!("insert: {:?}", [x0, x1, x2]);
-            math_uf.inc_eclass(x0, Self::COST);
-            math_uf.inc_eclass(x1, Self::COST);
-            math_uf.inc_eclass(x2, Self::COST);
             self.all_index_1_0_2.insert((x1, x0, x2));
             self.all_index_2_0_1.insert((x2, x0, x1));
             true
@@ -369,9 +357,6 @@ impl AddRelation {
             if self.all_index_0_1_2.remove(&(x0, x1, x2)) {
                 self.all_index_1_0_2.remove(&(x1, x0, x2));
                 self.all_index_2_0_1.remove(&(x2, x0, x1));
-                uf.math_uf.dec_eclass(x0, Self::COST);
-                uf.math_uf.dec_eclass(x1, Self::COST);
-                uf.math_uf.dec_eclass(x2, Self::COST);
                 println!("delete: {:?}", [x0, x1, x2]);
                 op_insert.push((
                     uf.math_uf.find(x0),
@@ -385,9 +370,6 @@ impl AddRelation {
                 return false;
             }
             println!("insert: {:?}", [x0, x1, x2]);
-            uf.math_uf.inc_eclass(x0, Self::COST);
-            uf.math_uf.inc_eclass(x1, Self::COST);
-            uf.math_uf.inc_eclass(x2, Self::COST);
             self.all_index_1_0_2.insert((x1, x0, x2));
             self.all_index_2_0_1.insert((x2, x0, x1));
             true
@@ -437,9 +419,6 @@ impl AddRelation {
             // if self.all_index_0_1_2.remove(&(x0, x1, x2)) {
             self.all_index_1_0_2.remove(&(x1, x0, x2));
             self.all_index_2_0_1.remove(&(x2, x0, x1));
-            uf.math_uf.dec_eclass(x0, Self::COST);
-            uf.math_uf.dec_eclass(x1, Self::COST);
-            uf.math_uf.dec_eclass(x2, Self::COST);
             op_insert.push((
                 uf.math_uf.find(x0),
                 uf.math_uf.find(x1),
@@ -451,9 +430,6 @@ impl AddRelation {
             if self.all_index_0_1_2.remove(&(x0, x1, x2)) {
                 // self.all_index_1_0_2.remove(&(x1, x0, x2));
                 self.all_index_2_0_1.remove(&(x2, x0, x1));
-                uf.math_uf.dec_eclass(x0, Self::COST);
-                uf.math_uf.dec_eclass(x1, Self::COST);
-                uf.math_uf.dec_eclass(x2, Self::COST);
                 op_insert.push((
                     uf.math_uf.find(x0),
                     uf.math_uf.find(x1),
@@ -465,9 +441,6 @@ impl AddRelation {
             if self.all_index_0_1_2.remove(&(x0, x1, x2)) {
                 self.all_index_1_0_2.remove(&(x1, x0, x2));
                 // self.all_index_2_0_1.remove(&(x2, x0, x1));
-                uf.math_uf.dec_eclass(x0, Self::COST);
-                uf.math_uf.dec_eclass(x1, Self::COST);
-                uf.math_uf.dec_eclass(x2, Self::COST);
                 op_insert.push((
                     uf.math_uf.find(x0),
                     uf.math_uf.find(x1),
@@ -487,9 +460,6 @@ impl AddRelation {
             if !self.all_index_0_1_2.insert((x0, x1, x2)) {
                 return false;
             }
-            uf.math_uf.inc_eclass(x0, Self::COST);
-            uf.math_uf.inc_eclass(x1, Self::COST);
-            uf.math_uf.inc_eclass(x2, Self::COST);
             self.all_index_1_0_2.insert((x1, x0, x2));
             self.all_index_2_0_1.insert((x2, x0, x1));
             true
@@ -531,9 +501,6 @@ impl AddRelation {
             self.all_index_2_0_1.remove(&(x2, x0, x1));
         }
         for (x0, x1, x2) in op_delete1.iter().copied() {
-            uf.math_uf.dec_eclass(x0, Self::COST);
-            uf.math_uf.dec_eclass(x1, Self::COST);
-            uf.math_uf.dec_eclass(x2, Self::COST);
             op_insert.push((
                 uf.math_uf.find(x0),
                 uf.math_uf.find(x1),
@@ -564,9 +531,6 @@ impl AddRelation {
             self.all_index_2_0_1.remove(&(x2, x0, x1));
         }
         for (x0, x1, x2) in op_delete2.iter().copied() {
-            uf.math_uf.dec_eclass(x0, Self::COST);
-            uf.math_uf.dec_eclass(x1, Self::COST);
-            uf.math_uf.dec_eclass(x2, Self::COST);
             op_insert.push((
                 uf.math_uf.find(x0),
                 uf.math_uf.find(x1),
@@ -599,9 +563,6 @@ impl AddRelation {
         }
 
         for (x0, x1, x2) in op_delete3.iter().copied() {
-            uf.math_uf.dec_eclass(x0, Self::COST);
-            uf.math_uf.dec_eclass(x1, Self::COST);
-            uf.math_uf.dec_eclass(x2, Self::COST);
             op_insert.push((
                 uf.math_uf.find(x0),
                 uf.math_uf.find(x1),
@@ -623,10 +584,6 @@ impl AddRelation {
             self.all_index_0_1_2.insert((x0, x1, x2));
             self.all_index_1_0_2.insert((x1, x0, x2));
             self.all_index_2_0_1.insert((x2, x0, x1));
-
-            uf.math_uf.inc_eclass(x0, Self::COST);
-            uf.math_uf.inc_eclass(x1, Self::COST);
-            uf.math_uf.inc_eclass(x2, Self::COST);
 
             true
         });
