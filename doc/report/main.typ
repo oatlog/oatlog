@@ -1120,6 +1120,36 @@ Overall, our comparative testing infrastructure (against egglog) can handle the 
   ),
 ) <oatlog_comparative_testing_conditions>
 
+=== Relation taxonomy.
+
+
+
+
+#figure(
+  table(
+    columns: (auto, auto, auto, auto),
+    [], [signature], [inserts], [get-or-default],
+    [function], [`[*] -> *`], [yes], [no],
+    [constructor], [`[*] -> E`], [yes], [yes, make eclass],
+    [relation], [`[*] -> ()`], [yes], [yes, performs insert],
+    [], [], [], [],
+    [function], [`[] -> *`], [yes], [yes if statically initialized.],
+    [global], [`[] -> *`], [yes], [yes if statically initialized.],
+    [], [], [], [],
+    [primitive], [`[*] -> *`], [not supported], [yes, allows side effects (eg insert)],
+  ),
+  caption: flex-caption(
+    [
+      Different types of functions.
+    ],
+    [
+      () means unit, \* means any, E means eclass, P means primitive.
+    ],
+  ),
+)
+
+
+
 = Evaluation
 
 #TODO[]

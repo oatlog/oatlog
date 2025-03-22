@@ -2425,6 +2425,47 @@ let v1 = compile(Optimized { using: Egglog }, metaprogram);
 Ergo, we can quite easily self-host if we are able to turn off optimizations.
 
 
+= (Frontend?) Type system
+
+```
+              ty         inserts         action entry
+function:     A  -> B    (A,  B )        no
+
+constructor:  A  -> B    (A,  B )        yes, make eclass
+relation:     A  -> ()   (A,  ())        yes, performs insert
+
+function:     () -> B    ((), B )        yes if statically initialized.
+global:       () -> B    ((), B )        yes if statically initialized.
+
+primitive:    A  -> B    not supported   yes 
+```
+
+
+= alternate relation impl
+
+```rust
+struct AddRelation {
+    new: Vec<Row>,
+    all_index_0_1_2: BTreeSet<(..)>,
+    all_index_1_0_2: BTreeSet<(..)>,
+    all_index_2_0_1: BTreeSet<(..)>,
+
+    delta: UnsafeCell<Vec<Row>>,
+}
+
+struct Relations {
+    add_relation: AddRelation,
+    mul_relation: MulRelation,
+}
+
+impl AddRelation {
+    fn update(relations: &mut Relations, uf: &mut Unification) {
+    }
+}
+
+```
+
+
 = TODO research
 
 - More info about DB term for curried indexes.
