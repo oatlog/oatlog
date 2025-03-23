@@ -35,7 +35,7 @@ fn hir_commutative() {
             (datatype Math
                 (Add Math Math)
             )
-            (rule ((= e (Add a b) )) ((= e (Add b a))))
+            (rule ((= e (Add a b) )) ((union e (Add b a))))
         ",
         expected_hir: Some(expect![[r#"
             Theory "":
@@ -99,7 +99,7 @@ fn hir_userspace_implicit_functionality() {
             (sort Math)
             (relation Add (Math Math Math))
 
-            (rule ((Add a b c) (Add a b d)) ((= c d)))
+            (rule ((Add a b c) (Add a b d)) ((union c d)))
         ",
         expected_hir: Some(expect![[r#"
             Theory "":
