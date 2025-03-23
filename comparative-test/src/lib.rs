@@ -232,7 +232,20 @@ egglog_test!(nogenerate, antiunify, expect![[r#"
     ( include "comparative-test/egglog-testsuite/antiunify.egg" )
 
 "#]], r#"(include "comparative-test/egglog-testsuite/antiunify.egg")"#);// needs primitive functions
-egglog_test!(nogenerate, array, expect!["PANIC: not yet implemented: panic rule action"], r#"(include "comparative-test/egglog-testsuite/array.egg")"#);// needs panic (does not use vec)
+egglog_test!(nogenerate, array, expect![[r#"
+    comparative-test/egglog-testsuite/array.egg: panic not implemented
+    ( panic "query (neq x x) found something equal to itself" )
+
+    comparative-test/egglog-testsuite/array.egg: while parsing this toplevel expression
+    ( rule ( ( neq x x ) ) ( ( panic "query (neq x x) found something equal to itself" ) ) )
+
+    comparative-test/egglog-testsuite/array.egg: while reading comparative-test/egglog-testsuite/array.egg
+    ( include "comparative-test/egglog-testsuite/array.egg" )
+
+    toplevel: while parsing this toplevel expression
+    ( include "comparative-test/egglog-testsuite/array.egg" )
+
+"#]], r#"(include "comparative-test/egglog-testsuite/array.egg")"#);// needs panic (does not use vec)
 egglog_test!(nogenerate, bdd, expect![[r#"
     comparative-test/egglog-testsuite/bdd.egg: function call < is not defined
     <
@@ -353,7 +366,20 @@ egglog_test!(nogenerate, cyk, expect![[r#"
     ( include "comparative-test/egglog-testsuite/cyk.egg" )
 
 "#]], r#"(include "comparative-test/egglog-testsuite/cyk.egg")"#);// needs primitive functions
-egglog_test!(nogenerate, cykjson, expect!["PANIC: not yet implemented: set rule action"], r#"(include "comparative-test/egglog-testsuite/cykjson.egg")"#);// needs primitive functions
+egglog_test!(nogenerate, cykjson, expect![[r#"
+    comparative-test/egglog-testsuite/cykjson.egg: function call + is not defined
+    +
+
+    comparative-test/egglog-testsuite/cykjson.egg: while parsing this toplevel expression
+    ( rule ( ( Prod a b c ) ( P p1 s b ) ( P p2 ( + s p1 ) c ) ) ( ( P ( + p1 p2 ) s a ) ) )
+
+    comparative-test/egglog-testsuite/cykjson.egg: while reading comparative-test/egglog-testsuite/cykjson.egg
+    ( include "comparative-test/egglog-testsuite/cykjson.egg" )
+
+    toplevel: while parsing this toplevel expression
+    ( include "comparative-test/egglog-testsuite/cykjson.egg" )
+
+"#]], r#"(include "comparative-test/egglog-testsuite/cykjson.egg")"#);// needs primitive functions
 egglog_test!(nogenerate, datatypes, expect![[r#"
     comparative-test/egglog-testsuite/datatypes.egg: TODO: forward declarations
     ( datatype* ( Math ( Add Math Math ) ( Sum MathVec ) ( B Bool ) ) ( sort MathVec ( Vec Math ) ) ( Bool ( True ) ( False ) ) )
@@ -612,7 +638,20 @@ egglog_test!(nogenerate, levenshtein_distance, expect![[r#"
     ( include "comparative-test/egglog-testsuite/levenshtein-distance.egg" )
 
 "#]], r#"(include "comparative-test/egglog-testsuite/levenshtein-distance.egg")"#);// needs primitive functions
-egglog_test!(nogenerate, list, expect!["PANIC: not yet implemented: set rule action"], r#"(include "comparative-test/egglog-testsuite/list.egg")"#);// primitive functions
+egglog_test!(nogenerate, list, expect![[r#"
+    comparative-test/egglog-testsuite/list.egg: function call + is not defined
+    +
+
+    comparative-test/egglog-testsuite/list.egg: while parsing this toplevel expression
+    ( rule ( ( list-length-demand ( Cons head tail ) ) ( = ( list-length tail ) tail-length ) ) ( ( set ( list-length ( Cons head tail ) ) ( + tail-length 1 ) ) ) :ruleset list )
+
+    comparative-test/egglog-testsuite/list.egg: while reading comparative-test/egglog-testsuite/list.egg
+    ( include "comparative-test/egglog-testsuite/list.egg" )
+
+    toplevel: while parsing this toplevel expression
+    ( include "comparative-test/egglog-testsuite/list.egg" )
+
+"#]], r#"(include "comparative-test/egglog-testsuite/list.egg")"#);// primitive functions
 egglog_test!(nogenerate, looking_up_global, expect![[r#"
     comparative-test/egglog-testsuite/looking_up_global.egg: not implemented yet
     ( set ( f ) 0 )
@@ -906,7 +945,20 @@ egglog_test!(nogenerate, repro_noteqbug, expect![[r#"
     ( include "comparative-test/egglog-testsuite/repro-noteqbug.egg" )
 
 "#]], r#"(include "comparative-test/egglog-testsuite/repro-noteqbug.egg")"#); // REASON: toplevel union
-egglog_test!(nogenerate, repro_primitive_query, expect!["PANIC: not yet implemented: panic rule action"], r#"(include "comparative-test/egglog-testsuite/repro-primitive-query.egg")"#);// impl panic
+egglog_test!(nogenerate, repro_primitive_query, expect![[r#"
+    comparative-test/egglog-testsuite/repro-primitive-query.egg: panic not implemented
+    ( panic "should not have matched" )
+
+    comparative-test/egglog-testsuite/repro-primitive-query.egg: while parsing this toplevel expression
+    ( rule ( ( Num ?a ) ( Num ?b ) ( = ( + ?a ?b ) 5 ) ) ( ( panic "should not have matched" ) ) )
+
+    comparative-test/egglog-testsuite/repro-primitive-query.egg: while reading comparative-test/egglog-testsuite/repro-primitive-query.egg
+    ( include "comparative-test/egglog-testsuite/repro-primitive-query.egg" )
+
+    toplevel: while parsing this toplevel expression
+    ( include "comparative-test/egglog-testsuite/repro-primitive-query.egg" )
+
+"#]], r#"(include "comparative-test/egglog-testsuite/repro-primitive-query.egg")"#);// impl panic
 egglog_test!(allcorrect, repro_querybug2, expect![[r#"
     Num: 1
     OtherNum: 1

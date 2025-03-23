@@ -52,6 +52,15 @@ pub(crate) mod hir2 {
     // Entry means that there is not a single canonical way to write actions of a rule, but that is
     // fine, assuming the merge works correctly.
 
+    // NOTE: if actions need to be merged then the two rules must have been equivalent, and the
+    // rules should have already been merged, ergo, we only need to be concerned about what
+    // redundant actions are performed along a trie path.
+
+    // NOTE: if there are INFALLIBLE premises (like globals/literals) we can move them from premise
+    // to action if not used in premise (IF it does not mutate in action).
+
+    // We can do INSERT -> ENTRY, we can not do INFALLIBLE ENTRY -> INSERT.
+
     pub(crate) struct SymbolicRule {
         // ====== PREMISE ======
         premise: Premise,

@@ -9,7 +9,7 @@ mod test {
                  (Add Math Math)
             )
             // implicit functionality
-            (rule ((= x (Add a b)) (= y (Add a b))) ((= x y)))
+            (rule ((= x (Add a b)) (= y (Add a b))) ((union x y)))
             // commutativity
             (rewrite (Add a b) (Add b a))
         ));

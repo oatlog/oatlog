@@ -2466,6 +2466,19 @@ impl AddRelation {
 ```
 
 
+= Bugs that we should avoid inheriting from egglog
+
+union of primitives.
+```
+(datatype Math (Const i64))
+(Const 1)
+(Const 2)
+(union 0 1)
+```
+
+`https://github.com/egraphs-good/egglog/issues/482`
+Lattice merge lookups can observe database in inconsistent state, so lattice merge should only be able to call primitives, and the primitives must remain consistent during rebuilding.
+
 = TODO research
 
 - More info about DB term for curried indexes.

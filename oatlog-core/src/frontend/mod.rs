@@ -1,6 +1,7 @@
 //! Frontend, parse source text into HIR.
 
 #![allow(clippy::zero_sized_map_values, reason = "MapExt trait usage")]
+#![deny(unused_must_use)]
 
 use std::{
     collections::{BTreeMap, btree_map::Entry},
@@ -41,12 +42,20 @@ impl<T> ResultExt for MResult<T> {
     }
 }
 
-trait VecExt<A, B> {
+trait VecExtClone<A, B> {
     fn mapf(&self, f: impl FnMut(A) -> MResult<B>) -> MResult<Vec<B>>;
 }
-impl<A: Clone, B> VecExt<A, B> for Vec<A> {
+trait VecExtRef<A, B> {
+    fn mapr(&self, f: impl FnMut(&A) -> MResult<B>) -> MResult<Vec<B>>;
+}
+impl<A: Clone, B> VecExtClone<A, B> for [A] {
     fn mapf(&self, f: impl FnMut(A) -> MResult<B>) -> MResult<Vec<B>> {
-        self.clone().into_iter().map(f).collect()
+        self.iter().cloned().map(f).collect()
+    }
+}
+impl<A: Clone, B> VecExtRef<A, B> for [A] {
+    fn mapr(&self, f: impl FnMut(&A) -> MResult<B>) -> MResult<Vec<B>> {
+        self.iter().map(f).collect()
     }
 }
 
@@ -438,7 +447,7 @@ impl Parser {
         let refuse_msg = err!("will not implement, this only makes sense for an interpreter");
         let unimplemented_msg = err!("not implemented yet");
         match ast.x {
-            egglog_ast::Statement::SetOption { name, value } => return refuse_msg,
+            egglog_ast::Statement::SetOption { .. } => return refuse_msg,
             egglog_ast::Statement::Sort { name, primitive } => {
                 if let Some(primitive) = primitive {
                     return err!("collections are not supported yet: {primitive:?}");
@@ -450,11 +459,7 @@ impl Parser {
                 for egglog_ast::Variant { name, types, cost } in variants.into_iter().map(|x| x.x) {
                     self.add_function(
                         name,
-                        types
-                            .into_iter()
-                            .map(|x| self.type_ids.lookup(x))
-                            .collect::<MResult<Vec<TypeId>>>()?
-                            .leak(),
+                        types.mapf(|x| self.type_ids.lookup(x))?.leak(),
                         FunctionKind::Constructor { output, cost },
                     )?;
                 }
@@ -470,11 +475,7 @@ impl Parser {
             } => {
                 self.add_function(
                     name,
-                    input
-                        .into_iter()
-                        .map(|x| self.type_ids.lookup(x))
-                        .collect::<MResult<Vec<TypeId>>>()?
-                        .leak(),
+                    &input.mapf(|x| self.type_ids.lookup(x))?,
                     FunctionKind::Constructor {
                         output: self.type_ids.lookup(output)?,
                         cost,
@@ -484,11 +485,7 @@ impl Parser {
             egglog_ast::Statement::Relation { name, input } => {
                 self.add_function(
                     name,
-                    input
-                        .into_iter()
-                        .map(|x| self.type_ids.lookup(x))
-                        .collect::<MResult<Vec<TypeId>>>()?
-                        .leak(),
+                    &input.mapf(|x| self.type_ids.lookup(x))?,
                     FunctionKind::Relation,
                 )?;
             }
@@ -503,11 +500,7 @@ impl Parser {
                 }
                 self.add_function(
                     name,
-                    input
-                        .into_iter()
-                        .map(|x| self.type_ids.lookup(x))
-                        .collect::<MResult<Vec<TypeId>>>()?
-                        .leak(),
+                    &input.mapf(|x| self.type_ids.lookup(x))?,
                     FunctionKind::Function {
                         output: self.type_ids.lookup(output)?,
                         merge: None,
@@ -517,8 +510,8 @@ impl Parser {
             egglog_ast::Statement::AddRuleSet(spanned) => {
                 self.rulesets.insert_unique(spanned, (), "ruleset")?;
             }
-            egglog_ast::Statement::UnstableCombinedRuleset(spanned, vec) => {
-                return unimplemented_msg;
+            egglog_ast::Statement::UnstableCombinedRuleset(..) => {
+                return refuse_msg;
             }
             egglog_ast::Statement::Rule {
                 name,
@@ -871,10 +864,8 @@ impl Parser {
                 }
             },
             Expr::Call(name, args) => {
-                let args = args
-                    .iter()
-                    .map(|expr| self.parse_lattice_expr(old, new, expr, variables, ops))
-                    .collect::<Result<Vec<_>, _>>()?;
+                let args =
+                    args.mapf(|expr| self.parse_lattice_expr(old, new, &*expr, variables, ops))?;
 
                 let possible_ids = &self.function_possible_ids.lookup(*name, "function")?;
                 let args_ty: Vec<_> = args.iter().map(|v| variables[*v].0).collect();
@@ -1000,7 +991,7 @@ impl Parser {
                     let (args, arg_ty): (Vec<_>, Vec<_>) = args
                         .into_iter()
                         .map(|expr| parse(parser, expr))
-                        .collect::<Result<_, _>>()?;
+                        .collect::<MResult<_>>()?;
 
                     let arg_ty_opt: Vec<_> = arg_ty.iter().copied().map(Some).collect();
 
@@ -1065,7 +1056,7 @@ impl Parser {
         Ok(())
     }
 
-    fn err_type_defined_here(&mut self, id: TypeId, err: &mut MError) {
+    fn err_type_defined_here(&self, id: TypeId, err: &mut MError) {
         let name = self.type_name(id);
         err.push(bare_!(name.span, "type {name} defined here"));
     }
@@ -1159,41 +1150,73 @@ mod compile_rule2 {
         err
     }
 
+    #[derive(Debug)]
     enum FlatExpr {
-        Literal(Literal),
         Call(Str, Vec<VariableId>),
         Possible(Str, Vec<RelationId>, Vec<VariableId>),
         Resolved(RelationId, Vec<VariableId>),
         Var,
     }
 
-    struct Flatten {
+    struct Flatten<'a> {
+        parser: &'a mut Parser,
         flattened: TVec<VariableId, FlatExpr>,
         spans: TVec<VariableId, Option<QSpan>>,
         labels: TVec<VariableId, &'static str>,
         symbols: BTreeMap<Str, VariableId>,
+        type_uf: Types,
     }
-    impl Flatten {
+    impl Flatten<'_> {
         fn flatten(&mut self, expr: &Spanned<Expr>) -> VariableId {
             let span = expr.span;
             match &expr.x {
                 Expr::Literal(x) => {
+                    let global_id = self
+                        .parser
+                        .add_global(
+                            None,
+                            self.parser.literal_type(**x),
+                            ComputeMethod::Literal(**x),
+                        )
+                        .unwrap();
+                    let global = &self.parser.global_variables[&global_id];
+                    let relation_id = global.relation_id;
+                    let ty = global.ty;
+                    let _: VariableId = self.type_uf.0.push(Some(ty));
                     let _: VariableId = self.spans.push(span);
-                    // TODO: when we can handle variable collisions, add a more descriptive name
-                    // here.
-                    let _ = self.labels.push("");
-                    self.flattened.push(FlatExpr::Literal(x.x))
+                    let _: VariableId = self.labels.push("");
+                    self.flattened.push(FlatExpr::Possible(
+                        Spanned::new("literal", x.span),
+                        vec![relation_id],
+                        vec![],
+                    ))
                 }
-                Expr::Var(s) => *self.symbols.entry(*s).or_insert_with(|| {
-                    let _: VariableId = self.spans.push(span);
-                    let _ = self.labels.push(**s);
-                    self.flattened.push(FlatExpr::Var)
-                }),
+                Expr::Var(s) => {
+                    if let Some(&global_id) = self.parser.global_variable_names.get(s) {
+                        let relation_id = self.parser.global_variables[&global_id].relation_id;
+                        let _: VariableId = self.type_uf.0.push(None);
+                        let _: VariableId = self.spans.push(span);
+                        let _: VariableId = self.labels.push(**s);
+                        self.flattened.push(FlatExpr::Possible(
+                            Spanned::new("global", span),
+                            vec![relation_id],
+                            vec![],
+                        ))
+                    } else {
+                        *self.symbols.entry(*s).or_insert_with(|| {
+                            let _: VariableId = self.type_uf.0.push(None);
+                            let _: VariableId = self.spans.push(span);
+                            let _: VariableId = self.labels.push(**s);
+                            self.flattened.push(FlatExpr::Var)
+                        })
+                    }
+                }
                 Expr::Call(name, args) => {
                     let args: Vec<VariableId> =
                         args.iter().map(|expr| self.flatten(expr)).collect();
+                    let _: VariableId = self.type_uf.0.push(None);
                     let _: VariableId = self.spans.push(span);
-                    let _ = self.labels.push("");
+                    let _: VariableId = self.labels.push("");
                     self.flattened.push(FlatExpr::Call(*name, args))
                 }
             }
@@ -1209,28 +1232,50 @@ mod compile_rule2 {
             i: VariableId,
             t: TypeId,
         ) -> MResult<()> {
-            match self.0[i] {
+            let entry = &mut self.0[i];
+            match *entry {
                 Some(old) if old == t => Ok(()),
-                None => Ok(()),
+                None => {
+                    *entry = Some(t);
+                    Ok(())
+                }
                 Some(old) => Err(type_mismatch_msg(parser, spans[i], old, t)),
             }
         }
+        fn merge(
+            &mut self,
+            parser: &Parser,
+            a: VariableId,
+            b: VariableId,
+            span: Option<QSpan>,
+        ) -> MResult<()> {
+            self.0
+                .try_union_merge(a, b, |&a, &b| match (a, b) {
+                    (None, None) => Ok(None),
+                    (None, Some(x)) | (Some(x), None) => Ok(Some(x)),
+                    (Some(a), Some(b)) if a == b => Ok(Some(a)),
+                    (Some(a), Some(b)) => Err(type_mismatch_msg(parser, span, a, b)),
+                })
+                .map(|_| ())
+        }
     }
 
-    fn compile(
+    pub(crate) fn add_rule(
         parser: &mut Parser,
         name: Option<Str>,
         ruleset: Option<Str>,
         facts: Vec<span::Spanned<egglog_ast::Fact>>,
         actions: Vec<span::Spanned<egglog_ast::Action>>,
     ) -> MResult<()> {
-        // TODO: turn into object.
+        let _ = ruleset;
 
         let mut flat = Flatten {
             flattened: TVec::new(),
             spans: TVec::new(),
             labels: TVec::new(),
             symbols: BTreeMap::new(),
+            parser,
+            type_uf: Types(UFData::new()),
         };
 
         let mut premise_merge = vec![];
@@ -1294,30 +1339,22 @@ mod compile_rule2 {
             spans,
             labels,
             symbols,
+            parser: _,
+            mut type_uf,
         } = flat;
         let n = flattened.len();
-        let mut type_uf = Types(UFData::new_with_size(n, None));
         for (a, b, span) in action_union
             .iter()
             .copied()
             .chain(premise_merge.iter().copied())
         {
-            type_uf.0.union_merge(a, b, |_, _| None);
+            type_uf.merge(parser, a, b, span)?;
         }
         loop {
             let mut progress = false;
             for (i, x) in flattened.iter_enumerate_mut() {
                 match x {
                     FlatExpr::Resolved(..) | FlatExpr::Var => {}
-                    FlatExpr::Literal(literal) => {
-                        let ty = parser.literal_type(*literal);
-                        type_uf.set_type(parser, &spans, i, ty)?;
-                        let global_id =
-                            parser.add_global(None, ty, ComputeMethod::Literal(*literal))?;
-                        let relation_id = parser.global_variables[&global_id].relation_id;
-                        *x = FlatExpr::Resolved(relation_id, vec![]);
-                        progress = true;
-                    }
                     FlatExpr::Call(name, args) => {
                         let ids = parser
                             .function_possible_ids
@@ -1363,36 +1400,53 @@ mod compile_rule2 {
                 break;
             }
         }
+
         let mut conjunctive_query = Vec::new();
         foreach_resolved(parser, &flattened, &type_uf, 0..n_fact, |i, f, args| {
             conjunctive_query.push((f, args.clone(), i));
         })?;
-        let mut inserts = Vec::new();
-        let mut entry = Vec::new();
+        let mut action_inserts = Vec::new();
         foreach_resolved(parser, &flattened, &type_uf, n_fact..n, |i, f, args| {
-            let mut args = args.clone();
-            if promote_insert.contains(&i) {
-                args.push(i);
-                inserts.push((f, args));
-            } else {
-                entry.push((f, args, i));
-            }
+            action_inserts.push((f, args.clone(), i));
         })?;
 
-        // let rule = hir::RuleArgs {
-        //     name: name.map_or("", |x| *x),
-        //     sort_vars: (0..n_fact).map(VariableId).collect(),
-        //     variables: variables
-        //         .iter()
-        //         .map(|VariableInfo { label, ty }| (types[*ty].unwrap(), label.map_or("", |x| *x)))
-        //         .collect(),
-        //     premise: premise_relations,
-        //     premise_unify,
-        //     action: action_relations,
-        //     action_unify,
-        //     delete: to_delete,
-        // }
-        // .build();
+        let unit_ty = parser.literal_type(Literal::Unit);
+
+        let rule = hir::RuleArgs {
+            name: name.map_or("", |x| *x),
+            sort_vars: (0..n_fact).map(VariableId).collect(),
+            variables: (0..n)
+                .map(VariableId)
+                .map(|x| (type_uf.0[x].expect("unresolved type"), labels[x]))
+                .collect(),
+            premise: conjunctive_query
+                .into_iter()
+                .map(|(relation, mut args, ret)| {
+                    if type_uf.0[ret].expect("unresolved type") != unit_ty {
+                        args.push(ret);
+                    }
+                    (relation, args)
+                })
+                .collect(),
+            premise_unify: premise_merge.iter().map(|&(a, b, _)| vec![a, b]).collect(),
+            action: action_inserts
+                .into_iter()
+                .map(|(relation, mut args, ret)| {
+                    if type_uf.0[ret].expect("unresolved type") != unit_ty {
+                        args.push(ret);
+                    }
+                    (relation, args)
+                })
+                .collect(),
+            action_unify: action_union.iter().map(|&(a, b, _)| vec![a, b]).collect(),
+            delete: (0..n)
+                .map(VariableId)
+                .filter(|&x| type_uf.0[x].expect("unresolved type") == unit_ty)
+                .collect(),
+        }
+        .build();
+
+        parser.symbolic_rules.push(rule);
 
         Ok(())
     }
@@ -1407,8 +1461,7 @@ mod compile_rule2 {
         for i in i.map(VariableId) {
             match &flattened[i] {
                 FlatExpr::Var => {}
-                FlatExpr::Literal(x) => unreachable!(),
-                FlatExpr::Call(spanned, vec) => unreachable!(),
+                FlatExpr::Call(..) => unreachable!(),
                 FlatExpr::Possible(name, ids, args) => {
                     return Err(ambigious_call_msg(parser, *name, ids, args, type_uf, i));
                 }
@@ -1424,7 +1477,7 @@ mod compile_rule {
 
     use super::{
         Action, ComputeMethod, Expr, Literal, MError, MResult, MapExt as _, Parser, QSpan, Str,
-        bare_,
+        VecExtRef, bare_,
     };
 
     use crate::{
@@ -1530,20 +1583,17 @@ mod compile_rule {
                 }
             }
             Expr::Call(name, args) => {
-                let args: Vec<_> = args
-                    .iter()
-                    .map(|expr| {
-                        parse_expr(
-                            parser,
-                            variables,
-                            types,
-                            bound_variables,
-                            unify,
-                            expr,
-                            calls,
-                        )
-                    })
-                    .collect::<Result<_, _>>()?;
+                let args: Vec<_> = args.mapr(|expr| {
+                    parse_expr(
+                        parser,
+                        variables,
+                        types,
+                        bound_variables,
+                        unify,
+                        expr,
+                        calls,
+                    )
+                })?;
 
                 if **name == "=" {
                     for (a, b) in args.windows(2).map(|w| (w[0], w[1])) {
@@ -1597,6 +1647,8 @@ mod compile_rule {
             facts2: Vec<span::Spanned<egglog_ast::Fact>>,
             actions2: Vec<span::Spanned<egglog_ast::Action>>,
         ) -> MResult<()> {
+            return super::compile_rule2::add_rule(self, name, ruleset, facts2, actions2);
+
             let mut premises = Vec::new();
             register_span!(None);
             for facts in facts2 {
@@ -1635,20 +1687,17 @@ mod compile_rule {
             let mut premise_unify: Vec<Vec<VariableId>> = Vec::new();
             let mut premise_unknown = Vec::new();
 
-            let sort_constraints = premises
-                .into_iter()
-                .map(|premise| {
-                    parse_expr(
-                        self,
-                        &mut variables,
-                        &mut types,
-                        &mut bound_variables,
-                        &mut premise_unify,
-                        &premise,
-                        &mut premise_unknown,
-                    )
-                })
-                .collect::<Result<_, _>>()?;
+            let sort_constraints = premises.mapr(|premise| {
+                parse_expr(
+                    self,
+                    &mut variables,
+                    &mut types,
+                    &mut bound_variables,
+                    &mut premise_unify,
+                    &premise,
+                    &mut premise_unknown,
+                )
+            })?;
 
             let mut action_unify = Vec::new();
             let mut action_unknown = Vec::new();

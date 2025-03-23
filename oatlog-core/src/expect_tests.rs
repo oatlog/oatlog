@@ -29,6 +29,28 @@ impl Steps {
 }
 
 #[test]
+fn weird_premise_equality() {
+    Steps {
+        code: "
+            (rule ((= x 1) (= y x) (= z y)) ())
+        ",
+        expected_hir: Some(expect![[r#"
+            Theory "":
+
+            g0(i64)
+
+            Rule "":
+            Premise: g0(xyz)
+            __: xyz
+
+        "#]]),
+        expected_lir: None,
+        expected_codegen: None,
+    }
+    .check();
+}
+
+#[test]
 fn hir_commutative() {
     Steps {
         code: "

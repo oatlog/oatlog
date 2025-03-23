@@ -14,7 +14,7 @@ pub(crate) type UF<T> = UFData<T, ()>;
 /// Union Find with optional attached data.
 ///
 /// Indexing canonicalizes the index and returns the associated data for that index.
-#[derive(Clone, Debug, Default)]
+#[derive(Clone, Default)]
 pub(crate) struct UFData<K: Id, V> {
     inner: Vec<UFElement<K, V>>,
 }
@@ -47,6 +47,23 @@ impl<K: Id, V: Clone> UFData<K, V> {
                 })
                 .collect(),
         }
+    }
+}
+
+impl<K: Id, V: std::fmt::Debug> std::fmt::Debug for UFData<K, V> {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_map()
+            .entries(self.inner.iter().enumerate().map(|(i, e)| {
+                let key = K::from(i);
+
+                let value: Box<dyn std::fmt::Debug> = match e {
+                    UFElement::Root { value, set: _ } => Box::new(value),
+                    UFElement::Child { parent } => Box::new(parent.get()),
+                };
+
+                (key, value)
+            }))
+            .finish()
     }
 }
 

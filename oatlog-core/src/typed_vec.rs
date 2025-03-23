@@ -120,6 +120,13 @@ impl<K: Id, V> std::ops::Index<&K> for TVec<K, V> {
         self.index(*idx)
     }
 }
+impl<K: Id, V> std::ops::Index<std::ops::Range<K>> for TVec<K, V> {
+    type Output = [V];
+
+    fn index(&self, idx: std::ops::Range<K>) -> &Self::Output {
+        &self.x[idx.start.into()..idx.end.into()]
+    }
+}
 impl<K: Id, V> std::ops::IndexMut<K> for TVec<K, V> {
     fn index_mut(&mut self, idx: K) -> &mut Self::Output {
         &mut self.x[idx.into()]

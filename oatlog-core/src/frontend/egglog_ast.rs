@@ -1,6 +1,7 @@
 //! AST that matches egglog exactly, so it includes things not supported by oatlog.
 use crate::frontend::{
-    Literal, MError, MResult, QSpan, Sexp, SexpSpan, Spanned, Str, err_, register_span,
+    Literal, MError, MResult, QSpan, Sexp, SexpSpan, Spanned, Str, VecExtClone as _,
+    VecExtRef as _, err_, register_span,
 };
 
 #[derive(Clone, Debug)]
@@ -466,11 +467,7 @@ macro_rules! pattern {
     };
     (,, (List $ident:ident $($func:expr)?)) => {
         $(
-            let $ident: Vec<_> = $ident
-                .iter()
-                .copied()
-                .map($func)
-                .collect::<MResult<_>>()?;
+            let $ident: Vec<_> = $ident.mapf($func)?;
         )?
     };
     (, ($ident:ident $($func:expr)?)) => {
@@ -484,11 +481,7 @@ macro_rules! pattern {
     };
     (,, ($ident:ident @ .. $($func:expr)?)) => {
         $(
-            let $ident: Vec<_> = $ident
-                .iter()
-                .copied()
-                .map($func)
-                .collect::<MResult<_>>()?;
+            let $ident: Vec<_> = $ident.mapf($func)?;
         )?
     };
 }
@@ -652,11 +645,7 @@ fn parse_statement(x: SexpSpan) -> MResult<Spanned<Statement>> {
             Statement::RunSchedule(schedule)
         }),
         "run-schedule" => usage!("(run-schedule <schedule>*)", {
-            let schedules: Vec<_> = args
-                .iter()
-                .copied()
-                .map(parse_schedule)
-                .collect::<MResult<_>>()?;
+            let schedules: Vec<_> = args.mapf(parse_schedule)?;
             Statement::RunSchedule(spanned!(Schedule::Sequence(schedules)))
         }),
         "simplify" => usage!("(simplify <schedule> <expr>)", {
@@ -706,11 +695,7 @@ fn parse_statement(x: SexpSpan) -> MResult<Spanned<Statement>> {
         }),
         "output" => usage!("(output \"<file name>\" <expr>)", {
             pattern!(args, [(String file), (exprs @ ..)]);
-            let exprs = exprs
-                .iter()
-                .copied()
-                .map(parse_expr)
-                .collect::<MResult<_>>()?;
+            let exprs = exprs.mapf(parse_expr)?;
             Statement::Output { file, exprs }
         }),
         "include" => usage!("(include \"<file name>\"", {
