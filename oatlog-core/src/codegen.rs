@@ -1,9 +1,8 @@
 use crate::{
     ids::{ColumnId, GlobalId, RelationId, TypeId, VariableId},
-    index_selection::{IndexInfo, IndexUsageInfo, MergeTy},
     lir::{
-        Action, GlobalCompute, Initial, Literal, RelationData, RelationKind, RuleAtom, RuleTrie,
-        Theory, TypeData, TypeKind, VariableData,
+        Action, GlobalCompute, IndexInfo, IndexUsageInfo, Initial, Literal, MergeTy, RelationData,
+        RelationKind, RuleAtom, RuleTrie, Theory, TypeData, TypeKind, VariableData,
     },
     typed_vec::TVec,
 };
@@ -1390,8 +1389,7 @@ fn codegen_relation(
 mod ident {
     use crate::{
         ids::ColumnId,
-        index_selection::{IndexInfo, IndexUsageInfo},
-        lir::{RelationData, Theory, TypeData, TypeKind, VariableData},
+        lir::{IndexInfo, IndexUsageInfo, RelationData, Theory, TypeData, TypeKind, VariableData},
     };
     use heck::{ToPascalCase as _, ToSnakeCase as _};
     use itertools::Itertools as _;

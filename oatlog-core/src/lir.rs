@@ -5,7 +5,6 @@
 
 use crate::{
     ids::{ColumnId, GlobalId, IndexId, IndexUsageId, RelationId, TypeId, VariableId},
-    index_selection::{self},
     typed_vec::TVec,
 };
 use derive_more::From;
@@ -113,8 +112,8 @@ impl RelationData {
     pub(crate) fn new_table(
         name: &'static str,
         types: TVec<ColumnId, TypeId>,
-        usage_to_info: TVec<IndexUsageId, index_selection::IndexUsageInfo>,
-        index_to_info: TVec<IndexId, index_selection::IndexInfo>,
+        usage_to_info: TVec<IndexUsageId, IndexUsageInfo>,
+        index_to_info: TVec<IndexId, IndexInfo>,
         column_back_reference: TVec<ColumnId, IndexUsageId>,
     ) -> Self {
         Self {
@@ -150,9 +149,9 @@ pub enum RelationKind {
     /// A regular btree table.
     Table {
         /// The actual indexes we need to generate.
-        index_to_info: TVec<IndexId, index_selection::IndexInfo>,
+        index_to_info: TVec<IndexId, IndexInfo>,
         /// Usage sites of any indexes
-        usage_to_info: TVec<IndexUsageId, index_selection::IndexUsageInfo>,
+        usage_to_info: TVec<IndexUsageId, IndexUsageInfo>,
         /// Index usage for back-references.
         column_back_reference: TVec<ColumnId, IndexUsageId>,
         // trigger_rules: ...
@@ -165,6 +164,27 @@ pub enum RelationKind {
     Global {
         id: GlobalId,
     },
+}
+
+#[derive(Clone, Eq, PartialEq, Ord, PartialOrd, Hash, Debug)]
+pub(crate) struct IndexInfo {
+    // index -> main
+    pub(crate) permuted_columns: TVec<ColumnId, ColumnId>,
+    pub(crate) primary_key_prefix_len: usize,
+    pub(crate) primary_key_violation_merge: MergeTy,
+}
+#[derive(Clone, Eq, PartialEq, Ord, PartialOrd, Hash, Debug)]
+pub enum MergeTy {
+    Union,
+    Panic,
+    // Lattice { .. },
+}
+
+#[derive(Clone, Eq, PartialEq, Ord, PartialOrd, Hash, Debug)]
+pub(crate) struct IndexUsageInfo {
+    // of the selected index (btree), how many variables are used for the lookup?
+    pub(crate) prefix: usize,
+    pub(crate) index: IndexId,
 }
 
 #[derive(Clone, Eq, PartialEq, Ord, PartialOrd, Hash, Debug, From)]
@@ -293,7 +313,6 @@ impl Theory {
     pub(crate) fn dbg_summary(&self) -> String {
         return format!("{:#?}", Dbg(self));
 
-        use index_selection::MergeTy;
         use itertools::Itertools as _;
         use std::{
             collections::BTreeMap,
@@ -386,7 +405,7 @@ impl Theory {
                         .field(
                             "index_to_info",
                             &NoAlt(&index_to_info.map_values(
-                                |index_selection::IndexInfo {
+                                |IndexInfo {
                                      permuted_columns,
                                      primary_key_prefix_len,
                                      primary_key_violation_merge,
@@ -412,11 +431,9 @@ impl Theory {
                         )
                         .field(
                             "usage_to_info",
-                            &usage_to_info.map_values(
-                                |index_selection::IndexUsageInfo { prefix, index }| {
-                                    DbgStr([format!("{index}[..{prefix}]")])
-                                },
-                            ),
+                            &usage_to_info.map_values(|IndexUsageInfo { prefix, index }| {
+                                DbgStr([format!("{index}[..{prefix}]")])
+                            }),
                         )
                         .field("column_back_reference", &NoAlt(&column_back_reference))
                         .finish(),

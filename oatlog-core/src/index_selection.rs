@@ -6,6 +6,7 @@
 use crate::{
     hir,
     ids::{ColumnId, IndexId, IndexUsageId},
+    lir,
     typed_vec::TVec,
 };
 
@@ -16,27 +17,6 @@ use std::collections::BTreeMap;
 // TODO: add some "maybe_contains" API.
 // TODO: bloom filters
 
-#[derive(Clone, Eq, PartialEq, Ord, PartialOrd, Hash, Debug)]
-pub(crate) struct IndexInfo {
-    // index -> main
-    pub(crate) permuted_columns: TVec<ColumnId, ColumnId>,
-    pub(crate) primary_key_prefix_len: usize,
-    pub(crate) primary_key_violation_merge: MergeTy,
-}
-#[derive(Clone, Eq, PartialEq, Ord, PartialOrd, Hash, Debug)]
-pub enum MergeTy {
-    Union,
-    Panic,
-    // Lattice { .. },
-}
-
-#[derive(Clone, Eq, PartialEq, Ord, PartialOrd, Hash, Debug)]
-pub(crate) struct IndexUsageInfo {
-    // of the selected index (btree), how many variables are used for the lookup?
-    pub(crate) prefix: usize,
-    pub(crate) index: IndexId,
-}
-
 // user:
 // Want an index on these columns
 // [0, 1*, 2, 3*, 4]
@@ -45,11 +25,6 @@ pub(crate) struct IndexUsageInfo {
 // Permute query/result in this order, and index on a prefix of 2 variables:
 // [*3, *1, 4, 2, 0]
 
-// #[derive(Debug)]
-// pub(crate) struct IndexUsageInfo {
-//     index: IndexId,
-//     perm: Vec<ColumnId>,
-// }
 /// Pick a set of indexes that are compatible with the required uses.
 /// In other words, turn a set of logical indexes into a smaller set of physical indexes.
 pub(crate) fn index_selection(
@@ -60,11 +35,14 @@ pub(crate) fn index_selection(
     // what logical "primary keys" are needed.
     uses: &TVec<IndexUsageId, Vec<ColumnId>>,
     implicit_rules: &[hir::ImplicitRule],
-) -> (TVec<IndexUsageId, IndexUsageInfo>, TVec<IndexId, IndexInfo>) {
+) -> (
+    TVec<IndexUsageId, lir::IndexUsageInfo>,
+    TVec<IndexId, lir::IndexInfo>,
+) {
     // Mapping (physical index) to (usage, prefix len).
     let mut columns_to_uses: BTreeMap<
         TVec<ColumnId, ColumnId>,
-        (Vec<(IndexUsageId, usize)>, Option<(usize, MergeTy)>),
+        (Vec<(IndexUsageId, usize)>, Option<(usize, lir::MergeTy)>),
     > = BTreeMap::new();
 
     let permuted_columns_of_use = |used_columns: &[ColumnId]| -> TVec<ColumnId, ColumnId> {
@@ -96,15 +74,15 @@ pub(crate) fn index_selection(
         ty,
     } in implicit_rules
     {
-        let (usage, merge) = columns_to_uses
+        let (_, merge) = columns_to_uses
             .entry(permuted_columns_of_use(on))
             .or_default();
         assert!(merge.is_none(), "overlapping implicit rules");
         *merge = Some({
             let primary_key_prefix_len = on.len();
             let primary_key_violation_merge = match ty {
-                hir::ImplicitRuleAction::Panic => MergeTy::Panic,
-                hir::ImplicitRuleAction::Unification => MergeTy::Union,
+                hir::ImplicitRuleAction::Panic => lir::MergeTy::Panic,
+                hir::ImplicitRuleAction::Unification => lir::MergeTy::Union,
                 hir::ImplicitRuleAction::Lattice { .. } => todo!("implement lattice merge"),
             };
             (primary_key_prefix_len, primary_key_violation_merge)
@@ -121,26 +99,26 @@ pub(crate) fn index_selection(
             .push((index_usage_id, prefix));
     }
 
-    let index_info: TVec<IndexId, IndexInfo> = columns_to_uses
+    let index_info: TVec<IndexId, lir::IndexInfo> = columns_to_uses
         .iter()
         .map(|(permuted_columns, (_, merge))| {
             let (primary_key_prefix_len, primary_key_violation_merge) = merge
                 .clone()
-                .unwrap_or((permuted_columns.len(), MergeTy::Panic));
-            IndexInfo {
+                .unwrap_or((permuted_columns.len(), lir::MergeTy::Panic));
+            lir::IndexInfo {
                 permuted_columns: permuted_columns.clone(),
                 primary_key_prefix_len,
                 primary_key_violation_merge,
             }
         })
         .collect();
-    let index_usage_to_index: TVec<IndexUsageId, IndexUsageInfo> =
+    let index_usage_to_index: TVec<IndexUsageId, lir::IndexUsageInfo> =
         TVec::from_iter_unordered(columns_to_uses.values().enumerate().flat_map(
             |(index_id, (usage, _))| {
                 usage.iter().map(move |&(index_usage_id, prefix)| {
                     (
                         index_usage_id,
-                        IndexUsageInfo {
+                        lir::IndexUsageInfo {
                             prefix,
                             index: IndexId(index_id),
                         },
