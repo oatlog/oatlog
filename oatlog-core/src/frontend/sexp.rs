@@ -44,13 +44,6 @@ impl SexpSpan {
             err_!(self.span, "{context}: expected atom")
         }
     }
-    pub(crate) fn list(self, context: &'static str) -> MResult<&'static [SexpSpan]> {
-        if let Sexp::List(x) = self.x {
-            Ok(x)
-        } else {
-            err_!(self.span, "{context}: expected list")
-        }
-    }
     pub(crate) fn uint(self, context: &'static str) -> MResult<u64> {
         register_span!(self.span);
         let Sexp::Literal(x) = self.x else {
@@ -59,19 +52,6 @@ impl SexpSpan {
 
         u64::try_from(x.i64().map_err(|()| bare!("{context}; expected int"))?)
             .map_err(|_| bare!("{context}: expected positive int"))
-    }
-    pub(crate) fn str(self, context: &'static str) -> MResult<Str> {
-        register_span!(self.span);
-        let Sexp::Literal(x) = self.x else {
-            return err!("{context}: expected a string literal");
-        };
-        let Literal::String(x) = x.x else {
-            return err!("{context}: expected a string literal");
-        };
-        Ok(spanned!(x))
-    }
-    pub(crate) fn string(self, context: &'static str) -> MResult<&'static str> {
-        self.str(context).map(|x| *x)
     }
     pub(crate) fn parse_string(span: Option<QSpan>, s: &'static str) -> MResult<Vec<SexpSpan>> {
         let mut tokens = Vec::new();
@@ -84,7 +64,7 @@ impl SexpSpan {
                     continue;
                 }
                 "\"" => {
-                    let Some(end_idx) = (&s[1..]).find("\"") else {
+                    let Some(end_idx) = &s[1..].find('\"') else {
                         return err_!(None, "string lacks endding \"");
                     };
                     tokens.push(&s[0..(end_idx + 2)]);

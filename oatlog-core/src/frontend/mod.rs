@@ -1,7 +1,12 @@
 //! Frontend, parse source text into HIR.
 
 #![allow(clippy::zero_sized_map_values, reason = "MapExt trait usage")]
+#![allow(
+    clippy::match_same_arms,
+    reason = "return unimplemented_msg; \"false positive\""
+)]
 #![deny(unused_must_use)]
+#![deny(clippy::let_underscore_untyped)]
 
 use std::{
     collections::{BTreeMap, btree_map::Entry},
@@ -45,17 +50,9 @@ impl<T> ResultExt for MResult<T> {
 trait VecExtClone<A, B> {
     fn mapf(&self, f: impl FnMut(A) -> MResult<B>) -> MResult<Vec<B>>;
 }
-trait VecExtRef<A, B> {
-    fn mapr(&self, f: impl FnMut(&A) -> MResult<B>) -> MResult<Vec<B>>;
-}
 impl<A: Clone, B> VecExtClone<A, B> for [A] {
     fn mapf(&self, f: impl FnMut(A) -> MResult<B>) -> MResult<Vec<B>> {
         self.iter().cloned().map(f).collect()
-    }
-}
-impl<A: Clone, B> VecExtRef<A, B> for [A] {
-    fn mapr(&self, f: impl FnMut(&A) -> MResult<B>) -> MResult<Vec<B>> {
-        self.iter().map(f).collect()
     }
 }
 
@@ -464,7 +461,7 @@ impl Parser {
                     )?;
                 }
             }
-            egglog_ast::Statement::Datatypes { datatypes } => {
+            egglog_ast::Statement::Datatypes { .. } => {
                 return err!("TODO: forward declarations");
             }
             egglog_ast::Statement::Constructor {
@@ -519,7 +516,7 @@ impl Parser {
                 rule,
             } => {
                 let egglog_ast::Rule { facts, actions } = rule;
-                self.add_rule(name, ruleset, facts, actions)?;
+                compile_rule::add_rule(self, name, ruleset, facts, actions)?;
             }
             egglog_ast::Statement::Rewrite {
                 ruleset,
@@ -549,7 +546,7 @@ impl Parser {
                     },
                     rhs.span,
                 )];
-                self.add_rule(None, ruleset, facts, actions)?;
+                compile_rule::add_rule(self, None, ruleset, facts, actions)?;
             }
             egglog_ast::Statement::BiRewrite { ruleset, rewrite } => {
                 let egglog_ast::Rewrite {
@@ -574,7 +571,7 @@ impl Parser {
                         },
                         rhs.span,
                     )];
-                    self.add_rule(None, ruleset, facts, actions)?;
+                    compile_rule::add_rule(self, None, ruleset, facts, actions)?;
                 }
             }
             egglog_ast::Statement::Action(action) => {
@@ -582,27 +579,19 @@ impl Parser {
                     egglog_ast::Action::Let { name, expr } => {
                         self.add_toplevel_binding(Some(name), expr)?;
                     }
-                    egglog_ast::Action::Set {
-                        table,
-                        args,
-                        result,
-                    } => {
+                    egglog_ast::Action::Set { .. } => {
                         return unimplemented_msg;
                     }
-                    egglog_ast::Action::Panic { message } => return unimplemented_msg,
-                    egglog_ast::Action::Union { lhs, rhs } => {
+                    egglog_ast::Action::Panic { .. } => return unimplemented_msg,
+                    egglog_ast::Action::Union { .. } => {
                         // (unimplemented for toplevel)
                         return unimplemented_msg;
                     }
                     egglog_ast::Action::Expr(expr) => {
                         self.add_toplevel_binding(None, expr)?;
                     }
-                    egglog_ast::Action::Change {
-                        table,
-                        args,
-                        change,
-                    } => return unimplemented_msg,
-                    egglog_ast::Action::Extract { expr, variants } => return refuse_msg,
+                    egglog_ast::Action::Change { .. } => return unimplemented_msg,
+                    egglog_ast::Action::Extract { .. } => return refuse_msg,
                 }
             }
             egglog_ast::Statement::RunSchedule(schedule) => match schedule.x {
@@ -620,34 +609,34 @@ impl Parser {
             egglog_ast::Statement::PrintOverallStatistics => {
                 // ignored
             }
-            egglog_ast::Statement::Simplify { expr, schedule } => return err!("not implemented"),
-            egglog_ast::Statement::QueryExtract { variants, expr } => {
+            egglog_ast::Statement::Simplify { .. } => return err!("not implemented"),
+            egglog_ast::Statement::QueryExtract { .. } => {
                 return err!("not implemented");
             }
-            egglog_ast::Statement::Check(vec) => {
+            egglog_ast::Statement::Check(..) => {
                 // TODO: impl
             }
-            egglog_ast::Statement::PrintFunction(spanned, _) => {
+            egglog_ast::Statement::PrintFunction(..) => {
                 // ignored
             }
-            egglog_ast::Statement::PrintSize(spanned) => {
+            egglog_ast::Statement::PrintSize(..) => {
                 // ignored
             }
-            egglog_ast::Statement::Input { table, file } => {
+            egglog_ast::Statement::Input { .. } => {
                 return refuse_msg;
             }
-            egglog_ast::Statement::Output { file, exprs } => {
+            egglog_ast::Statement::Output { .. } => {
                 return refuse_msg;
             }
-            egglog_ast::Statement::Push(_) => {
+            egglog_ast::Statement::Push(..) => {
                 // TODO: impl
                 return unimplemented_msg;
             }
-            egglog_ast::Statement::Pop(_) => {
+            egglog_ast::Statement::Pop(..) => {
                 // TODO: impl
                 return unimplemented_msg;
             }
-            egglog_ast::Statement::Fail(statement) => {
+            egglog_ast::Statement::Fail(..) => {
                 // TODO: impl
                 // ignored
             }
@@ -865,7 +854,7 @@ impl Parser {
             },
             Expr::Call(name, args) => {
                 let args =
-                    args.mapf(|expr| self.parse_lattice_expr(old, new, &*expr, variables, ops))?;
+                    args.mapf(|expr| self.parse_lattice_expr(old, new, &expr, variables, ops))?;
 
                 let possible_ids = &self.function_possible_ids.lookup(*name, "function")?;
                 let args_ty: Vec<_> = args.iter().map(|v| variables[*v].0).collect();
@@ -948,13 +937,6 @@ impl Parser {
 
 use egglog_ast::Expr;
 
-#[derive(Debug)]
-enum Action {
-    // never exists on toplevel
-    Expr(Spanned<Expr>),
-    // mark two things as equal. Possibly primitives => means insert
-    Union(Spanned<Expr>, Spanned<Expr>),
-}
 impl Parser {
     fn literal_type(&self, x: Literal) -> TypeId {
         let name = match x {
@@ -1056,10 +1038,6 @@ impl Parser {
         Ok(())
     }
 
-    fn err_type_defined_here(&self, id: TypeId, err: &mut MError) {
-        let name = self.type_name(id);
-        err.push(bare_!(name.span, "type {name} defined here"));
-    }
     fn err_function_defined_here(&mut self, id: RelationId, err: &mut MError) {
         let function = &self.relations_hir_and_func[id].1.as_ref().unwrap();
         let inputs_ty_s = function
@@ -1081,7 +1059,7 @@ impl Parser {
     }
 }
 
-mod compile_rule2 {
+mod compile_rule {
     use super::{
         ComputeMethod, Expr, Literal, MError, MResult, MapExt as _, Parser, QSpan, Spanned, Str,
         bare_, egglog_ast, register_span, span,
@@ -1267,7 +1245,7 @@ mod compile_rule2 {
         facts: Vec<span::Spanned<egglog_ast::Fact>>,
         actions: Vec<span::Spanned<egglog_ast::Action>>,
     ) -> MResult<()> {
-        let _ = ruleset;
+        let _: Option<Spanned<&str>> = ruleset;
 
         let mut flat = Flatten {
             flattened: TVec::new(),
@@ -1315,7 +1293,7 @@ mod compile_rule2 {
                     let res = flat.flatten(&result);
                     premise_merge.push((id, res, span!()));
                 }
-                egglog_ast::Action::Panic { message } => return err!("panic not implemented"),
+                egglog_ast::Action::Panic { .. } => return err!("panic not implemented"),
                 egglog_ast::Action::Union { lhs, rhs } => {
                     let lhs = flat.flatten(&lhs);
                     let rhs = flat.flatten(&rhs);
@@ -1324,12 +1302,8 @@ mod compile_rule2 {
                 egglog_ast::Action::Expr(expr) => {
                     let _: VariableId = flat.flatten(&expr);
                 }
-                egglog_ast::Action::Change {
-                    table,
-                    args,
-                    change,
-                } => return err!("change not implemented"),
-                egglog_ast::Action::Extract { expr, variants } => {
+                egglog_ast::Action::Change { .. } => return err!("change not implemented"),
+                egglog_ast::Action::Extract { .. } => {
                     return err!("extract action will not be implemented");
                 }
             }
@@ -1338,7 +1312,7 @@ mod compile_rule2 {
             mut flattened,
             spans,
             labels,
-            symbols,
+            symbols: _,
             parser: _,
             mut type_uf,
         } = flat;
@@ -1469,376 +1443,5 @@ mod compile_rule2 {
             }
         }
         Ok(())
-    }
-}
-
-mod compile_rule {
-    use std::{collections::BTreeMap, mem::replace};
-
-    use super::{
-        Action, ComputeMethod, Expr, Literal, MError, MResult, MapExt as _, Parser, QSpan, Str,
-        VecExtRef, bare_,
-    };
-
-    use crate::{
-        frontend::{egglog_ast, register_span, span},
-        hir,
-        ids::{RelationId, TypeId, TypeVarId, VariableId},
-        typed_vec::TVec,
-        union_find::UFData,
-    };
-
-    fn type_mismatch_msg(parser: &Parser, loc: Option<QSpan>, a: TypeId, b: TypeId) -> MError {
-        let a = parser.type_name(a);
-        let b = parser.type_name(b);
-
-        let mut err = bare_!(loc, "Type mismatch: {a} != {b}");
-        err.push(bare_!(a.span, "{a} defined here:"));
-        err.push(bare_!(b.span, "{b} defined here:"));
-        err
-    }
-
-    #[derive(Copy, Clone, PartialEq, Debug)]
-    struct VariableInfo {
-        /// ONLY for debug
-        /// sometimes a literal
-        label: Option<Str>,
-        // global: Option<GlobalId>,
-        ty: TypeVarId,
-    }
-
-    struct UnknownCall {
-        name: &'static str,
-        ids: Vec<RelationId>,
-        args: Vec<VariableId>,
-        rval: VariableId,
-    }
-
-    struct KnownCall {
-        id: RelationId,
-        args: Vec<VariableId>,
-        rval: VariableId,
-    }
-
-    fn parse_expr(
-        parser: &mut Parser,
-        variables: &mut TVec<VariableId, VariableInfo>,
-        types: &mut UFData<TypeVarId, Option<TypeId>>,
-        bound_variables: &mut BTreeMap<&'static str, VariableId>,
-        unify: &mut Vec<Vec<VariableId>>,
-        expr: &Expr,
-        calls: &mut Vec<UnknownCall>,
-    ) -> MResult<VariableId> {
-        Ok(match expr {
-            Expr::Literal(literal) => {
-                let ty = parser.literal_type(**literal);
-                let typevar = types.push(Some(ty));
-                let global_id = parser.add_global(None, ty, ComputeMethod::Literal(**literal))?;
-
-                let name = literal.map_s(|_| "");
-
-                let variable_id = variables.push(VariableInfo {
-                    label: Some(name),
-                    ty: typevar,
-                });
-
-                let relation_id = parser.global_variables[&global_id].relation_id;
-
-                calls.push(UnknownCall {
-                    name: *name,
-                    ids: vec![relation_id],
-                    args: vec![],
-                    rval: variable_id,
-                });
-
-                variable_id
-            }
-            Expr::Var(name) => {
-                if let Some(&global_id) = parser.global_variable_names.get(name) {
-                    let ty = parser.global_variables[global_id].ty;
-                    let typevar = types.push(Some(ty));
-                    let variable_id = variables.push(VariableInfo {
-                        label: Some(*name),
-                        ty: typevar,
-                    });
-
-                    let relation_id = parser.global_variables[&global_id].relation_id;
-
-                    calls.push(UnknownCall {
-                        name,
-                        ids: vec![relation_id],
-                        args: vec![],
-                        rval: variable_id,
-                    });
-
-                    variable_id
-                } else {
-                    *bound_variables.entry(name).or_insert_with(|| {
-                        let typevar = types.push(None);
-                        variables.push(VariableInfo {
-                            label: Some(*name),
-                            ty: typevar,
-                        })
-                    })
-                }
-            }
-            Expr::Call(name, args) => {
-                let args: Vec<_> = args.mapr(|expr| {
-                    parse_expr(
-                        parser,
-                        variables,
-                        types,
-                        bound_variables,
-                        unify,
-                        expr,
-                        calls,
-                    )
-                })?;
-
-                if **name == "=" {
-                    for (a, b) in args.windows(2).map(|w| (w[0], w[1])) {
-                        let ta = variables[a].ty;
-                        let tb = variables[b].ty;
-                        let _: Option<(TypeVarId, TypeVarId)> =
-                            types.try_union_merge(ta, tb, |&a, &b| match (a, b) {
-                                (None, None) => Ok(None),
-                                (None, Some(x)) | (Some(x), None) => Ok(Some(x)),
-                                (Some(a), Some(b)) if a == b => Ok(Some(a)),
-                                (Some(a), Some(b)) => {
-                                    Err(type_mismatch_msg(parser, name.span, a, b))
-                                }
-                            })?;
-                        unify.push(vec![a, b]);
-                    }
-                    let rval_ty = parser.literal_type(Literal::Unit);
-                    let rval_typevar = types.push(Some(rval_ty));
-                    variables.push(VariableInfo {
-                        label: None,
-                        ty: rval_typevar,
-                    })
-                } else {
-                    let rval_typevar = types.push(None);
-                    let rval = variables.push(VariableInfo {
-                        label: None,
-                        ty: rval_typevar,
-                    });
-                    let ids = parser
-                        .function_possible_ids
-                        .lookup(*name, "function call")?;
-                    calls.push(UnknownCall {
-                        name: **name,
-                        ids,
-                        args,
-                        rval,
-                    });
-                    rval
-                }
-            }
-        })
-    }
-
-    use crate::frontend::span::Spanned;
-
-    impl Parser {
-        pub(super) fn add_rule(
-            &mut self,
-            name: Option<Str>,
-            ruleset: Option<Str>,
-            facts2: Vec<span::Spanned<egglog_ast::Fact>>,
-            actions2: Vec<span::Spanned<egglog_ast::Action>>,
-        ) -> MResult<()> {
-            return super::compile_rule2::add_rule(self, name, ruleset, facts2, actions2);
-
-            let mut premises = Vec::new();
-            register_span!(None);
-            for facts in facts2 {
-                match facts.x {
-                    egglog_ast::Fact::Eq(e1, e2) => {
-                        premises.push(spanned!(Expr::Call(spanned!("="), vec![e1, e2])));
-                    }
-                    egglog_ast::Fact::Expr(e) => premises.push(e),
-                }
-            }
-
-            let actions: Vec<Action> = actions2
-                .into_iter()
-                .map(|action| match action.x {
-                    egglog_ast::Action::Let { name, expr } => todo!(),
-                    egglog_ast::Action::Set {
-                        table,
-                        args,
-                        result,
-                    } => todo!("set rule action"),
-                    egglog_ast::Action::Panic { message } => todo!("panic rule action"),
-                    egglog_ast::Action::Union { lhs, rhs } => Action::Union(lhs, rhs),
-                    egglog_ast::Action::Expr(e) => Action::Expr(e),
-                    egglog_ast::Action::Change {
-                        table,
-                        args,
-                        change,
-                    } => todo!("change rule action"),
-                    egglog_ast::Action::Extract { expr, variants } => todo!("extract rule action"),
-                })
-                .collect();
-
-            let mut variables: TVec<VariableId, VariableInfo> = TVec::new();
-            let mut types: UFData<TypeVarId, Option<TypeId>> = UFData::new();
-            let mut bound_variables: BTreeMap<&'static str, VariableId> = BTreeMap::new();
-            let mut premise_unify: Vec<Vec<VariableId>> = Vec::new();
-            let mut premise_unknown = Vec::new();
-
-            let sort_constraints = premises.mapr(|premise| {
-                parse_expr(
-                    self,
-                    &mut variables,
-                    &mut types,
-                    &mut bound_variables,
-                    &mut premise_unify,
-                    &premise,
-                    &mut premise_unknown,
-                )
-            })?;
-
-            let mut action_unify = Vec::new();
-            let mut action_unknown = Vec::new();
-
-            for action in actions {
-                let action = pseudo_parse_action(action);
-                let _: VariableId = parse_expr(
-                    self,
-                    &mut variables,
-                    &mut types,
-                    &mut bound_variables,
-                    &mut action_unify,
-                    &action,
-                    &mut action_unknown,
-                )?;
-            }
-
-            let mut premise_calls: Vec<KnownCall> = Vec::new();
-            let mut action_calls: Vec<KnownCall> = Vec::new();
-
-            let mut memento = (premise_unknown.len(), action_unknown.len());
-            loop {
-                for (known, unknown) in [
-                    (&mut premise_calls, &mut premise_unknown),
-                    (&mut action_calls, &mut action_unknown),
-                ] {
-                    unknown.retain_mut(
-                        |UnknownCall {
-                             name,
-                             ids,
-                             args,
-                             rval,
-                         }| {
-                            let at: Vec<_> = args.iter().map(|a| types[variables[*a].ty]).collect();
-                            let rt = types[variables[*rval].ty];
-                            ids.retain(|id| {
-                                // NOTE: we assume type constraints where added earlier.
-                                self.relations_hir_and_func[*id]
-                                    .1
-                                    .as_ref()
-                                    .is_none_or(|function| function.check_compatible(&at, rt))
-                            });
-
-                            match ids.as_slice() {
-                                [] => {
-                                    panic!("no function named {name} can be used here");
-                                }
-                                [id] => {
-                                    if let Some(function) =
-                                        self.relations_hir_and_func[*id].1.as_ref()
-                                    {
-                                        for (&var, &ty) in args.iter().zip(function.inputs.iter()) {
-                                            let typevar = variables[var].ty;
-                                            types[typevar] = Some(ty);
-                                        }
-                                        let rval_typevar = variables[*rval].ty;
-                                        types[rval_typevar] = Some(function.output);
-                                    }
-
-                                    known.push(KnownCall {
-                                        id: *id,
-                                        args: args.clone(),
-                                        rval: *rval,
-                                    });
-
-                                    false
-                                }
-                                _ => true,
-                            }
-                        },
-                    );
-                }
-                let new_memento = (premise_unknown.len(), action_unknown.len());
-                if replace(&mut memento, new_memento) == new_memento {
-                    break;
-                }
-            }
-
-            assert_eq!(memento, (0, 0), "type_inference failed");
-            assert!(
-                types.iter_roots().all(|(_, ty)| ty.is_some()),
-                "type inference failed"
-            );
-
-            let unit_ty = self.literal_type(Literal::Unit);
-            let to_delete: Vec<_> = variables
-                .iter_enumerate()
-                .filter_map(|(i, info)| (types[info.ty].unwrap() == unit_ty).then_some(i))
-                .collect();
-
-            let premise_relations: Vec<_> = premise_calls
-                .into_iter()
-                .map(|known| {
-                    let KnownCall { id, mut args, rval } = known;
-                    if types[variables[rval].ty].unwrap() != unit_ty {
-                        args.push(rval);
-                    }
-                    (id, args)
-                })
-                .collect();
-            let action_relations: Vec<_> = action_calls
-                .into_iter()
-                .map(|known| {
-                    let KnownCall { id, mut args, rval } = known;
-                    if types[variables[rval].ty].unwrap() != unit_ty {
-                        args.push(rval);
-                    }
-                    (id, args)
-                })
-                .collect();
-
-            _ = ruleset;
-            let rule = hir::RuleArgs {
-                name: name.map_or("", |x| *x),
-                sort_vars: sort_constraints,
-                variables: variables
-                    .iter()
-                    .map(|VariableInfo { label, ty }| {
-                        (types[*ty].unwrap(), label.map_or("", |x| *x))
-                    })
-                    .collect(),
-                premise: premise_relations,
-                premise_unify,
-                action: action_relations,
-                action_unify,
-                delete: to_delete,
-            }
-            .build();
-
-            self.symbolic_rules.push(rule);
-
-            Ok(())
-        }
-    }
-
-    fn pseudo_parse_action(action: Action) -> Spanned<Expr> {
-        register_span!(None);
-
-        match action {
-            Action::Expr(expr) => expr,
-            Action::Union(a, b) => spanned!(Expr::Call(Str::new("=", None), vec![a, b])),
-        }
     }
 }

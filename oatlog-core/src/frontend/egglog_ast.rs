@@ -1,7 +1,7 @@
 //! AST that matches egglog exactly, so it includes things not supported by oatlog.
 use crate::frontend::{
-    Literal, MError, MResult, QSpan, Sexp, SexpSpan, Spanned, Str, VecExtClone as _,
-    VecExtRef as _, err_, register_span,
+    Literal, MError, MResult, QSpan, Sexp, SexpSpan, Spanned, Str, VecExtClone as _, err_,
+    register_span,
 };
 
 #[derive(Clone, Debug)]
@@ -498,7 +498,7 @@ macro_rules! options {
 }
 
 pub(crate) fn parse_program(x: Vec<SexpSpan>) -> MResult<Vec<Spanned<Statement>>> {
-    x.into_iter().map(|x| parse_statement(x)).collect()
+    x.into_iter().map(parse_statement).collect()
 }
 
 fn parse_statement(x: SexpSpan) -> MResult<Spanned<Statement>> {
@@ -584,10 +584,7 @@ fn parse_statement(x: SexpSpan) -> MResult<Spanned<Statement>> {
                 Statement::Rule {
                     name,
                     ruleset,
-                    rule: Rule {
-                        facts: facts,
-                        actions: actions,
-                    },
+                    rule: Rule { facts, actions },
                 }
             }
         ),

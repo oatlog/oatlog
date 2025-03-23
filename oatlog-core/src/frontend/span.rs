@@ -1,6 +1,6 @@
 //! Span, span errors, and span macros.
 
-use std::ops::{Deref, DerefMut, FnMut, Range};
+use std::ops::{Deref, DerefMut, Range};
 
 use educe::Educe;
 use itertools::Itertools as _;
@@ -222,6 +222,7 @@ enum MaybeResolved {
         // None => toplevel, emit actual spans.
         filename: Option<&'static str>,
         /// Source text of entire file.
+        #[allow(unused, reason = "better to have it and not need it")]
         source_text: Option<&'static str>,
 
         message: &'static str,
@@ -259,9 +260,6 @@ pub(crate) struct Spanned<T> {
 impl<T> Spanned<T> {
     pub(crate) fn new(x: T, span: Option<QSpan>) -> Self {
         Self { x, span }
-    }
-    pub(crate) fn map_s<V, F: FnMut(T) -> V>(self, mut f: F) -> Spanned<V> {
-        Spanned::new(f(self.x), self.span)
     }
 }
 impl<T: std::fmt::Display> std::fmt::Display for Spanned<T> {
