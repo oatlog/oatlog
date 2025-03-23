@@ -1,12 +1,13 @@
 [workspace]
 members = [
+    "comparative-test",
+    "examples/quadratic-formula",
+    "examples/simple-forall",
     "oatlog",
+    "oatlog-bench",
     "oatlog-core",
     "oatlog-macro",
     "oatlog-test",
-    "oatlog-bench",
-    "examples/quadratic-formula",
-    "comparative-test",
 ]
 resolver = "2"
 

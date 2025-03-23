@@ -865,6 +865,7 @@ dependencies = [
  "clap 4.5.28",
  "oatlog-core",
  "oatlog-macro",
+ "regex",
 ]
 
 [[package]]
@@ -1239,6 +1240,13 @@ dependencies = [
  "cfg-if",
  "cpufeatures",
  "digest",
+]
+
+[[package]]
+name = "simple-forall"
+version = "0.1.0"
+dependencies = [
+ "oatlog",
 ]
 
 [[package]]

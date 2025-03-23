@@ -310,7 +310,7 @@ pub fn codegen(theory: &Theory) -> TokenStream {
             pub uf: Unification,
             uprooted: Uprooted,
             global_variables: GlobalVariables,
-            #(#stored_relations: #stored_relation_types,)*
+            #(pub #stored_relations: #stored_relation_types,)*
         }
         impl #theory_ty {
             pub fn new() -> Self {

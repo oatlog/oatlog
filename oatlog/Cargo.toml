@@ -7,6 +7,7 @@ edition = "2024"
 clap.workspace = true
 oatlog-core.workspace = true
 oatlog-macro.workspace = true
+regex.workspace = true
 
 [lints]
 workspace = true

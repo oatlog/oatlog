@@ -777,10 +777,14 @@ fn parse_action(x: SexpSpan) -> MResult<Spanned<Action>> {
                 [(expr parse_expr)] => { Action::Extract { expr, variants: 1 } }
             )
         }),
-        _ => {
+        "define" => usage!("(define <expr>)", {
+            pattern!(args, [(expr parse_expr)]);
+            Action::Expr(expr)
+        }),
+        _ => usage!("(<expr>)", {
             let expr = parse_expr(x)?;
-            Ok(spanned!(Action::Expr(expr)))
-        }
+            Action::Expr(expr)
+        }),
     }
 }
 fn parse_expr(x: SexpSpan) -> MResult<Spanned<Expr>> {
@@ -830,7 +834,15 @@ fn parse_fact(x: SexpSpan) -> MResult<Spanned<Fact>> {
                 Fact::Eq(lhs, rhs)
             })
         }
-        _ => Ok(spanned!(Fact::Expr(parse_expr(x)?))),
+        "forall" => {
+            usage!("(forall <expr>)", {
+                pattern!(args, [(e parse_expr)]);
+                Fact::Expr(e)
+            })
+        }
+        _ => {
+            usage!("(<expr>)", { Fact::Expr(parse_expr(x)?) })
+        }
     }
 }
 fn parse_variant(x: SexpSpan) -> MResult<Spanned<Variant>> {

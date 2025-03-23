@@ -870,10 +870,10 @@ fn codegen_bug1() {
                 pub uf: Unification,
                 uprooted: Uprooted,
                 global_variables: GlobalVariables,
-                forall_t0_relation: ForallT0Relation,
-                forall_t1_relation: ForallT1Relation,
-                forall_t2_relation: ForallT2Relation,
-                foo_relation: FooRelation,
+                pub forall_t0_relation: ForallT0Relation,
+                pub forall_t1_relation: ForallT1Relation,
+                pub forall_t2_relation: ForallT2Relation,
+                pub foo_relation: FooRelation,
             }
             impl Theory {
                 pub fn new() -> Self {
@@ -1175,8 +1175,8 @@ fn initial() {
                 pub uf: Unification,
                 uprooted: Uprooted,
                 global_variables: GlobalVariables,
-                forall_math_relation: ForallMathRelation,
-                const_relation: ConstRelation,
+                pub forall_math_relation: ForallMathRelation,
+                pub const_relation: ConstRelation,
             }
             impl Theory {
                 pub fn new() -> Self {
@@ -1957,11 +1957,11 @@ fn test_primitives_simple() {
                 pub uf: Unification,
                 uprooted: Uprooted,
                 global_variables: GlobalVariables,
-                forall_math_relation: ForallMathRelation,
-                mul_relation: MulRelation,
-                add_relation: AddRelation,
-                const_relation: ConstRelation,
-                var_relation: VarRelation,
+                pub forall_math_relation: ForallMathRelation,
+                pub mul_relation: MulRelation,
+                pub add_relation: AddRelation,
+                pub const_relation: ConstRelation,
+                pub var_relation: VarRelation,
             }
             impl Theory {
                 pub fn new() -> Self {
@@ -2708,11 +2708,11 @@ fn triangle_join() {
                 pub uf: Unification,
                 uprooted: Uprooted,
                 global_variables: GlobalVariables,
-                forall_math_relation: ForallMathRelation,
-                foo_relation: FooRelation,
-                bar_relation: BarRelation,
-                baz_relation: BazRelation,
-                triangle_relation: TriangleRelation,
+                pub forall_math_relation: ForallMathRelation,
+                pub foo_relation: FooRelation,
+                pub bar_relation: BarRelation,
+                pub baz_relation: BazRelation,
+                pub triangle_relation: TriangleRelation,
             }
             impl Theory {
                 pub fn new() -> Self {
@@ -3277,9 +3277,9 @@ fn edgecase0() {
                 pub uf: Unification,
                 uprooted: Uprooted,
                 global_variables: GlobalVariables,
-                forall_math_relation: ForallMathRelation,
-                mul_relation: MulRelation,
-                add_relation: AddRelation,
+                pub forall_math_relation: ForallMathRelation,
+                pub mul_relation: MulRelation,
+                pub add_relation: AddRelation,
             }
             impl Theory {
                 pub fn new() -> Self {
@@ -3814,9 +3814,9 @@ fn test_into_codegen() {
                 pub uf: Unification,
                 uprooted: Uprooted,
                 global_variables: GlobalVariables,
-                forall_math_relation: ForallMathRelation,
-                mul_relation: MulRelation,
-                add_relation: AddRelation,
+                pub forall_math_relation: ForallMathRelation,
+                pub mul_relation: MulRelation,
+                pub add_relation: AddRelation,
             }
             impl Theory {
                 pub fn new() -> Self {
