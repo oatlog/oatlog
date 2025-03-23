@@ -1,3 +1,4 @@
+#[cfg_attr(not(test), allow(unused))]
 use std::collections::BTreeMap;
 
 #[derive(PartialEq, Eq, Debug)]
@@ -9,6 +10,7 @@ enum Verdict {
     Panics,
 }
 
+#[cfg_attr(not(test), allow(unused))]
 fn compare_egglog_oatlog(
     egglog: &mut egglog::EGraph,
     oatlog_counts: BTreeMap<&'static str, usize>,
@@ -37,11 +39,10 @@ fn compare_egglog_oatlog(
     let mut any_mismatch = false;
     let mismatch_msgs: String = oatlog_counts
         .into_iter()
-        .filter_map(|(relation, count)| {
-            (count != egglog_counts[relation]).then(|| {
-                any_mismatch = true;
-                format!("{relation}: {} != {count}\n", egglog_counts[relation])
-            })
+        .filter(|(relation, count)| (*count != egglog_counts[*relation]))
+        .map(|(relation, count)| {
+            any_mismatch = true;
+            format!("{relation}: {} != {count}\n", egglog_counts[relation])
         })
         .collect();
     if any_mismatch {
@@ -79,7 +80,11 @@ macro_rules! comparative_test {
         }
 
         for _ in 0..$limit {
-            dbg!(egglog.num_tuples(), theory.get_total_relation_entry_count());
+            println!(
+                "egglog: {}, oatlog: {}",
+                egglog.num_tuples(),
+                theory.get_total_relation_entry_count()
+            );
 
             let mismatched = crate::compare_egglog_oatlog(
                 &mut egglog,
@@ -130,6 +135,7 @@ macro_rules! comparative_test {
 // proc-macro returns error
 // generated code does not compile
 
+#[cfg_attr(not(test), allow(unused))]
 macro_rules! egglog_test {
     // ONLY to validate that rustdoc tests work as expected.
     (valid_tests_compile_ok, $egglog_test_name:ident, expect![], $egglog_test_path:literal) => {
@@ -214,6 +220,7 @@ mod comparative_tests {
 // mismatched
 // does_panic
 
+#[cfg(test)]
 mod egglog_testsuite {
 #[cfg_attr(not(test), allow(unused))]
 use expect_test::expect;
@@ -1300,6 +1307,7 @@ egglog_test!(nogenerate, vec, expect![[r#"
 "#]], r#"(include "comparative-test/egglog-testsuite/vec.egg")"#); // collections
 }
 
+#[cfg(test)]
 mod additional {
 #[cfg_attr(not(test), allow(unused))]
 use expect_test::expect;

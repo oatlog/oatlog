@@ -19,13 +19,13 @@ oatlog-test.path = "oatlog-test"
 oatlog-bench.path = "oatlog-bench"
 comparative-test.path = "comparative-test"
 
-ariadne = { version = "0.5", features = ["auto-color"] }
+#ariadne = { version = "0.5", features = ["auto-color"] }
 clap = { version = "4", features = ["derive"]}
-criterion = "0.3"
+criterion = "0.5.1"
 derive_more = { version = "2", features = ["full"] }
 educe = "0.6"
 egglog = "0.4"
-eqlog-runtime = "0.8"
+#eqlog-runtime = "0.8"
 expect-test = "1"
 heck = "0.5"
 itertools = "0.14"
@@ -57,7 +57,10 @@ suspicious = { level = "deny", priority = -1 }
 
 complexity = { level = "warn", priority = -1 }
 type_complexity = "allow"
+
 perf = { level = "warn", priority = -1 }
+format_collect = "allow"
+
 style = { level = "warn", priority = -1 }
 
 pedantic = { level = "warn", priority = -1 }
@@ -147,7 +150,7 @@ module_name_repetitions = "warn"
 multiple_unsafe_ops_per_block = "warn"
 mutex_atomic = "warn"
 mutex_integer = "warn"
-needless_raw_strings = "warn"
+#needless_raw_strings = "warn"
 non_ascii_literal = "warn"
 non_zero_suggestions = "warn"
 #panic = "warn"

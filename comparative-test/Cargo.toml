@@ -5,7 +5,7 @@ edition = "2024"
 
 [dependencies]
 egglog.workspace = true
-eqlog-runtime.workspace = true
+#eqlog-runtime.workspace = true
 expect-test.workspace = true
 oatlog.workspace = true
 paste.workspace = true

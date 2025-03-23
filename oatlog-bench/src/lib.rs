@@ -3,6 +3,7 @@ use std::time::{Duration, Instant};
 
 use criterion::{BenchmarkGroup, Criterion, measurement::WallTime};
 
+#[allow(unused)]
 fn bench_serial(iters: u64, f: impl Fn()) -> Duration {
     let start = Instant::now();
     for _ in 0..iters {
@@ -12,17 +13,17 @@ fn bench_serial(iters: u64, f: impl Fn()) -> Duration {
 }
 
 // benchmark using all cores in theory we get more data faster, but it might be less accurate.
+#[allow(unused)]
 fn bench_parallel(iters: u64, f: impl Fn() + Sync) -> Duration {
     use rayon::prelude::*;
-    let duration = (0..iters)
+    (0..iters)
         .par_bridge()
         .map(|_| {
             let start = Instant::now();
             f();
             start.elapsed()
         })
-        .sum::<Duration>();
-    duration
+        .sum::<Duration>()
 }
 
 fn bench_custom(
@@ -30,11 +31,7 @@ fn bench_custom(
     name: &'static str,
     f: impl Fn() + Sync + Copy,
 ) {
-    group.bench_function(name, |b| {
-        b.iter(|| {
-            f();
-        })
-    });
+    group.bench_function(name, |b| b.iter(|| f()));
 }
 
 macro_rules! benchmarks {
