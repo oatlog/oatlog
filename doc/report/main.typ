@@ -15,6 +15,9 @@
 
 #set document(title: [Oatlog])
 
+#set raw(syntaxes: "egglog.sublime-syntax")
+#set raw(syntaxes: "datalog.sublime-syntax")
+
 #let department = "Department of Computer Science and Engineering"
 #show: template.with(
   title: [Oatlog: Ahead-of-time compiled #box[e-graphs] with primitives],
@@ -38,17 +41,10 @@
   ],
 )
 
-#set raw(syntaxes: "egglog.sublime-syntax")
-#set raw(syntaxes: "datalog.sublime-syntax")
-
 // #TODO[conceptual background: how things developed historically.]
 // #TODO[background: frontend, mid-end, backend.]
 
 #TODO[introduce relevant references]
-
-#TODO[Matti: Style and grammar things: in §2.2, it’s not clear what “their” refers to and there seems to be somewhat of a repetition in the text]
-
-#TODO[Matti: In general for §2.2, it is sometimes not entirely clear why certain references have been picked up and presented here, make sure that you tie all research presented here into your work for contextualizing your research: why this is important research to know and how it is different from your work]
 
 #TODO[Matti: §3.1 You talk about “practical performance on practical inputs”: how do you define practicality?]
 
@@ -107,20 +103,22 @@ a slow backtracking search, but most compilers do this heuristically instead.
 
 #META[Solution: E-graphs allow non-destructive rewrites.]
 
-#TODO[Alejandro: E-graphs and equality saturation (EqSat) are techniques implies E-graphs are a technique]
+#TODO[Alejandro: E-graphs and equality saturation (EqSat) are techniques implies e-graphs are a
+technique.
+
+Loke: Genuinely, are they not?
+]
 
 E-graphs and equality saturation (EqSat) are techniques that can be used to augment peephole
 rewriting to make it nondestructive. They allow multiple rewrites of a value, committing to one only
 after all rewrites have been searched while not duplicating work post-branch as a backtracking
 search would.
 
-#TODO[Alejandro: confusing sentence "not other expressions but rather" -> "by letting operators take equivalence classes of expressions as inputs"]
-
-E-graphs are data structures capable of compactly representing an exponential number of expressions
-evaluating to the same value, by letting operators take not other expressions but rather equivalence
-classes as input. An e-graph can be seen as a graph of e-nodes partitioned into e-classes, where
-e-nodes take e-classes as input. Concretely, the expressions $(2a)+b$ and $(a<<1)+b$ would be stored
-as an addition taking as its left argument a reference to the equivalence class ${2a, a<<1}$, thus
+E-graphs are data structures that compactly represent an exponential number of equivalent
+expressions by allowing operators to take equivalence classes as inputs instead of individual
+expressions. An e-graph can be seen as a graph of e-nodes partitioned into e-classes, where e-nodes
+take e-classes as input. Concretely, the expressions $(2a)+b$ and $(a<<1)+b$ would be stored as an
+addition taking as its left argument a reference to the equivalence class ${2a, a<<1}$, thus
 avoiding duplicated storage of any expression having $2a$ and therefore also $a<<1$ as possible
 subexpressions.
 
@@ -131,9 +129,7 @@ match on the existing e-graph and perform actions such as inserting new e-nodes 
 existing e-nodes (and hence their e-classes). When e-graphs are used for program synthesis or
 optimization, rather than automated theorem proving, we call this equality saturation (EqSat)
 @equalitysaturation. Additionally, in equality saturation, there is a final extraction phase where
-one of the globally optimal expressions is selected.
-
-#TODO[Alejandro: is this the goal of the thesis? "While we have chosen optimizing compilers to illustrate their usefulness"]
+one globally near-optimal expression is selected from the many possibilities implied by the e-graph.
 
 #META[Problem: even e-graphs suffer from combinatorial explosion]
 
@@ -141,51 +137,70 @@ E-graphs suffer from the combinatorial explosion resulting from trying to find e
 representation of the initial expression, despite it being reduced through their efficient
 deduplication. This is a major problem in practice and currently severely limits what applications
 e-graphs are suitable for. While we have chosen optimizing compilers to illustrate their usefulness,
-e-graphs were originally developed for automated theorem proving @oldegraph @egraphwithexplain.
-E-graphs have been used for synthesis of low-error floating point expressions @herbie, optimization
-of linear algebra expressions @spores, and more, but are absent from general-purpose compilers. The
-compiler backend Cranelift @cranelift is the only production compiler for general-purpose code we
-know of that has incorporated e-graphs, but it has done so in the weaker form of acyclic e-graphs
-(aegraphs) due to performance problems of full e-graphs.
+this is not a domain in which they have typically been used.
+
+E-graphs were originally developed for automated theorem proving @oldegraph @egraphwithexplain and
+have been used for synthesis of low-error floating point expressions @herbie, optimization of linear
+algebra expressions @spores, etc, but they are absent from general-purpose compilers. The compiler
+backend Cranelift @cranelift is the only production compiler for general-purpose code we know of
+that has incorporated e-graphs, but it has done so in the weaker form of acyclic e-graphs (aegraphs)
+due to performance problems of full e-graphs.
 
 == Datalog and relational databases
 
-#TODO[Alejandro: instead of describing what datalog is, start with why you want to use it]
+Recent developments in e-graphs and equality saturation @relationalematching @eqlog @egglog have
+shown that adding indices to e-graph pattern-matching creates a structure that is very similar to
+relational databases and in particular Datalog -- a declarative logic programming language that
+reasons bottom-up by inserting rows into tables. In fact, this similarity extends to the degree
+that e-graphs may be best thought of as Datalog extended with a unification operation.
 
-#TODO[confusing sentence, refer to semi-naive section "semi-naive join which is similar to using database triggers"]
+This allows EqSat to leverage algorithms from Datalog, in particular the algorithm semi-naive join
+which, rather than running queries against the entire database, specifically queries newly inserted
+rows in a manner similar to a database trigger.
 
-Datalog is a declarative logic programming language that reasons bottom-up in an architecture very
-similar to a relational database. Recent developments @eqlog @egglog @relationalematching have shown
-that adding indices to e-graph pattern-matching creates a very similar relational structure, to the
-point that e-graphs may be best thought of as datalog extended with a unification operation. This
-allows EqSat to leverage algorithms from datalog, in particular what is called a semi-naive join
-which is similar to using database triggers rather than running queries against the entire database.
 Incremental rule matching, together with indices and simple query planning, has brought an order of
 magnitude speedup to the recent e-graph engine egglog @egglog when compared to its predecessor egg
 @egg.
 
 Relational databases are a mature technology with rich theory and a wide breadth of implementations,
 providing many techniques that could be transferred to e-graphs beyond those already incorporated
-into egg. At the same time, e-graphs have unique requirements and have been understood as databases
-only recently. This background is what motivated us to look at datalog-like e-graph implementation
-for this master's thesis.
+into egglog. At the same time, e-graphs have unique requirements and have been understood as
+databases only recently. This background is what motivated us to look at Datalog-like e-graph
+implementation for our master's thesis.
 
 == Oatlog
 
-Our work introduces oatlog, a rewrite engine compatible with the egglog language @egglog. Like
-egglog, it can be seen as a datalog engine with support for unification. Unlike egglog, it compiles
-rules ahead-of-time (aot$#h(2pt)approx#h(2pt)$oat) which allows query planning and index selection
-to be optimized globally.
+Our work introduces oatlog, a rewrite engine compatible with the egglog language. Like egglog, it
+can be seen as a Datalog engine with support for unification. Unlike egglog, it compiles rules
+ahead-of-time (aot$#h(2pt)approx#h(2pt)$oat) which allows query planning and index selection to be
+optimized globally.
 
 Currently, as of the midpoint report, oatlog is slower than egglog and does not implement quite a
 few of egglog's features. Addressing this is our priority for the remainder of our master's thesis
 work.
 
-== This report
+== This thesis
 
-#TODO[overview of upcoming sections]
+#NOTE[This section talks about things that aren't finished as if they were.]
 
-= Conceptual background
+@conceptual_background extends this introduction with a conceptual background. This is a
+step-by-step explanation of what e-graphs are and how they have been implement prior to their
+unification to Datalog. We then motivate the idea of e-graphs as relational databases, culminating
+in showing how semi-naive evaluation avoids rediscovering facts.
+
+The background, @background, changes the perspective to instead introduce the techniques that are
+relevant for anyone writing a Datalog-inspired equality saturating engine, guided by their use
+within oatlog.
+
+@oatlog_implementation then concretely describes the implementation of these techniques in oatlog,
+in addition to showing what oatlog can do and how it is used. @oatlog_evaluation follows by
+evaluating oatlog through its test suite and benchmarks.
+
+#TODO[Elaborate on evaluation once that's possible.]
+
+#NOTE[The midpoint draft is too early for a conclusion.]
+
+= Conceptual background <conceptual_background>
 
 #TODO[Matti: §2.1 You should clarify the basic concepts (assume that the reader has basic knowledge of computer science, but has not heard anything about e-graphs); what are e-graphs, how are e-classes different from e-nodes, what does “extraction” mean, and so on. Think that your description should form a clear story that explains everything the reader needs to know to understand the remainder of the thesis.]
 
@@ -295,7 +310,7 @@ For example, consider a partial function that performs addition, which we can re
 ) <concept_table_concrete>
 
 This is a partial function because it's domain is a subset of all pairs of natural numbers. But
-since these are uninterpreted, we do not have actual values, but instead E-classes as in
+since these are uninterpreted, we do not have actual values, but instead e-classes as in
 @concept_table_eclasses.
 
 #figure(
@@ -412,32 +427,34 @@ becomes
 
 $"Mul"(t_0, c, t_1) join "Add"(a, b, t_0)$
 
-== Semi-naive evaluation
+== Semi-naive evaluation <conceptual_overview_seminaive>
 
-#TODO[Alejandro: way to join -> technique to join]
+Semi-naive evaluation is an algorithm for joining relations, each consisting of both old and new
+tuples, guaranteeing that each joined tuple contains some new information. In the context of
+Datalog, it avoids a situation in which we in each iteration rediscover every fact previously
+discovered in an earlier iteration. Expressing it as (pseudo)-relational algebra makes it more
+clear.
 
-Semi naive evaluation is a way to join relations where results only include possibly new
-information. In the context of Datalog, it avoids recomputing the same facts. Expressing it as
-(pseudo)-relational algebra makes it more clear. Lets say we want to join relations A, B and C,
-where $join$ is a join, $union$ is the union of relations and $Delta$ is the change to a relation.
+Let us say that we want to join relations A, B and C, where $join$ is a join, $union$ is the union
+of relations and $Delta$ is the change to a relation. Then
 
 $
-  "all information" = A join B join C
+  "all information" = A join B join C.
 $
 
 But we only care about the new join results, and this can be represented by subtracting the join
 that already occurred from the full join of the new database.
 
 $
-  "new information" subset &(A union Delta A) join &(B union Delta B) join &(C union Delta C) \
+  "new information" = &(A union Delta A) join &(B union Delta B) join &(C union Delta C) \
   -& A join B join C
 $
 
-The expression can be expanded and we get $A join B join C$ that can be canceled out.
+The expression can be expanded using the fact that joins distribute over union, $(X union Y) join Z
+= X join Z union Y join Z$, and we get $A join B join C$ that can be canceled out.
 
 #let hl(x) = text(fill: red, $#x$)
 
-//highlight(x)
 $
   "new information" =
   &hl(A join B join C) union \
@@ -453,18 +470,18 @@ $
   &(A union Delta A) &join& (B union Delta B) &join& Delta C \
 $
 
-To make the pattern more clear, $Delta X$ is written as "new", $X$ is written as "old" and $X union
-Delta X$ is written as all:
+To make the pattern more clear, we can write $Delta X$ as `new`, $X$ as `old` and $X union Delta X$
+as `all`:
 
 $
   "new information" =
-  &"new" &join& "old" &join& "old" union \
-  &"all" &join& "new" &join& "old" union \
-  &"all" &join& "all" &join& "new" \
+  &#`new` &join& #`old` &join& #`old` union \
+  &#`all` &join& #`new` &join& #`old` union \
+  &#`all` &join& #`all` &join& #`new` \
 $
 
-Implementing this directly would mean having separate relations for old, new possibly all. In
-pseudocode we get the following for $"all" join "new" join "old"$:
+Implementing this directly would require having separate relations for `old` and `new`, and
+also possibly for `all`. In pseudocode we get the following for $"all" join "new" join "old"$:
 
 ```rust
 for _ in b_new(..) {
@@ -475,37 +492,8 @@ for _ in b_new(..) {
     }
 }
 ```
-This is more or less what eqlog and egglog does, but there are some problems with it.
 
-+ we need indexes for "new"
-+ we are forced to chain the iteration of "new" and "old" when iterating all, which introduces
-  branching and reduces batching.
-
-#TODO[loke for erik: I thought deferred insertions break (non-surjective rules), and that this was the biggest
-  issue?]
-
-But if we replace all iterations of "old" with "all":
-$
-  "new information" subset
-  &"new" &join& "all" &join& "all" union \
-  &"all" &join& "new" &join& "all" union \
-  &"all" &join& "all" &join& "new" \
-$
-Then we get rid of both the branch/batching issue and the indexes for "new".
-
-Now the database only needs to maintain a list of "new" and indexes for "all". The reason indexes
-for "new" is not required is that it is almost always more efficient to iterate through "new" first,
-so the pseudocode becomes:
-
-```rust
-for _ in b_new(..) {
-    for _ in a_all(..) {
-        for _ in c_old(..) {
-            ..
-        }
-    }
-}
-```
+#TODO[what does this mean in practice?]
 
 == Theory languages
 
@@ -544,14 +532,14 @@ language @egglog.
 
 == Design constraints for Datalog engines vs SQL databases.
 
-SQL databases need to be extremely dynamic since arbitrary new queries can be done, but for datalog
-all queries are known up-front, so datalog engines can spend more resources on optimizing queries
+SQL databases need to be extremely dynamic since arbitrary new queries can be done, but for Datalog
+all queries are known up-front, so Datalog engines can spend more resources on optimizing queries
 and selecting optimal indexes and index data-structures.
 
 That said, it's entirely possible to create an e-graph engine that uses SQL internally and in fact a
 prototype of egglog, egglite, was originally implemented on top of sqlite @egglite @egraph_sqlite.
 
-= Background <thesection>
+= Background <background>
 
 #TODO[]
 
@@ -569,7 +557,7 @@ these terms largely interchangeably depending on the context.
       table.cell(colspan: 5, [*Approximate nomenclature guide*]),
       [*egglog* ],
       [*eqlog* ],
-      [*datalog* ],
+      [*Datalog* ],
       [*database* ],
       [*comment*],
     ),
@@ -583,7 +571,7 @@ these terms largely interchangeably depending on the context.
     [sort ], [type ], [type ], [type ], [e.g. `Math`, `i64`],
     [functional dependency], [implicit functionality], [], [primary key constraint], [],
   ),
-  caption: [Comparison of egglog, eqlog, datalog, and relational database terminology.],
+  caption: [Comparison of egglog, eqlog, Datalog, and relational database terminology.],
 ) <rosetta-table>
 
 == Logic programming languages
@@ -622,16 +610,62 @@ $ "Add"(x, y, a) $
 
 === Semi-naive evaluation
 
-To enable semi-naive evaluation, naive rules are replaced with multiple more selective rules created
-from changing any single atom to iterate `new` instead of `all`. A rule
+In @conceptual_overview_seminaive within the conceptual overview we saw that a query $A join B join
+C$ can be split into three queries
 
-$ R(x, y), S(y, z), T(z, x) $
+$
+  &#`new`_A &join& #`all`_B &join& #`all`_C union \
+  &#`all`_A &join& #`new`_B &join& #`all`_C union \
+  &#`all`_A &join& #`all`_B &join& #`new`_C \
+$
 
-becomes
+which can be implemented as
 
-$ R_"new" (x, y), S(y, z), T(z, x) $
-$ R(x, y), S_"new" (y, z), T(z, x) $
-$ R(x, y), S(y, z), T_"new" (z, x). $
+```rust
+for _ in b_new(..) {
+    for _ in concat(a_new(..), a_old(..)) {
+        for _ in c_old(..) {
+            ..
+        }
+    }
+}
+```
+
+One can do more or less this, but there are some problems with it. First of all, it requires
+indexing both `old` and either `all` or `new`, implying additional indexing overhead.
+
+Additionally, it can be beneficial to schedule queries to run differently often, in which case we
+can have a $#`new`_1$ for recently run queries $Q_1$ and a larger $#`new`_2$ for insertions made
+since running queries $Q_2$. This implies $#`old`_1$ and $#`old`_2$ which by the previous argument
+both require indexing. This leads to even more indexing overhead in the scenarios with more advanced
+scheduling.
+
+But if we replace all iterations of "old" with "all",
+$
+  "new information" subset
+  &"new" &join& "all" &join& "all" union \
+  &"all" &join& "new" &join& "all" union \
+  &"all" &join& "all" &join& "new", \
+$
+then we can get by with indexes only on `all`. `new` does not need indexes since efficient query
+planning will virtually always iterate the `new` relation in the outermost loop rather than
+performing an indexed lookup in one of the inner loops.
+
+We pay a cost in that we duplicate any tuples created by joining `new` from multiple relations. This
+duplication can be mitigated by annotating tuples with timestamps and eagerly filtering out such
+tuples after every join. The query $#`all`_A join #`new`_B join #`old`_C$ can now be implemented as
+
+```rust
+for _ in b_new(..) {
+    for _ in a_all(..) {
+        for _ in c_all(..).filter(old) {
+            ..
+        }
+    }
+}
+```
+
+#TODO[what does egglog and eqlog do?]
 
 === Merging rules (in HIR, not trie)
 
@@ -644,7 +678,7 @@ replace them with a rule that combines the actions of the original rules.
 
 === Magic sets
 
-#TODO[Since oatlog/egglog is a superset of datalog, this should be possible, right?]
+#TODO[Since oatlog/egglog is a superset of Datalog, this should be possible, right?]
 
 #TODO[we have not done this though, and it's unclear if it is useful, I guess rules can have a :magic annotation?]
 
@@ -791,7 +825,7 @@ for a visualization of this.
 // #TODO[Matti: Most importantly, what does it mean that something runs “in almost O(1)”? O(1) is a well-defined class of functions, so the function describing the running time either is or is not in O(1), it cannot “almost” be there (then it is not!); when using the big-O notation, please bear in mind that the statements actually do have a well-defined meaning and one cannot just informally throw it at things]
 Union-find is a data structure that maintains disjoint such that unifying sets and checking if elements belong to the same set is efficient @unionfindoriginal.
 When used in an e-graph, they store e-classes.
-Union-find with path compression is $O(n * alpha (n, n))$ #footnote[where $alpha$ is the inverse of the Ackermann's function. Inverse Ackermann's function grows so slowly that it can be considered constant for practical inputs @o1-union-find.] @fastunionfind.
+Union-find with path compression is $O(n * alpha (n))$ #footnote[where $alpha$ is the inverse of the Ackermann's function. Inverse Ackermann's function grows so slowly that it can be considered constant for practical inputs @o1-union-find.] @fastunionfind.
 An example implementation is shown in @union-find-path-compression.
 
 #figure(
@@ -900,7 +934,7 @@ trivial, but selecting an optimal expression, even with simple cost functions is
 
 Many NP-hard graph algorithms can be done in polynomial time for a fixed treewidth, and this also applies to extraction, where it can be done linear time @fastextract @egraphcircuit.
 
-= Oatlog implementation
+= Oatlog implementation <oatlog_implementation>
 
 This section discusses oatlog in detail, including how it is used, what it can do and how it is
 implemented.
@@ -1249,7 +1283,7 @@ Overall, our comparative testing infrastructure (against egglog) can handle the 
 //   ),
 // ) <function-taxonomy>
 
-= Evaluation
+= Oatlog evaluation <oatlog_evaluation>
 
 #TODO[Section summary]
 
@@ -1299,7 +1333,7 @@ startup and oatlog extraction is better handled using the run-time API.
 
 For a list of currently passing tests, see @passingtests.
 
-= Conclusion
+= Conclusion <conclusion>
 
 #TODO[]
 
