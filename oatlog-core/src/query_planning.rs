@@ -262,6 +262,8 @@ fn generate_tries(
             .collect::<Vec<_>>()
             .leak();
 
+
+
         for (query_ty, premise_relation, bound) in query_plan.iter().rev() {
             let relation = premise_relation.relation;
 
@@ -353,6 +355,8 @@ fn generate_tries(
             }]
             .leak();
         }
+        trie.iter_mut().for_each(|x| x.meta = Some(rule.name.src));
+
         tries.extend(trie.iter().copied());
     }
 }

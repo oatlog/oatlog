@@ -377,7 +377,10 @@ impl ImplicitRule {
 
                 let name = "";
                 SymbolicRule {
-                    name,
+                    name: RuleMeta {
+                        name,
+                        src: "from implicit rule",
+                    },
                     premise_relations: vec![
                         PremiseRelation {
                             args: first_args,
@@ -503,10 +506,17 @@ pub(crate) enum RelationTy {
     // MaterializedView {/* ... */}
 }
 
+#[derive(Clone, Debug)]
+pub(crate) struct RuleMeta {
+    pub(crate) name: &'static str,
+    // source text for this rule for debug information.
+    pub(crate) src: &'static str,
+}
+
 #[must_use]
 #[derive(Clone, Debug)]
 pub(crate) struct SymbolicRule {
-    pub(crate) name: &'static str,
+    pub(crate) name: RuleMeta,
     /// Requirements to trigger rule
     pub(crate) premise_relations: Vec<PremiseRelation>,
 
@@ -576,6 +586,7 @@ pub(crate) struct PremiseRelation {
 pub(crate) struct RuleArgs {
     /// Name of rule
     pub(crate) name: &'static str,
+    pub(crate) src: &'static str,
     /// Flag these variables as part of the premise even if not explicitly mentioned.
     pub(crate) sort_vars: Vec<VariableId>,
     /// Set of variables with their types and names
@@ -605,6 +616,7 @@ impl RuleArgs {
             action: self_action,
             action_unify: mut self_action_unify,
             delete: self_delete,
+            src,
         } = self;
         let n = self_variables.len();
         self_action_unify.extend(self_premise_unify.iter().cloned());
@@ -649,7 +661,10 @@ impl RuleArgs {
             .map(|(ty, name)| VariableMeta::new(name, *ty))
             .collect();
         SymbolicRule {
-            name: self_name,
+            name: RuleMeta {
+                name: self_name,
+                src,
+            },
             premise_relations,
             action_relations,
             unify,
@@ -838,7 +853,7 @@ impl SymbolicRule {
             unify,
             action_variables,
             premise_variables,
-            name: self.name,
+            name: self.name.clone(),
         }
         .normalize()
     }
@@ -1054,7 +1069,7 @@ impl SymbolicRule {
             .collect();
 
         SymbolicRule {
-            name: self.name,
+            name: self.name.clone(),
             premise_relations,
             action_relations: self.action_relations.clone(),
             unify,
@@ -1111,7 +1126,7 @@ impl Theory {
                 action_variables,
                 premise_variables: _,
             } = rule;
-            wln!("Rule {:?}:", name);
+            wln!("Rule {:?}:", name.name);
             let premise = premise_relations
                 .iter()
                 .map(|PremiseRelation { relation, args }| {

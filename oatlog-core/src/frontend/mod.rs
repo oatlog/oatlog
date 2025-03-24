@@ -516,7 +516,7 @@ impl Parser {
                 rule,
             } => {
                 let egglog_ast::Rule { facts, actions } = rule;
-                compile_rule::add_rule(self, name, ruleset, facts, actions)?;
+                compile_rule::add_rule(self, name, ruleset, facts, actions, span!())?;
             }
             egglog_ast::Statement::Rewrite {
                 ruleset,
@@ -546,7 +546,7 @@ impl Parser {
                     },
                     rhs.span,
                 )];
-                compile_rule::add_rule(self, None, ruleset, facts, actions)?;
+                compile_rule::add_rule(self, None, ruleset, facts, actions, span!())?;
             }
             egglog_ast::Statement::BiRewrite { ruleset, rewrite } => {
                 let egglog_ast::Rewrite {
@@ -571,7 +571,7 @@ impl Parser {
                         },
                         rhs.span,
                     )];
-                    compile_rule::add_rule(self, None, ruleset, facts, actions)?;
+                    compile_rule::add_rule(self, None, ruleset, facts, actions, span!())?;
                 }
             }
             egglog_ast::Statement::Action(action) => {
@@ -1244,6 +1244,7 @@ mod compile_rule {
         ruleset: Option<Str>,
         facts: Vec<span::Spanned<egglog_ast::Fact>>,
         actions: Vec<span::Spanned<egglog_ast::Action>>,
+        span: Option<QSpan>,
     ) -> MResult<()> {
         let _: Option<Spanned<&str>> = ruleset;
 
@@ -1417,6 +1418,7 @@ mod compile_rule {
                 .map(VariableId)
                 .filter(|&x| type_uf.0[x].expect("unresolved type") == unit_ty)
                 .collect(),
+            src: span.map(|x| x.text_compact).unwrap_or(""),
         }
         .build();
 

@@ -404,6 +404,7 @@ fn hir_global() {
                     g0: t0,
                 },
                 rule_tries: [
+                    meta: "( rewrite ( Const one ) ( Add b a ) )"
                     atom: [PremiseNew, r4(v0)]
                     then: [
                         atom: [Premise, r3(v0, v1), iu0]
@@ -413,6 +414,7 @@ fn hir_global() {
                             atom: [Action::Insert, r2(v2, v3, v1)],
                         ],
                     ],
+                    meta: "( rewrite ( Const one ) ( Add b a ) )"
                     atom: [PremiseNew, r3(v4, v5)]
                     then: [
                         atom: [PremiseAny, r4(v4), iu_bogus]
@@ -487,6 +489,7 @@ fn test_bind_variable_multiple_times() {
                 global_compute: {},
                 global_types: {},
                 rule_tries: [
+                    meta: "( rewrite ( Same x x ) x )"
                     atom: [PremiseNew, r1(v0, v0, v1)]
                     then: [
                         atom: [Action::Equate, v1=v0],
@@ -1929,6 +1932,7 @@ fn test_primitives_simple() {
                 }
                 #[inline(never)]
                 pub fn apply_rules(&mut self) {
+                    #[doc = "( rewrite ( Const one ) ( Add x x ) )"]
                     if self.global_variables.new {
                         let one = self.global_variables.global_i64[1usize];
                         for (p1,) in self.const_relation.iter1_0_1(one) {
@@ -1936,12 +1940,14 @@ fn test_primitives_simple() {
                             self.delta.insert_add((x, x, p1));
                         }
                     }
+                    #[doc = "( rewrite ( Const one ) ( Add x x ) )"]
                     for (one, p1) in self.const_relation.iter_new() {
                         if one == self.global_variables.global_i64[1usize] {
                             let x = self.uf.math_uf.add_eclass();
                             self.delta.insert_add((x, x, p1));
                         }
                     }
+                    #[doc = "( rewrite ( Const 2 ) ( Add z z ) )"]
                     if self.global_variables.new {
                         let p0 = self.global_variables.global_i64[0usize];
                         for (p1,) in self.const_relation.iter1_0_1(p0) {
@@ -1949,12 +1955,14 @@ fn test_primitives_simple() {
                             self.delta.insert_add((z, z, p1));
                         }
                     }
+                    #[doc = "( rewrite ( Const 2 ) ( Add z z ) )"]
                     for (p0, p1) in self.const_relation.iter_new() {
                         if p0 == self.global_variables.global_i64[0usize] {
                             let z = self.uf.math_uf.add_eclass();
                             self.delta.insert_add((z, z, p1));
                         }
                     }
+                    #[doc = "( rewrite ( Var \"x\" ) ( Var \"y\" ) )"]
                     if self.global_variables.new {
                         let p0 = self.global_variables.global_string[0usize];
                         for (p1,) in self.var_relation.iter1_0_1(p0) {
@@ -1962,12 +1970,14 @@ fn test_primitives_simple() {
                             self.delta.insert_var((a1, p1));
                         }
                     }
+                    #[doc = "( rewrite ( Var \"x\" ) ( Var \"y\" ) )"]
                     for (p0, p1) in self.var_relation.iter_new() {
                         if p0 == self.global_variables.global_string[0usize] {
                             let a1 = self.global_variables.global_string[1usize];
                             self.delta.insert_var((a1, p1));
                         }
                     }
+                    #[doc = "( rewrite ( Mul a ( Const 0 ) ) ( Const 0 ) )"]
                     if self.global_variables.new {
                         let p1 = self.global_variables.global_i64[2usize];
                         for (p2,) in self.const_relation.iter1_0_1(p1) {
@@ -1977,6 +1987,7 @@ fn test_primitives_simple() {
                             }
                         }
                     }
+                    #[doc = "( rewrite ( Mul a ( Const 0 ) ) ( Const 0 ) )"]
                     for (p1, p2) in self.const_relation.iter_new() {
                         if p1 == self.global_variables.global_i64[2usize] {
                             for (a, p3) in self.mul_relation.iter1_1_0_2(p2) {
@@ -1985,6 +1996,7 @@ fn test_primitives_simple() {
                             }
                         }
                     }
+                    #[doc = "( rewrite ( Mul a ( Const 0 ) ) ( Const 0 ) )"]
                     for (a, p2, p3) in self.mul_relation.iter_new() {
                         if self.const_relation.check1_1_0(p2) {
                             let p1 = self.global_variables.global_i64[2usize];
@@ -2620,6 +2632,7 @@ fn triangle_join() {
                 }
                 #[inline(never)]
                 pub fn apply_rules(&mut self) {
+                    #[doc = "( rule ( ( Foo a b ) ( Bar b c ) ( Baz c a ) ) ( ( Triangle a b c ) ) )"]
                     for (a, b) in self.foo_relation.iter_new() {
                         if self.baz_relation.check1_1_0(a) {
                             for (c,) in self.bar_relation.iter1_0_1(b) {
@@ -2629,6 +2642,7 @@ fn triangle_join() {
                             }
                         }
                     }
+                    #[doc = "( rule ( ( Foo a b ) ( Bar b c ) ( Baz c a ) ) ( ( Triangle a b c ) ) )"]
                     for (b, c) in self.bar_relation.iter_new() {
                         if self.foo_relation.check1_1_0(b) {
                             for (a,) in self.baz_relation.iter1_0_1(c) {
@@ -2638,6 +2652,7 @@ fn triangle_join() {
                             }
                         }
                     }
+                    #[doc = "( rule ( ( Foo a b ) ( Bar b c ) ( Baz c a ) ) ( ( Triangle a b c ) ) )"]
                     for (c, a) in self.baz_relation.iter_new() {
                         if self.foo_relation.check1_0_1(a) {
                             for (b,) in self.bar_relation.iter1_1_0(c) {
@@ -3131,6 +3146,7 @@ fn edgecase0() {
                 }
                 #[inline(never)]
                 pub fn apply_rules(&mut self) {
+                    #[doc = "( rewrite ( Add ( Mul a b ) ( Mul a c ) ) ( Mul a ( Add b c ) ) )"]
                     for (a, b, p2) in self.mul_relation.iter_new() {
                         if self.add_relation.check1_0_1_2(p2) {
                             for (c, p4) in self.mul_relation.iter1_0_1_2(a) {
@@ -3142,6 +3158,7 @@ fn edgecase0() {
                             }
                         }
                     }
+                    #[doc = "( rewrite ( Add ( Mul a b ) ( Mul a c ) ) ( Mul a ( Add b c ) ) )"]
                     for (a, c, p4) in self.mul_relation.iter_new() {
                         if self.mul_relation.check1_0_1_2(a) {
                             for (p2, p5) in self.add_relation.iter1_1_0_2(p4) {
@@ -3153,6 +3170,7 @@ fn edgecase0() {
                             }
                         }
                     }
+                    #[doc = "( rewrite ( Add ( Mul a b ) ( Mul a c ) ) ( Mul a ( Add b c ) ) )"]
                     for (p2, p4, p5) in self.add_relation.iter_new() {
                         if self.mul_relation.check1_2_0_1(p2) {
                             for (a, c) in self.mul_relation.iter1_2_0_1(p4) {
@@ -3611,6 +3629,7 @@ fn test_into_codegen() {
                 }
                 #[inline(never)]
                 pub fn apply_rules(&mut self) {
+                    #[doc = "( rewrite ( Mul ( Add a b ) c ) ( Add ( Mul a c ) ( Mul b c ) ) )"]
                     for (a, b, p2) in self.add_relation.iter_new() {
                         for (c, p4) in self.mul_relation.iter1_0_1_2(p2) {
                             let a5 = self.uf.math_uf.add_eclass();
@@ -3620,6 +3639,7 @@ fn test_into_codegen() {
                             self.delta.insert_mul((a, c, a4));
                         }
                     }
+                    #[doc = "( rewrite ( Mul ( Add a b ) c ) ( Add ( Mul a c ) ( Mul b c ) ) )"]
                     for (p2, c, p4) in self.mul_relation.iter_new() {
                         for (a, b) in self.add_relation.iter1_2_0_1(p2) {
                             let a5 = self.uf.math_uf.add_eclass();
