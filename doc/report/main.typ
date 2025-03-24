@@ -733,9 +733,9 @@ with inserting the results of some rules into the database. This has the
 drawback of still computing the joins unconditionally.
 
 Another approach is to use timestamps for each element in the database and
-explicitly query for things that are new. This is what egglog does, but it is
-problematic because it increases memory usage and essentially makes queries
-iterate through all historical timestamps.
+explicitly query for things that are new. This is what egglog @egglog does, but
+it is problematic because it increases memory usage and essentially makes
+queries iterate through all historical timestamps.
 
 Conceptually, our approach will be to store the new set in a push-only list,
 and make the rules store what index in these they are at. See @semi-something
@@ -777,22 +777,61 @@ for a visualization of this.
                ^                          ^
                |------rule2 new set-------|
   ```,
-  caption: [Staying semi-naive while running while not running all the rules at the same time.],
+  caption: [Staying semi-naive while not running all the rules at the same time.],
 ) <semi-something>
 
 == Canonicalization
 
-#TODO[]
+#TODO[remove non-canonical stuff from database]
 
 === Union-find
 
-#TODO[Matti: §2.2.1: I’m not very familiar with Rust code, but it seems to me that the code in Listing 2 is incorrect and should not compile (the function find in particular doesn’t make sense)]
+// #TODO[Matti: §2.2.1: I’m not very familiar with Rust code, but it seems to me that the code in Listing 2 is incorrect and should not compile (the function find in particular doesn’t make sense)]
+// #TODO[Matti: Also the description is unclear (what elements are we talking about, what set are they elements of)]
+// #TODO[Matti: Most importantly, what does it mean that something runs “in almost O(1)”? O(1) is a well-defined class of functions, so the function describing the running time either is or is not in O(1), it cannot “almost” be there (then it is not!); when using the big-O notation, please bear in mind that the statements actually do have a well-defined meaning and one cannot just informally throw it at things]
+Union-find is a data structure that maintains disjoint such that unifying sets and checking if elements belong to the same set is efficient @unionfindoriginal.
+When used in an e-graph, they store e-classes.
+Union-find with path compression is $O(n * alpha (n, n))$ #footnote[where $alpha$ is the inverse of the Ackermann's function. Inverse Ackermann's function grows so slowly that it can be considered constant for practical inputs @o1-union-find.] @fastunionfind.
+An example implementation is shown in @union-find-path-compression.
 
-#TODO[Matti: Also the description is unclear (what elements are we talking about, what set are they elements of)]
-
-#TODO[Matti: Most importantly, what does it mean that something runs “in almost O(1)”? O(1) is a well-defined class of functions, so the function describing the running time either is or is not in O(1), it cannot “almost” be there (then it is not!); when using the big-O notation, please bear in mind that the statements actually do have a well-defined meaning and one cannot just informally throw it at things]
-
-#TODO[]
+#figure(
+  ```rust
+  struct UnionFind {
+      repr: Vec<usize>,
+  }
+  impl UnionFind {
+      fn new(size: usize) -> Self {
+          Self { repr: (0..size).collect() }
+      }
+      fn find(&mut self, i: usize) -> usize {
+          if self.repr[i] == i {
+              return i;
+          } else {
+              let root = self.find(self.repr[i]);
+              self.repr[i] = root; // <-- path compression
+              return root;
+          }
+      }
+      fn union(&mut self, i: usize, j: usize) {
+          let i = self.find(i);
+          let j = self.find(j);
+          if i == j { return }
+          self.repr[i] = j;
+      }
+  }
+  let uf = UnionFind::new(5); // [[0], [1], [2], [3], [4]]
+  uf.union(2, 3); // [[0], [1], [2, 3], [4]]
+  uf.union(0, 4); // [[0, 4], [1], [2, 3]]
+  uf.union(0, 3); // [[0, 4, 2, 3], [1]]
+  // find(a) == find(b) <=> a,b belong to the same set
+  assert!(uf.find(4) == uf.find(3)); // 4 and 3 belong to the same set.
+  assert!(uf.find(4) != uf.find(1)); // 4 and 1 belong to different sets.
+  ```,
+  caption: flex-caption(
+    [Union-find with path compression. ],
+    [If `repr[i] == i` then `i` is a representative of the set. Initially `repr[i] = i`, so all elements belong to disjoint sets of size 1.],
+  ),
+) <union-find-path-compression>
 
 === Egg, batched
 
@@ -1077,6 +1116,69 @@ LIR is a low-level description of the actual code that is to be generated.
 
 #TODO[]
 
+=== Union-find dirty list and smaller-to-larger merging.
+
+When canonicalizing, it is useful to be able to iterate newly uprooted (non-canonical) e-classes to remove them from the database, so we also track a list of dirty ids when unifying. See @union-find-dirty-list.
+
+#figure(
+  ```rust
+  struct UnionFind {
+      repr: Vec<usize>,
+      dirty: Vec<usize>, // <-- tracking dirty ids
+      /* ... */
+  }
+  impl UnionFind {
+      /* ... */
+      fn union(&mut self, i: usize, j: usize) {
+          let i = self.find(i);
+          let j = self.find(j);
+          if i == j { return }
+          self.repr[i] = j;
+          self.dirty.push(i); // <-- tracking dirty ids
+      }
+  }
+  ```,
+  caption: [Union-find that tracks dirty ids.],
+) <union-find-dirty-list>
+
+If the indexes are not re-created after each step, then which set is merged
+into the other set starts to matter#footnote[Note that this is not the case if
+the index is for example a sorted list, where it needs to be re-created
+completely.], specifically we want to minimize the number of database
+modifications. To approximate this, the number of times an e-class has been
+referenced in the database can be used as a measure of how many changes to the
+database would be necessary. This can be seen in @union-find-smaller-to-larger.
+
+#figure(
+  ```rust
+  struct UnionFind {
+      repr: Vec<usize>,
+      size: Vec<i64>,
+      /* ... */
+  }
+  impl UnionFind {
+      /* ... */
+      fn union(&mut self, i: usize, j: usize) {
+          let i = self.find(i);
+          let j = self.find(j);
+          if i == j { return }
+          let (smaller, larger) = if self.size[i] < self.size[j] {
+              (i, j)
+          } else {
+              (j, i)
+          };
+          self.repr[smaller] = larger;
+      }
+      fn change_size(&mut self, i: usize, delta: i64) {
+          self.size[i] += delta;
+      }
+  }
+  ```,
+  caption: [Union-find that performs smaller-to-larger merging],
+) <union-find-smaller-to-larger>
+
+#TODO[maybe this actually belongs in the background]
+
 === Rustc spans across files
 
 Rust proc-macros work on Rust tokens which are annotated with spans that essentially are byte ranges
@@ -1173,6 +1275,7 @@ For a list of currently passing tests, see @passingtests.
 
 #TODO[]
 
+#TODO[bibliography: notes like "Accessed" do not show up.]
 #bibliography("refs.bib")
 #show: appendices
 
