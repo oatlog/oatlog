@@ -44,6 +44,16 @@ impl SexpSpan {
             err_!(self.span, "{context}: expected atom")
         }
     }
+    pub(crate) fn str(self, context: &'static str) -> MResult<Str> {
+        register_span!(self.span);
+        let Sexp::Literal(x) = self.x else {
+            return err!("{context}: expected a string literal");
+        };
+        let Literal::String(x) = x.x else {
+            return err!("{context}: expected a string literal");
+        };
+        Ok(spanned!(x))
+    }
     pub(crate) fn uint(self, context: &'static str) -> MResult<u64> {
         register_span!(self.span);
         let Sexp::Literal(x) = self.x else {

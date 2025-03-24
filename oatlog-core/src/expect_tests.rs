@@ -28,6 +28,158 @@ impl Steps {
     }
 }
 
+#[should_panic = "assertion failed: !self.is_bound(arg)"]
+#[test]
+fn redundant_premise_simplify() {
+    Steps {
+        code: r#"
+            (datatype Math (Const i64) (Add Math Math))
+            (rule
+                (
+                    (Const 1)
+                    (Const 1)
+                    (Add (Const 1) (Const 1))
+                    (Add (Const 1) (Const 1))
+                )
+                (
+                )
+                :name "complicated"
+            )
+            (rule
+                (
+                    (= one (Const 1))
+                    (= two (Add one one))
+                )
+                (
+                )
+                :name "expected simplified"
+            )
+        "#,
+        expected_hir: Some(expect![[r#"
+            Theory "":
+
+            Math(Math)
+            Const(i64, Math)
+            Add(Math, Math, Math)
+            g0(i64)
+
+            Rule "complicated":
+            Premise: g0(p0), Const(p0, p1), g0(p2), Const(p2, p3), g0(p4), Const(p4, p5), g0(p6), Const(p6, p7), Add(p5, p7, p8), g0(p9), Const(p9, p10), g0(p11), Const(p11, p12), Add(p10, p12, p13)
+            __: p0
+            __: p1
+            __: p2
+            __: p3
+            __: p4
+            __: p5
+            __: p6
+            __: p7
+            __: p8
+            __: p9
+            __: p10
+            __: p11
+            __: p12
+            __: p13
+
+            Rule "expected simplified":
+            Premise: g0(p1), Const(p1, one), Add(one, one, two)
+            __: one
+            __: p1
+            __: two
+
+        "#]]),
+        expected_lir: None,
+        expected_codegen: None,
+    }
+    .check();
+}
+
+#[test]
+fn redundant_action_simplify() {
+    Steps {
+        code: r#"
+            (datatype Math (Const i64) (Add Math Math))
+            (rule
+                (
+                    (Const 1)
+                    (Const 2)
+                    (Add (Const 1) (Const 2))
+                    (Add (Const 1) (Const 2))
+                    (Add (Const 1) (Const 2))
+                )
+                (
+                    (Const 1)
+                    (Const 2)
+                    (Add (Const 1) (Const 2))
+                )
+                :name "complicated"
+            )
+            (rule
+                (
+                    (= one (Const 1))
+                    (= two (Const 2))
+                    (= three (Add one two))
+                )
+                (
+                )
+                :name "expected simplified"
+            )
+        "#,
+        expected_hir: Some(expect![[r#"
+            Theory "":
+
+            Math(Math)
+            Const(i64, Math)
+            Add(Math, Math, Math)
+            g0(i64)
+            g1(i64)
+
+            Rule "complicated":
+            Premise: g0(p0), Const(p0, p1), g1(p2), Const(p2, p3), g0(p4), Const(p4, p5), g1(p6), Const(p6, p7), Add(p5, p7, p8), g0(p9), Const(p9, p10), g1(p11), Const(p11, p12), Add(p10, p12, p13), g0(p14), Const(p14, p15), g1(p16), Const(p16, p17), Add(p15, p17, p18)
+            __: p0
+            __: p1
+            __: p2
+            __: p3
+            __: p4
+            __: p5
+            __: p6
+            __: p7
+            __: p8
+            __: p9
+            __: p10
+            __: p11
+            __: p12
+            __: p13
+            __: p14
+            __: p15
+            __: p16
+            __: p17
+            __: p18
+            a0: __
+            a1: __
+            a2: __
+            a3: __
+            a4: __
+            a5: __
+            a6: __
+            a7: __
+            a8: __
+            Insert: Const(a0, a1), Const(a2, a3), Const(a4, a5), Const(a6, a7), Add(a5, a7, a8), g0(a0), g0(a4), g1(a2), g1(a6)
+
+            Rule "expected simplified":
+            Premise: g0(p1), Const(p1, one), g1(p3), Const(p3, two), Add(one, two, three)
+            __: one
+            __: p1
+            __: two
+            __: p3
+            __: three
+
+        "#]]),
+        expected_lir: None,
+        expected_codegen: None,
+    }
+    .check();
+}
+
 #[test]
 fn weird_premise_equality() {
     Steps {

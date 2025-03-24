@@ -579,7 +579,7 @@ fn parse_statement(x: SexpSpan) -> MResult<Spanned<Statement>> {
                 let mut name = None;
                 options!(options,
                     (":ruleset", [x]) => { ruleset = Some(x.atom("ruleset")?); }
-                    (":name", [x]) => { name = Some(x.atom("name")?); }
+                    (":name", [x]) => { name = Some(x.str("name")?); }
                 );
                 Statement::Rule {
                     name,
