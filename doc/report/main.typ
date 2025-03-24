@@ -1222,42 +1222,70 @@ Overall, our comparative testing infrastructure (against egglog) can handle the 
   ),
 ) <oatlog_comparative_testing_conditions>
 
-=== Relation taxonomy.
+// === Relation taxonomy.
+//
+// #TODO[@function-taxonomy]
+//
+// #figure(
+//   table(
+//     columns: (auto, auto, auto, auto),
+//     [], [signature], [inserts], [get-or-default],
+//     [function], [`[*] -> *`], [yes], [no],
+//     [constructor], [`[*] -> E`], [yes], [yes, make eclass],
+//     [relation], [`[*] -> ()`], [yes], [yes, performs insert],
+//     [], [], [], [],
+//     [function], [`[] -> *`], [yes], [yes if statically initialized.],
+//     [global], [`[] -> *`], [yes], [yes if statically initialized.],
+//     [], [], [], [],
+//     [primitive], [`[*] -> *`], [not supported], [yes, allows side effects (eg insert)],
+//   ),
+//   caption: flex-caption(
+//     [
+//       Different types of functions.
+//     ],
+//     [
+//       () means unit, \* means any, E means eclass, P means primitive.
+//     ],
+//   ),
+// ) <function-taxonomy>
 
-#TODO[@function-taxonomy]
+= Evaluation
+
+#TODO[Section summary]
+
+== Benchmarks
+
+#TODO[eventually replace with a log/log graph and add more benchmarks, include sizes]
+
+// generated using:
+// cargo bench --no-run && taskset -c 3 cargo bench
 
 #figure(
   table(
     columns: (auto, auto, auto, auto),
-    [], [signature], [inserts], [get-or-default],
-    [function], [`[*] -> *`], [yes], [no],
-    [constructor], [`[*] -> E`], [yes], [yes, make eclass],
-    [relation], [`[*] -> ()`], [yes], [yes, performs insert],
-    [], [], [], [],
-    [function], [`[] -> *`], [yes], [yes if statically initialized.],
-    [global], [`[] -> *`], [yes], [yes if statically initialized.],
-    [], [], [], [],
-    [primitive], [`[*] -> *`], [not supported], [yes, allows side effects (eg insert)],
+    table.header(
+      [*test*],
+      table.cell(colspan: 1, [*egglog*#footnote[egglog 0.4 was used.]]),
+      table.cell(colspan: 2, [*oatlog*]),
+      [],
+      [],
+      [sorted list],
+      [btreeset],
+    ),
+
+    [math], [24.038 ms], [24.884 ms], [326.83 ms],
+    [boolean adder], [30.935 ms], [56.890 ms], [249.33 ms],
   ),
   caption: flex-caption(
     [
-      Different types of functions.
+      Benchmark results comparing egglog with oatlog.
     ],
-    [
-      () means unit, \* means any, E means eclass, P means primitive.
-    ],
+    [],
   ),
-) <function-taxonomy>
+) <benchmark-results>
 
-= Evaluation
-
-#TODO[]
-
-== Benchmarks
-
-#TODO[Include actual benchmark results somehow]
-
-See @appendix_benchmarks for benchmark code.
+@benchmark-results describe our benchmark results.
+The benchmarks include the egglog code in @appendix_benchmarks and run 9 steps. This is repeated 100 times and an average is taken.
 
 == Egglog test suite
 
