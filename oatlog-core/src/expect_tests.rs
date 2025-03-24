@@ -3681,3 +3681,268 @@ fn test_into_codegen() {
     }
     .check();
 }
+
+#[test]
+fn simple_forall() {
+    Steps {
+        code: r#"
+            (sort Math)
+            (relation Le (Math Math))
+            (rule ((forall x)) ((define (Le x x))))
+        "#,
+        expected_hir: Some(expect![[r#"
+            Theory "":
+
+            Math(Math)
+            Le(Math, Math)
+
+            Rule "":
+            Premise:
+            x: x
+            Insert: Le(x, x)
+
+        "#]]),
+        expected_lir: Some(expect![[r#"
+            Theory {
+                name: "",
+                types: {
+                    [t0, i64]: std::primitive::i64,
+                    [t1, String]: oatlog::runtime::IString,
+                    [t2, unit]: THIS_STRING_SHOULD_NOT_APPEAR_IN_GENERATED_CODE,
+                    [t3, Math]: [symbolic],
+                },
+                relations: {
+                    r0: (hir-only relation),
+                    r1: RelationData {
+                        name: "Le",
+                        param_types: {c0: t3, c1: t3},
+                        kind: Table {
+                            index_to_info: {ir0: 0_1, ir1: 1_0},
+                            usage_to_info: {
+                                iu0: ir0[..1],
+                                iu1: ir1[..1],
+                            },
+                            column_back_reference: {c0: iu0, c1: iu1},
+                        },
+                    },
+                },
+                rule_variables: {},
+                global_compute: {},
+                global_types: {},
+                rule_tries: [],
+                initial: [],
+            }"#]]),
+        expected_codegen: Some(expect![[r#"
+            use oatlog::runtime::{self, *};
+            decl_row ! (Row2_0_1 < T0 first , T1 > (0 , 1) () (T0 , T1) () fc = (0) (T0) where u64 = s => ((s . 0 . inner () as u64) << 32) + ((s . 1 . inner () as u64) << 0));
+            decl_row ! (Row2_1_0 < T0 , T1 first > (1 , 0) () (T1 , T0) () fc = (1) (T1) where u64 = s => ((s . 1 . inner () as u64) << 32) + ((s . 0 . inner () as u64) << 0));
+            eclass_wrapper_ty!(Math);
+            #[derive(Debug, Default)]
+            struct LeRelation {
+                new: Vec<<Self as Relation>::Row>,
+                all_index_0_1: IndexImpl<RadixSortCtx<Row2_0_1<Math, Math>, u64>>,
+                all_index_1_0: IndexImpl<RadixSortCtx<Row2_1_0<Math, Math>, u64>>,
+            }
+            impl Relation for LeRelation {
+                type Row = (Math, Math);
+            }
+            impl LeRelation {
+                const COST: u32 = 4u32;
+                fn new() -> Self {
+                    Self::default()
+                }
+                fn has_new(&self) -> bool {
+                    !self.new.is_empty()
+                }
+                fn clear_new(&mut self) {
+                    self.new.clear();
+                }
+                fn iter_new(&self) -> impl Iterator<Item = <Self as Relation>::Row> + use<'_> {
+                    self.new.iter().copied()
+                }
+                fn iter1_0_1(&self, x0: Math) -> impl Iterator<Item = (Math,)> + use<'_> {
+                    self.all_index_0_1
+                        .range((x0, Math::MIN_ID)..=(x0, Math::MAX_ID))
+                        .map(|(x0, x1)| (x1,))
+                }
+                fn iter1_1_0(&self, x1: Math) -> impl Iterator<Item = (Math,)> + use<'_> {
+                    self.all_index_1_0
+                        .range((Math::MIN_ID, x1)..=(Math::MAX_ID, x1))
+                        .map(|(x0, x1)| (x0,))
+                }
+                fn check1_0_1(&self, x0: Math) -> bool {
+                    self.iter1_0_1(x0).next().is_some()
+                }
+                fn check1_1_0(&self, x1: Math) -> bool {
+                    self.iter1_1_0(x1).next().is_some()
+                }
+                fn update(&mut self, uf: &mut Unification, delta: &mut Delta) {
+                    let mut inserts = take(&mut delta.le_relation_delta);
+                    let orig_inserts = inserts.len();
+                    self.all_index_0_1
+                        .first_column_uproots(uf.math_uf.get_uprooted_snapshot(), |deleted_rows| {
+                            inserts.extend(deleted_rows)
+                        });
+                    self.all_index_1_0
+                        .first_column_uproots(uf.math_uf.get_uprooted_snapshot(), |deleted_rows| {
+                            inserts.extend(deleted_rows)
+                        });
+                    inserts[orig_inserts..].sort_unstable();
+                    runtime::dedup_suffix(&mut inserts, orig_inserts);
+                    self.all_index_0_1.delete_many(&mut inserts[orig_inserts..]);
+                    self.all_index_1_0.delete_many(&mut inserts[orig_inserts..]);
+                    inserts.iter_mut().for_each(|row| {
+                        row.0 = uf.math_uf.find(row.0);
+                        row.1 = uf.math_uf.find(row.1);
+                    });
+                    self.all_index_0_1
+                        .insert_many(&mut inserts, |mut old, mut new| {
+                            let () = old.value_mut();
+                            let () = new.value_mut();
+                            panic!("panicking merge action")
+                        });
+                    self.all_index_1_0
+                        .insert_many(&mut inserts, |mut old, mut new| {
+                            let () = old.value_mut();
+                            let () = new.value_mut();
+                            panic!("panicking merge action")
+                        });
+                    self.new.extend_from_slice(&inserts);
+                }
+                fn update_finalize(&mut self, uf: &mut Unification) {
+                    self.new.sort_unstable();
+                    self.new.dedup();
+                    self.new.retain(|(x0, x1)| {
+                        if *x0 != uf.math_uf.find(*x0) {
+                            return false;
+                        }
+                        if *x1 != uf.math_uf.find(*x1) {
+                            return false;
+                        }
+                        true
+                    });
+                }
+                fn emit_graphviz(&self, buf: &mut String) {
+                    use std::fmt::Write;
+                    for (i, (x0, x1)) in self.all_index_0_1.iter().enumerate() {
+                        write!(buf, "{}{i} -> {}{};", "le", "math", x0).unwrap();
+                        write!(buf, "{}{i} -> {}{};", "le", "math", x1).unwrap();
+                    }
+                }
+                fn len(&self) -> usize {
+                    self.all_index_0_1.len()
+                }
+            }
+            #[derive(Debug, Default)]
+            pub struct Delta {
+                le_relation_delta: Vec<<LeRelation as Relation>::Row>,
+            }
+            impl Delta {
+                fn new() -> Self {
+                    Self::default()
+                }
+                fn has_new_inserts(&self) -> bool {
+                    let mut has_new_inserts = false;
+                    has_new_inserts |= !self.le_relation_delta.is_empty();
+                    has_new_inserts
+                }
+                pub fn insert_le(&mut self, x: <LeRelation as Relation>::Row) {
+                    self.le_relation_delta.push(x);
+                }
+            }
+            #[derive(Default, Debug)]
+            struct GlobalVariables {
+                new: bool,
+            }
+            impl GlobalVariables {
+                fn initialize(&mut self, delta: &mut Delta, uf: &mut Unification) {
+                    self.new = true;
+                }
+            }
+            #[derive(Debug, Default)]
+            struct Unification {
+                pub math_uf: UnionFind<Math>,
+            }
+            impl Unification {
+                fn has_new_uproots(&mut self) -> bool {
+                    let mut ret = false;
+                    ret |= self.math_uf.has_new_uproots();
+                    ret
+                }
+                fn snapshot_all_uprooted(&mut self) {
+                    self.math_uf.create_uprooted_snapshot();
+                }
+            }
+            #[derive(Debug, Default)]
+            pub struct Theory {
+                pub delta: Delta,
+                pub uf: Unification,
+                global_variables: GlobalVariables,
+                pub le_relation: LeRelation,
+            }
+            impl Theory {
+                pub fn new() -> Self {
+                    let mut theory = Self::default();
+                    theory
+                        .global_variables
+                        .initialize(&mut theory.delta, &mut theory.uf);
+                    theory.canonicalize();
+                    theory.global_variables.new = true;
+                    theory
+                }
+                pub fn step(&mut self) -> [std::time::Duration; 2] {
+                    [
+                        {
+                            let start = std::time::Instant::now();
+                            self.apply_rules();
+                            start.elapsed()
+                        },
+                        {
+                            let start = std::time::Instant::now();
+                            self.canonicalize();
+                            start.elapsed()
+                        },
+                    ]
+                }
+                #[inline(never)]
+                pub fn apply_rules(&mut self) {}
+                fn emit_graphviz(&self) -> String {
+                    let mut buf = String::new();
+                    buf.push_str("digraph G {");
+                    self.le_relation.emit_graphviz(&mut buf);
+                    buf.push_str("}");
+                    buf
+                }
+                pub fn get_total_relation_entry_count(&self) -> usize {
+                    [self.le_relation.len()].into_iter().sum::<usize>()
+                }
+                pub fn get_relation_entry_count(&self) -> std::collections::BTreeMap<&'static str, usize> {
+                    [("Le", self.le_relation.len())].into_iter().collect()
+                }
+                #[inline(never)]
+                pub fn canonicalize(&mut self) {
+                    self.global_variables.new = false;
+                    self.le_relation.clear_new();
+                    while self.uf.has_new_uproots() || self.delta.has_new_inserts() {
+                        self.uf.snapshot_all_uprooted();
+                        self.le_relation.update(&mut self.uf, &mut self.delta);
+                    }
+                    self.uf.snapshot_all_uprooted();
+                    self.le_relation.update_finalize(&mut self.uf);
+                }
+            }
+            impl std::ops::Deref for Theory {
+                type Target = Delta;
+                fn deref(&self) -> &Self::Target {
+                    &self.delta
+                }
+            }
+            impl std::ops::DerefMut for Theory {
+                fn deref_mut(&mut self) -> &mut Self::Target {
+                    &mut self.delta
+                }
+            }
+        "#]]),
+    }
+    .check();
+}

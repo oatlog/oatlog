@@ -1116,13 +1116,13 @@ impl Theory {
                 .iter()
                 .map(|PremiseRelation { relation, args }| {
                     format!(
-                        "{}({})",
+                        " {}({})",
                         self.relations[*relation].name,
                         args.iter().map(|x| rule.premise_dbg(*x)).join(", ")
                     )
                 })
-                .join(", ");
-            wln!("Premise: {premise}");
+                .join(",");
+            wln!("Premise:{premise}");
             // assume normalized, so at most one action variable per set
             let mut sets: BTreeMap<_, Vec<ActionId>> =
                 unify.iter_sets().map(|x| (x, vec![])).collect();

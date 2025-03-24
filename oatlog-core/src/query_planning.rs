@@ -469,12 +469,21 @@ fn symbolic_rules_as_semi_naive(
     symbolic_rules
         .iter()
         .flat_map(|rule| {
-            (0..rule.premise_relations.len()).map(|i| {
+            let semi_naive_for_rule = (0..rule.premise_relations.len()).map(|i| {
                 let mut rule = rule.clone();
                 let relation_id = &mut rule.premise_relations[i].relation;
                 *relation_id = old_to_new[&*relation_id];
                 rule
-            })
+            });
+            assert_ne!(
+                semi_naive_for_rule.len(),
+                0,
+                concat!(
+                    "forall not yet supported, breaks because it is implicitly represented ",
+                    "by unbound premise variables which cannot be semi-naive-ified."
+                )
+            );
+            semi_naive_for_rule
         })
         .collect()
 }
