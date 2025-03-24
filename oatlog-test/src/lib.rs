@@ -22,7 +22,7 @@ mod test {
 
         impl EclassProvider<Math> for Theory {
             fn make(&mut self) -> Math {
-                self.delta.make_math(&mut self.uf)
+                self.uf.math_uf.add_eclass()
             }
 
             fn find(&mut self, t: Math) -> Math {
@@ -74,9 +74,6 @@ mod test {
         }
     }
     mod test_advanced_math {
-
-        use oatlog::runtime::EclassProvider as _;
-
         oatlog::compile_egraph!((
             (datatype Math
                 (Diff Math Math)

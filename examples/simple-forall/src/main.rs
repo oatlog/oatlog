@@ -8,7 +8,7 @@ oatlog::compile_egraph!((
 
 fn run() {
     let mut theory = Theory::new();
-    let x = theory.delta.make_math(&mut theory.uf);
+    let x = theory.uf.math_uf.add_eclass();
     theory.step();
 
     let x = theory.uf.math_uf.find(x);

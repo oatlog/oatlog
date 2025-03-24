@@ -23,7 +23,9 @@ use std::iter;
 pub(crate) struct Theory {
     pub(crate) name: &'static str,
     pub(crate) types: TVec<TypeId, TypeData>,
-    pub(crate) relations: TVec<RelationId, RelationData>,
+    // TODO loke: not all HIR relations become LIR relations, so the `RelationId` keyspace changes
+    // between HIR and LIR. We should actually implement this, not do this `Option` hack.
+    pub(crate) relations: TVec<RelationId, Option<RelationData>>,
     pub(crate) rule_variables: TVec<VariableId, VariableData>,
     pub(crate) global_compute: TVec<GlobalId, GlobalCompute>,
     pub(crate) global_types: TVec<GlobalId, TypeId>,
@@ -126,13 +128,6 @@ impl RelationData {
             },
         }
     }
-    pub(crate) fn new_forall(name: &'static str, ty: TypeId) -> Self {
-        Self {
-            name: format!("Forall{name}").leak(),
-            param_types: iter::once(ty).collect(),
-            kind: RelationKind::Forall { ty },
-        }
-    }
     pub(crate) fn new_global(name: Option<&'static str>, ty: TypeId, id: GlobalId) -> Self {
         let name = name.unwrap_or(&*id.to_string().leak());
         Self {
@@ -155,9 +150,6 @@ pub enum RelationKind {
         /// Index usage for back-references.
         column_back_reference: TVec<ColumnId, IndexUsageId>,
         // trigger_rules: ...
-    },
-    Forall {
-        ty: TypeId,
     },
     // /// Panics if usage is not a subset of indexes.
     // Primitive { }
@@ -379,13 +371,16 @@ impl Theory {
                     .finish()
             }
         }
-        impl Debug for Dbg<'_, RelationData> {
+        impl Debug for Dbg<'_, Option<RelationData>> {
             fn fmt(&self, f: &mut Formatter<'_>) -> Result<(), Error> {
-                let RelationData {
+                let Some(RelationData {
                     name,
                     param_types,
                     kind,
-                } = self.0;
+                }) = self.0
+                else {
+                    return f.write_str("(hir-only relation)");
+                };
                 f.debug_struct("RelationData")
                     .field("name", name)
                     .field("param_types", &NoAlt(param_types))
@@ -437,9 +432,6 @@ impl Theory {
                         )
                         .field("column_back_reference", &NoAlt(&column_back_reference))
                         .finish(),
-                    RelationKind::Forall { ty } => {
-                        write!(f, "{:?}", DbgStr(["Forall".to_string(), ty.to_string()]))
-                    }
                     RelationKind::Global { id } => {
                         write!(f, "{:?}", DbgStr(["Global".to_string(), id.to_string()]))
                     }

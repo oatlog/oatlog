@@ -96,7 +96,7 @@ pub(crate) fn emit_lir_theory(mut theory: hir::Theory) -> (hir::Theory, lir::The
 
     // compute indexes for relations.
 
-    let mut lir_relations: TVec<RelationId, lir::RelationData> = TVec::new();
+    let mut lir_relations: TVec<RelationId, Option<lir::RelationData>> = TVec::new();
 
     for relation_id in theory.relations.enumerate() {
         let relation = &theory.relations[relation_id];
@@ -106,14 +106,14 @@ pub(crate) fn emit_lir_theory(mut theory: hir::Theory) -> (hir::Theory, lir::The
             RelationTy::Global { id } => {
                 let ty = theory.global_types[id];
                 let lir_relation = lir::RelationData::new_global(None, ty, id);
-                lir_relations.push_expected(relation_id, lir_relation);
+                lir_relations.push_expected(relation_id, Some(lir_relation));
             }
             RelationTy::Primitive { .. } => {
                 unimplemented!("primtive relations not implemented")
             }
-            RelationTy::Forall { ty } => {
-                let lir_relation = lir::RelationData::new_forall(theory.types[ty].name, ty);
-                lir_relations.push_expected(relation_id, lir_relation);
+            RelationTy::Forall { ty: _ } => {
+                // Forall relations are implicitly created as a feature of `runtime::UnionFind`
+                lir_relations.push_expected(relation_id, None);
             }
             RelationTy::Table => {
                 let uses = &mut table_uses[relation_id];
@@ -150,7 +150,7 @@ pub(crate) fn emit_lir_theory(mut theory: hir::Theory) -> (hir::Theory, lir::The
                     index_to_info,
                     column_back_references,
                 );
-                lir_relations.push_expected(relation_id, lir_relation);
+                lir_relations.push_expected(relation_id, Some(lir_relation));
             }
         }
     }

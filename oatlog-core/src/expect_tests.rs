@@ -334,11 +334,7 @@ fn hir_global() {
                     [t3, Math]: [symbolic],
                 },
                 relations: {
-                    r0: RelationData {
-                        name: "ForallMath",
-                        param_types: {c0: t3},
-                        kind: [Forall, t3],
-                    },
+                    r0: (hir-only relation),
                     r1: RelationData {
                         name: "Mul",
                         param_types: {c0: t3, c1: t3, c2: t3},
@@ -468,11 +464,7 @@ fn test_bind_variable_multiple_times() {
                     [t3, Foo]: [symbolic],
                 },
                 relations: {
-                    r0: RelationData {
-                        name: "ForallFoo",
-                        param_types: {c0: t3},
-                        kind: [Forall, t3],
-                    },
+                    r0: (hir-only relation),
                     r1: RelationData {
                         name: "Same",
                         param_types: {c0: t3, c1: t3, c2: t3},
@@ -774,63 +766,6 @@ fn codegen_bug1() {
             eclass_wrapper_ty!(T1);
             eclass_wrapper_ty!(T2);
             #[derive(Debug, Default)]
-            struct ForallT0Relation {
-                new: std::collections::BTreeSet<<Self as Relation>::Row>,
-                all: std::collections::BTreeSet<<Self as Relation>::Row>,
-            }
-            impl Relation for ForallT0Relation {
-                type Row = (T0,);
-            }
-            impl ForallT0Relation {
-                fn update(&mut self, uprooted: &Uprooted, uf: &mut Unification, delta: &mut Delta) {
-                    delta.forall_t0_relation_delta.clear();
-                }
-                fn clear_new(&mut self) {}
-                fn update_finalize(&mut self, uf: &mut Unification) {}
-                fn emit_graphviz(&self, buf: &mut String) {}
-                fn len(&self) -> usize {
-                    self.all.len()
-                }
-            }
-            #[derive(Debug, Default)]
-            struct ForallT1Relation {
-                new: std::collections::BTreeSet<<Self as Relation>::Row>,
-                all: std::collections::BTreeSet<<Self as Relation>::Row>,
-            }
-            impl Relation for ForallT1Relation {
-                type Row = (T1,);
-            }
-            impl ForallT1Relation {
-                fn update(&mut self, uprooted: &Uprooted, uf: &mut Unification, delta: &mut Delta) {
-                    delta.forall_t1_relation_delta.clear();
-                }
-                fn clear_new(&mut self) {}
-                fn update_finalize(&mut self, uf: &mut Unification) {}
-                fn emit_graphviz(&self, buf: &mut String) {}
-                fn len(&self) -> usize {
-                    self.all.len()
-                }
-            }
-            #[derive(Debug, Default)]
-            struct ForallT2Relation {
-                new: std::collections::BTreeSet<<Self as Relation>::Row>,
-                all: std::collections::BTreeSet<<Self as Relation>::Row>,
-            }
-            impl Relation for ForallT2Relation {
-                type Row = (T2,);
-            }
-            impl ForallT2Relation {
-                fn update(&mut self, uprooted: &Uprooted, uf: &mut Unification, delta: &mut Delta) {
-                    delta.forall_t2_relation_delta.clear();
-                }
-                fn clear_new(&mut self) {}
-                fn update_finalize(&mut self, uf: &mut Unification) {}
-                fn emit_graphviz(&self, buf: &mut String) {}
-                fn len(&self) -> usize {
-                    self.all.len()
-                }
-            }
-            #[derive(Debug, Default)]
             struct FooRelation {
                 new: Vec<<Self as Relation>::Row>,
                 all_index_0_1_2: IndexImpl<RadixSortCtx<Row3_0_1_2<T0, T1, T2>, u128>>,
@@ -878,19 +813,19 @@ fn codegen_bug1() {
                 fn check1_2_0_1(&self, x2: T2) -> bool {
                     self.iter1_2_0_1(x2).next().is_some()
                 }
-                fn update(&mut self, uprooted: &Uprooted, uf: &mut Unification, delta: &mut Delta) {
+                fn update(&mut self, uf: &mut Unification, delta: &mut Delta) {
                     let mut inserts = take(&mut delta.foo_relation_delta);
                     let orig_inserts = inserts.len();
                     self.all_index_0_1_2
-                        .first_column_uproots(&uprooted.t0_uprooted, |deleted_rows| {
+                        .first_column_uproots(uf.t0_uf.get_uprooted_snapshot(), |deleted_rows| {
                             inserts.extend(deleted_rows)
                         });
                     self.all_index_1_0_2
-                        .first_column_uproots(&uprooted.t1_uprooted, |deleted_rows| {
+                        .first_column_uproots(uf.t1_uf.get_uprooted_snapshot(), |deleted_rows| {
                             inserts.extend(deleted_rows)
                         });
                     self.all_index_2_0_1
-                        .first_column_uproots(&uprooted.t2_uprooted, |deleted_rows| {
+                        .first_column_uproots(uf.t2_uf.get_uprooted_snapshot(), |deleted_rows| {
                             inserts.extend(deleted_rows)
                         });
                     inserts[orig_inserts..].sort_unstable();
@@ -901,14 +836,11 @@ fn codegen_bug1() {
                         .delete_many(&mut inserts[orig_inserts..]);
                     self.all_index_2_0_1
                         .delete_many(&mut inserts[orig_inserts..]);
-                    inserts
-                        .iter_mut()
-                        .enumerate()
-                        .for_each(|(i, old @ &mut (x0, x1, x2))| {
-                            old.0 = uf.t0_uf.find(x0);
-                            old.1 = uf.t1_uf.find(x1);
-                            old.2 = uf.t2_uf.find(x2);
-                        });
+                    inserts.iter_mut().for_each(|row| {
+                        row.0 = uf.t0_uf.find(row.0);
+                        row.1 = uf.t1_uf.find(row.1);
+                        row.2 = uf.t2_uf.find(row.2);
+                    });
                     self.all_index_0_1_2
                         .insert_many(&mut inserts, |mut old, mut new| {
                             let () = old.value_mut();
@@ -959,37 +891,16 @@ fn codegen_bug1() {
             }
             #[derive(Debug, Default)]
             pub struct Delta {
-                forall_t0_relation_delta: Vec<<ForallT0Relation as Relation>::Row>,
-                forall_t1_relation_delta: Vec<<ForallT1Relation as Relation>::Row>,
-                forall_t2_relation_delta: Vec<<ForallT2Relation as Relation>::Row>,
                 foo_relation_delta: Vec<<FooRelation as Relation>::Row>,
             }
             impl Delta {
                 fn new() -> Self {
                     Self::default()
                 }
-                fn has_new(&self) -> bool {
-                    let mut has_new = false;
-                    has_new |= !self.forall_t0_relation_delta.is_empty();
-                    has_new |= !self.forall_t1_relation_delta.is_empty();
-                    has_new |= !self.forall_t2_relation_delta.is_empty();
-                    has_new |= !self.foo_relation_delta.is_empty();
-                    has_new
-                }
-                pub fn make_t0(&mut self, uf: &mut Unification) -> T0 {
-                    let id = uf.t0_uf.add_eclass();
-                    self.forall_t0_relation_delta.push((id,));
-                    id
-                }
-                pub fn make_t1(&mut self, uf: &mut Unification) -> T1 {
-                    let id = uf.t1_uf.add_eclass();
-                    self.forall_t1_relation_delta.push((id,));
-                    id
-                }
-                pub fn make_t2(&mut self, uf: &mut Unification) -> T2 {
-                    let id = uf.t2_uf.add_eclass();
-                    self.forall_t2_relation_delta.push((id,));
-                    id
+                fn has_new_inserts(&self) -> bool {
+                    let mut has_new_inserts = false;
+                    has_new_inserts |= !self.foo_relation_delta.is_empty();
+                    has_new_inserts
                 }
                 pub fn insert_foo(&mut self, x: <FooRelation as Relation>::Row) {
                     self.foo_relation_delta.push(x);
@@ -1005,48 +916,30 @@ fn codegen_bug1() {
                 }
             }
             #[derive(Debug, Default)]
-            struct Uprooted {
-                t0_uprooted: Vec<T0>,
-                t1_uprooted: Vec<T1>,
-                t2_uprooted: Vec<T2>,
-            }
-            impl Uprooted {
-                fn take_dirt(&mut self, uf: &mut Unification) {
-                    self.t0_uprooted.clear();
-                    self.t1_uprooted.clear();
-                    self.t2_uprooted.clear();
-                    swap(&mut self.t0_uprooted, &mut uf.t0_uf.dirty());
-                    swap(&mut self.t1_uprooted, &mut uf.t1_uf.dirty());
-                    swap(&mut self.t2_uprooted, &mut uf.t2_uf.dirty());
-                    self.t0_uprooted.sort_unstable();
-                    self.t1_uprooted.sort_unstable();
-                    self.t2_uprooted.sort_unstable();
-                }
-            }
-            #[derive(Debug, Default)]
             struct Unification {
                 pub t0_uf: UnionFind<T0>,
                 pub t1_uf: UnionFind<T1>,
                 pub t2_uf: UnionFind<T2>,
             }
             impl Unification {
-                fn has_new(&mut self) -> bool {
-                    let mut has_new = false;
-                    has_new |= !self.t0_uf.dirty().is_empty();
-                    has_new |= !self.t1_uf.dirty().is_empty();
-                    has_new |= !self.t2_uf.dirty().is_empty();
-                    has_new
+                fn has_new_uproots(&mut self) -> bool {
+                    let mut ret = false;
+                    ret |= self.t0_uf.has_new_uproots();
+                    ret |= self.t1_uf.has_new_uproots();
+                    ret |= self.t2_uf.has_new_uproots();
+                    ret
+                }
+                fn snapshot_all_uprooted(&mut self) {
+                    self.t0_uf.create_uprooted_snapshot();
+                    self.t1_uf.create_uprooted_snapshot();
+                    self.t2_uf.create_uprooted_snapshot();
                 }
             }
             #[derive(Debug, Default)]
             pub struct Theory {
                 pub delta: Delta,
                 pub uf: Unification,
-                uprooted: Uprooted,
                 global_variables: GlobalVariables,
-                pub forall_t0_relation: ForallT0Relation,
-                pub forall_t1_relation: ForallT1Relation,
-                pub forall_t2_relation: ForallT2Relation,
                 pub foo_relation: FooRelation,
             }
             impl Theory {
@@ -1055,7 +948,7 @@ fn codegen_bug1() {
                     theory
                         .global_variables
                         .initialize(&mut theory.delta, &mut theory.uf);
-                    theory.clear_transient();
+                    theory.canonicalize();
                     theory.global_variables.new = true;
                     theory
                 }
@@ -1068,7 +961,7 @@ fn codegen_bug1() {
                         },
                         {
                             let start = std::time::Instant::now();
-                            self.clear_transient();
+                            self.canonicalize();
                             start.elapsed()
                         },
                     ]
@@ -1078,50 +971,25 @@ fn codegen_bug1() {
                 fn emit_graphviz(&self) -> String {
                     let mut buf = String::new();
                     buf.push_str("digraph G {");
-                    self.forall_t0_relation.emit_graphviz(&mut buf);
-                    self.forall_t1_relation.emit_graphviz(&mut buf);
-                    self.forall_t2_relation.emit_graphviz(&mut buf);
                     self.foo_relation.emit_graphviz(&mut buf);
                     buf.push_str("}");
                     buf
                 }
                 pub fn get_total_relation_entry_count(&self) -> usize {
-                    [
-                        self.forall_t0_relation.len(),
-                        self.forall_t1_relation.len(),
-                        self.forall_t2_relation.len(),
-                        self.foo_relation.len(),
-                    ]
-                    .into_iter()
-                    .sum::<usize>()
+                    [self.foo_relation.len()].into_iter().sum::<usize>()
                 }
                 pub fn get_relation_entry_count(&self) -> std::collections::BTreeMap<&'static str, usize> {
                     [("Foo", self.foo_relation.len())].into_iter().collect()
                 }
                 #[inline(never)]
-                pub fn clear_transient(&mut self) {
+                pub fn canonicalize(&mut self) {
                     self.global_variables.new = false;
-                    self.forall_t0_relation.clear_new();
-                    self.forall_t1_relation.clear_new();
-                    self.forall_t2_relation.clear_new();
                     self.foo_relation.clear_new();
-                    loop {
-                        self.uprooted.take_dirt(&mut self.uf);
-                        self.forall_t0_relation
-                            .update(&self.uprooted, &mut self.uf, &mut self.delta);
-                        self.forall_t1_relation
-                            .update(&self.uprooted, &mut self.uf, &mut self.delta);
-                        self.forall_t2_relation
-                            .update(&self.uprooted, &mut self.uf, &mut self.delta);
-                        self.foo_relation
-                            .update(&self.uprooted, &mut self.uf, &mut self.delta);
-                        if !(self.uf.has_new() || self.delta.has_new()) {
-                            break;
-                        }
+                    while self.uf.has_new_uproots() || self.delta.has_new_inserts() {
+                        self.uf.snapshot_all_uprooted();
+                        self.foo_relation.update(&mut self.uf, &mut self.delta);
                     }
-                    self.forall_t0_relation.update_finalize(&mut self.uf);
-                    self.forall_t1_relation.update_finalize(&mut self.uf);
-                    self.forall_t2_relation.update_finalize(&mut self.uf);
+                    self.uf.snapshot_all_uprooted();
                     self.foo_relation.update_finalize(&mut self.uf);
                 }
             }
@@ -1163,25 +1031,6 @@ fn initial() {
             decl_row ! (Row2_0 < T0 first , T1 > (0) (1) (T0) (T1) fc = (0) (T0) where u64 = s => ((s . 0 . inner () as u64) << 32) + ((s . 1 . inner () as u64) << 0));
             decl_row ! (Row2_1_0 < T0 , T1 first > (1 , 0) () (T1 , T0) () fc = (1) (T1) where u64 = s => ((s . 1 . inner () as u64) << 32) + ((s . 0 . inner () as u64) << 0));
             eclass_wrapper_ty!(Math);
-            #[derive(Debug, Default)]
-            struct ForallMathRelation {
-                new: std::collections::BTreeSet<<Self as Relation>::Row>,
-                all: std::collections::BTreeSet<<Self as Relation>::Row>,
-            }
-            impl Relation for ForallMathRelation {
-                type Row = (Math,);
-            }
-            impl ForallMathRelation {
-                fn update(&mut self, uprooted: &Uprooted, uf: &mut Unification, delta: &mut Delta) {
-                    delta.forall_math_relation_delta.clear();
-                }
-                fn clear_new(&mut self) {}
-                fn update_finalize(&mut self, uf: &mut Unification) {}
-                fn emit_graphviz(&self, buf: &mut String) {}
-                fn len(&self) -> usize {
-                    self.all.len()
-                }
-            }
             #[derive(Debug, Default)]
             struct ConstRelation {
                 new: Vec<<Self as Relation>::Row>,
@@ -1231,27 +1080,23 @@ fn initial() {
                         return (x1,);
                     }
                     let x1 = uf.math_uf.add_eclass();
-                    delta.forall_math_relation_delta.push((x1,));
                     delta.const_relation_delta.push((x0, x1));
                     (x1,)
                 }
-                fn update(&mut self, uprooted: &Uprooted, uf: &mut Unification, delta: &mut Delta) {
+                fn update(&mut self, uf: &mut Unification, delta: &mut Delta) {
                     let mut inserts = take(&mut delta.const_relation_delta);
                     let orig_inserts = inserts.len();
                     self.all_index_1_0
-                        .first_column_uproots(&uprooted.math_uprooted, |deleted_rows| {
+                        .first_column_uproots(uf.math_uf.get_uprooted_snapshot(), |deleted_rows| {
                             inserts.extend(deleted_rows)
                         });
                     inserts[orig_inserts..].sort_unstable();
                     runtime::dedup_suffix(&mut inserts, orig_inserts);
                     self.all_index_0_1.delete_many(&mut inserts[orig_inserts..]);
                     self.all_index_1_0.delete_many(&mut inserts[orig_inserts..]);
-                    inserts
-                        .iter_mut()
-                        .enumerate()
-                        .for_each(|(i, old @ &mut (x0, x1))| {
-                            old.1 = uf.math_uf.find(x1);
-                        });
+                    inserts.iter_mut().for_each(|row| {
+                        row.1 = uf.math_uf.find(row.1);
+                    });
                     self.all_index_0_1
                         .insert_many(&mut inserts, |mut old, mut new| {
                             let (x1,) = old.value_mut();
@@ -1290,23 +1135,16 @@ fn initial() {
             }
             #[derive(Debug, Default)]
             pub struct Delta {
-                forall_math_relation_delta: Vec<<ForallMathRelation as Relation>::Row>,
                 const_relation_delta: Vec<<ConstRelation as Relation>::Row>,
             }
             impl Delta {
                 fn new() -> Self {
                     Self::default()
                 }
-                fn has_new(&self) -> bool {
-                    let mut has_new = false;
-                    has_new |= !self.forall_math_relation_delta.is_empty();
-                    has_new |= !self.const_relation_delta.is_empty();
-                    has_new
-                }
-                pub fn make_math(&mut self, uf: &mut Unification) -> Math {
-                    let id = uf.math_uf.add_eclass();
-                    self.forall_math_relation_delta.push((id,));
-                    id
+                fn has_new_inserts(&self) -> bool {
+                    let mut has_new_inserts = false;
+                    has_new_inserts |= !self.const_relation_delta.is_empty();
+                    has_new_inserts
                 }
                 pub fn insert_const(&mut self, x: <ConstRelation as Relation>::Row) {
                     self.const_relation_delta.push(x);
@@ -1322,34 +1160,24 @@ fn initial() {
                 }
             }
             #[derive(Debug, Default)]
-            struct Uprooted {
-                math_uprooted: Vec<Math>,
-            }
-            impl Uprooted {
-                fn take_dirt(&mut self, uf: &mut Unification) {
-                    self.math_uprooted.clear();
-                    swap(&mut self.math_uprooted, &mut uf.math_uf.dirty());
-                    self.math_uprooted.sort_unstable();
-                }
-            }
-            #[derive(Debug, Default)]
             struct Unification {
                 pub math_uf: UnionFind<Math>,
             }
             impl Unification {
-                fn has_new(&mut self) -> bool {
-                    let mut has_new = false;
-                    has_new |= !self.math_uf.dirty().is_empty();
-                    has_new
+                fn has_new_uproots(&mut self) -> bool {
+                    let mut ret = false;
+                    ret |= self.math_uf.has_new_uproots();
+                    ret
+                }
+                fn snapshot_all_uprooted(&mut self) {
+                    self.math_uf.create_uprooted_snapshot();
                 }
             }
             #[derive(Debug, Default)]
             pub struct Theory {
                 pub delta: Delta,
                 pub uf: Unification,
-                uprooted: Uprooted,
                 global_variables: GlobalVariables,
-                pub forall_math_relation: ForallMathRelation,
                 pub const_relation: ConstRelation,
             }
             impl Theory {
@@ -1358,7 +1186,7 @@ fn initial() {
                     theory
                         .global_variables
                         .initialize(&mut theory.delta, &mut theory.uf);
-                    theory.clear_transient();
+                    theory.canonicalize();
                     theory.global_variables.new = true;
                     for _ in 0..42u64 {
                         theory.step();
@@ -1374,7 +1202,7 @@ fn initial() {
                         },
                         {
                             let start = std::time::Instant::now();
-                            self.clear_transient();
+                            self.canonicalize();
                             start.elapsed()
                         },
                     ]
@@ -1384,35 +1212,25 @@ fn initial() {
                 fn emit_graphviz(&self) -> String {
                     let mut buf = String::new();
                     buf.push_str("digraph G {");
-                    self.forall_math_relation.emit_graphviz(&mut buf);
                     self.const_relation.emit_graphviz(&mut buf);
                     buf.push_str("}");
                     buf
                 }
                 pub fn get_total_relation_entry_count(&self) -> usize {
-                    [self.forall_math_relation.len(), self.const_relation.len()]
-                        .into_iter()
-                        .sum::<usize>()
+                    [self.const_relation.len()].into_iter().sum::<usize>()
                 }
                 pub fn get_relation_entry_count(&self) -> std::collections::BTreeMap<&'static str, usize> {
                     [("Const", self.const_relation.len())].into_iter().collect()
                 }
                 #[inline(never)]
-                pub fn clear_transient(&mut self) {
+                pub fn canonicalize(&mut self) {
                     self.global_variables.new = false;
-                    self.forall_math_relation.clear_new();
                     self.const_relation.clear_new();
-                    loop {
-                        self.uprooted.take_dirt(&mut self.uf);
-                        self.forall_math_relation
-                            .update(&self.uprooted, &mut self.uf, &mut self.delta);
-                        self.const_relation
-                            .update(&self.uprooted, &mut self.uf, &mut self.delta);
-                        if !(self.uf.has_new() || self.delta.has_new()) {
-                            break;
-                        }
+                    while self.uf.has_new_uproots() || self.delta.has_new_inserts() {
+                        self.uf.snapshot_all_uprooted();
+                        self.const_relation.update(&mut self.uf, &mut self.delta);
                     }
-                    self.forall_math_relation.update_finalize(&mut self.uf);
+                    self.uf.snapshot_all_uprooted();
                     self.const_relation.update_finalize(&mut self.uf);
                 }
             }
@@ -1507,25 +1325,6 @@ fn test_primitives_simple() {
             decl_row ! (Row3_2_0_1 < T0 , T1 , T2 first > (2 , 0 , 1) () (T2 , T0 , T1) () fc = (2) (T2) where u128 = s => ((s . 2 . inner () as u128) << 64) + ((s . 0 . inner () as u128) << 32) + ((s . 1 . inner () as u128) << 0));
             eclass_wrapper_ty!(Math);
             #[derive(Debug, Default)]
-            struct ForallMathRelation {
-                new: std::collections::BTreeSet<<Self as Relation>::Row>,
-                all: std::collections::BTreeSet<<Self as Relation>::Row>,
-            }
-            impl Relation for ForallMathRelation {
-                type Row = (Math,);
-            }
-            impl ForallMathRelation {
-                fn update(&mut self, uprooted: &Uprooted, uf: &mut Unification, delta: &mut Delta) {
-                    delta.forall_math_relation_delta.clear();
-                }
-                fn clear_new(&mut self) {}
-                fn update_finalize(&mut self, uf: &mut Unification) {}
-                fn emit_graphviz(&self, buf: &mut String) {}
-                fn len(&self) -> usize {
-                    self.all.len()
-                }
-            }
-            #[derive(Debug, Default)]
             struct MulRelation {
                 new: Vec<<Self as Relation>::Row>,
                 all_index_0_1_2: IndexImpl<RadixSortCtx<Row3_0_1<Math, Math, Math>, u128>>,
@@ -1586,23 +1385,22 @@ fn test_primitives_simple() {
                         return (x2,);
                     }
                     let x2 = uf.math_uf.add_eclass();
-                    delta.forall_math_relation_delta.push((x2,));
                     delta.mul_relation_delta.push((x0, x1, x2));
                     (x2,)
                 }
-                fn update(&mut self, uprooted: &Uprooted, uf: &mut Unification, delta: &mut Delta) {
+                fn update(&mut self, uf: &mut Unification, delta: &mut Delta) {
                     let mut inserts = take(&mut delta.mul_relation_delta);
                     let orig_inserts = inserts.len();
                     self.all_index_0_1_2
-                        .first_column_uproots(&uprooted.math_uprooted, |deleted_rows| {
+                        .first_column_uproots(uf.math_uf.get_uprooted_snapshot(), |deleted_rows| {
                             inserts.extend(deleted_rows)
                         });
                     self.all_index_1_0_2
-                        .first_column_uproots(&uprooted.math_uprooted, |deleted_rows| {
+                        .first_column_uproots(uf.math_uf.get_uprooted_snapshot(), |deleted_rows| {
                             inserts.extend(deleted_rows)
                         });
                     self.all_index_2_0_1
-                        .first_column_uproots(&uprooted.math_uprooted, |deleted_rows| {
+                        .first_column_uproots(uf.math_uf.get_uprooted_snapshot(), |deleted_rows| {
                             inserts.extend(deleted_rows)
                         });
                     inserts[orig_inserts..].sort_unstable();
@@ -1613,14 +1411,11 @@ fn test_primitives_simple() {
                         .delete_many(&mut inserts[orig_inserts..]);
                     self.all_index_2_0_1
                         .delete_many(&mut inserts[orig_inserts..]);
-                    inserts
-                        .iter_mut()
-                        .enumerate()
-                        .for_each(|(i, old @ &mut (x0, x1, x2))| {
-                            old.0 = uf.math_uf.find(x0);
-                            old.1 = uf.math_uf.find(x1);
-                            old.2 = uf.math_uf.find(x2);
-                        });
+                    inserts.iter_mut().for_each(|row| {
+                        row.0 = uf.math_uf.find(row.0);
+                        row.1 = uf.math_uf.find(row.1);
+                        row.2 = uf.math_uf.find(row.2);
+                    });
                     self.all_index_0_1_2
                         .insert_many(&mut inserts, |mut old, mut new| {
                             let (x2,) = old.value_mut();
@@ -1731,23 +1526,22 @@ fn test_primitives_simple() {
                         return (x2,);
                     }
                     let x2 = uf.math_uf.add_eclass();
-                    delta.forall_math_relation_delta.push((x2,));
                     delta.add_relation_delta.push((x0, x1, x2));
                     (x2,)
                 }
-                fn update(&mut self, uprooted: &Uprooted, uf: &mut Unification, delta: &mut Delta) {
+                fn update(&mut self, uf: &mut Unification, delta: &mut Delta) {
                     let mut inserts = take(&mut delta.add_relation_delta);
                     let orig_inserts = inserts.len();
                     self.all_index_0_1_2
-                        .first_column_uproots(&uprooted.math_uprooted, |deleted_rows| {
+                        .first_column_uproots(uf.math_uf.get_uprooted_snapshot(), |deleted_rows| {
                             inserts.extend(deleted_rows)
                         });
                     self.all_index_1_0_2
-                        .first_column_uproots(&uprooted.math_uprooted, |deleted_rows| {
+                        .first_column_uproots(uf.math_uf.get_uprooted_snapshot(), |deleted_rows| {
                             inserts.extend(deleted_rows)
                         });
                     self.all_index_2_0_1
-                        .first_column_uproots(&uprooted.math_uprooted, |deleted_rows| {
+                        .first_column_uproots(uf.math_uf.get_uprooted_snapshot(), |deleted_rows| {
                             inserts.extend(deleted_rows)
                         });
                     inserts[orig_inserts..].sort_unstable();
@@ -1758,14 +1552,11 @@ fn test_primitives_simple() {
                         .delete_many(&mut inserts[orig_inserts..]);
                     self.all_index_2_0_1
                         .delete_many(&mut inserts[orig_inserts..]);
-                    inserts
-                        .iter_mut()
-                        .enumerate()
-                        .for_each(|(i, old @ &mut (x0, x1, x2))| {
-                            old.0 = uf.math_uf.find(x0);
-                            old.1 = uf.math_uf.find(x1);
-                            old.2 = uf.math_uf.find(x2);
-                        });
+                    inserts.iter_mut().for_each(|row| {
+                        row.0 = uf.math_uf.find(row.0);
+                        row.1 = uf.math_uf.find(row.1);
+                        row.2 = uf.math_uf.find(row.2);
+                    });
                     self.all_index_0_1_2
                         .insert_many(&mut inserts, |mut old, mut new| {
                             let (x2,) = old.value_mut();
@@ -1872,27 +1663,23 @@ fn test_primitives_simple() {
                         return (x1,);
                     }
                     let x1 = uf.math_uf.add_eclass();
-                    delta.forall_math_relation_delta.push((x1,));
                     delta.const_relation_delta.push((x0, x1));
                     (x1,)
                 }
-                fn update(&mut self, uprooted: &Uprooted, uf: &mut Unification, delta: &mut Delta) {
+                fn update(&mut self, uf: &mut Unification, delta: &mut Delta) {
                     let mut inserts = take(&mut delta.const_relation_delta);
                     let orig_inserts = inserts.len();
                     self.all_index_1_0
-                        .first_column_uproots(&uprooted.math_uprooted, |deleted_rows| {
+                        .first_column_uproots(uf.math_uf.get_uprooted_snapshot(), |deleted_rows| {
                             inserts.extend(deleted_rows)
                         });
                     inserts[orig_inserts..].sort_unstable();
                     runtime::dedup_suffix(&mut inserts, orig_inserts);
                     self.all_index_0_1.delete_many(&mut inserts[orig_inserts..]);
                     self.all_index_1_0.delete_many(&mut inserts[orig_inserts..]);
-                    inserts
-                        .iter_mut()
-                        .enumerate()
-                        .for_each(|(i, old @ &mut (x0, x1))| {
-                            old.1 = uf.math_uf.find(x1);
-                        });
+                    inserts.iter_mut().for_each(|row| {
+                        row.1 = uf.math_uf.find(row.1);
+                    });
                     self.all_index_0_1
                         .insert_many(&mut inserts, |mut old, mut new| {
                             let (x1,) = old.value_mut();
@@ -1978,27 +1765,23 @@ fn test_primitives_simple() {
                         return (x1,);
                     }
                     let x1 = uf.math_uf.add_eclass();
-                    delta.forall_math_relation_delta.push((x1,));
                     delta.var_relation_delta.push((x0, x1));
                     (x1,)
                 }
-                fn update(&mut self, uprooted: &Uprooted, uf: &mut Unification, delta: &mut Delta) {
+                fn update(&mut self, uf: &mut Unification, delta: &mut Delta) {
                     let mut inserts = take(&mut delta.var_relation_delta);
                     let orig_inserts = inserts.len();
                     self.all_index_1_0
-                        .first_column_uproots(&uprooted.math_uprooted, |deleted_rows| {
+                        .first_column_uproots(uf.math_uf.get_uprooted_snapshot(), |deleted_rows| {
                             inserts.extend(deleted_rows)
                         });
                     inserts[orig_inserts..].sort_unstable();
                     runtime::dedup_suffix(&mut inserts, orig_inserts);
                     self.all_index_0_1.delete_many(&mut inserts[orig_inserts..]);
                     self.all_index_1_0.delete_many(&mut inserts[orig_inserts..]);
-                    inserts
-                        .iter_mut()
-                        .enumerate()
-                        .for_each(|(i, old @ &mut (x0, x1))| {
-                            old.1 = uf.math_uf.find(x1);
-                        });
+                    inserts.iter_mut().for_each(|row| {
+                        row.1 = uf.math_uf.find(row.1);
+                    });
                     self.all_index_0_1
                         .insert_many(&mut inserts, |mut old, mut new| {
                             let (x1,) = old.value_mut();
@@ -2037,7 +1820,6 @@ fn test_primitives_simple() {
             }
             #[derive(Debug, Default)]
             pub struct Delta {
-                forall_math_relation_delta: Vec<<ForallMathRelation as Relation>::Row>,
                 mul_relation_delta: Vec<<MulRelation as Relation>::Row>,
                 add_relation_delta: Vec<<AddRelation as Relation>::Row>,
                 const_relation_delta: Vec<<ConstRelation as Relation>::Row>,
@@ -2047,19 +1829,13 @@ fn test_primitives_simple() {
                 fn new() -> Self {
                     Self::default()
                 }
-                fn has_new(&self) -> bool {
-                    let mut has_new = false;
-                    has_new |= !self.forall_math_relation_delta.is_empty();
-                    has_new |= !self.mul_relation_delta.is_empty();
-                    has_new |= !self.add_relation_delta.is_empty();
-                    has_new |= !self.const_relation_delta.is_empty();
-                    has_new |= !self.var_relation_delta.is_empty();
-                    has_new
-                }
-                pub fn make_math(&mut self, uf: &mut Unification) -> Math {
-                    let id = uf.math_uf.add_eclass();
-                    self.forall_math_relation_delta.push((id,));
-                    id
+                fn has_new_inserts(&self) -> bool {
+                    let mut has_new_inserts = false;
+                    has_new_inserts |= !self.mul_relation_delta.is_empty();
+                    has_new_inserts |= !self.add_relation_delta.is_empty();
+                    has_new_inserts |= !self.const_relation_delta.is_empty();
+                    has_new_inserts |= !self.var_relation_delta.is_empty();
+                    has_new_inserts
                 }
                 pub fn insert_mul(&mut self, x: <MulRelation as Relation>::Row) {
                     self.mul_relation_delta.push(x);
@@ -2104,34 +1880,24 @@ fn test_primitives_simple() {
                 }
             }
             #[derive(Debug, Default)]
-            struct Uprooted {
-                math_uprooted: Vec<Math>,
-            }
-            impl Uprooted {
-                fn take_dirt(&mut self, uf: &mut Unification) {
-                    self.math_uprooted.clear();
-                    swap(&mut self.math_uprooted, &mut uf.math_uf.dirty());
-                    self.math_uprooted.sort_unstable();
-                }
-            }
-            #[derive(Debug, Default)]
             struct Unification {
                 pub math_uf: UnionFind<Math>,
             }
             impl Unification {
-                fn has_new(&mut self) -> bool {
-                    let mut has_new = false;
-                    has_new |= !self.math_uf.dirty().is_empty();
-                    has_new
+                fn has_new_uproots(&mut self) -> bool {
+                    let mut ret = false;
+                    ret |= self.math_uf.has_new_uproots();
+                    ret
+                }
+                fn snapshot_all_uprooted(&mut self) {
+                    self.math_uf.create_uprooted_snapshot();
                 }
             }
             #[derive(Debug, Default)]
             pub struct Theory {
                 pub delta: Delta,
                 pub uf: Unification,
-                uprooted: Uprooted,
                 global_variables: GlobalVariables,
-                pub forall_math_relation: ForallMathRelation,
                 pub mul_relation: MulRelation,
                 pub add_relation: AddRelation,
                 pub const_relation: ConstRelation,
@@ -2143,7 +1909,7 @@ fn test_primitives_simple() {
                     theory
                         .global_variables
                         .initialize(&mut theory.delta, &mut theory.uf);
-                    theory.clear_transient();
+                    theory.canonicalize();
                     theory.global_variables.new = true;
                     theory
                 }
@@ -2156,7 +1922,7 @@ fn test_primitives_simple() {
                         },
                         {
                             let start = std::time::Instant::now();
-                            self.clear_transient();
+                            self.canonicalize();
                             start.elapsed()
                         },
                     ]
@@ -2166,26 +1932,26 @@ fn test_primitives_simple() {
                     if self.global_variables.new {
                         let one = self.global_variables.global_i64[1usize];
                         for (p1,) in self.const_relation.iter1_0_1(one) {
-                            let x = self.delta.make_math(&mut self.uf);
+                            let x = self.uf.math_uf.add_eclass();
                             self.delta.insert_add((x, x, p1));
                         }
                     }
                     for (one, p1) in self.const_relation.iter_new() {
                         if one == self.global_variables.global_i64[1usize] {
-                            let x = self.delta.make_math(&mut self.uf);
+                            let x = self.uf.math_uf.add_eclass();
                             self.delta.insert_add((x, x, p1));
                         }
                     }
                     if self.global_variables.new {
                         let p0 = self.global_variables.global_i64[0usize];
                         for (p1,) in self.const_relation.iter1_0_1(p0) {
-                            let z = self.delta.make_math(&mut self.uf);
+                            let z = self.uf.math_uf.add_eclass();
                             self.delta.insert_add((z, z, p1));
                         }
                     }
                     for (p0, p1) in self.const_relation.iter_new() {
                         if p0 == self.global_variables.global_i64[0usize] {
-                            let z = self.delta.make_math(&mut self.uf);
+                            let z = self.uf.math_uf.add_eclass();
                             self.delta.insert_add((z, z, p1));
                         }
                     }
@@ -2232,7 +1998,6 @@ fn test_primitives_simple() {
                 fn emit_graphviz(&self) -> String {
                     let mut buf = String::new();
                     buf.push_str("digraph G {");
-                    self.forall_math_relation.emit_graphviz(&mut buf);
                     self.mul_relation.emit_graphviz(&mut buf);
                     self.add_relation.emit_graphviz(&mut buf);
                     self.const_relation.emit_graphviz(&mut buf);
@@ -2242,7 +2007,6 @@ fn test_primitives_simple() {
                 }
                 pub fn get_total_relation_entry_count(&self) -> usize {
                     [
-                        self.forall_math_relation.len(),
                         self.mul_relation.len(),
                         self.add_relation.len(),
                         self.const_relation.len(),
@@ -2262,30 +2026,20 @@ fn test_primitives_simple() {
                     .collect()
                 }
                 #[inline(never)]
-                pub fn clear_transient(&mut self) {
+                pub fn canonicalize(&mut self) {
                     self.global_variables.new = false;
-                    self.forall_math_relation.clear_new();
                     self.mul_relation.clear_new();
                     self.add_relation.clear_new();
                     self.const_relation.clear_new();
                     self.var_relation.clear_new();
-                    loop {
-                        self.uprooted.take_dirt(&mut self.uf);
-                        self.forall_math_relation
-                            .update(&self.uprooted, &mut self.uf, &mut self.delta);
-                        self.mul_relation
-                            .update(&self.uprooted, &mut self.uf, &mut self.delta);
-                        self.add_relation
-                            .update(&self.uprooted, &mut self.uf, &mut self.delta);
-                        self.const_relation
-                            .update(&self.uprooted, &mut self.uf, &mut self.delta);
-                        self.var_relation
-                            .update(&self.uprooted, &mut self.uf, &mut self.delta);
-                        if !(self.uf.has_new() || self.delta.has_new()) {
-                            break;
-                        }
+                    while self.uf.has_new_uproots() || self.delta.has_new_inserts() {
+                        self.uf.snapshot_all_uprooted();
+                        self.mul_relation.update(&mut self.uf, &mut self.delta);
+                        self.add_relation.update(&mut self.uf, &mut self.delta);
+                        self.const_relation.update(&mut self.uf, &mut self.delta);
+                        self.var_relation.update(&mut self.uf, &mut self.delta);
                     }
-                    self.forall_math_relation.update_finalize(&mut self.uf);
+                    self.uf.snapshot_all_uprooted();
                     self.mul_relation.update_finalize(&mut self.uf);
                     self.add_relation.update_finalize(&mut self.uf);
                     self.const_relation.update_finalize(&mut self.uf);
@@ -2348,25 +2102,6 @@ fn triangle_join() {
             decl_row ! (Row3_2_0_1 < T0 , T1 , T2 first > (2 , 0 , 1) () (T2 , T0 , T1) () fc = (2) (T2) where u128 = s => ((s . 2 . inner () as u128) << 64) + ((s . 0 . inner () as u128) << 32) + ((s . 1 . inner () as u128) << 0));
             eclass_wrapper_ty!(Math);
             #[derive(Debug, Default)]
-            struct ForallMathRelation {
-                new: std::collections::BTreeSet<<Self as Relation>::Row>,
-                all: std::collections::BTreeSet<<Self as Relation>::Row>,
-            }
-            impl Relation for ForallMathRelation {
-                type Row = (Math,);
-            }
-            impl ForallMathRelation {
-                fn update(&mut self, uprooted: &Uprooted, uf: &mut Unification, delta: &mut Delta) {
-                    delta.forall_math_relation_delta.clear();
-                }
-                fn clear_new(&mut self) {}
-                fn update_finalize(&mut self, uf: &mut Unification) {}
-                fn emit_graphviz(&self, buf: &mut String) {}
-                fn len(&self) -> usize {
-                    self.all.len()
-                }
-            }
-            #[derive(Debug, Default)]
             struct FooRelation {
                 new: Vec<<Self as Relation>::Row>,
                 all_index_0_1: IndexImpl<RadixSortCtx<Row2_0_1<Math, Math>, u64>>,
@@ -2413,28 +2148,25 @@ fn triangle_join() {
                 fn check1_0_1(&self, x0: Math) -> bool {
                     self.iter1_0_1(x0).next().is_some()
                 }
-                fn update(&mut self, uprooted: &Uprooted, uf: &mut Unification, delta: &mut Delta) {
+                fn update(&mut self, uf: &mut Unification, delta: &mut Delta) {
                     let mut inserts = take(&mut delta.foo_relation_delta);
                     let orig_inserts = inserts.len();
                     self.all_index_0_1
-                        .first_column_uproots(&uprooted.math_uprooted, |deleted_rows| {
+                        .first_column_uproots(uf.math_uf.get_uprooted_snapshot(), |deleted_rows| {
                             inserts.extend(deleted_rows)
                         });
                     self.all_index_1_0
-                        .first_column_uproots(&uprooted.math_uprooted, |deleted_rows| {
+                        .first_column_uproots(uf.math_uf.get_uprooted_snapshot(), |deleted_rows| {
                             inserts.extend(deleted_rows)
                         });
                     inserts[orig_inserts..].sort_unstable();
                     runtime::dedup_suffix(&mut inserts, orig_inserts);
                     self.all_index_0_1.delete_many(&mut inserts[orig_inserts..]);
                     self.all_index_1_0.delete_many(&mut inserts[orig_inserts..]);
-                    inserts
-                        .iter_mut()
-                        .enumerate()
-                        .for_each(|(i, old @ &mut (x0, x1))| {
-                            old.0 = uf.math_uf.find(x0);
-                            old.1 = uf.math_uf.find(x1);
-                        });
+                    inserts.iter_mut().for_each(|row| {
+                        row.0 = uf.math_uf.find(row.0);
+                        row.1 = uf.math_uf.find(row.1);
+                    });
                     self.all_index_0_1
                         .insert_many(&mut inserts, |mut old, mut new| {
                             let () = old.value_mut();
@@ -2512,28 +2244,25 @@ fn triangle_join() {
                 fn check1_1_0(&self, x1: Math) -> bool {
                     self.iter1_1_0(x1).next().is_some()
                 }
-                fn update(&mut self, uprooted: &Uprooted, uf: &mut Unification, delta: &mut Delta) {
+                fn update(&mut self, uf: &mut Unification, delta: &mut Delta) {
                     let mut inserts = take(&mut delta.bar_relation_delta);
                     let orig_inserts = inserts.len();
                     self.all_index_0_1
-                        .first_column_uproots(&uprooted.math_uprooted, |deleted_rows| {
+                        .first_column_uproots(uf.math_uf.get_uprooted_snapshot(), |deleted_rows| {
                             inserts.extend(deleted_rows)
                         });
                     self.all_index_1_0
-                        .first_column_uproots(&uprooted.math_uprooted, |deleted_rows| {
+                        .first_column_uproots(uf.math_uf.get_uprooted_snapshot(), |deleted_rows| {
                             inserts.extend(deleted_rows)
                         });
                     inserts[orig_inserts..].sort_unstable();
                     runtime::dedup_suffix(&mut inserts, orig_inserts);
                     self.all_index_0_1.delete_many(&mut inserts[orig_inserts..]);
                     self.all_index_1_0.delete_many(&mut inserts[orig_inserts..]);
-                    inserts
-                        .iter_mut()
-                        .enumerate()
-                        .for_each(|(i, old @ &mut (x0, x1))| {
-                            old.0 = uf.math_uf.find(x0);
-                            old.1 = uf.math_uf.find(x1);
-                        });
+                    inserts.iter_mut().for_each(|row| {
+                        row.0 = uf.math_uf.find(row.0);
+                        row.1 = uf.math_uf.find(row.1);
+                    });
                     self.all_index_0_1
                         .insert_many(&mut inserts, |mut old, mut new| {
                             let () = old.value_mut();
@@ -2619,28 +2348,25 @@ fn triangle_join() {
                 fn check1_0_1(&self, x0: Math) -> bool {
                     self.iter1_0_1(x0).next().is_some()
                 }
-                fn update(&mut self, uprooted: &Uprooted, uf: &mut Unification, delta: &mut Delta) {
+                fn update(&mut self, uf: &mut Unification, delta: &mut Delta) {
                     let mut inserts = take(&mut delta.baz_relation_delta);
                     let orig_inserts = inserts.len();
                     self.all_index_0_1
-                        .first_column_uproots(&uprooted.math_uprooted, |deleted_rows| {
+                        .first_column_uproots(uf.math_uf.get_uprooted_snapshot(), |deleted_rows| {
                             inserts.extend(deleted_rows)
                         });
                     self.all_index_1_0
-                        .first_column_uproots(&uprooted.math_uprooted, |deleted_rows| {
+                        .first_column_uproots(uf.math_uf.get_uprooted_snapshot(), |deleted_rows| {
                             inserts.extend(deleted_rows)
                         });
                     inserts[orig_inserts..].sort_unstable();
                     runtime::dedup_suffix(&mut inserts, orig_inserts);
                     self.all_index_0_1.delete_many(&mut inserts[orig_inserts..]);
                     self.all_index_1_0.delete_many(&mut inserts[orig_inserts..]);
-                    inserts
-                        .iter_mut()
-                        .enumerate()
-                        .for_each(|(i, old @ &mut (x0, x1))| {
-                            old.0 = uf.math_uf.find(x0);
-                            old.1 = uf.math_uf.find(x1);
-                        });
+                    inserts.iter_mut().for_each(|row| {
+                        row.0 = uf.math_uf.find(row.0);
+                        row.1 = uf.math_uf.find(row.1);
+                    });
                     self.all_index_0_1
                         .insert_many(&mut inserts, |mut old, mut new| {
                             let () = old.value_mut();
@@ -2727,19 +2453,19 @@ fn triangle_join() {
                 fn check1_2_0_1(&self, x2: Math) -> bool {
                     self.iter1_2_0_1(x2).next().is_some()
                 }
-                fn update(&mut self, uprooted: &Uprooted, uf: &mut Unification, delta: &mut Delta) {
+                fn update(&mut self, uf: &mut Unification, delta: &mut Delta) {
                     let mut inserts = take(&mut delta.triangle_relation_delta);
                     let orig_inserts = inserts.len();
                     self.all_index_0_1_2
-                        .first_column_uproots(&uprooted.math_uprooted, |deleted_rows| {
+                        .first_column_uproots(uf.math_uf.get_uprooted_snapshot(), |deleted_rows| {
                             inserts.extend(deleted_rows)
                         });
                     self.all_index_1_0_2
-                        .first_column_uproots(&uprooted.math_uprooted, |deleted_rows| {
+                        .first_column_uproots(uf.math_uf.get_uprooted_snapshot(), |deleted_rows| {
                             inserts.extend(deleted_rows)
                         });
                     self.all_index_2_0_1
-                        .first_column_uproots(&uprooted.math_uprooted, |deleted_rows| {
+                        .first_column_uproots(uf.math_uf.get_uprooted_snapshot(), |deleted_rows| {
                             inserts.extend(deleted_rows)
                         });
                     inserts[orig_inserts..].sort_unstable();
@@ -2750,14 +2476,11 @@ fn triangle_join() {
                         .delete_many(&mut inserts[orig_inserts..]);
                     self.all_index_2_0_1
                         .delete_many(&mut inserts[orig_inserts..]);
-                    inserts
-                        .iter_mut()
-                        .enumerate()
-                        .for_each(|(i, old @ &mut (x0, x1, x2))| {
-                            old.0 = uf.math_uf.find(x0);
-                            old.1 = uf.math_uf.find(x1);
-                            old.2 = uf.math_uf.find(x2);
-                        });
+                    inserts.iter_mut().for_each(|row| {
+                        row.0 = uf.math_uf.find(row.0);
+                        row.1 = uf.math_uf.find(row.1);
+                        row.2 = uf.math_uf.find(row.2);
+                    });
                     self.all_index_0_1_2
                         .insert_many(&mut inserts, |mut old, mut new| {
                             let () = old.value_mut();
@@ -2808,7 +2531,6 @@ fn triangle_join() {
             }
             #[derive(Debug, Default)]
             pub struct Delta {
-                forall_math_relation_delta: Vec<<ForallMathRelation as Relation>::Row>,
                 foo_relation_delta: Vec<<FooRelation as Relation>::Row>,
                 bar_relation_delta: Vec<<BarRelation as Relation>::Row>,
                 baz_relation_delta: Vec<<BazRelation as Relation>::Row>,
@@ -2818,19 +2540,13 @@ fn triangle_join() {
                 fn new() -> Self {
                     Self::default()
                 }
-                fn has_new(&self) -> bool {
-                    let mut has_new = false;
-                    has_new |= !self.forall_math_relation_delta.is_empty();
-                    has_new |= !self.foo_relation_delta.is_empty();
-                    has_new |= !self.bar_relation_delta.is_empty();
-                    has_new |= !self.baz_relation_delta.is_empty();
-                    has_new |= !self.triangle_relation_delta.is_empty();
-                    has_new
-                }
-                pub fn make_math(&mut self, uf: &mut Unification) -> Math {
-                    let id = uf.math_uf.add_eclass();
-                    self.forall_math_relation_delta.push((id,));
-                    id
+                fn has_new_inserts(&self) -> bool {
+                    let mut has_new_inserts = false;
+                    has_new_inserts |= !self.foo_relation_delta.is_empty();
+                    has_new_inserts |= !self.bar_relation_delta.is_empty();
+                    has_new_inserts |= !self.baz_relation_delta.is_empty();
+                    has_new_inserts |= !self.triangle_relation_delta.is_empty();
+                    has_new_inserts
                 }
                 pub fn insert_foo(&mut self, x: <FooRelation as Relation>::Row) {
                     self.foo_relation_delta.push(x);
@@ -2855,34 +2571,24 @@ fn triangle_join() {
                 }
             }
             #[derive(Debug, Default)]
-            struct Uprooted {
-                math_uprooted: Vec<Math>,
-            }
-            impl Uprooted {
-                fn take_dirt(&mut self, uf: &mut Unification) {
-                    self.math_uprooted.clear();
-                    swap(&mut self.math_uprooted, &mut uf.math_uf.dirty());
-                    self.math_uprooted.sort_unstable();
-                }
-            }
-            #[derive(Debug, Default)]
             struct Unification {
                 pub math_uf: UnionFind<Math>,
             }
             impl Unification {
-                fn has_new(&mut self) -> bool {
-                    let mut has_new = false;
-                    has_new |= !self.math_uf.dirty().is_empty();
-                    has_new
+                fn has_new_uproots(&mut self) -> bool {
+                    let mut ret = false;
+                    ret |= self.math_uf.has_new_uproots();
+                    ret
+                }
+                fn snapshot_all_uprooted(&mut self) {
+                    self.math_uf.create_uprooted_snapshot();
                 }
             }
             #[derive(Debug, Default)]
             pub struct Theory {
                 pub delta: Delta,
                 pub uf: Unification,
-                uprooted: Uprooted,
                 global_variables: GlobalVariables,
-                pub forall_math_relation: ForallMathRelation,
                 pub foo_relation: FooRelation,
                 pub bar_relation: BarRelation,
                 pub baz_relation: BazRelation,
@@ -2894,7 +2600,7 @@ fn triangle_join() {
                     theory
                         .global_variables
                         .initialize(&mut theory.delta, &mut theory.uf);
-                    theory.clear_transient();
+                    theory.canonicalize();
                     theory.global_variables.new = true;
                     theory
                 }
@@ -2907,7 +2613,7 @@ fn triangle_join() {
                         },
                         {
                             let start = std::time::Instant::now();
-                            self.clear_transient();
+                            self.canonicalize();
                             start.elapsed()
                         },
                     ]
@@ -2945,7 +2651,6 @@ fn triangle_join() {
                 fn emit_graphviz(&self) -> String {
                     let mut buf = String::new();
                     buf.push_str("digraph G {");
-                    self.forall_math_relation.emit_graphviz(&mut buf);
                     self.foo_relation.emit_graphviz(&mut buf);
                     self.bar_relation.emit_graphviz(&mut buf);
                     self.baz_relation.emit_graphviz(&mut buf);
@@ -2955,7 +2660,6 @@ fn triangle_join() {
                 }
                 pub fn get_total_relation_entry_count(&self) -> usize {
                     [
-                        self.forall_math_relation.len(),
                         self.foo_relation.len(),
                         self.bar_relation.len(),
                         self.baz_relation.len(),
@@ -2975,30 +2679,20 @@ fn triangle_join() {
                     .collect()
                 }
                 #[inline(never)]
-                pub fn clear_transient(&mut self) {
+                pub fn canonicalize(&mut self) {
                     self.global_variables.new = false;
-                    self.forall_math_relation.clear_new();
                     self.foo_relation.clear_new();
                     self.bar_relation.clear_new();
                     self.baz_relation.clear_new();
                     self.triangle_relation.clear_new();
-                    loop {
-                        self.uprooted.take_dirt(&mut self.uf);
-                        self.forall_math_relation
-                            .update(&self.uprooted, &mut self.uf, &mut self.delta);
-                        self.foo_relation
-                            .update(&self.uprooted, &mut self.uf, &mut self.delta);
-                        self.bar_relation
-                            .update(&self.uprooted, &mut self.uf, &mut self.delta);
-                        self.baz_relation
-                            .update(&self.uprooted, &mut self.uf, &mut self.delta);
-                        self.triangle_relation
-                            .update(&self.uprooted, &mut self.uf, &mut self.delta);
-                        if !(self.uf.has_new() || self.delta.has_new()) {
-                            break;
-                        }
+                    while self.uf.has_new_uproots() || self.delta.has_new_inserts() {
+                        self.uf.snapshot_all_uprooted();
+                        self.foo_relation.update(&mut self.uf, &mut self.delta);
+                        self.bar_relation.update(&mut self.uf, &mut self.delta);
+                        self.baz_relation.update(&mut self.uf, &mut self.delta);
+                        self.triangle_relation.update(&mut self.uf, &mut self.delta);
                     }
-                    self.forall_math_relation.update_finalize(&mut self.uf);
+                    self.uf.snapshot_all_uprooted();
                     self.foo_relation.update_finalize(&mut self.uf);
                     self.bar_relation.update_finalize(&mut self.uf);
                     self.baz_relation.update_finalize(&mut self.uf);
@@ -3059,25 +2753,6 @@ fn edgecase0() {
             decl_row ! (Row3_1_0_2 < T0 , T1 first , T2 > (1 , 0 , 2) () (T1 , T0 , T2) () fc = (1) (T1) where u128 = s => ((s . 1 . inner () as u128) << 64) + ((s . 0 . inner () as u128) << 32) + ((s . 2 . inner () as u128) << 0));
             decl_row ! (Row3_2_0_1 < T0 , T1 , T2 first > (2 , 0 , 1) () (T2 , T0 , T1) () fc = (2) (T2) where u128 = s => ((s . 2 . inner () as u128) << 64) + ((s . 0 . inner () as u128) << 32) + ((s . 1 . inner () as u128) << 0));
             eclass_wrapper_ty!(Math);
-            #[derive(Debug, Default)]
-            struct ForallMathRelation {
-                new: std::collections::BTreeSet<<Self as Relation>::Row>,
-                all: std::collections::BTreeSet<<Self as Relation>::Row>,
-            }
-            impl Relation for ForallMathRelation {
-                type Row = (Math,);
-            }
-            impl ForallMathRelation {
-                fn update(&mut self, uprooted: &Uprooted, uf: &mut Unification, delta: &mut Delta) {
-                    delta.forall_math_relation_delta.clear();
-                }
-                fn clear_new(&mut self) {}
-                fn update_finalize(&mut self, uf: &mut Unification) {}
-                fn emit_graphviz(&self, buf: &mut String) {}
-                fn len(&self) -> usize {
-                    self.all.len()
-                }
-            }
             #[derive(Debug, Default)]
             struct MulRelation {
                 new: Vec<<Self as Relation>::Row>,
@@ -3148,23 +2823,22 @@ fn edgecase0() {
                         return (x2,);
                     }
                     let x2 = uf.math_uf.add_eclass();
-                    delta.forall_math_relation_delta.push((x2,));
                     delta.mul_relation_delta.push((x0, x1, x2));
                     (x2,)
                 }
-                fn update(&mut self, uprooted: &Uprooted, uf: &mut Unification, delta: &mut Delta) {
+                fn update(&mut self, uf: &mut Unification, delta: &mut Delta) {
                     let mut inserts = take(&mut delta.mul_relation_delta);
                     let orig_inserts = inserts.len();
                     self.all_index_0_1_2
-                        .first_column_uproots(&uprooted.math_uprooted, |deleted_rows| {
+                        .first_column_uproots(uf.math_uf.get_uprooted_snapshot(), |deleted_rows| {
                             inserts.extend(deleted_rows)
                         });
                     self.all_index_1_0_2
-                        .first_column_uproots(&uprooted.math_uprooted, |deleted_rows| {
+                        .first_column_uproots(uf.math_uf.get_uprooted_snapshot(), |deleted_rows| {
                             inserts.extend(deleted_rows)
                         });
                     self.all_index_2_0_1
-                        .first_column_uproots(&uprooted.math_uprooted, |deleted_rows| {
+                        .first_column_uproots(uf.math_uf.get_uprooted_snapshot(), |deleted_rows| {
                             inserts.extend(deleted_rows)
                         });
                     inserts[orig_inserts..].sort_unstable();
@@ -3177,14 +2851,11 @@ fn edgecase0() {
                         .delete_many(&mut inserts[orig_inserts..]);
                     self.all_index_2_0_1
                         .delete_many(&mut inserts[orig_inserts..]);
-                    inserts
-                        .iter_mut()
-                        .enumerate()
-                        .for_each(|(i, old @ &mut (x0, x1, x2))| {
-                            old.0 = uf.math_uf.find(x0);
-                            old.1 = uf.math_uf.find(x1);
-                            old.2 = uf.math_uf.find(x2);
-                        });
+                    inserts.iter_mut().for_each(|row| {
+                        row.0 = uf.math_uf.find(row.0);
+                        row.1 = uf.math_uf.find(row.1);
+                        row.2 = uf.math_uf.find(row.2);
+                    });
                     self.all_index_0_1_2
                         .insert_many(&mut inserts, |mut old, mut new| {
                             let (x2,) = old.value_mut();
@@ -3301,23 +2972,22 @@ fn edgecase0() {
                         return (x2,);
                     }
                     let x2 = uf.math_uf.add_eclass();
-                    delta.forall_math_relation_delta.push((x2,));
                     delta.add_relation_delta.push((x0, x1, x2));
                     (x2,)
                 }
-                fn update(&mut self, uprooted: &Uprooted, uf: &mut Unification, delta: &mut Delta) {
+                fn update(&mut self, uf: &mut Unification, delta: &mut Delta) {
                     let mut inserts = take(&mut delta.add_relation_delta);
                     let orig_inserts = inserts.len();
                     self.all_index_0_1_2
-                        .first_column_uproots(&uprooted.math_uprooted, |deleted_rows| {
+                        .first_column_uproots(uf.math_uf.get_uprooted_snapshot(), |deleted_rows| {
                             inserts.extend(deleted_rows)
                         });
                     self.all_index_1_0_2
-                        .first_column_uproots(&uprooted.math_uprooted, |deleted_rows| {
+                        .first_column_uproots(uf.math_uf.get_uprooted_snapshot(), |deleted_rows| {
                             inserts.extend(deleted_rows)
                         });
                     self.all_index_2_0_1
-                        .first_column_uproots(&uprooted.math_uprooted, |deleted_rows| {
+                        .first_column_uproots(uf.math_uf.get_uprooted_snapshot(), |deleted_rows| {
                             inserts.extend(deleted_rows)
                         });
                     inserts[orig_inserts..].sort_unstable();
@@ -3328,14 +2998,11 @@ fn edgecase0() {
                         .delete_many(&mut inserts[orig_inserts..]);
                     self.all_index_2_0_1
                         .delete_many(&mut inserts[orig_inserts..]);
-                    inserts
-                        .iter_mut()
-                        .enumerate()
-                        .for_each(|(i, old @ &mut (x0, x1, x2))| {
-                            old.0 = uf.math_uf.find(x0);
-                            old.1 = uf.math_uf.find(x1);
-                            old.2 = uf.math_uf.find(x2);
-                        });
+                    inserts.iter_mut().for_each(|row| {
+                        row.0 = uf.math_uf.find(row.0);
+                        row.1 = uf.math_uf.find(row.1);
+                        row.2 = uf.math_uf.find(row.2);
+                    });
                     self.all_index_0_1_2
                         .insert_many(&mut inserts, |mut old, mut new| {
                             let (x2,) = old.value_mut();
@@ -3387,7 +3054,6 @@ fn edgecase0() {
             }
             #[derive(Debug, Default)]
             pub struct Delta {
-                forall_math_relation_delta: Vec<<ForallMathRelation as Relation>::Row>,
                 mul_relation_delta: Vec<<MulRelation as Relation>::Row>,
                 add_relation_delta: Vec<<AddRelation as Relation>::Row>,
             }
@@ -3395,17 +3061,11 @@ fn edgecase0() {
                 fn new() -> Self {
                     Self::default()
                 }
-                fn has_new(&self) -> bool {
-                    let mut has_new = false;
-                    has_new |= !self.forall_math_relation_delta.is_empty();
-                    has_new |= !self.mul_relation_delta.is_empty();
-                    has_new |= !self.add_relation_delta.is_empty();
-                    has_new
-                }
-                pub fn make_math(&mut self, uf: &mut Unification) -> Math {
-                    let id = uf.math_uf.add_eclass();
-                    self.forall_math_relation_delta.push((id,));
-                    id
+                fn has_new_inserts(&self) -> bool {
+                    let mut has_new_inserts = false;
+                    has_new_inserts |= !self.mul_relation_delta.is_empty();
+                    has_new_inserts |= !self.add_relation_delta.is_empty();
+                    has_new_inserts
                 }
                 pub fn insert_mul(&mut self, x: <MulRelation as Relation>::Row) {
                     self.mul_relation_delta.push(x);
@@ -3424,34 +3084,24 @@ fn edgecase0() {
                 }
             }
             #[derive(Debug, Default)]
-            struct Uprooted {
-                math_uprooted: Vec<Math>,
-            }
-            impl Uprooted {
-                fn take_dirt(&mut self, uf: &mut Unification) {
-                    self.math_uprooted.clear();
-                    swap(&mut self.math_uprooted, &mut uf.math_uf.dirty());
-                    self.math_uprooted.sort_unstable();
-                }
-            }
-            #[derive(Debug, Default)]
             struct Unification {
                 pub math_uf: UnionFind<Math>,
             }
             impl Unification {
-                fn has_new(&mut self) -> bool {
-                    let mut has_new = false;
-                    has_new |= !self.math_uf.dirty().is_empty();
-                    has_new
+                fn has_new_uproots(&mut self) -> bool {
+                    let mut ret = false;
+                    ret |= self.math_uf.has_new_uproots();
+                    ret
+                }
+                fn snapshot_all_uprooted(&mut self) {
+                    self.math_uf.create_uprooted_snapshot();
                 }
             }
             #[derive(Debug, Default)]
             pub struct Theory {
                 pub delta: Delta,
                 pub uf: Unification,
-                uprooted: Uprooted,
                 global_variables: GlobalVariables,
-                pub forall_math_relation: ForallMathRelation,
                 pub mul_relation: MulRelation,
                 pub add_relation: AddRelation,
             }
@@ -3461,7 +3111,7 @@ fn edgecase0() {
                     theory
                         .global_variables
                         .initialize(&mut theory.delta, &mut theory.uf);
-                    theory.clear_transient();
+                    theory.canonicalize();
                     theory.global_variables.new = true;
                     theory
                 }
@@ -3474,7 +3124,7 @@ fn edgecase0() {
                         },
                         {
                             let start = std::time::Instant::now();
-                            self.clear_transient();
+                            self.canonicalize();
                             start.elapsed()
                         },
                     ]
@@ -3485,7 +3135,7 @@ fn edgecase0() {
                         if self.add_relation.check1_0_1_2(p2) {
                             for (c, p4) in self.mul_relation.iter1_0_1_2(a) {
                                 for (p5,) in self.add_relation.iter2_0_1_2(p2, p4) {
-                                    let a4 = self.delta.make_math(&mut self.uf);
+                                    let a4 = self.uf.math_uf.add_eclass();
                                     self.delta.insert_add((b, c, a4));
                                     self.delta.insert_mul((a, a4, p5));
                                 }
@@ -3496,7 +3146,7 @@ fn edgecase0() {
                         if self.mul_relation.check1_0_1_2(a) {
                             for (p2, p5) in self.add_relation.iter1_1_0_2(p4) {
                                 for (b,) in self.mul_relation.iter2_0_2_1(a, p2) {
-                                    let a4 = self.delta.make_math(&mut self.uf);
+                                    let a4 = self.uf.math_uf.add_eclass();
                                     self.delta.insert_add((b, c, a4));
                                     self.delta.insert_mul((a, a4, p5));
                                 }
@@ -3507,7 +3157,7 @@ fn edgecase0() {
                         if self.mul_relation.check1_2_0_1(p2) {
                             for (a, c) in self.mul_relation.iter1_2_0_1(p4) {
                                 for (b,) in self.mul_relation.iter2_0_2_1(a, p2) {
-                                    let a4 = self.delta.make_math(&mut self.uf);
+                                    let a4 = self.uf.math_uf.add_eclass();
                                     self.delta.insert_add((b, c, a4));
                                     self.delta.insert_mul((a, a4, p5));
                                 }
@@ -3518,20 +3168,15 @@ fn edgecase0() {
                 fn emit_graphviz(&self) -> String {
                     let mut buf = String::new();
                     buf.push_str("digraph G {");
-                    self.forall_math_relation.emit_graphviz(&mut buf);
                     self.mul_relation.emit_graphviz(&mut buf);
                     self.add_relation.emit_graphviz(&mut buf);
                     buf.push_str("}");
                     buf
                 }
                 pub fn get_total_relation_entry_count(&self) -> usize {
-                    [
-                        self.forall_math_relation.len(),
-                        self.mul_relation.len(),
-                        self.add_relation.len(),
-                    ]
-                    .into_iter()
-                    .sum::<usize>()
+                    [self.mul_relation.len(), self.add_relation.len()]
+                        .into_iter()
+                        .sum::<usize>()
                 }
                 pub fn get_relation_entry_count(&self) -> std::collections::BTreeMap<&'static str, usize> {
                     [
@@ -3542,24 +3187,16 @@ fn edgecase0() {
                     .collect()
                 }
                 #[inline(never)]
-                pub fn clear_transient(&mut self) {
+                pub fn canonicalize(&mut self) {
                     self.global_variables.new = false;
-                    self.forall_math_relation.clear_new();
                     self.mul_relation.clear_new();
                     self.add_relation.clear_new();
-                    loop {
-                        self.uprooted.take_dirt(&mut self.uf);
-                        self.forall_math_relation
-                            .update(&self.uprooted, &mut self.uf, &mut self.delta);
-                        self.mul_relation
-                            .update(&self.uprooted, &mut self.uf, &mut self.delta);
-                        self.add_relation
-                            .update(&self.uprooted, &mut self.uf, &mut self.delta);
-                        if !(self.uf.has_new() || self.delta.has_new()) {
-                            break;
-                        }
+                    while self.uf.has_new_uproots() || self.delta.has_new_inserts() {
+                        self.uf.snapshot_all_uprooted();
+                        self.mul_relation.update(&mut self.uf, &mut self.delta);
+                        self.add_relation.update(&mut self.uf, &mut self.delta);
                     }
-                    self.forall_math_relation.update_finalize(&mut self.uf);
+                    self.uf.snapshot_all_uprooted();
                     self.mul_relation.update_finalize(&mut self.uf);
                     self.add_relation.update_finalize(&mut self.uf);
                 }
@@ -3613,25 +3250,6 @@ fn test_into_codegen() {
             decl_row ! (Row3_1_0_2 < T0 , T1 first , T2 > (1 , 0 , 2) () (T1 , T0 , T2) () fc = (1) (T1) where u128 = s => ((s . 1 . inner () as u128) << 64) + ((s . 0 . inner () as u128) << 32) + ((s . 2 . inner () as u128) << 0));
             decl_row ! (Row3_2_0_1 < T0 , T1 , T2 first > (2 , 0 , 1) () (T2 , T0 , T1) () fc = (2) (T2) where u128 = s => ((s . 2 . inner () as u128) << 64) + ((s . 0 . inner () as u128) << 32) + ((s . 1 . inner () as u128) << 0));
             eclass_wrapper_ty!(Math);
-            #[derive(Debug, Default)]
-            struct ForallMathRelation {
-                new: std::collections::BTreeSet<<Self as Relation>::Row>,
-                all: std::collections::BTreeSet<<Self as Relation>::Row>,
-            }
-            impl Relation for ForallMathRelation {
-                type Row = (Math,);
-            }
-            impl ForallMathRelation {
-                fn update(&mut self, uprooted: &Uprooted, uf: &mut Unification, delta: &mut Delta) {
-                    delta.forall_math_relation_delta.clear();
-                }
-                fn clear_new(&mut self) {}
-                fn update_finalize(&mut self, uf: &mut Unification) {}
-                fn emit_graphviz(&self, buf: &mut String) {}
-                fn len(&self) -> usize {
-                    self.all.len()
-                }
-            }
             #[derive(Debug, Default)]
             struct MulRelation {
                 new: Vec<<Self as Relation>::Row>,
@@ -3693,23 +3311,22 @@ fn test_into_codegen() {
                         return (x2,);
                     }
                     let x2 = uf.math_uf.add_eclass();
-                    delta.forall_math_relation_delta.push((x2,));
                     delta.mul_relation_delta.push((x0, x1, x2));
                     (x2,)
                 }
-                fn update(&mut self, uprooted: &Uprooted, uf: &mut Unification, delta: &mut Delta) {
+                fn update(&mut self, uf: &mut Unification, delta: &mut Delta) {
                     let mut inserts = take(&mut delta.mul_relation_delta);
                     let orig_inserts = inserts.len();
                     self.all_index_0_1_2
-                        .first_column_uproots(&uprooted.math_uprooted, |deleted_rows| {
+                        .first_column_uproots(uf.math_uf.get_uprooted_snapshot(), |deleted_rows| {
                             inserts.extend(deleted_rows)
                         });
                     self.all_index_1_0_2
-                        .first_column_uproots(&uprooted.math_uprooted, |deleted_rows| {
+                        .first_column_uproots(uf.math_uf.get_uprooted_snapshot(), |deleted_rows| {
                             inserts.extend(deleted_rows)
                         });
                     self.all_index_2_0_1
-                        .first_column_uproots(&uprooted.math_uprooted, |deleted_rows| {
+                        .first_column_uproots(uf.math_uf.get_uprooted_snapshot(), |deleted_rows| {
                             inserts.extend(deleted_rows)
                         });
                     inserts[orig_inserts..].sort_unstable();
@@ -3720,14 +3337,11 @@ fn test_into_codegen() {
                         .delete_many(&mut inserts[orig_inserts..]);
                     self.all_index_2_0_1
                         .delete_many(&mut inserts[orig_inserts..]);
-                    inserts
-                        .iter_mut()
-                        .enumerate()
-                        .for_each(|(i, old @ &mut (x0, x1, x2))| {
-                            old.0 = uf.math_uf.find(x0);
-                            old.1 = uf.math_uf.find(x1);
-                            old.2 = uf.math_uf.find(x2);
-                        });
+                    inserts.iter_mut().for_each(|row| {
+                        row.0 = uf.math_uf.find(row.0);
+                        row.1 = uf.math_uf.find(row.1);
+                        row.2 = uf.math_uf.find(row.2);
+                    });
                     self.all_index_0_1_2
                         .insert_many(&mut inserts, |mut old, mut new| {
                             let (x2,) = old.value_mut();
@@ -3838,23 +3452,22 @@ fn test_into_codegen() {
                         return (x2,);
                     }
                     let x2 = uf.math_uf.add_eclass();
-                    delta.forall_math_relation_delta.push((x2,));
                     delta.add_relation_delta.push((x0, x1, x2));
                     (x2,)
                 }
-                fn update(&mut self, uprooted: &Uprooted, uf: &mut Unification, delta: &mut Delta) {
+                fn update(&mut self, uf: &mut Unification, delta: &mut Delta) {
                     let mut inserts = take(&mut delta.add_relation_delta);
                     let orig_inserts = inserts.len();
                     self.all_index_0_1_2
-                        .first_column_uproots(&uprooted.math_uprooted, |deleted_rows| {
+                        .first_column_uproots(uf.math_uf.get_uprooted_snapshot(), |deleted_rows| {
                             inserts.extend(deleted_rows)
                         });
                     self.all_index_1_0_2
-                        .first_column_uproots(&uprooted.math_uprooted, |deleted_rows| {
+                        .first_column_uproots(uf.math_uf.get_uprooted_snapshot(), |deleted_rows| {
                             inserts.extend(deleted_rows)
                         });
                     self.all_index_2_0_1
-                        .first_column_uproots(&uprooted.math_uprooted, |deleted_rows| {
+                        .first_column_uproots(uf.math_uf.get_uprooted_snapshot(), |deleted_rows| {
                             inserts.extend(deleted_rows)
                         });
                     inserts[orig_inserts..].sort_unstable();
@@ -3865,14 +3478,11 @@ fn test_into_codegen() {
                         .delete_many(&mut inserts[orig_inserts..]);
                     self.all_index_2_0_1
                         .delete_many(&mut inserts[orig_inserts..]);
-                    inserts
-                        .iter_mut()
-                        .enumerate()
-                        .for_each(|(i, old @ &mut (x0, x1, x2))| {
-                            old.0 = uf.math_uf.find(x0);
-                            old.1 = uf.math_uf.find(x1);
-                            old.2 = uf.math_uf.find(x2);
-                        });
+                    inserts.iter_mut().for_each(|row| {
+                        row.0 = uf.math_uf.find(row.0);
+                        row.1 = uf.math_uf.find(row.1);
+                        row.2 = uf.math_uf.find(row.2);
+                    });
                     self.all_index_0_1_2
                         .insert_many(&mut inserts, |mut old, mut new| {
                             let (x2,) = old.value_mut();
@@ -3924,7 +3534,6 @@ fn test_into_codegen() {
             }
             #[derive(Debug, Default)]
             pub struct Delta {
-                forall_math_relation_delta: Vec<<ForallMathRelation as Relation>::Row>,
                 mul_relation_delta: Vec<<MulRelation as Relation>::Row>,
                 add_relation_delta: Vec<<AddRelation as Relation>::Row>,
             }
@@ -3932,17 +3541,11 @@ fn test_into_codegen() {
                 fn new() -> Self {
                     Self::default()
                 }
-                fn has_new(&self) -> bool {
-                    let mut has_new = false;
-                    has_new |= !self.forall_math_relation_delta.is_empty();
-                    has_new |= !self.mul_relation_delta.is_empty();
-                    has_new |= !self.add_relation_delta.is_empty();
-                    has_new
-                }
-                pub fn make_math(&mut self, uf: &mut Unification) -> Math {
-                    let id = uf.math_uf.add_eclass();
-                    self.forall_math_relation_delta.push((id,));
-                    id
+                fn has_new_inserts(&self) -> bool {
+                    let mut has_new_inserts = false;
+                    has_new_inserts |= !self.mul_relation_delta.is_empty();
+                    has_new_inserts |= !self.add_relation_delta.is_empty();
+                    has_new_inserts
                 }
                 pub fn insert_mul(&mut self, x: <MulRelation as Relation>::Row) {
                     self.mul_relation_delta.push(x);
@@ -3961,34 +3564,24 @@ fn test_into_codegen() {
                 }
             }
             #[derive(Debug, Default)]
-            struct Uprooted {
-                math_uprooted: Vec<Math>,
-            }
-            impl Uprooted {
-                fn take_dirt(&mut self, uf: &mut Unification) {
-                    self.math_uprooted.clear();
-                    swap(&mut self.math_uprooted, &mut uf.math_uf.dirty());
-                    self.math_uprooted.sort_unstable();
-                }
-            }
-            #[derive(Debug, Default)]
             struct Unification {
                 pub math_uf: UnionFind<Math>,
             }
             impl Unification {
-                fn has_new(&mut self) -> bool {
-                    let mut has_new = false;
-                    has_new |= !self.math_uf.dirty().is_empty();
-                    has_new
+                fn has_new_uproots(&mut self) -> bool {
+                    let mut ret = false;
+                    ret |= self.math_uf.has_new_uproots();
+                    ret
+                }
+                fn snapshot_all_uprooted(&mut self) {
+                    self.math_uf.create_uprooted_snapshot();
                 }
             }
             #[derive(Debug, Default)]
             pub struct Theory {
                 pub delta: Delta,
                 pub uf: Unification,
-                uprooted: Uprooted,
                 global_variables: GlobalVariables,
-                pub forall_math_relation: ForallMathRelation,
                 pub mul_relation: MulRelation,
                 pub add_relation: AddRelation,
             }
@@ -3998,7 +3591,7 @@ fn test_into_codegen() {
                     theory
                         .global_variables
                         .initialize(&mut theory.delta, &mut theory.uf);
-                    theory.clear_transient();
+                    theory.canonicalize();
                     theory.global_variables.new = true;
                     theory
                 }
@@ -4011,7 +3604,7 @@ fn test_into_codegen() {
                         },
                         {
                             let start = std::time::Instant::now();
-                            self.clear_transient();
+                            self.canonicalize();
                             start.elapsed()
                         },
                     ]
@@ -4020,8 +3613,8 @@ fn test_into_codegen() {
                 pub fn apply_rules(&mut self) {
                     for (a, b, p2) in self.add_relation.iter_new() {
                         for (c, p4) in self.mul_relation.iter1_0_1_2(p2) {
-                            let a5 = self.delta.make_math(&mut self.uf);
-                            let a4 = self.delta.make_math(&mut self.uf);
+                            let a5 = self.uf.math_uf.add_eclass();
+                            let a4 = self.uf.math_uf.add_eclass();
                             self.delta.insert_add((a4, a5, p4));
                             self.delta.insert_mul((b, c, a5));
                             self.delta.insert_mul((a, c, a4));
@@ -4029,8 +3622,8 @@ fn test_into_codegen() {
                     }
                     for (p2, c, p4) in self.mul_relation.iter_new() {
                         for (a, b) in self.add_relation.iter1_2_0_1(p2) {
-                            let a5 = self.delta.make_math(&mut self.uf);
-                            let a4 = self.delta.make_math(&mut self.uf);
+                            let a5 = self.uf.math_uf.add_eclass();
+                            let a4 = self.uf.math_uf.add_eclass();
                             self.delta.insert_add((a4, a5, p4));
                             self.delta.insert_mul((b, c, a5));
                             self.delta.insert_mul((a, c, a4));
@@ -4040,20 +3633,15 @@ fn test_into_codegen() {
                 fn emit_graphviz(&self) -> String {
                     let mut buf = String::new();
                     buf.push_str("digraph G {");
-                    self.forall_math_relation.emit_graphviz(&mut buf);
                     self.mul_relation.emit_graphviz(&mut buf);
                     self.add_relation.emit_graphviz(&mut buf);
                     buf.push_str("}");
                     buf
                 }
                 pub fn get_total_relation_entry_count(&self) -> usize {
-                    [
-                        self.forall_math_relation.len(),
-                        self.mul_relation.len(),
-                        self.add_relation.len(),
-                    ]
-                    .into_iter()
-                    .sum::<usize>()
+                    [self.mul_relation.len(), self.add_relation.len()]
+                        .into_iter()
+                        .sum::<usize>()
                 }
                 pub fn get_relation_entry_count(&self) -> std::collections::BTreeMap<&'static str, usize> {
                     [
@@ -4064,24 +3652,16 @@ fn test_into_codegen() {
                     .collect()
                 }
                 #[inline(never)]
-                pub fn clear_transient(&mut self) {
+                pub fn canonicalize(&mut self) {
                     self.global_variables.new = false;
-                    self.forall_math_relation.clear_new();
                     self.mul_relation.clear_new();
                     self.add_relation.clear_new();
-                    loop {
-                        self.uprooted.take_dirt(&mut self.uf);
-                        self.forall_math_relation
-                            .update(&self.uprooted, &mut self.uf, &mut self.delta);
-                        self.mul_relation
-                            .update(&self.uprooted, &mut self.uf, &mut self.delta);
-                        self.add_relation
-                            .update(&self.uprooted, &mut self.uf, &mut self.delta);
-                        if !(self.uf.has_new() || self.delta.has_new()) {
-                            break;
-                        }
+                    while self.uf.has_new_uproots() || self.delta.has_new_inserts() {
+                        self.uf.snapshot_all_uprooted();
+                        self.mul_relation.update(&mut self.uf, &mut self.delta);
+                        self.add_relation.update(&mut self.uf, &mut self.delta);
                     }
-                    self.forall_math_relation.update_finalize(&mut self.uf);
+                    self.uf.snapshot_all_uprooted();
                     self.mul_relation.update_finalize(&mut self.uf);
                     self.add_relation.update_finalize(&mut self.uf);
                 }
