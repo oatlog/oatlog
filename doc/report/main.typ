@@ -6,10 +6,6 @@
 #let NOTE(msg) = {
   [#text(fill: blue, weight: "bold", size: 12pt)[NOTE: #msg]]
 }
-// remove on release
-#let META(msg) = {
-  [#text(fill: green, weight: "bold", size: 12pt)[META: #msg]]
-}
 
 #show "naive": "naïve"
 
@@ -92,16 +88,12 @@ represents both data flow and control flow as expressions with no side effects, 
 suited to peephole rewriting @son.]. At the same time, an optimization paradigm based on algebraic
 rewrites eases formally modeling programs and proving the correctness of optimizations.
 
-#META[Problem: rewrites are destructive]
-
 However, peephole rewriting does not avoid the issue of destructive rewrites being order-dependent
 in the face of multiple potentially good but mutually incompatible rewrites. Since one rewrite can
 unlock other beneficial rewrites later, one cannot select them greedily. This could be handled with
 a slow backtracking search, but most compilers do this heuristically instead.
 
 == E-graphs and EqSat
-
-#META[Solution: E-graphs allow non-destructive rewrites.]
 
 #TODO[Alejandro: E-graphs and equality saturation (EqSat) are techniques implies e-graphs are a
 technique.
@@ -130,8 +122,6 @@ existing e-nodes (and hence their e-classes). When e-graphs are used for program
 optimization, rather than automated theorem proving, we call this equality saturation (EqSat)
 @equalitysaturation. Additionally, in equality saturation, there is a final extraction phase where
 one globally near-optimal expression is selected from the many possibilities implied by the e-graph.
-
-#META[Problem: even e-graphs suffer from combinatorial explosion]
 
 E-graphs suffer from the combinatorial explosion resulting from trying to find every equivalent
 representation of the initial expression, despite it being reduced through their efficient
