@@ -2489,6 +2489,20 @@ Lattice merge lookups can observe database in inconsistent state, so lattice mer
 
 - "False positive only"- bloom filter, because implicit selects in our query means that we might add the same action twice.
 
+= Equality modolo permutation (slotted egraphs-lite)
+
+```
+Add(a, b, c)
+Add(b, a, c)
+```
+Only store lexicographically smallest permutation.
+```
+Add(a, Mul(..), c)
+Add(Mul(..), a, c)
+```
+Now problematic because we need double lookup.
+So we either need double lookup OR double insert.
+
 = TODO READ
 Papers are just under the first author i looked at.
 I stopped adding authors after a while since this is just too many papers.
