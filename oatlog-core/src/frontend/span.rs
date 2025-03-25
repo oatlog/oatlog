@@ -286,14 +286,17 @@ impl<T> DerefMut for Spanned<T> {
 }
 pub(crate) type Str = Spanned<&'static str>;
 
-static BYTE_RANGE_REGEX: std::sync::LazyLock<regex::Regex> =
-    std::sync::LazyLock::new(|| regex::Regex::new(r".*\(([0-9]+).*\.\.([0-9]+)\).*").unwrap());
+static BYTE_RANGE_REGEX: std::sync::LazyLock<regex::Regex> = std::sync::LazyLock::new(|| {
+    regex::Regex::new(r".*[^0-9]+([0-9]+).*\.\.([0-9]+)[^0-9]+.*").unwrap()
+});
 
 // NOTE: This works around that `proc_macro2::Span::byte_range` is for proc-macro contexts only
 // valid on nightly. Luckily the `Debug` implementation on stable (although doing this is unstable
 // itself) has the correct range.
 pub(crate) fn byte_range(span: Span) -> Range<usize> {
     let s = format!("{span:?}");
-    let caps = BYTE_RANGE_REGEX.captures(&s).unwrap();
-    caps.get(1).unwrap().as_str().parse().unwrap()..caps.get(2).unwrap().as_str().parse().unwrap()
+    let msg = &format!("error getting byte range from {s:?}");
+    let caps = BYTE_RANGE_REGEX.captures(&s).expect(msg);
+    caps.get(1).expect(msg).as_str().parse().expect(msg)
+        ..caps.get(2).expect(msg).as_str().parse().expect(msg)
 }
