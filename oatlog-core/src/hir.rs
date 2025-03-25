@@ -28,14 +28,22 @@ pub(crate) mod hir2 {
             ActionId, ColumnId, PremiseId, RelationId, RuleId, RuleSetId, RuleUsageId, TypeId,
             VariableId,
         },
+        lir,
         typed_vec::TVec,
         union_find::UF,
     };
 
     use std::collections::{BTreeMap, BTreeSet};
 
+    #[derive(Debug)]
     struct VariableMeta {
+        name: &'static str,
         ty: TypeId,
+    }
+    impl VariableMeta {
+        fn merge(a: Self, b: Self) -> Self {
+            todo!()
+        }
     }
 
     // Add(a, b, c), Add(d, e, b);
@@ -61,6 +69,53 @@ pub(crate) mod hir2 {
 
     // We can do INSERT -> ENTRY, we can not do INFALLIBLE ENTRY -> INSERT.
 
+    // semantics
+    //
+    // Premise: no entry only indexes with potentially limited FD. Any variable unification is
+    // fine.
+    //
+    // Action:
+    //
+    // By default, everything is entry (or insert with set), non-constructors/globals are fallible
+    // and fail immediately if they are not inserts. Frontend should check this.
+    //
+    // Only legal optimizations on IR is FD, eliminate double unify, defined only by existing entry
+    // calls.
+    //
+    // Unify among non-eqsorts on final rule will fail compilation.
+    //
+    // Reading from globals is entry of zero arguments.
+    //
+    // Action lowers to: pick a *variable ordering* (where a variable is a set in UF) such that all
+    // variables can be determined. If a variable is overdetermined (through UF), it is valid to
+    // transform an entry to a insert (If it is not an eqsort, compilation fails). This limits the
+    // number of potential bogus e-classes.
+
+    // NOTE: uf.find() is unsound in an action for purposes of entry.
+
+    // maybe sound normalization:
+    //
+    // 1) dedup using FD
+    //
+    // lowering:
+    //
+    // 1) Pick a *set ordering*. (If this fails (cycle) we can introduce make)
+    // 2) Emit "computation" + unification,
+    //
+
+    // NOTE: we never really care when ACTION's are equal if concat + normalize simplifies
+    // properly.
+
+    // Trie action dedup is trivial if UF is separated into it's individual parts.
+
+    // For premise, we additionally care about killing instances of forall, since forall does not
+    // actually constrain a variable.
+
+    struct RuleMeta {
+        name: &'static str,
+        ids: BTreeSet<RuleId>,
+    }
+
     pub(crate) struct SymbolicRule {
         // ====== PREMISE ======
         premise: Premise,
@@ -69,18 +124,75 @@ pub(crate) mod hir2 {
         action: Action,
 
         // ====== METADATA ======
-        name: &'static str,
-        action_variables: TVec<ActionId, VariableMeta>,
-        premise_variables: TVec<PremiseId, VariableMeta>,
-
-        ids: BTreeSet<RuleId>,
+        meta: RuleMeta,
+    }
+    impl SymbolicRule {
+        fn merge(a: Self, b: Self) -> Self {
+            assert_eq!(a.premise, b.premise);
+            todo!("not a priority")
+        }
+        /// try to simplify the premise.
+        /// also perform graph isomorphism thing.
+        /// apply FD to introduce more constraints.
+        fn simplify_premise(self /*, FD context, relation context */) -> Self {
+            todo!()
+        }
+        fn map_action(self, mut f: impl FnMut(ActionId) -> Option<ActionId>) -> Self {
+            Self {
+                premise: self.premise.map_action(&mut f),
+                action: self.action.map_action(&mut f),
+                meta: self.meta,
+            }
+        }
+        fn map_premise(self, mut f: impl FnMut(PremiseId) -> Option<PremiseId>) -> Self {
+            Self {
+                premise: self.premise.map_premise(&mut f),
+                action: self.action.map_premise(&mut f),
+                meta: self.meta,
+            }
+        }
     }
 
+    #[derive(Debug)]
     pub(crate) struct Premise {
         conjunctive_query: BTreeSet<(RelationId, Vec<PremiseId>)>,
+        variables: TVec<PremiseId, VariableMeta>,
+    }
+    impl PartialEq for Premise {
+        fn eq(&self, other: &Self) -> bool {
+            self.conjunctive_query == other.conjunctive_query
+        }
+    }
+    impl Premise {
+        fn map_premise<F: FnMut(PremiseId) -> Option<PremiseId>>(self, mut f: &mut F) -> Self {
+            Self {
+                conjunctive_query: self
+                    .conjunctive_query
+                    .into_iter()
+                    .map(|(relation, args)| {
+                        (
+                            relation,
+                            args.into_iter()
+                                .map(|x| f(x).expect("deleted premise variable still used"))
+                                .collect(),
+                        )
+                    })
+                    .collect(),
+                variables: self
+                    .variables
+                    .map_key(&mut f, |_, a, b| VariableMeta::merge(a, b)),
+            }
+        }
+        fn map_action<F: FnMut(ActionId) -> Option<ActionId>>(self, _f: &mut F) -> Self {
+            Self {
+                conjunctive_query: self.conjunctive_query,
+                variables: self.variables,
+            }
+        }
     }
 
     // TODO: is it sound to run uf.find() before inserting?
+    #[derive(PartialEq, Eq)]
     pub(crate) enum ActionSsa {
         /// Copy value from premise
         Premise(PremiseId),
@@ -91,13 +203,33 @@ pub(crate) mod hir2 {
         /// Entry implies the existence of an implicit rule.
         ///
         /// cost is 1 btree lookup.
+        ///
+        /// This ignores any "non-default" FD, but it's probably fine anyways.
         Entry {
             relation: RelationId,
             args: Vec<ActionId>,
         },
     }
+    impl ActionSsa {
+        fn map_action<F: FnMut(ActionId) -> Option<ActionId>>(
+            x: Option<Self>,
+            f: &mut F,
+        ) -> Option<Self> {
+            x.map(|x| match x {
+                ActionSsa::Premise(premise_id) => ActionSsa::Premise(premise_id),
+                ActionSsa::Entry { relation, args } => ActionSsa::Entry {
+                    relation,
+                    args: args
+                        .into_iter()
+                        .map(|x| f(x).expect("action variable is still used"))
+                        .collect(),
+                },
+            })
+        }
+    }
 
     pub(crate) struct Action {
+        // None = undetermined, may be replaced by make if we have to.
         ssa: TVec<ActionId, Option<ActionSsa>>,
         unify: UF<ActionId>,
         insert_rows: BTreeSet<(RelationId, Vec<ActionId>)>,
@@ -114,6 +246,86 @@ pub(crate) mod hir2 {
         /// ```
         expect_trigger: Option<(bool, &'static str)>,
         // change : subsume or delete
+        variables: TVec<ActionId, VariableMeta>,
+    }
+    impl Action {
+        // TODO: bad because we will get duplicates and it's no longer SSA.
+        fn map_action<F: FnMut(ActionId) -> Option<ActionId>>(self, mut f: &mut F) -> Self {
+            let variables = self
+                .variables
+                .map_key(&mut f, |_, a, b| VariableMeta::merge(a, b));
+            let n = variables.len();
+            let unify: UF<ActionId> = UF::from_pairs(
+                n,
+                self.unify
+                    .iter_edges()
+                    .filter_map(|(a, b)| f(a).and_then(|a| f(b).map(|b| (a, b)))),
+            );
+            let insert_rows: BTreeSet<_> = self
+                .insert_rows
+                .into_iter()
+                .map(|(relation, args)| {
+                    (
+                        relation,
+                        args.into_iter()
+                            .map(|x| f(x).expect("action still uses variable"))
+                            .collect::<Vec<_>>(),
+                    )
+                })
+                .collect();
+            let expect_trigger = self.expect_trigger;
+
+            let ssa: TVec<ActionId, Option<ActionSsa>> = self
+                .ssa
+                .into_iter()
+                .map(|x| ActionSsa::map_action(x, &mut f))
+                .collect();
+
+            let ssa = ssa.map_key(&mut f, |i, a, b| match (a, b) {
+                (None, None) => None,
+                (None, Some(x)) | (Some(x), None) => Some(x),
+                (Some(a), Some(b)) if a == b => Some(a),
+                (Some(a), Some(b)) => {
+                    // any codepath here is semantically strange, but maybe possible.
+                    match (a, b) {
+                        (ActionSsa::Premise(pa), ActionSsa::Premise(pb)) => panic!(),
+                        (
+                            ActionSsa::Premise(pa),
+                            ActionSsa::Entry {
+                                relation: rb,
+                                args: ab,
+                            },
+                        )
+                        | (
+                            ActionSsa::Entry {
+                                relation: rb,
+                                args: ab,
+                            },
+                            ActionSsa::Premise(pa),
+                        ) => {
+                            panic!()
+                        }
+                        (
+                            ActionSsa::Entry {
+                                relation: ra,
+                                args: aa,
+                            },
+                            ActionSsa::Entry {
+                                relation: rb,
+                                args: ab,
+                            },
+                        ) => {
+                            panic!()
+                        }
+                    }
+                }
+            });
+
+            todo!()
+        }
+        fn map_premise<F: FnMut(PremiseId) -> Option<PremiseId>>(self, f: &mut F) -> Self {
+            todo!()
+        }
     }
 
     pub(crate) struct RuleSet {
@@ -138,7 +350,7 @@ pub(crate) mod hir2 {
         VarOld,
         VarNew,
         Call(RelationId, Vec<MergeExpr>),
-        Literal(crate::lir::Literal),
+        Literal(lir::Literal),
     }
 
     // the only cross-rule optimizations are from implicit to symbolic.
@@ -170,7 +382,10 @@ pub(crate) mod hir2 {
         // Alias { permutation: TVec<ColumnId, ColumnId>, other: RelationId }
         // Global desugars to table.
         // MaterializedView
-        // Forall (impl later)
+        // Forall {
+        //     ty: TypeId,
+        // }
+        Literal(lir::Literal),
     }
 
     pub(crate) struct PrimitiveFunction {

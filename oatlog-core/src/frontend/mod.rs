@@ -413,7 +413,7 @@ impl Parser {
         }
     }
 
-    // TODO erik: parse to AST + forward declarations here
+    // TODO: parse to AST + forward declarations here
     fn parse_egglog_sexp(&mut self, sexp: Vec<SexpSpan>, config: Configuration) -> MResult<()> {
         let program = egglog_ast::parse_program(sexp.clone())?;
         self.parse_egglog_program(program, config)?;

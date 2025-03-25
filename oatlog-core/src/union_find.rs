@@ -187,6 +187,28 @@ impl<K: Id> UF<K> {
             }
         }
     }
+    pub(crate) fn from_pairs(n: usize, iter: impl Iterator<Item = (K, K)>) -> Self {
+        let mut uf = Self::new_with_size(n, ());
+        for (a, b) in iter {
+            uf.union(a, b);
+        }
+        uf
+    }
+
+    pub(crate) fn iter_edges(&self) -> impl Iterator<Item = (K, K)> + use<'_, K> {
+        self.inner
+            .iter()
+            .enumerate()
+            .filter_map(|(i, el)| match el {
+                UFElement::Root { set, .. } => Some(
+                    set.into_iter()
+                        .copied()
+                        .flat_map(|i| set.into_iter().copied().map(move |j| (i, j))),
+                ),
+                UFElement::Child { .. } => None,
+            })
+            .flatten()
+    }
 }
 
 impl<K: Id, V> FromIterator<V> for UFData<K, V> {
