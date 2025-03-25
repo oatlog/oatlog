@@ -43,7 +43,7 @@
 #TODO[introduce relevant references]
 
 #TODO[Alejandro: in general, try to maintain in every subsection of the introduction the structure
-of introducing a problem -> solving a problem]
+  of introducing a problem -> solving a problem]
 
 #TODO[Clearly present motivation for this work]
 
@@ -158,7 +158,7 @@ optimized globally.
 
 Our goal is for oatlog to
 + #[implement most of the egglog features that still make sense in the context
-of ahead-of-time embedding within a Rust program.]
+    of ahead-of-time embedding within a Rust program.]
 + be faster than egglog across a moderately broad set of benchmarks
 
 Currently, as of the midpoint report, oatlog is slower than egglog and does not implement quite a
@@ -166,7 +166,7 @@ few of egglog's features. Addressing this is our priority for the remainder of o
 work.
 
 #NOTE[The planning report goes into greater detail on what evaluating performance means and what
-sort of benchmarks we care about.]
+  sort of benchmarks we care about.]
 
 == This thesis
 
@@ -192,10 +192,10 @@ evaluating oatlog through its test suite and benchmarks.
 = Conceptual background <conceptual_background>
 
 #TODO[Matti: You should clarify the basic concepts (assume that the reader has basic knowledge
-of computer science, but has not heard anything about e-graphs); what are e-graphs, how are
-e-classes different from e-nodes, what does “extraction” mean, and so on. Think that your
-description should form a clear story that explains everything the reader needs to know to
-understand the remainder of the thesis.]
+  of computer science, but has not heard anything about e-graphs); what are e-graphs, how are
+  e-classes different from e-nodes, what does “extraction” mean, and so on. Think that your
+  description should form a clear story that explains everything the reader needs to know to
+  understand the remainder of the thesis.]
 
 E-graphs are motivated by the observation that directed acyclic graphs (DAGs) of expressions can
 efficiently represent a nested expression with a common subexpression, like say $f(g(x), g(x))$, as
@@ -273,7 +273,7 @@ are both heuristics and algorithms that work well on some types of e-graphs @fas
 == E-graphs as relational databases <conceptual_background_egraph_relational>
 
 #TODO[This section should be rewritten to actually introduce e-graphs as relational database, not
-just talk vaguely about what egglog is doing.]
+  just talk vaguely about what egglog is doing.]
 
 Conceptually, egglog stores _uninterpreted partial functions_.
 
@@ -363,52 +363,55 @@ But implementing Math like this would not work for several reasons, firstly we
 want the constructors to return e-classes, and take in e-classes, and secondly,
 sum types can not directly be stored in a relational database.
 
-This can be solved by creating a new table per constructor.
-Now, all e-classes are just integer ids, and exist implicitly in the tables.
+This can be solved by creating a new table per constructor, as in @sum_type_tables. Now, all
+e-classes are just integer ids, and exist implicitly in the tables.
 
-#grid(
-  columns: (auto, auto, auto),
-  rows: (auto, 60pt),
-  gutter: 3pt,
-  table(
+#figure(
+  grid(
     columns: (auto, auto, auto),
-    inset: 10pt,
-    align: horizon,
-    table.header(
-      table.cell(colspan: 3, [*Add*]),
-      [x],
-      [y],
-      [res],
-    ),
+    rows: (auto, auto),
+    gutter: 3pt,
+    table(
+      columns: (auto, auto, auto),
+      inset: 10pt,
+      align: horizon,
+      table.header(
+        table.cell(colspan: 3, [*Add*]),
+        [x],
+        [y],
+        [res],
+      ),
 
-    [...], [...], [...],
-  ),
-  table(
-    columns: (auto, auto, auto),
-    inset: 10pt,
-    align: horizon,
-    table.header(
-      table.cell(colspan: 3, [*Mul*]),
-      [x],
-      [y],
-      [res],
+      [...], [...], [...],
     ),
+    table(
+      columns: (auto, auto, auto),
+      inset: 10pt,
+      align: horizon,
+      table.header(
+        table.cell(colspan: 3, [*Mul*]),
+        [x],
+        [y],
+        [res],
+      ),
 
-    [...], [...], [...],
-  ),
-  table(
-    columns: (auto, auto),
-    inset: 10pt,
-    align: horizon,
-    table.header(
-      table.cell(colspan: 2, [*Const*]),
-      [x],
-      [res],
+      [...], [...], [...],
     ),
+    table(
+      columns: (auto, auto),
+      inset: 10pt,
+      align: horizon,
+      table.header(
+        table.cell(colspan: 2, [*Const*]),
+        [x],
+        [res],
+      ),
 
-    [...], [...],
+      [...], [...],
+    ),
   ),
-)
+  caption: [Sum types as multiple tables.],
+) <sum_type_tables>
 
 To perform e-matching, we turn the pattern into a conjunctive query
 
