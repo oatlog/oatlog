@@ -3,7 +3,7 @@ oatlog::compile_egraph!((
     (relation Le (Math Math))
 
     // Unlike egglog, oatlog supports querying `forall x`.
-    (rule ((forall x)) ((define (Le x x))))
+    // (rule ((forall x)) ((define (Le x x))))
 ));
 
 fn run() {

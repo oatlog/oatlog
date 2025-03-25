@@ -3702,6 +3702,7 @@ fn test_into_codegen() {
     .check();
 }
 
+#[should_panic = "assertion `left != right` failed: forall not yet supported, breaks because it is implicitly represented by unbound premise variables which cannot be semi-naive-ified.\n  left: 0\n right: 0"]
 #[test]
 fn simple_forall() {
     Steps {

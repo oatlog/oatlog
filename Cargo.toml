@@ -3,6 +3,7 @@ members = [
     "comparative-test",
     "examples/quadratic-formula",
     "examples/simple-forall",
+    "examples/test-api",
     "oatlog",
     "oatlog-bench",
     "oatlog-core",
@@ -19,13 +20,13 @@ oatlog-test.path = "oatlog-test"
 oatlog-bench.path = "oatlog-bench"
 comparative-test.path = "comparative-test"
 
-#ariadne = { version = "0.5", features = ["auto-color"] }
+ariadne = { version = "0.5", features = ["auto-color"] }
 clap = { version = "4", features = ["derive"]}
 criterion = "0.5.1"
 derive_more = { version = "2", features = ["full"] }
 educe = "0.6"
 egglog = "0.4"
-#eqlog-runtime = "0.8"
+eqlog-runtime = "0.8"
 expect-test = "1"
 heck = "0.5"
 itertools = "0.14"
