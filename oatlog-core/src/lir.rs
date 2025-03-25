@@ -8,7 +8,7 @@ use crate::{
     typed_vec::TVec,
 };
 use derive_more::From;
-use std::iter;
+use std::{iter, num::NonZeroU64};
 
 /// Data such as type and function names are technically unnecessary but used for more readable
 /// generated code. A compiler is far less performance sensitive than an interpreter (although the
@@ -27,22 +27,21 @@ pub(crate) struct Theory {
     // between HIR and LIR. We should actually implement this, not do this `Option` hack.
     pub(crate) relations: TVec<RelationId, Option<RelationData>>,
     pub(crate) rule_variables: TVec<VariableId, VariableData>,
-    pub(crate) global_compute: TVec<GlobalId, GlobalCompute>,
-    pub(crate) global_types: TVec<GlobalId, TypeId>,
+    pub(crate) global_variable_types: TVec<GlobalId, TypeId>,
     pub(crate) rule_tries: &'static [RuleTrie],
     pub(crate) initial: Vec<Initial>,
 }
-// TODO global variables could be read as relations, not a special GlobalVar struct
-// TODO computing global variables at startup should be more dynamic, support Run(steps) between inits.
 // TODO RuleAtom simplification, e.g. PremiseNew
 
 #[derive(Debug, Clone)]
 pub(crate) enum Initial {
-    Run { steps: u64 },
-    // ComputeGlobal {
-    //     id: GlobalId,
-    //     compute: GlobalCompute,
-    // },
+    Run {
+        steps: NonZeroU64,
+    },
+    ComputeGlobal {
+        global_id: GlobalId,
+        compute: GlobalCompute,
+    },
     // assert that rule matches database.
     // Check {
     //     ...
@@ -53,7 +52,7 @@ pub(crate) enum Initial {
     // }
 }
 impl Initial {
-    pub(crate) fn run(steps: u64) -> Self {
+    pub(crate) fn run(steps: NonZeroU64) -> Self {
         Self::Run { steps }
     }
     // fn global_literal(id: GlobalId, literal: Literal) -> Self {
@@ -325,8 +324,7 @@ impl Theory {
                     types,
                     relations,
                     rule_variables,
-                    global_compute,
-                    global_types,
+                    global_variable_types,
                     rule_tries,
                     initial,
                 } = self.0;
@@ -361,8 +359,7 @@ impl Theory {
                             })
                             .collect::<BTreeMap<_, _>>(),
                     )
-                    .field("global_compute", global_compute)
-                    .field("global_types", global_types)
+                    .field("global_variable_types", global_variable_types)
                     .field(
                         "rule_tries",
                         &rule_tries.iter().map(Dbg).collect::<Vec<_>>(),

@@ -12,6 +12,7 @@ use std::{
     collections::{BTreeMap, btree_map::Entry},
     fmt::Debug,
     hash::Hash,
+    num::NonZeroU64,
 };
 
 use itertools::Itertools as _;
@@ -218,14 +219,13 @@ const BUILTIN_SORTS: [(&str, &str); 3] = [
     // TODO: we could trivially add more here for all sizes of ints/floats.
     // (BUILTIN_F64, "std::primitive::f64"),
     // (BUILTIN_BOOL, "std::primitive::bool"),
-    (BUILTIN_STRING, "oatlog::runtime::IString"),
+    (BUILTIN_STRING, "runtime::IString"),
     (BUILTIN_UNIT, "std::primitive::unit"),
 ];
 
 #[derive(Debug, Clone, PartialEq)]
 struct GlobalVariableInfo {
     ty: TypeId,
-    compute: ComputeMethod,
     relation_id: RelationId,
 }
 
@@ -338,6 +338,8 @@ struct Parser {
     symbolic_rules: Vec<hir::SymbolicRule>,
     /// Rules derived from functional dependency within relations.
     implicit_rules: BTreeMap<RelationId, Vec<hir::ImplicitRule>>,
+
+    interner: crate::runtime::StringIntern,
 }
 impl Parser {
     fn new() -> Self {
@@ -354,6 +356,7 @@ impl Parser {
             type_ids: StringIds::new("type"),
             type_to_forall: BTreeMap::new(),
             types: TVec::new(),
+            interner: crate::runtime::StringIntern::new(),
         };
         for (builtin, path) in BUILTIN_SORTS {
             let _ty: TypeId = parser
@@ -373,7 +376,6 @@ impl Parser {
                 (None, None) => hir::Type::new_symbolic(*t.name),
             })
             .collect();
-        let mut interner = crate::runtime::StringIntern::new();
         hir::Theory {
             symbolic_rules: self.symbolic_rules.clone(),
             relations: self
@@ -391,25 +393,8 @@ impl Parser {
                 .iter()
                 .map(|i| i.relation_id)
                 .collect(),
-            global_compute: self
-                .global_variables
-                .iter()
-                .map(|x| match &x.compute {
-                    ComputeMethod::Literal(Literal::I64(x)) => lir::GlobalCompute::new_i64(*x),
-                    ComputeMethod::Literal(Literal::String(x)) => {
-                        lir::GlobalCompute::new_string((*x).to_owned(), &mut interner)
-                    }
-                    ComputeMethod::Function { function, args } => {
-                        lir::GlobalCompute::new_call(*function, args)
-                    }
-
-                    ComputeMethod::Literal(Literal::F64(_) | Literal::Bool(_) | Literal::Unit) => {
-                        panic!("only literal ints and strings are implemented for globals")
-                    }
-                })
-                .collect(),
-            interner,
             initial: self.initial.clone(),
+            interner: self.interner.clone(),
         }
     }
 
@@ -600,7 +585,9 @@ impl Parser {
                         ruleset: None,
                         until: None,
                     }) => {
-                        self.initial.push(lir::Initial::run(repeat));
+                        if let Some(repeat) = NonZeroU64::new(repeat) {
+                            self.initial.push(lir::Initial::run(repeat));
+                        }
                     }
                     _ => return unimplemented_msg,
                 },
@@ -695,54 +682,65 @@ impl Parser {
     /// Add new global variable, anonymous if missing name.
     /// Hashcons based on compute method.
     /// Error if name collision.
-    fn add_global(
-        &mut self,
-        name: Option<Str>,
-        ty: TypeId,
-        compute: ComputeMethod,
-    ) -> MResult<GlobalId> {
+    fn add_global_binding(&mut self, name: Str, global_id: GlobalId) -> MResult<()> {
         // Duplicate global variable names forbidden
-        if let Some(name) = name {
-            if let Entry::Occupied(entry) = self.global_variable_names.entry(name) {
-                let existing_span = entry.key().span;
-                return Err(already_defined(
-                    name.x,
-                    existing_span,
-                    name.span,
-                    "global variable",
-                ));
-            }
+        if let Entry::Occupied(entry) = self.global_variable_names.entry(name) {
+            let existing_span = entry.key().span;
+            return Err(already_defined(
+                name.x,
+                existing_span,
+                name.span,
+                "global variable",
+            ));
         }
+        // Override dummy name with real name
+        self.relations_hir_and_func[self.global_variables[global_id].relation_id]
+            .0
+            .name = &*name;
 
+        self.global_variable_names.insert(name, global_id);
+
+        Ok(())
+    }
+    fn add_global(&mut self, ty: TypeId, compute: ComputeMethod) -> MResult<GlobalId> {
         let new_id = GlobalId(self.compute_to_global.len());
         let global_id = *self
             .compute_to_global
             .entry(compute.clone())
             .or_insert_with(|| {
                 // Create relation and variable info for global variable
-                let relation_id = self.relations_hir_and_func.push((
-                    hir::Relation::global(
-                        name.map_or_else(|| &*new_id.to_string().leak(), |x| *x),
-                        new_id,
-                        ty,
-                    ),
-                    None,
-                ));
                 self.global_variables.push_expected(
                     new_id,
                     GlobalVariableInfo {
                         ty,
-                        compute,
-                        relation_id,
+                        relation_id: {
+                            let name = &*new_id.to_string().leak();
+                            self.relations_hir_and_func
+                                .push((hir::Relation::global(&name, new_id, ty), None))
+                        },
                     },
                 );
+                self.initial.push(lir::Initial::ComputeGlobal {
+                    global_id: new_id,
+                    compute: match compute {
+                        ComputeMethod::Literal(Literal::I64(x)) => lir::GlobalCompute::new_i64(x),
+                        ComputeMethod::Literal(Literal::String(x)) => {
+                            lir::GlobalCompute::new_string((*x).to_owned(), &mut self.interner)
+                        }
+                        ComputeMethod::Function { function, args } => {
+                            lir::GlobalCompute::new_call(function, &args)
+                        }
+
+                        ComputeMethod::Literal(
+                            Literal::F64(_) | Literal::Bool(_) | Literal::Unit,
+                        ) => {
+                            panic!("only literal ints and strings are implemented for globals")
+                        }
+                    },
+                });
 
                 new_id
             });
-
-        if let Some(name) = name {
-            self.global_variable_names.insert(name, global_id);
-        }
 
         Ok(global_id)
     }
@@ -838,7 +836,7 @@ impl Parser {
             Expr::Literal(spanned) => {
                 let literal = **spanned;
                 let ty = self.literal_type(literal);
-                let global_id = self.add_global(None, ty, ComputeMethod::Literal(literal))?;
+                let global_id = self.add_global(ty, ComputeMethod::Literal(literal))?;
                 variables.push((ty, Some(global_id)))
             }
             Expr::Var(spanned) => match **spanned {
@@ -962,7 +960,7 @@ impl Parser {
                     let compute = ComputeMethod::Literal(*x);
                     let ty = parser.literal_type(*x);
 
-                    (parser.add_global(None, ty, compute)?, ty)
+                    (parser.add_global(ty, compute)?, ty)
                 }
                 Expr::Var(x) => {
                     let id = parser.global_variable_names.lookup(x, "global variable")?;
@@ -1006,7 +1004,7 @@ impl Parser {
                                 .as_ref()
                                 .unwrap()
                                 .output;
-                            (parser.add_global(None, ty, compute)?, ty)
+                            (parser.add_global(ty, compute)?, ty)
                         }
                         [] => {
                             let mut err = bare_!(
@@ -1032,9 +1030,10 @@ impl Parser {
                 }
             })
         }
-        let (id, ty) = parse(self, expr)?;
-        let compute = self.global_variables[id].compute.clone();
-        assert_eq!(id, self.add_global(binding_name, ty, compute)?);
+        let (id, _ty) = parse(self, expr)?;
+        if let Some(binding_name) = binding_name {
+            self.add_global_binding(binding_name, id)?;
+        }
         Ok(())
     }
 
@@ -1151,11 +1150,7 @@ mod compile_rule {
                 Expr::Literal(x) => {
                     let global_id = self
                         .parser
-                        .add_global(
-                            None,
-                            self.parser.literal_type(**x),
-                            ComputeMethod::Literal(**x),
-                        )
+                        .add_global(self.parser.literal_type(**x), ComputeMethod::Literal(**x))
                         .unwrap();
                     let global = &self.parser.global_variables[&global_id];
                     let relation_id = global.relation_id;

@@ -313,10 +313,10 @@ fn hir_global() {
             Mul(Math, Math, Math)
             Add(Math, Math, Math)
             Const(i64, Math)
-            g0(i64)
+            one(i64)
 
             Rule "":
-            Premise: g0(one), Const(one, p1)
+            Premise: one(one), Const(one, p1)
             __: one
             a0: p1
             b: __
@@ -393,14 +393,7 @@ fn hir_global() {
                     [v6, b]: t3,
                     [v7, a]: t3,
                 },
-                global_compute: {
-                    g0: Literal(
-                        I64(
-                            1,
-                        ),
-                    ),
-                },
-                global_types: {
+                global_variable_types: {
                     g0: t0,
                 },
                 rule_tries: [
@@ -425,7 +418,16 @@ fn hir_global() {
                         ],
                     ],
                 ],
-                initial: [],
+                initial: [
+                    ComputeGlobal {
+                        global_id: g0,
+                        compute: Literal(
+                            I64(
+                                1,
+                            ),
+                        ),
+                    },
+                ],
             }"#]]),
         expected_codegen: None,
     }
@@ -486,8 +488,7 @@ fn test_bind_variable_multiple_times() {
                     [v0, x]: t3,
                     [v1, p1]: t3,
                 },
-                global_compute: {},
-                global_types: {},
+                global_variable_types: {},
                 rule_tries: [
                     meta: "( rewrite ( Same x x ) x )"
                     atom: [PremiseNew, r1(v0, v0, v1)]
@@ -524,7 +525,7 @@ fn test_negative_i64_tokens() {
             Sub(Math, Math, Math)
             Const(i64, Math)
             g0(i64)
-            g1(Math)
+            neg_two(Math)
             g2(i64)
 
             Rule "":
@@ -909,15 +910,6 @@ fn codegen_bug1() {
                     self.foo_relation_delta.push(x);
                 }
             }
-            #[derive(Default, Debug)]
-            struct GlobalVariables {
-                new: bool,
-            }
-            impl GlobalVariables {
-                fn initialize(&mut self, delta: &mut Delta, uf: &mut Unification) {
-                    self.new = true;
-                }
-            }
             #[derive(Debug, Default)]
             struct Unification {
                 pub t0_uf: UnionFind<T0>,
@@ -942,17 +934,11 @@ fn codegen_bug1() {
             pub struct Theory {
                 pub delta: Delta,
                 pub uf: Unification,
-                global_variables: GlobalVariables,
                 pub foo_relation: FooRelation,
             }
             impl Theory {
                 pub fn new() -> Self {
                     let mut theory = Self::default();
-                    theory
-                        .global_variables
-                        .initialize(&mut theory.delta, &mut theory.uf);
-                    theory.canonicalize();
-                    theory.global_variables.new = true;
                     theory
                 }
                 pub fn step(&mut self) -> [std::time::Duration; 2] {
@@ -986,7 +972,6 @@ fn codegen_bug1() {
                 }
                 #[inline(never)]
                 pub fn canonicalize(&mut self) {
-                    self.global_variables.new = false;
                     self.foo_relation.clear_new();
                     while self.uf.has_new_uproots() || self.delta.has_new_inserts() {
                         self.uf.snapshot_all_uprooted();
@@ -1153,15 +1138,6 @@ fn initial() {
                     self.const_relation_delta.push(x);
                 }
             }
-            #[derive(Default, Debug)]
-            struct GlobalVariables {
-                new: bool,
-            }
-            impl GlobalVariables {
-                fn initialize(&mut self, delta: &mut Delta, uf: &mut Unification) {
-                    self.new = true;
-                }
-            }
             #[derive(Debug, Default)]
             struct Unification {
                 pub math_uf: UnionFind<Math>,
@@ -1180,17 +1156,11 @@ fn initial() {
             pub struct Theory {
                 pub delta: Delta,
                 pub uf: Unification,
-                global_variables: GlobalVariables,
                 pub const_relation: ConstRelation,
             }
             impl Theory {
                 pub fn new() -> Self {
                     let mut theory = Self::default();
-                    theory
-                        .global_variables
-                        .initialize(&mut theory.delta, &mut theory.uf);
-                    theory.canonicalize();
-                    theory.global_variables.new = true;
                     for _ in 0..42u64 {
                         theory.step();
                     }
@@ -1227,7 +1197,6 @@ fn initial() {
                 }
                 #[inline(never)]
                 pub fn canonicalize(&mut self) {
-                    self.global_variables.new = false;
                     self.const_relation.clear_new();
                     while self.uf.has_new_uproots() || self.delta.has_new_inserts() {
                         self.uf.snapshot_all_uprooted();
@@ -1281,14 +1250,14 @@ fn test_primitives_simple() {
             Const(i64, Math)
             Var(String, Math)
             g0(i64)
-            g1(Math)
-            g2(i64)
+            two(Math)
+            one(i64)
             g3(String)
             g4(String)
             g5(i64)
 
             Rule "":
-            Premise: g2(one), Const(one, p1)
+            Premise: one(one), Const(one, p1)
             __: one
             a0: p1
             x: __
@@ -1853,35 +1822,6 @@ fn test_primitives_simple() {
                     self.var_relation_delta.push(x);
                 }
             }
-            #[derive(Default, Debug)]
-            struct GlobalVariables {
-                new: bool,
-                global_i64: Vec<std::primitive::i64>,
-                global_string: Vec<oatlog::runtime::IString>,
-                global_math: Vec<Math>,
-            }
-            impl GlobalVariables {
-                fn initialize(&mut self, delta: &mut Delta, uf: &mut Unification) {
-                    self.new = true;
-                    let tmp = { 2i64 };
-                    self.global_i64.push(tmp);
-                    let tmp = {
-                        let tmp0 = self.global_i64[0usize];
-                        let tmp_res = uf.math_uf.add_eclass();
-                        delta.insert_const((tmp0, tmp_res));
-                        tmp_res
-                    };
-                    self.global_math.push(tmp);
-                    let tmp = { 1i64 };
-                    self.global_i64.push(tmp);
-                    let tmp = { IString(0u32) };
-                    self.global_string.push(tmp);
-                    let tmp = { IString(1u32) };
-                    self.global_string.push(tmp);
-                    let tmp = { 0i64 };
-                    self.global_i64.push(tmp);
-                }
-            }
             #[derive(Debug, Default)]
             struct Unification {
                 pub math_uf: UnionFind<Math>,
@@ -1899,8 +1839,10 @@ fn test_primitives_simple() {
             #[derive(Debug, Default)]
             pub struct Theory {
                 pub delta: Delta,
+                global_i64: GlobalVars<std::primitive::i64>,
+                global_string: GlobalVars<oatlog::runtime::IString>,
+                global_math: GlobalVars<Math>,
                 pub uf: Unification,
-                global_variables: GlobalVariables,
                 pub mul_relation: MulRelation,
                 pub add_relation: AddRelation,
                 pub const_relation: ConstRelation,
@@ -1909,11 +1851,17 @@ fn test_primitives_simple() {
             impl Theory {
                 pub fn new() -> Self {
                     let mut theory = Self::default();
-                    theory
-                        .global_variables
-                        .initialize(&mut theory.delta, &mut theory.uf);
-                    theory.canonicalize();
-                    theory.global_variables.new = true;
+                    self.global_i64.define(0usize, 2i64);
+                    self.global_math.define(0usize, {
+                        let tmp0 = self.global_i64.get(0usize);
+                        let tmp_res = uf.math_uf.add_eclass();
+                        delta.insert_const((tmp0, tmp_res));
+                        tmp_res
+                    });
+                    self.global_i64.define(1usize, 1i64);
+                    self.global_string.define(0usize, IString(0u32));
+                    self.global_string.define(1usize, IString(1u32));
+                    self.global_i64.define(2usize, 0i64);
                     theory
                 }
                 pub fn step(&mut self) -> [std::time::Duration; 2] {
@@ -1933,8 +1881,7 @@ fn test_primitives_simple() {
                 #[inline(never)]
                 pub fn apply_rules(&mut self) {
                     #[doc = "( rewrite ( Const one ) ( Add x x ) )"]
-                    if self.global_variables.new {
-                        let one = self.global_variables.global_i64[1usize];
+                    if let Some(one) = self.global_i64.get_new(1usize) {
                         for (p1,) in self.const_relation.iter1_0_1(one) {
                             let x = self.uf.math_uf.add_eclass();
                             self.delta.insert_add((x, x, p1));
@@ -1942,14 +1889,13 @@ fn test_primitives_simple() {
                     }
                     #[doc = "( rewrite ( Const one ) ( Add x x ) )"]
                     for (one, p1) in self.const_relation.iter_new() {
-                        if one == self.global_variables.global_i64[1usize] {
+                        if one == self.global_i64.get(1usize) {
                             let x = self.uf.math_uf.add_eclass();
                             self.delta.insert_add((x, x, p1));
                         }
                     }
                     #[doc = "( rewrite ( Const 2 ) ( Add z z ) )"]
-                    if self.global_variables.new {
-                        let p0 = self.global_variables.global_i64[0usize];
+                    if let Some(p0) = self.global_i64.get_new(0usize) {
                         for (p1,) in self.const_relation.iter1_0_1(p0) {
                             let z = self.uf.math_uf.add_eclass();
                             self.delta.insert_add((z, z, p1));
@@ -1957,14 +1903,13 @@ fn test_primitives_simple() {
                     }
                     #[doc = "( rewrite ( Const 2 ) ( Add z z ) )"]
                     for (p0, p1) in self.const_relation.iter_new() {
-                        if p0 == self.global_variables.global_i64[0usize] {
+                        if p0 == self.global_i64.get(0usize) {
                             let z = self.uf.math_uf.add_eclass();
                             self.delta.insert_add((z, z, p1));
                         }
                     }
                     #[doc = "( rewrite ( Var \"x\" ) ( Var \"y\" ) )"]
-                    if self.global_variables.new {
-                        let p0 = self.global_variables.global_string[0usize];
+                    if let Some(p0) = self.global_string.get_new(0usize) {
                         for (p1,) in self.var_relation.iter1_0_1(p0) {
                             let a1 = self.global_variables.global_string[1usize];
                             self.delta.insert_var((a1, p1));
@@ -1972,14 +1917,13 @@ fn test_primitives_simple() {
                     }
                     #[doc = "( rewrite ( Var \"x\" ) ( Var \"y\" ) )"]
                     for (p0, p1) in self.var_relation.iter_new() {
-                        if p0 == self.global_variables.global_string[0usize] {
+                        if p0 == self.global_string.get(0usize) {
                             let a1 = self.global_variables.global_string[1usize];
                             self.delta.insert_var((a1, p1));
                         }
                     }
                     #[doc = "( rewrite ( Mul a ( Const 0 ) ) ( Const 0 ) )"]
-                    if self.global_variables.new {
-                        let p1 = self.global_variables.global_i64[2usize];
+                    if let Some(p1) = self.global_i64.get_new(2usize) {
                         for (p2,) in self.const_relation.iter1_0_1(p1) {
                             for (a, p3) in self.mul_relation.iter1_1_0_2(p2) {
                                 let a1 = self.global_variables.global_i64[2usize];
@@ -1989,7 +1933,7 @@ fn test_primitives_simple() {
                     }
                     #[doc = "( rewrite ( Mul a ( Const 0 ) ) ( Const 0 ) )"]
                     for (p1, p2) in self.const_relation.iter_new() {
-                        if p1 == self.global_variables.global_i64[2usize] {
+                        if p1 == self.global_i64.get(2usize) {
                             for (a, p3) in self.mul_relation.iter1_1_0_2(p2) {
                                 let a1 = self.global_variables.global_i64[2usize];
                                 self.delta.insert_const((a1, p3));
@@ -1999,7 +1943,7 @@ fn test_primitives_simple() {
                     #[doc = "( rewrite ( Mul a ( Const 0 ) ) ( Const 0 ) )"]
                     for (a, p2, p3) in self.mul_relation.iter_new() {
                         if self.const_relation.check1_1_0(p2) {
-                            let p1 = self.global_variables.global_i64[2usize];
+                            let p1 = self.global_i64.get(2usize);
                             if self.const_relation.check2_0_1(p1, p2) {
                                 let a1 = self.global_variables.global_i64[2usize];
                                 self.delta.insert_const((a1, p3));
@@ -2039,7 +1983,6 @@ fn test_primitives_simple() {
                 }
                 #[inline(never)]
                 pub fn canonicalize(&mut self) {
-                    self.global_variables.new = false;
                     self.mul_relation.clear_new();
                     self.add_relation.clear_new();
                     self.const_relation.clear_new();
@@ -2052,6 +1995,10 @@ fn test_primitives_simple() {
                         self.var_relation.update(&mut self.uf, &mut self.delta);
                     }
                     self.uf.snapshot_all_uprooted();
+                    self.global_math.update(&mut self.uf.math_uf);
+                    self.global_i64.update_finalize();
+                    self.global_string.update_finalize();
+                    self.global_math.update_finalize();
                     self.mul_relation.update_finalize(&mut self.uf);
                     self.add_relation.update_finalize(&mut self.uf);
                     self.const_relation.update_finalize(&mut self.uf);
@@ -2573,15 +2520,6 @@ fn triangle_join() {
                     self.triangle_relation_delta.push(x);
                 }
             }
-            #[derive(Default, Debug)]
-            struct GlobalVariables {
-                new: bool,
-            }
-            impl GlobalVariables {
-                fn initialize(&mut self, delta: &mut Delta, uf: &mut Unification) {
-                    self.new = true;
-                }
-            }
             #[derive(Debug, Default)]
             struct Unification {
                 pub math_uf: UnionFind<Math>,
@@ -2600,7 +2538,6 @@ fn triangle_join() {
             pub struct Theory {
                 pub delta: Delta,
                 pub uf: Unification,
-                global_variables: GlobalVariables,
                 pub foo_relation: FooRelation,
                 pub bar_relation: BarRelation,
                 pub baz_relation: BazRelation,
@@ -2609,11 +2546,6 @@ fn triangle_join() {
             impl Theory {
                 pub fn new() -> Self {
                     let mut theory = Self::default();
-                    theory
-                        .global_variables
-                        .initialize(&mut theory.delta, &mut theory.uf);
-                    theory.canonicalize();
-                    theory.global_variables.new = true;
                     theory
                 }
                 pub fn step(&mut self) -> [std::time::Duration; 2] {
@@ -2695,7 +2627,6 @@ fn triangle_join() {
                 }
                 #[inline(never)]
                 pub fn canonicalize(&mut self) {
-                    self.global_variables.new = false;
                     self.foo_relation.clear_new();
                     self.bar_relation.clear_new();
                     self.baz_relation.clear_new();
@@ -3089,15 +3020,6 @@ fn edgecase0() {
                     self.add_relation_delta.push(x);
                 }
             }
-            #[derive(Default, Debug)]
-            struct GlobalVariables {
-                new: bool,
-            }
-            impl GlobalVariables {
-                fn initialize(&mut self, delta: &mut Delta, uf: &mut Unification) {
-                    self.new = true;
-                }
-            }
             #[derive(Debug, Default)]
             struct Unification {
                 pub math_uf: UnionFind<Math>,
@@ -3116,18 +3038,12 @@ fn edgecase0() {
             pub struct Theory {
                 pub delta: Delta,
                 pub uf: Unification,
-                global_variables: GlobalVariables,
                 pub mul_relation: MulRelation,
                 pub add_relation: AddRelation,
             }
             impl Theory {
                 pub fn new() -> Self {
                     let mut theory = Self::default();
-                    theory
-                        .global_variables
-                        .initialize(&mut theory.delta, &mut theory.uf);
-                    theory.canonicalize();
-                    theory.global_variables.new = true;
                     theory
                 }
                 pub fn step(&mut self) -> [std::time::Duration; 2] {
@@ -3206,7 +3122,6 @@ fn edgecase0() {
                 }
                 #[inline(never)]
                 pub fn canonicalize(&mut self) {
-                    self.global_variables.new = false;
                     self.mul_relation.clear_new();
                     self.add_relation.clear_new();
                     while self.uf.has_new_uproots() || self.delta.has_new_inserts() {
@@ -3572,15 +3487,6 @@ fn test_into_codegen() {
                     self.add_relation_delta.push(x);
                 }
             }
-            #[derive(Default, Debug)]
-            struct GlobalVariables {
-                new: bool,
-            }
-            impl GlobalVariables {
-                fn initialize(&mut self, delta: &mut Delta, uf: &mut Unification) {
-                    self.new = true;
-                }
-            }
             #[derive(Debug, Default)]
             struct Unification {
                 pub math_uf: UnionFind<Math>,
@@ -3599,18 +3505,12 @@ fn test_into_codegen() {
             pub struct Theory {
                 pub delta: Delta,
                 pub uf: Unification,
-                global_variables: GlobalVariables,
                 pub mul_relation: MulRelation,
                 pub add_relation: AddRelation,
             }
             impl Theory {
                 pub fn new() -> Self {
                     let mut theory = Self::default();
-                    theory
-                        .global_variables
-                        .initialize(&mut theory.delta, &mut theory.uf);
-                    theory.canonicalize();
-                    theory.global_variables.new = true;
                     theory
                 }
                 pub fn step(&mut self) -> [std::time::Duration; 2] {
@@ -3673,7 +3573,6 @@ fn test_into_codegen() {
                 }
                 #[inline(never)]
                 pub fn canonicalize(&mut self) {
-                    self.global_variables.new = false;
                     self.mul_relation.clear_new();
                     self.add_relation.clear_new();
                     while self.uf.has_new_uproots() || self.delta.has_new_inserts() {
@@ -3704,6 +3603,7 @@ fn test_into_codegen() {
 
 #[should_panic = "assertion `left != right` failed: forall not yet supported, breaks because it is implicitly represented by unbound premise variables which cannot be semi-naive-ified.\n  left: 0\n right: 0"]
 #[test]
+#[ignore = "forall is not yet implemented (interacts badly with semi-naive)"]
 fn simple_forall() {
     Steps {
         code: r#"

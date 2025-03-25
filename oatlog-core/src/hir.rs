@@ -452,7 +452,6 @@ pub(crate) struct Theory {
     pub(crate) symbolic_rules: Vec<SymbolicRule>,
     pub(crate) implicit_rules: BTreeMap<RelationId, Vec<ImplicitRule>>,
     pub(crate) relations: TVec<RelationId, Relation>,
-    pub(crate) global_compute: TVec<GlobalId, crate::lir::GlobalCompute>,
     pub(crate) global_types: TVec<GlobalId, TypeId>,
     #[allow(unused)]
     /// NOTE: This may be useful if global variables are queried at run time

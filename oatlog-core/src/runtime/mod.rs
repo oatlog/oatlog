@@ -1,6 +1,7 @@
 //! "runtime" functions and types to be used by generated code.
 
 mod generic;
+mod global_vars;
 mod index;
 mod row;
 mod uf;
@@ -9,6 +10,7 @@ pub use crate::{
     decl_row, eclass_wrapper_ty, relation_element_wrapper_ty,
     runtime::{
         generic::{Eclass, EclassProvider, RelationElement},
+        global_vars::GlobalVars,
         index::{Index, IndexImpl, RadixSortCtx, StdSortCtx, dedup_suffix},
         row::IndexRow,
         uf::UnionFind,

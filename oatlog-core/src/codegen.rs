@@ -9,7 +9,10 @@ use crate::{
 use itertools::Itertools as _;
 use proc_macro2::{Ident, TokenStream};
 use quote::{format_ident, quote};
-use std::{collections::BTreeMap, iter};
+use std::{
+    collections::{BTreeMap, BTreeSet},
+    iter,
+};
 
 // TODO: emit identifiers with correct spans.
 
@@ -28,7 +31,8 @@ pub fn codegen(theory: &Theory) -> TokenStream {
         })
         .collect();
 
-    let (global_variables_decl, global_variables_map) = codegen_globals(theory);
+    let (global_variable_fields, global_variables_map, theory_initial) =
+        codegen_globals_and_initial(theory);
 
     let mut declare_rows = BTreeMap::new();
 
@@ -47,7 +51,7 @@ pub fn codegen(theory: &Theory) -> TokenStream {
             variables_bound: &mut theory.rule_variables.new_same_size(),
             scoped: true,
             priority_cap: Priority::MIN,
-            global_types: &theory.global_types,
+            global_variable_types: &theory.global_variable_types,
             global_idx: &global_variables_map,
         }
         .codegen_all(theory.rule_tries, true)
@@ -121,15 +125,29 @@ pub fn codegen(theory: &Theory) -> TokenStream {
                 }
             })
             .collect();
-
-        // uproot
-        // update relations
-        //
+        let types_used_in_global_variables = theory
+            .global_variable_types
+            .iter()
+            .copied()
+            .collect::<BTreeSet<_>>()
+            .into_iter()
+            .map(|ty| &theory.types[ty])
+            .filter(|ty| ty.name != "unit")
+            .collect_vec();
+        let (global_type_symbolic, global_type_symbolic_uf): (Vec<_>, Vec<_>) =
+            types_used_in_global_variables
+                .iter()
+                .filter(|ty| matches!(ty.kind, TypeKind::Symbolic))
+                .map(|ty| (ident::type_global(ty), ident::type_uf(ty)))
+                .collect();
+        let global_type = types_used_in_global_variables
+            .iter()
+            .map(|ty| ident::type_global(ty))
+            .collect_vec();
 
         quote! {
             #[inline(never)]
             pub fn canonicalize(&mut self) {
-                self.global_variables.new = false;
                 #(self.#relation_ident.clear_new();)*
                 while self.uf.has_new_uproots() || self.delta.has_new_inserts() {
                     self.uf.snapshot_all_uprooted();
@@ -139,6 +157,11 @@ pub fn codegen(theory: &Theory) -> TokenStream {
                 }
                 // clear snapshots
                 self.uf.snapshot_all_uprooted();
+
+                #(
+                    self.#global_type_symbolic.update(&mut self.uf.#global_type_symbolic_uf);
+                )*
+                #( self.#global_type.update_finalize(); )*
 
                 #(self.#relation_ident.update_finalize(&mut self.uf);)*
             }
@@ -176,12 +199,6 @@ pub fn codegen(theory: &Theory) -> TokenStream {
         quote! {0}
     } else {
         quote! {[#(self.#stored_relations.len(),)*].into_iter().sum::<usize>()}
-    };
-
-    let theory_initial = {
-        theory.initial.iter().map(|x| match x {
-            Initial::Run { steps } => quote! { for _ in 0..#steps { theory.step(); }},
-        })
     };
 
     let declare_rows = declare_rows.into_iter().map(
@@ -264,7 +281,6 @@ pub fn codegen(theory: &Theory) -> TokenStream {
         #(#symbolic_type_declarations)*
         #(#relations)*
         #delta
-        #global_variables_decl
         #[derive(Debug, Default)]
         struct Unification {
             #(pub #uf_ident: #uf_ty,)*
@@ -282,16 +298,13 @@ pub fn codegen(theory: &Theory) -> TokenStream {
         #[derive(Debug, Default)]
         pub struct #theory_ty {
             pub delta: #theory_delta_ty,
+            #(#global_variable_fields)*
             pub uf: Unification,
-            global_variables: GlobalVariables,
             #(pub #stored_relations: #stored_relation_types,)*
         }
         impl #theory_ty {
             pub fn new() -> Self {
                 let mut theory = Self::default();
-                theory.global_variables.initialize(&mut theory.delta, &mut theory.uf);
-                theory.canonicalize();
-                theory.global_variables.new = true;
                 #(#theory_initial)*
                 theory
             }
@@ -349,7 +362,7 @@ struct CodegenRuleTrieCtx<'a> {
     types: &'a TVec<TypeId, TypeData>,
     relations: &'a TVec<RelationId, Option<RelationData>>,
     variables: &'a TVec<VariableId, VariableData>,
-    global_types: &'a TVec<GlobalId, TypeId>,
+    global_variable_types: &'a TVec<GlobalId, TypeId>,
     global_idx: &'a TVec<GlobalId, usize>,
 
     variables_bound: &'a mut TVec<VariableId, bool>,
@@ -407,17 +420,16 @@ impl CodegenRuleTrieCtx<'_> {
                     .expect("only LIR relations (the `Some` case) can be used in `PremiseNew`");
                 match relation_.kind {
                     RelationKind::Global { id } => {
-                        let inner = self.codegen_all(then, true);
                         let var = args[0];
-                        let ty = self.global_types[id];
+                        let ty = self.global_variable_types[id];
                         let ty_ = &self.types[ty];
                         let idx = self.global_idx[id];
-                        let field = ident::type_global(ty_);
+                        let global_type = ident::type_global(ty_);
                         let name = ident::var_var(&self.variables[var]);
+
+                        let inner = self.codegen_all(then, true);
                         quote! {
-                            // "iterate" all in new
-                            if self.global_variables.new {
-                                let #name = self.global_variables.#field[#idx];
+                            if let Some(#name) = self.#global_type.get_new(#idx) {
                                 #inner
                             }
                         }
@@ -453,18 +465,23 @@ impl CodegenRuleTrieCtx<'_> {
                 match &relation.kind {
                     RelationKind::Global { id } => {
                         // assign global to variable.
-                        let inner = self.codegen_all(then, true);
                         let var = args[0];
-                        let ty = self.global_types[id];
+                        let ty = self.global_variable_types[id];
                         let ty_ = &self.types[ty];
                         let idx = self.global_idx[id];
-                        let field = ident::type_global(ty_);
+                        let global_type = ident::type_global(ty_);
                         let name = ident::var_var(&self.variables[var]);
-                        quote! {
-                            // "iterate" all => old and new so no filter.
-                            // TODO: optimize lookup if literal known
-                            let #name = self.global_variables.#field[#idx];
+
+                        let inner = self.codegen_all(then, false);
+
+                        let ret = quote! {
+                            let #name = self.#global_type.get(#idx);
                             #inner
+                        };
+                        if self.scoped {
+                            ret
+                        } else {
+                            quote! {{ret}}
                         }
                     }
                     RelationKind::Table {
@@ -537,15 +554,16 @@ impl CodegenRuleTrieCtx<'_> {
                 match &relation.kind {
                     RelationKind::Global { id } => {
                         // check that global in old matches var
-                        let inner = self.codegen_all(then, true);
                         let var = args[0];
-                        let ty = self.global_types[id];
+                        let ty = self.global_variable_types[id];
                         let ty_ = &self.types[ty];
                         let idx = self.global_idx[id];
-                        let field = ident::type_global(ty_);
+                        let global_ty = ident::type_global(ty_);
                         let name = ident::var_var(&self.variables[var]);
+
+                        let inner = self.codegen_all(then, true);
                         quote! {
-                            if #name == self.global_variables.#field[#idx] {
+                            if #name == self.#global_ty.get(#idx) {
                                 #inner
                             }
                         }
@@ -582,112 +600,7 @@ impl CodegenRuleTrieCtx<'_> {
                     }
                 }
             }
-            // RuleAtom::RequireNotAllPresent(..) => {
-            //     todo!("require not all present")
-            //     // let inner = self.codegen_all(then, true);
-            //     // let cond = actions.iter().map(|&action| match action {
-            //     //     Action::Insert { relation, args } => {
-            //     //         let relation = ident::rel_var(&self.relations[relation]);
-            //     //         let index_iter = "todo_indexed_iter_function_here";
-            //     //         let bound = args.iter().map(|&arg| {
-            //     //             assert!(self.is_bound(arg));
-            //     //             ident::var_var(self.var_of(arg))
-            //     //         });
-            //     //         quote! { self.#relation.#index_iter(#(#bound,)*).next().is_some() }
-            //     //     }
-            //     //     Action::Equate(a, b) => {
-            //     //         assert_eq!(self.var_of(a).type_, self.var_of(b).type_);
-            //     //         let type_uf = ident::type_uf(self.type_of(a));
-            //     //         let a = ident::var_var(self.var_of(a));
-            //     //         let b = ident::var_var(self.var_of(b));
-            //     //         quote! { self.#type_uf.same(#a, #b) }
-            //     //     }
-            //     //     Action::Make(variable_id) => todo!(),
-            //     // });
-            //     // quote! {
-            //     //     if !(#(#cond)&&*) {
-            //     //         #inner
-            //     //     }
-            //     // }
-            // }
-            // RuleAtom::LoadGlobal {
-            //     global,
-            //     variable,
-            //     new,
-            // } => {
-            //     todo!("load global")
-            //     // assert_eq!(self.variables[variable].type_, self.globals[global].type_);
-
-            //     // let x = ident::var_var(self.var_of(variable));
-            //     // let global = ident::var_var(&self.globals[global]);
-
-            //     // self.bind_var(variable);
-            //     // let ret = if new {
-            //     //     let inner = self.codegen_all(then, true);
-            //     //     quote! {
-            //     //         if let (#x, true) = self.#global {
-            //     //             #inner
-            //     //         }
-            //     //     }
-            //     // } else {
-            //     //     let inner = self.codegen_all(then, false);
-            //     //     let ret = quote! {
-            //     //         let #x = self.#global.0;
-            //     //         #inner
-            //     //     };
-            //     //     if self.scoped {
-            //     //         ret
-            //     //     } else {
-            //     //         quote! {{ret}}
-            //     //     }
-            //     // };
-            //     // self.unbind_var(variable);
-            //     // ret
-            // }
             RuleAtom::Action(Action::Insert { relation, args }) => {
-                // let rel_insert_with_priority =
-                //     ident::rel_insert_with_priority(&self.relations[relation]);
-                // let mut declare_unknown = Vec::new();
-                // let mut args_var = Vec::new();
-                // let mut unbound_vars = Vec::new();
-                // for &arg in args {
-                //     if self.is_bound(arg) {
-                //         args_var.push(ident::var_var(self.var_of(arg)));
-                //     } else {
-                //         self.bind_var(arg);
-                //         unbound_vars.push(arg);
-                //         let x = ident::var_var(self.var_of(arg));
-                //         args_var.push(x.clone());
-                //         let type_new = ident::type_new(self.type_of(arg));
-
-                //         declare_unknown.push(quote! {let #x = self.#type_new();});
-                //     }
-                // }
-
-                // let new_priority_cap = self.priority_cap.max(if declare_unknown.is_empty() {
-                //     Priority::Surjective
-                // } else {
-                //     Priority::Nonsurjective
-                // });
-
-                // let old_proprity_cap = self.priority_cap;
-                // self.priority_cap = new_priority_cap;
-                // let inner = self.codegen_all(then, false);
-                // self.priority_cap = old_proprity_cap;
-
-                // unbound_vars.iter().for_each(|&arg| self.unbind_var(arg));
-
-                // let ret = quote! {
-                //     #(#declare_unknown)*
-                //     self.#rel_insert_with_priority(#new_priority_cap, #(#args_var,)*);
-                //     #inner
-                // };
-                // if self.scoped {
-                //     ret
-                // } else {
-                //     quote! {{ret}}
-                // }
-
                 let relation = &self.relations[relation]
                     .as_ref()
                     .expect("only LIR relations (the `Some` case) can be used in `Action`");
@@ -700,13 +613,14 @@ impl CodegenRuleTrieCtx<'_> {
                     }
                     RelationKind::Global { id } => {
                         let var = args[0];
-                        let ty = self.global_types[id];
+                        let ty = self.global_variable_types[id];
                         let ty_ = &self.types[ty];
                         let idx = self.global_idx[id];
-                        let field = ident::type_global(ty_);
+                        let global_ty = ident::type_global(ty_);
                         let name = ident::var_var(&self.variables[var]);
+                        // NOTE: `Action::Insert`, specifically on global variables means load currently.
                         quote! {
-                            let #name = self.global_variables.#field[#idx];
+                            let #name = self.#global_ty.get(#idx);
                         }
                     }
                 }
@@ -718,9 +632,9 @@ impl CodegenRuleTrieCtx<'_> {
                 let a = ident::var_var(self.var_of(a));
                 let b = ident::var_var(self.var_of(b));
                 let inner = self.codegen_all(then, false);
-                // TODO consider `union_mut`?
                 let ret = quote! {
-                    self.uf.#uf_ident.union(#a, #b);
+                    let #a = self.uf.#uf_ident.union(#a, #b);
+                    let #b = #a;
                     #inner
                 };
                 if self.scoped {
@@ -757,147 +671,151 @@ impl CodegenRuleTrieCtx<'_> {
     }
 }
 
-fn codegen_globals(theory: &Theory) -> (TokenStream, TVec<GlobalId, usize>) {
-    let mut map: BTreeMap<TypeId, usize> = BTreeMap::new();
-    let mut assigned_indexes: TVec<GlobalId, usize> = TVec::new();
-    let compute_initial: Vec<_> = theory
-        .global_compute
-        .iter_enumerate()
-        .map(|(global_id, compute)| {
-            let ty = theory.global_types[global_id];
-            let ty_ = &theory.types[ty];
-            let expr = match compute {
-                GlobalCompute::Literal(Literal::I64(x)) => {
-                    quote! { #x }
-                }
-                GlobalCompute::Literal(Literal::String(x)) => {
-                    let x = x.0;
-                    quote! { IString ( #x ) }
-                }
-                // i guess create eclass and do an insert and make implicit functionality fix it
-                // later.
-                // also make sure delta/uf is available for write
-                GlobalCompute::Compute { relation, args } => {
-                    let relation_ = &theory.relations[relation]
-                        .as_ref()
-                        .expect("only LIR relations (the `Some` case) can be used in `Compute`");
-                    match &relation_.kind {
-                        RelationKind::Global { .. } => panic!(),
-                        RelationKind::Table {
-                            usage_to_info: _,
-                            index_to_info: _,
-                            column_back_reference: _,
-                        } => {
-                            // TODO: this just assumes that the last type in the relation is the output and also an eqsort.
+fn codegen_globals_and_initial(
+    theory: &Theory,
+) -> (Vec<TokenStream>, TVec<GlobalId, usize>, Vec<TokenStream>) {
+    fn global_compute_to_expr(
+        theory: &Theory,
+        global_id: GlobalId,
+        compute: &GlobalCompute,
+        assigned_indices: &TVec<GlobalId, usize>,
+    ) -> TokenStream {
+        match compute {
+            GlobalCompute::Literal(Literal::I64(x)) => {
+                quote! { #x }
+            }
+            GlobalCompute::Literal(Literal::String(x)) => {
+                let x = x.0;
+                quote! { IString ( #x ) }
+            }
+            // i guess create eclass and do an insert and make implicit functionality fix it
+            // later.
+            // also make sure delta/uf is available for write
+            GlobalCompute::Compute { relation, args } => {
+                let relation_ = &theory.relations[relation]
+                    .as_ref()
+                    .expect("only LIR relations (the `Some` case) can be used in `Compute`");
+                match &relation_.kind {
+                    RelationKind::Global { .. } => panic!(),
+                    RelationKind::Table {
+                        usage_to_info: _,
+                        index_to_info: _,
+                        column_back_reference: _,
+                    } => {
+                        // TODO: this just assumes that the last type in the relation is the output and also an eqsort.
 
-                            // let [others @ .., last] = relation_.param_types.inner().as_slice()
-                            // else {
-                            //     panic!()
-                            // };
+                        // let [others @ .., last] = relation_.param_types.inner().as_slice()
+                        // else {
+                        //     panic!()
+                        // };
 
-                            let (row, compute_row): (Vec<_>, Vec<_>) = args
-                                .iter()
-                                .enumerate()
-                                .map(|(i, id)| {
-                                    let ty = theory.global_types[id];
-                                    let ty_ = &theory.types[ty];
-                                    let tmp = format_ident!("tmp{i}");
-                                    let idx = assigned_indexes[id];
-                                    let field = ident::type_global(ty_);
-                                    (
-                                        tmp.clone(),
-                                        quote! {
-                                            let #tmp = self.#field[#idx];
-                                        },
-                                    )
-                                })
-                                .unzip();
-
-                            let (last, last_compute) = {
-                                let ty = theory.global_types[global_id];
+                        let (row, compute_row): (Vec<_>, Vec<_>) = args
+                            .iter()
+                            .enumerate()
+                            .map(|(i, id)| {
+                                let ty = theory.global_variable_types[id];
                                 let ty_ = &theory.types[ty];
-                                if ty_.is_zero_sized() {
-                                    // Global inserts on relations are implemented as anonymous
-                                    // global variables of value unit. These should not receive e-classes.
-                                    (vec![], quote! {})
-                                } else {
-                                    let tmp = format_ident!("tmp_res");
+                                let tmp = format_ident!("tmp{i}");
+                                let idx = assigned_indices[id];
+                                let field = ident::type_global(ty_);
+                                (
+                                    tmp.clone(),
+                                    quote! {
+                                        let #tmp = theory.#field.get(#idx);
+                                    },
+                                )
+                            })
+                            .unzip();
 
-                                    let uf = ident::type_uf(ty_);
-                                    (
-                                        vec![quote! { #tmp }],
-                                        quote! {
-                                            let #tmp = uf.#uf.add_eclass();
-                                        },
-                                    )
-                                }
-                            };
+                        let (last, last_compute) = {
+                            let ty = theory.global_variable_types[global_id];
+                            let ty_ = &theory.types[ty];
+                            if ty_.is_zero_sized() {
+                                // Global inserts on relations are implemented as anonymous
+                                // global variables of value unit. These should not receive e-classes.
+                                (vec![], quote! {})
+                            } else {
+                                let tmp = format_ident!("tmp_res");
 
-                            let insert_ident = ident::delta_insert_row(relation_);
+                                let uf = ident::type_uf(ty_);
+                                (
+                                    vec![quote! { #tmp }],
+                                    quote! {
+                                        let #tmp = theory.uf.#uf.add_eclass();
+                                    },
+                                )
+                            }
+                        };
 
-                            // NOTE: Function outputs are in the last column.
-                            quote! {
+                        let insert_ident = ident::delta_insert_row(relation_);
+
+                        // NOTE: Function outputs are in the last column.
+                        quote! {
+                            {
                                 #(#compute_row)*
                                 #last_compute
-                                delta.#insert_ident((#(#row,)* #(#last,)*));
+                                theory.delta.#insert_ident((#(#row,)* #(#last,)*));
                                 #(#last)*
                             }
                         }
                     }
                 }
-            };
-            let entry = map.entry(ty).or_default();
-            let idx = *entry;
-            *entry += 1;
+            }
+        }
+    }
 
-            let field = ident::type_global(ty_);
+    let mut map: BTreeMap<TypeId, usize> = BTreeMap::new();
+    let mut assigned_indices: TVec<GlobalId, usize> = TVec::new();
+    let theory_initial: Vec<TokenStream> = theory
+        .initial
+        .iter()
+        .map(|initial| match initial {
+            Initial::Run { steps } => {
+                let steps = steps.get();
+                quote! { for _ in 0..#steps { theory.step(); } }
+            }
+            Initial::ComputeGlobal { global_id, compute } => {
+                let ty = theory.global_variable_types[global_id];
+                let ty_data = &theory.types[ty];
 
-            assigned_indexes.push_expected(global_id, idx);
-            if ty_.is_zero_sized() {
-                quote! {
-                    { #expr };
-                }
-            } else {
-                quote! {
-                    let tmp = { #expr };
-                    self.#field.push(tmp);
+                let expr = global_compute_to_expr(theory, *global_id, compute, &assigned_indices);
+                let idx = {
+                    let entry = map.entry(ty).or_default();
+                    let idx = *entry;
+                    *entry += 1;
+                    idx
+                };
+
+                assigned_indices.push_expected(*global_id, idx);
+                if ty_data.is_zero_sized() {
+                    quote! {
+                        let _ = #expr;
+                    }
+                } else {
+                    let field = ident::type_global(ty_data);
+                    quote! {
+                        theory.#field.define(#idx, #expr);
+                    }
                 }
             }
         })
         .collect();
 
-    let fields_struct: Vec<_> = map
-        .iter()
-        .filter_map(|(ty, _)| {
-            let ty_ = &theory.types[ty];
-            if ty_.is_zero_sized() {
+    let global_variable_fields: Vec<_> = map
+        .keys()
+        .filter_map(|ty| {
+            let ty_data = &theory.types[ty];
+            if ty_data.is_zero_sized() {
                 None
             } else {
-                let field = ident::type_global(ty_);
-                let typ = ident::type_ty(ty_);
-                Some(quote! { #field : Vec<#typ> })
+                let field = ident::type_global(ty_data);
+                let typ = ident::type_ty(ty_data);
+                Some(quote! { #field : GlobalVars<#typ>, })
             }
         })
         .collect();
 
-    let theory_delta_ty = ident::theory_delta_ty(theory);
-
-    (
-        quote! {
-            #[derive(Default, Debug)]
-            struct GlobalVariables {
-                new: bool,
-                #(#fields_struct,)*
-            }
-            impl GlobalVariables {
-                fn initialize(&mut self, delta: &mut #theory_delta_ty, uf: &mut Unification) {
-                    self.new = true;
-                    #(#compute_initial)*
-                }
-            }
-        },
-        assigned_indexes,
-    )
+    (global_variable_fields, assigned_indices, theory_initial)
 }
 
 fn codegen_relation(
@@ -1363,18 +1281,6 @@ mod ident {
         let ty = type_ty(ty);
         quote! { UnionFind<#ty> }
     }
-    /// `math_uprooted`
-    pub fn type_uprooted(ty: &TypeData) -> Ident {
-        format_ident!("{}_uprooted", ty.name.to_snake_case())
-    }
-    /// `math_iter`
-    pub fn type_iter(ty: &TypeData) -> Ident {
-        format_ident!("{}_iter", ty.name.to_snake_case())
-    }
-    /// `math_iter_new`
-    pub fn type_iter_new(ty: &TypeData) -> Ident {
-        format_ident!("{}_iter_new", ty.name.to_snake_case())
-    }
     /// `MathRelation`, `AddRelation`
     pub fn rel_ty(rel: &RelationData) -> Ident {
         format_ident!("{}Relation", rel.name.to_pascal_case())
@@ -1463,11 +1369,6 @@ mod ident {
     pub fn delta_insert_row(rel: &RelationData) -> Ident {
         let x = rel.name.to_snake_case();
         format_ident!("insert_{x}")
-    }
-    /// `make_math`
-    pub fn delta_make(ty: &TypeData) -> Ident {
-        let x = ty.name.to_snake_case();
-        format_ident!("make_{x}")
     }
 }
 
