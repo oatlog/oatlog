@@ -17,7 +17,7 @@
 #let department = "Department of Computer Science and Engineering"
 #show: template.with(
   title: [Oatlog: Ahead-of-time compiled #box[e-graphs] with primitives],
-  subtitle: [Implementing a high-performance #box[e-graph] engine],
+  subtitle: [Implementing a high-performance relational #box[e-graph] engine],
   authors: ("Loke Gustafsson", "Erik Magnusson"),
   department: department,
   supervisor: ("Hazem Torfah", department),
@@ -42,11 +42,8 @@
 
 #TODO[introduce relevant references]
 
-#TODO[Matti: §3.1 You talk about “practical performance on practical inputs”: how do you define practicality?]
-
-#TODO[sections for WCOJ, free join, ]
-
-#TODO[Alejandro: in general, try to maintain in every subsection of the introduction the structure of introducing a problem -> solving a problem]
+#TODO[Alejandro: in general, try to maintain in every subsection of the introduction the structure
+of introducing a problem -> solving a problem]
 
 #TODO[Clearly present motivation for this work]
 
@@ -95,14 +92,8 @@ a slow backtracking search, but most compilers do this heuristically instead.
 
 == E-graphs and EqSat
 
-#TODO[Alejandro: E-graphs and equality saturation (EqSat) are techniques implies e-graphs are a
-technique.
-
-Loke: Genuinely, are they not?
-]
-
-E-graphs and equality saturation (EqSat) are techniques that can be used to augment peephole
-rewriting to make it nondestructive. They allow multiple rewrites of a value, committing to one only
+Equality saturation (EqSat), a technique based on e-graphs, can be used to augment peephole
+rewriting to make it nondestructive. It allows multiple rewrites of a value, committing to one only
 after all rewrites have been searched while not duplicating work post-branch as a backtracking
 search would.
 
@@ -165,9 +156,17 @@ can be seen as a Datalog engine with support for unification. Unlike egglog, it 
 ahead-of-time (aot$#h(2pt)approx#h(2pt)$oat) which allows query planning and index selection to be
 optimized globally.
 
+Our goal is for oatlog to
++ #[implement most of the egglog features that still make sense in the context
+of ahead-of-time embedding within a Rust program.]
++ be faster than egglog across a moderately broad set of benchmarks
+
 Currently, as of the midpoint report, oatlog is slower than egglog and does not implement quite a
 few of egglog's features. Addressing this is our priority for the remainder of our master's thesis
 work.
+
+#NOTE[The planning report goes into greater detail on what evaluating performance means and what
+sort of benchmarks we care about.]
 
 == This thesis
 
@@ -192,7 +191,11 @@ evaluating oatlog through its test suite and benchmarks.
 
 = Conceptual background <conceptual_background>
 
-#TODO[Matti: §2.1 You should clarify the basic concepts (assume that the reader has basic knowledge of computer science, but has not heard anything about e-graphs); what are e-graphs, how are e-classes different from e-nodes, what does “extraction” mean, and so on. Think that your description should form a clear story that explains everything the reader needs to know to understand the remainder of the thesis.]
+#TODO[Matti: You should clarify the basic concepts (assume that the reader has basic knowledge
+of computer science, but has not heard anything about e-graphs); what are e-graphs, how are
+e-classes different from e-nodes, what does “extraction” mean, and so on. Think that your
+description should form a clear story that explains everything the reader needs to know to
+understand the remainder of the thesis.]
 
 E-graphs are motivated by the observation that directed acyclic graphs (DAGs) of expressions can
 efficiently represent a nested expression with a common subexpression, like say $f(g(x), g(x))$, as
@@ -201,16 +204,15 @@ they can not efficiently deduplicate multiple identical consumers of different i
 $f(g(x))$ and $f(h(x))$. This is problematic when exploring local rewrites for optimization or
 theorem proving purposes as these activities will create many similar expressions.
 
-#TODO[Alejandro: confusing sentence "it makes sense to instead introduce a notion of e-classes of equal e-nodes that e-nodes refer to rather than referring to other e-nodes directly."]
-
-#TODO[e-classes instead of e-class]
-
-One could address the deduplication problem by introducing a function-like abstraction, but this
-would still require some at least constant-sized top-level bookkeeping per expression. In the
-specific case of local equality-preserving rewrites, however, it makes sense to instead introduce a
-notion of e-classes of equal e-nodes that e-nodes refer to rather than referring to other e-nodes directly.
-This allows an e-graph to represent an exponential number of
-equivalent expressions, parameterized by mappings from e-class to e-node.
+One could address the deduplication problem by introducing a function-like abstraction#footnote[It
+turns out such a function-like abstraction is useful even within an e-graph, and there exists an
+e-graph variant known as slotted e-graphs that has this @slotted_egraph. But oatlog does not
+implement slotted e-graphs and they are not directly relevant to this thesis.], but this would still
+require some at least constant-sized top-level bookkeeping per expression. However, for local
+equality-preserving rewrites, it is more effective to introduce e-classes -- groups of equal e-nodes
+-- that e-nodes reference instead of pointing to other e-nodes directly. This enables an e-graph to
+compactly represent an exponential number of equivalent expressions, parameterized by mappings from
+e-classes to e-nodes.
 
 E-graphs can be represented as graphs in multiple ways. In one formulation, hinted at by the
 terminology of e-nodes and e-classes, e-nodes are the nodes of the graph and e-classes are
@@ -226,9 +228,10 @@ are ordered from the point of view of the operation since not all operations are
 Finally, every e-node is a member of exactly one e-class and no e-class is empty.
 
 @informal-egraph-figure shows an example e-graph represented as a bipartite graph.
-@informal-egraph-figure-non-bipartite shows the same e-graph, but drawing e-classes as groups of e-nodes.
-
-#TODO[Matti: One thing for example that I was thinking about relating to above was when looking at [bipartite] was that it was not clear initially that constants would be e-nodes rather than e-classes, this is an example of things that should not surprise the reader]
+@informal-egraph-figure-non-bipartite shows the same e-graph, but drawing e-classes as groups of
+e-nodes. Note that we consider constants e-nodes rather than e-classes. While seeing constants as
+special e-classes would work, it would prevent use-cases such as equation solving in which e-nodes
+can have unknown inputs but known outputs.
 
 #figure(
   image("egraph_example.svg", width: 75%),
@@ -253,14 +256,12 @@ Finally, every e-node is a member of exactly one e-class and no e-class is empty
 
 == Non-relational e-matching
 
-#TODO[expand upon this and upon how egg does things in general]
+#TODO[This is very incomplete, must expand. Egg vs rollback for theorem proving.]
 
-#TODO[Alejandro: "“patterns”, then once these match add" -> "“patterns”. Once these match, they add"]
-
-Rewrite rules look for subgraph "patterns", then once these match add new e-classes and e-nodes and join existing
-e-classes by vertex contraction. EqSat involves repeatedly applying a set of rewrite rules, then
-finally performing extraction, i.e. determining canonical e-nodes for respective e-classes such that
-the implied DAG of e-nodes has some minimal cost.
+Rewrite rules look for subgraph "patterns". Once these match, they add new e-classes and e-nodes and
+unify existing e-classes by vertex contraction. EqSat involves repeatedly applying a set of rewrite
+rules, then finally performing extraction, i.e. determining canonical e-nodes for respective
+e-classes such that the implied DAG of e-nodes has some minimal cost.
 
 A set of rewrite rules is called a theory, and these can be shown to converge to finite e-graphs
 under some conditions. Practically, many theories diverge and the EqSat rewriting phase is often
@@ -269,9 +270,10 @@ performed until some timeout or until some other condition is met.
 Extraction, even when using a sum of static e-node costs as a cost function, is NP-hard, but there
 are both heuristics and algorithms that work well on some types of e-graphs @fastextract.
 
-== E-graphs as relational databases
+== E-graphs as relational databases <conceptual_background_egraph_relational>
 
-#TODO[go first principles, not through talking about egglog]
+#TODO[This section should be rewritten to actually introduce e-graphs as relational database, not
+just talk vaguely about what egglog is doing.]
 
 Conceptually, egglog stores _uninterpreted partial functions_.
 
@@ -531,18 +533,22 @@ prototype of egglog, egglite, was originally implemented on top of sqlite @eggli
 
 = Background <background>
 
-#TODO[]
+#TODO[Section overview]
 
 == Nomenclature
 
 @rosetta-table shows different terminology and relates e-graphs to relational databases. We use
 these terms largely interchangeably depending on the context.
 
-#TODO[Matti: Likewise you should expand and clarify what the connection between e-graphs and relational databases is, [nomenclature] looks rather incomprehensible as of now without this clarification]
+Egglog and eqlog are both relational e-graph engines, which as described in
+@conceptual_background_egraph_relational are essentially Datalog engines with unification. The
+nomenclature differs, primarily in the frontend language, but all represent statements as rows in
+table, with these statements in the e-graph context being e-nodes that relate e-classes to each
+other.
 
 #figure(
   table(
-    columns: (auto, auto, auto, auto, auto),
+    columns: (1fr, 1fr, 1fr, 1fr, 2fr),
     table.header(
       table.cell(colspan: 5, [*Approximate nomenclature guide*]),
       [*egglog* ],
@@ -730,7 +736,7 @@ only computed if they are potentially useful.
 
 == Rule scheduling and termination
 
-#TODO[]
+#TODO[section summary]
 
 === Surjectivity
 
@@ -806,22 +812,30 @@ for a visualization of this.
 
 == Canonicalization
 
-#TODO[remove non-canonical stuff from database]
+#TODO[When one actually inserts pending inserts and canonicalizes uprooted e-classes. Interaction
+  with semi-naive, updating what `new` means.]
 
 === Union-find
 
-// #TODO[Matti: §2.2.1: I’m not very familiar with Rust code, but it seems to me that the code in Listing 2 is incorrect and should not compile (the function find in particular doesn’t make sense)]
-// #TODO[Matti: Also the description is unclear (what elements are we talking about, what set are they elements of)]
-// #TODO[Matti: Most importantly, what does it mean that something runs “in almost O(1)”? O(1) is a well-defined class of functions, so the function describing the running time either is or is not in O(1), it cannot “almost” be there (then it is not!); when using the big-O notation, please bear in mind that the statements actually do have a well-defined meaning and one cannot just informally throw it at things]
-Union-find is a data structure that maintains disjoint such that unifying sets and checking if elements belong to the same set is efficient @unionfindoriginal.
-When used in an e-graph, they store e-classes.
-Union-find with path compression is $O(n * alpha (n))$ #footnote[where $alpha$ is the inverse of the Ackermann's function. Inverse Ackermann's function grows so slowly that it can be considered constant for practical inputs @o1-union-find.] @fastunionfind.
+Union-find is a data structure that maintains disjoint sets, supporting the two operations
+`union()`, which merges two sets and `find()` which returns the unique representative element of a
+set @unionfindoriginal. Alternatively, it can be seen as representing an undirected graph with
+`union()` adding an edge between two nodes and `find()` returning some designated representative of
+the connected compontent containing a given node. E-graphs use a union-find data structure to store
+e-classes and unify them once they are discovered to be equal.
+
+There are two optimizations used to speed up the union-find datastructure, path compression and
+smaller-to-larger merging. Operations have an amortized time complexity of $O(log n)$ if either
+optimization is applied individually, with an amortized time complexity of $O(alpha(n))$ if they are
+applied together #footnote[$alpha$ is the inverse of the Ackermann's function and grows slowly
+enough to be considered constant for all practical inputs.] @fastunionfind @unionfindvariantbounds.
 An example implementation is shown in @union-find-path-compression.
 
 #figure(
   ```rust
   struct UnionFind {
       repr: Vec<usize>,
+      size: Vec<usize>,
   }
   impl UnionFind {
       fn new(size: usize) -> Self {
@@ -829,18 +843,25 @@ An example implementation is shown in @union-find-path-compression.
       }
       fn find(&mut self, i: usize) -> usize {
           if self.repr[i] == i {
-              return i;
+              i
           } else {
               let root = self.find(self.repr[i]);
               self.repr[i] = root; // <-- path compression
-              return root;
+              root
           }
       }
       fn union(&mut self, i: usize, j: usize) {
-          let i = self.find(i);
-          let j = self.find(j);
-          if i == j { return }
-          self.repr[i] = j;
+          let mut i = self.find(i);
+          let mut j = self.find(j);
+          if i == j { return; }
+          // smaller-to-larger merging
+          let (larger, smaller) = if self.size[i] >= self.size[j] {
+            (i, j)
+          } else {
+            (j, i)
+          };
+          self.repr[smaller] = larger;
+          self.size[larger] += self.size[smaller];
       }
   }
   let uf = UnionFind::new(5); // [[0], [1], [2], [3], [4]]
@@ -857,13 +878,29 @@ An example implementation is shown in @union-find-path-compression.
   ),
 ) <union-find-path-compression>
 
-=== Egg, batched
+In the context of e-graphs, it makes sense to apply path compression to avoid walking a linked list
+within `find()`, although this part of the code is unlikely to be a bottleneck in comparison to
+index lookups or index maintenance.
 
-#TODO[]
+On the other hand, in the context of a relational e-graph engine, the canonicalization step will
+remove all "uprooted" e-classes, i.e. roots recently turned children after a `union()`, from all
+tables. If the index data structures are not recreated fully after each step, such as when using
+BTree indexes#footnote[When using immutable indexes recreated from scratch, such as sorted arrays
+with lookups using binary search, this point less but there is still some constant-factor overhead
+in doing unnecessary uproots.], which e-classes is merged into which matters. Specifically, the
+merge order should be chosen to minimize the number of database modifications to remove the uprooted
+e-class. A good approximation of this is the number of times an e-classes is stored within a table
+row. However, in practice tracking this number brings additional maintenance overhead and is
+therefore not performed in oatlog. Instead, one can merge larger-id to smaller-id as a heuristic,
+since earlier and hence smaller ids are likely to be present in more existing tuples.
+
+=== #TODO[]
+
+#TODO[Additional aspects of canonicalization, pseudocode etc]
 
 == Query planning
 
-#TODO[]
+#TODO[Worst-case optimal join, generic join, free join]
 
 == Index selection and implementation
 
@@ -899,7 +936,12 @@ See @index-datastructures.
       [*range*],
     ),
 
-    [naive btreeset ], [$M dot log N$], [$M dot log N$], [$log N$ ], [$log N$],
+    [Rust `std::collections::BTreeSet`, with a limited (non-batch) API],
+    [$M dot log N$],
+    [$M dot log N$],
+    [$log N$ ],
+    [$log N$],
+
     [custom btreeset], [$M + log N$ ], [$M + log N$ ], [$log N$ ], [$log N$],
     [sorted list ], [$N + M$ ], [$N + M$ ], [$log N$ ], [$log N$],
     [CSR/CSC ], [$N + M + E$ ], [$N + M + E$ ], [$log sqrt(N)$], [$1$],
@@ -1117,10 +1159,10 @@ inserts and unifications. HIR is lowered into LIR and that process also performs
 
 === QIR, Query-plan IR
 
-#NOTE[The current implementation is very ad-hoc and will be replaced by something similar to
-  free-join, except entirely static (only a single cover)]
+#NOTE[The current implementation is a very ad-hoc generic join and will be replaced by something
+  similar to free-join, except entirely static (only a single cover)]
 
-#TODO[We might need to explain free join]
+#TODO[We need to have explained query planning in the background and refer to that here.]
 
 Represents all the choices made to transform a conjunctive query to LIR, specifically the order of
 joins and how the joins are performed. Note that this IR only contains queries and other
@@ -1139,69 +1181,6 @@ LIR is a low-level description of the actual code that is to be generated.
 == Selected implementation details
 
 #TODO[]
-
-=== Union-find dirty list and smaller-to-larger merging.
-
-When canonicalizing, it is useful to be able to iterate newly uprooted (non-canonical) e-classes to remove them from the database, so we also track a list of dirty ids when unifying. See @union-find-dirty-list.
-
-#figure(
-  ```rust
-  struct UnionFind {
-      repr: Vec<usize>,
-      dirty: Vec<usize>, // <-- tracking dirty ids
-      /* ... */
-  }
-  impl UnionFind {
-      /* ... */
-      fn union(&mut self, i: usize, j: usize) {
-          let i = self.find(i);
-          let j = self.find(j);
-          if i == j { return }
-          self.repr[i] = j;
-          self.dirty.push(i); // <-- tracking dirty ids
-      }
-  }
-  ```,
-  caption: [Union-find that tracks dirty ids.],
-) <union-find-dirty-list>
-
-If the indexes are not re-created after each step, then which set is merged
-into the other set starts to matter#footnote[Note that this is not the case if
-the index is for example a sorted list, where it needs to be re-created
-completely.], specifically we want to minimize the number of database
-modifications. To approximate this, the number of times an e-class has been
-referenced in the database can be used as a measure of how many changes to the
-database would be necessary. This can be seen in @union-find-smaller-to-larger.
-
-#figure(
-  ```rust
-  struct UnionFind {
-      repr: Vec<usize>,
-      size: Vec<i64>,
-      /* ... */
-  }
-  impl UnionFind {
-      /* ... */
-      fn union(&mut self, i: usize, j: usize) {
-          let i = self.find(i);
-          let j = self.find(j);
-          if i == j { return }
-          let (smaller, larger) = if self.size[i] < self.size[j] {
-              (i, j)
-          } else {
-              (j, i)
-          };
-          self.repr[smaller] = larger;
-      }
-      fn change_size(&mut self, i: usize, delta: i64) {
-          self.size[i] += delta;
-      }
-  }
-  ```,
-  caption: [Union-find that performs smaller-to-larger merging],
-) <union-find-smaller-to-larger>
-
-#TODO[maybe this actually belongs in the background]
 
 === Rustc spans across files
 
@@ -1289,7 +1268,7 @@ Overall, our comparative testing infrastructure (against egglog) can handle the 
     columns: (auto, auto, auto, auto),
     table.header(
       [*test*],
-      table.cell(colspan: 1, [*egglog*#footnote[egglog 0.4 was used.]]),
+      table.cell(colspan: 1, [*egglog*#footnote[egglog version 0.4]]),
       table.cell(colspan: 2, [*oatlog*]),
       [],
       [],
@@ -1304,12 +1283,22 @@ Overall, our comparative testing infrastructure (against egglog) can handle the 
     [
       Benchmark results comparing egglog with oatlog.
     ],
-    [],
+    [
+      The btreeset index implementation for oatlog is particularly bad due to the `btree_cursors`
+      API still being nightly-only and therefore not used in oatlog. This is not a problem given
+      that oatlog anyway will use either sorted list indexes or a custom btreeset with support for
+      batched operations.
+    ],
   ),
 ) <benchmark-results>
 
-@benchmark-results describe our benchmark results.
-The benchmarks include the egglog code in @appendix_benchmarks and run 9 steps. This is repeated 100 times and an average is taken.
+@benchmark-results describe our benchmark results. The benchmarks include the egglog code in
+@appendix_benchmarks and run 9 steps. This is repeated 100 times and an average is taken.
+
+As of the midpoint report, there is low-hanging fruit in that oatlog creates unnecessary e-classes
+that are quickly eliminated. We believe this should address the performance difference compared to
+egglog #footnote[It should be noted that oatlog is algorithmically more similar to eqlog, with
+egglog being very different beyond also being a relational e-graph engine.].
 
 == Egglog test suite
 
@@ -1325,9 +1314,8 @@ For a list of currently passing tests, see @passingtests.
 
 = Conclusion <conclusion>
 
-#TODO[]
+#TODO[Nothing here yet..]
 
-#TODO[bibliography: notes like "Accessed" do not show up.]
 #bibliography("refs.bib")
 #show: appendices
 
