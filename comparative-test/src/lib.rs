@@ -42,10 +42,14 @@ fn compare_egglog_oatlog(
         .filter(|(relation, count)| (*count != egglog_counts[*relation]))
         .map(|(relation, count)| {
             any_mismatch = true;
-            format!("{relation}: {} != {count}\n", egglog_counts[relation])
+            format!(
+                "{relation}: {} (egglog) != {count} (oatlog)\n",
+                egglog_counts[relation]
+            )
         })
         .collect();
     if any_mismatch {
+        println!("{mismatch_msgs}");
         assert_eq!(verdict, Verdict::Mismatched, "expected mismatch");
         if let Some(e) = expected {
             e.assert_eq(&mismatch_msgs);
@@ -79,9 +83,9 @@ macro_rules! comparative_test {
             println!("egglog msg: {msg}");
         }
 
-        for _ in 0..$limit {
+        for i in 0..$limit {
             println!(
-                "egglog: {}, oatlog: {}",
+                "iteration {i}: egglog: {}, oatlog: {}",
                 egglog.num_tuples(),
                 theory.get_total_relation_entry_count()
             );
@@ -268,7 +272,7 @@ egglog_test!(nogenerate, bdd, expect![[r#"
 
 "#]], r#"(include "comparative-test/egglog-testsuite/bdd.egg")"#);// primitive functions
 egglog_test!(mismatched, before_proofs, expect![[r#"
-    Add: 10 != 33
+    Add: 10 (egglog) != 33 (oatlog)
 "#]], r#"(include "comparative-test/egglog-testsuite/before-proofs.egg")"#); // REASON: clear transient not performed on check, so globals have not affected the database yet.
 egglog_test!(nogenerate, bignum, expect![[r#"
     comparative-test/egglog-testsuite/bignum.egg: function bigint is not defined
@@ -1315,6 +1319,35 @@ use expect_test::expect;
 egglog_test!(valid_tests_compile_ok, should_compile, expect![], "(sort Math)");
 
 egglog_test!(zrocorrect, permutation_bugs, expect![], "(include \"comparative-test/additional/permutation_bugs.egg\")");
+
+egglog_test!(mismatched, quadratic, expect![[r#"
+    Add: 504 (egglog) != 532 (oatlog)
+"#]], r#"
+(datatype Math
+    (Mul Math Math)
+    (Add Math Math)
+    (Sub Math Math)
+    (Zero)
+    (Sqrt Math)
+    (Var String)
+)
+
+(rule ((= c (Sub a b))) ((union b (Add a c))))
+
+(rewrite (Mul a b) (Mul b a))
+(rewrite (Mul (Mul a b) c) (Mul a (Mul b c)))
+(rewrite (Add a b) (Add b a))
+(rewrite (Add (Add a b) c) (Add a (Add b c)))
+
+(rewrite (Mul x (Add a b)) (Add (Mul x a) (Mul x b)))
+
+(rewrite (Mul (Sqrt x) (Sqrt x)) x)
+
+(Add (Add (Mul (Var "x") (Var "x")) (Var "c")) (Add (Mul (Var "b") (Var "x")) (Mul (Var "b") (Var "x"))))
+(Sub (Sqrt (Sub (Mul (Var "b") (Var "b")) (Var "c"))) (Var "b"))
+
+"#);
+// (include \"comparative-test/additional/quadratic.egg\")
 
 }
 }

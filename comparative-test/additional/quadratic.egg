@@ -1,0 +1,53 @@
+
+(datatype Math
+    (Mul Math Math)
+    (Add Math Math)
+    (Sub Math Math)
+    (Zero)
+    (Sqrt Math)
+    (Var String)
+)
+
+(rule ((= c (Add a1 b)) (= c (Add a2 b))) ((union a1 a2)))
+(rule ((= c (Add b a1)) (= c (Add a2 b))) ((union a1 a2)))
+(rule ((= c (Add a b1)) (= c (Add a b2))) ((union b1 b2)))
+(rule ((= c (Add b1 a)) (= c (Add a b2))) ((union b1 b2)))
+(rule ((= c1 (Add a b)) (= c2 (Add a b))) ((union c1 c2)))
+(rule ((= c1 (Add b a)) (= c2 (Add a b))) ((union c1 c2)))
+
+(rule ((= c (Sub a b))) ((union b (Add a c))))
+
+(rule (
+    (= t0 (Mul x y2))
+    (= zero (Add y2 y))
+    (= zero (Zero))
+) (
+    (let t2 (Mul x y))
+    (union zero (Add t0 t2))
+))
+
+(rewrite (Add x (Zero)) x)
+(rewrite (Add (Zero) x) x)
+
+(rewrite (Mul x (Zero)) (Zero))
+(rewrite (Mul (Zero) x) (Zero))
+
+(rewrite (Mul a b) (Mul b a))
+(rewrite (Mul (Mul a b) c) (Mul a (Mul b c)))
+(rewrite (Add a b) (Add b a))
+(rewrite (Add (Add a b) c) (Add a (Add b c)))
+
+(birewrite (Mul x (Add a b)) (Add (Mul x a) (Mul x b)))
+
+
+(rewrite (Mul (Sqrt x) (Sqrt x)) x)
+
+(Zero)
+(rule ((Zero)) (
+    (let x (Var "x"))
+    (let b (Var "b"))
+    (let c (Var "c"))
+    (let t (Add (Add (Mul x x) c) (Add (Mul b x) (Mul b x))))
+    (union x (Sub (Sqrt (Sub (Mul b b) c)) b))
+))
+
