@@ -90,6 +90,8 @@ in the face of multiple potentially good but mutually incompatible rewrites. Sin
 unlock other beneficial rewrites later, one cannot select them greedily. This could be handled with
 a slow backtracking search, but most compilers do this heuristically instead.
 
+#TODO[make conceptual background sections link to each-other, it's not just a tree]
+
 == E-graphs and EqSat
 
 Equality saturation (EqSat), a technique based on e-graphs, can be used to augment peephole
@@ -114,11 +116,17 @@ optimization, rather than automated theorem proving, we call this equality satur
 @equalitysaturation. Additionally, in equality saturation, there is a final extraction phase where
 one globally near-optimal expression is selected from the many possibilities implied by the e-graph.
 
+#TODO[illustrate their usefulness is problematic wording]
+#TODO[clearly communicate: egraphs could be useful for compilers.]
+
 E-graphs suffer from the combinatorial explosion resulting from trying to find every equivalent
 representation of the initial expression, despite it being reduced through their efficient
 deduplication. This is a major problem in practice and currently severely limits what applications
 e-graphs are suitable for. While we have chosen optimizing compilers to illustrate their usefulness,
 this is not a domain in which they have typically been used.
+
+#TODO[Also present equation rewriting in general. Talk about how compilers is ONE application for them.]
+#TODO[Goal is to just to explore e-graphs, not just about optimizing compilers. Compilers are not really relevant.]
 
 E-graphs were originally developed for automated theorem proving @oldegraph @egraphwithexplain and
 have been used for synthesis of low-error floating point expressions @herbie, optimization of linear
@@ -190,6 +198,8 @@ evaluating oatlog through its test suite and benchmarks.
 #NOTE[The midpoint draft is too early for a conclusion.]
 
 = Conceptual background <conceptual_background>
+
+#TODO[section summary: we need to present technical concepts, section XX is YY etc.]
 
 #TODO[Matti: You should clarify the basic concepts (assume that the reader has basic knowledge
   of computer science, but has not heard anything about e-graphs); what are e-graphs, how are
@@ -264,7 +274,7 @@ rules, then finally performing extraction, i.e. determining canonical e-nodes fo
 e-classes such that the implied DAG of e-nodes has some minimal cost.
 
 A set of rewrite rules is called a theory, and these can be shown to converge to finite e-graphs
-under some conditions. Practically, many theories diverge and the EqSat rewriting phase is often
+under some conditions. In practice, many theories diverge and the EqSat rewriting phase is often
 performed until some timeout or until some other condition is met.
 
 Extraction, even when using a sum of static e-node costs as a cost function, is NP-hard, but there
@@ -280,6 +290,7 @@ Conceptually, egglog stores _uninterpreted partial functions_.
 Thinking about uninterpreted partial functions is a bit abstract, so I think it helps to drop to the
 abstraction of a relation directly.
 
+#TODO[reference table]
 For example, consider a partial function that performs addition, which we can represent as in
 @concept_table_concrete.
 
@@ -421,6 +432,8 @@ To perform e-matching, we turn the pattern into a conjunctive query
 becomes
 
 $"Mul"(t_0, c, t_1) join "Add"(a, b, t_0)$
+
+#TODO[connect sections by talking about conjunctive queries]
 
 == Semi-naive evaluation <conceptual_overview_seminaive>
 
@@ -670,6 +683,8 @@ for _ in b_new(..) {
 
 #NOTE[Not implemented yet.]
 
+#TODO[semi-naive *evaluation*]
+
 It is very rare that the user provides rules with identical premises, but with
 semi-naive we produce many very similar rules that can potentially be merged.
 To merge rules, we compare the premise of the rules and if they are equal
@@ -885,6 +900,10 @@ In the context of e-graphs, it makes sense to apply path compression to avoid wa
 within `find()`, although this part of the code is unlikely to be a bottleneck in comparison to
 index lookups or index maintenance.
 
+#TODO[On the other hand]
+
+#TODO[point less?]
+
 On the other hand, in the context of a relational e-graph engine, the canonicalization step will
 remove all "uprooted" e-classes, i.e. roots recently turned children after a `union()`, from all
 tables. If the index data structures are not recreated fully after each step, such as when using
@@ -970,6 +989,8 @@ trivial, but selecting an optimal expression, even with simple cost functions is
 Many NP-hard graph algorithms can be done in polynomial time for a fixed treewidth, and this also applies to extraction, where it can be done linear time @fastextract @egraphcircuit.
 
 = Oatlog implementation <oatlog_implementation>
+
+#TODO[what it can do]
 
 This section discusses oatlog in detail, including how it is used, what it can do and how it is
 implemented.

@@ -376,13 +376,15 @@ corresponds to the data that has been queries or asserted earlier in the rule, a
 the result of adjoining the data in that statement. Codomain and domain of subsequent statements
 match, so their morphisms are composable."
 
-#quote([ The general strategy is as follows:
-- The first flat function (with index 0) is the entry point for the flat rule. The body of function
-  0 consists of call to other functions only. This ensure that we can always append a call statement
-  to function 0 and be guaranteed that the call is executed precisely once.
-- During translation, we associate a "matching function" to each structure that occurs as a domain
-  or codomain of a morphism. The main property of the matching function is such that by the end of
-  its body, all elements of the corresponding structure have been matched.])
+#quote([
+  The general strategy is as follows:
+  - The first flat function (with index 0) is the entry point for the flat rule. The body of function
+    0 consists of call to other functions only. This ensure that we can always append a call statement
+    to function 0 and be guaranteed that the call is executed precisely once.
+  - During translation, we associate a "matching function" to each structure that occurs as a domain
+    or codomain of a morphism. The main property of the matching function is such that by the end of
+    its body, all elements of the corresponding structure have been matched.
+])
 
 `index_selection.rs` goes through all `if` statements across all rules to determine what indices are
 necessary and how `QuerySpec` maps to index. `if` statements have an already determined `QuerySpec`
@@ -436,7 +438,6 @@ TODO EXAMPLE
 ```
 
 
-
 = Extraction: Egraphs as circuits
 (independent discovery)
 - `https://arxiv.org/abs/2408.17042` "E-Graphs as Circuits, and Optimal Extraction via Treewidth"
@@ -454,7 +455,6 @@ We can use existing algorithms to simplify the circuit before extraction to acce
 Algorithm uses tree decomposition `https://en.wikipedia.org/wiki/Tree_decomposition`
 NP, but P for bounded treewidth, which is typically the case.
 
-
 Algorithm is essentially:
 1. Convert to circuit
 2. Simplify circuit (their heuristics)
@@ -462,7 +462,6 @@ Algorithm is essentially:
 4. Their algorithm.
 
 (costs can be arbitrary)
-
 
 = Scheduling
 Currently the proposed schedule is to run all rules and then canonicalize + insert.
@@ -490,7 +489,6 @@ self.drop_dirt(); // old_index += new_index; new_index.clear()
 delta.apply_surjective(self); // apply_equalities(); apply_tuples();
 self.canonicalize();
 ```
-
 
 ```rust
 // pseudocode of eqlog scheduling
@@ -543,7 +541,6 @@ loop {
 ```
 - Can we use type information to reduce the number of iterations for `uprooted_eclass`?
 - Can we implement implicit functionality with insert (`BTreeMap`?)
-
 
 ```rust
 loop {
@@ -826,32 +823,32 @@ Having semantics based on exact iterations is bad because we want to run some ru
 
 What do rules do?
 - "If rule matches the database, the actions will at some point be applied in the database in some order interleaved with actions from other rules"
-    - This means we have have some freedom to apply changes however we want.
-    - It is fine to delay implicit functionality.
+  - This means we have have some freedom to apply changes however we want.
+  - It is fine to delay implicit functionality.
 
 When do rules run?
 - user can trigger an "iteration" somehow.
 - Alternatives (are these equivalent?)
-    - "Rules run infinitely many times after infinitely many iterations" (self-stabilizing time scales)
-        - If we want to run surjective/convergent rules first.
-    - "Rules run after finitely many iterations"
-        - More understandable, finite can depend on size of e-graph, so we can still run surjective/convergent rules first.
+  - "Rules run infinitely many times after infinitely many iterations" (self-stabilizing time scales)
+    - If we want to run surjective/convergent rules first.
+  - "Rules run after finitely many iterations"
+    - More understandable, finite can depend on size of e-graph, so we can still run surjective/convergent rules first.
 
 
 What Theory transformations are sound?
 - Merging rules with equivalent premises.
-    - unfortunately equivalent is maybe a property of the entire theory, and not the pair of premises
-      when applying rules to rules.
+  - unfortunately equivalent is maybe a property of the entire theory, and not the pair of premises
+    when applying rules to rules.
 - Applying rules to rules (equality)
-    - rules assuming functional equality to reduce variables is sound since eqlog does it?
-        - this is just applying rules to rules.
-    - if we can assume that another rule will unify variables eventually, it is sound to add that unification as a constraint to the current rule.
-        - however that means that the applied rule must still run.
-            - applying a rule to itself will just make the action and premise equal.
-            - one solution: once a rule has been applied to another rule, no other rule can be applied to it. (it becomes an invariant)
+  - rules assuming functional equality to reduce variables is sound since eqlog does it?
+    - this is just applying rules to rules.
+  - if we can assume that another rule will unify variables eventually, it is sound to add that unification as a constraint to the current rule.
+    - however that means that the applied rule must still run.
+      - applying a rule to itself will just make the action and premise equal.
+      - one solution: once a rule has been applied to another rule, no other rule can be applied to it. (it becomes an invariant)
 - Normalizing a rule
-    - entry in action and premise -> delete entry in action
-    - etc
+  - entry in action and premise -> delete entry in action
+  - etc
 
 
 
@@ -948,8 +945,8 @@ Bottom-up evaluation might not terminate, for example the factorial function:
 
 Algo:
 - Compute demand patterns
-    - fact(bound, free), path(bound, bound)
-    - finding indexes-ish, but from a demand perspective.
+  - fact(bound, free), path(bound, bound)
+  - finding indexes-ish, but from a demand perspective.
 - Introduce demand predicates
 - Derive demand rules
 
@@ -1058,13 +1055,13 @@ Another way of seeing it is that after the action has run, the meaning of variab
 
 == User defined
 - Relation `any+ -> ()`, no implicit functionality
-    - like symbolic without ifunc
+  - like symbolic without ifunc
 - Symbolic `any+ -> eclass`, implicit functionality, merge with unification
-    - relation with ifunc
+  - relation with ifunc
 - Lattice `any+ -> !eclass`, implicit functionality, merge with expression of builtins
-    - unification in IR, but depends on relevant functions to get merge function.
+  - unification in IR, but depends on relevant functions to get merge function.
 - Global `() -> any`, user defined through let expressions.
-    - like builtin
+  - like builtin
 
 == Built-in functions (possibly user defined through rust code)
 - Builtin `any* -> any?`
@@ -1135,7 +1132,7 @@ We call it a lattice, but user only provides join, so it is actually a semilatti
 - $a and b = b and a$
 - $a and (b and c) = (a and b) and c$
 - $a and b$ must return an object greater than or equal to $a$ and $b$
-    - math: must be upper bound but we don't care about that.
+  - math: must be upper bound but we don't care about that.
 
 
 = Index selection
@@ -2043,8 +2040,8 @@ for (x, y) in R' {
 To restrict our search space, we know that a good query plan must:
 + Perform filtering as early as possible.
 + Minimize constraints on indexes
-    - do not perform unnecessary checks
-    - (global opt) minimize total number of indexes.
+  - do not perform unnecessary checks
+  - (global opt) minimize total number of indexes.
 
 
 
@@ -2052,14 +2049,14 @@ Simple algorithm (triangle query):
 $ R(x, y), S(y, z), T(z, x) $
 
 + Pick and arbitrary order to do the join
-    - $ [T, R, S] $
+  - $ [T, R, S] $
 + Introduce all variables immediately and filter greedily.
-    - $ [[T(z, x), R(x), S(z)], [R(y), S(y)]] $
+  - $ [[T(z, x), R(x), S(z)], [R(y), S(y)]] $
 + Do not perform unnecessary checks
-    - $ [[T(z, x), S(z)], [R(x, y), S(y)]] $
+  - $ [[T(z, x), S(z)], [R(x, y), S(y)]] $
 
 We do not want to do this:
-    - $ [[T(z, x), S(z, y)], [R(x, y)]] $
+- $ [[T(z, x), S(z, y)], [R(x, y)]] $
 Because this would be a cross join between T and S, however, if we knew that there was a functional dependency $z -> y$ OR $z -> x$ this would be a really good optimization.
 
 I actually am not entirely sure what the sub-arrays mean, it kind of means that we have have groups that are internally unordered.
@@ -2189,7 +2186,7 @@ $ Q_1(x_1) and Q_2(x_2) and (not A_1(y_1) or not A_2(y_2) or z_1 != z_2 or z_3 !
 
 Assume we are using tries.
 
-The tries for A, B, C, D and  B, A, C, D can share a suffix.
+The tries for A, B, C, D and B, A, C, D can share a suffix.
 
 So when iterating the first trie, there could be a lookup on the second trie.
 
@@ -2335,9 +2332,9 @@ With this approach, running arbitrary sets of rules just works, without involvin
 
 Assuming non termination, we either have (probably):
 - linear increase in database size.
-    - eg factorial or something.
+  - eg factorial or something.
 - exponential increase in database size.
-    - rule that triggers itself.
+  - rule that triggers itself.
 
 For linear we do not really care about performance.
 
@@ -2365,7 +2362,7 @@ Metaprogram:
     (Ary4 (FunctionId VariableId VariableId VariableId VariableId))
 )
 
-(datatype Premise 
+(datatype Premise
     (Contains PremiseAtom)
 )
 
@@ -2389,7 +2386,7 @@ Metaprogram:
 
 
 (sort RelationNew)
-(datatype RelationNew 
+(datatype RelationNew
     (MkRelationNew ())
 )
 
@@ -2437,7 +2434,7 @@ relation:     A  -> ()   (A,  ())        yes, performs insert
 function:     () -> B    ((), B )        yes if statically initialized.
 global:       () -> B    ((), B )        yes if statically initialized.
 
-primitive:    A  -> B    not supported   yes 
+primitive:    A  -> B    not supported   yes
 ```
 
 
@@ -2506,6 +2503,30 @@ So we either need double lookup OR double insert.
 = TODO READ
 Papers are just under the first author i looked at.
 I stopped adding authors after a while since this is just too many papers.
+
+
+= thing
+```
+A: Add(a, b) then a = b
+
+B: Add(a, b), Sub(a, b)
+
+for (a, b) in add {
+
+    union(a, b);
+
+    let c = foo.entry_0_1(a1, b);
+
+    let a2 = foo.entry_1_2(b, c);
+
+
+    for () in sub(a, a) {
+
+    }
+}
+
+
+```
 
 == Max Willsey (papers done, co-authors done)
 https://dl.acm.org/profile/99659359379
