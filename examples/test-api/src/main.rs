@@ -239,7 +239,6 @@ fn run() {
 
     let mut theory = Theory::new();
 
-
     theory.apply_rules();
     theory.canonicalize();
     for _ in 0..ITERS {
@@ -261,7 +260,6 @@ fn run() {
     }
 
     return;
-
 
     let x = theory.uf.math_uf.add_eclass();
     let b = theory.uf.math_uf.add_eclass();
