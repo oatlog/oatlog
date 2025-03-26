@@ -42,9 +42,6 @@
 
 #TODO[introduce relevant references]
 
-#TODO[Alejandro: in general, try to maintain in every subsection of the introduction the structure
-  of introducing a problem -> solving a problem]
-
 #TODO[Clearly present motivation for this work]
 
 = Introduction
@@ -75,11 +72,11 @@ ordering problem. Additionally, ad-hoc passes, implemented as arbitrary transfor
 intermediate representation, expressed in possibly thousands of lines of code, are difficult to
 model formally and to prove correct.
 
-The unlocking half of the issue can be avoided by replacing global rewrite passes with local
-rewrites. These local rewrites can be expressed within some framework that tracks dependencies and
-thus incrementally applies them until reaching a fixpoint. This avoids the computational
-inefficiency of having to reprocess the entire code with repeated passes, while at the same time not
-missing rewrites unlocked by other rewrites. This is called peephole rewriting and it lets us apply
+The unlocking half of the issue can be avoided by replacing global passes with local rewrites. These
+local rewrites can be expressed within some framework that tracks dependencies and thus
+incrementally applies them until reaching a fixpoint. This avoids the computational inefficiency of
+having to reprocess the entire code with repeated passes, while at the same time not missing
+rewrites unlocked by other rewrites. This is called peephole rewriting and it lets us apply
 monotonic rewrites to improve the program #footnote[Sea of Nodes is a compiler IR design that
 represents both data flow and control flow as expressions with no side effects, making it especially
 suited to peephole rewriting @son.]. At the same time, an optimization paradigm based on algebraic
@@ -88,68 +85,65 @@ rewrites eases formally modeling programs and proving the correctness of optimiz
 However, peephole rewriting does not avoid the issue of destructive rewrites being order-dependent
 in the face of multiple potentially good but mutually incompatible rewrites. Since one rewrite can
 unlock other beneficial rewrites later, one cannot select them greedily. This could be handled with
-a slow backtracking search, but most compilers do this heuristically instead.
+a slow backtracking search or with heuristics, with most compilers doing the latter. But there is a
+third approach, using equality saturation and e-graphs, that can be used to augment peephole
+rewriting to make it nondestructive.
 
-#TODO[make conceptual background sections link to each-other, it's not just a tree]
+== E-graphs and equality saturation
 
-== E-graphs and EqSat
+E-graphs @oldegraph are data structures for term rewriting that allow multiple representations of a
+value, committing to one only after all rewrites have been searched. The representations are stored
+simultaneously and since there is no backtracking there is no duplicated post-branch work.
 
-Equality saturation (EqSat), a technique based on e-graphs, can be used to augment peephole
-rewriting to make it nondestructive. It allows multiple rewrites of a value, committing to one only
-after all rewrites have been searched while not duplicating work post-branch as a backtracking
-search would.
-
-E-graphs are data structures that compactly represent an exponential number of equivalent
-expressions by allowing operators to take equivalence classes as inputs instead of individual
-expressions. An e-graph can be seen as a graph of e-nodes partitioned into e-classes, where e-nodes
-take e-classes as input. Concretely, the expressions $(2a)+b$ and $(a<<1)+b$ would be stored as an
+The trick that allows e-graphs to compactly represent an exponential number of equivalent
+expressions is that operators take equivalence classes as inputs instead of individual expressions.
+An e-graph can be seen as a graph of e-nodes partitioned into e-classes, where e-nodes take
+e-classes as input. Concretely, the expressions $(2a)+b$ and $(a<<1)+b$ would be stored as an
 addition taking as its left argument a reference to the equivalence class ${2a, a<<1}$, thus
 avoiding duplicated storage of any expression having $2a$ and therefore also $a<<1$ as possible
 subexpressions.
 
-A general workflow involves an e-graph initialized with a set of expressions representing facts or
-computations, and rewrite rules corresponding to logical deductions or optimizations respectively
-are applied until reaching a fixpoint or until some other criterion is met. Rewrite rules pattern
-match on the existing e-graph and perform actions such as inserting new e-nodes and equating
-existing e-nodes (and hence their e-classes). When e-graphs are used for program synthesis or
-optimization, rather than automated theorem proving, we call this equality saturation (EqSat)
-@equalitysaturation. Additionally, in equality saturation, there is a final extraction phase where
-one globally near-optimal expression is selected from the many possibilities implied by the e-graph.
+E-graphs were originally developed for automated theorem proving @oldegraph @egraphwithexplain, in
+which they interact with a larger system. The e-graph is fed assumptions, possibly producing
+contradictions, which are then revoked and replaced with other assumptions. This means e-graphs for
+use in automated theorem proving require support for backtracking, restricting how they can be
+implemented.
 
-#TODO[illustrate their usefulness is problematic wording]
-#TODO[clearly communicate: egraphs could be useful for compilers.]
+In contrast, the equality saturation (EqSat) @equalitysaturation workflow involves an e-graph
+initialized with a set of expressions representing facts or computations, and rewrite rules
+corresponding to logical deductions or optimizations respectively are applied until reaching a
+fixpoint or until some other criterion is met. Rewrite rules pattern match on the existing e-graph
+and perform actions such as inserting new e-nodes and equating existing e-nodes (and hence their
+e-classes). When equality saturation is used for program synthesis or optimization, there is a final
+extraction phase in which one globally near-optimal expression is selected from the many
+possibilities implied by the e-graph.
 
 E-graphs suffer from the combinatorial explosion resulting from trying to find every equivalent
 representation of the initial expression, despite it being reduced through their efficient
 deduplication. This is a major problem in practice and currently severely limits what applications
-e-graphs are suitable for. While we have chosen optimizing compilers to illustrate their usefulness,
-this is not a domain in which they have typically been used.
+e-graphs are suitable for. In particular, e-graphs are not used in current general-purpose compilers
+despite their ability to solve the phase ordering problem.
 
-#TODO[Also present equation rewriting in general. Talk about how compilers is ONE application for them.]
-#TODO[Goal is to just to explore e-graphs, not just about optimizing compilers. Compilers are not really relevant.]
-
-E-graphs were originally developed for automated theorem proving @oldegraph @egraphwithexplain and
-have been used for synthesis of low-error floating point expressions @herbie, optimization of linear
-algebra expressions @spores, etc, but they are absent from general-purpose compilers. The compiler
-backend Cranelift @cranelift is the only production compiler for general-purpose code we know of
-that has incorporated e-graphs, but it has done so in the weaker form of acyclic e-graphs (aegraphs)
-due to performance problems of full e-graphs.
+E-graphs have, however, been used in more specialized domains such as for synthesis of low-error
+floating point expressions @herbie and for optimization of linear algebra expressions @spores. They
+are also used in eggcc @eggcc, an experimental optimizing compiler for the toy language Bril, and
+the webassembly-oriented production compiler backend Cranelift @cranelift. Cranelift uses the weaker
+acyclic e-graphs (aegraphs), due to performance problems of full e-graphs. A proliferation of
+e-graphs within compilers would require them to become faster.
 
 == Datalog and relational databases
 
 Recent developments in e-graphs and equality saturation @relationalematching @eqlog @egglog have
-shown that adding indices to e-graph pattern-matching creates a structure that is very similar to
+shown that adding indexes to e-graph pattern-matching creates a structure that is very similar to
 relational databases and in particular Datalog -- a declarative logic programming language that
 reasons bottom-up by inserting rows into tables. In fact, this similarity extends to the degree
 that e-graphs may be best thought of as Datalog extended with a unification operation.
 
 This allows EqSat to leverage algorithms from Datalog, in particular the algorithm semi-naive join
 which, rather than running queries against the entire database, specifically queries newly inserted
-rows in a manner similar to a database trigger.
-
-Incremental rule matching, together with indices and simple query planning, has brought an order of
-magnitude speedup to the recent e-graph engine egglog @egglog when compared to its predecessor egg
-@egg.
+rows in a manner similar to a database trigger. Incremental rule matching, together with indexes and
+simple query planning, has brought an order of magnitude speedup to the recent e-graph engine egglog
+@egglog when compared to its predecessor egg @egg.
 
 Relational databases are a mature technology with rich theory and a wide breadth of implementations,
 providing many techniques that could be transferred to e-graphs beyond those already incorporated
@@ -173,12 +167,9 @@ Currently, as of the midpoint report, oatlog is slower than egglog and does not 
 few of egglog's features. Addressing this is our priority for the remainder of our master's thesis
 work.
 
-#NOTE[The planning report goes into greater detail on what evaluating performance means and what
-  sort of benchmarks we care about.]
-
 == This thesis
 
-#NOTE[This section talks about things that aren't finished as if they were.]
+#NOTE[This section talks about report sections that aren't finished as if they were.]
 
 @conceptual_background extends this introduction with a conceptual background. This is a
 step-by-step explanation of what e-graphs are and how they have been implement prior to their
@@ -186,7 +177,7 @@ unification to Datalog. We then motivate the idea of e-graphs as relational data
 in showing how semi-naive evaluation avoids rediscovering facts.
 
 The background, @background, changes the perspective to instead introduce the techniques that are
-relevant for anyone writing a Datalog-inspired equality saturating engine, guided by their use
+relevant for anyone writing a Datalog-inspired EqSat engine, guided by their use
 within oatlog.
 
 @oatlog_implementation then concretely describes the implementation of these techniques in oatlog,
@@ -199,20 +190,30 @@ evaluating oatlog through its test suite and benchmarks.
 
 = Conceptual background <conceptual_background>
 
-#TODO[section summary: we need to present technical concepts, section XX is YY etc.]
+#TODO[Asking Matti: Is the conceptual background sufficiently understandable?]
 
-#TODO[Matti: You should clarify the basic concepts (assume that the reader has basic knowledge
-  of computer science, but has not heard anything about e-graphs); what are e-graphs, how are
-  e-classes different from e-nodes, what does “extraction” mean, and so on. Think that your
-  description should form a clear story that explains everything the reader needs to know to
-  understand the remainder of the thesis.]
+The conceptual background explains the core concepts necessary to understand our work. Its
+explanation goes into greater technical detail than in the introduction, while remaining more
+pedagogical (and less comprehensive) than the background in @background.
+
+We start by describing e-graphs as a static data structure (@conceptual_background_egraphs) before
+explaining about how they are mutated in the e-matching and canonicalization stages of EqSat
+(@conceptual_background_nonrelational). Following this, we rethink the graph representation to
+simplify querying and end up with an e-graph represented as a collection of relational database
+tables (@conceptual_background_relational), a representation that unlocks semi-naive evaluation
+(@conceptual_background_seminaive). Finally, we briefly discuss the theory languages that one can
+use to interact with this entire machinery (@conceptual_background_theory_languages) and the design
+constraints that differentiate Datalog engines from SQL database management systems
+(@conceptual_background_datalog_vs_sql).
+
+== E-graphs <conceptual_background_egraphs>
 
 E-graphs are motivated by the observation that directed acyclic graphs (DAGs) of expressions can
 efficiently represent a nested expression with a common subexpression, like say $f(g(x), g(x))$, as
 well as multiple expressions sharing a common subexpression, like say $f(g(x))$ and $h(g(x))$), but
 they can not efficiently deduplicate multiple identical consumers of different inputs, such as
 $f(g(x))$ and $f(h(x))$. This is problematic when exploring local rewrites for optimization or
-theorem proving purposes as these activities will create many similar expressions.
+theorem proving purposes as these activities will create many expressions with shared parts.
 
 One could address the deduplication problem by introducing a function-like abstraction#footnote[It
 turns out such a function-like abstraction is useful even within an e-graph, and there exists an
@@ -237,16 +238,31 @@ e-classes to e-nodes denoting being used as input in the e-node's operation. Ope
 are ordered from the point of view of the operation since not all operations are commutative.
 Finally, every e-node is a member of exactly one e-class and no e-class is empty.
 
-@informal-egraph-figure shows an example e-graph represented as a bipartite graph.
-@informal-egraph-figure-non-bipartite shows the same e-graph, but drawing e-classes as groups of
-e-nodes. Note that we consider constants e-nodes rather than e-classes. While seeing constants as
+@informal-egraph-figure-non-bipartite shows an example e-graph represented as e-classes, i.e.
+equivalence classes of e-nodes, pointing to e-nodes. @informal-egraph-figure shows the same e-graph
+represented as a bipartite graph.
+
+Note that we consider constants e-nodes rather than e-classes. While seeing constants as
 special e-classes would work, it would prevent use-cases such as equation solving in which e-nodes
 can have unknown inputs but known outputs.
 
 #figure(
+  image("egraph_cluster.svg", width: 60%),
+  caption: flex-caption(
+    [Example of an equivalence-class-formulation e-graph that initially contains
+      $(a+2) dot c$.],
+    [
+      The sharp boxes are e-nodes and the rounded boxes are e-classes. E-classes
+      contain e-nodes evaluating to the same value and the input to an e-node can be computed from any
+      of the e-nodes in its input e-class.
+    ],
+  ),
+) <informal-egraph-figure-non-bipartite>
+
+#figure(
   image("egraph_example.svg", width: 75%),
   caption: flex-caption(
-    [Example of a bipartite-formulation e-graph that initially contains $(a + 2) dot c$.],
+    [The same e-graph as in @informal-egraph-figure-non-bipartite, but drawn as a bipartite graph.],
     [
       The oval shapes are e-classes, representing a set of equivalent expressions, with incoming edges
       denoting e-node members.
@@ -256,41 +272,65 @@ can have unknown inputs but known outputs.
   ),
 ) <informal-egraph-figure>
 
-#figure(
-  image("egraph_cluster.svg", width: 60%),
-  caption: [
-    The same e-graph as in @informal-egraph-figure, but drawing e-classes as groups of e-nodes
-    rather than as a bipartite graph.
-  ],
-) <informal-egraph-figure-non-bipartite>
+== Non-relational e-matching and canonicalization <conceptual_background_nonrelational>
 
-== Non-relational e-matching
+@informal-egraph-figure shows not only an e-graph but one that has e-nodes and e-classes added to it
+after the application of rewrite rules. While @conceptual_background_egraphs explains the meaning
+and invariant of a static e-graph, we have not yet considered how they are mutated.
 
-#TODO[This is very incomplete, must expand. Egg vs rollback for theorem proving.]
+The EqSat workflow consists of two parts, an e-matching phase and a canonicalization#footnote[Also
+known as rebuilding.] phase. E-matching involves searching the e-graph for all occurences of a
+pattern, i.e. a syntactic expression such as $(x+y) dot z$, for which e-matching involves selecting
+e-classes to assign to $x$, $y$ and $z$ which then implicitly selects unique e-nodes for $x+y$ and
+the root expression $(x+y) dot z$. E-matching requires solving the subgraph isomorphism problem for
+an e-graph.
 
-Rewrite rules look for subgraph "patterns". Once these match, they add new e-classes and e-nodes and
-unify existing e-classes by vertex contraction. EqSat involves repeatedly applying a set of rewrite
-rules, then finally performing extraction, i.e. determining canonical e-nodes for respective
-e-classes such that the implied DAG of e-nodes has some minimal cost.
+The rewrite rule will then describe some actions to take based on the match, the most important of
+which are adding new e-nodes to the graph, adding e-classes and unifying e-classes. These
+modifications are then applied to the e-graph in the canonicalization step, with the former two, in
+the bipartite formulation, corresponding to adding nodes and unification corresponding to a node
+contraction.
+
+#TODO[Formal e-graph representation (U, M, H, etc) suitable for implementation]
+
+#TODO[Canonicalization on this representation]
+
+#TODO[Recursive e-matching]
+
+#TODO[Batching rewrites for EqSat. WHY is this incompatible with rollback and hence theorem
+  proving?]
 
 A set of rewrite rules is called a theory, and these can be shown to converge to finite e-graphs
 under some conditions. In practice, many theories diverge and the EqSat rewriting phase is often
 performed until some timeout or until some other condition is met.
 
-Extraction, even when using a sum of static e-node costs as a cost function, is NP-hard, but there
-are both heuristics and algorithms that work well on some types of e-graphs @fastextract.
+When using EqSat to prove that two expressions are or are not equal, we simply query the e-class of
+these e-nodes after the e-matching and canonicalization loop has finished. But EqSat can also be
+used for optimization, in which case there is an extraction phase that selects a good expression
+computing a given e-class of the e-graph. Only slightly simplified#footnote[Only e-classes used in
+the extracted expression need to be realized as an e-node, and it would be possible although for
+most cost functions never desirable to realize the same e-class differently at different locations
+in the final expression.], extraction can be seen as selecting a primary e-node for each e-class.
+The cost of an e-node would usually depend on the e-nodes realizing its input e-classes, and the
+global cost to minimize would be the cost of the root e-class.
 
-== E-graphs as relational databases <conceptual_background_egraph_relational>
+A simple yet realistic cost function is a sum of static e-node costs for all e-nodes included in an
+extracted expression. This corresponds to minimizing the number of operations necessary to compute
+the final value, allowing reuse of temporaries. For trees, such a cost could be computed with
+dynamic programming in linear time since the cost of an e-node is a constant plus the sum of costs
+for its input e-classes. For general e-graphs extraction is NP-hard, but there are both heuristics
+and algorithms that perform in practice on some types of e-graphs @fastextract.
 
-#TODO[This section should be rewritten to actually introduce e-graphs as relational database, not
+== E-graphs as relational databases <conceptual_background_relational>
+
+#TODO[This section should be rewritten to actually introduce e-graphs as relational databases, not
   just talk vaguely about what egglog is doing.]
 
 Conceptually, egglog stores _uninterpreted partial functions_.
 
-Thinking about uninterpreted partial functions is a bit abstract, so I think it helps to drop to the
+Thinking about uninterpreted partial functions is a bit abstract, so it helps to drop to the
 abstraction of a relation directly.
 
-#TODO[reference table]
 For example, consider a partial function that performs addition, which we can represent as in
 @concept_table_concrete.
 
@@ -334,9 +374,9 @@ since these are uninterpreted, we do not have actual values, but instead e-class
   caption: [Partial function represented as a table of e-classes.],
 ) <concept_table_eclasses>
 
-For example, we can not really say anything about $a, b$ or $c$ other than $"add"(a,b) = c$. It is
-called a function because we have a functional dependency from (x,y) to res. In database
-terminology, we have a primary key on (x,y) for this relation.
+We can not really say anything about $a, b$ or $c$ other than $"add"(a,b) = c$. It is called a
+function because we have a functional dependency from (x,y) to res. In database terminology, we have
+a primary key on (x,y) for this relation.
 
 Egglog also supports a form of sum types
 
@@ -433,9 +473,28 @@ becomes
 
 $"Mul"(t_0, c, t_1) join "Add"(a, b, t_0)$
 
-#TODO[connect sections by talking about conjunctive queries]
+where $join$ denotes a natural join, here on the column $t_0$. In general, all patterns expressed as
+syntactic trees can be turned into such queries by adding temporary variables for function outputs.
+The problem of e-matching becomes a join, for which we must determine a join order (query planning)
+as well as determine how to do the actually lookups (index selection and implementation).
 
-== Semi-naive evaluation <conceptual_overview_seminaive>
+EqSat on a high level now looks like
+1. Execute conjuctive queries
+2. Perform actions (e-node insertions, creating e-classes, unifying e-classes) based on matches
+3. Canonicalization, applying these mutations to the database in batches.
+
+In comparison to recursive e-matching we benefit from being able to join in any order, not just
+recursively from the root of the pattern. We also benefit from already having implicit indices on
+e-node type, in that tuples for different partial functions are stored separately. We, however,
+still have an e-graph where all mutations leave pattern matches matching, so every iteration of
+e-matching and canonicalization will rediscover all previously discovered rewrites. This is
+addressed by semi-naive evaluation, an algorithm from Datalog that we now can use due to having
+conjunctive queries.
+
+== Semi-naive evaluation <conceptual_background_seminaive>
+
+#TODO[Explain that semi-naive wouldn't work in the non-relational formulation (since that requires
+  all queries to start at the root rather than at new, which semi-naive requires)]
 
 Semi-naive evaluation is an algorithm for joining relations, each consisting of both old and new
 tuples, guaranteeing that each joined tuple contains some new information. In the context of
@@ -503,10 +562,17 @@ for _ in b_new(..) {
 
 #TODO[what does this mean in practice?]
 
-== Theory languages
+== Theory languages <conceptual_background_theory_languages>
+
+#TODO[Elaborate]
 
 @informal-theory-example shows an example EqSat theory specified in the egglog domain-specific
-language @egglog.
+language @egglog. `Math` is essentially a sum type, where `Add`, `Sub`, etc are constructors.
+Rewrites mean that if the left side matches, add the right side to the database and unify it with
+the left side. Egglog semantics define running a set of rules as using their left side patterns to
+figure out what right side actions to perform, then doing all actions as a batch. Egglog defines a
+command `run <count>`, not shown here, that runs the set of all rules some number of times or until
+convergence.
 
 #figure(
   ```egglog
@@ -528,21 +594,15 @@ language @egglog.
   (rewrite (Mul x (Const 1)) (x))                       ; multiplicative unit
   ```,
 
-  caption: [
-    A theory written in the egglog language. `Math` is essentially a sum type, where `Add`, `Sub`,
-    etc are constructors. Rewrites mean that if the left side matches, add the right side to the
-    database and unify it with the left side. Egglog semantics define running a set of rules as
-    using their left side patterns to figure out what right side actions to perform, then doing all
-    actions as a batch. Egglog defines a command `run <count>`, not shown here, that runs the set of
-    all rules some number of times or until convergence.
-  ],
+  caption: [A theory written in the egglog language.],
 ) <informal-theory-example>
 
-== Design constraints for Datalog engines vs SQL databases.
+== Design constraints for Datalog engines vs SQL databases. <conceptual_background_datalog_vs_sql>
 
-SQL databases need to be extremely dynamic since arbitrary new queries can be done, but for Datalog
-all queries are known up-front, so Datalog engines can spend more resources on optimizing queries
-and selecting optimal indexes and index data-structures.
+SQL databases need to be extremely dynamic since arbitrary new queries can be done at run time, but
+in Datalog engines all queries are known up-front before starting the rewrite loop. This means that
+Datalog engines can spend more resources on optimizing queries and selecting optimal indexes and
+index data-structures based on exact queries.
 
 That said, it's entirely possible to create an e-graph engine that uses SQL internally and in fact a
 prototype of egglog, egglite, was originally implemented on top of sqlite @egglite @egraph_sqlite.
@@ -557,7 +617,7 @@ prototype of egglog, egglite, was originally implemented on top of sqlite @eggli
 these terms largely interchangeably depending on the context.
 
 Egglog and eqlog are both relational e-graph engines, which as described in
-@conceptual_background_egraph_relational are essentially Datalog engines with unification. The
+@conceptual_background_relational are essentially Datalog engines with unification. The
 nomenclature differs, primarily in the frontend language, but all represent statements as rows in
 table, with these statements in the e-graph context being e-nodes that relate e-classes to each
 other.
@@ -622,8 +682,8 @@ $ "Add"(x, y, a) $
 
 === Semi-naive evaluation
 
-In @conceptual_overview_seminaive within the conceptual overview we saw that a query $A join B join
-C$ can be split into three queries
+In @conceptual_background_seminaive within the conceptual overview we saw that a conjuctive query $A
+join B join C$ can be split into three queries
 
 $
   &#`new`_A &join& #`all`_B &join& #`all`_C union \
@@ -643,8 +703,9 @@ for _ in b_new(..) {
 }
 ```
 
-One can do more or less this, but there are some problems with it. First of all, it requires
-indexing both `old` and either `all` or `new`, implying additional indexing overhead.
+This is almost what a real implementation would do, but there are some problems with it. First of
+all, it requires indexing both `old` and either `all` or `new`, implying additional indexing
+overhead.
 
 Additionally, it can be beneficial to schedule queries to run differently often, in which case we
 can have a $#`new`_1$ for recently run queries $Q_1$ and a larger $#`new`_2$ for insertions made
@@ -679,16 +740,14 @@ for _ in b_new(..) {
 
 #TODO[what does egglog and eqlog do?]
 
-=== Merging rules (in HIR, not trie)
+=== Merging rules with identical premises
 
 #NOTE[Not implemented yet.]
 
-#TODO[semi-naive *evaluation*]
-
-It is very rare that the user provides rules with identical premises, but with
-semi-naive we produce many very similar rules that can potentially be merged.
-To merge rules, we compare the premise of the rules and if they are equal
-replace them with a rule that combines the actions of the original rules.
+It is very rare that the user provides rules with identical premises, but with semi-naive evaluation
+we produce many very similar rules that can potentially be merged. To merge rules, we compare the
+premises of the rules and, if they are equal, replace them with a rule that combines the actions of
+the original rules.
 
 === Magic sets
 
@@ -825,7 +884,7 @@ for a visualization of this.
                ^                          ^
                |------rule2 new set-------|
   ```,
-  caption: [Staying semi-naive while not running all the rules at the same time.],
+  caption: [Keeping semi-naive evaluation while not running all rules at the same time.],
 ) <semi-something>
 
 == Canonicalization
@@ -844,10 +903,10 @@ e-classes and unify them once they are discovered to be equal.
 
 There are two optimizations used to speed up the union-find datastructure, path compression and
 smaller-to-larger merging. Operations have an amortized time complexity of $O(log n)$ if either
-optimization is applied individually, with an amortized time complexity of $O(alpha(n))$ if they are
-applied together #footnote[$alpha$ is the inverse of the Ackermann's function and grows slowly
-enough to be considered constant for all practical inputs.] @fastunionfind @unionfindvariantbounds.
-An example implementation is shown in @union-find-path-compression.
+optimization is applied individually, with an amortized time complexity of $O(alpha(n))$
+#footnote[$alpha$ is the inverse of the Ackermann function and grows slowly enough to be considered
+constant for all practical inputs.] if they are applied together @fastunionfind
+@unionfindvariantbounds. An example implementation is shown in @union-find-path-compression.
 
 #figure(
   ```rust
@@ -900,17 +959,13 @@ In the context of e-graphs, it makes sense to apply path compression to avoid wa
 within `find()`, although this part of the code is unlikely to be a bottleneck in comparison to
 index lookups or index maintenance.
 
-#TODO[On the other hand]
-
-#TODO[point less?]
-
-On the other hand, in the context of a relational e-graph engine, the canonicalization step will
-remove all "uprooted" e-classes, i.e. roots recently turned children after a `union()`, from all
-tables. If the index data structures are not recreated fully after each step, such as when using
-BTree indexes#footnote[When using immutable indexes recreated from scratch, such as sorted arrays
-with lookups using binary search, this point less but there is still some constant-factor overhead
-in doing unnecessary uproots.], which e-classes is merged into which matters. Specifically, the
-merge order should be chosen to minimize the number of database modifications to remove the uprooted
+Contrastingly, in the context of a relational e-graph engine, the canonicalization step will remove
+all "uprooted" e-classes, i.e. roots recently turned children after a `union()`, from all tables. If
+the index data structures are not recreated fully after each step, such as when using BTree
+indexes#footnote[When using immutable indexes recreated from scratch, such as sorted arrays with
+lookups using binary search, this matters less but there is still some constant-factor overhead in
+doing unnecessary uproots.], which e-classes are merged into which matters. Specifically, the merge
+order should be chosen to minimize the number of database modifications to remove the uprooted
 e-class. A good approximation of this is the number of times an e-classes is stored within a table
 row. However, in practice tracking this number brings additional maintenance overhead and is
 therefore not performed in oatlog. Instead, one can merge larger-id to smaller-id as a heuristic,
@@ -933,8 +988,6 @@ since earlier and hence smaller ids are likely to be present in more existing tu
 === Curried indexes
 
 AKA factorized representation (DB theory) @relation_tensor
-
-@relation_tensor
 
 === Data structure selection
 
@@ -966,7 +1019,7 @@ See @index-datastructures.
 
     [custom btreeset], [$M + log N$ ], [$M + log N$ ], [$log N$ ], [$log N$],
     [sorted list ], [$N + M$ ], [$N + M$ ], [$log N$ ], [$log N$],
-    [CSR/CSC ], [$N + M + E$ ], [$N + M + E$ ], [$log sqrt(N)$], [$1$],
+    [compressed sparse row/column ], [$N + M + E$ ], [$N + M + E$ ], [$log sqrt(N)$], [$1$],
   ),
   caption: flex-caption(
     [Big-$O$ costs for various index data structures.],
@@ -977,6 +1030,8 @@ See @index-datastructures.
     ],
   ),
 ) <index-datastructures>
+
+#TODO[elaborate]
 
 == Extraction
 
@@ -990,9 +1045,9 @@ Many NP-hard graph algorithms can be done in polynomial time for a fixed treewid
 
 = Oatlog implementation <oatlog_implementation>
 
-#TODO[what it can do]
+#TODO[Elaborate and forward reference]
 
-This section discusses oatlog in detail, including how it is used, what it can do and how it is
+This section discusses oatlog in detail, including how its used, what it can do and how its
 implemented.
 
 == Egglog-compatible external interface
@@ -1034,7 +1089,7 @@ support for
 + #[Primitive functions, i.e. non-partial functions with exclusively primitive arguments and return
     values, implemented as Rust functions directly such as `i64::add` or `i64::mul`.]
 + #[Lattice functions, i.e. partial functions returning primitives updated through `:merge`.]
-+ #[Containers, such as sets and multisets containing EqSorts.]
++ #[Containers, such as sets and multisets containing non-primitives.]
 + #[Running arbitrary schedules.]
 
 #figure(
@@ -1054,7 +1109,7 @@ support for
         [include], yes,
         [sort], yes,
         [datatype], yes,
-        [datatype\*], no,
+        [datatype\*], yes,
         [constructor], yes,
         [function], yes,
         [relation], yes,
@@ -1087,8 +1142,8 @@ support for
         [combined-ruleset], no,
 
         table.cell(colspan: 2)[Push/Pop],
-        [push], no,
-        [pop], no,
+        [push], wont,
+        [pop], wont,
 
         table.cell(colspan: 2)[Statistics],
         [print-stats], wont,
@@ -1111,9 +1166,7 @@ support for
     let ignored = box(outset: 2pt, radius: 2pt, fill: gray.lighten(30%))[ignored]
     let wont = box(outset: 2pt, radius: 2pt, fill: blue.lighten(40%))[won't]
     flex-caption(
-      [
-        Egglog support in oatlog, by language keyword.
-      ],
+      [Egglog support in oatlog, by language keyword.],
       [
         Rows marked #no could make sense to implement, at the very
         least for unit tests. Rows marked #ignored are currently no-ops but should be implemented while
@@ -1149,9 +1202,7 @@ implemented and unimplemented features of the oatlog run-time API.
   caption: {
     let no = box(outset: 2pt, radius: 2pt, fill: red.lighten(20%))[no]
     flex-caption(
-      [
-        Oatlog run-time API feature implementation status.
-      ],
+      [Oatlog run-time API feature implementation status.],
       [
         Rows marked #no are not yet implemented.
       ],
@@ -1239,9 +1290,7 @@ Overall, our comparative testing infrastructure (against egglog) can handle the 
     [`allcorrect`], [Oatlog and egglog produce the same non-zero number of e-nodes],
   ),
   caption: flex-caption(
-    [
-      Possible outcomes for comparative testing of oatlog and egglog.
-    ],
+    [Possible outcomes for comparative testing of oatlog and egglog.],
     [
       The `zrocorrect` verdict is broken out from `allcorrect` since oatlog ignores the `check`
       command, which usually is used in those tests.
@@ -1304,9 +1353,7 @@ Overall, our comparative testing infrastructure (against egglog) can handle the 
     [boolean adder], [30.935 ms], [56.890 ms], [249.33 ms],
   ),
   caption: flex-caption(
-    [
-      Benchmark results comparing egglog with oatlog.
-    ],
+    [Benchmark results comparing egglog with oatlog.],
     [
       The btreeset index implementation for oatlog is particularly bad due to the `btree_cursors`
       API still being nightly-only and therefore not used in oatlog. This is not a problem given

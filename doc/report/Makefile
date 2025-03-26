@@ -17,8 +17,8 @@ lint:
 		then echo "ERROR: No two blank lines in a row please!"; exit 1; fi
 	@if $(RG) 's-expression'; \
 		then echo "ERROR: The S in S-expression should be capitalized!"; exit 1; fi
-	@if $(RG) '[^`"]datalog'; \
-		then echo "ERROR: The D in D-expression should be capitalized!"; exit 1; fi
+	@if $(RG) '[^`"_]datalog'; \
+		then echo "ERROR: The D in Datalog should be capitalized!"; exit 1; fi
 	@if $(RG) '[^`"]rust[^c]'; \
 		then echo "ERROR: The R in Rust should be capitalized!"; exit 1; fi
 	@if $(RG) '[^= \.] Oatlog'; \
