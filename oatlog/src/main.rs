@@ -1,8 +1,9 @@
 use clap::Parser;
 use std::{
-    fs,
+    fs::{self, File},
     io::{self, Read as _, Write as _},
-    path::PathBuf,
+    path::{Path, PathBuf},
+    process::{Command, Stdio},
 };
 
 #[derive(Parser)]
@@ -14,6 +15,10 @@ struct Cli {
     /// Output file (.rs), if not stdout.
     #[arg(short, long, value_name = "FILE")]
     output: Option<PathBuf>,
+
+    /// Take an egglog program that does not match egglog and shrink it.
+    #[arg(long)]
+    shrink: bool,
 }
 
 fn main() {
@@ -65,10 +70,202 @@ fn main() {
         input
     };
 
+    if cli.shrink {
+        shrink(input, cli.output);
+        return;
+    }
+
     let output = oatlog::compile_str(&input);
 
     match cli.output {
         Some(path) => fs::write(path, output).unwrap(),
         None => io::stdout().lock().write_all(output.as_bytes()).unwrap(),
     }
+}
+
+fn shrink(program: String, output: Option<PathBuf>) {
+    static FILE_LOCK: std::sync::Mutex<()> = std::sync::Mutex::new(());
+    let file_lock = FILE_LOCK.try_lock().unwrap();
+
+    let Some(output) = output else {
+        let mut smaller = program;
+        while let Some(nxt) = oatlog_core::shrink(smaller.clone()).next() {
+            smaller = nxt;
+            println!("{smaller}\n");
+        }
+        return;
+    };
+    let output = output.canonicalize().unwrap();
+    let wd = output.parent().unwrap();
+
+    // make sure we do not overwrite the wrong file.
+
+    dbg!(wd);
+
+    let mut file = open_source_file_checked(&output);
+    set_file_contents(&mut file, &empty_contents());
+
+    inner(program, wd, &mut file);
+    set_file_contents(&mut file, &empty_contents());
+    drop(file_lock);
+
+    fn inner(mut program: String, wd: &Path, file: &mut File) {
+        let mut get_verdict = |program| get_verdict(program, file, wd);
+        let initial_verdict = get_verdict(program.clone());
+        match initial_verdict {
+            AllCorrect => {
+                println!("initial verdict is all correct?");
+                return;
+            }
+            Mismatched => (),
+            NoGenerate => {
+                println!("initial code does not compile?");
+                return;
+            }
+        }
+        loop {
+            let mut progress = false;
+            for smaller in oatlog_core::shrink(program.clone()) {
+                match dbg!(get_verdict(smaller.clone())) {
+                    AllCorrect => continue,
+                    Mismatched => {
+                        progress = true;
+                        println!("smaller:\n{program}\n");
+                        program = smaller;
+                        break;
+                    }
+                    NoGenerate => continue,
+                }
+            }
+            if !progress {
+                break;
+            }
+        }
+        println!("minimal example\n{program}");
+    }
+}
+
+#[derive(Copy, Clone, Debug)]
+enum Verdict {
+    AllCorrect,
+    Mismatched,
+    NoGenerate,
+}
+use Verdict::*;
+
+fn get_verdict(program: String, file: &mut File, wd: &Path) -> Verdict {
+    // println!("testing program:\n{program}\n");
+    let contents = test_contents(&program);
+    set_file_contents(file, &contents);
+    let compile_ok = Command::new("cargo")
+        .arg("build")
+        .current_dir(wd)
+        .stderr(Stdio::null())
+        .stdout(Stdio::null())
+        .status()
+        .unwrap()
+        .success();
+    if !compile_ok {
+        return NoGenerate;
+    }
+    let test_ok = Command::new("cargo")
+        .arg("run")
+        .current_dir(wd)
+        .stderr(Stdio::null())
+        .stdout(Stdio::null())
+        .status()
+        .unwrap()
+        .success();
+    if test_ok { AllCorrect } else { Mismatched }
+}
+
+fn set_file_contents(file: &mut fs::File, contents: &str) {
+    use std::io::{Seek, Write};
+    file.rewind().unwrap();
+    file.set_len(0).unwrap();
+    write!(file, "{contents}").unwrap();
+}
+
+const MAGIC_HEADER: &str = "// AUTO GENERATED CODE FOR SHRINKING. THIS WILL BE OVERWRITTEN.";
+fn open_source_file_checked(output: &Path) -> std::fs::File {
+    assert_eq!(Some(std::ffi::OsStr::new("main.rs")), output.file_name());
+    let mut file = std::fs::OpenOptions::new()
+        .read(true)
+        .write(true)
+        .create(false)
+        .open(output)
+        .unwrap();
+    let mut current_contents = String::new();
+    file.read_to_string(&mut current_contents).unwrap();
+    assert!(current_contents.starts_with(MAGIC_HEADER));
+    file
+}
+
+// reset to this after running shrink.
+fn empty_contents() -> String {
+    format!("{MAGIC_HEADER}\nfn main() {{}}")
+}
+
+fn test_contents(program: &str) -> String {
+    format!(
+        "{MAGIC_HEADER}
+const INPUT: &str = r#\"
+{program}
+\"#;
+
+oatlog::compile_egraph!(r#\"
+{program}
+\"#);
+
+use std::collections::BTreeMap;
+
+static EGGLOG_COUNT_REGEX: std::sync::LazyLock<regex::Regex> =
+    std::sync::LazyLock::new(|| regex::Regex::new(r\"(.*): ([0-9]+)\").unwrap());
+
+fn main() {{
+    let mut egglog = egglog::EGraph::default();
+    for msg in egglog.parse_and_run_program(None, INPUT).unwrap() {{
+        println!(\"egglog msg: {{msg}}\");
+    }}
+    let mut theory = Theory::new();
+
+    for i in 0..5 {{
+        println!(\"step {{i}}\");
+        check_ok(&mut egglog, &theory);
+
+        let _: Vec<_> = egglog.parse_and_run_program(None, \"(run 1)\").unwrap();
+        theory.step();
+    }}
+    check_ok(&mut egglog, &theory);
+
+    let oatlog_counts = theory.get_relation_entry_count();
+
+    println!(\"ALL OK: {{oatlog_counts:?}}\");
+}}
+
+fn check_ok(egglog: &mut egglog::EGraph, theory: &Theory) {{
+    let egglog_counts: BTreeMap<_, _> = egglog
+        .parse_and_run_program(None, \"(print-size)\")
+        .unwrap()
+        .into_iter()
+        .flat_map(|msg| {{
+            msg.lines()
+                .map(|msg| {{
+                    let caps = EGGLOG_COUNT_REGEX.captures(msg.trim()).unwrap();
+                    let relation: String = caps.get(1).unwrap().as_str().to_owned();
+                    let count: usize = caps.get(2).unwrap().as_str().parse().unwrap();
+                    (relation, count)
+                }})
+                .collect::<Vec<_>>()
+        }})
+        .collect();
+
+    let oatlog_counts = theory.get_relation_entry_count();
+
+    for (&relation, &size) in oatlog_counts.iter() {{
+        assert_eq!(egglog_counts[relation], size);
+    }}
+}}
+"
+    )
 }

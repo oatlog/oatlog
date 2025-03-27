@@ -17,7 +17,31 @@ pub mod runtime;
 mod expect_tests;
 
 use frontend::MResult;
+use itertools::Itertools;
 use std::panic::UnwindSafe;
+
+pub fn shrink(program: String) -> Box<impl Iterator<Item = String>> {
+    use frontend::egglog_ast::Shrink;
+    fn to_egglog_ast(program: &str) -> frontend::egglog_ast::Program {
+        let program = program.to_string().leak();
+        frontend::egglog_ast::Program {
+            statements: frontend::egglog_ast::parse_program(
+                frontend::parse_str_to_sexps(program)
+                    .unwrap()
+                    .into_iter()
+                    .flatten()
+                    .collect_vec(),
+            )
+            .unwrap(),
+        }
+    }
+    fn from_egglog_ast(ast: frontend::egglog_ast::Program) -> String {
+        ast.to_string()
+    }
+    let ast = to_egglog_ast(&program);
+
+    Box::new(ast.shrink().map(|x| from_egglog_ast(x)))
+}
 
 pub fn try_compile(input: &str) -> Result<(), String> {
     let input = Input::String(input.to_string().leak());

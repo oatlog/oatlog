@@ -18,7 +18,6 @@ fn compare_egglog_oatlog(
     expected: Option<&expect_test::Expect>,
 ) -> bool {
     static EGGLOG_COUNT_REGEX: std::sync::LazyLock<regex::Regex> =
-        // std::sync::LazyLock::new(|| regex::Regex::new(r".*\(([0-9]+).*\.\.([0-9]+)\).*").unwrap());
         std::sync::LazyLock::new(|| regex::Regex::new(r"(.*): ([0-9]+)").unwrap());
     let egglog_counts: BTreeMap<_, _> = egglog
         .parse_and_run_program(None, "(print-size)")

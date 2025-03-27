@@ -261,10 +261,13 @@ impl<T> Spanned<T> {
     pub(crate) fn new(x: T, span: Option<QSpan>) -> Self {
         Self { x, span }
     }
+    pub(crate) fn set(&self, x: T) -> Self {
+        Spanned::new(x, self.span)
+    }
 }
 impl<T: std::fmt::Display> std::fmt::Display for Spanned<T> {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        self.x.fmt(f)
+        <T as std::fmt::Display>::fmt(&self.x, f)
     }
 }
 impl<T: std::fmt::Debug> std::fmt::Debug for Spanned<T> {

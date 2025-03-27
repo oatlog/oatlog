@@ -36,8 +36,7 @@ use sexp::{Literal, Sexp};
 pub(crate) mod primitive_mvp;
 
 // TODO: remove unused annotation when new ast is used.
-#[allow(unused)]
-mod egglog_ast;
+pub(crate) mod egglog_ast;
 
 trait ResultExt {
     fn add_err(self, syn_err: MError) -> Self;
@@ -48,11 +47,11 @@ impl<T> ResultExt for MResult<T> {
     }
 }
 
-trait VecExtClone<A, B> {
-    fn mapf(&self, f: impl FnMut(A) -> MResult<B>) -> MResult<Vec<B>>;
+trait VecExtClone<A, B, E> {
+    fn mapf(&self, f: impl FnMut(A) -> Result<B, E>) -> Result<Vec<B>, E>;
 }
-impl<A: Clone, B> VecExtClone<A, B> for [A] {
-    fn mapf(&self, f: impl FnMut(A) -> MResult<B>) -> MResult<Vec<B>> {
+impl<A: Clone, B, E> VecExtClone<A, B, E> for [A] {
+    fn mapf(&self, f: impl FnMut(A) -> Result<B, E>) -> Result<Vec<B>, E> {
         self.iter().cloned().map(f).collect()
     }
 }

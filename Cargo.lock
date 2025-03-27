@@ -1167,6 +1167,15 @@ dependencies = [
 ]
 
 [[package]]
+name = "shrink_scratch"
+version = "0.1.0"
+dependencies = [
+ "egglog",
+ "oatlog",
+ "regex",
+]
+
+[[package]]
 name = "simple-forall"
 version = "0.1.0"
 dependencies = [

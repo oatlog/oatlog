@@ -3,13 +3,18 @@ use crate::frontend::{
     Literal, MError, MResult, QSpan, Sexp, SexpSpan, Spanned, Str, VecExtClone as _, err_,
     register_span,
 };
+use std::fmt::Display;
 
-#[derive(Clone, Debug)]
+use super::sexp::OrdF64;
+
+use itertools::Itertools as _;
+
+#[derive(Clone, Debug, PartialEq, Eq, PartialOrd, Ord)]
 pub(crate) struct Program {
-    statements: Vec<Spanned<Statement>>,
+    pub(crate) statements: Vec<Spanned<Statement>>,
 }
-#[derive(Clone, Debug)]
-pub(crate) enum GExpr<F /* Function */, V /* Variable */> {
+#[derive(Clone, Debug, PartialEq, Eq, PartialOrd, Ord)]
+pub(crate) enum Expr {
     /// A literal.
     /// ```egglog
     /// 3
@@ -19,19 +24,16 @@ pub(crate) enum GExpr<F /* Function */, V /* Variable */> {
     /// ```egglog
     /// a
     /// ```
-    Var(V),
+    Var(Str),
     /// A call expression.
     /// ```egglog
     /// (Add a (Const 3))
     /// ```
     /// Note that `=` and `!=` are considered functions.
-    Call(F, Vec<Spanned<Self>>),
+    Call(Str, Vec<Spanned<Self>>),
 }
 
-// pub(crate) type ResolvedExpr = GExpr<crate::ids::RelationId, crate::ids::VariableId>;
-
-pub(crate) type Expr = GExpr<Str, Str>;
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, PartialEq, Eq, PartialOrd, Ord)]
 pub(crate) enum Action {
     /// Let expressions get or insert into the database and bind the result.
     /// ```egglog
@@ -112,12 +114,12 @@ pub(crate) enum Action {
     /// Unsupported.
     Extract { expr: Spanned<Expr>, variants: u64 },
 }
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, PartialEq, Eq, PartialOrd, Ord)]
 pub(crate) enum Change {
     Delete,
     Subsume,
 }
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, PartialEq, Eq, PartialOrd, Ord)]
 pub(crate) enum Statement {
     /// Unsupported.
     SetOption { name: Str, value: Spanned<Expr> },
@@ -315,7 +317,7 @@ pub(crate) enum Statement {
     Include(Str),
 }
 pub(crate) type Subsume = bool;
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, PartialEq, Eq, PartialOrd, Ord)]
 pub(crate) enum Schedule {
     /// Run schedule until saturation.
     Saturate(Box<Schedule>),
@@ -326,37 +328,37 @@ pub(crate) enum Schedule {
     /// Run a sequence of schedules.
     Sequence(Vec<Spanned<Schedule>>),
 }
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, PartialEq, Eq, PartialOrd, Ord)]
 pub(crate) struct RunConfig {
     pub(crate) ruleset: Option<Str>,
     pub(crate) until: Option<Vec<Spanned<Fact>>>,
 }
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, PartialEq, Eq, PartialOrd, Ord)]
 pub(crate) enum Fact {
     /// The following expressions are equal.
     Eq(Spanned<Expr>, Spanned<Expr>),
     /// The following expression exists in the database.
     Expr(Spanned<Expr>),
 }
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, PartialEq, Eq, PartialOrd, Ord)]
 pub(crate) struct Rule {
     /// When all facts match the database, the rule is triggered.
     pub(crate) facts: Vec<Spanned<Fact>>,
     /// When triggered, perform the following actions.
     pub(crate) actions: Vec<Spanned<Action>>,
 }
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, PartialEq, Eq, PartialOrd, Ord)]
 pub(crate) struct Rewrite {
     pub(crate) lhs: Spanned<Expr>,
     pub(crate) rhs: Spanned<Expr>,
     pub(crate) conditions: Vec<Spanned<Fact>>,
 }
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, PartialEq, Eq, PartialOrd, Ord)]
 pub(crate) enum SubDatatypes {
     Variants(Vec<Spanned<Variant>>),
     NewSort(Str, Vec<Spanned<Expr>>),
 }
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, PartialEq, Eq, PartialOrd, Ord)]
 pub(crate) struct Variant {
     pub(crate) name: Str,
     pub(crate) types: Vec<Str>,
@@ -946,3 +948,472 @@ fn parse_atom(x: SexpSpan) -> MResult<Str> {
         err!("expected atom")
     }
 }
+
+fn comma<A: IntoIterator<Item = B>, B: Display>(x: A) -> String {
+    x.into_iter().map(|x| x.to_string()).join(" ")
+}
+impl Display for Program {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        let s = self.statements.iter().map(|x| x.to_string()).join("\n");
+        s.fmt(f)
+    }
+}
+impl Display for Expr {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            Expr::Literal(x) => x.fmt(f),
+            Expr::Var(x) => x.fmt(f),
+            Expr::Call(x, args) => {
+                let args = comma(args);
+                write!(f, "({x} {args})")
+            }
+        }
+    }
+}
+impl Display for Action {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            Action::Let { name, expr } => write!(f, "(let {name} {expr})"),
+            Action::Set {
+                table,
+                args,
+                result,
+            } => {
+                let args = comma(args);
+                write!(f, "(set ({table} {args}) {result})")
+            }
+            Action::Panic { message } => write!(f, "(panic {message:?})"),
+            Action::Union { lhs, rhs } => write!(f, "(union {lhs} {rhs})"),
+            Action::Expr(expr) => expr.fmt(f),
+            Action::Change {
+                table,
+                args,
+                change,
+            } => {
+                let args = comma(args);
+                match change {
+                    Change::Delete => write!(f, "(delete ({table} {args}))"),
+                    Change::Subsume => write!(f, "(subsume ({table} {args}))"),
+                }
+            }
+            Action::Extract { expr, variants } => {
+                write!(f, "(extract {expr} {variants})")
+            }
+        }
+    }
+}
+impl Display for Statement {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            Statement::SetOption { name, value } => write!(f, "(set-option {name} {value})"),
+            Statement::Sort { name, primitive } => write!(f, "(sort {name})"),
+            Statement::Datatype { name, variants } => {
+                let variants = comma(variants);
+                write!(f, "(datatype {name} {variants})")
+            }
+            Statement::Datatypes { datatypes } => {
+                panic!();
+            }
+            Statement::Constructor {
+                name,
+                input,
+                output,
+                cost,
+            } => {
+                let input = comma(input);
+                write!(f, "(constructor {name} ({input}) {output})")
+            }
+            Statement::Relation { name, input } => {
+                let input = comma(input);
+                write!(f, "(relation name ({input}))")
+            }
+            Statement::Function {
+                name,
+                input,
+                output,
+                merge,
+            } => {
+                let merge = match merge {
+                    Some(expr) => {
+                        format!(":merge {expr}")
+                    }
+                    None => format!(":no-merge"),
+                };
+                let input = comma(input);
+                write!(f, "(function {name} ({input}) {output} {merge})")
+            }
+            Statement::AddRuleSet(name) => write!(f, "(ruleset {name:?})"),
+            Statement::UnstableCombinedRuleset(spanned, vec) => panic!(),
+            Statement::Rule {
+                name,
+                ruleset,
+                rule,
+            } => {
+                let Rule { facts, actions } = rule;
+                let facts = comma(facts);
+                let actions = comma(actions);
+                write!(f, "(rule ({facts}) ({actions}))")
+            }
+            Statement::Rewrite {
+                ruleset,
+                rewrite,
+                subsume,
+            } => {
+                let Rewrite {
+                    lhs,
+                    rhs,
+                    conditions,
+                } = rewrite;
+                write!(f, "(rewrite {lhs} {rhs})")
+            }
+            Statement::BiRewrite { ruleset, rewrite } => {
+                let Rewrite {
+                    lhs,
+                    rhs,
+                    conditions,
+                } = rewrite;
+                write!(f, "(birewrite {lhs} {rhs})")
+            }
+            Statement::Action(x) => x.fmt(f),
+            Statement::RunSchedule(x) => x.fmt(f),
+            Statement::PrintOverallStatistics => write!(f, "(print-stats)"),
+            Statement::Simplify { expr, schedule } => write!(f, "(simplify {schedule} {expr})"),
+
+            Statement::QueryExtract { variants, expr } => {
+                write!(f, "(query-extract :variants {variants} {expr})")
+            }
+            Statement::Check(facts) => {
+                let facts = comma(facts);
+                write!(f, "(check {facts})")
+            }
+            Statement::PrintFunction(name, rows) => write!(f, "(print-function {name} {rows})"),
+            Statement::PrintSize(name) => {
+                let name = name.map(|x| *x).unwrap_or("");
+                write!(f, "(print-size {name})")
+            }
+            Statement::Input { table, file } => write!(f, "(input {table} {file:?})"),
+            Statement::Output { file, exprs } => {
+                let exprs = comma(exprs);
+                write!(f, "(output {file:?} {exprs})")
+            }
+            Statement::Push(count) => write!(f, "(push {count})"),
+            Statement::Pop(count) => write!(f, "(pop {count})"),
+            Statement::Fail(stmt) => write!(f, "(fail {stmt})"),
+            Statement::Include(path) => write!(f, "(include {path:?})"),
+        }
+    }
+}
+impl Display for Variant {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        let Variant { name, types, cost } = self;
+        let types = comma(types);
+        write!(f, "({name} {types})")
+    }
+}
+impl Display for Fact {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            Fact::Eq(e1, e2) => write!(f, "(= {e1} {e2})"),
+            Fact::Expr(e) => e.fmt(f),
+        }
+    }
+}
+impl Display for Schedule {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            Schedule::Saturate(schedule) => write!(f, "(saturate {schedule})"),
+            Schedule::Repeat(n, schedule) => write!(f, "(repeat {n} {schedule})"),
+            Schedule::Run(run_config) => {
+                let RunConfig { ruleset, until } = run_config;
+                let ruleset = ruleset.map(|x| *x).unwrap_or("");
+                until.as_ref().unwrap();
+                write!(f, "(run {ruleset})")
+            }
+            Schedule::Sequence(x) => match x.as_slice() {
+                [x] => x.fmt(f),
+                [] => panic!(),
+                _ => {
+                    let x = comma(x);
+                    write!(f, "(seq {x})")
+                }
+            },
+        }
+    }
+}
+type It<T> = Box<dyn Iterator<Item = T>>;
+pub(crate) trait Shrink: Eq + Ord + Clone + 'static {
+    #[deprecated = "use shrink"]
+    fn impl_shrink(&self) -> Box<dyn Iterator<Item = Self>>;
+    // writing bad shrink impls is easier and this just makes sure that the shrinks are unique and
+    // distinct from self.
+    fn shrink(&self) -> Box<dyn Iterator<Item = Self>> {
+        let this = self.clone();
+        #[allow(deprecated)]
+        let mut iter = self.impl_shrink();
+        use std::collections::BTreeSet;
+        let mut dedup = BTreeSet::new();
+        Box::new(std::iter::from_fn(move || {
+            while let Some(nxt) = iter.next() {
+                if dedup.insert(nxt.clone()) && nxt != this {
+                    return Some(nxt);
+                }
+            }
+            None
+        }))
+    }
+}
+impl<T: Shrink + Clone + 'static> Shrink for Vec<T> {
+    fn impl_shrink(&self) -> It<Self> {
+        let d = self.clone();
+        let n = d.len();
+        let remove_one: It<Self> = Box::new((0..n).rev().map(move |i| {
+            let mut d = d.clone();
+            d.remove(i);
+            d
+        }));
+        let d = self.clone();
+        let shrink_one: It<Self> = Box::new((0..n).rev().flat_map(move |i| {
+            let d = d.clone();
+            d[i].shrink().map(move |e| {
+                let mut d = d.clone();
+                d[i] = e;
+                d
+            })
+        }));
+        Box::new(remove_one.chain(shrink_one))
+    }
+}
+impl Shrink for Program {
+    fn impl_shrink(&self) -> It<Self> {
+        Box::new(self.statements.shrink().map(|x| Program { statements: x }))
+    }
+}
+impl<T: Shrink> Shrink for Spanned<T> {
+    fn impl_shrink(&self) -> It<Self> {
+        let span = self.span;
+        Box::new(self.x.shrink().map(move |x| Spanned::new(x, span)))
+    }
+}
+impl Shrink for Expr {
+    fn impl_shrink(&self) -> It<Self> {
+        let none = Box::new(None.into_iter());
+        match self {
+            Expr::Literal(_) => none,
+            Expr::Var(_) => none,
+            Expr::Call(name, args) => Box::new(
+                args.clone()
+                    .into_iter()
+                    .chain(args.shrink().flatten())
+                    .map(move |x| x.x.clone())
+                    .chain({
+                        let name = name.clone();
+                        args.shrink().map(move |args| Expr::Call(name, args))
+                    }),
+            ),
+        }
+    }
+}
+impl Shrink for Statement {
+    fn impl_shrink(&self) -> It<Self> {
+        let none = Box::new(None.into_iter());
+        match self {
+            Statement::SetOption { name, value } => none,
+            Statement::Sort { name, primitive } => none,
+            Statement::Datatype { name, variants } => {
+                let name = name.clone();
+                Box::new(
+                    variants
+                        .clone()
+                        .shrink()
+                        .map(move |variants| Statement::Datatype { name, variants }),
+                )
+            }
+            Statement::Datatypes { datatypes } => none,
+            Statement::Constructor {
+                name,
+                input,
+                output,
+                cost,
+            } => none,
+            Statement::Relation { name, input } => none,
+            Statement::Function {
+                name,
+                input,
+                output,
+                merge,
+            } => none,
+            Statement::AddRuleSet(spanned) => none,
+            Statement::UnstableCombinedRuleset(spanned, vec) => none,
+            Statement::Rule {
+                name,
+                ruleset,
+                rule,
+            } => {
+                let name = name.clone();
+                let ruleset = ruleset.clone();
+                Box::new(rule.shrink().map(move |rule| Statement::Rule {
+                    name,
+                    ruleset,
+                    rule,
+                }))
+            }
+            Statement::Rewrite {
+                ruleset,
+                rewrite,
+                subsume,
+            } => {
+                let ruleset = ruleset.clone();
+                let subsume = subsume.clone();
+                Box::new(rewrite.shrink().map(move |rewrite| Statement::Rewrite {
+                    ruleset,
+                    rewrite,
+                    subsume,
+                }))
+            }
+            Statement::BiRewrite { ruleset, rewrite } => {
+                let ruleset = ruleset.clone();
+                Box::new(
+                    rewrite
+                        .shrink()
+                        .map(move |rewrite| Statement::BiRewrite { ruleset, rewrite }),
+                )
+            }
+            Statement::Action(action) => Box::new(action.shrink().map(Statement::Action)),
+            Statement::RunSchedule(schedule) => {
+                Box::new(schedule.shrink().map(Statement::RunSchedule))
+            }
+            Statement::PrintOverallStatistics => none,
+            Statement::Simplify { expr, schedule } => none,
+            Statement::QueryExtract { variants, expr } => none,
+            Statement::Check(vec) => none,
+            Statement::PrintFunction(spanned, _) => none,
+            Statement::PrintSize(spanned) => none,
+            Statement::Input { table, file } => none,
+            Statement::Output { file, exprs } => none,
+            Statement::Push(_) => none,
+            Statement::Pop(_) => none,
+            Statement::Fail(spanned) => none,
+            Statement::Include(spanned) => none,
+        }
+    }
+}
+impl Shrink for Rule {
+    fn impl_shrink(&self) -> It<Self> {
+        let Rule { facts, actions } = self.clone();
+        let shrink_fact = facts.shrink().map(move |facts| Rule {
+            facts,
+            actions: actions.clone(),
+        });
+
+        let Rule { facts, actions } = self.clone();
+        let shrink_action = actions.shrink().map(move |actions| Rule {
+            facts: facts.clone(),
+            actions,
+        });
+
+        Box::new(shrink_fact.chain(shrink_action))
+    }
+}
+impl Shrink for Fact {
+    fn impl_shrink(&self) -> It<Self> {
+        match self {
+            Fact::Eq(e1, e2) => Box::new(
+                ({
+                    let e2 = e2.clone();
+                    Box::new(e1.clone().shrink().map(move |e1| Fact::Eq(e1, e2.clone())))
+                })
+                .chain({
+                    let e1 = e1.clone();
+                    Box::new(e2.clone().shrink().map(move |e2| Fact::Eq(e1.clone(), e2)))
+                }),
+            ),
+            Fact::Expr(e) => Box::new(e.clone().shrink().map(|e| Fact::Expr(e))),
+        }
+    }
+}
+impl Shrink for Rewrite {
+    fn impl_shrink(&self) -> It<Self> {
+        let conditions = self.conditions.clone();
+        let rhs = self.rhs.clone();
+        let shrink_lhs = self.lhs.shrink().map(move |lhs| Rewrite {
+            lhs,
+            rhs: rhs.clone(),
+            conditions: conditions.clone(),
+        });
+
+        let conditions = self.conditions.clone();
+        let lhs = self.lhs.clone();
+        let shrink_rhs = self.rhs.shrink().map(move |rhs| Rewrite {
+            lhs: lhs.clone(),
+            rhs,
+            conditions: conditions.clone(),
+        });
+        Box::new(shrink_lhs.chain(shrink_rhs))
+    }
+}
+impl Shrink for Action {
+    fn impl_shrink(&self) -> It<Self> {
+        let none = Box::new(None.into_iter());
+        match self {
+            Action::Let { name, expr } => {
+                let name = name.clone();
+                Box::new(expr.shrink().map(move |expr| Action::Let { name, expr }))
+            }
+            Action::Set {
+                table,
+                args,
+                result,
+            } => {
+                let table = table.clone();
+                Box::new(
+                    ({
+                        let result = result.clone();
+                        args.shrink().map(move |args| Action::Set {
+                            table,
+                            args,
+                            result: result.clone(),
+                        })
+                    })
+                    .chain({
+                        let args = args.clone();
+                        result.shrink().map(move |result| Action::Set {
+                            table,
+                            args: args.clone(),
+                            result,
+                        })
+                    }),
+                )
+            }
+            Action::Panic { message } => none,
+            Action::Union { lhs, rhs } => Box::new(
+                lhs.clone()
+                    .shrink()
+                    .chain(rhs.clone().shrink())
+                    .map(|expr| Action::Expr(expr))
+                    .chain({
+                        let lhs = lhs.clone();
+                        rhs.shrink().map(move |rhs| Action::Union {
+                            lhs: lhs.clone(),
+                            rhs,
+                        })
+                    })
+                    .chain({
+                        let rhs = rhs.clone();
+                        lhs.shrink().map(move |lhs| Action::Union {
+                            lhs,
+                            rhs: rhs.clone(),
+                        })
+                    }),
+            ),
+            Action::Expr(expr) => Box::new(expr.shrink().map(Action::Expr)),
+            Action::Change {
+                table,
+                args,
+                change,
+            } => none,
+            Action::Extract { expr, variants } => none,
+        }
+    }
+}
+macro_rules! no_op_shrink { ($($ident:ident)*) => { $( impl Shrink for $ident { fn impl_shrink(&self) -> It<Self> { Box::new(None.into_iter()) } })* } }
+no_op_shrink!(Variant Schedule);

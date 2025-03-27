@@ -9,6 +9,7 @@ members = [
     "oatlog-core",
     "oatlog-macro",
     "oatlog-test",
+    "shrink_scratch",
 ]
 resolver = "2"
 
