@@ -183,9 +183,9 @@ fn redundant_action_simplify() {
 #[test]
 fn weird_premise_equality() {
     Steps {
-        code: "
+        code: r#"
             (rule ((= x 1) (= y x) (= z y)) ())
-        ",
+        "#,
         expected_hir: Some(expect![[r#"
             Theory "":
 
@@ -205,12 +205,12 @@ fn weird_premise_equality() {
 #[test]
 fn hir_commutative() {
     Steps {
-        code: "
+        code: r#"
             (datatype Math
                 (Add Math Math)
             )
             (rule ((= e (Add a b) )) ((union e (Add b a))))
-        ",
+        "#,
         expected_hir: Some(expect![[r#"
             Theory "":
 
@@ -234,13 +234,13 @@ fn hir_commutative() {
 #[test]
 fn hir_distributive() {
     Steps {
-        code: "
+        code: r#"
             (datatype Math
                 (Add Math Math)
                 (Mul Math Math)
             )
             (rewrite (Mul (Add a b) c) (Add (Mul a c) (Mul b c)))
-        ",
+        "#,
         expected_hir: Some(expect![[r#"
             Theory "":
 
@@ -269,12 +269,12 @@ fn hir_distributive() {
 #[test]
 fn hir_userspace_implicit_functionality() {
     Steps {
-        code: "
+        code: r#"
             (sort Math)
             (relation Add (Math Math Math))
 
             (rule ((Add a b c) (Add a b d)) ((union c d)))
-        ",
+        "#,
         expected_hir: Some(expect![[r#"
             Theory "":
 
@@ -297,7 +297,7 @@ fn hir_userspace_implicit_functionality() {
 #[test]
 fn hir_global() {
     Steps {
-        code: "
+        code: r#"
             (datatype Math
                 (Mul Math Math)
                 (Add Math Math)
@@ -305,7 +305,7 @@ fn hir_global() {
             )
             (let one 1)
             (rewrite (Const one) (Add b a))
-        ",
+        "#,
         expected_hir: Some(expect![[r#"
             Theory "":
 
@@ -329,7 +329,7 @@ fn hir_global() {
                 name: "",
                 types: {
                     [t0, i64]: std::primitive::i64,
-                    [t1, String]: oatlog::runtime::IString,
+                    [t1, String]: runtime::IString,
                     [t2, unit]: THIS_STRING_SHOULD_NOT_APPEAR_IN_GENERATED_CODE,
                     [t3, Math]: [symbolic],
                 },
@@ -441,12 +441,12 @@ fn hir_global() {
 // being identical. Requires codegen of an if-statement after.
 fn test_bind_variable_multiple_times() {
     Steps {
-        code: "
+        code: r#"
             (datatype Foo
                 (Same Foo Foo)
             )
             (rewrite (Same x x) x)
-        ",
+        "#,
         expected_hir: Some(expect![[r#"
             Theory "":
 
@@ -463,7 +463,7 @@ fn test_bind_variable_multiple_times() {
                 name: "",
                 types: {
                     [t0, i64]: std::primitive::i64,
-                    [t1, String]: oatlog::runtime::IString,
+                    [t1, String]: runtime::IString,
                     [t2, unit]: THIS_STRING_SHOULD_NOT_APPEAR_IN_GENERATED_CODE,
                     [t3, Foo]: [symbolic],
                 },
@@ -506,7 +506,7 @@ fn test_bind_variable_multiple_times() {
 #[test]
 fn test_negative_i64_tokens() {
     Steps {
-        code: "
+        code: r#"
             (datatype Math
                 (Mul Math Math)
                 (Add Math Math)
@@ -515,7 +515,7 @@ fn test_negative_i64_tokens() {
             )
             (let neg_two (Const -2))
             (rewrite (Const -1) (Const -1))
-        ",
+        "#,
         expected_hir: Some(expect![[r#"
             Theory "":
 
@@ -543,6 +543,716 @@ fn test_negative_i64_tokens() {
 }
 
 #[test]
+fn initial_exprs() {
+    Steps {
+        code: r#"
+            (datatype Math (Add Math Math) (Mul Math Math) (Const i64) (Var String))
+
+            (Add (Const 2) (Const 3))
+
+            (Mul (Var "x") (Var "y"))
+        "#,
+        expected_hir: Some(expect![[r#"
+            Theory "":
+
+            Math(Math)
+            Add(Math, Math, Math)
+            Mul(Math, Math, Math)
+            Const(i64, Math)
+            Var(String, Math)
+            g0(i64)
+            g1(Math)
+            g2(i64)
+            g3(Math)
+            g4(Math)
+            g5(String)
+            g6(Math)
+            g7(String)
+            g8(Math)
+            g9(Math)
+
+        "#]]),
+        expected_lir: None,
+        expected_codegen: Some(expect![[r#"
+            use oatlog::runtime::{self, *};
+            decl_row ! (Row2_0 < T0 first , T1 > (0) (1) (T0) (T1) fc = (0) (T0) where u64 = s => ((s . 0 . inner () as u64) << 32) + ((s . 1 . inner () as u64) << 0));
+            decl_row ! (Row2_1_0 < T0 , T1 first > (1 , 0) () (T1 , T0) () fc = (1) (T1) where u64 = s => ((s . 1 . inner () as u64) << 32) + ((s . 0 . inner () as u64) << 0));
+            decl_row ! (Row3_0_1 < T0 first , T1 , T2 > (0 , 1) (2) (T0 , T1) (T2) fc = (0) (T0) where u128 = s => ((s . 0 . inner () as u128) << 64) + ((s . 1 . inner () as u128) << 32) + ((s . 2 . inner () as u128) << 0));
+            decl_row ! (Row3_1_0_2 < T0 , T1 first , T2 > (1 , 0 , 2) () (T1 , T0 , T2) () fc = (1) (T1) where u128 = s => ((s . 1 . inner () as u128) << 64) + ((s . 0 . inner () as u128) << 32) + ((s . 2 . inner () as u128) << 0));
+            decl_row ! (Row3_2_0_1 < T0 , T1 , T2 first > (2 , 0 , 1) () (T2 , T0 , T1) () fc = (2) (T2) where u128 = s => ((s . 2 . inner () as u128) << 64) + ((s . 0 . inner () as u128) << 32) + ((s . 1 . inner () as u128) << 0));
+            eclass_wrapper_ty!(Math);
+            #[derive(Debug, Default)]
+            struct AddRelation {
+                new: Vec<<Self as Relation>::Row>,
+                all_index_0_1_2: IndexImpl<RadixSortCtx<Row3_0_1<Math, Math, Math>, u128>>,
+                all_index_1_0_2: IndexImpl<RadixSortCtx<Row3_1_0_2<Math, Math, Math>, u128>>,
+                all_index_2_0_1: IndexImpl<RadixSortCtx<Row3_2_0_1<Math, Math, Math>, u128>>,
+            }
+            impl Relation for AddRelation {
+                type Row = (Math, Math, Math);
+            }
+            impl AddRelation {
+                const COST: u32 = 9u32;
+                fn new() -> Self {
+                    Self::default()
+                }
+                fn has_new(&self) -> bool {
+                    !self.new.is_empty()
+                }
+                fn clear_new(&mut self) {
+                    self.new.clear();
+                }
+                fn iter_new(&self) -> impl Iterator<Item = <Self as Relation>::Row> + use<'_> {
+                    self.new.iter().copied()
+                }
+                fn iter1_0_1_2(&self, x0: Math) -> impl Iterator<Item = (Math, Math)> + use<'_> {
+                    self.all_index_0_1_2
+                        .range((x0, Math::MIN_ID, Math::MIN_ID)..=(x0, Math::MAX_ID, Math::MAX_ID))
+                        .map(|(x0, x1, x2)| (x1, x2))
+                }
+                fn iter1_1_0_2(&self, x1: Math) -> impl Iterator<Item = (Math, Math)> + use<'_> {
+                    self.all_index_1_0_2
+                        .range((Math::MIN_ID, x1, Math::MIN_ID)..=(Math::MAX_ID, x1, Math::MAX_ID))
+                        .map(|(x0, x1, x2)| (x0, x2))
+                }
+                fn iter1_2_0_1(&self, x2: Math) -> impl Iterator<Item = (Math, Math)> + use<'_> {
+                    self.all_index_2_0_1
+                        .range((Math::MIN_ID, Math::MIN_ID, x2)..=(Math::MAX_ID, Math::MAX_ID, x2))
+                        .map(|(x0, x1, x2)| (x0, x1))
+                }
+                fn iter2_0_1_2(&self, x0: Math, x1: Math) -> impl Iterator<Item = (Math,)> + use<'_> {
+                    self.all_index_0_1_2
+                        .range((x0, x1, Math::MIN_ID)..=(x0, x1, Math::MAX_ID))
+                        .map(|(x0, x1, x2)| (x2,))
+                }
+                fn check1_0_1_2(&self, x0: Math) -> bool {
+                    self.iter1_0_1_2(x0).next().is_some()
+                }
+                fn check1_1_0_2(&self, x1: Math) -> bool {
+                    self.iter1_1_0_2(x1).next().is_some()
+                }
+                fn check1_2_0_1(&self, x2: Math) -> bool {
+                    self.iter1_2_0_1(x2).next().is_some()
+                }
+                fn check2_0_1_2(&self, x0: Math, x1: Math) -> bool {
+                    self.iter2_0_1_2(x0, x1).next().is_some()
+                }
+                fn entry2_0_1_2(&self, delta: &mut Delta, uf: &mut Unification, x0: Math, x1: Math) -> (Math,) {
+                    if let Some((x2,)) = self.iter2_0_1_2(x0, x1).next() {
+                        return (x2,);
+                    }
+                    let x2 = uf.math_uf.add_eclass();
+                    delta.add_relation_delta.push((x0, x1, x2));
+                    (x2,)
+                }
+                fn update(&mut self, uf: &mut Unification, delta: &mut Delta) {
+                    let mut inserts = take(&mut delta.add_relation_delta);
+                    let orig_inserts = inserts.len();
+                    self.all_index_0_1_2
+                        .first_column_uproots(uf.math_uf.get_uprooted_snapshot(), |deleted_rows| {
+                            inserts.extend(deleted_rows)
+                        });
+                    self.all_index_1_0_2
+                        .first_column_uproots(uf.math_uf.get_uprooted_snapshot(), |deleted_rows| {
+                            inserts.extend(deleted_rows)
+                        });
+                    self.all_index_2_0_1
+                        .first_column_uproots(uf.math_uf.get_uprooted_snapshot(), |deleted_rows| {
+                            inserts.extend(deleted_rows)
+                        });
+                    inserts[orig_inserts..].sort_unstable();
+                    runtime::dedup_suffix(&mut inserts, orig_inserts);
+                    self.all_index_0_1_2
+                        .delete_many(&mut inserts[orig_inserts..]);
+                    self.all_index_1_0_2
+                        .delete_many(&mut inserts[orig_inserts..]);
+                    self.all_index_2_0_1
+                        .delete_many(&mut inserts[orig_inserts..]);
+                    inserts.iter_mut().for_each(|row| {
+                        row.0 = uf.math_uf.find(row.0);
+                        row.1 = uf.math_uf.find(row.1);
+                        row.2 = uf.math_uf.find(row.2);
+                    });
+                    self.all_index_0_1_2
+                        .insert_many(&mut inserts, |mut old, mut new| {
+                            let (x2,) = old.value_mut();
+                            let (y2,) = new.value_mut();
+                            uf.math_uf.union_mut(x2, y2);
+                            old
+                        });
+                    self.all_index_1_0_2
+                        .insert_many(&mut inserts, |mut old, mut new| {
+                            let () = old.value_mut();
+                            let () = new.value_mut();
+                            panic!("panicking merge action")
+                        });
+                    self.all_index_2_0_1
+                        .insert_many(&mut inserts, |mut old, mut new| {
+                            let () = old.value_mut();
+                            let () = new.value_mut();
+                            panic!("panicking merge action")
+                        });
+                    self.new.extend_from_slice(&inserts);
+                }
+                fn update_finalize(&mut self, uf: &mut Unification) {
+                    self.new.sort_unstable();
+                    self.new.dedup();
+                    self.new.retain(|(x0, x1, x2)| {
+                        if *x0 != uf.math_uf.find(*x0) {
+                            return false;
+                        }
+                        if *x1 != uf.math_uf.find(*x1) {
+                            return false;
+                        }
+                        if *x2 != uf.math_uf.find(*x2) {
+                            return false;
+                        }
+                        true
+                    });
+                }
+                fn emit_graphviz(&self, buf: &mut String) {
+                    use std::fmt::Write;
+                    for (i, (x0, x1, x2)) in self.all_index_0_1_2.iter().enumerate() {
+                        write!(buf, "{}{i} -> {}{};", "add", "math", x0).unwrap();
+                        write!(buf, "{}{i} -> {}{};", "add", "math", x1).unwrap();
+                        write!(buf, "{}{i} -> {}{};", "add", "math", x2).unwrap();
+                    }
+                }
+                fn len(&self) -> usize {
+                    self.all_index_0_1_2.len()
+                }
+            }
+            #[derive(Debug, Default)]
+            struct MulRelation {
+                new: Vec<<Self as Relation>::Row>,
+                all_index_0_1_2: IndexImpl<RadixSortCtx<Row3_0_1<Math, Math, Math>, u128>>,
+                all_index_1_0_2: IndexImpl<RadixSortCtx<Row3_1_0_2<Math, Math, Math>, u128>>,
+                all_index_2_0_1: IndexImpl<RadixSortCtx<Row3_2_0_1<Math, Math, Math>, u128>>,
+            }
+            impl Relation for MulRelation {
+                type Row = (Math, Math, Math);
+            }
+            impl MulRelation {
+                const COST: u32 = 9u32;
+                fn new() -> Self {
+                    Self::default()
+                }
+                fn has_new(&self) -> bool {
+                    !self.new.is_empty()
+                }
+                fn clear_new(&mut self) {
+                    self.new.clear();
+                }
+                fn iter_new(&self) -> impl Iterator<Item = <Self as Relation>::Row> + use<'_> {
+                    self.new.iter().copied()
+                }
+                fn iter1_0_1_2(&self, x0: Math) -> impl Iterator<Item = (Math, Math)> + use<'_> {
+                    self.all_index_0_1_2
+                        .range((x0, Math::MIN_ID, Math::MIN_ID)..=(x0, Math::MAX_ID, Math::MAX_ID))
+                        .map(|(x0, x1, x2)| (x1, x2))
+                }
+                fn iter1_1_0_2(&self, x1: Math) -> impl Iterator<Item = (Math, Math)> + use<'_> {
+                    self.all_index_1_0_2
+                        .range((Math::MIN_ID, x1, Math::MIN_ID)..=(Math::MAX_ID, x1, Math::MAX_ID))
+                        .map(|(x0, x1, x2)| (x0, x2))
+                }
+                fn iter1_2_0_1(&self, x2: Math) -> impl Iterator<Item = (Math, Math)> + use<'_> {
+                    self.all_index_2_0_1
+                        .range((Math::MIN_ID, Math::MIN_ID, x2)..=(Math::MAX_ID, Math::MAX_ID, x2))
+                        .map(|(x0, x1, x2)| (x0, x1))
+                }
+                fn iter2_0_1_2(&self, x0: Math, x1: Math) -> impl Iterator<Item = (Math,)> + use<'_> {
+                    self.all_index_0_1_2
+                        .range((x0, x1, Math::MIN_ID)..=(x0, x1, Math::MAX_ID))
+                        .map(|(x0, x1, x2)| (x2,))
+                }
+                fn check1_0_1_2(&self, x0: Math) -> bool {
+                    self.iter1_0_1_2(x0).next().is_some()
+                }
+                fn check1_1_0_2(&self, x1: Math) -> bool {
+                    self.iter1_1_0_2(x1).next().is_some()
+                }
+                fn check1_2_0_1(&self, x2: Math) -> bool {
+                    self.iter1_2_0_1(x2).next().is_some()
+                }
+                fn check2_0_1_2(&self, x0: Math, x1: Math) -> bool {
+                    self.iter2_0_1_2(x0, x1).next().is_some()
+                }
+                fn entry2_0_1_2(&self, delta: &mut Delta, uf: &mut Unification, x0: Math, x1: Math) -> (Math,) {
+                    if let Some((x2,)) = self.iter2_0_1_2(x0, x1).next() {
+                        return (x2,);
+                    }
+                    let x2 = uf.math_uf.add_eclass();
+                    delta.mul_relation_delta.push((x0, x1, x2));
+                    (x2,)
+                }
+                fn update(&mut self, uf: &mut Unification, delta: &mut Delta) {
+                    let mut inserts = take(&mut delta.mul_relation_delta);
+                    let orig_inserts = inserts.len();
+                    self.all_index_0_1_2
+                        .first_column_uproots(uf.math_uf.get_uprooted_snapshot(), |deleted_rows| {
+                            inserts.extend(deleted_rows)
+                        });
+                    self.all_index_1_0_2
+                        .first_column_uproots(uf.math_uf.get_uprooted_snapshot(), |deleted_rows| {
+                            inserts.extend(deleted_rows)
+                        });
+                    self.all_index_2_0_1
+                        .first_column_uproots(uf.math_uf.get_uprooted_snapshot(), |deleted_rows| {
+                            inserts.extend(deleted_rows)
+                        });
+                    inserts[orig_inserts..].sort_unstable();
+                    runtime::dedup_suffix(&mut inserts, orig_inserts);
+                    self.all_index_0_1_2
+                        .delete_many(&mut inserts[orig_inserts..]);
+                    self.all_index_1_0_2
+                        .delete_many(&mut inserts[orig_inserts..]);
+                    self.all_index_2_0_1
+                        .delete_many(&mut inserts[orig_inserts..]);
+                    inserts.iter_mut().for_each(|row| {
+                        row.0 = uf.math_uf.find(row.0);
+                        row.1 = uf.math_uf.find(row.1);
+                        row.2 = uf.math_uf.find(row.2);
+                    });
+                    self.all_index_0_1_2
+                        .insert_many(&mut inserts, |mut old, mut new| {
+                            let (x2,) = old.value_mut();
+                            let (y2,) = new.value_mut();
+                            uf.math_uf.union_mut(x2, y2);
+                            old
+                        });
+                    self.all_index_1_0_2
+                        .insert_many(&mut inserts, |mut old, mut new| {
+                            let () = old.value_mut();
+                            let () = new.value_mut();
+                            panic!("panicking merge action")
+                        });
+                    self.all_index_2_0_1
+                        .insert_many(&mut inserts, |mut old, mut new| {
+                            let () = old.value_mut();
+                            let () = new.value_mut();
+                            panic!("panicking merge action")
+                        });
+                    self.new.extend_from_slice(&inserts);
+                }
+                fn update_finalize(&mut self, uf: &mut Unification) {
+                    self.new.sort_unstable();
+                    self.new.dedup();
+                    self.new.retain(|(x0, x1, x2)| {
+                        if *x0 != uf.math_uf.find(*x0) {
+                            return false;
+                        }
+                        if *x1 != uf.math_uf.find(*x1) {
+                            return false;
+                        }
+                        if *x2 != uf.math_uf.find(*x2) {
+                            return false;
+                        }
+                        true
+                    });
+                }
+                fn emit_graphviz(&self, buf: &mut String) {
+                    use std::fmt::Write;
+                    for (i, (x0, x1, x2)) in self.all_index_0_1_2.iter().enumerate() {
+                        write!(buf, "{}{i} -> {}{};", "mul", "math", x0).unwrap();
+                        write!(buf, "{}{i} -> {}{};", "mul", "math", x1).unwrap();
+                        write!(buf, "{}{i} -> {}{};", "mul", "math", x2).unwrap();
+                    }
+                }
+                fn len(&self) -> usize {
+                    self.all_index_0_1_2.len()
+                }
+            }
+            #[derive(Debug, Default)]
+            struct ConstRelation {
+                new: Vec<<Self as Relation>::Row>,
+                all_index_0_1: IndexImpl<StdSortCtx<Row2_0<std::primitive::i64, Math>>>,
+                all_index_1_0: IndexImpl<StdSortCtx<Row2_1_0<std::primitive::i64, Math>>>,
+            }
+            impl Relation for ConstRelation {
+                type Row = (std::primitive::i64, Math);
+            }
+            impl ConstRelation {
+                const COST: u32 = 4u32;
+                fn new() -> Self {
+                    Self::default()
+                }
+                fn has_new(&self) -> bool {
+                    !self.new.is_empty()
+                }
+                fn clear_new(&mut self) {
+                    self.new.clear();
+                }
+                fn iter_new(&self) -> impl Iterator<Item = <Self as Relation>::Row> + use<'_> {
+                    self.new.iter().copied()
+                }
+                fn iter1_0_1(&self, x0: std::primitive::i64) -> impl Iterator<Item = (Math,)> + use<'_> {
+                    self.all_index_0_1
+                        .range((x0, Math::MIN_ID)..=(x0, Math::MAX_ID))
+                        .map(|(x0, x1)| (x1,))
+                }
+                fn iter1_1_0(&self, x1: Math) -> impl Iterator<Item = (std::primitive::i64,)> + use<'_> {
+                    self.all_index_1_0
+                        .range((std::primitive::i64::MIN_ID, x1)..=(std::primitive::i64::MAX_ID, x1))
+                        .map(|(x0, x1)| (x0,))
+                }
+                fn check1_0_1(&self, x0: std::primitive::i64) -> bool {
+                    self.iter1_0_1(x0).next().is_some()
+                }
+                fn check1_1_0(&self, x1: Math) -> bool {
+                    self.iter1_1_0(x1).next().is_some()
+                }
+                fn entry1_0_1(
+                    &self,
+                    delta: &mut Delta,
+                    uf: &mut Unification,
+                    x0: std::primitive::i64,
+                ) -> (Math,) {
+                    if let Some((x1,)) = self.iter1_0_1(x0).next() {
+                        return (x1,);
+                    }
+                    let x1 = uf.math_uf.add_eclass();
+                    delta.const_relation_delta.push((x0, x1));
+                    (x1,)
+                }
+                fn update(&mut self, uf: &mut Unification, delta: &mut Delta) {
+                    let mut inserts = take(&mut delta.const_relation_delta);
+                    let orig_inserts = inserts.len();
+                    self.all_index_1_0
+                        .first_column_uproots(uf.math_uf.get_uprooted_snapshot(), |deleted_rows| {
+                            inserts.extend(deleted_rows)
+                        });
+                    inserts[orig_inserts..].sort_unstable();
+                    runtime::dedup_suffix(&mut inserts, orig_inserts);
+                    self.all_index_0_1.delete_many(&mut inserts[orig_inserts..]);
+                    self.all_index_1_0.delete_many(&mut inserts[orig_inserts..]);
+                    inserts.iter_mut().for_each(|row| {
+                        row.1 = uf.math_uf.find(row.1);
+                    });
+                    self.all_index_0_1
+                        .insert_many(&mut inserts, |mut old, mut new| {
+                            let (x1,) = old.value_mut();
+                            let (y1,) = new.value_mut();
+                            uf.math_uf.union_mut(x1, y1);
+                            old
+                        });
+                    self.all_index_1_0
+                        .insert_many(&mut inserts, |mut old, mut new| {
+                            let () = old.value_mut();
+                            let () = new.value_mut();
+                            panic!("panicking merge action")
+                        });
+                    self.new.extend_from_slice(&inserts);
+                }
+                fn update_finalize(&mut self, uf: &mut Unification) {
+                    self.new.sort_unstable();
+                    self.new.dedup();
+                    self.new.retain(|(x0, x1)| {
+                        if *x1 != uf.math_uf.find(*x1) {
+                            return false;
+                        }
+                        true
+                    });
+                }
+                fn emit_graphviz(&self, buf: &mut String) {
+                    use std::fmt::Write;
+                    for (i, (x0, x1)) in self.all_index_0_1.iter().enumerate() {
+                        write!(buf, "{}{i} -> {}{};", "const", "i64", x0).unwrap();
+                        write!(buf, "{}{i} -> {}{};", "const", "math", x1).unwrap();
+                    }
+                }
+                fn len(&self) -> usize {
+                    self.all_index_0_1.len()
+                }
+            }
+            #[derive(Debug, Default)]
+            struct VarRelation {
+                new: Vec<<Self as Relation>::Row>,
+                all_index_0_1: IndexImpl<StdSortCtx<Row2_0<runtime::IString, Math>>>,
+                all_index_1_0: IndexImpl<StdSortCtx<Row2_1_0<runtime::IString, Math>>>,
+            }
+            impl Relation for VarRelation {
+                type Row = (runtime::IString, Math);
+            }
+            impl VarRelation {
+                const COST: u32 = 4u32;
+                fn new() -> Self {
+                    Self::default()
+                }
+                fn has_new(&self) -> bool {
+                    !self.new.is_empty()
+                }
+                fn clear_new(&mut self) {
+                    self.new.clear();
+                }
+                fn iter_new(&self) -> impl Iterator<Item = <Self as Relation>::Row> + use<'_> {
+                    self.new.iter().copied()
+                }
+                fn iter1_0_1(&self, x0: runtime::IString) -> impl Iterator<Item = (Math,)> + use<'_> {
+                    self.all_index_0_1
+                        .range((x0, Math::MIN_ID)..=(x0, Math::MAX_ID))
+                        .map(|(x0, x1)| (x1,))
+                }
+                fn iter1_1_0(&self, x1: Math) -> impl Iterator<Item = (runtime::IString,)> + use<'_> {
+                    self.all_index_1_0
+                        .range((runtime::IString::MIN_ID, x1)..=(runtime::IString::MAX_ID, x1))
+                        .map(|(x0, x1)| (x0,))
+                }
+                fn check1_0_1(&self, x0: runtime::IString) -> bool {
+                    self.iter1_0_1(x0).next().is_some()
+                }
+                fn check1_1_0(&self, x1: Math) -> bool {
+                    self.iter1_1_0(x1).next().is_some()
+                }
+                fn entry1_0_1(&self, delta: &mut Delta, uf: &mut Unification, x0: runtime::IString) -> (Math,) {
+                    if let Some((x1,)) = self.iter1_0_1(x0).next() {
+                        return (x1,);
+                    }
+                    let x1 = uf.math_uf.add_eclass();
+                    delta.var_relation_delta.push((x0, x1));
+                    (x1,)
+                }
+                fn update(&mut self, uf: &mut Unification, delta: &mut Delta) {
+                    let mut inserts = take(&mut delta.var_relation_delta);
+                    let orig_inserts = inserts.len();
+                    self.all_index_1_0
+                        .first_column_uproots(uf.math_uf.get_uprooted_snapshot(), |deleted_rows| {
+                            inserts.extend(deleted_rows)
+                        });
+                    inserts[orig_inserts..].sort_unstable();
+                    runtime::dedup_suffix(&mut inserts, orig_inserts);
+                    self.all_index_0_1.delete_many(&mut inserts[orig_inserts..]);
+                    self.all_index_1_0.delete_many(&mut inserts[orig_inserts..]);
+                    inserts.iter_mut().for_each(|row| {
+                        row.1 = uf.math_uf.find(row.1);
+                    });
+                    self.all_index_0_1
+                        .insert_many(&mut inserts, |mut old, mut new| {
+                            let (x1,) = old.value_mut();
+                            let (y1,) = new.value_mut();
+                            uf.math_uf.union_mut(x1, y1);
+                            old
+                        });
+                    self.all_index_1_0
+                        .insert_many(&mut inserts, |mut old, mut new| {
+                            let () = old.value_mut();
+                            let () = new.value_mut();
+                            panic!("panicking merge action")
+                        });
+                    self.new.extend_from_slice(&inserts);
+                }
+                fn update_finalize(&mut self, uf: &mut Unification) {
+                    self.new.sort_unstable();
+                    self.new.dedup();
+                    self.new.retain(|(x0, x1)| {
+                        if *x1 != uf.math_uf.find(*x1) {
+                            return false;
+                        }
+                        true
+                    });
+                }
+                fn emit_graphviz(&self, buf: &mut String) {
+                    use std::fmt::Write;
+                    for (i, (x0, x1)) in self.all_index_0_1.iter().enumerate() {
+                        write!(buf, "{}{i} -> {}{};", "var", "string", x0).unwrap();
+                        write!(buf, "{}{i} -> {}{};", "var", "math", x1).unwrap();
+                    }
+                }
+                fn len(&self) -> usize {
+                    self.all_index_0_1.len()
+                }
+            }
+            #[derive(Debug, Default)]
+            pub struct Delta {
+                add_relation_delta: Vec<<AddRelation as Relation>::Row>,
+                mul_relation_delta: Vec<<MulRelation as Relation>::Row>,
+                const_relation_delta: Vec<<ConstRelation as Relation>::Row>,
+                var_relation_delta: Vec<<VarRelation as Relation>::Row>,
+            }
+            impl Delta {
+                fn new() -> Self {
+                    Self::default()
+                }
+                fn has_new_inserts(&self) -> bool {
+                    let mut has_new_inserts = false;
+                    has_new_inserts |= !self.add_relation_delta.is_empty();
+                    has_new_inserts |= !self.mul_relation_delta.is_empty();
+                    has_new_inserts |= !self.const_relation_delta.is_empty();
+                    has_new_inserts |= !self.var_relation_delta.is_empty();
+                    has_new_inserts
+                }
+                pub fn insert_add(&mut self, x: <AddRelation as Relation>::Row) {
+                    self.add_relation_delta.push(x);
+                }
+                pub fn insert_mul(&mut self, x: <MulRelation as Relation>::Row) {
+                    self.mul_relation_delta.push(x);
+                }
+                pub fn insert_const(&mut self, x: <ConstRelation as Relation>::Row) {
+                    self.const_relation_delta.push(x);
+                }
+                pub fn insert_var(&mut self, x: <VarRelation as Relation>::Row) {
+                    self.var_relation_delta.push(x);
+                }
+            }
+            #[derive(Debug, Default)]
+            struct Unification {
+                pub math_uf: UnionFind<Math>,
+            }
+            impl Unification {
+                fn has_new_uproots(&mut self) -> bool {
+                    let mut ret = false;
+                    ret |= self.math_uf.has_new_uproots();
+                    ret
+                }
+                fn snapshot_all_uprooted(&mut self) {
+                    self.math_uf.create_uprooted_snapshot();
+                }
+            }
+            #[derive(Debug, Default)]
+            pub struct Theory {
+                pub delta: Delta,
+                global_i64: GlobalVars<std::primitive::i64>,
+                global_string: GlobalVars<runtime::IString>,
+                global_math: GlobalVars<Math>,
+                pub uf: Unification,
+                pub add_relation: AddRelation,
+                pub mul_relation: MulRelation,
+                pub const_relation: ConstRelation,
+                pub var_relation: VarRelation,
+            }
+            impl Theory {
+                pub fn new() -> Self {
+                    let mut theory = Self::default();
+                    theory.global_i64.define(0usize, 2i64);
+                    theory.global_math.define(0usize, {
+                        let tmp0 = theory.global_i64.get(0usize);
+                        let tmp_res = theory.uf.math_uf.add_eclass();
+                        theory.delta.insert_const((tmp0, tmp_res));
+                        tmp_res
+                    });
+                    theory.global_i64.define(1usize, 3i64);
+                    theory.global_math.define(1usize, {
+                        let tmp0 = theory.global_i64.get(1usize);
+                        let tmp_res = theory.uf.math_uf.add_eclass();
+                        theory.delta.insert_const((tmp0, tmp_res));
+                        tmp_res
+                    });
+                    theory.global_math.define(2usize, {
+                        let tmp0 = theory.global_math.get(0usize);
+                        let tmp1 = theory.global_math.get(1usize);
+                        let tmp_res = theory.uf.math_uf.add_eclass();
+                        theory.delta.insert_add((tmp0, tmp1, tmp_res));
+                        tmp_res
+                    });
+                    theory.global_string.define(0usize, IString(0u32));
+                    theory.global_math.define(3usize, {
+                        let tmp0 = theory.global_string.get(0usize);
+                        let tmp_res = theory.uf.math_uf.add_eclass();
+                        theory.delta.insert_var((tmp0, tmp_res));
+                        tmp_res
+                    });
+                    theory.global_string.define(1usize, IString(1u32));
+                    theory.global_math.define(4usize, {
+                        let tmp0 = theory.global_string.get(1usize);
+                        let tmp_res = theory.uf.math_uf.add_eclass();
+                        theory.delta.insert_var((tmp0, tmp_res));
+                        tmp_res
+                    });
+                    theory.global_math.define(5usize, {
+                        let tmp0 = theory.global_math.get(3usize);
+                        let tmp1 = theory.global_math.get(4usize);
+                        let tmp_res = theory.uf.math_uf.add_eclass();
+                        theory.delta.insert_mul((tmp0, tmp1, tmp_res));
+                        tmp_res
+                    });
+                    theory
+                }
+                pub fn step(&mut self) -> [std::time::Duration; 2] {
+                    [
+                        {
+                            let start = std::time::Instant::now();
+                            self.apply_rules();
+                            start.elapsed()
+                        },
+                        {
+                            let start = std::time::Instant::now();
+                            self.canonicalize();
+                            start.elapsed()
+                        },
+                    ]
+                }
+                #[inline(never)]
+                pub fn apply_rules(&mut self) {}
+                fn emit_graphviz(&self) -> String {
+                    let mut buf = String::new();
+                    buf.push_str("digraph G {");
+                    self.add_relation.emit_graphviz(&mut buf);
+                    self.mul_relation.emit_graphviz(&mut buf);
+                    self.const_relation.emit_graphviz(&mut buf);
+                    self.var_relation.emit_graphviz(&mut buf);
+                    buf.push_str("}");
+                    buf
+                }
+                pub fn get_total_relation_entry_count(&self) -> usize {
+                    [
+                        self.add_relation.len(),
+                        self.mul_relation.len(),
+                        self.const_relation.len(),
+                        self.var_relation.len(),
+                    ]
+                    .into_iter()
+                    .sum::<usize>()
+                }
+                pub fn get_relation_entry_count(&self) -> std::collections::BTreeMap<&'static str, usize> {
+                    [
+                        ("Add", self.add_relation.len()),
+                        ("Mul", self.mul_relation.len()),
+                        ("Const", self.const_relation.len()),
+                        ("Var", self.var_relation.len()),
+                    ]
+                    .into_iter()
+                    .collect()
+                }
+                #[inline(never)]
+                pub fn canonicalize(&mut self) {
+                    self.add_relation.clear_new();
+                    self.mul_relation.clear_new();
+                    self.const_relation.clear_new();
+                    self.var_relation.clear_new();
+                    while self.uf.has_new_uproots() || self.delta.has_new_inserts() {
+                        self.uf.snapshot_all_uprooted();
+                        self.add_relation.update(&mut self.uf, &mut self.delta);
+                        self.mul_relation.update(&mut self.uf, &mut self.delta);
+                        self.const_relation.update(&mut self.uf, &mut self.delta);
+                        self.var_relation.update(&mut self.uf, &mut self.delta);
+                    }
+                    self.uf.snapshot_all_uprooted();
+                    self.global_math.update(&mut self.uf.math_uf);
+                    self.global_i64.update_finalize();
+                    self.global_string.update_finalize();
+                    self.global_math.update_finalize();
+                    self.add_relation.update_finalize(&mut self.uf);
+                    self.mul_relation.update_finalize(&mut self.uf);
+                    self.const_relation.update_finalize(&mut self.uf);
+                    self.var_relation.update_finalize(&mut self.uf);
+                }
+            }
+            impl std::ops::Deref for Theory {
+                type Target = Delta;
+                fn deref(&self) -> &Self::Target {
+                    &self.delta
+                }
+            }
+            impl std::ops::DerefMut for Theory {
+                fn deref_mut(&mut self) -> &mut Self::Target {
+                    &mut self.delta
+                }
+            }
+        "#]]),
+    }.check()
+}
+
+#[test]
 #[ignore = "panic merge is no longer implemented"]
 fn codegen_panic_merge() {
     Steps {
@@ -550,10 +1260,10 @@ fn codegen_panic_merge() {
         //
         // (function g () i64 :no-merge)
         // (fail (let y (g)))
-        code: "
+        code: r#"
             (function f () i64 :no-merge)
             (set (f) 0)
-        ",
+        "#,
         expected_hir: Some(expect![[r#"
             Theory "":
 
@@ -745,12 +1455,12 @@ fn codegen_panic_merge() {
 #[test]
 fn codegen_bug1() {
     Steps {
-        code: "
+        code: r#"
             (sort T0)
             (sort T1)
             (sort T2)
             (relation Foo (T0 T1 T2))
-        ",
+        "#,
         expected_hir: Some(expect![[r#"
             Theory "":
 
@@ -1000,12 +1710,12 @@ fn codegen_bug1() {
 #[test]
 fn initial() {
     Steps {
-        code: "
+        code: r#"
             (datatype Math
                 (Const i64)
             )
             (run 42)
-        ",
+        "#,
         expected_hir: Some(expect![[r#"
             Theory "":
 
@@ -1691,11 +2401,11 @@ fn test_primitives_simple() {
             #[derive(Debug, Default)]
             struct VarRelation {
                 new: Vec<<Self as Relation>::Row>,
-                all_index_0_1: IndexImpl<StdSortCtx<Row2_0<oatlog::runtime::IString, Math>>>,
-                all_index_1_0: IndexImpl<StdSortCtx<Row2_1_0<oatlog::runtime::IString, Math>>>,
+                all_index_0_1: IndexImpl<StdSortCtx<Row2_0<runtime::IString, Math>>>,
+                all_index_1_0: IndexImpl<StdSortCtx<Row2_1_0<runtime::IString, Math>>>,
             }
             impl Relation for VarRelation {
-                type Row = (oatlog::runtime::IString, Math);
+                type Row = (runtime::IString, Math);
             }
             impl VarRelation {
                 const COST: u32 = 4u32;
@@ -1711,28 +2421,23 @@ fn test_primitives_simple() {
                 fn iter_new(&self) -> impl Iterator<Item = <Self as Relation>::Row> + use<'_> {
                     self.new.iter().copied()
                 }
-                fn iter1_0_1(&self, x0: oatlog::runtime::IString) -> impl Iterator<Item = (Math,)> + use<'_> {
+                fn iter1_0_1(&self, x0: runtime::IString) -> impl Iterator<Item = (Math,)> + use<'_> {
                     self.all_index_0_1
                         .range((x0, Math::MIN_ID)..=(x0, Math::MAX_ID))
                         .map(|(x0, x1)| (x1,))
                 }
-                fn iter1_1_0(&self, x1: Math) -> impl Iterator<Item = (oatlog::runtime::IString,)> + use<'_> {
+                fn iter1_1_0(&self, x1: Math) -> impl Iterator<Item = (runtime::IString,)> + use<'_> {
                     self.all_index_1_0
-                        .range((oatlog::runtime::IString::MIN_ID, x1)..=(oatlog::runtime::IString::MAX_ID, x1))
+                        .range((runtime::IString::MIN_ID, x1)..=(runtime::IString::MAX_ID, x1))
                         .map(|(x0, x1)| (x0,))
                 }
-                fn check1_0_1(&self, x0: oatlog::runtime::IString) -> bool {
+                fn check1_0_1(&self, x0: runtime::IString) -> bool {
                     self.iter1_0_1(x0).next().is_some()
                 }
                 fn check1_1_0(&self, x1: Math) -> bool {
                     self.iter1_1_0(x1).next().is_some()
                 }
-                fn entry1_0_1(
-                    &self,
-                    delta: &mut Delta,
-                    uf: &mut Unification,
-                    x0: oatlog::runtime::IString,
-                ) -> (Math,) {
+                fn entry1_0_1(&self, delta: &mut Delta, uf: &mut Unification, x0: runtime::IString) -> (Math,) {
                     if let Some((x1,)) = self.iter1_0_1(x0).next() {
                         return (x1,);
                     }
@@ -1840,7 +2545,7 @@ fn test_primitives_simple() {
             pub struct Theory {
                 pub delta: Delta,
                 global_i64: GlobalVars<std::primitive::i64>,
-                global_string: GlobalVars<oatlog::runtime::IString>,
+                global_string: GlobalVars<runtime::IString>,
                 global_math: GlobalVars<Math>,
                 pub uf: Unification,
                 pub mul_relation: MulRelation,
@@ -1851,17 +2556,17 @@ fn test_primitives_simple() {
             impl Theory {
                 pub fn new() -> Self {
                     let mut theory = Self::default();
-                    self.global_i64.define(0usize, 2i64);
-                    self.global_math.define(0usize, {
-                        let tmp0 = self.global_i64.get(0usize);
-                        let tmp_res = uf.math_uf.add_eclass();
-                        delta.insert_const((tmp0, tmp_res));
+                    theory.global_i64.define(0usize, 2i64);
+                    theory.global_math.define(0usize, {
+                        let tmp0 = theory.global_i64.get(0usize);
+                        let tmp_res = theory.uf.math_uf.add_eclass();
+                        theory.delta.insert_const((tmp0, tmp_res));
                         tmp_res
                     });
-                    self.global_i64.define(1usize, 1i64);
-                    self.global_string.define(0usize, IString(0u32));
-                    self.global_string.define(1usize, IString(1u32));
-                    self.global_i64.define(2usize, 0i64);
+                    theory.global_i64.define(1usize, 1i64);
+                    theory.global_string.define(0usize, IString(0u32));
+                    theory.global_string.define(1usize, IString(1u32));
+                    theory.global_i64.define(2usize, 0i64);
                     theory
                 }
                 pub fn step(&mut self) -> [std::time::Duration; 2] {
@@ -1911,14 +2616,14 @@ fn test_primitives_simple() {
                     #[doc = "( rewrite ( Var \"x\" ) ( Var \"y\" ) )"]
                     if let Some(p0) = self.global_string.get_new(0usize) {
                         for (p1,) in self.var_relation.iter1_0_1(p0) {
-                            let a1 = self.global_variables.global_string[1usize];
+                            let a1 = self.global_string.get(1usize);
                             self.delta.insert_var((a1, p1));
                         }
                     }
                     #[doc = "( rewrite ( Var \"x\" ) ( Var \"y\" ) )"]
                     for (p0, p1) in self.var_relation.iter_new() {
                         if p0 == self.global_string.get(0usize) {
-                            let a1 = self.global_variables.global_string[1usize];
+                            let a1 = self.global_string.get(1usize);
                             self.delta.insert_var((a1, p1));
                         }
                     }
@@ -1926,7 +2631,7 @@ fn test_primitives_simple() {
                     if let Some(p1) = self.global_i64.get_new(2usize) {
                         for (p2,) in self.const_relation.iter1_0_1(p1) {
                             for (a, p3) in self.mul_relation.iter1_1_0_2(p2) {
-                                let a1 = self.global_variables.global_i64[2usize];
+                                let a1 = self.global_i64.get(2usize);
                                 self.delta.insert_const((a1, p3));
                             }
                         }
@@ -1935,7 +2640,7 @@ fn test_primitives_simple() {
                     for (p1, p2) in self.const_relation.iter_new() {
                         if p1 == self.global_i64.get(2usize) {
                             for (a, p3) in self.mul_relation.iter1_1_0_2(p2) {
-                                let a1 = self.global_variables.global_i64[2usize];
+                                let a1 = self.global_i64.get(2usize);
                                 self.delta.insert_const((a1, p3));
                             }
                         }
@@ -1945,7 +2650,7 @@ fn test_primitives_simple() {
                         if self.const_relation.check1_1_0(p2) {
                             let p1 = self.global_i64.get(2usize);
                             if self.const_relation.check2_0_1(p1, p2) {
-                                let a1 = self.global_variables.global_i64[2usize];
+                                let a1 = self.global_i64.get(2usize);
                                 self.delta.insert_const((a1, p3));
                             }
                         }
@@ -2024,7 +2729,7 @@ fn test_primitives_simple() {
 #[test]
 fn triangle_join() {
     Steps {
-        code: "
+        code: r#"
             (sort Math)
             (relation Foo (Math Math))
             (relation Bar (Math Math))
@@ -2033,7 +2738,7 @@ fn triangle_join() {
             (relation Triangle (Math Math Math))
 
             (rule ((Foo a b) (Bar b c) (Baz c a)) ((Triangle a b c)))
-        ",
+        "#,
         expected_hir: Some(expect![[r#"
             Theory "":
 
@@ -2665,13 +3370,13 @@ fn triangle_join() {
 fn edgecase0() {
     // needed a "PremiseAny"
     Steps {
-        code: "
+        code: r#"
             (datatype Math
                 (Mul Math Math)
                 (Add Math Math)
             )
             (rewrite (Add (Mul a b) (Mul a c)) (Mul a (Add b c)))
-        ",
+        "#,
         expected_hir :Some( expect![[r#"
             Theory "":
 
@@ -3153,10 +3858,10 @@ fn edgecase0() {
 #[test]
 fn test_into_codegen() {
     Steps {
-        code: "
+        code: r#"
             (datatype Math (Mul Math Math) (Add Math Math))
             (rewrite (Mul (Add a b) c) (Add (Mul a c) (Mul b c)))
-        ",
+        "#,
         expected_hir: Some(expect![[r#"
             Theory "":
 
