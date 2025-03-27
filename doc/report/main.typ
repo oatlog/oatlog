@@ -272,7 +272,7 @@ can have unknown inputs but known outputs.
   ),
 ) <informal-egraph-figure>
 
-== Non-relational e-matching and canonicalization <conceptual_background_nonrelational>
+== Recursive e-matching and canonicalization <conceptual_background_nonrelational>
 
 @informal-egraph-figure shows not only an e-graph but one that has e-nodes and e-classes added to it
 after the application of rewrite rules. While @conceptual_background_egraphs explains the meaning
@@ -291,7 +291,27 @@ modifications are then applied to the e-graph in the canonicalization step, with
 the bipartite formulation, corresponding to adding nodes and unification corresponding to a node
 contraction.
 
-#TODO[Formal e-graph representation (U, M, H, etc) suitable for implementation]
+#TODO[Formal e-graph representation (Union-find $U : "EClassId" -> "EClassId"$, map $M : "EClassId"
+-> {"ENode"}$, hashcons $H : "ENode" -> "EClass"$, etc) suitable for implementation]
+
+#figure(
+  ```rust
+  // (egg does basically this)
+  enum Enode {
+    Add(EclassId, EclassId),
+    Mul(EclassId, EclassId),
+    Const(i64),
+    Var(String),
+    // etc
+  }
+  struct Egraph {
+    uf: UnionFind<EclassId>,
+    classes: HashMap<EclassId, Vec<Enode>>,
+    memo: HashMap<Enode, EclassId>,
+  }
+  ```,
+  caption: [Egg-like egraph representation],
+) <listing_egglike_egraph>
 
 #TODO[Canonicalization on this representation]
 
@@ -323,45 +343,123 @@ and algorithms that perform in practice on some types of e-graphs @fastextract.
 
 == E-graphs as relational databases <conceptual_background_relational>
 
-#TODO[This section should be rewritten to actually introduce e-graphs as relational databases, not
-  just talk vaguely about what egglog is doing.]
+#NOTE[The introduction of recursive e-matching is not actually written yet]
 
-Conceptually, egglog stores _uninterpreted partial functions_.
-
-Thinking about uninterpreted partial functions is a bit abstract, so it helps to drop to the
-abstraction of a relation directly.
-
-For example, consider a partial function that performs addition, which we can represent as in
-@concept_table_concrete.
+Recursive e-matching as introduced in the previous section could be implemented as in
+@listing_recursive_ematching.
 
 #figure(
-  table(
-    columns: (auto, auto, auto),
-    inset: 10pt,
-    align: horizon,
-    table.header(
-      [x],
-      [y],
-      [res],
-    ),
+  ```rust
+  impl Egraph {
+    // (x+y)*z
+    fn find_t0(&self)
+      -> impl Iterator<Item = ((Eclass, Eclass), Eclass)>
+    {
+      self.iter_enodes()
+        .filter(is_multiplication)
+        .flat_map(|t0| {
+          let lhs = self.find_t1(t0.lhs);
+          let rhs = iter::once(t0.rhs);
+          Iterator::cartesian_product(lhs, rhs)
+        })
+    }
+    // x+y
+    fn find_t1(&self, eclass: Eclass)
+      -> impl Iterator<Item = (Eclass, Eclass)>
+    {
+      self.iter_enodes()
+        .filter(|e| e.eclass() == eclass)
+        .filter(is_addition)
+        .map(|t1| (t1.lhs, t1.rhs))
+    }
+  }
+  ```,
+  caption: [Pseudocode for recursive e-matching of the pattern $(x+y)dot z$.],
+) <listing_recursive_ematching>
 
-    [1], [2], [3],
-    [4], [2], [6],
-    [3], [5], [8],
+Concretely, what this code does is iterate over e-nodes, filter based on the pattern constraints,
+recurse to match subpatterns and combine subpatterns with cartesian products. To speed this up, it
+would make sense to store e-nodes in a datastructure that allows us to do filtered lookups rather
+than iterating then filtering.
+
+The filters that appear in recursive e-matching are of the form
++ Require e-nodes to be of a certain variant (e.g. addition or multiplication).
++ Require e-nodes to belong to a certain parent e-class.
++ If supporting DAG patterns, require some bound e-classes from different subpatterns to be identical.
+
+The e-graph representation previously introduced in @listing_egglike_egraph already has indexes from
+e-class to e-node, allowing filters of type (1) to be accelerated. Filters of type (2) could be
+accelerated by also maintaining a `HashMap<Enode::Discriminant, Enode>` or similar.
+
+But these hashmaps cannot be combined, so one of (1) and (2) must be implemented as a filter. The
+same issue prevents (3) from being implemented, unless one decides to maintain mappings for all
+kinds of combinations of constraints on e-node variant, inputs and output. It appears we must
+rethink our e-graph representation rather than relying on "just one more hashmap".
+
+Revisiting our representation, we have e-nodes represented as enum variants containing their inputs
+that we then store in heterogenous `Vec`s and `HashMap`s, and we are now trying to figure out how to
+index based on their discriminant. But we could instead use an enum-of-array representation!
+
+#figure(
+  grid(
+    columns: (1fr, 1fr),
+    ```rust
+      // traditional struct-of-array (SoA)
+      struct Foo {
+        x: i32,
+        flag: bool,
+      }
+      struct ArrayOfStruct {
+        foos: Vec<Foo>
+      }
+      struct StructOfArray {
+        xs: Vec<i32>,
+        flags: Vec<bool>,
+      }
+    ```,
+    ```rust
+      // enum-of-array (EoA) for enodes
+      enum Enode {
+        Add(EclassId, EclassId),
+        Mul(EclassId, EclassId),
+        Const(i64),
+        Var(String),
+        // etc
+      }
+      struct ContainerOfEnums {
+        enodes: Vec<Enode>,
+      }
+      struct ContainerOfVariants {
+        adds: Vec<(EclassId, EclassId)>,
+        muls: Vec<(EclassId, EclassId)>,
+        consts: Vec<i64>,
+        vars: Vec<String>,
+      }
+    ```,
   ),
-  caption: [Partial function represented as a table of concrete values.],
-) <concept_table_concrete>
+  caption: flex-caption(
+    [Illustrating enum-of-array (EoA) representations for e-nodes, a representation reminicient of
+      the more known struct-of-array (SoA) representation.],
+    [
+      SoA is often motivated by avoiding bloating structs with padding, while also often simplifying
+      SIMD processing. EoA has similar but possibly greater benefits, avoiding both branching and
+      padding due to differently large enum variants.
+    ],
+  ),
+) <listing_enode_enum_of_array>
 
-This is a partial function because it's domain is a subset of all pairs of natural numbers. But
-since these are uninterpreted, we do not have actual values, but instead e-classes as in
-@concept_table_eclasses.
+As shown in @listing_enode_enum_of_array, we can store e-nodes more compactly by storing different
+variants separately at the top level. But the primary advantage of this approach is that it
+automatically provides us with variant indexes with no extra work. With e-nodes of each variant
+stored homogenously, we can think about them as tables like in
+@table_relational_enode_representation.
 
 #figure(
   table(
     columns: (auto, auto, auto),
-    inset: 10pt,
-    align: horizon,
+    inset: 8pt,
     table.header(
+      table.cell(colspan: 3, [*Add*]),
       [x],
       [y],
       [res],
@@ -371,112 +469,38 @@ since these are uninterpreted, we do not have actual values, but instead e-class
     [d], [b], [f],
     [c], [e], [g],
   ),
-  caption: [Partial function represented as a table of e-classes.],
-) <concept_table_eclasses>
+  caption: [The e-nodes of a given variant (Add) represented as a table of e-class IDs.],
+) <table_relational_enode_representation>
 
-We can not really say anything about $a, b$ or $c$ other than $"add"(a,b) = c$. It is called a
-function because we have a functional dependency from (x,y) to res. In database terminology, we have
-a primary key on (x,y) for this relation.
+In this representation iterating all e-nodes of a given variant, with filters on the output e-class
+and possibly some inputs, can be seen as a relational query with column value constraints.
 
-Egglog also supports a form of sum types
+The e-node $"Add"(a,b)=c$ implies that $c$ is uniquely determined by $a$ and $b$. This is because
+$"Add"$ is a function, and we have a functional dependency from $(x,y)$ to $"res"$. In database
+terminology, we have a primary key on (x,y) for this relation.
 
-```egglog
-(datatype Math
-    (Add (Math Math))
-    (Mul (Math Math))
-    (Const (i64))
-)
-; desugars to:
-(sort Math)
-(constructor Add (Math Math) Math)
-(constructor Mul (Math Math) Math)
-(constructor Const (i64) Math)
+#TODO[Maybe we should have a figure showing the tables Add and Mul being joined for $(x+y) dot z$ here?]
+
+What about e-matching? The pattern $(x+y) dot z$ for which we sketched recursive e-matching in
+@listing_recursive_ematching would in this new relational representation correspond to the SQL query
+
+```sql
+SELECT add.lhs AS x, add.rhs AS y, mul.rhs AS z
+FROM mul
+JOIN add ON add.sum = mul.lhs
 ```
 
-This is analogous to sum types in other languages like Rust or Haskell, which could be written as:
-```rust
-enum Math {
-    Add(&Math, &Math),
-    Mul(&Math, &Math),
-    Const(i64),
-}
-```
-```haskell
-data Math =
-   Add Math Math |
-   Mul Math Math |
-   Const Int
-```
-
-Here, `Add`, `Mul`, `Const` are constructors for `Math`.
-
-But implementing Math like this would not work for several reasons, firstly we
-want the constructors to return e-classes, and take in e-classes, and secondly,
-sum types can not directly be stored in a relational database.
-
-This can be solved by creating a new table per constructor, as in @sum_type_tables. Now, all
-e-classes are just integer ids, and exist implicitly in the tables.
-
-#figure(
-  grid(
-    columns: (auto, auto, auto),
-    rows: (auto, auto),
-    gutter: 3pt,
-    table(
-      columns: (auto, auto, auto),
-      inset: 10pt,
-      align: horizon,
-      table.header(
-        table.cell(colspan: 3, [*Add*]),
-        [x],
-        [y],
-        [res],
-      ),
-
-      [...], [...], [...],
-    ),
-    table(
-      columns: (auto, auto, auto),
-      inset: 10pt,
-      align: horizon,
-      table.header(
-        table.cell(colspan: 3, [*Mul*]),
-        [x],
-        [y],
-        [res],
-      ),
-
-      [...], [...], [...],
-    ),
-    table(
-      columns: (auto, auto),
-      inset: 10pt,
-      align: horizon,
-      table.header(
-        table.cell(colspan: 2, [*Const*]),
-        [x],
-        [res],
-      ),
-
-      [...], [...],
-    ),
-  ),
-  caption: [Sum types as multiple tables.],
-) <sum_type_tables>
-
-To perform e-matching, we turn the pattern into a conjunctive query
-
-```egglog
-(Mul (Add a b) c)
-```
-becomes
+i.e. a query on the form of iterating the root of the pattern and then adjoining tables for its
+subpatterns. The pattern can also be written as
 
 $"Mul"(t_0, c, t_1) join "Add"(a, b, t_0)$
 
-where $join$ denotes a natural join, here on the column $t_0$. In general, all patterns expressed as
-syntactic trees can be turned into such queries by adding temporary variables for function outputs.
-The problem of e-matching becomes a join, for which we must determine a join order (query planning)
-as well as determine how to do the actually lookups (index selection and implementation).
+where $join$ denotes a natural join, here on the column $t_0$. This is a conjunctive query, a
+(multi)set of tables that have their columns renamed and then naturally joined. In general, all
+patterns expressed as syntactic trees can be turned into conjunctive queries by adding temporary
+variables for function outputs. The problem of e-matching becomes a join, for which we must
+determine a join order (query planning) as well as determine how to do the actually lookups (index
+selection and implementation).
 
 EqSat on a high level now looks like
 1. Execute conjuctive queries
@@ -486,15 +510,12 @@ EqSat on a high level now looks like
 In comparison to recursive e-matching we benefit from being able to join in any order, not just
 recursively from the root of the pattern. We also benefit from already having implicit indices on
 e-node type, in that tuples for different partial functions are stored separately. We, however,
-still have an e-graph where all mutations leave pattern matches matching, so every iteration of
-e-matching and canonicalization will rediscover all previously discovered rewrites. This is
+still have an e-graph where all mutations leave pattern matches still matching, so every iteration
+of e-matching and canonicalization will rediscover all previously discovered rewrites. This is
 addressed by semi-naive evaluation, an algorithm from Datalog that we now can use due to having
 conjunctive queries.
 
 == Semi-naive evaluation <conceptual_background_seminaive>
-
-#TODO[Explain that semi-naive wouldn't work in the non-relational formulation (since that requires
-  all queries to start at the root rather than at new, which semi-naive requires)]
 
 Semi-naive evaluation is an algorithm for joining relations, each consisting of both old and new
 tuples, guaranteeing that each joined tuple contains some new information. In the context of
@@ -560,6 +581,11 @@ for _ in b_new(..) {
 }
 ```
 
+When using semi-naive evaluation it is often optimal to start the query plan at the `new` relation
+since the first relation in the query plan is iterated in its entirety. This makes semi-naive
+evaluation and recursive e-matching essentially incompatible, since the latter will always begin
+query execution at the pattern root.
+
 #TODO[what does this mean in practice?]
 
 == Theory languages <conceptual_background_theory_languages>
@@ -596,6 +622,92 @@ convergence.
 
   caption: [A theory written in the egglog language.],
 ) <informal-theory-example>
+
+Egglog also supports a form of sum types
+
+```egglog
+(datatype Math
+    (Add (Math Math))
+    (Mul (Math Math))
+    (Const (i64))
+)
+; desugars to:
+(sort Math)
+(constructor Add (Math Math) Math)
+(constructor Mul (Math Math) Math)
+(constructor Const (i64) Math)
+```
+
+This is analogous to sum types in other languages like Rust or Haskell, which could be written as:
+```rust
+enum Math {
+    Add(&Math, &Math),
+    Mul(&Math, &Math),
+    Const(i64),
+}
+```
+```haskell
+data Math =
+   Add Math Math |
+   Mul Math Math |
+   Const Int
+```
+
+Here, `Add`, `Mul`, `Const` are constructors for `Math`.
+
+But implementing Math like this would not work for several reasons, firstly we
+want the constructors to return e-classes, and take in e-classes, and secondly,
+sum types can not directly be stored in a relational database.
+
+This can be solved by creating a new table per constructor, as in @sum_type_tables. Now, all
+e-classes are just integer ids, and exist implicitly in the tables.
+
+#figure(
+  grid(
+    columns: (auto, auto, auto),
+    rows: (auto, auto),
+    gutter: 8pt,
+    table(
+      columns: (auto, auto, auto),
+      inset: 8pt,
+      align: horizon,
+      table.header(
+        table.cell(colspan: 3, [*Add*]),
+        [x],
+        [y],
+        [res],
+      ),
+
+      [...], [...], [...],
+    ),
+    table(
+      columns: (auto, auto, auto),
+      inset: 8pt,
+      align: horizon,
+      table.header(
+        table.cell(colspan: 3, [*Mul*]),
+        [x],
+        [y],
+        [res],
+      ),
+
+      [...], [...], [...],
+    ),
+    table(
+      columns: (auto, auto),
+      inset: 8pt,
+      align: horizon,
+      table.header(
+        table.cell(colspan: 2, [*Const*]),
+        [x],
+        [res],
+      ),
+
+      [...], [...],
+    ),
+  ),
+  caption: [Sum types as multiple tables.],
+) <sum_type_tables>
 
 == Design constraints for Datalog engines vs SQL databases. <conceptual_background_datalog_vs_sql>
 
