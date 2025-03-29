@@ -1165,6 +1165,7 @@ fn initial_exprs() {
                         theory.delta.insert_mul((tmp0, tmp1, tmp_res));
                         tmp_res
                     });
+                    theory.canonicalize();
                     theory
                 }
                 pub fn step(&mut self) -> [std::time::Duration; 2] {
@@ -1649,6 +1650,7 @@ fn codegen_bug1() {
             impl Theory {
                 pub fn new() -> Self {
                     let mut theory = Self::default();
+                    theory.canonicalize();
                     theory
                 }
                 pub fn step(&mut self) -> [std::time::Duration; 2] {
@@ -1871,6 +1873,7 @@ fn initial() {
             impl Theory {
                 pub fn new() -> Self {
                     let mut theory = Self::default();
+                    theory.canonicalize();
                     for _ in 0..42u64 {
                         theory.step();
                     }
@@ -2567,6 +2570,7 @@ fn test_primitives_simple() {
                     theory.global_string.define(0usize, IString(0u32));
                     theory.global_string.define(1usize, IString(1u32));
                     theory.global_i64.define(2usize, 0i64);
+                    theory.canonicalize();
                     theory
                 }
                 pub fn step(&mut self) -> [std::time::Duration; 2] {
@@ -3251,6 +3255,7 @@ fn triangle_join() {
             impl Theory {
                 pub fn new() -> Self {
                     let mut theory = Self::default();
+                    theory.canonicalize();
                     theory
                 }
                 pub fn step(&mut self) -> [std::time::Duration; 2] {
@@ -3749,6 +3754,7 @@ fn edgecase0() {
             impl Theory {
                 pub fn new() -> Self {
                     let mut theory = Self::default();
+                    theory.canonicalize();
                     theory
                 }
                 pub fn step(&mut self) -> [std::time::Duration; 2] {
@@ -4216,6 +4222,7 @@ fn test_into_codegen() {
             impl Theory {
                 pub fn new() -> Self {
                     let mut theory = Self::default();
+                    theory.canonicalize();
                     theory
                 }
                 pub fn step(&mut self) -> [std::time::Duration; 2] {

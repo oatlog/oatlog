@@ -1319,8 +1319,13 @@ egglog_test!(valid_tests_compile_ok, should_compile, expect![], "(sort Math)");
 
 egglog_test!(zrocorrect, permutation_bugs, expect![], "(include \"comparative-test/additional/permutation_bugs.egg\")");
 
-egglog_test!(mismatched, quadratic, expect![[r#"
-    Add: 504 (egglog) != 532 (oatlog)
+egglog_test!(allcorrect, quadratic, expect![[r#"
+    Add: 11063
+    Mul: 16
+    Sqrt: 1
+    Sub: 2
+    Var: 3
+    Zero: 0
 "#]], r#"
 (datatype Math
     (Mul Math Math)

@@ -16,7 +16,7 @@ impl<T: RelationElement> GlobalVars<T> {
         self.0.push(GlobalVar {
             val,
             new: true,
-            next: None,
+            next: Some(val),
         });
     }
     pub fn set(&mut self, id: usize, val: T, merge: impl FnOnce(T, T) -> T) {

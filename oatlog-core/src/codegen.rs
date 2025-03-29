@@ -31,7 +31,7 @@ pub fn codegen(theory: &Theory) -> TokenStream {
         })
         .collect();
 
-    let (global_variable_fields, global_variables_map, theory_initial) =
+    let (global_variable_fields, global_variables_map, theory_initial, compute_globals) =
         codegen_globals_and_initial(theory);
 
     let mut declare_rows = BTreeMap::new();
@@ -305,6 +305,11 @@ pub fn codegen(theory: &Theory) -> TokenStream {
         impl #theory_ty {
             pub fn new() -> Self {
                 let mut theory = Self::default();
+                #(#compute_globals)*
+                // not ideal, but we need to canonicalize (put globals into database) before
+                // running step(), fixed when we are able to canonicalize without running rules.
+                // see global_vars.rs
+                theory.canonicalize();
                 #(#theory_initial)*
                 theory
             }
@@ -673,7 +678,12 @@ impl CodegenRuleTrieCtx<'_> {
 
 fn codegen_globals_and_initial(
     theory: &Theory,
-) -> (Vec<TokenStream>, TVec<GlobalId, usize>, Vec<TokenStream>) {
+) -> (
+    Vec<TokenStream>,
+    TVec<GlobalId, usize>,
+    Vec<TokenStream>,
+    Vec<TokenStream>,
+) {
     fn global_compute_to_expr(
         theory: &Theory,
         global_id: GlobalId,
@@ -766,38 +776,51 @@ fn codegen_globals_and_initial(
 
     let mut map: BTreeMap<TypeId, usize> = BTreeMap::new();
     let mut assigned_indices: TVec<GlobalId, usize> = TVec::new();
+    let compute_globals: Vec<TokenStream> = theory
+        .initial
+        .iter()
+        .filter_map(|initial| {
+            Some(match initial {
+                Initial::Run { .. } => return None,
+                Initial::ComputeGlobal { global_id, compute } => {
+                    let ty = theory.global_variable_types[global_id];
+                    let ty_data = &theory.types[ty];
+
+                    let expr =
+                        global_compute_to_expr(theory, *global_id, compute, &assigned_indices);
+                    let idx = {
+                        let entry = map.entry(ty).or_default();
+                        let idx = *entry;
+                        *entry += 1;
+                        idx
+                    };
+
+                    assigned_indices.push_expected(*global_id, idx);
+                    if ty_data.is_zero_sized() {
+                        quote! {
+                            let _ = #expr;
+                        }
+                    } else {
+                        let field = ident::type_global(ty_data);
+                        quote! {
+                            theory.#field.define(#idx, #expr);
+                        }
+                    }
+                }
+            })
+        })
+        .collect();
     let theory_initial: Vec<TokenStream> = theory
         .initial
         .iter()
-        .map(|initial| match initial {
-            Initial::Run { steps } => {
-                let steps = steps.get();
-                quote! { for _ in 0..#steps { theory.step(); } }
-            }
-            Initial::ComputeGlobal { global_id, compute } => {
-                let ty = theory.global_variable_types[global_id];
-                let ty_data = &theory.types[ty];
-
-                let expr = global_compute_to_expr(theory, *global_id, compute, &assigned_indices);
-                let idx = {
-                    let entry = map.entry(ty).or_default();
-                    let idx = *entry;
-                    *entry += 1;
-                    idx
-                };
-
-                assigned_indices.push_expected(*global_id, idx);
-                if ty_data.is_zero_sized() {
-                    quote! {
-                        let _ = #expr;
-                    }
-                } else {
-                    let field = ident::type_global(ty_data);
-                    quote! {
-                        theory.#field.define(#idx, #expr);
-                    }
+        .filter_map(|initial| {
+            Some(match initial {
+                Initial::Run { steps } => {
+                    let steps = steps.get();
+                    quote! { for _ in 0..#steps { theory.step(); } }
                 }
-            }
+                Initial::ComputeGlobal { .. } => return None,
+            })
         })
         .collect();
 
@@ -815,7 +838,12 @@ fn codegen_globals_and_initial(
         })
         .collect();
 
-    (global_variable_fields, assigned_indices, theory_initial)
+    (
+        global_variable_fields,
+        assigned_indices,
+        theory_initial,
+        compute_globals,
+    )
 }
 
 fn codegen_relation(
