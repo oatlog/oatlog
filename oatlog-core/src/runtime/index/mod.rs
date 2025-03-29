@@ -56,20 +56,21 @@ pub trait RowCtx: Default + std::fmt::Debug {
     type Row: IndexRow;
     fn sort(slice: &mut [Self::Row]);
 }
+
 #[derive(Default, Debug)]
 pub struct StdSortCtx<R: Ord>(PhantomData<*const R>);
-#[derive(Default, Debug)]
-pub struct RadixSortCtx<
-    R: Ord + Copy + voracious_radix_sort::Radixable<K>,
-    K: Default + std::fmt::Debug + voracious_radix_sort::RadixKey,
->(PhantomData<*const (R, K)>);
-
 impl<R: IndexRow> RowCtx for StdSortCtx<R> {
     type Row = R;
     fn sort(slice: &mut [Self::Row]) {
         slice.sort_unstable();
     }
 }
+
+#[derive(Default, Debug)]
+pub struct RadixSortCtx<
+    R: Ord + Copy + voracious_radix_sort::Radixable<K>,
+    K: Default + std::fmt::Debug + voracious_radix_sort::RadixKey,
+>(PhantomData<*const (R, K)>);
 impl<
     K: Default + std::fmt::Debug + voracious_radix_sort::RadixKey,
     R: IndexRow + voracious_radix_sort::Radixable<K>,
@@ -82,7 +83,7 @@ impl<
     }
 }
 
-//pub type IndexImpl<RC> = BTreeSetIndex<RC>;
+// pub type IndexImpl<RC> = BTreeSetIndex<RC>;
 pub type IndexImpl<RC> = SortedVec<RC>;
 
 #[derive(Default, Debug)]
@@ -177,7 +178,20 @@ impl<RC: RowCtx> Index for SortedVec<RC> {
         r: RangeInclusive<<Self::Row as IndexRow>::Inner>,
     ) -> impl Iterator<Item = <Self::Row as IndexRow>::Inner> {
         let start = self.0.partition_point(|&k| k < Self::Row::new(*r.start()));
-        let end = self.0.partition_point(|&k| k < Self::Row::new(*r.end()));
+        let end = self.0.partition_point(|&k| k <= Self::Row::new(*r.end()));
+
+        //
+        // start = 1
+        // end = 4
+        //
+        // we have the invariant that elements are unique.
+        //
+        // k < start: [1, 0, 0, 0, 0, 0]
+        // k <= end:  [1, 1, 1, 1, 1, 0]
+        // arr:       [0, 1, 2, 3, 4, 5]
+        //                ^        ^
+        //                |--------|
+
         //println!("range len={} ans={}..{}", self.len(), start, end);
         self.0[start..end].iter().map(|r| r.inner())
     }
@@ -427,12 +441,20 @@ mod property_tests {
         T::FirstColumn: Arbitrary,
         T::Inner: Arbitrary,
     {
+        gen_ops_inner()
+    }
+
+    fn gen_ops_inner<T: IndexRow>() -> impl Strategy<Value = MutatingOperation<T>>
+    where
+        T::FirstColumn: Arbitrary,
+        T::Inner: Arbitrary,
+    {
         prop_oneof![
             // insert
             any::<(Vec<T::Inner>, bool)>().prop_map(|(a, b)| MutatingOperation::Insert(a, b)),
             // delete
             any::<Vec<usize>>().prop_map(MutatingOperation::Delete),
-            // uproot
+            // uproot (sorted)
             any::<Vec<T::FirstColumn>>().prop_map(|mut x| {
                 x.sort();
                 MutatingOperation::Uproot(x)
@@ -444,13 +466,14 @@ mod property_tests {
     enum QueryOperation<T> {
         Range(T, T),
     }
+
     macro_rules! gen_index_test {
         ($test_name:ident $inner:ty, $($ident:ident $indexes:ty),* $(,)?) => {
             #[cfg(feature = "proptest")]
             proptest! {
                 #![proptest_config(ProptestConfig {
                     // 16384 takes about 30s on release mode
-                    // cases: 131072, -> 4 mins
+                    // cases: 131072, // 4 mins
                     cases: 256,
                     ..Default::default()
                 })]
@@ -728,75 +751,19 @@ mod property_tests {
             ];
         }
 
-        // the same case as below as a regression_case
-        // regression_case! {
-        //     #[should_panic]
-        //     row2_0_regression2, Inner = Row2_0<Math, Math>;
-        //     btree_set = BTreeSetIndex<RadixSortCtx<Inner, u64>> = expect!["matching"];
-        //     sorted_vec = SortedVec<RadixSortCtx<Inner, u64>> = expect!["matching"];
-        //     ops = vec![
-        //         Insert(vec![(Math(40), Math(62))], false),
-        //     ];
-        //     query = vec![
-        //         (
-        //             Range((Math(0), Math(0)), (Math(40), Math(62))),
-        //             Some((expect![[r#"
-        //                 []
-        //             "#]], expect![[r#"
-        //                 [
-        //                     (
-        //                         Math(
-        //                             40,
-        //                         ),
-        //                         Math(
-        //                             62,
-        //                         ),
-        //                     ),
-        //                 ]
-        //             "#]]))
-        //         ),
-        //     ];
-        // }
-
-        #[test]
-        fn row2_0_regression_range_query() {
-            use super::*;
-            use MutatingOperation::*;
-            use QueryOperation::*;
-            type Inner = Row2_0<Math, Math>;
-
-            let mut btree_set = <BTreeSetIndex<RadixSortCtx<Inner, u64>> as Index>::new();
-            let mut sorted_vec = <SortedVec<RadixSortCtx<Inner, u64>> as Index>::new();
-
-            let merge = |a: Inner, b: Inner| a.max(b);
-
-            btree_set.insert_many(&mut vec![(Math(40), Math(62))], merge);
-            sorted_vec.insert_many(&mut vec![(Math(40), Math(62))], merge);
-
-            assert_eq!(btree_set.contents_sorted(), sorted_vec.contents_sorted());
-
-            let range = (Math(0), Math(0))..=(Math(40), Math(62));
-
-            let btree_set_range_result = btree_set.range(range.clone()).collect_vec();
-            expect![[r#"
-                [
-                    (
-                        Math(
-                            40,
-                        ),
-                        Math(
-                            62,
-                        ),
-                    ),
-                ]
-            "#]]
-            .assert_debug_eq(&btree_set_range_result);
-
-            let sorted_vec_range_result = sorted_vec.range(range.clone()).collect_vec();
-            expect![[r#"
-                []
-            "#]]
-            .assert_debug_eq(&sorted_vec_range_result);
+        regression_case! {
+            row2_0_regression2, Inner = Row2_0<Math, Math>;
+            btree_set = BTreeSetIndex<RadixSortCtx<Inner, u64>> = expect!["matching"];
+            sorted_vec = SortedVec<RadixSortCtx<Inner, u64>> = expect!["matching"];
+            ops = vec![
+                Insert(vec![(Math(40), Math(62))], false),
+            ];
+            query = vec![
+                (
+                    Range((Math(0), Math(0)), (Math(40), Math(62))),
+                    Some((expect!["matching"], expect!["matching"]))
+                ),
+            ];
         }
 
         gen_test_radix!(row1, Row1<Math>, u32);
