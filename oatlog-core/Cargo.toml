@@ -18,6 +18,17 @@ voracious_radix_sort.workspace = true
 
 [dev-dependencies]
 expect-test.workspace = true
+proptest.workspace = true
+proptest-derive.workspace = true
+
+[features]
+proptest = []
+
+[profile.test.package.proptest]
+opt-level = 3
+
+[profile.test.package.rand_chacha]
+opt-level = 3
 
 [lints]
 workspace = true

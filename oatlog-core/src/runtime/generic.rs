@@ -50,8 +50,9 @@ pub trait EclassProvider<T: Eclass> {
 
 #[macro_export]
 macro_rules! relation_element_wrapper_ty {
-    ($($name:ident),*) => {
+    ($($(#[$($tt:tt)*])* $name:ident),*) => {
         $(
+            $(#[$($tt)*])*
             #[derive(Copy, Clone, Eq, PartialEq, Ord, PartialOrd, Default, Hash, Debug)]
             pub struct $name(pub u32);
 
@@ -73,8 +74,8 @@ macro_rules! relation_element_wrapper_ty {
 /// Wrapper type for a u32 to represent a typed e-class.
 /// Emit this instead to make codegen a bit cleaner.
 macro_rules! eclass_wrapper_ty {
-    ($($name:ident),*) => {
-        relation_element_wrapper_ty!($($name),*);
+    ($($(#[$($tt:tt)*])* $name:ident),*) => {
+        relation_element_wrapper_ty!($($(#[$($tt)*])* $name),*);
         $(
             impl Eclass for $name {
                 fn new(value: u32) -> Self {

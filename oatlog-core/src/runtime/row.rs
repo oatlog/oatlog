@@ -1,16 +1,24 @@
 use crate::runtime::RelationElement;
 
+/// Requirements to be used as an element in an index.
+/// Either a tuple or an element in a tuple.
 pub trait PreReqs: Copy + Eq + Ord + Default + std::fmt::Debug {}
 impl<T: Copy + Eq + Ord + Default + std::fmt::Debug> PreReqs for T {}
 
 /// `Eq` and `Ord` consider only `key`.
+/// Implemented lazily, otherwise `O^*(n!)` implementations would be needed.
 pub trait IndexRow: PreReqs {
+    /// The actual memory representation
+    /// `Self` needs to be `repr(transparent)` of `Inner`.
+    /// (typically?) the same as `Relation::Row`.
     type Inner: PreReqs;
+    /// For `Eq` and `Ord`
     type Key: PreReqs;
     type Value: PreReqs;
     type ValueMut<'a>: Eq + Ord
     where
         Self: 'a;
+    /// The first column in the index. Uproots are allowed by the first index.
     type FirstColumn: PreReqs + RelationElement;
 
     fn inner_slice<'a>(slice: &'a [Self]) -> &'a [Self::Inner];
@@ -50,17 +58,20 @@ macro_rules! decl_row {
     };
     /////
     (
+        $(#[$($annotations:tt)*])*
         $name:ident<$($t_inner:ident $($first:ident)?),+>
         ($($key:tt),*) ($($value:tt),*)
         ($($key_t:tt),*) ($($value_t:tt),*)
         fc=($fci:tt) ($fci_t:tt)
         $(where $radix_key:ident = $inner:ident => $radix_impl:expr)?
     ) => {
+        $(#[$($annotations)*])*
         #[derive(Clone, Copy, PartialEq, Eq, Default, Debug)]
         #[repr(transparent)]
         pub struct $name<$($t_inner : RelationElement),*> {
             inner: ($($t_inner,)*)
         }
+
         #[allow(unsafe_code)]
         impl<$($t_inner : RelationElement),*> IndexRow for $name<$($t_inner),*> {
             type Inner = ($($t_inner,)*);
