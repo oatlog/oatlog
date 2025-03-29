@@ -2500,6 +2500,21 @@ Add(Mul(..), a, c)
 Now problematic because we need double lookup.
 So we either need double lookup OR double insert.
 
+
+= Unifying equality modulo permutation and alias relations.
+
+We can have alias relations:
+`Add(a, b, c) = Sub(c, b, a)`
+
+And we have equality modulo permuation:
+`Add(a, b, c) = Add(b, a, c)`
+
+And we have whatever this is:
+`Neg(a, b) = Sub(Zero, a, b)`
+
+
+
+
 = TODO READ
 Papers are just under the first author i looked at.
 I stopped adding authors after a while since this is just too many papers.
