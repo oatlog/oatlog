@@ -151,116 +151,95 @@
 // i=10 size=1841
 // i=11 size=1841
 
+// diverges due to unification rules not running to convergence.
+
 fn run() {
     oatlog::compile_egraph!((
         (datatype Math
             (Mul Math Math)
             (Add Math Math)
             (Sub Math Math)
-            // (Neg Math)
+            (Neg Math)
             (Zero)
             (Sqrt Math)
-            (Var String)
         )
+        (Zero)
 
+        (relation MathU (Math))
+        (rule ((= c (Add a b))) ((MathU a) (MathU b) (MathU c)))
+        // (rule ((= c (Sub a b))) ((MathU a) (MathU b) (MathU c)))
+        // (rule ((= c (Mul a b))) ((MathU a) (MathU b) (MathU c)))
+        // (rule ((= c (Neg a))) ((MathU a) (MathU c)))
+        // (rule ((= c (Zero))) ((MathU c)))
+        // (rule ((= c (Sqrt a))) ((MathU a) (MathU c)))
+
+        (relation MathU2 (Math))
+        (relation MathU3 (Math))
+        (relation MathU4 (Math))
+        (relation MathU5 (Math))
+        (rule ((MathU x)) ((MathU2 x)))
+        (rule ((MathU2 x)) ((MathU3 x)))
+        (rule ((MathU3 x)) ((MathU4 x)))
+        (rule ((MathU4 x)) ((MathU5 x)))
+
+        // FD rules
         (rule ((= c (Add a1 b)) (= c (Add a2 b))) ((union a1 a2)))
         (rule ((= c (Add b a1)) (= c (Add a2 b))) ((union a1 a2)))
         (rule ((= c (Add a b1)) (= c (Add a b2))) ((union b1 b2)))
         (rule ((= c (Add b1 a)) (= c (Add a b2))) ((union b1 b2)))
         (rule ((= c1 (Add a b)) (= c2 (Add a b))) ((union c1 c2)))
         (rule ((= c1 (Add b a)) (= c2 (Add a b))) ((union c1 c2)))
+        (rule ((= c1 (Mul a b)) (= c2 (Mul a b))) ((union c1 c2)))
+        (rule ((= c1 (Mul a b)) (= c2 (Mul b a))) ((union c1 c2)))
 
-        // a-b = a+(-b)
-        // (rewrite (Sub a b) (Add a (Neg b)))
-        // a - b = c => b = a + c
-        (rule ((= c (Sub a b))) ((union b (Add a c))))
+        // conversion rules
+        (rule ((= c (Sub a b))) ((union a (Add b c)))) // c = a - b => c + b = a
+        (rule ((= a (Neg b))) ((union (Zero) (Add a b)))) // a = 0 - b => 0 = a + b
 
-        // --x = x
-        // (rewrite (Neg (Neg x)) x)
-        // already covered
+        // inverse conversion rules are apparently fine.
+        // (rule ((= a (Add b c))) ((union c (Sub a b))) )
+        // (rule ((= (Zero) (Add a b))) ((union a (Neg b))))
 
-        // x*(-y) = -(xy)
+        // orig problematic
+        // (rewrite (Sub a b) (Add a (Neg b))) // needs to create e-class in argument position.
+        // (rewrite (Neg (Neg x)) x) // no-op
         // (rewrite (Mul x (Neg y)) (Neg (Mul x y)))
-        // t0 = (x * -y) then t1 = -(x * y), t0 = t1
-        //
-        // t0 = (x * y2)
-        // y2 = - y
-        // y2 + y = 0
-        //
-        //
-        // t1 = -t2
-        //
-        //
-        // t0 + t2 = 0
-        // t2 = x * y
-        //
-        //
-        (rule (
-            (= t0 (Mul x y2))
-            (= zero (Add y2 y))
-            (= zero (Zero))
-        ) (
-            (let t2 (Mul x y))
-            (union zero (Add t0 t2))
+        // (rewrite (Add x (Neg x)) (Zero)) // no-op
+
+        // problematic rewrite
+        // a = a + b => b = 0
+        (rule ((= a (Add a b))) ((union b (Zero))))
+        (rule ((= a (Add b a))) ((union b (Zero))))
+        // (forall x) => x + 0 = x
+        // (rule ((= c (Add a b))) (
+        //     (union a (Add a (Zero)))
+        //     (union b (Add b (Zero)))
+        //     (union c (Add c (Zero)))
+        // ))
+
+        (rule ((MathU5 x)) (
+            (union x (Add x (Zero)))
+            (union x (Add (Zero) x))
         ))
 
-        // x+(-x)=0 and x+0=0
-        // (rewrite (Add x (Neg x)) (Zero))
-        // covered maybe
+        // ok orig
+        // 0 = x + 0 => x = 0
+        (rule ((= (Zero) (Add (Zero) x))) ((union x (Zero))))
         (rewrite (Add x (Zero)) x)
         (rewrite (Add (Zero) x) x)
-
-        // x*0=0, -0=0
         (rewrite (Mul x (Zero)) (Zero))
         (rewrite (Mul (Zero) x) (Zero))
-        // (rewrite (Neg (Zero)) (Zero))
-
-        // Mul and Add commutative and associative
+        (rewrite (Neg (Zero)) (Zero))
         (rewrite (Mul a b) (Mul b a))
         (rewrite (Mul (Mul a b) c) (Mul a (Mul b c)))
         (rewrite (Add a b) (Add b a))
         (rewrite (Add (Add a b) c) (Add a (Add b c)))
-
-        // Distributivity
         (birewrite (Mul x (Add a b)) (Add (Mul x a) (Mul x b)))
-
-        // sqrt(x)*sqrt(x) = x, unsound, but ok for us here
         (rewrite (Mul (Sqrt x) (Sqrt x)) x)
 
-        (Zero)
-        (rule ((Zero)) (
-            (let x (Var "x"))
-            (let b (Var "b"))
-            (let c (Var "c"))
-            (let t (Add (Add (Mul x x) c) (Add (Mul b x) (Mul b x))))
-            (union x (Sub (Sqrt (Sub (Mul b b) c)) b))
-        ))
     ));
 
     let mut theory = Theory::new();
-
-    theory.apply_rules();
-    theory.canonicalize();
-    for _ in 0..ITERS {
-        theory.apply_rules();
-
-        dbg!(&theory.delta.add_relation_delta.len());
-
-        theory.canonicalize();
-
-        if true {
-            let relation_entry_count = theory
-                .get_relation_entry_count()
-                .into_iter()
-                .map(|(name, count)| format!("\t{name}: {count}"))
-                .collect::<Vec<String>>()
-                .join("\n");
-            println!("\n{}", relation_entry_count);
-        }
-    }
-
-    return;
-
     let x = theory.uf.math_uf.add_eclass();
     let b = theory.uf.math_uf.add_eclass();
     let c = theory.uf.math_uf.add_eclass();
@@ -296,48 +275,13 @@ fn run() {
     let zero = theory.uf.math_uf.add_eclass();
     theory.insert_zero((zero,));
 
-    // {
-    //     theory.global_variables.new = false;
-    //     theory.mul_relation.clear_new();
-    //     theory.add_relation.clear_new();
-    //     theory.sub_relation.clear_new();
-    //     theory.zero_relation.clear_new();
-    //     theory.sqrt_relation.clear_new();
-    //     while theory.uf.has_new_uproots()||theory.delta.has_new_inserts(){
-    //         {
-    //             {
-    //                 let this = &mut theory.uf.math_uf;
-    //                 this.uprooted_snapshot.clear();
-    //                 this.uprooted_snapshot.extend_from_slice(&this.uprooted);
-    //                 this.uprooted_snapshot.sort_unstable();
-    //                 this.uprooted.clear();
-    //             };
-    //         };
-    //         theory.mul_relation.update(&mut theory.uf, &mut theory.delta);
-    //         theory.add_relation.update(&mut theory.uf, &mut theory.delta);
-    //         theory.sub_relation.update(&mut theory.uf, &mut theory.delta);
-    //         theory.zero_relation.update(&mut theory.uf, &mut theory.delta);
-    //         theory.sqrt_relation.update(&mut theory.uf, &mut theory.delta);
-    //     }theory.uf.snapshot_all_uprooted();
-    //     theory.mul_relation.update_finalize(&mut theory.uf);
-    //     theory.add_relation.update_finalize(&mut theory.uf);
-    //     theory.sub_relation.update_finalize(&mut theory.uf);
-    //     theory.zero_relation.update_finalize(&mut theory.uf);
-    //     theory.sqrt_relation.update_finalize(&mut theory.uf);
-    // };
-
-    theory.canonicalize();
-
     const ITERS: usize = 100;
-    // let mut last = 0;
+    let mut last = 0;
+    let mut verified = false;
     for i in 0..ITERS {
-        theory.apply_rules();
+        theory.step();
 
-        dbg!(&theory.delta.add_relation_delta.len());
-
-        theory.canonicalize();
-
-        if true {
+        if false {
             let relation_entry_count = theory
                 .get_relation_entry_count()
                 .into_iter()
@@ -351,8 +295,10 @@ fn run() {
         println!("i={i} size={size}");
 
         if theory.uf.math_uf.are_equal(zero, t) {
+            assert!(!theory.uf.math_uf.are_equal(b, c));
+
             println!("\nVerified!");
-            return;
+            verified = true;
         }
 
         // if last == size {
@@ -361,7 +307,14 @@ fn run() {
         //     last = size;
         // }
     }
-    panic!("\nFailed to verify in {ITERS} iterations..");
+
+    if verified {
+        println!("\nVerified!");
+        println!("{}", theory.emit_graphviz());
+    } else {
+        // println!("{}", theory.emit_graphviz());
+        panic!("\nFailed to verify in {ITERS} iterations..");
+    }
 }
 
 fn main() {
