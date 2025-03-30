@@ -271,6 +271,12 @@ pub(crate) enum RuleAtom {
     //     variable: VariableId,
     //     new: bool,
     // },
+    /// if a == b { .. }
+    /// Motivation is this transformation:
+    /// for (x, x) in .. { .. }
+    /// to
+    /// for (x, y) in .. { if x == y { .. } }
+    IfEq(VariableId, VariableId),
 
     // ==== ACTIONS ====
     Action(Action),
@@ -529,6 +535,9 @@ impl Theory {
                     }
                     RuleAtom::Panic(msg) => {
                         write!(f, "{:?}", DbgStr(["Panic".to_string(), (*msg).to_string()]))
+                    }
+                    RuleAtom::IfEq(a, b) => {
+                        write!(f, "{:?}", DbgStr(["IfEq".to_string(), format!("{a}={b}")]))
                     }
                 }
             }

@@ -63,7 +63,7 @@ macro_rules! relation_element_wrapper_ty {
 
             impl std::fmt::Display for $name {
                 fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> Result<(), std::fmt::Error> {
-                    write!(f, "{self:?}")
+                    self.0.fmt(f)
                 }
             }
         )*

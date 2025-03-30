@@ -28,7 +28,6 @@ impl Steps {
     }
 }
 
-#[should_panic = "assertion failed: !self.is_bound(arg)"]
 #[test]
 fn redundant_premise_simplify() {
     Steps {
@@ -435,10 +434,6 @@ fn hir_global() {
 }
 
 #[test]
-#[should_panic]
-// NOTE that `atom: [PremiseNew, r1(v0, v0, v1)]`
-// is incorrect, as PremiseNew cannot handle multiple variables
-// being identical. Requires codegen of an if-statement after.
 fn test_bind_variable_multiple_times() {
     Steps {
         code: r#"
@@ -487,18 +482,272 @@ fn test_bind_variable_multiple_times() {
                 rule_variables: {
                     [v0, x]: t3,
                     [v1, p1]: t3,
+                    [v2, internal1_x]: t3,
                 },
                 global_variable_types: {},
                 rule_tries: [
                     meta: "( rewrite ( Same x x ) x )"
-                    atom: [PremiseNew, r1(v0, v0, v1)]
+                    atom: [PremiseNew, r1(v0, v2, v1)]
                     then: [
-                        atom: [Action::Equate, v1=v0],
+                        atom: [IfEq, v0=v2]
+                        then: [
+                            atom: [Action::Equate, v1=v0],
+                        ],
                     ],
                 ],
                 initial: [],
             }"#]]),
-        expected_codegen: None,
+        expected_codegen: Some(expect![[r#"
+            use oatlog::runtime::{self, *};
+            decl_row ! (Row3_0_1 < T0 first , T1 , T2 > (0 , 1) (2) (T0 , T1) (T2) fc = (0) (T0) where u128 = s => ((s . 0 . inner () as u128) << 64) + ((s . 1 . inner () as u128) << 32) + ((s . 2 . inner () as u128) << 0));
+            decl_row ! (Row3_1_0_2 < T0 , T1 first , T2 > (1 , 0 , 2) () (T1 , T0 , T2) () fc = (1) (T1) where u128 = s => ((s . 1 . inner () as u128) << 64) + ((s . 0 . inner () as u128) << 32) + ((s . 2 . inner () as u128) << 0));
+            decl_row ! (Row3_2_0_1 < T0 , T1 , T2 first > (2 , 0 , 1) () (T2 , T0 , T1) () fc = (2) (T2) where u128 = s => ((s . 2 . inner () as u128) << 64) + ((s . 0 . inner () as u128) << 32) + ((s . 1 . inner () as u128) << 0));
+            eclass_wrapper_ty!(Foo);
+            #[derive(Debug, Default)]
+            struct SameRelation {
+                new: Vec<<Self as Relation>::Row>,
+                all_index_0_1_2: IndexImpl<RadixSortCtx<Row3_0_1<Foo, Foo, Foo>, u128>>,
+                all_index_1_0_2: IndexImpl<RadixSortCtx<Row3_1_0_2<Foo, Foo, Foo>, u128>>,
+                all_index_2_0_1: IndexImpl<RadixSortCtx<Row3_2_0_1<Foo, Foo, Foo>, u128>>,
+            }
+            impl Relation for SameRelation {
+                type Row = (Foo, Foo, Foo);
+            }
+            impl SameRelation {
+                const COST: u32 = 9u32;
+                fn new() -> Self {
+                    Self::default()
+                }
+                fn has_new(&self) -> bool {
+                    !self.new.is_empty()
+                }
+                fn clear_new(&mut self) {
+                    self.new.clear();
+                }
+                fn iter_new(&self) -> impl Iterator<Item = <Self as Relation>::Row> + use<'_> {
+                    self.new.iter().copied()
+                }
+                fn iter1_0_1_2(&self, x0: Foo) -> impl Iterator<Item = (Foo, Foo)> + use<'_> {
+                    self.all_index_0_1_2
+                        .range((x0, Foo::MIN_ID, Foo::MIN_ID)..=(x0, Foo::MAX_ID, Foo::MAX_ID))
+                        .map(|(x0, x1, x2)| (x1, x2))
+                }
+                fn iter1_1_0_2(&self, x1: Foo) -> impl Iterator<Item = (Foo, Foo)> + use<'_> {
+                    self.all_index_1_0_2
+                        .range((Foo::MIN_ID, x1, Foo::MIN_ID)..=(Foo::MAX_ID, x1, Foo::MAX_ID))
+                        .map(|(x0, x1, x2)| (x0, x2))
+                }
+                fn iter1_2_0_1(&self, x2: Foo) -> impl Iterator<Item = (Foo, Foo)> + use<'_> {
+                    self.all_index_2_0_1
+                        .range((Foo::MIN_ID, Foo::MIN_ID, x2)..=(Foo::MAX_ID, Foo::MAX_ID, x2))
+                        .map(|(x0, x1, x2)| (x0, x1))
+                }
+                fn iter2_0_1_2(&self, x0: Foo, x1: Foo) -> impl Iterator<Item = (Foo,)> + use<'_> {
+                    self.all_index_0_1_2
+                        .range((x0, x1, Foo::MIN_ID)..=(x0, x1, Foo::MAX_ID))
+                        .map(|(x0, x1, x2)| (x2,))
+                }
+                fn check1_0_1_2(&self, x0: Foo) -> bool {
+                    self.iter1_0_1_2(x0).next().is_some()
+                }
+                fn check1_1_0_2(&self, x1: Foo) -> bool {
+                    self.iter1_1_0_2(x1).next().is_some()
+                }
+                fn check1_2_0_1(&self, x2: Foo) -> bool {
+                    self.iter1_2_0_1(x2).next().is_some()
+                }
+                fn check2_0_1_2(&self, x0: Foo, x1: Foo) -> bool {
+                    self.iter2_0_1_2(x0, x1).next().is_some()
+                }
+                fn entry2_0_1_2(&self, delta: &mut Delta, uf: &mut Unification, x0: Foo, x1: Foo) -> (Foo,) {
+                    if let Some((x2,)) = self.iter2_0_1_2(x0, x1).next() {
+                        return (x2,);
+                    }
+                    let x2 = uf.foo_uf.add_eclass();
+                    delta.same_relation_delta.push((x0, x1, x2));
+                    (x2,)
+                }
+                fn update(&mut self, uf: &mut Unification, delta: &mut Delta) {
+                    let mut inserts = take(&mut delta.same_relation_delta);
+                    let orig_inserts = inserts.len();
+                    self.all_index_0_1_2
+                        .first_column_uproots(uf.foo_uf.get_uprooted_snapshot(), |deleted_rows| {
+                            inserts.extend(deleted_rows)
+                        });
+                    self.all_index_1_0_2
+                        .first_column_uproots(uf.foo_uf.get_uprooted_snapshot(), |deleted_rows| {
+                            inserts.extend(deleted_rows)
+                        });
+                    self.all_index_2_0_1
+                        .first_column_uproots(uf.foo_uf.get_uprooted_snapshot(), |deleted_rows| {
+                            inserts.extend(deleted_rows)
+                        });
+                    inserts[orig_inserts..].sort_unstable();
+                    runtime::dedup_suffix(&mut inserts, orig_inserts);
+                    self.all_index_0_1_2
+                        .delete_many(&mut inserts[orig_inserts..]);
+                    self.all_index_1_0_2
+                        .delete_many(&mut inserts[orig_inserts..]);
+                    self.all_index_2_0_1
+                        .delete_many(&mut inserts[orig_inserts..]);
+                    inserts.iter_mut().for_each(|row| {
+                        row.0 = uf.foo_uf.find(row.0);
+                        row.1 = uf.foo_uf.find(row.1);
+                        row.2 = uf.foo_uf.find(row.2);
+                    });
+                    self.all_index_0_1_2
+                        .insert_many(&mut inserts, |mut old, mut new| {
+                            let (x2,) = old.value_mut();
+                            let (y2,) = new.value_mut();
+                            uf.foo_uf.union_mut(x2, y2);
+                            old
+                        });
+                    self.all_index_1_0_2
+                        .insert_many(&mut inserts, |mut old, mut new| {
+                            let () = old.value_mut();
+                            let () = new.value_mut();
+                            panic!("panicking merge action")
+                        });
+                    self.all_index_2_0_1
+                        .insert_many(&mut inserts, |mut old, mut new| {
+                            let () = old.value_mut();
+                            let () = new.value_mut();
+                            panic!("panicking merge action")
+                        });
+                    self.new.extend_from_slice(&inserts);
+                }
+                fn update_finalize(&mut self, uf: &mut Unification) {
+                    self.new.sort_unstable();
+                    self.new.dedup();
+                    self.new.retain(|(x0, x1, x2)| {
+                        if *x0 != uf.foo_uf.find(*x0) {
+                            return false;
+                        }
+                        if *x1 != uf.foo_uf.find(*x1) {
+                            return false;
+                        }
+                        if *x2 != uf.foo_uf.find(*x2) {
+                            return false;
+                        }
+                        true
+                    });
+                }
+                fn emit_graphviz(&self, buf: &mut String) {
+                    use std::fmt::Write;
+                    for (i, (x0, x1, x2)) in self.all_index_0_1_2.iter().enumerate() {
+                        writeln!(buf, "{}_{i} -> {}_{};", "same", "foo", x0).unwrap();
+                        writeln!(buf, "{}_{i} -> {}_{};", "same", "foo", x1).unwrap();
+                        writeln!(buf, "{}_{i} -> {}_{};", "same", "foo", x2).unwrap();
+                        writeln!(buf, "{}_{i} [shape = box];", "same").unwrap();
+                    }
+                }
+                fn len(&self) -> usize {
+                    self.all_index_0_1_2.len()
+                }
+            }
+            #[derive(Debug, Default)]
+            pub struct Delta {
+                same_relation_delta: Vec<<SameRelation as Relation>::Row>,
+            }
+            impl Delta {
+                fn new() -> Self {
+                    Self::default()
+                }
+                fn has_new_inserts(&self) -> bool {
+                    let mut has_new_inserts = false;
+                    has_new_inserts |= !self.same_relation_delta.is_empty();
+                    has_new_inserts
+                }
+                pub fn insert_same(&mut self, x: <SameRelation as Relation>::Row) {
+                    self.same_relation_delta.push(x);
+                }
+            }
+            #[derive(Debug, Default)]
+            struct Unification {
+                pub foo_uf: UnionFind<Foo>,
+            }
+            impl Unification {
+                fn has_new_uproots(&mut self) -> bool {
+                    let mut ret = false;
+                    ret |= self.foo_uf.has_new_uproots();
+                    ret
+                }
+                fn snapshot_all_uprooted(&mut self) {
+                    self.foo_uf.create_uprooted_snapshot();
+                }
+            }
+            #[derive(Debug, Default)]
+            pub struct Theory {
+                pub delta: Delta,
+                pub uf: Unification,
+                pub same_relation: SameRelation,
+            }
+            impl Theory {
+                pub fn new() -> Self {
+                    let mut theory = Self::default();
+                    theory.canonicalize();
+                    theory
+                }
+                pub fn step(&mut self) -> [std::time::Duration; 2] {
+                    [
+                        {
+                            let start = std::time::Instant::now();
+                            self.apply_rules();
+                            start.elapsed()
+                        },
+                        {
+                            let start = std::time::Instant::now();
+                            self.canonicalize();
+                            start.elapsed()
+                        },
+                    ]
+                }
+                #[inline(never)]
+                pub fn apply_rules(&mut self) {
+                    #[doc = "( rewrite ( Same x x ) x )"]
+                    for (x, internal1_x, p1) in self.same_relation.iter_new() {
+                        if x == internal1_x {
+                            let p1 = self.uf.foo_uf.union(p1, x);
+                            let x = p1;
+                        }
+                    }
+                }
+                fn emit_graphviz(&self) -> String {
+                    let mut buf = String::new();
+                    buf.push_str("digraph G {\n");
+                    self.same_relation.emit_graphviz(&mut buf);
+                    buf.push_str("}\n");
+                    buf
+                }
+                pub fn get_total_relation_entry_count(&self) -> usize {
+                    [self.same_relation.len()].into_iter().sum::<usize>()
+                }
+                pub fn get_relation_entry_count(&self) -> std::collections::BTreeMap<&'static str, usize> {
+                    [("Same", self.same_relation.len())].into_iter().collect()
+                }
+                #[inline(never)]
+                pub fn canonicalize(&mut self) {
+                    self.same_relation.clear_new();
+                    while self.uf.has_new_uproots() || self.delta.has_new_inserts() {
+                        self.uf.snapshot_all_uprooted();
+                        self.same_relation.update(&mut self.uf, &mut self.delta);
+                    }
+                    self.uf.snapshot_all_uprooted();
+                    self.same_relation.update_finalize(&mut self.uf);
+                }
+            }
+            impl std::ops::Deref for Theory {
+                type Target = Delta;
+                fn deref(&self) -> &Self::Target {
+                    &self.delta
+                }
+            }
+            impl std::ops::DerefMut for Theory {
+                fn deref_mut(&mut self) -> &mut Self::Target {
+                    &mut self.delta
+                }
+            }
+        "#]]),
     }
     .check();
 }
@@ -713,9 +962,10 @@ fn initial_exprs() {
                 fn emit_graphviz(&self, buf: &mut String) {
                     use std::fmt::Write;
                     for (i, (x0, x1, x2)) in self.all_index_0_1_2.iter().enumerate() {
-                        write!(buf, "{}{i} -> {}{};", "add", "math", x0).unwrap();
-                        write!(buf, "{}{i} -> {}{};", "add", "math", x1).unwrap();
-                        write!(buf, "{}{i} -> {}{};", "add", "math", x2).unwrap();
+                        writeln!(buf, "{}_{i} -> {}_{};", "add", "math", x0).unwrap();
+                        writeln!(buf, "{}_{i} -> {}_{};", "add", "math", x1).unwrap();
+                        writeln!(buf, "{}_{i} -> {}_{};", "add", "math", x2).unwrap();
+                        writeln!(buf, "{}_{i} [shape = box];", "add").unwrap();
                     }
                 }
                 fn len(&self) -> usize {
@@ -854,9 +1104,10 @@ fn initial_exprs() {
                 fn emit_graphviz(&self, buf: &mut String) {
                     use std::fmt::Write;
                     for (i, (x0, x1, x2)) in self.all_index_0_1_2.iter().enumerate() {
-                        write!(buf, "{}{i} -> {}{};", "mul", "math", x0).unwrap();
-                        write!(buf, "{}{i} -> {}{};", "mul", "math", x1).unwrap();
-                        write!(buf, "{}{i} -> {}{};", "mul", "math", x2).unwrap();
+                        writeln!(buf, "{}_{i} -> {}_{};", "mul", "math", x0).unwrap();
+                        writeln!(buf, "{}_{i} -> {}_{};", "mul", "math", x1).unwrap();
+                        writeln!(buf, "{}_{i} -> {}_{};", "mul", "math", x2).unwrap();
+                        writeln!(buf, "{}_{i} [shape = box];", "mul").unwrap();
                     }
                 }
                 fn len(&self) -> usize {
@@ -957,8 +1208,9 @@ fn initial_exprs() {
                 fn emit_graphviz(&self, buf: &mut String) {
                     use std::fmt::Write;
                     for (i, (x0, x1)) in self.all_index_0_1.iter().enumerate() {
-                        write!(buf, "{}{i} -> {}{};", "const", "i64", x0).unwrap();
-                        write!(buf, "{}{i} -> {}{};", "const", "math", x1).unwrap();
+                        writeln!(buf, "{}_{i} -> {}_{};", "const", "i64", x0).unwrap();
+                        writeln!(buf, "{}_{i} -> {}_{};", "const", "math", x1).unwrap();
+                        writeln!(buf, "{}_{i} [shape = box];", "const").unwrap();
                     }
                 }
                 fn len(&self) -> usize {
@@ -1054,8 +1306,9 @@ fn initial_exprs() {
                 fn emit_graphviz(&self, buf: &mut String) {
                     use std::fmt::Write;
                     for (i, (x0, x1)) in self.all_index_0_1.iter().enumerate() {
-                        write!(buf, "{}{i} -> {}{};", "var", "string", x0).unwrap();
-                        write!(buf, "{}{i} -> {}{};", "var", "math", x1).unwrap();
+                        writeln!(buf, "{}_{i} -> {}_{};", "var", "string", x0).unwrap();
+                        writeln!(buf, "{}_{i} -> {}_{};", "var", "math", x1).unwrap();
+                        writeln!(buf, "{}_{i} [shape = box];", "var").unwrap();
                     }
                 }
                 fn len(&self) -> usize {
@@ -1186,12 +1439,12 @@ fn initial_exprs() {
                 pub fn apply_rules(&mut self) {}
                 fn emit_graphviz(&self) -> String {
                     let mut buf = String::new();
-                    buf.push_str("digraph G {");
+                    buf.push_str("digraph G {\n");
                     self.add_relation.emit_graphviz(&mut buf);
                     self.mul_relation.emit_graphviz(&mut buf);
                     self.const_relation.emit_graphviz(&mut buf);
                     self.var_relation.emit_graphviz(&mut buf);
-                    buf.push_str("}");
+                    buf.push_str("}\n");
                     buf
                 }
                 pub fn get_total_relation_entry_count(&self) -> usize {
@@ -1595,9 +1848,10 @@ fn codegen_bug1() {
                 fn emit_graphviz(&self, buf: &mut String) {
                     use std::fmt::Write;
                     for (i, (x0, x1, x2)) in self.all_index_0_1_2.iter().enumerate() {
-                        write!(buf, "{}{i} -> {}{};", "foo", "t0", x0).unwrap();
-                        write!(buf, "{}{i} -> {}{};", "foo", "t1", x1).unwrap();
-                        write!(buf, "{}{i} -> {}{};", "foo", "t2", x2).unwrap();
+                        writeln!(buf, "{}_{i} -> {}_{};", "foo", "t0", x0).unwrap();
+                        writeln!(buf, "{}_{i} -> {}_{};", "foo", "t1", x1).unwrap();
+                        writeln!(buf, "{}_{i} -> {}_{};", "foo", "t2", x2).unwrap();
+                        writeln!(buf, "{}_{i} [shape = box];", "foo").unwrap();
                     }
                 }
                 fn len(&self) -> usize {
@@ -1671,9 +1925,9 @@ fn codegen_bug1() {
                 pub fn apply_rules(&mut self) {}
                 fn emit_graphviz(&self) -> String {
                     let mut buf = String::new();
-                    buf.push_str("digraph G {");
+                    buf.push_str("digraph G {\n");
                     self.foo_relation.emit_graphviz(&mut buf);
-                    buf.push_str("}");
+                    buf.push_str("}\n");
                     buf
                 }
                 pub fn get_total_relation_entry_count(&self) -> usize {
@@ -1825,8 +2079,9 @@ fn initial() {
                 fn emit_graphviz(&self, buf: &mut String) {
                     use std::fmt::Write;
                     for (i, (x0, x1)) in self.all_index_0_1.iter().enumerate() {
-                        write!(buf, "{}{i} -> {}{};", "const", "i64", x0).unwrap();
-                        write!(buf, "{}{i} -> {}{};", "const", "math", x1).unwrap();
+                        writeln!(buf, "{}_{i} -> {}_{};", "const", "i64", x0).unwrap();
+                        writeln!(buf, "{}_{i} -> {}_{};", "const", "math", x1).unwrap();
+                        writeln!(buf, "{}_{i} [shape = box];", "const").unwrap();
                     }
                 }
                 fn len(&self) -> usize {
@@ -1897,9 +2152,9 @@ fn initial() {
                 pub fn apply_rules(&mut self) {}
                 fn emit_graphviz(&self) -> String {
                     let mut buf = String::new();
-                    buf.push_str("digraph G {");
+                    buf.push_str("digraph G {\n");
                     self.const_relation.emit_graphviz(&mut buf);
-                    buf.push_str("}");
+                    buf.push_str("}\n");
                     buf
                 }
                 pub fn get_total_relation_entry_count(&self) -> usize {
@@ -2141,9 +2396,10 @@ fn test_primitives_simple() {
                 fn emit_graphviz(&self, buf: &mut String) {
                     use std::fmt::Write;
                     for (i, (x0, x1, x2)) in self.all_index_0_1_2.iter().enumerate() {
-                        write!(buf, "{}{i} -> {}{};", "mul", "math", x0).unwrap();
-                        write!(buf, "{}{i} -> {}{};", "mul", "math", x1).unwrap();
-                        write!(buf, "{}{i} -> {}{};", "mul", "math", x2).unwrap();
+                        writeln!(buf, "{}_{i} -> {}_{};", "mul", "math", x0).unwrap();
+                        writeln!(buf, "{}_{i} -> {}_{};", "mul", "math", x1).unwrap();
+                        writeln!(buf, "{}_{i} -> {}_{};", "mul", "math", x2).unwrap();
+                        writeln!(buf, "{}_{i} [shape = box];", "mul").unwrap();
                     }
                 }
                 fn len(&self) -> usize {
@@ -2282,9 +2538,10 @@ fn test_primitives_simple() {
                 fn emit_graphviz(&self, buf: &mut String) {
                     use std::fmt::Write;
                     for (i, (x0, x1, x2)) in self.all_index_0_1_2.iter().enumerate() {
-                        write!(buf, "{}{i} -> {}{};", "add", "math", x0).unwrap();
-                        write!(buf, "{}{i} -> {}{};", "add", "math", x1).unwrap();
-                        write!(buf, "{}{i} -> {}{};", "add", "math", x2).unwrap();
+                        writeln!(buf, "{}_{i} -> {}_{};", "add", "math", x0).unwrap();
+                        writeln!(buf, "{}_{i} -> {}_{};", "add", "math", x1).unwrap();
+                        writeln!(buf, "{}_{i} -> {}_{};", "add", "math", x2).unwrap();
+                        writeln!(buf, "{}_{i} [shape = box];", "add").unwrap();
                     }
                 }
                 fn len(&self) -> usize {
@@ -2393,8 +2650,9 @@ fn test_primitives_simple() {
                 fn emit_graphviz(&self, buf: &mut String) {
                     use std::fmt::Write;
                     for (i, (x0, x1)) in self.all_index_0_1.iter().enumerate() {
-                        write!(buf, "{}{i} -> {}{};", "const", "i64", x0).unwrap();
-                        write!(buf, "{}{i} -> {}{};", "const", "math", x1).unwrap();
+                        writeln!(buf, "{}_{i} -> {}_{};", "const", "i64", x0).unwrap();
+                        writeln!(buf, "{}_{i} -> {}_{};", "const", "math", x1).unwrap();
+                        writeln!(buf, "{}_{i} [shape = box];", "const").unwrap();
                     }
                 }
                 fn len(&self) -> usize {
@@ -2490,8 +2748,9 @@ fn test_primitives_simple() {
                 fn emit_graphviz(&self, buf: &mut String) {
                     use std::fmt::Write;
                     for (i, (x0, x1)) in self.all_index_0_1.iter().enumerate() {
-                        write!(buf, "{}{i} -> {}{};", "var", "string", x0).unwrap();
-                        write!(buf, "{}{i} -> {}{};", "var", "math", x1).unwrap();
+                        writeln!(buf, "{}_{i} -> {}_{};", "var", "string", x0).unwrap();
+                        writeln!(buf, "{}_{i} -> {}_{};", "var", "math", x1).unwrap();
+                        writeln!(buf, "{}_{i} [shape = box];", "var").unwrap();
                     }
                 }
                 fn len(&self) -> usize {
@@ -2662,12 +2921,12 @@ fn test_primitives_simple() {
                 }
                 fn emit_graphviz(&self) -> String {
                     let mut buf = String::new();
-                    buf.push_str("digraph G {");
+                    buf.push_str("digraph G {\n");
                     self.mul_relation.emit_graphviz(&mut buf);
                     self.add_relation.emit_graphviz(&mut buf);
                     self.const_relation.emit_graphviz(&mut buf);
                     self.var_relation.emit_graphviz(&mut buf);
-                    buf.push_str("}");
+                    buf.push_str("}\n");
                     buf
                 }
                 pub fn get_total_relation_entry_count(&self) -> usize {
@@ -2865,8 +3124,9 @@ fn triangle_join() {
                 fn emit_graphviz(&self, buf: &mut String) {
                     use std::fmt::Write;
                     for (i, (x0, x1)) in self.all_index_0_1.iter().enumerate() {
-                        write!(buf, "{}{i} -> {}{};", "foo", "math", x0).unwrap();
-                        write!(buf, "{}{i} -> {}{};", "foo", "math", x1).unwrap();
+                        writeln!(buf, "{}_{i} -> {}_{};", "foo", "math", x0).unwrap();
+                        writeln!(buf, "{}_{i} -> {}_{};", "foo", "math", x1).unwrap();
+                        writeln!(buf, "{}_{i} [shape = box];", "foo").unwrap();
                     }
                 }
                 fn len(&self) -> usize {
@@ -2961,8 +3221,9 @@ fn triangle_join() {
                 fn emit_graphviz(&self, buf: &mut String) {
                     use std::fmt::Write;
                     for (i, (x0, x1)) in self.all_index_0_1.iter().enumerate() {
-                        write!(buf, "{}{i} -> {}{};", "bar", "math", x0).unwrap();
-                        write!(buf, "{}{i} -> {}{};", "bar", "math", x1).unwrap();
+                        writeln!(buf, "{}_{i} -> {}_{};", "bar", "math", x0).unwrap();
+                        writeln!(buf, "{}_{i} -> {}_{};", "bar", "math", x1).unwrap();
+                        writeln!(buf, "{}_{i} [shape = box];", "bar").unwrap();
                     }
                 }
                 fn len(&self) -> usize {
@@ -3065,8 +3326,9 @@ fn triangle_join() {
                 fn emit_graphviz(&self, buf: &mut String) {
                     use std::fmt::Write;
                     for (i, (x0, x1)) in self.all_index_0_1.iter().enumerate() {
-                        write!(buf, "{}{i} -> {}{};", "baz", "math", x0).unwrap();
-                        write!(buf, "{}{i} -> {}{};", "baz", "math", x1).unwrap();
+                        writeln!(buf, "{}_{i} -> {}_{};", "baz", "math", x0).unwrap();
+                        writeln!(buf, "{}_{i} -> {}_{};", "baz", "math", x1).unwrap();
+                        writeln!(buf, "{}_{i} [shape = box];", "baz").unwrap();
                     }
                 }
                 fn len(&self) -> usize {
@@ -3188,9 +3450,10 @@ fn triangle_join() {
                 fn emit_graphviz(&self, buf: &mut String) {
                     use std::fmt::Write;
                     for (i, (x0, x1, x2)) in self.all_index_0_1_2.iter().enumerate() {
-                        write!(buf, "{}{i} -> {}{};", "triangle", "math", x0).unwrap();
-                        write!(buf, "{}{i} -> {}{};", "triangle", "math", x1).unwrap();
-                        write!(buf, "{}{i} -> {}{};", "triangle", "math", x2).unwrap();
+                        writeln!(buf, "{}_{i} -> {}_{};", "triangle", "math", x0).unwrap();
+                        writeln!(buf, "{}_{i} -> {}_{};", "triangle", "math", x1).unwrap();
+                        writeln!(buf, "{}_{i} -> {}_{};", "triangle", "math", x2).unwrap();
+                        writeln!(buf, "{}_{i} [shape = box];", "triangle").unwrap();
                     }
                 }
                 fn len(&self) -> usize {
@@ -3307,12 +3570,12 @@ fn triangle_join() {
                 }
                 fn emit_graphviz(&self) -> String {
                     let mut buf = String::new();
-                    buf.push_str("digraph G {");
+                    buf.push_str("digraph G {\n");
                     self.foo_relation.emit_graphviz(&mut buf);
                     self.bar_relation.emit_graphviz(&mut buf);
                     self.baz_relation.emit_graphviz(&mut buf);
                     self.triangle_relation.emit_graphviz(&mut buf);
-                    buf.push_str("}");
+                    buf.push_str("}\n");
                     buf
                 }
                 pub fn get_total_relation_entry_count(&self) -> usize {
@@ -3558,9 +3821,10 @@ fn edgecase0() {
                 fn emit_graphviz(&self, buf: &mut String) {
                     use std::fmt::Write;
                     for (i, (x0, x1, x2)) in self.all_index_0_1_2.iter().enumerate() {
-                        write!(buf, "{}{i} -> {}{};", "mul", "math", x0).unwrap();
-                        write!(buf, "{}{i} -> {}{};", "mul", "math", x1).unwrap();
-                        write!(buf, "{}{i} -> {}{};", "mul", "math", x2).unwrap();
+                        writeln!(buf, "{}_{i} -> {}_{};", "mul", "math", x0).unwrap();
+                        writeln!(buf, "{}_{i} -> {}_{};", "mul", "math", x1).unwrap();
+                        writeln!(buf, "{}_{i} -> {}_{};", "mul", "math", x2).unwrap();
+                        writeln!(buf, "{}_{i} [shape = box];", "mul").unwrap();
                     }
                 }
                 fn len(&self) -> usize {
@@ -3699,9 +3963,10 @@ fn edgecase0() {
                 fn emit_graphviz(&self, buf: &mut String) {
                     use std::fmt::Write;
                     for (i, (x0, x1, x2)) in self.all_index_0_1_2.iter().enumerate() {
-                        write!(buf, "{}{i} -> {}{};", "add", "math", x0).unwrap();
-                        write!(buf, "{}{i} -> {}{};", "add", "math", x1).unwrap();
-                        write!(buf, "{}{i} -> {}{};", "add", "math", x2).unwrap();
+                        writeln!(buf, "{}_{i} -> {}_{};", "add", "math", x0).unwrap();
+                        writeln!(buf, "{}_{i} -> {}_{};", "add", "math", x1).unwrap();
+                        writeln!(buf, "{}_{i} -> {}_{};", "add", "math", x2).unwrap();
+                        writeln!(buf, "{}_{i} [shape = box];", "add").unwrap();
                     }
                 }
                 fn len(&self) -> usize {
@@ -3812,10 +4077,10 @@ fn edgecase0() {
                 }
                 fn emit_graphviz(&self) -> String {
                     let mut buf = String::new();
-                    buf.push_str("digraph G {");
+                    buf.push_str("digraph G {\n");
                     self.mul_relation.emit_graphviz(&mut buf);
                     self.add_relation.emit_graphviz(&mut buf);
-                    buf.push_str("}");
+                    buf.push_str("}\n");
                     buf
                 }
                 pub fn get_total_relation_entry_count(&self) -> usize {
@@ -4026,9 +4291,10 @@ fn test_into_codegen() {
                 fn emit_graphviz(&self, buf: &mut String) {
                     use std::fmt::Write;
                     for (i, (x0, x1, x2)) in self.all_index_0_1_2.iter().enumerate() {
-                        write!(buf, "{}{i} -> {}{};", "mul", "math", x0).unwrap();
-                        write!(buf, "{}{i} -> {}{};", "mul", "math", x1).unwrap();
-                        write!(buf, "{}{i} -> {}{};", "mul", "math", x2).unwrap();
+                        writeln!(buf, "{}_{i} -> {}_{};", "mul", "math", x0).unwrap();
+                        writeln!(buf, "{}_{i} -> {}_{};", "mul", "math", x1).unwrap();
+                        writeln!(buf, "{}_{i} -> {}_{};", "mul", "math", x2).unwrap();
+                        writeln!(buf, "{}_{i} [shape = box];", "mul").unwrap();
                     }
                 }
                 fn len(&self) -> usize {
@@ -4167,9 +4433,10 @@ fn test_into_codegen() {
                 fn emit_graphviz(&self, buf: &mut String) {
                     use std::fmt::Write;
                     for (i, (x0, x1, x2)) in self.all_index_0_1_2.iter().enumerate() {
-                        write!(buf, "{}{i} -> {}{};", "add", "math", x0).unwrap();
-                        write!(buf, "{}{i} -> {}{};", "add", "math", x1).unwrap();
-                        write!(buf, "{}{i} -> {}{};", "add", "math", x2).unwrap();
+                        writeln!(buf, "{}_{i} -> {}_{};", "add", "math", x0).unwrap();
+                        writeln!(buf, "{}_{i} -> {}_{};", "add", "math", x1).unwrap();
+                        writeln!(buf, "{}_{i} -> {}_{};", "add", "math", x2).unwrap();
+                        writeln!(buf, "{}_{i} [shape = box];", "add").unwrap();
                     }
                 }
                 fn len(&self) -> usize {
@@ -4264,10 +4531,10 @@ fn test_into_codegen() {
                 }
                 fn emit_graphviz(&self) -> String {
                     let mut buf = String::new();
-                    buf.push_str("digraph G {");
+                    buf.push_str("digraph G {\n");
                     self.mul_relation.emit_graphviz(&mut buf);
                     self.add_relation.emit_graphviz(&mut buf);
-                    buf.push_str("}");
+                    buf.push_str("}\n");
                     buf
                 }
                 pub fn get_total_relation_entry_count(&self) -> usize {

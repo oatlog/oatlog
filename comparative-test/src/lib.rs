@@ -186,6 +186,7 @@ macro_rules! egglog_test {
     (allcorrect, $egglog_test_name:ident, $expected:expr, $egglog_test_path:literal $(, limit = $limit:literal)?) => {
         #[test]
         fn $egglog_test_name() {
+            println!("{}", stringify!($egglog_test_name));
             comparative_test!($egglog_test_path, Verdict::AllCorrect, Some($expected) $(, $limit)?);
         }
     };
@@ -193,6 +194,7 @@ macro_rules! egglog_test {
     (zrocorrect, $egglog_test_name:ident, $expected:expr, $egglog_test_path:literal $(, limit = $limit:literal)?) => {
         #[test]
         fn $egglog_test_name() {
+            println!("{}", stringify!($egglog_test_name));
             comparative_test!($egglog_test_path, Verdict::ZeroCorrect, Some($expected) $(, $limit)?);
         }
     };
@@ -200,6 +202,7 @@ macro_rules! egglog_test {
     (mismatched, $egglog_test_name:ident, $expected:expr, $egglog_test_path:literal $(, limit = $limit:literal)?) => {
         #[test]
         fn $egglog_test_name() {
+            println!("{}", stringify!($egglog_test_name));
             comparative_test!($egglog_test_path, Verdict::Mismatched, Some($expected) $(, $limit)?);
         }
     };
@@ -208,6 +211,7 @@ macro_rules! egglog_test {
         #[test]
         #[should_panic(expected = $panic_msg)]
         fn $egglog_test_name() {
+            println!("{}", stringify!($egglog_test_name));
             comparative_test!($egglog_test_path, Verdict::Panics, None $(, $limit)?);
         }
     };
@@ -718,7 +722,21 @@ egglog_test!(nogenerate, math, expect![[r#"
     ( include "comparative-test/egglog-testsuite/math.egg" )
 
 "#]], r#"(include "comparative-test/egglog-testsuite/math.egg")"#);// needs primitive functions
-egglog_test!(nogenerate, math_microbenchmark, expect!["PANIC: assertion failed: !self.is_bound(arg)"], r#"(include "comparative-test/egglog-testsuite/math-microbenchmark.egg")"#);// needs print-stats
+egglog_test!(allcorrect, math_microbenchmark, expect![[r#"
+    Add: 317
+    Const: 5
+    Cos: 1
+    Diff: 41
+    Div: 3
+    Integral: 60
+    Ln: 1
+    Mul: 314
+    Pow: 2
+    Sin: 1
+    Sqrt: 1
+    Sub: 35
+    Var: 3
+"#]], r#"(include "comparative-test/egglog-testsuite/math-microbenchmark.egg")"#, limit = 5);
 egglog_test!(nogenerate, matrix, expect![[r#"
     comparative-test/egglog-testsuite/matrix.egg: function call * is not defined
     *
@@ -1010,9 +1028,12 @@ egglog_test!(nogenerate, repro_should_saturate, expect![[r#"
     ( include "comparative-test/egglog-testsuite/repro-should-saturate.egg" )
 
 "#]], r#"(include "comparative-test/egglog-testsuite/repro-should-saturate.egg")"#);// merge
-egglog_test!(nogenerate, repro_silly_panic, expect!["PANIC: assertion failed: !self.is_bound(arg)"], r#"(include "comparative-test/egglog-testsuite/repro-silly-panic.egg")"#);// fails internal assertions
+egglog_test!(does_panic, repro_silly_panic, expect!["Global variables should have been desugared"], r#"(include "comparative-test/egglog-testsuite/repro-silly-panic.egg")"#);// fails internal assertions
 egglog_test!(nogenerate, repro_typechecking_schedule, expect!["PANIC: index out of bounds: the len is 0 but the index is 0"], r#"(include "comparative-test/egglog-testsuite/repro-typechecking-schedule.egg")"#);// index OOB
-egglog_test!(nogenerate, repro_unsound, expect!["PANIC: assertion failed: !self.is_bound(arg)"], r#"(include "comparative-test/egglog-testsuite/repro-unsound.egg")"#);// fails assert
+egglog_test!(mismatched, repro_unsound, expect![[r#"
+    Div: 8654 (egglog) != 8658 (oatlog)
+    Mul: 2811 (egglog) != 2818 (oatlog)
+"#]], r#"(include "comparative-test/egglog-testsuite/repro-unsound.egg")"#, limit = 3);// fails assert
 egglog_test!(allcorrect, repro_unsound_htutorial, expect![[r#"
     Add: 1
     Div: 0
@@ -1320,7 +1341,7 @@ egglog_test!(valid_tests_compile_ok, should_compile, expect![], "(sort Math)");
 egglog_test!(zrocorrect, permutation_bugs, expect![], "(include \"comparative-test/additional/permutation_bugs.egg\")");
 
 egglog_test!(allcorrect, quadratic, expect![[r#"
-    Add: 11063
+    Add: 504
     Mul: 16
     Sqrt: 1
     Sub: 2
@@ -1350,8 +1371,8 @@ egglog_test!(allcorrect, quadratic, expect![[r#"
 (Add (Add (Mul (Var "x") (Var "x")) (Var "c")) (Add (Mul (Var "b") (Var "x")) (Mul (Var "b") (Var "x"))))
 (Sub (Sqrt (Sub (Mul (Var "b") (Var "b")) (Var "c"))) (Var "b"))
 
-"#);
-// (include \"comparative-test/additional/quadratic.egg\")
+"#, 
+limit = 5);
 
 }
 }

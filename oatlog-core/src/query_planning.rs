@@ -261,25 +261,73 @@ fn generate_tries(
             .collect::<Vec<_>>()
             .leak();
 
-        for (query_ty, premise_relation, bound) in query_plan.iter().rev() {
+        for (query_ty, premise_relation, bound_columns) in query_plan.iter().rev() {
             let relation = premise_relation.relation;
 
             let mut make_index_use = |relation: RelationId| {
                 table_uses[relation].push(
-                    bound
+                    bound_columns
                         .iter_enumerate()
                         .filter_map(|(column, used): (ColumnId, &bool)| (*used).then_some(column))
                         .collect(),
                 )
             };
 
-            let args = premise_relation
+            let args: &mut [VariableId] = premise_relation
                 .args
                 .iter()
                 .copied()
                 .map(|x| premise_to_lir[x])
                 .collect::<Vec<_>>()
                 .leak();
+            match query_ty {
+                Query::CheckViable => (),
+                Query::Iterate => {
+                    // need to transform:
+                    // for (x, x) in .. { .. }
+                    // into
+                    // for (x, y) in .. { if x == y { .. } }
+
+                    let mut to_equate = vec![];
+                    loop {
+                        let mut progress = false;
+                        for i in 0..args.len() {
+                            if bound_columns[ColumnId(i)] {
+                                continue;
+                            }
+                            for j in (i + 1)..args.len() {
+                                if bound_columns[ColumnId(j)] {
+                                    continue;
+                                }
+                                if args[i] != args[j] {
+                                    continue;
+                                }
+                                progress = true;
+                                let to_replace = j;
+                                let var = &lir_variables[args[to_replace]];
+                                let name = format!("internal{to_replace}_{}", var.name);
+                                let new_id = lir_variables.push(lir::VariableData {
+                                    name: name.leak(),
+                                    type_: var.type_,
+                                });
+                                args[to_replace] = new_id;
+                                to_equate.push((i, j));
+                            }
+                        }
+                        if !progress {
+                            break;
+                        }
+                    }
+                    for (a, b) in to_equate {
+                        trie = vec![lir::RuleTrie {
+                            meta: None,
+                            atom: lir::RuleAtom::IfEq(args[a], args[b]),
+                            then: trie,
+                        }]
+                        .leak();
+                    }
+                }
+            }
             let atom = match (query_ty, theory.relations[relation].ty.clone()) {
                 (Query::CheckViable, RelationTy::NewOf { id: _ }) => {
                     panic!("does not make sense")

@@ -331,9 +331,9 @@ pub fn codegen(theory: &Theory) -> TokenStream {
             pub fn apply_rules(&mut self) { #rule_contents }
             fn emit_graphviz(&self) -> String {
                 let mut buf = String::new();
-                buf.push_str("digraph G {");
+                buf.push_str("digraph G {\n");
                 #(self.#stored_relations.emit_graphviz(&mut buf);)*
-                buf.push_str("}");
+                buf.push_str("}\n");
                 buf
             }
             pub fn get_total_relation_entry_count(&self) -> usize {
@@ -404,6 +404,16 @@ impl CodegenRuleTrieCtx<'_> {
     }
     fn codegen(&mut self, RuleTrie { meta, atom, then }: RuleTrie) -> TokenStream {
         let content = match atom {
+            RuleAtom::IfEq(a, b) => {
+                let inner = self.codegen_all(then, true);
+                let a = ident::var_var(self.var_of(a));
+                let b = ident::var_var(self.var_of(b));
+                quote! {
+                    if #a == #b {
+                        #inner
+                    }
+                }
+            }
             RuleAtom::Forall { variable: x, new } => {
                 assert!(new, "forall is only supported to iterate new");
 
@@ -1233,7 +1243,8 @@ fn codegen_relation(
                     fn emit_graphviz(&self, buf: &mut String) {
                         use std::fmt::Write;
                         for (i, (#(#first_index_order,)*)) in self.#first_index_ident.iter().enumerate() {
-                            #(write!(buf, "{}{i} -> {}{};", #relation_name, #column_types, #first_index_order).unwrap();)*
+                            #(writeln!(buf, "{}_{i} -> {}_{};", #relation_name, #column_types, #first_index_order).unwrap();)*
+                            writeln!(buf, "{}_{i} [shape = box];", #relation_name).unwrap();
                         }
                     }
                 }
