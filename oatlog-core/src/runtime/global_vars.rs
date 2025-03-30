@@ -7,6 +7,7 @@ pub struct GlobalVars<T>(Vec<GlobalVar<T>>);
 struct GlobalVar<T> {
     val: T,
     new: bool,
+    // TODO: should we be checking this when we want to know if we are saturated?
     next: Option<T>,
 }
 

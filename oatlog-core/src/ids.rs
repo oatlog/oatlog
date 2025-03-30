@@ -1,9 +1,6 @@
 //! Typed ids
 
-use std::{
-    fmt::{Debug, Display},
-    hash::Hash,
-};
+use std::{fmt::Debug, hash::Hash};
 
 /// Marks that the type acts like an usize
 pub(crate) trait Id:
@@ -29,12 +26,12 @@ macro_rules! id_wrap {
                 x
             }
         }
-        impl Debug for $i {
+        impl std::fmt::Debug for $i {
             fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
                 write!(f, "{self}")
             }
         }
-        impl Display for $i {
+        impl std::fmt::Display for $i {
             fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
                 if self.0 == usize::MAX {
                     write!(f, "{}_bogus", $dbg_prefix)

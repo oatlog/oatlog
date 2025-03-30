@@ -58,6 +58,11 @@ impl<T: Eclass> UnionFind<T> {
     pub fn find(&mut self, t: T) -> T {
         T::new(self.find_inner(t.inner()))
     }
+    /// Sugar
+    #[inline]
+    pub fn is_root(&mut self, t: T) -> bool {
+        self.find(t) == t
+    }
     #[inline]
     fn find_inner(&mut self, i: u32) -> u32 {
         if self.repr[i as usize] == i {

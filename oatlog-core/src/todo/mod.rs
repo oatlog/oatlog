@@ -26,3 +26,4 @@
 mod todo_join;
 mod todo_mathset;
 mod todo_scratch;
+mod todo_seminaive;
