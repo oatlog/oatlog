@@ -48,40 +48,40 @@ Let's verify that this is a solution!
 
 fn run() {
     let mut theory = Theory::new();
-    let x = theory.uf.math_uf.add_eclass();
-    let b = theory.uf.math_uf.add_eclass();
-    let c = theory.uf.math_uf.add_eclass();
+    let x = theory.make();
+    let b = theory.make();
+    let c = theory.make();
     println!("{}", HEADER);
 
     // b^2
-    let b2 = theory.uf.math_uf.add_eclass();
+    let b2 = theory.make();
     theory.insert_mul((b, b, b2));
     // b^2 - c
-    let b2_minus_c = theory.uf.math_uf.add_eclass();
+    let b2_minus_c = theory.make();
     theory.insert_sub((b2, c, b2_minus_c));
     // sqrt(b^2 - c)
-    let sqrt_b2_minus_c = theory.uf.math_uf.add_eclass();
+    let sqrt_b2_minus_c = theory.make();
     theory.insert_sqrt((b2_minus_c, sqrt_b2_minus_c));
     // x = sqrt(b^2 - c) - b
     theory.insert_sub((sqrt_b2_minus_c, b, x));
 
     // x^2
-    let x2 = theory.uf.math_uf.add_eclass();
+    let x2 = theory.make();
     theory.insert_mul((x, x, x2));
     // bx
-    let bx = theory.uf.math_uf.add_eclass();
+    let bx = theory.make();
     theory.insert_mul((b, x, bx));
     // 2bx
-    let two_bx = theory.uf.math_uf.add_eclass();
+    let two_bx = theory.make();
     theory.insert_add((bx, bx, two_bx));
     // x^2 + 2bx
-    let x2_2bx = theory.uf.math_uf.add_eclass();
+    let x2_2bx = theory.make();
     theory.insert_add((x2, two_bx, x2_2bx));
     // t = x^2 + 2bx + c
-    let t = theory.uf.math_uf.add_eclass();
+    let t = theory.make();
     theory.insert_add((x2_2bx, c, t));
 
-    let zero = theory.uf.math_uf.add_eclass();
+    let zero = theory.make();
     theory.insert_zero((zero,));
 
     const ITERS: usize = 100;
@@ -102,7 +102,7 @@ fn run() {
         let size = theory.get_total_relation_entry_count();
         println!("i={i} size={size}");
 
-        if theory.uf.math_uf.are_equal(zero, t) {
+        if theory.are_equal(zero, t) {
             println!("\nVerified!");
             return;
         }

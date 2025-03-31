@@ -240,39 +240,39 @@ fn run() {
     ));
 
     let mut theory = Theory::new();
-    let x = theory.uf.math_uf.add_eclass();
-    let b = theory.uf.math_uf.add_eclass();
-    let c = theory.uf.math_uf.add_eclass();
+    let x = theory.make();
+    let b = theory.make();
+    let c = theory.make();
 
     // b^2
-    let b2 = theory.uf.math_uf.add_eclass();
+    let b2 = theory.make();
     theory.insert_mul((b, b, b2));
     // b^2 - c
-    let b2_minus_c = theory.uf.math_uf.add_eclass();
+    let b2_minus_c = theory.make();
     theory.insert_sub((b2, c, b2_minus_c));
     // sqrt(b^2 - c)
-    let sqrt_b2_minus_c = theory.uf.math_uf.add_eclass();
+    let sqrt_b2_minus_c = theory.make();
     theory.insert_sqrt((b2_minus_c, sqrt_b2_minus_c));
     // x = sqrt(b^2 - c) - b
     theory.insert_sub((sqrt_b2_minus_c, b, x));
 
     // x^2
-    let x2 = theory.uf.math_uf.add_eclass();
+    let x2 = theory.make();
     theory.insert_mul((x, x, x2));
     // bx
-    let bx = theory.uf.math_uf.add_eclass();
+    let bx = theory.make();
     theory.insert_mul((b, x, bx));
     // 2bx
-    let two_bx = theory.uf.math_uf.add_eclass();
+    let two_bx = theory.make();
     theory.insert_add((bx, bx, two_bx));
     // x^2 + 2bx
-    let x2_2bx = theory.uf.math_uf.add_eclass();
+    let x2_2bx = theory.make();
     theory.insert_add((x2, two_bx, x2_2bx));
     // t = x^2 + 2bx + c
-    let t = theory.uf.math_uf.add_eclass();
+    let t = theory.make();
     theory.insert_add((x2_2bx, c, t));
 
-    let zero = theory.uf.math_uf.add_eclass();
+    let zero = theory.make();
     theory.insert_zero((zero,));
 
     const ITERS: usize = 100;
@@ -294,8 +294,8 @@ fn run() {
         let size = theory.get_total_relation_entry_count();
         println!("i={i} size={size}");
 
-        if theory.uf.math_uf.are_equal(zero, t) {
-            assert!(!theory.uf.math_uf.are_equal(b, c));
+        if theory.are_equal(zero, t) {
+            assert!(!theory.are_equal(b, c));
 
             println!("\nVerified!");
             verified = true;
@@ -345,20 +345,20 @@ fn test_basic_rewrite() {
     ));
     let mut theory = Theory::new();
 
-    let x = theory.uf.math_uf.add_eclass();
-    let y = theory.uf.math_uf.add_eclass();
-    let a = theory.uf.math_uf.add_eclass();
-    let b = theory.uf.math_uf.add_eclass();
+    let x = theory.make();
+    let y = theory.make();
+    let a = theory.make();
+    let b = theory.make();
 
     // x = a + b
     // y = b + a
     theory.insert_add((a, b, x));
     theory.insert_add((b, a, y));
 
-    assert!(!theory.uf.math_uf.are_equal(x, y));
+    assert!(!theory.are_equal(x, y));
 
     theory.step();
     theory.step();
 
-    assert!(theory.uf.math_uf.are_equal(x, y));
+    assert!(theory.are_equal(x, y));
 }

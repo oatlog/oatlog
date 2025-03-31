@@ -46,6 +46,12 @@ pub trait EclassProvider<T: Eclass> {
     fn make(&mut self) -> T;
     fn find(&mut self, t: T) -> T;
     fn union(&mut self, a: T, b: T);
+    fn is_root(&mut self, t: T) -> bool {
+        self.find(t) == t
+    }
+    fn are_equal(&mut self, a: T, b: T) -> bool {
+        self.find(a) == self.find(b)
+    }
 }
 
 #[macro_export]

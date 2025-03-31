@@ -108,7 +108,7 @@ pub fn codegen(theory: &Theory) -> TokenStream {
         .types
         .iter()
         .filter_map(|ty| match ty.kind {
-            TypeKind::Symbolic => Some((ident::type_uf(ty), ident::type_ty_uf(ty))),
+            TypeKind::Symbolic => Some((ident::type_uf(ty), ident::type_ty(ty))),
             TypeKind::Primitive { type_path: _ } => None,
         })
         .multiunzip();
@@ -283,7 +283,7 @@ pub fn codegen(theory: &Theory) -> TokenStream {
         #delta
         #[derive(Debug, Default)]
         struct Unification {
-            #(pub #uf_ident: #uf_ty,)*
+            #(pub #uf_ident: UnionFind<#uf_ty>,)*
         }
         impl Unification {
             fn has_new_uproots(&mut self) -> bool {
@@ -298,8 +298,8 @@ pub fn codegen(theory: &Theory) -> TokenStream {
         #[derive(Debug, Default)]
         pub struct #theory_ty {
             pub delta: #theory_delta_ty,
-            #(#global_variable_fields)*
             pub uf: Unification,
+            #(#global_variable_fields)*
             #(pub #stored_relations: #stored_relation_types,)*
         }
         impl #theory_ty {
@@ -351,6 +351,14 @@ pub fn codegen(theory: &Theory) -> TokenStream {
             }
             #canonicalize
         }
+
+        #(
+            impl EclassProvider<#uf_ty> for #theory_ty {
+                fn make(&mut self) -> #uf_ty { self.uf.#uf_ident.add_eclass() }
+                fn find(&mut self, t: #uf_ty) -> #uf_ty { self.uf.#uf_ident.find(t) }
+                fn union(&mut self, a: #uf_ty, b: #uf_ty) { self.uf.#uf_ident.union(a, b); }
+            }
+        )*
 
         // make insert functions "for free"
         impl std::ops::Deref for #theory_ty {
@@ -1311,9 +1319,9 @@ mod ident {
     pub fn type_global(ty: &TypeData) -> Ident {
         format_ident!("global_{}", ty.name.to_snake_case())
     }
-    /// `math_uf`
+    /// `math_`
     pub fn type_uf(ty: &TypeData) -> Ident {
-        format_ident!("{}_uf", ty.name.to_snake_case())
+        format_ident!("{}_", ty.name.to_snake_case())
     }
     /// `UnionFind<Math>`
     pub fn type_ty_uf(ty: &TypeData) -> TokenStream {
@@ -1324,9 +1332,9 @@ mod ident {
     pub fn rel_ty(rel: &RelationData) -> Ident {
         format_ident!("{}Relation", rel.name.to_pascal_case())
     }
-    /// `add_relation`
+    /// `add_`
     pub fn rel_var(rel: &RelationData) -> Ident {
-        format_ident!("{}_relation", rel.name.to_snake_case())
+        format_ident!("{}_", rel.name.to_snake_case())
     }
     /// `add`, `mul`
     pub fn rel_get(rel: &RelationData) -> Ident {
@@ -1399,10 +1407,10 @@ mod ident {
     pub fn column_alt(c: ColumnId) -> Ident {
         format_ident!("y{}", c.0)
     }
-    /// `add_relation_delta`
+    /// `add_`
     pub fn delta_row(rel: &RelationData) -> Ident {
         let x = rel.name.to_snake_case();
-        format_ident!("{x}_relation_delta")
+        format_ident!("{x}_")
     }
     /// `insert_add`
     pub fn delta_insert_row(rel: &RelationData) -> Ident {

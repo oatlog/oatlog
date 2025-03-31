@@ -14,26 +14,6 @@ mod test {
             (rewrite (Add a b) (Add b a))
         ));
 
-        // pub trait EclassProvider<T: Eclass> {
-        //     fn make(&mut self) -> T;
-        //     fn find(&mut self, t: T) -> T;
-        //     fn union(&mut self, a: T, b: T);
-        // }
-
-        impl EclassProvider<Math> for Theory {
-            fn make(&mut self) -> Math {
-                self.uf.math_uf.add_eclass()
-            }
-
-            fn find(&mut self, t: Math) -> Math {
-                self.uf.math_uf.find(t)
-            }
-
-            fn union(&mut self, a: Math, b: Math) {
-                self.uf.math_uf.union(a, b);
-            }
-        }
-
         #[test]
         fn test_implicit_functionality() {
             let mut theory = Theory::new();
