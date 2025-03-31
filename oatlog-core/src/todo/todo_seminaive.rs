@@ -359,10 +359,7 @@ impl LowerBoundRelation {
     }
 }
 
-
-
 decl_row!(Row3_0<T0 first 0, T1, T2> (T0 0) (T1 1, T2 2));
-
 
 // NOTE: it is actually fine for all indexes to have a lattice variable if we do this:
 // (a, b) -> (lattice)
@@ -417,8 +414,8 @@ impl UpperBoundRelation {
 
         self.all_index_0_1
             .insert_many(&mut inserts, |mut old, mut new| {
-                let (x1,x2) = old.value_mut();
-                let (y1,y2) = new.value_mut();
+                let (x1, x2) = old.value_mut();
+                let (y1, y2) = new.value_mut();
                 if *x1 != *y1 {
                     *x1 = i64::max(*x1, *y1);
                     // TODO: handle timestamp, should this go to new?
