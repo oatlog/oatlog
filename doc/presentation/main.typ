@@ -24,9 +24,23 @@
 
 == Phase ordering
 
+- Compiler passes don't commute.
+    - $f(g(x)) != g(f(x))$
+- Need to iterate until fixpoint
+- Don't reach global optima.
+- Passes must improve the code in all cases.
+- Makes compiler engineer sad.
+
 #TODO[]
 
 = E-graphs
+
+== E-graphs
+
+- Apply rewrites and keep both versions.
+- Reach global optima.
+- Passes don't need to improve the code.
+- Slow.
 
 = Demo!
 
