@@ -5,14 +5,14 @@ use crate::runtime::RelationElement;
 pub trait PreReqs: Copy + Eq + Ord + Default + std::fmt::Debug {}
 impl<T: Copy + Eq + Ord + Default + std::fmt::Debug> PreReqs for T {}
 
-/// `Eq` and `Ord` consider only `key`.
 /// Implemented lazily, otherwise `O^*(n!)` implementations would be needed.
-pub trait IndexRow: PreReqs {
-    /// The actual memory representation
-    /// `Self` needs to be `repr(transparent)` of `Inner`.
-    /// (typically?) the same as `Relation::Row`.
-    type Inner: PreReqs;
-    /// For `Eq` and `Ord`
+/// SAFETY: `Self` is `repr(transparent)` around `Self::Repr`.
+#[allow(unsafe_code)]
+pub unsafe trait IndexRow: PreReqs {
+    /// The memory representation.
+    /// Contains Key, Value in some permutation.
+    type Repr: PreReqs;
+    /// The "primary key" for this index.
     type Key: PreReqs;
     type Value: PreReqs;
     type ValueMut<'a>: Eq + Ord
@@ -21,11 +21,39 @@ pub trait IndexRow: PreReqs {
     /// The first column in the index. Uproots are allowed by the first index.
     type FirstColumn: PreReqs + RelationElement;
 
-    fn inner_slice<'a>(slice: &'a [Self]) -> &'a [Self::Inner];
-    fn from_inner_slice_mut<'a>(slice: &'a mut [Self::Inner]) -> &'a mut [Self];
+    fn inner_slice<'a>(slice: &'a [Self]) -> &'a [Self::Repr] {
+        use std::alloc::Layout;
+        assert_eq!(Layout::new::<Self>(), Layout::new::<Self::Repr>());
 
-    fn new(inner: Self::Inner) -> Self;
-    fn inner(self) -> Self::Inner;
+        // SAFETY: `Self` is `repr(transparent)` around `Self::Inner`.
+        #[allow(unsafe_code)]
+        unsafe {
+            let slice: &'a [Self] = slice;
+            let ptr: *const Self = slice.as_ptr();
+            let len = slice.len();
+            let ptr: *const Self::Repr = ptr as _;
+            let ret: &'a [Self::Repr] = std::slice::from_raw_parts(ptr, len);
+            ret
+        }
+    }
+
+    fn from_inner_slice_mut<'a>(slice: &'a mut [Self::Repr]) -> &'a mut [Self] {
+        use std::alloc::Layout;
+        assert_eq!(Layout::new::<Self>(), Layout::new::<Self::Repr>());
+
+        // SAFETY: `Self` is `repr(transparent)` around `Self::Inner`.
+        unsafe {
+            let slice: &'a mut [Self::Repr] = slice;
+            let ptr: *mut Self::Repr = slice.as_mut_ptr();
+            let len = slice.len();
+            let ptr: *mut Self = ptr as _;
+            let ret: &'a mut [Self] = std::slice::from_raw_parts_mut(ptr, len);
+            ret
+        }
+    }
+
+    fn new(inner: Self::Repr) -> Self;
+    fn inner(self) -> Self::Repr;
     fn key(self) -> Self::Key;
     fn value(self) -> Self::Value;
     fn value_mut<'a>(&'a mut self) -> Self::ValueMut<'a>;
@@ -34,116 +62,117 @@ pub trait IndexRow: PreReqs {
     fn first_col(self) -> Self::FirstColumn;
 }
 
+// FC = First Column
+//
+//                first column     key columns   key types    first column key, type
+//                       vvvvv           vvvv       vvvvvv             v   vv
+// decl_row!(Row3_0_1<T0 first, T1, T2> (0, 1) (2) (T0, T1) (T2) fc = (0) (T0));
+//           ^^^^^^^^^^^^^^^^^^^^^^^^^^         ^            ^^
+//                generated type        value columns     value types
+//
+
+// old syntax
+// decl_row!(Row3_0_1<T0 first 0, T1, T2> (0, 1) (2) (T0, T1) (T2) fc = (0) (T0));
+//
+// new syntax
+// decl_row!(Row3_0_1<T0 first 0, T1, T2> (T0 0, T1 1) (T2 2));
+
 #[macro_export]
 macro_rules! decl_row {
-    // Helper macros kept inline to not need additional exported macros
-    (impl radixable for $name:ident<$($t_inner:ident),+>) => {};
-    (impl radixable for $name:ident<$($t_inner:ident),+> where $radix_key:ident = $inner:ident => $radix_impl:expr) => {
-        impl<$($t_inner : Eclass),*> $crate::runtime::Radixable<$radix_key> for $name<$($t_inner),*> {
+    (radix_impl $row_ty:ident ($($repr_ty:ident),*)) => {};
+    (radix_impl $row_ty:ident ($($repr_ty:ident),*) $radix_key:ident $inner:ident $radix_impl:expr) => {
+        impl<$($repr_ty : Eclass),*> $crate::runtime::Radixable<$radix_key> for $row_ty<$($repr_ty),*> {
             type Key = $radix_key;
-            fn key(&self) -> $radix_key {
+            fn key(&self) -> Self::Key {
                 let $inner = self.inner;
                 $radix_impl
             }
         }
     };
-    (MIN $t_inner:ident $fc:expr) => {
-        <$t_inner as RelationElement>::MIN_ID
+
+    (first_col $repr_ty:tt) => {};
+    (first_col $repr_ty:tt $repr_i:tt) => {
+        type FirstColumn = $repr_ty;
+        fn first_col(self) -> Self::FirstColumn {
+            self.inner.$repr_i
+        }
     };
-    (MAX $t_inner:ident $fc:expr) => {
-        <$t_inner as RelationElement>::MAX_ID
-    };
-    ($minmax:ident $t_inner:ident $first:ident $fc:expr) => {
-        $fc
-    };
-    /////
+
+    (minmax $minmax:ident $repr_ty:ident $fc:ident) => { <$repr_ty as RelationElement>::$minmax };
+    (minmax $minmax:ident $repr_ty:ident $fc:ident $repr_i:tt) => { $fc };
+
+    // convert to new syntax
     (
         $(#[$($annotations:tt)*])*
-        $name:ident<$($t_inner:ident $($first:ident)?),+>
-        ($($key:tt),*) ($($value:tt),*)
-        ($($key_t:tt),*) ($($value_t:tt),*)
+        $row_ty:ident<$($repr_ty:ident $(first $repr_i:tt)?),*>
+        ($($key_i:tt),*) ($($value_i:tt),*)
+        ($($key_ty:tt),*) ($($value_ty:tt),*)
         fc=($fci:tt) ($fci_t:tt)
+        $(where $radix_key:ident = $inner:ident => $radix_impl:expr)?
+    ) => {
+        decl_row! {
+            $(#[$($annotations)*])*
+            $row_ty<$($repr_ty $(first $repr_i)?),*>
+            ($($key_ty $key_i),*) ($($value_ty $value_i),*)
+            $(where $radix_key = $inner => $radix_impl)?
+        }
+    };
+
+    (
+        $(#[$($annotations:tt)*])*
+        $row_ty:ident<$($repr_ty:ident $(first $repr_i:tt)?),*>
+        ($($key_ty:tt $key_i:tt),*) ($($value_ty:tt $value_i:tt),*)
         $(where $radix_key:ident = $inner:ident => $radix_impl:expr)?
     ) => {
         $(#[$($annotations)*])*
         #[derive(Clone, Copy, PartialEq, Eq, Default, Debug)]
         #[repr(transparent)]
-        pub struct $name<$($t_inner : RelationElement),*> {
-            inner: ($($t_inner,)*)
+        pub struct $row_ty<$($repr_ty : RelationElement),*> {
+            inner: ($($repr_ty,)*)
         }
 
+        /// SAFETY: `Self` is `repr(transparent)` around `Self::Repr`.
         #[allow(unsafe_code)]
-        impl<$($t_inner : RelationElement),*> IndexRow for $name<$($t_inner),*> {
-            type Inner = ($($t_inner,)*);
-            type Key = ($($key_t,)*);
-            type Value = ($($value_t,)*);
-            type ValueMut<'a> = ($(&'a mut $value_t,)*) where Self: 'a;
-            type FirstColumn = $fci_t;
+        unsafe impl<$($repr_ty : RelationElement),*> IndexRow for $row_ty<$($repr_ty),*> {
+            type Repr = ($($repr_ty,)*);
+            type Key = ($($key_ty,)*);
+            type Value = ($($value_ty,)*);
+            type ValueMut<'a> = ($(&'a mut $value_ty,)*) where Self: 'a;
 
-            fn inner_slice<'a>(slice: &'a [Self]) -> &'a [Self::Inner] {
-                use std::alloc::Layout;
-                assert_eq!(Layout::new::<Self>(), Layout::new::<Self::Inner>());
-
-                // SAFETY: `Self` is `repr(transparent)` around `Self::Inner`.
-                unsafe {
-                    let slice: &'a [Self] = slice;
-                    let ptr: *const Self = slice.as_ptr();
-                    let len = slice.len();
-                    let ptr: *const Self::Inner = ptr as _;
-                    let ret: &'a [Self::Inner] = std::slice::from_raw_parts(ptr, len);
-                    ret
-                }
-            }
-            fn from_inner_slice_mut<'a>(slice: &'a mut [Self::Inner]) -> &'a mut [Self] {
-                use std::alloc::Layout;
-                assert_eq!(Layout::new::<Self>(), Layout::new::<Self::Inner>());
-
-                // SAFETY: `Self` is `repr(transparent)` around `Self::Inner`.
-                unsafe {
-                    let slice: &'a mut [Self::Inner] = slice;
-                    let ptr: *mut Self::Inner = slice.as_mut_ptr();
-                    let len = slice.len();
-                    let ptr: *mut Self = ptr as _;
-                    let ret: &'a mut [Self] = std::slice::from_raw_parts_mut(ptr, len);
-                    ret
-                }
-            }
-
-            fn new(inner: Self::Inner) -> Self {
+            fn new(inner: Self::Repr) -> Self {
                 Self { inner }
             }
-            fn inner(self) -> Self::Inner {
+            fn inner(self) -> Self::Repr {
                 self.inner
             }
             fn key(self) -> Self::Key {
-                ($(self.inner.$key,)*)
+                ($(self.inner.$key_i,)*)
             }
             fn value(self) -> Self::Value {
-                ($(self.inner.$value,)*)
+                ($(self.inner.$value_i,)*)
             }
             fn value_mut<'a>(&'a mut self) -> Self::ValueMut<'a> {
-                ($(&mut self.inner.$value,)*)
+                ($(&mut self.inner.$value_i,)*)
             }
-            #[allow(unused, reason="false positive due to macros")]
+            #[allow(unused_variables, reason="false positive due to macros")]
             fn col_val_range(fc: Self::FirstColumn) -> std::ops::RangeInclusive<Self> {
                 Self{inner:(
-                    $(decl_row!(MIN $t_inner $($first)? fc),)+
+                    $(decl_row!(minmax MIN_ID $repr_ty fc $($repr_i)?),)+
                 )}..=Self{inner:(
-                    $(decl_row!(MAX $t_inner $($first)? fc),)+
+                    $(decl_row!(minmax MAX_ID $repr_ty fc $($repr_i)?),)+
                 )}
             }
-            fn first_col(self) -> Self::FirstColumn {
-                self.inner.$fci
-            }
+            $(decl_row!(first_col $repr_ty $($repr_i)?);)*
         }
-        decl_row!(impl radixable for $name<$($t_inner),*> $(where $radix_key = $inner => $radix_impl)?);
-        impl<$($t_inner : RelationElement),*> Ord for $name<$($t_inner),*> {
+        decl_row!(radix_impl $row_ty ($($repr_ty),*) $($radix_key $inner $radix_impl)?);
+
+        impl<$($repr_ty : RelationElement),*> Ord for $row_ty<$($repr_ty),*> {
             fn cmp(&self, other: &Self) -> std::cmp::Ordering {
-                let permuted_inner = |s: &Self| ($(s.inner.$key,)* $(s.inner.$value,)*);
+                let permuted_inner = |s: &Self| ($(s.inner.$key_i,)* $(s.inner.$value_i,)*);
                 Ord::cmp(&permuted_inner(self), &permuted_inner(other))
             }
         }
-        impl<$($t_inner : RelationElement),*> PartialOrd for $name<$($t_inner),*> {
+        impl<$($repr_ty : RelationElement),*> PartialOrd for $row_ty<$($repr_ty),*> {
             fn partial_cmp(&self, other: &Self) -> Option<std::cmp::Ordering> {
                 Some(self.cmp(other))
             }

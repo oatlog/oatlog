@@ -3,6 +3,7 @@
 
 use crate::ids::*;
 use crate::runtime::UnionFind;
+use crate::runtime::*;
 use crate::typed_vec::*;
 use crate::{
     eclass_wrapper_ty, relation_element_wrapper_ty,
@@ -53,20 +54,19 @@ impl PhiRuleState {
             // ...
         }
     }
-    fn min(x: impl Iterator<Item = Self>) -> Self {
-        fn min(a: Option<TimeStamp>, b: Option<TimeStamp>) -> Option<TimeStamp> {
+    fn merge_min(a: PhiRuleState, b: PhiRuleState) -> PhiRuleState {
+        fn merge(a: Option<TimeStamp>, b: Option<TimeStamp>) -> Option<TimeStamp> {
             match (a, b) {
                 (None, None) => None,
                 (None, Some(x)) | (Some(x), None) => Some(x),
                 (Some(a), Some(b)) => Some(a.min(b)),
             }
         }
-        x.reduce(|a, b| Self {
-            add_: min(a.add_, b.add_),
-            mul_: min(a.mul_, b.mul_),
-            const_: min(a.const_, b.const_),
-        })
-        .unwrap_or(Default::default())
+        Self {
+            add_: merge(a.add_, b.add_),
+            mul_: merge(a.mul_, b.mul_),
+            const_: merge(a.const_, b.const_),
+        }
     }
     fn bump_to(self, set_to: TimeStamp) -> Self {
         let Self { add_, mul_, const_ } = self;
@@ -123,7 +123,13 @@ impl Theory {
     // remove outdated rows from the new that will be read.
     fn strip_stale(&mut self, phi_rules: &[usize]) {
         // the oldest timestams that will be read.
-        let lower_bound = PhiRuleState::min(phi_rules.iter().copied().map(|x| self.rule_states[x]));
+        let lower_bound = phi_rules
+            .iter()
+            .copied()
+            .map(|x| self.rule_states[x])
+            .reduce(PhiRuleState::merge_min)
+            .unwrap();
+
         if let Some(starting_at) = lower_bound.add_ {
             self.relations.add_.strip_stale(&mut self.uf, starting_at);
         }
@@ -150,7 +156,12 @@ impl Theory {
     }
     // if needed we can remove outdated rows from new.
     fn gc_old_timestams(&mut self) {
-        let lowest_valid = PhiRuleState::min(self.rule_states.iter().copied());
+        let lowest_valid = self
+            .rule_states
+            .iter()
+            .copied()
+            .reduce(PhiRuleState::merge_min)
+            .unwrap();
         if let Some(starting_at) = lowest_valid.add_ {
             self.relations.add_.gc(starting_at);
         }
@@ -177,8 +188,22 @@ impl Delta {
         !self.add_.is_empty()
     }
 }
+// just to make the code easier to read in scratch
+#[derive(Copy, Clone)]
+struct MulRow {
+    a: Math,
+    b: Math,
+    res: Math,
+    timestamp: TimeStamp,
+}
 
-// just to make it easier to read in scratch.
+impl HasTimeStamp for MulRow {
+    fn timestamp(&self) -> TimeStamp {
+        self.timestamp
+    }
+}
+
+// just to make the code easier to read in scratch
 #[derive(Copy, Clone)]
 struct AddRow {
     a: Math,
@@ -249,4 +274,27 @@ impl MulRelation {
     fn strip_stale(&mut self, uf: /* only find */ &mut Unification, starting_at: TimeStamp) {
         todo!()
     }
+}
+
+mod scratch {
+    use super::*;
+
+    // just to check if we accidentally had type errors here.
+    eclass_wrapper_ty!(MathA);
+    eclass_wrapper_ty!(MathB);
+    eclass_wrapper_ty!(MathRes);
+
+    decl_row!(Row3_0_1<T0 first 0, T1, T2> (T0 0, T1 1) (T2 2));
+
+    // timestamp is always part of the "value" part and merge just takes the largest timestamp.
+
+    // struct Relation {
+    //     new: Vec<<Self as Relation>::Row>,
+    //     all_index_0_1_2: IndexImpl<RadixSortCtx<Row3_0_1<Foo, Foo, Foo, TimeStamp>, u128>>,
+    //     all_index_1_0_2: IndexImpl<RadixSortCtx<Row3_1_0_2<Foo, Foo, Foo, TimeStamp>, u128>>,
+    //     all_index_2_0_1: IndexImpl<RadixSortCtx<Row3_2_0_1<Foo, Foo, Foo, TimeStamp>, u128>>,
+    // }
+    // impl Relation for SameRelation {
+    //     type Row = (Math, Math, Math, TimeStamp);
+    // }
 }

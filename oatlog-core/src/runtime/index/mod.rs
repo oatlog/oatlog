@@ -12,13 +12,13 @@ pub trait Index {
 
     fn new() -> Self;
     fn len(&self) -> usize;
-    fn iter(&self) -> impl Iterator<Item = <Self::Row as IndexRow>::Inner>;
+    fn iter(&self) -> impl Iterator<Item = <Self::Row as IndexRow>::Repr>;
 
     /// Iterate through a range.
     fn range(
         &self,
-        r: RangeInclusive<<Self::Row as IndexRow>::Inner>,
-    ) -> impl Iterator<Item = <Self::Row as IndexRow>::Inner>;
+        r: RangeInclusive<<Self::Row as IndexRow>::Repr>,
+    ) -> impl Iterator<Item = <Self::Row as IndexRow>::Repr>;
 
     /// Find all rows with `uproots` value in the first column.
     ///
@@ -27,11 +27,11 @@ pub trait Index {
     fn first_column_uproots(
         &mut self,
         uproots: &[<Self::Row as IndexRow>::FirstColumn],
-        on_delete: impl FnMut(&[<Self::Row as IndexRow>::Inner]),
+        on_delete: impl FnMut(&[<Self::Row as IndexRow>::Repr]),
     );
 
     /// Delete rows exactly matching `deletions`.
-    fn delete_many(&mut self, deletions: &mut [<Self::Row as IndexRow>::Inner]);
+    fn delete_many(&mut self, deletions: &mut [<Self::Row as IndexRow>::Repr]);
 
     /// Insert rows on unique keys, performing `merge` on multiple values with identical keys.
     ///
@@ -40,12 +40,12 @@ pub trait Index {
     /// - Delete `merge`-eliminated rows from `insertions`.
     fn insert_many(
         &mut self,
-        insertions: &mut Vec<<Self::Row as IndexRow>::Inner>,
+        insertions: &mut Vec<<Self::Row as IndexRow>::Repr>,
         merge: impl FnMut(Self::Row, Self::Row) -> Self::Row,
     );
 
     #[cfg(test)]
-    fn contents_sorted(&self) -> Vec<<Self::Row as IndexRow>::Inner> {
+    fn contents_sorted(&self) -> Vec<<Self::Row as IndexRow>::Repr> {
         let mut contents: Vec<_> = self.iter().collect();
         contents.sort();
         contents
@@ -98,14 +98,14 @@ impl<RC: RowCtx> Index for BTreeSetIndex<RC> {
     fn len(&self) -> usize {
         self.0.len()
     }
-    fn iter(&self) -> impl Iterator<Item = <Self::Row as IndexRow>::Inner> {
+    fn iter(&self) -> impl Iterator<Item = <Self::Row as IndexRow>::Repr> {
         self.0.iter().map(|r| r.inner())
     }
 
     fn range(
         &self,
-        r: RangeInclusive<<Self::Row as IndexRow>::Inner>,
-    ) -> impl Iterator<Item = <Self::Row as IndexRow>::Inner> {
+        r: RangeInclusive<<Self::Row as IndexRow>::Repr>,
+    ) -> impl Iterator<Item = <Self::Row as IndexRow>::Repr> {
         let r = Self::Row::new(*r.start())..=Self::Row::new(*r.end());
         self.0.range(r.clone()).map(move |ret| ret.inner())
     }
@@ -113,7 +113,7 @@ impl<RC: RowCtx> Index for BTreeSetIndex<RC> {
     fn first_column_uproots(
         &mut self,
         uproots: &[<Self::Row as IndexRow>::FirstColumn],
-        mut on_delete: impl FnMut(&[<Self::Row as IndexRow>::Inner]),
+        mut on_delete: impl FnMut(&[<Self::Row as IndexRow>::Repr]),
     ) {
         for &uproot in uproots {
             let range = Self::Row::col_val_range(uproot);
@@ -123,14 +123,14 @@ impl<RC: RowCtx> Index for BTreeSetIndex<RC> {
         }
     }
 
-    fn delete_many(&mut self, deletions: &mut [<Self::Row as IndexRow>::Inner]) {
+    fn delete_many(&mut self, deletions: &mut [<Self::Row as IndexRow>::Repr]) {
         for d in Self::Row::from_inner_slice_mut(deletions) {
             self.0.remove(d);
         }
     }
     fn insert_many(
         &mut self,
-        insertions: &mut Vec<<Self::Row as IndexRow>::Inner>,
+        insertions: &mut Vec<<Self::Row as IndexRow>::Repr>,
         mut merge: impl FnMut(Self::Row, Self::Row) -> Self::Row,
     ) {
         let insertions = Self::Row::from_inner_slice_mut(insertions);
@@ -169,14 +169,14 @@ impl<RC: RowCtx> Index for SortedVec<RC> {
     fn len(&self) -> usize {
         self.0.len()
     }
-    fn iter(&self) -> impl Iterator<Item = <Self::Row as IndexRow>::Inner> {
+    fn iter(&self) -> impl Iterator<Item = <Self::Row as IndexRow>::Repr> {
         self.0.iter().map(|r| r.inner())
     }
 
     fn range(
         &self,
-        r: RangeInclusive<<Self::Row as IndexRow>::Inner>,
-    ) -> impl Iterator<Item = <Self::Row as IndexRow>::Inner> {
+        r: RangeInclusive<<Self::Row as IndexRow>::Repr>,
+    ) -> impl Iterator<Item = <Self::Row as IndexRow>::Repr> {
         let start = self.0.partition_point(|&k| k < Self::Row::new(*r.start()));
         let end = self.0.partition_point(|&k| k <= Self::Row::new(*r.end()));
 
@@ -200,7 +200,7 @@ impl<RC: RowCtx> Index for SortedVec<RC> {
     fn first_column_uproots(
         &mut self,
         uproots: &[<Self::Row as IndexRow>::FirstColumn],
-        mut on_delete: impl FnMut(&[<Self::Row as IndexRow>::Inner]),
+        mut on_delete: impl FnMut(&[<Self::Row as IndexRow>::Repr]),
     ) {
         debug_assert!(uproots.is_sorted());
         //println!("first_column_uproots len={} uproots.len()={}", self.len(), uproots.len());
@@ -233,7 +233,7 @@ impl<RC: RowCtx> Index for SortedVec<RC> {
         self.0.truncate(cursor_output);
     }
 
-    fn delete_many(&mut self, deletions: &mut [<Self::Row as IndexRow>::Inner]) {
+    fn delete_many(&mut self, deletions: &mut [<Self::Row as IndexRow>::Repr]) {
         //println!("delete_many len={} deletions.len()={}", self.len(), deletions.len());
         let deletions = Self::Row::from_inner_slice_mut(deletions);
         RC::sort(deletions);
@@ -286,7 +286,7 @@ impl<RC: RowCtx> Index for SortedVec<RC> {
     }
     fn insert_many(
         &mut self,
-        insertions: &mut Vec<<Self::Row as IndexRow>::Inner>,
+        insertions: &mut Vec<<Self::Row as IndexRow>::Repr>,
         mut merge: impl FnMut(Self::Row, Self::Row) -> Self::Row,
     ) {
         //println!("insert_many len={} insertions.len()={}", self.len(), insertions.len());
@@ -431,7 +431,7 @@ mod property_tests {
 
     #[derive(Clone, Debug)]
     enum MutatingOperation<T: IndexRow> {
-        Insert(Vec<T::Inner>, bool),
+        Insert(Vec<T::Repr>, bool),
         Delete(Vec<usize>),
         Uproot(Vec<T::FirstColumn>),
     }
@@ -439,7 +439,7 @@ mod property_tests {
     fn gen_ops<T: IndexRow>() -> impl Strategy<Value = MutatingOperation<T>>
     where
         T::FirstColumn: Arbitrary,
-        T::Inner: Arbitrary,
+        T::Repr: Arbitrary,
     {
         gen_ops_inner()
     }
@@ -447,11 +447,11 @@ mod property_tests {
     fn gen_ops_inner<T: IndexRow>() -> impl Strategy<Value = MutatingOperation<T>>
     where
         T::FirstColumn: Arbitrary,
-        T::Inner: Arbitrary,
+        T::Repr: Arbitrary,
     {
         prop_oneof![
             // insert
-            any::<(Vec<T::Inner>, bool)>().prop_map(|(a, b)| MutatingOperation::Insert(a, b)),
+            any::<(Vec<T::Repr>, bool)>().prop_map(|(a, b)| MutatingOperation::Insert(a, b)),
             // delete
             any::<Vec<usize>>().prop_map(MutatingOperation::Delete),
             // uproot (sorted)
@@ -480,7 +480,7 @@ mod property_tests {
                 #[test]
                 fn $test_name(
                     ops in proptest::collection::vec(gen_ops::<$inner>(), proptest::collection::SizeRange::default()),
-                    query in any::<Vec<QueryOperation<<$inner as IndexRow>::Inner>>>()
+                    query in any::<Vec<QueryOperation<<$inner as IndexRow>::Repr>>>()
                 ) {
                     $(let $ident = test_index::<$indexes>(ops.clone());)*
                     assert!([$($ident.contents_sorted()),*].into_iter().all_equal());
@@ -604,7 +604,7 @@ mod property_tests {
 
         decl_row!(
             #[derive(Arbitrary)]
-            Row3_2_0_1<T0, T1, T2 first>
+            Row3_2_0_1<T0, T1, T2 first 2>
             (2, 0, 1) ()
             (T2, T0, T1) ()
             fc = (2) (T2)
@@ -689,12 +689,12 @@ mod property_tests {
         use super::*;
         arb_wrapper!(Math);
 
-        decl_row!(Row1 < T0 first > () (0) () (T0) fc = (0) (T0) where u32 = s => ((s . 0 . inner () as u32) << 0));
-        decl_row!(Row2_0 < T0 first , T1 > (0) (1) (T0) (T1) fc = (0) (T0) where u64 = s => ((s . 0 . inner () as u64) << 32) + ((s . 1 . inner () as u64) << 0));
-        decl_row!(Row2_1_0 < T0 , T1 first > (1 , 0) () (T1 , T0) () fc = (1) (T1) where u64 = s => ((s . 1 . inner () as u64) << 32) + ((s . 0 . inner () as u64) << 0));
-        decl_row!(Row3_0_1 < T0 first , T1 , T2 > (0 , 1) (2) (T0 , T1) (T2) fc = (0) (T0) where u128 = s => ((s . 0 . inner () as u128) << 64) + ((s . 1 . inner () as u128) << 32) + ((s . 2 . inner () as u128) << 0));
-        decl_row!(Row3_1_0_2 < T0 , T1 first , T2 > (1 , 0 , 2) () (T1 , T0 , T2) () fc = (1) (T1) where u128 = s => ((s . 1 . inner () as u128) << 64) + ((s . 0 . inner () as u128) << 32) + ((s . 2 . inner () as u128) << 0));
-        decl_row!(Row3_2_0_1 < T0 , T1 , T2 first > (2 , 0 , 1) () (T2 , T0 , T1) () fc = (2) (T2) where u128 = s => ((s . 2 . inner () as u128) << 64) + ((s . 0 . inner () as u128) << 32) + ((s . 1 . inner () as u128) << 0));
+        decl_row!(Row1 < T0 first 0 > () (0) () (T0) fc = (0) (T0) where u32 = s => ((s . 0 . inner () as u32) << 0));
+        decl_row!(Row2_0 < T0 first 0 , T1 > (0) (1) (T0) (T1) fc = (0) (T0) where u64 = s => ((s . 0 . inner () as u64) << 32) + ((s . 1 . inner () as u64) << 0));
+        decl_row!(Row2_1_0 < T0 , T1 first 1 > (1 , 0) () (T1 , T0) () fc = (1) (T1) where u64 = s => ((s . 1 . inner () as u64) << 32) + ((s . 0 . inner () as u64) << 0));
+        decl_row!(Row3_0_1 < T0 first 0 , T1 , T2 > (0 , 1) (2) (T0 , T1) (T2) fc = (0) (T0) where u128 = s => ((s . 0 . inner () as u128) << 64) + ((s . 1 . inner () as u128) << 32) + ((s . 2 . inner () as u128) << 0));
+        decl_row!(Row3_1_0_2 < T0 , T1 first 1 , T2 > (1 , 0 , 2) () (T1 , T0 , T2) () fc = (1) (T1) where u128 = s => ((s . 1 . inner () as u128) << 64) + ((s . 0 . inner () as u128) << 32) + ((s . 2 . inner () as u128) << 0));
+        decl_row!(Row3_2_0_1 < T0 , T1 , T2 first 2 > (2 , 0 , 1) () (T2 , T0 , T1) () fc = (2) (T2) where u128 = s => ((s . 2 . inner () as u128) << 64) + ((s . 0 . inner () as u128) << 32) + ((s . 1 . inner () as u128) << 0));
 
         // triggers if merge is not commutative and associative.
         regression_case! {
@@ -778,12 +778,12 @@ mod property_tests {
         use super::*;
         arb_wrapper!(Proof);
 
-        decl_row!(Row2_0_1 < T0 first , T1 > (0 , 1) () (T0 , T1) () fc = (0) (T0) where u64 = s => ((s . 0 . inner () as u64) << 32) + ((s . 1 . inner () as u64) << 0));
-        decl_row!(Row2_1_0 < T0 , T1 first > (1 , 0) () (T1 , T0) () fc = (1) (T1) where u64 = s => ((s . 1 . inner () as u64) << 32) + ((s . 0 . inner () as u64) << 0));
-        decl_row!(Row3_0_1 < T0 first , T1 , T2 > (0 , 1) (2) (T0 , T1) (T2) fc = (0) (T0) where u128 = s => ((s . 0 . inner () as u128) << 64) + ((s . 1 . inner () as u128) << 32) + ((s . 2 . inner () as u128) << 0));
-        decl_row!(Row3_0_1_2 < T0 first , T1 , T2 > (0 , 1 , 2) () (T0 , T1 , T2) () fc = (0) (T0) where u128 = s => ((s . 0 . inner () as u128) << 64) + ((s . 1 . inner () as u128) << 32) + ((s . 2 . inner () as u128) << 0));
-        decl_row!(Row3_1_0_2 < T0 , T1 first , T2 > (1 , 0 , 2) () (T1 , T0 , T2) () fc = (1) (T1) where u128 = s => ((s . 1 . inner () as u128) << 64) + ((s . 0 . inner () as u128) << 32) + ((s . 2 . inner () as u128) << 0));
-        decl_row!(Row3_2_0_1 < T0 , T1 , T2 first > (2 , 0 , 1) () (T2 , T0 , T1) () fc = (2) (T2) where u128 = s => ((s . 2 . inner () as u128) << 64) + ((s . 0 . inner () as u128) << 32) + ((s . 1 . inner () as u128) << 0));
+        decl_row!(Row2_0_1 < T0 first 0 , T1 > (0 , 1) () (T0 , T1) () fc = (0) (T0) where u64 = s => ((s . 0 . inner () as u64) << 32) + ((s . 1 . inner () as u64) << 0));
+        decl_row!(Row2_1_0 < T0 , T1 first 1 > (1 , 0) () (T1 , T0) () fc = (1) (T1) where u64 = s => ((s . 1 . inner () as u64) << 32) + ((s . 0 . inner () as u64) << 0));
+        decl_row!(Row3_0_1 < T0 first 0 , T1 , T2 > (0 , 1) (2) (T0 , T1) (T2) fc = (0) (T0) where u128 = s => ((s . 0 . inner () as u128) << 64) + ((s . 1 . inner () as u128) << 32) + ((s . 2 . inner () as u128) << 0));
+        decl_row!(Row3_0_1_2 < T0 first 0 , T1 , T2 > (0 , 1 , 2) () (T0 , T1 , T2) () fc = (0) (T0) where u128 = s => ((s . 0 . inner () as u128) << 64) + ((s . 1 . inner () as u128) << 32) + ((s . 2 . inner () as u128) << 0));
+        decl_row!(Row3_1_0_2 < T0 , T1 first 1 , T2 > (1 , 0 , 2) () (T1 , T0 , T2) () fc = (1) (T1) where u128 = s => ((s . 1 . inner () as u128) << 64) + ((s . 0 . inner () as u128) << 32) + ((s . 2 . inner () as u128) << 0));
+        decl_row!(Row3_2_0_1 < T0 , T1 , T2 first 2 > (2 , 0 , 1) () (T2 , T0 , T1) () fc = (2) (T2) where u128 = s => ((s . 2 . inner () as u128) << 64) + ((s . 0 . inner () as u128) << 32) + ((s . 1 . inner () as u128) << 0));
 
         gen_test_std!(row2_0_1, Row2_0_1<i64, i64>);
         gen_test_std!(row2_1_0, Row2_1_0<i64, i64>);

@@ -214,7 +214,8 @@ pub fn codegen(theory: &Theory) -> TokenStream {
             let type_vars_with_first = (0..permuted_columns.len()).map(|i| {
                 let t = format_ident!("T{i}");
                 if i == fc {
-                    quote! { #t first }
+                    let i = proc_macro2::Literal::usize_unsuffixed(i);
+                    quote! { #t first #i }
                 } else {
                     quote! { #t }
                 }
