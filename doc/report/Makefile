@@ -1,9 +1,11 @@
+SHELL:=/usr/bin/env bash
+
 watch: dependencies
 	typst watch main.typ --root ../..
 
-dependencies: architecture.svg egraph_example.svg egraph_cluster.svg
+dependencies: $(shell echo ../figures/{architecture,egraph_example,egraph_cluster}.svg)
 
-%.svg: %.dot
+../figures/%.svg: ../figures/%.dot
 	dot -Tsvg $^ > $@
 
 RG := rg --glob '!mastery-chs' --glob '*.typ' --multiline

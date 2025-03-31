@@ -247,7 +247,7 @@ special e-classes would work, it would prevent use-cases such as equation solvin
 can have unknown inputs but known outputs.
 
 #figure(
-  image("egraph_cluster.svg", width: 60%),
+  image("../figures/egraph_cluster.svg", width: 60%),
   caption: flex-caption(
     [Example of an equivalence-class-formulation e-graph that initially contains
       $(a+2) dot c$.],
@@ -260,7 +260,7 @@ can have unknown inputs but known outputs.
 ) <informal-egraph-figure-non-bipartite>
 
 #figure(
-  image("egraph_example.svg", width: 75%),
+  image("../figures/egraph_example.svg", width: 75%),
   caption: flex-caption(
     [The same e-graph as in @informal-egraph-figure-non-bipartite, but drawn as a bipartite graph.],
     [
@@ -1329,7 +1329,7 @@ Oatlog is a Rust proc-macro that takes in egglog code and generates Rust code. S
 looks like. @oatlog-architecture shows an overview of oatlog's internal architecture.
 
 #figure(
-  image("architecture.svg"),
+  image("../figures/architecture.svg"),
   caption: [A coarse overview of the current oatlog architecture.],
 ) <oatlog-architecture>
 
