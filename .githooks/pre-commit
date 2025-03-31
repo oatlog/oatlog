@@ -3,6 +3,6 @@
 rg 'TODO \w+ for \w+'
 rg 'TODO \w+:'
 
-cargo fmt --check
+cargo fmt --check || exit 1
 
 make -C doc/report lint
