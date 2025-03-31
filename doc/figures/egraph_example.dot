@@ -1,24 +1,31 @@
-
 // (a + 2) * c
-
-
-
 digraph G {
     rankdir = "LR";
+    fontsize="24"
+    node [ fontsize="24" ]
 
     subgraph cluster_shift {
-        label = "apply: x * 2 = x << 1";
-        //subgraph cluster_enodes {
-        //    label = "enodes";
-        lit2_1 [label = "2", shape=rect];
-        lit1_1 [label = "1", color = "orange", shape=rect];
-        add_a_2_1 [label = "+", shape=rect];
-        mul_c_1 [label = "*", shape=rect];
-        mul_a_c_1 [label = "*", shape=rect];
-        mul_2_c_1 [label = "*", shape=rect];
-        add_dist_1 [label = "+", shape=rect];
-        c_shift_1_1 [label = "<<", color = "orange", shape=rect];
-        //}
+        label = "apply: x ∗ 2 = x << 1";
+
+        node [shape=rect] // e-nodes
+        lit2_1 [label = "2"];
+        lit1_1 [label = "1", color = "orange"];
+        add_a_2_1 [label = "+"];
+        mul_c_1 [label = "∗"];
+        mul_a_c_1 [label = "∗"];
+        mul_2_c_1 [label = "∗"];
+        add_dist_1 [label = "+"];
+        c_shift_1_1 [label = "<<", color = "orange"];
+
+        node [shape=ellipse] // e-classes
+        eadd_a_2_1 [label = ""];
+        elit2_1 [label = ""];
+        a_1 [label = "a"];
+        c_1 [label = "c"];
+        emul_c_1 [label = ""];
+        emul_2_c_1 [label = ""];
+        emul_a_c_1 [label = ""];
+        elit1_1 [label = "", color="orange"];
 
         lit2_1 -> elit2_1 ;
         lit1_1 -> elit1_1 [color = "orange"];
@@ -46,32 +53,27 @@ digraph G {
 
         eadd_a_2_1 -> mul_c_1 ;
         c_1 -> mul_c_1 ;
-
-
-        //subgraph cluster_eclasses {
-        //    label = "eclasses";
-        eadd_a_2_1 [label = ""];
-        elit2_1 [label = ""];
-        a_1 [label = "a"];
-        c_1 [label = "c"];
-        emul_c_1 [label = ""];
-        emul_2_c_1 [label = ""];
-        emul_a_c_1 [label = ""];
-        elit1_1 [label = "", color="orange"];
-        //}
     }
 
     subgraph cluster_dist {
-        label = "apply: (x + y) * z = x * z + y * z";
-        //subgraph cluster_enodes {
-        //    label = "enodes";
-        lit2_0 [label = "2", shape=rect];
-        add_a_2_0 [label = "+", shape=rect];
-        mul_c_0 [label = "*", shape=rect];
-        mul_a_c_0 [label = "*", color = "orange", shape=rect];
-        mul_2_c_0 [label = "*", color = "orange", shape=rect];
-        add_dist_0 [label = "+", color = "orange", shape=rect];
-        //}
+        label = "apply: (x + y) ∗ z = x ∗ z + y ∗ z";
+
+        node [shape=rect] // e-nodes
+        lit2_0 [label = "2"];
+        add_a_2_0 [label = "+"];
+        mul_c_0 [label = "∗"];
+        mul_a_c_0 [label = "∗", color = "orange"];
+        mul_2_c_0 [label = "∗", color = "orange"];
+        add_dist_0 [label = "+", color = "orange"];
+
+        node [shape=ellipse] // e-classes
+        eadd_a_2_0 [label = ""];
+        elit2_0 [label = ""];
+        a_0 [label = "a"];
+        c_0 [label = "c"];
+        emul_c_0 [label = ""];
+        emul_2_c_0 [label = "", color = "orange"];
+        emul_a_c_0 [label = "", color = "orange"];
 
         lit2_0 -> elit2_0;
         add_a_2_0 -> eadd_a_2_0;
@@ -94,29 +96,23 @@ digraph G {
 
         eadd_a_2_0 -> mul_c_0;
         c_0 -> mul_c_0;
-
-
-        //subgraph cluster_eclasses {
-        //    label = "eclasses";
-        eadd_a_2_0 [label = ""];
-        elit2_0 [label = ""];
-        a_0 [label = "a"];
-        c_0 [label = "c"];
-        emul_c_0 [label = ""];
-        emul_2_c_0 [label = "", color = "orange"];
-        emul_a_c_0 [label = "", color = "orange"];
-        //}
     }
 
 
     subgraph cluster_initial {
-        label = "initial: (a + 2) * c";
-        //subgraph cluster_enodes {
-        //    label = "enodes";
-        lit2 [label = "2", shape=rect];
-        add_a_2 [label = "+", shape=rect];
-        mul_c [label = "*", shape=rect];
-        //}
+        label = "initial: (a + 2) ∗ c";
+
+        node [shape=rect] // e-nodes
+        lit2 [label = "2"];
+        add_a_2 [label = "+"];
+        mul_c [label = "∗"];
+
+        node [shape=ellipse] // e-classes
+        eadd_a_2 [label = ""];
+        elit2 [label = ""];
+        a [label = "a"];
+        c [label = "c"];
+        emul_c [label = ""];
 
         lit2 -> elit2;
         add_a_2 -> eadd_a_2;
@@ -127,16 +123,5 @@ digraph G {
 
         eadd_a_2 -> mul_c;
         c -> mul_c;
-
-
-        //subgraph cluster_eclasses {
-        //    label = "eclasses";
-        eadd_a_2 [label = ""];
-        elit2 [label = ""];
-        a [label = "a"];
-        c [label = "c"];
-        emul_c [label = ""];
-        //}
     }
 }
-

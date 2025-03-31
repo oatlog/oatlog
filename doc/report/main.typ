@@ -91,7 +91,7 @@ rewriting to make it nondestructive.
 
 == E-graphs and equality saturation
 
-E-graphs @oldegraph are data structures for term rewriting that allow multiple representations of a
+E-graphs @oldegraph are data structures for rewriting that allow multiple representations of a
 value, committing to one only after all rewrites have been searched. The representations are stored
 simultaneously and since there is no backtracking there is no duplicated post-branch work.
 
