@@ -34,8 +34,10 @@ trait HasTimeStamp {
 //  |-----|  |--------|
 //    old        new
 //
-#[derive(Copy, Clone, PartialOrd, Ord, PartialEq, Eq)]
-struct TimeStamp(u32);
+// #[derive(Copy, Clone, PartialOrd, Ord, PartialEq, Eq)]
+// struct TimeStamp(u32);
+
+relation_element_wrapper_ty!(TimeStamp);
 
 #[derive(Copy, Clone, PartialOrd, Ord, PartialEq, Eq, Default)]
 struct PhiRuleState {
@@ -181,6 +183,8 @@ impl Relations {
 
 struct Delta {
     add_: Vec<AddRow>,
+    lower_bound_: Vec<<LowerBoundRelation as Relation>::Row>,
+    upper_bound_: Vec<<UpperBoundRelation as Relation>::Row>,
     // mul: ..
 }
 impl Delta {
@@ -283,18 +287,152 @@ mod scratch {
     eclass_wrapper_ty!(MathA);
     eclass_wrapper_ty!(MathB);
     eclass_wrapper_ty!(MathRes);
+    eclass_wrapper_ty!(Math);
+
+    // timestamp is always part of the "value" part and merge just takes the largest (or smallest?) timestamp.
+    // => timestamp is a weird lattice variable :(
+
+    // decl_row!(Row4_0_1<T0 first 0, T1, T2, T3> (T0 0, T1 1) (T2 2, T3 3));
 
     decl_row!(Row3_0_1<T0 first 0, T1, T2> (T0 0, T1 1) (T2 2));
+    decl_row!(Row3_1_0_2<T0, T1 first 1, T2> (T1 1, T0 0, T2 2) ());
+    decl_row!(Row3_2_0_1<T0, T1, T2 first 2> (T2 2, T0 0, T1 1) ());
 
-    // timestamp is always part of the "value" part and merge just takes the largest timestamp.
+    struct AddRelation {
+        new: Vec<<Self as Relation>::Row>,
+        all_index_0_1_2: IndexImpl<StdSortCtx<Row3_0_1<Math, Math, Math>>>,
+        all_index_1_0_2: IndexImpl<StdSortCtx<Row3_1_0_2<Math, Math, Math>>>,
+        all_index_2_0_1: IndexImpl<StdSortCtx<Row3_2_0_1<Math, Math, Math>>>,
+    }
+    impl Relation for AddRelation {
+        type Row = (Math, Math, Math);
+    }
+}
+use super::*;
+decl_row!(Row2_0<T0 first 0, T1> (T0 0) (T1 1));
 
-    // struct Relation {
-    //     new: Vec<<Self as Relation>::Row>,
-    //     all_index_0_1_2: IndexImpl<RadixSortCtx<Row3_0_1<Foo, Foo, Foo, TimeStamp>, u128>>,
-    //     all_index_1_0_2: IndexImpl<RadixSortCtx<Row3_1_0_2<Foo, Foo, Foo, TimeStamp>, u128>>,
-    //     all_index_2_0_1: IndexImpl<RadixSortCtx<Row3_2_0_1<Foo, Foo, Foo, TimeStamp>, u128>>,
-    // }
-    // impl Relation for SameRelation {
-    //     type Row = (Math, Math, Math, TimeStamp);
-    // }
+struct LowerBoundRelation {
+    new: Vec<<Self as Relation>::Row>,
+    all_index_0_1: IndexImpl<StdSortCtx<Row2_0<Math, i64>>>,
+}
+impl Relation for LowerBoundRelation {
+    type Row = (Math, i64);
+}
+impl LowerBoundRelation {
+    fn update(&mut self, uf: &mut Unification, delta: &mut Delta) {
+        let mut inserts: Vec<(Math, i64)> = take(&mut delta.lower_bound_);
+        let orig_inserts = inserts.len();
+        self.all_index_0_1
+            .first_column_uproots(uf.math_.get_uprooted_snapshot(), |deleted_rows| {
+                inserts.extend(deleted_rows);
+            });
+
+        inserts[orig_inserts..].sort_unstable();
+        dedup_suffix(&mut inserts, orig_inserts); // <- just a perf thing.
+
+        // pretend we have more than 1 index
+        self.all_index_0_1.delete_many(&mut inserts[orig_inserts..]);
+
+        inserts.iter_mut().for_each(|row| {
+            row.0 = uf.math_.find(row.0);
+        });
+
+        self.all_index_0_1
+            .insert_many(&mut inserts, |mut old, mut new| {
+                let (x1,) = old.value_mut();
+                let (y1,) = new.value_mut();
+                *x1 = i64::max(*x1, *y1);
+                old
+            });
+
+        self.new.extend_from_slice(&inserts);
+    }
+    fn update_finalize(&mut self, uf: &mut Unification) {
+        self.new.sort_unstable();
+        self.new.dedup();
+        self.new.retain(|(x0, x1)| {
+            if !uf.math_.is_root(*x0) {
+                return false;
+            }
+            true
+        })
+    }
+}
+
+
+
+decl_row!(Row3_0<T0 first 0, T1, T2> (T0 0) (T1 1, T2 2));
+
+
+// NOTE: it is actually fine for all indexes to have a lattice variable if we do this:
+// (a, b) -> (lattice)
+// (b, a) -> (lattice)
+//
+//
+//
+// (a, b) -> (timestamp)
+// (b, a) -> (timestamp)
+//
+// only requirement is that the lattice variable is in the "key" part of the index.
+
+struct UpperBoundRelation {
+    new: Vec<<Self as Relation>::Row>,
+    all_index_0_1: IndexImpl<StdSortCtx<Row3_0<Math, i64, TimeStamp>>>,
+}
+impl Relation for UpperBoundRelation {
+    type Row = (Math, i64, TimeStamp);
+}
+impl UpperBoundRelation {
+    fn update(&mut self, uf: &mut Unification, delta: &mut Delta, next_timestamp: TimeStamp) {
+        //
+        //                  orig_inserts
+        //                       v
+        // inserts: [_, _, _, _, _, _, _, _, _, _]
+        //           ^        ^  ^              ^
+        //           |--------|  |--------------|
+        //           from delta     uprooted
+        //               ^
+        //               |
+        // TODO: If this has rows already in ALL, then they still get passed to new.
+        // Inserts of things that are already in the database should be a no-op.
+        //
+
+        let mut inserts: Vec<(Math, i64, TimeStamp)> = take(&mut delta.upper_bound_);
+        let orig_inserts = inserts.len();
+        self.all_index_0_1
+            .first_column_uproots(uf.math_.get_uprooted_snapshot(), |deleted_rows| {
+                inserts.extend(deleted_rows);
+            });
+
+        inserts[orig_inserts..].sort_unstable();
+        dedup_suffix(&mut inserts, orig_inserts); // <- just a perf thing.
+
+        // (pretend we have more than 1 index so this makes sense)
+        self.all_index_0_1.delete_many(&mut inserts[orig_inserts..]);
+
+        inserts.iter_mut().for_each(|row| {
+            row.0 = uf.math_.find(row.0);
+            row.2 = next_timestamp;
+        });
+
+        self.all_index_0_1
+            .insert_many(&mut inserts, |mut old, mut new| {
+                let (x1,x2) = old.value_mut();
+                let (y1,y2) = new.value_mut();
+                if *x1 != *y1 {
+                    *x1 = i64::max(*x1, *y1);
+                    // TODO: handle timestamp, should this go to new?
+                    // it's fine for max, but for set-union, it should probably go to new.
+                } else {
+                    // lower timestamps are always safe, and taking min forms a lattice.
+                    *x2 = TimeStamp::min(*x2, *y2);
+                }
+                old
+            });
+
+        // self.new.extend_from_slice(&inserts);
+    }
+    fn update_finalize(&mut self, next_timestamp: TimeStamp) {
+        // sort + dedup of everything from latest timestamp.
+    }
 }

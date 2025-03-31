@@ -1212,8 +1212,18 @@ fn codegen_relation(
                         delta: &mut #theory_delta_ty
                     ) {
 
+                        //
+                        //                  orig_inserts
+                        //                       v
+                        // inserts: [_, _, _, _, _, _, _, _, _, _]
+                        //           ^        ^  ^              ^
+                        //           |--------|  |--------------|
+                        //           from delta     uprooted
+
                         let mut inserts = take(&mut delta.#delta_row);
                         let orig_inserts = inserts.len();
+
+                        // fill, sort, dedup uprooted
                         #(
                             self.#indexes_backreferences.first_column_uproots(
                                 uf.#indexes_backreferences_uf.get_uprooted_snapshot(),
@@ -1222,15 +1232,23 @@ fn codegen_relation(
                         )*
                         inserts[orig_inserts..].sort_unstable();
                         runtime::dedup_suffix(&mut inserts, orig_inserts);
+
+                        // delete uprooted
                         #(
                             self.#indexes_all.delete_many(&mut inserts[orig_inserts..]);
                         )*
+
+                        // canonicalize all inserts.
                         inserts.iter_mut().for_each(|row| {
                             #(row.#col_num_symbolic = uf.#uf_all_symbolic.find(row.#col_num_symbolic);)*
                         });
+
+                        // insert all.
                         #(
                             self.#indexes_all.insert_many(&mut inserts, #indexes_merge_fn);
                         )*
+
+                        // fill new with inserts (possibly duplicates)
                         self.new.extend_from_slice(&inserts);
                     }
 
