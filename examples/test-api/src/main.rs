@@ -218,10 +218,9 @@ fn run() {
         // 0 = x + 0 => x = 0
         (rule ((= a (Add b zero))) ((union a b)))
         (rule ((= a (Add zero c))) ((union a c)))
-        (rule ((= a (Add b c))) ())
 
-        (rewrite (Add x zero) x)
-        (rewrite (Add zero x) x)
+        (rule ((= a (Mul zero c))) ((union a zero)))
+        (rule ((= a (Mul b zero))) ((union b zero)))
 
 
         (rewrite (Mul x zero) zero)
