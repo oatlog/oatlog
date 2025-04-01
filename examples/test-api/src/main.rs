@@ -165,22 +165,13 @@ fn run() {
         )
         (Zero)
 
-        (relation MathU (Math))
-        (rule ((= c (Add a b))) ((MathU a) (MathU b) (MathU c)))
+        (let zero (Zero))
+
         // (rule ((= c (Sub a b))) ((MathU a) (MathU b) (MathU c)))
         // (rule ((= c (Mul a b))) ((MathU a) (MathU b) (MathU c)))
         // (rule ((= c (Neg a))) ((MathU a) (MathU c)))
         // (rule ((= c (Zero))) ((MathU c)))
         // (rule ((= c (Sqrt a))) ((MathU a) (MathU c)))
-
-        (relation MathU2 (Math))
-        (relation MathU3 (Math))
-        (relation MathU4 (Math))
-        (relation MathU5 (Math))
-        (rule ((MathU x)) ((MathU2 x)))
-        (rule ((MathU2 x)) ((MathU3 x)))
-        (rule ((MathU3 x)) ((MathU4 x)))
-        (rule ((MathU4 x)) ((MathU5 x)))
 
         // FD rules
         (rule ((= c (Add a1 b)) (= c (Add a2 b))) ((union a1 a2)))
@@ -194,7 +185,7 @@ fn run() {
 
         // conversion rules
         (rule ((= c (Sub a b))) ((union a (Add b c)))) // c = a - b => c + b = a
-        (rule ((= a (Neg b))) ((union (Zero) (Add a b)))) // a = 0 - b => 0 = a + b
+        (rule ((= a (Neg b))) ((union zero (Add a b)))) // a = 0 - b => 0 = a + b
 
         // inverse conversion rules are apparently fine.
         // (rule ((= a (Add b c))) ((union c (Sub a b))) )
@@ -208,8 +199,8 @@ fn run() {
 
         // problematic rewrite
         // a = a + b => b = 0
-        (rule ((= a (Add a b))) ((union b (Zero))))
-        (rule ((= a (Add b a))) ((union b (Zero))))
+        (rule ((= a (Add a b))) ((union b zero)))
+        (rule ((= a (Add b a))) ((union b zero)))
         // (forall x) => x + 0 = x
         // (rule ((= c (Add a b))) (
         //     (union a (Add a (Zero)))
@@ -217,24 +208,46 @@ fn run() {
         //     (union c (Add c (Zero)))
         // ))
 
-        (rule ((MathU5 x)) (
-            (union x (Add x (Zero)))
-            (union x (Add (Zero) x))
-        ))
+
+        // (rule ((= x (Add a b))) (
+        //     (union x (Add x zero))
+        //     // (union x (Add zero x))
+        // ))
 
         // ok orig
         // 0 = x + 0 => x = 0
-        (rule ((= (Zero) (Add (Zero) x))) ((union x (Zero))))
-        (rewrite (Add x (Zero)) x)
-        (rewrite (Add (Zero) x) x)
-        (rewrite (Mul x (Zero)) (Zero))
-        (rewrite (Mul (Zero) x) (Zero))
-        (rewrite (Neg (Zero)) (Zero))
+        (rule ((= a (Add b zero))) ((union a b)))
+        (rule ((= a (Add zero c))) ((union a c)))
+        (rule ((= a (Add b c))) ())
+
+        (rewrite (Add x zero) x)
+        (rewrite (Add zero x) x)
+
+
+        (rewrite (Mul x zero) zero)
+        (rewrite (Mul zero x) zero)
+        (rewrite (Neg zero) zero)
         (rewrite (Mul a b) (Mul b a))
-        (rewrite (Mul (Mul a b) c) (Mul a (Mul b c)))
+        (birewrite (Mul (Mul a b) c) (Mul a (Mul b c)))
         (rewrite (Add a b) (Add b a))
-        (rewrite (Add (Add a b) c) (Add a (Add b c)))
-        (birewrite (Mul x (Add a b)) (Add (Mul x a) (Mul x b)))
+        (birewrite (Add (Add a b) c) (Add a (Add b c)))
+
+        // (rule ((= zero (Add a b))) ((union a b)))
+
+
+        // a + b = c, a + d = e
+
+        (rewrite (Mul x (Add y z)) (Add (Mul x y) (Mul x z)))
+        // (rule ((= e (Mul x (Add y z)))) ((union e (Add (Mul x y) (Mul x z)))))
+
+        // (rule ((= e (Mul x (Add zero z)))) ((union e (Add (Mul x zero) (Mul x z)))))
+        // (rule ((= e (Mul x (Add y zero)))) ((union e (Add (Mul x y) (Mul x zero)))))
+        // (rule ((= e (Mul zero (Add y z)))) ((union e (Add (Mul zero y) (Mul zero z)))))
+        // (rule ((= zero (Mul x (Add y z)))) ((union zero (Add (Mul x y) (Mul x z)))))
+
+
+
+
         (rewrite (Mul (Sqrt x) (Sqrt x)) x)
 
     ));
@@ -290,6 +303,7 @@ fn run() {
                 .join("\n");
             println!("\n{}", relation_entry_count);
         }
+        dbg!(theory.add_.new.len());
 
         let size = theory.get_total_relation_entry_count();
         println!("i={i} size={size}");
@@ -312,7 +326,10 @@ fn run() {
         println!("\nVerified!");
         println!("{}", theory.emit_graphviz());
     } else {
-        // println!("{}", theory.emit_graphviz());
+        if theory.get_total_relation_entry_count() < 200 {
+            println!("{}", theory.emit_graphviz());
+            dbg!(theory.get_total_relation_entry_count());
+        }
         panic!("\nFailed to verify in {ITERS} iterations..");
     }
 }

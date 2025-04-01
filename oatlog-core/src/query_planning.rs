@@ -166,6 +166,8 @@ pub(crate) fn emit_lir_theory(mut theory: hir::Theory) -> (hir::Theory, lir::The
         })
         .collect();
 
+    remove_variable_collisions(lir_variables.inner_mut().as_mut_slice());
+
     let lir_theory = lir::Theory {
         name: theory.name,
         types,
@@ -177,6 +179,24 @@ pub(crate) fn emit_lir_theory(mut theory: hir::Theory) -> (hir::Theory, lir::The
     };
 
     (theory, lir_theory)
+}
+
+fn remove_variable_collisions(s: &mut [lir::VariableData]) {
+    let mut used: BTreeSet<String> = BTreeSet::new();
+
+    for s in s {
+        let base = s.name;
+        if used.insert(base.to_string()) {
+            continue;
+        }
+        for i in 2.. {
+            let candidate = format!("{base}_{i}");
+            if used.insert(candidate.to_string()) {
+                s.name = candidate.leak();
+                break;
+            }
+        }
+    }
 }
 
 fn generate_tries(

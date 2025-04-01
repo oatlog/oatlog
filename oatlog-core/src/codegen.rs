@@ -1193,6 +1193,8 @@ fn codegen_relation(
                     .map(|index_info| ident::index_all_field(index_info))
                     .collect();
 
+                let first_indexes_all = indexes_all[0].clone();
+
                 let column_types = rel
                     .param_types
                     .iter()
@@ -1242,6 +1244,8 @@ fn codegen_relation(
                         inserts.iter_mut().for_each(|row| {
                             #(row.#col_num_symbolic = uf.#uf_all_symbolic.find(row.#col_num_symbolic);)*
                         });
+
+                        // self.#first_indexes_all.filter_existing(&mut inserts);
 
                         // insert all.
                         #(

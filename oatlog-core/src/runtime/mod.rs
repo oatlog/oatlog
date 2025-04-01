@@ -11,7 +11,7 @@ pub use crate::{
     runtime::{
         generic::{Eclass, EclassProvider, RelationElement},
         global_vars::GlobalVars,
-        index::{Index, IndexImpl, RadixSortCtx, StdSortCtx, dedup_suffix},
+        index::{Index, IndexImpl, RadixSortCtx, RowCtx, StdSortCtx, dedup_suffix},
         row::IndexRow,
         uf::UnionFind,
     },

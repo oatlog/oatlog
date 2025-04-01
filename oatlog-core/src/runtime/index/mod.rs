@@ -50,6 +50,15 @@ pub trait Index {
         contents.sort();
         contents
     }
+
+    /// Remove everything from new that is already in self.
+    /// Motivation is to shrink the new set to stuff that is actually new.
+    ///
+    /// TODO: implementation is naive, should probably iterate index and new to avoid the O(log n) factor.
+    fn filter_existing(&self, potential_inserts: &mut Vec<<Self::Row as IndexRow>::Repr>) {
+        Self::RowCtx::sort(Self::Row::from_inner_slice_mut(potential_inserts));
+        potential_inserts.retain(|&x| self.range(x..=x).next().is_none());
+    }
 }
 
 pub trait RowCtx: Default + std::fmt::Debug {
