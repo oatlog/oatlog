@@ -5,7 +5,8 @@
   [#text(fill: red, weight: "bold", size: 20pt)[TODO: #msg]]
 }
 
-#set text(font: "New Computer Modern")
+//#set text(font: "New Computer Modern")
+#set text(font: "New Computer Modern Sans")
 
 #show: university-theme.with(
   config-info(
@@ -34,8 +35,62 @@
 - Demo
 - Benchmarks and implementation
   - Somewhat handwavey relational view, we don't really have time(?)
+  - Not done, here are the current results
+  - Compatibility, figures from report
+  - Idea sketch, associative+commutative containers
+  - Lots of details, what has been tried
 
-= Why e-graphs?
+= Term rewriting 101
+
+== Arithmetic as term rewriting
+
+#[
+  #let e = `expr`
+  #let op = `op`
+  #let t = `term`
+  #let a = text(fill: blue, raw("<"))
+  #let b = text(fill: blue, raw(">"))
+  #let term = [#a#e#b #a#op#b #a#e#b]
+
+  #pause - *Ground terms* $0, 1, -1, 2, -2, dots$
+
+  #pause - *Terms* #term for some $#a#op#b in {+, -, dot, div, dots}$
+
+  #pause - *Expressions* are ground terms or terms containing *subexpressions*
+
+  #pause - #[*Rewrite rules* for terms, written $#a#t#b -> #a#t#b$ such as in
+
+    #align(center, $0 dot x -> 0$)
+    #align(center, $x dot z + y dot z -> (x+y) dot z $)
+  ]
+
+  #pause - Essentially, expressions trees that can be _rewritten locally_
+]
+
+== Algebraic optimization
+
+#align(center, $0 dot x -> 0$)
+#align(center, $x dot z + y dot z -> (x+y) dot z$)
+#pause
+
++ Initial expression #pause
++ Rewrite rules maintain equality #pause
++ Rewrite rules improve quality (size, complexity, ...) #pause
+
+- Expression simplification
+- Equation solving
+
+== Compilation as term rewriting
+
+#TODO[]
+
+== Term rewriting definition
+
+"A set of objects and rules relating those objects"
+
+- Term
+- Expression
+- Rewrite rule
 
 == Phase ordering
 
@@ -48,7 +103,9 @@
 
 #TODO[]
 
-== E-graphs
+= E-graphs
+
+== Explain e-graphs
 
 - Apply rewrites and keep both versions.
 - Reach global optima.
@@ -59,6 +116,8 @@
 #image("../figures/egraph_cluster.svg")
 
 #focus-slide[
+  // Quadratic formula demo
+  // Egglog language overview
   #align(center, [Demo!])
 ]
 
