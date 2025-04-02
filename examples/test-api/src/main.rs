@@ -209,10 +209,10 @@ fn run() {
         // ))
 
 
-        // (rule ((= x (Add a b))) (
-        //     (union x (Add x zero))
-        //     // (union x (Add zero x))
-        // ))
+        (rule ((= x (Add a b))) (
+            (union x (Add x zero))
+            // (union x (Add zero x))
+        ))
 
         // ok orig
         // 0 = x + 0 => x = 0

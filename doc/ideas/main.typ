@@ -2513,13 +2513,6 @@ And we have whatever this is:
 `Neg(a, b) = Sub(Zero, a, b)`
 
 
-
-
-= TODO READ
-Papers are just under the first author i looked at.
-I stopped adding authors after a while since this is just too many papers.
-
-
 = thing
 ```
 A: Add(a, b) then a = b
@@ -2542,6 +2535,22 @@ for (a, b) in add {
 
 
 ```
+
+= Getting more unifying rules.
+We can take any subset of inserts (incl entry) from action to premise and delete the rest to generate a unifying rule.
+
+
+A -> B, C
+
+A -> union
+A, B -> union
+A, C -> union
+A, B, C -> union
+
+
+= TODO READ
+Papers are just under the first author i looked at.
+I stopped adding authors after a while since this is just too many papers.
 
 == Max Willsey (papers done, co-authors done)
 https://dl.acm.org/profile/99659359379

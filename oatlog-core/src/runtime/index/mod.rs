@@ -352,11 +352,12 @@ impl<RC: RowCtx> Index for SortedVec<RC> {
         }
         cursor_output += len - cursor_input;
         self.0.truncate(cursor_output);
-        if self.len() < insertions.len() {
-            insertions.clear();
-            insertions.extend_from_slice(Self::Row::inner_slice(&self.0));
-            //println!("insert_many shrunk insertions to insertions.len()={}", insertions.len());
-        }
+        // if self.len() < insertions.len() {
+        //     // panic!();
+        //     insertions.clear();
+        //     insertions.extend_from_slice(Self::Row::inner_slice(&self.0));
+        //     //println!("insert_many shrunk insertions to insertions.len()={}", insertions.len());
+        // }
     }
 }
 

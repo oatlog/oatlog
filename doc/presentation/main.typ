@@ -52,30 +52,29 @@
   #let b = text(fill: blue, raw(">"))
   #let term = [#a#e#b #a#op#b #a#e#b]
 
-  #pause - *Ground terms* $0, 1, -1, 2, -2, dots$
+  - *Ground terms* $0, 1, -1, 2, -2, dots$
 
-  #pause - *Terms* #term for some $#a#op#b in {+, -, dot, div, dots}$
+  - *Terms* #term for some $#a#op#b in {+, -, dot, div, dots}$
 
-  #pause - *Expressions* are ground terms or terms containing *subexpressions*
+  - *Expressions* are ground terms or terms containing *subexpressions*
 
-  #pause - #[*Rewrite rules* for terms, written $#a#t#b -> #a#t#b$ such as in
+  - #[*Rewrite rules* for terms, written $#a#e#b -> #a#e#b$ such as in
 
     #align(center, $0 dot x -> 0$)
     #align(center, $x dot z + y dot z -> (x+y) dot z $)
   ]
 
-  #pause - Essentially, expressions trees that can be _rewritten locally_
+  - Essentially, expressions trees that can be _rewritten locally_
 ]
 
 == Algebraic optimization
 
 #align(center, $0 dot x -> 0$)
 #align(center, $x dot z + y dot z -> (x+y) dot z$)
-#pause
 
-+ Initial expression #pause
-+ Rewrite rules maintain equality #pause
-+ Rewrite rules improve quality (size, complexity, ...) #pause
++ Initial expression 
++ Rewrite rules maintain equality 
++ Rewrite rules improve quality (size, complexity, ...) 
 
 - Expression simplification
 - Equation solving
