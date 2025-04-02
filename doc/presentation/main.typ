@@ -23,6 +23,70 @@
 
 #title-slide()
 
+= Compilers and the phase ordering problem
+
+== Compilation passes
+
+#TODO[]
+
+== LLVM has many passes
+
+#TODO[]
+
+== Phase ordering problem
+
+#TODO[]
+
+== Peephole optimization
+
+#TODO[]
+
+== Still rewrite order dependence...
+
+#TODO[]
+
+= E-graphs
+
+== E-graph walkthrough
+
+#TODO[]
+
+== Egglog and existing e-graph engines
+
+#TODO[]
+
+= Oatlog
+
+== Our contribution
+
+#TODO[]
+
+#focus-slide[
+  #align(center, [Demo!])
+]
+
+== Benchmarks
+
+#TODO[]
+
+== Egglog compatibility and testing
+
+#TODO[]
+
+== Oatlog architecture
+
+#TODO[]
+
+== Future work
+
+#TODO[]
+
+== (Bonus) Implementation details and generated code
+
+#TODO[]
+
+
+
 // everywhere: examples
 //
 // compiling program
@@ -41,8 +105,8 @@
 // implementation high-level (we are relation, semi-naive, we uproot the old in with the new)
 // future work
 // (bonus) implementation details + show generated code.
-//  
-// 
+//
+//
 // == #TODO[THIS SLIDE IS AN OUTLINE]
 //
 // - Why e-graphs?
@@ -65,7 +129,7 @@
 
 #TODO[show pitfalls for "bad" rewrite rules, non-termination, suboptimal cases]
 
-= Term rewriting 101
+= OLD SLIDES Term rewriting 101
 
 #TODO[explain problem directly, then solution]
 
