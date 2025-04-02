@@ -62,6 +62,23 @@
 // BACKGROUND: E-GRAPHS IN PRACTICE
 // PROBLEM: E-GRAPHS ARE SLOW
 
+// need to establish that egglog is slow
+
+```lisp
+(datatype Math
+    (Add Math Math)
+    (Mul Math Math)
+    (Const i64)
+)
+; (rewrite FROM TO)
+; x * 0 = x
+(rewrite (Mul x (Const 0)) (Const 0))
+; a * c + b * c
+(rewrite (Add (Mul a c) (Mul b c)) (Mul (Add a b) c))
+```
+
+- Egglog is both and interpreter and a language.
+
 #TODO[]
 
 = Oatlog
@@ -132,28 +149,6 @@
 //   - Compatibility, figures from report
 //   - Idea sketch, associative+commutative containers
 //   - Lots of details, what has been tried
-
-
-
-
-
-
-== Egglog and the egglog language (existing work)
-
-```lisp
-(datatype Math
-    (Add Math Math)
-    (Mul Math Math)
-    (Const i64)
-)
-; (rewrite FROM TO)
-; x * 0 = x
-(rewrite (Mul x (Const 0)) (Const 0)) 
-; a * c + b * c
-(rewrite (Add (Mul a c) (Mul b c)) (Mul (Add a b) c))
-```
-
-- Egglog is both and interpreter and a language.
 
 #pagebreak()
 
