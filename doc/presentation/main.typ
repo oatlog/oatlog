@@ -23,6 +23,26 @@
 
 #title-slide()
 
+// everywhere: examples
+//
+// compiling program
+// aba optimization bad
+// llvm has 70 passes
+// passes bad/annoying
+// peephole (easier to reason about
+// less duplicated work)
+// still has rewrite order dependence. keep old and keep both
+// this becomes an e-graph.
+// egglog
+// our contribution
+// demo
+// benchmarks
+// tests/support
+// implementation high-level (we are relation, semi-naive, we uproot the old in with the new)
+// future work
+// (bonus) implementation details + show generated code.
+//  
+// 
 // == #TODO[THIS SLIDE IS AN OUTLINE]
 //
 // - Why e-graphs?
@@ -39,6 +59,7 @@
 //   - Compatibility, figures from report
 //   - Idea sketch, associative+commutative containers
 //   - Lots of details, what has been tried
+
 
 #TODO[GOAL: what problem is, possible solutions, what have we done, what we wnat to do.]
 
