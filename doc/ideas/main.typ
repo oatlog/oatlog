@@ -2597,6 +2597,22 @@ i=8 size=154
 i=9 size=859
 ```
 
+= Fuel within e-graphs
+
+For rules like partial integration, we would like to only apply them 5 or so times.
+
+this can be achived by adding a "fuel" precondition.
+
+```
+(integral x)
+(fuel (fuel x))
+
+->
+
+(partialintegralthing x)
+(fuel x)
+```
+
 
 = TODO READ
 Papers are just under the first author i looked at.

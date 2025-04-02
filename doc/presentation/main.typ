@@ -284,32 +284,41 @@ Terms (called e-nodes) take equivalence classes (e-classes), not other terms as 
 
 - Enable easy embedding of e-graphs into Rust applications.
 
+- Document the egglog language.
+
+
+
 #focus-slide[
   #align(center, [Demo!])
 ]
 
 == Benchmarks
 
-#text(
-  20pt,
-  table(
-    columns: (auto, auto, auto, auto),
-    table.header(
-      [*test*],
-      table.cell(colspan: 1, [*egglog*]),
-      table.cell(colspan: 2, [*oatlog*]),
-      [],
-      [],
-      [sorted list],
-      [btreeset],
-    ),
+#figure(
+  text(
+    20pt,
+    table(
+      columns: (auto, auto, auto, auto),
+      table.header(
+        [*test*],
+        table.cell(colspan: 1, [*egglog*]),
+        table.cell(colspan: 2, [*oatlog*]),
+        [],
+        [],
+        [sorted list],
+        [btreeset],
+      ),
 
-    [math], [24.038 ms], [24.884 ms], [326.83 ms],
-    [boolean adder], [30.935 ms], [56.890 ms], [249.33 ms],
+      [math], [24.038 ms], [24.884 ms], [326.83 ms],
+      [boolean adder], [30.935 ms], [56.890 ms], [249.33 ms],
+    ),
   ),
+  caption: [Benchmarks comparing index implementations.],
 )
 
-#TODO[]
+- The benchmarks just contain exponentially growing rules.
+    - It's very hard to design reasonable benchmarks, that check what we want to check.
+    - We have some ideas on how to fix this with some sort of optimization fuel, but for e-graphs, so that we can instead test time to convergence.
 
 == Egglog compatibility and testing
 // NUMBER OF PASSING TESTS
@@ -365,13 +374,16 @@ Terms (called e-nodes) take equivalence classes (e-classes), not other terms as 
       table.cell(colspan: 2)[Actions],
       [union], yes,
       [set], no, // function set output, for lattices
-      [delete], no,
-      [subsume], no,
-      [panic], no,
+      [delete/subsume], no,
+      [panic], yes,
 
       table.cell(colspan: 2)[Asserting],
       [fail], ignored,
       [check], ignored,
+
+      table.cell(colspan: 2)[Other],
+      [lattice], no,
+      [primitive functions], no,
     ),
   ),
 )
@@ -395,7 +407,6 @@ Terms (called e-nodes) take equivalence classes (e-classes), not other terms as 
 
   ],
   [
-    #pause
     === Longer term
 
     - Better scheduling, run unifying more often.
@@ -409,10 +420,14 @@ Terms (called e-nodes) take equivalence classes (e-classes), not other terms as 
   ],
 )
 
+== Conclusion
+
+
+
+
 = Implementation details (bonus!)
 
-
-== HIR: High-level IR
+== HIR: High-level IR: represent rules
 
 #figure(
   ```rust
