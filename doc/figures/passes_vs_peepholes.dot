@@ -30,4 +30,6 @@ digraph G {
         Y:se -> Y:ne [label=" rewrite 2"];
         Y -> Z;
     }
+    D -> X [style="invis"];
+    D -> X1 [style="invis"];
 }

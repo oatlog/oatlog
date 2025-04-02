@@ -1,0 +1,13 @@
+digraph G {
+    newrank=true;
+    rankdir="TD";
+
+    A [label="input"]
+    B [label="pass 1"]
+    C [label="pass 2"]
+    D [label="output"]
+
+    A -> B;
+    B -> C;
+    C -> D;
+}

@@ -23,33 +23,165 @@
 
 #title-slide()
 
-= Compilers and the phase ordering problem
+= Compilers and the \ phase ordering problem
 
 == Compilation passes
-// BACKGROUND: What is compilation
 
-#TODO[]
+#slide(
+  repeat: 6,
+  self => [
+    #let (uncover, only, alternatives) = utils.methods(self)
+    #alternatives[```c
+      mem[0] = 1
+      a = mem[0] + 2 // a=3
+      mem[3] = 4
+      return mem[a] + 5 // return 9
+      ```][```c
 
-== LLVM has many passes
-// NATURALLY BUILD TOWARDS PHASE MESSINESS
+      a = 1 + 2 // a=3
+      mem[3] = 4
+      return mem[a] + 5 // return 9
+      ```][```c
 
-#TODO[]
+
+      mem[3] = 4
+      return mem[3] + 5 // return 9
+      ```][```c
+
+
+
+      return 4 + 5 // return 9
+      ```][```c
+
+
+
+      return 9
+      ```][```c
+      mem[0] = 1
+      a = mem[0] + 2 // a=3
+      mem[3] = 4
+      return mem[a] + 5 // return 9
+      ```]
+    + Store-to-load forwarding #pause
+    + Constant folding #pause
+    + Store-to-load forwarding #pause
+    + Constant folding #pause
+  ],
+)
+
+== Compilation pass architecture
+
+#v(1em)
+#grid(
+  columns: (2fr, 1fr, 2fr),
+  [
+    Passes are
+    - one (small) optimization
+    - applied to the entire program
+
+    Structured approach to implementing many optimizations!
+  ],
+  align(center, image("../figures/compilation_passes.svg")),
+  [
+    #pause
+    Passes must be:
+    - interleaved
+    - run multiple times
+
+    #v(1em)
+    ```c
+    mem[0] = 1
+    a = mem[0] + 2
+    mem[3] = 4
+    return mem[a] + 5
+    ```
+  ],
+)
 
 == Phase ordering problem
 // PROBLEM: PASSES HAVE DOWNSIDES
 
-#TODO[]
+#v(1em)
+#grid(
+  columns: (2fr, 1fr, 2fr),
+  [
+    Run passes
+    - in what order?
+    - how many times?
 
+    Unfortunately
+    - local optimum never guaranteed
+    - whole-program processing adds up, becomes slow
+  ],
+  align(center, image("../figures/compilation_passes.svg")),
+  box(
+    height: 67%,
+    figure(
+      grid(
+        columns: (2.5em, 6em, 2em),
+        [], columns(2, align(left, text(2.3pt, raw(read("llvm_passes.txt"))))), [],
+      ),
+      caption: [LLVM passes used in rustc],
+    ),
+  ),
+)
 
-== Peephole optimization
-// SOLUTION TO PHASE ORDERING
+== Peephole optimization to our rescue?
 
-#TODO[]
+#v(1em)
+#grid(
+  columns: (11fr, 15fr, 10fr),
+  gutter: 1em,
+  [
+    #uncover("2-")[
+      ```c
+      mem[0] = 1
+      a = mem[0] + 2
+      mem[3] = 4
+      return mem[a] + 5
+      ```
+    ]
+    #uncover("4-")[
+      Local rewrites to fixpoint
 
-== Still rewrite order dependence...
-// PROBLEM: NOT ACTUALLY A SOLUTION
+      Optimizations are
+      - fused
+      - incremental
+      - algebraic
+    ]
+  ],
+  uncover(
+    "3-",
+    figure(
+      image("../figures/peephole_example.svg", fit: "contain", height: 82%),
+      caption: [Peephole-able IR],
+    ),
+  ),
+  image("../figures/passes_vs_peepholes.svg", height: 93%),
+)
 
-#TODO[]
+== Peepholes aren't quite sufficent...
+
+#v(1em)
+Optimization to fixpoint *almost* solves the phase ordering problem.
+
+#pause
+
+But rewrites don't commute!
+
+```rust
+// input
+f(g(2*x+5+10), h(2*x+5))
+// constant folded
+f(g(2*x+15), h(2*x+5))
+// common subexpression eliminated
+y=2*x+5; f(g(y+10), h(y))
+```
+
+#pause
+
+Rewriting is destructive. We need a way to not forget previous and alternative representations of
+the program.
 
 = E-graphs
 
@@ -520,7 +652,7 @@ for (a, b, p2) in self.add_relation.iter_new() {
 
 == Phase ordering problem in peephole and term rewriting
 
-#v(2em)
+#v(1em)
 Optimization to fixpoint *almost* solves the phase ordering problem.
 
 But rewrites don't commute!

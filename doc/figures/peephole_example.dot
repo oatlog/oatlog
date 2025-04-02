@@ -1,0 +1,30 @@
+// (a + 2) * c
+digraph G {
+    rankdir = "TD";
+    fontsize="24"
+    node [ fontsize="24" ]
+
+    one [label="1"];
+    two [label="2"];
+    four [label="4"];
+    five [label="5"];
+    m0 [label="mem[0]"];
+    m3 [label="mem[3]"];
+    ma [label="mem[a]"];
+    q [label="mem[???]"];
+    a [label="+"];
+    ret [label="+"];
+    return [label="return"];
+
+    one -> m0;
+    m0 -> a;
+    two -> a;
+    four -> m3;
+    m0 -> ma;
+    m3 -> ma;
+    q -> ma;
+    ma -> ret;
+    a -> ma [style="dashed"];
+    five -> ret;
+    ret -> return;
+}
