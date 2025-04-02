@@ -229,7 +229,13 @@ the program.
 == Our contribution
 // SOLUTION: FASTER E-GRAPHS
 
-#TODO[]
+- #TODO[faster e-graphs]
+
+- Independent egglog implementation#footnote[this was hard], that is Ahead-of-Time, such that we can optimize rules together, pre-determine indexes, etc.
+
+- Identical behavior to egglog for the subset egglog that we support.
+
+- Enable easy embedding of e-graphs into Rust applications.
 
 #focus-slide[
   #align(center, [Demo!])
@@ -252,14 +258,6 @@ the program.
 #image("../figures/architecture.svg"),
 
 #TODO[]
-
-== Contribution
-
-- Independent egglog implementation#footnote[this was hard], that is Ahead-of-Time, such that we can optimize rules together, pre-determine indexes, etc.
-
-- Identical behavior to egglog for the subset that we support.
-
-- Enable easy embedding of e-graphs into Rust applications.
 
 == Future work (for the remaining part of the thesis)
 
