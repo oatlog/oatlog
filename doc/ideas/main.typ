@@ -2547,6 +2547,56 @@ A, B -> union
 A, C -> union
 A, B, C -> union
 
+= Adding dedup shrinks new (very good)
+
+without dedup
+```
+
+[examples/test-api/src/main.rs:305:9] theory.add_.new.len() = 3
+i=0 size=10
+[examples/test-api/src/main.rs:305:9] theory.add_.new.len() = 12
+i=1 size=22
+[examples/test-api/src/main.rs:305:9] theory.add_.new.len() = 48
+i=2 size=60
+[examples/test-api/src/main.rs:305:9] theory.add_.new.len() = 73
+i=3 size=82
+[examples/test-api/src/main.rs:305:9] theory.add_.new.len() = 68
+i=4 size=76
+[examples/test-api/src/main.rs:305:9] theory.add_.new.len() = 76
+i=5 size=86
+[examples/test-api/src/main.rs:305:9] theory.add_.new.len() = 68
+i=6 size=80
+[examples/test-api/src/main.rs:305:9] theory.add_.new.len() = 70
+i=7 size=89
+[examples/test-api/src/main.rs:305:9] theory.add_.new.len() = 70
+i=8 size=154
+[examples/test-api/src/main.rs:305:9] theory.add_.new.len() = 230
+i=9 size=859
+```
+with dedup
+```
+[examples/test-api/src/main.rs:305:9] theory.add_.new.len() = 3
+i=0 size=10
+[examples/test-api/src/main.rs:305:9] theory.add_.new.len() = 11
+i=1 size=22
+[examples/test-api/src/main.rs:305:9] theory.add_.new.len() = 38
+i=2 size=60
+[examples/test-api/src/main.rs:305:9] theory.add_.new.len() = 40
+i=3 size=82
+[examples/test-api/src/main.rs:305:9] theory.add_.new.len() = 11
+i=4 size=76
+[examples/test-api/src/main.rs:305:9] theory.add_.new.len() = 8
+i=5 size=86
+[examples/test-api/src/main.rs:305:9] theory.add_.new.len() = 0
+i=6 size=80
+[examples/test-api/src/main.rs:305:9] theory.add_.new.len() = 2
+i=7 size=89
+[examples/test-api/src/main.rs:305:9] theory.add_.new.len() = 2
+i=8 size=154
+[examples/test-api/src/main.rs:305:9] theory.add_.new.len() = 160
+i=9 size=859
+```
+
 
 = TODO READ
 Papers are just under the first author i looked at.
