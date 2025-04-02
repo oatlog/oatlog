@@ -328,9 +328,16 @@
 
 == Phase ordering problem in compilation passes
 
-- In what order should we run passes?
-- What passes should be run multiple times?
-- Must avoid optimizations that inhibit others!
+#grid(
+  rows: (1fr, 3fr),
+  [
+    - In what order should we run passes?
+    - What passes should be run multiple times?
+    - Must avoid optimizations that inhibit others!
+  ],
+  align(center, image("../figures/passes_vs_peepholes.svg")),
+)
+
 
 == Phase ordering problem in peephole and term rewriting
 
