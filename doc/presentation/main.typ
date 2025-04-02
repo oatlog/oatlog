@@ -314,9 +314,17 @@ Terms (called e-nodes) take equivalence classes (e-classes), not other terms as 
 == Egglog compatibility and testing
 // NUMBER OF PASSING TESTS
 
-- We produce exactly the same results for the subset of egglog that we support.
-
-#TODO[]
+#text(
+  24pt,
+  [
+    - We run the 93 tests from the egglog testsuite + our own extra tests.
+      - We are able to run 9 of them because we only support a subset of the egglog language (the others essentially only test our frontend).
+      - Of the tests we are able to run, we match perfectly (in terms of number of e-nodes)
+      - Instance shrinking is implemented for egglog/oatlog differences#footnote[This is not straightforward for code that needs to be compiled.].
+    - We have property tests (quickcheck with a different name) for index implementations.
+    - We use snapshot testing to validate our generated code and IRs (HIR, LIR).
+  ],
+)
 
 - Egglog testsuite (and some additional tests) are run on egglog and oatlog and e-node counts are compared.
 - Expect tests for IR and codegen.
