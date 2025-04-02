@@ -573,4 +573,52 @@ struct AddRelation {
     all_index_1_0_2: BTreeSet<(Math, Math, Math)>,
     all_index_2_0_1: BTreeSet<(Math, Math, Math)>,
 }
+impl AddRelation {
+    fn update(&mut self, uf: &mut Unification, delta: &mut Delta) {
+        let mut inserts = take(&mut delta.add_relation_delta);
+        let orig_inserts = inserts.len();
+        self.all_index_0_1_2.first_column_uproots(
+            uf.math_uf.get_uprooted_snapshot(),
+            |deleted_rows| inserts.extend(deleted_rows),
+        );
+        self.all_index_1_0_2.first_column_uproots(
+            uf.math_uf.get_uprooted_snapshot(),
+            |deleted_rows| inserts.extend(deleted_rows),
+        );
+        self.all_index_2_0_1.first_column_uproots(
+            uf.math_uf.get_uprooted_snapshot(),
+            |deleted_rows| inserts.extend(deleted_rows),
+        );
+        inserts[orig_inserts..].sort_unstable();
+        runtime::dedup_suffix(&mut inserts, orig_inserts);
+        self.all_index_0_1_2.delete_many(&mut inserts[orig_inserts..]);
+        self.all_index_1_0_2.delete_many(&mut inserts[orig_inserts..]);
+        self.all_index_2_0_1.delete_many(&mut inserts[orig_inserts..]);
+        inserts.iter_mut().for_each(|row| {
+            row.0 = uf.math_uf.find(row.0);
+            row.1 = uf.math_uf.find(row.1);
+            row.2 = uf.math_uf.find(row.2);
+        });
+        self.all_index_0_1_2
+            .insert_many(&mut inserts, |mut old, mut new| {
+                let (x2,) = old.value_mut();
+                let (y2,) = new.value_mut();
+                uf.math_uf.union_mut(x2, y2);
+                old
+            });
+        self.all_index_1_0_2
+            .insert_many(&mut inserts, |mut old, mut new| {
+                let () = old.value_mut();
+                let () = new.value_mut();
+                panic!("panicking merge action")
+            });
+        self.all_index_2_0_1
+            .insert_many(&mut inserts, |mut old, mut new| {
+                let () = old.value_mut();
+                let () = new.value_mut();
+                panic!("panicking merge action")
+            });
+        self.new.extend_from_slice(&inserts);
+    }
+}
 ```
