@@ -1,11 +1,11 @@
 oatlog::compile_egraph!((
     (datatype Math
-     (Mul Math Math)
-     (Add Math Math)
-     (Sub Math Math)
-     (Neg Math)
-     (Zero)
-     (Sqrt Math)
+        (Mul Math Math)
+        (Add Math Math)
+        (Sub Math Math)
+        (Neg Math)
+        (Zero)
+        (Sqrt Math)
     )
 
     // a-b = a+(-b)

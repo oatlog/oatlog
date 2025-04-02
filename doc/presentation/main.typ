@@ -23,22 +23,22 @@
 
 #title-slide()
 
-== #TODO[THIS SLIDE IS AN OUTLINE]
-
-- Why e-graphs?
-  - Formal rewriting systems 101
-    - Used for compilers, computer algebra
-    - Experiences *phase ordering problem* due to forgetfulness (non-commutativity, non-monotonicity)
-  - E-graphs as a solution to forgetfulness, every rewrite simulaneously
-    - Incl. walkthrough
-  - But e-graphs are slow!
-- Demo
-- Benchmarks and implementation
-  - Somewhat handwavey relational view, we don't really have time(?)
-  - Not done, here are the current results
-  - Compatibility, figures from report
-  - Idea sketch, associative+commutative containers
-  - Lots of details, what has been tried
+// == #TODO[THIS SLIDE IS AN OUTLINE]
+//
+// - Why e-graphs?
+//   - Formal rewriting systems 101
+//     - Used for compilers, computer algebra
+//     - Experiences *phase ordering problem* due to forgetfulness (non-commutativity, non-monotonicity)
+//   - E-graphs as a solution to forgetfulness, every rewrite simulaneously
+//     - Incl. walkthrough
+//   - But e-graphs are slow!
+// - Demo
+// - Benchmarks and implementation
+//   - Somewhat handwavey relational view, we don't really have time(?)
+//   - Not done, here are the current results
+//   - Compatibility, figures from report
+//   - Idea sketch, associative+commutative containers
+//   - Lots of details, what has been tried
 
 = Term rewriting 101
 
@@ -325,6 +325,226 @@
     Free MachineFunction
   ],
 )
+
+
+- Compiler passes don't commute.
+  - $f(g(x)) != g(f(x))$
+- Need to iterate until fixpoint
+- Don't reach global optima.
+- Passes must improve the code in all cases.
+- Makes compiler engineer sad.
+
+#TODO[]
+
+= E-graphs
+
+== Explain e-graphs
+
+- Apply rewrites and keep both versions.
+- Reach global optima.
+- Passes don't need to improve the code.
+- Slow.
+
+#grid(
+  columns: (auto, auto),
+  gutter: 1cm,
+  image("../figures/egraph_example.svg"), image("../figures/egraph_cluster.svg"),
+)
+
+= Our project: Oatlog
+
+== What we have made (rust macro)
+
+```rust
+oatlog::compile_egraph!((
+    (datatype Math
+        (Mul Math Math)
+        (Add Math Math)
+        (Neg Math)
+        /* ... */
+    )
+    (rewrite (Sub a b) (Add a (Neg b))) // a-b = a+(-b)
+    (rewrite (Neg (Neg x)) x) // --x = x
+    // Distributivity
+    (rewrite (Mul x (Add a b)) (Add (Mul x a) (Mul x b)))
+    /* ... */
+));
+```
+
+#focus-slide[
+  // Quadratic formula demo (just run it)
+  // Egglog language overview (just show quadratic)
+  #align(center, [Demo!])
+]
+
+== Benchmarks
+#text(
+  20pt,
+  table(
+    columns: (auto, auto, auto, auto),
+    table.header(
+      [*test*],
+      table.cell(colspan: 1, [*egglog*]),
+      table.cell(colspan: 2, [*oatlog*]),
+      [],
+      [],
+      [sorted list],
+      [btreeset],
+    ),
+
+    [math], [24.038 ms], [24.884 ms], [326.83 ms],
+    [boolean adder], [30.935 ms], [56.890 ms], [249.33 ms],
+  ),
+)
+
+- We have not implemented everything that we want to implement.
+
+== Testing
+
+- Egglog testsuite (and some additional tests) are run on egglog and oatlog and e-node counts are compared.
+- Expect tests for IR and codegen.
+- Comparing index implementations (Quickcheck tests)
+
+#pagebreak()
+
+== Language implementation
+#let yes = table.cell()[yes]
+#let no = table.cell(fill: red.lighten(20%))[no]
+#let ignored = table.cell(fill: gray.lighten(30%))[ignored]
+#let wont = table.cell(fill: blue.lighten(40%))[won't]
+
+#text(
+  20pt,
+  grid(
+    columns: (1fr, 1fr),
+    table(
+      columns: (45%, 45%),
+      [Egglog feature], [Oatlog support],
+
+      table.cell(colspan: 2)[Core],
+      [include], yes,
+      [sort], yes,
+      [datatype], yes,
+      [datatype\*], yes,
+      [constructor], yes,
+      [function], yes,
+      [relation], yes,
+      [let], yes,
+      [rule], yes,
+      [rewrite], yes,
+      [birewrite], yes,
+    ),
+    table(
+      columns: (45%, 45%),
+      [Egglog feature], [Oatlog support],
+
+      table.cell(colspan: 2)[Actions],
+      [union], yes,
+      [set], no, // function set output, for lattices
+      [delete], no,
+      [subsume], no,
+      [panic], no,
+
+      table.cell(colspan: 2)[Asserting],
+      [fail], ignored,
+      [check], ignored,
+    ),
+  ),
+)
+
+== E-graphs as relational databases
+
+#text(
+  grid(
+    columns: (auto, auto, auto),
+    inset: 0.4em,
+    table(
+      columns: (auto, auto, auto),
+      inset: 8pt,
+      table.header(
+        table.cell(colspan: 3, [*Add*]),
+        [*x*],
+        [*y*],
+        [*res*],
+      ),
+
+      [$e_0$], [$e_1$], [$e_2$],
+      [$e_3$], [$e_4$], [$e_5$],
+      [$e_6$], [$e_7$], [$e_8$],
+    ),
+    table(
+      columns: (auto, auto, auto),
+      inset: 8pt,
+      table.header(
+        table.cell(colspan: 3, [*Mul*]),
+        [*x*],
+        [*y*],
+        [*res*],
+      ),
+
+      [$e_9$], [$e_10$], [$e_2$],
+      [$e_11$], [$e_12$], [$e_5$],
+    ),
+    table(
+      columns: (auto, auto, auto, auto, auto),
+      // inset: 8pt,
+      table.header(
+        table.cell(colspan: 5, [*Join Add,Mul on res*]),
+        [*Add.x*],
+        [*Add.y*],
+        [*Mul.x*],
+        [*Mul.y*],
+        [*res*],
+      ),
+      [$e_0$], [$e_1$], [$e_9$], [$e_10$], [$e_2$],
+      [$e_3$], [$e_4$], [$e_11$], [$e_12$], [$e_5$],
+    ),
+  ),
+)
+
+- E-graph is treated as a relational database.
+- E-nodes are rows in the database.
+- Elements in rows are E-classes (just number labels).
+- The set of members of an E-class is implicit.
+
+== Rewrites as join + insert
+#text(
+  20pt,
+  ```rust
+  struct Math(u32);
+  struct Delta {
+      add: Vec<(Math, Math, Math)>,
+      mul: Vec<(Math, Math, Math)>,
+  }
+
+  // (rewrite (Mul (Add a b) c) (Add (Mul a c) (Mul b c)))
+  for (a, b, p2) in self.add_relation.iter_new() {
+      for (c, p4) in self.mul_relation.iter1_0_1_2(p2) {
+          let a5 = self.uf.math_uf.add_eclass();
+          let a4 = self.uf.math_uf.add_eclass();
+          self.delta.add.push((a4, a5, p4));
+          self.delta.mul.push((b, c, a5));
+          self.delta.mul.push((a, c, a4));
+      }
+  }
+  ```,
+)
+
+== Canonicalization
+
+```rust
+struct AddRelation {
+    new: Vec<(Math, Math, Math)>,
+    // BTreeSet is kind of a sorted list
+    all_index_0_1_2: BTreeSet<(Math, Math, Math)>,
+    all_index_1_0_2: BTreeSet<(Math, Math, Math)>,
+    all_index_2_0_1: BTreeSet<(Math, Math, Math)>,
+}
+```
+
+
+#pagebreak()
+
 
 == Phase ordering problem in compilation passes
 
