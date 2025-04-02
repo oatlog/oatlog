@@ -60,9 +60,9 @@
 
   - #[*Rewrite rules* for terms, written $#a#e#b -> #a#e#b$ such as in
 
-    #align(center, $0 dot x -> 0$)
-    #align(center, $x dot z + y dot z -> (x+y) dot z $)
-  ]
+      #align(center, $0 dot x -> 0$)
+      #align(center, $x dot z + y dot z -> (x+y) dot z$)
+    ]
 
   - Essentially, expressions trees that can be _rewritten locally_
 ]
@@ -72,9 +72,9 @@
 #align(center, $0 dot x -> 0$)
 #align(center, $x dot z + y dot z -> (x+y) dot z$)
 
-+ Initial expression 
-+ Rewrite rules maintain equality 
-+ Rewrite rules improve quality (size, complexity, ...) 
++ Initial expression
++ Rewrite rules maintain equality
++ Rewrite rules improve quality (size, complexity, ...)
 
 - Expression simplification
 - Equation solving
@@ -111,8 +111,13 @@
 - Passes don't need to improve the code.
 - Slow.
 
-#image("../figures/egraph_example.svg")
-#image("../figures/egraph_cluster.svg")
+
+#grid(
+  columns: (auto, auto),
+  gutter: 1cm,
+  image("../figures/egraph_example.svg"), image("../figures/egraph_cluster.svg"),
+)
+
 
 #focus-slide[
   // Quadratic formula demo

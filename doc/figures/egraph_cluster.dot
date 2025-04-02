@@ -27,12 +27,12 @@ digraph G {
     subgraph cluster_c_1 {
         margin=16
         style=rounded
-        c_1 [shape=rect, label = "c"];
+        c_1 [shape=rect, label = "c", penwidth = 0];
     }
     subgraph cluster_a_1 {
         margin=16
         style=rounded
-        a_1 [shape=rect, label = "a"];
+        a_1 [shape=rect, label = "a", penwidth = 0];
     }
     subgraph cluster_mul_a_c_1 {
         margin=16
