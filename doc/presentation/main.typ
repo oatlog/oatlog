@@ -62,24 +62,35 @@
 // BACKGROUND: E-GRAPHS IN PRACTICE
 // PROBLEM: E-GRAPHS ARE SLOW
 
-// need to establish that egglog is slow
-
-```lisp
-(datatype Math
-    (Add Math Math)
-    (Mul Math Math)
-    (Const i64)
-)
-; (rewrite FROM TO)
-; x * 0 = x
-(rewrite (Mul x (Const 0)) (Const 0))
-; a * c + b * c
-(rewrite (Add (Mul a c) (Mul b c)) (Mul (Add a b) c))
-```
 
 - Egglog is both and interpreter and a language.
+- Egglog improves upon egg by using semi-naive evaluation and relational e-matching.
+- Notable uses (egg/egglog)
+  - Eggcc, an experimental optimizing compiler.
+  - Herbie, a program to optimize floating point accuracy.
+  - Simplifying CAD models (union/difference, etc)
+  - Logic synthesis.
 
-#TODO[]
+#TODO[somehow say that e-graphs are slow]
+
+== Egglog language
+
+#figure(
+  ```lisp
+  (datatype Math
+      (Add Math Math)
+      (Mul Math Math)
+      (Const i64)
+  )
+  (rewrite <FROM> <TO>)
+  ; x * 0 -> x
+  (rewrite (Mul x (Const 0)) (Const 0))
+  ; a * c + b * c -> (a + b) * c
+  (rewrite (Add (Mul a c) (Mul b c)) (Mul (Add a b) c))
+  ```,
+  caption: [Example of the egglog language],
+)
+
 
 = Oatlog
 
@@ -97,22 +108,269 @@
 #TODO[]
 
 == Egglog compatibility and testing
+// NUMBER OF PASSING TESTS
+
+- We produce exactly the same results for the subset of egglog that we support.
 
 #TODO[]
 
 == Oatlog architecture
 
-#TODO[]
 
-== Future work
-
-#TODO[]
-
-== (Bonus) Implementation details and generated code
+#image("../figures/architecture.svg"),
 
 #TODO[]
 
+== Contribution
 
+- Independent egglog implementation#footnote[this was hard], that is Ahead-of-Time, such that we can optimize rules together, pre-determine indexes, etc.
+
+- Identical behavior to egglog for the subset that we support.
+
+- Enable easy embedding of e-graphs into Rust applications.
+
+== Future work (for the remaining part of the thesis)
+
+
+#grid(
+  columns: (1fr, 2fr),
+  [
+
+    === Short term
+
+    - Keeping multiple "new" sets to run some rules less often.
+    - Figure out good HIR representation.
+    - Lattice computations
+    - Primitive functions
+      - `+`, `-`, ... on i64
+
+  ],
+  [
+    === Longer term
+
+    - Better scheduling, run unifying more often.
+    - Perform analysis to infer infer new unifying rules.
+    - Automatically infer implicit functionality.
+    - Automatically merge relations.
+      - $a + b = c <=> b = c - a$
+    - Implement faster b-trees.
+    - Explore better query planning
+    - Containers
+
+  ],
+)
+
+
+#TODO[]
+
+= Implementation details
+
+
+== HIR: High-level IR
+
+#figure(
+  ```rust
+  pub(crate) struct SymbolicRule {
+      // ==== PREMISE ====
+      premise: Vec<(RelationId, Vec<PremiseId>)>,
+
+      // ==== ACTIONS ====
+      inserts: Vec<(RelationId, Vec<ActionId>>,
+      unify: UF<PremiseId>,
+      action_variables: HashMap<ActionId, Option<PremiseId>>,
+  }
+  ```,
+  caption: [simplified HIR implementation],
+)
+
+- A premise is a conjunctive query, $"Add"(a, b, c), "Mul"(c, d, e)$.
+- An action is a list of unifications and inserts.
+
+== E-graphs as relational databases
+
+#let rowh = 1.4em
+
+#text(
+  grid(
+    columns: (1fr, 1fr, 2fr),
+    inset: 0.4em,
+    figure(
+      table(
+        columns: (auto, auto, auto),
+        rows: rowh,
+        inset: 8pt,
+        table.header(
+          table.cell(colspan: 3, [*Add*]),
+          [*x*],
+          [*y*],
+          [*res*],
+        ),
+
+        [$e_0$], [$e_1$], [$e_2$],
+        [$e_3$], [$e_4$], [$e_5$],
+        [$e_6$], [$e_7$], [$e_8$],
+      ),
+      caption: [Add relation],
+    ),
+    figure(
+      table(
+        columns: (auto, auto, auto),
+        rows: rowh,
+        inset: 8pt,
+        table.header(
+          table.cell(colspan: 3, [*Mul*]),
+          [*x*],
+          [*y*],
+          [*res*],
+        ),
+
+        [$e_9$], [$e_10$], [$e_2$],
+        [$e_11$], [$e_12$], [$e_5$],
+      ),
+      caption: [Mul relation],
+    ),
+    figure(
+      table(
+        columns: (auto, auto, auto, auto, auto),
+        rows: rowh,
+        // inset: 8pt,
+        table.header(
+          table.cell(colspan: 5, [*Join Add,Mul on res*]),
+          [*Add.x*],
+          [*Add.y*],
+          [*Mul.x*],
+          [*Mul.y*],
+          [*res*],
+        ),
+        [$e_0$], [$e_1$], [$e_9$], [$e_10$], [$e_2$],
+        [$e_3$], [$e_4$], [$e_11$], [$e_12$], [$e_5$],
+      ),
+      caption: [Finding $a * b = c + d$],
+    ),
+  ),
+)
+
+- E-graph is treated as a relational database (established research).
+- E-nodes are rows in the database, elements in rows are E-classes.
+- There is no explicit list of members of an E-class.
+
+
+== Semi-naive evaluation
+
+- Rules re-discover the same facts, but we only care about new facts.
+- We can track what parts of the database is "new" and join that to the old database.
+
+#text(
+  40pt,
+  $ (A_"all" join B_"all")_"new" subset.eq A_"new" join B_"all" + A_"new" join B_"all" $,
+)
+
+- Very beneficial if $A' << A$.
+
+== Codegen for rules
+```rust
+// (rewrite (Mul (Add a b) c) (Add (Mul a c) (Mul b c)))
+for (a, b, p2) in self.add_relation.iter_new() {
+    for (c, p4) in self.mul_relation.iter1_0_1_2(p2) {
+        let a5 = self.uf.math_uf.add_eclass();
+        let a4 = self.uf.math_uf.add_eclass();
+        self.delta.add.push((a4, a5, p4));
+        self.delta.mul.push((b, c, a5));
+        self.delta.mul.push((a, c, a4));
+    }
+}
+```
+- Joins are (indexed) nested loops.
+- Actions put information in a delta.
+
+== Codegen for relations
+
+#figure(
+  ```rust
+  struct AddRelation {
+      // New needs no index, since it is only iterated
+      new: Vec<(Math, Math, Math)>,
+
+      // Indexes for ALL
+      all_index_0_1_2: BTreeSet<(Math, Math, Math)>,
+      all_index_1_0_2: BTreeSet<(Math, Math, Math)>,
+      all_index_2_0_1: BTreeSet<(Math, Math, Math)>,
+  }
+  ```,
+  caption: [Generated code for an add relation],
+)
+
+== Codegen for canonicalization + insertion
+- If we show that $e_3 = e_4$ then we remove all instances of $e_3$ and replace it with $e_4$.
+- Union-find is used to pick the minimal set to uproot.
+
++ Remove outdated E-classes from indexes.
++ Canonicalize uprooted e-nodes.
++ Insert canonicalized e-nodes into indexes along with delta, generating new equalites.
++ Repeat until fixpoint.
+
+== Codegen for uproots
+#figure(
+  text(
+    20pt,
+    ```rust
+    fn update(&mut self, uf: &mut Unification, delta: &mut Delta) {
+        let mut inserts = take(&mut delta.add_relation_delta);
+        let orig_inserts = inserts.len();
+        self.all_index_0_1_2.first_column_uproots(
+            uf.math_uf.get_uprooted_snapshot(),
+            |deleted_rows| inserts.extend(deleted_rows),
+        );
+        self.all_index_1_0_2.first_column_uproots(
+            uf.math_uf.get_uprooted_snapshot(),
+            |deleted_rows| inserts.extend(deleted_rows),
+        );
+        /* ... */
+        self.all_index_0_1_2.delete_many(&mut inserts[orig_inserts..]);
+        self.all_index_1_0_2.delete_many(&mut inserts[orig_inserts..]);
+        /* ... */
+    ```,
+  ),
+  caption: [Generated code for uprooting outdated e-classes],
+)
+== Codegen for canonicalizing e-nodes
+#figure(
+  text(
+    20pt,
+    ```rust
+        /* ... */
+        inserts.iter_mut().for_each(|row| {
+            row.0 = uf.math_uf.find(row.0);
+            row.1 = uf.math_uf.find(row.1);
+            row.2 = uf.math_uf.find(row.2);
+        });
+        /* ... */
+    ```,
+  ),
+  caption: [Generated code for canonicalizing e-nodes],
+)
+
+== Codegen for re-insertions
+#figure(
+  text(
+    20pt,
+    ```rust
+        /* ... */
+        self.all_index_0_1_2
+            .insert_many(&mut inserts, |mut old, mut new| {
+                let (x2,) = old.value_mut();
+                let (y2,) = new.value_mut();
+                uf.math_uf.union_mut(x2, y2);
+                old
+            });
+        self.all_index_1_0_2.insert_many(&mut inserts, |_, _| {});
+        self.all_index_2_0_1.insert_many(&mut inserts, |_, _| {});
+        self.new.extend_from_slice(&inserts); // also insert into new
+    }
+    ```,
+  ),
+  caption: [Generated code for re-inserting canonicalized e-nodes],
+)
 
 // everywhere: examples
 //
