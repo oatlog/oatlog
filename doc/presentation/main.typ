@@ -103,8 +103,7 @@
 // aba optimization bad
 // llvm has 70 passes
 // passes bad/annoying
-// peephole (easier to reason about
-// less duplicated work)
+// peephole (easier to reason about less duplicated work)
 // still has rewrite order dependence. keep old and keep both
 // this becomes an e-graph.
 // egglog
@@ -134,6 +133,29 @@
 //   - Idea sketch, associative+commutative containers
 //   - Lots of details, what has been tried
 
+
+
+
+
+
+== Egglog and the egglog language (existing work)
+
+```lisp
+(datatype Math
+    (Add Math Math)
+    (Mul Math Math)
+    (Const i64)
+)
+; (rewrite FROM TO)
+; x * 0 = x
+(rewrite (Mul x (Const 0)) (Const 0)) 
+; a * c + b * c
+(rewrite (Add (Mul a c) (Mul b c)) (Mul (Add a b) c))
+```
+
+- Egglog is both and interpreter and a language.
+
+#pagebreak()
 
 #TODO[GOAL: what problem is, possible solutions, what have we done, what we wnat to do.]
 
