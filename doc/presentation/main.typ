@@ -45,26 +45,25 @@
 == Arithmetic as term rewriting
 
 #[
-  #let e = `expr`
   #let op = `op`
   #let t = `term`
   #let a = text(fill: blue, raw("<"))
   #let b = text(fill: blue, raw(">"))
-  #let term = [#a#e#b #a#op#b #a#e#b]
+  #let term = [#a#t#b #a#op#b #a#t#b]
 
   - *Ground terms* $0, 1, -1, 2, -2, dots$
 
   - *Terms* #term for some $#a#op#b in {+, -, dot, div, dots}$
 
-  - *Expressions* are ground terms or terms containing *subexpressions*
+  - Terms are either ground terms or terms containing subexpressions
 
-  - #[*Rewrite rules* for terms, written $#a#e#b -> #a#e#b$ such as in
+  - #[*Rewrite rules* for terms, written $#a#t#b -> #a#t#b$ (with variables) such as in
 
       #align(center, $0 dot x -> 0$)
       #align(center, $x dot z + y dot z -> (x+y) dot z$)
     ]
 
-  - Essentially, expressions trees that can be _rewritten locally_
+  - Essentially, expression trees that can be _rewritten locally_
 ]
 
 == Algebraic optimization
@@ -73,23 +72,42 @@
 #align(center, $x dot z + y dot z -> (x+y) dot z$)
 
 + Initial expression
++ Apply rewrite rules
 + Rewrite rules maintain equality
 + Rewrite rules improve quality (size, complexity, ...)
 
 - Expression simplification
 - Equation solving
+- Compilers!
 
 == Compilation as term rewriting
 
-#TODO[]
++ Represent (sub)program as an expression in a term language
+  - Within basic block
+  - Within function (requires control flow#footnote[Single static assignment (SSA), etc])
+  - Across program (requires variable binding#footnote[Lambda calculus, etc])
++ Optimization steps are our rewrite rules
++ Optimizations maintain program behavior
++ Optimizations (hopefully) improve program performance
 
-== Term rewriting definition
+== Compilation passes vs peepholes
 
-"A set of objects and rules relating those objects"
-
-- Term
-- Expression
-- Rewrite rule
+#grid(
+  columns: (1fr, 1fr),
+  inset: 0.4em,
+  [
+    - Passes process entire program multiple times
+      - Slow
+      - Must repeat passes for synergy
+  ],
+  image("../figures/passes_vs_peepholes.svg"),
+  grid.cell(
+    colspan: 2,
+    [
+      Peepholes instead work locally within a dependency-tracking fixpoint framework
+    ],
+  ),
+)
 
 == Phase ordering
 

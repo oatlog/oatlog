@@ -1,0 +1,33 @@
+digraph G {
+    newrank=true;
+    rankdir="TD";
+
+    subgraph cluster_passes {
+        label = "Global compilation passes";
+
+        A [label="input"]
+        B [label="pass 1"]
+        C [label="pass 2"]
+        D [label="output"]
+
+        A -> B;
+        B -> C;
+        C -> D;
+    }
+    subgraph cluster_peepholes {
+        label = "Local compilation peepholes";
+
+        X1 [style="invis"]
+        X2 [style="invis"]
+        X1 -> X2 [style="invis"]
+
+        X [label="input"]
+        Y [label="intermediate"]
+        Z [label="output"]
+
+        X -> Y;
+        Y:sw -> Y:nw [label="rewrite 1 "];
+        Y:se -> Y:ne [label=" rewrite 2"];
+        Y -> Z;
+    }
+}
