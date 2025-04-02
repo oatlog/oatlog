@@ -40,9 +40,17 @@
 //   - Idea sketch, associative+commutative containers
 //   - Lots of details, what has been tried
 
+#TODO[GOAL: what problem is, possible solutions, what have we done, what we wnat to do.]
+
+#TODO[show pitfalls for "bad" rewrite rules, non-termination, suboptimal cases]
+
 = Term rewriting 101
 
+#TODO[explain problem directly, then solution]
+
 == Arithmetic as term rewriting
+
+#TODO[show as a graph, show lhs, rhs as two graphs]
 
 #[
   #let op = `op`
@@ -68,6 +76,8 @@
 
 == Algebraic optimization
 
+#TODO[show graphs here]
+
 #align(center, $0 dot x -> 0$)
 #align(center, $x dot z + y dot z -> (x+y) dot z$)
 
@@ -76,11 +86,15 @@
 + Rewrite rules maintain equality
 + Rewrite rules improve quality (size, complexity, ...)
 
+#TODO[make these actual examples]
+
 - Expression simplification
 - Equation solving
 - Compilers!
 
 == Compilation could be term rewriting
+
+#TODO[this should be an early slide]
 
 + Represent (sub)program as an expression in a term language
   - Within basic block
@@ -379,6 +393,8 @@ Terms (called e-nodes) take equivalence classes (e-classes), not other terms as 
 
 == What we have made (rust macro)
 
+#TODO[this presents the goal, should be earlier (informal), explain egglog, it's contribution, compare to egglog, explain at least one of the rules]
+
 ```rust
 oatlog::compile_egraph!((
     (datatype Math
@@ -423,6 +439,8 @@ oatlog::compile_egraph!((
 )
 
 - We have not implemented everything that we want to implement.
+
+#TODO[explain indexes]
 
 == Testing
 
@@ -477,6 +495,8 @@ oatlog::compile_egraph!((
 
 
 == Testing
+
+#TODO[argue that our implementation is (mostly) correct]
 
 - Egglog testsuite (and some additional tests) are run on egglog and oatlog and e-node counts are compared.
 - Expect tests for IR and codegen.
@@ -535,7 +555,7 @@ oatlog::compile_egraph!((
   ),
 )
 
-- E-graph is treated as a relational database.
+- E-graph is treated as a relational database (established research).
 - E-nodes are rows in the database.
 - Elements in rows are E-classes (just number labels).
 - The set of members of an E-class is implicit.
@@ -562,6 +582,7 @@ oatlog::compile_egraph!((
   }
   ```,
 )
+#TODO[add captions to listing]
 
 == Canonicalization
 
