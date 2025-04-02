@@ -327,14 +327,40 @@
 )
 
 
-- Compiler passes don't commute.
-  - $f(g(x)) != g(f(x))$
-- Need to iterate until fixpoint
-- Don't reach global optima.
-- Passes must improve the code in all cases.
-- Makes compiler engineer sad.
 
-#TODO[]
+
+
+== Phase ordering problem in compilation passes
+
+#grid(
+  rows: (1fr, 3fr),
+  [
+    - In what order should we run passes?
+    - What passes should be run multiple times?
+    - Must avoid optimizations that inhibit others!
+  ],
+  align(center, image("../figures/passes_vs_peepholes.svg")),
+)
+
+
+== Phase ordering problem in peephole and term rewriting
+
+#v(2em)
+Optimization to fixpoint *almost* solves the phase ordering problem.
+
+But rewrites don't commute!
+
+```rust
+// input
+f(g(2*x+5+10), h(2*x+5))
+// constant folded
+f(g(2*x+15), h(2*x+5))
+// common subexpression eliminated
+y=2*x+5; f(g(y+10), h(y))
+```
+
+Rewriting is destructive. We need a way to not forget previous and alternative representations of
+the program.
 
 = E-graphs
 
@@ -344,6 +370,7 @@
 - Reach global optima.
 - Passes don't need to improve the code.
 - Slow.
+
 
 #grid(
   columns: (auto, auto),
@@ -377,6 +404,7 @@ oatlog::compile_egraph!((
   #align(center, [Demo!])
 ]
 
+
 == Benchmarks
 #text(
   20pt,
@@ -400,10 +428,6 @@ oatlog::compile_egraph!((
 - We have not implemented everything that we want to implement.
 
 == Testing
-
-- Egglog testsuite (and some additional tests) are run on egglog and oatlog and e-node counts are compared.
-- Expect tests for IR and codegen.
-- Comparing index implementations (Quickcheck tests)
 
 #pagebreak()
 
@@ -451,6 +475,18 @@ oatlog::compile_egraph!((
     ),
   ),
 )
+
+#pagebreak()
+
+
+== Testing
+
+- Egglog testsuite (and some additional tests) are run on egglog and oatlog and e-node counts are compared.
+- Expect tests for IR and codegen.
+- Comparing index implementations (Quickcheck tests)
+
+#pagebreak()
+
 
 == E-graphs as relational databases
 
@@ -542,146 +578,3 @@ struct AddRelation {
 }
 ```
 
-
-#pagebreak()
-
-
-== Phase ordering problem in compilation passes
-
-#grid(
-  rows: (1fr, 3fr),
-  [
-    - In what order should we run passes?
-    - What passes should be run multiple times?
-    - Must avoid optimizations that inhibit others!
-  ],
-  align(center, image("../figures/passes_vs_peepholes.svg")),
-)
-
-
-== Phase ordering problem in peephole and term rewriting
-
-#v(2em)
-Optimization to fixpoint *almost* solves the phase ordering problem.
-
-But rewrites don't commute!
-
-```rust
-// input
-f(g(2*x+5+10), h(2*x+5))
-// constant folded
-f(g(2*x+15), h(2*x+5))
-// common subexpression eliminated
-y=2*x+5; f(g(y+10), h(y))
-```
-
-Rewriting is destructive. We need a way to not forget previous and alternative representations of
-the program.
-
-= E-graphs
-
-== Explain e-graphs
-
-- Apply rewrites and keep both versions.
-- Reach global optima.
-- Passes don't need to improve the code.
-- Slow.
-
-
-#grid(
-  columns: (auto, auto),
-  gutter: 1cm,
-  image("../figures/egraph_example.svg"), image("../figures/egraph_cluster.svg"),
-)
-
-
-#focus-slide[
-  // Quadratic formula demo (just run it)
-  // Egglog language overview (just show quadratic)
-  #align(center, [Demo!])
-]
-
-= Our project: Oatlog
-
-== Benchmarks
-#text(
-  20pt,
-  table(
-    columns: (auto, auto, auto, auto),
-    table.header(
-      [*test*],
-      table.cell(colspan: 1, [*egglog*]),
-      table.cell(colspan: 2, [*oatlog*]),
-      [],
-      [],
-      [sorted list],
-      [btreeset],
-    ),
-
-    [math], [24.038 ms], [24.884 ms], [326.83 ms],
-    [boolean adder], [30.935 ms], [56.890 ms], [249.33 ms],
-  ),
-)
-
-- We have not implemented everything that we want to implement.
-
-== Testing
-
-=== Comparing with egglog
-
-- Egglog testsuite (and some additional tests) are run on egglog and oatlog and e-node counts are compared.
-
-#pagebreak()
-
-=== Language implementation
-#let yes = table.cell()[yes]
-#let no = table.cell(fill: red.lighten(20%))[no]
-#let ignored = table.cell(fill: gray.lighten(30%))[ignored]
-#let wont = table.cell(fill: blue.lighten(40%))[won't]
-
-#text(
-  20pt,
-  grid(
-    columns: (1fr, 1fr),
-    table(
-      columns: (45%, 45%),
-      [Egglog feature], [Oatlog support],
-
-      table.cell(colspan: 2)[Core],
-      [include], yes,
-      [sort], yes,
-      [datatype], yes,
-      [datatype\*], yes,
-      [constructor], yes,
-      [function], yes,
-      [relation], yes,
-      [let], yes,
-      [rule], yes,
-      [rewrite], yes,
-      [birewrite], yes,
-    ),
-    table(
-      columns: (45%, 45%),
-      [Egglog feature], [Oatlog support],
-
-      table.cell(colspan: 2)[Actions],
-      [union], yes,
-      [set], no, // function set output, for lattices
-      [delete], no,
-      [subsume], no,
-      [panic], no,
-
-      table.cell(colspan: 2)[Asserting],
-      [fail], ignored,
-      [check], ignored,
-    ),
-  ),
-)
-
-
-
-
-
-#pagebreak()
-
-#TODO[]
