@@ -364,17 +364,14 @@ the program.
 
 = E-graphs
 
-== Explain e-graphs
+== E-graph walkthrough
 
-- Apply rewrites and keep both versions.
-- Reach global optima.
-- Passes don't need to improve the code.
-- Slow.
-
+Terms (called e-nodes) take equivalence classes (e-classes), not other terms as input #TODO[Animate]
 
 #grid(
-  columns: (auto, auto),
-  gutter: 1cm,
+  columns: (3fr, 4fr),
+  align: center,
+  rows: 79%,
   image("../figures/egraph_example.svg"), image("../figures/egraph_cluster.svg"),
 )
 
@@ -577,4 +574,3 @@ struct AddRelation {
     all_index_2_0_1: BTreeSet<(Math, Math, Math)>,
 }
 ```
-
