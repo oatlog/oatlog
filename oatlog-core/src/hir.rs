@@ -258,8 +258,8 @@ pub(crate) mod hir2 {
             let unify: UF<ActionId> = UF::from_pairs(
                 n,
                 self.unify
-                    .iter_edges()
-                    .filter_map(|(a, b)| f(a).and_then(|a| f(b).map(|b| (a, b)))),
+                    .iter_edges_fully_connected()
+                    .filter_map(|(a, b)| Some((f(a)?, f(b)?))),
             );
             let insert_rows: BTreeSet<_> = self
                 .insert_rows
