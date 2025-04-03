@@ -7,6 +7,7 @@ digraph G {
     two [label="2"];
     ctwo [label="",shape=ellipse];
     x [label="x"];
+    cx [label="",shape=ellipse];
     x2 [label="*"];
     cx2 [label="",shape=ellipse];
     x2_div2 [label="/"];
@@ -16,7 +17,8 @@ digraph G {
     cone [label="",shape=ellipse];
     xs [label="<<"];
 
-    x -> x2;
+    x -> cx;
+    cx -> x2;
     two -> ctwo;
     ctwo -> x2;
     x2 -> cx2;
@@ -24,7 +26,7 @@ digraph G {
     x2_div2 -> ctop;
 
     one -> cone;
-    x -> xs;
+    cx -> xs;
     cone -> xs;
     xs -> cx2;
 }

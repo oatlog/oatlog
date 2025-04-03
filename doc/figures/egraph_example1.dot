@@ -7,12 +7,14 @@ digraph G {
     two [label="2"];
     ctwo [label="",shape=ellipse];
     x [label="x"];
+    cx [label="",shape=ellipse];
     x2 [label="*"];
     cx2 [label="",shape=ellipse];
     x2_div2 [label="/"];
     ctop [label="",shape=ellipse];
 
-    x -> x2;
+    x -> cx;
+    cx -> x2;
     two -> ctwo;
     ctwo -> x2;
     x2 -> cx2;

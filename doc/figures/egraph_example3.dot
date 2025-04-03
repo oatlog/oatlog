@@ -20,10 +20,12 @@ digraph G {
     topmul [label="*"];
 
     x [label="x"];
+    cx [label="",shape=ellipse];
     cx2 [label="",shape=ellipse];
     ctop [label="",shape=ellipse];
 
-    x -> x2;
+    x -> cx;
+    cx -> x2;
     two -> ctwo;
     ctwo -> x2;
     x2 -> cx2;
@@ -34,14 +36,14 @@ digraph G {
     ctwo -> two_div_two;
     two_div_two -> ctwo_div_two;
     ctwo_div_two -> topmul;
-    x -> topmul;
+    cx -> topmul;
     topmul -> ctop;
 
 
     one -> cone;
-    x -> xs;
+    cx -> xs;
     cone -> xs;
     xs -> cx2;
 
-    x -> ctop;
+    cx -> ctop [style=dashed,shape=tee,dir=both];
 }

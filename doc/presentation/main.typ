@@ -42,9 +42,9 @@
 // future work
 // (bonus) implementation details + show generated code.
 
-#TODO[GOAL: what problem is, possible solutions, what have we done, what we wnat to do.]
+//#TODO[GOAL: what problem is, possible solutions, what have we done, what we wnat to do.]
 
-#TODO[show pitfalls for "bad" rewrite rules, non-termination, suboptimal cases]
+//#TODO[show pitfalls for "bad" rewrite rules, non-termination, suboptimal cases]
 
 = Compilers and the \ phase ordering problem
 
@@ -216,8 +216,14 @@ the program.
   self => [
     #let (uncover, only, alternatives) = utils.methods(self)
 
-    #box(outset: (x: 6pt, top: 6pt, bottom: 10pt), stroke: black, [Computations]) (called e-nodes)
-    take #box(baseline: -10.8pt, ellipse(inset: (x: -20pt, y: -10pt), outset: (x: 0pt, y: 30pt), [equivalence classes])) (e-classes), not other computations as input
+    #uncover(
+      "2-",
+      [
+        #box(outset: (x: 6pt, top: 6pt, bottom: 10pt), stroke: black, [Computations]) (called
+        e-nodes) take #box(baseline: -10.8pt, ellipse(inset: (x: -20pt, y: -10pt), outset: (x: 0pt,
+        y: 30pt), [equivalence classes])) (e-classes), not other computations as input
+      ],
+    )
 
     #grid(
       columns: (1fr, 3fr),
@@ -245,7 +251,7 @@ the program.
   [
     - Apply rewrites to fixpoint
     - Adding e-nodes and e-classes
-    - Merging e-nodes
+    - Merging e-classes
 
     #uncover("2-")[
       Extraction:
