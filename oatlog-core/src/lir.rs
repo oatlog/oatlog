@@ -21,7 +21,7 @@ use std::{iter, num::NonZeroU64};
 // startup, seem useful though.)
 #[derive(Debug)]
 pub(crate) struct Theory {
-    pub(crate) name: &'static str,
+    pub(crate) name: Option<&'static str>,
     pub(crate) types: TVec<TypeId, TypeData>,
     // TODO loke: not all HIR relations become LIR relations, so the `RelationId` keyspace changes
     // between HIR and LIR. We should actually implement this, not do this `Option` hack.

@@ -380,7 +380,7 @@ impl Parser {
                 .map(|(hir, _)| hir)
                 .cloned()
                 .collect(),
-            name: "",
+            name: None,
             types,
             implicit_rules: self.implicit_rules.clone(),
             global_types: self.global_variables.iter().map(|i| i.ty).collect(),
@@ -1379,7 +1379,7 @@ mod compile_rule {
         let unit_ty = parser.literal_type(Literal::Unit);
 
         let rule = hir::RuleArgs {
-            name: name.map_or("", |x| *x),
+            name: name.map(|x| *x),
             sort_vars: (0..n_fact).map(VariableId).collect(),
             variables: (0..n)
                 .map(VariableId)

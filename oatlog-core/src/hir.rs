@@ -447,7 +447,7 @@ pub(crate) mod hir2 {
 #[derive(Clone, Debug)]
 pub(crate) struct Theory {
     /// Name of final struct
-    pub(crate) name: &'static str,
+    pub(crate) name: Option<&'static str>,
     pub(crate) types: TVec<TypeId, Type>,
     pub(crate) symbolic_rules: Vec<SymbolicRule>,
     pub(crate) implicit_rules: BTreeMap<RelationId, Vec<ImplicitRule>>,
@@ -589,10 +589,9 @@ impl ImplicitRule {
                     })
                     .collect::<TVec<ColumnId, PremiseId>>();
 
-                let name = "";
                 SymbolicRule {
-                    name: RuleMeta {
-                        name,
+                    meta: RuleMeta {
+                        name: None,
                         src: "from implicit rule",
                     },
                     premise_relations: vec![
@@ -722,7 +721,7 @@ pub(crate) enum RelationTy {
 
 #[derive(Clone, Debug)]
 pub(crate) struct RuleMeta {
-    pub(crate) name: &'static str,
+    pub(crate) name: Option<&'static str>,
     // source text for this rule for debug information.
     pub(crate) src: &'static str,
 }
@@ -730,7 +729,7 @@ pub(crate) struct RuleMeta {
 #[must_use]
 #[derive(Clone, Debug)]
 pub(crate) struct SymbolicRule {
-    pub(crate) name: RuleMeta,
+    pub(crate) meta: RuleMeta,
     /// Requirements to trigger rule
     pub(crate) premise_relations: Vec<PremiseRelation>,
 
@@ -799,7 +798,7 @@ pub(crate) struct PremiseRelation {
 #[derive(Debug)]
 pub(crate) struct RuleArgs {
     /// Name of rule
-    pub(crate) name: &'static str,
+    pub(crate) name: Option<&'static str>,
     pub(crate) src: &'static str,
     /// Flag these variables as part of the premise even if not explicitly mentioned.
     pub(crate) sort_vars: Vec<VariableId>,
@@ -817,37 +816,29 @@ pub(crate) struct RuleArgs {
     pub(crate) delete: Vec<VariableId>,
 }
 impl RuleArgs {
-    pub(crate) fn build(self) -> SymbolicRule {
+    pub(crate) fn build(mut self) -> SymbolicRule {
         // general strategy is to initially make a VariableId correspond to both a PremiseId and an
         // ActionId and then normalize to get rid of the useless variables.
 
-        let RuleArgs {
-            name: self_name,
-            sort_vars: self_sort_vars,
-            variables: self_variables,
-            premise: self_premise,
-            premise_unify: self_premise_unify,
-            action: self_action,
-            action_unify: mut self_action_unify,
-            delete: self_delete,
-            src,
-        } = self;
-        let n = self_variables.len();
-        self_action_unify.extend(self_premise_unify.iter().cloned());
+        let n = self.variables.len();
+        self.action_unify.extend(self.premise_unify.iter().cloned());
 
-        let used_in_premise: BTreeSet<_> = self_sort_vars
+        let used_in_premise: BTreeSet<_> = self
+            .sort_vars
             .into_iter()
-            .chain(self_premise.iter().flat_map(|(_, x)| x.iter().copied()))
+            .chain(self.premise.iter().flat_map(|(_, x)| x.iter().copied()))
             .collect();
 
-        let premise_relations = self_premise
+        let premise_relations = self
+            .premise
             .iter()
             .map(|(id, args)| PremiseRelation {
                 relation: *id,
                 args: args.iter().map(|x| PremiseId(x.0)).collect(),
             })
             .collect();
-        let action_relations = self_action
+        let action_relations = self
+            .action
             .iter()
             .map(|(id, args)| ActionRelation {
                 relation: *id,
@@ -856,12 +847,13 @@ impl RuleArgs {
             .collect();
         let mut unify = UF::new_with_size(n, ());
         unify.union_groups(
-            self_action_unify
+            self.action_unify
                 .iter()
                 .map(|x| x.iter().map(|x| PremiseId(x.0)).collect()),
         );
 
-        let action_variables: TVec<ActionId, _> = self_variables
+        let action_variables: TVec<ActionId, _> = self
+            .variables
             .iter_enumerate()
             .map(|(i, (ty, name))| {
                 let meta = VariableMeta::new(name, *ty);
@@ -870,14 +862,15 @@ impl RuleArgs {
             })
             .collect();
 
-        let premise_variables: TVec<PremiseId, _> = self_variables
+        let premise_variables: TVec<PremiseId, _> = self
+            .variables
             .iter()
             .map(|(ty, name)| VariableMeta::new(name, *ty))
             .collect();
         SymbolicRule {
-            name: RuleMeta {
-                name: self_name,
-                src,
+            meta: RuleMeta {
+                name: self.name,
+                src: self.src,
             },
             premise_relations,
             action_relations,
@@ -886,16 +879,18 @@ impl RuleArgs {
             premise_variables,
         }
         .unify(UnifyArgs {
-            merge_premise: self_premise_unify
+            merge_premise: self
+                .premise_unify
                 .iter()
                 .map(|x| x.iter().map(|x| PremiseId(x.0)).collect())
                 .collect(),
-            merge_action: self_action_unify
+            merge_action: self
+                .action_unify
                 .iter()
                 .map(|x| x.iter().map(|x| ActionId(x.0)).collect())
                 .collect(),
-            premise_delete: self_delete.iter().map(|x| PremiseId(x.0)).collect(),
-            action_delete: self_delete.iter().map(|x| ActionId(x.0)).collect(),
+            premise_delete: self.delete.iter().map(|x| PremiseId(x.0)).collect(),
+            action_delete: self.delete.iter().map(|x| ActionId(x.0)).collect(),
         })
     }
 }
@@ -1067,7 +1062,7 @@ impl SymbolicRule {
             unify,
             action_variables,
             premise_variables,
-            name: self.name.clone(),
+            meta: self.meta.clone(),
         }
         .normalize()
     }
@@ -1283,7 +1278,7 @@ impl SymbolicRule {
             .collect();
 
         SymbolicRule {
-            name: self.name.clone(),
+            meta: self.meta.clone(),
             premise_relations,
             action_relations: self.action_relations.clone(),
             unify,
@@ -1318,7 +1313,11 @@ impl Theory {
             }
         }
 
-        wln!("Theory {:?}:", self.name);
+        if let Some(name) = self.name {
+            wln!("Theory {name:?}:");
+        } else {
+            wln!("Theory:");
+        }
         wln!();
         for Relation {
             name, columns: ty, ..
@@ -1333,14 +1332,18 @@ impl Theory {
 
         for rule in &self.symbolic_rules {
             let SymbolicRule {
-                name,
+                meta: name,
                 premise_relations,
                 action_relations,
                 unify,
                 action_variables,
                 premise_variables: _,
             } = rule;
-            wln!("Rule {:?}:", name.name);
+            if let Some(name) = name.name {
+                wln!("Rule {name:?}:");
+            } else {
+                wln!("Rule:");
+            }
             let premise = premise_relations
                 .iter()
                 .map(|PremiseRelation { relation, args }| {

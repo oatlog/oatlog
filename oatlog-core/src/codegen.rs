@@ -1360,11 +1360,19 @@ mod ident {
     }
     /// `SemilatticeTheory`
     pub fn theory_ty(theory: &Theory) -> Ident {
-        format_ident!("{}Theory", theory.name.to_pascal_case())
+        if let Some(name) = theory.name {
+            format_ident!("{}Theory", name.to_pascal_case())
+        } else {
+            format_ident!("Theory")
+        }
     }
     /// `SemilatticeDelta`
     pub fn theory_delta_ty(theory: &Theory) -> Ident {
-        format_ident!("{}Delta", theory.name.to_pascal_case())
+        if let Some(name) = theory.name {
+            format_ident!("{}Delta", name.to_pascal_case())
+        } else {
+            format_ident!("Delta")
+        }
     }
     /// `all_index_2_0_1`
     pub fn index_all_field(index: &IndexInfo) -> Ident {

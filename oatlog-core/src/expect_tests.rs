@@ -55,7 +55,7 @@ fn redundant_premise_simplify() {
             )
         "#,
         expected_hir: Some(expect![[r#"
-            Theory "":
+            Theory:
 
             Math(Math)
             Const(i64, Math)
@@ -124,7 +124,7 @@ fn redundant_action_simplify() {
             )
         "#,
         expected_hir: Some(expect![[r#"
-            Theory "":
+            Theory:
 
             Math(Math)
             Const(i64, Math)
@@ -186,11 +186,11 @@ fn weird_premise_equality() {
             (rule ((= x 1) (= y x) (= z y)) ())
         "#,
         expected_hir: Some(expect![[r#"
-            Theory "":
+            Theory:
 
             g0(i64)
 
-            Rule "":
+            Rule:
             Premise: g0(xyz)
             __: xyz
 
@@ -211,12 +211,12 @@ fn hir_commutative() {
             (rule ((= e (Add a b) )) ((union e (Add b a))))
         "#,
         expected_hir: Some(expect![[r#"
-            Theory "":
+            Theory:
 
             Math(Math)
             Add(Math, Math, Math)
 
-            Rule "":
+            Rule:
             Premise: Add(a, b, e)
             e: e
             a: a
@@ -241,13 +241,13 @@ fn hir_distributive() {
             (rewrite (Mul (Add a b) c) (Add (Mul a c) (Mul b c)))
         "#,
         expected_hir: Some(expect![[r#"
-            Theory "":
+            Theory:
 
             Math(Math)
             Add(Math, Math, Math)
             Mul(Math, Math, Math)
 
-            Rule "":
+            Rule:
             Premise: Add(a, b, p2), Mul(p2, c, p4)
             a: a
             b: b
@@ -275,12 +275,12 @@ fn hir_userspace_implicit_functionality() {
             (rule ((Add a b c) (Add a b d)) ((union c d)))
         "#,
         expected_hir: Some(expect![[r#"
-            Theory "":
+            Theory:
 
             Math(Math)
             Add(Math, Math, Math)
 
-            Rule "":
+            Rule:
             Premise: Add(a, b, c), Add(a, b, d)
             __: a
             __: b
@@ -306,7 +306,7 @@ fn hir_global() {
             (rewrite (Const one) (Add b a))
         "#,
         expected_hir: Some(expect![[r#"
-            Theory "":
+            Theory:
 
             Math(Math)
             Mul(Math, Math, Math)
@@ -314,7 +314,7 @@ fn hir_global() {
             Const(i64, Math)
             one(i64)
 
-            Rule "":
+            Rule:
             Premise: one(one), Const(one, p1)
             __: one
             a0: p1
@@ -325,7 +325,7 @@ fn hir_global() {
         "#]]),
         expected_lir: Some(expect![[r#"
             Theory {
-                name: "",
+                name: None,
                 types: {
                     [t0, i64]: std::primitive::i64,
                     [t1, String]: runtime::IString,
@@ -443,19 +443,19 @@ fn test_bind_variable_multiple_times() {
             (rewrite (Same x x) x)
         "#,
         expected_hir: Some(expect![[r#"
-            Theory "":
+            Theory:
 
             Foo(Foo)
             Same(Foo, Foo, Foo)
 
-            Rule "":
+            Rule:
             Premise: Same(x, x, p1)
             __: p1, x
 
         "#]]),
         expected_lir: Some(expect![[r#"
             Theory {
-                name: "",
+                name: None,
                 types: {
                     [t0, i64]: std::primitive::i64,
                     [t1, String]: runtime::IString,
@@ -777,7 +777,7 @@ fn test_negative_i64_tokens() {
             (rewrite (Const -1) (Const -1))
         "#,
         expected_hir: Some(expect![[r#"
-            Theory "":
+            Theory:
 
             Math(Math)
             Mul(Math, Math, Math)
@@ -788,7 +788,7 @@ fn test_negative_i64_tokens() {
             neg_two(Math)
             g2(i64)
 
-            Rule "":
+            Rule:
             Premise: g2(p0), Const(p0, p1)
             __: p0
             a0: p1
@@ -812,14 +812,14 @@ fn codegen_variable_reuse_bug() {
             (rule ((= zero (Add zero x))) ((union x (Zero))))
         "#,
         expected_hir: Some(expect![[r#"
-            Theory "":
+            Theory:
 
             Math(Math)
             Add(Math, Math, Math)
             Zero(Math)
             zero(Math)
 
-            Rule "":
+            Rule:
             Premise: zero(zero), zero(zero), Add(zero, x, zero)
             __: zero
             __: zero
@@ -829,7 +829,7 @@ fn codegen_variable_reuse_bug() {
         "#]]),
         expected_lir: Some(expect![[r#"
             Theory {
-                name: "",
+                name: None,
                 types: {
                     [t0, i64]: std::primitive::i64,
                     [t1, String]: runtime::IString,
@@ -1363,7 +1363,7 @@ fn initial_exprs() {
             (Mul (Var "x") (Var "y"))
         "#,
         expected_hir: Some(expect![[r#"
-            Theory "":
+            Theory:
 
             Math(Math)
             Add(Math, Math, Math)
@@ -2288,7 +2288,7 @@ fn codegen_bug1() {
             (relation Foo (T0 T1 T2))
         "#,
         expected_hir: Some(expect![[r#"
-            Theory "":
+            Theory:
 
             T0(T0)
             T1(T1)
@@ -2578,7 +2578,7 @@ fn initial() {
             (run 42)
         "#,
         expected_hir: Some(expect![[r#"
-            Theory "":
+            Theory:
 
             Math(Math)
             Const(i64, Math)
@@ -2826,7 +2826,7 @@ fn test_primitives_simple() {
             (rewrite (Mul a (Const 0)) (Const 0))
         "#,
         expected_hir :Some( expect![[r#"
-            Theory "":
+            Theory:
 
             Math(Math)
             Mul(Math, Math, Math)
@@ -2840,28 +2840,28 @@ fn test_primitives_simple() {
             g4(String)
             g5(i64)
 
-            Rule "":
+            Rule:
             Premise: one(one), Const(one, p1)
             __: one
             a0: p1
             x: __
             Insert: Add(x, x, a0)
 
-            Rule "":
+            Rule:
             Premise: g0(p0), Const(p0, p1)
             __: p0
             a0: p1
             z: __
             Insert: Add(z, z, a0)
 
-            Rule "":
+            Rule:
             Premise: g3(p0), Var(p0, p1)
             __: p0
             a0: p1
             a1: __
             Insert: Var(a1, a0), g4(a1)
 
-            Rule "":
+            Rule:
             Premise: g5(p1), Const(p1, p2), Mul(a, p2, p3)
             __: a
             __: p1
@@ -3630,7 +3630,7 @@ fn triangle_join() {
             (rule ((Foo a b) (Bar b c) (Baz c a)) ((Triangle a b c)))
         "#,
         expected_hir: Some(expect![[r#"
-            Theory "":
+            Theory:
 
             Math(Math)
             Foo(Math, Math)
@@ -3638,7 +3638,7 @@ fn triangle_join() {
             Baz(Math, Math)
             Triangle(Math, Math, Math)
 
-            Rule "":
+            Rule:
             Premise: Foo(a, b), Bar(b, c), Baz(c, a)
             a: a
             b: b
@@ -4284,13 +4284,13 @@ fn edgecase0() {
             (rewrite (Add (Mul a b) (Mul a c)) (Mul a (Add b c)))
         "#,
         expected_hir :Some( expect![[r#"
-            Theory "":
+            Theory:
 
             Math(Math)
             Mul(Math, Math, Math)
             Add(Math, Math, Math)
 
-            Rule "":
+            Rule:
             Premise: Mul(a, b, p2), Mul(a, c, p4), Add(p2, p4, p5)
             a: a
             b: b
@@ -4780,13 +4780,13 @@ fn test_into_codegen() {
             (rewrite (Mul (Add a b) c) (Add (Mul a c) (Mul b c)))
         "#,
         expected_hir: Some(expect![[r#"
-            Theory "":
+            Theory:
 
             Math(Math)
             Mul(Math, Math, Math)
             Add(Math, Math, Math)
 
-            Rule "":
+            Rule:
             Premise: Add(a, b, p2), Mul(p2, c, p4)
             a: a
             b: b

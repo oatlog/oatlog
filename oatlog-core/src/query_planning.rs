@@ -274,7 +274,7 @@ fn generate_tries(
         let mut trie = lir_actions
             .into_iter()
             .map(|x| lir::RuleTrie {
-                meta: None,
+                meta: rule.meta.name,
                 atom: lir::RuleAtom::Action(x),
                 then: &[],
             })
@@ -420,7 +420,7 @@ fn generate_tries(
             }]
             .leak();
         }
-        trie.iter_mut().for_each(|x| x.meta = Some(rule.name.src));
+        trie.iter_mut().for_each(|x| x.meta = Some(rule.meta.src));
 
         tries.extend(trie.iter().copied());
     }
