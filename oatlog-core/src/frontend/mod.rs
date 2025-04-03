@@ -634,10 +634,10 @@ impl Parser {
                 let content =
                     std::fs::read_to_string(filepath).map_err(|e| match config.file_not_found {
                         FileNotFoundAction::ImmediatePanic => {
-                            panic!("error opeing {filepath}: {e}, working directory is {working_directory:?}")
+                            panic!("error opening {filepath}: {e}, working directory is {working_directory:?}")
                         }
                         FileNotFoundAction::EmitError => {
-                            bare_!(span, "error opeing {filepath}: {e}, working directory is {working_directory:?}")
+                            bare_!(span, "error opening {filepath}: {e}, working directory is {working_directory:?}")
                         }
                     })?;
 
