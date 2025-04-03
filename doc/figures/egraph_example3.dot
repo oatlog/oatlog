@@ -1,0 +1,47 @@
+// (a + 2) * c
+digraph G {
+    rankdir = "LR";
+    fontsize="24"
+    node [ fontsize="24"; shape=rect ]
+
+    one [label="1"];
+    cone [label="",shape=ellipse];
+    xs [label="<<"];
+
+    two [label="2"];
+    ctwo [label="",shape=ellipse];
+    x2 [label="*"];
+
+    two_div_two [label="/"];
+    ctwo_div_two [label="",shape=ellipse];
+
+    x2_div2 [label="/"];
+
+    topmul [label="*"];
+
+    x [label="x"];
+    cx2 [label="",shape=ellipse];
+    ctop [label="",shape=ellipse];
+
+    x -> x2;
+    two -> ctwo;
+    ctwo -> x2;
+    x2 -> cx2;
+    cx2 -> x2_div2;
+    x2_div2 -> ctop;
+
+    ctwo -> two_div_two;
+    ctwo -> two_div_two;
+    two_div_two -> ctwo_div_two;
+    ctwo_div_two -> topmul;
+    x -> topmul;
+    topmul -> ctop;
+
+
+    one -> cone;
+    x -> xs;
+    cone -> xs;
+    xs -> cx2;
+
+    x -> ctop;
+}

@@ -1,0 +1,16 @@
+// (a + 2) * c
+digraph G {
+    rankdir = "TD";
+    fontsize="24"
+    node [ fontsize="24" ]
+
+    two [label="2"];
+    x [label="x"];
+    x2 [label="*"];
+    x2_div2 [label="/"];
+
+    x -> x2;
+    two -> x2;
+    x2 -> x2_div2;
+    two -> x2_div2;
+}

@@ -9,6 +9,7 @@
 #set text(font: "New Computer Modern Sans")
 
 #show: university-theme.with(
+  config-common(enable-frozen-states-and-counters: false),
   config-info(
     title: [Oatlog],
     subtitle: [Implementing a high-performance relational e-graph engine],
@@ -40,24 +41,6 @@
 // implementation high-level (we are relation, semi-naive, we uproot the old in with the new)
 // future work
 // (bonus) implementation details + show generated code.
-//
-//
-// == #TODO[THIS SLIDE IS AN OUTLINE]
-//
-// - Why e-graphs?
-//   - Formal rewriting systems 101
-//     - Used for compilers, computer algebra
-//     - Experiences *phase ordering problem* due to forgetfulness (non-commutativity, non-monotonicity)
-//   - E-graphs as a solution to forgetfulness, every rewrite simulaneously
-//     - Incl. walkthrough
-//   - But e-graphs are slow!
-// - Demo
-// - Benchmarks and implementation
-//   - Somewhat handwavey relational view, we don't really have time(?)
-//   - Not done, here are the current results
-//   - Compatibility, figures from report
-//   - Idea sketch, associative+commutative containers
-//   - Lots of details, what has been tried
 
 #TODO[GOAL: what problem is, possible solutions, what have we done, what we wnat to do.]
 
@@ -211,11 +194,12 @@ But rewrites don't commute!
 
 ```rust
 // input
-f(g(2*x+5+10), h(2*x+5))
-// constant folded
-f(g(2*x+15), h(2*x+5))
-// common subexpression eliminated
-y=2*x+5; f(g(y+10), h(y))
+(x * 2) / 2
+// strength reduced
+(x << 1) / 2
+// reassociated and constant folded
+x * (2 / 2)
+x
 ```
 
 #pause
@@ -226,31 +210,66 @@ the program.
 = E-graphs
 
 == E-graph walkthrough
-// SOLUTION: E-GRAPHS TO AVOID FORGETFULNESS/PHASE ORDERING
 
-Terms (called e-nodes) take equivalence classes (e-classes), not other terms as input #TODO[Animate]
+#slide(
+  repeat: 4,
+  self => [
+    #let (uncover, only, alternatives) = utils.methods(self)
+
+    #box(outset: (x: 6pt, top: 6pt, bottom: 10pt), stroke: black, [Computations]) (called e-nodes)
+    take #box(baseline: -10.8pt, ellipse(inset: (x: -20pt, y: -10pt), outset: (x: 0pt, y: 30pt), [equivalence classes])) (e-classes), not other computations as input
+
+    #grid(
+      columns: (1fr, 3fr),
+      [
+        ```rust
+        (x * 2) / 2
+        ```
+        #image("../figures/egraph_example0.svg")
+      ],
+      alternatives[][
+        #image("../figures/egraph_example1.svg")
+      ][
+        #image("../figures/egraph_example2.svg")
+      ][
+        #image("../figures/egraph_example3.svg")
+      ],
+    )
+  ],
+)
+
+== E-graphs walkthrough cont.
 
 #grid(
-  columns: (3fr, 4fr),
-  align: center,
-  rows: 79%,
-  image("../figures/egraph_example.svg"), image("../figures/egraph_cluster.svg"),
+  columns: (1fr, 1fr),
+  [
+    - Apply rewrites to fixpoint
+    - Adding e-nodes and e-classes
+    - Merging e-nodes
+
+    #uncover("2-")[
+      Extraction:
+      - Mapping e-class to arbitrary input e-node recovers a representation of the program
+    ]
+
+    #uncover(3)[
+      E-graph engines generic over
+      - term language
+      - rewrite rules
+    ]
+  ],
+  image("../figures/egraph_example3.svg"),
 )
 
 == Egglog and existing e-graph engines
-// BACKGROUND: E-GRAPHS IN PRACTICE
-// PROBLEM: E-GRAPHS ARE SLOW
 
-
-- Egglog is both and interpreter and a language.
+- Egglog is both an e-graph engine (interpreter) and a language.
 - Egglog improves upon egg by using semi-naive evaluation and relational e-matching.
 - Notable uses (egg/egglog)
   - Eggcc, an experimental optimizing compiler.
   - Herbie, a program to optimize floating point accuracy.
   - Simplifying CAD models (union/difference, etc)
   - Logic synthesis.
-
-#TODO[somehow say that e-graphs are slow]
 
 == Egglog language
 
@@ -270,19 +289,30 @@ Terms (called e-nodes) take equivalence classes (e-classes), not other terms as 
   caption: [Example of the egglog language],
 )
 
+== E-graph challenges and opportunities
+
+Recent research #pause
+- 1980, used in automated theorem proving #pause
+- 2009, used for equality saturation (algebraic optimization) #pause
+- 2021, batched canonicalization (egg) #pause
+- 2023, relational e-graphs, semi-naive (egglog) #pause
+
+Not yet really used in compilers. Too slow!
+- Despite potential to solve phase ordering
 
 = Oatlog
 
 == Our contribution
 // SOLUTION: FASTER E-GRAPHS
 
-- #TODO[faster e-graphs]
-
 - Independent egglog implementation#footnote[this was hard], that is Ahead-of-Time, such that we can optimize rules together, pre-determine indexes, etc.
 
-- Identical behavior to egglog for the subset egglog that we support.
+- Identical behavior on egglog language subset.
 
-- Enable easy embedding of e-graphs into Rust applications.
+- Enable easy embedding of e-graphs into Rust applications (like egg, but as fast as egglog).
+
+- [GOAL NOT YET REACHED] Faster than egglog
+
 
 - Document the egglog language.
 
