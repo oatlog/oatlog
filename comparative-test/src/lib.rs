@@ -229,7 +229,7 @@ mod comparative_tests {
 
 #[cfg(test)]
 mod egglog_testsuite {
-#[cfg_attr(not(test), allow(unused))]
+
 use expect_test::expect;
 
 egglog_test!(nogenerate, antiunify, expect![[r#"
@@ -1333,7 +1333,7 @@ egglog_test!(nogenerate, vec, expect![[r#"
 
 #[cfg(test)]
 mod additional {
-#[cfg_attr(not(test), allow(unused))]
+
 use expect_test::expect;
 
 egglog_test!(valid_tests_compile_ok, should_compile, expect![], "(sort Math)");
@@ -1371,7 +1371,7 @@ egglog_test!(allcorrect, quadratic, expect![[r#"
 (Add (Add (Mul (Var "x") (Var "x")) (Var "c")) (Add (Mul (Var "b") (Var "x")) (Mul (Var "b") (Var "x"))))
 (Sub (Sqrt (Sub (Mul (Var "b") (Var "b")) (Var "c"))) (Var "b"))
 
-"#, 
+"#,
 limit = 5);
 
 }
