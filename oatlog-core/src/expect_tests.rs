@@ -685,7 +685,6 @@ fn test_bind_variable_multiple_times() {
             impl Theory {
                 pub fn new() -> Self {
                     let mut theory = Self::default();
-                    theory.canonicalize();
                     theory
                 }
                 pub fn step(&mut self) -> [std::time::Duration; 2] {
@@ -2476,7 +2475,6 @@ fn codegen_bug1() {
             impl Theory {
                 pub fn new() -> Self {
                     let mut theory = Self::default();
-                    theory.canonicalize();
                     theory
                 }
                 pub fn step(&mut self) -> [std::time::Duration; 2] {
@@ -2733,7 +2731,6 @@ fn initial() {
             impl Theory {
                 pub fn new() -> Self {
                     let mut theory = Self::default();
-                    theory.canonicalize();
                     for _ in 0..42u64 {
                         theory.step();
                     }
@@ -4145,7 +4142,6 @@ fn triangle_join() {
             impl Theory {
                 pub fn new() -> Self {
                     let mut theory = Self::default();
-                    theory.canonicalize();
                     theory
                 }
                 pub fn step(&mut self) -> [std::time::Duration; 2] {
@@ -4657,7 +4653,6 @@ fn edgecase0() {
             impl Theory {
                 pub fn new() -> Self {
                     let mut theory = Self::default();
-                    theory.canonicalize();
                     theory
                 }
                 pub fn step(&mut self) -> [std::time::Duration; 2] {
@@ -5135,7 +5130,6 @@ fn test_into_codegen() {
             impl Theory {
                 pub fn new() -> Self {
                     let mut theory = Self::default();
-                    theory.canonicalize();
                     theory
                 }
                 pub fn step(&mut self) -> [std::time::Duration; 2] {

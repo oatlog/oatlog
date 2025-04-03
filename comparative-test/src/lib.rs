@@ -1,7 +1,7 @@
 #[cfg_attr(not(test), allow(unused))]
 use std::collections::BTreeMap;
 
-#[derive(PartialEq, Eq, Debug)]
+#[derive(PartialEq, Eq, Debug, Clone, Copy)]
 #[cfg_attr(not(test), allow(unused))]
 enum Verdict {
     AllCorrect,
@@ -92,7 +92,7 @@ macro_rules! comparative_test {
             let mismatched = crate::compare_egglog_oatlog(
                 &mut egglog,
                 theory.get_relation_entry_count(),
-                $verdict,
+                verdict,
                 expected.as_ref(),
             );
             if mismatched {
@@ -275,7 +275,7 @@ egglog_test!(nogenerate, bdd, expect![[r#"
 
 "#]], r#"(include "comparative-test/egglog-testsuite/bdd.egg")"#);// primitive functions
 egglog_test!(mismatched, before_proofs, expect![[r#"
-    Add: 10 (egglog) != 33 (oatlog)
+    Add: 34 (egglog) != 17 (oatlog)
 "#]], r#"(include "comparative-test/egglog-testsuite/before-proofs.egg")"#); // REASON: clear transient not performed on check, so globals have not affected the database yet.
 egglog_test!(nogenerate, bignum, expect![[r#"
     comparative-test/egglog-testsuite/bignum.egg: function bigint is not defined
