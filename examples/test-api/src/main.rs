@@ -153,6 +153,116 @@
 
 // diverges due to unification rules not running to convergence.
 
+fn run_fuel() {
+    oatlog::compile_egraph!((
+
+        (datatype Math
+            (Diff Math Math)
+            (Integral Math Math)
+
+            (Add Math Math)
+            (Sub Math Math)
+            (Mul Math Math)
+            (Div Math Math)
+            (Pow Math Math)
+            (Ln Math)
+            (Sqrt Math)
+
+            (Sin Math)
+            (Cos Math)
+
+            (Const i64)
+            (Var String)
+        )
+
+        (datatype FuelUnit
+            (Fuel FuelUnit)
+            (ZeroFuel)
+        )
+
+        (relation HasFuel (Math FuelUnit))
+
+        (let fuel5 (Fuel (Fuel (Fuel (ZeroFuel)))))
+
+        (rule ((HasFuel (Add a b) (Fuel fuel))) ((HasFuel a fuel) (HasFuel b fuel)))
+        // (rule ((HasFuel (Sub a b) (Fuel fuel))) ((HasFuel a fuel) (HasFuel b fuel)))
+        (rule ((HasFuel (Mul a b) (Fuel fuel))) ((HasFuel a fuel) (HasFuel b fuel)))
+        // (rule ((HasFuel (Div a b) (Fuel fuel))) ((HasFuel a fuel) (HasFuel b fuel)))
+        // (rule ((HasFuel (Pow a b) (Fuel fuel))) ((HasFuel a fuel) (HasFuel b fuel)))
+        (rule ((HasFuel (Ln a) (Fuel fuel))) ((HasFuel a fuel)))
+        (rule ((HasFuel (Sqrt a) (Fuel fuel))) ((HasFuel a fuel)))
+        (rule ((HasFuel (Sin a) (Fuel fuel))) ((HasFuel a fuel)))
+        (rule ((HasFuel (Cos a) (Fuel fuel))) ((HasFuel a fuel)))
+
+        (rewrite (Integral (Sin x) x) (Mul (Const -1) (Cos x)))
+        (rewrite (Sub a b) (Add a (Mul (Const -1) b)))
+        (rewrite (Diff x (Cos x)) (Mul (Const -1) (Sin x)))
+
+        (rewrite (Add a b) (Add b a))
+        (rewrite (Mul a b) (Mul b a))
+        (rewrite (Add a (Add b c)) (Add (Add a b) c))
+        (rewrite (Mul a (Mul b c)) (Mul (Mul a b) c))
+        (rewrite (Add a (Const 0)) a)
+        (rewrite (Mul a (Const 0)) (Const 0))
+        (rewrite (Mul a (Const 1)) a)
+        (rewrite (Mul a (Add b c)) (Add (Mul a b) (Mul a c)))
+        (rewrite (Add (Mul a b) (Mul a c)) (Mul a (Add b c)))
+
+        (rewrite (Mul (Pow a b) (Pow a c)) (Pow a (Add b c)))
+        (rewrite (Pow x (Const 1)) x)
+
+        (rewrite (Pow x (Const 2)) (Mul x x))
+        (rewrite (Diff x (Add a b)) (Add (Diff x a) (Diff x b)))
+        (rewrite (Diff x (Mul a b)) (Add (Mul a (Diff x b)) (Mul b (Diff x a))))
+        (rewrite (Diff x (Sin x)) (Cos x))
+        (rewrite (Integral (Const 1) x) x)
+        (rewrite (Integral (Cos x) x) (Sin x))
+        (rewrite (Integral (Add f g) x) (Add (Integral f x) (Integral g x)))
+        (rewrite (Integral (Sub f g) x) (Sub (Integral f x) (Integral g x)))
+
+        // needs fuel to avoid explosion.
+        (rule ((HasFuel e (Fuel fuel)) (= e (Integral (Mul a b) x))) (
+            (union e (Sub (Mul a (Integral b x)) (Integral (Mul (Diff x a) (Integral b x)) x)))
+            (HasFuel x fuel)
+            (HasFuel a fuel)
+            (HasFuel b fuel)
+            (HasFuel (Diff x a) fuel)
+            (HasFuel (Integral b x) fuel)
+            (HasFuel (Mul (Diff x a) (Integral b x)) fuel)
+        ))
+
+        (function Fueled (Math) Math)
+
+        (rule ((= e (Fueled x))) (
+            (union e x)
+            (HasFuel e fuel5)
+        ))
+
+        (Fueled (Integral (Fueled (Ln (Fueled (Var "x")))) (Fueled (Var "x"))))
+        (Fueled (Integral (Fueled (Add (Fueled (Var "x")) (Fueled (Cos (Fueled (Var "x")))))) (Fueled (Var "x"))))
+        (Fueled (Integral (Fueled (Mul (Fueled (Cos (Fueled (Var "x")))) (Fueled (Var "x")))) (Fueled (Var "x"))))
+        (Fueled (Diff (Fueled (Var "x")) (Fueled (Add (Fueled (Const 1)) (Fueled (Mul (Fueled (Const 2)) (Fueled (Var "x"))))))))
+        (Fueled (Diff (Fueled (Var "x")) (Fueled (Sub (Fueled (Pow (Fueled (Var "x")) (Fueled (Const 3)))) (Fueled (Mul (Fueled (Const 7)) (Fueled (Pow (Fueled (Var "x")) (Fueled (Const 2))))))))))
+        (Fueled (Add (Fueled (Mul (Fueled (Var "y")) (Fueled (Add (Fueled (Var "x")) (Fueled (Var "y")))))) (Fueled (Sub (Fueled (Add (Fueled (Var "x")) (Fueled (Const 2)))) (Fueled (Add (Fueled (Var "x")) (Fueled (Var "x"))))))))
+        (Fueled (Div (Fueled (Const 1)) (Fueled (Sub (Fueled (Div (Fueled (Add (Fueled (Const 1)) (Fueled (Sqrt (Fueled (Var "z")))))) (Fueled (Const 2)))) (Fueled (Div (Fueled (Sub (Fueled (Const 1)) (Fueled (Sqrt (Fueled (Var "z")))))) (Fueled (Const 2))))))))
+
+
+    ));
+
+    let mut theory = Theory::new();
+
+    for _ in 0..1000 {
+        theory.step();
+        let relation_entry_count = theory
+            .get_relation_entry_count()
+            .into_iter()
+            .map(|(name, count)| format!("\t{name}: {count}"))
+            .collect::<Vec<String>>()
+            .join("\n");
+        println!("\n{}", relation_entry_count);
+    }
+}
+
 fn run() {
     oatlog::compile_egraph!((
         (datatype Math
@@ -334,7 +444,7 @@ fn run() {
 }
 
 fn main() {
-    run()
+    run_fuel()
 }
 
 // NOTE: The index implementation rework, while bringing speedups, changed the scheduling a little

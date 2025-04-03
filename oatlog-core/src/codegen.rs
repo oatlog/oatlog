@@ -505,7 +505,7 @@ impl CodegenRuleTrieCtx<'_> {
                         if self.scoped {
                             ret
                         } else {
-                            quote! {{ret}}
+                            quote! {{#ret}}
                         }
                     }
                     RelationKind::Table {
@@ -664,7 +664,7 @@ impl CodegenRuleTrieCtx<'_> {
                 if self.scoped {
                     ret
                 } else {
-                    quote! {{ret}}
+                    quote! {{#ret}}
                 }
             }
             RuleAtom::Action(Action::Make(x)) => {
@@ -1245,7 +1245,7 @@ fn codegen_relation(
                             #(row.#col_num_symbolic = uf.#uf_all_symbolic.find(row.#col_num_symbolic);)*
                         });
 
-                        self.#first_indexes_all.filter_existing(&mut inserts);
+                        // self.#first_indexes_all.filter_existing(&mut inserts);
 
                         // insert all.
                         #(
