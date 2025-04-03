@@ -222,10 +222,14 @@ pub(crate) enum Statement {
     },
     /// Declare a ruleset.
     /// ```egglog
-    /// (ruleset "foo")
+    /// (ruleset foo)
     /// ```
     AddRuleSet(Str),
     /// Unimplemented
+    /// Declare a ruleset as the union of other rulesets.
+    /// ```egglog
+    /// (unstable-combined-ruleset foo child1 child2)
+    /// ```
     UnstableCombinedRuleset(Str, Vec<Str>),
     /// Declare a rule
     /// ```egglog
@@ -573,6 +577,12 @@ fn parse_statement(x: SexpSpan) -> MResult<Spanned<Statement>> {
             pattern!(args, [(Atom name)]);
             Statement::AddRuleSet(name)
         }),
+        "unstable-combined-ruleset" => {
+            usage!("(unstable-combined-ruleset <name> <child ruleset>*)", {
+                pattern!(args, [(Atom name), (subrulesets @ ..(|x| x.atom("child ruleset")))]);
+                Statement::UnstableCombinedRuleset(name, subrulesets)
+            })
+        }
         "rule" => usage!(
             "(rule (<fact>*) (<action>*) <option>*) where option = :ruleset <name>, :name <name>",
             {
@@ -1043,10 +1053,13 @@ impl Display for Statement {
                 write!(f, "(function {name} ({input}) {output} {merge})")
             }
             Statement::AddRuleSet(name) => write!(f, "(ruleset {name:?})"),
-            Statement::UnstableCombinedRuleset(spanned, vec) => panic!(),
+            Statement::UnstableCombinedRuleset(spanned, vec) => {
+                let vec = comma(vec);
+                write!(f, "(unstable-combined-ruleset {spanned} {vec})")
+            }
             Statement::Rule {
-                name,
-                ruleset,
+                name: _,
+                ruleset: _,
                 rule,
             } => {
                 let Rule { facts, actions } = rule;

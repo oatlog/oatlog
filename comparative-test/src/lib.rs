@@ -339,8 +339,8 @@ egglog_test!(nogenerate, combinators, expect![[r#"
 
 "#]], r#"(include "comparative-test/egglog-testsuite/combinators.egg")"#);// !=
 egglog_test!(nogenerate, combined_nested, expect![[r#"
-    comparative-test/egglog-testsuite/combined-nested.egg: function unstable-combined-ruleset is not defined
-    unstable-combined-ruleset
+    comparative-test/egglog-testsuite/combined-nested.egg: will not implement, this only makes sense for an interpreter
+    ( unstable-combined-ruleset rules1and2 myrules1 myrules2 )
 
     comparative-test/egglog-testsuite/combined-nested.egg: while parsing this toplevel expression
     ( unstable-combined-ruleset rules1and2 myrules1 myrules2 )
@@ -1169,8 +1169,8 @@ egglog_test!(nogenerate, subsume, expect![[r#"
 
 "#]], r#"(include "comparative-test/egglog-testsuite/subsume.egg")"#);// impl subsume
 egglog_test!(nogenerate, test_combined, expect![[r#"
-    comparative-test/egglog-testsuite/test-combined.egg: function unstable-combined-ruleset is not defined
-    unstable-combined-ruleset
+    comparative-test/egglog-testsuite/test-combined.egg: will not implement, this only makes sense for an interpreter
+    ( unstable-combined-ruleset myrules-combined myrules1 myrules2 )
 
     comparative-test/egglog-testsuite/test-combined.egg: while parsing this toplevel expression
     ( unstable-combined-ruleset myrules-combined myrules1 myrules2 )
