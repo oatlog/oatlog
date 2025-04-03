@@ -58,7 +58,7 @@ fn main() {
                 println!("===== EXTRACTED EGGLOG END   =====");
                 egglog
             }
-            Some("egglog") => fs::read_to_string(path).unwrap(),
+            Some("egglog" | "egg") => fs::read_to_string(path).unwrap(),
             other => {
                 println!("warning: unknown extension {other:?}, assuming egglog file");
                 fs::read_to_string(path).unwrap()
