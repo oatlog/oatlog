@@ -45,6 +45,16 @@ proptest-derive = "0.5.1"
 [profile.release]
 debug = true
 
+[profile.test.package.proptest]
+opt-level = 3
+
+[profile.test.package.rand_chacha]
+opt-level = 3
+
+#########
+# LINTS #
+#########
+
 [workspace.lints.rust]
 unsafe_code = "deny" # override to allow per file
 unknown_lints = "deny"
