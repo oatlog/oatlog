@@ -21,7 +21,6 @@ oatlog-test.path = "oatlog-test"
 oatlog-bench.path = "oatlog-bench"
 comparative-test.path = "comparative-test"
 
-ariadne = { version = "0.5", features = ["auto-color"] }
 clap = { version = "4", features = ["derive"]}
 criterion = "0.5.1"
 derive_more = { version = "2", features = ["full"] }
