@@ -5,8 +5,6 @@ use crate::frontend::{
 };
 use std::fmt::Display;
 
-use super::sexp::OrdF64;
-
 use itertools::Itertools as _;
 
 #[derive(Clone, Debug, PartialEq, Eq, PartialOrd, Ord)]
@@ -320,7 +318,6 @@ pub(crate) enum Statement {
     /// The only difference between just including the file contents is the error messages.
     Include(Str),
 }
-pub(crate) type Subsume = bool;
 #[derive(Clone, Debug, PartialEq, Eq, PartialOrd, Ord)]
 pub(crate) enum Schedule {
     /// Run schedule until saturation.
@@ -1016,26 +1013,26 @@ impl Display for Statement {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
             Statement::SetOption { name, value } => write!(f, "(set-option {name} {value})"),
-            Statement::Sort { name, primitive } => write!(f, "(sort {name})"),
+            Statement::Sort { name, primitive: _ } => write!(f, "(sort {name})"),
             Statement::Datatype { name, variants } => {
                 let variants = comma(variants);
                 write!(f, "(datatype {name} {variants})")
             }
-            Statement::Datatypes { datatypes } => {
+            Statement::Datatypes { datatypes: _ } => {
                 panic!();
             }
             Statement::Constructor {
                 name,
                 input,
                 output,
-                cost,
+                cost: _,
             } => {
                 let input = comma(input);
                 write!(f, "(constructor {name} ({input}) {output})")
             }
             Statement::Relation { name, input } => {
                 let input = comma(input);
-                write!(f, "(relation name ({input}))")
+                write!(f, "(relation {name} ({input}))")
             }
             Statement::Function {
                 name,
@@ -1068,22 +1065,25 @@ impl Display for Statement {
                 write!(f, "(rule ({facts}) ({actions}))")
             }
             Statement::Rewrite {
-                ruleset,
+                ruleset: _,
                 rewrite,
-                subsume,
+                subsume: _,
             } => {
                 let Rewrite {
                     lhs,
                     rhs,
-                    conditions,
+                    conditions: _,
                 } = rewrite;
                 write!(f, "(rewrite {lhs} {rhs})")
             }
-            Statement::BiRewrite { ruleset, rewrite } => {
+            Statement::BiRewrite {
+                ruleset: _,
+                rewrite,
+            } => {
                 let Rewrite {
                     lhs,
                     rhs,
-                    conditions,
+                    conditions: _,
                 } = rewrite;
                 write!(f, "(birewrite {lhs} {rhs})")
             }
@@ -1118,7 +1118,11 @@ impl Display for Statement {
 }
 impl Display for Variant {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        let Variant { name, types, cost } = self;
+        let Variant {
+            name,
+            types,
+            cost: _,
+        } = self;
         let types = comma(types);
         write!(f, "({name} {types})")
     }
@@ -1230,8 +1234,11 @@ impl Shrink for Statement {
     fn impl_shrink(&self) -> It<Self> {
         let none = Box::new(None.into_iter());
         match self {
-            Statement::SetOption { name, value } => none,
-            Statement::Sort { name, primitive } => none,
+            Statement::SetOption { name: _, value: _ } => none,
+            Statement::Sort {
+                name: _,
+                primitive: _,
+            } => none,
             Statement::Datatype { name, variants } => {
                 let name = name.clone();
                 Box::new(
@@ -1241,22 +1248,22 @@ impl Shrink for Statement {
                         .map(move |variants| Statement::Datatype { name, variants }),
                 )
             }
-            Statement::Datatypes { datatypes } => none,
+            Statement::Datatypes { datatypes: _ } => none,
             Statement::Constructor {
-                name,
-                input,
-                output,
-                cost,
+                name: _,
+                input: _,
+                output: _,
+                cost: _,
             } => none,
-            Statement::Relation { name, input } => none,
+            Statement::Relation { name: _, input: _ } => none,
             Statement::Function {
-                name,
-                input,
-                output,
-                merge,
+                name: _,
+                input: _,
+                output: _,
+                merge: _,
             } => none,
-            Statement::AddRuleSet(spanned) => none,
-            Statement::UnstableCombinedRuleset(spanned, vec) => none,
+            Statement::AddRuleSet(_name) => none,
+            Statement::UnstableCombinedRuleset(_name, _vec) => none,
             Statement::Rule {
                 name,
                 ruleset,
@@ -1296,17 +1303,23 @@ impl Shrink for Statement {
                 Box::new(schedule.shrink().map(Statement::RunSchedule))
             }
             Statement::PrintOverallStatistics => none,
-            Statement::Simplify { expr, schedule } => none,
-            Statement::QueryExtract { variants, expr } => none,
-            Statement::Check(vec) => none,
-            Statement::PrintFunction(spanned, _) => none,
-            Statement::PrintSize(spanned) => none,
-            Statement::Input { table, file } => none,
-            Statement::Output { file, exprs } => none,
+            Statement::Simplify {
+                expr: _,
+                schedule: _,
+            } => none,
+            Statement::QueryExtract {
+                variants: _,
+                expr: _,
+            } => none,
+            Statement::Check(_facts) => none,
+            Statement::PrintFunction(_relation_name, _) => none,
+            Statement::PrintSize(_relation_name) => none,
+            Statement::Input { table: _, file: _ } => none,
+            Statement::Output { file: _, exprs: _ } => none,
             Statement::Push(_) => none,
             Statement::Pop(_) => none,
-            Statement::Fail(spanned) => none,
-            Statement::Include(spanned) => none,
+            Statement::Fail(_inner) => none,
+            Statement::Include(_path) => none,
         }
     }
 }
@@ -1397,7 +1410,7 @@ impl Shrink for Action {
                     }),
                 )
             }
-            Action::Panic { message } => none,
+            Action::Panic { message: _ } => none,
             Action::Union { lhs, rhs } => Box::new(
                 lhs.clone()
                     .shrink()
@@ -1420,11 +1433,14 @@ impl Shrink for Action {
             ),
             Action::Expr(expr) => Box::new(expr.shrink().map(Action::Expr)),
             Action::Change {
-                table,
-                args,
-                change,
+                table: _,
+                args: _,
+                change: _,
             } => none,
-            Action::Extract { expr, variants } => none,
+            Action::Extract {
+                expr: _,
+                variants: _,
+            } => none,
         }
     }
 }

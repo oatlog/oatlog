@@ -1346,11 +1346,6 @@ mod ident {
     pub fn type_uf(ty: &TypeData) -> Ident {
         format_ident!("{}_", ty.name.to_snake_case())
     }
-    /// `UnionFind<Math>`
-    pub fn type_ty_uf(ty: &TypeData) -> TokenStream {
-        let ty = type_ty(ty);
-        quote! { UnionFind<#ty> }
-    }
     /// `MathRelation`, `AddRelation`
     pub fn rel_ty(rel: &RelationData) -> Ident {
         format_ident!("{}Relation", rel.name.to_pascal_case())

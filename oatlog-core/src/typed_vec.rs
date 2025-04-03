@@ -1,14 +1,6 @@
 use crate::ids::Id;
 use itertools::Itertools as _;
-use std::{
-    cmp::Eq,
-    collections::{
-        BTreeMap,
-        btree_map::Entry::{Occupied, Vacant},
-    },
-    fmt::Debug,
-    marker::PhantomData,
-};
+use std::{cmp::Eq, fmt::Debug, marker::PhantomData};
 
 /// Vec with typed indexes.
 #[derive(Clone, Eq, PartialEq, Ord, PartialOrd, Hash, Default)]
@@ -89,8 +81,8 @@ impl<K: Id, V> TVec<K, V> {
 impl<K: Id, V> TVec<K, V> {
     pub(crate) fn map_key<F: FnMut(K) -> Option<K>>(
         self,
-        f: &mut F,
-        mut merge: impl FnMut(K, V, V) -> V,
+        _f: &mut F,
+        _merge: impl FnMut(K, V, V) -> V,
     ) -> Self {
         todo!()
         // let mut map: BTreeMap<K, V> = BTreeMap::new();
