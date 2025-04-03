@@ -23,6 +23,7 @@
 #![allow(unused_parens)]
 #![allow(unused_variables)]
 
+mod primitive_mvp;
 mod todo_join;
 mod todo_mathset;
 mod todo_scratch;

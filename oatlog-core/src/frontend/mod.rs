@@ -18,25 +18,22 @@ use std::{
 use itertools::Itertools as _;
 use proc_macro2::{Delimiter, Span, TokenTree};
 
+pub(crate) use crate::frontend::{sexp::SexpSpan, span::MResult};
 use crate::{
-    Configuration, FileNotFoundAction, hir,
+    Configuration, FileNotFoundAction,
+    frontend::{
+        sexp::{Literal, Sexp},
+        span::{MError, QSpan, Spanned, Str, bare_, err_, register_span},
+    },
+    hir,
     ids::{ColumnId, GlobalId, Id, RelationId, TypeId, VariableId},
     lir,
     typed_vec::TVec,
 };
 
-pub(crate) mod span;
-pub(crate) use span::MResult;
-use span::{MError, QSpan, Spanned, Str, bare_, err_, register_span};
-
-pub(crate) mod sexp;
-pub(crate) use sexp::SexpSpan;
-use sexp::{Literal, Sexp};
-
-pub(crate) mod primitive_mvp;
-
-// TODO: remove unused annotation when new ast is used.
 pub(crate) mod egglog_ast;
+pub(crate) mod sexp;
+pub(crate) mod span;
 
 trait ResultExt {
     fn add_err(self, syn_err: MError) -> Self;
