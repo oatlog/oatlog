@@ -261,6 +261,17 @@ the program.
   image("../figures/egraph_example3.svg"),
 )
 
+== E-graph challenges and opportunities
+
+Recent research #pause
+- 1980, used in automated theorem proving #pause
+- 2009, used for equality saturation (algebraic optimization) #pause
+- 2021, batched canonicalization (egg) #pause
+- 2023, relational e-graphs, semi-naive (egglog) #pause
+
+Not yet really used in compilers. Too slow!
+- Despite potential to solve phase ordering
+
 == Egglog and existing e-graph engines
 
 - Egglog is both an e-graph engine (interpreter) and a language.
@@ -289,17 +300,6 @@ the program.
   caption: [Example of the egglog language],
 )
 
-== E-graph challenges and opportunities
-
-Recent research #pause
-- 1980, used in automated theorem proving #pause
-- 2009, used for equality saturation (algebraic optimization) #pause
-- 2021, batched canonicalization (egg) #pause
-- 2023, relational e-graphs, semi-naive (egglog) #pause
-
-Not yet really used in compilers. Too slow!
-- Despite potential to solve phase ordering
-
 = Oatlog
 
 == Our contribution
@@ -311,7 +311,7 @@ Not yet really used in compilers. Too slow!
 
 - Enable easy embedding of e-graphs into Rust applications (like egg, but as fast as egglog).
 
-- [GOAL NOT YET REACHED] Faster than egglog
+- [GOAL NOT YET REACHED 😔] Faster than egglog
 
 
 - Document the egglog language.
@@ -347,8 +347,8 @@ Not yet really used in compilers. Too slow!
 )
 
 - The benchmarks just contain exponentially growing rules.
-    - It's very hard to design reasonable benchmarks, that check what we want to check.
-    - We have some ideas on how to fix this with some sort of optimization fuel, but for e-graphs, so that we can instead test time to convergence.
+  - It's very hard to design reasonable benchmarks, that check what we want to check.
+  - Ideally, we would construct converging benchmarks.
 
 == Egglog compatibility and testing
 // NUMBER OF PASSING TESTS
@@ -542,10 +542,10 @@ Not yet really used in compilers. Too slow!
 
 #text(
   40pt,
-  $ (A_"all" join B_"all")_"new" subset.eq A_"new" join B_"all" + A_"new" join B_"all" $,
+  $ (A_"all" join B_"all")_"new" subset.eq A_"new" join B_"all" + A_"all" join B_"new" $,
 )
 
-- Very beneficial if $A' << A$.
+- Very beneficial if $A_"new" << A_"all"$.
 
 == Codegen for rules
 ```rust
