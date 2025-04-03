@@ -267,26 +267,20 @@ the program.
   image("../figures/egraph_example3.svg"),
 )
 
-== E-graph challenges and opportunities
-
-Recent research #pause
-- 1980, used in automated theorem proving #pause
-- 2009, used for equality saturation (algebraic optimization) #pause
-- 2021, batched canonicalization (egg) #pause
-- 2023, relational e-graphs, semi-naive (egglog) #pause
-
-Not yet really used in compilers. Too slow!
-- Despite potential to solve phase ordering
-
 == Egglog and existing e-graph engines
 
-- Egglog is both an e-graph engine (interpreter) and a language.
-- Egglog improves upon egg by using semi-naive evaluation and relational e-matching.
+#pause
+- The egglog e-graph engine
+  - interpreter, REPL
+  - a language #pause
+- Egglog's predecessor egg
+  - compiler, embeddable
+  - algorithmically different (non-relational) #pause
 - Notable uses (egg/egglog)
-  - Eggcc, an experimental optimizing compiler.
-  - Herbie, a program to optimize floating point accuracy.
-  - Simplifying CAD models (union/difference, etc)
-  - Logic synthesis.
+  - eggcc, an experimental optimizing compiler
+  - Herbie, a program to optimize floating point accuracy
+  - simplifying CAD models (union/difference, etc)
+  - logic synthesis
 
 == Egglog language
 
@@ -298,13 +292,24 @@ Not yet really used in compilers. Too slow!
       (Const i64)
   )
   (rewrite <FROM> <TO>)
-  ; x * 0 => x
+  ; x * 0 => 0
   (rewrite (Mul x (Const 0)) (Const 0))
   ; a * c + b * c => (a + b) * c
   (rewrite (Add (Mul a c) (Mul b c)) (Mul (Add a b) c))
   ```,
   caption: [Example of the egglog language],
 )
+
+== E-graph challenges and opportunities
+
+Brief history #pause
+- 1980, used in automated theorem proving #pause
+- 2009, used for equality saturation (algebraic optimization) #pause
+- 2021, batched canonicalization (egg) #pause
+- 2023, relational e-graphs, semi-naive evaluation (egglog) #pause
+
+Not yet really used in compilers. Too slow!
+- Despite potential to solve phase ordering
 
 = Oatlog
 
@@ -353,8 +358,8 @@ Not yet really used in compilers. Too slow!
 )
 
 - The benchmarks just contain exponentially growing rules.
-  - It's very hard to design reasonable benchmarks, that check what we want to check.
-  - Ideally, we would construct converging benchmarks.
+  - It's very hard to design representative benchmarks.
+  - Preferably converging benchmarks (scheduling flexibility).
 
 == Egglog compatibility and testing
 // NUMBER OF PASSING TESTS
@@ -362,23 +367,20 @@ Not yet really used in compilers. Too slow!
 #text(
   24pt,
   [
-    - We run the 93 tests from the egglog testsuite + our own extra tests.
-      - We are able to run 9 of them because we only support a subset of the egglog language (the others essentially only test our frontend).
+    - 93 tests from egglog testsuite + our own extra tests.
+      - We can run only 9, since we support a subset of the egglog language.
       - Of the tests we are able to run, we match perfectly (in terms of number of e-nodes)
-      - Instance shrinking is implemented for egglog/oatlog differences#footnote[This is not straightforward for code that needs to be compiled.].
-    - We have property tests (quickcheck with a different name) for index implementations.
-    - We use snapshot testing to validate our generated code and IRs (HIR, LIR).
+      - Instance shrinking is implemented for egglog/oatlog differences.
+    - Property tests (like quickcheck) for index implementations.
+    - Snapshot testing to validate our generated code and IRs (HIR, LIR).
   ],
 )
-
-- Egglog testsuite (and some additional tests) are run on egglog and oatlog and e-node counts are compared.
-- Expect tests for IR and codegen.
-- Comparing index implementations (Quickcheck tests)
 
 == Language implementation
 
 #let yes = table.cell()[yes]
 #let no = table.cell(fill: red.lighten(20%))[no]
+#let no_important = table.cell(fill: red.lighten(20%))[no, important!]
 #let ignored = table.cell(fill: gray.lighten(30%))[ignored]
 #let wont = table.cell(fill: blue.lighten(40%))[won't]
 
@@ -418,8 +420,8 @@ Not yet really used in compilers. Too slow!
       [check], ignored,
 
       table.cell(colspan: 2)[Other],
-      [lattice], no,
-      [primitive functions], no,
+      [lattice], no_important,
+      [primitive functions], no_important,
     ),
   ),
 )
@@ -430,41 +432,42 @@ Not yet really used in compilers. Too slow!
 
 == Future work (for the remaining part of the thesis)
 
-#grid(
-  columns: (1fr, 2fr),
-  [
+=== Short term
 
-    === Short term
+- Keeping multiple "new" sets to run some rules less often.
+- Figure out a good HIR representation.
+- Lattice computations
+- Primitive functions like $+$, $-$, ... on i64
 
-    - Keeping multiple "new" sets to run some rules less often.
-    - Figure out a good HIR representation.
-    - Lattice computations
-    - Primitive functions like $+$, $-$, ... on i64
+#pagebreak()
+=== Longer term
 
-  ],
-  [
-    === Longer term
-
-    - Better scheduling, run unifying more often.
-    - Perform analysis to infer infer new unifying rules.
-    - Automatically infer implicit functionality.
-    - Automatically merge relations.
-      - $a + b = c <=> b = c - a$
-    - Implement faster b-trees.
-    - Explore better query planning
-    - Egglog extension: containers of e-classes
-  ],
-)
+- Better scheduling, run unifying more often.
+- Perform analysis to infer infer new unifying rules.
+- Automatically infer implicit functionality.
+- Automatically merge relations.
+  - $a + b = c <=> b = c - a$
+- Implement faster b-trees.
+- Explore better query planning
+- Egglog extension: containers of e-classes
 
 == Conclusion
 
++ Compilers suffer from phase ordering problem
++ E-graphs solve phase ordering
++ E-graphs are a little slow and immature still
++ E-graphs are very actively researched
 
+$=>$ Motivates Oatlog
 
++ Oatlog could be faster than egglog
++ But oatlog is work in progress
 
 = Implementation details (bonus!)
 
 == HIR: High-level IR: represent rules
 
+/*
 #figure(
   ```rust
   pub(crate) struct SymbolicRule {
@@ -479,6 +482,7 @@ Not yet really used in compilers. Too slow!
   ```,
   caption: [simplified HIR implementation],
 )
+*/
 
 - A premise is a conjunctive query, $"Add"(a, b, c), "Mul"(c, d, e)$.
 - An action is a list of unifications and inserts.
