@@ -4,7 +4,6 @@
 #![allow(dead_code, reason = "temporary noise")]
 
 use crate::{
-    hir,
     ids::{ColumnId, IndexId, IndexUsageId},
     lir,
     typed_vec::TVec,
@@ -34,16 +33,13 @@ pub(crate) fn index_selection(
     columns: usize,
     // what logical "primary keys" are needed.
     uses: &TVec<IndexUsageId, Vec<ColumnId>>,
-    implicit_rules: &[hir::ImplicitRule],
 ) -> (
     TVec<IndexUsageId, lir::IndexUsageInfo>,
     TVec<IndexId, lir::IndexInfo>,
 ) {
     // Mapping (physical index) to (usage, prefix len).
-    let mut columns_to_uses: BTreeMap<
-        TVec<ColumnId, ColumnId>,
-        (Vec<(IndexUsageId, usize)>, Option<(usize, lir::MergeTy)>),
-    > = BTreeMap::new();
+    let mut columns_to_uses: BTreeMap<TVec<ColumnId, ColumnId>, Vec<(IndexUsageId, usize)>> =
+        BTreeMap::new();
 
     let permuted_columns_of_use = |used_columns: &[ColumnId]| -> TVec<ColumnId, ColumnId> {
         let prefix = used_columns.len();
@@ -68,21 +64,6 @@ pub(crate) fn index_selection(
         permuted_columns
     };
 
-    for hir::ImplicitRule { on, ty } in implicit_rules {
-        let (_, merge) = columns_to_uses
-            .entry(permuted_columns_of_use(on))
-            .or_default();
-        assert!(merge.is_none(), "overlapping implicit rules");
-        *merge = Some({
-            let primary_key_prefix_len = on.len();
-            let primary_key_violation_merge = match ty {
-                hir::ImplicitRuleAction::Panic => lir::MergeTy::Panic,
-                hir::ImplicitRuleAction::Unification => lir::MergeTy::Union,
-                hir::ImplicitRuleAction::Lattice { .. } => todo!("implement lattice merge"),
-            };
-            (primary_key_prefix_len, primary_key_violation_merge)
-        })
-    }
     for (index_usage_id, used_columns) in uses.iter_enumerate() {
         let prefix = used_columns.len();
         let permuted_columns = permuted_columns_of_use(used_columns);
@@ -90,26 +71,21 @@ pub(crate) fn index_selection(
         columns_to_uses
             .entry(permuted_columns)
             .or_default()
-            .0
             .push((index_usage_id, prefix));
     }
 
     let index_info: TVec<IndexId, lir::IndexInfo> = columns_to_uses
         .iter()
-        .map(|(permuted_columns, (_, merge))| {
-            let (primary_key_prefix_len, primary_key_violation_merge) = merge
-                .clone()
-                .unwrap_or((permuted_columns.len(), lir::MergeTy::Panic));
-            lir::IndexInfo {
-                permuted_columns: permuted_columns.clone(),
-                primary_key_prefix_len,
-                primary_key_violation_merge,
-            }
+        .map(|(permuted_columns, _)| lir::IndexInfo {
+            permuted_columns: permuted_columns.clone(),
+            primary_key_prefix_len: columns,
+            primary_key_violation_merge: BTreeMap::new(),
         })
         .collect();
+
     let index_usage_to_index: TVec<IndexUsageId, lir::IndexUsageInfo> =
         TVec::from_iter_unordered(columns_to_uses.values().enumerate().flat_map(
-            |(index_id, (usage, _))| {
+            |(index_id, usage)| {
                 usage.iter().map(move |&(index_usage_id, prefix)| {
                     (
                         index_usage_id,
@@ -140,7 +116,7 @@ mod test {
                 .into_iter()
                 .map(|x| x.into_iter().map(ColumnId).collect())
                 .collect();
-        let (logical_to_physical, physical_indexes) = index_selection(columns, &uses, &[]);
+        let (logical_to_physical, physical_indexes) = index_selection(columns, &uses);
         expect![["
             {
                 iu0: IndexUsageInfo {

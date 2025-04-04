@@ -62,8 +62,7 @@ impl<K: Id, V> TVec<K, V> {
     pub(crate) fn inner_mut(&mut self) -> &mut Vec<V> {
         &mut self.x
     }
-    #[cfg(test)]
-    pub(crate) fn map_values<'a, V2>(&'a self, f: impl FnMut(&'a V) -> V2) -> TVec<K, V2> {
+    pub(crate) fn map<'a, V2>(&'a self, f: impl FnMut(&'a V) -> V2) -> TVec<K, V2> {
         self.iter().map(f).collect()
     }
     /// Collect values that arrive out-of-order

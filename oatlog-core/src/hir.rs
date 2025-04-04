@@ -494,7 +494,6 @@ pub(crate) struct Theory {
     pub(crate) types: TVec<TypeId, Type>,
 
     pub(crate) symbolic_rules: Vec<SymbolicRule>,
-    pub(crate) implicit_rules: BTreeMap<RelationId, Vec<ImplicitRule>>,
 
     pub(crate) relations: TVec<RelationId, Relation>,
 
@@ -544,9 +543,7 @@ pub(crate) enum TypeKind {
     Primitive { type_path: &'static str },
 }
 
-/// TODO erik: fix these docs.
-///
-/// Lattice and Unification style implicit functionality
+/// Lattice and Unification implicit functionality
 ///
 /// Rules that can be applied through an entry API on a table.
 /// We can assume that these are always applied.
@@ -560,115 +557,48 @@ pub(crate) enum TypeKind {
 /// TODO: add optimization pass to turn symbolic rules to implicit rules.
 #[derive(Clone, Eq, PartialEq, Ord, PartialOrd, Hash, Debug)]
 pub(crate) struct ImplicitRule {
-    /// TODO erik: fix these docs.
-    /// If there is something in the database with the same values for these columns, trigger the rule.
-    pub(crate) on: Vec<ColumnId>,
-    /// TODO erik: fix these docs.
-    /// If there is a conflict, resolve it with this method.
-    pub(crate) ty: ImplicitRuleAction,
+    /// If all colums other than the ones mentioned here are equal, trigger rule for each column.
+    pub(crate) out: Vec<(ColumnId, ImplicitRuleAction)>,
 }
 impl ImplicitRule {
-    pub(crate) fn new_unify(inputs: usize) -> Self {
-        let on = (0..inputs).map(ColumnId).collect();
-        let ty = ImplicitRuleAction::Unification;
-        Self { on, ty }
+    pub(crate) fn new_unify(output: ColumnId) -> Self {
+        Self {
+            out: vec![(output, ImplicitRuleAction::Union)],
+        }
     }
-    pub(crate) fn new_panic(inputs: usize) -> Self {
-        let on = (0..inputs).map(ColumnId).collect();
-        let ty = ImplicitRuleAction::Panic;
-        Self { on, ty }
+    pub(crate) fn new_panic(output: ColumnId) -> Self {
+        Self {
+            out: vec![(output, ImplicitRuleAction::Panic)],
+        }
     }
-    pub(crate) fn new_lattice(
-        inputs: usize,
-        old: VariableId,
-        new: VariableId,
-        res: VariableId,
-        ops: Vec<(RelationId, Vec<VariableId>)>,
-        variables: TVec<VariableId, (TypeId, Option<GlobalId>)>,
-    ) -> Self {
-        let on = (0..inputs).map(ColumnId).collect();
-        let out_col = ColumnId(inputs + 1);
-        let ty = ImplicitRuleAction::Lattice {
-            ops,
-            variables,
-            old: vec![(old, out_col)],
-            new: vec![(new, out_col)],
-            res: vec![(res, out_col)],
-        };
-        Self { on, ty }
+    pub(crate) fn new_lattice(output: ColumnId) -> Self {
+        // TODO: implement codegen lattice and then fix this
+        Self {
+            out: vec![(output, ImplicitRuleAction::Panic)],
+        }
     }
-    /*#[allow(unused)]
-    fn to_symbolic(&self, relations: &TVec<RelationId, Relation>) -> Result<SymbolicRule, ()> {
-        Ok(match self.ty {
-            // TODO: impl panic like this maybe
-            ImplicitRuleAction::Panic => return Err(()),
-            // TODO: impl lattice like this maybe
-            ImplicitRuleAction::Lattice { .. } => return Err(()),
-            ImplicitRuleAction::Unification => {
-                let relation_ = &relations[self.relation];
+    pub(crate) fn value_columns(&self) -> Vec<ColumnId> {
+        self.out.iter().map(|x| x.0).collect()
+    }
+    pub(crate) fn key_columns(&self, columns: usize) -> Vec<ColumnId> {
+        let value_columns = self.value_columns();
 
-                let n = relation_.columns.len();
-
-                let mut premise_variables: TVec<PremiseId, VariableMeta> = TVec::new();
-
-                let mut unify: UF<PremiseId> = UF::new();
-
-                let first_args = (0..n)
-                    .map(ColumnId)
-                    .map(|i| {
-                        let id = unify.push(());
-                        premise_variables
-                            .push_expected(id, VariableMeta::new("", relation_.columns[i]));
-                        id
-                    })
-                    .collect::<TVec<ColumnId, PremiseId>>();
-
-                let second_args = (0..n)
-                    .map(ColumnId)
-                    .map(|i| {
-                        if self.on.contains(&i) {
-                            first_args[i]
-                        } else {
-                            let id = unify.push(());
-                            premise_variables
-                                .push_expected(id, VariableMeta::new("", relation_.columns[i]));
-                            unify.union(id, first_args[i]);
-                            id
-                        }
-                    })
-                    .collect::<TVec<ColumnId, PremiseId>>();
-
-                SymbolicRule {
-                    meta: RuleMeta {
-                        name: None,
-                        src: "from implicit rule",
-                    },
-                    premise_relations: vec![
-                        PremiseRelation {
-                            args: first_args,
-                            relation: self.relation,
-                        },
-                        PremiseRelation {
-                            args: second_args,
-                            relation: self.relation,
-                        },
-                    ],
-                    action_relations: Vec::new(),
-                    unify,
-                    action_variables: TVec::new(),
-                    premise_variables,
-                }
-            }
-        })
-    }*/
+        (0..columns)
+            .map(ColumnId)
+            .filter(|x| !value_columns.contains(x))
+            .collect()
+    }
 }
 
+/// How to merge two columns
 #[derive(Clone, Eq, PartialEq, Ord, PartialOrd, Hash, Debug)]
 pub(crate) enum ImplicitRuleAction {
-    /// Panics if values do not match.
+    /// Panics immediately.
+    ///
+    /// TODO: should this avoid panic if only other columns mismatch?
     Panic,
     /// Unifies all columns not mentioned in `on`
-    Unification,
+    Union,
     /// Run computation to figure out what to write.
     Lattice {
         /// call these functions in this order.
@@ -702,12 +632,16 @@ pub(crate) struct Relation {
 }
 impl Relation {
     // TODO: introduce implicit_rules in these constructors
-    pub(crate) fn table(name: &'static str, columns: TVec<ColumnId, TypeId>) -> Self {
+    pub(crate) fn table(
+        name: &'static str,
+        columns: TVec<ColumnId, TypeId>,
+        implicit_rules: TVec<ImplicitRuleId, ImplicitRule>,
+    ) -> Self {
         Self {
             name,
             columns,
             ty: RelationTy::Table,
-            implicit_rules: TVec::new(),
+            implicit_rules,
         }
     }
     pub(crate) fn forall(name: &'static str, ty: TypeId) -> Self {

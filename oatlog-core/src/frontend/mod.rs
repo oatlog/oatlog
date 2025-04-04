@@ -332,8 +332,6 @@ struct Parser {
 
     /// Rules written explicitly.
     symbolic_rules: Vec<hir::SymbolicRule>,
-    /// Rules derived from functional dependency within relations.
-    implicit_rules: BTreeMap<RelationId, Vec<hir::ImplicitRule>>,
 
     interner: crate::runtime::StringIntern,
 }
@@ -344,7 +342,6 @@ impl Parser {
             function_possible_ids: BTreeMap::new(),
             global_variable_names: BTreeMap::new(),
             global_variables: TVec::new(),
-            implicit_rules: BTreeMap::new(),
             initial: Vec::new(),
             relations_hir_and_func: TVec::new(),
             rulesets: BTreeMap::new(),
@@ -382,7 +379,6 @@ impl Parser {
                 .collect(),
             name: None,
             types,
-            implicit_rules: self.implicit_rules.clone(),
             global_types: self.global_variables.iter().map(|i| i.ty).collect(),
             global_to_relation: self
                 .global_variables
@@ -758,10 +754,51 @@ impl Parser {
                 .expect("unit type exists")
         });
 
+        let output_column = ColumnId(inputs.len());
         let columns: TVec<ColumnId, TypeId> = inputs.iter().copied().chain(output).collect();
 
         let relation_id = self.relations_hir_and_func.push((
-            hir::Relation::table(*name, columns),
+            hir::Relation::table(
+                *name,
+                columns,
+                match kind {
+                    FunctionKind::Constructor { output, cost: _ } => {
+                        assert!(self.types[output].can_unify());
+                        vec![hir::ImplicitRule::new_unify(output_column)].into()
+                    }
+                    FunctionKind::Function {
+                        output,
+                        merge: None,
+                    } => {
+                        if self.types[output].can_unify() {
+                            // eqsort type => unification
+                            // hir::ImplicitRule::new_unify(inputs.len())
+                            // panic!("should we allow lattice on an eqsort?")
+                            vec![hir::ImplicitRule::new_panic(output_column)].into()
+                        } else {
+                            // unify primitive => panic if disagree
+                            vec![hir::ImplicitRule::new_panic(output_column)].into()
+                        }
+                    }
+                    FunctionKind::Function {
+                        output: _,
+                        merge: Some(_),
+                    } => {
+                        // TODO: do a sort of constant propagation by promoting more function calls to
+                        // globals.
+                        // let mut variables: TVec<VariableId, (TypeId, Option<GlobalId>)> =
+                        //     TVec::new();
+                        // let mut ops = Vec::new();
+                        // let old = variables.push((output, None));
+                        // let new = variables.push((output, None));
+                        // let res =
+                        //     self.parse_lattice_expr(old, new, &merge, &mut variables, &mut ops)?;
+                        // hir::ImplicitRule::new_lattice(inputs.len(), old, new, res, ops, variables);
+                        vec![hir::ImplicitRule::new_lattice(output_column)].into()
+                    }
+                    FunctionKind::Relation => vec![].into(),
+                },
+            ),
             Some(FunctionData {
                 name,
                 inputs: inputs.iter().copied().collect(),
@@ -770,40 +807,6 @@ impl Parser {
                 cost,
             }),
         ));
-
-        let implicit_rule = match kind {
-            FunctionKind::Constructor { output, cost: _ }
-            | FunctionKind::Function {
-                output,
-                merge: None,
-            } => Some(if self.types[output].can_unify() {
-                // eqsort type => unification
-                hir::ImplicitRule::new_unify(inputs.len())
-            } else {
-                // unify primitive => panic if disagree
-                hir::ImplicitRule::new_panic(inputs.len())
-            }),
-            FunctionKind::Function {
-                output,
-                merge: Some(merge),
-            } => Some({
-                // TODO: do a sort of constant propagation by promoting more function calls to
-                // globals.
-                let mut variables: TVec<VariableId, (TypeId, Option<GlobalId>)> = TVec::new();
-                let mut ops = Vec::new();
-                let old = variables.push((output, None));
-                let new = variables.push((output, None));
-                let res = self.parse_lattice_expr(old, new, &merge, &mut variables, &mut ops)?;
-                hir::ImplicitRule::new_lattice(inputs.len(), old, new, res, ops, variables)
-            }),
-            FunctionKind::Relation => None,
-        };
-        if let Some(implicit_rule) = implicit_rule {
-            self.implicit_rules
-                .entry(relation_id)
-                .or_default()
-                .push(implicit_rule);
-        }
 
         self.function_possible_ids
             .entry(name)

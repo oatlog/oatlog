@@ -8,7 +8,7 @@ use crate::{
     typed_vec::TVec,
 };
 use derive_more::From;
-use std::{iter, num::NonZeroU64};
+use std::{collections::BTreeMap, iter, num::NonZeroU64};
 
 /// Data such as type and function names are technically unnecessary but used for more readable
 /// generated code. A compiler is far less performance sensitive than an interpreter (although the
@@ -159,10 +159,12 @@ pub enum RelationKind {
 
 #[derive(Clone, Eq, PartialEq, Ord, PartialOrd, Hash, Debug)]
 pub(crate) struct IndexInfo {
-    // index -> main
+    /// index -> main
     pub(crate) permuted_columns: TVec<ColumnId, ColumnId>,
     pub(crate) primary_key_prefix_len: usize,
-    pub(crate) primary_key_violation_merge: MergeTy,
+    /// INVARIANT: there is an entry for each value column.
+    /// the columns are in the MAIN column space.
+    pub(crate) primary_key_violation_merge: BTreeMap<ColumnId, MergeTy>,
 }
 #[derive(Clone, Eq, PartialEq, Ord, PartialOrd, Hash, Debug)]
 pub enum MergeTy {
@@ -352,7 +354,7 @@ impl Theory {
                             })
                             .collect::<BTreeMap<_, _>>(),
                     )
-                    .field("relations", &relations.map_values(Dbg))
+                    .field("relations", &relations.map(Dbg))
                     .field(
                         "rule_variables",
                         &rule_variables
@@ -402,7 +404,7 @@ impl Theory {
                         .debug_struct("Table")
                         .field(
                             "index_to_info",
-                            &NoAlt(&index_to_info.map_values(
+                            &NoAlt(&index_to_info.map(
                                 |IndexInfo {
                                      permuted_columns,
                                      primary_key_prefix_len,
@@ -415,12 +417,15 @@ impl Theory {
                                     if *primary_key_prefix_len == permuted_columns.len() {
                                         DbgStr([cols])
                                     } else {
-                                        let merge = match primary_key_violation_merge {
-                                            MergeTy::Union => "union",
-                                            MergeTy::Panic => "panic",
-                                        };
+                                        let merge = primary_key_violation_merge.iter().map(|(col, merge)| {
+                                            let merge = match merge {
+                                                MergeTy::Union => "union",
+                                                MergeTy::Panic => "panic",
+                                            };
+                                            format!("{}:{merge}", col.0)
+                                        }).join(", ");
                                         let cols_and_merge = format!(
-                                            "{cols} conflict[..{primary_key_prefix_len}] => {merge}"
+                                            "{cols} conflict[..{primary_key_prefix_len}] => [{merge}]"
                                         );
                                         DbgStr([cols_and_merge])
                                     }
@@ -429,7 +434,7 @@ impl Theory {
                         )
                         .field(
                             "usage_to_info",
-                            &usage_to_info.map_values(|IndexUsageInfo { prefix, index }| {
+                            &usage_to_info.map(|IndexUsageInfo { prefix, index }| {
                                 DbgStr([format!("{index}[..{prefix}]")])
                             }),
                         )

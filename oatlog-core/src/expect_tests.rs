@@ -338,7 +338,7 @@ fn hir_global() {
                         name: "Mul",
                         param_types: {c0: t3, c1: t3, c2: t3},
                         kind: Table {
-                            index_to_info: {ir0: 0_1_2 conflict[..2] => union, ir1: 1_0_2, ir2: 2_0_1},
+                            index_to_info: {ir0: 0_1_2 conflict[..2] => [2:union], ir1: 1_0_2, ir2: 2_0_1},
                             usage_to_info: {
                                 iu0: ir0[..1],
                                 iu1: ir1[..1],
@@ -352,7 +352,7 @@ fn hir_global() {
                         name: "Add",
                         param_types: {c0: t3, c1: t3, c2: t3},
                         kind: Table {
-                            index_to_info: {ir0: 0_1_2 conflict[..2] => union, ir1: 1_0_2, ir2: 2_0_1},
+                            index_to_info: {ir0: 0_1_2 conflict[..2] => [2:union], ir1: 1_0_2, ir2: 2_0_1},
                             usage_to_info: {
                                 iu0: ir0[..1],
                                 iu1: ir1[..1],
@@ -366,7 +366,7 @@ fn hir_global() {
                         name: "Const",
                         param_types: {c0: t0, c1: t3},
                         kind: Table {
-                            index_to_info: {ir0: 0_1 conflict[..1] => union, ir1: 1_0},
+                            index_to_info: {ir0: 0_1 conflict[..1] => [1:union], ir1: 1_0},
                             usage_to_info: {
                                 iu0: ir0[..1],
                                 iu1: ir0[..1],
@@ -468,7 +468,7 @@ fn test_bind_variable_multiple_times() {
                         name: "Same",
                         param_types: {c0: t3, c1: t3, c2: t3},
                         kind: Table {
-                            index_to_info: {ir0: 0_1_2 conflict[..2] => union, ir1: 1_0_2, ir2: 2_0_1},
+                            index_to_info: {ir0: 0_1_2 conflict[..2] => [2:union], ir1: 1_0_2, ir2: 2_0_1},
                             usage_to_info: {
                                 iu0: ir0[..1],
                                 iu1: ir1[..1],
@@ -559,7 +559,8 @@ fn test_bind_variable_multiple_times() {
                 fn check2_0_1_2(&self, x0: Foo, x1: Foo) -> bool {
                     self.iter2_0_1_2(x0, x1).next().is_some()
                 }
-                fn entry2_0_1_2(&self, delta: &mut Delta, uf: &mut Unification, x0: Foo, x1: Foo) -> (Foo,) {
+                #[allow(unreachable_code)]
+                fn entry2_0_1_2(&self, x0: Foo, x1: Foo, delta: &mut Delta, uf: &mut Unification) -> (Foo,) {
                     if let Some((x2,)) = self.iter2_0_1_2(x0, x1).next() {
                         return (x2,);
                     }
@@ -603,17 +604,9 @@ fn test_bind_variable_multiple_times() {
                             old
                         });
                     self.all_index_1_0_2
-                        .insert_many(&mut inserts, |mut old, mut new| {
-                            let () = old.value_mut();
-                            let () = new.value_mut();
-                            panic!("panicking merge action")
-                        });
+                        .insert_many(&mut inserts, |_, _| unreachable!());
                     self.all_index_2_0_1
-                        .insert_many(&mut inserts, |mut old, mut new| {
-                            let () = old.value_mut();
-                            let () = new.value_mut();
-                            panic!("panicking merge action")
-                        });
+                        .insert_many(&mut inserts, |_, _| unreachable!());
                     self.new.extend_from_slice(&inserts);
                 }
                 fn update_finalize(&mut self, uf: &mut Unification) {
@@ -841,7 +834,7 @@ fn codegen_variable_reuse_bug() {
                         name: "Add",
                         param_types: {c0: t3, c1: t3, c2: t3},
                         kind: Table {
-                            index_to_info: {ir0: 0_1_2 conflict[..2] => union, ir1: 0_2_1, ir2: 1_0_2, ir3: 2_0_1},
+                            index_to_info: {ir0: 0_1_2 conflict[..2] => [2:union], ir1: 0_2_1, ir2: 1_0_2, ir3: 2_0_1},
                             usage_to_info: {
                                 iu0: ir1[..2],
                                 iu1: ir3[..1],
@@ -859,7 +852,7 @@ fn codegen_variable_reuse_bug() {
                         name: "Zero",
                         param_types: {c0: t3},
                         kind: Table {
-                            index_to_info: {ir0: 0 conflict[..0] => union},
+                            index_to_info: {ir0: 0 conflict[..0] => [0:union]},
                             usage_to_info: {
                                 iu0: ir0[..1],
                                 iu1: ir0[..0],
@@ -1011,7 +1004,8 @@ fn codegen_variable_reuse_bug() {
                 fn check2_0_1_2(&self, x0: Math, x1: Math) -> bool {
                     self.iter2_0_1_2(x0, x1).next().is_some()
                 }
-                fn entry2_0_1_2(&self, delta: &mut Delta, uf: &mut Unification, x0: Math, x1: Math) -> (Math,) {
+                #[allow(unreachable_code)]
+                fn entry2_0_1_2(&self, x0: Math, x1: Math, delta: &mut Delta, uf: &mut Unification) -> (Math,) {
                     if let Some((x2,)) = self.iter2_0_1_2(x0, x1).next() {
                         return (x2,);
                     }
@@ -1057,23 +1051,11 @@ fn codegen_variable_reuse_bug() {
                             old
                         });
                     self.all_index_0_2_1
-                        .insert_many(&mut inserts, |mut old, mut new| {
-                            let () = old.value_mut();
-                            let () = new.value_mut();
-                            panic!("panicking merge action")
-                        });
+                        .insert_many(&mut inserts, |_, _| unreachable!());
                     self.all_index_1_0_2
-                        .insert_many(&mut inserts, |mut old, mut new| {
-                            let () = old.value_mut();
-                            let () = new.value_mut();
-                            panic!("panicking merge action")
-                        });
+                        .insert_many(&mut inserts, |_, _| unreachable!());
                     self.all_index_2_0_1
-                        .insert_many(&mut inserts, |mut old, mut new| {
-                            let () = old.value_mut();
-                            let () = new.value_mut();
-                            panic!("panicking merge action")
-                        });
+                        .insert_many(&mut inserts, |_, _| unreachable!());
                     self.new.extend_from_slice(&inserts);
                 }
                 fn update_finalize(&mut self, uf: &mut Unification) {
@@ -1141,6 +1123,15 @@ fn codegen_variable_reuse_bug() {
                 fn check0_0(&self) -> bool {
                     self.iter0_0().next().is_some()
                 }
+                #[allow(unreachable_code)]
+                fn entry1_0(&self, x0: Math, delta: &mut Delta, uf: &mut Unification) -> () {
+                    if let Some(()) = self.iter1_0(x0).next() {
+                        return ();
+                    }
+                    delta.zero_.push((x0,));
+                    ()
+                }
+                #[allow(unreachable_code)]
                 fn entry0_0(&self, delta: &mut Delta, uf: &mut Unification) -> (Math,) {
                     if let Some((x0,)) = self.iter0_0().next() {
                         return (x0,);
@@ -1446,7 +1437,8 @@ fn initial_exprs() {
                 fn check2_0_1_2(&self, x0: Math, x1: Math) -> bool {
                     self.iter2_0_1_2(x0, x1).next().is_some()
                 }
-                fn entry2_0_1_2(&self, delta: &mut Delta, uf: &mut Unification, x0: Math, x1: Math) -> (Math,) {
+                #[allow(unreachable_code)]
+                fn entry2_0_1_2(&self, x0: Math, x1: Math, delta: &mut Delta, uf: &mut Unification) -> (Math,) {
                     if let Some((x2,)) = self.iter2_0_1_2(x0, x1).next() {
                         return (x2,);
                     }
@@ -1490,17 +1482,9 @@ fn initial_exprs() {
                             old
                         });
                     self.all_index_1_0_2
-                        .insert_many(&mut inserts, |mut old, mut new| {
-                            let () = old.value_mut();
-                            let () = new.value_mut();
-                            panic!("panicking merge action")
-                        });
+                        .insert_many(&mut inserts, |_, _| unreachable!());
                     self.all_index_2_0_1
-                        .insert_many(&mut inserts, |mut old, mut new| {
-                            let () = old.value_mut();
-                            let () = new.value_mut();
-                            panic!("panicking merge action")
-                        });
+                        .insert_many(&mut inserts, |_, _| unreachable!());
                     self.new.extend_from_slice(&inserts);
                 }
                 fn update_finalize(&mut self, uf: &mut Unification) {
@@ -1588,7 +1572,8 @@ fn initial_exprs() {
                 fn check2_0_1_2(&self, x0: Math, x1: Math) -> bool {
                     self.iter2_0_1_2(x0, x1).next().is_some()
                 }
-                fn entry2_0_1_2(&self, delta: &mut Delta, uf: &mut Unification, x0: Math, x1: Math) -> (Math,) {
+                #[allow(unreachable_code)]
+                fn entry2_0_1_2(&self, x0: Math, x1: Math, delta: &mut Delta, uf: &mut Unification) -> (Math,) {
                     if let Some((x2,)) = self.iter2_0_1_2(x0, x1).next() {
                         return (x2,);
                     }
@@ -1632,17 +1617,9 @@ fn initial_exprs() {
                             old
                         });
                     self.all_index_1_0_2
-                        .insert_many(&mut inserts, |mut old, mut new| {
-                            let () = old.value_mut();
-                            let () = new.value_mut();
-                            panic!("panicking merge action")
-                        });
+                        .insert_many(&mut inserts, |_, _| unreachable!());
                     self.all_index_2_0_1
-                        .insert_many(&mut inserts, |mut old, mut new| {
-                            let () = old.value_mut();
-                            let () = new.value_mut();
-                            panic!("panicking merge action")
-                        });
+                        .insert_many(&mut inserts, |_, _| unreachable!());
                     self.new.extend_from_slice(&inserts);
                 }
                 fn update_finalize(&mut self, uf: &mut Unification) {
@@ -1713,11 +1690,12 @@ fn initial_exprs() {
                 fn check1_1_0(&self, x1: Math) -> bool {
                     self.iter1_1_0(x1).next().is_some()
                 }
+                #[allow(unreachable_code)]
                 fn entry1_0_1(
                     &self,
+                    x0: std::primitive::i64,
                     delta: &mut Delta,
                     uf: &mut Unification,
-                    x0: std::primitive::i64,
                 ) -> (Math,) {
                     if let Some((x1,)) = self.iter1_0_1(x0).next() {
                         return (x1,);
@@ -1748,11 +1726,7 @@ fn initial_exprs() {
                             old
                         });
                     self.all_index_1_0
-                        .insert_many(&mut inserts, |mut old, mut new| {
-                            let () = old.value_mut();
-                            let () = new.value_mut();
-                            panic!("panicking merge action")
-                        });
+                        .insert_many(&mut inserts, |_, _| unreachable!());
                     self.new.extend_from_slice(&inserts);
                 }
                 fn update_finalize(&mut self, uf: &mut Unification) {
@@ -1816,7 +1790,8 @@ fn initial_exprs() {
                 fn check1_1_0(&self, x1: Math) -> bool {
                     self.iter1_1_0(x1).next().is_some()
                 }
-                fn entry1_0_1(&self, delta: &mut Delta, uf: &mut Unification, x0: runtime::IString) -> (Math,) {
+                #[allow(unreachable_code)]
+                fn entry1_0_1(&self, x0: runtime::IString, delta: &mut Delta, uf: &mut Unification) -> (Math,) {
                     if let Some((x1,)) = self.iter1_0_1(x0).next() {
                         return (x1,);
                     }
@@ -1846,11 +1821,7 @@ fn initial_exprs() {
                             old
                         });
                     self.all_index_1_0
-                        .insert_many(&mut inserts, |mut old, mut new| {
-                            let () = old.value_mut();
-                            let () = new.value_mut();
-                            panic!("panicking merge action")
-                        });
+                        .insert_many(&mut inserts, |_, _| unreachable!());
                     self.new.extend_from_slice(&inserts);
                 }
                 fn update_finalize(&mut self, uf: &mut Unification) {
@@ -2078,7 +2049,7 @@ fn initial_exprs() {
 }
 
 #[test]
-#[ignore = "panic merge is no longer implemented"]
+#[ignore = "set not implemented yet"]
 fn codegen_panic_merge() {
     Steps {
         // (let x (f))
@@ -2381,23 +2352,11 @@ fn codegen_bug1() {
                         row.2 = uf.t2_.find(row.2);
                     });
                     self.all_index_0_1_2
-                        .insert_many(&mut inserts, |mut old, mut new| {
-                            let () = old.value_mut();
-                            let () = new.value_mut();
-                            panic!("panicking merge action")
-                        });
+                        .insert_many(&mut inserts, |_, _| unreachable!());
                     self.all_index_1_0_2
-                        .insert_many(&mut inserts, |mut old, mut new| {
-                            let () = old.value_mut();
-                            let () = new.value_mut();
-                            panic!("panicking merge action")
-                        });
+                        .insert_many(&mut inserts, |_, _| unreachable!());
                     self.all_index_2_0_1
-                        .insert_many(&mut inserts, |mut old, mut new| {
-                            let () = old.value_mut();
-                            let () = new.value_mut();
-                            panic!("panicking merge action")
-                        });
+                        .insert_many(&mut inserts, |_, _| unreachable!());
                     self.new.extend_from_slice(&inserts);
                 }
                 fn update_finalize(&mut self, uf: &mut Unification) {
@@ -2627,11 +2586,12 @@ fn initial() {
                 fn check1_1_0(&self, x1: Math) -> bool {
                     self.iter1_1_0(x1).next().is_some()
                 }
+                #[allow(unreachable_code)]
                 fn entry1_0_1(
                     &self,
+                    x0: std::primitive::i64,
                     delta: &mut Delta,
                     uf: &mut Unification,
-                    x0: std::primitive::i64,
                 ) -> (Math,) {
                     if let Some((x1,)) = self.iter1_0_1(x0).next() {
                         return (x1,);
@@ -2662,11 +2622,7 @@ fn initial() {
                             old
                         });
                     self.all_index_1_0
-                        .insert_many(&mut inserts, |mut old, mut new| {
-                            let () = old.value_mut();
-                            let () = new.value_mut();
-                            panic!("panicking merge action")
-                        });
+                        .insert_many(&mut inserts, |_, _| unreachable!());
                     self.new.extend_from_slice(&inserts);
                 }
                 fn update_finalize(&mut self, uf: &mut Unification) {
@@ -2933,7 +2889,8 @@ fn test_primitives_simple() {
                 fn check2_0_1_2(&self, x0: Math, x1: Math) -> bool {
                     self.iter2_0_1_2(x0, x1).next().is_some()
                 }
-                fn entry2_0_1_2(&self, delta: &mut Delta, uf: &mut Unification, x0: Math, x1: Math) -> (Math,) {
+                #[allow(unreachable_code)]
+                fn entry2_0_1_2(&self, x0: Math, x1: Math, delta: &mut Delta, uf: &mut Unification) -> (Math,) {
                     if let Some((x2,)) = self.iter2_0_1_2(x0, x1).next() {
                         return (x2,);
                     }
@@ -2977,17 +2934,9 @@ fn test_primitives_simple() {
                             old
                         });
                     self.all_index_1_0_2
-                        .insert_many(&mut inserts, |mut old, mut new| {
-                            let () = old.value_mut();
-                            let () = new.value_mut();
-                            panic!("panicking merge action")
-                        });
+                        .insert_many(&mut inserts, |_, _| unreachable!());
                     self.all_index_2_0_1
-                        .insert_many(&mut inserts, |mut old, mut new| {
-                            let () = old.value_mut();
-                            let () = new.value_mut();
-                            panic!("panicking merge action")
-                        });
+                        .insert_many(&mut inserts, |_, _| unreachable!());
                     self.new.extend_from_slice(&inserts);
                 }
                 fn update_finalize(&mut self, uf: &mut Unification) {
@@ -3075,7 +3024,8 @@ fn test_primitives_simple() {
                 fn check2_0_1_2(&self, x0: Math, x1: Math) -> bool {
                     self.iter2_0_1_2(x0, x1).next().is_some()
                 }
-                fn entry2_0_1_2(&self, delta: &mut Delta, uf: &mut Unification, x0: Math, x1: Math) -> (Math,) {
+                #[allow(unreachable_code)]
+                fn entry2_0_1_2(&self, x0: Math, x1: Math, delta: &mut Delta, uf: &mut Unification) -> (Math,) {
                     if let Some((x2,)) = self.iter2_0_1_2(x0, x1).next() {
                         return (x2,);
                     }
@@ -3119,17 +3069,9 @@ fn test_primitives_simple() {
                             old
                         });
                     self.all_index_1_0_2
-                        .insert_many(&mut inserts, |mut old, mut new| {
-                            let () = old.value_mut();
-                            let () = new.value_mut();
-                            panic!("panicking merge action")
-                        });
+                        .insert_many(&mut inserts, |_, _| unreachable!());
                     self.all_index_2_0_1
-                        .insert_many(&mut inserts, |mut old, mut new| {
-                            let () = old.value_mut();
-                            let () = new.value_mut();
-                            panic!("panicking merge action")
-                        });
+                        .insert_many(&mut inserts, |_, _| unreachable!());
                     self.new.extend_from_slice(&inserts);
                 }
                 fn update_finalize(&mut self, uf: &mut Unification) {
@@ -3208,11 +3150,12 @@ fn test_primitives_simple() {
                 fn check1_1_0(&self, x1: Math) -> bool {
                     self.iter1_1_0(x1).next().is_some()
                 }
+                #[allow(unreachable_code)]
                 fn entry1_0_1(
                     &self,
+                    x0: std::primitive::i64,
                     delta: &mut Delta,
                     uf: &mut Unification,
-                    x0: std::primitive::i64,
                 ) -> (Math,) {
                     if let Some((x1,)) = self.iter1_0_1(x0).next() {
                         return (x1,);
@@ -3220,6 +3163,20 @@ fn test_primitives_simple() {
                     let x1 = uf.math_.add_eclass();
                     delta.const_.push((x0, x1));
                     (x1,)
+                }
+                #[allow(unreachable_code)]
+                fn entry2_0_1(
+                    &self,
+                    x0: std::primitive::i64,
+                    x1: Math,
+                    delta: &mut Delta,
+                    uf: &mut Unification,
+                ) -> () {
+                    if let Some(()) = self.iter2_0_1(x0, x1).next() {
+                        return ();
+                    }
+                    delta.const_.push((x0, x1));
+                    ()
                 }
                 fn update(&mut self, uf: &mut Unification, delta: &mut Delta) {
                     let mut inserts = take(&mut delta.const_);
@@ -3243,11 +3200,7 @@ fn test_primitives_simple() {
                             old
                         });
                     self.all_index_1_0
-                        .insert_many(&mut inserts, |mut old, mut new| {
-                            let () = old.value_mut();
-                            let () = new.value_mut();
-                            panic!("panicking merge action")
-                        });
+                        .insert_many(&mut inserts, |_, _| unreachable!());
                     self.new.extend_from_slice(&inserts);
                 }
                 fn update_finalize(&mut self, uf: &mut Unification) {
@@ -3311,7 +3264,8 @@ fn test_primitives_simple() {
                 fn check1_1_0(&self, x1: Math) -> bool {
                     self.iter1_1_0(x1).next().is_some()
                 }
-                fn entry1_0_1(&self, delta: &mut Delta, uf: &mut Unification, x0: runtime::IString) -> (Math,) {
+                #[allow(unreachable_code)]
+                fn entry1_0_1(&self, x0: runtime::IString, delta: &mut Delta, uf: &mut Unification) -> (Math,) {
                     if let Some((x1,)) = self.iter1_0_1(x0).next() {
                         return (x1,);
                     }
@@ -3341,11 +3295,7 @@ fn test_primitives_simple() {
                             old
                         });
                     self.all_index_1_0
-                        .insert_many(&mut inserts, |mut old, mut new| {
-                            let () = old.value_mut();
-                            let () = new.value_mut();
-                            panic!("panicking merge action")
-                        });
+                        .insert_many(&mut inserts, |_, _| unreachable!());
                     self.new.extend_from_slice(&inserts);
                 }
                 fn update_finalize(&mut self, uf: &mut Unification) {
@@ -3699,6 +3649,14 @@ fn triangle_join() {
                 fn check1_0_1(&self, x0: Math) -> bool {
                     self.iter1_0_1(x0).next().is_some()
                 }
+                #[allow(unreachable_code)]
+                fn entry2_0_1(&self, x0: Math, x1: Math, delta: &mut Delta, uf: &mut Unification) -> () {
+                    if let Some(()) = self.iter2_0_1(x0, x1).next() {
+                        return ();
+                    }
+                    delta.foo_.push((x0, x1));
+                    ()
+                }
                 fn update(&mut self, uf: &mut Unification, delta: &mut Delta) {
                     let mut inserts = take(&mut delta.foo_);
                     let orig_inserts = inserts.len();
@@ -3719,17 +3677,9 @@ fn triangle_join() {
                         row.1 = uf.math_.find(row.1);
                     });
                     self.all_index_0_1
-                        .insert_many(&mut inserts, |mut old, mut new| {
-                            let () = old.value_mut();
-                            let () = new.value_mut();
-                            panic!("panicking merge action")
-                        });
+                        .insert_many(&mut inserts, |_, _| unreachable!());
                     self.all_index_1_0
-                        .insert_many(&mut inserts, |mut old, mut new| {
-                            let () = old.value_mut();
-                            let () = new.value_mut();
-                            panic!("panicking merge action")
-                        });
+                        .insert_many(&mut inserts, |_, _| unreachable!());
                     self.new.extend_from_slice(&inserts);
                 }
                 fn update_finalize(&mut self, uf: &mut Unification) {
@@ -3816,17 +3766,9 @@ fn triangle_join() {
                         row.1 = uf.math_.find(row.1);
                     });
                     self.all_index_0_1
-                        .insert_many(&mut inserts, |mut old, mut new| {
-                            let () = old.value_mut();
-                            let () = new.value_mut();
-                            panic!("panicking merge action")
-                        });
+                        .insert_many(&mut inserts, |_, _| unreachable!());
                     self.all_index_1_0
-                        .insert_many(&mut inserts, |mut old, mut new| {
-                            let () = old.value_mut();
-                            let () = new.value_mut();
-                            panic!("panicking merge action")
-                        });
+                        .insert_many(&mut inserts, |_, _| unreachable!());
                     self.new.extend_from_slice(&inserts);
                 }
                 fn update_finalize(&mut self, uf: &mut Unification) {
@@ -3901,6 +3843,14 @@ fn triangle_join() {
                 fn check1_0_1(&self, x0: Math) -> bool {
                     self.iter1_0_1(x0).next().is_some()
                 }
+                #[allow(unreachable_code)]
+                fn entry2_0_1(&self, x0: Math, x1: Math, delta: &mut Delta, uf: &mut Unification) -> () {
+                    if let Some(()) = self.iter2_0_1(x0, x1).next() {
+                        return ();
+                    }
+                    delta.baz_.push((x0, x1));
+                    ()
+                }
                 fn update(&mut self, uf: &mut Unification, delta: &mut Delta) {
                     let mut inserts = take(&mut delta.baz_);
                     let orig_inserts = inserts.len();
@@ -3921,17 +3871,9 @@ fn triangle_join() {
                         row.1 = uf.math_.find(row.1);
                     });
                     self.all_index_0_1
-                        .insert_many(&mut inserts, |mut old, mut new| {
-                            let () = old.value_mut();
-                            let () = new.value_mut();
-                            panic!("panicking merge action")
-                        });
+                        .insert_many(&mut inserts, |_, _| unreachable!());
                     self.all_index_1_0
-                        .insert_many(&mut inserts, |mut old, mut new| {
-                            let () = old.value_mut();
-                            let () = new.value_mut();
-                            panic!("panicking merge action")
-                        });
+                        .insert_many(&mut inserts, |_, _| unreachable!());
                     self.new.extend_from_slice(&inserts);
                 }
                 fn update_finalize(&mut self, uf: &mut Unification) {
@@ -4036,23 +3978,11 @@ fn triangle_join() {
                         row.2 = uf.math_.find(row.2);
                     });
                     self.all_index_0_1_2
-                        .insert_many(&mut inserts, |mut old, mut new| {
-                            let () = old.value_mut();
-                            let () = new.value_mut();
-                            panic!("panicking merge action")
-                        });
+                        .insert_many(&mut inserts, |_, _| unreachable!());
                     self.all_index_1_0_2
-                        .insert_many(&mut inserts, |mut old, mut new| {
-                            let () = old.value_mut();
-                            let () = new.value_mut();
-                            panic!("panicking merge action")
-                        });
+                        .insert_many(&mut inserts, |_, _| unreachable!());
                     self.all_index_2_0_1
-                        .insert_many(&mut inserts, |mut old, mut new| {
-                            let () = old.value_mut();
-                            let () = new.value_mut();
-                            panic!("panicking merge action")
-                        });
+                        .insert_many(&mut inserts, |_, _| unreachable!());
                     self.new.extend_from_slice(&inserts);
                 }
                 fn update_finalize(&mut self, uf: &mut Unification) {
@@ -4371,7 +4301,8 @@ fn edgecase0() {
                 fn check2_0_1_2(&self, x0: Math, x1: Math) -> bool {
                     self.iter2_0_1_2(x0, x1).next().is_some()
                 }
-                fn entry2_0_1_2(&self, delta: &mut Delta, uf: &mut Unification, x0: Math, x1: Math) -> (Math,) {
+                #[allow(unreachable_code)]
+                fn entry2_0_1_2(&self, x0: Math, x1: Math, delta: &mut Delta, uf: &mut Unification) -> (Math,) {
                     if let Some((x2,)) = self.iter2_0_1_2(x0, x1).next() {
                         return (x2,);
                     }
@@ -4417,23 +4348,11 @@ fn edgecase0() {
                             old
                         });
                     self.all_index_0_2_1
-                        .insert_many(&mut inserts, |mut old, mut new| {
-                            let () = old.value_mut();
-                            let () = new.value_mut();
-                            panic!("panicking merge action")
-                        });
+                        .insert_many(&mut inserts, |_, _| unreachable!());
                     self.all_index_1_0_2
-                        .insert_many(&mut inserts, |mut old, mut new| {
-                            let () = old.value_mut();
-                            let () = new.value_mut();
-                            panic!("panicking merge action")
-                        });
+                        .insert_many(&mut inserts, |_, _| unreachable!());
                     self.all_index_2_0_1
-                        .insert_many(&mut inserts, |mut old, mut new| {
-                            let () = old.value_mut();
-                            let () = new.value_mut();
-                            panic!("panicking merge action")
-                        });
+                        .insert_many(&mut inserts, |_, _| unreachable!());
                     self.new.extend_from_slice(&inserts);
                 }
                 fn update_finalize(&mut self, uf: &mut Unification) {
@@ -4521,7 +4440,8 @@ fn edgecase0() {
                 fn check1_2_0_1(&self, x2: Math) -> bool {
                     self.iter1_2_0_1(x2).next().is_some()
                 }
-                fn entry2_0_1_2(&self, delta: &mut Delta, uf: &mut Unification, x0: Math, x1: Math) -> (Math,) {
+                #[allow(unreachable_code)]
+                fn entry2_0_1_2(&self, x0: Math, x1: Math, delta: &mut Delta, uf: &mut Unification) -> (Math,) {
                     if let Some((x2,)) = self.iter2_0_1_2(x0, x1).next() {
                         return (x2,);
                     }
@@ -4565,17 +4485,9 @@ fn edgecase0() {
                             old
                         });
                     self.all_index_1_0_2
-                        .insert_many(&mut inserts, |mut old, mut new| {
-                            let () = old.value_mut();
-                            let () = new.value_mut();
-                            panic!("panicking merge action")
-                        });
+                        .insert_many(&mut inserts, |_, _| unreachable!());
                     self.all_index_2_0_1
-                        .insert_many(&mut inserts, |mut old, mut new| {
-                            let () = old.value_mut();
-                            let () = new.value_mut();
-                            panic!("panicking merge action")
-                        });
+                        .insert_many(&mut inserts, |_, _| unreachable!());
                     self.new.extend_from_slice(&inserts);
                 }
                 fn update_finalize(&mut self, uf: &mut Unification) {
@@ -4856,7 +4768,8 @@ fn test_into_codegen() {
                 fn check2_0_1_2(&self, x0: Math, x1: Math) -> bool {
                     self.iter2_0_1_2(x0, x1).next().is_some()
                 }
-                fn entry2_0_1_2(&self, delta: &mut Delta, uf: &mut Unification, x0: Math, x1: Math) -> (Math,) {
+                #[allow(unreachable_code)]
+                fn entry2_0_1_2(&self, x0: Math, x1: Math, delta: &mut Delta, uf: &mut Unification) -> (Math,) {
                     if let Some((x2,)) = self.iter2_0_1_2(x0, x1).next() {
                         return (x2,);
                     }
@@ -4900,17 +4813,9 @@ fn test_into_codegen() {
                             old
                         });
                     self.all_index_1_0_2
-                        .insert_many(&mut inserts, |mut old, mut new| {
-                            let () = old.value_mut();
-                            let () = new.value_mut();
-                            panic!("panicking merge action")
-                        });
+                        .insert_many(&mut inserts, |_, _| unreachable!());
                     self.all_index_2_0_1
-                        .insert_many(&mut inserts, |mut old, mut new| {
-                            let () = old.value_mut();
-                            let () = new.value_mut();
-                            panic!("panicking merge action")
-                        });
+                        .insert_many(&mut inserts, |_, _| unreachable!());
                     self.new.extend_from_slice(&inserts);
                 }
                 fn update_finalize(&mut self, uf: &mut Unification) {
@@ -4998,7 +4903,8 @@ fn test_into_codegen() {
                 fn check2_0_1_2(&self, x0: Math, x1: Math) -> bool {
                     self.iter2_0_1_2(x0, x1).next().is_some()
                 }
-                fn entry2_0_1_2(&self, delta: &mut Delta, uf: &mut Unification, x0: Math, x1: Math) -> (Math,) {
+                #[allow(unreachable_code)]
+                fn entry2_0_1_2(&self, x0: Math, x1: Math, delta: &mut Delta, uf: &mut Unification) -> (Math,) {
                     if let Some((x2,)) = self.iter2_0_1_2(x0, x1).next() {
                         return (x2,);
                     }
@@ -5042,17 +4948,9 @@ fn test_into_codegen() {
                             old
                         });
                     self.all_index_1_0_2
-                        .insert_many(&mut inserts, |mut old, mut new| {
-                            let () = old.value_mut();
-                            let () = new.value_mut();
-                            panic!("panicking merge action")
-                        });
+                        .insert_many(&mut inserts, |_, _| unreachable!());
                     self.all_index_2_0_1
-                        .insert_many(&mut inserts, |mut old, mut new| {
-                            let () = old.value_mut();
-                            let () = new.value_mut();
-                            panic!("panicking merge action")
-                        });
+                        .insert_many(&mut inserts, |_, _| unreachable!());
                     self.new.extend_from_slice(&inserts);
                 }
                 fn update_finalize(&mut self, uf: &mut Unification) {

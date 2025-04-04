@@ -124,24 +124,42 @@ pub(crate) fn emit_lir_theory(mut theory: hir::Theory) -> (hir::Theory, lir::The
                     .map(|i| uses.push(vec![i]))
                     .collect();
 
-                // Add index usages to guarantee existence of the `iter` functions called internally within `entry` functions.
-                theory
-                    .implicit_rules
-                    .get(&relation_id)
-                    .into_iter()
-                    .flatten()
-                    .for_each(|hir::ImplicitRule { on, .. }| {
-                        let _ = uses.push(on.clone());
-                    });
+                let implicit_with_index = relation.implicit_rules.map(|x| {
+                    let index_usage = uses.push(x.key_columns(relation.columns.len()));
+                    (index_usage, x)
+                });
 
-                let (usage_to_info, index_to_info) = index_selection::index_selection(
-                    relation.columns.len(),
-                    uses,
-                    theory
-                        .implicit_rules
-                        .get(&relation_id)
-                        .unwrap_or(&Vec::new()),
-                );
+                let (usage_to_info, mut index_to_info) =
+                    index_selection::index_selection(relation.columns.len(), uses);
+
+                for (index_usage, implicit_rule) in implicit_with_index {
+                    let lir::IndexInfo {
+                        permuted_columns: _,
+                        primary_key_prefix_len,
+                        primary_key_violation_merge,
+                    } = &mut index_to_info[usage_to_info[index_usage].index];
+                    assert_eq!(
+                        *primary_key_prefix_len,
+                        relation.columns.len(),
+                        "implicit rule collision (this can be solved)"
+                    );
+                    *primary_key_prefix_len = relation.columns.len() - implicit_rule.out.len();
+                    *primary_key_violation_merge = implicit_rule
+                        .out
+                        .iter()
+                        .map(|(out_column, merge_action)| {
+                            (*out_column, {
+                                match merge_action {
+                                    hir::ImplicitRuleAction::Panic => lir::MergeTy::Panic,
+                                    hir::ImplicitRuleAction::Union => lir::MergeTy::Union,
+                                    hir::ImplicitRuleAction::Lattice { .. } => {
+                                        todo!("implement lattice merge")
+                                    }
+                                }
+                            })
+                        })
+                        .collect();
+                }
 
                 let lir_relation = lir::RelationData::new_table(
                     relation.name,
