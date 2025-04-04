@@ -778,10 +778,10 @@ impl Parser {
                 merge: None,
             } => Some(if self.types[output].can_unify() {
                 // eqsort type => unification
-                hir::ImplicitRule::new_unify(relation_id, inputs.len())
+                hir::ImplicitRule::new_unify(inputs.len())
             } else {
                 // unify primitive => panic if disagree
-                hir::ImplicitRule::new_panic(relation_id, inputs.len())
+                hir::ImplicitRule::new_panic(inputs.len())
             }),
             FunctionKind::Function {
                 output,
@@ -794,15 +794,7 @@ impl Parser {
                 let old = variables.push((output, None));
                 let new = variables.push((output, None));
                 let res = self.parse_lattice_expr(old, new, &merge, &mut variables, &mut ops)?;
-                hir::ImplicitRule::new_lattice(
-                    relation_id,
-                    inputs.len(),
-                    old,
-                    new,
-                    res,
-                    ops,
-                    variables,
-                )
+                hir::ImplicitRule::new_lattice(inputs.len(), old, new, res, ops, variables)
             }),
             FunctionKind::Relation => None,
         };

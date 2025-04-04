@@ -563,7 +563,7 @@ impl Theory {
         self.relations
             .enumerate()
             .map(|old| {
-                let new_relation = self.relations[old].new(old);
+                let new_relation = self.relations[old].as_new(old);
                 let new = self.relations.push(new_relation);
                 (old, new)
             })

@@ -130,6 +130,15 @@ impl<K: Id> TVec<K, K> {
     }
 }
 
+impl<K, V> From<Vec<V>> for TVec<K, V> {
+    fn from(x: Vec<V>) -> Self {
+        Self {
+            x,
+            _marker: PhantomData,
+        }
+    }
+}
+
 impl<K: Id, V> std::ops::Index<K> for TVec<K, V> {
     type Output = V;
 

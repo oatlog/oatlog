@@ -68,12 +68,7 @@ pub(crate) fn index_selection(
         permuted_columns
     };
 
-    for hir::ImplicitRule {
-        relation: _,
-        on,
-        ty,
-    } in implicit_rules
-    {
+    for hir::ImplicitRule { on, ty } in implicit_rules {
         let (_, merge) = columns_to_uses
             .entry(permuted_columns_of_use(on))
             .or_default();

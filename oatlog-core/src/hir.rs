@@ -2,7 +2,9 @@
 //! Desugared, flattened rules.
 
 use crate::{
-    ids::{ActionId, ColumnId, GlobalId, Id, PremiseId, RelationId, TypeId, VariableId},
+    ids::{
+        ActionId, ColumnId, GlobalId, Id, ImplicitRuleId, PremiseId, RelationId, TypeId, VariableId,
+    },
     lir,
     typed_vec::TVec,
     union_find::{UF, UFData},
@@ -19,429 +21,470 @@ use std::{
     iter,
 };
 
-pub(crate) mod hir2 {
-
-    #![allow(unused)]
-
-    use crate::{
-        ids::{
-            ActionId, ColumnId, PremiseId, RelationId, RuleId, RuleSetId, RuleUsageId, TypeId,
-            VariableId,
-        },
-        lir,
-        typed_vec::TVec,
-        union_find::UF,
-    };
-
-    use std::collections::{BTreeMap, BTreeSet};
-
-    #[derive(Debug)]
-    struct VariableMeta {
-        name: &'static str,
-        ty: TypeId,
-    }
-    impl VariableMeta {
-        fn merge(a: Self, b: Self) -> Self {
-            todo!()
-        }
-    }
-
-    // Add(a, b, c), Add(d, e, b);
-    //
-    //
-    // a,b -> c, b,c -> a, c,a -> b
-    //
-    // d,e -> b, e,b -> d, b,d -> e
-
-    // Trie opts that we are concerned about are just to remove redundant actions (and pick ideal
-    // actions). For inserts/entry we do best-effort. For unification we can keep a UF for each
-    // path in the tree.
-
-    // Entry means that there is not a single canonical way to write actions of a rule, but that is
-    // fine, assuming the merge works correctly.
-
-    // NOTE: if actions need to be merged then the two rules must have been equivalent, and the
-    // rules should have already been merged, ergo, we only need to be concerned about what
-    // redundant actions are performed along a trie path.
-
-    // NOTE: if there are INFALLIBLE premises (like globals/literals) we can move them from premise
-    // to action if not used in premise (IF it does not mutate in action).
-
-    // We can do INSERT -> ENTRY, we can not do INFALLIBLE ENTRY -> INSERT.
-
-    // semantics
-    //
-    // Premise: no entry only indexes with potentially limited FD. Any variable unification is
-    // fine.
-    //
-    // Action:
-    //
-    // By default, everything is entry (or insert with set), non-constructors/globals are fallible
-    // and fail immediately if they are not inserts. Frontend should check this.
-    //
-    // Only legal optimizations on IR is FD, eliminate double unify, defined only by existing entry
-    // calls.
-    //
-    // Unify among non-eqsorts on final rule will fail compilation.
-    //
-    // Reading from globals is entry of zero arguments.
-    //
-    // Action lowers to: pick a *variable ordering* (where a variable is a set in UF) such that all
-    // variables can be determined. If a variable is overdetermined (through UF), it is valid to
-    // transform an entry to a insert (If it is not an eqsort, compilation fails). This limits the
-    // number of potential bogus e-classes.
-
-    // NOTE: uf.find() is unsound in an action for purposes of entry.
-
-    // maybe sound normalization:
-    //
-    // 1) dedup using FD
-    //
-    // lowering:
-    //
-    // 1) Pick a *set ordering*. (If this fails (cycle) we can introduce make)
-    // 2) Emit "computation" + unification,
-    //
-
-    // NOTE: we never really care when ACTION's are equal if concat + normalize simplifies
-    // properly.
-
-    // Trie action dedup is trivial if UF is separated into it's individual parts.
-
-    // For premise, we additionally care about killing instances of forall, since forall does not
-    // actually constrain a variable.
-
-    struct RuleMeta {
-        name: &'static str,
-        ids: BTreeSet<RuleId>,
-    }
-
-    pub(crate) struct SymbolicRule {
-        // ====== PREMISE ======
-        premise: Premise,
-
-        // ====== ACTION ======
-        action: Action,
-
-        // ====== METADATA ======
-        meta: RuleMeta,
-    }
-    impl SymbolicRule {
-        fn merge(a: Self, b: Self) -> Self {
-            assert_eq!(a.premise, b.premise);
-            todo!("not a priority")
-        }
-        /// try to simplify the premise.
-        /// also perform graph isomorphism thing.
-        /// apply FD to introduce more constraints.
-        fn simplify_premise(self /*, FD context, relation context */) -> Self {
-            todo!()
-        }
-        fn map_action(self, mut f: impl FnMut(ActionId) -> Option<ActionId>) -> Self {
-            Self {
-                premise: self.premise.map_action(&mut f),
-                action: self.action.map_action(&mut f),
-                meta: self.meta,
-            }
-        }
-        fn map_premise(self, mut f: impl FnMut(PremiseId) -> Option<PremiseId>) -> Self {
-            Self {
-                premise: self.premise.map_premise(&mut f),
-                action: self.action.map_premise(&mut f),
-                meta: self.meta,
-            }
-        }
-    }
-
-    #[derive(Debug)]
-    pub(crate) struct Premise {
-        conjunctive_query: BTreeSet<(RelationId, Vec<PremiseId>)>,
-        variables: TVec<PremiseId, VariableMeta>,
-    }
-    impl PartialEq for Premise {
-        fn eq(&self, other: &Self) -> bool {
-            self.conjunctive_query == other.conjunctive_query
-        }
-    }
-    impl Premise {
-        fn map_premise<F: FnMut(PremiseId) -> Option<PremiseId>>(self, mut f: &mut F) -> Self {
-            Self {
-                conjunctive_query: self
-                    .conjunctive_query
-                    .into_iter()
-                    .map(|(relation, args)| {
-                        (
-                            relation,
-                            args.into_iter()
-                                .map(|x| f(x).expect("deleted premise variable still used"))
-                                .collect(),
-                        )
-                    })
-                    .collect(),
-                variables: self
-                    .variables
-                    .map_key(&mut f, |_, a, b| VariableMeta::merge(a, b)),
-            }
-        }
-        fn map_action<F: FnMut(ActionId) -> Option<ActionId>>(self, _f: &mut F) -> Self {
-            Self {
-                conjunctive_query: self.conjunctive_query,
-                variables: self.variables,
-            }
-        }
-    }
-
-    // TODO: is it sound to run uf.find() before inserting?
-    #[derive(PartialEq, Eq)]
-    pub(crate) enum ActionSsa {
-        /// Copy value from premise
-        Premise(PremiseId),
-        /// Read from relation or make new e-class if not found.
-        /// Note that use of entry means that there is not a single canonical representation for
-        /// actions.
-        ///
-        /// Entry implies the existence of an implicit rule.
-        ///
-        /// cost is 1 btree lookup.
-        ///
-        /// This ignores any "non-default" FD, but it's probably fine anyways.
-        Entry {
-            relation: RelationId,
-            args: Vec<ActionId>,
-        },
-    }
-    impl ActionSsa {
-        fn map_action<F: FnMut(ActionId) -> Option<ActionId>>(
-            x: Option<Self>,
-            f: &mut F,
-        ) -> Option<Self> {
-            x.map(|x| match x {
-                ActionSsa::Premise(premise_id) => ActionSsa::Premise(premise_id),
-                ActionSsa::Entry { relation, args } => ActionSsa::Entry {
-                    relation,
-                    args: args
-                        .into_iter()
-                        .map(|x| f(x).expect("action variable is still used"))
-                        .collect(),
-                },
-            })
-        }
-    }
-
-    pub(crate) struct Action {
-        // None = undetermined, may be replaced by make if we have to.
-        ssa: TVec<ActionId, Option<ActionSsa>>,
-        unify: UF<ActionId>,
-        insert_rows: BTreeSet<(RelationId, Vec<ActionId>)>,
-        /// For running checks, do we expect that this rule will trigger?
-        /// Merging with this enabled is tricky, so disable it.
-        /// We also can't run this action eagerly anymore.
-        /// ```text
-        /// let rule_ran = false;
-        /// for ... in ... {
-        ///     for ... in ... {
-        ///          rule_ran = true;
-        ///     }
-        /// }
-        /// ```
-        expect_trigger: Option<(bool, &'static str)>,
-        // change : subsume or delete
-        variables: TVec<ActionId, VariableMeta>,
-    }
-    impl Action {
-        // TODO: bad because we will get duplicates and it's no longer SSA.
-        fn map_action<F: FnMut(ActionId) -> Option<ActionId>>(self, mut f: &mut F) -> Self {
-            let variables = self
-                .variables
-                .map_key(&mut f, |_, a, b| VariableMeta::merge(a, b));
-            let n = variables.len();
-            let unify: UF<ActionId> = UF::from_pairs(
-                n,
-                self.unify
-                    .iter_edges_fully_connected()
-                    .filter_map(|(a, b)| Some((f(a)?, f(b)?))),
-            );
-            let insert_rows: BTreeSet<_> = self
-                .insert_rows
-                .into_iter()
-                .map(|(relation, args)| {
-                    (
-                        relation,
-                        args.into_iter()
-                            .map(|x| f(x).expect("action still uses variable"))
-                            .collect::<Vec<_>>(),
-                    )
-                })
-                .collect();
-            let expect_trigger = self.expect_trigger;
-
-            let ssa: TVec<ActionId, Option<ActionSsa>> = self
-                .ssa
-                .into_iter()
-                .map(|x| ActionSsa::map_action(x, &mut f))
-                .collect();
-
-            let ssa = ssa.map_key(&mut f, |i, a, b| match (a, b) {
-                (None, None) => None,
-                (None, Some(x)) | (Some(x), None) => Some(x),
-                (Some(a), Some(b)) if a == b => Some(a),
-                (Some(a), Some(b)) => {
-                    // any codepath here is semantically strange, but maybe possible.
-                    match (a, b) {
-                        (ActionSsa::Premise(pa), ActionSsa::Premise(pb)) => panic!(),
-                        (
-                            ActionSsa::Premise(pa),
-                            ActionSsa::Entry {
-                                relation: rb,
-                                args: ab,
-                            },
-                        )
-                        | (
-                            ActionSsa::Entry {
-                                relation: rb,
-                                args: ab,
-                            },
-                            ActionSsa::Premise(pa),
-                        ) => {
-                            panic!()
-                        }
-                        (
-                            ActionSsa::Entry {
-                                relation: ra,
-                                args: aa,
-                            },
-                            ActionSsa::Entry {
-                                relation: rb,
-                                args: ab,
-                            },
-                        ) => {
-                            panic!()
-                        }
-                    }
-                }
-            });
-
-            todo!()
-        }
-        fn map_premise<F: FnMut(PremiseId) -> Option<PremiseId>>(self, f: &mut F) -> Self {
-            todo!()
-        }
-    }
-
-    pub(crate) struct RuleSet {
-        rules: Vec<RuleUsageId>,
-    }
-
-    pub(crate) struct ImplicitRule {
-        relation: RelationId,
-        on: Vec<ColumnId>,
-        ty: ImplicitRuleAction,
-    }
-    pub(crate) enum ImplicitRuleAction {
-        Unify,
-        // not needed since :no-merge is equivalent to :merge new
-        // Panic,
-        Merge(BTreeMap<ColumnId, MergeExpr>),
-    }
-
-    // Assume: we implement lattice through just having a single memory location for the lattice
-    // value.
-    pub(crate) enum MergeExpr {
-        VarOld,
-        VarNew,
-        Call(RelationId, Vec<MergeExpr>),
-        Literal(lir::Literal),
-    }
-
-    // the only cross-rule optimizations are from implicit to symbolic.
-
-    pub(crate) struct Theory {
-        rulesets: TVec<RuleSetId, RuleSet>,
-        /// None if deleted (promoted to symbolic)
-        rules: TVec<RuleId, Option<SymbolicRule>>,
-        implicit_rules: BTreeMap<RelationId, Vec<ImplicitRule>>,
-
-        // ===============================00
-        name: &'static str,
-        types: TVec<TypeId, Type>,
-        relations: TVec<RelationId, Relation>,
-    }
-
-    pub(crate) struct Relation {
-        name: &'static str,
-        columns: TVec<ColumnId, TypeId>,
-        ty: RelationTy,
-    }
-
-    pub(crate) enum RelationTy {
-        NewOf(RelationId),
-        // entry sometimes ok
-        Table,
-        // entry always ok (unless it returns an iterator and then we have problems)
-        Primitive(PrimitiveFunction),
-        // Alias { permutation: TVec<ColumnId, ColumnId>, other: RelationId }
-        // Global desugars to table.
-        // MaterializedView
-        // Forall {
-        //     ty: TypeId,
-        // }
-        Literal(lir::Literal),
-    }
-
-    pub(crate) struct PrimitiveFunction {
-        name: &'static str,
-        id: &'static str,
-        types: Vec<TypeId>,
-        /// compute column using other columns.
-        /// multiple return is implemented using multiple indexes.
-        indexes: BTreeMap<(ColumnId, Vec<ColumnId>), PrimitiveIndex>,
-    }
-
-    pub(crate) struct PrimitiveIndex {
-        // #ident(args..) calls function.
-        ident: &'static str,
-        cost: u64,
-    }
-
-    pub(crate) struct Type {
-        name: &'static str,
-        primitive: Option<&'static str>,
-    }
-
-    pub(crate) mod lir2 {
-        use crate::ids::*;
-        pub(crate) enum Expr {
-            Call(RelationId, Vec<Expr>),
-            Literal(crate::lir::Literal),
-        }
-        pub(crate) enum Initial {
-            Union(Expr, Expr),
-            Set(RelationId, Vec<Expr>),
-            Panic,
-            Push,
-            Pop,
-            Expr(Expr),
-            // Change(RelationId, Vec<Expr>,
-        }
-
-        // enum Change {
-        //     Subsume,
-        //     Delete,
-        // }
-    }
-
-    // * entry behavior for different cases:
-    //     * Primitive - (hopefully) infallible, so ok
-    //     * Collection - (hopefully) infallible, so ok
-    //     * Lattice/function - always fails to compile.
-    //     * Constructor - just creates a new e-class if needed.
-    //     * Global - compiles to function but ok because infallible.
-    //
-
-    // Unresolved:
-    // * merge + ssa might create cycles, which is bad. eg [a = f(b), b = f(a)]
-    // * merge + ssa might result in several ways to compute value.
-}
+// pub(crate) mod hir2 {
+//
+//     #![allow(unused)]
+//
+//     use crate::{
+//         ids::{
+//             ActionId, ColumnId, PremiseId, RelationId, RuleId, RuleSetId, RuleUsageId, TypeId,
+//             VariableId,
+//         },
+//         lir,
+//         typed_vec::TVec,
+//         union_find::UF,
+//     };
+//
+//     use std::collections::{BTreeMap, BTreeSet};
+//
+//     #[derive(Debug)]
+//     struct VariableMeta {
+//         name: &'static str,
+//         ty: TypeId,
+//     }
+//     impl VariableMeta {
+//         fn merge(a: Self, b: Self) -> Self {
+//             assert_eq!(a.ty, b.ty);
+//             Self {
+//                 name: format!("{}{}", a.name, b.name).leak(),
+//                 ty: a.ty,
+//             }
+//         }
+//     }
+//
+//     // Add(a, b, c), Add(d, e, b);
+//     //
+//     //
+//     // a,b -> c, b,c -> a, c,a -> b
+//     //
+//     // d,e -> b, e,b -> d, b,d -> e
+//
+//     // Trie opts that we are concerned about are just to remove redundant actions (and pick ideal
+//     // actions). For inserts/entry we do best-effort. For unification we can keep a UF for each
+//     // path in the tree.
+//
+//     // Entry means that there is not a single canonical way to write actions of a rule, but that is
+//     // fine, assuming the merge works correctly.
+//
+//     // NOTE: if actions need to be merged then the two rules must have been equivalent, and the
+//     // rules should have already been merged, ergo, we only need to be concerned about what
+//     // redundant actions are performed along a trie path.
+//
+//     // NOTE: if there are INFALLIBLE premises (like globals/literals) we can move them from premise
+//     // to action if not used in premise (IF it does not mutate in action).
+//
+//     // We can do INSERT -> ENTRY, we can not do INFALLIBLE ENTRY -> INSERT.
+//
+//     // semantics
+//     //
+//     // Premise: no entry only indexes with potentially limited FD. Any variable unification is
+//     // fine.
+//     //
+//     // Action:
+//     //
+//     // By default, everything is entry (or insert with set), non-constructors/globals are fallible
+//     // and fail immediately if they are not inserts. Frontend should check this.
+//     //
+//     // Only legal optimizations on IR is FD, eliminate double unify, defined only by existing entry
+//     // calls.
+//     //
+//     // Unify among non-eqsorts on final rule will fail compilation.
+//     //
+//     // Reading from globals is entry of zero arguments.
+//     //
+//     // Action lowers to: pick a *variable ordering* (where a variable is a set in UF) such that all
+//     // variables can be determined. If a variable is overdetermined (through UF), it is valid to
+//     // transform an entry to a insert (If it is not an eqsort, compilation fails). This limits the
+//     // number of potential bogus e-classes.
+//
+//     // NOTE: uf.find() is unsound in an action for purposes of entry.
+//
+//     // maybe sound normalization:
+//     //
+//     // 1) dedup using FD
+//     //
+//     // lowering:
+//     //
+//     // 1) Pick a *set ordering*. (If this fails (cycle) we can introduce make)
+//     // 2) Emit "computation" + unification,
+//     //
+//
+//     // NOTE: we never really care when ACTION's are equal if concat + normalize simplifies
+//     // properly.
+//
+//     // Trie action dedup is trivial if UF is separated into it's individual parts.
+//
+//     // For premise, we additionally care about killing instances of forall, since forall does not
+//     // actually constrain a variable.
+//
+//     struct RuleMeta {
+//         name: &'static str,
+//         ids: BTreeSet<RuleId>,
+//     }
+//
+//     pub(crate) struct SymbolicRule {
+//         // ====== PREMISE ======
+//         premise: Premise,
+//
+//         // ====== ACTION ======
+//         action: Action,
+//
+//         // ====== METADATA ======
+//         meta: RuleMeta,
+//     }
+//     impl SymbolicRule {
+//         fn merge(a: Self, b: Self) -> Self {
+//             assert_eq!(a.premise, b.premise);
+//             todo!("not a priority")
+//         }
+//         /// try to simplify the premise.
+//         /// also perform graph isomorphism thing.
+//         /// apply FD to introduce more constraints.
+//         fn simplify_premise(self /*, FD context, relation context */) -> Self {
+//             todo!()
+//         }
+//         fn map_action(self, mut f: impl FnMut(ActionId) -> Option<ActionId>) -> Self {
+//             Self {
+//                 premise: self.premise.map_action(&mut f),
+//                 action: self.action.map_action(&mut f),
+//                 meta: self.meta,
+//             }
+//         }
+//         fn map_premise(self, mut f: impl FnMut(PremiseId) -> Option<PremiseId>) -> Self {
+//             Self {
+//                 premise: self.premise.map_premise(&mut f),
+//                 action: self.action.map_premise(&mut f),
+//                 meta: self.meta,
+//             }
+//         }
+//     }
+//
+//     #[derive(Debug)]
+//     pub(crate) struct Premise {
+//         conjunctive_query: BTreeSet<(RelationId, Vec<PremiseId>)>,
+//         variables: TVec<PremiseId, VariableMeta>,
+//     }
+//     impl PartialEq for Premise {
+//         fn eq(&self, other: &Self) -> bool {
+//             self.conjunctive_query == other.conjunctive_query
+//         }
+//     }
+//     impl Premise {
+//         fn map_premise<F: FnMut(PremiseId) -> Option<PremiseId>>(self, mut f: &mut F) -> Self {
+//             Self {
+//                 conjunctive_query: self
+//                     .conjunctive_query
+//                     .into_iter()
+//                     .map(|(relation, args)| {
+//                         (
+//                             relation,
+//                             args.into_iter()
+//                                 .map(|x| f(x).expect("deleted premise variable still used"))
+//                                 .collect(),
+//                         )
+//                     })
+//                     .collect(),
+//                 variables: self
+//                     .variables
+//                     .map_key(&mut f, |_, a, b| VariableMeta::merge(a, b)),
+//             }
+//         }
+//         fn map_action<F: FnMut(ActionId) -> Option<ActionId>>(self, _f: &mut F) -> Self {
+//             Self {
+//                 conjunctive_query: self.conjunctive_query,
+//                 variables: self.variables,
+//             }
+//         }
+//     }
+//
+//     // TODO: is it sound to run uf.find() before inserting?
+//     #[derive(PartialEq, Eq)]
+//     pub(crate) enum ActionSsa {
+//         /// Copy value from premise
+//         Premise(PremiseId),
+//         /// Read from relation or make new e-class if not found.
+//         /// Note that use of entry means that there is not a single canonical representation for
+//         /// actions.
+//         ///
+//         /// Entry implies the existence of an implicit rule.
+//         ///
+//         /// cost is 1 btree lookup.
+//         ///
+//         /// This ignores any "non-default" FD, but it's probably fine anyways.
+//         Entry {
+//             relation: RelationId,
+//             args: Vec<ActionId>,
+//         },
+//     }
+//     impl ActionSsa {
+//         fn map_action<F: FnMut(ActionId) -> Option<ActionId>>(
+//             x: Option<Self>,
+//             f: &mut F,
+//         ) -> Option<Self> {
+//             x.map(|x| match x {
+//                 ActionSsa::Premise(premise_id) => ActionSsa::Premise(premise_id),
+//                 ActionSsa::Entry { relation, args } => ActionSsa::Entry {
+//                     relation,
+//                     args: args
+//                         .into_iter()
+//                         .map(|x| f(x).expect("action variable is still used"))
+//                         .collect(),
+//                 },
+//             })
+//         }
+//     }
+//
+//     pub(crate) struct Action {
+//         // None = undetermined, may be replaced by make if we have to.
+//         ssa: TVec<ActionId, Option<ActionSsa>>,
+//         unify: UF<ActionId>,
+//         insert_rows: BTreeSet<(RelationId, Vec<ActionId>)>,
+//         /// For running checks, do we expect that this rule will trigger?
+//         /// Merging with this enabled is tricky, so disable it.
+//         /// We also can't run this action eagerly anymore.
+//         /// ```text
+//         /// let rule_ran = false;
+//         /// for ... in ... {
+//         ///     for ... in ... {
+//         ///          rule_ran = true;
+//         ///     }
+//         /// }
+//         /// ```
+//         expect_trigger: Option<(bool, &'static str)>,
+//         // change : subsume or delete
+//         variables: TVec<ActionId, VariableMeta>,
+//     }
+//     impl Action {
+//         // TODO: bad because we will get duplicates and it's no longer SSA.
+//         fn map_action<F: FnMut(ActionId) -> Option<ActionId>>(self, mut f: &mut F) -> Self {
+//             let variables = self
+//                 .variables
+//                 .map_key(&mut f, |_, a, b| VariableMeta::merge(a, b));
+//             let n = variables.len();
+//             let unify: UF<ActionId> = UF::from_pairs(
+//                 n,
+//                 self.unify
+//                     .iter_edges()
+//                     .filter_map(|(a, b)| f(a).and_then(|a| f(b).map(|b| (a, b)))),
+//             );
+//             let insert_rows: BTreeSet<_> = self
+//                 .insert_rows
+//                 .into_iter()
+//                 .map(|(relation, args)| {
+//                     (
+//                         relation,
+//                         args.into_iter()
+//                             .map(|x| f(x).expect("action still uses variable"))
+//                             .collect::<Vec<_>>(),
+//                     )
+//                 })
+//                 .collect();
+//             let expect_trigger = self.expect_trigger;
+//
+//             let ssa: TVec<ActionId, Option<ActionSsa>> = self
+//                 .ssa
+//                 .into_iter()
+//                 .map(|x| ActionSsa::map_action(x, &mut f))
+//                 .collect();
+//
+//             let ssa = ssa.map_key(&mut f, |i, a, b| match (a, b) {
+//                 (None, None) => None,
+//                 (None, Some(x)) | (Some(x), None) => Some(x),
+//                 (Some(a), Some(b)) if a == b => Some(a),
+//                 (Some(a), Some(b)) => {
+//                     // any codepath here is semantically strange, but maybe possible.
+//                     match (a, b) {
+//                         (ActionSsa::Premise(pa), ActionSsa::Premise(pb)) => panic!(),
+//                         (
+//                             ActionSsa::Premise(pa),
+//                             ActionSsa::Entry {
+//                                 relation: rb,
+//                                 args: ab,
+//                             },
+//                         )
+//                         | (
+//                             ActionSsa::Entry {
+//                                 relation: rb,
+//                                 args: ab,
+//                             },
+//                             ActionSsa::Premise(pa),
+//                         ) => {
+//                             panic!()
+//                         }
+//                         (
+//                             ActionSsa::Entry {
+//                                 relation: ra,
+//                                 args: aa,
+//                             },
+//                             ActionSsa::Entry {
+//                                 relation: rb,
+//                                 args: ab,
+//                             },
+//                         ) => {
+//                             panic!()
+//                         }
+//                     }
+//                 }
+//             });
+//
+//             todo!()
+//         }
+//         fn map_premise<F: FnMut(PremiseId) -> Option<PremiseId>>(self, f: &mut F) -> Self {
+//             todo!()
+//         }
+//     }
+//
+//     pub(crate) struct ImplicitRule {
+//         relation: RelationId,
+//         on: Vec<ColumnId>,
+//         ty: ImplicitRuleAction,
+//     }
+//     pub(crate) enum ImplicitRuleAction {
+//         Unify,
+//         // not needed since :no-merge is equivalent to :merge new
+//         // Panic,
+//         Merge(BTreeMap<ColumnId, MergeExpr>),
+//     }
+//
+//     // Assume: we implement lattice through just having a single memory location for the lattice
+//     // value.
+//     pub(crate) enum MergeExpr {
+//         VarOld,
+//         VarNew,
+//         Call(RelationId, Vec<MergeExpr>),
+//         Literal(lir::Literal),
+//     }
+//
+//     // the only cross-rule optimizations are from implicit to symbolic.
+//
+//     pub(crate) struct Theory {
+//         /// None if deleted (promoted to symbolic)
+//         rules: TVec<RuleId, Option<SymbolicRule>>,
+//         implicit_rules: BTreeMap<RelationId, Vec<ImplicitRule>>,
+//
+//         // ===============================00
+//         name: &'static str,
+//         types: TVec<TypeId, Type>,
+//         relations: TVec<RelationId, Relation>,
+//     }
+//
+//     pub(crate) struct Relation {
+//         name: &'static str,
+//         columns: TVec<ColumnId, TypeId>,
+//         ty: RelationTy,
+//     }
+//
+//     pub(crate) enum RelationTy {
+//         NewOf(RelationId),
+//         // entry sometimes ok
+//         Table,
+//         // entry always ok (unless it returns an iterator and then we have problems)
+//         Primitive(PrimitiveFunction),
+//         // Alias { permutation: TVec<ColumnId, ColumnId>, other: RelationId }
+//         // Global desugars to table.
+//         // MaterializedView
+//         // Forall {
+//         //     ty: TypeId,
+//         // }
+//         Literal(lir::Literal),
+//     }
+//
+//     pub(crate) struct PrimitiveFunction {
+//         name: &'static str,
+//         id: &'static str,
+//         types: Vec<TypeId>,
+//         /// compute column using other columns.
+//         /// multiple return is implemented using multiple indexes.
+//         indexes: BTreeMap<(ColumnId, Vec<ColumnId>), PrimitiveIndex>,
+//     }
+//
+//     pub(crate) struct PrimitiveIndex {
+//         // #ident(args..) calls function.
+//         ident: &'static str,
+//         cost: u64,
+//     }
+//
+//     pub(crate) struct Type {
+//         name: &'static str,
+//         primitive: Option<&'static str>,
+//     }
+//
+//     pub(crate) mod lir2 {
+//         use crate::ids::*;
+//         pub(crate) enum Expr {
+//             Call(RelationId, Vec<Expr>),
+//             Literal(crate::lir::Literal),
+//         }
+//         pub(crate) enum Initial {
+//             Union(Expr, Expr),
+//             Set(RelationId, Vec<Expr>),
+//             Panic,
+//             Push,
+//             Pop,
+//             Expr(Expr),
+//             // Change(RelationId, Vec<Expr>,
+//         }
+//
+//         // enum Change {
+//         //     Subsume,
+//         //     Delete,
+//         // }
+//     }
+//
+//     // * entry behavior for different cases:
+//     //     * Primitive - (hopefully) infallible, so ok
+//     //     * Collection - (hopefully) infallible, so ok
+//     //     * Lattice/function - always fails to compile.
+//     //     * Constructor - just creates a new e-class if needed.
+//     //     * Global - compiles to function but ok because infallible.
+//     //
+//
+//     // Unresolved:
+//     // * merge + ssa might create cycles, which is bad. eg [a = f(b), b = f(a)]
+//     // * merge + ssa might result in several ways to compute value.
+// }
+//
+// mod hir3 {
+//     use crate::ids::*;
+//     use crate::lir;
+//
+//
+//     // change repr for implicit rule
+//
+//     /// If all other columns are equal, trigger rule.
+//     /// All columns in out become the "key" part in some index.
+//     struct ImplicitRule {
+//         relation: RelationId,
+//         // typically length 1, but *inferred* rules may have other lengths.
+//         out: Vec<(ColumnId, ImplicitRuleAction)>,
+//     }
+//
+//     enum ImplicitRuleAction {
+//         Unify,
+//         // forces column to be in "value" part of ALL indexes.
+//         MergeExpr(MergeExpr),
+//         // also placeholder for FD on primitive functions.
+//         Panic,
+//     }
+//
+//     // A and B instead of "old"/"new" because everything breaks if anything cares about what
+//     // exactly is old/new
+//     enum MergeExpr {
+//         VarA,
+//         VarB,
+//         Literal(lir::Literal),
+//         // this will only be primitive functions, so there is a single canonical way to
+//         // call this.
+//         Call(RelationId, Vec<MergeExpr>),
+//     }
+//
+//     struct ActionInsert {
+//         relation: RelationId,
+//         args: Vec<ActionId>,
+//         // for some relations, this can become none.
+//         entry: Option<ImplicitRuleId>,
+//     }
+// }
 
 /// Represents a theory (set of rules) with associated information
 #[derive(Clone, Debug)]
@@ -449,13 +492,19 @@ pub(crate) struct Theory {
     /// Name of final struct
     pub(crate) name: Option<&'static str>,
     pub(crate) types: TVec<TypeId, Type>,
+
     pub(crate) symbolic_rules: Vec<SymbolicRule>,
     pub(crate) implicit_rules: BTreeMap<RelationId, Vec<ImplicitRule>>,
+
     pub(crate) relations: TVec<RelationId, Relation>,
+
     pub(crate) global_types: TVec<GlobalId, TypeId>,
-    #[allow(unused)]
-    /// NOTE: This may be useful if global variables are queried at run time
+    #[allow(
+        unused,
+        reason = "This may be useful if global variables are queried at run time"
+    )]
     pub(crate) global_to_relation: TVec<GlobalId, RelationId>,
+    #[allow(unused, reason = "not used at runtime")]
     pub(crate) interner: crate::runtime::StringIntern,
     pub(crate) initial: Vec<lir::Initial>,
 }
@@ -495,8 +544,8 @@ pub(crate) enum TypeKind {
     Primitive { type_path: &'static str },
 }
 
-// unify can not read lattice variable.
-
+/// TODO erik: fix these docs.
+///
 /// Lattice and Unification style implicit functionality
 ///
 /// Rules that can be applied through an entry API on a table.
@@ -511,25 +560,25 @@ pub(crate) enum TypeKind {
 /// TODO: add optimization pass to turn symbolic rules to implicit rules.
 #[derive(Clone, Eq, PartialEq, Ord, PartialOrd, Hash, Debug)]
 pub(crate) struct ImplicitRule {
-    pub(crate) relation: RelationId,
+    /// TODO erik: fix these docs.
     /// If there is something in the database with the same values for these columns, trigger the rule.
     pub(crate) on: Vec<ColumnId>,
+    /// TODO erik: fix these docs.
     /// If there is a conflict, resolve it with this method.
     pub(crate) ty: ImplicitRuleAction,
 }
 impl ImplicitRule {
-    pub(crate) fn new_unify(relation: RelationId, inputs: usize) -> Self {
+    pub(crate) fn new_unify(inputs: usize) -> Self {
         let on = (0..inputs).map(ColumnId).collect();
         let ty = ImplicitRuleAction::Unification;
-        Self { relation, on, ty }
+        Self { on, ty }
     }
-    pub(crate) fn new_panic(relation: RelationId, inputs: usize) -> Self {
+    pub(crate) fn new_panic(inputs: usize) -> Self {
         let on = (0..inputs).map(ColumnId).collect();
         let ty = ImplicitRuleAction::Panic;
-        Self { relation, on, ty }
+        Self { on, ty }
     }
     pub(crate) fn new_lattice(
-        relation: RelationId,
         inputs: usize,
         old: VariableId,
         new: VariableId,
@@ -546,9 +595,9 @@ impl ImplicitRule {
             new: vec![(new, out_col)],
             res: vec![(res, out_col)],
         };
-        Self { relation, on, ty }
+        Self { on, ty }
     }
-    #[allow(unused)]
+    /*#[allow(unused)]
     fn to_symbolic(&self, relations: &TVec<RelationId, Relation>) -> Result<SymbolicRule, ()> {
         Ok(match self.ty {
             // TODO: impl panic like this maybe
@@ -611,7 +660,7 @@ impl ImplicitRule {
                 }
             }
         })
-    }
+    }*/
 }
 
 #[derive(Clone, Eq, PartialEq, Ord, PartialOrd, Hash, Debug)]
@@ -648,13 +697,17 @@ pub(crate) struct Relation {
     /// Types of columns
     pub(crate) columns: TVec<ColumnId, TypeId>,
     pub(crate) ty: RelationTy,
+
+    pub(crate) implicit_rules: TVec<ImplicitRuleId, ImplicitRule>,
 }
 impl Relation {
+    // TODO: introduce implicit_rules in these constructors
     pub(crate) fn table(name: &'static str, columns: TVec<ColumnId, TypeId>) -> Self {
         Self {
             name,
             columns,
             ty: RelationTy::Table,
+            implicit_rules: TVec::new(),
         }
     }
     pub(crate) fn forall(name: &'static str, ty: TypeId) -> Self {
@@ -663,6 +716,8 @@ impl Relation {
             name,
             columns,
             ty: RelationTy::Forall { ty },
+            // forall is [x] -> (), so no implicit rules
+            implicit_rules: TVec::new(),
         }
     }
     pub(crate) fn global(name: &'static str, id: GlobalId, ty: TypeId) -> Self {
@@ -671,14 +726,17 @@ impl Relation {
             name,
             columns,
             ty: RelationTy::Global { id },
+            // global is [] -> (x), so we have a implicit (panicing) rule.
+            implicit_rules: TVec::new(),
         }
     }
-    #[allow(clippy::wrong_self_convention)]
-    pub(crate) fn new(&self, id: RelationId) -> Self {
+    pub(crate) fn as_new(&self, id: RelationId) -> Self {
         Self {
             name: format!("New{}", self.name).leak(),
             columns: self.columns.clone(),
             ty: RelationTy::NewOf { id },
+            // we inherit the implicit rules of the original relation
+            implicit_rules: self.implicit_rules.clone(),
         }
     }
 }
