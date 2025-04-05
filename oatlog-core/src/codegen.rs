@@ -1,8 +1,8 @@
 use crate::{
     ids::{ColumnId, GlobalId, RelationId, TypeId, VariableId},
     lir::{
-        Action, GlobalCompute, IndexInfo, IndexUsageInfo, Initial, Literal, MergeTy, RelationData,
-        RelationKind, RuleAtom, RuleTrie, Theory, TypeData, TypeKind, VariableData,
+        Action, GlobalCompute, IndexInfo, Initial, Literal, MergeTy, RelationData, RelationKind,
+        RuleAtom, RuleTrie, Theory, TypeData, TypeKind, VariableData,
     },
     typed_vec::TVec,
 };
@@ -15,38 +15,23 @@ use std::{
 };
 
 pub trait MultiUnzipVec<FromI>: Iterator {
-    fn multiunzip_vec(self) -> FromI;
+    fn collect_vecs(self) -> FromI;
 }
 
 macro_rules! impl_unzip_iter {
     ($($T:ident $t:ident),*) => (
         #[allow(non_snake_case)]
         impl<IT: Iterator<Item = ($($T,)*)>, $($T),* > MultiUnzipVec<($(Vec<$T>,)*)> for IT {
-            fn multiunzip_vec(self) -> ($(Vec<$T>,)*) {
-                let mut res = ($(Vec::<$T>::new(),)*);
-                let ($($t,)*) = &mut res;
-                self.fold((), |(), ($($T,)*)| {
-                    $( $t.push($T); )*
-                });
-                res
+            fn collect_vecs(self) -> ($(Vec<$T>,)*) {
+                self.collect()
             }
         }
     );
 }
-
 impl_unzip_iter!();
 impl_unzip_iter!(A a);
 impl_unzip_iter!(A a, B b);
 impl_unzip_iter!(A a, B b, C c);
-impl_unzip_iter!(A a, B b, C c, D d);
-impl_unzip_iter!(A a, B b, C c, D d, E e);
-impl_unzip_iter!(A a, B b, C c, D d, E e, F f);
-impl_unzip_iter!(A a, B b, C c, D d, E e, F f, G g);
-impl_unzip_iter!(A a, B b, C c, D d, E e, F f, G g, H h);
-impl_unzip_iter!(A a, B b, C c, D d, E e, F f, G g, H h, I i);
-impl_unzip_iter!(A a, B b, C c, D d, E e, F f, G g, H h, I i, J j);
-impl_unzip_iter!(A a, B b, C c, D d, E e, F f, G g, H h, I i, J j, K k);
-impl_unzip_iter!(A a, B b, C c, D d, E e, F f, G g, H h, I i, J j, K k, L l);
 
 // TODO: emit identifiers with correct spans.
 
@@ -116,7 +101,7 @@ pub fn codegen(theory: &Theory) -> TokenStream {
                         }
                     })
             })
-            .multiunzip_vec();
+            .collect_vecs();
 
         let theory_delta_ty = ident::theory_delta_ty(theory);
 
@@ -145,7 +130,7 @@ pub fn codegen(theory: &Theory) -> TokenStream {
             TypeKind::Symbolic => Some((ident::type_uf(ty), ident::type_ty(ty))),
             TypeKind::Primitive { type_path: _ } => None,
         })
-        .multiunzip_vec();
+        .collect_vecs();
 
     let canonicalize = {
         let relation_ident = theory
@@ -172,7 +157,7 @@ pub fn codegen(theory: &Theory) -> TokenStream {
             .iter()
             .filter(|ty| matches!(ty.kind, TypeKind::Symbolic))
             .map(|ty| (ident::type_global(ty), ident::type_uf(ty)))
-            .multiunzip_vec();
+            .collect_vecs();
         let global_type = types_used_in_global_variables
             .iter()
             .map(|ty| ident::type_global(ty))
@@ -211,7 +196,7 @@ pub fn codegen(theory: &Theory) -> TokenStream {
                 RelationKind::Global { .. } => return None,
             })
         })
-        .multiunzip_vec();
+        .collect_vecs();
 
     let (counted_stored_relations, counted_relations_names) = theory
         .relations
@@ -223,7 +208,7 @@ pub fn codegen(theory: &Theory) -> TokenStream {
                 _ => None,
             }
         })
-        .multiunzip_vec();
+        .collect_vecs();
 
     let theory_ty = ident::theory_ty(theory);
     let theory_delta_ty = ident::theory_delta_ty(theory);
@@ -262,11 +247,11 @@ pub fn codegen(theory: &Theory) -> TokenStream {
             let (keys, keys_t) = permuted_columns.inner()[..primary_key_prefix_len]
                 .iter()
                 .map(|&ColumnId(i)| num_and_t(i))
-                .multiunzip_vec();
+                .collect_vecs();
             let (values, values_t) = permuted_columns.inner()[primary_key_prefix_len..]
                 .iter()
                 .map(|&ColumnId(i)| num_and_t(i))
-                .multiunzip_vec();
+                .collect_vecs();
             assert!(permuted_columns.inner()[primary_key_prefix_len..].is_sorted());
             let (fci, fci_t) = num_and_t(fc);
             let radix_implementation = {
@@ -775,7 +760,7 @@ fn codegen_globals_and_initial(
                                     },
                                 )
                             })
-                            .multiunzip_vec();
+                            .collect_vecs();
 
                         let (last, last_compute) = {
                             let ty = theory.global_variable_types[global_id];
@@ -988,7 +973,7 @@ fn codegen_relation(
                                 let ty = ident::type_ty(&theory.types[rel.param_types[col]]);
                                 (quote! { #ty::MIN_ID }, quote! { #ty::MAX_ID })
                             }
-                        }).multiunzip_vec();
+                        }).collect_vecs();
 
                         let col_symbs = rel.param_types.enumerate().map(ident::column).collect_vec();
 
@@ -1048,7 +1033,7 @@ fn codegen_relation(
                     };
                     (iter_all, check_all, entry_all)
                 })
-                .multiunzip_vec();
+                .collect_vecs();
 
             let update = {
                 let indexes_merge_fn = index_to_info
@@ -1094,7 +1079,7 @@ fn codegen_relation(
                                         col_new,
                                     )
                                 })
-                                .multiunzip_vec();
+                                .collect_vecs();
 
                             quote! {
                                 |mut old, mut new| {
@@ -1127,7 +1112,7 @@ fn codegen_relation(
                             }
                         }
                     })
-                    .multiunzip_vec();
+                    .collect_vecs();
 
                 let (first_index_ident, first_index_order): (Ident, Vec<_>) = {
                     let [first_index, ..] = index_to_info.inner().as_slice() else {
@@ -1157,7 +1142,7 @@ fn codegen_relation(
                             )),
                         }
                     })
-                    .multiunzip_vec();
+                    .collect_vecs();
 
                 let indexes_all = index_to_info
                     .iter()
