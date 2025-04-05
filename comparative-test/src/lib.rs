@@ -275,7 +275,7 @@ egglog_test!(nogenerate, bdd, expect![[r#"
 
 "#]], r#"(include "comparative-test/egglog-testsuite/bdd.egg")"#);// primitive functions
 egglog_test!(mismatched, before_proofs, expect![[r#"
-    Add: 34 (egglog) != 17 (oatlog)
+    Add: 34 (egglog) != 10 (oatlog)
 "#]], r#"(include "comparative-test/egglog-testsuite/before-proofs.egg")"#); // REASON: clear transient not performed on check, so globals have not affected the database yet.
 egglog_test!(nogenerate, bignum, expect![[r#"
     comparative-test/egglog-testsuite/bignum.egg: function bigint is not defined

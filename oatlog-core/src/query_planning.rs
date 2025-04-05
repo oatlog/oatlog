@@ -1,7 +1,9 @@
 //! All query plan *choices* occur here.
 use crate::{
-    hir::{self, PremiseRelation, RelationTy, SymbolicRule, Theory},
-    ids::{ActionId, ColumnId, IndexUsageId, PremiseId, RelationId, VariableId},
+    hir::{self, ActionRelation, PremiseRelation, RelationTy, SymbolicRule, Theory},
+    ids::{
+        ActionId, ColumnId, ImplicitRuleId, IndexUsageId, PremiseId, RelationId, TypeId, VariableId,
+    },
     index_selection, lir,
     typed_vec::TVec,
 };
@@ -66,21 +68,28 @@ enum RelationScore {
 
 /// Returns `lir::Theory` and `hir::Theory` since the `hir::Theory` is modified when
 /// emitted.
-/// TODO: emit implicit rules, trigger rules.
 pub(crate) fn emit_lir_theory(mut theory: hir::Theory) -> (hir::Theory, lir::Theory) {
     let non_new_relations = theory.relations.len();
     let old_to_new = theory.add_delta_relations_in_place();
-
-    // for implicit in theory.implicit_rules.iter() {
-    //     theory
-    //         .symbolic_rules
-    //         .push(implicit.to_symbolic(&theory.relations).unwrap())
-    // }
 
     let rules = symbolic_rules_as_semi_naive(&theory.symbolic_rules, &old_to_new);
 
     let mut table_uses: TVec<RelationId, TVec<IndexUsageId, BTreeSet<ColumnId>>> =
         TVec::new_with_size(non_new_relations, TVec::new());
+
+    for (relation_id, relation) in theory.relations.iter_enumerate() {
+        if relation.ty == RelationTy::Table {
+            let uses = &mut table_uses[relation_id];
+            // ImplicitRuleId(x) => IndexUsageId(x)
+            assert_eq!(uses.len(), 0);
+            uses.extend(
+                relation
+                    .implicit_rules
+                    .iter()
+                    .map(|x| x.key_columns(relation.columns.len())),
+            )
+        }
+    }
 
     let mut lir_variables: TVec<VariableId, lir::VariableData> = TVec::new();
 
@@ -95,9 +104,7 @@ pub(crate) fn emit_lir_theory(mut theory: hir::Theory) -> (hir::Theory, lir::The
     );
 
     // compute indexes for relations.
-
     let mut lir_relations: TVec<RelationId, Option<lir::RelationData>> = TVec::new();
-
     for relation_id in theory.relations.enumerate() {
         let relation = &theory.relations[relation_id];
         match relation.ty {
@@ -217,6 +224,251 @@ fn remove_variable_collisions(s: &mut [lir::VariableData]) {
     }
 }
 
+fn scc_group_size<'a>(
+    actions: impl Iterator<Item = &'a ActionRelation>,
+    relations: &TVec<RelationId, hir::Relation>,
+) -> BTreeMap<ActionRelation, usize> {
+    fn strongly_connected_components(adj: &[Vec<usize>]) -> Vec<Vec<usize>> {
+        fn adj_reverse(adj: &[Vec<usize>]) -> Vec<Vec<usize>> {
+            let n = adj.len();
+            let mut adj_inv = vec![vec![]; n];
+            for i in 0..n {
+                for &a in &adj[i] {
+                    adj_inv[a].push(i);
+                }
+            }
+            adj_inv
+        }
+        fn dfs(i: usize, adj: &[Vec<usize>], out: &mut Vec<usize>, visited: &mut Vec<bool>) {
+            if replace(&mut visited[i], true) {
+                return;
+            }
+            for &a in &adj[i] {
+                dfs(a, adj, out, visited);
+            }
+            out.push(i);
+        }
+        let n = adj.len();
+        let mut order = Vec::new();
+        let mut visited = vec![false; n];
+        for i in 0..n {
+            dfs(i, adj, &mut order, &mut visited);
+        }
+        let adj_inv = adj_reverse(&adj);
+
+        visited.fill(false);
+
+        let mut components = Vec::new();
+        for &i in order.iter().rev() {
+            if visited[i] {
+                continue;
+            }
+            let mut component = Vec::new();
+            dfs(i, &adj_inv, &mut component, &mut visited);
+            components.push(component);
+        }
+        components
+    }
+
+    let mut var_to_action: BTreeMap<ActionId, Vec<&ActionRelation>> = BTreeMap::new();
+    let (idx_to_action, action_to_idx): (
+        BTreeMap<usize, &ActionRelation>,
+        BTreeMap<&ActionRelation, usize>,
+    ) = actions
+        .enumerate()
+        .map(|(i, a)| {
+            a.entry_inputs(relations).into_iter().for_each(|input| {
+                var_to_action.entry(input).or_default().push(a);
+            });
+            ((i, a), (a, i))
+        })
+        .collect();
+
+    let n = idx_to_action.len();
+    let mut adj: Vec<Vec<usize>> = vec![vec![]; n];
+
+    for (&i, &a) in &idx_to_action {
+        for output in a.entry_outputs(relations) {
+            let Some(actions) = var_to_action.get(&output) else {
+                continue;
+            };
+            for action in actions {
+                let j = action_to_idx[action];
+                adj[i].push(j);
+            }
+        }
+    }
+    adj.iter_mut().for_each(|x| {
+        x.sort();
+        x.dedup()
+    });
+
+    strongly_connected_components(&adj)
+        .into_iter()
+        .flat_map(|v| {
+            let idx_to_action = &idx_to_action;
+            let n = v.len();
+            v.iter()
+                .copied()
+                .map(move |i| (idx_to_action[&i].clone(), n))
+                .collect::<Vec<_>>()
+        })
+        .collect()
+}
+
+// topological sort + turn entry -> insert if needed.
+fn topo_resolve<'a>(
+    x: impl IntoIterator<Item = &'a ActionRelation>,
+    theory: &hir::Theory,
+    n: usize,
+    dbg_rule_src: &'static str,
+    from_premise: BTreeSet<ActionId>,
+    action_to_lir: &mut TVec<ActionId, VariableId>,
+    lir_variables: &mut TVec<VariableId, lir::VariableData>,
+    to_unify: &mut Vec<(VariableId, VariableId)>,
+    action_variables: &TVec<ActionId, (hir::VariableMeta, Option<PremiseId>)>,
+) -> Vec<ActionRelation> {
+    let relations = &theory.relations;
+
+    let mut actions: BTreeSet<ActionRelation> = x.into_iter().cloned().collect();
+
+    let mut schedule = vec![];
+
+    // TODO erik: consider promoting entry to insert in ALL cases that would not introduce MAKE.
+
+    // promote entry to insert until fixpoint.
+    let mut write_deg = {
+        let mut problematic: Vec<_> = actions.iter().cloned().collect();
+
+        let mut write_deg: TVec<ActionId, usize>;
+
+        loop {
+            write_deg = vec![0; n].into();
+
+            for action in &actions {
+                for i in action.entry_outputs(relations) {
+                    if i.0 < write_deg.len() {
+                        write_deg[i] += 1;
+                    }
+                }
+            }
+            for i in from_premise.iter().copied() {
+                if i.0 < write_deg.len() {
+                    write_deg[i] += 1;
+                }
+            }
+
+            let scc_sizes = scc_group_size(problematic.iter(), relations);
+
+            problematic.retain(|x| {
+                let inputs = x.entry_inputs(relations);
+                let outputs = x.entry_outputs(relations);
+
+                outputs.into_iter().any(|output| {
+                    let write_conflict = output.0 < write_deg.len() && write_deg[output] > 1;
+                    let self_cycle = inputs.contains(&output);
+                    write_conflict || self_cycle
+                }) || scc_sizes[x] > 1
+            });
+
+            if problematic.len() == 0 {
+                break;
+            }
+
+            // pick the entry that would introduce the fewest MAKE
+            problematic.sort_by_key(|x| {
+                x.entry_outputs(relations)
+                    .into_iter()
+                    .filter(|x| x.0 < write_deg.len() && write_deg[x] == 1)
+                    .count()
+            });
+
+            let mut ok = false;
+            for (i, x) in problematic.iter().enumerate() {
+                let entry = x.entry.expect("problematic has entry");
+                let relation_ = &relations[x.relation];
+                if relation_.can_become_insert(entry) {
+                    let mut action = problematic.remove(i);
+                    actions.remove(&action);
+                    action.entry = None;
+                    actions.insert(action);
+                    ok = true;
+                    break;
+                }
+
+                // NOTE: This can still be solved, if ALL outputs are eqsorts.
+                let entry = &relation_.implicit_rules[entry];
+                let outputs = entry.value_columns();
+                if outputs
+                    .iter()
+                    .all(|x| theory.types[relation_.columns[*x]].ty == hir::TypeKind::Symbolic)
+                {
+                    assert_ne!(outputs.len(), 0);
+
+                    let mut x2 = x.clone();
+                    outputs.iter().for_each(|c| {
+                        let old_action_id = x2.args[*c];
+                        let meta = &action_variables[old_action_id].0;
+                        let lir_meta = meta.into_lir(old_action_id);
+
+                        let old_lir_id = action_to_lir[old_action_id];
+                        let new_lir_id = lir_variables.push(lir_meta);
+
+                        let new_action_id = action_to_lir.push(new_lir_id);
+
+                        to_unify.push((old_lir_id, new_lir_id));
+
+                        x2.args[*c] = new_action_id;
+                    });
+
+                    actions.remove(x);
+                    actions.insert(x2);
+                    ok = true;
+                    break;
+                }
+            }
+
+            if !ok {
+                panic!("problematic array has something transformable to insert");
+            }
+        }
+
+        write_deg
+    };
+
+    if !write_deg.inner().iter().all(|x| *x <= 1) {
+        panic!("TODO: resolve multiple assignment {dbg_rule_src:?} {write_deg:?} {actions:?}");
+    }
+
+    for i in from_premise.iter().copied() {
+        if i.0 < write_deg.len() {
+            write_deg[i] -= 1;
+        }
+    }
+
+    while !actions.is_empty() {
+        let mut progress = false;
+        actions.retain(|action| {
+            let inputs = action.entry_inputs(relations);
+            if !inputs.iter().all(|x| write_deg[x] == 0) {
+                return true;
+            }
+            let outputs = action.entry_outputs(relations);
+            for output in outputs {
+                if output.0 < write_deg.len() {
+                    write_deg[output] -= 1;
+                }
+            }
+            schedule.push(action.clone());
+            progress = true;
+            false
+        });
+        assert!(progress, "unresolved cycles");
+    }
+
+    schedule
+}
+
 fn generate_tries(
     rules: Vec<SymbolicRule>,
     lir_variables: &mut TVec<VariableId, lir::VariableData>,
@@ -230,7 +482,7 @@ fn generate_tries(
             .iter_enumerate()
             .map(|(id, meta)| lir_variables.push(meta.into_lir(id)))
             .collect();
-        let action_to_lir: TVec<ActionId, VariableId> = rule
+        let mut action_to_lir: TVec<ActionId, VariableId> = rule
             .action_variables
             .iter_enumerate()
             .map(|(id, (meta, link))| {
@@ -249,37 +501,87 @@ fn generate_tries(
 
         let mut lir_actions: Vec<lir::Action> = Vec::new();
 
-        // TODO: think about what happens with primitives here.
-        //       "calling" a function should sometimes result in an indexed lookup instead of
-        //       an insert.
-
         let mut extra_bound_action_variables: BTreeSet<ActionId> = BTreeSet::new();
-        lir_actions.extend(rule.action_relations.iter().map(|relation| {
-            match &theory.relations[relation.relation].ty {
-                RelationTy::Forall { .. } | RelationTy::NewOf { .. } | RelationTy::Alias { .. } => {
-                    panic!()
-                }
-                RelationTy::Primitive {} => todo!(),
-                RelationTy::Global { .. } => {
-                    extra_bound_action_variables.insert(relation.args.inner()[0]);
-                }
-                RelationTy::Table => {}
-            };
-            lir::Action::Insert {
-                relation: relation.relation,
-                args: relation
-                    .args
-                    .iter()
-                    .copied()
-                    .map(|x| action_to_lir[x])
-                    .collect::<Vec<_>>()
-                    .leak(),
-            }
-        }));
+        let mut to_unify = vec![];
+        lir_actions.extend(
+            topo_resolve(
+                &rule.action_relations,
+                theory,
+                rule.action_variables.len(),
+                rule.meta.src,
+                rule.action_variables
+                    .iter_enumerate()
+                    .filter_map(|(i, x)| x.1.map(|_| i))
+                    .collect(),
+                &mut action_to_lir,
+                lir_variables,
+                &mut to_unify,
+                &rule.action_variables,
+            )
+            .iter()
+            .rev()
+            .map(
+                |hir::ActionRelation {
+                     relation,
+                     args,
+                     entry,
+                 }| {
+                    match &theory.relations[relation].ty {
+                        RelationTy::Forall { .. }
+                        | RelationTy::NewOf { .. }
+                        | RelationTy::Alias { .. } => {
+                            panic!()
+                        }
+                        RelationTy::Primitive {} => todo!(),
+                        RelationTy::Global { .. } => {
+                            extra_bound_action_variables.insert(args.inner()[0]);
+                        }
+                        RelationTy::Table => {}
+                    };
+                    let args_lir = args
+                        .iter()
+                        .copied()
+                        .map(|x| action_to_lir[x])
+                        .collect::<Vec<_>>()
+                        .leak();
+
+                    if let &Some(entry) = entry {
+                        // NOTE: this is safe because the implicit rules are the first ones to be
+                        // assigned an IndexUsageId.
+                        let index = IndexUsageId(entry.0);
+
+                        let relation_ = &theory.relations[relation];
+
+                        extra_bound_action_variables.extend(
+                            relation_.implicit_rules[entry]
+                                .value_columns()
+                                .into_iter()
+                                .map(|c| args[c]),
+                        );
+
+                        lir::Action::Entry {
+                            relation: *relation,
+                            index,
+                            args: args_lir,
+                        }
+                    } else {
+                        lir::Action::Insert {
+                            relation: *relation,
+                            args: args_lir,
+                        }
+                    }
+                },
+            ),
+        );
 
         lir_actions.extend(rule.unify.iter_all().filter_map(|(i0, i, ())| {
             (i != i0).then_some(lir::Action::Equate(premise_to_lir[i], premise_to_lir[i0]))
         }));
+        lir_actions = to_unify
+            .into_iter()
+            .map(|(a, b)| lir::Action::Equate(a, b))
+            .chain(lir_actions.into_iter())
+            .collect();
 
         lir_actions.extend(rule.action_variables.iter_enumerate().filter_map(
             |(id, (_meta, link))| {
@@ -410,26 +712,6 @@ fn generate_tries(
                     args,
                     index: make_index_use(relation),
                 },
-                // Query::CheckViable => match theory.relations[relation].ty {
-                //     RelationTy::NewOf { id } => unreachable!("does not make sense"),
-                //     RelationTy::Table => lir::RuleAtom::PremiseAny {
-                //         relation,
-                //         args,
-                //         index,
-                //     },
-                //     RelationTy::Alias { permutation, other } => {
-                //         unreachable!("should have been desugared")
-                //     }
-                //     RelationTy::Global { id } => todo!(),
-                //     RelationTy::Primitive {} => todo!(),
-                //     RelationTy::Forall { ty } => todo!(),
-                // },
-
-                // Query::Iterate => lir::RuleAtom::Premise {
-                //     relation,
-                //     args,
-                //     index,
-                // },
             };
             trie = vec![lir::RuleTrie {
                 meta: None,
@@ -611,12 +893,5 @@ impl Theory {
     /// Is this indexed lookup possible?
     fn is_viable(&self, id: RelationId, bound: &TVec<ColumnId, bool>) -> bool {
         self.tiny_result(id, bound).is_some()
-    }
-
-    /// Apply implicit rules and promote to implicit rules.
-    // TODO: Implement this
-    #[allow(unused)]
-    fn optimize(&self) -> Self {
-        self.clone()
     }
 }

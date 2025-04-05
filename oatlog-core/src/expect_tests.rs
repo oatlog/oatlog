@@ -28,6 +28,57 @@ impl Steps {
     }
 }
 
+fn shrink_err(program: expect_test::Expect, expected_err: expect_test::Expect) {
+    let mut state = crate::format_program(program.data().trim().to_string());
+    let res = crate::try_compile(&state);
+    let expected_err = match res {
+        Ok(_) => {
+            expected_err.assert_eq("DOES NOT ERROR?");
+            return;
+        }
+        Err(err) => {
+            expected_err.assert_eq(&err);
+            err
+        }
+    };
+
+    loop {
+        let mut progress = false;
+        for smaller in crate::shrink(state.clone()) {
+            match crate::try_compile(&smaller) {
+                Ok(()) => continue,
+                Err(err) if err != expected_err => continue,
+                Err(_) => {
+                    state = smaller;
+                    progress = true;
+                    break;
+                }
+            }
+        }
+        if !progress {
+            break;
+        }
+    }
+    program.assert_eq(&state);
+}
+
+#[test]
+fn shink_cases() {
+    // shrink_err(
+    //     expect![[r#"
+    //         (datatype Math (Sin Math) (Const i64))
+    //         (rewrite (Sin x) (Const -1))"#]],
+    //     expect!["PANIC: index out of bounds: the len is 0 but the index is 0"],
+    // );
+    shrink_err(
+        expect![[r#"
+            (datatype Math (Mul Math Math) (Zero ))
+            (let zero (Zero ))
+            (rule ((= a (Mul zero c))) ((union a zero)))"#]],
+        expect!["DOES NOT ERROR?"],
+    );
+}
+
 #[test]
 fn redundant_premise_simplify() {
     Steps {
@@ -63,7 +114,7 @@ fn redundant_premise_simplify() {
             g0(i64)
 
             Rule "complicated":
-            Premise: g0(p0), Const(p0, p1), g0(p2), Const(p2, p3), g0(p4), Const(p4, p5), g0(p6), Const(p6, p7), Add(p5, p7, p8), g0(p9), Const(p9, p10), g0(p11), Const(p11, p12), Add(p10, p12, p13)
+            Premise: Const(p0, p1), Const(p2, p3), Const(p4, p5), Const(p6, p7), Const(p9, p10), Const(p11, p12), Add(p5, p7, p8), Add(p10, p12, p13), g0(p0), g0(p2), g0(p4), g0(p6), g0(p9), g0(p11)
             __: p0
             __: p1
             __: p2
@@ -80,7 +131,7 @@ fn redundant_premise_simplify() {
             __: p13
 
             Rule "expected simplified":
-            Premise: g0(p1), Const(p1, one), Add(one, one, two)
+            Premise: Const(p1, one), Add(one, one, two), g0(p1)
             __: one
             __: p1
             __: two
@@ -133,7 +184,7 @@ fn redundant_action_simplify() {
             g1(i64)
 
             Rule "complicated":
-            Premise: g0(p0), Const(p0, p1), g1(p2), Const(p2, p3), g0(p4), Const(p4, p5), g1(p6), Const(p6, p7), Add(p5, p7, p8), g0(p9), Const(p9, p10), g1(p11), Const(p11, p12), Add(p10, p12, p13), g0(p14), Const(p14, p15), g1(p16), Const(p16, p17), Add(p15, p17, p18)
+            Premise: Const(p0, p1), Const(p2, p3), Const(p4, p5), Const(p6, p7), Const(p9, p10), Const(p11, p12), Const(p14, p15), Const(p16, p17), Add(p5, p7, p8), Add(p10, p12, p13), Add(p15, p17, p18), g0(p0), g0(p4), g0(p9), g0(p14), g1(p2), g1(p6), g1(p11), g1(p16)
             __: p0
             __: p1
             __: p2
@@ -162,10 +213,10 @@ fn redundant_action_simplify() {
             a6: __
             a7: __
             a8: __
-            Insert: Const(a0, a1), Const(a2, a3), Const(a4, a5), Const(a6, a7), Add(a5, a7, a8), g0(a0), g0(a4), g1(a2), g1(a6)
+            Insert: Const(a0, a1).n0, Const(a2, a3).n0, Const(a4, a5).n0, Const(a6, a7).n0, Add(a5, a7, a8).n0, g0(a0).n0, g0(a4).n0, g1(a2).n0, g1(a6).n0
 
             Rule "expected simplified":
-            Premise: g0(p1), Const(p1, one), g1(p3), Const(p3, two), Add(one, two, three)
+            Premise: Const(p1, one), Const(p3, two), Add(one, two, three), g0(p1), g1(p3)
             __: one
             __: p1
             __: two
@@ -221,7 +272,7 @@ fn hir_commutative() {
             e: e
             a: a
             b: b
-            Insert: Add(b, a, e)
+            Insert: Add(b, a, e).n0
 
         "#]]),
         expected_lir: None,
@@ -256,7 +307,7 @@ fn hir_distributive() {
             a3: p4
             a4: __
             a5: __
-            Insert: Add(a4, a5, a3), Mul(a, c, a4), Mul(b, c, a5)
+            Insert: Add(a4, a5, a3).n0, Mul(a, c, a4).n0, Mul(b, c, a5).n0
 
         "#]]),
         expected_lir: None,
@@ -315,12 +366,12 @@ fn hir_global() {
             one(i64)
 
             Rule:
-            Premise: one(one), Const(one, p1)
+            Premise: Const(one, p1), one(one)
             __: one
             a0: p1
             b: __
             a: __
-            Insert: Add(b, a, a0)
+            Insert: Add(b, a, a0).n0
 
         "#]]),
         expected_lir: Some(expect![[r#"
@@ -340,12 +391,13 @@ fn hir_global() {
                         kind: Table {
                             index_to_info: {ir0: 0_1_2 conflict[..2] => [2:union], ir1: 1_0_2, ir2: 2_0_1},
                             usage_to_info: {
-                                iu0: ir0[..1],
-                                iu1: ir1[..1],
-                                iu2: ir2[..1],
-                                iu3: ir0[..2],
+                                iu0: ir0[..2],
+                                iu1: ir0[..1],
+                                iu2: ir1[..1],
+                                iu3: ir2[..1],
+                                iu4: ir0[..2],
                             },
-                            column_back_reference: {c0: iu0, c1: iu1, c2: iu2},
+                            column_back_reference: {c0: iu1, c1: iu2, c2: iu3},
                         },
                     },
                     r2: RelationData {
@@ -354,12 +406,13 @@ fn hir_global() {
                         kind: Table {
                             index_to_info: {ir0: 0_1_2 conflict[..2] => [2:union], ir1: 1_0_2, ir2: 2_0_1},
                             usage_to_info: {
-                                iu0: ir0[..1],
-                                iu1: ir1[..1],
-                                iu2: ir2[..1],
-                                iu3: ir0[..2],
+                                iu0: ir0[..2],
+                                iu1: ir0[..1],
+                                iu2: ir1[..1],
+                                iu3: ir2[..1],
+                                iu4: ir0[..2],
                             },
-                            column_back_reference: {c0: iu0, c1: iu1, c2: iu2},
+                            column_back_reference: {c0: iu1, c1: iu2, c2: iu3},
                         },
                     },
                     r3: RelationData {
@@ -370,10 +423,11 @@ fn hir_global() {
                             usage_to_info: {
                                 iu0: ir0[..1],
                                 iu1: ir0[..1],
-                                iu2: ir1[..1],
-                                iu3: ir0[..1],
+                                iu2: ir0[..1],
+                                iu3: ir1[..1],
+                                iu4: ir0[..1],
                             },
-                            column_back_reference: {c0: iu1, c1: iu2},
+                            column_back_reference: {c0: iu2, c1: iu3},
                         },
                     },
                     r4: RelationData {
@@ -397,9 +451,9 @@ fn hir_global() {
                 },
                 rule_tries: [
                     meta: "( rewrite ( Const one ) ( Add b a ) )"
-                    atom: [PremiseNew, r4(v0)]
+                    atom: [PremiseNew, r3(v0, v1)]
                     then: [
-                        atom: [Premise, r3(v0, v1), iu0]
+                        atom: [PremiseAny, r4(v0), iu_bogus]
                         then: [
                             atom: [Action::Make, v3],
                             atom: [Action::Make, v2],
@@ -407,9 +461,9 @@ fn hir_global() {
                         ],
                     ],
                     meta: "( rewrite ( Const one ) ( Add b a ) )"
-                    atom: [PremiseNew, r3(v4, v5)]
+                    atom: [PremiseNew, r4(v4)]
                     then: [
-                        atom: [PremiseAny, r4(v4), iu_bogus]
+                        atom: [Premise, r3(v4, v5), iu1]
                         then: [
                             atom: [Action::Make, v7],
                             atom: [Action::Make, v6],
@@ -429,6 +483,1283 @@ fn hir_global() {
                 ],
             }"#]]),
         expected_codegen: None,
+    }
+    .check();
+}
+
+#[test]
+fn regression_elim_problematic() {
+    Steps {
+        code: r#" 
+            (datatype Math (Mul Math Math) (Zero ))
+            (let zero (Zero ))
+            (rule ((= a (Mul zero c))) ((union a zero)))
+        "#,
+        expected_hir: Some(expect![[r#"
+            Theory:
+
+            Math(Math)
+            Mul(Math, Math, Math)
+            Zero(Math)
+            zero(Math)
+
+            Rule:
+            Premise: Mul(zero, c, a), zero(zero)
+            azero: a
+            __: zero
+            __: c
+            Insert: zero(azero).n0
+
+        "#]]),
+        expected_lir: None,
+        expected_codegen: None,
+    }
+    .check();
+}
+
+#[ignore = "template"]
+#[test]
+fn codegen_template() {
+    Steps {
+        code: r#" 
+        "#,
+        expected_hir: Some(expect![[r#""#]]),
+        expected_lir: Some(expect![[r#""#]]),
+        expected_codegen: Some(expect![[r#""#]]),
+    }
+    .check();
+}
+
+#[test]
+fn codegen_commutative() {
+    Steps {
+        code: r#"
+            (datatype Math
+                (Add Math Math)
+            )
+            (rule ((= e (Add a b) )) ((union e (Add b a))))
+        "#,
+        expected_hir: None,
+        expected_lir: None,
+        expected_codegen: Some(expect![[r#"
+            use oatlog::runtime::{self, *};
+            decl_row ! (Row3_0_1 < T0 first 0 , T1 , T2 > (0 , 1) (2) (T0 , T1) (T2) fc = (0) (T0) where u128 = s => ((s . 0 . inner () as u128) << 64) + ((s . 1 . inner () as u128) << 32) + ((s . 2 . inner () as u128) << 0));
+            decl_row ! (Row3_1_0_2 < T0 , T1 first 1 , T2 > (1 , 0 , 2) () (T1 , T0 , T2) () fc = (1) (T1) where u128 = s => ((s . 1 . inner () as u128) << 64) + ((s . 0 . inner () as u128) << 32) + ((s . 2 . inner () as u128) << 0));
+            decl_row ! (Row3_2_0_1 < T0 , T1 , T2 first 2 > (2 , 0 , 1) () (T2 , T0 , T1) () fc = (2) (T2) where u128 = s => ((s . 2 . inner () as u128) << 64) + ((s . 0 . inner () as u128) << 32) + ((s . 1 . inner () as u128) << 0));
+            eclass_wrapper_ty!(Math);
+            #[derive(Debug, Default)]
+            struct AddRelation {
+                new: Vec<<Self as Relation>::Row>,
+                all_index_0_1_2: IndexImpl<RadixSortCtx<Row3_0_1<Math, Math, Math>, u128>>,
+                all_index_1_0_2: IndexImpl<RadixSortCtx<Row3_1_0_2<Math, Math, Math>, u128>>,
+                all_index_2_0_1: IndexImpl<RadixSortCtx<Row3_2_0_1<Math, Math, Math>, u128>>,
+            }
+            impl Relation for AddRelation {
+                type Row = (Math, Math, Math);
+            }
+            impl AddRelation {
+                const COST: u32 = 9u32;
+                fn new() -> Self {
+                    Self::default()
+                }
+                fn has_new(&self) -> bool {
+                    !self.new.is_empty()
+                }
+                fn clear_new(&mut self) {
+                    self.new.clear();
+                }
+                fn iter_new(&self) -> impl Iterator<Item = <Self as Relation>::Row> + use<'_> {
+                    self.new.iter().copied()
+                }
+                fn iter2_0_1_2(&self, x0: Math, x1: Math) -> impl Iterator<Item = (Math,)> + use<'_> {
+                    self.all_index_0_1_2
+                        .range((x0, x1, Math::MIN_ID)..=(x0, x1, Math::MAX_ID))
+                        .map(|(x0, x1, x2)| (x2,))
+                }
+                fn iter1_0_1_2(&self, x0: Math) -> impl Iterator<Item = (Math, Math)> + use<'_> {
+                    self.all_index_0_1_2
+                        .range((x0, Math::MIN_ID, Math::MIN_ID)..=(x0, Math::MAX_ID, Math::MAX_ID))
+                        .map(|(x0, x1, x2)| (x1, x2))
+                }
+                fn iter1_1_0_2(&self, x1: Math) -> impl Iterator<Item = (Math, Math)> + use<'_> {
+                    self.all_index_1_0_2
+                        .range((Math::MIN_ID, x1, Math::MIN_ID)..=(Math::MAX_ID, x1, Math::MAX_ID))
+                        .map(|(x0, x1, x2)| (x0, x2))
+                }
+                fn iter1_2_0_1(&self, x2: Math) -> impl Iterator<Item = (Math, Math)> + use<'_> {
+                    self.all_index_2_0_1
+                        .range((Math::MIN_ID, Math::MIN_ID, x2)..=(Math::MAX_ID, Math::MAX_ID, x2))
+                        .map(|(x0, x1, x2)| (x0, x1))
+                }
+                fn check2_0_1_2(&self, x0: Math, x1: Math) -> bool {
+                    self.iter2_0_1_2(x0, x1).next().is_some()
+                }
+                fn check1_0_1_2(&self, x0: Math) -> bool {
+                    self.iter1_0_1_2(x0).next().is_some()
+                }
+                fn check1_1_0_2(&self, x1: Math) -> bool {
+                    self.iter1_1_0_2(x1).next().is_some()
+                }
+                fn check1_2_0_1(&self, x2: Math) -> bool {
+                    self.iter1_2_0_1(x2).next().is_some()
+                }
+                #[allow(unreachable_code)]
+                fn entry2_0_1_2(&self, x0: Math, x1: Math, delta: &mut Delta, uf: &mut Unification) -> (Math,) {
+                    if let Some((x2,)) = self.iter2_0_1_2(x0, x1).next() {
+                        return (x2,);
+                    }
+                    let x2 = uf.math_.add_eclass();
+                    delta.add_.push((x0, x1, x2));
+                    (x2,)
+                }
+                fn update(&mut self, uf: &mut Unification, delta: &mut Delta) {
+                    let mut inserts = take(&mut delta.add_);
+                    let orig_inserts = inserts.len();
+                    self.all_index_0_1_2
+                        .first_column_uproots(uf.math_.get_uprooted_snapshot(), |deleted_rows| {
+                            inserts.extend(deleted_rows)
+                        });
+                    self.all_index_1_0_2
+                        .first_column_uproots(uf.math_.get_uprooted_snapshot(), |deleted_rows| {
+                            inserts.extend(deleted_rows)
+                        });
+                    self.all_index_2_0_1
+                        .first_column_uproots(uf.math_.get_uprooted_snapshot(), |deleted_rows| {
+                            inserts.extend(deleted_rows)
+                        });
+                    inserts[orig_inserts..].sort_unstable();
+                    runtime::dedup_suffix(&mut inserts, orig_inserts);
+                    self.all_index_0_1_2
+                        .delete_many(&mut inserts[orig_inserts..]);
+                    self.all_index_1_0_2
+                        .delete_many(&mut inserts[orig_inserts..]);
+                    self.all_index_2_0_1
+                        .delete_many(&mut inserts[orig_inserts..]);
+                    inserts.iter_mut().for_each(|row| {
+                        row.0 = uf.math_.find(row.0);
+                        row.1 = uf.math_.find(row.1);
+                        row.2 = uf.math_.find(row.2);
+                    });
+                    self.all_index_0_1_2.filter_existing(&mut inserts);
+                    self.all_index_0_1_2
+                        .insert_many(&mut inserts, |mut old, mut new| {
+                            let (x2,) = old.value_mut();
+                            let (y2,) = new.value_mut();
+                            uf.math_.union_mut(x2, y2);
+                            old
+                        });
+                    self.all_index_1_0_2
+                        .insert_many(&mut inserts, |_, _| unreachable!());
+                    self.all_index_2_0_1
+                        .insert_many(&mut inserts, |_, _| unreachable!());
+                    self.new.extend_from_slice(&inserts);
+                }
+                fn update_finalize(&mut self, uf: &mut Unification) {
+                    self.new.sort_unstable();
+                    self.new.dedup();
+                    self.new.retain(|(x0, x1, x2)| {
+                        if *x0 != uf.math_.find(*x0) {
+                            return false;
+                        }
+                        if *x1 != uf.math_.find(*x1) {
+                            return false;
+                        }
+                        if *x2 != uf.math_.find(*x2) {
+                            return false;
+                        }
+                        true
+                    });
+                }
+                fn emit_graphviz(&self, buf: &mut String) {
+                    use std::fmt::Write;
+                    for (i, (x0, x1, x2)) in self.all_index_0_1_2.iter().enumerate() {
+                        writeln!(buf, "{}_{i} -> {}_{};", "add", "math", x0).unwrap();
+                        writeln!(buf, "{}_{i} -> {}_{};", "add", "math", x1).unwrap();
+                        writeln!(buf, "{}_{i} -> {}_{};", "add", "math", x2).unwrap();
+                        writeln!(buf, "{}_{i} [shape = box];", "add").unwrap();
+                    }
+                }
+                fn len(&self) -> usize {
+                    self.all_index_0_1_2.len()
+                }
+            }
+            #[derive(Debug, Default)]
+            pub struct Delta {
+                add_: Vec<<AddRelation as Relation>::Row>,
+            }
+            impl Delta {
+                fn new() -> Self {
+                    Self::default()
+                }
+                fn has_new_inserts(&self) -> bool {
+                    let mut has_new_inserts = false;
+                    has_new_inserts |= !self.add_.is_empty();
+                    has_new_inserts
+                }
+                pub fn insert_add(&mut self, x: <AddRelation as Relation>::Row) {
+                    self.add_.push(x);
+                }
+            }
+            #[derive(Debug, Default)]
+            struct Unification {
+                pub math_: UnionFind<Math>,
+            }
+            impl Unification {
+                fn has_new_uproots(&mut self) -> bool {
+                    let mut ret = false;
+                    ret |= self.math_.has_new_uproots();
+                    ret
+                }
+                fn snapshot_all_uprooted(&mut self) {
+                    self.math_.create_uprooted_snapshot();
+                }
+            }
+            #[derive(Debug, Default)]
+            pub struct Theory {
+                pub delta: Delta,
+                pub uf: Unification,
+                pub add_: AddRelation,
+            }
+            impl Theory {
+                pub fn new() -> Self {
+                    let mut theory = Self::default();
+                    theory
+                }
+                pub fn step(&mut self) -> [std::time::Duration; 2] {
+                    [
+                        {
+                            let start = std::time::Instant::now();
+                            self.apply_rules();
+                            start.elapsed()
+                        },
+                        {
+                            let start = std::time::Instant::now();
+                            self.canonicalize();
+                            start.elapsed()
+                        },
+                    ]
+                }
+                #[inline(never)]
+                pub fn apply_rules(&mut self) {
+                    #[doc = "( rule ( ( = e ( Add a b ) ) ) ( ( union e ( Add b a ) ) ) )"]
+                    for (a, b, e) in self.add_.iter_new() {
+                        self.delta.insert_add((b, a, e));
+                    }
+                }
+                fn emit_graphviz(&self) -> String {
+                    let mut buf = String::new();
+                    buf.push_str("digraph G {\n");
+                    self.add_.emit_graphviz(&mut buf);
+                    buf.push_str("}\n");
+                    buf
+                }
+                pub fn get_total_relation_entry_count(&self) -> usize {
+                    [self.add_.len()].into_iter().sum::<usize>()
+                }
+                pub fn get_relation_entry_count(&self) -> std::collections::BTreeMap<&'static str, usize> {
+                    [("Add", self.add_.len())].into_iter().collect()
+                }
+                #[inline(never)]
+                pub fn canonicalize(&mut self) {
+                    self.add_.clear_new();
+                    while self.uf.has_new_uproots() || self.delta.has_new_inserts() {
+                        self.uf.snapshot_all_uprooted();
+                        self.add_.update(&mut self.uf, &mut self.delta);
+                    }
+                    self.uf.snapshot_all_uprooted();
+                    self.add_.update_finalize(&mut self.uf);
+                }
+            }
+            impl EclassProvider<Math> for Theory {
+                fn make(&mut self) -> Math {
+                    self.uf.math_.add_eclass()
+                }
+                fn find(&mut self, t: Math) -> Math {
+                    self.uf.math_.find(t)
+                }
+                fn union(&mut self, a: Math, b: Math) {
+                    self.uf.math_.union(a, b);
+                }
+            }
+            impl std::ops::Deref for Theory {
+                type Target = Delta;
+                fn deref(&self) -> &Self::Target {
+                    &self.delta
+                }
+            }
+            impl std::ops::DerefMut for Theory {
+                fn deref_mut(&mut self) -> &mut Self::Target {
+                    &mut self.delta
+                }
+            }
+        "#]]),
+    }
+    .check();
+}
+
+#[test]
+fn regression_entry2() {
+    Steps {
+        code: r#" 
+            (datatype Math (Sub Math Math) (Const i64))
+            (rewrite (Sub a b) (Const -1))
+        "#,
+        expected_hir: Some(expect![[r#"
+            Theory:
+
+            Math(Math)
+            Sub(Math, Math, Math)
+            Const(i64, Math)
+            g0(i64)
+
+            Rule:
+            Premise: Sub(a, b, p2)
+            __: a
+            __: b
+            a0: p2
+            a1: __
+            Insert: Const(a1, a0).n0, g0(a1).n0
+
+        "#]]),
+        expected_lir: Some(expect![[r#"
+            Theory {
+                name: None,
+                types: {
+                    [t0, i64]: std::primitive::i64,
+                    [t1, String]: runtime::IString,
+                    [t2, unit]: THIS_STRING_SHOULD_NOT_APPEAR_IN_GENERATED_CODE,
+                    [t3, Math]: [symbolic],
+                },
+                relations: {
+                    r0: (hir-only relation),
+                    r1: RelationData {
+                        name: "Sub",
+                        param_types: {c0: t3, c1: t3, c2: t3},
+                        kind: Table {
+                            index_to_info: {ir0: 0_1_2 conflict[..2] => [2:union], ir1: 1_0_2, ir2: 2_0_1},
+                            usage_to_info: {
+                                iu0: ir0[..2],
+                                iu1: ir0[..1],
+                                iu2: ir1[..1],
+                                iu3: ir2[..1],
+                                iu4: ir0[..2],
+                            },
+                            column_back_reference: {c0: iu1, c1: iu2, c2: iu3},
+                        },
+                    },
+                    r2: RelationData {
+                        name: "Const",
+                        param_types: {c0: t0, c1: t3},
+                        kind: Table {
+                            index_to_info: {ir0: 0_1 conflict[..1] => [1:union], ir1: 1_0},
+                            usage_to_info: {
+                                iu0: ir0[..1],
+                                iu1: ir0[..1],
+                                iu2: ir1[..1],
+                                iu3: ir0[..1],
+                            },
+                            column_back_reference: {c0: iu1, c1: iu2},
+                        },
+                    },
+                    r3: RelationData {
+                        name: "g0",
+                        param_types: {c0: t0},
+                        kind: [Global, g0],
+                    },
+                },
+                rule_variables: {
+                    [v0, a]: t3,
+                    [v1, b]: t3,
+                    [v2, p2]: t3,
+                    [v3, a1]: t0,
+                },
+                global_variable_types: {
+                    g0: t0,
+                },
+                rule_tries: [
+                    meta: "( rewrite ( Sub a b ) ( Const -1 ) )"
+                    atom: [PremiseNew, r1(v0, v1, v2)]
+                    then: [
+                        atom: [Action::Insert, r3(v3) on iu0],
+                        atom: [Action::Insert, r2(v3, v2)],
+                    ],
+                ],
+                initial: [
+                    ComputeGlobal {
+                        global_id: g0,
+                        compute: Literal(
+                            I64(
+                                -1,
+                            ),
+                        ),
+                    },
+                ],
+            }"#]]),
+        expected_codegen: Some(expect![[r#"
+            use oatlog::runtime::{self, *};
+            decl_row ! (Row2_0 < T0 first 0 , T1 > (0) (1) (T0) (T1) fc = (0) (T0) where u64 = s => ((s . 0 . inner () as u64) << 32) + ((s . 1 . inner () as u64) << 0));
+            decl_row ! (Row2_1_0 < T0 , T1 first 1 > (1 , 0) () (T1 , T0) () fc = (1) (T1) where u64 = s => ((s . 1 . inner () as u64) << 32) + ((s . 0 . inner () as u64) << 0));
+            decl_row ! (Row3_0_1 < T0 first 0 , T1 , T2 > (0 , 1) (2) (T0 , T1) (T2) fc = (0) (T0) where u128 = s => ((s . 0 . inner () as u128) << 64) + ((s . 1 . inner () as u128) << 32) + ((s . 2 . inner () as u128) << 0));
+            decl_row ! (Row3_1_0_2 < T0 , T1 first 1 , T2 > (1 , 0 , 2) () (T1 , T0 , T2) () fc = (1) (T1) where u128 = s => ((s . 1 . inner () as u128) << 64) + ((s . 0 . inner () as u128) << 32) + ((s . 2 . inner () as u128) << 0));
+            decl_row ! (Row3_2_0_1 < T0 , T1 , T2 first 2 > (2 , 0 , 1) () (T2 , T0 , T1) () fc = (2) (T2) where u128 = s => ((s . 2 . inner () as u128) << 64) + ((s . 0 . inner () as u128) << 32) + ((s . 1 . inner () as u128) << 0));
+            eclass_wrapper_ty!(Math);
+            #[derive(Debug, Default)]
+            struct SubRelation {
+                new: Vec<<Self as Relation>::Row>,
+                all_index_0_1_2: IndexImpl<RadixSortCtx<Row3_0_1<Math, Math, Math>, u128>>,
+                all_index_1_0_2: IndexImpl<RadixSortCtx<Row3_1_0_2<Math, Math, Math>, u128>>,
+                all_index_2_0_1: IndexImpl<RadixSortCtx<Row3_2_0_1<Math, Math, Math>, u128>>,
+            }
+            impl Relation for SubRelation {
+                type Row = (Math, Math, Math);
+            }
+            impl SubRelation {
+                const COST: u32 = 9u32;
+                fn new() -> Self {
+                    Self::default()
+                }
+                fn has_new(&self) -> bool {
+                    !self.new.is_empty()
+                }
+                fn clear_new(&mut self) {
+                    self.new.clear();
+                }
+                fn iter_new(&self) -> impl Iterator<Item = <Self as Relation>::Row> + use<'_> {
+                    self.new.iter().copied()
+                }
+                fn iter2_0_1_2(&self, x0: Math, x1: Math) -> impl Iterator<Item = (Math,)> + use<'_> {
+                    self.all_index_0_1_2
+                        .range((x0, x1, Math::MIN_ID)..=(x0, x1, Math::MAX_ID))
+                        .map(|(x0, x1, x2)| (x2,))
+                }
+                fn iter1_0_1_2(&self, x0: Math) -> impl Iterator<Item = (Math, Math)> + use<'_> {
+                    self.all_index_0_1_2
+                        .range((x0, Math::MIN_ID, Math::MIN_ID)..=(x0, Math::MAX_ID, Math::MAX_ID))
+                        .map(|(x0, x1, x2)| (x1, x2))
+                }
+                fn iter1_1_0_2(&self, x1: Math) -> impl Iterator<Item = (Math, Math)> + use<'_> {
+                    self.all_index_1_0_2
+                        .range((Math::MIN_ID, x1, Math::MIN_ID)..=(Math::MAX_ID, x1, Math::MAX_ID))
+                        .map(|(x0, x1, x2)| (x0, x2))
+                }
+                fn iter1_2_0_1(&self, x2: Math) -> impl Iterator<Item = (Math, Math)> + use<'_> {
+                    self.all_index_2_0_1
+                        .range((Math::MIN_ID, Math::MIN_ID, x2)..=(Math::MAX_ID, Math::MAX_ID, x2))
+                        .map(|(x0, x1, x2)| (x0, x1))
+                }
+                fn check2_0_1_2(&self, x0: Math, x1: Math) -> bool {
+                    self.iter2_0_1_2(x0, x1).next().is_some()
+                }
+                fn check1_0_1_2(&self, x0: Math) -> bool {
+                    self.iter1_0_1_2(x0).next().is_some()
+                }
+                fn check1_1_0_2(&self, x1: Math) -> bool {
+                    self.iter1_1_0_2(x1).next().is_some()
+                }
+                fn check1_2_0_1(&self, x2: Math) -> bool {
+                    self.iter1_2_0_1(x2).next().is_some()
+                }
+                #[allow(unreachable_code)]
+                fn entry2_0_1_2(&self, x0: Math, x1: Math, delta: &mut Delta, uf: &mut Unification) -> (Math,) {
+                    if let Some((x2,)) = self.iter2_0_1_2(x0, x1).next() {
+                        return (x2,);
+                    }
+                    let x2 = uf.math_.add_eclass();
+                    delta.sub_.push((x0, x1, x2));
+                    (x2,)
+                }
+                fn update(&mut self, uf: &mut Unification, delta: &mut Delta) {
+                    let mut inserts = take(&mut delta.sub_);
+                    let orig_inserts = inserts.len();
+                    self.all_index_0_1_2
+                        .first_column_uproots(uf.math_.get_uprooted_snapshot(), |deleted_rows| {
+                            inserts.extend(deleted_rows)
+                        });
+                    self.all_index_1_0_2
+                        .first_column_uproots(uf.math_.get_uprooted_snapshot(), |deleted_rows| {
+                            inserts.extend(deleted_rows)
+                        });
+                    self.all_index_2_0_1
+                        .first_column_uproots(uf.math_.get_uprooted_snapshot(), |deleted_rows| {
+                            inserts.extend(deleted_rows)
+                        });
+                    inserts[orig_inserts..].sort_unstable();
+                    runtime::dedup_suffix(&mut inserts, orig_inserts);
+                    self.all_index_0_1_2
+                        .delete_many(&mut inserts[orig_inserts..]);
+                    self.all_index_1_0_2
+                        .delete_many(&mut inserts[orig_inserts..]);
+                    self.all_index_2_0_1
+                        .delete_many(&mut inserts[orig_inserts..]);
+                    inserts.iter_mut().for_each(|row| {
+                        row.0 = uf.math_.find(row.0);
+                        row.1 = uf.math_.find(row.1);
+                        row.2 = uf.math_.find(row.2);
+                    });
+                    self.all_index_0_1_2.filter_existing(&mut inserts);
+                    self.all_index_0_1_2
+                        .insert_many(&mut inserts, |mut old, mut new| {
+                            let (x2,) = old.value_mut();
+                            let (y2,) = new.value_mut();
+                            uf.math_.union_mut(x2, y2);
+                            old
+                        });
+                    self.all_index_1_0_2
+                        .insert_many(&mut inserts, |_, _| unreachable!());
+                    self.all_index_2_0_1
+                        .insert_many(&mut inserts, |_, _| unreachable!());
+                    self.new.extend_from_slice(&inserts);
+                }
+                fn update_finalize(&mut self, uf: &mut Unification) {
+                    self.new.sort_unstable();
+                    self.new.dedup();
+                    self.new.retain(|(x0, x1, x2)| {
+                        if *x0 != uf.math_.find(*x0) {
+                            return false;
+                        }
+                        if *x1 != uf.math_.find(*x1) {
+                            return false;
+                        }
+                        if *x2 != uf.math_.find(*x2) {
+                            return false;
+                        }
+                        true
+                    });
+                }
+                fn emit_graphviz(&self, buf: &mut String) {
+                    use std::fmt::Write;
+                    for (i, (x0, x1, x2)) in self.all_index_0_1_2.iter().enumerate() {
+                        writeln!(buf, "{}_{i} -> {}_{};", "sub", "math", x0).unwrap();
+                        writeln!(buf, "{}_{i} -> {}_{};", "sub", "math", x1).unwrap();
+                        writeln!(buf, "{}_{i} -> {}_{};", "sub", "math", x2).unwrap();
+                        writeln!(buf, "{}_{i} [shape = box];", "sub").unwrap();
+                    }
+                }
+                fn len(&self) -> usize {
+                    self.all_index_0_1_2.len()
+                }
+            }
+            #[derive(Debug, Default)]
+            struct ConstRelation {
+                new: Vec<<Self as Relation>::Row>,
+                all_index_0_1: IndexImpl<StdSortCtx<Row2_0<std::primitive::i64, Math>>>,
+                all_index_1_0: IndexImpl<StdSortCtx<Row2_1_0<std::primitive::i64, Math>>>,
+            }
+            impl Relation for ConstRelation {
+                type Row = (std::primitive::i64, Math);
+            }
+            impl ConstRelation {
+                const COST: u32 = 4u32;
+                fn new() -> Self {
+                    Self::default()
+                }
+                fn has_new(&self) -> bool {
+                    !self.new.is_empty()
+                }
+                fn clear_new(&mut self) {
+                    self.new.clear();
+                }
+                fn iter_new(&self) -> impl Iterator<Item = <Self as Relation>::Row> + use<'_> {
+                    self.new.iter().copied()
+                }
+                fn iter1_0_1(&self, x0: std::primitive::i64) -> impl Iterator<Item = (Math,)> + use<'_> {
+                    self.all_index_0_1
+                        .range((x0, Math::MIN_ID)..=(x0, Math::MAX_ID))
+                        .map(|(x0, x1)| (x1,))
+                }
+                fn iter1_1_0(&self, x1: Math) -> impl Iterator<Item = (std::primitive::i64,)> + use<'_> {
+                    self.all_index_1_0
+                        .range((std::primitive::i64::MIN_ID, x1)..=(std::primitive::i64::MAX_ID, x1))
+                        .map(|(x0, x1)| (x0,))
+                }
+                fn check1_0_1(&self, x0: std::primitive::i64) -> bool {
+                    self.iter1_0_1(x0).next().is_some()
+                }
+                fn check1_1_0(&self, x1: Math) -> bool {
+                    self.iter1_1_0(x1).next().is_some()
+                }
+                #[allow(unreachable_code)]
+                fn entry1_0_1(
+                    &self,
+                    x0: std::primitive::i64,
+                    delta: &mut Delta,
+                    uf: &mut Unification,
+                ) -> (Math,) {
+                    if let Some((x1,)) = self.iter1_0_1(x0).next() {
+                        return (x1,);
+                    }
+                    let x1 = uf.math_.add_eclass();
+                    delta.const_.push((x0, x1));
+                    (x1,)
+                }
+                fn update(&mut self, uf: &mut Unification, delta: &mut Delta) {
+                    let mut inserts = take(&mut delta.const_);
+                    let orig_inserts = inserts.len();
+                    self.all_index_1_0
+                        .first_column_uproots(uf.math_.get_uprooted_snapshot(), |deleted_rows| {
+                            inserts.extend(deleted_rows)
+                        });
+                    inserts[orig_inserts..].sort_unstable();
+                    runtime::dedup_suffix(&mut inserts, orig_inserts);
+                    self.all_index_0_1.delete_many(&mut inserts[orig_inserts..]);
+                    self.all_index_1_0.delete_many(&mut inserts[orig_inserts..]);
+                    inserts.iter_mut().for_each(|row| {
+                        row.1 = uf.math_.find(row.1);
+                    });
+                    self.all_index_0_1.filter_existing(&mut inserts);
+                    self.all_index_0_1
+                        .insert_many(&mut inserts, |mut old, mut new| {
+                            let (x1,) = old.value_mut();
+                            let (y1,) = new.value_mut();
+                            uf.math_.union_mut(x1, y1);
+                            old
+                        });
+                    self.all_index_1_0
+                        .insert_many(&mut inserts, |_, _| unreachable!());
+                    self.new.extend_from_slice(&inserts);
+                }
+                fn update_finalize(&mut self, uf: &mut Unification) {
+                    self.new.sort_unstable();
+                    self.new.dedup();
+                    self.new.retain(|(x0, x1)| {
+                        if *x1 != uf.math_.find(*x1) {
+                            return false;
+                        }
+                        true
+                    });
+                }
+                fn emit_graphviz(&self, buf: &mut String) {
+                    use std::fmt::Write;
+                    for (i, (x0, x1)) in self.all_index_0_1.iter().enumerate() {
+                        writeln!(buf, "{}_{i} -> {}_{};", "const", "i64", x0).unwrap();
+                        writeln!(buf, "{}_{i} -> {}_{};", "const", "math", x1).unwrap();
+                        writeln!(buf, "{}_{i} [shape = box];", "const").unwrap();
+                    }
+                }
+                fn len(&self) -> usize {
+                    self.all_index_0_1.len()
+                }
+            }
+            #[derive(Debug, Default)]
+            pub struct Delta {
+                sub_: Vec<<SubRelation as Relation>::Row>,
+                const_: Vec<<ConstRelation as Relation>::Row>,
+            }
+            impl Delta {
+                fn new() -> Self {
+                    Self::default()
+                }
+                fn has_new_inserts(&self) -> bool {
+                    let mut has_new_inserts = false;
+                    has_new_inserts |= !self.sub_.is_empty();
+                    has_new_inserts |= !self.const_.is_empty();
+                    has_new_inserts
+                }
+                pub fn insert_sub(&mut self, x: <SubRelation as Relation>::Row) {
+                    self.sub_.push(x);
+                }
+                pub fn insert_const(&mut self, x: <ConstRelation as Relation>::Row) {
+                    self.const_.push(x);
+                }
+            }
+            #[derive(Debug, Default)]
+            struct Unification {
+                pub math_: UnionFind<Math>,
+            }
+            impl Unification {
+                fn has_new_uproots(&mut self) -> bool {
+                    let mut ret = false;
+                    ret |= self.math_.has_new_uproots();
+                    ret
+                }
+                fn snapshot_all_uprooted(&mut self) {
+                    self.math_.create_uprooted_snapshot();
+                }
+            }
+            #[derive(Debug, Default)]
+            pub struct Theory {
+                pub delta: Delta,
+                pub uf: Unification,
+                global_i64: GlobalVars<std::primitive::i64>,
+                pub sub_: SubRelation,
+                pub const_: ConstRelation,
+            }
+            impl Theory {
+                pub fn new() -> Self {
+                    let mut theory = Self::default();
+                    theory.global_i64.define(0usize, -1i64);
+                    theory.canonicalize();
+                    theory
+                }
+                pub fn step(&mut self) -> [std::time::Duration; 2] {
+                    [
+                        {
+                            let start = std::time::Instant::now();
+                            self.apply_rules();
+                            start.elapsed()
+                        },
+                        {
+                            let start = std::time::Instant::now();
+                            self.canonicalize();
+                            start.elapsed()
+                        },
+                    ]
+                }
+                #[inline(never)]
+                pub fn apply_rules(&mut self) {
+                    #[doc = "( rewrite ( Sub a b ) ( Const -1 ) )"]
+                    for (a, b, p2) in self.sub_.iter_new() {
+                        let a1 = self.global_i64.get(0usize);
+                        self.delta.insert_const((a1, p2));
+                    }
+                }
+                fn emit_graphviz(&self) -> String {
+                    let mut buf = String::new();
+                    buf.push_str("digraph G {\n");
+                    self.sub_.emit_graphviz(&mut buf);
+                    self.const_.emit_graphviz(&mut buf);
+                    buf.push_str("}\n");
+                    buf
+                }
+                pub fn get_total_relation_entry_count(&self) -> usize {
+                    [self.sub_.len(), self.const_.len()]
+                        .into_iter()
+                        .sum::<usize>()
+                }
+                pub fn get_relation_entry_count(&self) -> std::collections::BTreeMap<&'static str, usize> {
+                    [("Sub", self.sub_.len()), ("Const", self.const_.len())]
+                        .into_iter()
+                        .collect()
+                }
+                #[inline(never)]
+                pub fn canonicalize(&mut self) {
+                    self.sub_.clear_new();
+                    self.const_.clear_new();
+                    while self.uf.has_new_uproots() || self.delta.has_new_inserts() {
+                        self.uf.snapshot_all_uprooted();
+                        self.sub_.update(&mut self.uf, &mut self.delta);
+                        self.const_.update(&mut self.uf, &mut self.delta);
+                    }
+                    self.uf.snapshot_all_uprooted();
+                    self.global_i64.update_finalize();
+                    self.sub_.update_finalize(&mut self.uf);
+                    self.const_.update_finalize(&mut self.uf);
+                }
+            }
+            impl EclassProvider<Math> for Theory {
+                fn make(&mut self) -> Math {
+                    self.uf.math_.add_eclass()
+                }
+                fn find(&mut self, t: Math) -> Math {
+                    self.uf.math_.find(t)
+                }
+                fn union(&mut self, a: Math, b: Math) {
+                    self.uf.math_.union(a, b);
+                }
+            }
+            impl std::ops::Deref for Theory {
+                type Target = Delta;
+                fn deref(&self) -> &Self::Target {
+                    &self.delta
+                }
+            }
+            impl std::ops::DerefMut for Theory {
+                fn deref_mut(&mut self) -> &mut Self::Target {
+                    &mut self.delta
+                }
+            }
+        "#]]),
+    }
+    .check();
+}
+
+#[test]
+fn regression_entry() {
+    Steps {
+        code: r#" 
+            (datatype Math (Integral Math Math) (Add Math Math))
+            (rewrite (Add f g) (Add (Integral f f) g))
+        "#,
+        expected_hir: Some(expect![[r#"
+            Theory:
+
+            Math(Math)
+            Integral(Math, Math, Math)
+            Add(Math, Math, Math)
+
+            Rule:
+            Premise: Add(f, g, p2)
+            f: f
+            g: g
+            a2: p2
+            a3: __
+            Insert: Integral(f, f, a3).n0, Add(a3, g, a2).n0
+
+        "#]]),
+        expected_lir: Some(expect![[r#"
+            Theory {
+                name: None,
+                types: {
+                    [t0, i64]: std::primitive::i64,
+                    [t1, String]: runtime::IString,
+                    [t2, unit]: THIS_STRING_SHOULD_NOT_APPEAR_IN_GENERATED_CODE,
+                    [t3, Math]: [symbolic],
+                },
+                relations: {
+                    r0: (hir-only relation),
+                    r1: RelationData {
+                        name: "Integral",
+                        param_types: {c0: t3, c1: t3, c2: t3},
+                        kind: Table {
+                            index_to_info: {ir0: 0_1_2 conflict[..2] => [2:union], ir1: 1_0_2, ir2: 2_0_1},
+                            usage_to_info: {
+                                iu0: ir0[..2],
+                                iu1: ir0[..1],
+                                iu2: ir1[..1],
+                                iu3: ir2[..1],
+                                iu4: ir0[..2],
+                            },
+                            column_back_reference: {c0: iu1, c1: iu2, c2: iu3},
+                        },
+                    },
+                    r2: RelationData {
+                        name: "Add",
+                        param_types: {c0: t3, c1: t3, c2: t3},
+                        kind: Table {
+                            index_to_info: {ir0: 0_1_2 conflict[..2] => [2:union], ir1: 1_0_2, ir2: 2_0_1},
+                            usage_to_info: {
+                                iu0: ir0[..2],
+                                iu1: ir0[..1],
+                                iu2: ir1[..1],
+                                iu3: ir2[..1],
+                                iu4: ir0[..2],
+                            },
+                            column_back_reference: {c0: iu1, c1: iu2, c2: iu3},
+                        },
+                    },
+                },
+                rule_variables: {
+                    [v0, f]: t3,
+                    [v1, g]: t3,
+                    [v2, p2]: t3,
+                    [v3, a3]: t3,
+                },
+                global_variable_types: {},
+                rule_tries: [
+                    meta: "( rewrite ( Add f g ) ( Add ( Integral f f ) g ) )"
+                    atom: [PremiseNew, r2(v0, v1, v2)]
+                    then: [
+                        atom: [Action::Insert, r1(v0, v0, v3) on iu0],
+                        atom: [Action::Insert, r2(v3, v1, v2)],
+                    ],
+                ],
+                initial: [],
+            }"#]]),
+        expected_codegen: Some(expect![[r#"
+            use oatlog::runtime::{self, *};
+            decl_row ! (Row3_0_1 < T0 first 0 , T1 , T2 > (0 , 1) (2) (T0 , T1) (T2) fc = (0) (T0) where u128 = s => ((s . 0 . inner () as u128) << 64) + ((s . 1 . inner () as u128) << 32) + ((s . 2 . inner () as u128) << 0));
+            decl_row ! (Row3_1_0_2 < T0 , T1 first 1 , T2 > (1 , 0 , 2) () (T1 , T0 , T2) () fc = (1) (T1) where u128 = s => ((s . 1 . inner () as u128) << 64) + ((s . 0 . inner () as u128) << 32) + ((s . 2 . inner () as u128) << 0));
+            decl_row ! (Row3_2_0_1 < T0 , T1 , T2 first 2 > (2 , 0 , 1) () (T2 , T0 , T1) () fc = (2) (T2) where u128 = s => ((s . 2 . inner () as u128) << 64) + ((s . 0 . inner () as u128) << 32) + ((s . 1 . inner () as u128) << 0));
+            eclass_wrapper_ty!(Math);
+            #[derive(Debug, Default)]
+            struct IntegralRelation {
+                new: Vec<<Self as Relation>::Row>,
+                all_index_0_1_2: IndexImpl<RadixSortCtx<Row3_0_1<Math, Math, Math>, u128>>,
+                all_index_1_0_2: IndexImpl<RadixSortCtx<Row3_1_0_2<Math, Math, Math>, u128>>,
+                all_index_2_0_1: IndexImpl<RadixSortCtx<Row3_2_0_1<Math, Math, Math>, u128>>,
+            }
+            impl Relation for IntegralRelation {
+                type Row = (Math, Math, Math);
+            }
+            impl IntegralRelation {
+                const COST: u32 = 9u32;
+                fn new() -> Self {
+                    Self::default()
+                }
+                fn has_new(&self) -> bool {
+                    !self.new.is_empty()
+                }
+                fn clear_new(&mut self) {
+                    self.new.clear();
+                }
+                fn iter_new(&self) -> impl Iterator<Item = <Self as Relation>::Row> + use<'_> {
+                    self.new.iter().copied()
+                }
+                fn iter2_0_1_2(&self, x0: Math, x1: Math) -> impl Iterator<Item = (Math,)> + use<'_> {
+                    self.all_index_0_1_2
+                        .range((x0, x1, Math::MIN_ID)..=(x0, x1, Math::MAX_ID))
+                        .map(|(x0, x1, x2)| (x2,))
+                }
+                fn iter1_0_1_2(&self, x0: Math) -> impl Iterator<Item = (Math, Math)> + use<'_> {
+                    self.all_index_0_1_2
+                        .range((x0, Math::MIN_ID, Math::MIN_ID)..=(x0, Math::MAX_ID, Math::MAX_ID))
+                        .map(|(x0, x1, x2)| (x1, x2))
+                }
+                fn iter1_1_0_2(&self, x1: Math) -> impl Iterator<Item = (Math, Math)> + use<'_> {
+                    self.all_index_1_0_2
+                        .range((Math::MIN_ID, x1, Math::MIN_ID)..=(Math::MAX_ID, x1, Math::MAX_ID))
+                        .map(|(x0, x1, x2)| (x0, x2))
+                }
+                fn iter1_2_0_1(&self, x2: Math) -> impl Iterator<Item = (Math, Math)> + use<'_> {
+                    self.all_index_2_0_1
+                        .range((Math::MIN_ID, Math::MIN_ID, x2)..=(Math::MAX_ID, Math::MAX_ID, x2))
+                        .map(|(x0, x1, x2)| (x0, x1))
+                }
+                fn check2_0_1_2(&self, x0: Math, x1: Math) -> bool {
+                    self.iter2_0_1_2(x0, x1).next().is_some()
+                }
+                fn check1_0_1_2(&self, x0: Math) -> bool {
+                    self.iter1_0_1_2(x0).next().is_some()
+                }
+                fn check1_1_0_2(&self, x1: Math) -> bool {
+                    self.iter1_1_0_2(x1).next().is_some()
+                }
+                fn check1_2_0_1(&self, x2: Math) -> bool {
+                    self.iter1_2_0_1(x2).next().is_some()
+                }
+                #[allow(unreachable_code)]
+                fn entry2_0_1_2(&self, x0: Math, x1: Math, delta: &mut Delta, uf: &mut Unification) -> (Math,) {
+                    if let Some((x2,)) = self.iter2_0_1_2(x0, x1).next() {
+                        return (x2,);
+                    }
+                    let x2 = uf.math_.add_eclass();
+                    delta.integral_.push((x0, x1, x2));
+                    (x2,)
+                }
+                fn update(&mut self, uf: &mut Unification, delta: &mut Delta) {
+                    let mut inserts = take(&mut delta.integral_);
+                    let orig_inserts = inserts.len();
+                    self.all_index_0_1_2
+                        .first_column_uproots(uf.math_.get_uprooted_snapshot(), |deleted_rows| {
+                            inserts.extend(deleted_rows)
+                        });
+                    self.all_index_1_0_2
+                        .first_column_uproots(uf.math_.get_uprooted_snapshot(), |deleted_rows| {
+                            inserts.extend(deleted_rows)
+                        });
+                    self.all_index_2_0_1
+                        .first_column_uproots(uf.math_.get_uprooted_snapshot(), |deleted_rows| {
+                            inserts.extend(deleted_rows)
+                        });
+                    inserts[orig_inserts..].sort_unstable();
+                    runtime::dedup_suffix(&mut inserts, orig_inserts);
+                    self.all_index_0_1_2
+                        .delete_many(&mut inserts[orig_inserts..]);
+                    self.all_index_1_0_2
+                        .delete_many(&mut inserts[orig_inserts..]);
+                    self.all_index_2_0_1
+                        .delete_many(&mut inserts[orig_inserts..]);
+                    inserts.iter_mut().for_each(|row| {
+                        row.0 = uf.math_.find(row.0);
+                        row.1 = uf.math_.find(row.1);
+                        row.2 = uf.math_.find(row.2);
+                    });
+                    self.all_index_0_1_2.filter_existing(&mut inserts);
+                    self.all_index_0_1_2
+                        .insert_many(&mut inserts, |mut old, mut new| {
+                            let (x2,) = old.value_mut();
+                            let (y2,) = new.value_mut();
+                            uf.math_.union_mut(x2, y2);
+                            old
+                        });
+                    self.all_index_1_0_2
+                        .insert_many(&mut inserts, |_, _| unreachable!());
+                    self.all_index_2_0_1
+                        .insert_many(&mut inserts, |_, _| unreachable!());
+                    self.new.extend_from_slice(&inserts);
+                }
+                fn update_finalize(&mut self, uf: &mut Unification) {
+                    self.new.sort_unstable();
+                    self.new.dedup();
+                    self.new.retain(|(x0, x1, x2)| {
+                        if *x0 != uf.math_.find(*x0) {
+                            return false;
+                        }
+                        if *x1 != uf.math_.find(*x1) {
+                            return false;
+                        }
+                        if *x2 != uf.math_.find(*x2) {
+                            return false;
+                        }
+                        true
+                    });
+                }
+                fn emit_graphviz(&self, buf: &mut String) {
+                    use std::fmt::Write;
+                    for (i, (x0, x1, x2)) in self.all_index_0_1_2.iter().enumerate() {
+                        writeln!(buf, "{}_{i} -> {}_{};", "integral", "math", x0).unwrap();
+                        writeln!(buf, "{}_{i} -> {}_{};", "integral", "math", x1).unwrap();
+                        writeln!(buf, "{}_{i} -> {}_{};", "integral", "math", x2).unwrap();
+                        writeln!(buf, "{}_{i} [shape = box];", "integral").unwrap();
+                    }
+                }
+                fn len(&self) -> usize {
+                    self.all_index_0_1_2.len()
+                }
+            }
+            #[derive(Debug, Default)]
+            struct AddRelation {
+                new: Vec<<Self as Relation>::Row>,
+                all_index_0_1_2: IndexImpl<RadixSortCtx<Row3_0_1<Math, Math, Math>, u128>>,
+                all_index_1_0_2: IndexImpl<RadixSortCtx<Row3_1_0_2<Math, Math, Math>, u128>>,
+                all_index_2_0_1: IndexImpl<RadixSortCtx<Row3_2_0_1<Math, Math, Math>, u128>>,
+            }
+            impl Relation for AddRelation {
+                type Row = (Math, Math, Math);
+            }
+            impl AddRelation {
+                const COST: u32 = 9u32;
+                fn new() -> Self {
+                    Self::default()
+                }
+                fn has_new(&self) -> bool {
+                    !self.new.is_empty()
+                }
+                fn clear_new(&mut self) {
+                    self.new.clear();
+                }
+                fn iter_new(&self) -> impl Iterator<Item = <Self as Relation>::Row> + use<'_> {
+                    self.new.iter().copied()
+                }
+                fn iter2_0_1_2(&self, x0: Math, x1: Math) -> impl Iterator<Item = (Math,)> + use<'_> {
+                    self.all_index_0_1_2
+                        .range((x0, x1, Math::MIN_ID)..=(x0, x1, Math::MAX_ID))
+                        .map(|(x0, x1, x2)| (x2,))
+                }
+                fn iter1_0_1_2(&self, x0: Math) -> impl Iterator<Item = (Math, Math)> + use<'_> {
+                    self.all_index_0_1_2
+                        .range((x0, Math::MIN_ID, Math::MIN_ID)..=(x0, Math::MAX_ID, Math::MAX_ID))
+                        .map(|(x0, x1, x2)| (x1, x2))
+                }
+                fn iter1_1_0_2(&self, x1: Math) -> impl Iterator<Item = (Math, Math)> + use<'_> {
+                    self.all_index_1_0_2
+                        .range((Math::MIN_ID, x1, Math::MIN_ID)..=(Math::MAX_ID, x1, Math::MAX_ID))
+                        .map(|(x0, x1, x2)| (x0, x2))
+                }
+                fn iter1_2_0_1(&self, x2: Math) -> impl Iterator<Item = (Math, Math)> + use<'_> {
+                    self.all_index_2_0_1
+                        .range((Math::MIN_ID, Math::MIN_ID, x2)..=(Math::MAX_ID, Math::MAX_ID, x2))
+                        .map(|(x0, x1, x2)| (x0, x1))
+                }
+                fn check2_0_1_2(&self, x0: Math, x1: Math) -> bool {
+                    self.iter2_0_1_2(x0, x1).next().is_some()
+                }
+                fn check1_0_1_2(&self, x0: Math) -> bool {
+                    self.iter1_0_1_2(x0).next().is_some()
+                }
+                fn check1_1_0_2(&self, x1: Math) -> bool {
+                    self.iter1_1_0_2(x1).next().is_some()
+                }
+                fn check1_2_0_1(&self, x2: Math) -> bool {
+                    self.iter1_2_0_1(x2).next().is_some()
+                }
+                #[allow(unreachable_code)]
+                fn entry2_0_1_2(&self, x0: Math, x1: Math, delta: &mut Delta, uf: &mut Unification) -> (Math,) {
+                    if let Some((x2,)) = self.iter2_0_1_2(x0, x1).next() {
+                        return (x2,);
+                    }
+                    let x2 = uf.math_.add_eclass();
+                    delta.add_.push((x0, x1, x2));
+                    (x2,)
+                }
+                fn update(&mut self, uf: &mut Unification, delta: &mut Delta) {
+                    let mut inserts = take(&mut delta.add_);
+                    let orig_inserts = inserts.len();
+                    self.all_index_0_1_2
+                        .first_column_uproots(uf.math_.get_uprooted_snapshot(), |deleted_rows| {
+                            inserts.extend(deleted_rows)
+                        });
+                    self.all_index_1_0_2
+                        .first_column_uproots(uf.math_.get_uprooted_snapshot(), |deleted_rows| {
+                            inserts.extend(deleted_rows)
+                        });
+                    self.all_index_2_0_1
+                        .first_column_uproots(uf.math_.get_uprooted_snapshot(), |deleted_rows| {
+                            inserts.extend(deleted_rows)
+                        });
+                    inserts[orig_inserts..].sort_unstable();
+                    runtime::dedup_suffix(&mut inserts, orig_inserts);
+                    self.all_index_0_1_2
+                        .delete_many(&mut inserts[orig_inserts..]);
+                    self.all_index_1_0_2
+                        .delete_many(&mut inserts[orig_inserts..]);
+                    self.all_index_2_0_1
+                        .delete_many(&mut inserts[orig_inserts..]);
+                    inserts.iter_mut().for_each(|row| {
+                        row.0 = uf.math_.find(row.0);
+                        row.1 = uf.math_.find(row.1);
+                        row.2 = uf.math_.find(row.2);
+                    });
+                    self.all_index_0_1_2.filter_existing(&mut inserts);
+                    self.all_index_0_1_2
+                        .insert_many(&mut inserts, |mut old, mut new| {
+                            let (x2,) = old.value_mut();
+                            let (y2,) = new.value_mut();
+                            uf.math_.union_mut(x2, y2);
+                            old
+                        });
+                    self.all_index_1_0_2
+                        .insert_many(&mut inserts, |_, _| unreachable!());
+                    self.all_index_2_0_1
+                        .insert_many(&mut inserts, |_, _| unreachable!());
+                    self.new.extend_from_slice(&inserts);
+                }
+                fn update_finalize(&mut self, uf: &mut Unification) {
+                    self.new.sort_unstable();
+                    self.new.dedup();
+                    self.new.retain(|(x0, x1, x2)| {
+                        if *x0 != uf.math_.find(*x0) {
+                            return false;
+                        }
+                        if *x1 != uf.math_.find(*x1) {
+                            return false;
+                        }
+                        if *x2 != uf.math_.find(*x2) {
+                            return false;
+                        }
+                        true
+                    });
+                }
+                fn emit_graphviz(&self, buf: &mut String) {
+                    use std::fmt::Write;
+                    for (i, (x0, x1, x2)) in self.all_index_0_1_2.iter().enumerate() {
+                        writeln!(buf, "{}_{i} -> {}_{};", "add", "math", x0).unwrap();
+                        writeln!(buf, "{}_{i} -> {}_{};", "add", "math", x1).unwrap();
+                        writeln!(buf, "{}_{i} -> {}_{};", "add", "math", x2).unwrap();
+                        writeln!(buf, "{}_{i} [shape = box];", "add").unwrap();
+                    }
+                }
+                fn len(&self) -> usize {
+                    self.all_index_0_1_2.len()
+                }
+            }
+            #[derive(Debug, Default)]
+            pub struct Delta {
+                integral_: Vec<<IntegralRelation as Relation>::Row>,
+                add_: Vec<<AddRelation as Relation>::Row>,
+            }
+            impl Delta {
+                fn new() -> Self {
+                    Self::default()
+                }
+                fn has_new_inserts(&self) -> bool {
+                    let mut has_new_inserts = false;
+                    has_new_inserts |= !self.integral_.is_empty();
+                    has_new_inserts |= !self.add_.is_empty();
+                    has_new_inserts
+                }
+                pub fn insert_integral(&mut self, x: <IntegralRelation as Relation>::Row) {
+                    self.integral_.push(x);
+                }
+                pub fn insert_add(&mut self, x: <AddRelation as Relation>::Row) {
+                    self.add_.push(x);
+                }
+            }
+            #[derive(Debug, Default)]
+            struct Unification {
+                pub math_: UnionFind<Math>,
+            }
+            impl Unification {
+                fn has_new_uproots(&mut self) -> bool {
+                    let mut ret = false;
+                    ret |= self.math_.has_new_uproots();
+                    ret
+                }
+                fn snapshot_all_uprooted(&mut self) {
+                    self.math_.create_uprooted_snapshot();
+                }
+            }
+            #[derive(Debug, Default)]
+            pub struct Theory {
+                pub delta: Delta,
+                pub uf: Unification,
+                pub integral_: IntegralRelation,
+                pub add_: AddRelation,
+            }
+            impl Theory {
+                pub fn new() -> Self {
+                    let mut theory = Self::default();
+                    theory
+                }
+                pub fn step(&mut self) -> [std::time::Duration; 2] {
+                    [
+                        {
+                            let start = std::time::Instant::now();
+                            self.apply_rules();
+                            start.elapsed()
+                        },
+                        {
+                            let start = std::time::Instant::now();
+                            self.canonicalize();
+                            start.elapsed()
+                        },
+                    ]
+                }
+                #[inline(never)]
+                pub fn apply_rules(&mut self) {
+                    #[doc = "( rewrite ( Add f g ) ( Add ( Integral f f ) g ) )"]
+                    for (f, g, p2) in self.add_.iter_new() {
+                        let (a3,) = self
+                            .integral_
+                            .entry2_0_1_2(f, f, &mut self.delta, &mut self.uf);
+                        self.delta.insert_add((a3, g, p2));
+                    }
+                }
+                fn emit_graphviz(&self) -> String {
+                    let mut buf = String::new();
+                    buf.push_str("digraph G {\n");
+                    self.integral_.emit_graphviz(&mut buf);
+                    self.add_.emit_graphviz(&mut buf);
+                    buf.push_str("}\n");
+                    buf
+                }
+                pub fn get_total_relation_entry_count(&self) -> usize {
+                    [self.integral_.len(), self.add_.len()]
+                        .into_iter()
+                        .sum::<usize>()
+                }
+                pub fn get_relation_entry_count(&self) -> std::collections::BTreeMap<&'static str, usize> {
+                    [("Integral", self.integral_.len()), ("Add", self.add_.len())]
+                        .into_iter()
+                        .collect()
+                }
+                #[inline(never)]
+                pub fn canonicalize(&mut self) {
+                    self.integral_.clear_new();
+                    self.add_.clear_new();
+                    while self.uf.has_new_uproots() || self.delta.has_new_inserts() {
+                        self.uf.snapshot_all_uprooted();
+                        self.integral_.update(&mut self.uf, &mut self.delta);
+                        self.add_.update(&mut self.uf, &mut self.delta);
+                    }
+                    self.uf.snapshot_all_uprooted();
+                    self.integral_.update_finalize(&mut self.uf);
+                    self.add_.update_finalize(&mut self.uf);
+                }
+            }
+            impl EclassProvider<Math> for Theory {
+                fn make(&mut self) -> Math {
+                    self.uf.math_.add_eclass()
+                }
+                fn find(&mut self, t: Math) -> Math {
+                    self.uf.math_.find(t)
+                }
+                fn union(&mut self, a: Math, b: Math) {
+                    self.uf.math_.union(a, b);
+                }
+            }
+            impl std::ops::Deref for Theory {
+                type Target = Delta;
+                fn deref(&self) -> &Self::Target {
+                    &self.delta
+                }
+            }
+            impl std::ops::DerefMut for Theory {
+                fn deref_mut(&mut self) -> &mut Self::Target {
+                    &mut self.delta
+                }
+            }
+        "#]]),
     }
     .check();
 }
@@ -470,12 +1801,13 @@ fn test_bind_variable_multiple_times() {
                         kind: Table {
                             index_to_info: {ir0: 0_1_2 conflict[..2] => [2:union], ir1: 1_0_2, ir2: 2_0_1},
                             usage_to_info: {
-                                iu0: ir0[..1],
-                                iu1: ir1[..1],
-                                iu2: ir2[..1],
-                                iu3: ir0[..2],
+                                iu0: ir0[..2],
+                                iu1: ir0[..1],
+                                iu2: ir1[..1],
+                                iu3: ir2[..1],
+                                iu4: ir0[..2],
                             },
-                            column_back_reference: {c0: iu0, c1: iu1, c2: iu2},
+                            column_back_reference: {c0: iu1, c1: iu2, c2: iu3},
                         },
                     },
                 },
@@ -527,6 +1859,11 @@ fn test_bind_variable_multiple_times() {
                 fn iter_new(&self) -> impl Iterator<Item = <Self as Relation>::Row> + use<'_> {
                     self.new.iter().copied()
                 }
+                fn iter2_0_1_2(&self, x0: Foo, x1: Foo) -> impl Iterator<Item = (Foo,)> + use<'_> {
+                    self.all_index_0_1_2
+                        .range((x0, x1, Foo::MIN_ID)..=(x0, x1, Foo::MAX_ID))
+                        .map(|(x0, x1, x2)| (x2,))
+                }
                 fn iter1_0_1_2(&self, x0: Foo) -> impl Iterator<Item = (Foo, Foo)> + use<'_> {
                     self.all_index_0_1_2
                         .range((x0, Foo::MIN_ID, Foo::MIN_ID)..=(x0, Foo::MAX_ID, Foo::MAX_ID))
@@ -542,10 +1879,8 @@ fn test_bind_variable_multiple_times() {
                         .range((Foo::MIN_ID, Foo::MIN_ID, x2)..=(Foo::MAX_ID, Foo::MAX_ID, x2))
                         .map(|(x0, x1, x2)| (x0, x1))
                 }
-                fn iter2_0_1_2(&self, x0: Foo, x1: Foo) -> impl Iterator<Item = (Foo,)> + use<'_> {
-                    self.all_index_0_1_2
-                        .range((x0, x1, Foo::MIN_ID)..=(x0, x1, Foo::MAX_ID))
-                        .map(|(x0, x1, x2)| (x2,))
+                fn check2_0_1_2(&self, x0: Foo, x1: Foo) -> bool {
+                    self.iter2_0_1_2(x0, x1).next().is_some()
                 }
                 fn check1_0_1_2(&self, x0: Foo) -> bool {
                     self.iter1_0_1_2(x0).next().is_some()
@@ -555,9 +1890,6 @@ fn test_bind_variable_multiple_times() {
                 }
                 fn check1_2_0_1(&self, x2: Foo) -> bool {
                     self.iter1_2_0_1(x2).next().is_some()
-                }
-                fn check2_0_1_2(&self, x0: Foo, x1: Foo) -> bool {
-                    self.iter2_0_1_2(x0, x1).next().is_some()
                 }
                 #[allow(unreachable_code)]
                 fn entry2_0_1_2(&self, x0: Foo, x1: Foo, delta: &mut Delta, uf: &mut Unification) -> (Foo,) {
@@ -596,6 +1928,7 @@ fn test_bind_variable_multiple_times() {
                         row.1 = uf.foo_.find(row.1);
                         row.2 = uf.foo_.find(row.2);
                     });
+                    self.all_index_0_1_2.filter_existing(&mut inserts);
                     self.all_index_0_1_2
                         .insert_many(&mut inserts, |mut old, mut new| {
                             let (x2,) = old.value_mut();
@@ -781,11 +2114,11 @@ fn test_negative_i64_tokens() {
             g2(i64)
 
             Rule:
-            Premise: g2(p0), Const(p0, p1)
+            Premise: Const(p0, p1), g2(p0)
             __: p0
             a0: p1
             a1: __
-            Insert: Const(a1, a0), g2(a1)
+            Insert: Const(a1, a0).n0, g2(a1).n0
 
         "#]]),
         expected_lir: None,
@@ -812,11 +2145,11 @@ fn codegen_variable_reuse_bug() {
             zero(Math)
 
             Rule:
-            Premise: zero(zero), zero(zero), Add(zero, x, zero)
+            Premise: Add(zero, x, zero), zero(zero), zero(zero)
             __: zero
             __: zero
             x: x
-            Insert: Zero(x)
+            Insert: Zero(x).n0
 
         "#]]),
         expected_lir: Some(expect![[r#"
@@ -836,16 +2169,17 @@ fn codegen_variable_reuse_bug() {
                         kind: Table {
                             index_to_info: {ir0: 0_1_2 conflict[..2] => [2:union], ir1: 0_2_1, ir2: 1_0_2, ir3: 2_0_1},
                             usage_to_info: {
-                                iu0: ir1[..2],
-                                iu1: ir3[..1],
-                                iu2: ir1[..2],
-                                iu3: ir0[..1],
+                                iu0: ir0[..2],
+                                iu1: ir1[..2],
+                                iu2: ir3[..1],
+                                iu3: ir1[..2],
                                 iu4: ir0[..1],
-                                iu5: ir2[..1],
-                                iu6: ir3[..1],
-                                iu7: ir0[..2],
+                                iu5: ir0[..1],
+                                iu6: ir2[..1],
+                                iu7: ir3[..1],
+                                iu8: ir0[..2],
                             },
-                            column_back_reference: {c0: iu4, c1: iu5, c2: iu6},
+                            column_back_reference: {c0: iu5, c1: iu6, c2: iu7},
                         },
                     },
                     r2: RelationData {
@@ -854,10 +2188,11 @@ fn codegen_variable_reuse_bug() {
                         kind: Table {
                             index_to_info: {ir0: 0 conflict[..0] => [0:union]},
                             usage_to_info: {
-                                iu0: ir0[..1],
-                                iu1: ir0[..0],
+                                iu0: ir0[..0],
+                                iu1: ir0[..1],
+                                iu2: ir0[..0],
                             },
-                            column_back_reference: {c0: iu0},
+                            column_back_reference: {c0: iu1},
                         },
                     },
                     r3: RelationData {
@@ -882,27 +2217,24 @@ fn codegen_variable_reuse_bug() {
                 },
                 rule_tries: [
                     meta: "( rule ( ( = zero ( Add zero x ) ) ) ( ( union x ( Zero ) ) ) )"
-                    atom: [PremiseNew, r3(v0)]
+                    atom: [PremiseNew, r1(v1, v2, v0)]
                     then: [
-                        atom: [PremiseAny, r1(v1, v2, v0), iu1]
+                        atom: [PremiseAny, r3(v0), iu_bogus]
                         then: [
-                            atom: [Premise, r3(v1), iu_bogus]
+                            atom: [PremiseAny, r3(v1), iu_bogus]
                             then: [
-                                atom: [Premise, r1(v1, v2, v0), iu0]
-                                then: [
-                                    atom: [Action::Insert, r2(v2)],
-                                ],
+                                atom: [Action::Insert, r2(v2)],
                             ],
                         ],
                     ],
                     meta: "( rule ( ( = zero ( Add zero x ) ) ) ( ( union x ( Zero ) ) ) )"
-                    atom: [PremiseNew, r3(v4)]
+                    atom: [PremiseNew, r3(v3)]
                     then: [
-                        atom: [PremiseAny, r1(v4, v5, v3), iu3]
+                        atom: [PremiseAny, r1(v4, v5, v3), iu2]
                         then: [
-                            atom: [Premise, r3(v3), iu_bogus]
+                            atom: [Premise, r3(v4), iu_bogus]
                             then: [
-                                atom: [Premise, r1(v4, v5, v3), iu2]
+                                atom: [Premise, r1(v4, v5, v3), iu1]
                                 then: [
                                     atom: [Action::Insert, r2(v5)],
                                 ],
@@ -910,13 +2242,16 @@ fn codegen_variable_reuse_bug() {
                         ],
                     ],
                     meta: "( rule ( ( = zero ( Add zero x ) ) ) ( ( union x ( Zero ) ) ) )"
-                    atom: [PremiseNew, r1(v7, v8, v6)]
+                    atom: [PremiseNew, r3(v7)]
                     then: [
-                        atom: [PremiseAny, r3(v7), iu_bogus]
+                        atom: [PremiseAny, r1(v7, v8, v6), iu4]
                         then: [
-                            atom: [PremiseAny, r3(v6), iu_bogus]
+                            atom: [Premise, r3(v6), iu_bogus]
                             then: [
-                                atom: [Action::Insert, r2(v8)],
+                                atom: [Premise, r1(v7, v8, v6), iu3]
+                                then: [
+                                    atom: [Action::Insert, r2(v8)],
+                                ],
                             ],
                         ],
                     ],
@@ -964,6 +2299,11 @@ fn codegen_variable_reuse_bug() {
                 fn iter_new(&self) -> impl Iterator<Item = <Self as Relation>::Row> + use<'_> {
                     self.new.iter().copied()
                 }
+                fn iter2_0_1_2(&self, x0: Math, x1: Math) -> impl Iterator<Item = (Math,)> + use<'_> {
+                    self.all_index_0_1_2
+                        .range((x0, x1, Math::MIN_ID)..=(x0, x1, Math::MAX_ID))
+                        .map(|(x0, x1, x2)| (x2,))
+                }
                 fn iter2_0_2_1(&self, x0: Math, x2: Math) -> impl Iterator<Item = (Math,)> + use<'_> {
                     self.all_index_0_2_1
                         .range((x0, Math::MIN_ID, x2)..=(x0, Math::MAX_ID, x2))
@@ -984,10 +2324,8 @@ fn codegen_variable_reuse_bug() {
                         .range((Math::MIN_ID, x1, Math::MIN_ID)..=(Math::MAX_ID, x1, Math::MAX_ID))
                         .map(|(x0, x1, x2)| (x0, x2))
                 }
-                fn iter2_0_1_2(&self, x0: Math, x1: Math) -> impl Iterator<Item = (Math,)> + use<'_> {
-                    self.all_index_0_1_2
-                        .range((x0, x1, Math::MIN_ID)..=(x0, x1, Math::MAX_ID))
-                        .map(|(x0, x1, x2)| (x2,))
+                fn check2_0_1_2(&self, x0: Math, x1: Math) -> bool {
+                    self.iter2_0_1_2(x0, x1).next().is_some()
                 }
                 fn check2_0_2_1(&self, x0: Math, x2: Math) -> bool {
                     self.iter2_0_2_1(x0, x2).next().is_some()
@@ -1000,9 +2338,6 @@ fn codegen_variable_reuse_bug() {
                 }
                 fn check1_1_0_2(&self, x1: Math) -> bool {
                     self.iter1_1_0_2(x1).next().is_some()
-                }
-                fn check2_0_1_2(&self, x0: Math, x1: Math) -> bool {
-                    self.iter2_0_1_2(x0, x1).next().is_some()
                 }
                 #[allow(unreachable_code)]
                 fn entry2_0_1_2(&self, x0: Math, x1: Math, delta: &mut Delta, uf: &mut Unification) -> (Math,) {
@@ -1043,6 +2378,7 @@ fn codegen_variable_reuse_bug() {
                         row.1 = uf.math_.find(row.1);
                         row.2 = uf.math_.find(row.2);
                     });
+                    self.all_index_0_1_2.filter_existing(&mut inserts);
                     self.all_index_0_1_2
                         .insert_many(&mut inserts, |mut old, mut new| {
                             let (x2,) = old.value_mut();
@@ -1109,27 +2445,19 @@ fn codegen_variable_reuse_bug() {
                 fn iter_new(&self) -> impl Iterator<Item = <Self as Relation>::Row> + use<'_> {
                     self.new.iter().copied()
                 }
-                fn iter1_0(&self, x0: Math) -> impl Iterator<Item = ()> + use<'_> {
-                    self.all_index_0.range((x0,)..=(x0,)).map(|(x0,)| ())
-                }
                 fn iter0_0(&self) -> impl Iterator<Item = (Math,)> + use<'_> {
                     self.all_index_0
                         .range((Math::MIN_ID,)..=(Math::MAX_ID,))
                         .map(|(x0,)| (x0,))
                 }
-                fn check1_0(&self, x0: Math) -> bool {
-                    self.iter1_0(x0).next().is_some()
+                fn iter1_0(&self, x0: Math) -> impl Iterator<Item = ()> + use<'_> {
+                    self.all_index_0.range((x0,)..=(x0,)).map(|(x0,)| ())
                 }
                 fn check0_0(&self) -> bool {
                     self.iter0_0().next().is_some()
                 }
-                #[allow(unreachable_code)]
-                fn entry1_0(&self, x0: Math, delta: &mut Delta, uf: &mut Unification) -> () {
-                    if let Some(()) = self.iter1_0(x0).next() {
-                        return ();
-                    }
-                    delta.zero_.push((x0,));
-                    ()
+                fn check1_0(&self, x0: Math) -> bool {
+                    self.iter1_0(x0).next().is_some()
                 }
                 #[allow(unreachable_code)]
                 fn entry0_0(&self, delta: &mut Delta, uf: &mut Unification) -> (Math,) {
@@ -1139,6 +2467,14 @@ fn codegen_variable_reuse_bug() {
                     let x0 = uf.math_.add_eclass();
                     delta.zero_.push((x0,));
                     (x0,)
+                }
+                #[allow(unreachable_code)]
+                fn entry1_0(&self, x0: Math, delta: &mut Delta, uf: &mut Unification) -> () {
+                    if let Some(()) = self.iter1_0(x0).next() {
+                        return ();
+                    }
+                    delta.zero_.push((x0,));
+                    ()
                 }
                 fn update(&mut self, uf: &mut Unification, delta: &mut Delta) {
                     let mut inserts = take(&mut delta.zero_);
@@ -1153,6 +2489,7 @@ fn codegen_variable_reuse_bug() {
                     inserts.iter_mut().for_each(|row| {
                         row.0 = uf.math_.find(row.0);
                     });
+                    self.all_index_0.filter_existing(&mut inserts);
                     self.all_index_0
                         .insert_many(&mut inserts, |mut old, mut new| {
                             let (x0,) = old.value_mut();
@@ -1255,27 +2592,27 @@ fn codegen_variable_reuse_bug() {
                 #[inline(never)]
                 pub fn apply_rules(&mut self) {
                     #[doc = "( rule ( ( = zero ( Add zero x ) ) ) ( ( union x ( Zero ) ) ) )"]
-                    if let Some(zero) = self.global_math.get_new(0usize) {
-                        if self.add_.check1_2_0_1(zero) {
-                            let zero_2 = self.global_math.get(0usize);
-                            for (x,) in self.add_.iter2_0_2_1(zero_2, zero) {
+                    for (zero_2, x, zero) in self.add_.iter_new() {
+                        if zero == self.global_math.get(0usize) {
+                            if zero_2 == self.global_math.get(0usize) {
                                 self.delta.insert_zero((x,));
                             }
                         }
                     }
                     #[doc = "( rule ( ( = zero ( Add zero x ) ) ) ( ( union x ( Zero ) ) ) )"]
-                    if let Some(zero_4) = self.global_math.get_new(0usize) {
-                        if self.add_.check1_0_1_2(zero_4) {
-                            let zero_3 = self.global_math.get(0usize);
+                    if let Some(zero_3) = self.global_math.get_new(0usize) {
+                        if self.add_.check1_2_0_1(zero_3) {
+                            let zero_4 = self.global_math.get(0usize);
                             for (x_2,) in self.add_.iter2_0_2_1(zero_4, zero_3) {
                                 self.delta.insert_zero((x_2,));
                             }
                         }
                     }
                     #[doc = "( rule ( ( = zero ( Add zero x ) ) ) ( ( union x ( Zero ) ) ) )"]
-                    for (zero_6, x_3, zero_5) in self.add_.iter_new() {
-                        if zero_6 == self.global_math.get(0usize) {
-                            if zero_5 == self.global_math.get(0usize) {
+                    if let Some(zero_6) = self.global_math.get_new(0usize) {
+                        if self.add_.check1_0_1_2(zero_6) {
+                            let zero_5 = self.global_math.get(0usize);
+                            for (x_3,) in self.add_.iter2_0_2_1(zero_6, zero_5) {
                                 self.delta.insert_zero((x_3,));
                             }
                         }
@@ -1405,6 +2742,11 @@ fn initial_exprs() {
                 fn iter_new(&self) -> impl Iterator<Item = <Self as Relation>::Row> + use<'_> {
                     self.new.iter().copied()
                 }
+                fn iter2_0_1_2(&self, x0: Math, x1: Math) -> impl Iterator<Item = (Math,)> + use<'_> {
+                    self.all_index_0_1_2
+                        .range((x0, x1, Math::MIN_ID)..=(x0, x1, Math::MAX_ID))
+                        .map(|(x0, x1, x2)| (x2,))
+                }
                 fn iter1_0_1_2(&self, x0: Math) -> impl Iterator<Item = (Math, Math)> + use<'_> {
                     self.all_index_0_1_2
                         .range((x0, Math::MIN_ID, Math::MIN_ID)..=(x0, Math::MAX_ID, Math::MAX_ID))
@@ -1420,10 +2762,8 @@ fn initial_exprs() {
                         .range((Math::MIN_ID, Math::MIN_ID, x2)..=(Math::MAX_ID, Math::MAX_ID, x2))
                         .map(|(x0, x1, x2)| (x0, x1))
                 }
-                fn iter2_0_1_2(&self, x0: Math, x1: Math) -> impl Iterator<Item = (Math,)> + use<'_> {
-                    self.all_index_0_1_2
-                        .range((x0, x1, Math::MIN_ID)..=(x0, x1, Math::MAX_ID))
-                        .map(|(x0, x1, x2)| (x2,))
+                fn check2_0_1_2(&self, x0: Math, x1: Math) -> bool {
+                    self.iter2_0_1_2(x0, x1).next().is_some()
                 }
                 fn check1_0_1_2(&self, x0: Math) -> bool {
                     self.iter1_0_1_2(x0).next().is_some()
@@ -1433,9 +2773,6 @@ fn initial_exprs() {
                 }
                 fn check1_2_0_1(&self, x2: Math) -> bool {
                     self.iter1_2_0_1(x2).next().is_some()
-                }
-                fn check2_0_1_2(&self, x0: Math, x1: Math) -> bool {
-                    self.iter2_0_1_2(x0, x1).next().is_some()
                 }
                 #[allow(unreachable_code)]
                 fn entry2_0_1_2(&self, x0: Math, x1: Math, delta: &mut Delta, uf: &mut Unification) -> (Math,) {
@@ -1474,6 +2811,7 @@ fn initial_exprs() {
                         row.1 = uf.math_.find(row.1);
                         row.2 = uf.math_.find(row.2);
                     });
+                    self.all_index_0_1_2.filter_existing(&mut inserts);
                     self.all_index_0_1_2
                         .insert_many(&mut inserts, |mut old, mut new| {
                             let (x2,) = old.value_mut();
@@ -1540,6 +2878,11 @@ fn initial_exprs() {
                 fn iter_new(&self) -> impl Iterator<Item = <Self as Relation>::Row> + use<'_> {
                     self.new.iter().copied()
                 }
+                fn iter2_0_1_2(&self, x0: Math, x1: Math) -> impl Iterator<Item = (Math,)> + use<'_> {
+                    self.all_index_0_1_2
+                        .range((x0, x1, Math::MIN_ID)..=(x0, x1, Math::MAX_ID))
+                        .map(|(x0, x1, x2)| (x2,))
+                }
                 fn iter1_0_1_2(&self, x0: Math) -> impl Iterator<Item = (Math, Math)> + use<'_> {
                     self.all_index_0_1_2
                         .range((x0, Math::MIN_ID, Math::MIN_ID)..=(x0, Math::MAX_ID, Math::MAX_ID))
@@ -1555,10 +2898,8 @@ fn initial_exprs() {
                         .range((Math::MIN_ID, Math::MIN_ID, x2)..=(Math::MAX_ID, Math::MAX_ID, x2))
                         .map(|(x0, x1, x2)| (x0, x1))
                 }
-                fn iter2_0_1_2(&self, x0: Math, x1: Math) -> impl Iterator<Item = (Math,)> + use<'_> {
-                    self.all_index_0_1_2
-                        .range((x0, x1, Math::MIN_ID)..=(x0, x1, Math::MAX_ID))
-                        .map(|(x0, x1, x2)| (x2,))
+                fn check2_0_1_2(&self, x0: Math, x1: Math) -> bool {
+                    self.iter2_0_1_2(x0, x1).next().is_some()
                 }
                 fn check1_0_1_2(&self, x0: Math) -> bool {
                     self.iter1_0_1_2(x0).next().is_some()
@@ -1568,9 +2909,6 @@ fn initial_exprs() {
                 }
                 fn check1_2_0_1(&self, x2: Math) -> bool {
                     self.iter1_2_0_1(x2).next().is_some()
-                }
-                fn check2_0_1_2(&self, x0: Math, x1: Math) -> bool {
-                    self.iter2_0_1_2(x0, x1).next().is_some()
                 }
                 #[allow(unreachable_code)]
                 fn entry2_0_1_2(&self, x0: Math, x1: Math, delta: &mut Delta, uf: &mut Unification) -> (Math,) {
@@ -1609,6 +2947,7 @@ fn initial_exprs() {
                         row.1 = uf.math_.find(row.1);
                         row.2 = uf.math_.find(row.2);
                     });
+                    self.all_index_0_1_2.filter_existing(&mut inserts);
                     self.all_index_0_1_2
                         .insert_many(&mut inserts, |mut old, mut new| {
                             let (x2,) = old.value_mut();
@@ -1718,6 +3057,7 @@ fn initial_exprs() {
                     inserts.iter_mut().for_each(|row| {
                         row.1 = uf.math_.find(row.1);
                     });
+                    self.all_index_0_1.filter_existing(&mut inserts);
                     self.all_index_0_1
                         .insert_many(&mut inserts, |mut old, mut new| {
                             let (x1,) = old.value_mut();
@@ -1813,6 +3153,7 @@ fn initial_exprs() {
                     inserts.iter_mut().for_each(|row| {
                         row.1 = uf.math_.find(row.1);
                     });
+                    self.all_index_0_1.filter_existing(&mut inserts);
                     self.all_index_0_1
                         .insert_many(&mut inserts, |mut old, mut new| {
                             let (x1,) = old.value_mut();
@@ -2351,6 +3692,7 @@ fn codegen_bug1() {
                         row.1 = uf.t1_.find(row.1);
                         row.2 = uf.t2_.find(row.2);
                     });
+                    self.all_index_0_1_2.filter_existing(&mut inserts);
                     self.all_index_0_1_2
                         .insert_many(&mut inserts, |_, _| unreachable!());
                     self.all_index_1_0_2
@@ -2614,6 +3956,7 @@ fn initial() {
                     inserts.iter_mut().for_each(|row| {
                         row.1 = uf.math_.find(row.1);
                     });
+                    self.all_index_0_1.filter_existing(&mut inserts);
                     self.all_index_0_1
                         .insert_many(&mut inserts, |mut old, mut new| {
                             let (x1,) = old.value_mut();
@@ -2794,34 +4137,34 @@ fn test_primitives_simple() {
             g5(i64)
 
             Rule:
-            Premise: one(one), Const(one, p1)
+            Premise: Const(one, p1), one(one)
             __: one
             a0: p1
             x: __
-            Insert: Add(x, x, a0)
+            Insert: Add(x, x, a0).n0
 
             Rule:
-            Premise: g0(p0), Const(p0, p1)
+            Premise: Const(p0, p1), g0(p0)
             __: p0
             a0: p1
             z: __
-            Insert: Add(z, z, a0)
+            Insert: Add(z, z, a0).n0
 
             Rule:
-            Premise: g3(p0), Var(p0, p1)
+            Premise: Var(p0, p1), g3(p0)
             __: p0
             a0: p1
             a1: __
-            Insert: Var(a1, a0), g4(a1)
+            Insert: Var(a1, a0).n0, g4(a1).n0
 
             Rule:
-            Premise: g5(p1), Const(p1, p2), Mul(a, p2, p3)
+            Premise: Mul(a, p2, p3), Const(p1, p2), g5(p1)
             __: a
             __: p1
             __: p2
             a0: p3
             a1: __
-            Insert: Const(a1, a0), g5(a1)
+            Insert: Const(a1, a0).n0, g5(a1).n0
 
         "#]]),
         expected_lir: None,
@@ -2857,6 +4200,11 @@ fn test_primitives_simple() {
                 fn iter_new(&self) -> impl Iterator<Item = <Self as Relation>::Row> + use<'_> {
                     self.new.iter().copied()
                 }
+                fn iter2_0_1_2(&self, x0: Math, x1: Math) -> impl Iterator<Item = (Math,)> + use<'_> {
+                    self.all_index_0_1_2
+                        .range((x0, x1, Math::MIN_ID)..=(x0, x1, Math::MAX_ID))
+                        .map(|(x0, x1, x2)| (x2,))
+                }
                 fn iter1_1_0_2(&self, x1: Math) -> impl Iterator<Item = (Math, Math)> + use<'_> {
                     self.all_index_1_0_2
                         .range((Math::MIN_ID, x1, Math::MIN_ID)..=(Math::MAX_ID, x1, Math::MAX_ID))
@@ -2872,10 +4220,8 @@ fn test_primitives_simple() {
                         .range((Math::MIN_ID, Math::MIN_ID, x2)..=(Math::MAX_ID, Math::MAX_ID, x2))
                         .map(|(x0, x1, x2)| (x0, x1))
                 }
-                fn iter2_0_1_2(&self, x0: Math, x1: Math) -> impl Iterator<Item = (Math,)> + use<'_> {
-                    self.all_index_0_1_2
-                        .range((x0, x1, Math::MIN_ID)..=(x0, x1, Math::MAX_ID))
-                        .map(|(x0, x1, x2)| (x2,))
+                fn check2_0_1_2(&self, x0: Math, x1: Math) -> bool {
+                    self.iter2_0_1_2(x0, x1).next().is_some()
                 }
                 fn check1_1_0_2(&self, x1: Math) -> bool {
                     self.iter1_1_0_2(x1).next().is_some()
@@ -2885,9 +4231,6 @@ fn test_primitives_simple() {
                 }
                 fn check1_2_0_1(&self, x2: Math) -> bool {
                     self.iter1_2_0_1(x2).next().is_some()
-                }
-                fn check2_0_1_2(&self, x0: Math, x1: Math) -> bool {
-                    self.iter2_0_1_2(x0, x1).next().is_some()
                 }
                 #[allow(unreachable_code)]
                 fn entry2_0_1_2(&self, x0: Math, x1: Math, delta: &mut Delta, uf: &mut Unification) -> (Math,) {
@@ -2926,6 +4269,7 @@ fn test_primitives_simple() {
                         row.1 = uf.math_.find(row.1);
                         row.2 = uf.math_.find(row.2);
                     });
+                    self.all_index_0_1_2.filter_existing(&mut inserts);
                     self.all_index_0_1_2
                         .insert_many(&mut inserts, |mut old, mut new| {
                             let (x2,) = old.value_mut();
@@ -2992,6 +4336,11 @@ fn test_primitives_simple() {
                 fn iter_new(&self) -> impl Iterator<Item = <Self as Relation>::Row> + use<'_> {
                     self.new.iter().copied()
                 }
+                fn iter2_0_1_2(&self, x0: Math, x1: Math) -> impl Iterator<Item = (Math,)> + use<'_> {
+                    self.all_index_0_1_2
+                        .range((x0, x1, Math::MIN_ID)..=(x0, x1, Math::MAX_ID))
+                        .map(|(x0, x1, x2)| (x2,))
+                }
                 fn iter1_0_1_2(&self, x0: Math) -> impl Iterator<Item = (Math, Math)> + use<'_> {
                     self.all_index_0_1_2
                         .range((x0, Math::MIN_ID, Math::MIN_ID)..=(x0, Math::MAX_ID, Math::MAX_ID))
@@ -3007,10 +4356,8 @@ fn test_primitives_simple() {
                         .range((Math::MIN_ID, Math::MIN_ID, x2)..=(Math::MAX_ID, Math::MAX_ID, x2))
                         .map(|(x0, x1, x2)| (x0, x1))
                 }
-                fn iter2_0_1_2(&self, x0: Math, x1: Math) -> impl Iterator<Item = (Math,)> + use<'_> {
-                    self.all_index_0_1_2
-                        .range((x0, x1, Math::MIN_ID)..=(x0, x1, Math::MAX_ID))
-                        .map(|(x0, x1, x2)| (x2,))
+                fn check2_0_1_2(&self, x0: Math, x1: Math) -> bool {
+                    self.iter2_0_1_2(x0, x1).next().is_some()
                 }
                 fn check1_0_1_2(&self, x0: Math) -> bool {
                     self.iter1_0_1_2(x0).next().is_some()
@@ -3020,9 +4367,6 @@ fn test_primitives_simple() {
                 }
                 fn check1_2_0_1(&self, x2: Math) -> bool {
                     self.iter1_2_0_1(x2).next().is_some()
-                }
-                fn check2_0_1_2(&self, x0: Math, x1: Math) -> bool {
-                    self.iter2_0_1_2(x0, x1).next().is_some()
                 }
                 #[allow(unreachable_code)]
                 fn entry2_0_1_2(&self, x0: Math, x1: Math, delta: &mut Delta, uf: &mut Unification) -> (Math,) {
@@ -3061,6 +4405,7 @@ fn test_primitives_simple() {
                         row.1 = uf.math_.find(row.1);
                         row.2 = uf.math_.find(row.2);
                     });
+                    self.all_index_0_1_2.filter_existing(&mut inserts);
                     self.all_index_0_1_2
                         .insert_many(&mut inserts, |mut old, mut new| {
                             let (x2,) = old.value_mut();
@@ -3192,6 +4537,7 @@ fn test_primitives_simple() {
                     inserts.iter_mut().for_each(|row| {
                         row.1 = uf.math_.find(row.1);
                     });
+                    self.all_index_0_1.filter_existing(&mut inserts);
                     self.all_index_0_1
                         .insert_many(&mut inserts, |mut old, mut new| {
                             let (x1,) = old.value_mut();
@@ -3287,6 +4633,7 @@ fn test_primitives_simple() {
                     inserts.iter_mut().for_each(|row| {
                         row.1 = uf.math_.find(row.1);
                     });
+                    self.all_index_0_1.filter_existing(&mut inserts);
                     self.all_index_0_1
                         .insert_many(&mut inserts, |mut old, mut new| {
                             let (x1,) = old.value_mut();
@@ -3412,51 +4759,52 @@ fn test_primitives_simple() {
                 #[inline(never)]
                 pub fn apply_rules(&mut self) {
                     #[doc = "( rewrite ( Const one ) ( Add x x ) )"]
-                    if let Some(one) = self.global_i64.get_new(1usize) {
-                        for (p1,) in self.const_.iter1_0_1(one) {
+                    for (one, p1) in self.const_.iter_new() {
+                        if one == self.global_i64.get(1usize) {
                             let x = self.uf.math_.add_eclass();
                             self.delta.insert_add((x, x, p1));
                         }
                     }
                     #[doc = "( rewrite ( Const one ) ( Add x x ) )"]
-                    for (one_2, p1_2) in self.const_.iter_new() {
-                        if one_2 == self.global_i64.get(1usize) {
+                    if let Some(one_2) = self.global_i64.get_new(1usize) {
+                        for (p1_2,) in self.const_.iter1_0_1(one_2) {
                             let x_2 = self.uf.math_.add_eclass();
                             self.delta.insert_add((x_2, x_2, p1_2));
                         }
                     }
                     #[doc = "( rewrite ( Const 2 ) ( Add z z ) )"]
-                    if let Some(p0) = self.global_i64.get_new(0usize) {
-                        for (p1_3,) in self.const_.iter1_0_1(p0) {
+                    for (p0, p1_3) in self.const_.iter_new() {
+                        if p0 == self.global_i64.get(0usize) {
                             let z = self.uf.math_.add_eclass();
                             self.delta.insert_add((z, z, p1_3));
                         }
                     }
                     #[doc = "( rewrite ( Const 2 ) ( Add z z ) )"]
-                    for (p0_2, p1_4) in self.const_.iter_new() {
-                        if p0_2 == self.global_i64.get(0usize) {
+                    if let Some(p0_2) = self.global_i64.get_new(0usize) {
+                        for (p1_4,) in self.const_.iter1_0_1(p0_2) {
                             let z_2 = self.uf.math_.add_eclass();
                             self.delta.insert_add((z_2, z_2, p1_4));
                         }
                     }
                     #[doc = "( rewrite ( Var \"x\" ) ( Var \"y\" ) )"]
-                    if let Some(p0_3) = self.global_string.get_new(0usize) {
-                        for (p1_5,) in self.var_.iter1_0_1(p0_3) {
+                    for (p0_3, p1_5) in self.var_.iter_new() {
+                        if p0_3 == self.global_string.get(0usize) {
                             let a1 = self.global_string.get(1usize);
                             self.delta.insert_var((a1, p1_5));
                         }
                     }
                     #[doc = "( rewrite ( Var \"x\" ) ( Var \"y\" ) )"]
-                    for (p0_4, p1_6) in self.var_.iter_new() {
-                        if p0_4 == self.global_string.get(0usize) {
+                    if let Some(p0_4) = self.global_string.get_new(0usize) {
+                        for (p1_6,) in self.var_.iter1_0_1(p0_4) {
                             let a1_2 = self.global_string.get(1usize);
                             self.delta.insert_var((a1_2, p1_6));
                         }
                     }
                     #[doc = "( rewrite ( Mul a ( Const 0 ) ) ( Const 0 ) )"]
-                    if let Some(p1_7) = self.global_i64.get_new(2usize) {
-                        for (p2,) in self.const_.iter1_0_1(p1_7) {
-                            for (a, p3) in self.mul_.iter1_1_0_2(p2) {
+                    for (a, p2, p3) in self.mul_.iter_new() {
+                        if self.const_.check1_1_0(p2) {
+                            let p1_7 = self.global_i64.get(2usize);
+                            if self.const_.check2_0_1(p1_7, p2) {
                                 let a1_3 = self.global_i64.get(2usize);
                                 self.delta.insert_const((a1_3, p3));
                             }
@@ -3472,10 +4820,9 @@ fn test_primitives_simple() {
                         }
                     }
                     #[doc = "( rewrite ( Mul a ( Const 0 ) ) ( Const 0 ) )"]
-                    for (a_3, p2_3, p3_3) in self.mul_.iter_new() {
-                        if self.const_.check1_1_0(p2_3) {
-                            let p1_9 = self.global_i64.get(2usize);
-                            if self.const_.check2_0_1(p1_9, p2_3) {
+                    if let Some(p1_9) = self.global_i64.get_new(2usize) {
+                        for (p2_3,) in self.const_.iter1_0_1(p1_9) {
+                            for (a_3, p3_3) in self.mul_.iter1_1_0_2(p2_3) {
                                 let a1_5 = self.global_i64.get(2usize);
                                 self.delta.insert_const((a1_5, p3_3));
                             }
@@ -3590,7 +4937,7 @@ fn triangle_join() {
             a: a
             b: b
             c: c
-            Insert: Triangle(a, b, c)
+            Insert: Triangle(a, b, c)._
 
         "#]]),
         expected_lir: None,
@@ -3676,6 +5023,7 @@ fn triangle_join() {
                         row.0 = uf.math_.find(row.0);
                         row.1 = uf.math_.find(row.1);
                     });
+                    self.all_index_0_1.filter_existing(&mut inserts);
                     self.all_index_0_1
                         .insert_many(&mut inserts, |_, _| unreachable!());
                     self.all_index_1_0
@@ -3765,6 +5113,7 @@ fn triangle_join() {
                         row.0 = uf.math_.find(row.0);
                         row.1 = uf.math_.find(row.1);
                     });
+                    self.all_index_0_1.filter_existing(&mut inserts);
                     self.all_index_0_1
                         .insert_many(&mut inserts, |_, _| unreachable!());
                     self.all_index_1_0
@@ -3870,6 +5219,7 @@ fn triangle_join() {
                         row.0 = uf.math_.find(row.0);
                         row.1 = uf.math_.find(row.1);
                     });
+                    self.all_index_0_1.filter_existing(&mut inserts);
                     self.all_index_0_1
                         .insert_many(&mut inserts, |_, _| unreachable!());
                     self.all_index_1_0
@@ -3977,6 +5327,7 @@ fn triangle_join() {
                         row.1 = uf.math_.find(row.1);
                         row.2 = uf.math_.find(row.2);
                     });
+                    self.all_index_0_1_2.filter_existing(&mut inserts);
                     self.all_index_0_1_2
                         .insert_many(&mut inserts, |_, _| unreachable!());
                     self.all_index_1_0_2
@@ -4225,7 +5576,7 @@ fn edgecase0() {
             __: p4
             a3: p5
             a4: __
-            Insert: Mul(a, a4, a3), Add(b, c, a4)
+            Insert: Mul(a, a4, a3).n0, Add(b, c, a4).n0
 
         "#]]),
         expected_lir: None,
@@ -4261,6 +5612,11 @@ fn edgecase0() {
                 fn iter_new(&self) -> impl Iterator<Item = <Self as Relation>::Row> + use<'_> {
                     self.new.iter().copied()
                 }
+                fn iter2_0_1_2(&self, x0: Math, x1: Math) -> impl Iterator<Item = (Math,)> + use<'_> {
+                    self.all_index_0_1_2
+                        .range((x0, x1, Math::MIN_ID)..=(x0, x1, Math::MAX_ID))
+                        .map(|(x0, x1, x2)| (x2,))
+                }
                 fn iter1_0_1_2(&self, x0: Math) -> impl Iterator<Item = (Math, Math)> + use<'_> {
                     self.all_index_0_1_2
                         .range((x0, Math::MIN_ID, Math::MIN_ID)..=(x0, Math::MAX_ID, Math::MAX_ID))
@@ -4281,10 +5637,8 @@ fn edgecase0() {
                         .range((Math::MIN_ID, x1, Math::MIN_ID)..=(Math::MAX_ID, x1, Math::MAX_ID))
                         .map(|(x0, x1, x2)| (x0, x2))
                 }
-                fn iter2_0_1_2(&self, x0: Math, x1: Math) -> impl Iterator<Item = (Math,)> + use<'_> {
-                    self.all_index_0_1_2
-                        .range((x0, x1, Math::MIN_ID)..=(x0, x1, Math::MAX_ID))
-                        .map(|(x0, x1, x2)| (x2,))
+                fn check2_0_1_2(&self, x0: Math, x1: Math) -> bool {
+                    self.iter2_0_1_2(x0, x1).next().is_some()
                 }
                 fn check1_0_1_2(&self, x0: Math) -> bool {
                     self.iter1_0_1_2(x0).next().is_some()
@@ -4297,9 +5651,6 @@ fn edgecase0() {
                 }
                 fn check1_1_0_2(&self, x1: Math) -> bool {
                     self.iter1_1_0_2(x1).next().is_some()
-                }
-                fn check2_0_1_2(&self, x0: Math, x1: Math) -> bool {
-                    self.iter2_0_1_2(x0, x1).next().is_some()
                 }
                 #[allow(unreachable_code)]
                 fn entry2_0_1_2(&self, x0: Math, x1: Math, delta: &mut Delta, uf: &mut Unification) -> (Math,) {
@@ -4340,6 +5691,7 @@ fn edgecase0() {
                         row.1 = uf.math_.find(row.1);
                         row.2 = uf.math_.find(row.2);
                     });
+                    self.all_index_0_1_2.filter_existing(&mut inserts);
                     self.all_index_0_1_2
                         .insert_many(&mut inserts, |mut old, mut new| {
                             let (x2,) = old.value_mut();
@@ -4477,6 +5829,7 @@ fn edgecase0() {
                         row.1 = uf.math_.find(row.1);
                         row.2 = uf.math_.find(row.2);
                     });
+                    self.all_index_0_1_2.filter_existing(&mut inserts);
                     self.all_index_0_1_2
                         .insert_many(&mut inserts, |mut old, mut new| {
                             let (x2,) = old.value_mut();
@@ -4588,8 +5941,7 @@ fn edgecase0() {
                         if self.add_.check1_0_1_2(p2) {
                             for (c, p4) in self.mul_.iter1_0_1_2(a) {
                                 for (p5,) in self.add_.iter2_0_1_2(p2, p4) {
-                                    let a4 = self.uf.math_.add_eclass();
-                                    self.delta.insert_add((b, c, a4));
+                                    let (a4,) = self.add_.entry2_0_1_2(b, c, &mut self.delta, &mut self.uf);
                                     self.delta.insert_mul((a, a4, p5));
                                 }
                             }
@@ -4600,8 +5952,9 @@ fn edgecase0() {
                         if self.mul_.check1_0_1_2(a_2) {
                             for (p2_2, p5_2) in self.add_.iter1_1_0_2(p4_2) {
                                 for (b_2,) in self.mul_.iter2_0_2_1(a_2, p2_2) {
-                                    let a4_2 = self.uf.math_.add_eclass();
-                                    self.delta.insert_add((b_2, c_2, a4_2));
+                                    let (a4_2,) =
+                                        self.add_
+                                            .entry2_0_1_2(b_2, c_2, &mut self.delta, &mut self.uf);
                                     self.delta.insert_mul((a_2, a4_2, p5_2));
                                 }
                             }
@@ -4612,8 +5965,9 @@ fn edgecase0() {
                         if self.mul_.check1_2_0_1(p2_3) {
                             for (a_3, c_3) in self.mul_.iter1_2_0_1(p4_3) {
                                 for (b_3,) in self.mul_.iter2_0_2_1(a_3, p2_3) {
-                                    let a4_3 = self.uf.math_.add_eclass();
-                                    self.delta.insert_add((b_3, c_3, a4_3));
+                                    let (a4_3,) =
+                                        self.add_
+                                            .entry2_0_1_2(b_3, c_3, &mut self.delta, &mut self.uf);
                                     self.delta.insert_mul((a_3, a4_3, p5_3));
                                 }
                             }
@@ -4694,7 +6048,7 @@ fn test_into_codegen() {
             Add(Math, Math, Math)
 
             Rule:
-            Premise: Add(a, b, p2), Mul(p2, c, p4)
+            Premise: Mul(p2, c, p4), Add(a, b, p2)
             a: a
             b: b
             __: p2
@@ -4702,7 +6056,7 @@ fn test_into_codegen() {
             a3: p4
             a4: __
             a5: __
-            Insert: Mul(a, c, a4), Mul(b, c, a5), Add(a4, a5, a3)
+            Insert: Mul(a, c, a4).n0, Mul(b, c, a5).n0, Add(a4, a5, a3).n0
 
         "#]]),
         expected_lir: None,
@@ -4736,6 +6090,11 @@ fn test_into_codegen() {
                 fn iter_new(&self) -> impl Iterator<Item = <Self as Relation>::Row> + use<'_> {
                     self.new.iter().copied()
                 }
+                fn iter2_0_1_2(&self, x0: Math, x1: Math) -> impl Iterator<Item = (Math,)> + use<'_> {
+                    self.all_index_0_1_2
+                        .range((x0, x1, Math::MIN_ID)..=(x0, x1, Math::MAX_ID))
+                        .map(|(x0, x1, x2)| (x2,))
+                }
                 fn iter1_0_1_2(&self, x0: Math) -> impl Iterator<Item = (Math, Math)> + use<'_> {
                     self.all_index_0_1_2
                         .range((x0, Math::MIN_ID, Math::MIN_ID)..=(x0, Math::MAX_ID, Math::MAX_ID))
@@ -4751,10 +6110,8 @@ fn test_into_codegen() {
                         .range((Math::MIN_ID, Math::MIN_ID, x2)..=(Math::MAX_ID, Math::MAX_ID, x2))
                         .map(|(x0, x1, x2)| (x0, x1))
                 }
-                fn iter2_0_1_2(&self, x0: Math, x1: Math) -> impl Iterator<Item = (Math,)> + use<'_> {
-                    self.all_index_0_1_2
-                        .range((x0, x1, Math::MIN_ID)..=(x0, x1, Math::MAX_ID))
-                        .map(|(x0, x1, x2)| (x2,))
+                fn check2_0_1_2(&self, x0: Math, x1: Math) -> bool {
+                    self.iter2_0_1_2(x0, x1).next().is_some()
                 }
                 fn check1_0_1_2(&self, x0: Math) -> bool {
                     self.iter1_0_1_2(x0).next().is_some()
@@ -4764,9 +6121,6 @@ fn test_into_codegen() {
                 }
                 fn check1_2_0_1(&self, x2: Math) -> bool {
                     self.iter1_2_0_1(x2).next().is_some()
-                }
-                fn check2_0_1_2(&self, x0: Math, x1: Math) -> bool {
-                    self.iter2_0_1_2(x0, x1).next().is_some()
                 }
                 #[allow(unreachable_code)]
                 fn entry2_0_1_2(&self, x0: Math, x1: Math, delta: &mut Delta, uf: &mut Unification) -> (Math,) {
@@ -4805,6 +6159,7 @@ fn test_into_codegen() {
                         row.1 = uf.math_.find(row.1);
                         row.2 = uf.math_.find(row.2);
                     });
+                    self.all_index_0_1_2.filter_existing(&mut inserts);
                     self.all_index_0_1_2
                         .insert_many(&mut inserts, |mut old, mut new| {
                             let (x2,) = old.value_mut();
@@ -4871,6 +6226,11 @@ fn test_into_codegen() {
                 fn iter_new(&self) -> impl Iterator<Item = <Self as Relation>::Row> + use<'_> {
                     self.new.iter().copied()
                 }
+                fn iter2_0_1_2(&self, x0: Math, x1: Math) -> impl Iterator<Item = (Math,)> + use<'_> {
+                    self.all_index_0_1_2
+                        .range((x0, x1, Math::MIN_ID)..=(x0, x1, Math::MAX_ID))
+                        .map(|(x0, x1, x2)| (x2,))
+                }
                 fn iter1_2_0_1(&self, x2: Math) -> impl Iterator<Item = (Math, Math)> + use<'_> {
                     self.all_index_2_0_1
                         .range((Math::MIN_ID, Math::MIN_ID, x2)..=(Math::MAX_ID, Math::MAX_ID, x2))
@@ -4886,10 +6246,8 @@ fn test_into_codegen() {
                         .range((Math::MIN_ID, x1, Math::MIN_ID)..=(Math::MAX_ID, x1, Math::MAX_ID))
                         .map(|(x0, x1, x2)| (x0, x2))
                 }
-                fn iter2_0_1_2(&self, x0: Math, x1: Math) -> impl Iterator<Item = (Math,)> + use<'_> {
-                    self.all_index_0_1_2
-                        .range((x0, x1, Math::MIN_ID)..=(x0, x1, Math::MAX_ID))
-                        .map(|(x0, x1, x2)| (x2,))
+                fn check2_0_1_2(&self, x0: Math, x1: Math) -> bool {
+                    self.iter2_0_1_2(x0, x1).next().is_some()
                 }
                 fn check1_2_0_1(&self, x2: Math) -> bool {
                     self.iter1_2_0_1(x2).next().is_some()
@@ -4899,9 +6257,6 @@ fn test_into_codegen() {
                 }
                 fn check1_1_0_2(&self, x1: Math) -> bool {
                     self.iter1_1_0_2(x1).next().is_some()
-                }
-                fn check2_0_1_2(&self, x0: Math, x1: Math) -> bool {
-                    self.iter2_0_1_2(x0, x1).next().is_some()
                 }
                 #[allow(unreachable_code)]
                 fn entry2_0_1_2(&self, x0: Math, x1: Math, delta: &mut Delta, uf: &mut Unification) -> (Math,) {
@@ -4940,6 +6295,7 @@ fn test_into_codegen() {
                         row.1 = uf.math_.find(row.1);
                         row.2 = uf.math_.find(row.2);
                     });
+                    self.all_index_0_1_2.filter_existing(&mut inserts);
                     self.all_index_0_1_2
                         .insert_many(&mut inserts, |mut old, mut new| {
                             let (x2,) = old.value_mut();
@@ -5047,23 +6403,23 @@ fn test_into_codegen() {
                 #[inline(never)]
                 pub fn apply_rules(&mut self) {
                     #[doc = "( rewrite ( Mul ( Add a b ) c ) ( Add ( Mul a c ) ( Mul b c ) ) )"]
-                    for (a, b, p2) in self.add_.iter_new() {
-                        for (c, p4) in self.mul_.iter1_0_1_2(p2) {
-                            let a5 = self.uf.math_.add_eclass();
-                            let a4 = self.uf.math_.add_eclass();
+                    for (p2, c, p4) in self.mul_.iter_new() {
+                        for (a, b) in self.add_.iter1_2_0_1(p2) {
+                            let (a4,) = self.mul_.entry2_0_1_2(a, c, &mut self.delta, &mut self.uf);
+                            let (a5,) = self.mul_.entry2_0_1_2(b, c, &mut self.delta, &mut self.uf);
                             self.delta.insert_add((a4, a5, p4));
-                            self.delta.insert_mul((b, c, a5));
-                            self.delta.insert_mul((a, c, a4));
                         }
                     }
                     #[doc = "( rewrite ( Mul ( Add a b ) c ) ( Add ( Mul a c ) ( Mul b c ) ) )"]
-                    for (p2_2, c_2, p4_2) in self.mul_.iter_new() {
-                        for (a_2, b_2) in self.add_.iter1_2_0_1(p2_2) {
-                            let a5_2 = self.uf.math_.add_eclass();
-                            let a4_2 = self.uf.math_.add_eclass();
+                    for (a_2, b_2, p2_2) in self.add_.iter_new() {
+                        for (c_2, p4_2) in self.mul_.iter1_0_1_2(p2_2) {
+                            let (a4_2,) = self
+                                .mul_
+                                .entry2_0_1_2(a_2, c_2, &mut self.delta, &mut self.uf);
+                            let (a5_2,) = self
+                                .mul_
+                                .entry2_0_1_2(b_2, c_2, &mut self.delta, &mut self.uf);
                             self.delta.insert_add((a4_2, a5_2, p4_2));
-                            self.delta.insert_mul((b_2, c_2, a5_2));
-                            self.delta.insert_mul((a_2, c_2, a4_2));
                         }
                     }
                 }

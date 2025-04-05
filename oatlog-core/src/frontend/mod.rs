@@ -388,6 +388,7 @@ impl Parser {
             initial: self.initial.clone(),
             interner: self.interner.clone(),
         }
+        .optimize()
     }
 
     // TODO: parse to AST + forward declarations here
@@ -1395,8 +1396,11 @@ mod compile_rule {
                 .map(|(relation, mut args, ret)| {
                     if type_uf.0[ret].expect("unresolved type") != unit_ty {
                         args.push(ret);
+                        // to test without entry: matches!(parser.relations_hir_and_func[relation].0.ty, hir::RelationTy::Global { .. })
+                        (relation, args, true)
+                    } else {
+                        (relation, args, false)
                     }
-                    (relation, args)
                 })
                 .collect(),
             action_unify: action_union.iter().map(|&(a, b, _)| vec![a, b]).collect(),

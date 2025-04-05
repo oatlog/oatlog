@@ -636,6 +636,7 @@ impl CodegenRuleTrieCtx<'_> {
                 }
             }
             RuleAtom::Action(Action::Insert { relation, args }) => {
+                // TODO: assert bound or whatever
                 let relation = &self.relations[relation]
                     .as_ref()
                     .expect("only LIR relations (the `Some` case) can be used in `Action`");
@@ -646,17 +647,8 @@ impl CodegenRuleTrieCtx<'_> {
                         let row = args.iter().copied().map(|x| ident::var_var(self.var_of(x)));
                         quote! { self.delta.#insert_ident((#(#row,)*)); }
                     }
-                    RelationKind::Global { id } => {
-                        let var = args[0];
-                        let ty = self.global_variable_types[id];
-                        let ty_ = &self.types[ty];
-                        let idx = self.global_idx[id];
-                        let global_ty = ident::type_global(ty_);
-                        let name = ident::var_var(&self.variables[var]);
-                        // NOTE: `Action::Insert`, specifically on global variables means load currently.
-                        quote! {
-                            let #name = self.#global_ty.get(#idx);
-                        }
+                    RelationKind::Global { .. } => {
+                        panic!("Are you sure you wanted to insert into a global instead of entry?");
                     }
                 }
             }
@@ -668,6 +660,8 @@ impl CodegenRuleTrieCtx<'_> {
                 let b = ident::var_var(self.var_of(b));
                 let inner = self.codegen_all(then, false);
                 let ret = quote! {
+                    // TODO erik for loke: Is this sound when we have entry? The main
+                    // concern is that infallible lookups remain infallible.
                     let #a = self.uf.#uf_ident.union(#a, #b);
                     let #b = #a;
                     #inner
@@ -685,6 +679,64 @@ impl CodegenRuleTrieCtx<'_> {
                 let type_uf = ident::type_uf(self.type_of(x));
                 quote! { let #var = self.uf.#type_uf.add_eclass(); }
             }
+            RuleAtom::Action(Action::Entry {
+                relation,
+                index,
+                args,
+            }) => {
+                let relation = &self.relations[relation]
+                    .as_ref()
+                    .expect("only LIR relations (the `Some` case) can be used in `Action`");
+
+                match &relation.kind {
+                    RelationKind::Table {
+                        index_to_info,
+                        usage_to_info,
+                        column_back_reference: _,
+                    } => {
+                        let usage_info = &usage_to_info[index];
+                        let index_info = &index_to_info[usage_info.index];
+                        let bound_columns = &index_info
+                            .permuted_columns
+                            .iter()
+                            .take(usage_info.prefix)
+                            .map(|x| args[x.0])
+                            .collect_vec();
+                        let bound_columns_ = bound_columns
+                            .iter()
+                            .map(|&x| ident::var_var(self.var_of(x)))
+                            .collect_vec();
+                        let new_columns = &index_info
+                            .permuted_columns
+                            .iter()
+                            .skip(usage_info.prefix)
+                            .map(|x| args[x.0])
+                            .collect_vec();
+                        let new_columns_ = new_columns
+                            .iter()
+                            .map(|&x| ident::var_var(self.var_of(x)))
+                            .collect_vec();
+
+                        let entry_ident = ident::index_all_entry(usage_info, index_info);
+                        let relation_ident = ident::rel_var(relation);
+                        quote! {
+                            let (#(#new_columns_,)*) =  self.#relation_ident.#entry_ident(#(#bound_columns_,)* &mut self.delta, &mut self.uf);
+                        }
+                    }
+                    RelationKind::Global { id } => {
+                        let var = args[0];
+                        let ty = self.global_variable_types[id];
+                        let ty_ = &self.types[ty];
+                        let idx = self.global_idx[id];
+                        let global_ty = ident::type_global(ty_);
+                        let name = ident::var_var(&self.variables[var]);
+                        quote! {
+                            let #name = self.#global_ty.get(#idx);
+                        }
+                    }
+                }
+            }
+
             RuleAtom::Panic(msg) => quote! {
                 panic!("explicit rule panic: {}", #msg)
             },
@@ -1201,7 +1253,7 @@ fn codegen_relation(
                             #(row.#col_num_symbolic = uf.#uf_all_symbolic.find(row.#col_num_symbolic);)*
                         });
 
-                        // self.#first_indexes_all.filter_existing(&mut inserts);
+                        self.#first_indexes_all.filter_existing(&mut inserts);
 
                         // insert all.
                         #(

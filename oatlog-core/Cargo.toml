@@ -14,6 +14,7 @@ regex.workspace = true
 smallvec.workspace = true
 syn.workspace = true
 voracious_radix_sort.workspace = true
+rand.workspace = true
 
 [dev-dependencies]
 expect-test.workspace = true

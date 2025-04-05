@@ -1,4 +1,4 @@
-use clap::Parser;
+use clap::{Parser, ValueEnum};
 use std::{
     fs::{self, File},
     io::{self, Read as _, Write as _},
@@ -18,7 +18,7 @@ struct Cli {
 
     /// Take an egglog program that does not match egglog and shrink it.
     #[arg(long)]
-    shrink: bool,
+    shrink: Option<Verdict>,
 }
 
 fn main() {
@@ -70,8 +70,8 @@ fn main() {
         input
     };
 
-    if cli.shrink {
-        shrink(input, cli.output);
+    if let Some(expected) = cli.shrink {
+        shrink(input, cli.output, expected);
         return;
     }
 
@@ -83,18 +83,22 @@ fn main() {
     }
 }
 
-fn shrink(program: String, output: Option<PathBuf>) {
+fn shrink(program: String, output: Option<PathBuf>, wanted_verdict: Verdict) {
     static FILE_LOCK: std::sync::Mutex<()> = std::sync::Mutex::new(());
     let file_lock = FILE_LOCK.try_lock().unwrap();
 
-    let Some(output) = output else {
-        let mut smaller = program;
-        while let Some(nxt) = oatlog_core::shrink(smaller.clone()).next() {
-            smaller = nxt;
-            println!("{smaller}\n");
-        }
-        return;
-    };
+    // let Some(output) = output else {
+    //     let mut smaller = program;
+    //     while let Some(nxt) = oatlog_core::shrink(smaller.clone()).next() {
+    //         smaller = nxt;
+    //         println!("{smaller}\n");
+    //     }
+    //     println!("(when no output is pro
+    //     return;
+    // };
+
+    let output = output.expect("shrink needs an output file (../shrink_scratch/src/main.rs)");
+
     let output = output.canonicalize().unwrap();
     let wd = output.parent().unwrap();
 
@@ -105,36 +109,22 @@ fn shrink(program: String, output: Option<PathBuf>) {
     let mut file = open_source_file_checked(&output);
     set_file_contents(&mut file, &empty_contents());
 
-    inner(program, wd, &mut file);
+    inner(program, wd, &mut file, wanted_verdict);
     set_file_contents(&mut file, &empty_contents());
     drop(file_lock);
 
-    fn inner(mut program: String, wd: &Path, file: &mut File) {
+    fn inner(mut program: String, wd: &Path, file: &mut File, wanted_verdict: Verdict) {
         let mut get_verdict = |program| get_verdict(program, file, wd);
         let initial_verdict = get_verdict(program.clone());
-        match initial_verdict {
-            AllCorrect => {
-                println!("initial verdict is all correct?");
-                return;
-            }
-            Mismatched => (),
-            NoGenerate => {
-                println!("initial code does not compile?");
-                return;
-            }
-        }
+        assert_eq!(initial_verdict, wanted_verdict);
         loop {
             let mut progress = false;
             for smaller in oatlog_core::shrink(program.clone()) {
-                match dbg!(get_verdict(smaller.clone())) {
-                    AllCorrect => continue,
-                    Mismatched => {
-                        progress = true;
-                        println!("smaller:\n{program}\n");
-                        program = smaller;
-                        break;
-                    }
-                    NoGenerate => continue,
+                if dbg!(get_verdict(smaller.clone())) == wanted_verdict {
+                    progress = true;
+                    println!("smaller:\n{program}\n");
+                    program = smaller;
+                    break;
                 }
             }
             if !progress {
@@ -145,16 +135,20 @@ fn shrink(program: String, output: Option<PathBuf>) {
     }
 }
 
-#[derive(Copy, Clone, Debug)]
+#[derive(Clone, Debug, PartialEq, Eq, ValueEnum)]
 enum Verdict {
     AllCorrect,
     Mismatched,
-    NoGenerate,
+    NoCompile,
+    GenErr,
 }
 use Verdict::*;
 
 fn get_verdict(program: String, file: &mut File, wd: &Path) -> Verdict {
     // println!("testing program:\n{program}\n");
+    if let Err(_) = oatlog_core::try_compile(&program) {
+        return GenErr;
+    }
     let contents = test_contents(&program);
     set_file_contents(file, &contents);
     let compile_ok = Command::new("cargo")
@@ -166,7 +160,7 @@ fn get_verdict(program: String, file: &mut File, wd: &Path) -> Verdict {
         .unwrap()
         .success();
     if !compile_ok {
-        return NoGenerate;
+        return NoCompile;
     }
     let test_ok = Command::new("cargo")
         .arg("run")
@@ -203,7 +197,7 @@ fn open_source_file_checked(output: &Path) -> std::fs::File {
 
 // reset to this after running shrink.
 fn empty_contents() -> String {
-    format!("{MAGIC_HEADER}\nfn main() {{}}")
+    format!("{MAGIC_HEADER}\nfn main() {{}}\n")
 }
 
 fn test_contents(program: &str) -> String {

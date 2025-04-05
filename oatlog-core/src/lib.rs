@@ -20,27 +20,32 @@ use frontend::MResult;
 use itertools::Itertools;
 use std::panic::UnwindSafe;
 
+fn to_egglog_ast(program: &str) -> frontend::egglog_ast::Program {
+    let program = program.to_string().leak();
+    frontend::egglog_ast::Program {
+        statements: frontend::egglog_ast::parse_program(
+            frontend::parse_str_to_sexps(program)
+                .unwrap()
+                .into_iter()
+                .flatten()
+                .collect_vec(),
+        )
+        .unwrap(),
+    }
+}
+fn from_egglog_ast(ast: frontend::egglog_ast::Program) -> String {
+    ast.to_string()
+}
+
 pub fn shrink(program: String) -> Box<impl Iterator<Item = String>> {
     use frontend::egglog_ast::Shrink;
-    fn to_egglog_ast(program: &str) -> frontend::egglog_ast::Program {
-        let program = program.to_string().leak();
-        frontend::egglog_ast::Program {
-            statements: frontend::egglog_ast::parse_program(
-                frontend::parse_str_to_sexps(program)
-                    .unwrap()
-                    .into_iter()
-                    .flatten()
-                    .collect_vec(),
-            )
-            .unwrap(),
-        }
-    }
-    fn from_egglog_ast(ast: frontend::egglog_ast::Program) -> String {
-        ast.to_string()
-    }
     let ast = to_egglog_ast(&program);
 
     Box::new(ast.shrink().map(|x| from_egglog_ast(x)))
+}
+
+pub fn format_program(program: String) -> String {
+    from_egglog_ast(to_egglog_ast(&program))
 }
 
 pub fn try_compile(input: &str) -> Result<(), String> {
@@ -82,7 +87,7 @@ pub fn compile(input: proc_macro2::TokenStream) -> proc_macro2::TokenStream {
     let input = Input::Tokens(input);
     let config = Configuration {
         file_not_found: FileNotFoundAction::EmitError,
-        panic_backtrace: BackTraceAction::Passthrough,
+        panic_backtrace: BackTraceAction::ForceBacktracePanic,
     };
 
     match universal(input, config) {

@@ -1179,17 +1179,40 @@ pub(crate) trait Shrink: Eq + Ord + Clone + 'static {
         }))
     }
 }
+
+trait ShuffleExt<T>: Iterator<Item = T> + Sized + 'static {
+    fn chain_rand(self, other: impl Iterator<Item = T> + 'static) -> impl Iterator<Item = T> {
+        use rand::prelude::*;
+        let mut rng = rand::rng();
+        let mut lhs: Box<dyn Iterator<Item = T>> = Box::new(self);
+        let mut rhs: Box<dyn Iterator<Item = T>> = Box::new(other);
+        std::iter::from_fn(move || {
+            if rng.random() {
+                std::mem::swap(&mut lhs, &mut rhs)
+            }
+            lhs.next().or_else(|| rhs.next())
+        })
+    }
+    fn shuffle(self) -> impl Iterator<Item = T> {
+        use rand::{rng, seq::SliceRandom};
+        let mut elems: Vec<_> = self.collect();
+        elems.shuffle(&mut rng());
+        elems.into_iter()
+    }
+}
+impl<T, X: Iterator<Item = T> + Sized + 'static> ShuffleExt<T> for X {}
+
 impl<T: Shrink + Clone + 'static> Shrink for Vec<T> {
     fn impl_shrink(&self) -> It<Self> {
         let d = self.clone();
         let n = d.len();
-        let remove_one: It<Self> = Box::new((0..n).rev().map(move |i| {
+        let remove_one: It<Self> = Box::new((0..n).shuffle().map(move |i| {
             let mut d = d.clone();
             d.remove(i);
             d
         }));
         let d = self.clone();
-        let shrink_one: It<Self> = Box::new((0..n).rev().flat_map(move |i| {
+        let shrink_one: It<Self> = Box::new((0..n).shuffle().flat_map(move |i| {
             let d = d.clone();
             d[i].shrink().map(move |e| {
                 let mut d = d.clone();
@@ -1197,7 +1220,7 @@ impl<T: Shrink + Clone + 'static> Shrink for Vec<T> {
                 d
             })
         }));
-        Box::new(remove_one.chain(shrink_one))
+        Box::new(remove_one.chain_rand(shrink_one))
     }
 }
 impl Shrink for Program {
@@ -1220,9 +1243,9 @@ impl Shrink for Expr {
             Expr::Call(name, args) => Box::new(
                 args.clone()
                     .into_iter()
-                    .chain(args.shrink().flatten())
+                    .chain_rand(args.shrink().flatten())
                     .map(move |x| x.x.clone())
-                    .chain({
+                    .chain_rand({
                         let name = name.clone();
                         args.shrink().map(move |args| Expr::Call(name, args))
                     }),
@@ -1337,7 +1360,7 @@ impl Shrink for Rule {
             actions,
         });
 
-        Box::new(shrink_fact.chain(shrink_action))
+        Box::new(shrink_fact.chain_rand(shrink_action))
     }
 }
 impl Shrink for Fact {
@@ -1348,7 +1371,7 @@ impl Shrink for Fact {
                     let e2 = e2.clone();
                     Box::new(e1.clone().shrink().map(move |e1| Fact::Eq(e1, e2.clone())))
                 })
-                .chain({
+                .chain_rand({
                     let e1 = e1.clone();
                     Box::new(e2.clone().shrink().map(move |e2| Fact::Eq(e1.clone(), e2)))
                 }),
@@ -1374,7 +1397,7 @@ impl Shrink for Rewrite {
             rhs,
             conditions: conditions.clone(),
         });
-        Box::new(shrink_lhs.chain(shrink_rhs))
+        Box::new(shrink_lhs.chain_rand(shrink_rhs))
     }
 }
 impl Shrink for Action {
@@ -1400,7 +1423,7 @@ impl Shrink for Action {
                             result: result.clone(),
                         })
                     })
-                    .chain({
+                    .chain_rand({
                         let args = args.clone();
                         result.shrink().map(move |result| Action::Set {
                             table,
@@ -1414,16 +1437,16 @@ impl Shrink for Action {
             Action::Union { lhs, rhs } => Box::new(
                 lhs.clone()
                     .shrink()
-                    .chain(rhs.clone().shrink())
+                    .chain_rand(rhs.clone().shrink())
                     .map(|expr| Action::Expr(expr))
-                    .chain({
+                    .chain_rand({
                         let lhs = lhs.clone();
                         rhs.shrink().map(move |rhs| Action::Union {
                             lhs: lhs.clone(),
                             rhs,
                         })
                     })
-                    .chain({
+                    .chain_rand({
                         let rhs = rhs.clone();
                         lhs.shrink().map(move |lhs| Action::Union {
                             lhs,

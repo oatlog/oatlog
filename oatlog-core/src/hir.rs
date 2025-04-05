@@ -18,7 +18,6 @@ use std::{
     convert::identity,
     fmt::Display,
     hash::Hash,
-    iter,
 };
 
 // pub(crate) mod hir2 {
@@ -577,9 +576,11 @@ impl ImplicitRule {
             out: BTreeMap::from_iter([(output, ImplicitRuleAction::Panic)]),
         }
     }
+    /// AKA outputs
     pub(crate) fn value_columns(&self) -> BTreeSet<ColumnId> {
         self.out.keys().copied().collect()
     }
+    /// AKA inputs
     pub(crate) fn key_columns(&self, columns: usize) -> BTreeSet<ColumnId> {
         let value_columns = self.value_columns();
 
@@ -601,19 +602,19 @@ pub(crate) enum ImplicitRuleAction {
     Union,
     /// Run computation to figure out what to write.
     Lattice {
-        /// call these functions in this order.
-        /// panic if result is empty.
-        ops: Vec<(RelationId, Vec<VariableId>)>,
-        /// Mostly here to insert literals.
-        /// Reading literals should occur first.
-        /// TODO: use globalid relation directly.
-        variables: TVec<VariableId, (TypeId, Option<GlobalId>)>,
-        /// existing output value in a table.
-        old: Vec<(VariableId, ColumnId)>,
-        /// output value we want to write.
-        new: Vec<(VariableId, ColumnId)>,
-        /// what `VariableId` to write to the column
-        res: Vec<(VariableId, ColumnId)>,
+        // /// call these functions in this order.
+        // /// panic if result is empty.
+        // ops: Vec<(RelationId, Vec<VariableId>)>,
+        // /// Mostly here to insert literals.
+        // /// Reading literals should occur first.
+        // /// TODO: use globalid relation directly.
+        // variables: TVec<VariableId, (TypeId, Option<GlobalId>)>,
+        // /// existing output value in a table.
+        // old: Vec<(VariableId, ColumnId)>,
+        // /// output value we want to write.
+        // new: Vec<(VariableId, ColumnId)>,
+        // /// what `VariableId` to write to the column
+        // res: Vec<(VariableId, ColumnId)>,
     },
 }
 
@@ -645,23 +646,21 @@ impl Relation {
         }
     }
     pub(crate) fn forall(name: &'static str, ty: TypeId) -> Self {
-        let columns = iter::once(ty).collect();
         Self {
             name,
-            columns,
+            columns: vec![ty].into(),
             ty: RelationTy::Forall { ty },
             // forall is [x] -> (), so no implicit rules
             implicit_rules: TVec::new(),
         }
     }
     pub(crate) fn global(name: &'static str, id: GlobalId, ty: TypeId) -> Self {
-        let columns = iter::once(ty).collect();
         Self {
             name,
-            columns,
+            columns: vec![ty].into(),
             ty: RelationTy::Global { id },
             // global is [] -> (x), so we have a implicit (panicing) rule.
-            implicit_rules: TVec::new(),
+            implicit_rules: vec![ImplicitRule::new_panic(ColumnId(0))].into(),
         }
     }
     pub(crate) fn as_new(&self, id: RelationId) -> Self {
@@ -671,6 +670,23 @@ impl Relation {
             ty: RelationTy::NewOf { id },
             // we inherit the implicit rules of the original relation
             implicit_rules: self.implicit_rules.clone(),
+        }
+    }
+    /// Is it sound to turn entry on this into an insert.
+    pub(crate) fn can_become_insert(&self, im: ImplicitRuleId) -> bool {
+        match &self.ty {
+            RelationTy::NewOf { .. } => unreachable!(),
+            RelationTy::Table => {
+                // TODO erik: think about requirements
+                true
+            }
+            RelationTy::Alias { .. } => unreachable!(),
+            RelationTy::Global { .. } => false,
+            RelationTy::Primitive {} => {
+                // depends on if it's a collection, right?
+                todo!()
+            }
+            RelationTy::Forall { .. } => unreachable!(),
         }
     }
 }
@@ -779,6 +795,35 @@ impl VariableMeta {
 pub(crate) struct ActionRelation {
     pub(crate) relation: RelationId,
     pub(crate) args: TVec<ColumnId, ActionId>,
+    // TODO erik: make sure our passes don't do bad stuff with entry.
+    pub(crate) entry: Option<ImplicitRuleId>,
+}
+impl ActionRelation {
+    // needs to be computed after inputs are computed
+    pub(crate) fn entry_inputs(&self, relations: &TVec<RelationId, Relation>) -> Vec<ActionId> {
+        if let Some(entry) = self.entry {
+            let relation = &relations[self.relation];
+            relation.implicit_rules[entry]
+                .key_columns(self.args.len())
+                .into_iter()
+                .map(|x| self.args[x])
+                .collect()
+        } else {
+            self.args.inner().clone()
+        }
+    }
+    pub(crate) fn entry_outputs(&self, relations: &TVec<RelationId, Relation>) -> Vec<ActionId> {
+        if let Some(entry) = self.entry {
+            let relation = &relations[self.relation];
+            relation.implicit_rules[entry]
+                .value_columns()
+                .into_iter()
+                .map(|x| self.args[x])
+                .collect()
+        } else {
+            vec![]
+        }
+    }
 }
 #[derive(Clone, Eq, PartialEq, Ord, PartialOrd, Hash, Debug)]
 pub(crate) struct PremiseRelation {
@@ -800,8 +845,8 @@ pub(crate) struct RuleArgs {
     pub(crate) premise: Vec<(RelationId, Vec<VariableId>)>,
     /// These should be the same variable, but we let the backend fix it instead.
     pub(crate) premise_unify: Vec<Vec<VariableId>>,
-    /// To be inserted when action is triggered
-    pub(crate) action: Vec<(RelationId, Vec<VariableId>)>,
+    /// To be inserted when action is triggered (true = entry)
+    pub(crate) action: Vec<(RelationId, Vec<VariableId>, bool)>,
     /// To be unified when action is triggered
     pub(crate) action_unify: Vec<Vec<VariableId>>,
     /// These variables should have been deleted (eg unit variables)
@@ -832,9 +877,11 @@ impl RuleArgs {
         let action_relations = self
             .action
             .iter()
-            .map(|(id, args)| ActionRelation {
+            .map(|(id, args, entry)| ActionRelation {
                 relation: *id,
                 args: args.iter().map(|x| ActionId(x.0)).collect(),
+                // Just pick 0 and hope for the best :)
+                entry: entry.then_some(ImplicitRuleId(0)),
             })
             .collect();
         let mut unify = UF::new_with_size(n, ());
@@ -957,14 +1004,21 @@ impl SymbolicRule {
             action_relations = self
                 .action_relations
                 .iter()
-                .map(|ActionRelation { relation, args }| ActionRelation {
-                    relation: *relation,
-                    args: args
-                        .iter()
-                        .copied()
-                        .map(|x| map(x).expect("relation still uses variable"))
-                        .collect(),
-                })
+                .map(
+                    |ActionRelation {
+                         relation,
+                         args,
+                         entry,
+                     }| ActionRelation {
+                        relation: *relation,
+                        args: args
+                            .iter()
+                            .copied()
+                            .map(|x| map(x).expect("relation still uses variable"))
+                            .collect(),
+                        entry: *entry,
+                    },
+                )
                 .collect();
         }
 
@@ -1067,6 +1121,7 @@ impl SymbolicRule {
         // no duplicate actions
         // (duplicate premises removed later)
         self.action_relations.sort_dedup();
+        self.premise_relations.sort_dedup();
 
         // remove actions present in premise.
         // TODO: think about weird edge cases.
@@ -1293,6 +1348,9 @@ impl<T: Ord> VecExt for Vec<T> {
 }
 
 impl Theory {
+    pub(crate) fn optimize(&self) -> Self {
+        self.clone()
+    }
     #[cfg(test)]
     pub(crate) fn dbg_summary(&self) -> String {
         use std::fmt::Write as _;
@@ -1380,13 +1438,20 @@ impl Theory {
             }
             let insert = action_relations
                 .iter()
-                .map(|ActionRelation { relation, args }| {
-                    format!(
-                        "{}({})",
-                        self.relations[*relation].name,
-                        args.iter().map(|x| rule.action_dbg(*x)).join(", ")
-                    )
-                })
+                .map(
+                    |ActionRelation {
+                         relation,
+                         args,
+                         entry,
+                     }| {
+                        format!(
+                            "{}({}).{}",
+                            self.relations[*relation].name,
+                            args.iter().map(|x| rule.action_dbg(*x)).join(", "),
+                            entry.map(|x| format!("{x:?}")).unwrap_or("_".to_string()),
+                        )
+                    },
+                )
                 .join(", ");
             if !insert.is_empty() {
                 wln!("Insert: {insert}");

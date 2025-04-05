@@ -305,6 +305,12 @@ pub(crate) enum Action {
     // },
     /// Make a new E-class.
     Make(VariableId),
+
+    Entry {
+        relation: RelationId,
+        index: IndexUsageId,
+        args: &'static [VariableId],
+    },
 }
 
 impl Theory {
@@ -536,6 +542,20 @@ impl Theory {
                             f,
                             "{:?}",
                             DbgStr(["Action::Make".to_string(), e.to_string()])
+                        )
+                    }
+                    RuleAtom::Action(Action::Entry {
+                        relation,
+                        index,
+                        args,
+                    }) => {
+                        write!(
+                            f,
+                            "{:?}",
+                            DbgStr([
+                                "Action::Insert".to_string(),
+                                format!("{relation}({}) on {index:?}", args.iter().join(", "))
+                            ])
                         )
                     }
                     RuleAtom::Panic(msg) => {

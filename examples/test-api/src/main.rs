@@ -152,7 +152,7 @@
 // i=11 size=1841
 
 // diverges due to unification rules not running to convergence.
-/*
+
 fn run_fuel() {
     oatlog::compile_egraph!((
 
@@ -488,17 +488,3 @@ fn test_basic_rewrite() {
 
     assert!(theory.are_equal(x, y));
 }
-*/
-
-oatlog::compile_egraph!((
-    (sort T1)
-    (sort T2)
-    (sort T3)
-    (sort T4)
-
-    (constructor ImFun (T1 T2 T3) T4)
-
-    (function PanicFun (T1 T2 T3) T4 :no-merge)
-));
-
-fn main() {}
