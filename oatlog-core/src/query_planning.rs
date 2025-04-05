@@ -79,7 +79,7 @@ pub(crate) fn emit_lir_theory(mut theory: hir::Theory) -> (hir::Theory, lir::The
 
     let rules = symbolic_rules_as_semi_naive(&theory.symbolic_rules, &old_to_new);
 
-    let mut table_uses: TVec<RelationId, TVec<IndexUsageId, Vec<ColumnId>>> =
+    let mut table_uses: TVec<RelationId, TVec<IndexUsageId, BTreeSet<ColumnId>>> =
         TVec::new_with_size(non_new_relations, TVec::new());
 
     let mut lir_variables: TVec<VariableId, lir::VariableData> = TVec::new();
@@ -121,7 +121,7 @@ pub(crate) fn emit_lir_theory(mut theory: hir::Theory) -> (hir::Theory, lir::The
                 let column_back_references: TVec<ColumnId, IndexUsageId> = relation
                     .columns
                     .enumerate()
-                    .map(|i| uses.push(vec![i]))
+                    .map(|i| uses.push(BTreeSet::from_iter([i])))
                     .collect();
 
                 let implicit_with_index = relation.implicit_rules.map(|x| {
@@ -221,7 +221,7 @@ fn generate_tries(
     rules: Vec<SymbolicRule>,
     lir_variables: &mut TVec<VariableId, lir::VariableData>,
     theory: &hir::Theory,
-    table_uses: &mut TVec<RelationId, TVec<IndexUsageId, Vec<ColumnId>>>,
+    table_uses: &mut TVec<RelationId, TVec<IndexUsageId, BTreeSet<ColumnId>>>,
     tries: &mut Vec<lir::RuleTrie>,
 ) {
     for rule in rules {

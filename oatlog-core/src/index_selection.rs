@@ -9,7 +9,7 @@ use crate::{
     typed_vec::TVec,
 };
 
-use std::collections::BTreeMap;
+use std::collections::{BTreeMap, BTreeSet};
 
 // TODO: compute *optimal* indexes using flow/similar.
 // TODO: optimize for queries where only a semi-join is performed (no introduced variables)
@@ -32,7 +32,7 @@ pub(crate) fn index_selection(
     // exist in
     columns: usize,
     // what logical "primary keys" are needed.
-    uses: &TVec<IndexUsageId, Vec<ColumnId>>,
+    uses: &TVec<IndexUsageId, BTreeSet<ColumnId>>,
 ) -> (
     TVec<IndexUsageId, lir::IndexUsageInfo>,
     TVec<IndexId, lir::IndexInfo>,
@@ -41,7 +41,7 @@ pub(crate) fn index_selection(
     let mut columns_to_uses: BTreeMap<TVec<ColumnId, ColumnId>, Vec<(IndexUsageId, usize)>> =
         BTreeMap::new();
 
-    let permuted_columns_of_use = |used_columns: &[ColumnId]| -> TVec<ColumnId, ColumnId> {
+    let permuted_columns_of_use = |used_columns: &BTreeSet<ColumnId>| -> TVec<ColumnId, ColumnId> {
         let prefix = used_columns.len();
         // `order` satisfies that all columns present in `c` come before those that are not present.
         // `order` is a valid physical index (one among many) implementing the logical index `c`.
@@ -107,14 +107,15 @@ mod test {
     use crate::typed_vec::TVec;
     use expect_test::expect;
     use itertools::Itertools as _;
+    use std::collections::BTreeSet;
 
     #[test]
     fn test_simple() {
         let columns = 4;
-        let uses: TVec<IndexUsageId, Vec<ColumnId>> =
-            [vec![0], vec![0, 1], vec![1], vec![1, 3], vec![2], vec![3]]
+        let uses: TVec<IndexUsageId, BTreeSet<ColumnId>> =
+            [&[0][..], &[0, 1], &[1], &[1, 3], &[2], &[3]]
                 .into_iter()
-                .map(|x| x.into_iter().map(ColumnId).collect())
+                .map(|x| x.into_iter().copied().map(ColumnId).collect())
                 .collect();
         let (logical_to_physical, physical_indexes) = index_selection(columns, &uses);
         expect![["

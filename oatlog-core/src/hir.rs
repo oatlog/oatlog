@@ -558,29 +558,29 @@ pub(crate) enum TypeKind {
 #[derive(Clone, Eq, PartialEq, Ord, PartialOrd, Hash, Debug)]
 pub(crate) struct ImplicitRule {
     /// If all colums other than the ones mentioned here are equal, trigger rule for each column.
-    pub(crate) out: Vec<(ColumnId, ImplicitRuleAction)>,
+    pub(crate) out: BTreeMap<ColumnId, ImplicitRuleAction>,
 }
 impl ImplicitRule {
     pub(crate) fn new_unify(output: ColumnId) -> Self {
         Self {
-            out: vec![(output, ImplicitRuleAction::Union)],
+            out: BTreeMap::from_iter([(output, ImplicitRuleAction::Union)]),
         }
     }
     pub(crate) fn new_panic(output: ColumnId) -> Self {
         Self {
-            out: vec![(output, ImplicitRuleAction::Panic)],
+            out: BTreeMap::from_iter([(output, ImplicitRuleAction::Panic)]),
         }
     }
     pub(crate) fn new_lattice(output: ColumnId) -> Self {
         // TODO: implement codegen lattice and then fix this
         Self {
-            out: vec![(output, ImplicitRuleAction::Panic)],
+            out: BTreeMap::from_iter([(output, ImplicitRuleAction::Panic)]),
         }
     }
-    pub(crate) fn value_columns(&self) -> Vec<ColumnId> {
-        self.out.iter().map(|x| x.0).collect()
+    pub(crate) fn value_columns(&self) -> BTreeSet<ColumnId> {
+        self.out.keys().copied().collect()
     }
-    pub(crate) fn key_columns(&self, columns: usize) -> Vec<ColumnId> {
+    pub(crate) fn key_columns(&self, columns: usize) -> BTreeSet<ColumnId> {
         let value_columns = self.value_columns();
 
         (0..columns)
