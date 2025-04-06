@@ -4,7 +4,7 @@
 #![allow(dead_code, reason = "temporary noise")]
 
 use crate::{
-    ids::{ColumnId, IndexId, IndexUsageId},
+    ids::{ColumnId, IndexId, IndexUsageId, IuDedupId},
     lir,
     typed_vec::TVec,
 };
@@ -15,6 +15,77 @@ use std::collections::{BTreeMap, BTreeSet};
 // TODO: optimize for queries where only a semi-join is performed (no introduced variables)
 // TODO: add some "maybe_contains" API.
 // TODO: bloom filters
+
+struct BipartiteMatching {
+    next: TVec<IuDedupId, Option<IuDedupId>>,
+    has_prev: TVec<IuDedupId, bool>,
+}
+impl BipartiteMatching {
+    /// Uses Ford-Fulkerson
+    ///
+    /// 1. Repeatedly, find a single augmenting path to extend the matching.
+    /// 2. DFS from any unmatched left-node, taking unused edges rightwards and used edges leftwards.
+    fn compute_maximum_bipartite_matching(graph: &TVec<IuDedupId, Vec<IuDedupId>>) -> Self {
+        // `graph[iuA].contains(iuB)` implies that `iuA` queries a subset of the columns of `iuB`.
+
+        let mut match_back: TVec<IuDedupId, Option<IuDedupId>> = graph.new_same_size();
+        let mut matched = 0;
+
+        for left_origin in graph.enumerate() {
+            let mut visited_right: TVec<IuDedupId, bool> = graph.new_same_size();
+
+            match dfs(left_origin, graph, &mut match_back, &mut visited_right) {
+                Ok(()) => matched += 1,
+                Err(()) => {}
+            }
+        }
+        assert_eq!(
+            matched,
+            match_back.iter().copied().filter(Option::is_some).count()
+        );
+
+        fn dfs(
+            left: IuDedupId,
+            graph: &TVec<IuDedupId, Vec<IuDedupId>>,
+            match_back: &mut TVec<IuDedupId, Option<IuDedupId>>,
+            visited_right: &mut TVec<IuDedupId, bool>,
+        ) -> Result<(), ()> {
+            for &right in &graph[left] {
+                if match_back[right].is_none() {
+                    // Found augmenting path!
+                    match_back[right] = Some(left);
+                    return Ok(());
+                }
+            }
+            for &right in &graph[left] {
+                let conflict = match_back[right].unwrap();
+                if conflict == left || visited_right[right] {
+                    continue;
+                }
+                visited_right[right] = true;
+
+                if let Ok(()) = dfs(conflict, graph, match_back, visited_right) {
+                    // DFS found augmenting path
+                    match_back[right] = Some(left);
+                    return Ok(());
+                }
+            }
+            Err(())
+        }
+
+        Self {
+            next: {
+                let mut next: TVec<IuDedupId, Option<IuDedupId>> = match_back.new_same_size();
+                for (right, left) in match_back.iter_enumerate() {
+                    let &Some(left) = left else { continue };
+                    next[left] = Some(right);
+                }
+                next
+            },
+            has_prev: match_back.map(|left| left.is_some()),
+        }
+    }
+}
 
 // user:
 // Want an index on these columns
@@ -37,77 +108,170 @@ pub(crate) fn index_selection(
     TVec<IndexUsageId, lir::IndexUsageInfo>,
     TVec<IndexId, lir::IndexInfo>,
 ) {
-    // Mapping (physical index) to (usage, prefix len).
-    let mut columns_to_uses: BTreeMap<TVec<ColumnId, ColumnId>, Vec<(IndexUsageId, usize)>> =
-        BTreeMap::new();
+    // Deduplicate identical index usages.
 
-    let permuted_columns_of_use = |used_columns: &BTreeSet<ColumnId>| -> TVec<ColumnId, ColumnId> {
-        let prefix = used_columns.len();
-        // `order` satisfies that all columns present in `c` come before those that are not present.
-        // `order` is a valid physical index (one among many) implementing the logical index `c`.
-        let permuted_columns: TVec<ColumnId, ColumnId> = used_columns
-            .iter()
-            .copied()
-            .chain(
+    let mut index_usage_dedup: BTreeMap<BTreeSet<ColumnId>, IuDedupId> = BTreeMap::new();
+    let mut index_usage_to_dedup: TVec<IndexUsageId, IuDedupId> = uses.new_same_size();
+
+    let mut dedup_id = 0;
+    for (iu, columns) in uses.iter_enumerate() {
+        let iud = *index_usage_dedup.entry(columns.clone()).or_insert_with(|| {
+            let ret = IuDedupId(dedup_id);
+            dedup_id += 1;
+            ret
+        });
+        index_usage_to_dedup[iu] = iud;
+    }
+    assert_eq!(dedup_id, index_usage_dedup.len());
+
+    let iud_to_columns: TVec<IuDedupId, &BTreeSet<ColumnId>> =
+        TVec::from_iter_unordered(index_usage_dedup.iter().map(|(cols, &id)| (id, cols)));
+
+    // Bipartite matching can solve the problem of covering a directed graph with a minimum
+    // number of disjoint line graphs (isolated nodes are considered lines).
+    //
+    // Reduction: Split every node of the directed graph into a left and right node. Replace
+    // every directed edge with an undirected edge from and to the corresponding left and right
+    // nodes.
+
+    let graph = {
+        let mut graph: TVec<IuDedupId, Vec<IuDedupId>> = iud_to_columns.new_same_size();
+        for (columns_left, &iud_left) in &index_usage_dedup {
+            for (columns_right, &iud_right) in &index_usage_dedup {
+                if columns_left.len() < columns_right.len() && columns_left.is_subset(columns_right)
+                {
+                    graph[iud_left].push(iud_right);
+                }
+            }
+        }
+        graph
+    };
+    let BipartiteMatching { next, has_prev } =
+        BipartiteMatching::compute_maximum_bipartite_matching(&graph);
+
+    // Recover full indexes from matching.
+
+    let (indexes, iud_to_index) = {
+        let mut iud_to_index: TVec<IuDedupId, Option<IndexId>> = iud_to_columns.new_same_size();
+        let mut indexes: TVec<IndexId, Vec<ColumnId>> = TVec::new();
+
+        for mut iud in has_prev
+            .iter_enumerate()
+            .filter_map(|(iud, has_prev)| (!has_prev).then_some(iud))
+        {
+            let mut index = Vec::new();
+            let index_id = IndexId(indexes.len());
+
+            index.extend(iud_to_columns[iud]);
+            iud_to_index[iud] = Some(index_id);
+
+            while let Some(iud2) = next[iud] {
+                index.extend(iud_to_columns[iud2].difference(iud_to_columns[iud]));
+                assert_eq!(index.len(), iud_to_columns[iud2].len());
+                iud_to_index[iud2] = Some(index_id);
+                iud = iud2;
+            }
+            index.extend(
                 (0..columns)
                     .map(ColumnId)
-                    .filter(|c| !used_columns.contains(c)),
-            )
-            .collect();
+                    .filter(|c| !iud_to_columns[iud].contains(c)),
+            );
 
-        assert!(permuted_columns.inner()[..prefix].is_sorted());
-        assert!(
-            permuted_columns.inner()[..prefix]
-                .windows(2)
-                .all(|w| w[0] != w[1])
-        );
-        permuted_columns
+            indexes.push_expected(index_id, index);
+        }
+
+        let indexes_permutation = indexes.permutation_to_sort();
+
+        (
+            indexes.permute(&indexes_permutation),
+            iud_to_index.map(|index_id| {
+                let index_id = index_id.expect(
+                    "all iud should have been visited, as roots or by walking a line subgraph",
+                );
+                indexes_permutation[index_id]
+            }),
+        )
     };
 
-    for (index_usage_id, used_columns) in uses.iter_enumerate() {
-        let prefix = used_columns.len();
-        let permuted_columns = permuted_columns_of_use(used_columns);
-
-        columns_to_uses
-            .entry(permuted_columns)
-            .or_default()
-            .push((index_usage_id, prefix));
-    }
-
-    let index_info: TVec<IndexId, lir::IndexInfo> = columns_to_uses
-        .iter()
-        .map(|(permuted_columns, _)| lir::IndexInfo {
-            permuted_columns: permuted_columns.clone(),
-            primary_key_prefix_len: columns,
-            primary_key_violation_merge: BTreeMap::new(),
-        })
-        .collect();
-
-    let index_usage_to_index: TVec<IndexUsageId, lir::IndexUsageInfo> =
-        TVec::from_iter_unordered(columns_to_uses.values().enumerate().flat_map(
-            |(index_id, usage)| {
-                usage.iter().map(move |&(index_usage_id, prefix)| {
-                    (
-                        index_usage_id,
-                        lir::IndexUsageInfo {
-                            prefix,
-                            index: IndexId(index_id),
-                        },
-                    )
-                })
-            },
-        ));
-
-    (index_usage_to_index, index_info)
+    (
+        index_usage_to_dedup
+            .iter_enumerate()
+            .map(|(iu, iud)| lir::IndexUsageInfo {
+                prefix: uses[iu].len(),
+                index: iud_to_index[iud],
+            })
+            .collect(),
+        indexes.map(|permuted_columns| {
+            assert_eq!(columns, permuted_columns.len());
+            lir::IndexInfo {
+                permuted_columns: permuted_columns.iter().copied().collect(),
+                primary_key_prefix_len: columns,
+                primary_key_violation_merge: BTreeMap::new(),
+            }
+        }),
+    )
 }
 
 #[cfg(test)]
 mod test {
-    use super::{ColumnId, IndexUsageId, index_selection};
+    use super::{BipartiteMatching, ColumnId, IndexUsageId, IuDedupId, index_selection};
     use crate::typed_vec::TVec;
     use expect_test::expect;
     use itertools::Itertools as _;
     use std::collections::BTreeSet;
+
+    fn test_bipartite<const N: usize>(graph: [&[usize]; N], expected: expect_test::Expect) {
+        let graph: TVec<IuDedupId, Vec<IuDedupId>> = graph
+            .iter()
+            .map(|inner| inner.into_iter().copied().map(IuDedupId).collect_vec())
+            .collect();
+        let result: String = BipartiteMatching::compute_maximum_bipartite_matching(&graph)
+            .next
+            .iter()
+            .map(|&right| right.map_or("-".to_string(), |IuDedupId(r)| r.to_string()))
+            .collect::<Vec<_>>()
+            .join(" ");
+
+        expected.assert_eq(&result);
+    }
+
+    #[test]
+    fn bipartite0() {
+        test_bipartite([], expect![[""]]);
+    }
+    #[test]
+    fn bipartite1() {
+        test_bipartite([&[]], expect!["-"]);
+        test_bipartite([&[0]], expect!["0"]);
+    }
+    #[test]
+    fn bipartite2() {
+        test_bipartite([&[], &[]], expect!["- -"]);
+        test_bipartite([&[0], &[0, 1]], expect!["0 1"]);
+        test_bipartite([&[1], &[0, 1]], expect!["1 0"]);
+        test_bipartite([&[0, 1], &[1]], expect!["0 1"]);
+        test_bipartite([&[0, 1], &[0]], expect!["1 0"]);
+        test_bipartite([&[0, 1], &[0, 1]], expect!["0 1"]);
+    }
+    #[test]
+    fn bipartite3() {
+        test_bipartite([&[0, 1], &[0, 1], &[0, 1]], expect!["0 1 -"]);
+        test_bipartite([&[0, 1], &[0, 1, 2], &[0, 1]], expect!["1 2 0"]);
+        test_bipartite([&[1], &[2], &[0]], expect!["1 2 0"]);
+        test_bipartite([&[0], &[0, 1], &[1]], expect!["0 1 -"]);
+    }
+    #[test]
+    fn bipartite5() {
+        // 0A, 1B, 2AB, 3ABC, 4ABD
+        // => 023, 14 i.e. ABC, BAD
+        test_bipartite(
+            [&[2, 3, 4], &[2, 3, 4], &[3, 4], &[], &[]],
+            expect!["2 3 4 - -"],
+        );
+        // "W"-shaped
+        test_bipartite([&[0], &[], &[0, 1], &[], &[1]], expect!["0 - 1 - -"]);
+        test_bipartite([&[1], &[], &[1, 3], &[], &[3]], expect!["1 - 3 - -"]);
+    }
 
     #[test]
     fn test_simple() {
@@ -118,7 +282,7 @@ mod test {
                 .map(|x| x.into_iter().copied().map(ColumnId).collect())
                 .collect();
         let (logical_to_physical, physical_indexes) = index_selection(columns, &uses);
-        expect![["
+        expect![[r#"
             {
                 iu0: IndexUsageInfo {
                     prefix: 1,
@@ -134,25 +298,24 @@ mod test {
                 },
                 iu3: IndexUsageInfo {
                     prefix: 2,
-                    index: ir2,
+                    index: ir1,
                 },
                 iu4: IndexUsageInfo {
                     prefix: 1,
-                    index: ir3,
+                    index: ir2,
                 },
                 iu5: IndexUsageInfo {
                     prefix: 1,
-                    index: ir4,
+                    index: ir3,
                 },
             }
-        "]]
+        "#]]
         .assert_debug_eq(&logical_to_physical);
-        expect![["
+        expect![[r#"
             0 1 2 3
-            1 0 2 3
             1 3 0 2
             2 0 1 3
-            3 0 1 2"]]
+            3 0 1 2"#]]
         .assert_eq(
             &physical_indexes
                 .iter()

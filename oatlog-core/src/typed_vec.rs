@@ -77,6 +77,17 @@ impl<K: Id, V> TVec<K, V> {
             .collect()
     }
 }
+impl<K: Id, V: Ord> TVec<K, V> {
+    pub(crate) fn permutation_to_sort(&self) -> TVec<K, K> {
+        let mut xs: Vec<(&V, K)> = self.iter_enumerate().map(|(k, v)| (v, k)).collect();
+        xs.sort_unstable();
+        let mut ret = self.new_same_size();
+        for (dest, &(_, src)) in xs.iter().enumerate() {
+            ret[src] = dest.into();
+        }
+        ret
+    }
+}
 impl<K: Id, V> TVec<K, V> {
     pub(crate) fn map_key<F: FnMut(K) -> Option<K>>(
         self,
@@ -162,6 +173,11 @@ impl<K: Id, V> std::ops::Index<std::ops::Range<K>> for TVec<K, V> {
 impl<K: Id, V> std::ops::IndexMut<K> for TVec<K, V> {
     fn index_mut(&mut self, idx: K) -> &mut Self::Output {
         &mut self.x[idx.into()]
+    }
+}
+impl<K: Id, V> std::ops::IndexMut<&K> for TVec<K, V> {
+    fn index_mut(&mut self, idx: &K) -> &mut Self::Output {
+        self.index_mut(*idx)
     }
 }
 impl<K: Id + Debug, V: Debug> Debug for TVec<K, V> {

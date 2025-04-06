@@ -2167,16 +2167,16 @@ fn codegen_variable_reuse_bug() {
                         name: "Add",
                         param_types: {c0: t3, c1: t3, c2: t3},
                         kind: Table {
-                            index_to_info: {ir0: 0_1_2 conflict[..2] => [2:union], ir1: 0_2_1, ir2: 1_0_2, ir3: 2_0_1},
+                            index_to_info: {ir0: 0_1_2 conflict[..2] => [2:union], ir1: 1_0_2, ir2: 2_0_1},
                             usage_to_info: {
                                 iu0: ir0[..2],
-                                iu1: ir1[..2],
-                                iu2: ir3[..1],
-                                iu3: ir1[..2],
+                                iu1: ir2[..2],
+                                iu2: ir2[..1],
+                                iu3: ir2[..2],
                                 iu4: ir0[..1],
                                 iu5: ir0[..1],
-                                iu6: ir2[..1],
-                                iu7: ir3[..1],
+                                iu6: ir1[..1],
+                                iu7: ir2[..1],
                                 iu8: ir0[..2],
                             },
                             column_back_reference: {c0: iu5, c1: iu6, c2: iu7},
@@ -2270,7 +2270,6 @@ fn codegen_variable_reuse_bug() {
             use oatlog::runtime::{self, *};
             decl_row ! (Row1 < T0 first 0 > () (0) () (T0) fc = (0) (T0) where u32 = s => ((s . 0 . inner () as u32) << 0));
             decl_row ! (Row3_0_1 < T0 first 0 , T1 , T2 > (0 , 1) (2) (T0 , T1) (T2) fc = (0) (T0) where u128 = s => ((s . 0 . inner () as u128) << 64) + ((s . 1 . inner () as u128) << 32) + ((s . 2 . inner () as u128) << 0));
-            decl_row ! (Row3_0_2_1 < T0 first 0 , T1 , T2 > (0 , 2 , 1) () (T0 , T2 , T1) () fc = (0) (T0) where u128 = s => ((s . 0 . inner () as u128) << 64) + ((s . 2 . inner () as u128) << 32) + ((s . 1 . inner () as u128) << 0));
             decl_row ! (Row3_1_0_2 < T0 , T1 first 1 , T2 > (1 , 0 , 2) () (T1 , T0 , T2) () fc = (1) (T1) where u128 = s => ((s . 1 . inner () as u128) << 64) + ((s . 0 . inner () as u128) << 32) + ((s . 2 . inner () as u128) << 0));
             decl_row ! (Row3_2_0_1 < T0 , T1 , T2 first 2 > (2 , 0 , 1) () (T2 , T0 , T1) () fc = (2) (T2) where u128 = s => ((s . 2 . inner () as u128) << 64) + ((s . 0 . inner () as u128) << 32) + ((s . 1 . inner () as u128) << 0));
             eclass_wrapper_ty!(Math);
@@ -2278,7 +2277,6 @@ fn codegen_variable_reuse_bug() {
             struct AddRelation {
                 new: Vec<<Self as Relation>::Row>,
                 all_index_0_1_2: IndexImpl<RadixSortCtx<Row3_0_1<Math, Math, Math>, u128>>,
-                all_index_0_2_1: IndexImpl<RadixSortCtx<Row3_0_2_1<Math, Math, Math>, u128>>,
                 all_index_1_0_2: IndexImpl<RadixSortCtx<Row3_1_0_2<Math, Math, Math>, u128>>,
                 all_index_2_0_1: IndexImpl<RadixSortCtx<Row3_2_0_1<Math, Math, Math>, u128>>,
             }
@@ -2286,7 +2284,7 @@ fn codegen_variable_reuse_bug() {
                 type Row = (Math, Math, Math);
             }
             impl AddRelation {
-                const COST: u32 = 12u32;
+                const COST: u32 = 9u32;
                 fn new() -> Self {
                     Self::default()
                 }
@@ -2304,8 +2302,8 @@ fn codegen_variable_reuse_bug() {
                         .range((x0, x1, Math::MIN_ID)..=(x0, x1, Math::MAX_ID))
                         .map(|(x0, x1, x2)| (x2,))
                 }
-                fn iter2_0_2_1(&self, x0: Math, x2: Math) -> impl Iterator<Item = (Math,)> + use<'_> {
-                    self.all_index_0_2_1
+                fn iter2_2_0_1(&self, x2: Math, x0: Math) -> impl Iterator<Item = (Math,)> + use<'_> {
+                    self.all_index_2_0_1
                         .range((x0, Math::MIN_ID, x2)..=(x0, Math::MAX_ID, x2))
                         .map(|(x0, x1, x2)| (x1,))
                 }
@@ -2327,8 +2325,8 @@ fn codegen_variable_reuse_bug() {
                 fn check2_0_1_2(&self, x0: Math, x1: Math) -> bool {
                     self.iter2_0_1_2(x0, x1).next().is_some()
                 }
-                fn check2_0_2_1(&self, x0: Math, x2: Math) -> bool {
-                    self.iter2_0_2_1(x0, x2).next().is_some()
+                fn check2_2_0_1(&self, x2: Math, x0: Math) -> bool {
+                    self.iter2_2_0_1(x2, x0).next().is_some()
                 }
                 fn check1_2_0_1(&self, x2: Math) -> bool {
                     self.iter1_2_0_1(x2).next().is_some()
@@ -2367,8 +2365,6 @@ fn codegen_variable_reuse_bug() {
                     runtime::dedup_suffix(&mut inserts, orig_inserts);
                     self.all_index_0_1_2
                         .delete_many(&mut inserts[orig_inserts..]);
-                    self.all_index_0_2_1
-                        .delete_many(&mut inserts[orig_inserts..]);
                     self.all_index_1_0_2
                         .delete_many(&mut inserts[orig_inserts..]);
                     self.all_index_2_0_1
@@ -2386,8 +2382,6 @@ fn codegen_variable_reuse_bug() {
                             uf.math_.union_mut(x2, y2);
                             old
                         });
-                    self.all_index_0_2_1
-                        .insert_many(&mut inserts, |_, _| unreachable!());
                     self.all_index_1_0_2
                         .insert_many(&mut inserts, |_, _| unreachable!());
                     self.all_index_2_0_1
@@ -2603,7 +2597,7 @@ fn codegen_variable_reuse_bug() {
                     if let Some(zero_3) = self.global_math.get_new(0usize) {
                         if self.add_.check1_2_0_1(zero_3) {
                             let zero_4 = self.global_math.get(0usize);
-                            for (x_2,) in self.add_.iter2_0_2_1(zero_4, zero_3) {
+                            for (x_2,) in self.add_.iter2_2_0_1(zero_3, zero_4) {
                                 self.delta.insert_zero((x_2,));
                             }
                         }
@@ -2612,7 +2606,7 @@ fn codegen_variable_reuse_bug() {
                     if let Some(zero_6) = self.global_math.get_new(0usize) {
                         if self.add_.check1_0_1_2(zero_6) {
                             let zero_5 = self.global_math.get(0usize);
-                            for (x_3,) in self.add_.iter2_0_2_1(zero_6, zero_5) {
+                            for (x_3,) in self.add_.iter2_2_0_1(zero_5, zero_6) {
                                 self.delta.insert_zero((x_3,));
                             }
                         }
@@ -4173,14 +4167,16 @@ fn test_primitives_simple() {
             decl_row ! (Row2_0 < T0 first 0 , T1 > (0) (1) (T0) (T1) fc = (0) (T0) where u64 = s => ((s . 0 . inner () as u64) << 32) + ((s . 1 . inner () as u64) << 0));
             decl_row ! (Row2_1_0 < T0 , T1 first 1 > (1 , 0) () (T1 , T0) () fc = (1) (T1) where u64 = s => ((s . 1 . inner () as u64) << 32) + ((s . 0 . inner () as u64) << 0));
             decl_row ! (Row3_0_1 < T0 first 0 , T1 , T2 > (0 , 1) (2) (T0 , T1) (T2) fc = (0) (T0) where u128 = s => ((s . 0 . inner () as u128) << 64) + ((s . 1 . inner () as u128) << 32) + ((s . 2 . inner () as u128) << 0));
+            decl_row ! (Row3_0_1_2 < T0 first 0 , T1 , T2 > (0 , 1 , 2) () (T0 , T1 , T2) () fc = (0) (T0) where u128 = s => ((s . 0 . inner () as u128) << 64) + ((s . 1 . inner () as u128) << 32) + ((s . 2 . inner () as u128) << 0));
+            decl_row ! (Row3_1_0 < T0 , T1 first 1 , T2 > (1 , 0) (2) (T1 , T0) (T2) fc = (1) (T1) where u128 = s => ((s . 1 . inner () as u128) << 64) + ((s . 0 . inner () as u128) << 32) + ((s . 2 . inner () as u128) << 0));
             decl_row ! (Row3_1_0_2 < T0 , T1 first 1 , T2 > (1 , 0 , 2) () (T1 , T0 , T2) () fc = (1) (T1) where u128 = s => ((s . 1 . inner () as u128) << 64) + ((s . 0 . inner () as u128) << 32) + ((s . 2 . inner () as u128) << 0));
             decl_row ! (Row3_2_0_1 < T0 , T1 , T2 first 2 > (2 , 0 , 1) () (T2 , T0 , T1) () fc = (2) (T2) where u128 = s => ((s . 2 . inner () as u128) << 64) + ((s . 0 . inner () as u128) << 32) + ((s . 1 . inner () as u128) << 0));
             eclass_wrapper_ty!(Math);
             #[derive(Debug, Default)]
             struct MulRelation {
                 new: Vec<<Self as Relation>::Row>,
-                all_index_0_1_2: IndexImpl<RadixSortCtx<Row3_0_1<Math, Math, Math>, u128>>,
-                all_index_1_0_2: IndexImpl<RadixSortCtx<Row3_1_0_2<Math, Math, Math>, u128>>,
+                all_index_0_1_2: IndexImpl<RadixSortCtx<Row3_0_1_2<Math, Math, Math>, u128>>,
+                all_index_1_0_2: IndexImpl<RadixSortCtx<Row3_1_0<Math, Math, Math>, u128>>,
                 all_index_2_0_1: IndexImpl<RadixSortCtx<Row3_2_0_1<Math, Math, Math>, u128>>,
             }
             impl Relation for MulRelation {
@@ -4200,8 +4196,8 @@ fn test_primitives_simple() {
                 fn iter_new(&self) -> impl Iterator<Item = <Self as Relation>::Row> + use<'_> {
                     self.new.iter().copied()
                 }
-                fn iter2_0_1_2(&self, x0: Math, x1: Math) -> impl Iterator<Item = (Math,)> + use<'_> {
-                    self.all_index_0_1_2
+                fn iter2_1_0_2(&self, x1: Math, x0: Math) -> impl Iterator<Item = (Math,)> + use<'_> {
+                    self.all_index_1_0_2
                         .range((x0, x1, Math::MIN_ID)..=(x0, x1, Math::MAX_ID))
                         .map(|(x0, x1, x2)| (x2,))
                 }
@@ -4220,8 +4216,8 @@ fn test_primitives_simple() {
                         .range((Math::MIN_ID, Math::MIN_ID, x2)..=(Math::MAX_ID, Math::MAX_ID, x2))
                         .map(|(x0, x1, x2)| (x0, x1))
                 }
-                fn check2_0_1_2(&self, x0: Math, x1: Math) -> bool {
-                    self.iter2_0_1_2(x0, x1).next().is_some()
+                fn check2_1_0_2(&self, x1: Math, x0: Math) -> bool {
+                    self.iter2_1_0_2(x1, x0).next().is_some()
                 }
                 fn check1_1_0_2(&self, x1: Math) -> bool {
                     self.iter1_1_0_2(x1).next().is_some()
@@ -4233,8 +4229,8 @@ fn test_primitives_simple() {
                     self.iter1_2_0_1(x2).next().is_some()
                 }
                 #[allow(unreachable_code)]
-                fn entry2_0_1_2(&self, x0: Math, x1: Math, delta: &mut Delta, uf: &mut Unification) -> (Math,) {
-                    if let Some((x2,)) = self.iter2_0_1_2(x0, x1).next() {
+                fn entry2_1_0_2(&self, x1: Math, x0: Math, delta: &mut Delta, uf: &mut Unification) -> (Math,) {
+                    if let Some((x2,)) = self.iter2_1_0_2(x1, x0).next() {
                         return (x2,);
                     }
                     let x2 = uf.math_.add_eclass();
@@ -4271,14 +4267,14 @@ fn test_primitives_simple() {
                     });
                     self.all_index_0_1_2.filter_existing(&mut inserts);
                     self.all_index_0_1_2
+                        .insert_many(&mut inserts, |_, _| unreachable!());
+                    self.all_index_1_0_2
                         .insert_many(&mut inserts, |mut old, mut new| {
                             let (x2,) = old.value_mut();
                             let (y2,) = new.value_mut();
                             uf.math_.union_mut(x2, y2);
                             old
                         });
-                    self.all_index_1_0_2
-                        .insert_many(&mut inserts, |_, _| unreachable!());
                     self.all_index_2_0_1
                         .insert_many(&mut inserts, |_, _| unreachable!());
                     self.new.extend_from_slice(&inserts);
@@ -4972,8 +4968,8 @@ fn triangle_join() {
                 fn iter_new(&self) -> impl Iterator<Item = <Self as Relation>::Row> + use<'_> {
                     self.new.iter().copied()
                 }
-                fn iter2_0_1(&self, x0: Math, x1: Math) -> impl Iterator<Item = ()> + use<'_> {
-                    self.all_index_0_1
+                fn iter2_1_0(&self, x1: Math, x0: Math) -> impl Iterator<Item = ()> + use<'_> {
+                    self.all_index_1_0
                         .range((x0, x1)..=(x0, x1))
                         .map(|(x0, x1)| ())
                 }
@@ -4987,8 +4983,8 @@ fn triangle_join() {
                         .range((x0, Math::MIN_ID)..=(x0, Math::MAX_ID))
                         .map(|(x0, x1)| (x1,))
                 }
-                fn check2_0_1(&self, x0: Math, x1: Math) -> bool {
-                    self.iter2_0_1(x0, x1).next().is_some()
+                fn check2_1_0(&self, x1: Math, x0: Math) -> bool {
+                    self.iter2_1_0(x1, x0).next().is_some()
                 }
                 fn check1_1_0(&self, x1: Math) -> bool {
                     self.iter1_1_0(x1).next().is_some()
@@ -4997,8 +4993,8 @@ fn triangle_join() {
                     self.iter1_0_1(x0).next().is_some()
                 }
                 #[allow(unreachable_code)]
-                fn entry2_0_1(&self, x0: Math, x1: Math, delta: &mut Delta, uf: &mut Unification) -> () {
-                    if let Some(()) = self.iter2_0_1(x0, x1).next() {
+                fn entry2_1_0(&self, x1: Math, x0: Math, delta: &mut Delta, uf: &mut Unification) -> () {
+                    if let Some(()) = self.iter2_1_0(x1, x0).next() {
                         return ();
                     }
                     delta.foo_.push((x0, x1));
@@ -5168,8 +5164,8 @@ fn triangle_join() {
                 fn iter_new(&self) -> impl Iterator<Item = <Self as Relation>::Row> + use<'_> {
                     self.new.iter().copied()
                 }
-                fn iter2_0_1(&self, x0: Math, x1: Math) -> impl Iterator<Item = ()> + use<'_> {
-                    self.all_index_0_1
+                fn iter2_1_0(&self, x1: Math, x0: Math) -> impl Iterator<Item = ()> + use<'_> {
+                    self.all_index_1_0
                         .range((x0, x1)..=(x0, x1))
                         .map(|(x0, x1)| ())
                 }
@@ -5183,8 +5179,8 @@ fn triangle_join() {
                         .range((x0, Math::MIN_ID)..=(x0, Math::MAX_ID))
                         .map(|(x0, x1)| (x1,))
                 }
-                fn check2_0_1(&self, x0: Math, x1: Math) -> bool {
-                    self.iter2_0_1(x0, x1).next().is_some()
+                fn check2_1_0(&self, x1: Math, x0: Math) -> bool {
+                    self.iter2_1_0(x1, x0).next().is_some()
                 }
                 fn check1_1_0(&self, x1: Math) -> bool {
                     self.iter1_1_0(x1).next().is_some()
@@ -5193,8 +5189,8 @@ fn triangle_join() {
                     self.iter1_0_1(x0).next().is_some()
                 }
                 #[allow(unreachable_code)]
-                fn entry2_0_1(&self, x0: Math, x1: Math, delta: &mut Delta, uf: &mut Unification) -> () {
-                    if let Some(()) = self.iter2_0_1(x0, x1).next() {
+                fn entry2_1_0(&self, x1: Math, x0: Math, delta: &mut Delta, uf: &mut Unification) -> () {
+                    if let Some(()) = self.iter2_1_0(x1, x0).next() {
                         return ();
                     }
                     delta.baz_.push((x0, x1));
@@ -5445,7 +5441,7 @@ fn triangle_join() {
                     for (a, b) in self.foo_.iter_new() {
                         if self.baz_.check1_1_0(a) {
                             for (c,) in self.bar_.iter1_0_1(b) {
-                                if self.baz_.check2_0_1(c, a) {
+                                if self.baz_.check2_1_0(a, c) {
                                     self.delta.insert_triangle((a, b, c));
                                 }
                             }
@@ -5455,7 +5451,7 @@ fn triangle_join() {
                     for (b_2, c_2) in self.bar_.iter_new() {
                         if self.foo_.check1_1_0(b_2) {
                             for (a_2,) in self.baz_.iter1_0_1(c_2) {
-                                if self.foo_.check2_0_1(a_2, b_2) {
+                                if self.foo_.check2_1_0(b_2, a_2) {
                                     self.delta.insert_triangle((a_2, b_2, c_2));
                                 }
                             }
@@ -5465,7 +5461,7 @@ fn triangle_join() {
                     for (c_3, a_3) in self.baz_.iter_new() {
                         if self.foo_.check1_0_1(a_3) {
                             for (b_3,) in self.bar_.iter1_1_0(c_3) {
-                                if self.foo_.check2_0_1(a_3, b_3) {
+                                if self.foo_.check2_1_0(b_3, a_3) {
                                     self.delta.insert_triangle((a_3, b_3, c_3));
                                 }
                             }
@@ -5583,7 +5579,6 @@ fn edgecase0() {
         expected_codegen : Some(expect![[r#"
             use oatlog::runtime::{self, *};
             decl_row ! (Row3_0_1 < T0 first 0 , T1 , T2 > (0 , 1) (2) (T0 , T1) (T2) fc = (0) (T0) where u128 = s => ((s . 0 . inner () as u128) << 64) + ((s . 1 . inner () as u128) << 32) + ((s . 2 . inner () as u128) << 0));
-            decl_row ! (Row3_0_2_1 < T0 first 0 , T1 , T2 > (0 , 2 , 1) () (T0 , T2 , T1) () fc = (0) (T0) where u128 = s => ((s . 0 . inner () as u128) << 64) + ((s . 2 . inner () as u128) << 32) + ((s . 1 . inner () as u128) << 0));
             decl_row ! (Row3_1_0_2 < T0 , T1 first 1 , T2 > (1 , 0 , 2) () (T1 , T0 , T2) () fc = (1) (T1) where u128 = s => ((s . 1 . inner () as u128) << 64) + ((s . 0 . inner () as u128) << 32) + ((s . 2 . inner () as u128) << 0));
             decl_row ! (Row3_2_0_1 < T0 , T1 , T2 first 2 > (2 , 0 , 1) () (T2 , T0 , T1) () fc = (2) (T2) where u128 = s => ((s . 2 . inner () as u128) << 64) + ((s . 0 . inner () as u128) << 32) + ((s . 1 . inner () as u128) << 0));
             eclass_wrapper_ty!(Math);
@@ -5591,7 +5586,6 @@ fn edgecase0() {
             struct MulRelation {
                 new: Vec<<Self as Relation>::Row>,
                 all_index_0_1_2: IndexImpl<RadixSortCtx<Row3_0_1<Math, Math, Math>, u128>>,
-                all_index_0_2_1: IndexImpl<RadixSortCtx<Row3_0_2_1<Math, Math, Math>, u128>>,
                 all_index_1_0_2: IndexImpl<RadixSortCtx<Row3_1_0_2<Math, Math, Math>, u128>>,
                 all_index_2_0_1: IndexImpl<RadixSortCtx<Row3_2_0_1<Math, Math, Math>, u128>>,
             }
@@ -5599,7 +5593,7 @@ fn edgecase0() {
                 type Row = (Math, Math, Math);
             }
             impl MulRelation {
-                const COST: u32 = 12u32;
+                const COST: u32 = 9u32;
                 fn new() -> Self {
                     Self::default()
                 }
@@ -5622,8 +5616,8 @@ fn edgecase0() {
                         .range((x0, Math::MIN_ID, Math::MIN_ID)..=(x0, Math::MAX_ID, Math::MAX_ID))
                         .map(|(x0, x1, x2)| (x1, x2))
                 }
-                fn iter2_0_2_1(&self, x0: Math, x2: Math) -> impl Iterator<Item = (Math,)> + use<'_> {
-                    self.all_index_0_2_1
+                fn iter2_2_0_1(&self, x2: Math, x0: Math) -> impl Iterator<Item = (Math,)> + use<'_> {
+                    self.all_index_2_0_1
                         .range((x0, Math::MIN_ID, x2)..=(x0, Math::MAX_ID, x2))
                         .map(|(x0, x1, x2)| (x1,))
                 }
@@ -5643,8 +5637,8 @@ fn edgecase0() {
                 fn check1_0_1_2(&self, x0: Math) -> bool {
                     self.iter1_0_1_2(x0).next().is_some()
                 }
-                fn check2_0_2_1(&self, x0: Math, x2: Math) -> bool {
-                    self.iter2_0_2_1(x0, x2).next().is_some()
+                fn check2_2_0_1(&self, x2: Math, x0: Math) -> bool {
+                    self.iter2_2_0_1(x2, x0).next().is_some()
                 }
                 fn check1_2_0_1(&self, x2: Math) -> bool {
                     self.iter1_2_0_1(x2).next().is_some()
@@ -5680,8 +5674,6 @@ fn edgecase0() {
                     runtime::dedup_suffix(&mut inserts, orig_inserts);
                     self.all_index_0_1_2
                         .delete_many(&mut inserts[orig_inserts..]);
-                    self.all_index_0_2_1
-                        .delete_many(&mut inserts[orig_inserts..]);
                     self.all_index_1_0_2
                         .delete_many(&mut inserts[orig_inserts..]);
                     self.all_index_2_0_1
@@ -5699,8 +5691,6 @@ fn edgecase0() {
                             uf.math_.union_mut(x2, y2);
                             old
                         });
-                    self.all_index_0_2_1
-                        .insert_many(&mut inserts, |_, _| unreachable!());
                     self.all_index_1_0_2
                         .insert_many(&mut inserts, |_, _| unreachable!());
                     self.all_index_2_0_1
@@ -5951,7 +5941,7 @@ fn edgecase0() {
                     for (a_2, c_2, p4_2) in self.mul_.iter_new() {
                         if self.mul_.check1_0_1_2(a_2) {
                             for (p2_2, p5_2) in self.add_.iter1_1_0_2(p4_2) {
-                                for (b_2,) in self.mul_.iter2_0_2_1(a_2, p2_2) {
+                                for (b_2,) in self.mul_.iter2_2_0_1(p2_2, a_2) {
                                     let (a4_2,) =
                                         self.add_
                                             .entry2_0_1_2(b_2, c_2, &mut self.delta, &mut self.uf);
@@ -5964,7 +5954,7 @@ fn edgecase0() {
                     for (p2_3, p4_3, p5_3) in self.add_.iter_new() {
                         if self.mul_.check1_2_0_1(p2_3) {
                             for (a_3, c_3) in self.mul_.iter1_2_0_1(p4_3) {
-                                for (b_3,) in self.mul_.iter2_0_2_1(a_3, p2_3) {
+                                for (b_3,) in self.mul_.iter2_2_0_1(p2_3, a_3) {
                                     let (a4_3,) =
                                         self.add_
                                             .entry2_0_1_2(b_3, c_3, &mut self.delta, &mut self.uf);
