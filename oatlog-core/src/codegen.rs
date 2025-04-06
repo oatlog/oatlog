@@ -14,24 +14,18 @@ use std::{
     iter,
 };
 
-pub trait MultiUnzipVec<FromI>: Iterator {
-    fn collect_vecs(self) -> FromI;
-}
-
 macro_rules! impl_unzip_iter {
-    ($($T:ident $t:ident),*) => (
-        #[allow(non_snake_case)]
-        impl<IT: Iterator<Item = ($($T,)*)>, $($T),* > MultiUnzipVec<($(Vec<$T>,)*)> for IT {
-            fn collect_vecs(self) -> ($(Vec<$T>,)*) {
+    () => { pub trait MultiUnzipVec<FromI>: Iterator { fn collect_vecs(self) -> FromI; } };
+    ($T:ident $(, $TS:ident)*) => (
+        impl_unzip_iter!($($TS),*);
+        impl<IT: Iterator<Item = ($T, $($TS,)*)>, $T, $($TS),* > MultiUnzipVec<(Vec<$T>, $(Vec<$TS>,)*)> for IT {
+            fn collect_vecs(self) -> (Vec<$T>, $(Vec<$TS>,)*) {
                 self.collect()
             }
         }
     );
 }
-impl_unzip_iter!();
-impl_unzip_iter!(A a);
-impl_unzip_iter!(A a, B b);
-impl_unzip_iter!(A a, B b, C c);
+impl_unzip_iter!(A, B, C, D, E, F, G, H, I, J, K, L);
 
 // TODO: emit identifiers with correct spans.
 

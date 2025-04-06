@@ -18,7 +18,7 @@ mod expect_tests;
 
 use frontend::MResult;
 use itertools::Itertools;
-use std::panic::UnwindSafe;
+use std::{collections::BTreeMap, panic::UnwindSafe};
 
 fn to_egglog_ast(program: &str) -> frontend::egglog_ast::Program {
     let program = program.to_string().leak();
@@ -254,4 +254,17 @@ fn format_tokens(tokens: &proc_macro2::TokenStream) -> String {
     assert!(stderr.is_empty(), "{}", String::from_utf8(stderr).unwrap());
     assert_eq!(status.code(), Some(0));
     String::from_utf8(stdout).unwrap()
+}
+
+trait MultiMapCollect<K, V> {
+    fn collect_multimap(self) -> BTreeMap<K, Vec<V>>;
+}
+impl<K: Ord, V, T: Iterator<Item = (K, V)>> MultiMapCollect<K, V> for T {
+    fn collect_multimap(self) -> BTreeMap<K, Vec<V>> {
+        let mut map: BTreeMap<K, Vec<V>> = BTreeMap::new();
+        for (k, v) in self {
+            map.entry(k).or_default().push(v);
+        }
+        map
+    }
 }

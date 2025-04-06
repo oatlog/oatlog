@@ -32,6 +32,7 @@ use crate::{
 };
 
 pub(crate) mod egglog_ast;
+pub(crate) mod primitive;
 pub(crate) mod sexp;
 pub(crate) mod span;
 

@@ -41,6 +41,7 @@ voracious_radix_sort = "1"
 proptest = "1.6.0"
 proptest-derive = "0.5.1"
 rand = "0.9.0"
+darling = "0.20.11"
 
 [profile.release]
 debug = true
