@@ -63,7 +63,6 @@ pub fn codegen(theory: &Theory) -> TokenStream {
 
             variables_bound: &mut theory.rule_variables.new_same_size(),
             scoped: true,
-            priority_cap: Priority::MIN,
             global_variable_types: &theory.global_variable_types,
             global_idx: &global_variables_map,
         }
@@ -398,7 +397,6 @@ struct CodegenRuleTrieCtx<'a> {
     variables_bound: &'a mut TVec<VariableId, bool>,
     /// Can variables be added without affecting top-level scope?
     scoped: bool,
-    priority_cap: Priority,
 }
 
 impl CodegenRuleTrieCtx<'_> {
@@ -943,7 +941,6 @@ fn codegen_relation(
         .iter()
         .map(|type_| ident::type_ty(&theory.types[type_]))
         .collect();
-    let theory_delta_ty = ident::theory_delta_ty(theory);
     let rel_update_ctx_ty = ident::rel_update_ctx_ty(rel);
 
     match &rel.kind {
@@ -954,7 +951,7 @@ fn codegen_relation(
         RelationKind::Table {
             usage_to_info,
             index_to_info,
-            column_back_reference,
+            column_back_reference: _,
         } => {
             let (index_fields_name, index_fields_ty) = index_to_info
                 .iter()
@@ -1169,7 +1166,7 @@ fn codegen_relation(
                     (first_index_ident, first_index_order)
                 };
 
-                let (col_symbs_symbolic, col_num_symbolic, uf_all_symbolic) = rel
+                let (col_num_symbolic, uf_all_symbolic) = rel
                     .param_types
                     .iter_enumerate()
                     .filter_map(|(i, ty)| {
@@ -1177,7 +1174,6 @@ fn codegen_relation(
                         match ty.kind {
                             TypeKind::Primitive { type_path: _ } => None,
                             TypeKind::Symbolic => Some((
-                                ident::column(i),
                                 proc_macro2::Literal::usize_unsuffixed(i.0),
                                 ident::type_uf(ty),
                             )),
@@ -1190,21 +1186,18 @@ fn codegen_relation(
                     .map(|index_info| ident::index_all_field(index_info))
                     .collect_vec();
 
-                let first_indexes_all = indexes_all[0].clone();
-
                 let column_types = rel
                     .param_types
                     .iter()
                     .copied()
                     .map(|ty| ident::type_name(&theory.types[ty]).to_string());
 
-                let col_symbs = rel.param_types.enumerate().map(ident::column).collect_vec();
-
                 let relation_name = ident::rel_get(rel).to_string();
 
                 let already_canon_expr: TokenStream = if uf_all_symbolic.is_empty() {
                     quote! { true }
                 } else {
+                    #[allow(unstable_name_collisions, reason = "itertools and std intersperse behave identically")]
                     Iterator::zip(uf_all_symbolic.iter(), col_num_symbolic.iter())
                         .map(|(uf_symb, col_symb)| quote!{ uf.#uf_symb.already_canonical(&mut row.#col_symb) })
                         .intersperse(quote!{ && })
@@ -1454,31 +1447,5 @@ mod ident {
     pub fn delta_insert_row(rel: &RelationData) -> Ident {
         let x = rel.name.to_snake_case();
         format_ident!("insert_{x}")
-    }
-}
-
-#[derive(PartialEq, Eq, PartialOrd, Ord, Clone, Copy)]
-#[repr(usize)]
-pub enum Priority {
-    /// Highest priority, insertions caused by UF join. Bounded O(N).
-    Canonicalizing,
-    /// Medium priority, insertions that did not require new e-classes. Bounded O(N^arity).
-    Surjective,
-    /// Lowest priority, insertions using new e-classes. Potentially non-terminating.
-    Nonsurjective,
-}
-impl Priority {
-    const COUNT: usize = 3;
-    const LIST: [Self; Self::COUNT] = [Self::Canonicalizing, Self::Surjective, Self::Nonsurjective];
-    const MIN: Self = Self::LIST[0];
-    const MAX: Self = Self::LIST[Self::COUNT - 1];
-}
-impl quote::ToTokens for Priority {
-    fn to_tokens(&self, tokens: &mut TokenStream) {
-        match self {
-            Self::Canonicalizing => tokens.extend(quote!(Priority::Canonicalizing)),
-            Self::Surjective => tokens.extend(quote!(Priority::Surjective)),
-            Self::Nonsurjective => tokens.extend(quote!(Priority::Nonsurjective)),
-        }
     }
 }

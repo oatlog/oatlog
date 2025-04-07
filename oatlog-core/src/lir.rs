@@ -147,6 +147,10 @@ pub enum RelationKind {
         /// Usage sites of any indexes
         usage_to_info: TVec<IndexUsageId, IndexUsageInfo>,
         /// Index usage for back-references.
+        #[allow(
+            dead_code,
+            reason = "`SortedVec` indexes do not use `column_back_reference` but other indexes (none currently used) could."
+        )]
         column_back_reference: TVec<ColumnId, IndexUsageId>,
         // trigger_rules: ...
     },

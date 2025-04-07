@@ -1,9 +1,7 @@
 //! All query plan *choices* occur here.
 use crate::{
     hir::{self, ActionRelation, PremiseRelation, RelationTy, SymbolicRule, Theory},
-    ids::{
-        ActionId, ColumnId, ImplicitRuleId, IndexUsageId, PremiseId, RelationId, TypeId, VariableId,
-    },
+    ids::{ActionId, ColumnId, IndexUsageId, PremiseId, RelationId, VariableId},
     index_selection, lir,
     typed_vec::{TVec, tvec},
 };
