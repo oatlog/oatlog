@@ -1,6 +1,7 @@
 [workspace]
 members = [
     "comparative-test",
+    "examples/partial-integration",
     "examples/quadratic-formula",
     "examples/simple-forall",
     "examples/test-api",
