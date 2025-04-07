@@ -17,13 +17,6 @@ pub fn codegen_table_relation(
     index_to_info: &TVec<IndexId, IndexInfo>,
 ) -> TokenStream {
     assert!(matches!(rel.kind, RelationKind::Table { .. }));
-    let rel_ty = ident::rel_ty(rel);
-    let params: Vec<TokenStream> = rel
-        .param_types
-        .iter()
-        .map(|type_| ident::type_ty(&theory.types[type_]))
-        .collect();
-    let rel_update_ctx_ty = ident::rel_update_ctx_ty(rel);
 
     let (index_fields_name, index_fields_ty) = index_to_info
         .iter()
@@ -57,9 +50,34 @@ pub fn codegen_table_relation(
         })
         .collect_vecs();
 
-    let cost = u32::try_from(index_to_info.len() * rel.param_types.len()).unwrap();
+    let (first_index_ident, first_index_order): (Ident, Vec<_>) = {
+        let [first_index, ..] = index_to_info.inner().as_slice() else {
+            panic!("zero indexes?")
+        };
+        let first_index_order = first_index
+            .permuted_columns
+            .iter()
+            .copied()
+            .map(ident::column)
+            .collect();
+        let first_index_ident = ident::index_all_field(first_index);
+        (first_index_ident, first_index_order)
+    };
 
-    let arbitrary_index = ident::index_all_field(index_to_info.iter().next().unwrap());
+    let (params, column_types) = rel
+        .param_types
+        .iter()
+        .map(|ty| {
+            let type_ = &theory.types[ty];
+            (ident::type_ty(type_), ident::type_name(type_).to_string())
+        })
+        .collect_vecs();
+
+    let rel_ty = ident::rel_ty(rel);
+    let rel_update_ctx_ty = ident::rel_update_ctx_ty(rel);
+    let relation_name = ident::rel_get(rel).to_string();
+
+    let cost = u32::try_from(index_to_info.len() * rel.param_types.len()).unwrap();
 
     let (iter_all, check_all, entry_all) = usage_to_info
         .iter()
@@ -67,175 +85,14 @@ pub fn codegen_table_relation(
         .map(|usage_info| per_usage(rel, theory, index_to_info, usage_info))
         .collect_vecs();
 
-    let update = {
-        let indexes_merge_fn = index_to_info
-            .iter()
-            .map(
-                |IndexInfo {
-                     permuted_columns,
-                     primary_key_prefix_len,
-                     primary_key_violation_merge,
-                 }| {
-                    let mut value_columns: Vec<ColumnId> = permuted_columns
-                        .iter()
-                        .copied()
-                        .skip(*primary_key_prefix_len)
-                        .collect();
+    let (update_ctx_field_decl, update_fns) = update(
+        rel,
+        theory,
+        index_to_info,
+        first_index_ident.clone(),
+        index_fields_ty.first().unwrap(),
+    );
 
-                    if value_columns.is_empty() {
-                        return quote! { |_, _, _| unreachable!() };
-                    }
-
-                    value_columns.sort();
-
-                    let (body, col_x, col_y) = value_columns
-                        .iter()
-                        .map(|x| {
-                            let col_x = ident::column(*x);
-                            let col_y = ident::column_alt(*x);
-                            let ty = rel.param_types[*x];
-                            let ty = &theory.types[ty];
-                            let uf = ident::type_uf(ty);
-                            (
-                                match primary_key_violation_merge[x] {
-                                    MergeTy::Union => {
-                                        quote! (uf.#uf.union_mut(#col_x, #col_y);)
-                                    }
-                                    MergeTy::Panic => quote! {
-                                        if #col_x != #col_y {
-                                            panic!();
-                                        }
-                                    },
-                                },
-                                col_x,
-                                col_y,
-                            )
-                        })
-                        .collect_vecs();
-
-                    quote! {
-                        |uf, x, mut y| {
-                            ran_merge = true;
-                            let (#(#col_x,)*) = x.value_mut();
-                            let (#(#col_y,)*) = y.value_mut();
-                            #(#body)*
-                        }
-                    }
-                },
-            )
-            .collect_vec();
-
-        let (first_index_ident, first_index_order): (Ident, Vec<_>) = {
-            let [first_index, ..] = index_to_info.inner().as_slice() else {
-                panic!("zero indexes?")
-            };
-            let first_index_order = first_index
-                .permuted_columns
-                .iter()
-                .copied()
-                .map(ident::column)
-                .collect();
-            let first_index_ident = ident::index_all_field(first_index);
-            (first_index_ident, first_index_order)
-        };
-
-        let (col_num_symbolic, uf_all_symbolic) = rel
-            .param_types
-            .iter_enumerate()
-            .filter_map(|(i, ty)| {
-                let ty = &theory.types[ty];
-                match ty.kind {
-                    TypeKind::Primitive { type_path: _ } => None,
-                    TypeKind::Symbolic => Some((
-                        proc_macro2::Literal::usize_unsuffixed(i.0),
-                        ident::type_uf(ty),
-                    )),
-                }
-            })
-            .collect_vecs();
-
-        let indexes_all = index_to_info
-            .iter()
-            .map(|index_info| ident::index_all_field(index_info))
-            .collect_vec();
-
-        let column_types = rel
-            .param_types
-            .iter()
-            .copied()
-            .map(|ty| ident::type_name(&theory.types[ty]).to_string());
-
-        let relation_name = ident::rel_get(rel).to_string();
-
-        let already_canon_expr: TokenStream = if uf_all_symbolic.is_empty() {
-            quote! { true }
-        } else {
-            #[allow(unstable_name_collisions, reason = "itertools and std intersperse behave identically")]
-                    Iterator::zip(uf_all_symbolic.iter(), col_num_symbolic.iter())
-                        .map(|(uf_symb, col_symb)| quote!{ uf.#uf_symb.already_canonical(&mut row.#col_symb) })
-                        .intersperse(quote!{ && })
-                        .collect::<TokenStream>()
-        };
-
-        quote! {
-            fn update(
-                &mut self,
-                insertions: &mut Vec<Self::Row>,
-                ctx: &mut Self::UpdateCtx,
-                uf: &mut Unification,
-            ) {
-                insertions.iter_mut().for_each(|row| {
-                    #(row.#col_num_symbolic = uf.#uf_all_symbolic.find(row.#col_num_symbolic);)*
-                });
-                let already_canon = |uf: &mut Unification, row: &mut Self::Row| #already_canon_expr;
-                let mut ran_merge = false;
-                loop {
-                    #(
-                        self.#indexes_all.sorted_vec_update(
-                            insertions,
-                            &mut ctx.deferred_insertions,
-                            &mut ctx.scratch,
-                            uf,
-                            already_canon,
-                            #indexes_merge_fn,
-                        );
-                    )*
-                    if ctx.deferred_insertions.is_empty() && ran_merge == false {
-                        break;
-                    }
-                    ran_merge = false;
-                    std::mem::swap(insertions, &mut ctx.deferred_insertions);
-                    ctx.deferred_insertions.clear();
-                }
-                insertions.clear();
-                assert!(ctx.scratch.is_empty());
-                assert!(ctx.deferred_insertions.is_empty());
-            }
-            fn update_begin(&self) -> Self::UpdateCtx {
-                #rel_update_ctx_ty {
-                    scratch: Vec::new(),
-                    deferred_insertions: Vec::new(),
-                    old: self.#arbitrary_index.clone(),
-                }
-            }
-            fn update_finalize(
-                &mut self,
-                ctx: Self::UpdateCtx,
-                uf: &mut Unification,
-            ) {
-                self.new.extend(self.#arbitrary_index.minus(&ctx.old));
-            }
-            fn emit_graphviz(&self, buf: &mut String) {
-                use std::fmt::Write;
-                for (i, (#(#first_index_order,)*)) in self.#first_index_ident.iter().enumerate() {
-                    #(writeln!(buf, "{}_{i} -> {}_{};", #relation_name, #column_types, #first_index_order).unwrap();)*
-                    writeln!(buf, "{}_{i} [shape = box];", #relation_name).unwrap();
-                }
-            }
-        }
-    };
-
-    let arbitrary_index_ty = index_fields_ty.first().unwrap();
     quote! {
         #[derive(Debug, Default)]
         struct #rel_ty {
@@ -243,9 +100,7 @@ pub fn codegen_table_relation(
             #(#index_fields_name: #index_fields_ty,)*
         }
         struct #rel_update_ctx_ty {
-            scratch: Vec<(#(#params,)*)>,
-            deferred_insertions: Vec<(#(#params,)*)>,
-            old: #arbitrary_index_ty,
+            #update_ctx_field_decl
         }
         impl Relation for #rel_ty {
             type Row = (#(#params,)*);
@@ -267,10 +122,16 @@ pub fn codegen_table_relation(
                 self.new.iter().copied()
             }
             fn len(&self) -> usize {
-                self.#arbitrary_index.len()
+                self.#first_index_ident.len()
             }
-
-            #update
+            fn emit_graphviz(&self, buf: &mut String) {
+                use std::fmt::Write;
+                for (i, (#(#first_index_order,)*)) in self.#first_index_ident.iter().enumerate() {
+                    #(writeln!(buf, "{}_{i} -> {}_{};", #relation_name, #column_types, #first_index_order).unwrap();)*
+                    writeln!(buf, "{}_{i} [shape = box];", #relation_name).unwrap();
+                }
+            }
+            #update_fns
         }
         impl #rel_ty {
             #(#iter_all)*
@@ -278,6 +139,169 @@ pub fn codegen_table_relation(
             #(#entry_all)*
         }
     }
+}
+
+fn update(
+    rel: &RelationData,
+    theory: &Theory,
+    index_to_info: &TVec<IndexId, IndexInfo>,
+    primary_index_ident: Ident,
+    primary_index_ty: &TokenStream,
+) -> (TokenStream, TokenStream) {
+    let indexes_merge_fn = index_to_info
+        .iter()
+        .map(
+            |IndexInfo {
+                 permuted_columns,
+                 primary_key_prefix_len,
+                 primary_key_violation_merge,
+             }| {
+                let mut value_columns: Vec<ColumnId> = permuted_columns
+                    .iter()
+                    .copied()
+                    .skip(*primary_key_prefix_len)
+                    .collect();
+
+                if value_columns.is_empty() {
+                    return quote! { |_, _, _| unreachable!() };
+                }
+
+                value_columns.sort();
+
+                let (body, col_x, col_y) = value_columns
+                    .iter()
+                    .map(|x| {
+                        let col_x = ident::column(*x);
+                        let col_y = ident::column_alt(*x);
+                        let ty = rel.param_types[*x];
+                        let ty = &theory.types[ty];
+                        let uf = ident::type_uf(ty);
+                        (
+                            match primary_key_violation_merge[x] {
+                                MergeTy::Union => {
+                                    quote! (uf.#uf.union_mut(#col_x, #col_y);)
+                                }
+                                MergeTy::Panic => quote! {
+                                    if #col_x != #col_y {
+                                        panic!();
+                                    }
+                                },
+                            },
+                            col_x,
+                            col_y,
+                        )
+                    })
+                    .collect_vecs();
+
+                quote! {
+                    |uf, x, mut y| {
+                        ran_merge = true;
+                        let (#(#col_x,)*) = x.value_mut();
+                        let (#(#col_y,)*) = y.value_mut();
+                        #(#body)*
+                    }
+                }
+            },
+        )
+        .collect_vec();
+
+    let (col_num_symbolic, uf_all_symbolic) = rel
+        .param_types
+        .iter_enumerate()
+        .filter_map(|(i, ty)| {
+            let ty = &theory.types[ty];
+            match ty.kind {
+                TypeKind::Primitive { type_path: _ } => None,
+                TypeKind::Symbolic => Some((
+                    proc_macro2::Literal::usize_unsuffixed(i.0),
+                    ident::type_uf(ty),
+                )),
+            }
+        })
+        .collect_vecs();
+
+    let indexes_all = index_to_info
+        .iter()
+        .map(|index_info| ident::index_all_field(index_info))
+        .collect_vec();
+
+    let already_canon_expr: TokenStream = if uf_all_symbolic.is_empty() {
+        quote! { true }
+    } else {
+        #[allow(
+            unstable_name_collisions,
+            reason = "itertools and std intersperse behave identically"
+        )]
+        Iterator::zip(uf_all_symbolic.iter(), col_num_symbolic.iter())
+            .map(|(uf_symb, col_symb)| quote! { uf.#uf_symb.already_canonical(&mut row.#col_symb) })
+            .intersperse(quote! { && })
+            .collect::<TokenStream>()
+    };
+
+    let params: Vec<TokenStream> = rel
+        .param_types
+        .iter()
+        .map(|type_| ident::type_ty(&theory.types[type_]))
+        .collect();
+
+    let rel_update_ctx_ty = ident::rel_update_ctx_ty(rel);
+
+    let update_ctx_field_decl = quote! {
+        scratch: Vec<(#(#params,)*)>,
+        deferred_insertions: Vec<(#(#params,)*)>,
+        old: #primary_index_ty,
+    };
+    let update_fns = quote! {
+        fn update(
+            &mut self,
+            insertions: &mut Vec<Self::Row>,
+            ctx: &mut Self::UpdateCtx,
+            uf: &mut Unification,
+        ) {
+            insertions.iter_mut().for_each(|row| {
+                #(row.#col_num_symbolic = uf.#uf_all_symbolic.find(row.#col_num_symbolic);)*
+            });
+            let already_canon = |uf: &mut Unification, row: &mut Self::Row| #already_canon_expr;
+            let mut ran_merge = false;
+            loop {
+                #(
+                    self.#indexes_all.sorted_vec_update(
+                        insertions,
+                        &mut ctx.deferred_insertions,
+                        &mut ctx.scratch,
+                        uf,
+                        already_canon,
+                        #indexes_merge_fn,
+                    );
+                )*
+                if ctx.deferred_insertions.is_empty() && ran_merge == false {
+                    break;
+                }
+                ran_merge = false;
+                std::mem::swap(insertions, &mut ctx.deferred_insertions);
+                ctx.deferred_insertions.clear();
+            }
+            insertions.clear();
+            assert!(ctx.scratch.is_empty());
+            assert!(ctx.deferred_insertions.is_empty());
+        }
+        fn update_begin(&self) -> Self::UpdateCtx {
+            #rel_update_ctx_ty {
+                scratch: Vec::new(),
+                deferred_insertions: Vec::new(),
+                old: self.#primary_index_ident.clone(),
+            }
+        }
+        fn update_finalize(
+            &mut self,
+            ctx: Self::UpdateCtx,
+            uf: &mut Unification,
+        ) {
+            self.new.extend(self.#primary_index_ident.minus(&ctx.old));
+        }
+    };
+
+    (update_ctx_field_decl, update_fns)
 }
 
 fn per_usage(

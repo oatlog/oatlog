@@ -579,6 +579,15 @@ fn codegen_commutative() {
                 fn len(&self) -> usize {
                     self.all_index_0_1_2.len()
                 }
+                fn emit_graphviz(&self, buf: &mut String) {
+                    use std::fmt::Write;
+                    for (i, (x0, x1, x2)) in self.all_index_0_1_2.iter().enumerate() {
+                        writeln!(buf, "{}_{i} -> {}_{};", "add", "math", x0).unwrap();
+                        writeln!(buf, "{}_{i} -> {}_{};", "add", "math", x1).unwrap();
+                        writeln!(buf, "{}_{i} -> {}_{};", "add", "math", x2).unwrap();
+                        writeln!(buf, "{}_{i} [shape = box];", "add").unwrap();
+                    }
+                }
                 fn update(
                     &mut self,
                     insertions: &mut Vec<Self::Row>,
@@ -646,15 +655,6 @@ fn codegen_commutative() {
                 }
                 fn update_finalize(&mut self, ctx: Self::UpdateCtx, uf: &mut Unification) {
                     self.new.extend(self.all_index_0_1_2.minus(&ctx.old));
-                }
-                fn emit_graphviz(&self, buf: &mut String) {
-                    use std::fmt::Write;
-                    for (i, (x0, x1, x2)) in self.all_index_0_1_2.iter().enumerate() {
-                        writeln!(buf, "{}_{i} -> {}_{};", "add", "math", x0).unwrap();
-                        writeln!(buf, "{}_{i} -> {}_{};", "add", "math", x1).unwrap();
-                        writeln!(buf, "{}_{i} -> {}_{};", "add", "math", x2).unwrap();
-                        writeln!(buf, "{}_{i} [shape = box];", "add").unwrap();
-                    }
                 }
             }
             impl AddRelation {
@@ -960,6 +960,15 @@ fn regression_entry2() {
                 fn len(&self) -> usize {
                     self.all_index_0_1_2.len()
                 }
+                fn emit_graphviz(&self, buf: &mut String) {
+                    use std::fmt::Write;
+                    for (i, (x0, x1, x2)) in self.all_index_0_1_2.iter().enumerate() {
+                        writeln!(buf, "{}_{i} -> {}_{};", "sub", "math", x0).unwrap();
+                        writeln!(buf, "{}_{i} -> {}_{};", "sub", "math", x1).unwrap();
+                        writeln!(buf, "{}_{i} -> {}_{};", "sub", "math", x2).unwrap();
+                        writeln!(buf, "{}_{i} [shape = box];", "sub").unwrap();
+                    }
+                }
                 fn update(
                     &mut self,
                     insertions: &mut Vec<Self::Row>,
@@ -1027,15 +1036,6 @@ fn regression_entry2() {
                 }
                 fn update_finalize(&mut self, ctx: Self::UpdateCtx, uf: &mut Unification) {
                     self.new.extend(self.all_index_0_1_2.minus(&ctx.old));
-                }
-                fn emit_graphviz(&self, buf: &mut String) {
-                    use std::fmt::Write;
-                    for (i, (x0, x1, x2)) in self.all_index_0_1_2.iter().enumerate() {
-                        writeln!(buf, "{}_{i} -> {}_{};", "sub", "math", x0).unwrap();
-                        writeln!(buf, "{}_{i} -> {}_{};", "sub", "math", x1).unwrap();
-                        writeln!(buf, "{}_{i} -> {}_{};", "sub", "math", x2).unwrap();
-                        writeln!(buf, "{}_{i} [shape = box];", "sub").unwrap();
-                    }
                 }
             }
             impl SubRelation {
@@ -1112,6 +1112,14 @@ fn regression_entry2() {
                 fn len(&self) -> usize {
                     self.all_index_0_1.len()
                 }
+                fn emit_graphviz(&self, buf: &mut String) {
+                    use std::fmt::Write;
+                    for (i, (x0, x1)) in self.all_index_0_1.iter().enumerate() {
+                        writeln!(buf, "{}_{i} -> {}_{};", "const", "i64", x0).unwrap();
+                        writeln!(buf, "{}_{i} -> {}_{};", "const", "math", x1).unwrap();
+                        writeln!(buf, "{}_{i} [shape = box];", "const").unwrap();
+                    }
+                }
                 fn update(
                     &mut self,
                     insertions: &mut Vec<Self::Row>,
@@ -1166,14 +1174,6 @@ fn regression_entry2() {
                 }
                 fn update_finalize(&mut self, ctx: Self::UpdateCtx, uf: &mut Unification) {
                     self.new.extend(self.all_index_0_1.minus(&ctx.old));
-                }
-                fn emit_graphviz(&self, buf: &mut String) {
-                    use std::fmt::Write;
-                    for (i, (x0, x1)) in self.all_index_0_1.iter().enumerate() {
-                        writeln!(buf, "{}_{i} -> {}_{};", "const", "i64", x0).unwrap();
-                        writeln!(buf, "{}_{i} -> {}_{};", "const", "math", x1).unwrap();
-                        writeln!(buf, "{}_{i} [shape = box];", "const").unwrap();
-                    }
                 }
             }
             impl ConstRelation {
@@ -1471,6 +1471,15 @@ fn regression_entry() {
                 fn len(&self) -> usize {
                     self.all_index_0_1_2.len()
                 }
+                fn emit_graphviz(&self, buf: &mut String) {
+                    use std::fmt::Write;
+                    for (i, (x0, x1, x2)) in self.all_index_0_1_2.iter().enumerate() {
+                        writeln!(buf, "{}_{i} -> {}_{};", "integral", "math", x0).unwrap();
+                        writeln!(buf, "{}_{i} -> {}_{};", "integral", "math", x1).unwrap();
+                        writeln!(buf, "{}_{i} -> {}_{};", "integral", "math", x2).unwrap();
+                        writeln!(buf, "{}_{i} [shape = box];", "integral").unwrap();
+                    }
+                }
                 fn update(
                     &mut self,
                     insertions: &mut Vec<Self::Row>,
@@ -1538,15 +1547,6 @@ fn regression_entry() {
                 }
                 fn update_finalize(&mut self, ctx: Self::UpdateCtx, uf: &mut Unification) {
                     self.new.extend(self.all_index_0_1_2.minus(&ctx.old));
-                }
-                fn emit_graphviz(&self, buf: &mut String) {
-                    use std::fmt::Write;
-                    for (i, (x0, x1, x2)) in self.all_index_0_1_2.iter().enumerate() {
-                        writeln!(buf, "{}_{i} -> {}_{};", "integral", "math", x0).unwrap();
-                        writeln!(buf, "{}_{i} -> {}_{};", "integral", "math", x1).unwrap();
-                        writeln!(buf, "{}_{i} -> {}_{};", "integral", "math", x2).unwrap();
-                        writeln!(buf, "{}_{i} [shape = box];", "integral").unwrap();
-                    }
                 }
             }
             impl IntegralRelation {
@@ -1624,6 +1624,15 @@ fn regression_entry() {
                 fn len(&self) -> usize {
                     self.all_index_0_1_2.len()
                 }
+                fn emit_graphviz(&self, buf: &mut String) {
+                    use std::fmt::Write;
+                    for (i, (x0, x1, x2)) in self.all_index_0_1_2.iter().enumerate() {
+                        writeln!(buf, "{}_{i} -> {}_{};", "add", "math", x0).unwrap();
+                        writeln!(buf, "{}_{i} -> {}_{};", "add", "math", x1).unwrap();
+                        writeln!(buf, "{}_{i} -> {}_{};", "add", "math", x2).unwrap();
+                        writeln!(buf, "{}_{i} [shape = box];", "add").unwrap();
+                    }
+                }
                 fn update(
                     &mut self,
                     insertions: &mut Vec<Self::Row>,
@@ -1691,15 +1700,6 @@ fn regression_entry() {
                 }
                 fn update_finalize(&mut self, ctx: Self::UpdateCtx, uf: &mut Unification) {
                     self.new.extend(self.all_index_0_1_2.minus(&ctx.old));
-                }
-                fn emit_graphviz(&self, buf: &mut String) {
-                    use std::fmt::Write;
-                    for (i, (x0, x1, x2)) in self.all_index_0_1_2.iter().enumerate() {
-                        writeln!(buf, "{}_{i} -> {}_{};", "add", "math", x0).unwrap();
-                        writeln!(buf, "{}_{i} -> {}_{};", "add", "math", x1).unwrap();
-                        writeln!(buf, "{}_{i} -> {}_{};", "add", "math", x2).unwrap();
-                        writeln!(buf, "{}_{i} [shape = box];", "add").unwrap();
-                    }
                 }
             }
             impl AddRelation {
@@ -1989,6 +1989,15 @@ fn test_bind_variable_multiple_times() {
                 fn len(&self) -> usize {
                     self.all_index_0_1_2.len()
                 }
+                fn emit_graphviz(&self, buf: &mut String) {
+                    use std::fmt::Write;
+                    for (i, (x0, x1, x2)) in self.all_index_0_1_2.iter().enumerate() {
+                        writeln!(buf, "{}_{i} -> {}_{};", "same", "foo", x0).unwrap();
+                        writeln!(buf, "{}_{i} -> {}_{};", "same", "foo", x1).unwrap();
+                        writeln!(buf, "{}_{i} -> {}_{};", "same", "foo", x2).unwrap();
+                        writeln!(buf, "{}_{i} [shape = box];", "same").unwrap();
+                    }
+                }
                 fn update(
                     &mut self,
                     insertions: &mut Vec<Self::Row>,
@@ -2056,15 +2065,6 @@ fn test_bind_variable_multiple_times() {
                 }
                 fn update_finalize(&mut self, ctx: Self::UpdateCtx, uf: &mut Unification) {
                     self.new.extend(self.all_index_0_1_2.minus(&ctx.old));
-                }
-                fn emit_graphviz(&self, buf: &mut String) {
-                    use std::fmt::Write;
-                    for (i, (x0, x1, x2)) in self.all_index_0_1_2.iter().enumerate() {
-                        writeln!(buf, "{}_{i} -> {}_{};", "same", "foo", x0).unwrap();
-                        writeln!(buf, "{}_{i} -> {}_{};", "same", "foo", x1).unwrap();
-                        writeln!(buf, "{}_{i} -> {}_{};", "same", "foo", x2).unwrap();
-                        writeln!(buf, "{}_{i} [shape = box];", "same").unwrap();
-                    }
                 }
             }
             impl SameRelation {
@@ -2452,6 +2452,15 @@ fn codegen_variable_reuse_bug() {
                 fn len(&self) -> usize {
                     self.all_index_0_1_2.len()
                 }
+                fn emit_graphviz(&self, buf: &mut String) {
+                    use std::fmt::Write;
+                    for (i, (x0, x1, x2)) in self.all_index_0_1_2.iter().enumerate() {
+                        writeln!(buf, "{}_{i} -> {}_{};", "add", "math", x0).unwrap();
+                        writeln!(buf, "{}_{i} -> {}_{};", "add", "math", x1).unwrap();
+                        writeln!(buf, "{}_{i} -> {}_{};", "add", "math", x2).unwrap();
+                        writeln!(buf, "{}_{i} [shape = box];", "add").unwrap();
+                    }
+                }
                 fn update(
                     &mut self,
                     insertions: &mut Vec<Self::Row>,
@@ -2519,15 +2528,6 @@ fn codegen_variable_reuse_bug() {
                 }
                 fn update_finalize(&mut self, ctx: Self::UpdateCtx, uf: &mut Unification) {
                     self.new.extend(self.all_index_0_1_2.minus(&ctx.old));
-                }
-                fn emit_graphviz(&self, buf: &mut String) {
-                    use std::fmt::Write;
-                    for (i, (x0, x1, x2)) in self.all_index_0_1_2.iter().enumerate() {
-                        writeln!(buf, "{}_{i} -> {}_{};", "add", "math", x0).unwrap();
-                        writeln!(buf, "{}_{i} -> {}_{};", "add", "math", x1).unwrap();
-                        writeln!(buf, "{}_{i} -> {}_{};", "add", "math", x2).unwrap();
-                        writeln!(buf, "{}_{i} [shape = box];", "add").unwrap();
-                    }
                 }
             }
             impl AddRelation {
@@ -2611,6 +2611,13 @@ fn codegen_variable_reuse_bug() {
                 fn len(&self) -> usize {
                     self.all_index_0.len()
                 }
+                fn emit_graphviz(&self, buf: &mut String) {
+                    use std::fmt::Write;
+                    for (i, (x0,)) in self.all_index_0.iter().enumerate() {
+                        writeln!(buf, "{}_{i} -> {}_{};", "zero", "math", x0).unwrap();
+                        writeln!(buf, "{}_{i} [shape = box];", "zero").unwrap();
+                    }
+                }
                 fn update(
                     &mut self,
                     insertions: &mut Vec<Self::Row>,
@@ -2657,13 +2664,6 @@ fn codegen_variable_reuse_bug() {
                 }
                 fn update_finalize(&mut self, ctx: Self::UpdateCtx, uf: &mut Unification) {
                     self.new.extend(self.all_index_0.minus(&ctx.old));
-                }
-                fn emit_graphviz(&self, buf: &mut String) {
-                    use std::fmt::Write;
-                    for (i, (x0,)) in self.all_index_0.iter().enumerate() {
-                        writeln!(buf, "{}_{i} -> {}_{};", "zero", "math", x0).unwrap();
-                        writeln!(buf, "{}_{i} [shape = box];", "zero").unwrap();
-                    }
                 }
             }
             impl ZeroRelation {
@@ -2939,6 +2939,15 @@ fn initial_exprs() {
                 fn len(&self) -> usize {
                     self.all_index_0_1_2.len()
                 }
+                fn emit_graphviz(&self, buf: &mut String) {
+                    use std::fmt::Write;
+                    for (i, (x0, x1, x2)) in self.all_index_0_1_2.iter().enumerate() {
+                        writeln!(buf, "{}_{i} -> {}_{};", "add", "math", x0).unwrap();
+                        writeln!(buf, "{}_{i} -> {}_{};", "add", "math", x1).unwrap();
+                        writeln!(buf, "{}_{i} -> {}_{};", "add", "math", x2).unwrap();
+                        writeln!(buf, "{}_{i} [shape = box];", "add").unwrap();
+                    }
+                }
                 fn update(
                     &mut self,
                     insertions: &mut Vec<Self::Row>,
@@ -3006,15 +3015,6 @@ fn initial_exprs() {
                 }
                 fn update_finalize(&mut self, ctx: Self::UpdateCtx, uf: &mut Unification) {
                     self.new.extend(self.all_index_0_1_2.minus(&ctx.old));
-                }
-                fn emit_graphviz(&self, buf: &mut String) {
-                    use std::fmt::Write;
-                    for (i, (x0, x1, x2)) in self.all_index_0_1_2.iter().enumerate() {
-                        writeln!(buf, "{}_{i} -> {}_{};", "add", "math", x0).unwrap();
-                        writeln!(buf, "{}_{i} -> {}_{};", "add", "math", x1).unwrap();
-                        writeln!(buf, "{}_{i} -> {}_{};", "add", "math", x2).unwrap();
-                        writeln!(buf, "{}_{i} [shape = box];", "add").unwrap();
-                    }
                 }
             }
             impl AddRelation {
@@ -3092,6 +3092,15 @@ fn initial_exprs() {
                 fn len(&self) -> usize {
                     self.all_index_0_1_2.len()
                 }
+                fn emit_graphviz(&self, buf: &mut String) {
+                    use std::fmt::Write;
+                    for (i, (x0, x1, x2)) in self.all_index_0_1_2.iter().enumerate() {
+                        writeln!(buf, "{}_{i} -> {}_{};", "mul", "math", x0).unwrap();
+                        writeln!(buf, "{}_{i} -> {}_{};", "mul", "math", x1).unwrap();
+                        writeln!(buf, "{}_{i} -> {}_{};", "mul", "math", x2).unwrap();
+                        writeln!(buf, "{}_{i} [shape = box];", "mul").unwrap();
+                    }
+                }
                 fn update(
                     &mut self,
                     insertions: &mut Vec<Self::Row>,
@@ -3159,15 +3168,6 @@ fn initial_exprs() {
                 }
                 fn update_finalize(&mut self, ctx: Self::UpdateCtx, uf: &mut Unification) {
                     self.new.extend(self.all_index_0_1_2.minus(&ctx.old));
-                }
-                fn emit_graphviz(&self, buf: &mut String) {
-                    use std::fmt::Write;
-                    for (i, (x0, x1, x2)) in self.all_index_0_1_2.iter().enumerate() {
-                        writeln!(buf, "{}_{i} -> {}_{};", "mul", "math", x0).unwrap();
-                        writeln!(buf, "{}_{i} -> {}_{};", "mul", "math", x1).unwrap();
-                        writeln!(buf, "{}_{i} -> {}_{};", "mul", "math", x2).unwrap();
-                        writeln!(buf, "{}_{i} [shape = box];", "mul").unwrap();
-                    }
                 }
             }
             impl MulRelation {
@@ -3244,6 +3244,14 @@ fn initial_exprs() {
                 fn len(&self) -> usize {
                     self.all_index_0_1.len()
                 }
+                fn emit_graphviz(&self, buf: &mut String) {
+                    use std::fmt::Write;
+                    for (i, (x0, x1)) in self.all_index_0_1.iter().enumerate() {
+                        writeln!(buf, "{}_{i} -> {}_{};", "const", "i64", x0).unwrap();
+                        writeln!(buf, "{}_{i} -> {}_{};", "const", "math", x1).unwrap();
+                        writeln!(buf, "{}_{i} [shape = box];", "const").unwrap();
+                    }
+                }
                 fn update(
                     &mut self,
                     insertions: &mut Vec<Self::Row>,
@@ -3298,14 +3306,6 @@ fn initial_exprs() {
                 }
                 fn update_finalize(&mut self, ctx: Self::UpdateCtx, uf: &mut Unification) {
                     self.new.extend(self.all_index_0_1.minus(&ctx.old));
-                }
-                fn emit_graphviz(&self, buf: &mut String) {
-                    use std::fmt::Write;
-                    for (i, (x0, x1)) in self.all_index_0_1.iter().enumerate() {
-                        writeln!(buf, "{}_{i} -> {}_{};", "const", "i64", x0).unwrap();
-                        writeln!(buf, "{}_{i} -> {}_{};", "const", "math", x1).unwrap();
-                        writeln!(buf, "{}_{i} [shape = box];", "const").unwrap();
-                    }
                 }
             }
             impl ConstRelation {
@@ -3371,6 +3371,14 @@ fn initial_exprs() {
                 fn len(&self) -> usize {
                     self.all_index_0_1.len()
                 }
+                fn emit_graphviz(&self, buf: &mut String) {
+                    use std::fmt::Write;
+                    for (i, (x0, x1)) in self.all_index_0_1.iter().enumerate() {
+                        writeln!(buf, "{}_{i} -> {}_{};", "var", "string", x0).unwrap();
+                        writeln!(buf, "{}_{i} -> {}_{};", "var", "math", x1).unwrap();
+                        writeln!(buf, "{}_{i} [shape = box];", "var").unwrap();
+                    }
+                }
                 fn update(
                     &mut self,
                     insertions: &mut Vec<Self::Row>,
@@ -3425,14 +3433,6 @@ fn initial_exprs() {
                 }
                 fn update_finalize(&mut self, ctx: Self::UpdateCtx, uf: &mut Unification) {
                     self.new.extend(self.all_index_0_1.minus(&ctx.old));
-                }
-                fn emit_graphviz(&self, buf: &mut String) {
-                    use std::fmt::Write;
-                    for (i, (x0, x1)) in self.all_index_0_1.iter().enumerate() {
-                        writeln!(buf, "{}_{i} -> {}_{};", "var", "string", x0).unwrap();
-                        writeln!(buf, "{}_{i} -> {}_{};", "var", "math", x1).unwrap();
-                        writeln!(buf, "{}_{i} [shape = box];", "var").unwrap();
-                    }
                 }
             }
             impl VarRelation {
@@ -3937,6 +3937,15 @@ fn codegen_bug1() {
                 fn len(&self) -> usize {
                     self.all_index_0_1_2.len()
                 }
+                fn emit_graphviz(&self, buf: &mut String) {
+                    use std::fmt::Write;
+                    for (i, (x0, x1, x2)) in self.all_index_0_1_2.iter().enumerate() {
+                        writeln!(buf, "{}_{i} -> {}_{};", "foo", "t0", x0).unwrap();
+                        writeln!(buf, "{}_{i} -> {}_{};", "foo", "t1", x1).unwrap();
+                        writeln!(buf, "{}_{i} -> {}_{};", "foo", "t2", x2).unwrap();
+                        writeln!(buf, "{}_{i} [shape = box];", "foo").unwrap();
+                    }
+                }
                 fn update(
                     &mut self,
                     insertions: &mut Vec<Self::Row>,
@@ -3999,15 +4008,6 @@ fn codegen_bug1() {
                 }
                 fn update_finalize(&mut self, ctx: Self::UpdateCtx, uf: &mut Unification) {
                     self.new.extend(self.all_index_0_1_2.minus(&ctx.old));
-                }
-                fn emit_graphviz(&self, buf: &mut String) {
-                    use std::fmt::Write;
-                    for (i, (x0, x1, x2)) in self.all_index_0_1_2.iter().enumerate() {
-                        writeln!(buf, "{}_{i} -> {}_{};", "foo", "t0", x0).unwrap();
-                        writeln!(buf, "{}_{i} -> {}_{};", "foo", "t1", x1).unwrap();
-                        writeln!(buf, "{}_{i} -> {}_{};", "foo", "t2", x2).unwrap();
-                        writeln!(buf, "{}_{i} [shape = box];", "foo").unwrap();
-                    }
                 }
             }
             impl FooRelation {
@@ -4234,6 +4234,14 @@ fn initial() {
                 fn len(&self) -> usize {
                     self.all_index_0_1.len()
                 }
+                fn emit_graphviz(&self, buf: &mut String) {
+                    use std::fmt::Write;
+                    for (i, (x0, x1)) in self.all_index_0_1.iter().enumerate() {
+                        writeln!(buf, "{}_{i} -> {}_{};", "const", "i64", x0).unwrap();
+                        writeln!(buf, "{}_{i} -> {}_{};", "const", "math", x1).unwrap();
+                        writeln!(buf, "{}_{i} [shape = box];", "const").unwrap();
+                    }
+                }
                 fn update(
                     &mut self,
                     insertions: &mut Vec<Self::Row>,
@@ -4288,14 +4296,6 @@ fn initial() {
                 }
                 fn update_finalize(&mut self, ctx: Self::UpdateCtx, uf: &mut Unification) {
                     self.new.extend(self.all_index_0_1.minus(&ctx.old));
-                }
-                fn emit_graphviz(&self, buf: &mut String) {
-                    use std::fmt::Write;
-                    for (i, (x0, x1)) in self.all_index_0_1.iter().enumerate() {
-                        writeln!(buf, "{}_{i} -> {}_{};", "const", "i64", x0).unwrap();
-                        writeln!(buf, "{}_{i} -> {}_{};", "const", "math", x1).unwrap();
-                        writeln!(buf, "{}_{i} [shape = box];", "const").unwrap();
-                    }
                 }
             }
             impl ConstRelation {
@@ -4558,6 +4558,15 @@ fn test_primitives_simple() {
                 fn len(&self) -> usize {
                     self.all_index_0_1_2.len()
                 }
+                fn emit_graphviz(&self, buf: &mut String) {
+                    use std::fmt::Write;
+                    for (i, (x0, x1, x2)) in self.all_index_0_1_2.iter().enumerate() {
+                        writeln!(buf, "{}_{i} -> {}_{};", "mul", "math", x0).unwrap();
+                        writeln!(buf, "{}_{i} -> {}_{};", "mul", "math", x1).unwrap();
+                        writeln!(buf, "{}_{i} -> {}_{};", "mul", "math", x2).unwrap();
+                        writeln!(buf, "{}_{i} [shape = box];", "mul").unwrap();
+                    }
+                }
                 fn update(
                     &mut self,
                     insertions: &mut Vec<Self::Row>,
@@ -4625,15 +4634,6 @@ fn test_primitives_simple() {
                 }
                 fn update_finalize(&mut self, ctx: Self::UpdateCtx, uf: &mut Unification) {
                     self.new.extend(self.all_index_0_1_2.minus(&ctx.old));
-                }
-                fn emit_graphviz(&self, buf: &mut String) {
-                    use std::fmt::Write;
-                    for (i, (x0, x1, x2)) in self.all_index_0_1_2.iter().enumerate() {
-                        writeln!(buf, "{}_{i} -> {}_{};", "mul", "math", x0).unwrap();
-                        writeln!(buf, "{}_{i} -> {}_{};", "mul", "math", x1).unwrap();
-                        writeln!(buf, "{}_{i} -> {}_{};", "mul", "math", x2).unwrap();
-                        writeln!(buf, "{}_{i} [shape = box];", "mul").unwrap();
-                    }
                 }
             }
             impl MulRelation {
@@ -4711,6 +4711,15 @@ fn test_primitives_simple() {
                 fn len(&self) -> usize {
                     self.all_index_0_1_2.len()
                 }
+                fn emit_graphviz(&self, buf: &mut String) {
+                    use std::fmt::Write;
+                    for (i, (x0, x1, x2)) in self.all_index_0_1_2.iter().enumerate() {
+                        writeln!(buf, "{}_{i} -> {}_{};", "add", "math", x0).unwrap();
+                        writeln!(buf, "{}_{i} -> {}_{};", "add", "math", x1).unwrap();
+                        writeln!(buf, "{}_{i} -> {}_{};", "add", "math", x2).unwrap();
+                        writeln!(buf, "{}_{i} [shape = box];", "add").unwrap();
+                    }
+                }
                 fn update(
                     &mut self,
                     insertions: &mut Vec<Self::Row>,
@@ -4778,15 +4787,6 @@ fn test_primitives_simple() {
                 }
                 fn update_finalize(&mut self, ctx: Self::UpdateCtx, uf: &mut Unification) {
                     self.new.extend(self.all_index_0_1_2.minus(&ctx.old));
-                }
-                fn emit_graphviz(&self, buf: &mut String) {
-                    use std::fmt::Write;
-                    for (i, (x0, x1, x2)) in self.all_index_0_1_2.iter().enumerate() {
-                        writeln!(buf, "{}_{i} -> {}_{};", "add", "math", x0).unwrap();
-                        writeln!(buf, "{}_{i} -> {}_{};", "add", "math", x1).unwrap();
-                        writeln!(buf, "{}_{i} -> {}_{};", "add", "math", x2).unwrap();
-                        writeln!(buf, "{}_{i} [shape = box];", "add").unwrap();
-                    }
                 }
             }
             impl AddRelation {
@@ -4863,6 +4863,14 @@ fn test_primitives_simple() {
                 fn len(&self) -> usize {
                     self.all_index_0_1.len()
                 }
+                fn emit_graphviz(&self, buf: &mut String) {
+                    use std::fmt::Write;
+                    for (i, (x0, x1)) in self.all_index_0_1.iter().enumerate() {
+                        writeln!(buf, "{}_{i} -> {}_{};", "const", "i64", x0).unwrap();
+                        writeln!(buf, "{}_{i} -> {}_{};", "const", "math", x1).unwrap();
+                        writeln!(buf, "{}_{i} [shape = box];", "const").unwrap();
+                    }
+                }
                 fn update(
                     &mut self,
                     insertions: &mut Vec<Self::Row>,
@@ -4917,14 +4925,6 @@ fn test_primitives_simple() {
                 }
                 fn update_finalize(&mut self, ctx: Self::UpdateCtx, uf: &mut Unification) {
                     self.new.extend(self.all_index_0_1.minus(&ctx.old));
-                }
-                fn emit_graphviz(&self, buf: &mut String) {
-                    use std::fmt::Write;
-                    for (i, (x0, x1)) in self.all_index_0_1.iter().enumerate() {
-                        writeln!(buf, "{}_{i} -> {}_{};", "const", "i64", x0).unwrap();
-                        writeln!(buf, "{}_{i} -> {}_{};", "const", "math", x1).unwrap();
-                        writeln!(buf, "{}_{i} [shape = box];", "const").unwrap();
-                    }
                 }
             }
             impl ConstRelation {
@@ -5012,6 +5012,14 @@ fn test_primitives_simple() {
                 fn len(&self) -> usize {
                     self.all_index_0_1.len()
                 }
+                fn emit_graphviz(&self, buf: &mut String) {
+                    use std::fmt::Write;
+                    for (i, (x0, x1)) in self.all_index_0_1.iter().enumerate() {
+                        writeln!(buf, "{}_{i} -> {}_{};", "var", "string", x0).unwrap();
+                        writeln!(buf, "{}_{i} -> {}_{};", "var", "math", x1).unwrap();
+                        writeln!(buf, "{}_{i} [shape = box];", "var").unwrap();
+                    }
+                }
                 fn update(
                     &mut self,
                     insertions: &mut Vec<Self::Row>,
@@ -5066,14 +5074,6 @@ fn test_primitives_simple() {
                 }
                 fn update_finalize(&mut self, ctx: Self::UpdateCtx, uf: &mut Unification) {
                     self.new.extend(self.all_index_0_1.minus(&ctx.old));
-                }
-                fn emit_graphviz(&self, buf: &mut String) {
-                    use std::fmt::Write;
-                    for (i, (x0, x1)) in self.all_index_0_1.iter().enumerate() {
-                        writeln!(buf, "{}_{i} -> {}_{};", "var", "string", x0).unwrap();
-                        writeln!(buf, "{}_{i} -> {}_{};", "var", "math", x1).unwrap();
-                        writeln!(buf, "{}_{i} [shape = box];", "var").unwrap();
-                    }
                 }
             }
             impl VarRelation {
@@ -5430,6 +5430,14 @@ fn triangle_join() {
                 fn len(&self) -> usize {
                     self.all_index_0_1.len()
                 }
+                fn emit_graphviz(&self, buf: &mut String) {
+                    use std::fmt::Write;
+                    for (i, (x0, x1)) in self.all_index_0_1.iter().enumerate() {
+                        writeln!(buf, "{}_{i} -> {}_{};", "foo", "math", x0).unwrap();
+                        writeln!(buf, "{}_{i} -> {}_{};", "foo", "math", x1).unwrap();
+                        writeln!(buf, "{}_{i} [shape = box];", "foo").unwrap();
+                    }
+                }
                 fn update(
                     &mut self,
                     insertions: &mut Vec<Self::Row>,
@@ -5481,14 +5489,6 @@ fn triangle_join() {
                 }
                 fn update_finalize(&mut self, ctx: Self::UpdateCtx, uf: &mut Unification) {
                     self.new.extend(self.all_index_0_1.minus(&ctx.old));
-                }
-                fn emit_graphviz(&self, buf: &mut String) {
-                    use std::fmt::Write;
-                    for (i, (x0, x1)) in self.all_index_0_1.iter().enumerate() {
-                        writeln!(buf, "{}_{i} -> {}_{};", "foo", "math", x0).unwrap();
-                        writeln!(buf, "{}_{i} -> {}_{};", "foo", "math", x1).unwrap();
-                        writeln!(buf, "{}_{i} [shape = box];", "foo").unwrap();
-                    }
                 }
             }
             impl FooRelation {
@@ -5556,6 +5556,14 @@ fn triangle_join() {
                 fn len(&self) -> usize {
                     self.all_index_0_1.len()
                 }
+                fn emit_graphviz(&self, buf: &mut String) {
+                    use std::fmt::Write;
+                    for (i, (x0, x1)) in self.all_index_0_1.iter().enumerate() {
+                        writeln!(buf, "{}_{i} -> {}_{};", "bar", "math", x0).unwrap();
+                        writeln!(buf, "{}_{i} -> {}_{};", "bar", "math", x1).unwrap();
+                        writeln!(buf, "{}_{i} [shape = box];", "bar").unwrap();
+                    }
+                }
                 fn update(
                     &mut self,
                     insertions: &mut Vec<Self::Row>,
@@ -5608,14 +5616,6 @@ fn triangle_join() {
                 fn update_finalize(&mut self, ctx: Self::UpdateCtx, uf: &mut Unification) {
                     self.new.extend(self.all_index_0_1.minus(&ctx.old));
                 }
-                fn emit_graphviz(&self, buf: &mut String) {
-                    use std::fmt::Write;
-                    for (i, (x0, x1)) in self.all_index_0_1.iter().enumerate() {
-                        writeln!(buf, "{}_{i} -> {}_{};", "bar", "math", x0).unwrap();
-                        writeln!(buf, "{}_{i} -> {}_{};", "bar", "math", x1).unwrap();
-                        writeln!(buf, "{}_{i} [shape = box];", "bar").unwrap();
-                    }
-                }
             }
             impl BarRelation {
                 fn iter1_0_1(&self, x0: Math) -> impl Iterator<Item = (Math,)> + use<'_> {
@@ -5665,6 +5665,14 @@ fn triangle_join() {
                 }
                 fn len(&self) -> usize {
                     self.all_index_0_1.len()
+                }
+                fn emit_graphviz(&self, buf: &mut String) {
+                    use std::fmt::Write;
+                    for (i, (x0, x1)) in self.all_index_0_1.iter().enumerate() {
+                        writeln!(buf, "{}_{i} -> {}_{};", "baz", "math", x0).unwrap();
+                        writeln!(buf, "{}_{i} -> {}_{};", "baz", "math", x1).unwrap();
+                        writeln!(buf, "{}_{i} [shape = box];", "baz").unwrap();
+                    }
                 }
                 fn update(
                     &mut self,
@@ -5717,14 +5725,6 @@ fn triangle_join() {
                 }
                 fn update_finalize(&mut self, ctx: Self::UpdateCtx, uf: &mut Unification) {
                     self.new.extend(self.all_index_0_1.minus(&ctx.old));
-                }
-                fn emit_graphviz(&self, buf: &mut String) {
-                    use std::fmt::Write;
-                    for (i, (x0, x1)) in self.all_index_0_1.iter().enumerate() {
-                        writeln!(buf, "{}_{i} -> {}_{};", "baz", "math", x0).unwrap();
-                        writeln!(buf, "{}_{i} -> {}_{};", "baz", "math", x1).unwrap();
-                        writeln!(buf, "{}_{i} [shape = box];", "baz").unwrap();
-                    }
                 }
             }
             impl BazRelation {
@@ -5793,6 +5793,15 @@ fn triangle_join() {
                 fn len(&self) -> usize {
                     self.all_index_0_1_2.len()
                 }
+                fn emit_graphviz(&self, buf: &mut String) {
+                    use std::fmt::Write;
+                    for (i, (x0, x1, x2)) in self.all_index_0_1_2.iter().enumerate() {
+                        writeln!(buf, "{}_{i} -> {}_{};", "triangle", "math", x0).unwrap();
+                        writeln!(buf, "{}_{i} -> {}_{};", "triangle", "math", x1).unwrap();
+                        writeln!(buf, "{}_{i} -> {}_{};", "triangle", "math", x2).unwrap();
+                        writeln!(buf, "{}_{i} [shape = box];", "triangle").unwrap();
+                    }
+                }
                 fn update(
                     &mut self,
                     insertions: &mut Vec<Self::Row>,
@@ -5855,15 +5864,6 @@ fn triangle_join() {
                 }
                 fn update_finalize(&mut self, ctx: Self::UpdateCtx, uf: &mut Unification) {
                     self.new.extend(self.all_index_0_1_2.minus(&ctx.old));
-                }
-                fn emit_graphviz(&self, buf: &mut String) {
-                    use std::fmt::Write;
-                    for (i, (x0, x1, x2)) in self.all_index_0_1_2.iter().enumerate() {
-                        writeln!(buf, "{}_{i} -> {}_{};", "triangle", "math", x0).unwrap();
-                        writeln!(buf, "{}_{i} -> {}_{};", "triangle", "math", x1).unwrap();
-                        writeln!(buf, "{}_{i} -> {}_{};", "triangle", "math", x2).unwrap();
-                        writeln!(buf, "{}_{i} [shape = box];", "triangle").unwrap();
-                    }
                 }
             }
             impl TriangleRelation {
@@ -6159,6 +6159,15 @@ fn edgecase0() {
                 fn len(&self) -> usize {
                     self.all_index_0_1_2.len()
                 }
+                fn emit_graphviz(&self, buf: &mut String) {
+                    use std::fmt::Write;
+                    for (i, (x0, x1, x2)) in self.all_index_0_1_2.iter().enumerate() {
+                        writeln!(buf, "{}_{i} -> {}_{};", "mul", "math", x0).unwrap();
+                        writeln!(buf, "{}_{i} -> {}_{};", "mul", "math", x1).unwrap();
+                        writeln!(buf, "{}_{i} -> {}_{};", "mul", "math", x2).unwrap();
+                        writeln!(buf, "{}_{i} [shape = box];", "mul").unwrap();
+                    }
+                }
                 fn update(
                     &mut self,
                     insertions: &mut Vec<Self::Row>,
@@ -6226,15 +6235,6 @@ fn edgecase0() {
                 }
                 fn update_finalize(&mut self, ctx: Self::UpdateCtx, uf: &mut Unification) {
                     self.new.extend(self.all_index_0_1_2.minus(&ctx.old));
-                }
-                fn emit_graphviz(&self, buf: &mut String) {
-                    use std::fmt::Write;
-                    for (i, (x0, x1, x2)) in self.all_index_0_1_2.iter().enumerate() {
-                        writeln!(buf, "{}_{i} -> {}_{};", "mul", "math", x0).unwrap();
-                        writeln!(buf, "{}_{i} -> {}_{};", "mul", "math", x1).unwrap();
-                        writeln!(buf, "{}_{i} -> {}_{};", "mul", "math", x2).unwrap();
-                        writeln!(buf, "{}_{i} [shape = box];", "mul").unwrap();
-                    }
                 }
             }
             impl MulRelation {
@@ -6320,6 +6320,15 @@ fn edgecase0() {
                 fn len(&self) -> usize {
                     self.all_index_0_1_2.len()
                 }
+                fn emit_graphviz(&self, buf: &mut String) {
+                    use std::fmt::Write;
+                    for (i, (x0, x1, x2)) in self.all_index_0_1_2.iter().enumerate() {
+                        writeln!(buf, "{}_{i} -> {}_{};", "add", "math", x0).unwrap();
+                        writeln!(buf, "{}_{i} -> {}_{};", "add", "math", x1).unwrap();
+                        writeln!(buf, "{}_{i} -> {}_{};", "add", "math", x2).unwrap();
+                        writeln!(buf, "{}_{i} [shape = box];", "add").unwrap();
+                    }
+                }
                 fn update(
                     &mut self,
                     insertions: &mut Vec<Self::Row>,
@@ -6387,15 +6396,6 @@ fn edgecase0() {
                 }
                 fn update_finalize(&mut self, ctx: Self::UpdateCtx, uf: &mut Unification) {
                     self.new.extend(self.all_index_0_1_2.minus(&ctx.old));
-                }
-                fn emit_graphviz(&self, buf: &mut String) {
-                    use std::fmt::Write;
-                    for (i, (x0, x1, x2)) in self.all_index_0_1_2.iter().enumerate() {
-                        writeln!(buf, "{}_{i} -> {}_{};", "add", "math", x0).unwrap();
-                        writeln!(buf, "{}_{i} -> {}_{};", "add", "math", x1).unwrap();
-                        writeln!(buf, "{}_{i} -> {}_{};", "add", "math", x2).unwrap();
-                        writeln!(buf, "{}_{i} [shape = box];", "add").unwrap();
-                    }
                 }
             }
             impl AddRelation {
@@ -6677,6 +6677,15 @@ fn test_into_codegen() {
                 fn len(&self) -> usize {
                     self.all_index_0_1_2.len()
                 }
+                fn emit_graphviz(&self, buf: &mut String) {
+                    use std::fmt::Write;
+                    for (i, (x0, x1, x2)) in self.all_index_0_1_2.iter().enumerate() {
+                        writeln!(buf, "{}_{i} -> {}_{};", "mul", "math", x0).unwrap();
+                        writeln!(buf, "{}_{i} -> {}_{};", "mul", "math", x1).unwrap();
+                        writeln!(buf, "{}_{i} -> {}_{};", "mul", "math", x2).unwrap();
+                        writeln!(buf, "{}_{i} [shape = box];", "mul").unwrap();
+                    }
+                }
                 fn update(
                     &mut self,
                     insertions: &mut Vec<Self::Row>,
@@ -6744,15 +6753,6 @@ fn test_into_codegen() {
                 }
                 fn update_finalize(&mut self, ctx: Self::UpdateCtx, uf: &mut Unification) {
                     self.new.extend(self.all_index_0_1_2.minus(&ctx.old));
-                }
-                fn emit_graphviz(&self, buf: &mut String) {
-                    use std::fmt::Write;
-                    for (i, (x0, x1, x2)) in self.all_index_0_1_2.iter().enumerate() {
-                        writeln!(buf, "{}_{i} -> {}_{};", "mul", "math", x0).unwrap();
-                        writeln!(buf, "{}_{i} -> {}_{};", "mul", "math", x1).unwrap();
-                        writeln!(buf, "{}_{i} -> {}_{};", "mul", "math", x2).unwrap();
-                        writeln!(buf, "{}_{i} [shape = box];", "mul").unwrap();
-                    }
                 }
             }
             impl MulRelation {
@@ -6830,6 +6830,15 @@ fn test_into_codegen() {
                 fn len(&self) -> usize {
                     self.all_index_0_1_2.len()
                 }
+                fn emit_graphviz(&self, buf: &mut String) {
+                    use std::fmt::Write;
+                    for (i, (x0, x1, x2)) in self.all_index_0_1_2.iter().enumerate() {
+                        writeln!(buf, "{}_{i} -> {}_{};", "add", "math", x0).unwrap();
+                        writeln!(buf, "{}_{i} -> {}_{};", "add", "math", x1).unwrap();
+                        writeln!(buf, "{}_{i} -> {}_{};", "add", "math", x2).unwrap();
+                        writeln!(buf, "{}_{i} [shape = box];", "add").unwrap();
+                    }
+                }
                 fn update(
                     &mut self,
                     insertions: &mut Vec<Self::Row>,
@@ -6897,15 +6906,6 @@ fn test_into_codegen() {
                 }
                 fn update_finalize(&mut self, ctx: Self::UpdateCtx, uf: &mut Unification) {
                     self.new.extend(self.all_index_0_1_2.minus(&ctx.old));
-                }
-                fn emit_graphviz(&self, buf: &mut String) {
-                    use std::fmt::Write;
-                    for (i, (x0, x1, x2)) in self.all_index_0_1_2.iter().enumerate() {
-                        writeln!(buf, "{}_{i} -> {}_{};", "add", "math", x0).unwrap();
-                        writeln!(buf, "{}_{i} -> {}_{};", "add", "math", x1).unwrap();
-                        writeln!(buf, "{}_{i} -> {}_{};", "add", "math", x2).unwrap();
-                        writeln!(buf, "{}_{i} [shape = box];", "add").unwrap();
-                    }
                 }
             }
             impl AddRelation {
