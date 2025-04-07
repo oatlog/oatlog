@@ -46,12 +46,12 @@ const HEADER: &str = "
 Let's verify that this is a solution!
 ";
 
-fn run() {
+fn run(sink: &mut impl std::io::Write) {
     let mut theory = Theory::new();
     let x = theory.make();
     let b = theory.make();
     let c = theory.make();
-    println!("{}", HEADER);
+    writeln!(sink, "{}", HEADER).unwrap();
 
     // b^2
     let b2 = theory.make();
@@ -96,14 +96,14 @@ fn run() {
                 .map(|(name, count)| format!("\t{name}: {count}"))
                 .collect::<Vec<String>>()
                 .join("\n");
-            println!("\n{}", relation_entry_count);
+            writeln!(sink, "\n{}", relation_entry_count).unwrap();
         }
 
         let size = theory.get_total_relation_entry_count();
-        println!("i={i} size={size}");
+        writeln!(sink, "i={i} size={size}").unwrap();
 
         if theory.are_equal(zero, t) {
-            println!("\nVerified!");
+            writeln!(sink, "\nVerified!").unwrap();
             return;
         }
 
@@ -117,13 +117,34 @@ fn run() {
 }
 
 fn main() {
-    run()
+    run(&mut std::io::stdout());
 }
 
-// NOTE: The index implementation rework, while bringing speedups, changed the scheduling a little
-// and caused quadratic-formula to not terminate.
-//
-//#[test]
-//fn test() {
-//    run()
-//}
+#[test]
+fn test() {
+    let mut sink = Vec::new();
+    run(&mut sink);
+    let sink = String::from_utf8(sink).unwrap();
+    expect_test::expect!([r#"
+
+        >> x^2 + 2bx + c = 0
+        >> (x+b)^2 = b^2 - c
+        >> x = -b \pm sqrt(b^2 - c)
+        (but let's actually say)
+        >> x = sqrt(b^2 - c) - b
+        Let's verify that this is a solution!
+
+        i=0 size=10
+        i=1 size=19
+        i=2 size=35
+        i=3 size=71
+        i=4 size=149
+        i=5 size=347
+        i=6 size=996
+        i=7 size=1394
+        i=8 size=4459
+
+        Verified!
+    "#])
+    .assert_eq(&sink);
+}
