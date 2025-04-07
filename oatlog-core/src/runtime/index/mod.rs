@@ -70,7 +70,7 @@ pub trait RowCtx: Default + std::fmt::Debug {
     fn sort(slice: &mut [Self::Row]);
 }
 
-#[derive(Default, Debug)]
+#[derive(Default, Debug, Clone)]
 pub struct StdSortCtx<R: Ord>(PhantomData<*const R>);
 impl<R: IndexRow> RowCtx for StdSortCtx<R> {
     type Row = R;
@@ -79,7 +79,7 @@ impl<R: IndexRow> RowCtx for StdSortCtx<R> {
     }
 }
 
-#[derive(Default, Debug)]
+#[derive(Default, Debug, Clone)]
 pub struct RadixSortCtx<
     R: Ord + Copy + voracious_radix_sort::Radixable<K>,
     K: Default + std::fmt::Debug + voracious_radix_sort::RadixKey,
@@ -170,8 +170,86 @@ impl<RC: RowCtx> Index for BTreeSetIndex<RC> {
         }
     }
 }
-#[derive(Default, Debug)]
+#[derive(Default, Debug, Clone)]
 pub struct SortedVec<RC: RowCtx>(Vec<RC::Row>, RC);
+impl<RC: RowCtx> SortedVec<RC> {
+    /// Arguments
+    /// - insertions: permuted.
+    /// - deferred_insertions: initially empty, pushed to when `already_canon(existing_row) == false`.
+    /// - uf
+    /// - scratch: initially and finally empty, used to avoid allocation.
+    /// - already_canon: canonicalize a row and return whether it already was canonical.
+    /// - merge
+    // TODO: Maybe remove from `insertions` entries that already exist (can be done efficiently with some extra bookkeeping)
+    pub fn sorted_vec_update<UF>(
+        &mut self,
+        insertions: &mut Vec<<RC::Row as IndexRow>::Repr>,
+        deferred_insertions: &mut Vec<<RC::Row as IndexRow>::Repr>,
+        scratch: &mut Vec<<RC::Row as IndexRow>::Repr>,
+        uf: &mut UF,
+        mut already_canon: impl FnMut(&mut UF, &mut <RC::Row as IndexRow>::Repr) -> bool,
+        mut merge: impl FnMut(&mut UF, &mut RC::Row, RC::Row),
+    ) {
+        let insertions = RC::Row::from_inner_slice_mut(insertions);
+        let deferred_insertions = RC::Row::from_inner_vec(deferred_insertions);
+        let scratch = RC::Row::from_inner_vec(scratch);
+
+        RC::sort(insertions);
+
+        assert!(scratch.is_empty());
+
+        let mut push_item = |mut row: RC::Row| {
+            if already_canon(uf, RC::Row::inner_mut(&mut row)) {
+                match scratch.last_mut() {
+                    Some(head) if *head == row => {}
+                    Some(head) if head.key() == row.key() => merge(uf, head, row),
+                    _ => scratch.push(row),
+                }
+            } else {
+                deferred_insertions.push(row);
+            }
+        };
+
+        let mut i = 0;
+        let mut j = 0;
+        if insertions.len() > 0 && self.0.len() > 0 {
+            'done: loop {
+                while insertions[i] <= self.0[j] {
+                    push_item(insertions[i]);
+                    i += 1;
+                    if i == insertions.len() {
+                        break 'done;
+                    }
+                }
+                while self.0[j] <= insertions[i] {
+                    push_item(self.0[j]);
+                    j += 1;
+                    if j == self.0.len() {
+                        break 'done;
+                    }
+                }
+            }
+        }
+        self.0[j..].iter().copied().for_each(&mut push_item);
+        insertions[i..].iter().copied().for_each(&mut push_item);
+
+        std::mem::swap(&mut self.0, scratch);
+        scratch.clear();
+    }
+    pub fn minus(&self, rhs: &Self) -> impl Iterator<Item = <RC::Row as IndexRow>::Repr> {
+        let mut i = 0;
+        self.0
+            .iter()
+            .copied()
+            .filter(move |&row| {
+                while i < rhs.0.len() && rhs.0[i] < row {
+                    i += 1;
+                }
+                rhs.0.get(i).map_or(true, |&other| other != row)
+            })
+            .map(RC::Row::inner)
+    }
+}
 impl<RC: RowCtx> Index for SortedVec<RC> {
     type Row = RC::Row;
     type RowCtx = RC;

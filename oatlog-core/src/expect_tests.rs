@@ -550,14 +550,19 @@ fn codegen_commutative() {
             #[derive(Debug, Default)]
             struct AddRelation {
                 new: Vec<<Self as Relation>::Row>,
-                all_index_0_1_2: IndexImpl<RadixSortCtx<Row3_0_1<Math, Math, Math>, u128>>,
-                all_index_1_0_2: IndexImpl<RadixSortCtx<Row3_1_0_2<Math, Math, Math>, u128>>,
-                all_index_2_0_1: IndexImpl<RadixSortCtx<Row3_2_0_1<Math, Math, Math>, u128>>,
+                all_index_0_1_2: SortedVec<RadixSortCtx<Row3_0_1<Math, Math, Math>, u128>>,
+                all_index_1_0_2: SortedVec<RadixSortCtx<Row3_1_0_2<Math, Math, Math>, u128>>,
+                all_index_2_0_1: SortedVec<RadixSortCtx<Row3_2_0_1<Math, Math, Math>, u128>>,
+            }
+            struct AddUpdateCtx {
+                scratch: Vec<(Math, Math, Math)>,
+                deferred_insertions: Vec<(Math, Math, Math)>,
+                old: SortedVec<RadixSortCtx<Row3_0_1<Math, Math, Math>, u128>>,
             }
             impl Relation for AddRelation {
                 type Row = (Math, Math, Math);
-            }
-            impl AddRelation {
+                type UpdateCtx = AddUpdateCtx;
+                type Unification = Unification;
                 const COST: u32 = 9u32;
                 fn new() -> Self {
                     Self::default()
@@ -568,9 +573,91 @@ fn codegen_commutative() {
                 fn clear_new(&mut self) {
                     self.new.clear();
                 }
-                fn iter_new(&self) -> impl Iterator<Item = <Self as Relation>::Row> + use<'_> {
+                fn iter_new(&self) -> impl '_ + Iterator<Item = Self::Row> {
                     self.new.iter().copied()
                 }
+                fn len(&self) -> usize {
+                    self.all_index_0_1_2.len()
+                }
+                fn update(
+                    &mut self,
+                    insertions: &mut Vec<Self::Row>,
+                    ctx: &mut Self::UpdateCtx,
+                    uf: &mut Unification,
+                ) {
+                    insertions.iter_mut().for_each(|row| {
+                        row.0 = uf.math_.find(row.0);
+                        row.1 = uf.math_.find(row.1);
+                        row.2 = uf.math_.find(row.2);
+                    });
+                    let already_canon = |uf: &mut Unification, row: &mut Self::Row| {
+                        uf.math_.already_canonical(&mut row.0)
+                            && uf.math_.already_canonical(&mut row.1)
+                            && uf.math_.already_canonical(&mut row.2)
+                    };
+                    let mut ran_merge = false;
+                    loop {
+                        self.all_index_0_1_2.sorted_vec_update(
+                            insertions,
+                            &mut ctx.deferred_insertions,
+                            &mut ctx.scratch,
+                            uf,
+                            already_canon,
+                            |uf, x, mut y| {
+                                ran_merge = true;
+                                let (x2,) = x.value_mut();
+                                let (y2,) = y.value_mut();
+                                uf.math_.union_mut(x2, y2);
+                            },
+                        );
+                        self.all_index_1_0_2.sorted_vec_update(
+                            insertions,
+                            &mut ctx.deferred_insertions,
+                            &mut ctx.scratch,
+                            uf,
+                            already_canon,
+                            |_, _, _| unreachable!(),
+                        );
+                        self.all_index_2_0_1.sorted_vec_update(
+                            insertions,
+                            &mut ctx.deferred_insertions,
+                            &mut ctx.scratch,
+                            uf,
+                            already_canon,
+                            |_, _, _| unreachable!(),
+                        );
+                        if ctx.deferred_insertions.is_empty() && ran_merge == false {
+                            break;
+                        }
+                        ran_merge = false;
+                        std::mem::swap(insertions, &mut ctx.deferred_insertions);
+                        ctx.deferred_insertions.clear();
+                    }
+                    insertions.clear();
+                    assert!(ctx.scratch.is_empty());
+                    assert!(ctx.deferred_insertions.is_empty());
+                }
+                fn update_begin(&self) -> Self::UpdateCtx {
+                    AddUpdateCtx {
+                        scratch: Vec::new(),
+                        deferred_insertions: Vec::new(),
+                        old: self.all_index_0_1_2.clone(),
+                    }
+                }
+                fn update_finalize(&mut self, ctx: Self::UpdateCtx, uf: &mut Unification) {
+                    self.new.extend(self.all_index_0_1_2.minus(&ctx.old));
+                }
+                fn emit_graphviz(&self, buf: &mut String) {
+                    use std::fmt::Write;
+                    for (i, (x0, x1, x2)) in self.all_index_0_1_2.iter().enumerate() {
+                        writeln!(buf, "{}_{i} -> {}_{};", "add", "math", x0).unwrap();
+                        writeln!(buf, "{}_{i} -> {}_{};", "add", "math", x1).unwrap();
+                        writeln!(buf, "{}_{i} -> {}_{};", "add", "math", x2).unwrap();
+                        writeln!(buf, "{}_{i} [shape = box];", "add").unwrap();
+                    }
+                }
+            }
+            impl AddRelation {
                 fn iter2_0_1_2(&self, x0: Math, x1: Math) -> impl Iterator<Item = (Math,)> + use<'_> {
                     self.all_index_0_1_2
                         .range((x0, x1, Math::MIN_ID)..=(x0, x1, Math::MAX_ID))
@@ -611,76 +698,6 @@ fn codegen_commutative() {
                     let x2 = uf.math_.add_eclass();
                     delta.add_.push((x0, x1, x2));
                     (x2,)
-                }
-                fn update(&mut self, uf: &mut Unification, delta: &mut Delta) {
-                    let mut inserts = take(&mut delta.add_);
-                    let orig_inserts = inserts.len();
-                    self.all_index_0_1_2
-                        .first_column_uproots(uf.math_.get_uprooted_snapshot(), |deleted_rows| {
-                            inserts.extend(deleted_rows)
-                        });
-                    self.all_index_1_0_2
-                        .first_column_uproots(uf.math_.get_uprooted_snapshot(), |deleted_rows| {
-                            inserts.extend(deleted_rows)
-                        });
-                    self.all_index_2_0_1
-                        .first_column_uproots(uf.math_.get_uprooted_snapshot(), |deleted_rows| {
-                            inserts.extend(deleted_rows)
-                        });
-                    inserts[orig_inserts..].sort_unstable();
-                    runtime::dedup_suffix(&mut inserts, orig_inserts);
-                    self.all_index_0_1_2
-                        .delete_many(&mut inserts[orig_inserts..]);
-                    self.all_index_1_0_2
-                        .delete_many(&mut inserts[orig_inserts..]);
-                    self.all_index_2_0_1
-                        .delete_many(&mut inserts[orig_inserts..]);
-                    inserts.iter_mut().for_each(|row| {
-                        row.0 = uf.math_.find(row.0);
-                        row.1 = uf.math_.find(row.1);
-                        row.2 = uf.math_.find(row.2);
-                    });
-                    self.all_index_0_1_2.filter_existing(&mut inserts);
-                    self.all_index_0_1_2
-                        .insert_many(&mut inserts, |mut old, mut new| {
-                            let (x2,) = old.value_mut();
-                            let (y2,) = new.value_mut();
-                            uf.math_.union_mut(x2, y2);
-                            old
-                        });
-                    self.all_index_1_0_2
-                        .insert_many(&mut inserts, |_, _| unreachable!());
-                    self.all_index_2_0_1
-                        .insert_many(&mut inserts, |_, _| unreachable!());
-                    self.new.extend_from_slice(&inserts);
-                }
-                fn update_finalize(&mut self, uf: &mut Unification) {
-                    self.new.sort_unstable();
-                    self.new.dedup();
-                    self.new.retain(|(x0, x1, x2)| {
-                        if *x0 != uf.math_.find(*x0) {
-                            return false;
-                        }
-                        if *x1 != uf.math_.find(*x1) {
-                            return false;
-                        }
-                        if *x2 != uf.math_.find(*x2) {
-                            return false;
-                        }
-                        true
-                    });
-                }
-                fn emit_graphviz(&self, buf: &mut String) {
-                    use std::fmt::Write;
-                    for (i, (x0, x1, x2)) in self.all_index_0_1_2.iter().enumerate() {
-                        writeln!(buf, "{}_{i} -> {}_{};", "add", "math", x0).unwrap();
-                        writeln!(buf, "{}_{i} -> {}_{};", "add", "math", x1).unwrap();
-                        writeln!(buf, "{}_{i} -> {}_{};", "add", "math", x2).unwrap();
-                        writeln!(buf, "{}_{i} [shape = box];", "add").unwrap();
-                    }
-                }
-                fn len(&self) -> usize {
-                    self.all_index_0_1_2.len()
                 }
             }
             #[derive(Debug, Default)]
@@ -762,12 +779,20 @@ fn codegen_commutative() {
                 #[inline(never)]
                 pub fn canonicalize(&mut self) {
                     self.add_.clear_new();
-                    while self.uf.has_new_uproots() || self.delta.has_new_inserts() {
+                    if !self.delta.has_new_inserts() && !self.uf.has_new_uproots() {
+                        return;
+                    }
+                    let mut add_ctx = self.add_.update_begin();
+                    loop {
                         self.uf.snapshot_all_uprooted();
-                        self.add_.update(&mut self.uf, &mut self.delta);
+                        self.add_
+                            .update(&mut self.delta.add_, &mut add_ctx, &mut self.uf);
+                        if !self.uf.has_new_uproots() {
+                            break;
+                        }
                     }
                     self.uf.snapshot_all_uprooted();
-                    self.add_.update_finalize(&mut self.uf);
+                    self.add_.update_finalize(add_ctx, &mut self.uf);
                 }
             }
             impl EclassProvider<Math> for Theory {
@@ -906,14 +931,19 @@ fn regression_entry2() {
             #[derive(Debug, Default)]
             struct SubRelation {
                 new: Vec<<Self as Relation>::Row>,
-                all_index_0_1_2: IndexImpl<RadixSortCtx<Row3_0_1<Math, Math, Math>, u128>>,
-                all_index_1_0_2: IndexImpl<RadixSortCtx<Row3_1_0_2<Math, Math, Math>, u128>>,
-                all_index_2_0_1: IndexImpl<RadixSortCtx<Row3_2_0_1<Math, Math, Math>, u128>>,
+                all_index_0_1_2: SortedVec<RadixSortCtx<Row3_0_1<Math, Math, Math>, u128>>,
+                all_index_1_0_2: SortedVec<RadixSortCtx<Row3_1_0_2<Math, Math, Math>, u128>>,
+                all_index_2_0_1: SortedVec<RadixSortCtx<Row3_2_0_1<Math, Math, Math>, u128>>,
+            }
+            struct SubUpdateCtx {
+                scratch: Vec<(Math, Math, Math)>,
+                deferred_insertions: Vec<(Math, Math, Math)>,
+                old: SortedVec<RadixSortCtx<Row3_0_1<Math, Math, Math>, u128>>,
             }
             impl Relation for SubRelation {
                 type Row = (Math, Math, Math);
-            }
-            impl SubRelation {
+                type UpdateCtx = SubUpdateCtx;
+                type Unification = Unification;
                 const COST: u32 = 9u32;
                 fn new() -> Self {
                     Self::default()
@@ -924,9 +954,91 @@ fn regression_entry2() {
                 fn clear_new(&mut self) {
                     self.new.clear();
                 }
-                fn iter_new(&self) -> impl Iterator<Item = <Self as Relation>::Row> + use<'_> {
+                fn iter_new(&self) -> impl '_ + Iterator<Item = Self::Row> {
                     self.new.iter().copied()
                 }
+                fn len(&self) -> usize {
+                    self.all_index_0_1_2.len()
+                }
+                fn update(
+                    &mut self,
+                    insertions: &mut Vec<Self::Row>,
+                    ctx: &mut Self::UpdateCtx,
+                    uf: &mut Unification,
+                ) {
+                    insertions.iter_mut().for_each(|row| {
+                        row.0 = uf.math_.find(row.0);
+                        row.1 = uf.math_.find(row.1);
+                        row.2 = uf.math_.find(row.2);
+                    });
+                    let already_canon = |uf: &mut Unification, row: &mut Self::Row| {
+                        uf.math_.already_canonical(&mut row.0)
+                            && uf.math_.already_canonical(&mut row.1)
+                            && uf.math_.already_canonical(&mut row.2)
+                    };
+                    let mut ran_merge = false;
+                    loop {
+                        self.all_index_0_1_2.sorted_vec_update(
+                            insertions,
+                            &mut ctx.deferred_insertions,
+                            &mut ctx.scratch,
+                            uf,
+                            already_canon,
+                            |uf, x, mut y| {
+                                ran_merge = true;
+                                let (x2,) = x.value_mut();
+                                let (y2,) = y.value_mut();
+                                uf.math_.union_mut(x2, y2);
+                            },
+                        );
+                        self.all_index_1_0_2.sorted_vec_update(
+                            insertions,
+                            &mut ctx.deferred_insertions,
+                            &mut ctx.scratch,
+                            uf,
+                            already_canon,
+                            |_, _, _| unreachable!(),
+                        );
+                        self.all_index_2_0_1.sorted_vec_update(
+                            insertions,
+                            &mut ctx.deferred_insertions,
+                            &mut ctx.scratch,
+                            uf,
+                            already_canon,
+                            |_, _, _| unreachable!(),
+                        );
+                        if ctx.deferred_insertions.is_empty() && ran_merge == false {
+                            break;
+                        }
+                        ran_merge = false;
+                        std::mem::swap(insertions, &mut ctx.deferred_insertions);
+                        ctx.deferred_insertions.clear();
+                    }
+                    insertions.clear();
+                    assert!(ctx.scratch.is_empty());
+                    assert!(ctx.deferred_insertions.is_empty());
+                }
+                fn update_begin(&self) -> Self::UpdateCtx {
+                    SubUpdateCtx {
+                        scratch: Vec::new(),
+                        deferred_insertions: Vec::new(),
+                        old: self.all_index_0_1_2.clone(),
+                    }
+                }
+                fn update_finalize(&mut self, ctx: Self::UpdateCtx, uf: &mut Unification) {
+                    self.new.extend(self.all_index_0_1_2.minus(&ctx.old));
+                }
+                fn emit_graphviz(&self, buf: &mut String) {
+                    use std::fmt::Write;
+                    for (i, (x0, x1, x2)) in self.all_index_0_1_2.iter().enumerate() {
+                        writeln!(buf, "{}_{i} -> {}_{};", "sub", "math", x0).unwrap();
+                        writeln!(buf, "{}_{i} -> {}_{};", "sub", "math", x1).unwrap();
+                        writeln!(buf, "{}_{i} -> {}_{};", "sub", "math", x2).unwrap();
+                        writeln!(buf, "{}_{i} [shape = box];", "sub").unwrap();
+                    }
+                }
+            }
+            impl SubRelation {
                 fn iter2_0_1_2(&self, x0: Math, x1: Math) -> impl Iterator<Item = (Math,)> + use<'_> {
                     self.all_index_0_1_2
                         .range((x0, x1, Math::MIN_ID)..=(x0, x1, Math::MAX_ID))
@@ -968,87 +1080,22 @@ fn regression_entry2() {
                     delta.sub_.push((x0, x1, x2));
                     (x2,)
                 }
-                fn update(&mut self, uf: &mut Unification, delta: &mut Delta) {
-                    let mut inserts = take(&mut delta.sub_);
-                    let orig_inserts = inserts.len();
-                    self.all_index_0_1_2
-                        .first_column_uproots(uf.math_.get_uprooted_snapshot(), |deleted_rows| {
-                            inserts.extend(deleted_rows)
-                        });
-                    self.all_index_1_0_2
-                        .first_column_uproots(uf.math_.get_uprooted_snapshot(), |deleted_rows| {
-                            inserts.extend(deleted_rows)
-                        });
-                    self.all_index_2_0_1
-                        .first_column_uproots(uf.math_.get_uprooted_snapshot(), |deleted_rows| {
-                            inserts.extend(deleted_rows)
-                        });
-                    inserts[orig_inserts..].sort_unstable();
-                    runtime::dedup_suffix(&mut inserts, orig_inserts);
-                    self.all_index_0_1_2
-                        .delete_many(&mut inserts[orig_inserts..]);
-                    self.all_index_1_0_2
-                        .delete_many(&mut inserts[orig_inserts..]);
-                    self.all_index_2_0_1
-                        .delete_many(&mut inserts[orig_inserts..]);
-                    inserts.iter_mut().for_each(|row| {
-                        row.0 = uf.math_.find(row.0);
-                        row.1 = uf.math_.find(row.1);
-                        row.2 = uf.math_.find(row.2);
-                    });
-                    self.all_index_0_1_2.filter_existing(&mut inserts);
-                    self.all_index_0_1_2
-                        .insert_many(&mut inserts, |mut old, mut new| {
-                            let (x2,) = old.value_mut();
-                            let (y2,) = new.value_mut();
-                            uf.math_.union_mut(x2, y2);
-                            old
-                        });
-                    self.all_index_1_0_2
-                        .insert_many(&mut inserts, |_, _| unreachable!());
-                    self.all_index_2_0_1
-                        .insert_many(&mut inserts, |_, _| unreachable!());
-                    self.new.extend_from_slice(&inserts);
-                }
-                fn update_finalize(&mut self, uf: &mut Unification) {
-                    self.new.sort_unstable();
-                    self.new.dedup();
-                    self.new.retain(|(x0, x1, x2)| {
-                        if *x0 != uf.math_.find(*x0) {
-                            return false;
-                        }
-                        if *x1 != uf.math_.find(*x1) {
-                            return false;
-                        }
-                        if *x2 != uf.math_.find(*x2) {
-                            return false;
-                        }
-                        true
-                    });
-                }
-                fn emit_graphviz(&self, buf: &mut String) {
-                    use std::fmt::Write;
-                    for (i, (x0, x1, x2)) in self.all_index_0_1_2.iter().enumerate() {
-                        writeln!(buf, "{}_{i} -> {}_{};", "sub", "math", x0).unwrap();
-                        writeln!(buf, "{}_{i} -> {}_{};", "sub", "math", x1).unwrap();
-                        writeln!(buf, "{}_{i} -> {}_{};", "sub", "math", x2).unwrap();
-                        writeln!(buf, "{}_{i} [shape = box];", "sub").unwrap();
-                    }
-                }
-                fn len(&self) -> usize {
-                    self.all_index_0_1_2.len()
-                }
             }
             #[derive(Debug, Default)]
             struct ConstRelation {
                 new: Vec<<Self as Relation>::Row>,
-                all_index_0_1: IndexImpl<StdSortCtx<Row2_0<std::primitive::i64, Math>>>,
-                all_index_1_0: IndexImpl<StdSortCtx<Row2_1_0<std::primitive::i64, Math>>>,
+                all_index_0_1: SortedVec<StdSortCtx<Row2_0<std::primitive::i64, Math>>>,
+                all_index_1_0: SortedVec<StdSortCtx<Row2_1_0<std::primitive::i64, Math>>>,
+            }
+            struct ConstUpdateCtx {
+                scratch: Vec<(std::primitive::i64, Math)>,
+                deferred_insertions: Vec<(std::primitive::i64, Math)>,
+                old: SortedVec<StdSortCtx<Row2_0<std::primitive::i64, Math>>>,
             }
             impl Relation for ConstRelation {
                 type Row = (std::primitive::i64, Math);
-            }
-            impl ConstRelation {
+                type UpdateCtx = ConstUpdateCtx;
+                type Unification = Unification;
                 const COST: u32 = 4u32;
                 fn new() -> Self {
                     Self::default()
@@ -1059,9 +1106,77 @@ fn regression_entry2() {
                 fn clear_new(&mut self) {
                     self.new.clear();
                 }
-                fn iter_new(&self) -> impl Iterator<Item = <Self as Relation>::Row> + use<'_> {
+                fn iter_new(&self) -> impl '_ + Iterator<Item = Self::Row> {
                     self.new.iter().copied()
                 }
+                fn len(&self) -> usize {
+                    self.all_index_0_1.len()
+                }
+                fn update(
+                    &mut self,
+                    insertions: &mut Vec<Self::Row>,
+                    ctx: &mut Self::UpdateCtx,
+                    uf: &mut Unification,
+                ) {
+                    insertions.iter_mut().for_each(|row| {
+                        row.1 = uf.math_.find(row.1);
+                    });
+                    let already_canon =
+                        |uf: &mut Unification, row: &mut Self::Row| uf.math_.already_canonical(&mut row.1);
+                    let mut ran_merge = false;
+                    loop {
+                        self.all_index_0_1.sorted_vec_update(
+                            insertions,
+                            &mut ctx.deferred_insertions,
+                            &mut ctx.scratch,
+                            uf,
+                            already_canon,
+                            |uf, x, mut y| {
+                                ran_merge = true;
+                                let (x1,) = x.value_mut();
+                                let (y1,) = y.value_mut();
+                                uf.math_.union_mut(x1, y1);
+                            },
+                        );
+                        self.all_index_1_0.sorted_vec_update(
+                            insertions,
+                            &mut ctx.deferred_insertions,
+                            &mut ctx.scratch,
+                            uf,
+                            already_canon,
+                            |_, _, _| unreachable!(),
+                        );
+                        if ctx.deferred_insertions.is_empty() && ran_merge == false {
+                            break;
+                        }
+                        ran_merge = false;
+                        std::mem::swap(insertions, &mut ctx.deferred_insertions);
+                        ctx.deferred_insertions.clear();
+                    }
+                    insertions.clear();
+                    assert!(ctx.scratch.is_empty());
+                    assert!(ctx.deferred_insertions.is_empty());
+                }
+                fn update_begin(&self) -> Self::UpdateCtx {
+                    ConstUpdateCtx {
+                        scratch: Vec::new(),
+                        deferred_insertions: Vec::new(),
+                        old: self.all_index_0_1.clone(),
+                    }
+                }
+                fn update_finalize(&mut self, ctx: Self::UpdateCtx, uf: &mut Unification) {
+                    self.new.extend(self.all_index_0_1.minus(&ctx.old));
+                }
+                fn emit_graphviz(&self, buf: &mut String) {
+                    use std::fmt::Write;
+                    for (i, (x0, x1)) in self.all_index_0_1.iter().enumerate() {
+                        writeln!(buf, "{}_{i} -> {}_{};", "const", "i64", x0).unwrap();
+                        writeln!(buf, "{}_{i} -> {}_{};", "const", "math", x1).unwrap();
+                        writeln!(buf, "{}_{i} [shape = box];", "const").unwrap();
+                    }
+                }
+            }
+            impl ConstRelation {
                 fn iter1_0_1(&self, x0: std::primitive::i64) -> impl Iterator<Item = (Math,)> + use<'_> {
                     self.all_index_0_1
                         .range((x0, Math::MIN_ID)..=(x0, Math::MAX_ID))
@@ -1091,53 +1206,6 @@ fn regression_entry2() {
                     let x1 = uf.math_.add_eclass();
                     delta.const_.push((x0, x1));
                     (x1,)
-                }
-                fn update(&mut self, uf: &mut Unification, delta: &mut Delta) {
-                    let mut inserts = take(&mut delta.const_);
-                    let orig_inserts = inserts.len();
-                    self.all_index_1_0
-                        .first_column_uproots(uf.math_.get_uprooted_snapshot(), |deleted_rows| {
-                            inserts.extend(deleted_rows)
-                        });
-                    inserts[orig_inserts..].sort_unstable();
-                    runtime::dedup_suffix(&mut inserts, orig_inserts);
-                    self.all_index_0_1.delete_many(&mut inserts[orig_inserts..]);
-                    self.all_index_1_0.delete_many(&mut inserts[orig_inserts..]);
-                    inserts.iter_mut().for_each(|row| {
-                        row.1 = uf.math_.find(row.1);
-                    });
-                    self.all_index_0_1.filter_existing(&mut inserts);
-                    self.all_index_0_1
-                        .insert_many(&mut inserts, |mut old, mut new| {
-                            let (x1,) = old.value_mut();
-                            let (y1,) = new.value_mut();
-                            uf.math_.union_mut(x1, y1);
-                            old
-                        });
-                    self.all_index_1_0
-                        .insert_many(&mut inserts, |_, _| unreachable!());
-                    self.new.extend_from_slice(&inserts);
-                }
-                fn update_finalize(&mut self, uf: &mut Unification) {
-                    self.new.sort_unstable();
-                    self.new.dedup();
-                    self.new.retain(|(x0, x1)| {
-                        if *x1 != uf.math_.find(*x1) {
-                            return false;
-                        }
-                        true
-                    });
-                }
-                fn emit_graphviz(&self, buf: &mut String) {
-                    use std::fmt::Write;
-                    for (i, (x0, x1)) in self.all_index_0_1.iter().enumerate() {
-                        writeln!(buf, "{}_{i} -> {}_{};", "const", "i64", x0).unwrap();
-                        writeln!(buf, "{}_{i} -> {}_{};", "const", "math", x1).unwrap();
-                        writeln!(buf, "{}_{i} [shape = box];", "const").unwrap();
-                    }
-                }
-                fn len(&self) -> usize {
-                    self.all_index_0_1.len()
                 }
             }
             #[derive(Debug, Default)]
@@ -1235,15 +1303,25 @@ fn regression_entry2() {
                 pub fn canonicalize(&mut self) {
                     self.sub_.clear_new();
                     self.const_.clear_new();
-                    while self.uf.has_new_uproots() || self.delta.has_new_inserts() {
+                    if !self.delta.has_new_inserts() && !self.uf.has_new_uproots() {
+                        return;
+                    }
+                    let mut sub_ctx = self.sub_.update_begin();
+                    let mut const_ctx = self.const_.update_begin();
+                    loop {
                         self.uf.snapshot_all_uprooted();
-                        self.sub_.update(&mut self.uf, &mut self.delta);
-                        self.const_.update(&mut self.uf, &mut self.delta);
+                        self.sub_
+                            .update(&mut self.delta.sub_, &mut sub_ctx, &mut self.uf);
+                        self.const_
+                            .update(&mut self.delta.const_, &mut const_ctx, &mut self.uf);
+                        if !self.uf.has_new_uproots() {
+                            break;
+                        }
                     }
                     self.uf.snapshot_all_uprooted();
                     self.global_i64.update_finalize();
-                    self.sub_.update_finalize(&mut self.uf);
-                    self.const_.update_finalize(&mut self.uf);
+                    self.sub_.update_finalize(sub_ctx, &mut self.uf);
+                    self.const_.update_finalize(const_ctx, &mut self.uf);
                 }
             }
             impl EclassProvider<Math> for Theory {
@@ -1364,14 +1442,19 @@ fn regression_entry() {
             #[derive(Debug, Default)]
             struct IntegralRelation {
                 new: Vec<<Self as Relation>::Row>,
-                all_index_0_1_2: IndexImpl<RadixSortCtx<Row3_0_1<Math, Math, Math>, u128>>,
-                all_index_1_0_2: IndexImpl<RadixSortCtx<Row3_1_0_2<Math, Math, Math>, u128>>,
-                all_index_2_0_1: IndexImpl<RadixSortCtx<Row3_2_0_1<Math, Math, Math>, u128>>,
+                all_index_0_1_2: SortedVec<RadixSortCtx<Row3_0_1<Math, Math, Math>, u128>>,
+                all_index_1_0_2: SortedVec<RadixSortCtx<Row3_1_0_2<Math, Math, Math>, u128>>,
+                all_index_2_0_1: SortedVec<RadixSortCtx<Row3_2_0_1<Math, Math, Math>, u128>>,
+            }
+            struct IntegralUpdateCtx {
+                scratch: Vec<(Math, Math, Math)>,
+                deferred_insertions: Vec<(Math, Math, Math)>,
+                old: SortedVec<RadixSortCtx<Row3_0_1<Math, Math, Math>, u128>>,
             }
             impl Relation for IntegralRelation {
                 type Row = (Math, Math, Math);
-            }
-            impl IntegralRelation {
+                type UpdateCtx = IntegralUpdateCtx;
+                type Unification = Unification;
                 const COST: u32 = 9u32;
                 fn new() -> Self {
                     Self::default()
@@ -1382,9 +1465,91 @@ fn regression_entry() {
                 fn clear_new(&mut self) {
                     self.new.clear();
                 }
-                fn iter_new(&self) -> impl Iterator<Item = <Self as Relation>::Row> + use<'_> {
+                fn iter_new(&self) -> impl '_ + Iterator<Item = Self::Row> {
                     self.new.iter().copied()
                 }
+                fn len(&self) -> usize {
+                    self.all_index_0_1_2.len()
+                }
+                fn update(
+                    &mut self,
+                    insertions: &mut Vec<Self::Row>,
+                    ctx: &mut Self::UpdateCtx,
+                    uf: &mut Unification,
+                ) {
+                    insertions.iter_mut().for_each(|row| {
+                        row.0 = uf.math_.find(row.0);
+                        row.1 = uf.math_.find(row.1);
+                        row.2 = uf.math_.find(row.2);
+                    });
+                    let already_canon = |uf: &mut Unification, row: &mut Self::Row| {
+                        uf.math_.already_canonical(&mut row.0)
+                            && uf.math_.already_canonical(&mut row.1)
+                            && uf.math_.already_canonical(&mut row.2)
+                    };
+                    let mut ran_merge = false;
+                    loop {
+                        self.all_index_0_1_2.sorted_vec_update(
+                            insertions,
+                            &mut ctx.deferred_insertions,
+                            &mut ctx.scratch,
+                            uf,
+                            already_canon,
+                            |uf, x, mut y| {
+                                ran_merge = true;
+                                let (x2,) = x.value_mut();
+                                let (y2,) = y.value_mut();
+                                uf.math_.union_mut(x2, y2);
+                            },
+                        );
+                        self.all_index_1_0_2.sorted_vec_update(
+                            insertions,
+                            &mut ctx.deferred_insertions,
+                            &mut ctx.scratch,
+                            uf,
+                            already_canon,
+                            |_, _, _| unreachable!(),
+                        );
+                        self.all_index_2_0_1.sorted_vec_update(
+                            insertions,
+                            &mut ctx.deferred_insertions,
+                            &mut ctx.scratch,
+                            uf,
+                            already_canon,
+                            |_, _, _| unreachable!(),
+                        );
+                        if ctx.deferred_insertions.is_empty() && ran_merge == false {
+                            break;
+                        }
+                        ran_merge = false;
+                        std::mem::swap(insertions, &mut ctx.deferred_insertions);
+                        ctx.deferred_insertions.clear();
+                    }
+                    insertions.clear();
+                    assert!(ctx.scratch.is_empty());
+                    assert!(ctx.deferred_insertions.is_empty());
+                }
+                fn update_begin(&self) -> Self::UpdateCtx {
+                    IntegralUpdateCtx {
+                        scratch: Vec::new(),
+                        deferred_insertions: Vec::new(),
+                        old: self.all_index_0_1_2.clone(),
+                    }
+                }
+                fn update_finalize(&mut self, ctx: Self::UpdateCtx, uf: &mut Unification) {
+                    self.new.extend(self.all_index_0_1_2.minus(&ctx.old));
+                }
+                fn emit_graphviz(&self, buf: &mut String) {
+                    use std::fmt::Write;
+                    for (i, (x0, x1, x2)) in self.all_index_0_1_2.iter().enumerate() {
+                        writeln!(buf, "{}_{i} -> {}_{};", "integral", "math", x0).unwrap();
+                        writeln!(buf, "{}_{i} -> {}_{};", "integral", "math", x1).unwrap();
+                        writeln!(buf, "{}_{i} -> {}_{};", "integral", "math", x2).unwrap();
+                        writeln!(buf, "{}_{i} [shape = box];", "integral").unwrap();
+                    }
+                }
+            }
+            impl IntegralRelation {
                 fn iter2_0_1_2(&self, x0: Math, x1: Math) -> impl Iterator<Item = (Math,)> + use<'_> {
                     self.all_index_0_1_2
                         .range((x0, x1, Math::MIN_ID)..=(x0, x1, Math::MAX_ID))
@@ -1426,88 +1591,23 @@ fn regression_entry() {
                     delta.integral_.push((x0, x1, x2));
                     (x2,)
                 }
-                fn update(&mut self, uf: &mut Unification, delta: &mut Delta) {
-                    let mut inserts = take(&mut delta.integral_);
-                    let orig_inserts = inserts.len();
-                    self.all_index_0_1_2
-                        .first_column_uproots(uf.math_.get_uprooted_snapshot(), |deleted_rows| {
-                            inserts.extend(deleted_rows)
-                        });
-                    self.all_index_1_0_2
-                        .first_column_uproots(uf.math_.get_uprooted_snapshot(), |deleted_rows| {
-                            inserts.extend(deleted_rows)
-                        });
-                    self.all_index_2_0_1
-                        .first_column_uproots(uf.math_.get_uprooted_snapshot(), |deleted_rows| {
-                            inserts.extend(deleted_rows)
-                        });
-                    inserts[orig_inserts..].sort_unstable();
-                    runtime::dedup_suffix(&mut inserts, orig_inserts);
-                    self.all_index_0_1_2
-                        .delete_many(&mut inserts[orig_inserts..]);
-                    self.all_index_1_0_2
-                        .delete_many(&mut inserts[orig_inserts..]);
-                    self.all_index_2_0_1
-                        .delete_many(&mut inserts[orig_inserts..]);
-                    inserts.iter_mut().for_each(|row| {
-                        row.0 = uf.math_.find(row.0);
-                        row.1 = uf.math_.find(row.1);
-                        row.2 = uf.math_.find(row.2);
-                    });
-                    self.all_index_0_1_2.filter_existing(&mut inserts);
-                    self.all_index_0_1_2
-                        .insert_many(&mut inserts, |mut old, mut new| {
-                            let (x2,) = old.value_mut();
-                            let (y2,) = new.value_mut();
-                            uf.math_.union_mut(x2, y2);
-                            old
-                        });
-                    self.all_index_1_0_2
-                        .insert_many(&mut inserts, |_, _| unreachable!());
-                    self.all_index_2_0_1
-                        .insert_many(&mut inserts, |_, _| unreachable!());
-                    self.new.extend_from_slice(&inserts);
-                }
-                fn update_finalize(&mut self, uf: &mut Unification) {
-                    self.new.sort_unstable();
-                    self.new.dedup();
-                    self.new.retain(|(x0, x1, x2)| {
-                        if *x0 != uf.math_.find(*x0) {
-                            return false;
-                        }
-                        if *x1 != uf.math_.find(*x1) {
-                            return false;
-                        }
-                        if *x2 != uf.math_.find(*x2) {
-                            return false;
-                        }
-                        true
-                    });
-                }
-                fn emit_graphviz(&self, buf: &mut String) {
-                    use std::fmt::Write;
-                    for (i, (x0, x1, x2)) in self.all_index_0_1_2.iter().enumerate() {
-                        writeln!(buf, "{}_{i} -> {}_{};", "integral", "math", x0).unwrap();
-                        writeln!(buf, "{}_{i} -> {}_{};", "integral", "math", x1).unwrap();
-                        writeln!(buf, "{}_{i} -> {}_{};", "integral", "math", x2).unwrap();
-                        writeln!(buf, "{}_{i} [shape = box];", "integral").unwrap();
-                    }
-                }
-                fn len(&self) -> usize {
-                    self.all_index_0_1_2.len()
-                }
             }
             #[derive(Debug, Default)]
             struct AddRelation {
                 new: Vec<<Self as Relation>::Row>,
-                all_index_0_1_2: IndexImpl<RadixSortCtx<Row3_0_1<Math, Math, Math>, u128>>,
-                all_index_1_0_2: IndexImpl<RadixSortCtx<Row3_1_0_2<Math, Math, Math>, u128>>,
-                all_index_2_0_1: IndexImpl<RadixSortCtx<Row3_2_0_1<Math, Math, Math>, u128>>,
+                all_index_0_1_2: SortedVec<RadixSortCtx<Row3_0_1<Math, Math, Math>, u128>>,
+                all_index_1_0_2: SortedVec<RadixSortCtx<Row3_1_0_2<Math, Math, Math>, u128>>,
+                all_index_2_0_1: SortedVec<RadixSortCtx<Row3_2_0_1<Math, Math, Math>, u128>>,
+            }
+            struct AddUpdateCtx {
+                scratch: Vec<(Math, Math, Math)>,
+                deferred_insertions: Vec<(Math, Math, Math)>,
+                old: SortedVec<RadixSortCtx<Row3_0_1<Math, Math, Math>, u128>>,
             }
             impl Relation for AddRelation {
                 type Row = (Math, Math, Math);
-            }
-            impl AddRelation {
+                type UpdateCtx = AddUpdateCtx;
+                type Unification = Unification;
                 const COST: u32 = 9u32;
                 fn new() -> Self {
                     Self::default()
@@ -1518,9 +1618,91 @@ fn regression_entry() {
                 fn clear_new(&mut self) {
                     self.new.clear();
                 }
-                fn iter_new(&self) -> impl Iterator<Item = <Self as Relation>::Row> + use<'_> {
+                fn iter_new(&self) -> impl '_ + Iterator<Item = Self::Row> {
                     self.new.iter().copied()
                 }
+                fn len(&self) -> usize {
+                    self.all_index_0_1_2.len()
+                }
+                fn update(
+                    &mut self,
+                    insertions: &mut Vec<Self::Row>,
+                    ctx: &mut Self::UpdateCtx,
+                    uf: &mut Unification,
+                ) {
+                    insertions.iter_mut().for_each(|row| {
+                        row.0 = uf.math_.find(row.0);
+                        row.1 = uf.math_.find(row.1);
+                        row.2 = uf.math_.find(row.2);
+                    });
+                    let already_canon = |uf: &mut Unification, row: &mut Self::Row| {
+                        uf.math_.already_canonical(&mut row.0)
+                            && uf.math_.already_canonical(&mut row.1)
+                            && uf.math_.already_canonical(&mut row.2)
+                    };
+                    let mut ran_merge = false;
+                    loop {
+                        self.all_index_0_1_2.sorted_vec_update(
+                            insertions,
+                            &mut ctx.deferred_insertions,
+                            &mut ctx.scratch,
+                            uf,
+                            already_canon,
+                            |uf, x, mut y| {
+                                ran_merge = true;
+                                let (x2,) = x.value_mut();
+                                let (y2,) = y.value_mut();
+                                uf.math_.union_mut(x2, y2);
+                            },
+                        );
+                        self.all_index_1_0_2.sorted_vec_update(
+                            insertions,
+                            &mut ctx.deferred_insertions,
+                            &mut ctx.scratch,
+                            uf,
+                            already_canon,
+                            |_, _, _| unreachable!(),
+                        );
+                        self.all_index_2_0_1.sorted_vec_update(
+                            insertions,
+                            &mut ctx.deferred_insertions,
+                            &mut ctx.scratch,
+                            uf,
+                            already_canon,
+                            |_, _, _| unreachable!(),
+                        );
+                        if ctx.deferred_insertions.is_empty() && ran_merge == false {
+                            break;
+                        }
+                        ran_merge = false;
+                        std::mem::swap(insertions, &mut ctx.deferred_insertions);
+                        ctx.deferred_insertions.clear();
+                    }
+                    insertions.clear();
+                    assert!(ctx.scratch.is_empty());
+                    assert!(ctx.deferred_insertions.is_empty());
+                }
+                fn update_begin(&self) -> Self::UpdateCtx {
+                    AddUpdateCtx {
+                        scratch: Vec::new(),
+                        deferred_insertions: Vec::new(),
+                        old: self.all_index_0_1_2.clone(),
+                    }
+                }
+                fn update_finalize(&mut self, ctx: Self::UpdateCtx, uf: &mut Unification) {
+                    self.new.extend(self.all_index_0_1_2.minus(&ctx.old));
+                }
+                fn emit_graphviz(&self, buf: &mut String) {
+                    use std::fmt::Write;
+                    for (i, (x0, x1, x2)) in self.all_index_0_1_2.iter().enumerate() {
+                        writeln!(buf, "{}_{i} -> {}_{};", "add", "math", x0).unwrap();
+                        writeln!(buf, "{}_{i} -> {}_{};", "add", "math", x1).unwrap();
+                        writeln!(buf, "{}_{i} -> {}_{};", "add", "math", x2).unwrap();
+                        writeln!(buf, "{}_{i} [shape = box];", "add").unwrap();
+                    }
+                }
+            }
+            impl AddRelation {
                 fn iter2_0_1_2(&self, x0: Math, x1: Math) -> impl Iterator<Item = (Math,)> + use<'_> {
                     self.all_index_0_1_2
                         .range((x0, x1, Math::MIN_ID)..=(x0, x1, Math::MAX_ID))
@@ -1561,76 +1743,6 @@ fn regression_entry() {
                     let x2 = uf.math_.add_eclass();
                     delta.add_.push((x0, x1, x2));
                     (x2,)
-                }
-                fn update(&mut self, uf: &mut Unification, delta: &mut Delta) {
-                    let mut inserts = take(&mut delta.add_);
-                    let orig_inserts = inserts.len();
-                    self.all_index_0_1_2
-                        .first_column_uproots(uf.math_.get_uprooted_snapshot(), |deleted_rows| {
-                            inserts.extend(deleted_rows)
-                        });
-                    self.all_index_1_0_2
-                        .first_column_uproots(uf.math_.get_uprooted_snapshot(), |deleted_rows| {
-                            inserts.extend(deleted_rows)
-                        });
-                    self.all_index_2_0_1
-                        .first_column_uproots(uf.math_.get_uprooted_snapshot(), |deleted_rows| {
-                            inserts.extend(deleted_rows)
-                        });
-                    inserts[orig_inserts..].sort_unstable();
-                    runtime::dedup_suffix(&mut inserts, orig_inserts);
-                    self.all_index_0_1_2
-                        .delete_many(&mut inserts[orig_inserts..]);
-                    self.all_index_1_0_2
-                        .delete_many(&mut inserts[orig_inserts..]);
-                    self.all_index_2_0_1
-                        .delete_many(&mut inserts[orig_inserts..]);
-                    inserts.iter_mut().for_each(|row| {
-                        row.0 = uf.math_.find(row.0);
-                        row.1 = uf.math_.find(row.1);
-                        row.2 = uf.math_.find(row.2);
-                    });
-                    self.all_index_0_1_2.filter_existing(&mut inserts);
-                    self.all_index_0_1_2
-                        .insert_many(&mut inserts, |mut old, mut new| {
-                            let (x2,) = old.value_mut();
-                            let (y2,) = new.value_mut();
-                            uf.math_.union_mut(x2, y2);
-                            old
-                        });
-                    self.all_index_1_0_2
-                        .insert_many(&mut inserts, |_, _| unreachable!());
-                    self.all_index_2_0_1
-                        .insert_many(&mut inserts, |_, _| unreachable!());
-                    self.new.extend_from_slice(&inserts);
-                }
-                fn update_finalize(&mut self, uf: &mut Unification) {
-                    self.new.sort_unstable();
-                    self.new.dedup();
-                    self.new.retain(|(x0, x1, x2)| {
-                        if *x0 != uf.math_.find(*x0) {
-                            return false;
-                        }
-                        if *x1 != uf.math_.find(*x1) {
-                            return false;
-                        }
-                        if *x2 != uf.math_.find(*x2) {
-                            return false;
-                        }
-                        true
-                    });
-                }
-                fn emit_graphviz(&self, buf: &mut String) {
-                    use std::fmt::Write;
-                    for (i, (x0, x1, x2)) in self.all_index_0_1_2.iter().enumerate() {
-                        writeln!(buf, "{}_{i} -> {}_{};", "add", "math", x0).unwrap();
-                        writeln!(buf, "{}_{i} -> {}_{};", "add", "math", x1).unwrap();
-                        writeln!(buf, "{}_{i} -> {}_{};", "add", "math", x2).unwrap();
-                        writeln!(buf, "{}_{i} [shape = box];", "add").unwrap();
-                    }
-                }
-                fn len(&self) -> usize {
-                    self.all_index_0_1_2.len()
                 }
             }
             #[derive(Debug, Default)]
@@ -1727,14 +1839,24 @@ fn regression_entry() {
                 pub fn canonicalize(&mut self) {
                     self.integral_.clear_new();
                     self.add_.clear_new();
-                    while self.uf.has_new_uproots() || self.delta.has_new_inserts() {
+                    if !self.delta.has_new_inserts() && !self.uf.has_new_uproots() {
+                        return;
+                    }
+                    let mut integral_ctx = self.integral_.update_begin();
+                    let mut add_ctx = self.add_.update_begin();
+                    loop {
                         self.uf.snapshot_all_uprooted();
-                        self.integral_.update(&mut self.uf, &mut self.delta);
-                        self.add_.update(&mut self.uf, &mut self.delta);
+                        self.integral_
+                            .update(&mut self.delta.integral_, &mut integral_ctx, &mut self.uf);
+                        self.add_
+                            .update(&mut self.delta.add_, &mut add_ctx, &mut self.uf);
+                        if !self.uf.has_new_uproots() {
+                            break;
+                        }
                     }
                     self.uf.snapshot_all_uprooted();
-                    self.integral_.update_finalize(&mut self.uf);
-                    self.add_.update_finalize(&mut self.uf);
+                    self.integral_.update_finalize(integral_ctx, &mut self.uf);
+                    self.add_.update_finalize(add_ctx, &mut self.uf);
                 }
             }
             impl EclassProvider<Math> for Theory {
@@ -1838,14 +1960,19 @@ fn test_bind_variable_multiple_times() {
             #[derive(Debug, Default)]
             struct SameRelation {
                 new: Vec<<Self as Relation>::Row>,
-                all_index_0_1_2: IndexImpl<RadixSortCtx<Row3_0_1<Foo, Foo, Foo>, u128>>,
-                all_index_1_0_2: IndexImpl<RadixSortCtx<Row3_1_0_2<Foo, Foo, Foo>, u128>>,
-                all_index_2_0_1: IndexImpl<RadixSortCtx<Row3_2_0_1<Foo, Foo, Foo>, u128>>,
+                all_index_0_1_2: SortedVec<RadixSortCtx<Row3_0_1<Foo, Foo, Foo>, u128>>,
+                all_index_1_0_2: SortedVec<RadixSortCtx<Row3_1_0_2<Foo, Foo, Foo>, u128>>,
+                all_index_2_0_1: SortedVec<RadixSortCtx<Row3_2_0_1<Foo, Foo, Foo>, u128>>,
+            }
+            struct SameUpdateCtx {
+                scratch: Vec<(Foo, Foo, Foo)>,
+                deferred_insertions: Vec<(Foo, Foo, Foo)>,
+                old: SortedVec<RadixSortCtx<Row3_0_1<Foo, Foo, Foo>, u128>>,
             }
             impl Relation for SameRelation {
                 type Row = (Foo, Foo, Foo);
-            }
-            impl SameRelation {
+                type UpdateCtx = SameUpdateCtx;
+                type Unification = Unification;
                 const COST: u32 = 9u32;
                 fn new() -> Self {
                     Self::default()
@@ -1856,9 +1983,91 @@ fn test_bind_variable_multiple_times() {
                 fn clear_new(&mut self) {
                     self.new.clear();
                 }
-                fn iter_new(&self) -> impl Iterator<Item = <Self as Relation>::Row> + use<'_> {
+                fn iter_new(&self) -> impl '_ + Iterator<Item = Self::Row> {
                     self.new.iter().copied()
                 }
+                fn len(&self) -> usize {
+                    self.all_index_0_1_2.len()
+                }
+                fn update(
+                    &mut self,
+                    insertions: &mut Vec<Self::Row>,
+                    ctx: &mut Self::UpdateCtx,
+                    uf: &mut Unification,
+                ) {
+                    insertions.iter_mut().for_each(|row| {
+                        row.0 = uf.foo_.find(row.0);
+                        row.1 = uf.foo_.find(row.1);
+                        row.2 = uf.foo_.find(row.2);
+                    });
+                    let already_canon = |uf: &mut Unification, row: &mut Self::Row| {
+                        uf.foo_.already_canonical(&mut row.0)
+                            && uf.foo_.already_canonical(&mut row.1)
+                            && uf.foo_.already_canonical(&mut row.2)
+                    };
+                    let mut ran_merge = false;
+                    loop {
+                        self.all_index_0_1_2.sorted_vec_update(
+                            insertions,
+                            &mut ctx.deferred_insertions,
+                            &mut ctx.scratch,
+                            uf,
+                            already_canon,
+                            |uf, x, mut y| {
+                                ran_merge = true;
+                                let (x2,) = x.value_mut();
+                                let (y2,) = y.value_mut();
+                                uf.foo_.union_mut(x2, y2);
+                            },
+                        );
+                        self.all_index_1_0_2.sorted_vec_update(
+                            insertions,
+                            &mut ctx.deferred_insertions,
+                            &mut ctx.scratch,
+                            uf,
+                            already_canon,
+                            |_, _, _| unreachable!(),
+                        );
+                        self.all_index_2_0_1.sorted_vec_update(
+                            insertions,
+                            &mut ctx.deferred_insertions,
+                            &mut ctx.scratch,
+                            uf,
+                            already_canon,
+                            |_, _, _| unreachable!(),
+                        );
+                        if ctx.deferred_insertions.is_empty() && ran_merge == false {
+                            break;
+                        }
+                        ran_merge = false;
+                        std::mem::swap(insertions, &mut ctx.deferred_insertions);
+                        ctx.deferred_insertions.clear();
+                    }
+                    insertions.clear();
+                    assert!(ctx.scratch.is_empty());
+                    assert!(ctx.deferred_insertions.is_empty());
+                }
+                fn update_begin(&self) -> Self::UpdateCtx {
+                    SameUpdateCtx {
+                        scratch: Vec::new(),
+                        deferred_insertions: Vec::new(),
+                        old: self.all_index_0_1_2.clone(),
+                    }
+                }
+                fn update_finalize(&mut self, ctx: Self::UpdateCtx, uf: &mut Unification) {
+                    self.new.extend(self.all_index_0_1_2.minus(&ctx.old));
+                }
+                fn emit_graphviz(&self, buf: &mut String) {
+                    use std::fmt::Write;
+                    for (i, (x0, x1, x2)) in self.all_index_0_1_2.iter().enumerate() {
+                        writeln!(buf, "{}_{i} -> {}_{};", "same", "foo", x0).unwrap();
+                        writeln!(buf, "{}_{i} -> {}_{};", "same", "foo", x1).unwrap();
+                        writeln!(buf, "{}_{i} -> {}_{};", "same", "foo", x2).unwrap();
+                        writeln!(buf, "{}_{i} [shape = box];", "same").unwrap();
+                    }
+                }
+            }
+            impl SameRelation {
                 fn iter2_0_1_2(&self, x0: Foo, x1: Foo) -> impl Iterator<Item = (Foo,)> + use<'_> {
                     self.all_index_0_1_2
                         .range((x0, x1, Foo::MIN_ID)..=(x0, x1, Foo::MAX_ID))
@@ -1899,76 +2108,6 @@ fn test_bind_variable_multiple_times() {
                     let x2 = uf.foo_.add_eclass();
                     delta.same_.push((x0, x1, x2));
                     (x2,)
-                }
-                fn update(&mut self, uf: &mut Unification, delta: &mut Delta) {
-                    let mut inserts = take(&mut delta.same_);
-                    let orig_inserts = inserts.len();
-                    self.all_index_0_1_2
-                        .first_column_uproots(uf.foo_.get_uprooted_snapshot(), |deleted_rows| {
-                            inserts.extend(deleted_rows)
-                        });
-                    self.all_index_1_0_2
-                        .first_column_uproots(uf.foo_.get_uprooted_snapshot(), |deleted_rows| {
-                            inserts.extend(deleted_rows)
-                        });
-                    self.all_index_2_0_1
-                        .first_column_uproots(uf.foo_.get_uprooted_snapshot(), |deleted_rows| {
-                            inserts.extend(deleted_rows)
-                        });
-                    inserts[orig_inserts..].sort_unstable();
-                    runtime::dedup_suffix(&mut inserts, orig_inserts);
-                    self.all_index_0_1_2
-                        .delete_many(&mut inserts[orig_inserts..]);
-                    self.all_index_1_0_2
-                        .delete_many(&mut inserts[orig_inserts..]);
-                    self.all_index_2_0_1
-                        .delete_many(&mut inserts[orig_inserts..]);
-                    inserts.iter_mut().for_each(|row| {
-                        row.0 = uf.foo_.find(row.0);
-                        row.1 = uf.foo_.find(row.1);
-                        row.2 = uf.foo_.find(row.2);
-                    });
-                    self.all_index_0_1_2.filter_existing(&mut inserts);
-                    self.all_index_0_1_2
-                        .insert_many(&mut inserts, |mut old, mut new| {
-                            let (x2,) = old.value_mut();
-                            let (y2,) = new.value_mut();
-                            uf.foo_.union_mut(x2, y2);
-                            old
-                        });
-                    self.all_index_1_0_2
-                        .insert_many(&mut inserts, |_, _| unreachable!());
-                    self.all_index_2_0_1
-                        .insert_many(&mut inserts, |_, _| unreachable!());
-                    self.new.extend_from_slice(&inserts);
-                }
-                fn update_finalize(&mut self, uf: &mut Unification) {
-                    self.new.sort_unstable();
-                    self.new.dedup();
-                    self.new.retain(|(x0, x1, x2)| {
-                        if *x0 != uf.foo_.find(*x0) {
-                            return false;
-                        }
-                        if *x1 != uf.foo_.find(*x1) {
-                            return false;
-                        }
-                        if *x2 != uf.foo_.find(*x2) {
-                            return false;
-                        }
-                        true
-                    });
-                }
-                fn emit_graphviz(&self, buf: &mut String) {
-                    use std::fmt::Write;
-                    for (i, (x0, x1, x2)) in self.all_index_0_1_2.iter().enumerate() {
-                        writeln!(buf, "{}_{i} -> {}_{};", "same", "foo", x0).unwrap();
-                        writeln!(buf, "{}_{i} -> {}_{};", "same", "foo", x1).unwrap();
-                        writeln!(buf, "{}_{i} -> {}_{};", "same", "foo", x2).unwrap();
-                        writeln!(buf, "{}_{i} [shape = box];", "same").unwrap();
-                    }
-                }
-                fn len(&self) -> usize {
-                    self.all_index_0_1_2.len()
                 }
             }
             #[derive(Debug, Default)]
@@ -2053,12 +2192,20 @@ fn test_bind_variable_multiple_times() {
                 #[inline(never)]
                 pub fn canonicalize(&mut self) {
                     self.same_.clear_new();
-                    while self.uf.has_new_uproots() || self.delta.has_new_inserts() {
+                    if !self.delta.has_new_inserts() && !self.uf.has_new_uproots() {
+                        return;
+                    }
+                    let mut same_ctx = self.same_.update_begin();
+                    loop {
                         self.uf.snapshot_all_uprooted();
-                        self.same_.update(&mut self.uf, &mut self.delta);
+                        self.same_
+                            .update(&mut self.delta.same_, &mut same_ctx, &mut self.uf);
+                        if !self.uf.has_new_uproots() {
+                            break;
+                        }
                     }
                     self.uf.snapshot_all_uprooted();
-                    self.same_.update_finalize(&mut self.uf);
+                    self.same_.update_finalize(same_ctx, &mut self.uf);
                 }
             }
             impl EclassProvider<Foo> for Theory {
@@ -2276,14 +2423,19 @@ fn codegen_variable_reuse_bug() {
             #[derive(Debug, Default)]
             struct AddRelation {
                 new: Vec<<Self as Relation>::Row>,
-                all_index_0_1_2: IndexImpl<RadixSortCtx<Row3_0_1<Math, Math, Math>, u128>>,
-                all_index_1_0_2: IndexImpl<RadixSortCtx<Row3_1_0_2<Math, Math, Math>, u128>>,
-                all_index_2_0_1: IndexImpl<RadixSortCtx<Row3_2_0_1<Math, Math, Math>, u128>>,
+                all_index_0_1_2: SortedVec<RadixSortCtx<Row3_0_1<Math, Math, Math>, u128>>,
+                all_index_1_0_2: SortedVec<RadixSortCtx<Row3_1_0_2<Math, Math, Math>, u128>>,
+                all_index_2_0_1: SortedVec<RadixSortCtx<Row3_2_0_1<Math, Math, Math>, u128>>,
+            }
+            struct AddUpdateCtx {
+                scratch: Vec<(Math, Math, Math)>,
+                deferred_insertions: Vec<(Math, Math, Math)>,
+                old: SortedVec<RadixSortCtx<Row3_0_1<Math, Math, Math>, u128>>,
             }
             impl Relation for AddRelation {
                 type Row = (Math, Math, Math);
-            }
-            impl AddRelation {
+                type UpdateCtx = AddUpdateCtx;
+                type Unification = Unification;
                 const COST: u32 = 9u32;
                 fn new() -> Self {
                     Self::default()
@@ -2294,9 +2446,91 @@ fn codegen_variable_reuse_bug() {
                 fn clear_new(&mut self) {
                     self.new.clear();
                 }
-                fn iter_new(&self) -> impl Iterator<Item = <Self as Relation>::Row> + use<'_> {
+                fn iter_new(&self) -> impl '_ + Iterator<Item = Self::Row> {
                     self.new.iter().copied()
                 }
+                fn len(&self) -> usize {
+                    self.all_index_0_1_2.len()
+                }
+                fn update(
+                    &mut self,
+                    insertions: &mut Vec<Self::Row>,
+                    ctx: &mut Self::UpdateCtx,
+                    uf: &mut Unification,
+                ) {
+                    insertions.iter_mut().for_each(|row| {
+                        row.0 = uf.math_.find(row.0);
+                        row.1 = uf.math_.find(row.1);
+                        row.2 = uf.math_.find(row.2);
+                    });
+                    let already_canon = |uf: &mut Unification, row: &mut Self::Row| {
+                        uf.math_.already_canonical(&mut row.0)
+                            && uf.math_.already_canonical(&mut row.1)
+                            && uf.math_.already_canonical(&mut row.2)
+                    };
+                    let mut ran_merge = false;
+                    loop {
+                        self.all_index_0_1_2.sorted_vec_update(
+                            insertions,
+                            &mut ctx.deferred_insertions,
+                            &mut ctx.scratch,
+                            uf,
+                            already_canon,
+                            |uf, x, mut y| {
+                                ran_merge = true;
+                                let (x2,) = x.value_mut();
+                                let (y2,) = y.value_mut();
+                                uf.math_.union_mut(x2, y2);
+                            },
+                        );
+                        self.all_index_1_0_2.sorted_vec_update(
+                            insertions,
+                            &mut ctx.deferred_insertions,
+                            &mut ctx.scratch,
+                            uf,
+                            already_canon,
+                            |_, _, _| unreachable!(),
+                        );
+                        self.all_index_2_0_1.sorted_vec_update(
+                            insertions,
+                            &mut ctx.deferred_insertions,
+                            &mut ctx.scratch,
+                            uf,
+                            already_canon,
+                            |_, _, _| unreachable!(),
+                        );
+                        if ctx.deferred_insertions.is_empty() && ran_merge == false {
+                            break;
+                        }
+                        ran_merge = false;
+                        std::mem::swap(insertions, &mut ctx.deferred_insertions);
+                        ctx.deferred_insertions.clear();
+                    }
+                    insertions.clear();
+                    assert!(ctx.scratch.is_empty());
+                    assert!(ctx.deferred_insertions.is_empty());
+                }
+                fn update_begin(&self) -> Self::UpdateCtx {
+                    AddUpdateCtx {
+                        scratch: Vec::new(),
+                        deferred_insertions: Vec::new(),
+                        old: self.all_index_0_1_2.clone(),
+                    }
+                }
+                fn update_finalize(&mut self, ctx: Self::UpdateCtx, uf: &mut Unification) {
+                    self.new.extend(self.all_index_0_1_2.minus(&ctx.old));
+                }
+                fn emit_graphviz(&self, buf: &mut String) {
+                    use std::fmt::Write;
+                    for (i, (x0, x1, x2)) in self.all_index_0_1_2.iter().enumerate() {
+                        writeln!(buf, "{}_{i} -> {}_{};", "add", "math", x0).unwrap();
+                        writeln!(buf, "{}_{i} -> {}_{};", "add", "math", x1).unwrap();
+                        writeln!(buf, "{}_{i} -> {}_{};", "add", "math", x2).unwrap();
+                        writeln!(buf, "{}_{i} [shape = box];", "add").unwrap();
+                    }
+                }
+            }
+            impl AddRelation {
                 fn iter2_0_1_2(&self, x0: Math, x1: Math) -> impl Iterator<Item = (Math,)> + use<'_> {
                     self.all_index_0_1_2
                         .range((x0, x1, Math::MIN_ID)..=(x0, x1, Math::MAX_ID))
@@ -2346,86 +2580,21 @@ fn codegen_variable_reuse_bug() {
                     delta.add_.push((x0, x1, x2));
                     (x2,)
                 }
-                fn update(&mut self, uf: &mut Unification, delta: &mut Delta) {
-                    let mut inserts = take(&mut delta.add_);
-                    let orig_inserts = inserts.len();
-                    self.all_index_0_1_2
-                        .first_column_uproots(uf.math_.get_uprooted_snapshot(), |deleted_rows| {
-                            inserts.extend(deleted_rows)
-                        });
-                    self.all_index_1_0_2
-                        .first_column_uproots(uf.math_.get_uprooted_snapshot(), |deleted_rows| {
-                            inserts.extend(deleted_rows)
-                        });
-                    self.all_index_2_0_1
-                        .first_column_uproots(uf.math_.get_uprooted_snapshot(), |deleted_rows| {
-                            inserts.extend(deleted_rows)
-                        });
-                    inserts[orig_inserts..].sort_unstable();
-                    runtime::dedup_suffix(&mut inserts, orig_inserts);
-                    self.all_index_0_1_2
-                        .delete_many(&mut inserts[orig_inserts..]);
-                    self.all_index_1_0_2
-                        .delete_many(&mut inserts[orig_inserts..]);
-                    self.all_index_2_0_1
-                        .delete_many(&mut inserts[orig_inserts..]);
-                    inserts.iter_mut().for_each(|row| {
-                        row.0 = uf.math_.find(row.0);
-                        row.1 = uf.math_.find(row.1);
-                        row.2 = uf.math_.find(row.2);
-                    });
-                    self.all_index_0_1_2.filter_existing(&mut inserts);
-                    self.all_index_0_1_2
-                        .insert_many(&mut inserts, |mut old, mut new| {
-                            let (x2,) = old.value_mut();
-                            let (y2,) = new.value_mut();
-                            uf.math_.union_mut(x2, y2);
-                            old
-                        });
-                    self.all_index_1_0_2
-                        .insert_many(&mut inserts, |_, _| unreachable!());
-                    self.all_index_2_0_1
-                        .insert_many(&mut inserts, |_, _| unreachable!());
-                    self.new.extend_from_slice(&inserts);
-                }
-                fn update_finalize(&mut self, uf: &mut Unification) {
-                    self.new.sort_unstable();
-                    self.new.dedup();
-                    self.new.retain(|(x0, x1, x2)| {
-                        if *x0 != uf.math_.find(*x0) {
-                            return false;
-                        }
-                        if *x1 != uf.math_.find(*x1) {
-                            return false;
-                        }
-                        if *x2 != uf.math_.find(*x2) {
-                            return false;
-                        }
-                        true
-                    });
-                }
-                fn emit_graphviz(&self, buf: &mut String) {
-                    use std::fmt::Write;
-                    for (i, (x0, x1, x2)) in self.all_index_0_1_2.iter().enumerate() {
-                        writeln!(buf, "{}_{i} -> {}_{};", "add", "math", x0).unwrap();
-                        writeln!(buf, "{}_{i} -> {}_{};", "add", "math", x1).unwrap();
-                        writeln!(buf, "{}_{i} -> {}_{};", "add", "math", x2).unwrap();
-                        writeln!(buf, "{}_{i} [shape = box];", "add").unwrap();
-                    }
-                }
-                fn len(&self) -> usize {
-                    self.all_index_0_1_2.len()
-                }
             }
             #[derive(Debug, Default)]
             struct ZeroRelation {
                 new: Vec<<Self as Relation>::Row>,
-                all_index_0: IndexImpl<RadixSortCtx<Row1<Math>, u32>>,
+                all_index_0: SortedVec<RadixSortCtx<Row1<Math>, u32>>,
+            }
+            struct ZeroUpdateCtx {
+                scratch: Vec<(Math,)>,
+                deferred_insertions: Vec<(Math,)>,
+                old: SortedVec<RadixSortCtx<Row1<Math>, u32>>,
             }
             impl Relation for ZeroRelation {
                 type Row = (Math,);
-            }
-            impl ZeroRelation {
+                type UpdateCtx = ZeroUpdateCtx;
+                type Unification = Unification;
                 const COST: u32 = 1u32;
                 fn new() -> Self {
                     Self::default()
@@ -2436,9 +2605,68 @@ fn codegen_variable_reuse_bug() {
                 fn clear_new(&mut self) {
                     self.new.clear();
                 }
-                fn iter_new(&self) -> impl Iterator<Item = <Self as Relation>::Row> + use<'_> {
+                fn iter_new(&self) -> impl '_ + Iterator<Item = Self::Row> {
                     self.new.iter().copied()
                 }
+                fn len(&self) -> usize {
+                    self.all_index_0.len()
+                }
+                fn update(
+                    &mut self,
+                    insertions: &mut Vec<Self::Row>,
+                    ctx: &mut Self::UpdateCtx,
+                    uf: &mut Unification,
+                ) {
+                    insertions.iter_mut().for_each(|row| {
+                        row.0 = uf.math_.find(row.0);
+                    });
+                    let already_canon =
+                        |uf: &mut Unification, row: &mut Self::Row| uf.math_.already_canonical(&mut row.0);
+                    let mut ran_merge = false;
+                    loop {
+                        self.all_index_0.sorted_vec_update(
+                            insertions,
+                            &mut ctx.deferred_insertions,
+                            &mut ctx.scratch,
+                            uf,
+                            already_canon,
+                            |uf, x, mut y| {
+                                ran_merge = true;
+                                let (x0,) = x.value_mut();
+                                let (y0,) = y.value_mut();
+                                uf.math_.union_mut(x0, y0);
+                            },
+                        );
+                        if ctx.deferred_insertions.is_empty() && ran_merge == false {
+                            break;
+                        }
+                        ran_merge = false;
+                        std::mem::swap(insertions, &mut ctx.deferred_insertions);
+                        ctx.deferred_insertions.clear();
+                    }
+                    insertions.clear();
+                    assert!(ctx.scratch.is_empty());
+                    assert!(ctx.deferred_insertions.is_empty());
+                }
+                fn update_begin(&self) -> Self::UpdateCtx {
+                    ZeroUpdateCtx {
+                        scratch: Vec::new(),
+                        deferred_insertions: Vec::new(),
+                        old: self.all_index_0.clone(),
+                    }
+                }
+                fn update_finalize(&mut self, ctx: Self::UpdateCtx, uf: &mut Unification) {
+                    self.new.extend(self.all_index_0.minus(&ctx.old));
+                }
+                fn emit_graphviz(&self, buf: &mut String) {
+                    use std::fmt::Write;
+                    for (i, (x0,)) in self.all_index_0.iter().enumerate() {
+                        writeln!(buf, "{}_{i} -> {}_{};", "zero", "math", x0).unwrap();
+                        writeln!(buf, "{}_{i} [shape = box];", "zero").unwrap();
+                    }
+                }
+            }
+            impl ZeroRelation {
                 fn iter0_0(&self) -> impl Iterator<Item = (Math,)> + use<'_> {
                     self.all_index_0
                         .range((Math::MIN_ID,)..=(Math::MAX_ID,))
@@ -2469,49 +2697,6 @@ fn codegen_variable_reuse_bug() {
                     }
                     delta.zero_.push((x0,));
                     ()
-                }
-                fn update(&mut self, uf: &mut Unification, delta: &mut Delta) {
-                    let mut inserts = take(&mut delta.zero_);
-                    let orig_inserts = inserts.len();
-                    self.all_index_0
-                        .first_column_uproots(uf.math_.get_uprooted_snapshot(), |deleted_rows| {
-                            inserts.extend(deleted_rows)
-                        });
-                    inserts[orig_inserts..].sort_unstable();
-                    runtime::dedup_suffix(&mut inserts, orig_inserts);
-                    self.all_index_0.delete_many(&mut inserts[orig_inserts..]);
-                    inserts.iter_mut().for_each(|row| {
-                        row.0 = uf.math_.find(row.0);
-                    });
-                    self.all_index_0.filter_existing(&mut inserts);
-                    self.all_index_0
-                        .insert_many(&mut inserts, |mut old, mut new| {
-                            let (x0,) = old.value_mut();
-                            let (y0,) = new.value_mut();
-                            uf.math_.union_mut(x0, y0);
-                            old
-                        });
-                    self.new.extend_from_slice(&inserts);
-                }
-                fn update_finalize(&mut self, uf: &mut Unification) {
-                    self.new.sort_unstable();
-                    self.new.dedup();
-                    self.new.retain(|(x0,)| {
-                        if *x0 != uf.math_.find(*x0) {
-                            return false;
-                        }
-                        true
-                    });
-                }
-                fn emit_graphviz(&self, buf: &mut String) {
-                    use std::fmt::Write;
-                    for (i, (x0,)) in self.all_index_0.iter().enumerate() {
-                        writeln!(buf, "{}_{i} -> {}_{};", "zero", "math", x0).unwrap();
-                        writeln!(buf, "{}_{i} [shape = box];", "zero").unwrap();
-                    }
-                }
-                fn len(&self) -> usize {
-                    self.all_index_0.len()
                 }
             }
             #[derive(Debug, Default)]
@@ -2634,16 +2819,26 @@ fn codegen_variable_reuse_bug() {
                 pub fn canonicalize(&mut self) {
                     self.add_.clear_new();
                     self.zero_.clear_new();
-                    while self.uf.has_new_uproots() || self.delta.has_new_inserts() {
+                    if !self.delta.has_new_inserts() && !self.uf.has_new_uproots() {
+                        return;
+                    }
+                    let mut add_ctx = self.add_.update_begin();
+                    let mut zero_ctx = self.zero_.update_begin();
+                    loop {
                         self.uf.snapshot_all_uprooted();
-                        self.add_.update(&mut self.uf, &mut self.delta);
-                        self.zero_.update(&mut self.uf, &mut self.delta);
+                        self.add_
+                            .update(&mut self.delta.add_, &mut add_ctx, &mut self.uf);
+                        self.zero_
+                            .update(&mut self.delta.zero_, &mut zero_ctx, &mut self.uf);
+                        if !self.uf.has_new_uproots() {
+                            break;
+                        }
                     }
                     self.uf.snapshot_all_uprooted();
                     self.global_math.update(&mut self.uf.math_);
                     self.global_math.update_finalize();
-                    self.add_.update_finalize(&mut self.uf);
-                    self.zero_.update_finalize(&mut self.uf);
+                    self.add_.update_finalize(add_ctx, &mut self.uf);
+                    self.zero_.update_finalize(zero_ctx, &mut self.uf);
                 }
             }
             impl EclassProvider<Math> for Theory {
@@ -2715,14 +2910,19 @@ fn initial_exprs() {
             #[derive(Debug, Default)]
             struct AddRelation {
                 new: Vec<<Self as Relation>::Row>,
-                all_index_0_1_2: IndexImpl<RadixSortCtx<Row3_0_1<Math, Math, Math>, u128>>,
-                all_index_1_0_2: IndexImpl<RadixSortCtx<Row3_1_0_2<Math, Math, Math>, u128>>,
-                all_index_2_0_1: IndexImpl<RadixSortCtx<Row3_2_0_1<Math, Math, Math>, u128>>,
+                all_index_0_1_2: SortedVec<RadixSortCtx<Row3_0_1<Math, Math, Math>, u128>>,
+                all_index_1_0_2: SortedVec<RadixSortCtx<Row3_1_0_2<Math, Math, Math>, u128>>,
+                all_index_2_0_1: SortedVec<RadixSortCtx<Row3_2_0_1<Math, Math, Math>, u128>>,
+            }
+            struct AddUpdateCtx {
+                scratch: Vec<(Math, Math, Math)>,
+                deferred_insertions: Vec<(Math, Math, Math)>,
+                old: SortedVec<RadixSortCtx<Row3_0_1<Math, Math, Math>, u128>>,
             }
             impl Relation for AddRelation {
                 type Row = (Math, Math, Math);
-            }
-            impl AddRelation {
+                type UpdateCtx = AddUpdateCtx;
+                type Unification = Unification;
                 const COST: u32 = 9u32;
                 fn new() -> Self {
                     Self::default()
@@ -2733,9 +2933,91 @@ fn initial_exprs() {
                 fn clear_new(&mut self) {
                     self.new.clear();
                 }
-                fn iter_new(&self) -> impl Iterator<Item = <Self as Relation>::Row> + use<'_> {
+                fn iter_new(&self) -> impl '_ + Iterator<Item = Self::Row> {
                     self.new.iter().copied()
                 }
+                fn len(&self) -> usize {
+                    self.all_index_0_1_2.len()
+                }
+                fn update(
+                    &mut self,
+                    insertions: &mut Vec<Self::Row>,
+                    ctx: &mut Self::UpdateCtx,
+                    uf: &mut Unification,
+                ) {
+                    insertions.iter_mut().for_each(|row| {
+                        row.0 = uf.math_.find(row.0);
+                        row.1 = uf.math_.find(row.1);
+                        row.2 = uf.math_.find(row.2);
+                    });
+                    let already_canon = |uf: &mut Unification, row: &mut Self::Row| {
+                        uf.math_.already_canonical(&mut row.0)
+                            && uf.math_.already_canonical(&mut row.1)
+                            && uf.math_.already_canonical(&mut row.2)
+                    };
+                    let mut ran_merge = false;
+                    loop {
+                        self.all_index_0_1_2.sorted_vec_update(
+                            insertions,
+                            &mut ctx.deferred_insertions,
+                            &mut ctx.scratch,
+                            uf,
+                            already_canon,
+                            |uf, x, mut y| {
+                                ran_merge = true;
+                                let (x2,) = x.value_mut();
+                                let (y2,) = y.value_mut();
+                                uf.math_.union_mut(x2, y2);
+                            },
+                        );
+                        self.all_index_1_0_2.sorted_vec_update(
+                            insertions,
+                            &mut ctx.deferred_insertions,
+                            &mut ctx.scratch,
+                            uf,
+                            already_canon,
+                            |_, _, _| unreachable!(),
+                        );
+                        self.all_index_2_0_1.sorted_vec_update(
+                            insertions,
+                            &mut ctx.deferred_insertions,
+                            &mut ctx.scratch,
+                            uf,
+                            already_canon,
+                            |_, _, _| unreachable!(),
+                        );
+                        if ctx.deferred_insertions.is_empty() && ran_merge == false {
+                            break;
+                        }
+                        ran_merge = false;
+                        std::mem::swap(insertions, &mut ctx.deferred_insertions);
+                        ctx.deferred_insertions.clear();
+                    }
+                    insertions.clear();
+                    assert!(ctx.scratch.is_empty());
+                    assert!(ctx.deferred_insertions.is_empty());
+                }
+                fn update_begin(&self) -> Self::UpdateCtx {
+                    AddUpdateCtx {
+                        scratch: Vec::new(),
+                        deferred_insertions: Vec::new(),
+                        old: self.all_index_0_1_2.clone(),
+                    }
+                }
+                fn update_finalize(&mut self, ctx: Self::UpdateCtx, uf: &mut Unification) {
+                    self.new.extend(self.all_index_0_1_2.minus(&ctx.old));
+                }
+                fn emit_graphviz(&self, buf: &mut String) {
+                    use std::fmt::Write;
+                    for (i, (x0, x1, x2)) in self.all_index_0_1_2.iter().enumerate() {
+                        writeln!(buf, "{}_{i} -> {}_{};", "add", "math", x0).unwrap();
+                        writeln!(buf, "{}_{i} -> {}_{};", "add", "math", x1).unwrap();
+                        writeln!(buf, "{}_{i} -> {}_{};", "add", "math", x2).unwrap();
+                        writeln!(buf, "{}_{i} [shape = box];", "add").unwrap();
+                    }
+                }
+            }
+            impl AddRelation {
                 fn iter2_0_1_2(&self, x0: Math, x1: Math) -> impl Iterator<Item = (Math,)> + use<'_> {
                     self.all_index_0_1_2
                         .range((x0, x1, Math::MIN_ID)..=(x0, x1, Math::MAX_ID))
@@ -2777,88 +3059,23 @@ fn initial_exprs() {
                     delta.add_.push((x0, x1, x2));
                     (x2,)
                 }
-                fn update(&mut self, uf: &mut Unification, delta: &mut Delta) {
-                    let mut inserts = take(&mut delta.add_);
-                    let orig_inserts = inserts.len();
-                    self.all_index_0_1_2
-                        .first_column_uproots(uf.math_.get_uprooted_snapshot(), |deleted_rows| {
-                            inserts.extend(deleted_rows)
-                        });
-                    self.all_index_1_0_2
-                        .first_column_uproots(uf.math_.get_uprooted_snapshot(), |deleted_rows| {
-                            inserts.extend(deleted_rows)
-                        });
-                    self.all_index_2_0_1
-                        .first_column_uproots(uf.math_.get_uprooted_snapshot(), |deleted_rows| {
-                            inserts.extend(deleted_rows)
-                        });
-                    inserts[orig_inserts..].sort_unstable();
-                    runtime::dedup_suffix(&mut inserts, orig_inserts);
-                    self.all_index_0_1_2
-                        .delete_many(&mut inserts[orig_inserts..]);
-                    self.all_index_1_0_2
-                        .delete_many(&mut inserts[orig_inserts..]);
-                    self.all_index_2_0_1
-                        .delete_many(&mut inserts[orig_inserts..]);
-                    inserts.iter_mut().for_each(|row| {
-                        row.0 = uf.math_.find(row.0);
-                        row.1 = uf.math_.find(row.1);
-                        row.2 = uf.math_.find(row.2);
-                    });
-                    self.all_index_0_1_2.filter_existing(&mut inserts);
-                    self.all_index_0_1_2
-                        .insert_many(&mut inserts, |mut old, mut new| {
-                            let (x2,) = old.value_mut();
-                            let (y2,) = new.value_mut();
-                            uf.math_.union_mut(x2, y2);
-                            old
-                        });
-                    self.all_index_1_0_2
-                        .insert_many(&mut inserts, |_, _| unreachable!());
-                    self.all_index_2_0_1
-                        .insert_many(&mut inserts, |_, _| unreachable!());
-                    self.new.extend_from_slice(&inserts);
-                }
-                fn update_finalize(&mut self, uf: &mut Unification) {
-                    self.new.sort_unstable();
-                    self.new.dedup();
-                    self.new.retain(|(x0, x1, x2)| {
-                        if *x0 != uf.math_.find(*x0) {
-                            return false;
-                        }
-                        if *x1 != uf.math_.find(*x1) {
-                            return false;
-                        }
-                        if *x2 != uf.math_.find(*x2) {
-                            return false;
-                        }
-                        true
-                    });
-                }
-                fn emit_graphviz(&self, buf: &mut String) {
-                    use std::fmt::Write;
-                    for (i, (x0, x1, x2)) in self.all_index_0_1_2.iter().enumerate() {
-                        writeln!(buf, "{}_{i} -> {}_{};", "add", "math", x0).unwrap();
-                        writeln!(buf, "{}_{i} -> {}_{};", "add", "math", x1).unwrap();
-                        writeln!(buf, "{}_{i} -> {}_{};", "add", "math", x2).unwrap();
-                        writeln!(buf, "{}_{i} [shape = box];", "add").unwrap();
-                    }
-                }
-                fn len(&self) -> usize {
-                    self.all_index_0_1_2.len()
-                }
             }
             #[derive(Debug, Default)]
             struct MulRelation {
                 new: Vec<<Self as Relation>::Row>,
-                all_index_0_1_2: IndexImpl<RadixSortCtx<Row3_0_1<Math, Math, Math>, u128>>,
-                all_index_1_0_2: IndexImpl<RadixSortCtx<Row3_1_0_2<Math, Math, Math>, u128>>,
-                all_index_2_0_1: IndexImpl<RadixSortCtx<Row3_2_0_1<Math, Math, Math>, u128>>,
+                all_index_0_1_2: SortedVec<RadixSortCtx<Row3_0_1<Math, Math, Math>, u128>>,
+                all_index_1_0_2: SortedVec<RadixSortCtx<Row3_1_0_2<Math, Math, Math>, u128>>,
+                all_index_2_0_1: SortedVec<RadixSortCtx<Row3_2_0_1<Math, Math, Math>, u128>>,
+            }
+            struct MulUpdateCtx {
+                scratch: Vec<(Math, Math, Math)>,
+                deferred_insertions: Vec<(Math, Math, Math)>,
+                old: SortedVec<RadixSortCtx<Row3_0_1<Math, Math, Math>, u128>>,
             }
             impl Relation for MulRelation {
                 type Row = (Math, Math, Math);
-            }
-            impl MulRelation {
+                type UpdateCtx = MulUpdateCtx;
+                type Unification = Unification;
                 const COST: u32 = 9u32;
                 fn new() -> Self {
                     Self::default()
@@ -2869,9 +3086,91 @@ fn initial_exprs() {
                 fn clear_new(&mut self) {
                     self.new.clear();
                 }
-                fn iter_new(&self) -> impl Iterator<Item = <Self as Relation>::Row> + use<'_> {
+                fn iter_new(&self) -> impl '_ + Iterator<Item = Self::Row> {
                     self.new.iter().copied()
                 }
+                fn len(&self) -> usize {
+                    self.all_index_0_1_2.len()
+                }
+                fn update(
+                    &mut self,
+                    insertions: &mut Vec<Self::Row>,
+                    ctx: &mut Self::UpdateCtx,
+                    uf: &mut Unification,
+                ) {
+                    insertions.iter_mut().for_each(|row| {
+                        row.0 = uf.math_.find(row.0);
+                        row.1 = uf.math_.find(row.1);
+                        row.2 = uf.math_.find(row.2);
+                    });
+                    let already_canon = |uf: &mut Unification, row: &mut Self::Row| {
+                        uf.math_.already_canonical(&mut row.0)
+                            && uf.math_.already_canonical(&mut row.1)
+                            && uf.math_.already_canonical(&mut row.2)
+                    };
+                    let mut ran_merge = false;
+                    loop {
+                        self.all_index_0_1_2.sorted_vec_update(
+                            insertions,
+                            &mut ctx.deferred_insertions,
+                            &mut ctx.scratch,
+                            uf,
+                            already_canon,
+                            |uf, x, mut y| {
+                                ran_merge = true;
+                                let (x2,) = x.value_mut();
+                                let (y2,) = y.value_mut();
+                                uf.math_.union_mut(x2, y2);
+                            },
+                        );
+                        self.all_index_1_0_2.sorted_vec_update(
+                            insertions,
+                            &mut ctx.deferred_insertions,
+                            &mut ctx.scratch,
+                            uf,
+                            already_canon,
+                            |_, _, _| unreachable!(),
+                        );
+                        self.all_index_2_0_1.sorted_vec_update(
+                            insertions,
+                            &mut ctx.deferred_insertions,
+                            &mut ctx.scratch,
+                            uf,
+                            already_canon,
+                            |_, _, _| unreachable!(),
+                        );
+                        if ctx.deferred_insertions.is_empty() && ran_merge == false {
+                            break;
+                        }
+                        ran_merge = false;
+                        std::mem::swap(insertions, &mut ctx.deferred_insertions);
+                        ctx.deferred_insertions.clear();
+                    }
+                    insertions.clear();
+                    assert!(ctx.scratch.is_empty());
+                    assert!(ctx.deferred_insertions.is_empty());
+                }
+                fn update_begin(&self) -> Self::UpdateCtx {
+                    MulUpdateCtx {
+                        scratch: Vec::new(),
+                        deferred_insertions: Vec::new(),
+                        old: self.all_index_0_1_2.clone(),
+                    }
+                }
+                fn update_finalize(&mut self, ctx: Self::UpdateCtx, uf: &mut Unification) {
+                    self.new.extend(self.all_index_0_1_2.minus(&ctx.old));
+                }
+                fn emit_graphviz(&self, buf: &mut String) {
+                    use std::fmt::Write;
+                    for (i, (x0, x1, x2)) in self.all_index_0_1_2.iter().enumerate() {
+                        writeln!(buf, "{}_{i} -> {}_{};", "mul", "math", x0).unwrap();
+                        writeln!(buf, "{}_{i} -> {}_{};", "mul", "math", x1).unwrap();
+                        writeln!(buf, "{}_{i} -> {}_{};", "mul", "math", x2).unwrap();
+                        writeln!(buf, "{}_{i} [shape = box];", "mul").unwrap();
+                    }
+                }
+            }
+            impl MulRelation {
                 fn iter2_0_1_2(&self, x0: Math, x1: Math) -> impl Iterator<Item = (Math,)> + use<'_> {
                     self.all_index_0_1_2
                         .range((x0, x1, Math::MIN_ID)..=(x0, x1, Math::MAX_ID))
@@ -2913,87 +3212,22 @@ fn initial_exprs() {
                     delta.mul_.push((x0, x1, x2));
                     (x2,)
                 }
-                fn update(&mut self, uf: &mut Unification, delta: &mut Delta) {
-                    let mut inserts = take(&mut delta.mul_);
-                    let orig_inserts = inserts.len();
-                    self.all_index_0_1_2
-                        .first_column_uproots(uf.math_.get_uprooted_snapshot(), |deleted_rows| {
-                            inserts.extend(deleted_rows)
-                        });
-                    self.all_index_1_0_2
-                        .first_column_uproots(uf.math_.get_uprooted_snapshot(), |deleted_rows| {
-                            inserts.extend(deleted_rows)
-                        });
-                    self.all_index_2_0_1
-                        .first_column_uproots(uf.math_.get_uprooted_snapshot(), |deleted_rows| {
-                            inserts.extend(deleted_rows)
-                        });
-                    inserts[orig_inserts..].sort_unstable();
-                    runtime::dedup_suffix(&mut inserts, orig_inserts);
-                    self.all_index_0_1_2
-                        .delete_many(&mut inserts[orig_inserts..]);
-                    self.all_index_1_0_2
-                        .delete_many(&mut inserts[orig_inserts..]);
-                    self.all_index_2_0_1
-                        .delete_many(&mut inserts[orig_inserts..]);
-                    inserts.iter_mut().for_each(|row| {
-                        row.0 = uf.math_.find(row.0);
-                        row.1 = uf.math_.find(row.1);
-                        row.2 = uf.math_.find(row.2);
-                    });
-                    self.all_index_0_1_2.filter_existing(&mut inserts);
-                    self.all_index_0_1_2
-                        .insert_many(&mut inserts, |mut old, mut new| {
-                            let (x2,) = old.value_mut();
-                            let (y2,) = new.value_mut();
-                            uf.math_.union_mut(x2, y2);
-                            old
-                        });
-                    self.all_index_1_0_2
-                        .insert_many(&mut inserts, |_, _| unreachable!());
-                    self.all_index_2_0_1
-                        .insert_many(&mut inserts, |_, _| unreachable!());
-                    self.new.extend_from_slice(&inserts);
-                }
-                fn update_finalize(&mut self, uf: &mut Unification) {
-                    self.new.sort_unstable();
-                    self.new.dedup();
-                    self.new.retain(|(x0, x1, x2)| {
-                        if *x0 != uf.math_.find(*x0) {
-                            return false;
-                        }
-                        if *x1 != uf.math_.find(*x1) {
-                            return false;
-                        }
-                        if *x2 != uf.math_.find(*x2) {
-                            return false;
-                        }
-                        true
-                    });
-                }
-                fn emit_graphviz(&self, buf: &mut String) {
-                    use std::fmt::Write;
-                    for (i, (x0, x1, x2)) in self.all_index_0_1_2.iter().enumerate() {
-                        writeln!(buf, "{}_{i} -> {}_{};", "mul", "math", x0).unwrap();
-                        writeln!(buf, "{}_{i} -> {}_{};", "mul", "math", x1).unwrap();
-                        writeln!(buf, "{}_{i} -> {}_{};", "mul", "math", x2).unwrap();
-                        writeln!(buf, "{}_{i} [shape = box];", "mul").unwrap();
-                    }
-                }
-                fn len(&self) -> usize {
-                    self.all_index_0_1_2.len()
-                }
             }
             #[derive(Debug, Default)]
             struct ConstRelation {
                 new: Vec<<Self as Relation>::Row>,
-                all_index_0_1: IndexImpl<StdSortCtx<Row2_0<std::primitive::i64, Math>>>,
-                all_index_1_0: IndexImpl<StdSortCtx<Row2_1_0<std::primitive::i64, Math>>>,
+                all_index_0_1: SortedVec<StdSortCtx<Row2_0<std::primitive::i64, Math>>>,
+                all_index_1_0: SortedVec<StdSortCtx<Row2_1_0<std::primitive::i64, Math>>>,
+            }
+            struct ConstUpdateCtx {
+                scratch: Vec<(std::primitive::i64, Math)>,
+                deferred_insertions: Vec<(std::primitive::i64, Math)>,
+                old: SortedVec<StdSortCtx<Row2_0<std::primitive::i64, Math>>>,
             }
             impl Relation for ConstRelation {
                 type Row = (std::primitive::i64, Math);
-            }
-            impl ConstRelation {
+                type UpdateCtx = ConstUpdateCtx;
+                type Unification = Unification;
                 const COST: u32 = 4u32;
                 fn new() -> Self {
                     Self::default()
@@ -3004,9 +3238,77 @@ fn initial_exprs() {
                 fn clear_new(&mut self) {
                     self.new.clear();
                 }
-                fn iter_new(&self) -> impl Iterator<Item = <Self as Relation>::Row> + use<'_> {
+                fn iter_new(&self) -> impl '_ + Iterator<Item = Self::Row> {
                     self.new.iter().copied()
                 }
+                fn len(&self) -> usize {
+                    self.all_index_0_1.len()
+                }
+                fn update(
+                    &mut self,
+                    insertions: &mut Vec<Self::Row>,
+                    ctx: &mut Self::UpdateCtx,
+                    uf: &mut Unification,
+                ) {
+                    insertions.iter_mut().for_each(|row| {
+                        row.1 = uf.math_.find(row.1);
+                    });
+                    let already_canon =
+                        |uf: &mut Unification, row: &mut Self::Row| uf.math_.already_canonical(&mut row.1);
+                    let mut ran_merge = false;
+                    loop {
+                        self.all_index_0_1.sorted_vec_update(
+                            insertions,
+                            &mut ctx.deferred_insertions,
+                            &mut ctx.scratch,
+                            uf,
+                            already_canon,
+                            |uf, x, mut y| {
+                                ran_merge = true;
+                                let (x1,) = x.value_mut();
+                                let (y1,) = y.value_mut();
+                                uf.math_.union_mut(x1, y1);
+                            },
+                        );
+                        self.all_index_1_0.sorted_vec_update(
+                            insertions,
+                            &mut ctx.deferred_insertions,
+                            &mut ctx.scratch,
+                            uf,
+                            already_canon,
+                            |_, _, _| unreachable!(),
+                        );
+                        if ctx.deferred_insertions.is_empty() && ran_merge == false {
+                            break;
+                        }
+                        ran_merge = false;
+                        std::mem::swap(insertions, &mut ctx.deferred_insertions);
+                        ctx.deferred_insertions.clear();
+                    }
+                    insertions.clear();
+                    assert!(ctx.scratch.is_empty());
+                    assert!(ctx.deferred_insertions.is_empty());
+                }
+                fn update_begin(&self) -> Self::UpdateCtx {
+                    ConstUpdateCtx {
+                        scratch: Vec::new(),
+                        deferred_insertions: Vec::new(),
+                        old: self.all_index_0_1.clone(),
+                    }
+                }
+                fn update_finalize(&mut self, ctx: Self::UpdateCtx, uf: &mut Unification) {
+                    self.new.extend(self.all_index_0_1.minus(&ctx.old));
+                }
+                fn emit_graphviz(&self, buf: &mut String) {
+                    use std::fmt::Write;
+                    for (i, (x0, x1)) in self.all_index_0_1.iter().enumerate() {
+                        writeln!(buf, "{}_{i} -> {}_{};", "const", "i64", x0).unwrap();
+                        writeln!(buf, "{}_{i} -> {}_{};", "const", "math", x1).unwrap();
+                        writeln!(buf, "{}_{i} [shape = box];", "const").unwrap();
+                    }
+                }
+            }
+            impl ConstRelation {
                 fn iter1_0_1(&self, x0: std::primitive::i64) -> impl Iterator<Item = (Math,)> + use<'_> {
                     self.all_index_0_1
                         .range((x0, Math::MIN_ID)..=(x0, Math::MAX_ID))
@@ -3037,64 +3339,22 @@ fn initial_exprs() {
                     delta.const_.push((x0, x1));
                     (x1,)
                 }
-                fn update(&mut self, uf: &mut Unification, delta: &mut Delta) {
-                    let mut inserts = take(&mut delta.const_);
-                    let orig_inserts = inserts.len();
-                    self.all_index_1_0
-                        .first_column_uproots(uf.math_.get_uprooted_snapshot(), |deleted_rows| {
-                            inserts.extend(deleted_rows)
-                        });
-                    inserts[orig_inserts..].sort_unstable();
-                    runtime::dedup_suffix(&mut inserts, orig_inserts);
-                    self.all_index_0_1.delete_many(&mut inserts[orig_inserts..]);
-                    self.all_index_1_0.delete_many(&mut inserts[orig_inserts..]);
-                    inserts.iter_mut().for_each(|row| {
-                        row.1 = uf.math_.find(row.1);
-                    });
-                    self.all_index_0_1.filter_existing(&mut inserts);
-                    self.all_index_0_1
-                        .insert_many(&mut inserts, |mut old, mut new| {
-                            let (x1,) = old.value_mut();
-                            let (y1,) = new.value_mut();
-                            uf.math_.union_mut(x1, y1);
-                            old
-                        });
-                    self.all_index_1_0
-                        .insert_many(&mut inserts, |_, _| unreachable!());
-                    self.new.extend_from_slice(&inserts);
-                }
-                fn update_finalize(&mut self, uf: &mut Unification) {
-                    self.new.sort_unstable();
-                    self.new.dedup();
-                    self.new.retain(|(x0, x1)| {
-                        if *x1 != uf.math_.find(*x1) {
-                            return false;
-                        }
-                        true
-                    });
-                }
-                fn emit_graphviz(&self, buf: &mut String) {
-                    use std::fmt::Write;
-                    for (i, (x0, x1)) in self.all_index_0_1.iter().enumerate() {
-                        writeln!(buf, "{}_{i} -> {}_{};", "const", "i64", x0).unwrap();
-                        writeln!(buf, "{}_{i} -> {}_{};", "const", "math", x1).unwrap();
-                        writeln!(buf, "{}_{i} [shape = box];", "const").unwrap();
-                    }
-                }
-                fn len(&self) -> usize {
-                    self.all_index_0_1.len()
-                }
             }
             #[derive(Debug, Default)]
             struct VarRelation {
                 new: Vec<<Self as Relation>::Row>,
-                all_index_0_1: IndexImpl<StdSortCtx<Row2_0<runtime::IString, Math>>>,
-                all_index_1_0: IndexImpl<StdSortCtx<Row2_1_0<runtime::IString, Math>>>,
+                all_index_0_1: SortedVec<StdSortCtx<Row2_0<runtime::IString, Math>>>,
+                all_index_1_0: SortedVec<StdSortCtx<Row2_1_0<runtime::IString, Math>>>,
+            }
+            struct VarUpdateCtx {
+                scratch: Vec<(runtime::IString, Math)>,
+                deferred_insertions: Vec<(runtime::IString, Math)>,
+                old: SortedVec<StdSortCtx<Row2_0<runtime::IString, Math>>>,
             }
             impl Relation for VarRelation {
                 type Row = (runtime::IString, Math);
-            }
-            impl VarRelation {
+                type UpdateCtx = VarUpdateCtx;
+                type Unification = Unification;
                 const COST: u32 = 4u32;
                 fn new() -> Self {
                     Self::default()
@@ -3105,9 +3365,77 @@ fn initial_exprs() {
                 fn clear_new(&mut self) {
                     self.new.clear();
                 }
-                fn iter_new(&self) -> impl Iterator<Item = <Self as Relation>::Row> + use<'_> {
+                fn iter_new(&self) -> impl '_ + Iterator<Item = Self::Row> {
                     self.new.iter().copied()
                 }
+                fn len(&self) -> usize {
+                    self.all_index_0_1.len()
+                }
+                fn update(
+                    &mut self,
+                    insertions: &mut Vec<Self::Row>,
+                    ctx: &mut Self::UpdateCtx,
+                    uf: &mut Unification,
+                ) {
+                    insertions.iter_mut().for_each(|row| {
+                        row.1 = uf.math_.find(row.1);
+                    });
+                    let already_canon =
+                        |uf: &mut Unification, row: &mut Self::Row| uf.math_.already_canonical(&mut row.1);
+                    let mut ran_merge = false;
+                    loop {
+                        self.all_index_0_1.sorted_vec_update(
+                            insertions,
+                            &mut ctx.deferred_insertions,
+                            &mut ctx.scratch,
+                            uf,
+                            already_canon,
+                            |uf, x, mut y| {
+                                ran_merge = true;
+                                let (x1,) = x.value_mut();
+                                let (y1,) = y.value_mut();
+                                uf.math_.union_mut(x1, y1);
+                            },
+                        );
+                        self.all_index_1_0.sorted_vec_update(
+                            insertions,
+                            &mut ctx.deferred_insertions,
+                            &mut ctx.scratch,
+                            uf,
+                            already_canon,
+                            |_, _, _| unreachable!(),
+                        );
+                        if ctx.deferred_insertions.is_empty() && ran_merge == false {
+                            break;
+                        }
+                        ran_merge = false;
+                        std::mem::swap(insertions, &mut ctx.deferred_insertions);
+                        ctx.deferred_insertions.clear();
+                    }
+                    insertions.clear();
+                    assert!(ctx.scratch.is_empty());
+                    assert!(ctx.deferred_insertions.is_empty());
+                }
+                fn update_begin(&self) -> Self::UpdateCtx {
+                    VarUpdateCtx {
+                        scratch: Vec::new(),
+                        deferred_insertions: Vec::new(),
+                        old: self.all_index_0_1.clone(),
+                    }
+                }
+                fn update_finalize(&mut self, ctx: Self::UpdateCtx, uf: &mut Unification) {
+                    self.new.extend(self.all_index_0_1.minus(&ctx.old));
+                }
+                fn emit_graphviz(&self, buf: &mut String) {
+                    use std::fmt::Write;
+                    for (i, (x0, x1)) in self.all_index_0_1.iter().enumerate() {
+                        writeln!(buf, "{}_{i} -> {}_{};", "var", "string", x0).unwrap();
+                        writeln!(buf, "{}_{i} -> {}_{};", "var", "math", x1).unwrap();
+                        writeln!(buf, "{}_{i} [shape = box];", "var").unwrap();
+                    }
+                }
+            }
+            impl VarRelation {
                 fn iter1_0_1(&self, x0: runtime::IString) -> impl Iterator<Item = (Math,)> + use<'_> {
                     self.all_index_0_1
                         .range((x0, Math::MIN_ID)..=(x0, Math::MAX_ID))
@@ -3132,53 +3460,6 @@ fn initial_exprs() {
                     let x1 = uf.math_.add_eclass();
                     delta.var_.push((x0, x1));
                     (x1,)
-                }
-                fn update(&mut self, uf: &mut Unification, delta: &mut Delta) {
-                    let mut inserts = take(&mut delta.var_);
-                    let orig_inserts = inserts.len();
-                    self.all_index_1_0
-                        .first_column_uproots(uf.math_.get_uprooted_snapshot(), |deleted_rows| {
-                            inserts.extend(deleted_rows)
-                        });
-                    inserts[orig_inserts..].sort_unstable();
-                    runtime::dedup_suffix(&mut inserts, orig_inserts);
-                    self.all_index_0_1.delete_many(&mut inserts[orig_inserts..]);
-                    self.all_index_1_0.delete_many(&mut inserts[orig_inserts..]);
-                    inserts.iter_mut().for_each(|row| {
-                        row.1 = uf.math_.find(row.1);
-                    });
-                    self.all_index_0_1.filter_existing(&mut inserts);
-                    self.all_index_0_1
-                        .insert_many(&mut inserts, |mut old, mut new| {
-                            let (x1,) = old.value_mut();
-                            let (y1,) = new.value_mut();
-                            uf.math_.union_mut(x1, y1);
-                            old
-                        });
-                    self.all_index_1_0
-                        .insert_many(&mut inserts, |_, _| unreachable!());
-                    self.new.extend_from_slice(&inserts);
-                }
-                fn update_finalize(&mut self, uf: &mut Unification) {
-                    self.new.sort_unstable();
-                    self.new.dedup();
-                    self.new.retain(|(x0, x1)| {
-                        if *x1 != uf.math_.find(*x1) {
-                            return false;
-                        }
-                        true
-                    });
-                }
-                fn emit_graphviz(&self, buf: &mut String) {
-                    use std::fmt::Write;
-                    for (i, (x0, x1)) in self.all_index_0_1.iter().enumerate() {
-                        writeln!(buf, "{}_{i} -> {}_{};", "var", "string", x0).unwrap();
-                        writeln!(buf, "{}_{i} -> {}_{};", "var", "math", x1).unwrap();
-                        writeln!(buf, "{}_{i} [shape = box];", "var").unwrap();
-                    }
-                }
-                fn len(&self) -> usize {
-                    self.all_index_0_1.len()
                 }
             }
             #[derive(Debug, Default)]
@@ -3339,22 +3620,36 @@ fn initial_exprs() {
                     self.mul_.clear_new();
                     self.const_.clear_new();
                     self.var_.clear_new();
-                    while self.uf.has_new_uproots() || self.delta.has_new_inserts() {
+                    if !self.delta.has_new_inserts() && !self.uf.has_new_uproots() {
+                        return;
+                    }
+                    let mut add_ctx = self.add_.update_begin();
+                    let mut mul_ctx = self.mul_.update_begin();
+                    let mut const_ctx = self.const_.update_begin();
+                    let mut var_ctx = self.var_.update_begin();
+                    loop {
                         self.uf.snapshot_all_uprooted();
-                        self.add_.update(&mut self.uf, &mut self.delta);
-                        self.mul_.update(&mut self.uf, &mut self.delta);
-                        self.const_.update(&mut self.uf, &mut self.delta);
-                        self.var_.update(&mut self.uf, &mut self.delta);
+                        self.add_
+                            .update(&mut self.delta.add_, &mut add_ctx, &mut self.uf);
+                        self.mul_
+                            .update(&mut self.delta.mul_, &mut mul_ctx, &mut self.uf);
+                        self.const_
+                            .update(&mut self.delta.const_, &mut const_ctx, &mut self.uf);
+                        self.var_
+                            .update(&mut self.delta.var_, &mut var_ctx, &mut self.uf);
+                        if !self.uf.has_new_uproots() {
+                            break;
+                        }
                     }
                     self.uf.snapshot_all_uprooted();
                     self.global_math.update(&mut self.uf.math_);
                     self.global_i64.update_finalize();
                     self.global_string.update_finalize();
                     self.global_math.update_finalize();
-                    self.add_.update_finalize(&mut self.uf);
-                    self.mul_.update_finalize(&mut self.uf);
-                    self.const_.update_finalize(&mut self.uf);
-                    self.var_.update_finalize(&mut self.uf);
+                    self.add_.update_finalize(add_ctx, &mut self.uf);
+                    self.mul_.update_finalize(mul_ctx, &mut self.uf);
+                    self.const_.update_finalize(const_ctx, &mut self.uf);
+                    self.var_.update_finalize(var_ctx, &mut self.uf);
                 }
             }
             impl EclassProvider<Math> for Theory {
@@ -3613,14 +3908,19 @@ fn codegen_bug1() {
             #[derive(Debug, Default)]
             struct FooRelation {
                 new: Vec<<Self as Relation>::Row>,
-                all_index_0_1_2: IndexImpl<RadixSortCtx<Row3_0_1_2<T0, T1, T2>, u128>>,
-                all_index_1_0_2: IndexImpl<RadixSortCtx<Row3_1_0_2<T0, T1, T2>, u128>>,
-                all_index_2_0_1: IndexImpl<RadixSortCtx<Row3_2_0_1<T0, T1, T2>, u128>>,
+                all_index_0_1_2: SortedVec<RadixSortCtx<Row3_0_1_2<T0, T1, T2>, u128>>,
+                all_index_1_0_2: SortedVec<RadixSortCtx<Row3_1_0_2<T0, T1, T2>, u128>>,
+                all_index_2_0_1: SortedVec<RadixSortCtx<Row3_2_0_1<T0, T1, T2>, u128>>,
+            }
+            struct FooUpdateCtx {
+                scratch: Vec<(T0, T1, T2)>,
+                deferred_insertions: Vec<(T0, T1, T2)>,
+                old: SortedVec<RadixSortCtx<Row3_0_1_2<T0, T1, T2>, u128>>,
             }
             impl Relation for FooRelation {
                 type Row = (T0, T1, T2);
-            }
-            impl FooRelation {
+                type UpdateCtx = FooUpdateCtx;
+                type Unification = Unification;
                 const COST: u32 = 9u32;
                 fn new() -> Self {
                     Self::default()
@@ -3631,9 +3931,86 @@ fn codegen_bug1() {
                 fn clear_new(&mut self) {
                     self.new.clear();
                 }
-                fn iter_new(&self) -> impl Iterator<Item = <Self as Relation>::Row> + use<'_> {
+                fn iter_new(&self) -> impl '_ + Iterator<Item = Self::Row> {
                     self.new.iter().copied()
                 }
+                fn len(&self) -> usize {
+                    self.all_index_0_1_2.len()
+                }
+                fn update(
+                    &mut self,
+                    insertions: &mut Vec<Self::Row>,
+                    ctx: &mut Self::UpdateCtx,
+                    uf: &mut Unification,
+                ) {
+                    insertions.iter_mut().for_each(|row| {
+                        row.0 = uf.t0_.find(row.0);
+                        row.1 = uf.t1_.find(row.1);
+                        row.2 = uf.t2_.find(row.2);
+                    });
+                    let already_canon = |uf: &mut Unification, row: &mut Self::Row| {
+                        uf.t0_.already_canonical(&mut row.0)
+                            && uf.t1_.already_canonical(&mut row.1)
+                            && uf.t2_.already_canonical(&mut row.2)
+                    };
+                    let mut ran_merge = false;
+                    loop {
+                        self.all_index_0_1_2.sorted_vec_update(
+                            insertions,
+                            &mut ctx.deferred_insertions,
+                            &mut ctx.scratch,
+                            uf,
+                            already_canon,
+                            |_, _, _| unreachable!(),
+                        );
+                        self.all_index_1_0_2.sorted_vec_update(
+                            insertions,
+                            &mut ctx.deferred_insertions,
+                            &mut ctx.scratch,
+                            uf,
+                            already_canon,
+                            |_, _, _| unreachable!(),
+                        );
+                        self.all_index_2_0_1.sorted_vec_update(
+                            insertions,
+                            &mut ctx.deferred_insertions,
+                            &mut ctx.scratch,
+                            uf,
+                            already_canon,
+                            |_, _, _| unreachable!(),
+                        );
+                        if ctx.deferred_insertions.is_empty() && ran_merge == false {
+                            break;
+                        }
+                        ran_merge = false;
+                        std::mem::swap(insertions, &mut ctx.deferred_insertions);
+                        ctx.deferred_insertions.clear();
+                    }
+                    insertions.clear();
+                    assert!(ctx.scratch.is_empty());
+                    assert!(ctx.deferred_insertions.is_empty());
+                }
+                fn update_begin(&self) -> Self::UpdateCtx {
+                    FooUpdateCtx {
+                        scratch: Vec::new(),
+                        deferred_insertions: Vec::new(),
+                        old: self.all_index_0_1_2.clone(),
+                    }
+                }
+                fn update_finalize(&mut self, ctx: Self::UpdateCtx, uf: &mut Unification) {
+                    self.new.extend(self.all_index_0_1_2.minus(&ctx.old));
+                }
+                fn emit_graphviz(&self, buf: &mut String) {
+                    use std::fmt::Write;
+                    for (i, (x0, x1, x2)) in self.all_index_0_1_2.iter().enumerate() {
+                        writeln!(buf, "{}_{i} -> {}_{};", "foo", "t0", x0).unwrap();
+                        writeln!(buf, "{}_{i} -> {}_{};", "foo", "t1", x1).unwrap();
+                        writeln!(buf, "{}_{i} -> {}_{};", "foo", "t2", x2).unwrap();
+                        writeln!(buf, "{}_{i} [shape = box];", "foo").unwrap();
+                    }
+                }
+            }
+            impl FooRelation {
                 fn iter1_0_1_2(&self, x0: T0) -> impl Iterator<Item = (T1, T2)> + use<'_> {
                     self.all_index_0_1_2
                         .range((x0, T1::MIN_ID, T2::MIN_ID)..=(x0, T1::MAX_ID, T2::MAX_ID))
@@ -3657,71 +4034,6 @@ fn codegen_bug1() {
                 }
                 fn check1_2_0_1(&self, x2: T2) -> bool {
                     self.iter1_2_0_1(x2).next().is_some()
-                }
-                fn update(&mut self, uf: &mut Unification, delta: &mut Delta) {
-                    let mut inserts = take(&mut delta.foo_);
-                    let orig_inserts = inserts.len();
-                    self.all_index_0_1_2
-                        .first_column_uproots(uf.t0_.get_uprooted_snapshot(), |deleted_rows| {
-                            inserts.extend(deleted_rows)
-                        });
-                    self.all_index_1_0_2
-                        .first_column_uproots(uf.t1_.get_uprooted_snapshot(), |deleted_rows| {
-                            inserts.extend(deleted_rows)
-                        });
-                    self.all_index_2_0_1
-                        .first_column_uproots(uf.t2_.get_uprooted_snapshot(), |deleted_rows| {
-                            inserts.extend(deleted_rows)
-                        });
-                    inserts[orig_inserts..].sort_unstable();
-                    runtime::dedup_suffix(&mut inserts, orig_inserts);
-                    self.all_index_0_1_2
-                        .delete_many(&mut inserts[orig_inserts..]);
-                    self.all_index_1_0_2
-                        .delete_many(&mut inserts[orig_inserts..]);
-                    self.all_index_2_0_1
-                        .delete_many(&mut inserts[orig_inserts..]);
-                    inserts.iter_mut().for_each(|row| {
-                        row.0 = uf.t0_.find(row.0);
-                        row.1 = uf.t1_.find(row.1);
-                        row.2 = uf.t2_.find(row.2);
-                    });
-                    self.all_index_0_1_2.filter_existing(&mut inserts);
-                    self.all_index_0_1_2
-                        .insert_many(&mut inserts, |_, _| unreachable!());
-                    self.all_index_1_0_2
-                        .insert_many(&mut inserts, |_, _| unreachable!());
-                    self.all_index_2_0_1
-                        .insert_many(&mut inserts, |_, _| unreachable!());
-                    self.new.extend_from_slice(&inserts);
-                }
-                fn update_finalize(&mut self, uf: &mut Unification) {
-                    self.new.sort_unstable();
-                    self.new.dedup();
-                    self.new.retain(|(x0, x1, x2)| {
-                        if *x0 != uf.t0_.find(*x0) {
-                            return false;
-                        }
-                        if *x1 != uf.t1_.find(*x1) {
-                            return false;
-                        }
-                        if *x2 != uf.t2_.find(*x2) {
-                            return false;
-                        }
-                        true
-                    });
-                }
-                fn emit_graphviz(&self, buf: &mut String) {
-                    use std::fmt::Write;
-                    for (i, (x0, x1, x2)) in self.all_index_0_1_2.iter().enumerate() {
-                        writeln!(buf, "{}_{i} -> {}_{};", "foo", "t0", x0).unwrap();
-                        writeln!(buf, "{}_{i} -> {}_{};", "foo", "t1", x1).unwrap();
-                        writeln!(buf, "{}_{i} -> {}_{};", "foo", "t2", x2).unwrap();
-                        writeln!(buf, "{}_{i} [shape = box];", "foo").unwrap();
-                    }
-                }
-                fn len(&self) -> usize {
-                    self.all_index_0_1_2.len()
                 }
             }
             #[derive(Debug, Default)]
@@ -3804,12 +4116,20 @@ fn codegen_bug1() {
                 #[inline(never)]
                 pub fn canonicalize(&mut self) {
                     self.foo_.clear_new();
-                    while self.uf.has_new_uproots() || self.delta.has_new_inserts() {
+                    if !self.delta.has_new_inserts() && !self.uf.has_new_uproots() {
+                        return;
+                    }
+                    let mut foo_ctx = self.foo_.update_begin();
+                    loop {
                         self.uf.snapshot_all_uprooted();
-                        self.foo_.update(&mut self.uf, &mut self.delta);
+                        self.foo_
+                            .update(&mut self.delta.foo_, &mut foo_ctx, &mut self.uf);
+                        if !self.uf.has_new_uproots() {
+                            break;
+                        }
                     }
                     self.uf.snapshot_all_uprooted();
-                    self.foo_.update_finalize(&mut self.uf);
+                    self.foo_.update_finalize(foo_ctx, &mut self.uf);
                 }
             }
             impl EclassProvider<T0> for Theory {
@@ -3886,13 +4206,18 @@ fn initial() {
             #[derive(Debug, Default)]
             struct ConstRelation {
                 new: Vec<<Self as Relation>::Row>,
-                all_index_0_1: IndexImpl<StdSortCtx<Row2_0<std::primitive::i64, Math>>>,
-                all_index_1_0: IndexImpl<StdSortCtx<Row2_1_0<std::primitive::i64, Math>>>,
+                all_index_0_1: SortedVec<StdSortCtx<Row2_0<std::primitive::i64, Math>>>,
+                all_index_1_0: SortedVec<StdSortCtx<Row2_1_0<std::primitive::i64, Math>>>,
+            }
+            struct ConstUpdateCtx {
+                scratch: Vec<(std::primitive::i64, Math)>,
+                deferred_insertions: Vec<(std::primitive::i64, Math)>,
+                old: SortedVec<StdSortCtx<Row2_0<std::primitive::i64, Math>>>,
             }
             impl Relation for ConstRelation {
                 type Row = (std::primitive::i64, Math);
-            }
-            impl ConstRelation {
+                type UpdateCtx = ConstUpdateCtx;
+                type Unification = Unification;
                 const COST: u32 = 4u32;
                 fn new() -> Self {
                     Self::default()
@@ -3903,9 +4228,77 @@ fn initial() {
                 fn clear_new(&mut self) {
                     self.new.clear();
                 }
-                fn iter_new(&self) -> impl Iterator<Item = <Self as Relation>::Row> + use<'_> {
+                fn iter_new(&self) -> impl '_ + Iterator<Item = Self::Row> {
                     self.new.iter().copied()
                 }
+                fn len(&self) -> usize {
+                    self.all_index_0_1.len()
+                }
+                fn update(
+                    &mut self,
+                    insertions: &mut Vec<Self::Row>,
+                    ctx: &mut Self::UpdateCtx,
+                    uf: &mut Unification,
+                ) {
+                    insertions.iter_mut().for_each(|row| {
+                        row.1 = uf.math_.find(row.1);
+                    });
+                    let already_canon =
+                        |uf: &mut Unification, row: &mut Self::Row| uf.math_.already_canonical(&mut row.1);
+                    let mut ran_merge = false;
+                    loop {
+                        self.all_index_0_1.sorted_vec_update(
+                            insertions,
+                            &mut ctx.deferred_insertions,
+                            &mut ctx.scratch,
+                            uf,
+                            already_canon,
+                            |uf, x, mut y| {
+                                ran_merge = true;
+                                let (x1,) = x.value_mut();
+                                let (y1,) = y.value_mut();
+                                uf.math_.union_mut(x1, y1);
+                            },
+                        );
+                        self.all_index_1_0.sorted_vec_update(
+                            insertions,
+                            &mut ctx.deferred_insertions,
+                            &mut ctx.scratch,
+                            uf,
+                            already_canon,
+                            |_, _, _| unreachable!(),
+                        );
+                        if ctx.deferred_insertions.is_empty() && ran_merge == false {
+                            break;
+                        }
+                        ran_merge = false;
+                        std::mem::swap(insertions, &mut ctx.deferred_insertions);
+                        ctx.deferred_insertions.clear();
+                    }
+                    insertions.clear();
+                    assert!(ctx.scratch.is_empty());
+                    assert!(ctx.deferred_insertions.is_empty());
+                }
+                fn update_begin(&self) -> Self::UpdateCtx {
+                    ConstUpdateCtx {
+                        scratch: Vec::new(),
+                        deferred_insertions: Vec::new(),
+                        old: self.all_index_0_1.clone(),
+                    }
+                }
+                fn update_finalize(&mut self, ctx: Self::UpdateCtx, uf: &mut Unification) {
+                    self.new.extend(self.all_index_0_1.minus(&ctx.old));
+                }
+                fn emit_graphviz(&self, buf: &mut String) {
+                    use std::fmt::Write;
+                    for (i, (x0, x1)) in self.all_index_0_1.iter().enumerate() {
+                        writeln!(buf, "{}_{i} -> {}_{};", "const", "i64", x0).unwrap();
+                        writeln!(buf, "{}_{i} -> {}_{};", "const", "math", x1).unwrap();
+                        writeln!(buf, "{}_{i} [shape = box];", "const").unwrap();
+                    }
+                }
+            }
+            impl ConstRelation {
                 fn iter1_0_1(&self, x0: std::primitive::i64) -> impl Iterator<Item = (Math,)> + use<'_> {
                     self.all_index_0_1
                         .range((x0, Math::MIN_ID)..=(x0, Math::MAX_ID))
@@ -3935,53 +4328,6 @@ fn initial() {
                     let x1 = uf.math_.add_eclass();
                     delta.const_.push((x0, x1));
                     (x1,)
-                }
-                fn update(&mut self, uf: &mut Unification, delta: &mut Delta) {
-                    let mut inserts = take(&mut delta.const_);
-                    let orig_inserts = inserts.len();
-                    self.all_index_1_0
-                        .first_column_uproots(uf.math_.get_uprooted_snapshot(), |deleted_rows| {
-                            inserts.extend(deleted_rows)
-                        });
-                    inserts[orig_inserts..].sort_unstable();
-                    runtime::dedup_suffix(&mut inserts, orig_inserts);
-                    self.all_index_0_1.delete_many(&mut inserts[orig_inserts..]);
-                    self.all_index_1_0.delete_many(&mut inserts[orig_inserts..]);
-                    inserts.iter_mut().for_each(|row| {
-                        row.1 = uf.math_.find(row.1);
-                    });
-                    self.all_index_0_1.filter_existing(&mut inserts);
-                    self.all_index_0_1
-                        .insert_many(&mut inserts, |mut old, mut new| {
-                            let (x1,) = old.value_mut();
-                            let (y1,) = new.value_mut();
-                            uf.math_.union_mut(x1, y1);
-                            old
-                        });
-                    self.all_index_1_0
-                        .insert_many(&mut inserts, |_, _| unreachable!());
-                    self.new.extend_from_slice(&inserts);
-                }
-                fn update_finalize(&mut self, uf: &mut Unification) {
-                    self.new.sort_unstable();
-                    self.new.dedup();
-                    self.new.retain(|(x0, x1)| {
-                        if *x1 != uf.math_.find(*x1) {
-                            return false;
-                        }
-                        true
-                    });
-                }
-                fn emit_graphviz(&self, buf: &mut String) {
-                    use std::fmt::Write;
-                    for (i, (x0, x1)) in self.all_index_0_1.iter().enumerate() {
-                        writeln!(buf, "{}_{i} -> {}_{};", "const", "i64", x0).unwrap();
-                        writeln!(buf, "{}_{i} -> {}_{};", "const", "math", x1).unwrap();
-                        writeln!(buf, "{}_{i} [shape = box];", "const").unwrap();
-                    }
-                }
-                fn len(&self) -> usize {
-                    self.all_index_0_1.len()
                 }
             }
             #[derive(Debug, Default)]
@@ -4061,12 +4407,20 @@ fn initial() {
                 #[inline(never)]
                 pub fn canonicalize(&mut self) {
                     self.const_.clear_new();
-                    while self.uf.has_new_uproots() || self.delta.has_new_inserts() {
+                    if !self.delta.has_new_inserts() && !self.uf.has_new_uproots() {
+                        return;
+                    }
+                    let mut const_ctx = self.const_.update_begin();
+                    loop {
                         self.uf.snapshot_all_uprooted();
-                        self.const_.update(&mut self.uf, &mut self.delta);
+                        self.const_
+                            .update(&mut self.delta.const_, &mut const_ctx, &mut self.uf);
+                        if !self.uf.has_new_uproots() {
+                            break;
+                        }
                     }
                     self.uf.snapshot_all_uprooted();
-                    self.const_.update_finalize(&mut self.uf);
+                    self.const_.update_finalize(const_ctx, &mut self.uf);
                 }
             }
             impl EclassProvider<Math> for Theory {
@@ -4175,14 +4529,19 @@ fn test_primitives_simple() {
             #[derive(Debug, Default)]
             struct MulRelation {
                 new: Vec<<Self as Relation>::Row>,
-                all_index_0_1_2: IndexImpl<RadixSortCtx<Row3_0_1_2<Math, Math, Math>, u128>>,
-                all_index_1_0_2: IndexImpl<RadixSortCtx<Row3_1_0<Math, Math, Math>, u128>>,
-                all_index_2_0_1: IndexImpl<RadixSortCtx<Row3_2_0_1<Math, Math, Math>, u128>>,
+                all_index_0_1_2: SortedVec<RadixSortCtx<Row3_0_1_2<Math, Math, Math>, u128>>,
+                all_index_1_0_2: SortedVec<RadixSortCtx<Row3_1_0<Math, Math, Math>, u128>>,
+                all_index_2_0_1: SortedVec<RadixSortCtx<Row3_2_0_1<Math, Math, Math>, u128>>,
+            }
+            struct MulUpdateCtx {
+                scratch: Vec<(Math, Math, Math)>,
+                deferred_insertions: Vec<(Math, Math, Math)>,
+                old: SortedVec<RadixSortCtx<Row3_0_1_2<Math, Math, Math>, u128>>,
             }
             impl Relation for MulRelation {
                 type Row = (Math, Math, Math);
-            }
-            impl MulRelation {
+                type UpdateCtx = MulUpdateCtx;
+                type Unification = Unification;
                 const COST: u32 = 9u32;
                 fn new() -> Self {
                     Self::default()
@@ -4193,9 +4552,91 @@ fn test_primitives_simple() {
                 fn clear_new(&mut self) {
                     self.new.clear();
                 }
-                fn iter_new(&self) -> impl Iterator<Item = <Self as Relation>::Row> + use<'_> {
+                fn iter_new(&self) -> impl '_ + Iterator<Item = Self::Row> {
                     self.new.iter().copied()
                 }
+                fn len(&self) -> usize {
+                    self.all_index_0_1_2.len()
+                }
+                fn update(
+                    &mut self,
+                    insertions: &mut Vec<Self::Row>,
+                    ctx: &mut Self::UpdateCtx,
+                    uf: &mut Unification,
+                ) {
+                    insertions.iter_mut().for_each(|row| {
+                        row.0 = uf.math_.find(row.0);
+                        row.1 = uf.math_.find(row.1);
+                        row.2 = uf.math_.find(row.2);
+                    });
+                    let already_canon = |uf: &mut Unification, row: &mut Self::Row| {
+                        uf.math_.already_canonical(&mut row.0)
+                            && uf.math_.already_canonical(&mut row.1)
+                            && uf.math_.already_canonical(&mut row.2)
+                    };
+                    let mut ran_merge = false;
+                    loop {
+                        self.all_index_0_1_2.sorted_vec_update(
+                            insertions,
+                            &mut ctx.deferred_insertions,
+                            &mut ctx.scratch,
+                            uf,
+                            already_canon,
+                            |_, _, _| unreachable!(),
+                        );
+                        self.all_index_1_0_2.sorted_vec_update(
+                            insertions,
+                            &mut ctx.deferred_insertions,
+                            &mut ctx.scratch,
+                            uf,
+                            already_canon,
+                            |uf, x, mut y| {
+                                ran_merge = true;
+                                let (x2,) = x.value_mut();
+                                let (y2,) = y.value_mut();
+                                uf.math_.union_mut(x2, y2);
+                            },
+                        );
+                        self.all_index_2_0_1.sorted_vec_update(
+                            insertions,
+                            &mut ctx.deferred_insertions,
+                            &mut ctx.scratch,
+                            uf,
+                            already_canon,
+                            |_, _, _| unreachable!(),
+                        );
+                        if ctx.deferred_insertions.is_empty() && ran_merge == false {
+                            break;
+                        }
+                        ran_merge = false;
+                        std::mem::swap(insertions, &mut ctx.deferred_insertions);
+                        ctx.deferred_insertions.clear();
+                    }
+                    insertions.clear();
+                    assert!(ctx.scratch.is_empty());
+                    assert!(ctx.deferred_insertions.is_empty());
+                }
+                fn update_begin(&self) -> Self::UpdateCtx {
+                    MulUpdateCtx {
+                        scratch: Vec::new(),
+                        deferred_insertions: Vec::new(),
+                        old: self.all_index_0_1_2.clone(),
+                    }
+                }
+                fn update_finalize(&mut self, ctx: Self::UpdateCtx, uf: &mut Unification) {
+                    self.new.extend(self.all_index_0_1_2.minus(&ctx.old));
+                }
+                fn emit_graphviz(&self, buf: &mut String) {
+                    use std::fmt::Write;
+                    for (i, (x0, x1, x2)) in self.all_index_0_1_2.iter().enumerate() {
+                        writeln!(buf, "{}_{i} -> {}_{};", "mul", "math", x0).unwrap();
+                        writeln!(buf, "{}_{i} -> {}_{};", "mul", "math", x1).unwrap();
+                        writeln!(buf, "{}_{i} -> {}_{};", "mul", "math", x2).unwrap();
+                        writeln!(buf, "{}_{i} [shape = box];", "mul").unwrap();
+                    }
+                }
+            }
+            impl MulRelation {
                 fn iter2_1_0_2(&self, x1: Math, x0: Math) -> impl Iterator<Item = (Math,)> + use<'_> {
                     self.all_index_1_0_2
                         .range((x0, x1, Math::MIN_ID)..=(x0, x1, Math::MAX_ID))
@@ -4237,88 +4678,23 @@ fn test_primitives_simple() {
                     delta.mul_.push((x0, x1, x2));
                     (x2,)
                 }
-                fn update(&mut self, uf: &mut Unification, delta: &mut Delta) {
-                    let mut inserts = take(&mut delta.mul_);
-                    let orig_inserts = inserts.len();
-                    self.all_index_0_1_2
-                        .first_column_uproots(uf.math_.get_uprooted_snapshot(), |deleted_rows| {
-                            inserts.extend(deleted_rows)
-                        });
-                    self.all_index_1_0_2
-                        .first_column_uproots(uf.math_.get_uprooted_snapshot(), |deleted_rows| {
-                            inserts.extend(deleted_rows)
-                        });
-                    self.all_index_2_0_1
-                        .first_column_uproots(uf.math_.get_uprooted_snapshot(), |deleted_rows| {
-                            inserts.extend(deleted_rows)
-                        });
-                    inserts[orig_inserts..].sort_unstable();
-                    runtime::dedup_suffix(&mut inserts, orig_inserts);
-                    self.all_index_0_1_2
-                        .delete_many(&mut inserts[orig_inserts..]);
-                    self.all_index_1_0_2
-                        .delete_many(&mut inserts[orig_inserts..]);
-                    self.all_index_2_0_1
-                        .delete_many(&mut inserts[orig_inserts..]);
-                    inserts.iter_mut().for_each(|row| {
-                        row.0 = uf.math_.find(row.0);
-                        row.1 = uf.math_.find(row.1);
-                        row.2 = uf.math_.find(row.2);
-                    });
-                    self.all_index_0_1_2.filter_existing(&mut inserts);
-                    self.all_index_0_1_2
-                        .insert_many(&mut inserts, |_, _| unreachable!());
-                    self.all_index_1_0_2
-                        .insert_many(&mut inserts, |mut old, mut new| {
-                            let (x2,) = old.value_mut();
-                            let (y2,) = new.value_mut();
-                            uf.math_.union_mut(x2, y2);
-                            old
-                        });
-                    self.all_index_2_0_1
-                        .insert_many(&mut inserts, |_, _| unreachable!());
-                    self.new.extend_from_slice(&inserts);
-                }
-                fn update_finalize(&mut self, uf: &mut Unification) {
-                    self.new.sort_unstable();
-                    self.new.dedup();
-                    self.new.retain(|(x0, x1, x2)| {
-                        if *x0 != uf.math_.find(*x0) {
-                            return false;
-                        }
-                        if *x1 != uf.math_.find(*x1) {
-                            return false;
-                        }
-                        if *x2 != uf.math_.find(*x2) {
-                            return false;
-                        }
-                        true
-                    });
-                }
-                fn emit_graphviz(&self, buf: &mut String) {
-                    use std::fmt::Write;
-                    for (i, (x0, x1, x2)) in self.all_index_0_1_2.iter().enumerate() {
-                        writeln!(buf, "{}_{i} -> {}_{};", "mul", "math", x0).unwrap();
-                        writeln!(buf, "{}_{i} -> {}_{};", "mul", "math", x1).unwrap();
-                        writeln!(buf, "{}_{i} -> {}_{};", "mul", "math", x2).unwrap();
-                        writeln!(buf, "{}_{i} [shape = box];", "mul").unwrap();
-                    }
-                }
-                fn len(&self) -> usize {
-                    self.all_index_0_1_2.len()
-                }
             }
             #[derive(Debug, Default)]
             struct AddRelation {
                 new: Vec<<Self as Relation>::Row>,
-                all_index_0_1_2: IndexImpl<RadixSortCtx<Row3_0_1<Math, Math, Math>, u128>>,
-                all_index_1_0_2: IndexImpl<RadixSortCtx<Row3_1_0_2<Math, Math, Math>, u128>>,
-                all_index_2_0_1: IndexImpl<RadixSortCtx<Row3_2_0_1<Math, Math, Math>, u128>>,
+                all_index_0_1_2: SortedVec<RadixSortCtx<Row3_0_1<Math, Math, Math>, u128>>,
+                all_index_1_0_2: SortedVec<RadixSortCtx<Row3_1_0_2<Math, Math, Math>, u128>>,
+                all_index_2_0_1: SortedVec<RadixSortCtx<Row3_2_0_1<Math, Math, Math>, u128>>,
+            }
+            struct AddUpdateCtx {
+                scratch: Vec<(Math, Math, Math)>,
+                deferred_insertions: Vec<(Math, Math, Math)>,
+                old: SortedVec<RadixSortCtx<Row3_0_1<Math, Math, Math>, u128>>,
             }
             impl Relation for AddRelation {
                 type Row = (Math, Math, Math);
-            }
-            impl AddRelation {
+                type UpdateCtx = AddUpdateCtx;
+                type Unification = Unification;
                 const COST: u32 = 9u32;
                 fn new() -> Self {
                     Self::default()
@@ -4329,9 +4705,91 @@ fn test_primitives_simple() {
                 fn clear_new(&mut self) {
                     self.new.clear();
                 }
-                fn iter_new(&self) -> impl Iterator<Item = <Self as Relation>::Row> + use<'_> {
+                fn iter_new(&self) -> impl '_ + Iterator<Item = Self::Row> {
                     self.new.iter().copied()
                 }
+                fn len(&self) -> usize {
+                    self.all_index_0_1_2.len()
+                }
+                fn update(
+                    &mut self,
+                    insertions: &mut Vec<Self::Row>,
+                    ctx: &mut Self::UpdateCtx,
+                    uf: &mut Unification,
+                ) {
+                    insertions.iter_mut().for_each(|row| {
+                        row.0 = uf.math_.find(row.0);
+                        row.1 = uf.math_.find(row.1);
+                        row.2 = uf.math_.find(row.2);
+                    });
+                    let already_canon = |uf: &mut Unification, row: &mut Self::Row| {
+                        uf.math_.already_canonical(&mut row.0)
+                            && uf.math_.already_canonical(&mut row.1)
+                            && uf.math_.already_canonical(&mut row.2)
+                    };
+                    let mut ran_merge = false;
+                    loop {
+                        self.all_index_0_1_2.sorted_vec_update(
+                            insertions,
+                            &mut ctx.deferred_insertions,
+                            &mut ctx.scratch,
+                            uf,
+                            already_canon,
+                            |uf, x, mut y| {
+                                ran_merge = true;
+                                let (x2,) = x.value_mut();
+                                let (y2,) = y.value_mut();
+                                uf.math_.union_mut(x2, y2);
+                            },
+                        );
+                        self.all_index_1_0_2.sorted_vec_update(
+                            insertions,
+                            &mut ctx.deferred_insertions,
+                            &mut ctx.scratch,
+                            uf,
+                            already_canon,
+                            |_, _, _| unreachable!(),
+                        );
+                        self.all_index_2_0_1.sorted_vec_update(
+                            insertions,
+                            &mut ctx.deferred_insertions,
+                            &mut ctx.scratch,
+                            uf,
+                            already_canon,
+                            |_, _, _| unreachable!(),
+                        );
+                        if ctx.deferred_insertions.is_empty() && ran_merge == false {
+                            break;
+                        }
+                        ran_merge = false;
+                        std::mem::swap(insertions, &mut ctx.deferred_insertions);
+                        ctx.deferred_insertions.clear();
+                    }
+                    insertions.clear();
+                    assert!(ctx.scratch.is_empty());
+                    assert!(ctx.deferred_insertions.is_empty());
+                }
+                fn update_begin(&self) -> Self::UpdateCtx {
+                    AddUpdateCtx {
+                        scratch: Vec::new(),
+                        deferred_insertions: Vec::new(),
+                        old: self.all_index_0_1_2.clone(),
+                    }
+                }
+                fn update_finalize(&mut self, ctx: Self::UpdateCtx, uf: &mut Unification) {
+                    self.new.extend(self.all_index_0_1_2.minus(&ctx.old));
+                }
+                fn emit_graphviz(&self, buf: &mut String) {
+                    use std::fmt::Write;
+                    for (i, (x0, x1, x2)) in self.all_index_0_1_2.iter().enumerate() {
+                        writeln!(buf, "{}_{i} -> {}_{};", "add", "math", x0).unwrap();
+                        writeln!(buf, "{}_{i} -> {}_{};", "add", "math", x1).unwrap();
+                        writeln!(buf, "{}_{i} -> {}_{};", "add", "math", x2).unwrap();
+                        writeln!(buf, "{}_{i} [shape = box];", "add").unwrap();
+                    }
+                }
+            }
+            impl AddRelation {
                 fn iter2_0_1_2(&self, x0: Math, x1: Math) -> impl Iterator<Item = (Math,)> + use<'_> {
                     self.all_index_0_1_2
                         .range((x0, x1, Math::MIN_ID)..=(x0, x1, Math::MAX_ID))
@@ -4373,87 +4831,22 @@ fn test_primitives_simple() {
                     delta.add_.push((x0, x1, x2));
                     (x2,)
                 }
-                fn update(&mut self, uf: &mut Unification, delta: &mut Delta) {
-                    let mut inserts = take(&mut delta.add_);
-                    let orig_inserts = inserts.len();
-                    self.all_index_0_1_2
-                        .first_column_uproots(uf.math_.get_uprooted_snapshot(), |deleted_rows| {
-                            inserts.extend(deleted_rows)
-                        });
-                    self.all_index_1_0_2
-                        .first_column_uproots(uf.math_.get_uprooted_snapshot(), |deleted_rows| {
-                            inserts.extend(deleted_rows)
-                        });
-                    self.all_index_2_0_1
-                        .first_column_uproots(uf.math_.get_uprooted_snapshot(), |deleted_rows| {
-                            inserts.extend(deleted_rows)
-                        });
-                    inserts[orig_inserts..].sort_unstable();
-                    runtime::dedup_suffix(&mut inserts, orig_inserts);
-                    self.all_index_0_1_2
-                        .delete_many(&mut inserts[orig_inserts..]);
-                    self.all_index_1_0_2
-                        .delete_many(&mut inserts[orig_inserts..]);
-                    self.all_index_2_0_1
-                        .delete_many(&mut inserts[orig_inserts..]);
-                    inserts.iter_mut().for_each(|row| {
-                        row.0 = uf.math_.find(row.0);
-                        row.1 = uf.math_.find(row.1);
-                        row.2 = uf.math_.find(row.2);
-                    });
-                    self.all_index_0_1_2.filter_existing(&mut inserts);
-                    self.all_index_0_1_2
-                        .insert_many(&mut inserts, |mut old, mut new| {
-                            let (x2,) = old.value_mut();
-                            let (y2,) = new.value_mut();
-                            uf.math_.union_mut(x2, y2);
-                            old
-                        });
-                    self.all_index_1_0_2
-                        .insert_many(&mut inserts, |_, _| unreachable!());
-                    self.all_index_2_0_1
-                        .insert_many(&mut inserts, |_, _| unreachable!());
-                    self.new.extend_from_slice(&inserts);
-                }
-                fn update_finalize(&mut self, uf: &mut Unification) {
-                    self.new.sort_unstable();
-                    self.new.dedup();
-                    self.new.retain(|(x0, x1, x2)| {
-                        if *x0 != uf.math_.find(*x0) {
-                            return false;
-                        }
-                        if *x1 != uf.math_.find(*x1) {
-                            return false;
-                        }
-                        if *x2 != uf.math_.find(*x2) {
-                            return false;
-                        }
-                        true
-                    });
-                }
-                fn emit_graphviz(&self, buf: &mut String) {
-                    use std::fmt::Write;
-                    for (i, (x0, x1, x2)) in self.all_index_0_1_2.iter().enumerate() {
-                        writeln!(buf, "{}_{i} -> {}_{};", "add", "math", x0).unwrap();
-                        writeln!(buf, "{}_{i} -> {}_{};", "add", "math", x1).unwrap();
-                        writeln!(buf, "{}_{i} -> {}_{};", "add", "math", x2).unwrap();
-                        writeln!(buf, "{}_{i} [shape = box];", "add").unwrap();
-                    }
-                }
-                fn len(&self) -> usize {
-                    self.all_index_0_1_2.len()
-                }
             }
             #[derive(Debug, Default)]
             struct ConstRelation {
                 new: Vec<<Self as Relation>::Row>,
-                all_index_0_1: IndexImpl<StdSortCtx<Row2_0<std::primitive::i64, Math>>>,
-                all_index_1_0: IndexImpl<StdSortCtx<Row2_1_0<std::primitive::i64, Math>>>,
+                all_index_0_1: SortedVec<StdSortCtx<Row2_0<std::primitive::i64, Math>>>,
+                all_index_1_0: SortedVec<StdSortCtx<Row2_1_0<std::primitive::i64, Math>>>,
+            }
+            struct ConstUpdateCtx {
+                scratch: Vec<(std::primitive::i64, Math)>,
+                deferred_insertions: Vec<(std::primitive::i64, Math)>,
+                old: SortedVec<StdSortCtx<Row2_0<std::primitive::i64, Math>>>,
             }
             impl Relation for ConstRelation {
                 type Row = (std::primitive::i64, Math);
-            }
-            impl ConstRelation {
+                type UpdateCtx = ConstUpdateCtx;
+                type Unification = Unification;
                 const COST: u32 = 4u32;
                 fn new() -> Self {
                     Self::default()
@@ -4464,9 +4857,77 @@ fn test_primitives_simple() {
                 fn clear_new(&mut self) {
                     self.new.clear();
                 }
-                fn iter_new(&self) -> impl Iterator<Item = <Self as Relation>::Row> + use<'_> {
+                fn iter_new(&self) -> impl '_ + Iterator<Item = Self::Row> {
                     self.new.iter().copied()
                 }
+                fn len(&self) -> usize {
+                    self.all_index_0_1.len()
+                }
+                fn update(
+                    &mut self,
+                    insertions: &mut Vec<Self::Row>,
+                    ctx: &mut Self::UpdateCtx,
+                    uf: &mut Unification,
+                ) {
+                    insertions.iter_mut().for_each(|row| {
+                        row.1 = uf.math_.find(row.1);
+                    });
+                    let already_canon =
+                        |uf: &mut Unification, row: &mut Self::Row| uf.math_.already_canonical(&mut row.1);
+                    let mut ran_merge = false;
+                    loop {
+                        self.all_index_0_1.sorted_vec_update(
+                            insertions,
+                            &mut ctx.deferred_insertions,
+                            &mut ctx.scratch,
+                            uf,
+                            already_canon,
+                            |uf, x, mut y| {
+                                ran_merge = true;
+                                let (x1,) = x.value_mut();
+                                let (y1,) = y.value_mut();
+                                uf.math_.union_mut(x1, y1);
+                            },
+                        );
+                        self.all_index_1_0.sorted_vec_update(
+                            insertions,
+                            &mut ctx.deferred_insertions,
+                            &mut ctx.scratch,
+                            uf,
+                            already_canon,
+                            |_, _, _| unreachable!(),
+                        );
+                        if ctx.deferred_insertions.is_empty() && ran_merge == false {
+                            break;
+                        }
+                        ran_merge = false;
+                        std::mem::swap(insertions, &mut ctx.deferred_insertions);
+                        ctx.deferred_insertions.clear();
+                    }
+                    insertions.clear();
+                    assert!(ctx.scratch.is_empty());
+                    assert!(ctx.deferred_insertions.is_empty());
+                }
+                fn update_begin(&self) -> Self::UpdateCtx {
+                    ConstUpdateCtx {
+                        scratch: Vec::new(),
+                        deferred_insertions: Vec::new(),
+                        old: self.all_index_0_1.clone(),
+                    }
+                }
+                fn update_finalize(&mut self, ctx: Self::UpdateCtx, uf: &mut Unification) {
+                    self.new.extend(self.all_index_0_1.minus(&ctx.old));
+                }
+                fn emit_graphviz(&self, buf: &mut String) {
+                    use std::fmt::Write;
+                    for (i, (x0, x1)) in self.all_index_0_1.iter().enumerate() {
+                        writeln!(buf, "{}_{i} -> {}_{};", "const", "i64", x0).unwrap();
+                        writeln!(buf, "{}_{i} -> {}_{};", "const", "math", x1).unwrap();
+                        writeln!(buf, "{}_{i} [shape = box];", "const").unwrap();
+                    }
+                }
+            }
+            impl ConstRelation {
                 fn iter1_0_1(&self, x0: std::primitive::i64) -> impl Iterator<Item = (Math,)> + use<'_> {
                     self.all_index_0_1
                         .range((x0, Math::MIN_ID)..=(x0, Math::MAX_ID))
@@ -4519,64 +4980,22 @@ fn test_primitives_simple() {
                     delta.const_.push((x0, x1));
                     ()
                 }
-                fn update(&mut self, uf: &mut Unification, delta: &mut Delta) {
-                    let mut inserts = take(&mut delta.const_);
-                    let orig_inserts = inserts.len();
-                    self.all_index_1_0
-                        .first_column_uproots(uf.math_.get_uprooted_snapshot(), |deleted_rows| {
-                            inserts.extend(deleted_rows)
-                        });
-                    inserts[orig_inserts..].sort_unstable();
-                    runtime::dedup_suffix(&mut inserts, orig_inserts);
-                    self.all_index_0_1.delete_many(&mut inserts[orig_inserts..]);
-                    self.all_index_1_0.delete_many(&mut inserts[orig_inserts..]);
-                    inserts.iter_mut().for_each(|row| {
-                        row.1 = uf.math_.find(row.1);
-                    });
-                    self.all_index_0_1.filter_existing(&mut inserts);
-                    self.all_index_0_1
-                        .insert_many(&mut inserts, |mut old, mut new| {
-                            let (x1,) = old.value_mut();
-                            let (y1,) = new.value_mut();
-                            uf.math_.union_mut(x1, y1);
-                            old
-                        });
-                    self.all_index_1_0
-                        .insert_many(&mut inserts, |_, _| unreachable!());
-                    self.new.extend_from_slice(&inserts);
-                }
-                fn update_finalize(&mut self, uf: &mut Unification) {
-                    self.new.sort_unstable();
-                    self.new.dedup();
-                    self.new.retain(|(x0, x1)| {
-                        if *x1 != uf.math_.find(*x1) {
-                            return false;
-                        }
-                        true
-                    });
-                }
-                fn emit_graphviz(&self, buf: &mut String) {
-                    use std::fmt::Write;
-                    for (i, (x0, x1)) in self.all_index_0_1.iter().enumerate() {
-                        writeln!(buf, "{}_{i} -> {}_{};", "const", "i64", x0).unwrap();
-                        writeln!(buf, "{}_{i} -> {}_{};", "const", "math", x1).unwrap();
-                        writeln!(buf, "{}_{i} [shape = box];", "const").unwrap();
-                    }
-                }
-                fn len(&self) -> usize {
-                    self.all_index_0_1.len()
-                }
             }
             #[derive(Debug, Default)]
             struct VarRelation {
                 new: Vec<<Self as Relation>::Row>,
-                all_index_0_1: IndexImpl<StdSortCtx<Row2_0<runtime::IString, Math>>>,
-                all_index_1_0: IndexImpl<StdSortCtx<Row2_1_0<runtime::IString, Math>>>,
+                all_index_0_1: SortedVec<StdSortCtx<Row2_0<runtime::IString, Math>>>,
+                all_index_1_0: SortedVec<StdSortCtx<Row2_1_0<runtime::IString, Math>>>,
+            }
+            struct VarUpdateCtx {
+                scratch: Vec<(runtime::IString, Math)>,
+                deferred_insertions: Vec<(runtime::IString, Math)>,
+                old: SortedVec<StdSortCtx<Row2_0<runtime::IString, Math>>>,
             }
             impl Relation for VarRelation {
                 type Row = (runtime::IString, Math);
-            }
-            impl VarRelation {
+                type UpdateCtx = VarUpdateCtx;
+                type Unification = Unification;
                 const COST: u32 = 4u32;
                 fn new() -> Self {
                     Self::default()
@@ -4587,9 +5006,77 @@ fn test_primitives_simple() {
                 fn clear_new(&mut self) {
                     self.new.clear();
                 }
-                fn iter_new(&self) -> impl Iterator<Item = <Self as Relation>::Row> + use<'_> {
+                fn iter_new(&self) -> impl '_ + Iterator<Item = Self::Row> {
                     self.new.iter().copied()
                 }
+                fn len(&self) -> usize {
+                    self.all_index_0_1.len()
+                }
+                fn update(
+                    &mut self,
+                    insertions: &mut Vec<Self::Row>,
+                    ctx: &mut Self::UpdateCtx,
+                    uf: &mut Unification,
+                ) {
+                    insertions.iter_mut().for_each(|row| {
+                        row.1 = uf.math_.find(row.1);
+                    });
+                    let already_canon =
+                        |uf: &mut Unification, row: &mut Self::Row| uf.math_.already_canonical(&mut row.1);
+                    let mut ran_merge = false;
+                    loop {
+                        self.all_index_0_1.sorted_vec_update(
+                            insertions,
+                            &mut ctx.deferred_insertions,
+                            &mut ctx.scratch,
+                            uf,
+                            already_canon,
+                            |uf, x, mut y| {
+                                ran_merge = true;
+                                let (x1,) = x.value_mut();
+                                let (y1,) = y.value_mut();
+                                uf.math_.union_mut(x1, y1);
+                            },
+                        );
+                        self.all_index_1_0.sorted_vec_update(
+                            insertions,
+                            &mut ctx.deferred_insertions,
+                            &mut ctx.scratch,
+                            uf,
+                            already_canon,
+                            |_, _, _| unreachable!(),
+                        );
+                        if ctx.deferred_insertions.is_empty() && ran_merge == false {
+                            break;
+                        }
+                        ran_merge = false;
+                        std::mem::swap(insertions, &mut ctx.deferred_insertions);
+                        ctx.deferred_insertions.clear();
+                    }
+                    insertions.clear();
+                    assert!(ctx.scratch.is_empty());
+                    assert!(ctx.deferred_insertions.is_empty());
+                }
+                fn update_begin(&self) -> Self::UpdateCtx {
+                    VarUpdateCtx {
+                        scratch: Vec::new(),
+                        deferred_insertions: Vec::new(),
+                        old: self.all_index_0_1.clone(),
+                    }
+                }
+                fn update_finalize(&mut self, ctx: Self::UpdateCtx, uf: &mut Unification) {
+                    self.new.extend(self.all_index_0_1.minus(&ctx.old));
+                }
+                fn emit_graphviz(&self, buf: &mut String) {
+                    use std::fmt::Write;
+                    for (i, (x0, x1)) in self.all_index_0_1.iter().enumerate() {
+                        writeln!(buf, "{}_{i} -> {}_{};", "var", "string", x0).unwrap();
+                        writeln!(buf, "{}_{i} -> {}_{};", "var", "math", x1).unwrap();
+                        writeln!(buf, "{}_{i} [shape = box];", "var").unwrap();
+                    }
+                }
+            }
+            impl VarRelation {
                 fn iter1_0_1(&self, x0: runtime::IString) -> impl Iterator<Item = (Math,)> + use<'_> {
                     self.all_index_0_1
                         .range((x0, Math::MIN_ID)..=(x0, Math::MAX_ID))
@@ -4614,53 +5101,6 @@ fn test_primitives_simple() {
                     let x1 = uf.math_.add_eclass();
                     delta.var_.push((x0, x1));
                     (x1,)
-                }
-                fn update(&mut self, uf: &mut Unification, delta: &mut Delta) {
-                    let mut inserts = take(&mut delta.var_);
-                    let orig_inserts = inserts.len();
-                    self.all_index_1_0
-                        .first_column_uproots(uf.math_.get_uprooted_snapshot(), |deleted_rows| {
-                            inserts.extend(deleted_rows)
-                        });
-                    inserts[orig_inserts..].sort_unstable();
-                    runtime::dedup_suffix(&mut inserts, orig_inserts);
-                    self.all_index_0_1.delete_many(&mut inserts[orig_inserts..]);
-                    self.all_index_1_0.delete_many(&mut inserts[orig_inserts..]);
-                    inserts.iter_mut().for_each(|row| {
-                        row.1 = uf.math_.find(row.1);
-                    });
-                    self.all_index_0_1.filter_existing(&mut inserts);
-                    self.all_index_0_1
-                        .insert_many(&mut inserts, |mut old, mut new| {
-                            let (x1,) = old.value_mut();
-                            let (y1,) = new.value_mut();
-                            uf.math_.union_mut(x1, y1);
-                            old
-                        });
-                    self.all_index_1_0
-                        .insert_many(&mut inserts, |_, _| unreachable!());
-                    self.new.extend_from_slice(&inserts);
-                }
-                fn update_finalize(&mut self, uf: &mut Unification) {
-                    self.new.sort_unstable();
-                    self.new.dedup();
-                    self.new.retain(|(x0, x1)| {
-                        if *x1 != uf.math_.find(*x1) {
-                            return false;
-                        }
-                        true
-                    });
-                }
-                fn emit_graphviz(&self, buf: &mut String) {
-                    use std::fmt::Write;
-                    for (i, (x0, x1)) in self.all_index_0_1.iter().enumerate() {
-                        writeln!(buf, "{}_{i} -> {}_{};", "var", "string", x0).unwrap();
-                        writeln!(buf, "{}_{i} -> {}_{};", "var", "math", x1).unwrap();
-                        writeln!(buf, "{}_{i} [shape = box];", "var").unwrap();
-                    }
-                }
-                fn len(&self) -> usize {
-                    self.all_index_0_1.len()
                 }
             }
             #[derive(Debug, Default)]
@@ -4861,22 +5301,36 @@ fn test_primitives_simple() {
                     self.add_.clear_new();
                     self.const_.clear_new();
                     self.var_.clear_new();
-                    while self.uf.has_new_uproots() || self.delta.has_new_inserts() {
+                    if !self.delta.has_new_inserts() && !self.uf.has_new_uproots() {
+                        return;
+                    }
+                    let mut mul_ctx = self.mul_.update_begin();
+                    let mut add_ctx = self.add_.update_begin();
+                    let mut const_ctx = self.const_.update_begin();
+                    let mut var_ctx = self.var_.update_begin();
+                    loop {
                         self.uf.snapshot_all_uprooted();
-                        self.mul_.update(&mut self.uf, &mut self.delta);
-                        self.add_.update(&mut self.uf, &mut self.delta);
-                        self.const_.update(&mut self.uf, &mut self.delta);
-                        self.var_.update(&mut self.uf, &mut self.delta);
+                        self.mul_
+                            .update(&mut self.delta.mul_, &mut mul_ctx, &mut self.uf);
+                        self.add_
+                            .update(&mut self.delta.add_, &mut add_ctx, &mut self.uf);
+                        self.const_
+                            .update(&mut self.delta.const_, &mut const_ctx, &mut self.uf);
+                        self.var_
+                            .update(&mut self.delta.var_, &mut var_ctx, &mut self.uf);
+                        if !self.uf.has_new_uproots() {
+                            break;
+                        }
                     }
                     self.uf.snapshot_all_uprooted();
                     self.global_math.update(&mut self.uf.math_);
                     self.global_i64.update_finalize();
                     self.global_string.update_finalize();
                     self.global_math.update_finalize();
-                    self.mul_.update_finalize(&mut self.uf);
-                    self.add_.update_finalize(&mut self.uf);
-                    self.const_.update_finalize(&mut self.uf);
-                    self.var_.update_finalize(&mut self.uf);
+                    self.mul_.update_finalize(mul_ctx, &mut self.uf);
+                    self.add_.update_finalize(add_ctx, &mut self.uf);
+                    self.const_.update_finalize(const_ctx, &mut self.uf);
+                    self.var_.update_finalize(var_ctx, &mut self.uf);
                 }
             }
             impl EclassProvider<Math> for Theory {
@@ -4948,13 +5402,18 @@ fn triangle_join() {
             #[derive(Debug, Default)]
             struct FooRelation {
                 new: Vec<<Self as Relation>::Row>,
-                all_index_0_1: IndexImpl<RadixSortCtx<Row2_0_1<Math, Math>, u64>>,
-                all_index_1_0: IndexImpl<RadixSortCtx<Row2_1_0<Math, Math>, u64>>,
+                all_index_0_1: SortedVec<RadixSortCtx<Row2_0_1<Math, Math>, u64>>,
+                all_index_1_0: SortedVec<RadixSortCtx<Row2_1_0<Math, Math>, u64>>,
+            }
+            struct FooUpdateCtx {
+                scratch: Vec<(Math, Math)>,
+                deferred_insertions: Vec<(Math, Math)>,
+                old: SortedVec<RadixSortCtx<Row2_0_1<Math, Math>, u64>>,
             }
             impl Relation for FooRelation {
                 type Row = (Math, Math);
-            }
-            impl FooRelation {
+                type UpdateCtx = FooUpdateCtx;
+                type Unification = Unification;
                 const COST: u32 = 4u32;
                 fn new() -> Self {
                     Self::default()
@@ -4965,9 +5424,74 @@ fn triangle_join() {
                 fn clear_new(&mut self) {
                     self.new.clear();
                 }
-                fn iter_new(&self) -> impl Iterator<Item = <Self as Relation>::Row> + use<'_> {
+                fn iter_new(&self) -> impl '_ + Iterator<Item = Self::Row> {
                     self.new.iter().copied()
                 }
+                fn len(&self) -> usize {
+                    self.all_index_0_1.len()
+                }
+                fn update(
+                    &mut self,
+                    insertions: &mut Vec<Self::Row>,
+                    ctx: &mut Self::UpdateCtx,
+                    uf: &mut Unification,
+                ) {
+                    insertions.iter_mut().for_each(|row| {
+                        row.0 = uf.math_.find(row.0);
+                        row.1 = uf.math_.find(row.1);
+                    });
+                    let already_canon = |uf: &mut Unification, row: &mut Self::Row| {
+                        uf.math_.already_canonical(&mut row.0) && uf.math_.already_canonical(&mut row.1)
+                    };
+                    let mut ran_merge = false;
+                    loop {
+                        self.all_index_0_1.sorted_vec_update(
+                            insertions,
+                            &mut ctx.deferred_insertions,
+                            &mut ctx.scratch,
+                            uf,
+                            already_canon,
+                            |_, _, _| unreachable!(),
+                        );
+                        self.all_index_1_0.sorted_vec_update(
+                            insertions,
+                            &mut ctx.deferred_insertions,
+                            &mut ctx.scratch,
+                            uf,
+                            already_canon,
+                            |_, _, _| unreachable!(),
+                        );
+                        if ctx.deferred_insertions.is_empty() && ran_merge == false {
+                            break;
+                        }
+                        ran_merge = false;
+                        std::mem::swap(insertions, &mut ctx.deferred_insertions);
+                        ctx.deferred_insertions.clear();
+                    }
+                    insertions.clear();
+                    assert!(ctx.scratch.is_empty());
+                    assert!(ctx.deferred_insertions.is_empty());
+                }
+                fn update_begin(&self) -> Self::UpdateCtx {
+                    FooUpdateCtx {
+                        scratch: Vec::new(),
+                        deferred_insertions: Vec::new(),
+                        old: self.all_index_0_1.clone(),
+                    }
+                }
+                fn update_finalize(&mut self, ctx: Self::UpdateCtx, uf: &mut Unification) {
+                    self.new.extend(self.all_index_0_1.minus(&ctx.old));
+                }
+                fn emit_graphviz(&self, buf: &mut String) {
+                    use std::fmt::Write;
+                    for (i, (x0, x1)) in self.all_index_0_1.iter().enumerate() {
+                        writeln!(buf, "{}_{i} -> {}_{};", "foo", "math", x0).unwrap();
+                        writeln!(buf, "{}_{i} -> {}_{};", "foo", "math", x1).unwrap();
+                        writeln!(buf, "{}_{i} [shape = box];", "foo").unwrap();
+                    }
+                }
+            }
+            impl FooRelation {
                 fn iter2_1_0(&self, x1: Math, x0: Math) -> impl Iterator<Item = ()> + use<'_> {
                     self.all_index_1_0
                         .range((x0, x1)..=(x0, x1))
@@ -5000,67 +5524,22 @@ fn triangle_join() {
                     delta.foo_.push((x0, x1));
                     ()
                 }
-                fn update(&mut self, uf: &mut Unification, delta: &mut Delta) {
-                    let mut inserts = take(&mut delta.foo_);
-                    let orig_inserts = inserts.len();
-                    self.all_index_0_1
-                        .first_column_uproots(uf.math_.get_uprooted_snapshot(), |deleted_rows| {
-                            inserts.extend(deleted_rows)
-                        });
-                    self.all_index_1_0
-                        .first_column_uproots(uf.math_.get_uprooted_snapshot(), |deleted_rows| {
-                            inserts.extend(deleted_rows)
-                        });
-                    inserts[orig_inserts..].sort_unstable();
-                    runtime::dedup_suffix(&mut inserts, orig_inserts);
-                    self.all_index_0_1.delete_many(&mut inserts[orig_inserts..]);
-                    self.all_index_1_0.delete_many(&mut inserts[orig_inserts..]);
-                    inserts.iter_mut().for_each(|row| {
-                        row.0 = uf.math_.find(row.0);
-                        row.1 = uf.math_.find(row.1);
-                    });
-                    self.all_index_0_1.filter_existing(&mut inserts);
-                    self.all_index_0_1
-                        .insert_many(&mut inserts, |_, _| unreachable!());
-                    self.all_index_1_0
-                        .insert_many(&mut inserts, |_, _| unreachable!());
-                    self.new.extend_from_slice(&inserts);
-                }
-                fn update_finalize(&mut self, uf: &mut Unification) {
-                    self.new.sort_unstable();
-                    self.new.dedup();
-                    self.new.retain(|(x0, x1)| {
-                        if *x0 != uf.math_.find(*x0) {
-                            return false;
-                        }
-                        if *x1 != uf.math_.find(*x1) {
-                            return false;
-                        }
-                        true
-                    });
-                }
-                fn emit_graphviz(&self, buf: &mut String) {
-                    use std::fmt::Write;
-                    for (i, (x0, x1)) in self.all_index_0_1.iter().enumerate() {
-                        writeln!(buf, "{}_{i} -> {}_{};", "foo", "math", x0).unwrap();
-                        writeln!(buf, "{}_{i} -> {}_{};", "foo", "math", x1).unwrap();
-                        writeln!(buf, "{}_{i} [shape = box];", "foo").unwrap();
-                    }
-                }
-                fn len(&self) -> usize {
-                    self.all_index_0_1.len()
-                }
             }
             #[derive(Debug, Default)]
             struct BarRelation {
                 new: Vec<<Self as Relation>::Row>,
-                all_index_0_1: IndexImpl<RadixSortCtx<Row2_0_1<Math, Math>, u64>>,
-                all_index_1_0: IndexImpl<RadixSortCtx<Row2_1_0<Math, Math>, u64>>,
+                all_index_0_1: SortedVec<RadixSortCtx<Row2_0_1<Math, Math>, u64>>,
+                all_index_1_0: SortedVec<RadixSortCtx<Row2_1_0<Math, Math>, u64>>,
+            }
+            struct BarUpdateCtx {
+                scratch: Vec<(Math, Math)>,
+                deferred_insertions: Vec<(Math, Math)>,
+                old: SortedVec<RadixSortCtx<Row2_0_1<Math, Math>, u64>>,
             }
             impl Relation for BarRelation {
                 type Row = (Math, Math);
-            }
-            impl BarRelation {
+                type UpdateCtx = BarUpdateCtx;
+                type Unification = Unification;
                 const COST: u32 = 4u32;
                 fn new() -> Self {
                     Self::default()
@@ -5071,9 +5550,74 @@ fn triangle_join() {
                 fn clear_new(&mut self) {
                     self.new.clear();
                 }
-                fn iter_new(&self) -> impl Iterator<Item = <Self as Relation>::Row> + use<'_> {
+                fn iter_new(&self) -> impl '_ + Iterator<Item = Self::Row> {
                     self.new.iter().copied()
                 }
+                fn len(&self) -> usize {
+                    self.all_index_0_1.len()
+                }
+                fn update(
+                    &mut self,
+                    insertions: &mut Vec<Self::Row>,
+                    ctx: &mut Self::UpdateCtx,
+                    uf: &mut Unification,
+                ) {
+                    insertions.iter_mut().for_each(|row| {
+                        row.0 = uf.math_.find(row.0);
+                        row.1 = uf.math_.find(row.1);
+                    });
+                    let already_canon = |uf: &mut Unification, row: &mut Self::Row| {
+                        uf.math_.already_canonical(&mut row.0) && uf.math_.already_canonical(&mut row.1)
+                    };
+                    let mut ran_merge = false;
+                    loop {
+                        self.all_index_0_1.sorted_vec_update(
+                            insertions,
+                            &mut ctx.deferred_insertions,
+                            &mut ctx.scratch,
+                            uf,
+                            already_canon,
+                            |_, _, _| unreachable!(),
+                        );
+                        self.all_index_1_0.sorted_vec_update(
+                            insertions,
+                            &mut ctx.deferred_insertions,
+                            &mut ctx.scratch,
+                            uf,
+                            already_canon,
+                            |_, _, _| unreachable!(),
+                        );
+                        if ctx.deferred_insertions.is_empty() && ran_merge == false {
+                            break;
+                        }
+                        ran_merge = false;
+                        std::mem::swap(insertions, &mut ctx.deferred_insertions);
+                        ctx.deferred_insertions.clear();
+                    }
+                    insertions.clear();
+                    assert!(ctx.scratch.is_empty());
+                    assert!(ctx.deferred_insertions.is_empty());
+                }
+                fn update_begin(&self) -> Self::UpdateCtx {
+                    BarUpdateCtx {
+                        scratch: Vec::new(),
+                        deferred_insertions: Vec::new(),
+                        old: self.all_index_0_1.clone(),
+                    }
+                }
+                fn update_finalize(&mut self, ctx: Self::UpdateCtx, uf: &mut Unification) {
+                    self.new.extend(self.all_index_0_1.minus(&ctx.old));
+                }
+                fn emit_graphviz(&self, buf: &mut String) {
+                    use std::fmt::Write;
+                    for (i, (x0, x1)) in self.all_index_0_1.iter().enumerate() {
+                        writeln!(buf, "{}_{i} -> {}_{};", "bar", "math", x0).unwrap();
+                        writeln!(buf, "{}_{i} -> {}_{};", "bar", "math", x1).unwrap();
+                        writeln!(buf, "{}_{i} [shape = box];", "bar").unwrap();
+                    }
+                }
+            }
+            impl BarRelation {
                 fn iter1_0_1(&self, x0: Math) -> impl Iterator<Item = (Math,)> + use<'_> {
                     self.all_index_0_1
                         .range((x0, Math::MIN_ID)..=(x0, Math::MAX_ID))
@@ -5090,67 +5634,22 @@ fn triangle_join() {
                 fn check1_1_0(&self, x1: Math) -> bool {
                     self.iter1_1_0(x1).next().is_some()
                 }
-                fn update(&mut self, uf: &mut Unification, delta: &mut Delta) {
-                    let mut inserts = take(&mut delta.bar_);
-                    let orig_inserts = inserts.len();
-                    self.all_index_0_1
-                        .first_column_uproots(uf.math_.get_uprooted_snapshot(), |deleted_rows| {
-                            inserts.extend(deleted_rows)
-                        });
-                    self.all_index_1_0
-                        .first_column_uproots(uf.math_.get_uprooted_snapshot(), |deleted_rows| {
-                            inserts.extend(deleted_rows)
-                        });
-                    inserts[orig_inserts..].sort_unstable();
-                    runtime::dedup_suffix(&mut inserts, orig_inserts);
-                    self.all_index_0_1.delete_many(&mut inserts[orig_inserts..]);
-                    self.all_index_1_0.delete_many(&mut inserts[orig_inserts..]);
-                    inserts.iter_mut().for_each(|row| {
-                        row.0 = uf.math_.find(row.0);
-                        row.1 = uf.math_.find(row.1);
-                    });
-                    self.all_index_0_1.filter_existing(&mut inserts);
-                    self.all_index_0_1
-                        .insert_many(&mut inserts, |_, _| unreachable!());
-                    self.all_index_1_0
-                        .insert_many(&mut inserts, |_, _| unreachable!());
-                    self.new.extend_from_slice(&inserts);
-                }
-                fn update_finalize(&mut self, uf: &mut Unification) {
-                    self.new.sort_unstable();
-                    self.new.dedup();
-                    self.new.retain(|(x0, x1)| {
-                        if *x0 != uf.math_.find(*x0) {
-                            return false;
-                        }
-                        if *x1 != uf.math_.find(*x1) {
-                            return false;
-                        }
-                        true
-                    });
-                }
-                fn emit_graphviz(&self, buf: &mut String) {
-                    use std::fmt::Write;
-                    for (i, (x0, x1)) in self.all_index_0_1.iter().enumerate() {
-                        writeln!(buf, "{}_{i} -> {}_{};", "bar", "math", x0).unwrap();
-                        writeln!(buf, "{}_{i} -> {}_{};", "bar", "math", x1).unwrap();
-                        writeln!(buf, "{}_{i} [shape = box];", "bar").unwrap();
-                    }
-                }
-                fn len(&self) -> usize {
-                    self.all_index_0_1.len()
-                }
             }
             #[derive(Debug, Default)]
             struct BazRelation {
                 new: Vec<<Self as Relation>::Row>,
-                all_index_0_1: IndexImpl<RadixSortCtx<Row2_0_1<Math, Math>, u64>>,
-                all_index_1_0: IndexImpl<RadixSortCtx<Row2_1_0<Math, Math>, u64>>,
+                all_index_0_1: SortedVec<RadixSortCtx<Row2_0_1<Math, Math>, u64>>,
+                all_index_1_0: SortedVec<RadixSortCtx<Row2_1_0<Math, Math>, u64>>,
+            }
+            struct BazUpdateCtx {
+                scratch: Vec<(Math, Math)>,
+                deferred_insertions: Vec<(Math, Math)>,
+                old: SortedVec<RadixSortCtx<Row2_0_1<Math, Math>, u64>>,
             }
             impl Relation for BazRelation {
                 type Row = (Math, Math);
-            }
-            impl BazRelation {
+                type UpdateCtx = BazUpdateCtx;
+                type Unification = Unification;
                 const COST: u32 = 4u32;
                 fn new() -> Self {
                     Self::default()
@@ -5161,9 +5660,74 @@ fn triangle_join() {
                 fn clear_new(&mut self) {
                     self.new.clear();
                 }
-                fn iter_new(&self) -> impl Iterator<Item = <Self as Relation>::Row> + use<'_> {
+                fn iter_new(&self) -> impl '_ + Iterator<Item = Self::Row> {
                     self.new.iter().copied()
                 }
+                fn len(&self) -> usize {
+                    self.all_index_0_1.len()
+                }
+                fn update(
+                    &mut self,
+                    insertions: &mut Vec<Self::Row>,
+                    ctx: &mut Self::UpdateCtx,
+                    uf: &mut Unification,
+                ) {
+                    insertions.iter_mut().for_each(|row| {
+                        row.0 = uf.math_.find(row.0);
+                        row.1 = uf.math_.find(row.1);
+                    });
+                    let already_canon = |uf: &mut Unification, row: &mut Self::Row| {
+                        uf.math_.already_canonical(&mut row.0) && uf.math_.already_canonical(&mut row.1)
+                    };
+                    let mut ran_merge = false;
+                    loop {
+                        self.all_index_0_1.sorted_vec_update(
+                            insertions,
+                            &mut ctx.deferred_insertions,
+                            &mut ctx.scratch,
+                            uf,
+                            already_canon,
+                            |_, _, _| unreachable!(),
+                        );
+                        self.all_index_1_0.sorted_vec_update(
+                            insertions,
+                            &mut ctx.deferred_insertions,
+                            &mut ctx.scratch,
+                            uf,
+                            already_canon,
+                            |_, _, _| unreachable!(),
+                        );
+                        if ctx.deferred_insertions.is_empty() && ran_merge == false {
+                            break;
+                        }
+                        ran_merge = false;
+                        std::mem::swap(insertions, &mut ctx.deferred_insertions);
+                        ctx.deferred_insertions.clear();
+                    }
+                    insertions.clear();
+                    assert!(ctx.scratch.is_empty());
+                    assert!(ctx.deferred_insertions.is_empty());
+                }
+                fn update_begin(&self) -> Self::UpdateCtx {
+                    BazUpdateCtx {
+                        scratch: Vec::new(),
+                        deferred_insertions: Vec::new(),
+                        old: self.all_index_0_1.clone(),
+                    }
+                }
+                fn update_finalize(&mut self, ctx: Self::UpdateCtx, uf: &mut Unification) {
+                    self.new.extend(self.all_index_0_1.minus(&ctx.old));
+                }
+                fn emit_graphviz(&self, buf: &mut String) {
+                    use std::fmt::Write;
+                    for (i, (x0, x1)) in self.all_index_0_1.iter().enumerate() {
+                        writeln!(buf, "{}_{i} -> {}_{};", "baz", "math", x0).unwrap();
+                        writeln!(buf, "{}_{i} -> {}_{};", "baz", "math", x1).unwrap();
+                        writeln!(buf, "{}_{i} [shape = box];", "baz").unwrap();
+                    }
+                }
+            }
+            impl BazRelation {
                 fn iter2_1_0(&self, x1: Math, x0: Math) -> impl Iterator<Item = ()> + use<'_> {
                     self.all_index_1_0
                         .range((x0, x1)..=(x0, x1))
@@ -5196,68 +5760,23 @@ fn triangle_join() {
                     delta.baz_.push((x0, x1));
                     ()
                 }
-                fn update(&mut self, uf: &mut Unification, delta: &mut Delta) {
-                    let mut inserts = take(&mut delta.baz_);
-                    let orig_inserts = inserts.len();
-                    self.all_index_0_1
-                        .first_column_uproots(uf.math_.get_uprooted_snapshot(), |deleted_rows| {
-                            inserts.extend(deleted_rows)
-                        });
-                    self.all_index_1_0
-                        .first_column_uproots(uf.math_.get_uprooted_snapshot(), |deleted_rows| {
-                            inserts.extend(deleted_rows)
-                        });
-                    inserts[orig_inserts..].sort_unstable();
-                    runtime::dedup_suffix(&mut inserts, orig_inserts);
-                    self.all_index_0_1.delete_many(&mut inserts[orig_inserts..]);
-                    self.all_index_1_0.delete_many(&mut inserts[orig_inserts..]);
-                    inserts.iter_mut().for_each(|row| {
-                        row.0 = uf.math_.find(row.0);
-                        row.1 = uf.math_.find(row.1);
-                    });
-                    self.all_index_0_1.filter_existing(&mut inserts);
-                    self.all_index_0_1
-                        .insert_many(&mut inserts, |_, _| unreachable!());
-                    self.all_index_1_0
-                        .insert_many(&mut inserts, |_, _| unreachable!());
-                    self.new.extend_from_slice(&inserts);
-                }
-                fn update_finalize(&mut self, uf: &mut Unification) {
-                    self.new.sort_unstable();
-                    self.new.dedup();
-                    self.new.retain(|(x0, x1)| {
-                        if *x0 != uf.math_.find(*x0) {
-                            return false;
-                        }
-                        if *x1 != uf.math_.find(*x1) {
-                            return false;
-                        }
-                        true
-                    });
-                }
-                fn emit_graphviz(&self, buf: &mut String) {
-                    use std::fmt::Write;
-                    for (i, (x0, x1)) in self.all_index_0_1.iter().enumerate() {
-                        writeln!(buf, "{}_{i} -> {}_{};", "baz", "math", x0).unwrap();
-                        writeln!(buf, "{}_{i} -> {}_{};", "baz", "math", x1).unwrap();
-                        writeln!(buf, "{}_{i} [shape = box];", "baz").unwrap();
-                    }
-                }
-                fn len(&self) -> usize {
-                    self.all_index_0_1.len()
-                }
             }
             #[derive(Debug, Default)]
             struct TriangleRelation {
                 new: Vec<<Self as Relation>::Row>,
-                all_index_0_1_2: IndexImpl<RadixSortCtx<Row3_0_1_2<Math, Math, Math>, u128>>,
-                all_index_1_0_2: IndexImpl<RadixSortCtx<Row3_1_0_2<Math, Math, Math>, u128>>,
-                all_index_2_0_1: IndexImpl<RadixSortCtx<Row3_2_0_1<Math, Math, Math>, u128>>,
+                all_index_0_1_2: SortedVec<RadixSortCtx<Row3_0_1_2<Math, Math, Math>, u128>>,
+                all_index_1_0_2: SortedVec<RadixSortCtx<Row3_1_0_2<Math, Math, Math>, u128>>,
+                all_index_2_0_1: SortedVec<RadixSortCtx<Row3_2_0_1<Math, Math, Math>, u128>>,
+            }
+            struct TriangleUpdateCtx {
+                scratch: Vec<(Math, Math, Math)>,
+                deferred_insertions: Vec<(Math, Math, Math)>,
+                old: SortedVec<RadixSortCtx<Row3_0_1_2<Math, Math, Math>, u128>>,
             }
             impl Relation for TriangleRelation {
                 type Row = (Math, Math, Math);
-            }
-            impl TriangleRelation {
+                type UpdateCtx = TriangleUpdateCtx;
+                type Unification = Unification;
                 const COST: u32 = 9u32;
                 fn new() -> Self {
                     Self::default()
@@ -5268,9 +5787,86 @@ fn triangle_join() {
                 fn clear_new(&mut self) {
                     self.new.clear();
                 }
-                fn iter_new(&self) -> impl Iterator<Item = <Self as Relation>::Row> + use<'_> {
+                fn iter_new(&self) -> impl '_ + Iterator<Item = Self::Row> {
                     self.new.iter().copied()
                 }
+                fn len(&self) -> usize {
+                    self.all_index_0_1_2.len()
+                }
+                fn update(
+                    &mut self,
+                    insertions: &mut Vec<Self::Row>,
+                    ctx: &mut Self::UpdateCtx,
+                    uf: &mut Unification,
+                ) {
+                    insertions.iter_mut().for_each(|row| {
+                        row.0 = uf.math_.find(row.0);
+                        row.1 = uf.math_.find(row.1);
+                        row.2 = uf.math_.find(row.2);
+                    });
+                    let already_canon = |uf: &mut Unification, row: &mut Self::Row| {
+                        uf.math_.already_canonical(&mut row.0)
+                            && uf.math_.already_canonical(&mut row.1)
+                            && uf.math_.already_canonical(&mut row.2)
+                    };
+                    let mut ran_merge = false;
+                    loop {
+                        self.all_index_0_1_2.sorted_vec_update(
+                            insertions,
+                            &mut ctx.deferred_insertions,
+                            &mut ctx.scratch,
+                            uf,
+                            already_canon,
+                            |_, _, _| unreachable!(),
+                        );
+                        self.all_index_1_0_2.sorted_vec_update(
+                            insertions,
+                            &mut ctx.deferred_insertions,
+                            &mut ctx.scratch,
+                            uf,
+                            already_canon,
+                            |_, _, _| unreachable!(),
+                        );
+                        self.all_index_2_0_1.sorted_vec_update(
+                            insertions,
+                            &mut ctx.deferred_insertions,
+                            &mut ctx.scratch,
+                            uf,
+                            already_canon,
+                            |_, _, _| unreachable!(),
+                        );
+                        if ctx.deferred_insertions.is_empty() && ran_merge == false {
+                            break;
+                        }
+                        ran_merge = false;
+                        std::mem::swap(insertions, &mut ctx.deferred_insertions);
+                        ctx.deferred_insertions.clear();
+                    }
+                    insertions.clear();
+                    assert!(ctx.scratch.is_empty());
+                    assert!(ctx.deferred_insertions.is_empty());
+                }
+                fn update_begin(&self) -> Self::UpdateCtx {
+                    TriangleUpdateCtx {
+                        scratch: Vec::new(),
+                        deferred_insertions: Vec::new(),
+                        old: self.all_index_0_1_2.clone(),
+                    }
+                }
+                fn update_finalize(&mut self, ctx: Self::UpdateCtx, uf: &mut Unification) {
+                    self.new.extend(self.all_index_0_1_2.minus(&ctx.old));
+                }
+                fn emit_graphviz(&self, buf: &mut String) {
+                    use std::fmt::Write;
+                    for (i, (x0, x1, x2)) in self.all_index_0_1_2.iter().enumerate() {
+                        writeln!(buf, "{}_{i} -> {}_{};", "triangle", "math", x0).unwrap();
+                        writeln!(buf, "{}_{i} -> {}_{};", "triangle", "math", x1).unwrap();
+                        writeln!(buf, "{}_{i} -> {}_{};", "triangle", "math", x2).unwrap();
+                        writeln!(buf, "{}_{i} [shape = box];", "triangle").unwrap();
+                    }
+                }
+            }
+            impl TriangleRelation {
                 fn iter1_0_1_2(&self, x0: Math) -> impl Iterator<Item = (Math, Math)> + use<'_> {
                     self.all_index_0_1_2
                         .range((x0, Math::MIN_ID, Math::MIN_ID)..=(x0, Math::MAX_ID, Math::MAX_ID))
@@ -5294,71 +5890,6 @@ fn triangle_join() {
                 }
                 fn check1_2_0_1(&self, x2: Math) -> bool {
                     self.iter1_2_0_1(x2).next().is_some()
-                }
-                fn update(&mut self, uf: &mut Unification, delta: &mut Delta) {
-                    let mut inserts = take(&mut delta.triangle_);
-                    let orig_inserts = inserts.len();
-                    self.all_index_0_1_2
-                        .first_column_uproots(uf.math_.get_uprooted_snapshot(), |deleted_rows| {
-                            inserts.extend(deleted_rows)
-                        });
-                    self.all_index_1_0_2
-                        .first_column_uproots(uf.math_.get_uprooted_snapshot(), |deleted_rows| {
-                            inserts.extend(deleted_rows)
-                        });
-                    self.all_index_2_0_1
-                        .first_column_uproots(uf.math_.get_uprooted_snapshot(), |deleted_rows| {
-                            inserts.extend(deleted_rows)
-                        });
-                    inserts[orig_inserts..].sort_unstable();
-                    runtime::dedup_suffix(&mut inserts, orig_inserts);
-                    self.all_index_0_1_2
-                        .delete_many(&mut inserts[orig_inserts..]);
-                    self.all_index_1_0_2
-                        .delete_many(&mut inserts[orig_inserts..]);
-                    self.all_index_2_0_1
-                        .delete_many(&mut inserts[orig_inserts..]);
-                    inserts.iter_mut().for_each(|row| {
-                        row.0 = uf.math_.find(row.0);
-                        row.1 = uf.math_.find(row.1);
-                        row.2 = uf.math_.find(row.2);
-                    });
-                    self.all_index_0_1_2.filter_existing(&mut inserts);
-                    self.all_index_0_1_2
-                        .insert_many(&mut inserts, |_, _| unreachable!());
-                    self.all_index_1_0_2
-                        .insert_many(&mut inserts, |_, _| unreachable!());
-                    self.all_index_2_0_1
-                        .insert_many(&mut inserts, |_, _| unreachable!());
-                    self.new.extend_from_slice(&inserts);
-                }
-                fn update_finalize(&mut self, uf: &mut Unification) {
-                    self.new.sort_unstable();
-                    self.new.dedup();
-                    self.new.retain(|(x0, x1, x2)| {
-                        if *x0 != uf.math_.find(*x0) {
-                            return false;
-                        }
-                        if *x1 != uf.math_.find(*x1) {
-                            return false;
-                        }
-                        if *x2 != uf.math_.find(*x2) {
-                            return false;
-                        }
-                        true
-                    });
-                }
-                fn emit_graphviz(&self, buf: &mut String) {
-                    use std::fmt::Write;
-                    for (i, (x0, x1, x2)) in self.all_index_0_1_2.iter().enumerate() {
-                        writeln!(buf, "{}_{i} -> {}_{};", "triangle", "math", x0).unwrap();
-                        writeln!(buf, "{}_{i} -> {}_{};", "triangle", "math", x1).unwrap();
-                        writeln!(buf, "{}_{i} -> {}_{};", "triangle", "math", x2).unwrap();
-                        writeln!(buf, "{}_{i} [shape = box];", "triangle").unwrap();
-                    }
-                }
-                fn len(&self) -> usize {
-                    self.all_index_0_1_2.len()
                 }
             }
             #[derive(Debug, Default)]
@@ -5504,18 +6035,32 @@ fn triangle_join() {
                     self.bar_.clear_new();
                     self.baz_.clear_new();
                     self.triangle_.clear_new();
-                    while self.uf.has_new_uproots() || self.delta.has_new_inserts() {
+                    if !self.delta.has_new_inserts() && !self.uf.has_new_uproots() {
+                        return;
+                    }
+                    let mut foo_ctx = self.foo_.update_begin();
+                    let mut bar_ctx = self.bar_.update_begin();
+                    let mut baz_ctx = self.baz_.update_begin();
+                    let mut triangle_ctx = self.triangle_.update_begin();
+                    loop {
                         self.uf.snapshot_all_uprooted();
-                        self.foo_.update(&mut self.uf, &mut self.delta);
-                        self.bar_.update(&mut self.uf, &mut self.delta);
-                        self.baz_.update(&mut self.uf, &mut self.delta);
-                        self.triangle_.update(&mut self.uf, &mut self.delta);
+                        self.foo_
+                            .update(&mut self.delta.foo_, &mut foo_ctx, &mut self.uf);
+                        self.bar_
+                            .update(&mut self.delta.bar_, &mut bar_ctx, &mut self.uf);
+                        self.baz_
+                            .update(&mut self.delta.baz_, &mut baz_ctx, &mut self.uf);
+                        self.triangle_
+                            .update(&mut self.delta.triangle_, &mut triangle_ctx, &mut self.uf);
+                        if !self.uf.has_new_uproots() {
+                            break;
+                        }
                     }
                     self.uf.snapshot_all_uprooted();
-                    self.foo_.update_finalize(&mut self.uf);
-                    self.bar_.update_finalize(&mut self.uf);
-                    self.baz_.update_finalize(&mut self.uf);
-                    self.triangle_.update_finalize(&mut self.uf);
+                    self.foo_.update_finalize(foo_ctx, &mut self.uf);
+                    self.bar_.update_finalize(bar_ctx, &mut self.uf);
+                    self.baz_.update_finalize(baz_ctx, &mut self.uf);
+                    self.triangle_.update_finalize(triangle_ctx, &mut self.uf);
                 }
             }
             impl EclassProvider<Math> for Theory {
@@ -5585,14 +6130,19 @@ fn edgecase0() {
             #[derive(Debug, Default)]
             struct MulRelation {
                 new: Vec<<Self as Relation>::Row>,
-                all_index_0_1_2: IndexImpl<RadixSortCtx<Row3_0_1<Math, Math, Math>, u128>>,
-                all_index_1_0_2: IndexImpl<RadixSortCtx<Row3_1_0_2<Math, Math, Math>, u128>>,
-                all_index_2_0_1: IndexImpl<RadixSortCtx<Row3_2_0_1<Math, Math, Math>, u128>>,
+                all_index_0_1_2: SortedVec<RadixSortCtx<Row3_0_1<Math, Math, Math>, u128>>,
+                all_index_1_0_2: SortedVec<RadixSortCtx<Row3_1_0_2<Math, Math, Math>, u128>>,
+                all_index_2_0_1: SortedVec<RadixSortCtx<Row3_2_0_1<Math, Math, Math>, u128>>,
+            }
+            struct MulUpdateCtx {
+                scratch: Vec<(Math, Math, Math)>,
+                deferred_insertions: Vec<(Math, Math, Math)>,
+                old: SortedVec<RadixSortCtx<Row3_0_1<Math, Math, Math>, u128>>,
             }
             impl Relation for MulRelation {
                 type Row = (Math, Math, Math);
-            }
-            impl MulRelation {
+                type UpdateCtx = MulUpdateCtx;
+                type Unification = Unification;
                 const COST: u32 = 9u32;
                 fn new() -> Self {
                     Self::default()
@@ -5603,9 +6153,91 @@ fn edgecase0() {
                 fn clear_new(&mut self) {
                     self.new.clear();
                 }
-                fn iter_new(&self) -> impl Iterator<Item = <Self as Relation>::Row> + use<'_> {
+                fn iter_new(&self) -> impl '_ + Iterator<Item = Self::Row> {
                     self.new.iter().copied()
                 }
+                fn len(&self) -> usize {
+                    self.all_index_0_1_2.len()
+                }
+                fn update(
+                    &mut self,
+                    insertions: &mut Vec<Self::Row>,
+                    ctx: &mut Self::UpdateCtx,
+                    uf: &mut Unification,
+                ) {
+                    insertions.iter_mut().for_each(|row| {
+                        row.0 = uf.math_.find(row.0);
+                        row.1 = uf.math_.find(row.1);
+                        row.2 = uf.math_.find(row.2);
+                    });
+                    let already_canon = |uf: &mut Unification, row: &mut Self::Row| {
+                        uf.math_.already_canonical(&mut row.0)
+                            && uf.math_.already_canonical(&mut row.1)
+                            && uf.math_.already_canonical(&mut row.2)
+                    };
+                    let mut ran_merge = false;
+                    loop {
+                        self.all_index_0_1_2.sorted_vec_update(
+                            insertions,
+                            &mut ctx.deferred_insertions,
+                            &mut ctx.scratch,
+                            uf,
+                            already_canon,
+                            |uf, x, mut y| {
+                                ran_merge = true;
+                                let (x2,) = x.value_mut();
+                                let (y2,) = y.value_mut();
+                                uf.math_.union_mut(x2, y2);
+                            },
+                        );
+                        self.all_index_1_0_2.sorted_vec_update(
+                            insertions,
+                            &mut ctx.deferred_insertions,
+                            &mut ctx.scratch,
+                            uf,
+                            already_canon,
+                            |_, _, _| unreachable!(),
+                        );
+                        self.all_index_2_0_1.sorted_vec_update(
+                            insertions,
+                            &mut ctx.deferred_insertions,
+                            &mut ctx.scratch,
+                            uf,
+                            already_canon,
+                            |_, _, _| unreachable!(),
+                        );
+                        if ctx.deferred_insertions.is_empty() && ran_merge == false {
+                            break;
+                        }
+                        ran_merge = false;
+                        std::mem::swap(insertions, &mut ctx.deferred_insertions);
+                        ctx.deferred_insertions.clear();
+                    }
+                    insertions.clear();
+                    assert!(ctx.scratch.is_empty());
+                    assert!(ctx.deferred_insertions.is_empty());
+                }
+                fn update_begin(&self) -> Self::UpdateCtx {
+                    MulUpdateCtx {
+                        scratch: Vec::new(),
+                        deferred_insertions: Vec::new(),
+                        old: self.all_index_0_1_2.clone(),
+                    }
+                }
+                fn update_finalize(&mut self, ctx: Self::UpdateCtx, uf: &mut Unification) {
+                    self.new.extend(self.all_index_0_1_2.minus(&ctx.old));
+                }
+                fn emit_graphviz(&self, buf: &mut String) {
+                    use std::fmt::Write;
+                    for (i, (x0, x1, x2)) in self.all_index_0_1_2.iter().enumerate() {
+                        writeln!(buf, "{}_{i} -> {}_{};", "mul", "math", x0).unwrap();
+                        writeln!(buf, "{}_{i} -> {}_{};", "mul", "math", x1).unwrap();
+                        writeln!(buf, "{}_{i} -> {}_{};", "mul", "math", x2).unwrap();
+                        writeln!(buf, "{}_{i} [shape = box];", "mul").unwrap();
+                    }
+                }
+            }
+            impl MulRelation {
                 fn iter2_0_1_2(&self, x0: Math, x1: Math) -> impl Iterator<Item = (Math,)> + use<'_> {
                     self.all_index_0_1_2
                         .range((x0, x1, Math::MIN_ID)..=(x0, x1, Math::MAX_ID))
@@ -5655,88 +6287,23 @@ fn edgecase0() {
                     delta.mul_.push((x0, x1, x2));
                     (x2,)
                 }
-                fn update(&mut self, uf: &mut Unification, delta: &mut Delta) {
-                    let mut inserts = take(&mut delta.mul_);
-                    let orig_inserts = inserts.len();
-                    self.all_index_0_1_2
-                        .first_column_uproots(uf.math_.get_uprooted_snapshot(), |deleted_rows| {
-                            inserts.extend(deleted_rows)
-                        });
-                    self.all_index_1_0_2
-                        .first_column_uproots(uf.math_.get_uprooted_snapshot(), |deleted_rows| {
-                            inserts.extend(deleted_rows)
-                        });
-                    self.all_index_2_0_1
-                        .first_column_uproots(uf.math_.get_uprooted_snapshot(), |deleted_rows| {
-                            inserts.extend(deleted_rows)
-                        });
-                    inserts[orig_inserts..].sort_unstable();
-                    runtime::dedup_suffix(&mut inserts, orig_inserts);
-                    self.all_index_0_1_2
-                        .delete_many(&mut inserts[orig_inserts..]);
-                    self.all_index_1_0_2
-                        .delete_many(&mut inserts[orig_inserts..]);
-                    self.all_index_2_0_1
-                        .delete_many(&mut inserts[orig_inserts..]);
-                    inserts.iter_mut().for_each(|row| {
-                        row.0 = uf.math_.find(row.0);
-                        row.1 = uf.math_.find(row.1);
-                        row.2 = uf.math_.find(row.2);
-                    });
-                    self.all_index_0_1_2.filter_existing(&mut inserts);
-                    self.all_index_0_1_2
-                        .insert_many(&mut inserts, |mut old, mut new| {
-                            let (x2,) = old.value_mut();
-                            let (y2,) = new.value_mut();
-                            uf.math_.union_mut(x2, y2);
-                            old
-                        });
-                    self.all_index_1_0_2
-                        .insert_many(&mut inserts, |_, _| unreachable!());
-                    self.all_index_2_0_1
-                        .insert_many(&mut inserts, |_, _| unreachable!());
-                    self.new.extend_from_slice(&inserts);
-                }
-                fn update_finalize(&mut self, uf: &mut Unification) {
-                    self.new.sort_unstable();
-                    self.new.dedup();
-                    self.new.retain(|(x0, x1, x2)| {
-                        if *x0 != uf.math_.find(*x0) {
-                            return false;
-                        }
-                        if *x1 != uf.math_.find(*x1) {
-                            return false;
-                        }
-                        if *x2 != uf.math_.find(*x2) {
-                            return false;
-                        }
-                        true
-                    });
-                }
-                fn emit_graphviz(&self, buf: &mut String) {
-                    use std::fmt::Write;
-                    for (i, (x0, x1, x2)) in self.all_index_0_1_2.iter().enumerate() {
-                        writeln!(buf, "{}_{i} -> {}_{};", "mul", "math", x0).unwrap();
-                        writeln!(buf, "{}_{i} -> {}_{};", "mul", "math", x1).unwrap();
-                        writeln!(buf, "{}_{i} -> {}_{};", "mul", "math", x2).unwrap();
-                        writeln!(buf, "{}_{i} [shape = box];", "mul").unwrap();
-                    }
-                }
-                fn len(&self) -> usize {
-                    self.all_index_0_1_2.len()
-                }
             }
             #[derive(Debug, Default)]
             struct AddRelation {
                 new: Vec<<Self as Relation>::Row>,
-                all_index_0_1_2: IndexImpl<RadixSortCtx<Row3_0_1<Math, Math, Math>, u128>>,
-                all_index_1_0_2: IndexImpl<RadixSortCtx<Row3_1_0_2<Math, Math, Math>, u128>>,
-                all_index_2_0_1: IndexImpl<RadixSortCtx<Row3_2_0_1<Math, Math, Math>, u128>>,
+                all_index_0_1_2: SortedVec<RadixSortCtx<Row3_0_1<Math, Math, Math>, u128>>,
+                all_index_1_0_2: SortedVec<RadixSortCtx<Row3_1_0_2<Math, Math, Math>, u128>>,
+                all_index_2_0_1: SortedVec<RadixSortCtx<Row3_2_0_1<Math, Math, Math>, u128>>,
+            }
+            struct AddUpdateCtx {
+                scratch: Vec<(Math, Math, Math)>,
+                deferred_insertions: Vec<(Math, Math, Math)>,
+                old: SortedVec<RadixSortCtx<Row3_0_1<Math, Math, Math>, u128>>,
             }
             impl Relation for AddRelation {
                 type Row = (Math, Math, Math);
-            }
-            impl AddRelation {
+                type UpdateCtx = AddUpdateCtx;
+                type Unification = Unification;
                 const COST: u32 = 9u32;
                 fn new() -> Self {
                     Self::default()
@@ -5747,9 +6314,91 @@ fn edgecase0() {
                 fn clear_new(&mut self) {
                     self.new.clear();
                 }
-                fn iter_new(&self) -> impl Iterator<Item = <Self as Relation>::Row> + use<'_> {
+                fn iter_new(&self) -> impl '_ + Iterator<Item = Self::Row> {
                     self.new.iter().copied()
                 }
+                fn len(&self) -> usize {
+                    self.all_index_0_1_2.len()
+                }
+                fn update(
+                    &mut self,
+                    insertions: &mut Vec<Self::Row>,
+                    ctx: &mut Self::UpdateCtx,
+                    uf: &mut Unification,
+                ) {
+                    insertions.iter_mut().for_each(|row| {
+                        row.0 = uf.math_.find(row.0);
+                        row.1 = uf.math_.find(row.1);
+                        row.2 = uf.math_.find(row.2);
+                    });
+                    let already_canon = |uf: &mut Unification, row: &mut Self::Row| {
+                        uf.math_.already_canonical(&mut row.0)
+                            && uf.math_.already_canonical(&mut row.1)
+                            && uf.math_.already_canonical(&mut row.2)
+                    };
+                    let mut ran_merge = false;
+                    loop {
+                        self.all_index_0_1_2.sorted_vec_update(
+                            insertions,
+                            &mut ctx.deferred_insertions,
+                            &mut ctx.scratch,
+                            uf,
+                            already_canon,
+                            |uf, x, mut y| {
+                                ran_merge = true;
+                                let (x2,) = x.value_mut();
+                                let (y2,) = y.value_mut();
+                                uf.math_.union_mut(x2, y2);
+                            },
+                        );
+                        self.all_index_1_0_2.sorted_vec_update(
+                            insertions,
+                            &mut ctx.deferred_insertions,
+                            &mut ctx.scratch,
+                            uf,
+                            already_canon,
+                            |_, _, _| unreachable!(),
+                        );
+                        self.all_index_2_0_1.sorted_vec_update(
+                            insertions,
+                            &mut ctx.deferred_insertions,
+                            &mut ctx.scratch,
+                            uf,
+                            already_canon,
+                            |_, _, _| unreachable!(),
+                        );
+                        if ctx.deferred_insertions.is_empty() && ran_merge == false {
+                            break;
+                        }
+                        ran_merge = false;
+                        std::mem::swap(insertions, &mut ctx.deferred_insertions);
+                        ctx.deferred_insertions.clear();
+                    }
+                    insertions.clear();
+                    assert!(ctx.scratch.is_empty());
+                    assert!(ctx.deferred_insertions.is_empty());
+                }
+                fn update_begin(&self) -> Self::UpdateCtx {
+                    AddUpdateCtx {
+                        scratch: Vec::new(),
+                        deferred_insertions: Vec::new(),
+                        old: self.all_index_0_1_2.clone(),
+                    }
+                }
+                fn update_finalize(&mut self, ctx: Self::UpdateCtx, uf: &mut Unification) {
+                    self.new.extend(self.all_index_0_1_2.minus(&ctx.old));
+                }
+                fn emit_graphviz(&self, buf: &mut String) {
+                    use std::fmt::Write;
+                    for (i, (x0, x1, x2)) in self.all_index_0_1_2.iter().enumerate() {
+                        writeln!(buf, "{}_{i} -> {}_{};", "add", "math", x0).unwrap();
+                        writeln!(buf, "{}_{i} -> {}_{};", "add", "math", x1).unwrap();
+                        writeln!(buf, "{}_{i} -> {}_{};", "add", "math", x2).unwrap();
+                        writeln!(buf, "{}_{i} [shape = box];", "add").unwrap();
+                    }
+                }
+            }
+            impl AddRelation {
                 fn iter2_0_1_2(&self, x0: Math, x1: Math) -> impl Iterator<Item = (Math,)> + use<'_> {
                     self.all_index_0_1_2
                         .range((x0, x1, Math::MIN_ID)..=(x0, x1, Math::MAX_ID))
@@ -5790,76 +6439,6 @@ fn edgecase0() {
                     let x2 = uf.math_.add_eclass();
                     delta.add_.push((x0, x1, x2));
                     (x2,)
-                }
-                fn update(&mut self, uf: &mut Unification, delta: &mut Delta) {
-                    let mut inserts = take(&mut delta.add_);
-                    let orig_inserts = inserts.len();
-                    self.all_index_0_1_2
-                        .first_column_uproots(uf.math_.get_uprooted_snapshot(), |deleted_rows| {
-                            inserts.extend(deleted_rows)
-                        });
-                    self.all_index_1_0_2
-                        .first_column_uproots(uf.math_.get_uprooted_snapshot(), |deleted_rows| {
-                            inserts.extend(deleted_rows)
-                        });
-                    self.all_index_2_0_1
-                        .first_column_uproots(uf.math_.get_uprooted_snapshot(), |deleted_rows| {
-                            inserts.extend(deleted_rows)
-                        });
-                    inserts[orig_inserts..].sort_unstable();
-                    runtime::dedup_suffix(&mut inserts, orig_inserts);
-                    self.all_index_0_1_2
-                        .delete_many(&mut inserts[orig_inserts..]);
-                    self.all_index_1_0_2
-                        .delete_many(&mut inserts[orig_inserts..]);
-                    self.all_index_2_0_1
-                        .delete_many(&mut inserts[orig_inserts..]);
-                    inserts.iter_mut().for_each(|row| {
-                        row.0 = uf.math_.find(row.0);
-                        row.1 = uf.math_.find(row.1);
-                        row.2 = uf.math_.find(row.2);
-                    });
-                    self.all_index_0_1_2.filter_existing(&mut inserts);
-                    self.all_index_0_1_2
-                        .insert_many(&mut inserts, |mut old, mut new| {
-                            let (x2,) = old.value_mut();
-                            let (y2,) = new.value_mut();
-                            uf.math_.union_mut(x2, y2);
-                            old
-                        });
-                    self.all_index_1_0_2
-                        .insert_many(&mut inserts, |_, _| unreachable!());
-                    self.all_index_2_0_1
-                        .insert_many(&mut inserts, |_, _| unreachable!());
-                    self.new.extend_from_slice(&inserts);
-                }
-                fn update_finalize(&mut self, uf: &mut Unification) {
-                    self.new.sort_unstable();
-                    self.new.dedup();
-                    self.new.retain(|(x0, x1, x2)| {
-                        if *x0 != uf.math_.find(*x0) {
-                            return false;
-                        }
-                        if *x1 != uf.math_.find(*x1) {
-                            return false;
-                        }
-                        if *x2 != uf.math_.find(*x2) {
-                            return false;
-                        }
-                        true
-                    });
-                }
-                fn emit_graphviz(&self, buf: &mut String) {
-                    use std::fmt::Write;
-                    for (i, (x0, x1, x2)) in self.all_index_0_1_2.iter().enumerate() {
-                        writeln!(buf, "{}_{i} -> {}_{};", "add", "math", x0).unwrap();
-                        writeln!(buf, "{}_{i} -> {}_{};", "add", "math", x1).unwrap();
-                        writeln!(buf, "{}_{i} -> {}_{};", "add", "math", x2).unwrap();
-                        writeln!(buf, "{}_{i} [shape = box];", "add").unwrap();
-                    }
-                }
-                fn len(&self) -> usize {
-                    self.all_index_0_1_2.len()
                 }
             }
             #[derive(Debug, Default)]
@@ -5986,14 +6565,24 @@ fn edgecase0() {
                 pub fn canonicalize(&mut self) {
                     self.mul_.clear_new();
                     self.add_.clear_new();
-                    while self.uf.has_new_uproots() || self.delta.has_new_inserts() {
+                    if !self.delta.has_new_inserts() && !self.uf.has_new_uproots() {
+                        return;
+                    }
+                    let mut mul_ctx = self.mul_.update_begin();
+                    let mut add_ctx = self.add_.update_begin();
+                    loop {
                         self.uf.snapshot_all_uprooted();
-                        self.mul_.update(&mut self.uf, &mut self.delta);
-                        self.add_.update(&mut self.uf, &mut self.delta);
+                        self.mul_
+                            .update(&mut self.delta.mul_, &mut mul_ctx, &mut self.uf);
+                        self.add_
+                            .update(&mut self.delta.add_, &mut add_ctx, &mut self.uf);
+                        if !self.uf.has_new_uproots() {
+                            break;
+                        }
                     }
                     self.uf.snapshot_all_uprooted();
-                    self.mul_.update_finalize(&mut self.uf);
-                    self.add_.update_finalize(&mut self.uf);
+                    self.mul_.update_finalize(mul_ctx, &mut self.uf);
+                    self.add_.update_finalize(add_ctx, &mut self.uf);
                 }
             }
             impl EclassProvider<Math> for Theory {
@@ -6059,14 +6648,19 @@ fn test_into_codegen() {
             #[derive(Debug, Default)]
             struct MulRelation {
                 new: Vec<<Self as Relation>::Row>,
-                all_index_0_1_2: IndexImpl<RadixSortCtx<Row3_0_1<Math, Math, Math>, u128>>,
-                all_index_1_0_2: IndexImpl<RadixSortCtx<Row3_1_0_2<Math, Math, Math>, u128>>,
-                all_index_2_0_1: IndexImpl<RadixSortCtx<Row3_2_0_1<Math, Math, Math>, u128>>,
+                all_index_0_1_2: SortedVec<RadixSortCtx<Row3_0_1<Math, Math, Math>, u128>>,
+                all_index_1_0_2: SortedVec<RadixSortCtx<Row3_1_0_2<Math, Math, Math>, u128>>,
+                all_index_2_0_1: SortedVec<RadixSortCtx<Row3_2_0_1<Math, Math, Math>, u128>>,
+            }
+            struct MulUpdateCtx {
+                scratch: Vec<(Math, Math, Math)>,
+                deferred_insertions: Vec<(Math, Math, Math)>,
+                old: SortedVec<RadixSortCtx<Row3_0_1<Math, Math, Math>, u128>>,
             }
             impl Relation for MulRelation {
                 type Row = (Math, Math, Math);
-            }
-            impl MulRelation {
+                type UpdateCtx = MulUpdateCtx;
+                type Unification = Unification;
                 const COST: u32 = 9u32;
                 fn new() -> Self {
                     Self::default()
@@ -6077,9 +6671,91 @@ fn test_into_codegen() {
                 fn clear_new(&mut self) {
                     self.new.clear();
                 }
-                fn iter_new(&self) -> impl Iterator<Item = <Self as Relation>::Row> + use<'_> {
+                fn iter_new(&self) -> impl '_ + Iterator<Item = Self::Row> {
                     self.new.iter().copied()
                 }
+                fn len(&self) -> usize {
+                    self.all_index_0_1_2.len()
+                }
+                fn update(
+                    &mut self,
+                    insertions: &mut Vec<Self::Row>,
+                    ctx: &mut Self::UpdateCtx,
+                    uf: &mut Unification,
+                ) {
+                    insertions.iter_mut().for_each(|row| {
+                        row.0 = uf.math_.find(row.0);
+                        row.1 = uf.math_.find(row.1);
+                        row.2 = uf.math_.find(row.2);
+                    });
+                    let already_canon = |uf: &mut Unification, row: &mut Self::Row| {
+                        uf.math_.already_canonical(&mut row.0)
+                            && uf.math_.already_canonical(&mut row.1)
+                            && uf.math_.already_canonical(&mut row.2)
+                    };
+                    let mut ran_merge = false;
+                    loop {
+                        self.all_index_0_1_2.sorted_vec_update(
+                            insertions,
+                            &mut ctx.deferred_insertions,
+                            &mut ctx.scratch,
+                            uf,
+                            already_canon,
+                            |uf, x, mut y| {
+                                ran_merge = true;
+                                let (x2,) = x.value_mut();
+                                let (y2,) = y.value_mut();
+                                uf.math_.union_mut(x2, y2);
+                            },
+                        );
+                        self.all_index_1_0_2.sorted_vec_update(
+                            insertions,
+                            &mut ctx.deferred_insertions,
+                            &mut ctx.scratch,
+                            uf,
+                            already_canon,
+                            |_, _, _| unreachable!(),
+                        );
+                        self.all_index_2_0_1.sorted_vec_update(
+                            insertions,
+                            &mut ctx.deferred_insertions,
+                            &mut ctx.scratch,
+                            uf,
+                            already_canon,
+                            |_, _, _| unreachable!(),
+                        );
+                        if ctx.deferred_insertions.is_empty() && ran_merge == false {
+                            break;
+                        }
+                        ran_merge = false;
+                        std::mem::swap(insertions, &mut ctx.deferred_insertions);
+                        ctx.deferred_insertions.clear();
+                    }
+                    insertions.clear();
+                    assert!(ctx.scratch.is_empty());
+                    assert!(ctx.deferred_insertions.is_empty());
+                }
+                fn update_begin(&self) -> Self::UpdateCtx {
+                    MulUpdateCtx {
+                        scratch: Vec::new(),
+                        deferred_insertions: Vec::new(),
+                        old: self.all_index_0_1_2.clone(),
+                    }
+                }
+                fn update_finalize(&mut self, ctx: Self::UpdateCtx, uf: &mut Unification) {
+                    self.new.extend(self.all_index_0_1_2.minus(&ctx.old));
+                }
+                fn emit_graphviz(&self, buf: &mut String) {
+                    use std::fmt::Write;
+                    for (i, (x0, x1, x2)) in self.all_index_0_1_2.iter().enumerate() {
+                        writeln!(buf, "{}_{i} -> {}_{};", "mul", "math", x0).unwrap();
+                        writeln!(buf, "{}_{i} -> {}_{};", "mul", "math", x1).unwrap();
+                        writeln!(buf, "{}_{i} -> {}_{};", "mul", "math", x2).unwrap();
+                        writeln!(buf, "{}_{i} [shape = box];", "mul").unwrap();
+                    }
+                }
+            }
+            impl MulRelation {
                 fn iter2_0_1_2(&self, x0: Math, x1: Math) -> impl Iterator<Item = (Math,)> + use<'_> {
                     self.all_index_0_1_2
                         .range((x0, x1, Math::MIN_ID)..=(x0, x1, Math::MAX_ID))
@@ -6121,88 +6797,23 @@ fn test_into_codegen() {
                     delta.mul_.push((x0, x1, x2));
                     (x2,)
                 }
-                fn update(&mut self, uf: &mut Unification, delta: &mut Delta) {
-                    let mut inserts = take(&mut delta.mul_);
-                    let orig_inserts = inserts.len();
-                    self.all_index_0_1_2
-                        .first_column_uproots(uf.math_.get_uprooted_snapshot(), |deleted_rows| {
-                            inserts.extend(deleted_rows)
-                        });
-                    self.all_index_1_0_2
-                        .first_column_uproots(uf.math_.get_uprooted_snapshot(), |deleted_rows| {
-                            inserts.extend(deleted_rows)
-                        });
-                    self.all_index_2_0_1
-                        .first_column_uproots(uf.math_.get_uprooted_snapshot(), |deleted_rows| {
-                            inserts.extend(deleted_rows)
-                        });
-                    inserts[orig_inserts..].sort_unstable();
-                    runtime::dedup_suffix(&mut inserts, orig_inserts);
-                    self.all_index_0_1_2
-                        .delete_many(&mut inserts[orig_inserts..]);
-                    self.all_index_1_0_2
-                        .delete_many(&mut inserts[orig_inserts..]);
-                    self.all_index_2_0_1
-                        .delete_many(&mut inserts[orig_inserts..]);
-                    inserts.iter_mut().for_each(|row| {
-                        row.0 = uf.math_.find(row.0);
-                        row.1 = uf.math_.find(row.1);
-                        row.2 = uf.math_.find(row.2);
-                    });
-                    self.all_index_0_1_2.filter_existing(&mut inserts);
-                    self.all_index_0_1_2
-                        .insert_many(&mut inserts, |mut old, mut new| {
-                            let (x2,) = old.value_mut();
-                            let (y2,) = new.value_mut();
-                            uf.math_.union_mut(x2, y2);
-                            old
-                        });
-                    self.all_index_1_0_2
-                        .insert_many(&mut inserts, |_, _| unreachable!());
-                    self.all_index_2_0_1
-                        .insert_many(&mut inserts, |_, _| unreachable!());
-                    self.new.extend_from_slice(&inserts);
-                }
-                fn update_finalize(&mut self, uf: &mut Unification) {
-                    self.new.sort_unstable();
-                    self.new.dedup();
-                    self.new.retain(|(x0, x1, x2)| {
-                        if *x0 != uf.math_.find(*x0) {
-                            return false;
-                        }
-                        if *x1 != uf.math_.find(*x1) {
-                            return false;
-                        }
-                        if *x2 != uf.math_.find(*x2) {
-                            return false;
-                        }
-                        true
-                    });
-                }
-                fn emit_graphviz(&self, buf: &mut String) {
-                    use std::fmt::Write;
-                    for (i, (x0, x1, x2)) in self.all_index_0_1_2.iter().enumerate() {
-                        writeln!(buf, "{}_{i} -> {}_{};", "mul", "math", x0).unwrap();
-                        writeln!(buf, "{}_{i} -> {}_{};", "mul", "math", x1).unwrap();
-                        writeln!(buf, "{}_{i} -> {}_{};", "mul", "math", x2).unwrap();
-                        writeln!(buf, "{}_{i} [shape = box];", "mul").unwrap();
-                    }
-                }
-                fn len(&self) -> usize {
-                    self.all_index_0_1_2.len()
-                }
             }
             #[derive(Debug, Default)]
             struct AddRelation {
                 new: Vec<<Self as Relation>::Row>,
-                all_index_0_1_2: IndexImpl<RadixSortCtx<Row3_0_1<Math, Math, Math>, u128>>,
-                all_index_1_0_2: IndexImpl<RadixSortCtx<Row3_1_0_2<Math, Math, Math>, u128>>,
-                all_index_2_0_1: IndexImpl<RadixSortCtx<Row3_2_0_1<Math, Math, Math>, u128>>,
+                all_index_0_1_2: SortedVec<RadixSortCtx<Row3_0_1<Math, Math, Math>, u128>>,
+                all_index_1_0_2: SortedVec<RadixSortCtx<Row3_1_0_2<Math, Math, Math>, u128>>,
+                all_index_2_0_1: SortedVec<RadixSortCtx<Row3_2_0_1<Math, Math, Math>, u128>>,
+            }
+            struct AddUpdateCtx {
+                scratch: Vec<(Math, Math, Math)>,
+                deferred_insertions: Vec<(Math, Math, Math)>,
+                old: SortedVec<RadixSortCtx<Row3_0_1<Math, Math, Math>, u128>>,
             }
             impl Relation for AddRelation {
                 type Row = (Math, Math, Math);
-            }
-            impl AddRelation {
+                type UpdateCtx = AddUpdateCtx;
+                type Unification = Unification;
                 const COST: u32 = 9u32;
                 fn new() -> Self {
                     Self::default()
@@ -6213,9 +6824,91 @@ fn test_into_codegen() {
                 fn clear_new(&mut self) {
                     self.new.clear();
                 }
-                fn iter_new(&self) -> impl Iterator<Item = <Self as Relation>::Row> + use<'_> {
+                fn iter_new(&self) -> impl '_ + Iterator<Item = Self::Row> {
                     self.new.iter().copied()
                 }
+                fn len(&self) -> usize {
+                    self.all_index_0_1_2.len()
+                }
+                fn update(
+                    &mut self,
+                    insertions: &mut Vec<Self::Row>,
+                    ctx: &mut Self::UpdateCtx,
+                    uf: &mut Unification,
+                ) {
+                    insertions.iter_mut().for_each(|row| {
+                        row.0 = uf.math_.find(row.0);
+                        row.1 = uf.math_.find(row.1);
+                        row.2 = uf.math_.find(row.2);
+                    });
+                    let already_canon = |uf: &mut Unification, row: &mut Self::Row| {
+                        uf.math_.already_canonical(&mut row.0)
+                            && uf.math_.already_canonical(&mut row.1)
+                            && uf.math_.already_canonical(&mut row.2)
+                    };
+                    let mut ran_merge = false;
+                    loop {
+                        self.all_index_0_1_2.sorted_vec_update(
+                            insertions,
+                            &mut ctx.deferred_insertions,
+                            &mut ctx.scratch,
+                            uf,
+                            already_canon,
+                            |uf, x, mut y| {
+                                ran_merge = true;
+                                let (x2,) = x.value_mut();
+                                let (y2,) = y.value_mut();
+                                uf.math_.union_mut(x2, y2);
+                            },
+                        );
+                        self.all_index_1_0_2.sorted_vec_update(
+                            insertions,
+                            &mut ctx.deferred_insertions,
+                            &mut ctx.scratch,
+                            uf,
+                            already_canon,
+                            |_, _, _| unreachable!(),
+                        );
+                        self.all_index_2_0_1.sorted_vec_update(
+                            insertions,
+                            &mut ctx.deferred_insertions,
+                            &mut ctx.scratch,
+                            uf,
+                            already_canon,
+                            |_, _, _| unreachable!(),
+                        );
+                        if ctx.deferred_insertions.is_empty() && ran_merge == false {
+                            break;
+                        }
+                        ran_merge = false;
+                        std::mem::swap(insertions, &mut ctx.deferred_insertions);
+                        ctx.deferred_insertions.clear();
+                    }
+                    insertions.clear();
+                    assert!(ctx.scratch.is_empty());
+                    assert!(ctx.deferred_insertions.is_empty());
+                }
+                fn update_begin(&self) -> Self::UpdateCtx {
+                    AddUpdateCtx {
+                        scratch: Vec::new(),
+                        deferred_insertions: Vec::new(),
+                        old: self.all_index_0_1_2.clone(),
+                    }
+                }
+                fn update_finalize(&mut self, ctx: Self::UpdateCtx, uf: &mut Unification) {
+                    self.new.extend(self.all_index_0_1_2.minus(&ctx.old));
+                }
+                fn emit_graphviz(&self, buf: &mut String) {
+                    use std::fmt::Write;
+                    for (i, (x0, x1, x2)) in self.all_index_0_1_2.iter().enumerate() {
+                        writeln!(buf, "{}_{i} -> {}_{};", "add", "math", x0).unwrap();
+                        writeln!(buf, "{}_{i} -> {}_{};", "add", "math", x1).unwrap();
+                        writeln!(buf, "{}_{i} -> {}_{};", "add", "math", x2).unwrap();
+                        writeln!(buf, "{}_{i} [shape = box];", "add").unwrap();
+                    }
+                }
+            }
+            impl AddRelation {
                 fn iter2_0_1_2(&self, x0: Math, x1: Math) -> impl Iterator<Item = (Math,)> + use<'_> {
                     self.all_index_0_1_2
                         .range((x0, x1, Math::MIN_ID)..=(x0, x1, Math::MAX_ID))
@@ -6256,76 +6949,6 @@ fn test_into_codegen() {
                     let x2 = uf.math_.add_eclass();
                     delta.add_.push((x0, x1, x2));
                     (x2,)
-                }
-                fn update(&mut self, uf: &mut Unification, delta: &mut Delta) {
-                    let mut inserts = take(&mut delta.add_);
-                    let orig_inserts = inserts.len();
-                    self.all_index_0_1_2
-                        .first_column_uproots(uf.math_.get_uprooted_snapshot(), |deleted_rows| {
-                            inserts.extend(deleted_rows)
-                        });
-                    self.all_index_1_0_2
-                        .first_column_uproots(uf.math_.get_uprooted_snapshot(), |deleted_rows| {
-                            inserts.extend(deleted_rows)
-                        });
-                    self.all_index_2_0_1
-                        .first_column_uproots(uf.math_.get_uprooted_snapshot(), |deleted_rows| {
-                            inserts.extend(deleted_rows)
-                        });
-                    inserts[orig_inserts..].sort_unstable();
-                    runtime::dedup_suffix(&mut inserts, orig_inserts);
-                    self.all_index_0_1_2
-                        .delete_many(&mut inserts[orig_inserts..]);
-                    self.all_index_1_0_2
-                        .delete_many(&mut inserts[orig_inserts..]);
-                    self.all_index_2_0_1
-                        .delete_many(&mut inserts[orig_inserts..]);
-                    inserts.iter_mut().for_each(|row| {
-                        row.0 = uf.math_.find(row.0);
-                        row.1 = uf.math_.find(row.1);
-                        row.2 = uf.math_.find(row.2);
-                    });
-                    self.all_index_0_1_2.filter_existing(&mut inserts);
-                    self.all_index_0_1_2
-                        .insert_many(&mut inserts, |mut old, mut new| {
-                            let (x2,) = old.value_mut();
-                            let (y2,) = new.value_mut();
-                            uf.math_.union_mut(x2, y2);
-                            old
-                        });
-                    self.all_index_1_0_2
-                        .insert_many(&mut inserts, |_, _| unreachable!());
-                    self.all_index_2_0_1
-                        .insert_many(&mut inserts, |_, _| unreachable!());
-                    self.new.extend_from_slice(&inserts);
-                }
-                fn update_finalize(&mut self, uf: &mut Unification) {
-                    self.new.sort_unstable();
-                    self.new.dedup();
-                    self.new.retain(|(x0, x1, x2)| {
-                        if *x0 != uf.math_.find(*x0) {
-                            return false;
-                        }
-                        if *x1 != uf.math_.find(*x1) {
-                            return false;
-                        }
-                        if *x2 != uf.math_.find(*x2) {
-                            return false;
-                        }
-                        true
-                    });
-                }
-                fn emit_graphviz(&self, buf: &mut String) {
-                    use std::fmt::Write;
-                    for (i, (x0, x1, x2)) in self.all_index_0_1_2.iter().enumerate() {
-                        writeln!(buf, "{}_{i} -> {}_{};", "add", "math", x0).unwrap();
-                        writeln!(buf, "{}_{i} -> {}_{};", "add", "math", x1).unwrap();
-                        writeln!(buf, "{}_{i} -> {}_{};", "add", "math", x2).unwrap();
-                        writeln!(buf, "{}_{i} [shape = box];", "add").unwrap();
-                    }
-                }
-                fn len(&self) -> usize {
-                    self.all_index_0_1_2.len()
                 }
             }
             #[derive(Debug, Default)]
@@ -6435,14 +7058,24 @@ fn test_into_codegen() {
                 pub fn canonicalize(&mut self) {
                     self.mul_.clear_new();
                     self.add_.clear_new();
-                    while self.uf.has_new_uproots() || self.delta.has_new_inserts() {
+                    if !self.delta.has_new_inserts() && !self.uf.has_new_uproots() {
+                        return;
+                    }
+                    let mut mul_ctx = self.mul_.update_begin();
+                    let mut add_ctx = self.add_.update_begin();
+                    loop {
                         self.uf.snapshot_all_uprooted();
-                        self.mul_.update(&mut self.uf, &mut self.delta);
-                        self.add_.update(&mut self.uf, &mut self.delta);
+                        self.mul_
+                            .update(&mut self.delta.mul_, &mut mul_ctx, &mut self.uf);
+                        self.add_
+                            .update(&mut self.delta.add_, &mut add_ctx, &mut self.uf);
+                        if !self.uf.has_new_uproots() {
+                            break;
+                        }
                     }
                     self.uf.snapshot_all_uprooted();
-                    self.mul_.update_finalize(&mut self.uf);
-                    self.add_.update_finalize(&mut self.uf);
+                    self.mul_.update_finalize(mul_ctx, &mut self.uf);
+                    self.add_.update_finalize(add_ctx, &mut self.uf);
                 }
             }
             impl EclassProvider<Math> for Theory {

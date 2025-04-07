@@ -127,17 +127,21 @@ pub fn codegen(theory: &Theory) -> TokenStream {
         .collect_vecs();
 
     let canonicalize = {
-        let relation_ident = theory
+        let (relation_ident, rel_ctx_ident, delta_row) = theory
             .relations
             .iter()
             .filter_map(|rel| {
                 let rel = rel.as_ref()?;
                 match &rel.kind {
                     RelationKind::Global { .. } => None,
-                    RelationKind::Table { .. } => Some(ident::rel_var(rel)),
+                    RelationKind::Table { .. } => Some((
+                        ident::rel_var(rel),
+                        ident::rel_ctx_ident(rel),
+                        ident::delta_row(rel),
+                    )),
                 }
             })
-            .collect_vec();
+            .collect_vecs();
         let types_used_in_global_variables = theory
             .global_variable_types
             .iter()
@@ -161,11 +165,18 @@ pub fn codegen(theory: &Theory) -> TokenStream {
             #[inline(never)]
             pub fn canonicalize(&mut self) {
                 #(self.#relation_ident.clear_new();)*
-                while self.uf.has_new_uproots() || self.delta.has_new_inserts() {
+                if !self.delta.has_new_inserts() && !self.uf.has_new_uproots() {
+                    return;
+                }
+                #(let mut #rel_ctx_ident = self.#relation_ident.update_begin();)*
+                loop {
                     self.uf.snapshot_all_uprooted();
                     #(
-                        self.#relation_ident.update(&mut self.uf, &mut self.delta);
+                        self.#relation_ident.update(&mut self.delta.#delta_row, &mut #rel_ctx_ident, &mut self.uf);
                     )*
+                    if !self.uf.has_new_uproots() {
+                        break;
+                    }
                 }
                 // clear snapshots
                 self.uf.snapshot_all_uprooted();
@@ -175,7 +186,7 @@ pub fn codegen(theory: &Theory) -> TokenStream {
                 )*
                 #( self.#global_type.update_finalize(); )*
 
-                #(self.#relation_ident.update_finalize(&mut self.uf);)*
+                #(self.#relation_ident.update_finalize(#rel_ctx_ident, &mut self.uf);)*
             }
         }
     };
@@ -927,11 +938,13 @@ fn codegen_relation(
     declare_rows: &mut BTreeMap<Ident, IndexInfo>,
 ) -> TokenStream {
     let rel_ty = ident::rel_ty(rel);
-    let params = rel
+    let params: Vec<TokenStream> = rel
         .param_types
         .iter()
-        .map(|type_| ident::type_ty(&theory.types[type_]));
+        .map(|type_| ident::type_ty(&theory.types[type_]))
+        .collect();
     let theory_delta_ty = ident::theory_delta_ty(theory);
+    let rel_update_ctx_ty = ident::rel_update_ctx_ty(rel);
 
     match &rel.kind {
         RelationKind::Global { .. } => {
@@ -943,7 +956,7 @@ fn codegen_relation(
             index_to_info,
             column_back_reference,
         } => {
-            let index_fields = index_to_info
+            let (index_fields_name, index_fields_ty) = index_to_info
                 .iter()
                 .map(|index_info| {
                     let attr_name = ident::index_all_field(index_info);
@@ -955,7 +968,7 @@ fn codegen_relation(
                     declare_rows
                         .entry(row_choice.clone())
                         .or_insert_with(|| index_info.clone());
-                    if rel.param_types.len() <= 4
+                    let ty = if rel.param_types.len() <= 4
                         && rel
                             .param_types
                             .iter()
@@ -967,12 +980,13 @@ fn codegen_relation(
                             3 | 4 => quote! { u128 },
                             _ => unreachable!(),
                         };
-                        quote! { #attr_name : IndexImpl<RadixSortCtx<#row_choice<#(#fields_ty,)*>, #radix_key>> }
+                        quote! { SortedVec<RadixSortCtx<#row_choice<#(#fields_ty,)*>, #radix_key>> }
                     } else {
-                        quote! { #attr_name : IndexImpl<StdSortCtx<#row_choice<#(#fields_ty,)*>>> }
-                    }
+                        quote! { SortedVec<StdSortCtx<#row_choice<#(#fields_ty,)*>>> }
+                    };
+                    (attr_name, ty)
                 })
-                .collect_vec();
+                .collect_vecs();
 
             let cost = u32::try_from(index_to_info.len() * rel.param_types.len()).unwrap();
 
@@ -1081,6 +1095,8 @@ fn codegen_relation(
                 })
                 .collect_vecs();
 
+            let arbitrary_index = ident::index_all_field(index_to_info.iter().next().unwrap());
+
             let update = {
                 let indexes_merge_fn = index_to_info
                     .iter()
@@ -1097,68 +1113,47 @@ fn codegen_relation(
                                 .collect();
 
                             if value_columns.is_empty() {
-                                return quote! { |_, _| unreachable!() };
+                                return quote! { |_, _, _| unreachable!() };
                             }
 
                             value_columns.sort();
 
-                            let (body, col_old, col_new) = value_columns
+                            let (body, col_x, col_y) = value_columns
                                 .iter()
                                 .map(|x| {
-                                    let col_old = ident::column(*x);
-                                    let col_new = ident::column_alt(*x);
+                                    let col_x = ident::column(*x);
+                                    let col_y = ident::column_alt(*x);
                                     let ty = rel.param_types[*x];
                                     let ty = &theory.types[ty];
                                     let uf = ident::type_uf(ty);
                                     (
                                         match primary_key_violation_merge[x] {
                                             MergeTy::Union => {
-                                                quote! (uf.#uf.union_mut(#col_old, #col_new);)
+                                                quote! (uf.#uf.union_mut(#col_x, #col_y);)
                                             }
                                             MergeTy::Panic => quote! {
-                                                if #col_old != #col_new {
+                                                if #col_x != #col_y {
                                                     panic!();
                                                 }
                                             },
                                         },
-                                        col_old,
-                                        col_new,
+                                        col_x,
+                                        col_y,
                                     )
                                 })
                                 .collect_vecs();
 
                             quote! {
-                                |mut old, mut new| {
-                                    let (#(#col_old,)*) = old.value_mut();
-                                    let (#(#col_new,)*) = new.value_mut();
+                                |uf, x, mut y| {
+                                    ran_merge = true;
+                                    let (#(#col_x,)*) = x.value_mut();
+                                    let (#(#col_y,)*) = y.value_mut();
                                     #(#body)*
-                                    old
                                 }
                             }
                         },
                     )
                     .collect_vec();
-
-                let (indexes_backreferences, indexes_backreferences_uf) = column_back_reference
-                    .iter_enumerate()
-                    .filter_map(|(c, usage)| {
-                        let ty = rel.param_types[c];
-                        let ty = &theory.types[ty];
-                        match ty.kind {
-                            TypeKind::Primitive { type_path: _ } => None,
-                            TypeKind::Symbolic => {
-                                let usage_info = &usage_to_info[*usage];
-                                let index_info = &index_to_info[usage_info.index];
-
-                                let index_field = ident::index_all_field(index_info);
-                                let index_col_uf =
-                                    ident::type_uf(&theory.types[rel.param_types[c]]);
-
-                                Some((index_field, index_col_uf))
-                            }
-                        }
-                    })
-                    .collect_vecs();
 
                 let (first_index_ident, first_index_order): (Ident, Vec<_>) = {
                     let [first_index, ..] = index_to_info.inner().as_slice() else {
@@ -1205,73 +1200,64 @@ fn codegen_relation(
 
                 let col_symbs = rel.param_types.enumerate().map(ident::column).collect_vec();
 
-                let delta_row = ident::delta_row(rel);
-
                 let relation_name = ident::rel_get(rel).to_string();
+
+                let already_canon_expr: TokenStream = if uf_all_symbolic.is_empty() {
+                    quote! { true }
+                } else {
+                    Iterator::zip(uf_all_symbolic.iter(), col_num_symbolic.iter())
+                        .map(|(uf_symb, col_symb)| quote!{ uf.#uf_symb.already_canonical(&mut row.#col_symb) })
+                        .intersperse(quote!{ && })
+                        .collect::<TokenStream>()
+                };
 
                 quote! {
                     fn update(
                         &mut self,
+                        insertions: &mut Vec<Self::Row>,
+                        ctx: &mut Self::UpdateCtx,
                         uf: &mut Unification,
-                        delta: &mut #theory_delta_ty
                     ) {
-
-                        //
-                        //                  orig_inserts
-                        //                       v
-                        // inserts: [_, _, _, _, _, _, _, _, _, _]
-                        //           ^        ^  ^              ^
-                        //           |--------|  |--------------|
-                        //           from delta     uprooted
-
-                        let mut inserts = take(&mut delta.#delta_row);
-                        let orig_inserts = inserts.len();
-
-                        // fill, sort, dedup uprooted
-                        #(
-                            self.#indexes_backreferences.first_column_uproots(
-                                uf.#indexes_backreferences_uf.get_uprooted_snapshot(),
-                                |deleted_rows| inserts.extend(deleted_rows),
-                            );
-                        )*
-                        inserts[orig_inserts..].sort_unstable();
-                        runtime::dedup_suffix(&mut inserts, orig_inserts);
-
-                        // delete uprooted
-                        #(
-                            self.#indexes_all.delete_many(&mut inserts[orig_inserts..]);
-                        )*
-
-                        // canonicalize all inserts.
-                        inserts.iter_mut().for_each(|row| {
+                        insertions.iter_mut().for_each(|row| {
                             #(row.#col_num_symbolic = uf.#uf_all_symbolic.find(row.#col_num_symbolic);)*
                         });
-
-                        self.#first_indexes_all.filter_existing(&mut inserts);
-
-                        // insert all.
-                        #(
-                            self.#indexes_all.insert_many(&mut inserts, #indexes_merge_fn);
-                        )*
-
-                        // fill new with inserts (possibly duplicates)
-                        self.new.extend_from_slice(&inserts);
+                        let already_canon = |uf: &mut Unification, row: &mut Self::Row| #already_canon_expr;
+                        let mut ran_merge = false;
+                        loop {
+                            #(
+                                self.#indexes_all.sorted_vec_update(
+                                    insertions,
+                                    &mut ctx.deferred_insertions,
+                                    &mut ctx.scratch,
+                                    uf,
+                                    already_canon,
+                                    #indexes_merge_fn,
+                                );
+                            )*
+                            if ctx.deferred_insertions.is_empty() && ran_merge == false {
+                                break;
+                            }
+                            ran_merge = false;
+                            std::mem::swap(insertions, &mut ctx.deferred_insertions);
+                            ctx.deferred_insertions.clear();
+                        }
+                        insertions.clear();
+                        assert!(ctx.scratch.is_empty());
+                        assert!(ctx.deferred_insertions.is_empty());
                     }
-
+                    fn update_begin(&self) -> Self::UpdateCtx {
+                        #rel_update_ctx_ty {
+                            scratch: Vec::new(),
+                            deferred_insertions: Vec::new(),
+                            old: self.#arbitrary_index.clone(),
+                        }
+                    }
                     fn update_finalize(
                         &mut self,
+                        ctx: Self::UpdateCtx,
                         uf: &mut Unification,
                     ) {
-                        self.new.sort_unstable();
-                        self.new.dedup();
-                        self.new.retain(|(#(#col_symbs,)*)| {
-                            #(
-                                if *#col_symbs_symbolic != uf.#uf_all_symbolic.find(*#col_symbs_symbolic) {
-                                    return false;
-                                }
-                            )*
-                            true
-                        });
+                        self.new.extend(self.#arbitrary_index.minus(&ctx.old));
                     }
                     fn emit_graphviz(&self, buf: &mut String) {
                         use std::fmt::Write;
@@ -1283,30 +1269,47 @@ fn codegen_relation(
                 }
             };
 
-            let some_index_field = ident::index_all_field(index_to_info.iter().next().unwrap());
-
+            let arbitrary_index_ty = index_fields_ty.first().unwrap();
             quote! {
                 #[derive(Debug, Default)]
                 struct #rel_ty {
                     new: Vec<<Self as Relation>::Row>,
-                    #(#index_fields,)*
+                    #(#index_fields_name: #index_fields_ty,)*
+                }
+                struct #rel_update_ctx_ty {
+                    scratch: Vec<(#(#params,)*)>,
+                    deferred_insertions: Vec<(#(#params,)*)>,
+                    old: #arbitrary_index_ty,
                 }
                 impl Relation for #rel_ty {
                     type Row = (#(#params,)*);
+                    type UpdateCtx = #rel_update_ctx_ty;
+                    type Unification = Unification;
+
+                    const COST: u32 = #cost;
+
+                    fn new() -> Self {
+                        Self::default()
+                    }
+                    fn has_new(&self) -> bool {
+                        !self.new.is_empty()
+                    }
+                    fn clear_new(&mut self) {
+                        self.new.clear();
+                    }
+                    fn iter_new(&self) -> impl '_ + Iterator<Item = Self::Row> {
+                        self.new.iter().copied()
+                    }
+                    fn len(&self) -> usize {
+                        self.#arbitrary_index.len()
+                    }
+
+                    #update
                 }
                 impl #rel_ty {
-                    const COST: u32 = #cost;
-                    fn new() -> Self { Self::default() }
-                    fn has_new(&self) -> bool { !self.new.is_empty() }
-                    fn clear_new(&mut self) { self.new.clear(); }
-                    fn iter_new(&self) -> impl Iterator<Item = <Self as Relation>::Row> + use<'_>{ self.new.iter().copied() }
                     #(#iter_all)*
                     #(#check_all)*
                     #(#(#entry_all)*)*
-                    #update
-                    fn len(&self) -> usize {
-                        self.#some_index_field.len()
-                    }
                 }
             }
         }
@@ -1352,9 +1355,16 @@ mod ident {
     pub fn rel_ty(rel: &RelationData) -> Ident {
         format_ident!("{}Relation", rel.name.to_pascal_case())
     }
+    /// `AddUpdateCtx`
+    pub fn rel_update_ctx_ty(rel: &RelationData) -> Ident {
+        format_ident!("{}UpdateCtx", rel.name.to_pascal_case())
+    }
     /// `add_`
     pub fn rel_var(rel: &RelationData) -> Ident {
         format_ident!("{}_", rel.name.to_snake_case())
+    }
+    pub fn rel_ctx_ident(rel: &RelationData) -> Ident {
+        format_ident!("{}_ctx", rel.name.to_snake_case())
     }
     /// `add`, `mul`
     pub fn rel_get(rel: &RelationData) -> Ident {

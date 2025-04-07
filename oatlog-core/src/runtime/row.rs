@@ -25,7 +25,7 @@ pub unsafe trait IndexRow: PreReqs {
         use std::alloc::Layout;
         assert_eq!(Layout::new::<Self>(), Layout::new::<Self::Repr>());
 
-        // SAFETY: `Self` is `repr(transparent)` around `Self::Inner`.
+        // SAFETY: `Self` is `repr(transparent)` around `Self::Repr`.
         #[allow(unsafe_code)]
         unsafe {
             let slice: &'a [Self] = slice;
@@ -41,7 +41,7 @@ pub unsafe trait IndexRow: PreReqs {
         use std::alloc::Layout;
         assert_eq!(Layout::new::<Self>(), Layout::new::<Self::Repr>());
 
-        // SAFETY: `Self` is `repr(transparent)` around `Self::Inner`.
+        // SAFETY: `Self` is `repr(transparent)` around `Self::Repr`.
         unsafe {
             let slice: &'a mut [Self::Repr] = slice;
             let ptr: *mut Self::Repr = slice.as_mut_ptr();
@@ -52,8 +52,17 @@ pub unsafe trait IndexRow: PreReqs {
         }
     }
 
+    fn from_inner_vec<'a>(vec: &'a mut Vec<Self::Repr>) -> &'a mut Vec<Self> {
+        use std::alloc::Layout;
+        assert_eq!(Layout::new::<Self>(), Layout::new::<Self::Repr>());
+
+        // SAFETY: `Self` is `repr(transparent)` around `Self::Repr`.
+        unsafe { std::mem::transmute(vec) }
+    }
+
     fn new(inner: Self::Repr) -> Self;
     fn inner(self) -> Self::Repr;
+    fn inner_mut(&mut self) -> &mut Self::Repr;
     fn key(self) -> Self::Key;
     fn value(self) -> Self::Value;
     fn value_mut<'a>(&'a mut self) -> Self::ValueMut<'a>;
@@ -144,6 +153,9 @@ macro_rules! decl_row {
             }
             fn inner(self) -> Self::Repr {
                 self.inner
+            }
+            fn inner_mut(&mut self) -> &mut Self::Repr {
+                &mut self.inner
             }
             fn key(self) -> Self::Key {
                 ($(self.inner.$key_i,)*)

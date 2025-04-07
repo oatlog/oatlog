@@ -64,6 +64,18 @@ impl<T: Eclass> UnionFind<T> {
         self.find(t) == t
     }
     #[inline]
+    pub fn already_canonical(&mut self, t: &mut T) -> bool {
+        let i = t.inner();
+        if self.repr[i as usize] == i {
+            true
+        } else {
+            let root = self.find_inner(self.repr[i as usize]);
+            self.repr[i as usize] = root;
+            *t = T::new(root);
+            false
+        }
+    }
+    #[inline]
     fn find_inner(&mut self, i: u32) -> u32 {
         if self.repr[i as usize] == i {
             i

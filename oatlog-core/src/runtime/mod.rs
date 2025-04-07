@@ -11,7 +11,7 @@ pub use crate::{
     runtime::{
         generic::{Eclass, EclassProvider, RelationElement},
         global_vars::GlobalVars,
-        index::{Index, IndexImpl, RadixSortCtx, RowCtx, StdSortCtx, dedup_suffix},
+        index::{Index, IndexImpl, RadixSortCtx, RowCtx, SortedVec, StdSortCtx, dedup_suffix},
         row::IndexRow,
         uf::UnionFind,
     },
@@ -36,6 +36,25 @@ impl<T> Clear for Vec<T> {
 
 pub trait Relation {
     type Row;
+    type UpdateCtx;
+    type Unification;
+
+    const COST: u32;
+
+    fn new() -> Self;
+    fn has_new(&self) -> bool;
+    fn clear_new(&mut self);
+    fn iter_new(&self) -> impl '_ + Iterator<Item = Self::Row>;
+    fn len(&self) -> usize;
+    fn update(
+        &mut self,
+        insertions: &mut Vec<Self::Row>,
+        ctx: &mut Self::UpdateCtx,
+        uf: &mut Self::Unification,
+    );
+    fn update_begin(&self) -> Self::UpdateCtx;
+    fn update_finalize(&mut self, ctx: Self::UpdateCtx, uf: &mut Self::Unification);
+    fn emit_graphviz(&self, buf: &mut String);
 }
 
 relation_element_wrapper_ty!(IString);

@@ -196,8 +196,8 @@ mod v0 {
 
     struct Delta {
         add_: Vec<AddRow>,
-        lower_bound_: Vec<<LowerBoundRelation as Relation>::Row>,
-        upper_bound_: Vec<<UpperBoundRelation as Relation>::Row>,
+        lower_bound_: Vec<(Math, i64)>,
+        upper_bound_: Vec<(Math, i64, TimeStamp)>,
         // mul: ..
     }
     impl Delta {
@@ -312,11 +312,8 @@ mod v0 {
     decl_row!(Row2_0<T0 first 0, T1> (T0 0) (T1 1));
 
     struct LowerBoundRelation {
-        new: Vec<<Self as Relation>::Row>,
+        new: Vec<(Math, i64)>,
         all_index_0_1: IndexImpl<StdSortCtx<Row2_0<Math, i64>>>,
-    }
-    impl Relation for LowerBoundRelation {
-        type Row = (Math, i64);
     }
     impl LowerBoundRelation {
         fn update(&mut self, uf: &mut Unification, delta: &mut Delta) {
@@ -375,11 +372,8 @@ mod v0 {
     // only requirement is that the lattice variable is in the "key" part of the index.
 
     struct UpperBoundRelation {
-        new: Vec<<Self as Relation>::Row>,
+        new: Vec<(Math, i64, TimeStamp)>,
         all_index_0_1: IndexImpl<StdSortCtx<Row3_0<Math, i64, TimeStamp>>>,
-    }
-    impl Relation for UpperBoundRelation {
-        type Row = (Math, i64, TimeStamp);
     }
     impl UpperBoundRelation {
         fn update(&mut self, uf: &mut Unification, delta: &mut Delta, next_timestamp: TimeStamp) {
@@ -528,21 +522,18 @@ mod v1 {
         math: UnionFind<Math>,
     }
     struct Delta {
-        add: Vec<<AddRelation as Relation>::Row>,
+        add: Vec<(Math, Math, Math)>,
     }
     struct AddRelation {
         // putting it in a tuple is mostly fine for alignment because basically everything is a u32
         // anyways, and it makes the code significantly simpler.
         //
         // putting timestamp first makes it safe to sort an arbitrary slice of new.
-        new: Vec<(TimeStamp, <Self as Relation>::Row)>,
+        new: Vec<(TimeStamp, (Math, Math, Math))>,
         all_index_0_1_2: IndexImpl<StdSortCtx<Row3_0_1<Math, Math, Math>>>,
         all_index_0_2_1: IndexImpl<StdSortCtx<Row3_0_2_1<Math, Math, Math>>>,
         all_index_1_0_2: IndexImpl<StdSortCtx<Row3_1_0_2<Math, Math, Math>>>,
         all_index_2_0_1: IndexImpl<StdSortCtx<Row3_2_0_1<Math, Math, Math>>>,
-    }
-    impl Relation for AddRelation {
-        type Row = (Math, Math, Math);
     }
 
     impl Theory {
@@ -726,10 +717,7 @@ mod v1 {
                 uf.math.is_root(x.0) && uf.math.is_root(x.1) && uf.math.is_root(x.2)
             });
         }
-        fn iter_new(
-            &self,
-            starting_at: TimeStamp,
-        ) -> impl Iterator<Item = <Self as Relation>::Row> {
+        fn iter_new(&self, starting_at: TimeStamp) -> impl Iterator<Item = (Math, Math, Math)> {
             let start_idx = self.new.partition_point(|x| x.0 < starting_at);
             self.new[start_idx..].iter().copied().map(|(_, x)| x)
         }
