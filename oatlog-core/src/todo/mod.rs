@@ -1,7 +1,7 @@
 //! Experiments module
 //!
-//! This module contains experiments of what generated code could look like, and should be deleted
-//! as soon as we are happy with the codegen.
+//! This module contains outlines of what code could look like, to try things out before committing
+//! to them. Delete once integrated.
 
 #![allow(clippy::empty_structs_with_brackets)]
 #![allow(clippy::iter_over_hash_type)]
@@ -23,6 +23,7 @@
 #![allow(unused_parens)]
 #![allow(unused_variables)]
 
+mod todo_hir;
 mod todo_join;
 mod todo_mathset;
 mod todo_scratch;

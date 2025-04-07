@@ -2613,6 +2613,17 @@ this can be achived by adding a "fuel" precondition.
 (fuel x)
 ```
 
+= Query planning
+
+One option is to do a random plan and then measure how "good" it is, but that requires a total order of query plans, which is hard.
+
+Instead, we can do cardinality estimation based on functional dependencies and just pick "small" relations.
+
+Then query plans will be pretty similar and merging to trie should work most of the time.
+
+If we want better plans, we can try to do greedy planning with all rules at the same time.
+
+Then based on the indexes we get, we can redo the plans greedily to get fewer indexes.
 
 = TODO READ
 Papers are just under the first author i looked at.
