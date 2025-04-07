@@ -11,14 +11,26 @@ pub(crate) enum Uninhabited {}
 /// Type alias for union-find without data.
 pub(crate) type UF<T> = UFData<T, ()>;
 
+macro_rules! uf {
+    [] => { UFData::new() };
+    [$elem:expr; $n:expr] => { UFData::new_with_size($n, $elem) };
+    [$n:expr] => { UFData::new_with_size($n, ()) }
+}
+pub(crate) use uf;
+
 /// Union Find with optional attached data.
 ///
 /// Indexing canonicalizes the index and returns the associated data for that index.
-#[derive(Clone, Default)]
+#[derive(Clone, Eq, PartialEq, Ord, PartialOrd)]
 pub(crate) struct UFData<K: Id, V> {
     inner: Vec<UFElement<K, V>>,
 }
-#[derive(Clone, Debug)]
+impl<K: Id, V> Default for UFData<K, V> {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+#[derive(Clone, Debug, Eq, PartialEq, Ord, PartialOrd)]
 enum UFElement<K: Id, V> {
     Root { value: V, set: Vec<K> },
     Child { parent: Cell<K> },

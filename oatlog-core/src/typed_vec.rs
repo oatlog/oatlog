@@ -9,6 +9,11 @@ pub(crate) struct TVec<K, V> {
     _marker: PhantomData<K>,
 }
 
+macro_rules! tvec {
+    [$($tt:tt)*] => { TVec::from(vec![$($tt)*]) };
+}
+pub(crate) use tvec;
+
 impl<K: Id, V: Clone> TVec<K, V> {
     /// analogous to `vec![default; n]`;
     pub(crate) fn new_with_size(n: usize, default: V) -> Self {

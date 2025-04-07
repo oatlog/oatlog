@@ -6,8 +6,8 @@ use crate::{
         ActionId, ColumnId, GlobalId, Id, ImplicitRuleId, PremiseId, RelationId, TypeId, VariableId,
     },
     lir,
-    typed_vec::TVec,
-    union_find::{UF, UFData},
+    typed_vec::{TVec, tvec},
+    union_find::{UF, UFData, uf},
 };
 
 #[cfg(test)]
@@ -34,7 +34,7 @@ pub(crate) struct Theory {
     pub(crate) global_types: TVec<GlobalId, TypeId>,
     #[allow(
         unused,
-        reason = "This may be useful if global variables are queried at run time"
+        reason = "This may be useful to codegen global accessor functions for user API"
     )]
     pub(crate) global_to_relation: TVec<GlobalId, RelationId>,
     #[allow(unused, reason = "not used at runtime")]
@@ -183,7 +183,7 @@ impl Relation {
     pub(crate) fn forall(name: &'static str, ty: TypeId) -> Self {
         Self {
             name,
-            columns: vec![ty].into(),
+            columns: tvec![ty],
             ty: RelationTy::Forall { ty },
             // forall is [x] -> (), so no implicit rules
             implicit_rules: TVec::new(),
@@ -192,10 +192,10 @@ impl Relation {
     pub(crate) fn global(name: &'static str, id: GlobalId, ty: TypeId) -> Self {
         Self {
             name,
-            columns: vec![ty].into(),
+            columns: tvec![ty],
             ty: RelationTy::Global { id },
             // global is [] -> (x), so we have a implicit (panicing) rule.
-            implicit_rules: vec![ImplicitRule::new_panic(ColumnId(0))].into(),
+            implicit_rules: tvec![ImplicitRule::new_panic(ColumnId(0))],
         }
     }
     pub(crate) fn as_new(&self, id: RelationId) -> Self {
@@ -419,7 +419,7 @@ impl RuleArgs {
                 entry: entry.then_some(ImplicitRuleId(0)),
             })
             .collect();
-        let mut unify = UF::new_with_size(n, ());
+        let mut unify = uf![n];
         unify.union_groups(
             self.action_unify
                 .iter()
@@ -627,7 +627,7 @@ impl SymbolicRule {
                 }
             }
             // fix unify
-            let mut new_unify: UF<PremiseId> = UF::new_with_size(premise_variables.len(), ());
+            let mut new_unify: UF<PremiseId> = uf![premise_variables.len()];
 
             for set in unify.iter_merged_sets() {
                 let set: Vec<_> = set.iter().filter_map(|x| premise_map(*x)).collect();
@@ -786,7 +786,7 @@ impl SymbolicRule {
 
         let n = self.premise_variables.len();
         let mut local_initial: TVec<PremiseId, BTreeMap<(RelationId, usize), usize>> =
-            TVec::new_with_size(n, BTreeMap::new());
+            tvec![BTreeMap::new(); n];
 
         for PremiseRelation { relation, args } in &self.premise_relations {
             for (i, a) in args.iter().enumerate() {
@@ -804,7 +804,7 @@ impl SymbolicRule {
             .collect();
 
         let mut local_structure: TVec<PremiseId, BTreeMap<(RelationId, usize, usize, u64), usize>> =
-            TVec::new_with_size(n, BTreeMap::new());
+            tvec![BTreeMap::new(); n];
 
         for _ in 0..10 {
             for PremiseRelation { relation, args } in &self.premise_relations {
@@ -843,7 +843,7 @@ impl SymbolicRule {
                 args: args.iter().map(|x| permutation[x]).collect(),
             })
             .collect();
-        let mut unify: UF<PremiseId> = UF::new_with_size(self.premise_variables.len(), ());
+        let mut unify: UF<PremiseId> = uf![self.premise_variables.len()];
         for (a, b, ()) in self.unify.iter_all() {
             unify.union(permutation[a], permutation[b]);
         }

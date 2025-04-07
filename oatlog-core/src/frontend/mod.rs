@@ -28,7 +28,7 @@ use crate::{
     hir,
     ids::{ColumnId, GlobalId, Id, RelationId, TypeId, VariableId},
     lir,
-    typed_vec::TVec,
+    typed_vec::{TVec, tvec},
 };
 
 pub(crate) mod egglog_ast;
@@ -766,7 +766,7 @@ impl Parser {
                 match kind {
                     FunctionKind::Constructor { output, cost: _ } => {
                         assert!(self.types[output].can_unify());
-                        vec![hir::ImplicitRule::new_unify(output_column)].into()
+                        tvec![hir::ImplicitRule::new_unify(output_column)]
                     }
                     FunctionKind::Function {
                         output,
@@ -776,10 +776,10 @@ impl Parser {
                             // eqsort type => unification
                             // hir::ImplicitRule::new_unify(inputs.len())
                             // panic!("should we allow lattice on an eqsort?")
-                            vec![hir::ImplicitRule::new_panic(output_column)].into()
+                            tvec![hir::ImplicitRule::new_panic(output_column)]
                         } else {
                             // unify primitive => panic if disagree
-                            vec![hir::ImplicitRule::new_panic(output_column)].into()
+                            tvec![hir::ImplicitRule::new_panic(output_column)]
                         }
                     }
                     FunctionKind::Function {
@@ -796,9 +796,9 @@ impl Parser {
                         // let res =
                         //     self.parse_lattice_expr(old, new, &merge, &mut variables, &mut ops)?;
                         // hir::ImplicitRule::new_lattice(inputs.len(), old, new, res, ops, variables);
-                        vec![hir::ImplicitRule::new_lattice(output_column)].into()
+                        tvec![hir::ImplicitRule::new_lattice(output_column)]
                     }
-                    FunctionKind::Relation => vec![].into(),
+                    FunctionKind::Relation => tvec![],
                 },
             ),
             Some(FunctionData {

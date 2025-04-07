@@ -5,7 +5,7 @@ use crate::{
         ActionId, ColumnId, ImplicitRuleId, IndexUsageId, PremiseId, RelationId, TypeId, VariableId,
     },
     index_selection, lir,
-    typed_vec::TVec,
+    typed_vec::{TVec, tvec},
 };
 use std::{
     collections::{BTreeMap, BTreeSet},
@@ -75,7 +75,7 @@ pub(crate) fn emit_lir_theory(mut theory: hir::Theory) -> (hir::Theory, lir::The
     let rules = symbolic_rules_as_semi_naive(&theory.symbolic_rules, &old_to_new);
 
     let mut table_uses: TVec<RelationId, TVec<IndexUsageId, BTreeSet<ColumnId>>> =
-        TVec::new_with_size(non_new_relations, TVec::new());
+        tvec![TVec::new(); non_new_relations];
 
     for (relation_id, relation) in theory.relations.iter_enumerate() {
         if relation.ty == RelationTy::Table {
@@ -343,7 +343,7 @@ fn topo_resolve<'a>(
         let mut write_deg: TVec<ActionId, usize>;
 
         loop {
-            write_deg = vec![0; n].into();
+            write_deg = tvec![0; n];
 
             for action in &actions {
                 for i in action.entry_outputs(relations) {
@@ -736,8 +736,8 @@ fn make_simple_query_plan(
     use RelationScore::{AllBound, Indexed, New, NoQuery, SingleElement};
 
     let mut remaining_constraints = rule.premise_relations.clone();
-    let mut currently_bound = TVec::new_with_size(rule.premise_variables.len(), false);
-    let mut variable_cardinality = TVec::new_with_size(rule.premise_variables.len(), 0);
+    let mut currently_bound = tvec![false; rule.premise_variables.len()];
+    let mut variable_cardinality = tvec![0; rule.premise_variables.len()];
 
     let mut query_plan: Vec<(Query, PremiseRelation, TVec<ColumnId, bool>)> = Vec::new();
 
