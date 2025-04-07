@@ -7,7 +7,7 @@ pub(crate) mod hir2 {
         },
         lir,
         typed_vec::TVec,
-        union_find::UF,
+        union_find::{UF, UFData, uf},
     };
 
     use std::collections::{BTreeMap, BTreeSet};
@@ -461,54 +461,70 @@ mod hir3 {
 }
 
 mod hir4 {
-    use crate::{ids::*, lir, typed_vec::*, union_find::*};
+    use crate::{MultiMapCollect, ids::*, lir, typed_vec::*, union_find::*};
     use std::collections::{BTreeMap, BTreeSet};
 
+    #[derive(Copy, Clone, Eq, PartialEq, Ord, PartialOrd, Hash, Debug, Default)]
     struct RuleMeta {
         name: Option<&'static str>,
         src: &'static str,
-        // we want to track that we have merged wit another rule.
-        ids: BTreeSet<RuleId>,
     }
 
+    #[derive(Clone, Eq, PartialEq, Ord, PartialOrd, Hash, Debug, Default)]
     struct ImplicitRule {
         // for primitive we need to be able to refer to a specific index without asserting a functional
         // dependence.
         fd: bool,
         // fd = true <=> out.len() > 1
         out: BTreeMap<ColumnId, ImplicitRuleAction>,
+        // redundant information stored in relation, but simplifies key_columns
+        columns: usize,
     }
 
+    #[derive(Copy, Clone, Eq, PartialEq, Ord, PartialOrd, Hash, Debug, Default)]
     struct VariableMeta {
         name: &'static str,
         ty: TypeId,
     }
 
-    // to extract premsie, sort relations, and re-label all variables.
+    // to extract premise, sort relations, and re-label all variables.
+    #[derive(Clone, Eq, PartialEq, Ord, PartialOrd, Debug, Default)]
     struct SymbolicRule {
         meta: RuleMeta,
-        relations: Vec<GenRelation>,
+        atoms: Vec<Atom>,
         unify: UF<VariableId>,
         variables: TVec<VariableId, VariableMeta>,
     }
 
+    // #[derive(Copy, Clone, Eq, PartialEq, Ord, PartialOrd, Hash, Debug, Display, Default)]
+    #[derive(Copy, Clone, Eq, PartialEq, Ord, PartialOrd, Hash, Debug, Default)]
+    enum IsPremise {
+        #[default]
+        Premise,
+        Action,
+    }
+
     // generic over premise and action.
-    struct GenRelation {
+    #[derive(Clone, Eq, PartialEq, Ord, PartialOrd, Hash, Debug, Default)]
+    struct Atom {
         // true => part of premise.
-        premise: bool,
+        premise: IsPremise,
         relation: RelationId,
         columns: TVec<ColumnId, VariableId>,
         // refers to a specific index, so this can be Some for premise for primitive relations.
         entry: Option<ImplicitRuleId>,
     }
-
+    #[derive(Clone, Eq, PartialEq, Ord, PartialOrd, Hash, Debug, Default)]
     enum ImplicitRuleAction {
+        #[default]
         Panic,
         Union,
         Lattice(LatticeExpr),
     }
 
+    #[derive(Clone, Eq, PartialEq, Ord, PartialOrd, Hash, Debug, Default)]
     enum LatticeExpr {
+        #[default]
         VarA,
         VarB,
         Literal(lir::Literal),
@@ -516,19 +532,164 @@ mod hir4 {
         Call(RelationId, ImplicitRuleId, Vec<LatticeExpr>),
     }
 
+    pub(crate) struct Relation {
+        pub(crate) name: &'static str,
+        pub(crate) columns: TVec<ColumnId, TypeId>,
+        pub(crate) ty: RelationTy,
+        // for new, clear all and add a single impicit rule () -> [row]
+        pub(crate) implicit_rules: TVec<ImplicitRuleId, ImplicitRule>,
+        // Is allowed to form cycles.
+        // pub(crate) alias: Vec<RelationAlias>,
+        // includes the closure of the permutations.
+        // pub(crate) perm: Vec<TVec<ColumnId, ColumnId>>,
+    }
+
+    // struct RelationAlias {
+    //     other: RelationId,
+    //     this_to_other: TVec<ColumnId, ColumnId>,
+    //     impl_this_to_other: BTreeMap<ImplicitRuleId, ImplicitRuleId>,
+    // }
+
+    enum RelationTy {
+        // more questionable tbh.
+        NewOf { id: RelationId },
+    }
+
     impl SymbolicRule {
         // (relation args are bogus and just for demonstration)
-        fn optimize(&self, relations: TVec<RelationId, TVec<ImplicitRuleId, ImplicitRule>>) {
-            let mut to_unify: UF<VariableId> = UF::new_with_size(self.variables.len(), ());
-            let mut to_delete: Vec<GenRelation> = Vec::new();
 
-            for a in &self.relations {
-                for b in &self.relations {
-                    if a.relation != b.relation {
-                        continue;
+        // dedup actions, dedup premise
+        // remove actions in premise
+        // remove unused variables
+
+        fn optimize(&self, relations: TVec<RelationId, Relation>) -> Self {
+            let mut to_unify: UF<VariableId> = uf![self.variables.len()];
+            let mut queue = self.atoms.clone();
+
+            loop {
+                queue.sort_by_key(|x| x.premise /* start with premise */);
+
+                let mut progress = false;
+                let mut assumed_true: BTreeSet<Atom> = BTreeSet::new();
+                for atom in queue.into_iter() {
+                    let equivalent = atom.equivalent_atoms();
+                    let mut deleted = false;
+                    for assumed in assumed_true.clone().into_iter() {
+                        for atom in equivalent.iter().filter(|x| x.relation == assumed.relation) {
+                            for implicit_rule in &relations[atom.relation].implicit_rules {
+                                if !implicit_rule
+                                    .key_columns()
+                                    .into_iter()
+                                    .all(|c| atom.columns[c] == assumed.columns[c])
+                                {
+                                    continue;
+                                }
+                                for c in implicit_rule.value_columns().into_iter() {
+                                    to_unify.union(atom.columns[c], assumed.columns[c]);
+                                }
+                                deleted = true;
+                                progress = true;
+                                break;
+                            }
+                            if deleted {
+                                break;
+                            }
+                        }
+                        if deleted {
+                            break;
+                        }
+                    }
+                    if !deleted {
+                        assumed_true.insert(Atom::canonial_atom(&equivalent));
                     }
                 }
+                queue = assumed_true.into_iter().collect();
+                if !progress {
+                    break;
+                }
             }
+
+            let mut n = 0;
+            let old_to_new: BTreeMap<VariableId, VariableId> = to_unify
+                .iter_sets()
+                .zip((0..).map(VariableId))
+                .flat_map(|(from, to)| {
+                    n = n.max(to.0 + 1);
+                    from.iter().copied().map(move |from| (from, to))
+                })
+                .collect();
+
+            Self {
+                meta: self.meta,
+                atoms: queue
+                    .into_iter()
+                    .map(|atom| atom.map_v(|x| old_to_new[&x]))
+                    .collect(),
+                unify: UF::from_pairs(
+                    n,
+                    self.unify
+                        .iter_edges_fully_connected()
+                        .map(|(a, b)| (old_to_new[&a], old_to_new[&b])),
+                ),
+                variables: self
+                    .variables
+                    .iter_enumerate()
+                    .map(|(k, v)| (old_to_new[&k], *v))
+                    .collect_multimap()
+                    .into_iter()
+                    .map(|(_, v)| v.into_iter().reduce(VariableMeta::merge).unwrap())
+                    .collect(),
+            }
+        }
+    }
+
+    impl Atom {
+        fn map_v(&self, mut f: impl FnMut(VariableId) -> VariableId) -> Self {
+            Self {
+                premise: self.premise,
+                relation: self.relation,
+                columns: self.columns.iter().copied().map(f).collect(),
+                entry: self.entry,
+            }
+        }
+        // list all atoms we consider equivalent to this atom.
+        // includes permutations etc.
+        //
+        // We can't just pick the canonical one since we specifically want to find pairs of atoms
+        // where keys match but values don't and the lexicographically smallest atom might miss
+        // that.
+        //
+        // Alias and similar can just switch directly to the canonical relation.
+        fn equivalent_atoms(&self) -> Vec<Atom> {
+            // TODO: impl
+            vec![self.clone()]
+        }
+
+        //
+        fn canonial_atom(atoms: &[Atom]) -> Atom {
+            atoms.into_iter().min().unwrap().clone()
+        }
+    }
+
+    impl ImplicitRule {
+        /// AKA outputs
+        pub(crate) fn value_columns(&self) -> BTreeSet<ColumnId> {
+            self.out.keys().copied().collect()
+        }
+        /// AKA inputs
+        pub(crate) fn key_columns(&self) -> BTreeSet<ColumnId> {
+            let value_columns = self.value_columns();
+
+            (0..self.columns)
+                .map(ColumnId)
+                .filter(|x| !value_columns.contains(x))
+                .collect()
+        }
+    }
+
+    impl VariableMeta {
+        fn merge(a: Self, b: Self) -> Self {
+            todo!()
         }
     }
 }
