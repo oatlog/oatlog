@@ -61,7 +61,11 @@ pub fn codegen_table_relation(
 
     let arbitrary_index = ident::index_all_field(index_to_info.iter().next().unwrap());
 
-    let (iter_all, check_all, entry_all) = per_usage(rel, theory, usage_to_info, index_to_info);
+    let (iter_all, check_all, entry_all) = usage_to_info
+        .iter()
+        .unique()
+        .map(|usage_info| per_usage(rel, theory, index_to_info, usage_info))
+        .collect_vecs();
 
     let update = {
         let indexes_merge_fn = index_to_info
@@ -279,111 +283,118 @@ pub fn codegen_table_relation(
 fn per_usage(
     rel: &RelationData,
     theory: &Theory,
-    usage_to_info: &TVec<IndexUsageId, IndexUsageInfo>,
     index_to_info: &TVec<IndexId, IndexInfo>,
-) -> (Vec<TokenStream>, Vec<TokenStream>, Vec<TokenStream>) {
-    usage_to_info
+    usage_info: &IndexUsageInfo,
+) -> (TokenStream, TokenStream, TokenStream) {
+    let index_info = &index_to_info[usage_info.index];
+    let index_field = ident::index_all_field(index_info);
+
+    let call_args = index_info.permuted_columns.inner()[0..usage_info.prefix]
+        .iter()
+        .copied()
+        .map(|x| ident::column(x))
+        .collect_vec();
+
+    // let input_columns = vec![];
+
+    let args = iter::once(quote! { &self })
+        .chain(
+            index_info.permuted_columns.inner()[0..usage_info.prefix]
                 .iter()
-                .unique()
-                .map(|usage_info| {
-                    let index_info = &index_to_info[usage_info.index];
-                    let index_field = ident::index_all_field(index_info);
+                .copied()
+                .map(|x| {
+                    let ident = ident::column(x);
+                    let ident_ty = ident::type_ty(&theory.types[rel.param_types[x]]);
+                    quote! { #ident : #ident_ty }
+                }),
+        )
+        .collect_vec();
 
-                    let call_args = index_info.permuted_columns.inner()[0..usage_info.prefix].iter().copied().map(|x| { ident::column(x) }).collect_vec();
+    let out_columns = index_info.permuted_columns.inner()[usage_info.prefix..]
+        .iter()
+        .copied()
+        .map(ident::column)
+        .collect_vec();
 
-                    // let input_columns = vec![];
+    let out_ty = index_info.permuted_columns.inner()[usage_info.prefix..]
+        .iter()
+        .copied()
+        .map(|x| ident::type_ty(&theory.types[rel.param_types[x]]))
+        .collect_vec();
 
-                    let args = iter::once(quote! { &self }).chain(
-                        index_info.permuted_columns.inner()[0..usage_info.prefix]
-                            .iter()
-                            .copied()
-                            .map(|x| {
-                                let ident = ident::column(x);
-                                let ident_ty = ident::type_ty(&theory.types[rel.param_types[x]]);
-                                quote! { #ident : #ident_ty }
-                            }),
-                    ).collect_vec();
+    let iter_all_ident = ident::index_all_iter(usage_info, index_info);
+    let iter_all = {
+        let col_placement = index_info.permuted_columns.invert_permutation();
+        let (range_from, range_to) = col_placement
+            .iter_enumerate()
+            .map(|(col, placement)| {
+                if placement.0 < usage_info.prefix {
+                    let col = ident::column(col);
+                    (quote! { #col }, quote! { #col })
+                } else {
+                    let ty = ident::type_ty(&theory.types[rel.param_types[col]]);
+                    (quote! { #ty::MIN_ID }, quote! { #ty::MAX_ID })
+                }
+            })
+            .collect_vecs();
 
+        let col_symbs = rel.param_types.enumerate().map(ident::column).collect_vec();
 
-                    let out_columns = index_info.permuted_columns.inner()[usage_info.prefix..].iter().copied().map(ident::column).collect_vec();
+        quote! {
+            fn #iter_all_ident(#(#args,)*) -> impl Iterator<Item = (#(#out_ty,)*)> + use<'_> {
+                self.#index_field
+                    .range((#(#range_from,)*)..=(#(#range_to,)*))
+                    .map(|(#(#col_symbs,)*)| (#(#out_columns,)*))
+            }
+        }
+    };
+    let check_all = {
+        let check_all_ident = ident::index_all_check(usage_info, index_info);
+        quote! {
+            fn #check_all_ident(#(#args,)*) -> bool {
+                self.#iter_all_ident(#(#call_args,)*).next().is_some()
+            }
+        }
+    };
+    let entry_all = {
+        let entry_all_ident = ident::index_all_entry(usage_info, index_info);
+        let relation_delta = ident::delta_row(&rel);
+        let all_columns = (0..index_info.permuted_columns.len())
+            .map(ColumnId)
+            .map(ident::column);
 
-                    let out_ty = index_info.permuted_columns.inner()[usage_info.prefix..]
-                        .iter()
-                        .copied()
-                        .map(|x| ident::type_ty(&theory.types[rel.param_types[x]]))
-                        .collect_vec();
+        index_info.permuted_columns
+                    .iter_enumerate()
+                    .skip(usage_info.prefix)
+                    .map(|(i, &c)| index_info.primary_key_violation_merge.get(&c).map(|merge| {
+                        let ty = &theory.types[rel.param_types[i]];
+                        let out_col = ident::column(c);
 
-                    let iter_all_ident = ident::index_all_iter(usage_info, index_info);
-                    let iter_all = {
+                        let uf = ident::type_uf(ty);
 
-                        let col_placement = index_info.permuted_columns.invert_permutation();
-                        let (range_from, range_to) = col_placement.iter_enumerate().map(|(col, placement)| {
-                            if placement.0 < usage_info.prefix {
-                                let col = ident::column(col);
-                                (quote! { #col }, quote! { #col })
-                            } else {
-                                let ty = ident::type_ty(&theory.types[rel.param_types[col]]);
-                                (quote! { #ty::MIN_ID }, quote! { #ty::MAX_ID })
-                            }
-                        }).collect_vecs();
-
-                        let col_symbs = rel.param_types.enumerate().map(ident::column).collect_vec();
-
+                        match merge {
+                            MergeTy::Union => quote! {
+                                let #out_col = uf.#uf.add_eclass();
+                            },
+                            MergeTy::Panic => quote! {
+                                let #out_col = panic!("entry on value not present in database for a panic-merge implicit rule");
+                            },
+                        }
+                    }))
+                    .collect::<Option<Vec<_>>>()
+                    .map(|body| {
                         quote! {
-                            fn #iter_all_ident(#(#args,)*) -> impl Iterator<Item = (#(#out_ty,)*)> + use<'_> {
-                                self.#index_field
-                                    .range((#(#range_from,)*)..=(#(#range_to,)*))
-                                    .map(|(#(#col_symbs,)*)| (#(#out_columns,)*))
+                            #[allow(unreachable_code)]
+                            fn #entry_all_ident(#(#args,)* delta: &mut Delta, uf: &mut Unification) -> (#(#out_ty,)*) {
+                                if let Some((#(#out_columns,)*)) = self.#iter_all_ident(#(#call_args,)*).next() {
+                                    return (#(#out_columns,)*);
+                                }
+                                #(#body)*
+                                delta.#relation_delta.push((#(#all_columns,)*));
+                                (#(#out_columns,)*)
                             }
                         }
-                    };
-                    let check_all = {
-                        let check_all_ident = ident::index_all_check(usage_info, index_info);
-                        quote! {
-                            fn #check_all_ident(#(#args,)*) -> bool {
-                                self.#iter_all_ident(#(#call_args,)*).next().is_some()
-                            }
-                        }
-                    };
-                    let entry_all = {
-                        let entry_all_ident = ident::index_all_entry(usage_info, index_info);
-                        let relation_delta = ident::delta_row(&rel);
-                        let all_columns = (0..index_info.permuted_columns.len()).map(ColumnId).map(ident::column);
-
-                        index_info.permuted_columns
-                            .iter_enumerate()
-                            .skip(usage_info.prefix)
-                            .map(|(i, &c)| index_info.primary_key_violation_merge.get(&c).map(|merge| {
-                                let ty = &theory.types[rel.param_types[i]];
-                                let out_col = ident::column(c);
-
-                                let uf = ident::type_uf(ty);
-
-                                match merge {
-                                    MergeTy::Union => quote! {
-                                        let #out_col = uf.#uf.add_eclass();
-                                    },
-                                    MergeTy::Panic => quote! {
-                                        let #out_col = panic!("entry on value not present in database for a panic-merge implicit rule");
-                                    },
-                                }
-                            }))
-                            .collect::<Option<Vec<_>>>()
-                            .map(|body| {
-                                quote! {
-                                    #[allow(unreachable_code)]
-                                    fn #entry_all_ident(#(#args,)* delta: &mut Delta, uf: &mut Unification) -> (#(#out_ty,)*) {
-                                        if let Some((#(#out_columns,)*)) = self.#iter_all_ident(#(#call_args,)*).next() {
-                                            return (#(#out_columns,)*);
-                                        }
-                                        #(#body)*
-                                        delta.#relation_delta.push((#(#all_columns,)*));
-                                        (#(#out_columns,)*)
-                                    }
-                                }
-                            }).unwrap_or(quote!{})
-                    };
-                    (iter_all, check_all, entry_all)
-                })
-                .collect_vecs()
+                    }).unwrap_or(quote!{})
+    };
+    (iter_all, check_all, entry_all)
 }
