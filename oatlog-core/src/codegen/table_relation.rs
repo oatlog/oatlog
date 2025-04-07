@@ -89,8 +89,7 @@ pub fn codegen_table_relation(
         rel,
         theory,
         index_to_info,
-        first_index_ident.clone(),
-        index_fields_ty.first().unwrap(),
+        &TVec::from(index_fields_ty.clone()),
     );
 
     quote! {
@@ -145,65 +144,63 @@ fn update(
     rel: &RelationData,
     theory: &Theory,
     index_to_info: &TVec<IndexId, IndexInfo>,
-    primary_index_ident: Ident,
-    primary_index_ty: &TokenStream,
+    primary_index_ty_for_index: &TVec<IndexId, TokenStream>,
 ) -> (TokenStream, TokenStream) {
-    let indexes_merge_fn = index_to_info
-        .iter()
-        .map(
-            |IndexInfo {
-                 permuted_columns,
-                 primary_key_prefix_len,
-                 primary_key_violation_merge,
-             }| {
-                let mut value_columns: Vec<ColumnId> = permuted_columns
-                    .iter()
-                    .copied()
-                    .skip(*primary_key_prefix_len)
-                    .collect();
+    fn merge_fn(
+        rel: &RelationData,
+        theory: &Theory,
+        IndexInfo {
+            permuted_columns,
+            primary_key_prefix_len,
+            primary_key_violation_merge,
+        }: &IndexInfo,
+    ) -> TokenStream {
+        let mut value_columns: Vec<ColumnId> = permuted_columns
+            .iter()
+            .copied()
+            .skip(*primary_key_prefix_len)
+            .collect();
 
-                if value_columns.is_empty() {
-                    return quote! { |_, _, _| unreachable!() };
-                }
+        assert!(
+            !value_columns.is_empty(),
+            "handled separately when `any_union_merge == false`"
+        );
+        value_columns.sort();
 
-                value_columns.sort();
+        let (body, col_x, col_y) = value_columns
+            .iter()
+            .map(|x| {
+                let col_x = ident::column(*x);
+                let col_y = ident::column_alt(*x);
+                let ty = rel.param_types[*x];
+                let ty = &theory.types[ty];
+                let uf = ident::type_uf(ty);
+                (
+                    match primary_key_violation_merge[x] {
+                        MergeTy::Union => {
+                            quote! (uf.#uf.union_mut(#col_x, #col_y);)
+                        }
+                        MergeTy::Panic => quote! {
+                            if #col_x != #col_y {
+                                panic!();
+                            }
+                        },
+                    },
+                    col_x,
+                    col_y,
+                )
+            })
+            .collect_vecs();
 
-                let (body, col_x, col_y) = value_columns
-                    .iter()
-                    .map(|x| {
-                        let col_x = ident::column(*x);
-                        let col_y = ident::column_alt(*x);
-                        let ty = rel.param_types[*x];
-                        let ty = &theory.types[ty];
-                        let uf = ident::type_uf(ty);
-                        (
-                            match primary_key_violation_merge[x] {
-                                MergeTy::Union => {
-                                    quote! (uf.#uf.union_mut(#col_x, #col_y);)
-                                }
-                                MergeTy::Panic => quote! {
-                                    if #col_x != #col_y {
-                                        panic!();
-                                    }
-                                },
-                            },
-                            col_x,
-                            col_y,
-                        )
-                    })
-                    .collect_vecs();
-
-                quote! {
-                    |uf, x, mut y| {
-                        ran_merge = true;
-                        let (#(#col_x,)*) = x.value_mut();
-                        let (#(#col_y,)*) = y.value_mut();
-                        #(#body)*
-                    }
-                }
-            },
-        )
-        .collect_vec();
+        quote! {
+            |uf, x, mut y| {
+                ran_merge = true;
+                let (#(#col_x,)*) = x.value_mut();
+                let (#(#col_y,)*) = y.value_mut();
+                #(#body)*
+            }
+        }
+    }
 
     let (col_num_symbolic, uf_all_symbolic) = rel
         .param_types
@@ -220,9 +217,73 @@ fn update(
         })
         .collect_vecs();
 
-    let indexes_all = index_to_info
+    let (primary_index_id, indexes_to_fixpoint, indexes_to_fixpoint_merge_fn, indexes_to_recreate) = {
+        let index_any_union_merge = |index: &IndexInfo| {
+            index.primary_key_violation_merge.values().any(|merge|
+                // NOTE: Rethink this code VERY carefully when adding more merge types
+                match merge {
+                    MergeTy::Union => true,
+                    MergeTy::Panic => false,
+                })
+        };
+
+        let any_union_merge = index_to_info.iter().any(index_any_union_merge);
+        if any_union_merge {
+            // A fixpoint computation is necessary if and only if there are any union merges.
+            // In such a case, run indexes with union merges to fixpoint, then recreate all others.
+            let mut indexes_to_fixpoint = Vec::new();
+            let mut indexes_to_recreate = Vec::new();
+            let mut primary_index_id = None;
+            for (id, index) in index_to_info.iter_enumerate() {
+                if index_any_union_merge(index) {
+                    primary_index_id.get_or_insert(id);
+                    indexes_to_fixpoint.push(index)
+                } else {
+                    indexes_to_recreate.push(index)
+                }
+            }
+            (
+                primary_index_id.unwrap(),
+                indexes_to_fixpoint
+                    .iter()
+                    .map(|index| ident::index_all_field(index))
+                    .collect_vec(),
+                indexes_to_fixpoint
+                    .iter()
+                    .map(|index| merge_fn(rel, theory, index))
+                    .collect_vec(),
+                indexes_to_recreate
+                    .iter()
+                    .map(|index| ident::index_all_field(index))
+                    .collect_vec(),
+            )
+        } else {
+            // If there are no union merges the fixpoint will actually consist of
+            // 1. Insertion of new rows and removal of uprooted
+            // 2. Insertion of uprooted
+            // This is more efficient than recreation.
+            (
+                IndexId(0),
+                index_to_info
+                    .iter()
+                    .map(ident::index_all_field)
+                    .collect_vec(),
+                index_to_info
+                    .iter()
+                    .map(|_| quote! { |_, _, _| unreachable!() })
+                    .collect_vec(),
+                vec![],
+            )
+        }
+    };
+    let primary_index_ident = ident::index_all_field(&index_to_info[primary_index_id]);
+    let primary_index_ty = &primary_index_ty_for_index[primary_index_id];
+    assert!(indexes_to_fixpoint.contains(&primary_index_ident));
+
+    let indexes_all_except_primary = index_to_info
         .iter()
-        .map(|index_info| ident::index_all_field(index_info))
+        .map(ident::index_all_field)
+        .filter(|ident| *ident != primary_index_ident)
         .collect_vec();
 
     let already_canon_expr: TokenStream = if uf_all_symbolic.is_empty() {
@@ -265,13 +326,13 @@ fn update(
             let mut ran_merge = false;
             loop {
                 #(
-                    self.#indexes_all.sorted_vec_update(
+                    self.#indexes_to_fixpoint.sorted_vec_update(
                         insertions,
                         &mut ctx.deferred_insertions,
                         &mut ctx.scratch,
                         uf,
                         already_canon,
-                        #indexes_merge_fn,
+                        #indexes_to_fixpoint_merge_fn,
                     );
                 )*
                 if ctx.deferred_insertions.is_empty() && ran_merge == false {
@@ -297,6 +358,8 @@ fn update(
             ctx: Self::UpdateCtx,
             uf: &mut Unification,
         ) {
+            #(self.#indexes_to_recreate.recreate_from(&self.#primary_index_ident.as_slice());)*
+            #(assert_eq!(self.#indexes_all_except_primary.len(), self.#primary_index_ident.len());)*
             self.new.extend(self.#primary_index_ident.minus(&ctx.old));
         }
     };

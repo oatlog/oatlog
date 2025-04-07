@@ -249,6 +249,20 @@ impl<RC: RowCtx> SortedVec<RC> {
             })
             .map(RC::Row::inner)
     }
+    pub fn recreate_from(&mut self, other: &[<RC::Row as IndexRow>::Repr]) {
+        assert_eq!(
+            std::mem::size_of::<<RC::Row as IndexRow>::Value>(),
+            0,
+            "recreate_from requires the absence of implicit rules"
+        );
+
+        self.0.clear();
+        self.0.extend_from_slice(RC::Row::from_inner_slice(other));
+        RC::sort(&mut self.0);
+    }
+    pub fn as_slice(&self) -> &[<RC::Row as IndexRow>::Repr] {
+        RC::Row::inner_slice(&self.0)
+    }
 }
 impl<RC: RowCtx> Index for SortedVec<RC> {
     type Row = RC::Row;

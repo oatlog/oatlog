@@ -619,22 +619,6 @@ fn codegen_commutative() {
                                 uf.math_.union_mut(x2, y2);
                             },
                         );
-                        self.all_index_1_0_2.sorted_vec_update(
-                            insertions,
-                            &mut ctx.deferred_insertions,
-                            &mut ctx.scratch,
-                            uf,
-                            already_canon,
-                            |_, _, _| unreachable!(),
-                        );
-                        self.all_index_2_0_1.sorted_vec_update(
-                            insertions,
-                            &mut ctx.deferred_insertions,
-                            &mut ctx.scratch,
-                            uf,
-                            already_canon,
-                            |_, _, _| unreachable!(),
-                        );
                         if ctx.deferred_insertions.is_empty() && ran_merge == false {
                             break;
                         }
@@ -654,6 +638,12 @@ fn codegen_commutative() {
                     }
                 }
                 fn update_finalize(&mut self, ctx: Self::UpdateCtx, uf: &mut Unification) {
+                    self.all_index_1_0_2
+                        .recreate_from(&self.all_index_0_1_2.as_slice());
+                    self.all_index_2_0_1
+                        .recreate_from(&self.all_index_0_1_2.as_slice());
+                    assert_eq!(self.all_index_1_0_2.len(), self.all_index_0_1_2.len());
+                    assert_eq!(self.all_index_2_0_1.len(), self.all_index_0_1_2.len());
                     self.new.extend(self.all_index_0_1_2.minus(&ctx.old));
                 }
             }
@@ -1000,22 +990,6 @@ fn regression_entry2() {
                                 uf.math_.union_mut(x2, y2);
                             },
                         );
-                        self.all_index_1_0_2.sorted_vec_update(
-                            insertions,
-                            &mut ctx.deferred_insertions,
-                            &mut ctx.scratch,
-                            uf,
-                            already_canon,
-                            |_, _, _| unreachable!(),
-                        );
-                        self.all_index_2_0_1.sorted_vec_update(
-                            insertions,
-                            &mut ctx.deferred_insertions,
-                            &mut ctx.scratch,
-                            uf,
-                            already_canon,
-                            |_, _, _| unreachable!(),
-                        );
                         if ctx.deferred_insertions.is_empty() && ran_merge == false {
                             break;
                         }
@@ -1035,6 +1009,12 @@ fn regression_entry2() {
                     }
                 }
                 fn update_finalize(&mut self, ctx: Self::UpdateCtx, uf: &mut Unification) {
+                    self.all_index_1_0_2
+                        .recreate_from(&self.all_index_0_1_2.as_slice());
+                    self.all_index_2_0_1
+                        .recreate_from(&self.all_index_0_1_2.as_slice());
+                    assert_eq!(self.all_index_1_0_2.len(), self.all_index_0_1_2.len());
+                    assert_eq!(self.all_index_2_0_1.len(), self.all_index_0_1_2.len());
                     self.new.extend(self.all_index_0_1_2.minus(&ctx.old));
                 }
             }
@@ -1146,14 +1126,6 @@ fn regression_entry2() {
                                 uf.math_.union_mut(x1, y1);
                             },
                         );
-                        self.all_index_1_0.sorted_vec_update(
-                            insertions,
-                            &mut ctx.deferred_insertions,
-                            &mut ctx.scratch,
-                            uf,
-                            already_canon,
-                            |_, _, _| unreachable!(),
-                        );
                         if ctx.deferred_insertions.is_empty() && ran_merge == false {
                             break;
                         }
@@ -1173,6 +1145,9 @@ fn regression_entry2() {
                     }
                 }
                 fn update_finalize(&mut self, ctx: Self::UpdateCtx, uf: &mut Unification) {
+                    self.all_index_1_0
+                        .recreate_from(&self.all_index_0_1.as_slice());
+                    assert_eq!(self.all_index_1_0.len(), self.all_index_0_1.len());
                     self.new.extend(self.all_index_0_1.minus(&ctx.old));
                 }
             }
@@ -1511,22 +1486,6 @@ fn regression_entry() {
                                 uf.math_.union_mut(x2, y2);
                             },
                         );
-                        self.all_index_1_0_2.sorted_vec_update(
-                            insertions,
-                            &mut ctx.deferred_insertions,
-                            &mut ctx.scratch,
-                            uf,
-                            already_canon,
-                            |_, _, _| unreachable!(),
-                        );
-                        self.all_index_2_0_1.sorted_vec_update(
-                            insertions,
-                            &mut ctx.deferred_insertions,
-                            &mut ctx.scratch,
-                            uf,
-                            already_canon,
-                            |_, _, _| unreachable!(),
-                        );
                         if ctx.deferred_insertions.is_empty() && ran_merge == false {
                             break;
                         }
@@ -1546,6 +1505,12 @@ fn regression_entry() {
                     }
                 }
                 fn update_finalize(&mut self, ctx: Self::UpdateCtx, uf: &mut Unification) {
+                    self.all_index_1_0_2
+                        .recreate_from(&self.all_index_0_1_2.as_slice());
+                    self.all_index_2_0_1
+                        .recreate_from(&self.all_index_0_1_2.as_slice());
+                    assert_eq!(self.all_index_1_0_2.len(), self.all_index_0_1_2.len());
+                    assert_eq!(self.all_index_2_0_1.len(), self.all_index_0_1_2.len());
                     self.new.extend(self.all_index_0_1_2.minus(&ctx.old));
                 }
             }
@@ -1664,22 +1629,6 @@ fn regression_entry() {
                                 uf.math_.union_mut(x2, y2);
                             },
                         );
-                        self.all_index_1_0_2.sorted_vec_update(
-                            insertions,
-                            &mut ctx.deferred_insertions,
-                            &mut ctx.scratch,
-                            uf,
-                            already_canon,
-                            |_, _, _| unreachable!(),
-                        );
-                        self.all_index_2_0_1.sorted_vec_update(
-                            insertions,
-                            &mut ctx.deferred_insertions,
-                            &mut ctx.scratch,
-                            uf,
-                            already_canon,
-                            |_, _, _| unreachable!(),
-                        );
                         if ctx.deferred_insertions.is_empty() && ran_merge == false {
                             break;
                         }
@@ -1699,6 +1648,12 @@ fn regression_entry() {
                     }
                 }
                 fn update_finalize(&mut self, ctx: Self::UpdateCtx, uf: &mut Unification) {
+                    self.all_index_1_0_2
+                        .recreate_from(&self.all_index_0_1_2.as_slice());
+                    self.all_index_2_0_1
+                        .recreate_from(&self.all_index_0_1_2.as_slice());
+                    assert_eq!(self.all_index_1_0_2.len(), self.all_index_0_1_2.len());
+                    assert_eq!(self.all_index_2_0_1.len(), self.all_index_0_1_2.len());
                     self.new.extend(self.all_index_0_1_2.minus(&ctx.old));
                 }
             }
@@ -2029,22 +1984,6 @@ fn test_bind_variable_multiple_times() {
                                 uf.foo_.union_mut(x2, y2);
                             },
                         );
-                        self.all_index_1_0_2.sorted_vec_update(
-                            insertions,
-                            &mut ctx.deferred_insertions,
-                            &mut ctx.scratch,
-                            uf,
-                            already_canon,
-                            |_, _, _| unreachable!(),
-                        );
-                        self.all_index_2_0_1.sorted_vec_update(
-                            insertions,
-                            &mut ctx.deferred_insertions,
-                            &mut ctx.scratch,
-                            uf,
-                            already_canon,
-                            |_, _, _| unreachable!(),
-                        );
                         if ctx.deferred_insertions.is_empty() && ran_merge == false {
                             break;
                         }
@@ -2064,6 +2003,12 @@ fn test_bind_variable_multiple_times() {
                     }
                 }
                 fn update_finalize(&mut self, ctx: Self::UpdateCtx, uf: &mut Unification) {
+                    self.all_index_1_0_2
+                        .recreate_from(&self.all_index_0_1_2.as_slice());
+                    self.all_index_2_0_1
+                        .recreate_from(&self.all_index_0_1_2.as_slice());
+                    assert_eq!(self.all_index_1_0_2.len(), self.all_index_0_1_2.len());
+                    assert_eq!(self.all_index_2_0_1.len(), self.all_index_0_1_2.len());
                     self.new.extend(self.all_index_0_1_2.minus(&ctx.old));
                 }
             }
@@ -2492,22 +2437,6 @@ fn codegen_variable_reuse_bug() {
                                 uf.math_.union_mut(x2, y2);
                             },
                         );
-                        self.all_index_1_0_2.sorted_vec_update(
-                            insertions,
-                            &mut ctx.deferred_insertions,
-                            &mut ctx.scratch,
-                            uf,
-                            already_canon,
-                            |_, _, _| unreachable!(),
-                        );
-                        self.all_index_2_0_1.sorted_vec_update(
-                            insertions,
-                            &mut ctx.deferred_insertions,
-                            &mut ctx.scratch,
-                            uf,
-                            already_canon,
-                            |_, _, _| unreachable!(),
-                        );
                         if ctx.deferred_insertions.is_empty() && ran_merge == false {
                             break;
                         }
@@ -2527,6 +2456,12 @@ fn codegen_variable_reuse_bug() {
                     }
                 }
                 fn update_finalize(&mut self, ctx: Self::UpdateCtx, uf: &mut Unification) {
+                    self.all_index_1_0_2
+                        .recreate_from(&self.all_index_0_1_2.as_slice());
+                    self.all_index_2_0_1
+                        .recreate_from(&self.all_index_0_1_2.as_slice());
+                    assert_eq!(self.all_index_1_0_2.len(), self.all_index_0_1_2.len());
+                    assert_eq!(self.all_index_2_0_1.len(), self.all_index_0_1_2.len());
                     self.new.extend(self.all_index_0_1_2.minus(&ctx.old));
                 }
             }
@@ -2979,22 +2914,6 @@ fn initial_exprs() {
                                 uf.math_.union_mut(x2, y2);
                             },
                         );
-                        self.all_index_1_0_2.sorted_vec_update(
-                            insertions,
-                            &mut ctx.deferred_insertions,
-                            &mut ctx.scratch,
-                            uf,
-                            already_canon,
-                            |_, _, _| unreachable!(),
-                        );
-                        self.all_index_2_0_1.sorted_vec_update(
-                            insertions,
-                            &mut ctx.deferred_insertions,
-                            &mut ctx.scratch,
-                            uf,
-                            already_canon,
-                            |_, _, _| unreachable!(),
-                        );
                         if ctx.deferred_insertions.is_empty() && ran_merge == false {
                             break;
                         }
@@ -3014,6 +2933,12 @@ fn initial_exprs() {
                     }
                 }
                 fn update_finalize(&mut self, ctx: Self::UpdateCtx, uf: &mut Unification) {
+                    self.all_index_1_0_2
+                        .recreate_from(&self.all_index_0_1_2.as_slice());
+                    self.all_index_2_0_1
+                        .recreate_from(&self.all_index_0_1_2.as_slice());
+                    assert_eq!(self.all_index_1_0_2.len(), self.all_index_0_1_2.len());
+                    assert_eq!(self.all_index_2_0_1.len(), self.all_index_0_1_2.len());
                     self.new.extend(self.all_index_0_1_2.minus(&ctx.old));
                 }
             }
@@ -3132,22 +3057,6 @@ fn initial_exprs() {
                                 uf.math_.union_mut(x2, y2);
                             },
                         );
-                        self.all_index_1_0_2.sorted_vec_update(
-                            insertions,
-                            &mut ctx.deferred_insertions,
-                            &mut ctx.scratch,
-                            uf,
-                            already_canon,
-                            |_, _, _| unreachable!(),
-                        );
-                        self.all_index_2_0_1.sorted_vec_update(
-                            insertions,
-                            &mut ctx.deferred_insertions,
-                            &mut ctx.scratch,
-                            uf,
-                            already_canon,
-                            |_, _, _| unreachable!(),
-                        );
                         if ctx.deferred_insertions.is_empty() && ran_merge == false {
                             break;
                         }
@@ -3167,6 +3076,12 @@ fn initial_exprs() {
                     }
                 }
                 fn update_finalize(&mut self, ctx: Self::UpdateCtx, uf: &mut Unification) {
+                    self.all_index_1_0_2
+                        .recreate_from(&self.all_index_0_1_2.as_slice());
+                    self.all_index_2_0_1
+                        .recreate_from(&self.all_index_0_1_2.as_slice());
+                    assert_eq!(self.all_index_1_0_2.len(), self.all_index_0_1_2.len());
+                    assert_eq!(self.all_index_2_0_1.len(), self.all_index_0_1_2.len());
                     self.new.extend(self.all_index_0_1_2.minus(&ctx.old));
                 }
             }
@@ -3278,14 +3193,6 @@ fn initial_exprs() {
                                 uf.math_.union_mut(x1, y1);
                             },
                         );
-                        self.all_index_1_0.sorted_vec_update(
-                            insertions,
-                            &mut ctx.deferred_insertions,
-                            &mut ctx.scratch,
-                            uf,
-                            already_canon,
-                            |_, _, _| unreachable!(),
-                        );
                         if ctx.deferred_insertions.is_empty() && ran_merge == false {
                             break;
                         }
@@ -3305,6 +3212,9 @@ fn initial_exprs() {
                     }
                 }
                 fn update_finalize(&mut self, ctx: Self::UpdateCtx, uf: &mut Unification) {
+                    self.all_index_1_0
+                        .recreate_from(&self.all_index_0_1.as_slice());
+                    assert_eq!(self.all_index_1_0.len(), self.all_index_0_1.len());
                     self.new.extend(self.all_index_0_1.minus(&ctx.old));
                 }
             }
@@ -3405,14 +3315,6 @@ fn initial_exprs() {
                                 uf.math_.union_mut(x1, y1);
                             },
                         );
-                        self.all_index_1_0.sorted_vec_update(
-                            insertions,
-                            &mut ctx.deferred_insertions,
-                            &mut ctx.scratch,
-                            uf,
-                            already_canon,
-                            |_, _, _| unreachable!(),
-                        );
                         if ctx.deferred_insertions.is_empty() && ran_merge == false {
                             break;
                         }
@@ -3432,6 +3334,9 @@ fn initial_exprs() {
                     }
                 }
                 fn update_finalize(&mut self, ctx: Self::UpdateCtx, uf: &mut Unification) {
+                    self.all_index_1_0
+                        .recreate_from(&self.all_index_0_1.as_slice());
+                    assert_eq!(self.all_index_1_0.len(), self.all_index_0_1.len());
                     self.new.extend(self.all_index_0_1.minus(&ctx.old));
                 }
             }
@@ -4007,6 +3912,8 @@ fn codegen_bug1() {
                     }
                 }
                 fn update_finalize(&mut self, ctx: Self::UpdateCtx, uf: &mut Unification) {
+                    assert_eq!(self.all_index_1_0_2.len(), self.all_index_0_1_2.len());
+                    assert_eq!(self.all_index_2_0_1.len(), self.all_index_0_1_2.len());
                     self.new.extend(self.all_index_0_1_2.minus(&ctx.old));
                 }
             }
@@ -4268,14 +4175,6 @@ fn initial() {
                                 uf.math_.union_mut(x1, y1);
                             },
                         );
-                        self.all_index_1_0.sorted_vec_update(
-                            insertions,
-                            &mut ctx.deferred_insertions,
-                            &mut ctx.scratch,
-                            uf,
-                            already_canon,
-                            |_, _, _| unreachable!(),
-                        );
                         if ctx.deferred_insertions.is_empty() && ran_merge == false {
                             break;
                         }
@@ -4295,6 +4194,9 @@ fn initial() {
                     }
                 }
                 fn update_finalize(&mut self, ctx: Self::UpdateCtx, uf: &mut Unification) {
+                    self.all_index_1_0
+                        .recreate_from(&self.all_index_0_1.as_slice());
+                    assert_eq!(self.all_index_1_0.len(), self.all_index_0_1.len());
                     self.new.extend(self.all_index_0_1.minus(&ctx.old));
                 }
             }
@@ -4536,7 +4438,7 @@ fn test_primitives_simple() {
             struct MulUpdateCtx {
                 scratch: Vec<(Math, Math, Math)>,
                 deferred_insertions: Vec<(Math, Math, Math)>,
-                old: SortedVec<RadixSortCtx<Row3_0_1_2<Math, Math, Math>, u128>>,
+                old: SortedVec<RadixSortCtx<Row3_1_0<Math, Math, Math>, u128>>,
             }
             impl Relation for MulRelation {
                 type Row = (Math, Math, Math);
@@ -4585,14 +4487,6 @@ fn test_primitives_simple() {
                     };
                     let mut ran_merge = false;
                     loop {
-                        self.all_index_0_1_2.sorted_vec_update(
-                            insertions,
-                            &mut ctx.deferred_insertions,
-                            &mut ctx.scratch,
-                            uf,
-                            already_canon,
-                            |_, _, _| unreachable!(),
-                        );
                         self.all_index_1_0_2.sorted_vec_update(
                             insertions,
                             &mut ctx.deferred_insertions,
@@ -4605,14 +4499,6 @@ fn test_primitives_simple() {
                                 let (y2,) = y.value_mut();
                                 uf.math_.union_mut(x2, y2);
                             },
-                        );
-                        self.all_index_2_0_1.sorted_vec_update(
-                            insertions,
-                            &mut ctx.deferred_insertions,
-                            &mut ctx.scratch,
-                            uf,
-                            already_canon,
-                            |_, _, _| unreachable!(),
                         );
                         if ctx.deferred_insertions.is_empty() && ran_merge == false {
                             break;
@@ -4629,11 +4515,17 @@ fn test_primitives_simple() {
                     MulUpdateCtx {
                         scratch: Vec::new(),
                         deferred_insertions: Vec::new(),
-                        old: self.all_index_0_1_2.clone(),
+                        old: self.all_index_1_0_2.clone(),
                     }
                 }
                 fn update_finalize(&mut self, ctx: Self::UpdateCtx, uf: &mut Unification) {
-                    self.new.extend(self.all_index_0_1_2.minus(&ctx.old));
+                    self.all_index_0_1_2
+                        .recreate_from(&self.all_index_1_0_2.as_slice());
+                    self.all_index_2_0_1
+                        .recreate_from(&self.all_index_1_0_2.as_slice());
+                    assert_eq!(self.all_index_0_1_2.len(), self.all_index_1_0_2.len());
+                    assert_eq!(self.all_index_2_0_1.len(), self.all_index_1_0_2.len());
+                    self.new.extend(self.all_index_1_0_2.minus(&ctx.old));
                 }
             }
             impl MulRelation {
@@ -4751,22 +4643,6 @@ fn test_primitives_simple() {
                                 uf.math_.union_mut(x2, y2);
                             },
                         );
-                        self.all_index_1_0_2.sorted_vec_update(
-                            insertions,
-                            &mut ctx.deferred_insertions,
-                            &mut ctx.scratch,
-                            uf,
-                            already_canon,
-                            |_, _, _| unreachable!(),
-                        );
-                        self.all_index_2_0_1.sorted_vec_update(
-                            insertions,
-                            &mut ctx.deferred_insertions,
-                            &mut ctx.scratch,
-                            uf,
-                            already_canon,
-                            |_, _, _| unreachable!(),
-                        );
                         if ctx.deferred_insertions.is_empty() && ran_merge == false {
                             break;
                         }
@@ -4786,6 +4662,12 @@ fn test_primitives_simple() {
                     }
                 }
                 fn update_finalize(&mut self, ctx: Self::UpdateCtx, uf: &mut Unification) {
+                    self.all_index_1_0_2
+                        .recreate_from(&self.all_index_0_1_2.as_slice());
+                    self.all_index_2_0_1
+                        .recreate_from(&self.all_index_0_1_2.as_slice());
+                    assert_eq!(self.all_index_1_0_2.len(), self.all_index_0_1_2.len());
+                    assert_eq!(self.all_index_2_0_1.len(), self.all_index_0_1_2.len());
                     self.new.extend(self.all_index_0_1_2.minus(&ctx.old));
                 }
             }
@@ -4897,14 +4779,6 @@ fn test_primitives_simple() {
                                 uf.math_.union_mut(x1, y1);
                             },
                         );
-                        self.all_index_1_0.sorted_vec_update(
-                            insertions,
-                            &mut ctx.deferred_insertions,
-                            &mut ctx.scratch,
-                            uf,
-                            already_canon,
-                            |_, _, _| unreachable!(),
-                        );
                         if ctx.deferred_insertions.is_empty() && ran_merge == false {
                             break;
                         }
@@ -4924,6 +4798,9 @@ fn test_primitives_simple() {
                     }
                 }
                 fn update_finalize(&mut self, ctx: Self::UpdateCtx, uf: &mut Unification) {
+                    self.all_index_1_0
+                        .recreate_from(&self.all_index_0_1.as_slice());
+                    assert_eq!(self.all_index_1_0.len(), self.all_index_0_1.len());
                     self.new.extend(self.all_index_0_1.minus(&ctx.old));
                 }
             }
@@ -5046,14 +4923,6 @@ fn test_primitives_simple() {
                                 uf.math_.union_mut(x1, y1);
                             },
                         );
-                        self.all_index_1_0.sorted_vec_update(
-                            insertions,
-                            &mut ctx.deferred_insertions,
-                            &mut ctx.scratch,
-                            uf,
-                            already_canon,
-                            |_, _, _| unreachable!(),
-                        );
                         if ctx.deferred_insertions.is_empty() && ran_merge == false {
                             break;
                         }
@@ -5073,6 +4942,9 @@ fn test_primitives_simple() {
                     }
                 }
                 fn update_finalize(&mut self, ctx: Self::UpdateCtx, uf: &mut Unification) {
+                    self.all_index_1_0
+                        .recreate_from(&self.all_index_0_1.as_slice());
+                    assert_eq!(self.all_index_1_0.len(), self.all_index_0_1.len());
                     self.new.extend(self.all_index_0_1.minus(&ctx.old));
                 }
             }
@@ -5488,6 +5360,7 @@ fn triangle_join() {
                     }
                 }
                 fn update_finalize(&mut self, ctx: Self::UpdateCtx, uf: &mut Unification) {
+                    assert_eq!(self.all_index_1_0.len(), self.all_index_0_1.len());
                     self.new.extend(self.all_index_0_1.minus(&ctx.old));
                 }
             }
@@ -5614,6 +5487,7 @@ fn triangle_join() {
                     }
                 }
                 fn update_finalize(&mut self, ctx: Self::UpdateCtx, uf: &mut Unification) {
+                    assert_eq!(self.all_index_1_0.len(), self.all_index_0_1.len());
                     self.new.extend(self.all_index_0_1.minus(&ctx.old));
                 }
             }
@@ -5724,6 +5598,7 @@ fn triangle_join() {
                     }
                 }
                 fn update_finalize(&mut self, ctx: Self::UpdateCtx, uf: &mut Unification) {
+                    assert_eq!(self.all_index_1_0.len(), self.all_index_0_1.len());
                     self.new.extend(self.all_index_0_1.minus(&ctx.old));
                 }
             }
@@ -5863,6 +5738,8 @@ fn triangle_join() {
                     }
                 }
                 fn update_finalize(&mut self, ctx: Self::UpdateCtx, uf: &mut Unification) {
+                    assert_eq!(self.all_index_1_0_2.len(), self.all_index_0_1_2.len());
+                    assert_eq!(self.all_index_2_0_1.len(), self.all_index_0_1_2.len());
                     self.new.extend(self.all_index_0_1_2.minus(&ctx.old));
                 }
             }
@@ -6199,22 +6076,6 @@ fn edgecase0() {
                                 uf.math_.union_mut(x2, y2);
                             },
                         );
-                        self.all_index_1_0_2.sorted_vec_update(
-                            insertions,
-                            &mut ctx.deferred_insertions,
-                            &mut ctx.scratch,
-                            uf,
-                            already_canon,
-                            |_, _, _| unreachable!(),
-                        );
-                        self.all_index_2_0_1.sorted_vec_update(
-                            insertions,
-                            &mut ctx.deferred_insertions,
-                            &mut ctx.scratch,
-                            uf,
-                            already_canon,
-                            |_, _, _| unreachable!(),
-                        );
                         if ctx.deferred_insertions.is_empty() && ran_merge == false {
                             break;
                         }
@@ -6234,6 +6095,12 @@ fn edgecase0() {
                     }
                 }
                 fn update_finalize(&mut self, ctx: Self::UpdateCtx, uf: &mut Unification) {
+                    self.all_index_1_0_2
+                        .recreate_from(&self.all_index_0_1_2.as_slice());
+                    self.all_index_2_0_1
+                        .recreate_from(&self.all_index_0_1_2.as_slice());
+                    assert_eq!(self.all_index_1_0_2.len(), self.all_index_0_1_2.len());
+                    assert_eq!(self.all_index_2_0_1.len(), self.all_index_0_1_2.len());
                     self.new.extend(self.all_index_0_1_2.minus(&ctx.old));
                 }
             }
@@ -6360,22 +6227,6 @@ fn edgecase0() {
                                 uf.math_.union_mut(x2, y2);
                             },
                         );
-                        self.all_index_1_0_2.sorted_vec_update(
-                            insertions,
-                            &mut ctx.deferred_insertions,
-                            &mut ctx.scratch,
-                            uf,
-                            already_canon,
-                            |_, _, _| unreachable!(),
-                        );
-                        self.all_index_2_0_1.sorted_vec_update(
-                            insertions,
-                            &mut ctx.deferred_insertions,
-                            &mut ctx.scratch,
-                            uf,
-                            already_canon,
-                            |_, _, _| unreachable!(),
-                        );
                         if ctx.deferred_insertions.is_empty() && ran_merge == false {
                             break;
                         }
@@ -6395,6 +6246,12 @@ fn edgecase0() {
                     }
                 }
                 fn update_finalize(&mut self, ctx: Self::UpdateCtx, uf: &mut Unification) {
+                    self.all_index_1_0_2
+                        .recreate_from(&self.all_index_0_1_2.as_slice());
+                    self.all_index_2_0_1
+                        .recreate_from(&self.all_index_0_1_2.as_slice());
+                    assert_eq!(self.all_index_1_0_2.len(), self.all_index_0_1_2.len());
+                    assert_eq!(self.all_index_2_0_1.len(), self.all_index_0_1_2.len());
                     self.new.extend(self.all_index_0_1_2.minus(&ctx.old));
                 }
             }
@@ -6717,22 +6574,6 @@ fn test_into_codegen() {
                                 uf.math_.union_mut(x2, y2);
                             },
                         );
-                        self.all_index_1_0_2.sorted_vec_update(
-                            insertions,
-                            &mut ctx.deferred_insertions,
-                            &mut ctx.scratch,
-                            uf,
-                            already_canon,
-                            |_, _, _| unreachable!(),
-                        );
-                        self.all_index_2_0_1.sorted_vec_update(
-                            insertions,
-                            &mut ctx.deferred_insertions,
-                            &mut ctx.scratch,
-                            uf,
-                            already_canon,
-                            |_, _, _| unreachable!(),
-                        );
                         if ctx.deferred_insertions.is_empty() && ran_merge == false {
                             break;
                         }
@@ -6752,6 +6593,12 @@ fn test_into_codegen() {
                     }
                 }
                 fn update_finalize(&mut self, ctx: Self::UpdateCtx, uf: &mut Unification) {
+                    self.all_index_1_0_2
+                        .recreate_from(&self.all_index_0_1_2.as_slice());
+                    self.all_index_2_0_1
+                        .recreate_from(&self.all_index_0_1_2.as_slice());
+                    assert_eq!(self.all_index_1_0_2.len(), self.all_index_0_1_2.len());
+                    assert_eq!(self.all_index_2_0_1.len(), self.all_index_0_1_2.len());
                     self.new.extend(self.all_index_0_1_2.minus(&ctx.old));
                 }
             }
@@ -6870,22 +6717,6 @@ fn test_into_codegen() {
                                 uf.math_.union_mut(x2, y2);
                             },
                         );
-                        self.all_index_1_0_2.sorted_vec_update(
-                            insertions,
-                            &mut ctx.deferred_insertions,
-                            &mut ctx.scratch,
-                            uf,
-                            already_canon,
-                            |_, _, _| unreachable!(),
-                        );
-                        self.all_index_2_0_1.sorted_vec_update(
-                            insertions,
-                            &mut ctx.deferred_insertions,
-                            &mut ctx.scratch,
-                            uf,
-                            already_canon,
-                            |_, _, _| unreachable!(),
-                        );
                         if ctx.deferred_insertions.is_empty() && ran_merge == false {
                             break;
                         }
@@ -6905,6 +6736,12 @@ fn test_into_codegen() {
                     }
                 }
                 fn update_finalize(&mut self, ctx: Self::UpdateCtx, uf: &mut Unification) {
+                    self.all_index_1_0_2
+                        .recreate_from(&self.all_index_0_1_2.as_slice());
+                    self.all_index_2_0_1
+                        .recreate_from(&self.all_index_0_1_2.as_slice());
+                    assert_eq!(self.all_index_1_0_2.len(), self.all_index_0_1_2.len());
+                    assert_eq!(self.all_index_2_0_1.len(), self.all_index_0_1_2.len());
                     self.new.extend(self.all_index_0_1_2.minus(&ctx.old));
                 }
             }

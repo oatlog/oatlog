@@ -36,7 +36,20 @@ pub unsafe trait IndexRow: PreReqs {
             ret
         }
     }
+    fn from_inner_slice<'a>(slice: &'a [Self::Repr]) -> &'a [Self] {
+        use std::alloc::Layout;
+        assert_eq!(Layout::new::<Self>(), Layout::new::<Self::Repr>());
 
+        // SAFETY: `Self` is `repr(transparent)` around `Self::Repr`.
+        unsafe {
+            let slice: &'a [Self::Repr] = slice;
+            let ptr: *const Self::Repr = slice.as_ptr();
+            let len = slice.len();
+            let ptr: *const Self = ptr as _;
+            let ret: &'a [Self] = std::slice::from_raw_parts(ptr, len);
+            ret
+        }
+    }
     fn from_inner_slice_mut<'a>(slice: &'a mut [Self::Repr]) -> &'a mut [Self] {
         use std::alloc::Layout;
         assert_eq!(Layout::new::<Self>(), Layout::new::<Self::Repr>());
@@ -51,7 +64,6 @@ pub unsafe trait IndexRow: PreReqs {
             ret
         }
     }
-
     fn from_inner_vec<'a>(vec: &'a mut Vec<Self::Repr>) -> &'a mut Vec<Self> {
         use std::alloc::Layout;
         assert_eq!(Layout::new::<Self>(), Layout::new::<Self::Repr>());
