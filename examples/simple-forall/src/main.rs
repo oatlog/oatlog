@@ -11,6 +11,8 @@ fn run() {
     let x = theory.make();
     theory.step();
 
+    let _ = x;
+
     let x = theory.make();
     dbg!(&theory);
     assert!(theory.le_.iter1_0_1(x).find(|&(e,)| e == x).is_some());

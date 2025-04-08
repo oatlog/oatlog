@@ -106,20 +106,20 @@ pub(crate) enum TypeKind {
 pub(crate) struct RelationData {
     /// Generated name
     pub name: &'static str,
-    pub param_types: TVec<ColumnId, TypeId>,
+    pub columns: TVec<ColumnId, TypeId>,
     pub kind: RelationKind,
 }
 impl RelationData {
     pub(crate) fn new_table(
         name: &'static str,
-        types: TVec<ColumnId, TypeId>,
+        columns: TVec<ColumnId, TypeId>,
         usage_to_info: TVec<IndexUsageId, IndexUsageInfo>,
         index_to_info: TVec<IndexId, IndexInfo>,
         column_back_reference: TVec<ColumnId, IndexUsageId>,
     ) -> Self {
         Self {
             name,
-            param_types: types.iter().copied().collect(),
+            columns,
             kind: RelationKind::Table {
                 usage_to_info,
                 index_to_info,
@@ -131,8 +131,20 @@ impl RelationData {
         let name = name.unwrap_or(&*id.to_string().leak());
         Self {
             name,
-            param_types: iter::once(ty).collect(),
+            columns: iter::once(ty).collect(),
             kind: RelationKind::Global { id },
+        }
+    }
+    pub(crate) fn new_primitive(
+        ident: &'static str,
+        columns: TVec<ColumnId, TypeId>,
+        codegen: proc_macro2::TokenStream,
+        out_col: ColumnId,
+    ) -> Self {
+        Self {
+            name: ident,
+            columns,
+            kind: RelationKind::Primitive { codegen, out_col },
         }
     }
 }
@@ -154,10 +166,12 @@ pub enum RelationKind {
         column_back_reference: TVec<ColumnId, IndexUsageId>,
         // trigger_rules: ...
     },
-    // /// Panics if usage is not a subset of indexes.
-    // Primitive { }
     Global {
         id: GlobalId,
+    },
+    Primitive {
+        codegen: proc_macro2::TokenStream,
+        out_col: ColumnId,
     },
 }
 
@@ -243,6 +257,7 @@ pub(crate) struct RuleTrie {
 pub(crate) enum RuleAtom {
     // ==== PREMISES ====
     /// Iterate (all)/(all new) elements of a type.
+    #[allow(unused)]
     Forall {
         variable: VariableId,
         new: bool,
@@ -260,6 +275,7 @@ pub(crate) enum RuleAtom {
         index: IndexUsageId,
     },
     /// Proceed only if at least one row matching the `args` pattern exists in `relation`.
+    /// AKA semi-join.
     PremiseAny {
         relation: RelationId,
         /// a bit cursed to not have Option<VariableId> here, but it works when generating.
@@ -287,6 +303,7 @@ pub(crate) enum RuleAtom {
     // ==== ACTIONS ====
     Action(Action),
     /// Panic in the generated rust code.
+    #[allow(unused)]
     Panic(&'static str),
 }
 
@@ -390,7 +407,7 @@ impl Theory {
             fn fmt(&self, f: &mut Formatter<'_>) -> Result<(), Error> {
                 let Some(RelationData {
                     name,
-                    param_types,
+                    columns: param_types,
                     kind,
                 }) = self.0
                 else {
@@ -453,6 +470,9 @@ impl Theory {
                     RelationKind::Global { id } => {
                         write!(f, "{:?}", DbgStr(["Global".to_string(), id.to_string()]))
                     }
+                    RelationKind::Primitive { codegen: _, out_col: _ } => {
+                        write!(f, "{:?}", DbgStr(["Primitive".to_string()]))
+                    },
                 }
             }
         }

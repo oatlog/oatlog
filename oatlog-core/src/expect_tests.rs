@@ -108,6 +108,20 @@ fn redundant_premise_simplify() {
         expected_hir: Some(expect![[r#"
             Theory:
 
+            +(i64, i64, i64)
+            &(i64, i64, i64)
+            not-i64(i64, i64)
+            |(i64, i64, i64)
+            <<(i64, i64, i64)
+            >>(i64, i64, i64)
+            ^(i64, i64, i64)
+            /(i64, i64, i64)
+            log2(i64, i64)
+            max(i64, i64, i64)
+            min(i64, i64, i64)
+            *(i64, i64, i64)
+            %(i64, i64, i64)
+            -(i64, i64, i64)
             Math(Math)
             Const(i64, Math)
             Add(Math, Math, Math)
@@ -177,6 +191,20 @@ fn redundant_action_simplify() {
         expected_hir: Some(expect![[r#"
             Theory:
 
+            +(i64, i64, i64)
+            &(i64, i64, i64)
+            not-i64(i64, i64)
+            |(i64, i64, i64)
+            <<(i64, i64, i64)
+            >>(i64, i64, i64)
+            ^(i64, i64, i64)
+            /(i64, i64, i64)
+            log2(i64, i64)
+            max(i64, i64, i64)
+            min(i64, i64, i64)
+            *(i64, i64, i64)
+            %(i64, i64, i64)
+            -(i64, i64, i64)
             Math(Math)
             Const(i64, Math)
             Add(Math, Math, Math)
@@ -239,6 +267,20 @@ fn weird_premise_equality() {
         expected_hir: Some(expect![[r#"
             Theory:
 
+            +(i64, i64, i64)
+            &(i64, i64, i64)
+            not-i64(i64, i64)
+            |(i64, i64, i64)
+            <<(i64, i64, i64)
+            >>(i64, i64, i64)
+            ^(i64, i64, i64)
+            /(i64, i64, i64)
+            log2(i64, i64)
+            max(i64, i64, i64)
+            min(i64, i64, i64)
+            *(i64, i64, i64)
+            %(i64, i64, i64)
+            -(i64, i64, i64)
             g0(i64)
 
             Rule:
@@ -264,6 +306,20 @@ fn hir_commutative() {
         expected_hir: Some(expect![[r#"
             Theory:
 
+            +(i64, i64, i64)
+            &(i64, i64, i64)
+            not-i64(i64, i64)
+            |(i64, i64, i64)
+            <<(i64, i64, i64)
+            >>(i64, i64, i64)
+            ^(i64, i64, i64)
+            /(i64, i64, i64)
+            log2(i64, i64)
+            max(i64, i64, i64)
+            min(i64, i64, i64)
+            *(i64, i64, i64)
+            %(i64, i64, i64)
+            -(i64, i64, i64)
             Math(Math)
             Add(Math, Math, Math)
 
@@ -294,6 +350,20 @@ fn hir_distributive() {
         expected_hir: Some(expect![[r#"
             Theory:
 
+            +(i64, i64, i64)
+            &(i64, i64, i64)
+            not-i64(i64, i64)
+            |(i64, i64, i64)
+            <<(i64, i64, i64)
+            >>(i64, i64, i64)
+            ^(i64, i64, i64)
+            /(i64, i64, i64)
+            log2(i64, i64)
+            max(i64, i64, i64)
+            min(i64, i64, i64)
+            *(i64, i64, i64)
+            %(i64, i64, i64)
+            -(i64, i64, i64)
             Math(Math)
             Add(Math, Math, Math)
             Mul(Math, Math, Math)
@@ -328,6 +398,20 @@ fn hir_userspace_implicit_functionality() {
         expected_hir: Some(expect![[r#"
             Theory:
 
+            +(i64, i64, i64)
+            &(i64, i64, i64)
+            not-i64(i64, i64)
+            |(i64, i64, i64)
+            <<(i64, i64, i64)
+            >>(i64, i64, i64)
+            ^(i64, i64, i64)
+            /(i64, i64, i64)
+            log2(i64, i64)
+            max(i64, i64, i64)
+            min(i64, i64, i64)
+            *(i64, i64, i64)
+            %(i64, i64, i64)
+            -(i64, i64, i64)
             Math(Math)
             Add(Math, Math, Math)
 
@@ -359,6 +443,20 @@ fn hir_global() {
         expected_hir: Some(expect![[r#"
             Theory:
 
+            +(i64, i64, i64)
+            &(i64, i64, i64)
+            not-i64(i64, i64)
+            |(i64, i64, i64)
+            <<(i64, i64, i64)
+            >>(i64, i64, i64)
+            ^(i64, i64, i64)
+            /(i64, i64, i64)
+            log2(i64, i64)
+            max(i64, i64, i64)
+            min(i64, i64, i64)
+            *(i64, i64, i64)
+            %(i64, i64, i64)
+            -(i64, i64, i64)
             Math(Math)
             Mul(Math, Math, Math)
             Add(Math, Math, Math)
@@ -378,14 +476,84 @@ fn hir_global() {
             Theory {
                 name: None,
                 types: {
-                    [t0, i64]: std::primitive::i64,
-                    [t1, String]: runtime::IString,
-                    [t2, unit]: THIS_STRING_SHOULD_NOT_APPEAR_IN_GENERATED_CODE,
+                    [t0, unit]: THIS_STRING_SHOULD_NOT_APPEAR_IN_GENERATED_CODE,
+                    [t1, i64]: std::primitive::i64,
+                    [t2, String]: runtime::IString,
                     [t3, Math]: [symbolic],
                 },
                 relations: {
-                    r0: (hir-only relation),
+                    r0: RelationData {
+                        name: "i64_add012",
+                        param_types: {c0: t1, c1: t1, c2: t1},
+                        kind: Primitive,
+                    },
                     r1: RelationData {
+                        name: "i64_bitand012",
+                        param_types: {c0: t1, c1: t1, c2: t1},
+                        kind: Primitive,
+                    },
+                    r2: RelationData {
+                        name: "i64_bitnot01",
+                        param_types: {c0: t1, c1: t1},
+                        kind: Primitive,
+                    },
+                    r3: RelationData {
+                        name: "i64_bitor012",
+                        param_types: {c0: t1, c1: t1, c2: t1},
+                        kind: Primitive,
+                    },
+                    r4: RelationData {
+                        name: "i64_bitshl012",
+                        param_types: {c0: t1, c1: t1, c2: t1},
+                        kind: Primitive,
+                    },
+                    r5: RelationData {
+                        name: "i64_bitshr012",
+                        param_types: {c0: t1, c1: t1, c2: t1},
+                        kind: Primitive,
+                    },
+                    r6: RelationData {
+                        name: "i64_bitxor012",
+                        param_types: {c0: t1, c1: t1, c2: t1},
+                        kind: Primitive,
+                    },
+                    r7: RelationData {
+                        name: "i64_div012",
+                        param_types: {c0: t1, c1: t1, c2: t1},
+                        kind: Primitive,
+                    },
+                    r8: RelationData {
+                        name: "i64_log01",
+                        param_types: {c0: t1, c1: t1},
+                        kind: Primitive,
+                    },
+                    r9: RelationData {
+                        name: "i64_max012",
+                        param_types: {c0: t1, c1: t1, c2: t1},
+                        kind: Primitive,
+                    },
+                    r10: RelationData {
+                        name: "i64_min012",
+                        param_types: {c0: t1, c1: t1, c2: t1},
+                        kind: Primitive,
+                    },
+                    r11: RelationData {
+                        name: "i64_mul012",
+                        param_types: {c0: t1, c1: t1, c2: t1},
+                        kind: Primitive,
+                    },
+                    r12: RelationData {
+                        name: "i64_rem012",
+                        param_types: {c0: t1, c1: t1, c2: t1},
+                        kind: Primitive,
+                    },
+                    r13: RelationData {
+                        name: "i64_sub012",
+                        param_types: {c0: t1, c1: t1, c2: t1},
+                        kind: Primitive,
+                    },
+                    r14: (hir-only relation),
+                    r15: RelationData {
                         name: "Mul",
                         param_types: {c0: t3, c1: t3, c2: t3},
                         kind: Table {
@@ -400,7 +568,7 @@ fn hir_global() {
                             column_back_reference: {c0: iu1, c1: iu2, c2: iu3},
                         },
                     },
-                    r2: RelationData {
+                    r16: RelationData {
                         name: "Add",
                         param_types: {c0: t3, c1: t3, c2: t3},
                         kind: Table {
@@ -415,9 +583,9 @@ fn hir_global() {
                             column_back_reference: {c0: iu1, c1: iu2, c2: iu3},
                         },
                     },
-                    r3: RelationData {
+                    r17: RelationData {
                         name: "Const",
-                        param_types: {c0: t0, c1: t3},
+                        param_types: {c0: t1, c1: t3},
                         kind: Table {
                             index_to_info: {ir0: 0_1 conflict[..1] => [1:union], ir1: 1_0},
                             usage_to_info: {
@@ -430,44 +598,44 @@ fn hir_global() {
                             column_back_reference: {c0: iu2, c1: iu3},
                         },
                     },
-                    r4: RelationData {
+                    r18: RelationData {
                         name: "g0",
-                        param_types: {c0: t0},
+                        param_types: {c0: t1},
                         kind: [Global, g0],
                     },
                 },
                 rule_variables: {
-                    [v0, one]: t0,
+                    [v0, one]: t1,
                     [v1, p1]: t3,
                     [v2, b]: t3,
                     [v3, a]: t3,
-                    [v4, one_2]: t0,
+                    [v4, one_2]: t1,
                     [v5, p1_2]: t3,
                     [v6, b_2]: t3,
                     [v7, a_2]: t3,
                 },
                 global_variable_types: {
-                    g0: t0,
+                    g0: t1,
                 },
                 rule_tries: [
                     meta: "( rewrite ( Const one ) ( Add b a ) )"
-                    atom: [PremiseNew, r3(v0, v1)]
+                    atom: [PremiseNew, r17(v0, v1)]
                     then: [
-                        atom: [PremiseAny, r4(v0), iu_bogus]
+                        atom: [PremiseAny, r18(v0), iu_bogus]
                         then: [
                             atom: [Action::Make, v3],
                             atom: [Action::Make, v2],
-                            atom: [Action::Insert, r2(v2, v3, v1)],
+                            atom: [Action::Insert, r16(v2, v3, v1)],
                         ],
                     ],
                     meta: "( rewrite ( Const one ) ( Add b a ) )"
-                    atom: [PremiseNew, r4(v4)]
+                    atom: [PremiseNew, r18(v4)]
                     then: [
-                        atom: [Premise, r3(v4, v5), iu1]
+                        atom: [Premise, r17(v4, v5), iu1]
                         then: [
                             atom: [Action::Make, v7],
                             atom: [Action::Make, v6],
-                            atom: [Action::Insert, r2(v6, v7, v5)],
+                            atom: [Action::Insert, r16(v6, v7, v5)],
                         ],
                     ],
                 ],
@@ -498,6 +666,20 @@ fn regression_elim_problematic() {
         expected_hir: Some(expect![[r#"
             Theory:
 
+            +(i64, i64, i64)
+            &(i64, i64, i64)
+            not-i64(i64, i64)
+            |(i64, i64, i64)
+            <<(i64, i64, i64)
+            >>(i64, i64, i64)
+            ^(i64, i64, i64)
+            /(i64, i64, i64)
+            log2(i64, i64)
+            max(i64, i64, i64)
+            min(i64, i64, i64)
+            *(i64, i64, i64)
+            %(i64, i64, i64)
+            -(i64, i64, i64)
             Math(Math)
             Mul(Math, Math, Math)
             Zero(Math)
@@ -531,6 +713,992 @@ fn codegen_template() {
 }
 
 #[test]
+fn codegen_constant_propagation() {
+    Steps {
+        code: r#" 
+            (datatype Math
+                (Add Math Math)
+                (Mul Math Math)
+                (Const i64)
+            )
+            (rule ((= e (Add (Const a) (Const b)))) ((union e (Const (+ a b)))))
+            (rule ((= e (Mul (Const a) (Const b)))) ((union e (Const (* a b)))))
+        "#,
+        expected_hir: Some(expect![[r#"
+            Theory:
+
+            +(i64, i64, i64)
+            &(i64, i64, i64)
+            not-i64(i64, i64)
+            |(i64, i64, i64)
+            <<(i64, i64, i64)
+            >>(i64, i64, i64)
+            ^(i64, i64, i64)
+            /(i64, i64, i64)
+            log2(i64, i64)
+            max(i64, i64, i64)
+            min(i64, i64, i64)
+            *(i64, i64, i64)
+            %(i64, i64, i64)
+            -(i64, i64, i64)
+            Math(Math)
+            Add(Math, Math, Math)
+            Mul(Math, Math, Math)
+            Const(i64, Math)
+
+            Rule:
+            Premise: Add(p2, p4, e), Const(a, p2), Const(b, p4)
+            e: e
+            a: a
+            __: p2
+            b: b
+            __: p4
+            a3: __
+            Insert: +(a, b, a3).n0, Const(a3, e).n0
+
+            Rule:
+            Premise: Mul(p2, p4, e), Const(a, p2), Const(b, p4)
+            e: e
+            a: a
+            __: p2
+            b: b
+            __: p4
+            a3: __
+            Insert: *(a, b, a3).n0, Const(a3, e).n0
+
+        "#]]),
+        expected_lir: Some(expect![[r#"
+            Theory {
+                name: None,
+                types: {
+                    [t0, unit]: THIS_STRING_SHOULD_NOT_APPEAR_IN_GENERATED_CODE,
+                    [t1, i64]: std::primitive::i64,
+                    [t2, String]: runtime::IString,
+                    [t3, Math]: [symbolic],
+                },
+                relations: {
+                    r0: RelationData {
+                        name: "i64_add012",
+                        param_types: {c0: t1, c1: t1, c2: t1},
+                        kind: Primitive,
+                    },
+                    r1: RelationData {
+                        name: "i64_bitand012",
+                        param_types: {c0: t1, c1: t1, c2: t1},
+                        kind: Primitive,
+                    },
+                    r2: RelationData {
+                        name: "i64_bitnot01",
+                        param_types: {c0: t1, c1: t1},
+                        kind: Primitive,
+                    },
+                    r3: RelationData {
+                        name: "i64_bitor012",
+                        param_types: {c0: t1, c1: t1, c2: t1},
+                        kind: Primitive,
+                    },
+                    r4: RelationData {
+                        name: "i64_bitshl012",
+                        param_types: {c0: t1, c1: t1, c2: t1},
+                        kind: Primitive,
+                    },
+                    r5: RelationData {
+                        name: "i64_bitshr012",
+                        param_types: {c0: t1, c1: t1, c2: t1},
+                        kind: Primitive,
+                    },
+                    r6: RelationData {
+                        name: "i64_bitxor012",
+                        param_types: {c0: t1, c1: t1, c2: t1},
+                        kind: Primitive,
+                    },
+                    r7: RelationData {
+                        name: "i64_div012",
+                        param_types: {c0: t1, c1: t1, c2: t1},
+                        kind: Primitive,
+                    },
+                    r8: RelationData {
+                        name: "i64_log01",
+                        param_types: {c0: t1, c1: t1},
+                        kind: Primitive,
+                    },
+                    r9: RelationData {
+                        name: "i64_max012",
+                        param_types: {c0: t1, c1: t1, c2: t1},
+                        kind: Primitive,
+                    },
+                    r10: RelationData {
+                        name: "i64_min012",
+                        param_types: {c0: t1, c1: t1, c2: t1},
+                        kind: Primitive,
+                    },
+                    r11: RelationData {
+                        name: "i64_mul012",
+                        param_types: {c0: t1, c1: t1, c2: t1},
+                        kind: Primitive,
+                    },
+                    r12: RelationData {
+                        name: "i64_rem012",
+                        param_types: {c0: t1, c1: t1, c2: t1},
+                        kind: Primitive,
+                    },
+                    r13: RelationData {
+                        name: "i64_sub012",
+                        param_types: {c0: t1, c1: t1, c2: t1},
+                        kind: Primitive,
+                    },
+                    r14: (hir-only relation),
+                    r15: RelationData {
+                        name: "Add",
+                        param_types: {c0: t3, c1: t3, c2: t3},
+                        kind: Table {
+                            index_to_info: {ir0: 0_1_2 conflict[..2] => [2:union], ir1: 1_0_2, ir2: 2_0_1},
+                            usage_to_info: {
+                                iu0: ir0[..2],
+                                iu1: ir0[..1],
+                                iu2: ir1[..1],
+                                iu3: ir0[..1],
+                                iu4: ir1[..1],
+                                iu5: ir2[..1],
+                                iu6: ir0[..2],
+                            },
+                            column_back_reference: {c0: iu3, c1: iu4, c2: iu5},
+                        },
+                    },
+                    r16: RelationData {
+                        name: "Mul",
+                        param_types: {c0: t3, c1: t3, c2: t3},
+                        kind: Table {
+                            index_to_info: {ir0: 0_1_2 conflict[..2] => [2:union], ir1: 1_0_2, ir2: 2_0_1},
+                            usage_to_info: {
+                                iu0: ir0[..2],
+                                iu1: ir0[..1],
+                                iu2: ir1[..1],
+                                iu3: ir0[..1],
+                                iu4: ir1[..1],
+                                iu5: ir2[..1],
+                                iu6: ir0[..2],
+                            },
+                            column_back_reference: {c0: iu3, c1: iu4, c2: iu5},
+                        },
+                    },
+                    r17: RelationData {
+                        name: "Const",
+                        param_types: {c0: t1, c1: t3},
+                        kind: Table {
+                            index_to_info: {ir0: 0_1 conflict[..1] => [1:union], ir1: 1_0},
+                            usage_to_info: {
+                                iu0: ir0[..1],
+                                iu1: ir1[..1],
+                                iu2: ir1[..1],
+                                iu3: ir1[..1],
+                                iu4: ir1[..1],
+                                iu5: ir1[..1],
+                                iu6: ir1[..1],
+                                iu7: ir1[..1],
+                                iu8: ir1[..1],
+                                iu9: ir1[..1],
+                                iu10: ir1[..1],
+                                iu11: ir0[..1],
+                                iu12: ir1[..1],
+                                iu13: ir0[..1],
+                            },
+                            column_back_reference: {c0: iu11, c1: iu12},
+                        },
+                    },
+                },
+                rule_variables: {
+                    [v0, e]: t3,
+                    [v1, a]: t1,
+                    [v10, p4_2]: t3,
+                    [v11, a3_2]: t1,
+                    [v12, e_3]: t3,
+                    [v13, a_3]: t1,
+                    [v14, p2_3]: t3,
+                    [v15, b_3]: t1,
+                    [v16, p4_3]: t3,
+                    [v17, a3_3]: t1,
+                    [v18, e_4]: t3,
+                    [v19, a_4]: t1,
+                    [v2, p2]: t3,
+                    [v20, p2_4]: t3,
+                    [v21, b_4]: t1,
+                    [v22, p4_4]: t3,
+                    [v23, a3_4]: t1,
+                    [v24, e_5]: t3,
+                    [v25, a_5]: t1,
+                    [v26, p2_5]: t3,
+                    [v27, b_5]: t1,
+                    [v28, p4_5]: t3,
+                    [v29, a3_5]: t1,
+                    [v3, b]: t1,
+                    [v30, e_6]: t3,
+                    [v31, a_6]: t1,
+                    [v32, p2_6]: t3,
+                    [v33, b_6]: t1,
+                    [v34, p4_6]: t3,
+                    [v35, a3_6]: t1,
+                    [v4, p4]: t3,
+                    [v5, a3]: t1,
+                    [v6, e_2]: t3,
+                    [v7, a_2]: t1,
+                    [v8, p2_2]: t3,
+                    [v9, b_2]: t1,
+                },
+                global_variable_types: {},
+                rule_tries: [
+                    meta: "( rule ( ( = e ( Add ( Const a ) ( Const b ) ) ) ) ( ( union e ( Const ( + a b ) ) ) ) )"
+                    atom: [PremiseNew, r15(v2, v4, v0)]
+                    then: [
+                        atom: [PremiseAny, r17(v3, v4), iu3]
+                        then: [
+                            atom: [Premise, r17(v1, v2), iu2]
+                            then: [
+                                atom: [Premise, r17(v3, v4), iu1]
+                                then: [
+                                    atom: [Action::Insert, r0(v1, v3, v5) on iu0],
+                                    atom: [Action::Insert, r17(v5, v0)],
+                                ],
+                            ],
+                        ],
+                    ],
+                    meta: "( rule ( ( = e ( Add ( Const a ) ( Const b ) ) ) ) ( ( union e ( Const ( + a b ) ) ) ) )"
+                    atom: [PremiseNew, r17(v7, v8)]
+                    then: [
+                        atom: [Premise, r15(v8, v10, v6), iu1]
+                        then: [
+                            atom: [Premise, r17(v9, v10), iu4]
+                            then: [
+                                atom: [Action::Insert, r0(v7, v9, v11) on iu0],
+                                atom: [Action::Insert, r17(v11, v6)],
+                            ],
+                        ],
+                    ],
+                    meta: "( rule ( ( = e ( Add ( Const a ) ( Const b ) ) ) ) ( ( union e ( Const ( + a b ) ) ) ) )"
+                    atom: [PremiseNew, r17(v15, v16)]
+                    then: [
+                        atom: [Premise, r15(v14, v16, v12), iu2]
+                        then: [
+                            atom: [Premise, r17(v13, v14), iu5]
+                            then: [
+                                atom: [Action::Insert, r0(v13, v15, v17) on iu0],
+                                atom: [Action::Insert, r17(v17, v12)],
+                            ],
+                        ],
+                    ],
+                    meta: "( rule ( ( = e ( Mul ( Const a ) ( Const b ) ) ) ) ( ( union e ( Const ( * a b ) ) ) ) )"
+                    atom: [PremiseNew, r16(v20, v22, v18)]
+                    then: [
+                        atom: [PremiseAny, r17(v21, v22), iu8]
+                        then: [
+                            atom: [Premise, r17(v19, v20), iu7]
+                            then: [
+                                atom: [Premise, r17(v21, v22), iu6]
+                                then: [
+                                    atom: [Action::Insert, r11(v19, v21, v23) on iu0],
+                                    atom: [Action::Insert, r17(v23, v18)],
+                                ],
+                            ],
+                        ],
+                    ],
+                    meta: "( rule ( ( = e ( Mul ( Const a ) ( Const b ) ) ) ) ( ( union e ( Const ( * a b ) ) ) ) )"
+                    atom: [PremiseNew, r17(v25, v26)]
+                    then: [
+                        atom: [Premise, r16(v26, v28, v24), iu1]
+                        then: [
+                            atom: [Premise, r17(v27, v28), iu9]
+                            then: [
+                                atom: [Action::Insert, r11(v25, v27, v29) on iu0],
+                                atom: [Action::Insert, r17(v29, v24)],
+                            ],
+                        ],
+                    ],
+                    meta: "( rule ( ( = e ( Mul ( Const a ) ( Const b ) ) ) ) ( ( union e ( Const ( * a b ) ) ) ) )"
+                    atom: [PremiseNew, r17(v33, v34)]
+                    then: [
+                        atom: [Premise, r16(v32, v34, v30), iu2]
+                        then: [
+                            atom: [Premise, r17(v31, v32), iu10]
+                            then: [
+                                atom: [Action::Insert, r11(v31, v33, v35) on iu0],
+                                atom: [Action::Insert, r17(v35, v30)],
+                            ],
+                        ],
+                    ],
+                ],
+                initial: [],
+            }"#]]),
+        expected_codegen: Some(expect![[r#"
+            use oatlog::runtime::{self, *};
+            decl_row ! (Row2_0 < T0 first 0 , T1 > (0) (1) (T0) (T1) fc = (0) (T0) where u64 = s => ((s . 0 . inner () as u64) << 32) + ((s . 1 . inner () as u64) << 0));
+            decl_row ! (Row2_1_0 < T0 , T1 first 1 > (1 , 0) () (T1 , T0) () fc = (1) (T1) where u64 = s => ((s . 1 . inner () as u64) << 32) + ((s . 0 . inner () as u64) << 0));
+            decl_row ! (Row3_0_1 < T0 first 0 , T1 , T2 > (0 , 1) (2) (T0 , T1) (T2) fc = (0) (T0) where u128 = s => ((s . 0 . inner () as u128) << 64) + ((s . 1 . inner () as u128) << 32) + ((s . 2 . inner () as u128) << 0));
+            decl_row ! (Row3_1_0_2 < T0 , T1 first 1 , T2 > (1 , 0 , 2) () (T1 , T0 , T2) () fc = (1) (T1) where u128 = s => ((s . 1 . inner () as u128) << 64) + ((s . 0 . inner () as u128) << 32) + ((s . 2 . inner () as u128) << 0));
+            decl_row ! (Row3_2_0_1 < T0 , T1 , T2 first 2 > (2 , 0 , 1) () (T2 , T0 , T1) () fc = (2) (T2) where u128 = s => ((s . 2 . inner () as u128) << 64) + ((s . 0 . inner () as u128) << 32) + ((s . 1 . inner () as u128) << 0));
+            eclass_wrapper_ty!(Math);
+            fn i64_add012(a: i64, b: i64) -> impl Iterator<Item = (i64,)> {
+                a.checked_add(b).map(|x| (x,)).into_iter()
+            }
+            fn i64_bitand012(a: i64, b: i64) -> impl Iterator<Item = (i64,)> {
+                std::iter::once((a & b,))
+            }
+            fn i64_bitnot01(a: i64) -> impl Iterator<Item = (i64,)> {
+                std::iter::once((!a,))
+            }
+            fn i64_bitor012(a: i64, b: i64) -> impl Iterator<Item = (i64,)> {
+                std::iter::once((a | b,))
+            }
+            fn i64_bitshl012(a: i64, b: i64) -> impl Iterator<Item = (i64,)> {
+                a.checked_shl(b.try_into().unwrap())
+                    .map(|x| (x,))
+                    .into_iter()
+            }
+            fn i64_bitshr012(a: i64, b: i64) -> impl Iterator<Item = (i64,)> {
+                a.checked_shr(b.try_into().unwrap())
+                    .map(|x| (x,))
+                    .into_iter()
+            }
+            fn i64_bitxor012(a: i64, b: i64) -> impl Iterator<Item = (i64,)> {
+                std::iter::once((a ^ b,))
+            }
+            fn i64_div012(a: i64, b: i64) -> impl Iterator<Item = (i64,)> {
+                a.checked_div(b).map(|x| (x,)).into_iter()
+            }
+            fn i64_log01(a: i64) -> impl Iterator<Item = (i64,)> {
+                std::iter::once((a.ilog2() as i64,))
+            }
+            fn i64_max012(a: i64, b: i64) -> impl Iterator<Item = (i64,)> {
+                std::iter::once((a.max(b),))
+            }
+            fn i64_min012(a: i64, b: i64) -> impl Iterator<Item = (i64,)> {
+                std::iter::once((a.min(b),))
+            }
+            fn i64_mul012(a: i64, b: i64) -> impl Iterator<Item = (i64,)> {
+                a.checked_mul(b).map(|x| (x,)).into_iter()
+            }
+            fn i64_rem012(a: i64, b: i64) -> impl Iterator<Item = (i64,)> {
+                a.checked_rem(b).map(|x| (x,)).into_iter()
+            }
+            fn i64_sub012(a: i64, b: i64) -> impl Iterator<Item = (i64,)> {
+                a.checked_sub(b).map(|x| (x,)).into_iter()
+            }
+            #[derive(Debug, Default)]
+            struct AddRelation {
+                new: Vec<<Self as Relation>::Row>,
+                all_index_0_1_2: SortedVec<RadixSortCtx<Row3_0_1<Math, Math, Math>, u128>>,
+                all_index_1_0_2: SortedVec<RadixSortCtx<Row3_1_0_2<Math, Math, Math>, u128>>,
+                all_index_2_0_1: SortedVec<RadixSortCtx<Row3_2_0_1<Math, Math, Math>, u128>>,
+            }
+            struct AddUpdateCtx {
+                scratch: Vec<(Math, Math, Math)>,
+                deferred_insertions: Vec<(Math, Math, Math)>,
+                old: SortedVec<RadixSortCtx<Row3_0_1<Math, Math, Math>, u128>>,
+            }
+            impl Relation for AddRelation {
+                type Row = (Math, Math, Math);
+                type UpdateCtx = AddUpdateCtx;
+                type Unification = Unification;
+                const COST: u32 = 9u32;
+                fn new() -> Self {
+                    Self::default()
+                }
+                fn has_new(&self) -> bool {
+                    !self.new.is_empty()
+                }
+                fn clear_new(&mut self) {
+                    self.new.clear();
+                }
+                fn iter_new(&self) -> impl '_ + Iterator<Item = Self::Row> {
+                    self.new.iter().copied()
+                }
+                fn len(&self) -> usize {
+                    self.all_index_0_1_2.len()
+                }
+                fn emit_graphviz(&self, buf: &mut String) {
+                    use std::fmt::Write;
+                    for (i, (x0, x1, x2)) in self.all_index_0_1_2.iter().enumerate() {
+                        writeln!(buf, "{}_{i} -> {}_{};", "add", "math", x0).unwrap();
+                        writeln!(buf, "{}_{i} -> {}_{};", "add", "math", x1).unwrap();
+                        writeln!(buf, "{}_{i} -> {}_{};", "add", "math", x2).unwrap();
+                        writeln!(buf, "{}_{i} [shape = box];", "add").unwrap();
+                    }
+                }
+                fn update(
+                    &mut self,
+                    insertions: &mut Vec<Self::Row>,
+                    ctx: &mut Self::UpdateCtx,
+                    uf: &mut Unification,
+                ) {
+                    insertions.iter_mut().for_each(|row| {
+                        row.0 = uf.math_.find(row.0);
+                        row.1 = uf.math_.find(row.1);
+                        row.2 = uf.math_.find(row.2);
+                    });
+                    let already_canon = |uf: &mut Unification, row: &mut Self::Row| {
+                        uf.math_.already_canonical(&mut row.0)
+                            && uf.math_.already_canonical(&mut row.1)
+                            && uf.math_.already_canonical(&mut row.2)
+                    };
+                    let mut ran_merge = false;
+                    loop {
+                        self.all_index_0_1_2.sorted_vec_update(
+                            insertions,
+                            &mut ctx.deferred_insertions,
+                            &mut ctx.scratch,
+                            uf,
+                            already_canon,
+                            |uf, x, mut y| {
+                                ran_merge = true;
+                                let (x2,) = x.value_mut();
+                                let (y2,) = y.value_mut();
+                                uf.math_.union_mut(x2, y2);
+                            },
+                        );
+                        if ctx.deferred_insertions.is_empty() && ran_merge == false {
+                            break;
+                        }
+                        ran_merge = false;
+                        std::mem::swap(insertions, &mut ctx.deferred_insertions);
+                        ctx.deferred_insertions.clear();
+                    }
+                    insertions.clear();
+                    assert!(ctx.scratch.is_empty());
+                    assert!(ctx.deferred_insertions.is_empty());
+                }
+                fn update_begin(&self) -> Self::UpdateCtx {
+                    AddUpdateCtx {
+                        scratch: Vec::new(),
+                        deferred_insertions: Vec::new(),
+                        old: self.all_index_0_1_2.clone(),
+                    }
+                }
+                fn update_finalize(&mut self, ctx: Self::UpdateCtx, uf: &mut Unification) {
+                    self.all_index_1_0_2
+                        .recreate_from(&self.all_index_0_1_2.as_slice());
+                    self.all_index_2_0_1
+                        .recreate_from(&self.all_index_0_1_2.as_slice());
+                    assert_eq!(self.all_index_1_0_2.len(), self.all_index_0_1_2.len());
+                    assert_eq!(self.all_index_2_0_1.len(), self.all_index_0_1_2.len());
+                    self.new.extend(self.all_index_0_1_2.minus(&ctx.old));
+                }
+            }
+            impl AddRelation {
+                fn iter2_0_1_2(&self, x0: Math, x1: Math) -> impl Iterator<Item = (Math,)> + use<'_> {
+                    self.all_index_0_1_2
+                        .range((x0, x1, Math::MIN_ID)..=(x0, x1, Math::MAX_ID))
+                        .map(|(x0, x1, x2)| (x2,))
+                }
+                fn iter1_0_1_2(&self, x0: Math) -> impl Iterator<Item = (Math, Math)> + use<'_> {
+                    self.all_index_0_1_2
+                        .range((x0, Math::MIN_ID, Math::MIN_ID)..=(x0, Math::MAX_ID, Math::MAX_ID))
+                        .map(|(x0, x1, x2)| (x1, x2))
+                }
+                fn iter1_1_0_2(&self, x1: Math) -> impl Iterator<Item = (Math, Math)> + use<'_> {
+                    self.all_index_1_0_2
+                        .range((Math::MIN_ID, x1, Math::MIN_ID)..=(Math::MAX_ID, x1, Math::MAX_ID))
+                        .map(|(x0, x1, x2)| (x0, x2))
+                }
+                fn iter1_2_0_1(&self, x2: Math) -> impl Iterator<Item = (Math, Math)> + use<'_> {
+                    self.all_index_2_0_1
+                        .range((Math::MIN_ID, Math::MIN_ID, x2)..=(Math::MAX_ID, Math::MAX_ID, x2))
+                        .map(|(x0, x1, x2)| (x0, x1))
+                }
+                fn check2_0_1_2(&self, x0: Math, x1: Math) -> bool {
+                    self.iter2_0_1_2(x0, x1).next().is_some()
+                }
+                fn check1_0_1_2(&self, x0: Math) -> bool {
+                    self.iter1_0_1_2(x0).next().is_some()
+                }
+                fn check1_1_0_2(&self, x1: Math) -> bool {
+                    self.iter1_1_0_2(x1).next().is_some()
+                }
+                fn check1_2_0_1(&self, x2: Math) -> bool {
+                    self.iter1_2_0_1(x2).next().is_some()
+                }
+                #[allow(unreachable_code)]
+                fn entry2_0_1_2(&self, x0: Math, x1: Math, delta: &mut Delta, uf: &mut Unification) -> (Math,) {
+                    if let Some((x2,)) = self.iter2_0_1_2(x0, x1).next() {
+                        return (x2,);
+                    }
+                    let x2 = uf.math_.add_eclass();
+                    delta.add_.push((x0, x1, x2));
+                    (x2,)
+                }
+            }
+            #[derive(Debug, Default)]
+            struct MulRelation {
+                new: Vec<<Self as Relation>::Row>,
+                all_index_0_1_2: SortedVec<RadixSortCtx<Row3_0_1<Math, Math, Math>, u128>>,
+                all_index_1_0_2: SortedVec<RadixSortCtx<Row3_1_0_2<Math, Math, Math>, u128>>,
+                all_index_2_0_1: SortedVec<RadixSortCtx<Row3_2_0_1<Math, Math, Math>, u128>>,
+            }
+            struct MulUpdateCtx {
+                scratch: Vec<(Math, Math, Math)>,
+                deferred_insertions: Vec<(Math, Math, Math)>,
+                old: SortedVec<RadixSortCtx<Row3_0_1<Math, Math, Math>, u128>>,
+            }
+            impl Relation for MulRelation {
+                type Row = (Math, Math, Math);
+                type UpdateCtx = MulUpdateCtx;
+                type Unification = Unification;
+                const COST: u32 = 9u32;
+                fn new() -> Self {
+                    Self::default()
+                }
+                fn has_new(&self) -> bool {
+                    !self.new.is_empty()
+                }
+                fn clear_new(&mut self) {
+                    self.new.clear();
+                }
+                fn iter_new(&self) -> impl '_ + Iterator<Item = Self::Row> {
+                    self.new.iter().copied()
+                }
+                fn len(&self) -> usize {
+                    self.all_index_0_1_2.len()
+                }
+                fn emit_graphviz(&self, buf: &mut String) {
+                    use std::fmt::Write;
+                    for (i, (x0, x1, x2)) in self.all_index_0_1_2.iter().enumerate() {
+                        writeln!(buf, "{}_{i} -> {}_{};", "mul", "math", x0).unwrap();
+                        writeln!(buf, "{}_{i} -> {}_{};", "mul", "math", x1).unwrap();
+                        writeln!(buf, "{}_{i} -> {}_{};", "mul", "math", x2).unwrap();
+                        writeln!(buf, "{}_{i} [shape = box];", "mul").unwrap();
+                    }
+                }
+                fn update(
+                    &mut self,
+                    insertions: &mut Vec<Self::Row>,
+                    ctx: &mut Self::UpdateCtx,
+                    uf: &mut Unification,
+                ) {
+                    insertions.iter_mut().for_each(|row| {
+                        row.0 = uf.math_.find(row.0);
+                        row.1 = uf.math_.find(row.1);
+                        row.2 = uf.math_.find(row.2);
+                    });
+                    let already_canon = |uf: &mut Unification, row: &mut Self::Row| {
+                        uf.math_.already_canonical(&mut row.0)
+                            && uf.math_.already_canonical(&mut row.1)
+                            && uf.math_.already_canonical(&mut row.2)
+                    };
+                    let mut ran_merge = false;
+                    loop {
+                        self.all_index_0_1_2.sorted_vec_update(
+                            insertions,
+                            &mut ctx.deferred_insertions,
+                            &mut ctx.scratch,
+                            uf,
+                            already_canon,
+                            |uf, x, mut y| {
+                                ran_merge = true;
+                                let (x2,) = x.value_mut();
+                                let (y2,) = y.value_mut();
+                                uf.math_.union_mut(x2, y2);
+                            },
+                        );
+                        if ctx.deferred_insertions.is_empty() && ran_merge == false {
+                            break;
+                        }
+                        ran_merge = false;
+                        std::mem::swap(insertions, &mut ctx.deferred_insertions);
+                        ctx.deferred_insertions.clear();
+                    }
+                    insertions.clear();
+                    assert!(ctx.scratch.is_empty());
+                    assert!(ctx.deferred_insertions.is_empty());
+                }
+                fn update_begin(&self) -> Self::UpdateCtx {
+                    MulUpdateCtx {
+                        scratch: Vec::new(),
+                        deferred_insertions: Vec::new(),
+                        old: self.all_index_0_1_2.clone(),
+                    }
+                }
+                fn update_finalize(&mut self, ctx: Self::UpdateCtx, uf: &mut Unification) {
+                    self.all_index_1_0_2
+                        .recreate_from(&self.all_index_0_1_2.as_slice());
+                    self.all_index_2_0_1
+                        .recreate_from(&self.all_index_0_1_2.as_slice());
+                    assert_eq!(self.all_index_1_0_2.len(), self.all_index_0_1_2.len());
+                    assert_eq!(self.all_index_2_0_1.len(), self.all_index_0_1_2.len());
+                    self.new.extend(self.all_index_0_1_2.minus(&ctx.old));
+                }
+            }
+            impl MulRelation {
+                fn iter2_0_1_2(&self, x0: Math, x1: Math) -> impl Iterator<Item = (Math,)> + use<'_> {
+                    self.all_index_0_1_2
+                        .range((x0, x1, Math::MIN_ID)..=(x0, x1, Math::MAX_ID))
+                        .map(|(x0, x1, x2)| (x2,))
+                }
+                fn iter1_0_1_2(&self, x0: Math) -> impl Iterator<Item = (Math, Math)> + use<'_> {
+                    self.all_index_0_1_2
+                        .range((x0, Math::MIN_ID, Math::MIN_ID)..=(x0, Math::MAX_ID, Math::MAX_ID))
+                        .map(|(x0, x1, x2)| (x1, x2))
+                }
+                fn iter1_1_0_2(&self, x1: Math) -> impl Iterator<Item = (Math, Math)> + use<'_> {
+                    self.all_index_1_0_2
+                        .range((Math::MIN_ID, x1, Math::MIN_ID)..=(Math::MAX_ID, x1, Math::MAX_ID))
+                        .map(|(x0, x1, x2)| (x0, x2))
+                }
+                fn iter1_2_0_1(&self, x2: Math) -> impl Iterator<Item = (Math, Math)> + use<'_> {
+                    self.all_index_2_0_1
+                        .range((Math::MIN_ID, Math::MIN_ID, x2)..=(Math::MAX_ID, Math::MAX_ID, x2))
+                        .map(|(x0, x1, x2)| (x0, x1))
+                }
+                fn check2_0_1_2(&self, x0: Math, x1: Math) -> bool {
+                    self.iter2_0_1_2(x0, x1).next().is_some()
+                }
+                fn check1_0_1_2(&self, x0: Math) -> bool {
+                    self.iter1_0_1_2(x0).next().is_some()
+                }
+                fn check1_1_0_2(&self, x1: Math) -> bool {
+                    self.iter1_1_0_2(x1).next().is_some()
+                }
+                fn check1_2_0_1(&self, x2: Math) -> bool {
+                    self.iter1_2_0_1(x2).next().is_some()
+                }
+                #[allow(unreachable_code)]
+                fn entry2_0_1_2(&self, x0: Math, x1: Math, delta: &mut Delta, uf: &mut Unification) -> (Math,) {
+                    if let Some((x2,)) = self.iter2_0_1_2(x0, x1).next() {
+                        return (x2,);
+                    }
+                    let x2 = uf.math_.add_eclass();
+                    delta.mul_.push((x0, x1, x2));
+                    (x2,)
+                }
+            }
+            #[derive(Debug, Default)]
+            struct ConstRelation {
+                new: Vec<<Self as Relation>::Row>,
+                all_index_0_1: SortedVec<StdSortCtx<Row2_0<std::primitive::i64, Math>>>,
+                all_index_1_0: SortedVec<StdSortCtx<Row2_1_0<std::primitive::i64, Math>>>,
+            }
+            struct ConstUpdateCtx {
+                scratch: Vec<(std::primitive::i64, Math)>,
+                deferred_insertions: Vec<(std::primitive::i64, Math)>,
+                old: SortedVec<StdSortCtx<Row2_0<std::primitive::i64, Math>>>,
+            }
+            impl Relation for ConstRelation {
+                type Row = (std::primitive::i64, Math);
+                type UpdateCtx = ConstUpdateCtx;
+                type Unification = Unification;
+                const COST: u32 = 4u32;
+                fn new() -> Self {
+                    Self::default()
+                }
+                fn has_new(&self) -> bool {
+                    !self.new.is_empty()
+                }
+                fn clear_new(&mut self) {
+                    self.new.clear();
+                }
+                fn iter_new(&self) -> impl '_ + Iterator<Item = Self::Row> {
+                    self.new.iter().copied()
+                }
+                fn len(&self) -> usize {
+                    self.all_index_0_1.len()
+                }
+                fn emit_graphviz(&self, buf: &mut String) {
+                    use std::fmt::Write;
+                    for (i, (x0, x1)) in self.all_index_0_1.iter().enumerate() {
+                        writeln!(buf, "{}_{i} -> {}_{};", "const", "i64", x0).unwrap();
+                        writeln!(buf, "{}_{i} -> {}_{};", "const", "math", x1).unwrap();
+                        writeln!(buf, "{}_{i} [shape = box];", "const").unwrap();
+                    }
+                }
+                fn update(
+                    &mut self,
+                    insertions: &mut Vec<Self::Row>,
+                    ctx: &mut Self::UpdateCtx,
+                    uf: &mut Unification,
+                ) {
+                    insertions.iter_mut().for_each(|row| {
+                        row.1 = uf.math_.find(row.1);
+                    });
+                    let already_canon =
+                        |uf: &mut Unification, row: &mut Self::Row| uf.math_.already_canonical(&mut row.1);
+                    let mut ran_merge = false;
+                    loop {
+                        self.all_index_0_1.sorted_vec_update(
+                            insertions,
+                            &mut ctx.deferred_insertions,
+                            &mut ctx.scratch,
+                            uf,
+                            already_canon,
+                            |uf, x, mut y| {
+                                ran_merge = true;
+                                let (x1,) = x.value_mut();
+                                let (y1,) = y.value_mut();
+                                uf.math_.union_mut(x1, y1);
+                            },
+                        );
+                        if ctx.deferred_insertions.is_empty() && ran_merge == false {
+                            break;
+                        }
+                        ran_merge = false;
+                        std::mem::swap(insertions, &mut ctx.deferred_insertions);
+                        ctx.deferred_insertions.clear();
+                    }
+                    insertions.clear();
+                    assert!(ctx.scratch.is_empty());
+                    assert!(ctx.deferred_insertions.is_empty());
+                }
+                fn update_begin(&self) -> Self::UpdateCtx {
+                    ConstUpdateCtx {
+                        scratch: Vec::new(),
+                        deferred_insertions: Vec::new(),
+                        old: self.all_index_0_1.clone(),
+                    }
+                }
+                fn update_finalize(&mut self, ctx: Self::UpdateCtx, uf: &mut Unification) {
+                    self.all_index_1_0
+                        .recreate_from(&self.all_index_0_1.as_slice());
+                    assert_eq!(self.all_index_1_0.len(), self.all_index_0_1.len());
+                    self.new.extend(self.all_index_0_1.minus(&ctx.old));
+                }
+            }
+            impl ConstRelation {
+                fn iter1_0_1(&self, x0: std::primitive::i64) -> impl Iterator<Item = (Math,)> + use<'_> {
+                    self.all_index_0_1
+                        .range((x0, Math::MIN_ID)..=(x0, Math::MAX_ID))
+                        .map(|(x0, x1)| (x1,))
+                }
+                fn iter1_1_0(&self, x1: Math) -> impl Iterator<Item = (std::primitive::i64,)> + use<'_> {
+                    self.all_index_1_0
+                        .range((std::primitive::i64::MIN_ID, x1)..=(std::primitive::i64::MAX_ID, x1))
+                        .map(|(x0, x1)| (x0,))
+                }
+                fn check1_0_1(&self, x0: std::primitive::i64) -> bool {
+                    self.iter1_0_1(x0).next().is_some()
+                }
+                fn check1_1_0(&self, x1: Math) -> bool {
+                    self.iter1_1_0(x1).next().is_some()
+                }
+                #[allow(unreachable_code)]
+                fn entry1_0_1(
+                    &self,
+                    x0: std::primitive::i64,
+                    delta: &mut Delta,
+                    uf: &mut Unification,
+                ) -> (Math,) {
+                    if let Some((x1,)) = self.iter1_0_1(x0).next() {
+                        return (x1,);
+                    }
+                    let x1 = uf.math_.add_eclass();
+                    delta.const_.push((x0, x1));
+                    (x1,)
+                }
+            }
+            #[derive(Debug, Default)]
+            pub struct Delta {
+                add_: Vec<<AddRelation as Relation>::Row>,
+                mul_: Vec<<MulRelation as Relation>::Row>,
+                const_: Vec<<ConstRelation as Relation>::Row>,
+            }
+            impl Delta {
+                fn new() -> Self {
+                    Self::default()
+                }
+                fn has_new_inserts(&self) -> bool {
+                    let mut has_new_inserts = false;
+                    has_new_inserts |= !self.add_.is_empty();
+                    has_new_inserts |= !self.mul_.is_empty();
+                    has_new_inserts |= !self.const_.is_empty();
+                    has_new_inserts
+                }
+                pub fn insert_add(&mut self, x: <AddRelation as Relation>::Row) {
+                    self.add_.push(x);
+                }
+                pub fn insert_mul(&mut self, x: <MulRelation as Relation>::Row) {
+                    self.mul_.push(x);
+                }
+                pub fn insert_const(&mut self, x: <ConstRelation as Relation>::Row) {
+                    self.const_.push(x);
+                }
+            }
+            #[derive(Debug, Default)]
+            struct Unification {
+                pub math_: UnionFind<Math>,
+            }
+            impl Unification {
+                fn has_new_uproots(&mut self) -> bool {
+                    let mut ret = false;
+                    ret |= self.math_.has_new_uproots();
+                    ret
+                }
+                fn snapshot_all_uprooted(&mut self) {
+                    self.math_.create_uprooted_snapshot();
+                }
+            }
+            #[derive(Debug, Default)]
+            pub struct Theory {
+                pub delta: Delta,
+                pub uf: Unification,
+                pub add_: AddRelation,
+                pub mul_: MulRelation,
+                pub const_: ConstRelation,
+            }
+            impl Theory {
+                pub fn new() -> Self {
+                    let mut theory = Self::default();
+                    theory
+                }
+                pub fn step(&mut self) -> [std::time::Duration; 2] {
+                    [
+                        {
+                            let start = std::time::Instant::now();
+                            self.apply_rules();
+                            start.elapsed()
+                        },
+                        {
+                            let start = std::time::Instant::now();
+                            self.canonicalize();
+                            start.elapsed()
+                        },
+                    ]
+                }
+                #[inline(never)]
+                pub fn apply_rules(&mut self) {
+                    #[doc = "( rule ( ( = e ( Add ( Const a ) ( Const b ) ) ) ) ( ( union e ( Const ( + a b ) ) ) ) )"]
+                    for (p2, p4, e) in self.add_.iter_new() {
+                        if self.const_.check1_1_0(p4) {
+                            for (a,) in self.const_.iter1_1_0(p2) {
+                                for (b,) in self.const_.iter1_1_0(p4) {
+                                    let (a3,) = i64_add012(a, b).next().unwrap();
+                                    self.delta.insert_const((a3, e));
+                                }
+                            }
+                        }
+                    }
+                    #[doc = "( rule ( ( = e ( Add ( Const a ) ( Const b ) ) ) ) ( ( union e ( Const ( + a b ) ) ) ) )"]
+                    for (a_2, p2_2) in self.const_.iter_new() {
+                        for (p4_2, e_2) in self.add_.iter1_0_1_2(p2_2) {
+                            for (b_2,) in self.const_.iter1_1_0(p4_2) {
+                                let (a3_2,) = i64_add012(a_2, b_2).next().unwrap();
+                                self.delta.insert_const((a3_2, e_2));
+                            }
+                        }
+                    }
+                    #[doc = "( rule ( ( = e ( Add ( Const a ) ( Const b ) ) ) ) ( ( union e ( Const ( + a b ) ) ) ) )"]
+                    for (b_3, p4_3) in self.const_.iter_new() {
+                        for (p2_3, e_3) in self.add_.iter1_1_0_2(p4_3) {
+                            for (a_3,) in self.const_.iter1_1_0(p2_3) {
+                                let (a3_3,) = i64_add012(a_3, b_3).next().unwrap();
+                                self.delta.insert_const((a3_3, e_3));
+                            }
+                        }
+                    }
+                    #[doc = "( rule ( ( = e ( Mul ( Const a ) ( Const b ) ) ) ) ( ( union e ( Const ( * a b ) ) ) ) )"]
+                    for (p2_4, p4_4, e_4) in self.mul_.iter_new() {
+                        if self.const_.check1_1_0(p4_4) {
+                            for (a_4,) in self.const_.iter1_1_0(p2_4) {
+                                for (b_4,) in self.const_.iter1_1_0(p4_4) {
+                                    let (a3_4,) = i64_mul012(a_4, b_4).next().unwrap();
+                                    self.delta.insert_const((a3_4, e_4));
+                                }
+                            }
+                        }
+                    }
+                    #[doc = "( rule ( ( = e ( Mul ( Const a ) ( Const b ) ) ) ) ( ( union e ( Const ( * a b ) ) ) ) )"]
+                    for (a_5, p2_5) in self.const_.iter_new() {
+                        for (p4_5, e_5) in self.mul_.iter1_0_1_2(p2_5) {
+                            for (b_5,) in self.const_.iter1_1_0(p4_5) {
+                                let (a3_5,) = i64_mul012(a_5, b_5).next().unwrap();
+                                self.delta.insert_const((a3_5, e_5));
+                            }
+                        }
+                    }
+                    #[doc = "( rule ( ( = e ( Mul ( Const a ) ( Const b ) ) ) ) ( ( union e ( Const ( * a b ) ) ) ) )"]
+                    for (b_6, p4_6) in self.const_.iter_new() {
+                        for (p2_6, e_6) in self.mul_.iter1_1_0_2(p4_6) {
+                            for (a_6,) in self.const_.iter1_1_0(p2_6) {
+                                let (a3_6,) = i64_mul012(a_6, b_6).next().unwrap();
+                                self.delta.insert_const((a3_6, e_6));
+                            }
+                        }
+                    }
+                }
+                fn emit_graphviz(&self) -> String {
+                    let mut buf = String::new();
+                    buf.push_str("digraph G {\n");
+                    self.add_.emit_graphviz(&mut buf);
+                    self.mul_.emit_graphviz(&mut buf);
+                    self.const_.emit_graphviz(&mut buf);
+                    buf.push_str("}\n");
+                    buf
+                }
+                pub fn get_total_relation_entry_count(&self) -> usize {
+                    [self.add_.len(), self.mul_.len(), self.const_.len()]
+                        .into_iter()
+                        .sum::<usize>()
+                }
+                pub fn get_relation_entry_count(&self) -> std::collections::BTreeMap<&'static str, usize> {
+                    [
+                        ("Add", self.add_.len()),
+                        ("Mul", self.mul_.len()),
+                        ("Const", self.const_.len()),
+                    ]
+                    .into_iter()
+                    .collect()
+                }
+                #[inline(never)]
+                pub fn canonicalize(&mut self) {
+                    self.add_.clear_new();
+                    self.mul_.clear_new();
+                    self.const_.clear_new();
+                    if !self.delta.has_new_inserts() && !self.uf.has_new_uproots() {
+                        return;
+                    }
+                    let mut add_ctx = self.add_.update_begin();
+                    let mut mul_ctx = self.mul_.update_begin();
+                    let mut const_ctx = self.const_.update_begin();
+                    loop {
+                        self.uf.snapshot_all_uprooted();
+                        self.add_
+                            .update(&mut self.delta.add_, &mut add_ctx, &mut self.uf);
+                        self.mul_
+                            .update(&mut self.delta.mul_, &mut mul_ctx, &mut self.uf);
+                        self.const_
+                            .update(&mut self.delta.const_, &mut const_ctx, &mut self.uf);
+                        if !self.uf.has_new_uproots() {
+                            break;
+                        }
+                    }
+                    self.uf.snapshot_all_uprooted();
+                    self.add_.update_finalize(add_ctx, &mut self.uf);
+                    self.mul_.update_finalize(mul_ctx, &mut self.uf);
+                    self.const_.update_finalize(const_ctx, &mut self.uf);
+                }
+            }
+            impl EclassProvider<Math> for Theory {
+                fn make(&mut self) -> Math {
+                    self.uf.math_.add_eclass()
+                }
+                fn find(&mut self, t: Math) -> Math {
+                    self.uf.math_.find(t)
+                }
+                fn union(&mut self, a: Math, b: Math) {
+                    self.uf.math_.union(a, b);
+                }
+            }
+            impl std::ops::Deref for Theory {
+                type Target = Delta;
+                fn deref(&self) -> &Self::Target {
+                    &self.delta
+                }
+            }
+            impl std::ops::DerefMut for Theory {
+                fn deref_mut(&mut self) -> &mut Self::Target {
+                    &mut self.delta
+                }
+            }
+        "#]]),
+    }
+    .check();
+}
+
+#[test]
 fn codegen_commutative() {
     Steps {
         code: r#"
@@ -547,6 +1715,52 @@ fn codegen_commutative() {
             decl_row ! (Row3_1_0_2 < T0 , T1 first 1 , T2 > (1 , 0 , 2) () (T1 , T0 , T2) () fc = (1) (T1) where u128 = s => ((s . 1 . inner () as u128) << 64) + ((s . 0 . inner () as u128) << 32) + ((s . 2 . inner () as u128) << 0));
             decl_row ! (Row3_2_0_1 < T0 , T1 , T2 first 2 > (2 , 0 , 1) () (T2 , T0 , T1) () fc = (2) (T2) where u128 = s => ((s . 2 . inner () as u128) << 64) + ((s . 0 . inner () as u128) << 32) + ((s . 1 . inner () as u128) << 0));
             eclass_wrapper_ty!(Math);
+            fn i64_add012(a: i64, b: i64) -> impl Iterator<Item = (i64,)> {
+                a.checked_add(b).map(|x| (x,)).into_iter()
+            }
+            fn i64_bitand012(a: i64, b: i64) -> impl Iterator<Item = (i64,)> {
+                std::iter::once((a & b,))
+            }
+            fn i64_bitnot01(a: i64) -> impl Iterator<Item = (i64,)> {
+                std::iter::once((!a,))
+            }
+            fn i64_bitor012(a: i64, b: i64) -> impl Iterator<Item = (i64,)> {
+                std::iter::once((a | b,))
+            }
+            fn i64_bitshl012(a: i64, b: i64) -> impl Iterator<Item = (i64,)> {
+                a.checked_shl(b.try_into().unwrap())
+                    .map(|x| (x,))
+                    .into_iter()
+            }
+            fn i64_bitshr012(a: i64, b: i64) -> impl Iterator<Item = (i64,)> {
+                a.checked_shr(b.try_into().unwrap())
+                    .map(|x| (x,))
+                    .into_iter()
+            }
+            fn i64_bitxor012(a: i64, b: i64) -> impl Iterator<Item = (i64,)> {
+                std::iter::once((a ^ b,))
+            }
+            fn i64_div012(a: i64, b: i64) -> impl Iterator<Item = (i64,)> {
+                a.checked_div(b).map(|x| (x,)).into_iter()
+            }
+            fn i64_log01(a: i64) -> impl Iterator<Item = (i64,)> {
+                std::iter::once((a.ilog2() as i64,))
+            }
+            fn i64_max012(a: i64, b: i64) -> impl Iterator<Item = (i64,)> {
+                std::iter::once((a.max(b),))
+            }
+            fn i64_min012(a: i64, b: i64) -> impl Iterator<Item = (i64,)> {
+                std::iter::once((a.min(b),))
+            }
+            fn i64_mul012(a: i64, b: i64) -> impl Iterator<Item = (i64,)> {
+                a.checked_mul(b).map(|x| (x,)).into_iter()
+            }
+            fn i64_rem012(a: i64, b: i64) -> impl Iterator<Item = (i64,)> {
+                a.checked_rem(b).map(|x| (x,)).into_iter()
+            }
+            fn i64_sub012(a: i64, b: i64) -> impl Iterator<Item = (i64,)> {
+                a.checked_sub(b).map(|x| (x,)).into_iter()
+            }
             #[derive(Debug, Default)]
             struct AddRelation {
                 new: Vec<<Self as Relation>::Row>,
@@ -822,6 +2036,20 @@ fn regression_entry2() {
         expected_hir: Some(expect![[r#"
             Theory:
 
+            +(i64, i64, i64)
+            &(i64, i64, i64)
+            not-i64(i64, i64)
+            |(i64, i64, i64)
+            <<(i64, i64, i64)
+            >>(i64, i64, i64)
+            ^(i64, i64, i64)
+            /(i64, i64, i64)
+            log2(i64, i64)
+            max(i64, i64, i64)
+            min(i64, i64, i64)
+            *(i64, i64, i64)
+            %(i64, i64, i64)
+            -(i64, i64, i64)
             Math(Math)
             Sub(Math, Math, Math)
             Const(i64, Math)
@@ -840,14 +2068,84 @@ fn regression_entry2() {
             Theory {
                 name: None,
                 types: {
-                    [t0, i64]: std::primitive::i64,
-                    [t1, String]: runtime::IString,
-                    [t2, unit]: THIS_STRING_SHOULD_NOT_APPEAR_IN_GENERATED_CODE,
+                    [t0, unit]: THIS_STRING_SHOULD_NOT_APPEAR_IN_GENERATED_CODE,
+                    [t1, i64]: std::primitive::i64,
+                    [t2, String]: runtime::IString,
                     [t3, Math]: [symbolic],
                 },
                 relations: {
-                    r0: (hir-only relation),
+                    r0: RelationData {
+                        name: "i64_add012",
+                        param_types: {c0: t1, c1: t1, c2: t1},
+                        kind: Primitive,
+                    },
                     r1: RelationData {
+                        name: "i64_bitand012",
+                        param_types: {c0: t1, c1: t1, c2: t1},
+                        kind: Primitive,
+                    },
+                    r2: RelationData {
+                        name: "i64_bitnot01",
+                        param_types: {c0: t1, c1: t1},
+                        kind: Primitive,
+                    },
+                    r3: RelationData {
+                        name: "i64_bitor012",
+                        param_types: {c0: t1, c1: t1, c2: t1},
+                        kind: Primitive,
+                    },
+                    r4: RelationData {
+                        name: "i64_bitshl012",
+                        param_types: {c0: t1, c1: t1, c2: t1},
+                        kind: Primitive,
+                    },
+                    r5: RelationData {
+                        name: "i64_bitshr012",
+                        param_types: {c0: t1, c1: t1, c2: t1},
+                        kind: Primitive,
+                    },
+                    r6: RelationData {
+                        name: "i64_bitxor012",
+                        param_types: {c0: t1, c1: t1, c2: t1},
+                        kind: Primitive,
+                    },
+                    r7: RelationData {
+                        name: "i64_div012",
+                        param_types: {c0: t1, c1: t1, c2: t1},
+                        kind: Primitive,
+                    },
+                    r8: RelationData {
+                        name: "i64_log01",
+                        param_types: {c0: t1, c1: t1},
+                        kind: Primitive,
+                    },
+                    r9: RelationData {
+                        name: "i64_max012",
+                        param_types: {c0: t1, c1: t1, c2: t1},
+                        kind: Primitive,
+                    },
+                    r10: RelationData {
+                        name: "i64_min012",
+                        param_types: {c0: t1, c1: t1, c2: t1},
+                        kind: Primitive,
+                    },
+                    r11: RelationData {
+                        name: "i64_mul012",
+                        param_types: {c0: t1, c1: t1, c2: t1},
+                        kind: Primitive,
+                    },
+                    r12: RelationData {
+                        name: "i64_rem012",
+                        param_types: {c0: t1, c1: t1, c2: t1},
+                        kind: Primitive,
+                    },
+                    r13: RelationData {
+                        name: "i64_sub012",
+                        param_types: {c0: t1, c1: t1, c2: t1},
+                        kind: Primitive,
+                    },
+                    r14: (hir-only relation),
+                    r15: RelationData {
                         name: "Sub",
                         param_types: {c0: t3, c1: t3, c2: t3},
                         kind: Table {
@@ -862,9 +2160,9 @@ fn regression_entry2() {
                             column_back_reference: {c0: iu1, c1: iu2, c2: iu3},
                         },
                     },
-                    r2: RelationData {
+                    r16: RelationData {
                         name: "Const",
-                        param_types: {c0: t0, c1: t3},
+                        param_types: {c0: t1, c1: t3},
                         kind: Table {
                             index_to_info: {ir0: 0_1 conflict[..1] => [1:union], ir1: 1_0},
                             usage_to_info: {
@@ -876,9 +2174,9 @@ fn regression_entry2() {
                             column_back_reference: {c0: iu1, c1: iu2},
                         },
                     },
-                    r3: RelationData {
+                    r17: RelationData {
                         name: "g0",
-                        param_types: {c0: t0},
+                        param_types: {c0: t1},
                         kind: [Global, g0],
                     },
                 },
@@ -886,17 +2184,17 @@ fn regression_entry2() {
                     [v0, a]: t3,
                     [v1, b]: t3,
                     [v2, p2]: t3,
-                    [v3, a1]: t0,
+                    [v3, a1]: t1,
                 },
                 global_variable_types: {
-                    g0: t0,
+                    g0: t1,
                 },
                 rule_tries: [
                     meta: "( rewrite ( Sub a b ) ( Const -1 ) )"
-                    atom: [PremiseNew, r1(v0, v1, v2)]
+                    atom: [PremiseNew, r15(v0, v1, v2)]
                     then: [
-                        atom: [Action::Insert, r3(v3) on iu0],
-                        atom: [Action::Insert, r2(v3, v2)],
+                        atom: [Action::Insert, r17(v3) on iu0],
+                        atom: [Action::Insert, r16(v3, v2)],
                     ],
                 ],
                 initial: [
@@ -918,6 +2216,52 @@ fn regression_entry2() {
             decl_row ! (Row3_1_0_2 < T0 , T1 first 1 , T2 > (1 , 0 , 2) () (T1 , T0 , T2) () fc = (1) (T1) where u128 = s => ((s . 1 . inner () as u128) << 64) + ((s . 0 . inner () as u128) << 32) + ((s . 2 . inner () as u128) << 0));
             decl_row ! (Row3_2_0_1 < T0 , T1 , T2 first 2 > (2 , 0 , 1) () (T2 , T0 , T1) () fc = (2) (T2) where u128 = s => ((s . 2 . inner () as u128) << 64) + ((s . 0 . inner () as u128) << 32) + ((s . 1 . inner () as u128) << 0));
             eclass_wrapper_ty!(Math);
+            fn i64_add012(a: i64, b: i64) -> impl Iterator<Item = (i64,)> {
+                a.checked_add(b).map(|x| (x,)).into_iter()
+            }
+            fn i64_bitand012(a: i64, b: i64) -> impl Iterator<Item = (i64,)> {
+                std::iter::once((a & b,))
+            }
+            fn i64_bitnot01(a: i64) -> impl Iterator<Item = (i64,)> {
+                std::iter::once((!a,))
+            }
+            fn i64_bitor012(a: i64, b: i64) -> impl Iterator<Item = (i64,)> {
+                std::iter::once((a | b,))
+            }
+            fn i64_bitshl012(a: i64, b: i64) -> impl Iterator<Item = (i64,)> {
+                a.checked_shl(b.try_into().unwrap())
+                    .map(|x| (x,))
+                    .into_iter()
+            }
+            fn i64_bitshr012(a: i64, b: i64) -> impl Iterator<Item = (i64,)> {
+                a.checked_shr(b.try_into().unwrap())
+                    .map(|x| (x,))
+                    .into_iter()
+            }
+            fn i64_bitxor012(a: i64, b: i64) -> impl Iterator<Item = (i64,)> {
+                std::iter::once((a ^ b,))
+            }
+            fn i64_div012(a: i64, b: i64) -> impl Iterator<Item = (i64,)> {
+                a.checked_div(b).map(|x| (x,)).into_iter()
+            }
+            fn i64_log01(a: i64) -> impl Iterator<Item = (i64,)> {
+                std::iter::once((a.ilog2() as i64,))
+            }
+            fn i64_max012(a: i64, b: i64) -> impl Iterator<Item = (i64,)> {
+                std::iter::once((a.max(b),))
+            }
+            fn i64_min012(a: i64, b: i64) -> impl Iterator<Item = (i64,)> {
+                std::iter::once((a.min(b),))
+            }
+            fn i64_mul012(a: i64, b: i64) -> impl Iterator<Item = (i64,)> {
+                a.checked_mul(b).map(|x| (x,)).into_iter()
+            }
+            fn i64_rem012(a: i64, b: i64) -> impl Iterator<Item = (i64,)> {
+                a.checked_rem(b).map(|x| (x,)).into_iter()
+            }
+            fn i64_sub012(a: i64, b: i64) -> impl Iterator<Item = (i64,)> {
+                a.checked_sub(b).map(|x| (x,)).into_iter()
+            }
             #[derive(Debug, Default)]
             struct SubRelation {
                 new: Vec<<Self as Relation>::Row>,
@@ -1336,6 +2680,20 @@ fn regression_entry() {
         expected_hir: Some(expect![[r#"
             Theory:
 
+            +(i64, i64, i64)
+            &(i64, i64, i64)
+            not-i64(i64, i64)
+            |(i64, i64, i64)
+            <<(i64, i64, i64)
+            >>(i64, i64, i64)
+            ^(i64, i64, i64)
+            /(i64, i64, i64)
+            log2(i64, i64)
+            max(i64, i64, i64)
+            min(i64, i64, i64)
+            *(i64, i64, i64)
+            %(i64, i64, i64)
+            -(i64, i64, i64)
             Math(Math)
             Integral(Math, Math, Math)
             Add(Math, Math, Math)
@@ -1353,14 +2711,84 @@ fn regression_entry() {
             Theory {
                 name: None,
                 types: {
-                    [t0, i64]: std::primitive::i64,
-                    [t1, String]: runtime::IString,
-                    [t2, unit]: THIS_STRING_SHOULD_NOT_APPEAR_IN_GENERATED_CODE,
+                    [t0, unit]: THIS_STRING_SHOULD_NOT_APPEAR_IN_GENERATED_CODE,
+                    [t1, i64]: std::primitive::i64,
+                    [t2, String]: runtime::IString,
                     [t3, Math]: [symbolic],
                 },
                 relations: {
-                    r0: (hir-only relation),
+                    r0: RelationData {
+                        name: "i64_add012",
+                        param_types: {c0: t1, c1: t1, c2: t1},
+                        kind: Primitive,
+                    },
                     r1: RelationData {
+                        name: "i64_bitand012",
+                        param_types: {c0: t1, c1: t1, c2: t1},
+                        kind: Primitive,
+                    },
+                    r2: RelationData {
+                        name: "i64_bitnot01",
+                        param_types: {c0: t1, c1: t1},
+                        kind: Primitive,
+                    },
+                    r3: RelationData {
+                        name: "i64_bitor012",
+                        param_types: {c0: t1, c1: t1, c2: t1},
+                        kind: Primitive,
+                    },
+                    r4: RelationData {
+                        name: "i64_bitshl012",
+                        param_types: {c0: t1, c1: t1, c2: t1},
+                        kind: Primitive,
+                    },
+                    r5: RelationData {
+                        name: "i64_bitshr012",
+                        param_types: {c0: t1, c1: t1, c2: t1},
+                        kind: Primitive,
+                    },
+                    r6: RelationData {
+                        name: "i64_bitxor012",
+                        param_types: {c0: t1, c1: t1, c2: t1},
+                        kind: Primitive,
+                    },
+                    r7: RelationData {
+                        name: "i64_div012",
+                        param_types: {c0: t1, c1: t1, c2: t1},
+                        kind: Primitive,
+                    },
+                    r8: RelationData {
+                        name: "i64_log01",
+                        param_types: {c0: t1, c1: t1},
+                        kind: Primitive,
+                    },
+                    r9: RelationData {
+                        name: "i64_max012",
+                        param_types: {c0: t1, c1: t1, c2: t1},
+                        kind: Primitive,
+                    },
+                    r10: RelationData {
+                        name: "i64_min012",
+                        param_types: {c0: t1, c1: t1, c2: t1},
+                        kind: Primitive,
+                    },
+                    r11: RelationData {
+                        name: "i64_mul012",
+                        param_types: {c0: t1, c1: t1, c2: t1},
+                        kind: Primitive,
+                    },
+                    r12: RelationData {
+                        name: "i64_rem012",
+                        param_types: {c0: t1, c1: t1, c2: t1},
+                        kind: Primitive,
+                    },
+                    r13: RelationData {
+                        name: "i64_sub012",
+                        param_types: {c0: t1, c1: t1, c2: t1},
+                        kind: Primitive,
+                    },
+                    r14: (hir-only relation),
+                    r15: RelationData {
                         name: "Integral",
                         param_types: {c0: t3, c1: t3, c2: t3},
                         kind: Table {
@@ -1375,7 +2803,7 @@ fn regression_entry() {
                             column_back_reference: {c0: iu1, c1: iu2, c2: iu3},
                         },
                     },
-                    r2: RelationData {
+                    r16: RelationData {
                         name: "Add",
                         param_types: {c0: t3, c1: t3, c2: t3},
                         kind: Table {
@@ -1400,10 +2828,10 @@ fn regression_entry() {
                 global_variable_types: {},
                 rule_tries: [
                     meta: "( rewrite ( Add f g ) ( Add ( Integral f f ) g ) )"
-                    atom: [PremiseNew, r2(v0, v1, v2)]
+                    atom: [PremiseNew, r16(v0, v1, v2)]
                     then: [
-                        atom: [Action::Insert, r1(v0, v0, v3) on iu0],
-                        atom: [Action::Insert, r2(v3, v1, v2)],
+                        atom: [Action::Insert, r15(v0, v0, v3) on iu0],
+                        atom: [Action::Insert, r16(v3, v1, v2)],
                     ],
                 ],
                 initial: [],
@@ -1414,6 +2842,52 @@ fn regression_entry() {
             decl_row ! (Row3_1_0_2 < T0 , T1 first 1 , T2 > (1 , 0 , 2) () (T1 , T0 , T2) () fc = (1) (T1) where u128 = s => ((s . 1 . inner () as u128) << 64) + ((s . 0 . inner () as u128) << 32) + ((s . 2 . inner () as u128) << 0));
             decl_row ! (Row3_2_0_1 < T0 , T1 , T2 first 2 > (2 , 0 , 1) () (T2 , T0 , T1) () fc = (2) (T2) where u128 = s => ((s . 2 . inner () as u128) << 64) + ((s . 0 . inner () as u128) << 32) + ((s . 1 . inner () as u128) << 0));
             eclass_wrapper_ty!(Math);
+            fn i64_add012(a: i64, b: i64) -> impl Iterator<Item = (i64,)> {
+                a.checked_add(b).map(|x| (x,)).into_iter()
+            }
+            fn i64_bitand012(a: i64, b: i64) -> impl Iterator<Item = (i64,)> {
+                std::iter::once((a & b,))
+            }
+            fn i64_bitnot01(a: i64) -> impl Iterator<Item = (i64,)> {
+                std::iter::once((!a,))
+            }
+            fn i64_bitor012(a: i64, b: i64) -> impl Iterator<Item = (i64,)> {
+                std::iter::once((a | b,))
+            }
+            fn i64_bitshl012(a: i64, b: i64) -> impl Iterator<Item = (i64,)> {
+                a.checked_shl(b.try_into().unwrap())
+                    .map(|x| (x,))
+                    .into_iter()
+            }
+            fn i64_bitshr012(a: i64, b: i64) -> impl Iterator<Item = (i64,)> {
+                a.checked_shr(b.try_into().unwrap())
+                    .map(|x| (x,))
+                    .into_iter()
+            }
+            fn i64_bitxor012(a: i64, b: i64) -> impl Iterator<Item = (i64,)> {
+                std::iter::once((a ^ b,))
+            }
+            fn i64_div012(a: i64, b: i64) -> impl Iterator<Item = (i64,)> {
+                a.checked_div(b).map(|x| (x,)).into_iter()
+            }
+            fn i64_log01(a: i64) -> impl Iterator<Item = (i64,)> {
+                std::iter::once((a.ilog2() as i64,))
+            }
+            fn i64_max012(a: i64, b: i64) -> impl Iterator<Item = (i64,)> {
+                std::iter::once((a.max(b),))
+            }
+            fn i64_min012(a: i64, b: i64) -> impl Iterator<Item = (i64,)> {
+                std::iter::once((a.min(b),))
+            }
+            fn i64_mul012(a: i64, b: i64) -> impl Iterator<Item = (i64,)> {
+                a.checked_mul(b).map(|x| (x,)).into_iter()
+            }
+            fn i64_rem012(a: i64, b: i64) -> impl Iterator<Item = (i64,)> {
+                a.checked_rem(b).map(|x| (x,)).into_iter()
+            }
+            fn i64_sub012(a: i64, b: i64) -> impl Iterator<Item = (i64,)> {
+                a.checked_sub(b).map(|x| (x,)).into_iter()
+            }
             #[derive(Debug, Default)]
             struct IntegralRelation {
                 new: Vec<<Self as Relation>::Row>,
@@ -1853,6 +3327,20 @@ fn test_bind_variable_multiple_times() {
         expected_hir: Some(expect![[r#"
             Theory:
 
+            +(i64, i64, i64)
+            &(i64, i64, i64)
+            not-i64(i64, i64)
+            |(i64, i64, i64)
+            <<(i64, i64, i64)
+            >>(i64, i64, i64)
+            ^(i64, i64, i64)
+            /(i64, i64, i64)
+            log2(i64, i64)
+            max(i64, i64, i64)
+            min(i64, i64, i64)
+            *(i64, i64, i64)
+            %(i64, i64, i64)
+            -(i64, i64, i64)
             Foo(Foo)
             Same(Foo, Foo, Foo)
 
@@ -1865,14 +3353,84 @@ fn test_bind_variable_multiple_times() {
             Theory {
                 name: None,
                 types: {
-                    [t0, i64]: std::primitive::i64,
-                    [t1, String]: runtime::IString,
-                    [t2, unit]: THIS_STRING_SHOULD_NOT_APPEAR_IN_GENERATED_CODE,
+                    [t0, unit]: THIS_STRING_SHOULD_NOT_APPEAR_IN_GENERATED_CODE,
+                    [t1, i64]: std::primitive::i64,
+                    [t2, String]: runtime::IString,
                     [t3, Foo]: [symbolic],
                 },
                 relations: {
-                    r0: (hir-only relation),
+                    r0: RelationData {
+                        name: "i64_add012",
+                        param_types: {c0: t1, c1: t1, c2: t1},
+                        kind: Primitive,
+                    },
                     r1: RelationData {
+                        name: "i64_bitand012",
+                        param_types: {c0: t1, c1: t1, c2: t1},
+                        kind: Primitive,
+                    },
+                    r2: RelationData {
+                        name: "i64_bitnot01",
+                        param_types: {c0: t1, c1: t1},
+                        kind: Primitive,
+                    },
+                    r3: RelationData {
+                        name: "i64_bitor012",
+                        param_types: {c0: t1, c1: t1, c2: t1},
+                        kind: Primitive,
+                    },
+                    r4: RelationData {
+                        name: "i64_bitshl012",
+                        param_types: {c0: t1, c1: t1, c2: t1},
+                        kind: Primitive,
+                    },
+                    r5: RelationData {
+                        name: "i64_bitshr012",
+                        param_types: {c0: t1, c1: t1, c2: t1},
+                        kind: Primitive,
+                    },
+                    r6: RelationData {
+                        name: "i64_bitxor012",
+                        param_types: {c0: t1, c1: t1, c2: t1},
+                        kind: Primitive,
+                    },
+                    r7: RelationData {
+                        name: "i64_div012",
+                        param_types: {c0: t1, c1: t1, c2: t1},
+                        kind: Primitive,
+                    },
+                    r8: RelationData {
+                        name: "i64_log01",
+                        param_types: {c0: t1, c1: t1},
+                        kind: Primitive,
+                    },
+                    r9: RelationData {
+                        name: "i64_max012",
+                        param_types: {c0: t1, c1: t1, c2: t1},
+                        kind: Primitive,
+                    },
+                    r10: RelationData {
+                        name: "i64_min012",
+                        param_types: {c0: t1, c1: t1, c2: t1},
+                        kind: Primitive,
+                    },
+                    r11: RelationData {
+                        name: "i64_mul012",
+                        param_types: {c0: t1, c1: t1, c2: t1},
+                        kind: Primitive,
+                    },
+                    r12: RelationData {
+                        name: "i64_rem012",
+                        param_types: {c0: t1, c1: t1, c2: t1},
+                        kind: Primitive,
+                    },
+                    r13: RelationData {
+                        name: "i64_sub012",
+                        param_types: {c0: t1, c1: t1, c2: t1},
+                        kind: Primitive,
+                    },
+                    r14: (hir-only relation),
+                    r15: RelationData {
                         name: "Same",
                         param_types: {c0: t3, c1: t3, c2: t3},
                         kind: Table {
@@ -1896,7 +3454,7 @@ fn test_bind_variable_multiple_times() {
                 global_variable_types: {},
                 rule_tries: [
                     meta: "( rewrite ( Same x x ) x )"
-                    atom: [PremiseNew, r1(v0, v2, v1)]
+                    atom: [PremiseNew, r15(v0, v2, v1)]
                     then: [
                         atom: [IfEq, v0=v2]
                         then: [
@@ -1912,6 +3470,52 @@ fn test_bind_variable_multiple_times() {
             decl_row ! (Row3_1_0_2 < T0 , T1 first 1 , T2 > (1 , 0 , 2) () (T1 , T0 , T2) () fc = (1) (T1) where u128 = s => ((s . 1 . inner () as u128) << 64) + ((s . 0 . inner () as u128) << 32) + ((s . 2 . inner () as u128) << 0));
             decl_row ! (Row3_2_0_1 < T0 , T1 , T2 first 2 > (2 , 0 , 1) () (T2 , T0 , T1) () fc = (2) (T2) where u128 = s => ((s . 2 . inner () as u128) << 64) + ((s . 0 . inner () as u128) << 32) + ((s . 1 . inner () as u128) << 0));
             eclass_wrapper_ty!(Foo);
+            fn i64_add012(a: i64, b: i64) -> impl Iterator<Item = (i64,)> {
+                a.checked_add(b).map(|x| (x,)).into_iter()
+            }
+            fn i64_bitand012(a: i64, b: i64) -> impl Iterator<Item = (i64,)> {
+                std::iter::once((a & b,))
+            }
+            fn i64_bitnot01(a: i64) -> impl Iterator<Item = (i64,)> {
+                std::iter::once((!a,))
+            }
+            fn i64_bitor012(a: i64, b: i64) -> impl Iterator<Item = (i64,)> {
+                std::iter::once((a | b,))
+            }
+            fn i64_bitshl012(a: i64, b: i64) -> impl Iterator<Item = (i64,)> {
+                a.checked_shl(b.try_into().unwrap())
+                    .map(|x| (x,))
+                    .into_iter()
+            }
+            fn i64_bitshr012(a: i64, b: i64) -> impl Iterator<Item = (i64,)> {
+                a.checked_shr(b.try_into().unwrap())
+                    .map(|x| (x,))
+                    .into_iter()
+            }
+            fn i64_bitxor012(a: i64, b: i64) -> impl Iterator<Item = (i64,)> {
+                std::iter::once((a ^ b,))
+            }
+            fn i64_div012(a: i64, b: i64) -> impl Iterator<Item = (i64,)> {
+                a.checked_div(b).map(|x| (x,)).into_iter()
+            }
+            fn i64_log01(a: i64) -> impl Iterator<Item = (i64,)> {
+                std::iter::once((a.ilog2() as i64,))
+            }
+            fn i64_max012(a: i64, b: i64) -> impl Iterator<Item = (i64,)> {
+                std::iter::once((a.max(b),))
+            }
+            fn i64_min012(a: i64, b: i64) -> impl Iterator<Item = (i64,)> {
+                std::iter::once((a.min(b),))
+            }
+            fn i64_mul012(a: i64, b: i64) -> impl Iterator<Item = (i64,)> {
+                a.checked_mul(b).map(|x| (x,)).into_iter()
+            }
+            fn i64_rem012(a: i64, b: i64) -> impl Iterator<Item = (i64,)> {
+                a.checked_rem(b).map(|x| (x,)).into_iter()
+            }
+            fn i64_sub012(a: i64, b: i64) -> impl Iterator<Item = (i64,)> {
+                a.checked_sub(b).map(|x| (x,)).into_iter()
+            }
             #[derive(Debug, Default)]
             struct SameRelation {
                 new: Vec<<Self as Relation>::Row>,
@@ -2196,6 +3800,20 @@ fn test_negative_i64_tokens() {
         expected_hir: Some(expect![[r#"
             Theory:
 
+            +(i64, i64, i64)
+            &(i64, i64, i64)
+            not-i64(i64, i64)
+            |(i64, i64, i64)
+            <<(i64, i64, i64)
+            >>(i64, i64, i64)
+            ^(i64, i64, i64)
+            /(i64, i64, i64)
+            log2(i64, i64)
+            max(i64, i64, i64)
+            min(i64, i64, i64)
+            *(i64, i64, i64)
+            %(i64, i64, i64)
+            -(i64, i64, i64)
             Math(Math)
             Mul(Math, Math, Math)
             Add(Math, Math, Math)
@@ -2231,6 +3849,20 @@ fn codegen_variable_reuse_bug() {
         expected_hir: Some(expect![[r#"
             Theory:
 
+            +(i64, i64, i64)
+            &(i64, i64, i64)
+            not-i64(i64, i64)
+            |(i64, i64, i64)
+            <<(i64, i64, i64)
+            >>(i64, i64, i64)
+            ^(i64, i64, i64)
+            /(i64, i64, i64)
+            log2(i64, i64)
+            max(i64, i64, i64)
+            min(i64, i64, i64)
+            *(i64, i64, i64)
+            %(i64, i64, i64)
+            -(i64, i64, i64)
             Math(Math)
             Add(Math, Math, Math)
             Zero(Math)
@@ -2248,14 +3880,84 @@ fn codegen_variable_reuse_bug() {
             Theory {
                 name: None,
                 types: {
-                    [t0, i64]: std::primitive::i64,
-                    [t1, String]: runtime::IString,
-                    [t2, unit]: THIS_STRING_SHOULD_NOT_APPEAR_IN_GENERATED_CODE,
+                    [t0, unit]: THIS_STRING_SHOULD_NOT_APPEAR_IN_GENERATED_CODE,
+                    [t1, i64]: std::primitive::i64,
+                    [t2, String]: runtime::IString,
                     [t3, Math]: [symbolic],
                 },
                 relations: {
-                    r0: (hir-only relation),
+                    r0: RelationData {
+                        name: "i64_add012",
+                        param_types: {c0: t1, c1: t1, c2: t1},
+                        kind: Primitive,
+                    },
                     r1: RelationData {
+                        name: "i64_bitand012",
+                        param_types: {c0: t1, c1: t1, c2: t1},
+                        kind: Primitive,
+                    },
+                    r2: RelationData {
+                        name: "i64_bitnot01",
+                        param_types: {c0: t1, c1: t1},
+                        kind: Primitive,
+                    },
+                    r3: RelationData {
+                        name: "i64_bitor012",
+                        param_types: {c0: t1, c1: t1, c2: t1},
+                        kind: Primitive,
+                    },
+                    r4: RelationData {
+                        name: "i64_bitshl012",
+                        param_types: {c0: t1, c1: t1, c2: t1},
+                        kind: Primitive,
+                    },
+                    r5: RelationData {
+                        name: "i64_bitshr012",
+                        param_types: {c0: t1, c1: t1, c2: t1},
+                        kind: Primitive,
+                    },
+                    r6: RelationData {
+                        name: "i64_bitxor012",
+                        param_types: {c0: t1, c1: t1, c2: t1},
+                        kind: Primitive,
+                    },
+                    r7: RelationData {
+                        name: "i64_div012",
+                        param_types: {c0: t1, c1: t1, c2: t1},
+                        kind: Primitive,
+                    },
+                    r8: RelationData {
+                        name: "i64_log01",
+                        param_types: {c0: t1, c1: t1},
+                        kind: Primitive,
+                    },
+                    r9: RelationData {
+                        name: "i64_max012",
+                        param_types: {c0: t1, c1: t1, c2: t1},
+                        kind: Primitive,
+                    },
+                    r10: RelationData {
+                        name: "i64_min012",
+                        param_types: {c0: t1, c1: t1, c2: t1},
+                        kind: Primitive,
+                    },
+                    r11: RelationData {
+                        name: "i64_mul012",
+                        param_types: {c0: t1, c1: t1, c2: t1},
+                        kind: Primitive,
+                    },
+                    r12: RelationData {
+                        name: "i64_rem012",
+                        param_types: {c0: t1, c1: t1, c2: t1},
+                        kind: Primitive,
+                    },
+                    r13: RelationData {
+                        name: "i64_sub012",
+                        param_types: {c0: t1, c1: t1, c2: t1},
+                        kind: Primitive,
+                    },
+                    r14: (hir-only relation),
+                    r15: RelationData {
                         name: "Add",
                         param_types: {c0: t3, c1: t3, c2: t3},
                         kind: Table {
@@ -2274,7 +3976,7 @@ fn codegen_variable_reuse_bug() {
                             column_back_reference: {c0: iu5, c1: iu6, c2: iu7},
                         },
                     },
-                    r2: RelationData {
+                    r16: RelationData {
                         name: "Zero",
                         param_types: {c0: t3},
                         kind: Table {
@@ -2287,7 +3989,7 @@ fn codegen_variable_reuse_bug() {
                             column_back_reference: {c0: iu1},
                         },
                     },
-                    r3: RelationData {
+                    r17: RelationData {
                         name: "g0",
                         param_types: {c0: t3},
                         kind: [Global, g0],
@@ -2309,40 +4011,40 @@ fn codegen_variable_reuse_bug() {
                 },
                 rule_tries: [
                     meta: "( rule ( ( = zero ( Add zero x ) ) ) ( ( union x ( Zero ) ) ) )"
-                    atom: [PremiseNew, r1(v1, v2, v0)]
+                    atom: [PremiseNew, r15(v1, v2, v0)]
                     then: [
-                        atom: [PremiseAny, r3(v0), iu_bogus]
+                        atom: [PremiseAny, r17(v0), iu_bogus]
                         then: [
-                            atom: [PremiseAny, r3(v1), iu_bogus]
+                            atom: [PremiseAny, r17(v1), iu_bogus]
                             then: [
-                                atom: [Action::Insert, r2(v2)],
+                                atom: [Action::Insert, r16(v2)],
                             ],
                         ],
                     ],
                     meta: "( rule ( ( = zero ( Add zero x ) ) ) ( ( union x ( Zero ) ) ) )"
-                    atom: [PremiseNew, r3(v3)]
+                    atom: [PremiseNew, r17(v3)]
                     then: [
-                        atom: [PremiseAny, r1(v4, v5, v3), iu2]
+                        atom: [PremiseAny, r15(v4, v5, v3), iu2]
                         then: [
-                            atom: [Premise, r3(v4), iu_bogus]
+                            atom: [Premise, r17(v4), iu_bogus]
                             then: [
-                                atom: [Premise, r1(v4, v5, v3), iu1]
+                                atom: [Premise, r15(v4, v5, v3), iu1]
                                 then: [
-                                    atom: [Action::Insert, r2(v5)],
+                                    atom: [Action::Insert, r16(v5)],
                                 ],
                             ],
                         ],
                     ],
                     meta: "( rule ( ( = zero ( Add zero x ) ) ) ( ( union x ( Zero ) ) ) )"
-                    atom: [PremiseNew, r3(v7)]
+                    atom: [PremiseNew, r17(v7)]
                     then: [
-                        atom: [PremiseAny, r1(v7, v8, v6), iu4]
+                        atom: [PremiseAny, r15(v7, v8, v6), iu4]
                         then: [
-                            atom: [Premise, r3(v6), iu_bogus]
+                            atom: [Premise, r17(v6), iu_bogus]
                             then: [
-                                atom: [Premise, r1(v7, v8, v6), iu3]
+                                atom: [Premise, r15(v7, v8, v6), iu3]
                                 then: [
-                                    atom: [Action::Insert, r2(v8)],
+                                    atom: [Action::Insert, r16(v8)],
                                 ],
                             ],
                         ],
@@ -2352,7 +4054,7 @@ fn codegen_variable_reuse_bug() {
                     ComputeGlobal {
                         global_id: g0,
                         compute: Compute {
-                            relation: r2,
+                            relation: r16,
                             args: [],
                         },
                     },
@@ -2365,6 +4067,52 @@ fn codegen_variable_reuse_bug() {
             decl_row ! (Row3_1_0_2 < T0 , T1 first 1 , T2 > (1 , 0 , 2) () (T1 , T0 , T2) () fc = (1) (T1) where u128 = s => ((s . 1 . inner () as u128) << 64) + ((s . 0 . inner () as u128) << 32) + ((s . 2 . inner () as u128) << 0));
             decl_row ! (Row3_2_0_1 < T0 , T1 , T2 first 2 > (2 , 0 , 1) () (T2 , T0 , T1) () fc = (2) (T2) where u128 = s => ((s . 2 . inner () as u128) << 64) + ((s . 0 . inner () as u128) << 32) + ((s . 1 . inner () as u128) << 0));
             eclass_wrapper_ty!(Math);
+            fn i64_add012(a: i64, b: i64) -> impl Iterator<Item = (i64,)> {
+                a.checked_add(b).map(|x| (x,)).into_iter()
+            }
+            fn i64_bitand012(a: i64, b: i64) -> impl Iterator<Item = (i64,)> {
+                std::iter::once((a & b,))
+            }
+            fn i64_bitnot01(a: i64) -> impl Iterator<Item = (i64,)> {
+                std::iter::once((!a,))
+            }
+            fn i64_bitor012(a: i64, b: i64) -> impl Iterator<Item = (i64,)> {
+                std::iter::once((a | b,))
+            }
+            fn i64_bitshl012(a: i64, b: i64) -> impl Iterator<Item = (i64,)> {
+                a.checked_shl(b.try_into().unwrap())
+                    .map(|x| (x,))
+                    .into_iter()
+            }
+            fn i64_bitshr012(a: i64, b: i64) -> impl Iterator<Item = (i64,)> {
+                a.checked_shr(b.try_into().unwrap())
+                    .map(|x| (x,))
+                    .into_iter()
+            }
+            fn i64_bitxor012(a: i64, b: i64) -> impl Iterator<Item = (i64,)> {
+                std::iter::once((a ^ b,))
+            }
+            fn i64_div012(a: i64, b: i64) -> impl Iterator<Item = (i64,)> {
+                a.checked_div(b).map(|x| (x,)).into_iter()
+            }
+            fn i64_log01(a: i64) -> impl Iterator<Item = (i64,)> {
+                std::iter::once((a.ilog2() as i64,))
+            }
+            fn i64_max012(a: i64, b: i64) -> impl Iterator<Item = (i64,)> {
+                std::iter::once((a.max(b),))
+            }
+            fn i64_min012(a: i64, b: i64) -> impl Iterator<Item = (i64,)> {
+                std::iter::once((a.min(b),))
+            }
+            fn i64_mul012(a: i64, b: i64) -> impl Iterator<Item = (i64,)> {
+                a.checked_mul(b).map(|x| (x,)).into_iter()
+            }
+            fn i64_rem012(a: i64, b: i64) -> impl Iterator<Item = (i64,)> {
+                a.checked_rem(b).map(|x| (x,)).into_iter()
+            }
+            fn i64_sub012(a: i64, b: i64) -> impl Iterator<Item = (i64,)> {
+                a.checked_sub(b).map(|x| (x,)).into_iter()
+            }
             #[derive(Debug, Default)]
             struct AddRelation {
                 new: Vec<<Self as Relation>::Row>,
@@ -2816,6 +4564,20 @@ fn initial_exprs() {
         expected_hir: Some(expect![[r#"
             Theory:
 
+            +(i64, i64, i64)
+            &(i64, i64, i64)
+            not-i64(i64, i64)
+            |(i64, i64, i64)
+            <<(i64, i64, i64)
+            >>(i64, i64, i64)
+            ^(i64, i64, i64)
+            /(i64, i64, i64)
+            log2(i64, i64)
+            max(i64, i64, i64)
+            min(i64, i64, i64)
+            *(i64, i64, i64)
+            %(i64, i64, i64)
+            -(i64, i64, i64)
             Math(Math)
             Add(Math, Math, Math)
             Mul(Math, Math, Math)
@@ -2842,6 +4604,52 @@ fn initial_exprs() {
             decl_row ! (Row3_1_0_2 < T0 , T1 first 1 , T2 > (1 , 0 , 2) () (T1 , T0 , T2) () fc = (1) (T1) where u128 = s => ((s . 1 . inner () as u128) << 64) + ((s . 0 . inner () as u128) << 32) + ((s . 2 . inner () as u128) << 0));
             decl_row ! (Row3_2_0_1 < T0 , T1 , T2 first 2 > (2 , 0 , 1) () (T2 , T0 , T1) () fc = (2) (T2) where u128 = s => ((s . 2 . inner () as u128) << 64) + ((s . 0 . inner () as u128) << 32) + ((s . 1 . inner () as u128) << 0));
             eclass_wrapper_ty!(Math);
+            fn i64_add012(a: i64, b: i64) -> impl Iterator<Item = (i64,)> {
+                a.checked_add(b).map(|x| (x,)).into_iter()
+            }
+            fn i64_bitand012(a: i64, b: i64) -> impl Iterator<Item = (i64,)> {
+                std::iter::once((a & b,))
+            }
+            fn i64_bitnot01(a: i64) -> impl Iterator<Item = (i64,)> {
+                std::iter::once((!a,))
+            }
+            fn i64_bitor012(a: i64, b: i64) -> impl Iterator<Item = (i64,)> {
+                std::iter::once((a | b,))
+            }
+            fn i64_bitshl012(a: i64, b: i64) -> impl Iterator<Item = (i64,)> {
+                a.checked_shl(b.try_into().unwrap())
+                    .map(|x| (x,))
+                    .into_iter()
+            }
+            fn i64_bitshr012(a: i64, b: i64) -> impl Iterator<Item = (i64,)> {
+                a.checked_shr(b.try_into().unwrap())
+                    .map(|x| (x,))
+                    .into_iter()
+            }
+            fn i64_bitxor012(a: i64, b: i64) -> impl Iterator<Item = (i64,)> {
+                std::iter::once((a ^ b,))
+            }
+            fn i64_div012(a: i64, b: i64) -> impl Iterator<Item = (i64,)> {
+                a.checked_div(b).map(|x| (x,)).into_iter()
+            }
+            fn i64_log01(a: i64) -> impl Iterator<Item = (i64,)> {
+                std::iter::once((a.ilog2() as i64,))
+            }
+            fn i64_max012(a: i64, b: i64) -> impl Iterator<Item = (i64,)> {
+                std::iter::once((a.max(b),))
+            }
+            fn i64_min012(a: i64, b: i64) -> impl Iterator<Item = (i64,)> {
+                std::iter::once((a.min(b),))
+            }
+            fn i64_mul012(a: i64, b: i64) -> impl Iterator<Item = (i64,)> {
+                a.checked_mul(b).map(|x| (x,)).into_iter()
+            }
+            fn i64_rem012(a: i64, b: i64) -> impl Iterator<Item = (i64,)> {
+                a.checked_rem(b).map(|x| (x,)).into_iter()
+            }
+            fn i64_sub012(a: i64, b: i64) -> impl Iterator<Item = (i64,)> {
+                a.checked_sub(b).map(|x| (x,)).into_iter()
+            }
             #[derive(Debug, Default)]
             struct AddRelation {
                 new: Vec<<Self as Relation>::Row>,
@@ -3795,6 +5603,20 @@ fn codegen_bug1() {
         expected_hir: Some(expect![[r#"
             Theory:
 
+            +(i64, i64, i64)
+            &(i64, i64, i64)
+            not-i64(i64, i64)
+            |(i64, i64, i64)
+            <<(i64, i64, i64)
+            >>(i64, i64, i64)
+            ^(i64, i64, i64)
+            /(i64, i64, i64)
+            log2(i64, i64)
+            max(i64, i64, i64)
+            min(i64, i64, i64)
+            *(i64, i64, i64)
+            %(i64, i64, i64)
+            -(i64, i64, i64)
             T0(T0)
             T1(T1)
             T2(T2)
@@ -3810,6 +5632,52 @@ fn codegen_bug1() {
             eclass_wrapper_ty!(T0);
             eclass_wrapper_ty!(T1);
             eclass_wrapper_ty!(T2);
+            fn i64_add012(a: i64, b: i64) -> impl Iterator<Item = (i64,)> {
+                a.checked_add(b).map(|x| (x,)).into_iter()
+            }
+            fn i64_bitand012(a: i64, b: i64) -> impl Iterator<Item = (i64,)> {
+                std::iter::once((a & b,))
+            }
+            fn i64_bitnot01(a: i64) -> impl Iterator<Item = (i64,)> {
+                std::iter::once((!a,))
+            }
+            fn i64_bitor012(a: i64, b: i64) -> impl Iterator<Item = (i64,)> {
+                std::iter::once((a | b,))
+            }
+            fn i64_bitshl012(a: i64, b: i64) -> impl Iterator<Item = (i64,)> {
+                a.checked_shl(b.try_into().unwrap())
+                    .map(|x| (x,))
+                    .into_iter()
+            }
+            fn i64_bitshr012(a: i64, b: i64) -> impl Iterator<Item = (i64,)> {
+                a.checked_shr(b.try_into().unwrap())
+                    .map(|x| (x,))
+                    .into_iter()
+            }
+            fn i64_bitxor012(a: i64, b: i64) -> impl Iterator<Item = (i64,)> {
+                std::iter::once((a ^ b,))
+            }
+            fn i64_div012(a: i64, b: i64) -> impl Iterator<Item = (i64,)> {
+                a.checked_div(b).map(|x| (x,)).into_iter()
+            }
+            fn i64_log01(a: i64) -> impl Iterator<Item = (i64,)> {
+                std::iter::once((a.ilog2() as i64,))
+            }
+            fn i64_max012(a: i64, b: i64) -> impl Iterator<Item = (i64,)> {
+                std::iter::once((a.max(b),))
+            }
+            fn i64_min012(a: i64, b: i64) -> impl Iterator<Item = (i64,)> {
+                std::iter::once((a.min(b),))
+            }
+            fn i64_mul012(a: i64, b: i64) -> impl Iterator<Item = (i64,)> {
+                a.checked_mul(b).map(|x| (x,)).into_iter()
+            }
+            fn i64_rem012(a: i64, b: i64) -> impl Iterator<Item = (i64,)> {
+                a.checked_rem(b).map(|x| (x,)).into_iter()
+            }
+            fn i64_sub012(a: i64, b: i64) -> impl Iterator<Item = (i64,)> {
+                a.checked_sub(b).map(|x| (x,)).into_iter()
+            }
             #[derive(Debug, Default)]
             struct FooRelation {
                 new: Vec<<Self as Relation>::Row>,
@@ -4100,6 +5968,20 @@ fn initial() {
         expected_hir: Some(expect![[r#"
             Theory:
 
+            +(i64, i64, i64)
+            &(i64, i64, i64)
+            not-i64(i64, i64)
+            |(i64, i64, i64)
+            <<(i64, i64, i64)
+            >>(i64, i64, i64)
+            ^(i64, i64, i64)
+            /(i64, i64, i64)
+            log2(i64, i64)
+            max(i64, i64, i64)
+            min(i64, i64, i64)
+            *(i64, i64, i64)
+            %(i64, i64, i64)
+            -(i64, i64, i64)
             Math(Math)
             Const(i64, Math)
 
@@ -4110,6 +5992,52 @@ fn initial() {
             decl_row ! (Row2_0 < T0 first 0 , T1 > (0) (1) (T0) (T1) fc = (0) (T0) where u64 = s => ((s . 0 . inner () as u64) << 32) + ((s . 1 . inner () as u64) << 0));
             decl_row ! (Row2_1_0 < T0 , T1 first 1 > (1 , 0) () (T1 , T0) () fc = (1) (T1) where u64 = s => ((s . 1 . inner () as u64) << 32) + ((s . 0 . inner () as u64) << 0));
             eclass_wrapper_ty!(Math);
+            fn i64_add012(a: i64, b: i64) -> impl Iterator<Item = (i64,)> {
+                a.checked_add(b).map(|x| (x,)).into_iter()
+            }
+            fn i64_bitand012(a: i64, b: i64) -> impl Iterator<Item = (i64,)> {
+                std::iter::once((a & b,))
+            }
+            fn i64_bitnot01(a: i64) -> impl Iterator<Item = (i64,)> {
+                std::iter::once((!a,))
+            }
+            fn i64_bitor012(a: i64, b: i64) -> impl Iterator<Item = (i64,)> {
+                std::iter::once((a | b,))
+            }
+            fn i64_bitshl012(a: i64, b: i64) -> impl Iterator<Item = (i64,)> {
+                a.checked_shl(b.try_into().unwrap())
+                    .map(|x| (x,))
+                    .into_iter()
+            }
+            fn i64_bitshr012(a: i64, b: i64) -> impl Iterator<Item = (i64,)> {
+                a.checked_shr(b.try_into().unwrap())
+                    .map(|x| (x,))
+                    .into_iter()
+            }
+            fn i64_bitxor012(a: i64, b: i64) -> impl Iterator<Item = (i64,)> {
+                std::iter::once((a ^ b,))
+            }
+            fn i64_div012(a: i64, b: i64) -> impl Iterator<Item = (i64,)> {
+                a.checked_div(b).map(|x| (x,)).into_iter()
+            }
+            fn i64_log01(a: i64) -> impl Iterator<Item = (i64,)> {
+                std::iter::once((a.ilog2() as i64,))
+            }
+            fn i64_max012(a: i64, b: i64) -> impl Iterator<Item = (i64,)> {
+                std::iter::once((a.max(b),))
+            }
+            fn i64_min012(a: i64, b: i64) -> impl Iterator<Item = (i64,)> {
+                std::iter::once((a.min(b),))
+            }
+            fn i64_mul012(a: i64, b: i64) -> impl Iterator<Item = (i64,)> {
+                a.checked_mul(b).map(|x| (x,)).into_iter()
+            }
+            fn i64_rem012(a: i64, b: i64) -> impl Iterator<Item = (i64,)> {
+                a.checked_rem(b).map(|x| (x,)).into_iter()
+            }
+            fn i64_sub012(a: i64, b: i64) -> impl Iterator<Item = (i64,)> {
+                a.checked_sub(b).map(|x| (x,)).into_iter()
+            }
             #[derive(Debug, Default)]
             struct ConstRelation {
                 new: Vec<<Self as Relation>::Row>,
@@ -4374,6 +6302,20 @@ fn test_primitives_simple() {
         expected_hir :Some( expect![[r#"
             Theory:
 
+            +(i64, i64, i64)
+            &(i64, i64, i64)
+            not-i64(i64, i64)
+            |(i64, i64, i64)
+            <<(i64, i64, i64)
+            >>(i64, i64, i64)
+            ^(i64, i64, i64)
+            /(i64, i64, i64)
+            log2(i64, i64)
+            max(i64, i64, i64)
+            min(i64, i64, i64)
+            *(i64, i64, i64)
+            %(i64, i64, i64)
+            -(i64, i64, i64)
             Math(Math)
             Mul(Math, Math, Math)
             Add(Math, Math, Math)
@@ -4428,6 +6370,52 @@ fn test_primitives_simple() {
             decl_row ! (Row3_1_0_2 < T0 , T1 first 1 , T2 > (1 , 0 , 2) () (T1 , T0 , T2) () fc = (1) (T1) where u128 = s => ((s . 1 . inner () as u128) << 64) + ((s . 0 . inner () as u128) << 32) + ((s . 2 . inner () as u128) << 0));
             decl_row ! (Row3_2_0_1 < T0 , T1 , T2 first 2 > (2 , 0 , 1) () (T2 , T0 , T1) () fc = (2) (T2) where u128 = s => ((s . 2 . inner () as u128) << 64) + ((s . 0 . inner () as u128) << 32) + ((s . 1 . inner () as u128) << 0));
             eclass_wrapper_ty!(Math);
+            fn i64_add012(a: i64, b: i64) -> impl Iterator<Item = (i64,)> {
+                a.checked_add(b).map(|x| (x,)).into_iter()
+            }
+            fn i64_bitand012(a: i64, b: i64) -> impl Iterator<Item = (i64,)> {
+                std::iter::once((a & b,))
+            }
+            fn i64_bitnot01(a: i64) -> impl Iterator<Item = (i64,)> {
+                std::iter::once((!a,))
+            }
+            fn i64_bitor012(a: i64, b: i64) -> impl Iterator<Item = (i64,)> {
+                std::iter::once((a | b,))
+            }
+            fn i64_bitshl012(a: i64, b: i64) -> impl Iterator<Item = (i64,)> {
+                a.checked_shl(b.try_into().unwrap())
+                    .map(|x| (x,))
+                    .into_iter()
+            }
+            fn i64_bitshr012(a: i64, b: i64) -> impl Iterator<Item = (i64,)> {
+                a.checked_shr(b.try_into().unwrap())
+                    .map(|x| (x,))
+                    .into_iter()
+            }
+            fn i64_bitxor012(a: i64, b: i64) -> impl Iterator<Item = (i64,)> {
+                std::iter::once((a ^ b,))
+            }
+            fn i64_div012(a: i64, b: i64) -> impl Iterator<Item = (i64,)> {
+                a.checked_div(b).map(|x| (x,)).into_iter()
+            }
+            fn i64_log01(a: i64) -> impl Iterator<Item = (i64,)> {
+                std::iter::once((a.ilog2() as i64,))
+            }
+            fn i64_max012(a: i64, b: i64) -> impl Iterator<Item = (i64,)> {
+                std::iter::once((a.max(b),))
+            }
+            fn i64_min012(a: i64, b: i64) -> impl Iterator<Item = (i64,)> {
+                std::iter::once((a.min(b),))
+            }
+            fn i64_mul012(a: i64, b: i64) -> impl Iterator<Item = (i64,)> {
+                a.checked_mul(b).map(|x| (x,)).into_iter()
+            }
+            fn i64_rem012(a: i64, b: i64) -> impl Iterator<Item = (i64,)> {
+                a.checked_rem(b).map(|x| (x,)).into_iter()
+            }
+            fn i64_sub012(a: i64, b: i64) -> impl Iterator<Item = (i64,)> {
+                a.checked_sub(b).map(|x| (x,)).into_iter()
+            }
             #[derive(Debug, Default)]
             struct MulRelation {
                 new: Vec<<Self as Relation>::Row>,
@@ -5248,6 +7236,20 @@ fn triangle_join() {
         expected_hir: Some(expect![[r#"
             Theory:
 
+            +(i64, i64, i64)
+            &(i64, i64, i64)
+            not-i64(i64, i64)
+            |(i64, i64, i64)
+            <<(i64, i64, i64)
+            >>(i64, i64, i64)
+            ^(i64, i64, i64)
+            /(i64, i64, i64)
+            log2(i64, i64)
+            max(i64, i64, i64)
+            min(i64, i64, i64)
+            *(i64, i64, i64)
+            %(i64, i64, i64)
+            -(i64, i64, i64)
             Math(Math)
             Foo(Math, Math)
             Bar(Math, Math)
@@ -5271,6 +7273,52 @@ fn triangle_join() {
             decl_row ! (Row3_1_0_2 < T0 , T1 first 1 , T2 > (1 , 0 , 2) () (T1 , T0 , T2) () fc = (1) (T1) where u128 = s => ((s . 1 . inner () as u128) << 64) + ((s . 0 . inner () as u128) << 32) + ((s . 2 . inner () as u128) << 0));
             decl_row ! (Row3_2_0_1 < T0 , T1 , T2 first 2 > (2 , 0 , 1) () (T2 , T0 , T1) () fc = (2) (T2) where u128 = s => ((s . 2 . inner () as u128) << 64) + ((s . 0 . inner () as u128) << 32) + ((s . 1 . inner () as u128) << 0));
             eclass_wrapper_ty!(Math);
+            fn i64_add012(a: i64, b: i64) -> impl Iterator<Item = (i64,)> {
+                a.checked_add(b).map(|x| (x,)).into_iter()
+            }
+            fn i64_bitand012(a: i64, b: i64) -> impl Iterator<Item = (i64,)> {
+                std::iter::once((a & b,))
+            }
+            fn i64_bitnot01(a: i64) -> impl Iterator<Item = (i64,)> {
+                std::iter::once((!a,))
+            }
+            fn i64_bitor012(a: i64, b: i64) -> impl Iterator<Item = (i64,)> {
+                std::iter::once((a | b,))
+            }
+            fn i64_bitshl012(a: i64, b: i64) -> impl Iterator<Item = (i64,)> {
+                a.checked_shl(b.try_into().unwrap())
+                    .map(|x| (x,))
+                    .into_iter()
+            }
+            fn i64_bitshr012(a: i64, b: i64) -> impl Iterator<Item = (i64,)> {
+                a.checked_shr(b.try_into().unwrap())
+                    .map(|x| (x,))
+                    .into_iter()
+            }
+            fn i64_bitxor012(a: i64, b: i64) -> impl Iterator<Item = (i64,)> {
+                std::iter::once((a ^ b,))
+            }
+            fn i64_div012(a: i64, b: i64) -> impl Iterator<Item = (i64,)> {
+                a.checked_div(b).map(|x| (x,)).into_iter()
+            }
+            fn i64_log01(a: i64) -> impl Iterator<Item = (i64,)> {
+                std::iter::once((a.ilog2() as i64,))
+            }
+            fn i64_max012(a: i64, b: i64) -> impl Iterator<Item = (i64,)> {
+                std::iter::once((a.max(b),))
+            }
+            fn i64_min012(a: i64, b: i64) -> impl Iterator<Item = (i64,)> {
+                std::iter::once((a.min(b),))
+            }
+            fn i64_mul012(a: i64, b: i64) -> impl Iterator<Item = (i64,)> {
+                a.checked_mul(b).map(|x| (x,)).into_iter()
+            }
+            fn i64_rem012(a: i64, b: i64) -> impl Iterator<Item = (i64,)> {
+                a.checked_rem(b).map(|x| (x,)).into_iter()
+            }
+            fn i64_sub012(a: i64, b: i64) -> impl Iterator<Item = (i64,)> {
+                a.checked_sub(b).map(|x| (x,)).into_iter()
+            }
             #[derive(Debug, Default)]
             struct FooRelation {
                 new: Vec<<Self as Relation>::Row>,
@@ -5981,6 +8029,20 @@ fn edgecase0() {
         expected_hir :Some( expect![[r#"
             Theory:
 
+            +(i64, i64, i64)
+            &(i64, i64, i64)
+            not-i64(i64, i64)
+            |(i64, i64, i64)
+            <<(i64, i64, i64)
+            >>(i64, i64, i64)
+            ^(i64, i64, i64)
+            /(i64, i64, i64)
+            log2(i64, i64)
+            max(i64, i64, i64)
+            min(i64, i64, i64)
+            *(i64, i64, i64)
+            %(i64, i64, i64)
+            -(i64, i64, i64)
             Math(Math)
             Mul(Math, Math, Math)
             Add(Math, Math, Math)
@@ -6004,6 +8066,52 @@ fn edgecase0() {
             decl_row ! (Row3_1_0_2 < T0 , T1 first 1 , T2 > (1 , 0 , 2) () (T1 , T0 , T2) () fc = (1) (T1) where u128 = s => ((s . 1 . inner () as u128) << 64) + ((s . 0 . inner () as u128) << 32) + ((s . 2 . inner () as u128) << 0));
             decl_row ! (Row3_2_0_1 < T0 , T1 , T2 first 2 > (2 , 0 , 1) () (T2 , T0 , T1) () fc = (2) (T2) where u128 = s => ((s . 2 . inner () as u128) << 64) + ((s . 0 . inner () as u128) << 32) + ((s . 1 . inner () as u128) << 0));
             eclass_wrapper_ty!(Math);
+            fn i64_add012(a: i64, b: i64) -> impl Iterator<Item = (i64,)> {
+                a.checked_add(b).map(|x| (x,)).into_iter()
+            }
+            fn i64_bitand012(a: i64, b: i64) -> impl Iterator<Item = (i64,)> {
+                std::iter::once((a & b,))
+            }
+            fn i64_bitnot01(a: i64) -> impl Iterator<Item = (i64,)> {
+                std::iter::once((!a,))
+            }
+            fn i64_bitor012(a: i64, b: i64) -> impl Iterator<Item = (i64,)> {
+                std::iter::once((a | b,))
+            }
+            fn i64_bitshl012(a: i64, b: i64) -> impl Iterator<Item = (i64,)> {
+                a.checked_shl(b.try_into().unwrap())
+                    .map(|x| (x,))
+                    .into_iter()
+            }
+            fn i64_bitshr012(a: i64, b: i64) -> impl Iterator<Item = (i64,)> {
+                a.checked_shr(b.try_into().unwrap())
+                    .map(|x| (x,))
+                    .into_iter()
+            }
+            fn i64_bitxor012(a: i64, b: i64) -> impl Iterator<Item = (i64,)> {
+                std::iter::once((a ^ b,))
+            }
+            fn i64_div012(a: i64, b: i64) -> impl Iterator<Item = (i64,)> {
+                a.checked_div(b).map(|x| (x,)).into_iter()
+            }
+            fn i64_log01(a: i64) -> impl Iterator<Item = (i64,)> {
+                std::iter::once((a.ilog2() as i64,))
+            }
+            fn i64_max012(a: i64, b: i64) -> impl Iterator<Item = (i64,)> {
+                std::iter::once((a.max(b),))
+            }
+            fn i64_min012(a: i64, b: i64) -> impl Iterator<Item = (i64,)> {
+                std::iter::once((a.min(b),))
+            }
+            fn i64_mul012(a: i64, b: i64) -> impl Iterator<Item = (i64,)> {
+                a.checked_mul(b).map(|x| (x,)).into_iter()
+            }
+            fn i64_rem012(a: i64, b: i64) -> impl Iterator<Item = (i64,)> {
+                a.checked_rem(b).map(|x| (x,)).into_iter()
+            }
+            fn i64_sub012(a: i64, b: i64) -> impl Iterator<Item = (i64,)> {
+                a.checked_sub(b).map(|x| (x,)).into_iter()
+            }
             #[derive(Debug, Default)]
             struct MulRelation {
                 new: Vec<<Self as Relation>::Row>,
@@ -6479,6 +8587,20 @@ fn test_into_codegen() {
         expected_hir: Some(expect![[r#"
             Theory:
 
+            +(i64, i64, i64)
+            &(i64, i64, i64)
+            not-i64(i64, i64)
+            |(i64, i64, i64)
+            <<(i64, i64, i64)
+            >>(i64, i64, i64)
+            ^(i64, i64, i64)
+            /(i64, i64, i64)
+            log2(i64, i64)
+            max(i64, i64, i64)
+            min(i64, i64, i64)
+            *(i64, i64, i64)
+            %(i64, i64, i64)
+            -(i64, i64, i64)
             Math(Math)
             Mul(Math, Math, Math)
             Add(Math, Math, Math)
@@ -6502,6 +8624,52 @@ fn test_into_codegen() {
             decl_row ! (Row3_1_0_2 < T0 , T1 first 1 , T2 > (1 , 0 , 2) () (T1 , T0 , T2) () fc = (1) (T1) where u128 = s => ((s . 1 . inner () as u128) << 64) + ((s . 0 . inner () as u128) << 32) + ((s . 2 . inner () as u128) << 0));
             decl_row ! (Row3_2_0_1 < T0 , T1 , T2 first 2 > (2 , 0 , 1) () (T2 , T0 , T1) () fc = (2) (T2) where u128 = s => ((s . 2 . inner () as u128) << 64) + ((s . 0 . inner () as u128) << 32) + ((s . 1 . inner () as u128) << 0));
             eclass_wrapper_ty!(Math);
+            fn i64_add012(a: i64, b: i64) -> impl Iterator<Item = (i64,)> {
+                a.checked_add(b).map(|x| (x,)).into_iter()
+            }
+            fn i64_bitand012(a: i64, b: i64) -> impl Iterator<Item = (i64,)> {
+                std::iter::once((a & b,))
+            }
+            fn i64_bitnot01(a: i64) -> impl Iterator<Item = (i64,)> {
+                std::iter::once((!a,))
+            }
+            fn i64_bitor012(a: i64, b: i64) -> impl Iterator<Item = (i64,)> {
+                std::iter::once((a | b,))
+            }
+            fn i64_bitshl012(a: i64, b: i64) -> impl Iterator<Item = (i64,)> {
+                a.checked_shl(b.try_into().unwrap())
+                    .map(|x| (x,))
+                    .into_iter()
+            }
+            fn i64_bitshr012(a: i64, b: i64) -> impl Iterator<Item = (i64,)> {
+                a.checked_shr(b.try_into().unwrap())
+                    .map(|x| (x,))
+                    .into_iter()
+            }
+            fn i64_bitxor012(a: i64, b: i64) -> impl Iterator<Item = (i64,)> {
+                std::iter::once((a ^ b,))
+            }
+            fn i64_div012(a: i64, b: i64) -> impl Iterator<Item = (i64,)> {
+                a.checked_div(b).map(|x| (x,)).into_iter()
+            }
+            fn i64_log01(a: i64) -> impl Iterator<Item = (i64,)> {
+                std::iter::once((a.ilog2() as i64,))
+            }
+            fn i64_max012(a: i64, b: i64) -> impl Iterator<Item = (i64,)> {
+                std::iter::once((a.max(b),))
+            }
+            fn i64_min012(a: i64, b: i64) -> impl Iterator<Item = (i64,)> {
+                std::iter::once((a.min(b),))
+            }
+            fn i64_mul012(a: i64, b: i64) -> impl Iterator<Item = (i64,)> {
+                a.checked_mul(b).map(|x| (x,)).into_iter()
+            }
+            fn i64_rem012(a: i64, b: i64) -> impl Iterator<Item = (i64,)> {
+                a.checked_rem(b).map(|x| (x,)).into_iter()
+            }
+            fn i64_sub012(a: i64, b: i64) -> impl Iterator<Item = (i64,)> {
+                a.checked_sub(b).map(|x| (x,)).into_iter()
+            }
             #[derive(Debug, Default)]
             struct MulRelation {
                 new: Vec<<Self as Relation>::Row>,

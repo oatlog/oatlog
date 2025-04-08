@@ -1,9 +1,9 @@
 //! All query plan *choices* occur here.
 use crate::{
     hir::{self, ActionRelation, PremiseRelation, RelationTy, SymbolicRule, Theory},
-    ids::{ActionId, ColumnId, IndexUsageId, PremiseId, RelationId, VariableId},
+    ids::{ActionId, ColumnId, ImplicitRuleId, IndexUsageId, PremiseId, RelationId, VariableId},
     index_selection, lir,
-    typed_vec::{TVec, tvec},
+    typed_vec::{tvec, TVec},
 };
 use std::{
     collections::{BTreeMap, BTreeSet},
@@ -105,16 +105,27 @@ pub(crate) fn emit_lir_theory(mut theory: hir::Theory) -> (hir::Theory, lir::The
     let mut lir_relations: TVec<RelationId, Option<lir::RelationData>> = TVec::new();
     for relation_id in theory.relations.enumerate() {
         let relation = &theory.relations[relation_id];
-        match relation.ty {
+        match &relation.ty {
             RelationTy::NewOf { .. } => continue,
             RelationTy::Alias { .. } => unimplemented!("alias relations not implemented"),
             RelationTy::Global { id } => {
                 let ty = theory.global_types[id];
-                let lir_relation = lir::RelationData::new_global(None, ty, id);
+                let lir_relation = lir::RelationData::new_global(None, ty, *id);
                 lir_relations.push_expected(relation_id, Some(lir_relation));
             }
-            RelationTy::Primitive { .. } => {
-                unimplemented!("primtive relations not implemented")
+            RelationTy::Primitive { syn, ident } => {
+                let lir_relation = lir::RelationData::new_primitive(
+                    ident,
+                    relation.columns.clone(),
+                    syn.0.clone(),
+                    relation.implicit_rules[ImplicitRuleId(0)]
+                        .out
+                        .iter()
+                        .next()
+                        .map(|(col, _)| *col)
+                        .unwrap(),
+                );
+                lir_relations.push_expected(relation_id, Some(lir_relation));
             }
             RelationTy::Forall { ty: _ } => {
                 // Forall relations are implicitly created as a feature of `runtime::UnionFind`
@@ -530,7 +541,9 @@ fn generate_tries(
                         | RelationTy::Alias { .. } => {
                             panic!()
                         }
-                        RelationTy::Primitive {} => todo!(),
+                        RelationTy::Primitive { .. } => {
+                            // TODO erik: Forgot what I was doing here.
+                        }
                         RelationTy::Global { .. } => {
                             extra_bound_action_variables.insert(args.inner()[0]);
                         }
@@ -689,7 +702,10 @@ fn generate_tries(
                     args,
                     index: IndexUsageId::bogus(),
                 },
-                (_, RelationTy::Primitive {}) => todo!("primitive not implemented"),
+                (_, RelationTy::Primitive { .. }) => {
+                    // TODO erik: need "entry" or similar in HIR to use primitives in premises.
+                    todo!("primitive not implemented for premise, need HIR changes")
+                }
                 (Query::Iterate, RelationTy::Forall { ty: _ }) => {
                     todo!("forall not implemented")
                 }
@@ -883,7 +899,10 @@ impl Theory {
             }
             RelationTy::Alias { .. } => todo!("alias not implemented"),
             RelationTy::Global { .. } => Some(true),
-            RelationTy::Primitive { .. } => todo!("primitives not implemented"),
+            RelationTy::Primitive { .. } => {
+                // TODO erik: depends, but for now, yes.
+                Some(true)
+            }
             RelationTy::Forall { .. } => Some(false),
         }
     }

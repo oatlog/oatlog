@@ -8,6 +8,7 @@ use crate::{
 use itertools::Itertools as _;
 use proc_macro2::{Ident, TokenStream};
 use quote::{format_ident, quote};
+
 use std::collections::{BTreeMap, BTreeSet};
 
 mod query;
@@ -86,6 +87,10 @@ pub fn codegen(theory: &Theory) -> TokenStream {
                                 field
                             )
                         }
+                        RelationKind::Primitive {..} => {
+                            // it's not possible to make inserts into primitive functions.
+                            return None;
+                        },
                     })
             })
             .collect_vecs();
@@ -122,9 +127,11 @@ pub fn codegen(theory: &Theory) -> TokenStream {
                         ident::rel_ctx_ident(rel),
                         ident::delta_row(rel),
                     )),
+                    RelationKind::Primitive { .. } => None,
                 }
             })
             .collect_vecs();
+
         let types_used_in_global_variables = theory
             .global_variable_types
             .iter()
@@ -182,6 +189,7 @@ pub fn codegen(theory: &Theory) -> TokenStream {
             Some(match &rel.kind {
                 RelationKind::Table { .. } => (ident::rel_var(rel), ident::rel_ty(rel), rel.name),
                 RelationKind::Global { .. } => return None,
+                RelationKind::Primitive { .. } => return None,
             })
         })
         .collect_vecs();
@@ -378,6 +386,7 @@ fn codegen_globals_and_initial(
                             }
                         }
                     }
+                    RelationKind::Primitive { codegen: _, out_col: _ } => todo!("primtive compute global"),
                 }
             }
         }
@@ -480,6 +489,10 @@ fn codegen_relation(
             usage_to_info,
             index_to_info,
         ),
+        RelationKind::Primitive {
+            codegen,
+            out_col: _,
+        } => codegen.clone(),
     }
 }
 

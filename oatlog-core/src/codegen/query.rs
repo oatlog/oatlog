@@ -6,21 +6,22 @@ use crate::{
     },
     typed_vec::TVec,
 };
+
 use itertools::Itertools as _;
 use proc_macro2::TokenStream;
-use quote::quote;
+use quote::{format_ident, quote};
 
-pub struct CodegenRuleTrieCtx<'a> {
-    pub types: &'a TVec<TypeId, TypeData>,
-    pub relations: &'a TVec<RelationId, Option<RelationData>>,
-    pub variables: &'a TVec<VariableId, VariableData>,
-    pub global_variable_types: &'a TVec<GlobalId, TypeId>,
-    pub global_idx: &'a TVec<GlobalId, usize>,
+pub(crate) struct CodegenRuleTrieCtx<'a> {
+    pub(crate) types: &'a TVec<TypeId, TypeData>,
+    pub(crate) relations: &'a TVec<RelationId, Option<RelationData>>,
+    pub(crate) variables: &'a TVec<VariableId, VariableData>,
+    pub(crate) global_variable_types: &'a TVec<GlobalId, TypeId>,
+    pub(crate) global_idx: &'a TVec<GlobalId, usize>,
 
-    pub variables_bound: &'a mut TVec<VariableId, bool>,
+    pub(crate) variables_bound: &'a mut TVec<VariableId, bool>,
 
     /// Whether this recursion level has a fresh scope compared to its parent.
-    pub scoped: bool,
+    pub(crate) scoped: bool,
 }
 
 impl CodegenRuleTrieCtx<'_> {
@@ -42,7 +43,7 @@ impl CodegenRuleTrieCtx<'_> {
         self.variables_bound[x] = false;
     }
 
-    pub fn codegen_all(&mut self, tries: &[RuleTrie], isolated_scope: bool) -> TokenStream {
+    pub(crate) fn codegen_all(&mut self, tries: &[RuleTrie], isolated_scope: bool) -> TokenStream {
         let old_scoped = self.scoped;
         self.scoped = isolated_scope && tries.len() <= 1;
         let ret = tries.iter().map(|&trie| self.codegen(trie)).collect();
@@ -80,7 +81,7 @@ impl CodegenRuleTrieCtx<'_> {
                 let relation_ = &self.relations[relation]
                     .as_ref()
                     .expect("only LIR relations (the `Some` case) can be used in `PremiseNew`");
-                match relation_.kind {
+                match &relation_.kind {
                     RelationKind::Global { id } => {
                         let var = args[0];
                         let ty = self.global_variable_types[id];
@@ -113,6 +114,9 @@ impl CodegenRuleTrieCtx<'_> {
                                 #inner
                             }
                         }
+                    }
+                    RelationKind::Primitive { .. } => {
+                        unreachable!("primtive functions do not have new")
                     }
                 }
             }
@@ -203,6 +207,9 @@ impl CodegenRuleTrieCtx<'_> {
                             }
                         }
                     }
+                    RelationKind::Primitive { .. } => {
+                        todo!("fix when new HIR has entry for premises")
+                    }
                 }
             }
             RuleAtom::PremiseAny {
@@ -260,6 +267,9 @@ impl CodegenRuleTrieCtx<'_> {
                             }
                         }
                     }
+                    RelationKind::Primitive { .. } => {
+                        todo!("fix when new HIR has entry for premises")
+                    }
                 }
             }
             RuleAtom::Action(Action::Insert { relation, args }) => {
@@ -276,6 +286,9 @@ impl CodegenRuleTrieCtx<'_> {
                     }
                     RelationKind::Global { .. } => {
                         panic!("Are you sure you wanted to insert into a global instead of entry?");
+                    }
+                    RelationKind::Primitive { .. } => {
+                        panic!("Insert is not supported for primtive relations")
                     }
                 }
             }
@@ -359,6 +372,22 @@ impl CodegenRuleTrieCtx<'_> {
                         let name = ident::var_var(&self.variables[var]);
                         quote! {
                             let #name = self.#global_ty.get(#idx);
+                        }
+                    }
+                    RelationKind::Primitive {
+                        codegen: _,
+                        out_col,
+                    } => {
+                        assert_eq!(out_col.0 + 1, args.len());
+                        let output = ident::var_var(&self.variables[args.last().copied().unwrap()]);
+                        let inputs = args[0..args.len() - 1]
+                            .iter()
+                            .copied()
+                            .map(|x| ident::var_var(&self.variables[x]))
+                            .collect_vec();
+                        let ident = format_ident!("{}", relation.name);
+                        quote! {
+                            let (#output,) = #ident(#(#inputs),*).next().unwrap();
                         }
                     }
                 }

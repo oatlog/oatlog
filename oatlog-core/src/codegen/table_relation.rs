@@ -24,19 +24,19 @@ pub fn codegen_table_relation(
             let attr_name = ident::index_all_field(index_info);
             let row_choice = ident::index_all_row(index_info);
             let fields_ty = rel
-                .param_types
+                .columns
                 .iter()
                 .map(|&ty| ident::type_ty(&theory.types[ty]));
             declare_rows
                 .entry(row_choice.clone())
                 .or_insert_with(|| index_info.clone());
-            let ty = if rel.param_types.len() <= 4
+            let ty = if rel.columns.len() <= 4
                 && rel
-                    .param_types
+                    .columns
                     .iter()
                     .all(|&ty| matches!(theory.types[ty].kind, TypeKind::Symbolic))
             {
-                let radix_key = match rel.param_types.len() {
+                let radix_key = match rel.columns.len() {
                     1 => quote! { u32 },
                     2 => quote! { u64 },
                     3 | 4 => quote! { u128 },
@@ -65,7 +65,7 @@ pub fn codegen_table_relation(
     };
 
     let (params, column_types) = rel
-        .param_types
+        .columns
         .iter()
         .map(|ty| {
             let type_ = &theory.types[ty];
@@ -77,7 +77,7 @@ pub fn codegen_table_relation(
     let rel_update_ctx_ty = ident::rel_update_ctx_ty(rel);
     let relation_name = ident::rel_get(rel).to_string();
 
-    let cost = u32::try_from(index_to_info.len() * rel.param_types.len()).unwrap();
+    let cost = u32::try_from(index_to_info.len() * rel.columns.len()).unwrap();
 
     let (iter_all, check_all, entry_all) = usage_to_info
         .iter()
@@ -172,7 +172,7 @@ fn update(
             .map(|x| {
                 let col_x = ident::column(*x);
                 let col_y = ident::column_alt(*x);
-                let ty = rel.param_types[*x];
+                let ty = rel.columns[*x];
                 let ty = &theory.types[ty];
                 let uf = ident::type_uf(ty);
                 (
@@ -203,7 +203,7 @@ fn update(
     }
 
     let (col_num_symbolic, uf_all_symbolic) = rel
-        .param_types
+        .columns
         .iter_enumerate()
         .filter_map(|(i, ty)| {
             let ty = &theory.types[ty];
@@ -300,7 +300,7 @@ fn update(
     };
 
     let params: Vec<TokenStream> = rel
-        .param_types
+        .columns
         .iter()
         .map(|type_| ident::type_ty(&theory.types[type_]))
         .collect();
@@ -391,7 +391,7 @@ fn per_usage(
                 .copied()
                 .map(|x| {
                     let ident = ident::column(x);
-                    let ident_ty = ident::type_ty(&theory.types[rel.param_types[x]]);
+                    let ident_ty = ident::type_ty(&theory.types[rel.columns[x]]);
                     quote! { #ident : #ident_ty }
                 }),
         )
@@ -406,7 +406,7 @@ fn per_usage(
     let out_ty = index_info.permuted_columns.inner()[usage_info.prefix..]
         .iter()
         .copied()
-        .map(|x| ident::type_ty(&theory.types[rel.param_types[x]]))
+        .map(|x| ident::type_ty(&theory.types[rel.columns[x]]))
         .collect_vec();
 
     let iter_all_ident = ident::index_all_iter(usage_info, index_info);
@@ -419,13 +419,13 @@ fn per_usage(
                     let col = ident::column(col);
                     (quote! { #col }, quote! { #col })
                 } else {
-                    let ty = ident::type_ty(&theory.types[rel.param_types[col]]);
+                    let ty = ident::type_ty(&theory.types[rel.columns[col]]);
                     (quote! { #ty::MIN_ID }, quote! { #ty::MAX_ID })
                 }
             })
             .collect_vecs();
 
-        let col_symbs = rel.param_types.enumerate().map(ident::column).collect_vec();
+        let col_symbs = rel.columns.enumerate().map(ident::column).collect_vec();
 
         quote! {
             fn #iter_all_ident(#(#args,)*) -> impl Iterator<Item = (#(#out_ty,)*)> + use<'_> {
@@ -451,37 +451,37 @@ fn per_usage(
             .map(ident::column);
 
         index_info.permuted_columns
-                    .iter_enumerate()
-                    .skip(usage_info.prefix)
-                    .map(|(i, &c)| index_info.primary_key_violation_merge.get(&c).map(|merge| {
-                        let ty = &theory.types[rel.param_types[i]];
-                        let out_col = ident::column(c);
+            .iter_enumerate()
+            .skip(usage_info.prefix)
+            .map(|(i, &c)| index_info.primary_key_violation_merge.get(&c).map(|merge| {
+                let ty = &theory.types[rel.columns[i]];
+                let out_col = ident::column(c);
 
-                        let uf = ident::type_uf(ty);
+                let uf = ident::type_uf(ty);
 
-                        match merge {
-                            MergeTy::Union => quote! {
-                                let #out_col = uf.#uf.add_eclass();
-                            },
-                            MergeTy::Panic => quote! {
-                                let #out_col = panic!("entry on value not present in database for a panic-merge implicit rule");
-                            },
+                match merge {
+                    MergeTy::Union => quote! {
+                        let #out_col = uf.#uf.add_eclass();
+                    },
+                    MergeTy::Panic => quote! {
+                        let #out_col = panic!("entry on value not present in database for a panic-merge implicit rule");
+                    },
+                }
+            }))
+            .collect::<Option<Vec<_>>>()
+            .map(|body| {
+                quote! {
+                    #[allow(unreachable_code)]
+                    fn #entry_all_ident(#(#args,)* delta: &mut Delta, uf: &mut Unification) -> (#(#out_ty,)*) {
+                        if let Some((#(#out_columns,)*)) = self.#iter_all_ident(#(#call_args,)*).next() {
+                            return (#(#out_columns,)*);
                         }
-                    }))
-                    .collect::<Option<Vec<_>>>()
-                    .map(|body| {
-                        quote! {
-                            #[allow(unreachable_code)]
-                            fn #entry_all_ident(#(#args,)* delta: &mut Delta, uf: &mut Unification) -> (#(#out_ty,)*) {
-                                if let Some((#(#out_columns,)*)) = self.#iter_all_ident(#(#call_args,)*).next() {
-                                    return (#(#out_columns,)*);
-                                }
-                                #(#body)*
-                                delta.#relation_delta.push((#(#all_columns,)*));
-                                (#(#out_columns,)*)
-                            }
-                        }
-                    }).unwrap_or(quote!{})
+                        #(#body)*
+                        delta.#relation_delta.push((#(#all_columns,)*));
+                        (#(#out_columns,)*)
+                    }
+                }
+            }).unwrap_or(quote!{})
     };
     (iter_all, check_all, entry_all)
 }

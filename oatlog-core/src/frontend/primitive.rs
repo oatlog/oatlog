@@ -4,9 +4,13 @@ use std::{collections::BTreeSet, mem::take};
 
 use darling::FromMeta;
 use educe::Educe;
+use quote::ToTokens;
+use syn::spanned::Spanned as _;
 
 use crate::{
     MultiMapCollect,
+    frontend::span::MResult,
+    frontend::span::{self, QSpan, Spanned, Str},
     ids::{ColumnId, ImplicitRuleId, TypeId},
     typed_vec::TVec,
 };
@@ -28,25 +32,26 @@ macro_rules! letexp {
 
 #[derive(Clone, Debug)]
 pub(crate) struct PrimFunc {
-    name: String,
-    columns: TVec<ColumnId, TypeId>,
-    indexes: TVec<ImplicitRuleId, PrimIndex>,
+    pub(crate) name: Str,
+    pub(crate) columns: TVec<ColumnId, TypeId>,
+    pub(crate) indexes: TVec<ImplicitRuleId, PrimIndex>,
 }
 
 #[derive(Clone, Educe)]
 #[educe(Debug)]
 pub(crate) struct PrimIndex {
     // out does not imply fd.
-    out: BTreeSet<ColumnId>,
-    index_to_main: TVec<ColumnId, ColumnId>,
-    fd: bool,
+    pub(crate) out: BTreeSet<ColumnId>,
+    pub(crate) index_to_main: TVec<ColumnId, ColumnId>,
+    pub(crate) fd: bool,
     #[educe(Debug(ignore))]
-    syn: syn::ItemFn,
+    pub(crate) syn: syn::ItemFn,
+    pub(crate) ident: String,
 }
 
 pub(crate) fn parse_prim_funcs(
     prim_funcs: proc_macro2::TokenStream,
-    mut get_type: impl FnMut(&str) -> TypeId,
+    mut get_type: impl FnMut(Str) -> TypeId,
 ) -> Vec<PrimFunc> {
     syn::parse2::<syn::File>(prim_funcs)
         .unwrap()
@@ -59,7 +64,9 @@ pub(crate) fn parse_prim_funcs(
 
             let attr = take(&mut item_fn.attrs).into_iter().next().unwrap();
             let attr = <PrimAttrMeta as FromMeta>::from_meta(&attr.meta).unwrap();
-            (attr.id.clone(), (attr, item_fn))
+
+            let span = QSpan::new(item_fn.span(), item_fn.to_token_stream().to_string());
+            (attr.id.clone(), (attr, item_fn, Some(span)))
         })
         .collect_multimap()
         .into_iter()
@@ -68,20 +75,20 @@ pub(crate) fn parse_prim_funcs(
             let mut expected_name = None;
             let indexes: TVec<ImplicitRuleId, PrimIndex> = attr
                 .into_iter()
-                .map(|(meta, item)| {
+                .map(|(meta, item, span)| {
                     let inputs = parse_input_ty(&item);
                     let outputs = parse_output_ty(&item);
 
                     let index_to_main: TVec<ColumnId, ColumnId> =
                         meta.index_to_main.iter().map(|x| ColumnId(*x)).collect();
 
-                    let types_index: TVec<ColumnId, String> = inputs
+                    let types_index: TVec<ColumnId, Str> = inputs
                         .iter()
                         .cloned()
                         .chain(outputs.iter().cloned())
                         .collect();
 
-                    let types_main: TVec<ColumnId, String> = TVec::from_iter_unordered(
+                    let types_main: TVec<ColumnId, Str> = TVec::from_iter_unordered(
                         types_index
                             .iter_enumerate()
                             .map(|(i, x)| (index_to_main[i], x.clone())),
@@ -91,10 +98,13 @@ pub(crate) fn parse_prim_funcs(
                         assert_eq!(e, &types_main);
                     }
                     expected_types = Some(types_main);
-                    if let Some(e) = expected_name.as_ref() {
-                        assert_eq!(e, &meta.name);
+
+                    let name = Spanned::new(&*meta.name.leak(), span);
+
+                    if let Some(e) = expected_name {
+                        assert_eq!(e, name);
                     }
-                    expected_name = Some(meta.name);
+                    expected_name = Some(name);
 
                     let out: BTreeSet<ColumnId> = (0..outputs.len())
                         .map(|x| x + inputs.len())
@@ -102,25 +112,28 @@ pub(crate) fn parse_prim_funcs(
                         .map(|x| index_to_main[x])
                         .collect();
 
+                    let ident = item.sig.ident.to_string();
+
                     PrimIndex {
                         out,
                         index_to_main,
                         fd: meta.fd,
                         syn: item,
+                        ident,
                     }
                 })
                 .collect();
 
             PrimFunc {
                 name: expected_name.unwrap(),
-                columns: expected_types.unwrap().map(|x| get_type(x)),
+                columns: expected_types.unwrap().map(|x| get_type(*x)),
                 indexes,
             }
         })
         .collect()
 }
 
-fn parse_output_ty(item: &syn::ItemFn) -> Vec<String> {
+fn parse_output_ty(item: &syn::ItemFn) -> Vec<Str> {
     letexp! {
         syn::ReturnType::Type(_, x) = &item.sig.output;
         syn::Type::ImplTrait(x) = &**x;
@@ -133,7 +146,7 @@ fn parse_output_ty(item: &syn::ItemFn) -> Vec<String> {
     x
 }
 
-fn parse_input_ty(item: &syn::ItemFn) -> Vec<String> {
+fn parse_input_ty(item: &syn::ItemFn) -> Vec<Str> {
     item.sig
         .inputs
         .iter()
@@ -145,11 +158,77 @@ fn parse_input_ty(item: &syn::ItemFn) -> Vec<String> {
         .collect()
 }
 
-fn parse_ty(x: &syn::Type) -> String {
+fn parse_ty(x: &syn::Type) -> Str {
     let syn::Type::Path(syn::TypePath { path: x, qself: _ }) = x else {
         panic!()
     };
-    x.segments[0].ident.to_string()
+    let ident = &x.segments[0].ident.clone();
+
+    let span = QSpan::from_tree(ident);
+
+    Spanned::new(ident.to_string().leak(), Some(span))
+}
+
+pub(crate) fn runtime_primitive_functions() -> proc_macro2::TokenStream {
+    use quote::quote;
+    quote! {
+        #[prim_func(name = "+", id = "i64_add", index = [0, 1, 2], fd = true)]
+        fn i64_add012(a: i64, b: i64) -> impl Iterator<Item = (i64,)> { a.checked_add(b).map(|x| (x,)).into_iter() }
+
+        #[prim_func(name = "-", id = "i64_sub", index = [0, 1, 2], fd = true)]
+        fn i64_sub012(a: i64, b: i64) -> impl Iterator<Item = (i64,)> { a.checked_sub(b).map(|x| (x,)).into_iter() }
+
+        #[prim_func(name = "*", id = "i64_mul", index = [0, 1, 2], fd = true)]
+        fn i64_mul012(a: i64, b: i64) -> impl Iterator<Item = (i64,)> { a.checked_mul(b).map(|x| (x,)).into_iter() }
+
+        #[prim_func(name = "/", id = "i64_div", index = [0, 1, 2], fd = true)]
+        fn i64_div012(a: i64, b: i64) -> impl Iterator<Item = (i64,)> { a.checked_div(b).map(|x| (x,)).into_iter() }
+
+        #[prim_func(name = "%", id = "i64_rem", index = [0, 1, 2], fd = true)]
+        fn i64_rem012(a: i64, b: i64) -> impl Iterator<Item = (i64,)> { a.checked_rem(b).map(|x| (x,)).into_iter() }
+
+        #[prim_func(name = "&", id = "i64_bitand", index = [0, 1, 2], fd = true)]
+        fn i64_bitand012(a: i64, b: i64) -> impl Iterator<Item = (i64,)> { std::iter::once((a & b,)) }
+
+        #[prim_func(name = "|", id = "i64_bitor", index = [0, 1, 2], fd = true)]
+        fn i64_bitor012(a: i64, b: i64) -> impl Iterator<Item = (i64,)> { std::iter::once((a | b,)) }
+
+        #[prim_func(name = "^", id = "i64_bitxor", index = [0, 1, 2], fd = true)]
+        fn i64_bitxor012(a: i64, b: i64) -> impl Iterator<Item = (i64,)> { std::iter::once((a ^ b,)) }
+
+        #[prim_func(name = "<<", id = "i64_bitshl", index = [0, 1, 2], fd = true)]
+        fn i64_bitshl012(a: i64, b: i64) -> impl Iterator<Item = (i64,)> { a.checked_shl(b.try_into().unwrap()).map(|x| (x,)).into_iter() }
+
+        #[prim_func(name = ">>", id = "i64_bitshr", index = [0, 1, 2], fd = true)]
+        fn i64_bitshr012(a: i64, b: i64) -> impl Iterator<Item = (i64,)> { a.checked_shr(b.try_into().unwrap()).map(|x| (x,)).into_iter() }
+
+        #[prim_func(name = "not-i64", id = "i64_bitnot", index = [0, 1], fd = true)]
+        fn i64_bitnot01(a: i64) -> impl Iterator<Item = (i64,)> { std::iter::once((!a,)) }
+
+        #[prim_func(name = "log2", id = "i64_log2", index = [0, 1], fd = true)]
+        fn i64_log01(a: i64) -> impl Iterator<Item = (i64,)> { std::iter::once((a.ilog2() as i64,)) }
+
+        #[prim_func(name = "min", id = "i64_min", index = [0, 1, 2], fd = true)]
+        fn i64_min012(a: i64, b: i64) -> impl Iterator<Item = (i64,)> { std::iter::once((a.min(b),)) }
+
+        #[prim_func(name = "max", id = "i64_max", index = [0, 1, 2], fd = true)]
+        fn i64_max012(a: i64, b: i64) -> impl Iterator<Item = (i64,)> { std::iter::once((a.max(b),)) }
+
+        // #[prim_func(name = ">", id = "i64_gt", index = [0, 1], fd = false)]
+        // fn i64_gt01(a: i64, b: i64) -> impl Iterator<Item = ()> { (a > b).then_some(()).into_iter() }
+
+        // #[prim_func(name = "<", id = "i64_lt", index = [0, 1], fd = false)]
+        // fn i64_lt01(a: i64, b: i64) -> impl Iterator<Item = ()> { (a < b).then_some(()).into_iter() }
+
+        // #[prim_func(name = ">=", id = "i64_gte", index = [0, 1], fd = false)]
+        // fn i64_gt01(a: i64, b: i64) -> impl Iterator<Item = ()> { (a >= b).then_some(()).into_iter() }
+
+        // #[prim_func(name = "<=", id = "i64_lte", index = [0, 1], fd = false)]
+        // fn i64_lt01(a: i64, b: i64) -> impl Iterator<Item = ()> { (a <= b).then_some(()).into_iter() }
+
+        // #[prim_func(name = "!=", id = "i64_ne", index = [0, 1], fd = false)]
+        // fn i64_ne01(a: i64, b: i64) -> impl Iterator<Item = ()> { (a != b).then_some(()).into_iter() }
+    }
 }
 
 /*
@@ -344,6 +423,7 @@ mod tests {
                                 c2: c2,
                             },
                             fd: true,
+                            ident: "i64_add012",
                         },
                     },
                 },
@@ -365,6 +445,7 @@ mod tests {
                                 c2: c2,
                             },
                             fd: true,
+                            ident: "i64_div012",
                         },
                     },
                 },
@@ -382,6 +463,7 @@ mod tests {
                                 c1: c1,
                             },
                             fd: false,
+                            ident: "i64_eq01",
                         },
                         n1: PrimIndex {
                             out: {
@@ -392,6 +474,7 @@ mod tests {
                                 c1: c1,
                             },
                             fd: true,
+                            ident: "i64_eq01",
                         },
                         n2: PrimIndex {
                             out: {
@@ -402,6 +485,7 @@ mod tests {
                                 c1: c0,
                             },
                             fd: true,
+                            ident: "i64_eq10",
                         },
                     },
                 },
@@ -419,6 +503,7 @@ mod tests {
                                 c1: c1,
                             },
                             fd: false,
+                            ident: "i64_gt01",
                         },
                     },
                 },
@@ -436,6 +521,7 @@ mod tests {
                                 c1: c1,
                             },
                             fd: false,
+                            ident: "i64_gt01",
                         },
                     },
                 },
@@ -453,6 +539,7 @@ mod tests {
                                 c1: c1,
                             },
                             fd: false,
+                            ident: "i64_lt01",
                         },
                     },
                 },
@@ -470,6 +557,7 @@ mod tests {
                                 c1: c1,
                             },
                             fd: false,
+                            ident: "i64_lt01",
                         },
                     },
                 },
@@ -491,6 +579,7 @@ mod tests {
                                 c2: c2,
                             },
                             fd: true,
+                            ident: "i64_max012",
                         },
                     },
                 },
@@ -512,6 +601,7 @@ mod tests {
                                 c2: c2,
                             },
                             fd: true,
+                            ident: "i64_min012",
                         },
                     },
                 },
@@ -533,6 +623,7 @@ mod tests {
                                 c2: c2,
                             },
                             fd: true,
+                            ident: "i64_mul012",
                         },
                     },
                 },
@@ -550,6 +641,7 @@ mod tests {
                                 c1: c1,
                             },
                             fd: false,
+                            ident: "i64_ne01",
                         },
                     },
                 },
@@ -571,6 +663,7 @@ mod tests {
                                 c2: c2,
                             },
                             fd: true,
+                            ident: "i64_rem012",
                         },
                     },
                 },
@@ -592,6 +685,7 @@ mod tests {
                                 c2: c2,
                             },
                             fd: true,
+                            ident: "i64_sub012",
                         },
                     },
                 },
@@ -613,6 +707,7 @@ mod tests {
                                 c3: c3,
                             },
                             fd: false,
+                            ident: "testpermute0",
                         },
                         n1: PrimIndex {
                             out: {},
@@ -623,6 +718,7 @@ mod tests {
                                 c3: c1,
                             },
                             fd: false,
+                            ident: "testpermute1",
                         },
                         n2: PrimIndex {
                             out: {},
@@ -633,6 +729,7 @@ mod tests {
                                 c3: c1,
                             },
                             fd: false,
+                            ident: "testpermute2",
                         },
                     },
                 },

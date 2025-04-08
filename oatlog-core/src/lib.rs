@@ -27,7 +27,7 @@ fn to_egglog_ast(program: &str) -> frontend::egglog_ast::Program {
             frontend::parse_str_to_sexps(program)
                 .unwrap()
                 .into_iter()
-                .flatten()
+                .flat_map(|x| x.unwrap())
                 .collect_vec(),
         )
         .unwrap(),
@@ -121,7 +121,7 @@ enum Input {
     String(&'static str),
 }
 impl Input {
-    fn to_sexp(self) -> frontend::MResult<Vec<Vec<frontend::sexp::SexpSpan>>> {
+    fn to_sexp(self) -> frontend::MResult<Vec<frontend::ParseInput>> {
         match self {
             Input::Tokens(x) => frontend::parse_to_sexps(x),
             Input::String(x) => frontend::parse_str_to_sexps(x),
@@ -190,7 +190,7 @@ fn universal(input: Input, config: Configuration) -> Result<Output, CompileError
 
     return output;
 
-    fn compile_impl(sexps: Vec<Vec<frontend::SexpSpan>>, config: Configuration) -> MResult<Output> {
+    fn compile_impl(sexps: Vec<frontend::ParseInput>, config: Configuration) -> MResult<Output> {
         let hir = frontend::parse(sexps, config)?;
         let (_, lir) = query_planning::emit_lir_theory(hir);
         let generated_tokens = codegen::codegen(&lir);

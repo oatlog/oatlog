@@ -261,6 +261,7 @@ impl<T> Spanned<T> {
     pub(crate) fn new(x: T, span: Option<QSpan>) -> Self {
         Self { x, span }
     }
+    #[allow(unused)]
     pub(crate) fn set(&self, x: T) -> Self {
         Spanned::new(x, self.span)
     }

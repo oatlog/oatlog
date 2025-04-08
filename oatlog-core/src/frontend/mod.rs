@@ -15,8 +15,9 @@ use std::{
     num::NonZeroU64,
 };
 
+use derive_more::From;
 use itertools::Itertools as _;
-use proc_macro2::{Delimiter, Span, TokenTree};
+use proc_macro2::{Delimiter, Span, TokenStream, TokenTree};
 
 pub(crate) use crate::frontend::{sexp::SexpSpan, span::MResult};
 use crate::{
@@ -26,7 +27,7 @@ use crate::{
         span::{MError, QSpan, Spanned, Str, bare_, err_, register_span},
     },
     hir,
-    ids::{ColumnId, GlobalId, Id, RelationId, TypeId, VariableId},
+    ids::{ColumnId, GlobalId, Id, ImplicitRuleId, RelationId, TypeId, VariableId},
     lir,
     typed_vec::{TVec, tvec},
 };
@@ -54,34 +55,56 @@ impl<A: Clone, B, E> VecExtClone<A, B, E> for [A] {
     }
 }
 
-pub(crate) fn parse(sexps: Vec<Vec<SexpSpan>>, config: Configuration) -> MResult<hir::Theory> {
+pub(crate) fn parse(sexps: Vec<ParseInput>, config: Configuration) -> MResult<hir::Theory> {
     let mut parser = Parser::new();
     for sexp in sexps {
-        parser.parse_egglog_sexp(sexp, config)?;
+        match sexp {
+            ParseInput::Sexp(sexp) => {
+                parser.parse_egglog_sexp(sexp, config)?;
+            }
+            ParseInput::Rust(primitive_functions) => {
+                parser.parse_primitives(primitive_functions)?;
+            }
+        }
     }
     Ok(parser.emit_hir())
 }
-pub(crate) fn parse_str_to_sexps(s: &'static str) -> MResult<Vec<Vec<SexpSpan>>> {
+pub(crate) fn parse_str_to_sexps(s: &'static str) -> MResult<Vec<ParseInput>> {
     let span = QSpan::new(Span::call_site(), s.to_string());
     let sexp = SexpSpan::parse_string(Some(span), s)?;
-    Ok(vec![sexp])
+    Ok(vec![sexp.into()])
 }
 
-pub(crate) fn parse_to_sexps(x: proc_macro2::TokenStream) -> MResult<Vec<Vec<SexpSpan>>> {
-    let sexps_many:MResult<Vec<Vec<Vec<SexpSpan>>>>  = x.into_iter().map(|token_tree: proc_macro2::TokenTree| -> MResult<Vec<Vec<SexpSpan>>> {
-        register_span!(,token_tree);
-        let span = QSpan::from_tree(&token_tree);
+#[derive(From)]
+pub(crate) enum ParseInput {
+    Sexp(Vec<SexpSpan>),
+    Rust(proc_macro2::TokenStream),
+}
+impl ParseInput {
+    pub(crate) fn unwrap(self) -> Vec<SexpSpan> {
+        if let ParseInput::Sexp(x) = self {
+            x
+        } else {
+            panic!()
+        }
+    }
+}
 
+pub(crate) fn parse_to_sexps(x: proc_macro2::TokenStream) -> MResult<Vec<ParseInput>> {
+    Ok(x.into_iter().map(|token_tree| {
+        register_span!(,token_tree);
         match token_tree {
-            // compile_egraph!(((datatype Math (Add Math Math) (Sub Math Math))))
             TokenTree::Group(group) => {
-                let delim = group.delimiter();
                 let stream = group.stream();
-                match delim {
+                match group.delimiter() {
                     Delimiter::Parenthesis => {
-                        Ok(vec![SexpSpan::parse_stream(stream)?])
+                        // compile_egraph!(((datatype Math (Add Math Math) (Sub Math Math))));
+                        Ok(vec![SexpSpan::parse_stream(stream)?.into()])
                     }
-                    Delimiter::Brace => err!("importing rust code unimplemented"),
+                    Delimiter::Brace => {
+                        // compile_egraph!({ rust code });
+                        Ok(vec![stream.into()])
+                    },
                     Delimiter::Bracket => err!("brace not expected"),
                     Delimiter::None => {
                         // Invisible delimiters due to declarative macro invocation
@@ -89,15 +112,11 @@ pub(crate) fn parse_to_sexps(x: proc_macro2::TokenStream) -> MResult<Vec<Vec<Sex
                     }
                 }
             }
-            // compile_egraph!("(datatype Math (Add Math Math) (Sub Math Math))")
             TokenTree::Literal(literal) => {
-                let x = syn::Lit::new(literal);
-                match x {
+                match syn::Lit::new(literal) {
                     syn::Lit::Str(literal) => {
-                        // TODO: add error context information
-                        // let content = &*strip_comments(&literal.value()).leak();
-                        let content = literal.value().leak();
-                        Ok(vec![SexpSpan::parse_string(Some(span), &*content)?])
+                        // compile_egraph!("(datatype Math (Add Math Math) (Sub Math Math))");
+                        Ok(vec![SexpSpan::parse_string(span!(), literal.value().leak())?.into()])
                     }
                     _ => err!("expected a string literal"),
                 }
@@ -109,8 +128,7 @@ pub(crate) fn parse_to_sexps(x: proc_macro2::TokenStream) -> MResult<Vec<Vec<Sex
                 )
             }
         }
-    }).collect();
-    Ok(sexps_many?.concat())
+    }).collect::<MResult<Vec<Vec<ParseInput>>>>()?.into_iter().flatten().collect())
 }
 
 #[derive(Debug, Clone, PartialEq)]
@@ -128,23 +146,17 @@ impl TypeData {
     }
 }
 
-/// A declared function
+/// A callable function. The first columns are input and if there is an output, it is the last
+/// column.
 #[derive(Debug, Clone)]
-struct FunctionData {
+struct LangFunction {
     name: Str,
     inputs: TVec<ColumnId, TypeId>,
 
     /// Relations are represented as functions returning `Unit`.
     output: TypeId,
-
-    // NOTE: for variadic functions, possibly do the following:
-    // variadic : Option<TypeId>
-    #[allow(unused)]
-    merge: Option<Spanned<Expr>>,
-    #[allow(unused)]
-    cost: Option<u64>,
 }
-impl FunctionData {
+impl LangFunction {
     fn check_compatible(&self, inputs: &[Option<TypeId>], output: Option<TypeId>) -> bool {
         if self.inputs.len() != inputs.len() {
             return false;
@@ -163,12 +175,21 @@ impl FunctionData {
         }
         true
     }
+    fn new(name: Str, inputs: &[TypeId], output: Option<TypeId>) -> Self {
+        Self {
+            name,
+            inputs: inputs.to_owned().into(),
+            output: output.unwrap_or(TYPE_UNIT),
+        }
+    }
 }
-#[derive(Clone)]
-enum FunctionKind {
+
+/// To be used as args for add_function
+enum EggFunctionKind {
     Constructor {
         output: TypeId,
         // None means it can not be extracted
+        #[allow(unused, reason = "fix when implementing extraction.")]
         cost: Option<u64>,
     },
     Function {
@@ -176,6 +197,16 @@ enum FunctionKind {
         merge: Option<Spanned<Expr>>,
     },
     Relation,
+}
+
+/// To be used as args for add_function
+enum FunctionKind {
+    Primitive(primitive::PrimFunc),
+    Egg {
+        name: Str,
+        inputs: Vec<TypeId>,
+        kind: EggFunctionKind,
+    },
 }
 
 #[derive(Debug)]
@@ -211,13 +242,15 @@ const BUILTIN_STRING: &str = "String";
 const BUILTIN_BOOL: &str = "bool";
 const BUILTIN_UNIT: &str = "()"; // TODO: "()" -> "unit" to avoid fixup in backend.
 
-const BUILTIN_SORTS: [(&str, &str); 3] = [
-    (BUILTIN_I64, "std::primitive::i64"),
+const TYPE_UNIT: TypeId = TypeId(0);
+
+const BUILTIN_SORTS: [(&str, &str, TypeId); 3] = [
+    (BUILTIN_UNIT, "std::primitive::unit", TYPE_UNIT),
+    (BUILTIN_I64, "std::primitive::i64", TypeId(1)),
     // TODO: we could trivially add more here for all sizes of ints/floats.
     // (BUILTIN_F64, "std::primitive::f64"),
     // (BUILTIN_BOOL, "std::primitive::bool"),
-    (BUILTIN_STRING, "runtime::IString"),
-    (BUILTIN_UNIT, "std::primitive::unit"),
+    (BUILTIN_STRING, "runtime::IString", TypeId(2)),
 ];
 
 #[derive(Debug, Clone, PartialEq)]
@@ -308,11 +341,16 @@ struct Parser {
     /// using type information, similar to C++ overloading.
     function_possible_ids: BTreeMap<Str, Vec<RelationId>>,
 
-    /// Functions have a language-level component `FunctionData` useful
-    /// for e.g. type checking, and a hir-level component.
-    ///
-    /// Some relations, such as those implementing global variables, lack `FunctionData`.
-    relations_hir_and_func: TVec<RelationId, (hir::Relation, Option<FunctionData>)>,
+    /// All relations, including global, forall etc.
+    hir_relations: TVec<RelationId, hir::Relation>,
+
+    /// Data for Language-level functions. In order for a function to be "callable" it needs to be
+    /// here, so this includes:
+    /// * (function ..)
+    /// * (relation ..)
+    /// * (constructor ..)
+    /// * primitive functions
+    lang_relations: BTreeMap<RelationId, LangFunction>,
 
     /// Type data, containing additional info for primitives (and TODO collections).
     types: TVec<TypeId, TypeData>,
@@ -336,6 +374,7 @@ struct Parser {
 
     interner: crate::runtime::StringIntern,
 }
+use egglog_ast::Expr;
 impl Parser {
     fn new() -> Self {
         let mut parser = Parser {
@@ -344,19 +383,23 @@ impl Parser {
             global_variable_names: BTreeMap::new(),
             global_variables: TVec::new(),
             initial: Vec::new(),
-            relations_hir_and_func: TVec::new(),
+            hir_relations: TVec::new(),
             rulesets: BTreeMap::new(),
             symbolic_rules: Vec::new(),
             type_ids: StringIds::new("type"),
             type_to_forall: BTreeMap::new(),
             types: TVec::new(),
             interner: crate::runtime::StringIntern::new(),
+            lang_relations: BTreeMap::new(),
         };
-        for (builtin, path) in BUILTIN_SORTS {
-            let _ty: TypeId = parser
+        for (builtin, path, expected_id) in BUILTIN_SORTS {
+            let id: TypeId = parser
                 .add_sort(Spanned::new(builtin, None), None, Some(path))
                 .unwrap();
+            assert_eq!(id, expected_id);
         }
+        let runtime_tokenstream = primitive::runtime_primitive_functions();
+        parser.parse_primitives(runtime_tokenstream).unwrap();
         parser
     }
 
@@ -372,12 +415,7 @@ impl Parser {
             .collect();
         hir::Theory {
             symbolic_rules: self.symbolic_rules.clone(),
-            relations: self
-                .relations_hir_and_func
-                .iter()
-                .map(|(hir, _)| hir)
-                .cloned()
-                .collect(),
+            relations: self.hir_relations.clone(),
             name: None,
             types,
             global_types: self.global_variables.iter().map(|i| i.ty).collect(),
@@ -433,11 +471,11 @@ impl Parser {
             egglog_ast::Statement::Datatype { name, variants } => {
                 let output = self.add_sort(name, None, None)?;
                 for egglog_ast::Variant { name, types, cost } in variants.into_iter().map(|x| x.x) {
-                    self.add_function(
+                    self.add_function(FunctionKind::Egg {
                         name,
-                        types.mapf(|x| self.type_ids.lookup(x))?.leak(),
-                        FunctionKind::Constructor { output, cost },
-                    )?;
+                        inputs: types.mapf(|x| self.type_ids.lookup(x))?,
+                        kind: EggFunctionKind::Constructor { output, cost },
+                    })?;
                 }
             }
             egglog_ast::Statement::Datatypes { .. } => {
@@ -449,21 +487,21 @@ impl Parser {
                 output,
                 cost,
             } => {
-                self.add_function(
+                self.add_function(FunctionKind::Egg {
                     name,
-                    &input.mapf(|x| self.type_ids.lookup(x))?,
-                    FunctionKind::Constructor {
+                    inputs: input.mapf(|x| self.type_ids.lookup(x))?,
+                    kind: EggFunctionKind::Constructor {
                         output: self.type_ids.lookup(output)?,
                         cost,
                     },
-                )?;
+                })?;
             }
             egglog_ast::Statement::Relation { name, input } => {
-                self.add_function(
+                self.add_function(FunctionKind::Egg {
                     name,
-                    &input.mapf(|x| self.type_ids.lookup(x))?,
-                    FunctionKind::Relation,
-                )?;
+                    inputs: input.mapf(|x| self.type_ids.lookup(x))?,
+                    kind: EggFunctionKind::Relation,
+                })?;
             }
             egglog_ast::Statement::Function {
                 name,
@@ -474,14 +512,14 @@ impl Parser {
                 if merge.is_some() {
                     return err!("lattice computations not implemented");
                 }
-                self.add_function(
+                self.add_function(FunctionKind::Egg {
                     name,
-                    &input.mapf(|x| self.type_ids.lookup(x))?,
-                    FunctionKind::Function {
+                    inputs: input.mapf(|x| self.type_ids.lookup(x))?,
+                    kind: EggFunctionKind::Function {
                         output: self.type_ids.lookup(output)?,
                         merge: None,
                     },
-                )?;
+                })?;
             }
             egglog_ast::Statement::AddRuleSet(spanned) => {
                 self.rulesets.insert_unique(spanned, (), "ruleset")?;
@@ -666,8 +704,11 @@ impl Parser {
         // TODO: should collection types have a forall?
         if collection.is_none() && primitive.is_none() {
             let relation_id = self
-                .relations_hir_and_func
-                .push((hir::Relation::forall(*name, type_id), None));
+                .hir_relations
+                .push(hir::Relation::forall(*name, type_id));
+
+            // TODO: add forall lang function.
+
             self.type_to_forall.insert(type_id, relation_id);
         }
         Ok(type_id)
@@ -688,9 +729,8 @@ impl Parser {
             ));
         }
         // Override dummy name with real name
-        self.relations_hir_and_func[self.global_variables[global_id].relation_id]
-            .0
-            .name = &*name;
+        // TODO erik: look at this.
+        self.hir_relations[self.global_variables[global_id].relation_id].name = &*name;
 
         self.global_variable_names.insert(name, global_id);
 
@@ -709,8 +749,8 @@ impl Parser {
                         ty,
                         relation_id: {
                             let name = &*new_id.to_string().leak();
-                            self.relations_hir_and_func
-                                .push((hir::Relation::global(&name, new_id, ty), None))
+                            self.hir_relations
+                                .push(hir::Relation::global(&name, new_id, ty))
                         },
                     },
                 );
@@ -739,84 +779,114 @@ impl Parser {
         Ok(global_id)
     }
 
-    fn add_function(&mut self, name: Str, inputs: &[TypeId], kind: FunctionKind) -> MResult<()> {
-        // output is none => no implicit rule for functional dependency
-        // merge is some => lattice
-        // merge is none, output is eqsort => unification.
-        // merge is none, output is primitive => panic.
+    fn add_function(&mut self, kind: FunctionKind) -> MResult<()> {
+        match kind {
+            FunctionKind::Egg { name, inputs, kind } => {
+                let output = match &kind {
+                    EggFunctionKind::Constructor { output, cost: _ } => Some(*output),
+                    EggFunctionKind::Function { output, merge: _ } => Some(*output),
+                    EggFunctionKind::Relation => None,
+                };
 
-        let (output, merge, cost) = match kind.clone() {
-            FunctionKind::Constructor { output, cost } => (Some(output), None, cost),
-            FunctionKind::Function { output, merge } => (Some(output), merge, None),
-            FunctionKind::Relation => (None, None, None),
-        };
-        let output_or_unit = output.unwrap_or_else(|| {
-            self.type_ids
-                .lookup(Str::new(BUILTIN_UNIT, None))
-                .expect("unit type exists")
-        });
+                let output_column = ColumnId(inputs.len());
+                let columns: TVec<ColumnId, TypeId> =
+                    inputs.iter().copied().chain(output).collect();
 
-        let output_column = ColumnId(inputs.len());
-        let columns: TVec<ColumnId, TypeId> = inputs.iter().copied().chain(output).collect();
-
-        let relation_id = self.relations_hir_and_func.push((
-            hir::Relation::table(
-                *name,
-                columns,
-                match kind {
-                    FunctionKind::Constructor { output, cost: _ } => {
-                        assert!(self.types[output].can_unify());
-                        tvec![hir::ImplicitRule::new_unify(output_column)]
-                    }
-                    FunctionKind::Function {
-                        output,
-                        merge: None,
-                    } => {
-                        if self.types[output].can_unify() {
-                            // eqsort type => unification
-                            // hir::ImplicitRule::new_unify(inputs.len())
-                            // panic!("should we allow lattice on an eqsort?")
-                            tvec![hir::ImplicitRule::new_panic(output_column)]
-                        } else {
-                            // unify primitive => panic if disagree
-                            tvec![hir::ImplicitRule::new_panic(output_column)]
+                let relation_id = self.hir_relations.push(hir::Relation::table(
+                    *name,
+                    columns,
+                    match kind {
+                        EggFunctionKind::Constructor { output, cost: _ } => {
+                            assert!(self.types[output].can_unify());
+                            tvec![hir::ImplicitRule::new_unify(output_column)]
                         }
-                    }
-                    FunctionKind::Function {
-                        output: _,
-                        merge: Some(_),
-                    } => {
-                        // TODO: do a sort of constant propagation by promoting more function calls to
-                        // globals.
-                        // let mut variables: TVec<VariableId, (TypeId, Option<GlobalId>)> =
-                        //     TVec::new();
-                        // let mut ops = Vec::new();
-                        // let old = variables.push((output, None));
-                        // let new = variables.push((output, None));
-                        // let res =
-                        //     self.parse_lattice_expr(old, new, &merge, &mut variables, &mut ops)?;
-                        // hir::ImplicitRule::new_lattice(inputs.len(), old, new, res, ops, variables);
-                        tvec![hir::ImplicitRule::new_lattice(output_column)]
-                    }
-                    FunctionKind::Relation => tvec![],
-                },
-            ),
-            Some(FunctionData {
-                name,
-                inputs: inputs.iter().copied().collect(),
-                output: output_or_unit,
-                merge,
-                cost,
-            }),
-        ));
+                        EggFunctionKind::Function {
+                            output,
+                            merge: None,
+                        } => {
+                            if self.types[output].can_unify() {
+                                // eqsort type => unification
+                                // hir::ImplicitRule::new_unify(inputs.len())
+                                // panic!("should we allow lattice on an eqsort?")
+                                tvec![hir::ImplicitRule::new_panic(output_column)]
+                            } else {
+                                // unify primitive => panic if disagree
+                                tvec![hir::ImplicitRule::new_panic(output_column)]
+                            }
+                        }
+                        EggFunctionKind::Function {
+                            output: _,
+                            merge: Some(_),
+                        } => {
+                            // TODO: do something with lattice.
+                            tvec![hir::ImplicitRule::new_lattice(output_column)]
+                        }
+                        EggFunctionKind::Relation => tvec![],
+                    },
+                ));
 
-        self.function_possible_ids
-            .entry(name)
-            .or_default()
-            .push(relation_id);
+                self.lang_relations
+                    .insert(relation_id, LangFunction::new(name, &inputs, output));
+
+                self.function_possible_ids
+                    .entry(name)
+                    .or_default()
+                    .push(relation_id);
+            }
+            FunctionKind::Primitive(primitive::PrimFunc {
+                name,
+                columns,
+                indexes,
+            }) => {
+                // In order to be egglog callable, we need:
+                // * index is in increasing columns: 0, 1, 2
+                // * input columns are first
+                // * ImplicitRule(0) is callable.
+                //
+
+                // TODO: FIRST index
+                let primitive::PrimIndex {
+                    out,
+                    index_to_main,
+                    fd,
+                    syn,
+                    ident,
+                } = indexes[ImplicitRuleId(0)].clone();
+
+                assert!(
+                    index_to_main
+                        .iter()
+                        .copied()
+                        .zip((0..).map(ColumnId))
+                        .all(|(a, b)| a == b)
+                );
+                assert_eq!(out.len(), 1);
+                let out_col = out.into_iter().next().unwrap();
+                assert_eq!(*index_to_main.inner().last().unwrap(), out_col);
+                assert!(fd);
+
+                let inputs = &columns.inner()[0..columns.len() - 1];
+                let output = *columns.inner().last().unwrap();
+
+                let lang_function = LangFunction::new(name, inputs, Some(output));
+                let ident = ident.leak();
+
+                let relation_id = self.hir_relations.push(hir::Relation::primitive(
+                    columns, *name, out_col, syn, ident,
+                ));
+
+                self.lang_relations.insert(relation_id, lang_function);
+
+                self.function_possible_ids
+                    .entry(name)
+                    .or_default()
+                    .push(relation_id);
+            }
+        }
         Ok(())
     }
 
+    #[allow(unused)]
     fn parse_lattice_expr(
         &mut self,
         old: VariableId,
@@ -857,18 +927,13 @@ impl Parser {
                 let possible_ids: Vec<_> = possible_ids
                     .iter()
                     .copied()
-                    .filter(|x| {
-                        self.relations_hir_and_func[x]
-                            .1
-                            .as_ref()
-                            .unwrap()
-                            .check_compatible(&args_ty_pat, None)
-                    })
+                    .filter(|x| self.lang_relations[x].check_compatible(&args_ty_pat, None))
                     .collect();
+
                 match possible_ids.as_slice() {
                     [id] => {
                         let id = *id;
-                        let function = &self.relations_hir_and_func[id].1.as_ref().unwrap();
+                        let function = &self.lang_relations[&id];
                         let ty = function.output;
 
                         // TODO: is this optimization sound?
@@ -917,18 +982,7 @@ impl Parser {
             }
         })
     }
-}
 
-// #[derive(Debug, Clone, PartialEq)]
-// enum Expr {
-//     Literal(Spanned<Literal>),
-//     Var(Str),
-//     Call(Str, Vec<Expr>),
-// }
-
-use egglog_ast::Expr;
-
-impl Parser {
     fn literal_type(&self, x: Literal) -> TypeId {
         let name = match x {
             Literal::I64(_) => BUILTIN_I64,
@@ -971,13 +1025,7 @@ impl Parser {
                     let ids: Vec<_> = possible_ids
                         .iter()
                         .copied()
-                        .filter(|id| {
-                            parser.relations_hir_and_func[*id]
-                                .1
-                                .as_ref()
-                                .unwrap()
-                                .check_compatible(&arg_ty_opt, None)
-                        })
+                        .filter(|id| parser.lang_relations[id].check_compatible(&arg_ty_opt, None))
                         .collect();
 
                     let inputs_ty_s = arg_ty
@@ -992,11 +1040,7 @@ impl Parser {
                                 function: *id,
                                 args,
                             };
-                            let ty = parser.relations_hir_and_func[*id]
-                                .1
-                                .as_ref()
-                                .unwrap()
-                                .output;
+                            let ty = parser.lang_relations[id].output;
                             (parser.add_global(ty, compute)?, ty)
                         }
                         [] => {
@@ -1031,7 +1075,7 @@ impl Parser {
     }
 
     fn err_function_defined_here(&mut self, id: RelationId, err: &mut MError) {
-        let function = &self.relations_hir_and_func[id].1.as_ref().unwrap();
+        let function = &self.lang_relations[&id];
         let inputs_ty_s = function
             .inputs
             .iter()
@@ -1049,12 +1093,21 @@ impl Parser {
     fn type_name(&self, ty: TypeId) -> Str {
         self.types[&ty].name
     }
+    fn parse_primitives(&mut self, prim_funcs: TokenStream) -> MResult<()> {
+        let primitive_functions =
+            primitive::parse_prim_funcs(prim_funcs, |s| self.type_ids.lookup(s).unwrap());
+
+        for primitive_function in primitive_functions {
+            self.add_function(FunctionKind::Primitive(primitive_function))?;
+        }
+        Ok(())
+    }
 }
 
 mod compile_rule {
     use super::{
-        ComputeMethod, Expr, Literal, MError, MResult, MapExt as _, Parser, QSpan, Spanned, Str,
-        bare_, egglog_ast, register_span, span,
+        ComputeMethod, Expr, MError, MResult, MapExt as _, Parser, QSpan, Spanned, Str,
+        TYPE_UNIT, bare_, egglog_ast, register_span, span,
     };
 
     use std::collections::{BTreeMap, BTreeSet};
@@ -1107,9 +1160,7 @@ mod compile_rule {
             .map(|&x| type_uf.0[x].map_or("?", |x| *parser.type_name(x)))
             .collect();
         let output = type_uf.0[i].map_or("?", |x| *parser.type_name(x));
-        let possible_function_names = ids
-            .iter()
-            .map(|&x| parser.relations_hir_and_func[x].1.as_ref().unwrap().name);
+        let possible_function_names = ids.iter().map(|&x| parser.lang_relations[&x].name);
         let mut err = bare_!(
             name.span,
             "ambigious call to {name}, with input {input:?} and output {output:?}"
@@ -1329,11 +1380,11 @@ mod compile_rule {
                     FlatExpr::Possible(name, ids, args) => {
                         let inputs: Vec<_> = args.iter().copied().map(|i| type_uf.0[i]).collect();
                         let output = type_uf.0[i];
-                        ids.retain(|&id| {
-                            // TODO: when is functiondata None?
-                            parser.relations_hir_and_func[id]
-                                .1
-                                .as_ref()
+                        ids.retain(|id| {
+                            // id can be missing from lang_relations for global.
+                            parser
+                                .lang_relations
+                                .get(id)
                                 .is_none_or(|f| f.check_compatible(&inputs, output))
                         });
 
@@ -1345,8 +1396,8 @@ mod compile_rule {
                                 ));
                             }
                             &[id] => {
-                                if let Some(function) = parser.relations_hir_and_func[id].1.as_ref()
-                                {
+                                if let Some(function) = parser.lang_relations.get(&id) {
+                                    // non-lang relations already enforced their types.
                                     for (&i, &t) in args.iter().zip(function.inputs.iter()) {
                                         type_uf.set_type(parser, &spans, i, t)?;
                                     }
@@ -1373,7 +1424,7 @@ mod compile_rule {
             action_inserts.push((f, args.clone(), i));
         })?;
 
-        let unit_ty = parser.literal_type(Literal::Unit);
+        let unit_ty = TYPE_UNIT;
 
         let rule = hir::RuleArgs {
             name: name.map(|x| *x),

@@ -10,8 +10,10 @@ use crate::{
     union_find::{UF, UFData, uf},
 };
 
+use educe::Educe;
 #[cfg(test)]
 use itertools::Itertools as _;
+use quote::ToTokens;
 
 use std::{
     collections::{BTreeMap, BTreeSet},
@@ -136,6 +138,7 @@ pub(crate) enum ImplicitRuleAction {
     /// Unifies all columns not mentioned in `on`
     Union,
     /// Run computation to figure out what to write.
+    #[allow(unused)]
     Lattice {
         // /// call these functions in this order.
         // /// panic if result is empty.
@@ -180,6 +183,23 @@ impl Relation {
             implicit_rules,
         }
     }
+    pub(crate) fn primitive(
+        columns: TVec<ColumnId, TypeId>,
+        name: &'static str,
+        out_col: ColumnId,
+        syn: syn::ItemFn,
+        ident: &'static str,
+    ) -> Self {
+        Self {
+            name,
+            implicit_rules: tvec![ImplicitRule::new_panic(out_col)],
+            columns,
+            ty: RelationTy::Primitive {
+                syn: IgnoreBox(syn.to_token_stream()),
+                ident,
+            },
+        }
+    }
     pub(crate) fn forall(name: &'static str, ty: TypeId) -> Self {
         Self {
             name,
@@ -199,6 +219,7 @@ impl Relation {
         }
     }
     pub(crate) fn as_new(&self, id: RelationId) -> Self {
+        // TODO erik: make this return none for primitive relations.
         Self {
             name: format!("New{}", self.name).leak(),
             columns: self.columns.clone(),
@@ -208,7 +229,7 @@ impl Relation {
         }
     }
     /// Is it sound to turn entry on this into an insert.
-    pub(crate) fn can_become_insert(&self, im: ImplicitRuleId) -> bool {
+    pub(crate) fn can_become_insert(&self, _im: ImplicitRuleId) -> bool {
         match &self.ty {
             RelationTy::NewOf { .. } => unreachable!(),
             RelationTy::Table => {
@@ -217,14 +238,18 @@ impl Relation {
             }
             RelationTy::Alias { .. } => unreachable!(),
             RelationTy::Global { .. } => false,
-            RelationTy::Primitive {} => {
-                // depends on if it's a collection, right?
-                todo!()
+            RelationTy::Primitive { .. } => {
+                // for collections, inserts would be through entry.
+                false
             }
             RelationTy::Forall { .. } => unreachable!(),
         }
     }
 }
+
+#[derive(Educe, Clone, Debug)]
+#[educe(Ord, PartialOrd, Hash, Eq, PartialEq)]
+pub(crate) struct IgnoreBox<T>(#[educe(Ord(ignore), Hash(ignore), Eq(ignore))] pub(crate) T);
 
 #[derive(Clone, Eq, PartialEq, Ord, PartialOrd, Hash, Debug)]
 pub(crate) enum RelationTy {
@@ -246,12 +271,11 @@ pub(crate) enum RelationTy {
     /// Special because it always succeeds and has zero cost.
     /// Supports lookup/iteration
     Global { id: GlobalId },
-    /// Externally defined, predefined set of indexes.
-    /// Supports inserts, iteration, lookup for some indexes.
-    #[allow(unused)]
     Primitive {
-        // context: ComtextId,
-        // indexes: Vec<(Vec<ColumnId>, path_to_function)>,
+        /// Rust function as tokens.
+        syn: IgnoreBox<proc_macro2::TokenStream>,
+        /// Name of rust function to call.
+        ident: &'static str,
     },
     /// Conceptually a database view for everything with this type
     /// Points to relations and relevant columns? (fine assuming we do not create more

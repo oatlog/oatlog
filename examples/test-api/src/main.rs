@@ -1,3 +1,5 @@
+#![allow(unused)]
+
 // oatlog::compile_egraph!((
 //     (datatype Math
 //      (Mul Math Math)
