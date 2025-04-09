@@ -19,11 +19,11 @@ darling.workspace = true
 
 [dev-dependencies]
 expect-test.workspace = true
-proptest.workspace = true
 proptest-derive.workspace = true
+proptest.workspace = true
 
 [features]
-proptest = []
+proptest-intense = []
 
 [lints]
 workspace = true
