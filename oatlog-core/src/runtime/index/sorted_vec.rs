@@ -29,19 +29,16 @@ impl<RC: RowCtx> Index for SortedVec<RC> {
     fn iter(&self) -> impl Iterator<Item = Self::Repr> {
         RC::Row::inner_slice(&self.inner).into_iter().copied()
     }
-    fn range(&self, r: RangeInclusive<Self::Repr>) -> impl Iterator<Item = Self::Repr> {
-        // First element `>= r.start()` (first to include)
+    fn range(&self, range: RangeInclusive<Self::Repr>) -> impl Iterator<Item = Self::Repr> {
+        // First element `>= range.start()` (first to include)
         let start = self
             .inner
-            .partition_point(|&k| k < Self::Row::new(*r.start()));
+            .partition_point(|&r| r < Self::Row::new(*range.start()));
 
-        // First element `> r.end()` (first to exclude)
-        let end = self
-            .inner
-            .partition_point(|&k| k <= Self::Row::new(*r.end()));
-
-        // Hence `start..end` half-open
-        self.inner[start..end].iter().map(|r| r.inner())
+        self.inner[start..]
+            .iter()
+            .take_while(move |&&r| r <= Self::Row::new(*range.end()))
+            .map(|r| r.inner())
     }
 }
 impl<RC: RowCtx> IndexStatic for SortedVec<RC> {
