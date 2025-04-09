@@ -3,7 +3,7 @@ use crate::{
     hir::{self, ActionRelation, PremiseRelation, RelationTy, SymbolicRule, Theory},
     ids::{ActionId, ColumnId, ImplicitRuleId, IndexUsageId, PremiseId, RelationId, VariableId},
     index_selection, lir,
-    typed_vec::{tvec, TVec},
+    typed_vec::{TVec, tvec},
 };
 use std::{
     collections::{BTreeMap, BTreeSet},

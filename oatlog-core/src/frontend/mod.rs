@@ -1106,8 +1106,8 @@ impl Parser {
 
 mod compile_rule {
     use super::{
-        ComputeMethod, Expr, MError, MResult, MapExt as _, Parser, QSpan, Spanned, Str,
-        TYPE_UNIT, bare_, egglog_ast, register_span, span,
+        ComputeMethod, Expr, MError, MResult, MapExt as _, Parser, QSpan, Spanned, Str, TYPE_UNIT,
+        bare_, egglog_ast, register_span, span,
     };
 
     use std::collections::{BTreeMap, BTreeSet};
