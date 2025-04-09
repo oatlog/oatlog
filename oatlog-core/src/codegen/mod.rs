@@ -386,7 +386,10 @@ fn codegen_globals_and_initial(
                             }
                         }
                     }
-                    RelationKind::Primitive { codegen: _, out_col: _ } => todo!("primtive compute global"),
+                    RelationKind::Primitive {
+                        codegen: _,
+                        out_col: _,
+                    } => todo!("primitive compute global"),
                 }
             }
         }

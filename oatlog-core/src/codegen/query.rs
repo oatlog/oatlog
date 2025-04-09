@@ -9,7 +9,7 @@ use crate::{
 
 use itertools::Itertools as _;
 use proc_macro2::TokenStream;
-use quote::{format_ident, quote};
+use quote::quote;
 
 pub(crate) struct CodegenRuleTrieCtx<'a> {
     pub(crate) types: &'a TVec<TypeId, TypeData>,
@@ -116,7 +116,7 @@ impl CodegenRuleTrieCtx<'_> {
                         }
                     }
                     RelationKind::Primitive { .. } => {
-                        unreachable!("primtive functions do not have new")
+                        unreachable!("primitive functions do not have new")
                     }
                 }
             }
@@ -288,7 +288,7 @@ impl CodegenRuleTrieCtx<'_> {
                         panic!("Are you sure you wanted to insert into a global instead of entry?");
                     }
                     RelationKind::Primitive { .. } => {
-                        panic!("Insert is not supported for primtive relations")
+                        panic!("Insert is not supported for primitive relations")
                     }
                 }
             }
@@ -379,15 +379,16 @@ impl CodegenRuleTrieCtx<'_> {
                         out_col,
                     } => {
                         assert_eq!(out_col.0 + 1, args.len());
-                        let output = ident::var_var(&self.variables[args.last().copied().unwrap()]);
-                        let inputs = args[0..args.len() - 1]
+                        let args = args
                             .iter()
-                            .copied()
                             .map(|x| ident::var_var(&self.variables[x]))
                             .collect_vec();
-                        let ident = format_ident!("{}", relation.name);
+                        let [inputs @ .., output] = &args[..] else {
+                            unreachable!()
+                        };
+                        let rel = ident::rel_get(relation);
                         quote! {
-                            let (#output,) = #ident(#(#inputs),*).next().unwrap();
+                            let (#output,) = #rel(#(#inputs),*).next().unwrap();
                         }
                     }
                 }
