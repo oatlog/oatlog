@@ -3720,8 +3720,7 @@ fn test_bind_variable_multiple_times() {
                     #[doc = "( rewrite ( Same x x ) x )"]
                     for (x, internal1_x, p1) in self.same_.iter_new() {
                         if x == internal1_x {
-                            let p1 = self.uf.foo_.union(p1, x);
-                            let x = p1;
+                            self.uf.foo_.union(p1, x);
                         }
                     }
                 }

@@ -300,10 +300,7 @@ impl CodegenRuleTrieCtx<'_> {
                 let b = ident::var_var(self.var_of(b));
                 let inner = self.codegen_all(then, false);
                 let ret = quote! {
-                    // TODO erik for loke: Is this sound when we have entry? The main
-                    // concern is that infallible lookups remain infallible.
-                    let #a = self.uf.#uf_ident.union(#a, #b);
-                    let #b = #a;
+                    self.uf.#uf_ident.union(#a, #b);
                     #inner
                 };
                 if self.scoped {
