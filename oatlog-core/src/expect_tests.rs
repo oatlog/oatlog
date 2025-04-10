@@ -1173,6 +1173,7 @@ fn codegen_constant_propagation() {
                     }
                 }
                 fn update_finalize(&mut self, ctx: Self::UpdateCtx, uf: &mut Unification) {
+                    self.all_index_0_1_2.finalize();
                     self.all_index_1_0_2
                         .recreate_from(&self.all_index_0_1_2.as_slice());
                     self.all_index_2_0_1
@@ -1316,6 +1317,7 @@ fn codegen_constant_propagation() {
                     }
                 }
                 fn update_finalize(&mut self, ctx: Self::UpdateCtx, uf: &mut Unification) {
+                    self.all_index_0_1_2.finalize();
                     self.all_index_1_0_2
                         .recreate_from(&self.all_index_0_1_2.as_slice());
                     self.all_index_2_0_1
@@ -1452,6 +1454,7 @@ fn codegen_constant_propagation() {
                     }
                 }
                 fn update_finalize(&mut self, ctx: Self::UpdateCtx, uf: &mut Unification) {
+                    self.all_index_0_1.finalize();
                     self.all_index_1_0
                         .recreate_from(&self.all_index_0_1.as_slice());
                     assert_eq!(self.all_index_1_0.len(), self.all_index_0_1.len());
@@ -1852,6 +1855,7 @@ fn codegen_commutative() {
                     }
                 }
                 fn update_finalize(&mut self, ctx: Self::UpdateCtx, uf: &mut Unification) {
+                    self.all_index_0_1_2.finalize();
                     self.all_index_1_0_2
                         .recreate_from(&self.all_index_0_1_2.as_slice());
                     self.all_index_2_0_1
@@ -2353,6 +2357,7 @@ fn regression_entry2() {
                     }
                 }
                 fn update_finalize(&mut self, ctx: Self::UpdateCtx, uf: &mut Unification) {
+                    self.all_index_0_1_2.finalize();
                     self.all_index_1_0_2
                         .recreate_from(&self.all_index_0_1_2.as_slice());
                     self.all_index_2_0_1
@@ -2489,6 +2494,7 @@ fn regression_entry2() {
                     }
                 }
                 fn update_finalize(&mut self, ctx: Self::UpdateCtx, uf: &mut Unification) {
+                    self.all_index_0_1.finalize();
                     self.all_index_1_0
                         .recreate_from(&self.all_index_0_1.as_slice());
                     assert_eq!(self.all_index_1_0.len(), self.all_index_0_1.len());
@@ -2979,6 +2985,7 @@ fn regression_entry() {
                     }
                 }
                 fn update_finalize(&mut self, ctx: Self::UpdateCtx, uf: &mut Unification) {
+                    self.all_index_0_1_2.finalize();
                     self.all_index_1_0_2
                         .recreate_from(&self.all_index_0_1_2.as_slice());
                     self.all_index_2_0_1
@@ -3122,6 +3129,7 @@ fn regression_entry() {
                     }
                 }
                 fn update_finalize(&mut self, ctx: Self::UpdateCtx, uf: &mut Unification) {
+                    self.all_index_0_1_2.finalize();
                     self.all_index_1_0_2
                         .recreate_from(&self.all_index_0_1_2.as_slice());
                     self.all_index_2_0_1
@@ -3607,6 +3615,7 @@ fn test_bind_variable_multiple_times() {
                     }
                 }
                 fn update_finalize(&mut self, ctx: Self::UpdateCtx, uf: &mut Unification) {
+                    self.all_index_0_1_2.finalize();
                     self.all_index_1_0_2
                         .recreate_from(&self.all_index_0_1_2.as_slice());
                     self.all_index_2_0_1
@@ -4203,6 +4212,7 @@ fn codegen_variable_reuse_bug() {
                     }
                 }
                 fn update_finalize(&mut self, ctx: Self::UpdateCtx, uf: &mut Unification) {
+                    self.all_index_0_1_2.finalize();
                     self.all_index_1_0_2
                         .recreate_from(&self.all_index_0_1_2.as_slice());
                     self.all_index_2_0_1
@@ -4345,6 +4355,7 @@ fn codegen_variable_reuse_bug() {
                     }
                 }
                 fn update_finalize(&mut self, ctx: Self::UpdateCtx, uf: &mut Unification) {
+                    self.all_index_0.finalize();
                     self.new.extend(self.all_index_0.minus(&ctx.old));
                 }
             }
@@ -4740,6 +4751,7 @@ fn initial_exprs() {
                     }
                 }
                 fn update_finalize(&mut self, ctx: Self::UpdateCtx, uf: &mut Unification) {
+                    self.all_index_0_1_2.finalize();
                     self.all_index_1_0_2
                         .recreate_from(&self.all_index_0_1_2.as_slice());
                     self.all_index_2_0_1
@@ -4883,6 +4895,7 @@ fn initial_exprs() {
                     }
                 }
                 fn update_finalize(&mut self, ctx: Self::UpdateCtx, uf: &mut Unification) {
+                    self.all_index_0_1_2.finalize();
                     self.all_index_1_0_2
                         .recreate_from(&self.all_index_0_1_2.as_slice());
                     self.all_index_2_0_1
@@ -5019,6 +5032,7 @@ fn initial_exprs() {
                     }
                 }
                 fn update_finalize(&mut self, ctx: Self::UpdateCtx, uf: &mut Unification) {
+                    self.all_index_0_1.finalize();
                     self.all_index_1_0
                         .recreate_from(&self.all_index_0_1.as_slice());
                     assert_eq!(self.all_index_1_0.len(), self.all_index_0_1.len());
@@ -5141,6 +5155,7 @@ fn initial_exprs() {
                     }
                 }
                 fn update_finalize(&mut self, ctx: Self::UpdateCtx, uf: &mut Unification) {
+                    self.all_index_0_1.finalize();
                     self.all_index_1_0
                         .recreate_from(&self.all_index_0_1.as_slice());
                     assert_eq!(self.all_index_1_0.len(), self.all_index_0_1.len());
@@ -5779,6 +5794,9 @@ fn codegen_bug1() {
                     }
                 }
                 fn update_finalize(&mut self, ctx: Self::UpdateCtx, uf: &mut Unification) {
+                    self.all_index_0_1_2.finalize();
+                    self.all_index_1_0_2.finalize();
+                    self.all_index_2_0_1.finalize();
                     assert_eq!(self.all_index_1_0_2.len(), self.all_index_0_1_2.len());
                     assert_eq!(self.all_index_2_0_1.len(), self.all_index_0_1_2.len());
                     self.new.extend(self.all_index_0_1_2.minus(&ctx.old));
@@ -6121,6 +6139,7 @@ fn initial() {
                     }
                 }
                 fn update_finalize(&mut self, ctx: Self::UpdateCtx, uf: &mut Unification) {
+                    self.all_index_0_1.finalize();
                     self.all_index_1_0
                         .recreate_from(&self.all_index_0_1.as_slice());
                     assert_eq!(self.all_index_1_0.len(), self.all_index_0_1.len());
@@ -6506,6 +6525,7 @@ fn test_primitives_simple() {
                     }
                 }
                 fn update_finalize(&mut self, ctx: Self::UpdateCtx, uf: &mut Unification) {
+                    self.all_index_1_0_2.finalize();
                     self.all_index_0_1_2
                         .recreate_from(&self.all_index_1_0_2.as_slice());
                     self.all_index_2_0_1
@@ -6649,6 +6669,7 @@ fn test_primitives_simple() {
                     }
                 }
                 fn update_finalize(&mut self, ctx: Self::UpdateCtx, uf: &mut Unification) {
+                    self.all_index_0_1_2.finalize();
                     self.all_index_1_0_2
                         .recreate_from(&self.all_index_0_1_2.as_slice());
                     self.all_index_2_0_1
@@ -6785,6 +6806,7 @@ fn test_primitives_simple() {
                     }
                 }
                 fn update_finalize(&mut self, ctx: Self::UpdateCtx, uf: &mut Unification) {
+                    self.all_index_0_1.finalize();
                     self.all_index_1_0
                         .recreate_from(&self.all_index_0_1.as_slice());
                     assert_eq!(self.all_index_1_0.len(), self.all_index_0_1.len());
@@ -6929,6 +6951,7 @@ fn test_primitives_simple() {
                     }
                 }
                 fn update_finalize(&mut self, ctx: Self::UpdateCtx, uf: &mut Unification) {
+                    self.all_index_0_1.finalize();
                     self.all_index_1_0
                         .recreate_from(&self.all_index_0_1.as_slice());
                     assert_eq!(self.all_index_1_0.len(), self.all_index_0_1.len());
@@ -7407,6 +7430,8 @@ fn triangle_join() {
                     }
                 }
                 fn update_finalize(&mut self, ctx: Self::UpdateCtx, uf: &mut Unification) {
+                    self.all_index_0_1.finalize();
+                    self.all_index_1_0.finalize();
                     assert_eq!(self.all_index_1_0.len(), self.all_index_0_1.len());
                     self.new.extend(self.all_index_0_1.minus(&ctx.old));
                 }
@@ -7534,6 +7559,8 @@ fn triangle_join() {
                     }
                 }
                 fn update_finalize(&mut self, ctx: Self::UpdateCtx, uf: &mut Unification) {
+                    self.all_index_0_1.finalize();
+                    self.all_index_1_0.finalize();
                     assert_eq!(self.all_index_1_0.len(), self.all_index_0_1.len());
                     self.new.extend(self.all_index_0_1.minus(&ctx.old));
                 }
@@ -7645,6 +7672,8 @@ fn triangle_join() {
                     }
                 }
                 fn update_finalize(&mut self, ctx: Self::UpdateCtx, uf: &mut Unification) {
+                    self.all_index_0_1.finalize();
+                    self.all_index_1_0.finalize();
                     assert_eq!(self.all_index_1_0.len(), self.all_index_0_1.len());
                     self.new.extend(self.all_index_0_1.minus(&ctx.old));
                 }
@@ -7785,6 +7814,9 @@ fn triangle_join() {
                     }
                 }
                 fn update_finalize(&mut self, ctx: Self::UpdateCtx, uf: &mut Unification) {
+                    self.all_index_0_1_2.finalize();
+                    self.all_index_1_0_2.finalize();
+                    self.all_index_2_0_1.finalize();
                     assert_eq!(self.all_index_1_0_2.len(), self.all_index_0_1_2.len());
                     assert_eq!(self.all_index_2_0_1.len(), self.all_index_0_1_2.len());
                     self.new.extend(self.all_index_0_1_2.minus(&ctx.old));
@@ -8202,6 +8234,7 @@ fn edgecase0() {
                     }
                 }
                 fn update_finalize(&mut self, ctx: Self::UpdateCtx, uf: &mut Unification) {
+                    self.all_index_0_1_2.finalize();
                     self.all_index_1_0_2
                         .recreate_from(&self.all_index_0_1_2.as_slice());
                     self.all_index_2_0_1
@@ -8353,6 +8386,7 @@ fn edgecase0() {
                     }
                 }
                 fn update_finalize(&mut self, ctx: Self::UpdateCtx, uf: &mut Unification) {
+                    self.all_index_0_1_2.finalize();
                     self.all_index_1_0_2
                         .recreate_from(&self.all_index_0_1_2.as_slice());
                     self.all_index_2_0_1
@@ -8760,6 +8794,7 @@ fn test_into_codegen() {
                     }
                 }
                 fn update_finalize(&mut self, ctx: Self::UpdateCtx, uf: &mut Unification) {
+                    self.all_index_0_1_2.finalize();
                     self.all_index_1_0_2
                         .recreate_from(&self.all_index_0_1_2.as_slice());
                     self.all_index_2_0_1
@@ -8903,6 +8938,7 @@ fn test_into_codegen() {
                     }
                 }
                 fn update_finalize(&mut self, ctx: Self::UpdateCtx, uf: &mut Unification) {
+                    self.all_index_0_1_2.finalize();
                     self.all_index_1_0_2
                         .recreate_from(&self.all_index_0_1_2.as_slice());
                     self.all_index_2_0_1

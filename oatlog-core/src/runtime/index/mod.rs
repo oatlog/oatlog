@@ -33,6 +33,7 @@ pub trait IndexStatic: Index {
     ) -> impl 'a + Iterator<Item = <Self::Row as IndexRow>::Repr>;
 
     fn recreate_from(&mut self, other: &[<Self::Row as IndexRow>::Repr]);
+    fn finalize(&mut self);
 
     fn sorted_vec_update<UF>(
         &mut self,
@@ -48,6 +49,12 @@ pub trait IndexStatic: Index {
 pub trait RowCtx: Default + std::fmt::Debug {
     type Row: IndexRow;
     fn sort(slice: &mut [Self::Row]);
+
+    const B: usize;
+    type BTreeNode: Clone;
+    const BTREE_INFINITY: Self::BTreeNode;
+    fn btree_node(rows: impl ExactSizeIterator<Item = Self::Row>) -> Self::BTreeNode;
+    fn count_less_than(block: &Self::BTreeNode, key: Self::Row) -> usize;
 }
 
 #[derive(Default, Debug, Clone)]
@@ -56,6 +63,19 @@ impl<R: IndexRow> RowCtx for StdSortCtx<R> {
     type Row = R;
     fn sort(slice: &mut [Self::Row]) {
         slice.sort_unstable();
+    }
+
+    const B: usize = 2;
+    type BTreeNode = [R; 2];
+    const BTREE_INFINITY: Self::BTreeNode = [R::MAX; 2];
+    fn btree_node(mut rows: impl ExactSizeIterator<Item = Self::Row>) -> Self::BTreeNode {
+        assert_eq!(rows.len(), Self::B);
+        let ret = [rows.next().unwrap(), rows.next().unwrap()];
+        assert!(rows.next().is_none());
+        ret
+    }
+    fn count_less_than(block: &Self::BTreeNode, key: Self::Row) -> usize {
+        block.iter().take_while(|r| **r < key).count()
     }
 }
 
@@ -73,6 +93,20 @@ impl<
     fn sort(slice: &mut [Self::Row]) {
         use voracious_radix_sort::RadixSort;
         slice.voracious_sort();
+    }
+
+    const B: usize = 2;
+    type BTreeNode = [R; 2];
+    const BTREE_INFINITY: Self::BTreeNode = [R::MAX; 2];
+    fn btree_node(mut rows: impl ExactSizeIterator<Item = Self::Row>) -> Self::BTreeNode {
+        assert_eq!(rows.len(), Self::B);
+        let ret = [rows.next().unwrap(), rows.next().unwrap()];
+        assert!(rows.next().is_none());
+        ret
+    }
+    // TODO loke: SIMD here
+    fn count_less_than(block: &Self::BTreeNode, key: Self::Row) -> usize {
+        block.iter().take_while(|r| **r < key).count()
     }
 }
 

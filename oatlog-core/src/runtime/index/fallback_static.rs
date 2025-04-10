@@ -54,6 +54,7 @@ impl<RC: RowCtx> IndexStatic for FallbackStatic<RC> {
         self.inner = RC::Row::from_inner_slice(other).iter().copied().collect();
         self.as_vec = self.inner.iter().copied().collect();
     }
+    fn finalize(&mut self) {}
     fn sorted_vec_update<UF>(
         &mut self,
         insertions: &mut Vec<Self::Repr>,

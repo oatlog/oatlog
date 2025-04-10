@@ -160,6 +160,8 @@ fn comparative_test<
             progress |= update!(fast, fast_uf, fast_insertions);
             progress |= update!(fallback, fallback_uf, fallback_insertions);
         }
+        fast.finalize();
+        fallback.finalize();
 
         assert_eq!(fast.len(), fallback.len());
         assert_eq!(fast_insertions, fallback_insertions);
@@ -205,8 +207,12 @@ fn test_with_std() {
     type Row = Row3_0_1<Math, Math, Math>;
     type RC = StdSortCtx<Row>;
 
+    let proptest_config = ProptestConfig {
+        max_shrink_iters: 16 * CASES,
+        ..ProptestConfig::with_cases(CASES)
+    };
     proptest!(
-        ProptestConfig::with_cases(CASES),
+        proptest_config,
         |(ops in proptest::collection::vec(
             SortedVecUpdateOp::strategy(),
             proptest::collection::SizeRange::default(),

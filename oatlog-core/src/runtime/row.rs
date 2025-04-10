@@ -21,6 +21,8 @@ pub unsafe trait IndexRow: PreReqs {
     /// The first column in the index. Uproots are allowed by the first index.
     type FirstColumn: PreReqs + RelationElement;
 
+    const MAX: Self;
+
     fn inner_slice<'a>(slice: &'a [Self]) -> &'a [Self::Repr] {
         use std::alloc::Layout;
         assert_eq!(Layout::new::<Self>(), Layout::new::<Self::Repr>());
@@ -159,6 +161,8 @@ macro_rules! decl_row {
             type Key = ($($key_ty,)*);
             type Value = ($($value_ty,)*);
             type ValueMut<'a> = ($(&'a mut $value_ty,)*) where Self: 'a;
+
+            const MAX: Self = Self { inner: ($($repr_ty::MAX_ID,)*) };
 
             fn new(inner: Self::Repr) -> Self {
                 Self { inner }

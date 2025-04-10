@@ -358,6 +358,7 @@ fn update(
             ctx: Self::UpdateCtx,
             uf: &mut Unification,
         ) {
+            #(self.#indexes_to_fixpoint.finalize();)*
             #(self.#indexes_to_recreate.recreate_from(&self.#primary_index_ident.as_slice());)*
             #(assert_eq!(self.#indexes_all_except_primary.len(), self.#primary_index_ident.len());)*
             self.new.extend(self.#primary_index_ident.minus(&ctx.old));
