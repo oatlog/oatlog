@@ -96,10 +96,10 @@ impl<K: Id, V> UFData<K, V> {
             }
         }
     }
-    /// The set that this element belongs to
-    pub(crate) fn set(&self, i: K) -> &[K] {
-        self.find_root(i).2
-    }
+    // /// The set that this element belongs to
+    // pub(crate) fn set(&self, i: K) -> &[K] {
+    //     self.find_root(i).2
+    // }
 
     /// Iterate the root representatives and their data
     pub(crate) fn iter_roots(&self) -> impl Iterator<Item = (K, &V)> + use<'_, K, V> {
@@ -116,10 +116,6 @@ impl<K: Id, V> UFData<K, V> {
             UFElement::Root { set, .. } => Some(set.as_slice()),
             UFElement::Child { .. } => None,
         })
-    }
-    /// Iterate the sets that contain > 1 element.
-    pub(crate) fn iter_merged_sets(&self) -> impl Iterator<Item = &[K]> {
-        self.iter_sets().filter(|s| s.len() > 1)
     }
     /// Iterate all entries, including non-root.
     ///
@@ -191,13 +187,6 @@ impl<K: Id> UF<K> {
         let res: Result<_, Uninhabited> = self.try_union_merge(i, j, |(), ()| Ok(()));
         let Ok(res) = res;
         res
-    }
-    pub(crate) fn union_groups(&mut self, iter: impl Iterator<Item = Vec<K>>) {
-        for x in iter {
-            for w in x.windows(2) {
-                self.union(w[0], w[1]);
-            }
-        }
     }
     pub(crate) fn from_pairs(n: usize, iter: impl Iterator<Item = (K, K)>) -> Self {
         let mut uf = Self::new_with_size(n, ());

@@ -1,9 +1,7 @@
 use crate::{
     codegen::ident,
     ids::{GlobalId, RelationId, TypeId, VariableId},
-    lir::{
-        Action, RelationData, RelationKind, RuleAtom, RuleTrie, TypeData, TypeKind, VariableData,
-    },
+    lir::{Action, RelationData, RelationKind, RuleAtom, RuleTrie, TypeData, VariableData},
     typed_vec::TVec,
 };
 
@@ -51,6 +49,13 @@ impl CodegenRuleTrieCtx<'_> {
         ret
     }
     fn codegen(&mut self, RuleTrie { meta, atom, then }: RuleTrie) -> TokenStream {
+        if let RuleAtom::Action(_) = &atom {
+            assert_eq!(
+                then.len(),
+                0,
+                "we don't actually codegen `then` for all actions currently"
+            );
+        }
         let content = match atom {
             RuleAtom::IfEq(a, b) => {
                 let inner = self.codegen_all(then, true);
@@ -303,19 +308,18 @@ impl CodegenRuleTrieCtx<'_> {
                     self.uf.#uf_ident.union(#a, #b);
                     #inner
                 };
-                if self.scoped {
-                    ret
-                } else {
-                    quote! {{#ret}}
-                }
+                // if self.scoped {
+                ret
+                // } else {
+                //     quote! {{#ret}}
+                // }
             }
-            RuleAtom::Action(Action::Make(x)) => {
-                assert!(matches!(self.type_of(x).kind, TypeKind::Symbolic));
-
-                let var = ident::var_var(self.var_of(x));
-                let type_uf = ident::type_uf(self.type_of(x));
-                quote! { let #var = self.uf.#type_uf.add_eclass(); }
-            }
+            // RuleAtom::Action(Action::Make(x)) => {
+            //     assert!(matches!(self.type_of(x).kind, TypeKind::Symbolic));
+            //     let var = ident::var_var(self.var_of(x));
+            //     let type_uf = ident::type_uf(self.type_of(x));
+            //     quote! { let #var = self.uf.#type_uf.add_eclass(); }
+            // }
             RuleAtom::Action(Action::Entry {
                 relation,
                 index,

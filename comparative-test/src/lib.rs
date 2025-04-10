@@ -1008,7 +1008,20 @@ egglog_test!(nogenerate, repro_should_saturate, expect![[r#"
 
 "#]], r#"(include "comparative-test/egglog-testsuite/repro-should-saturate.egg")"#);// merge
 egglog_test!(does_panic, repro_silly_panic, expect!["Global variables should have been desugared"], r#"(include "comparative-test/egglog-testsuite/repro-silly-panic.egg")"#);// fails internal assertions
-egglog_test!(nogenerate, repro_typechecking_schedule, expect!["PANIC: index out of bounds: the len is 0 but the index is 0"], r#"(include "comparative-test/egglog-testsuite/repro-typechecking-schedule.egg")"#);// index OOB
+egglog_test!(nogenerate, repro_typechecking_schedule, expect![[r#"
+    comparative-test/egglog-testsuite/repro-typechecking-schedule.egg: not implemented yet
+    ( run-schedule ( seq ( run :until ( = a 1 ) ) ( run :until ( = a "s" ) ) ) )
+
+    comparative-test/egglog-testsuite/repro-typechecking-schedule.egg: while parsing this toplevel expression
+    ( run-schedule ( seq ( run :until ( = a 1 ) ) ( run :until ( = a "s" ) ) ) )
+
+    comparative-test/egglog-testsuite/repro-typechecking-schedule.egg: while reading comparative-test/egglog-testsuite/repro-typechecking-schedule.egg
+    ( include "comparative-test/egglog-testsuite/repro-typechecking-schedule.egg" )
+
+    toplevel: while parsing this toplevel expression
+    ( include "comparative-test/egglog-testsuite/repro-typechecking-schedule.egg" )
+
+"#]], r#"(include "comparative-test/egglog-testsuite/repro-typechecking-schedule.egg")"#);// index OOB
 // egglog_test!(mismatched, repro_unsound, expect![[r#"
 //     Div: 8654 (egglog) != 8658 (oatlog)
 //     Mul: 2811 (egglog) != 2818 (oatlog)

@@ -72,12 +72,19 @@ fn shink_cases() {
     // );
     shrink_err(
         expect![[r#"
-            (datatype Math (Mul Math Math) (Zero ))
-            (let zero (Zero ))
-            (rule ((= a (Mul zero c))) ((union a zero)))"#]],
+            (datatype Math (Mul Math Math))
+            (rule ((= a (Mul zero c))) ())"#]],
         expect!["DOES NOT ERROR?"],
     );
 }
+
+// TODO erik: This is expressible when we have custom implicit functionality rules.
+//
+// Premise: (Add a b c)
+// Action: (Neg a b), (Neg a c)
+//
+// Premise: (Add a b b)
+// Action: (Neg a b), (Neg a c)
 
 #[test]
 fn redundant_premise_simplify() {
@@ -106,51 +113,66 @@ fn redundant_premise_simplify() {
             )
         "#,
         expected_hir: Some(expect![[r#"
-            Theory:
-
-            +(i64, i64, i64)
-            &(i64, i64, i64)
-            not-i64(i64, i64)
-            |(i64, i64, i64)
-            <<(i64, i64, i64)
-            >>(i64, i64, i64)
-            ^(i64, i64, i64)
-            /(i64, i64, i64)
-            log2(i64, i64)
-            max(i64, i64, i64)
-            min(i64, i64, i64)
-            *(i64, i64, i64)
-            %(i64, i64, i64)
-            -(i64, i64, i64)
-            Math(Math)
-            Const(i64, Math)
-            Add(Math, Math, Math)
-            g0(i64)
-
-            Rule "complicated":
-            Premise: Const(p0, p1), Const(p2, p3), Const(p4, p5), Const(p6, p7), Const(p9, p10), Const(p11, p12), Add(p5, p7, p8), Add(p10, p12, p13), g0(p0), g0(p2), g0(p4), g0(p6), g0(p9), g0(p11)
-            __: p0
-            __: p1
-            __: p2
-            __: p3
-            __: p4
-            __: p5
-            __: p6
-            __: p7
-            __: p8
-            __: p9
-            __: p10
-            __: p11
-            __: p12
-            __: p13
-
-            Rule "expected simplified":
-            Premise: Const(p1, one), Add(one, one, two), g0(p1)
-            __: one
-            __: p1
-            __: two
-
-        "#]]),
+            Theory {
+                types: {
+                    [t0, ()]: std::primitive::unit,
+                    [t1, i64]: std::primitive::i64,
+                    [t2, String]: runtime::IString,
+                    [t3, Math]: [symbolic],
+                },
+                symbolic_rules: [
+                    SymbolicRule {
+                        name: "complicated",
+                        src: "( rule ( ( Const 1 ) ( Const 1 ) ( Add ( Const 1 ) ( Const 1 ) ) ( Add ( Const 1 ) ( Const 1 ) ) ) ( ) :name \"complicated\" )",
+                        atoms: [
+                            Premise { relation: Const, columns: [v0, v1] },
+                            Premise { relation: Add, columns: [v1, v1, v2] },
+                            Premise { relation: g0, columns: [v0] },
+                        ],
+                        variables: {
+                            v0: VariableMeta { name: None, ty: t1 },
+                            v1: VariableMeta { name: None, ty: t3 },
+                            v2: VariableMeta { name: None, ty: t3 },
+                        },
+                        unify: [],
+                    },
+                    SymbolicRule {
+                        name: "expected simplified",
+                        src: "( rule ( ( = one ( Const 1 ) ) ( = two ( Add one one ) ) ) ( ) :name \"expected simplified\" )",
+                        atoms: [
+                            Premise { relation: Const, columns: [v1, one] },
+                            Premise { relation: Add, columns: [one, one, two] },
+                            Premise { relation: g0, columns: [v1] },
+                        ],
+                        variables: {
+                            v0: VariableMeta { name: Some("one"), ty: t3 },
+                            v1: VariableMeta { name: None, ty: t1 },
+                            v2: VariableMeta { name: Some("two"), ty: t3 },
+                        },
+                        unify: [],
+                    },
+                ],
+                relations: {
+                    r0: + { columns: [i64, i64, i64], kind: Primitive(i64_add012), implicit_rules: {n0: [_, _, !]} },
+                    r1: & { columns: [i64, i64, i64], kind: Primitive(i64_bitand012), implicit_rules: {n0: [_, _, !]} },
+                    r2: not-i64 { columns: [i64, i64], kind: Primitive(i64_bitnot01), implicit_rules: {n0: [_, !]} },
+                    r3: | { columns: [i64, i64, i64], kind: Primitive(i64_bitor012), implicit_rules: {n0: [_, _, !]} },
+                    r4: << { columns: [i64, i64, i64], kind: Primitive(i64_bitshl012), implicit_rules: {n0: [_, _, !]} },
+                    r5: >> { columns: [i64, i64, i64], kind: Primitive(i64_bitshr012), implicit_rules: {n0: [_, _, !]} },
+                    r6: ^ { columns: [i64, i64, i64], kind: Primitive(i64_bitxor012), implicit_rules: {n0: [_, _, !]} },
+                    r7: / { columns: [i64, i64, i64], kind: Primitive(i64_div012), implicit_rules: {n0: [_, _, !]} },
+                    r8: log2 { columns: [i64, i64], kind: Primitive(i64_log01), implicit_rules: {n0: [_, !]} },
+                    r9: max { columns: [i64, i64, i64], kind: Primitive(i64_max012), implicit_rules: {n0: [_, _, !]} },
+                    r10: min { columns: [i64, i64, i64], kind: Primitive(i64_min012), implicit_rules: {n0: [_, _, !]} },
+                    r11: * { columns: [i64, i64, i64], kind: Primitive(i64_mul012), implicit_rules: {n0: [_, _, !]} },
+                    r12: % { columns: [i64, i64, i64], kind: Primitive(i64_rem012), implicit_rules: {n0: [_, _, !]} },
+                    r13: - { columns: [i64, i64, i64], kind: Primitive(i64_sub012), implicit_rules: {n0: [_, _, !]} },
+                    r14: Math { columns: [Math], kind: Forall(t3), implicit_rules: {} },
+                    r15: Const { columns: [i64, Math], kind: Table, implicit_rules: {n0: [_, U]} },
+                    r16: Add { columns: [Math, Math, Math], kind: Table, implicit_rules: {n0: [_, _, U]} },
+                    r17: g0 { columns: [i64], kind: Global(g0), implicit_rules: {n0: [!]} },
+                },
+            }"#]]),
         expected_lir: None,
         expected_codegen: None,
     }
@@ -189,69 +211,75 @@ fn redundant_action_simplify() {
             )
         "#,
         expected_hir: Some(expect![[r#"
-            Theory:
-
-            +(i64, i64, i64)
-            &(i64, i64, i64)
-            not-i64(i64, i64)
-            |(i64, i64, i64)
-            <<(i64, i64, i64)
-            >>(i64, i64, i64)
-            ^(i64, i64, i64)
-            /(i64, i64, i64)
-            log2(i64, i64)
-            max(i64, i64, i64)
-            min(i64, i64, i64)
-            *(i64, i64, i64)
-            %(i64, i64, i64)
-            -(i64, i64, i64)
-            Math(Math)
-            Const(i64, Math)
-            Add(Math, Math, Math)
-            g0(i64)
-            g1(i64)
-
-            Rule "complicated":
-            Premise: Const(p0, p1), Const(p2, p3), Const(p4, p5), Const(p6, p7), Const(p9, p10), Const(p11, p12), Const(p14, p15), Const(p16, p17), Add(p5, p7, p8), Add(p10, p12, p13), Add(p15, p17, p18), g0(p0), g0(p4), g0(p9), g0(p14), g1(p2), g1(p6), g1(p11), g1(p16)
-            __: p0
-            __: p1
-            __: p2
-            __: p3
-            __: p4
-            __: p5
-            __: p6
-            __: p7
-            __: p8
-            __: p9
-            __: p10
-            __: p11
-            __: p12
-            __: p13
-            __: p14
-            __: p15
-            __: p16
-            __: p17
-            __: p18
-            a0: __
-            a1: __
-            a2: __
-            a3: __
-            a4: __
-            a5: __
-            a6: __
-            a7: __
-            a8: __
-            Insert: Const(a0, a1).n0, Const(a2, a3).n0, Const(a4, a5).n0, Const(a6, a7).n0, Add(a5, a7, a8).n0, g0(a0).n0, g0(a4).n0, g1(a2).n0, g1(a6).n0
-
-            Rule "expected simplified":
-            Premise: Const(p1, one), Const(p3, two), Add(one, two, three), g0(p1), g1(p3)
-            __: one
-            __: p1
-            __: two
-            __: p3
-            __: three
-
-        "#]]),
+            Theory {
+                types: {
+                    [t0, ()]: std::primitive::unit,
+                    [t1, i64]: std::primitive::i64,
+                    [t2, String]: runtime::IString,
+                    [t3, Math]: [symbolic],
+                },
+                symbolic_rules: [
+                    SymbolicRule {
+                        name: "complicated",
+                        src: "( rule ( ( Const 1 ) ( Const 2 ) ( Add ( Const 1 ) ( Const 2 ) ) ( Add ( Const 1 ) ( Const 2 ) ) ( Add ( Const 1 ) ( Const 2 ) ) ) ( ( Const 1 ) ( Const 2 ) ( Add ( Const 1 ) ( Const 2 ) ) ) :name \"complicated\" )",
+                        atoms: [
+                            Premise { relation: Const, columns: [v0, v1] },
+                            Premise { relation: Const, columns: [v2, v3] },
+                            Premise { relation: Add, columns: [v1, v3, v4] },
+                            Premise { relation: g0, columns: [v0] },
+                            Premise { relation: g1, columns: [v2] },
+                        ],
+                        variables: {
+                            v0: VariableMeta { name: None, ty: t1 },
+                            v1: VariableMeta { name: None, ty: t3 },
+                            v2: VariableMeta { name: None, ty: t1 },
+                            v3: VariableMeta { name: None, ty: t3 },
+                            v4: VariableMeta { name: None, ty: t3 },
+                        },
+                        unify: [],
+                    },
+                    SymbolicRule {
+                        name: "expected simplified",
+                        src: "( rule ( ( = one ( Const 1 ) ) ( = two ( Const 2 ) ) ( = three ( Add one two ) ) ) ( ) :name \"expected simplified\" )",
+                        atoms: [
+                            Premise { relation: Const, columns: [v1, one] },
+                            Premise { relation: Const, columns: [v3, two] },
+                            Premise { relation: Add, columns: [one, two, three] },
+                            Premise { relation: g0, columns: [v1] },
+                            Premise { relation: g1, columns: [v3] },
+                        ],
+                        variables: {
+                            v0: VariableMeta { name: Some("one"), ty: t3 },
+                            v1: VariableMeta { name: None, ty: t1 },
+                            v2: VariableMeta { name: Some("two"), ty: t3 },
+                            v3: VariableMeta { name: None, ty: t1 },
+                            v4: VariableMeta { name: Some("three"), ty: t3 },
+                        },
+                        unify: [],
+                    },
+                ],
+                relations: {
+                    r0: + { columns: [i64, i64, i64], kind: Primitive(i64_add012), implicit_rules: {n0: [_, _, !]} },
+                    r1: & { columns: [i64, i64, i64], kind: Primitive(i64_bitand012), implicit_rules: {n0: [_, _, !]} },
+                    r2: not-i64 { columns: [i64, i64], kind: Primitive(i64_bitnot01), implicit_rules: {n0: [_, !]} },
+                    r3: | { columns: [i64, i64, i64], kind: Primitive(i64_bitor012), implicit_rules: {n0: [_, _, !]} },
+                    r4: << { columns: [i64, i64, i64], kind: Primitive(i64_bitshl012), implicit_rules: {n0: [_, _, !]} },
+                    r5: >> { columns: [i64, i64, i64], kind: Primitive(i64_bitshr012), implicit_rules: {n0: [_, _, !]} },
+                    r6: ^ { columns: [i64, i64, i64], kind: Primitive(i64_bitxor012), implicit_rules: {n0: [_, _, !]} },
+                    r7: / { columns: [i64, i64, i64], kind: Primitive(i64_div012), implicit_rules: {n0: [_, _, !]} },
+                    r8: log2 { columns: [i64, i64], kind: Primitive(i64_log01), implicit_rules: {n0: [_, !]} },
+                    r9: max { columns: [i64, i64, i64], kind: Primitive(i64_max012), implicit_rules: {n0: [_, _, !]} },
+                    r10: min { columns: [i64, i64, i64], kind: Primitive(i64_min012), implicit_rules: {n0: [_, _, !]} },
+                    r11: * { columns: [i64, i64, i64], kind: Primitive(i64_mul012), implicit_rules: {n0: [_, _, !]} },
+                    r12: % { columns: [i64, i64, i64], kind: Primitive(i64_rem012), implicit_rules: {n0: [_, _, !]} },
+                    r13: - { columns: [i64, i64, i64], kind: Primitive(i64_sub012), implicit_rules: {n0: [_, _, !]} },
+                    r14: Math { columns: [Math], kind: Forall(t3), implicit_rules: {} },
+                    r15: Const { columns: [i64, Math], kind: Table, implicit_rules: {n0: [_, U]} },
+                    r16: Add { columns: [Math, Math, Math], kind: Table, implicit_rules: {n0: [_, _, U]} },
+                    r17: g0 { columns: [i64], kind: Global(g0), implicit_rules: {n0: [!]} },
+                    r18: g1 { columns: [i64], kind: Global(g1), implicit_rules: {n0: [!]} },
+                },
+            }"#]]),
         expected_lir: None,
         expected_codegen: None,
     }
@@ -265,29 +293,42 @@ fn weird_premise_equality() {
             (rule ((= x 1) (= y x) (= z y)) ())
         "#,
         expected_hir: Some(expect![[r#"
-            Theory:
-
-            +(i64, i64, i64)
-            &(i64, i64, i64)
-            not-i64(i64, i64)
-            |(i64, i64, i64)
-            <<(i64, i64, i64)
-            >>(i64, i64, i64)
-            ^(i64, i64, i64)
-            /(i64, i64, i64)
-            log2(i64, i64)
-            max(i64, i64, i64)
-            min(i64, i64, i64)
-            *(i64, i64, i64)
-            %(i64, i64, i64)
-            -(i64, i64, i64)
-            g0(i64)
-
-            Rule:
-            Premise: g0(xyz)
-            __: xyz
-
-        "#]]),
+            Theory {
+                types: {
+                    [t0, ()]: std::primitive::unit,
+                    [t1, i64]: std::primitive::i64,
+                    [t2, String]: runtime::IString,
+                },
+                symbolic_rules: [
+                    SymbolicRule {
+                        src: "( rule ( ( = x 1 ) ( = y x ) ( = z y ) ) ( ) )",
+                        atoms: [
+                            Premise { relation: g0, columns: [xyz] },
+                        ],
+                        variables: {
+                            v0: VariableMeta { name: Some("xyz"), ty: t1 },
+                        },
+                        unify: [],
+                    },
+                ],
+                relations: {
+                    r0: + { columns: [i64, i64, i64], kind: Primitive(i64_add012), implicit_rules: {n0: [_, _, !]} },
+                    r1: & { columns: [i64, i64, i64], kind: Primitive(i64_bitand012), implicit_rules: {n0: [_, _, !]} },
+                    r2: not-i64 { columns: [i64, i64], kind: Primitive(i64_bitnot01), implicit_rules: {n0: [_, !]} },
+                    r3: | { columns: [i64, i64, i64], kind: Primitive(i64_bitor012), implicit_rules: {n0: [_, _, !]} },
+                    r4: << { columns: [i64, i64, i64], kind: Primitive(i64_bitshl012), implicit_rules: {n0: [_, _, !]} },
+                    r5: >> { columns: [i64, i64, i64], kind: Primitive(i64_bitshr012), implicit_rules: {n0: [_, _, !]} },
+                    r6: ^ { columns: [i64, i64, i64], kind: Primitive(i64_bitxor012), implicit_rules: {n0: [_, _, !]} },
+                    r7: / { columns: [i64, i64, i64], kind: Primitive(i64_div012), implicit_rules: {n0: [_, _, !]} },
+                    r8: log2 { columns: [i64, i64], kind: Primitive(i64_log01), implicit_rules: {n0: [_, !]} },
+                    r9: max { columns: [i64, i64, i64], kind: Primitive(i64_max012), implicit_rules: {n0: [_, _, !]} },
+                    r10: min { columns: [i64, i64, i64], kind: Primitive(i64_min012), implicit_rules: {n0: [_, _, !]} },
+                    r11: * { columns: [i64, i64, i64], kind: Primitive(i64_mul012), implicit_rules: {n0: [_, _, !]} },
+                    r12: % { columns: [i64, i64, i64], kind: Primitive(i64_rem012), implicit_rules: {n0: [_, _, !]} },
+                    r13: - { columns: [i64, i64, i64], kind: Primitive(i64_sub012), implicit_rules: {n0: [_, _, !]} },
+                    r14: g0 { columns: [i64], kind: Global(g0), implicit_rules: {n0: [!]} },
+                },
+            }"#]]),
         expected_lir: None,
         expected_codegen: None,
     }
@@ -304,33 +345,47 @@ fn hir_commutative() {
             (rule ((= e (Add a b) )) ((union e (Add b a))))
         "#,
         expected_hir: Some(expect![[r#"
-            Theory:
-
-            +(i64, i64, i64)
-            &(i64, i64, i64)
-            not-i64(i64, i64)
-            |(i64, i64, i64)
-            <<(i64, i64, i64)
-            >>(i64, i64, i64)
-            ^(i64, i64, i64)
-            /(i64, i64, i64)
-            log2(i64, i64)
-            max(i64, i64, i64)
-            min(i64, i64, i64)
-            *(i64, i64, i64)
-            %(i64, i64, i64)
-            -(i64, i64, i64)
-            Math(Math)
-            Add(Math, Math, Math)
-
-            Rule:
-            Premise: Add(a, b, e)
-            e: e
-            a: a
-            b: b
-            Insert: Add(b, a, e).n0
-
-        "#]]),
+            Theory {
+                types: {
+                    [t0, ()]: std::primitive::unit,
+                    [t1, i64]: std::primitive::i64,
+                    [t2, String]: runtime::IString,
+                    [t3, Math]: [symbolic],
+                },
+                symbolic_rules: [
+                    SymbolicRule {
+                        src: "( rule ( ( = e ( Add a b ) ) ) ( ( union e ( Add b a ) ) ) )",
+                        atoms: [
+                            Premise { relation: Add, columns: [a, b, e] },
+                            Action { relation: Add, columns: [b, a, e], entry: [_, _, U] },
+                        ],
+                        variables: {
+                            v0: VariableMeta { name: Some("e"), ty: t3 },
+                            v1: VariableMeta { name: Some("a"), ty: t3 },
+                            v2: VariableMeta { name: Some("b"), ty: t3 },
+                        },
+                        unify: [],
+                    },
+                ],
+                relations: {
+                    r0: + { columns: [i64, i64, i64], kind: Primitive(i64_add012), implicit_rules: {n0: [_, _, !]} },
+                    r1: & { columns: [i64, i64, i64], kind: Primitive(i64_bitand012), implicit_rules: {n0: [_, _, !]} },
+                    r2: not-i64 { columns: [i64, i64], kind: Primitive(i64_bitnot01), implicit_rules: {n0: [_, !]} },
+                    r3: | { columns: [i64, i64, i64], kind: Primitive(i64_bitor012), implicit_rules: {n0: [_, _, !]} },
+                    r4: << { columns: [i64, i64, i64], kind: Primitive(i64_bitshl012), implicit_rules: {n0: [_, _, !]} },
+                    r5: >> { columns: [i64, i64, i64], kind: Primitive(i64_bitshr012), implicit_rules: {n0: [_, _, !]} },
+                    r6: ^ { columns: [i64, i64, i64], kind: Primitive(i64_bitxor012), implicit_rules: {n0: [_, _, !]} },
+                    r7: / { columns: [i64, i64, i64], kind: Primitive(i64_div012), implicit_rules: {n0: [_, _, !]} },
+                    r8: log2 { columns: [i64, i64], kind: Primitive(i64_log01), implicit_rules: {n0: [_, !]} },
+                    r9: max { columns: [i64, i64, i64], kind: Primitive(i64_max012), implicit_rules: {n0: [_, _, !]} },
+                    r10: min { columns: [i64, i64, i64], kind: Primitive(i64_min012), implicit_rules: {n0: [_, _, !]} },
+                    r11: * { columns: [i64, i64, i64], kind: Primitive(i64_mul012), implicit_rules: {n0: [_, _, !]} },
+                    r12: % { columns: [i64, i64, i64], kind: Primitive(i64_rem012), implicit_rules: {n0: [_, _, !]} },
+                    r13: - { columns: [i64, i64, i64], kind: Primitive(i64_sub012), implicit_rules: {n0: [_, _, !]} },
+                    r14: Math { columns: [Math], kind: Forall(t3), implicit_rules: {} },
+                    r15: Add { columns: [Math, Math, Math], kind: Table, implicit_rules: {n0: [_, _, U]} },
+                },
+            }"#]]),
         expected_lir: None,
         expected_codegen: None,
     }
@@ -348,38 +403,55 @@ fn hir_distributive() {
             (rewrite (Mul (Add a b) c) (Add (Mul a c) (Mul b c)))
         "#,
         expected_hir: Some(expect![[r#"
-            Theory:
-
-            +(i64, i64, i64)
-            &(i64, i64, i64)
-            not-i64(i64, i64)
-            |(i64, i64, i64)
-            <<(i64, i64, i64)
-            >>(i64, i64, i64)
-            ^(i64, i64, i64)
-            /(i64, i64, i64)
-            log2(i64, i64)
-            max(i64, i64, i64)
-            min(i64, i64, i64)
-            *(i64, i64, i64)
-            %(i64, i64, i64)
-            -(i64, i64, i64)
-            Math(Math)
-            Add(Math, Math, Math)
-            Mul(Math, Math, Math)
-
-            Rule:
-            Premise: Add(a, b, p2), Mul(p2, c, p4)
-            a: a
-            b: b
-            __: p2
-            c: c
-            a3: p4
-            a4: __
-            a5: __
-            Insert: Add(a4, a5, a3).n0, Mul(a, c, a4).n0, Mul(b, c, a5).n0
-
-        "#]]),
+            Theory {
+                types: {
+                    [t0, ()]: std::primitive::unit,
+                    [t1, i64]: std::primitive::i64,
+                    [t2, String]: runtime::IString,
+                    [t3, Math]: [symbolic],
+                },
+                symbolic_rules: [
+                    SymbolicRule {
+                        src: "( rewrite ( Mul ( Add a b ) c ) ( Add ( Mul a c ) ( Mul b c ) ) )",
+                        atoms: [
+                            Premise { relation: Add, columns: [a, b, v2] },
+                            Premise { relation: Mul, columns: [v2, c, v4] },
+                            Action { relation: Add, columns: [v5, v6, v4], entry: [_, _, U] },
+                            Action { relation: Mul, columns: [a, c, v5], entry: [_, _, U] },
+                            Action { relation: Mul, columns: [b, c, v6], entry: [_, _, U] },
+                        ],
+                        variables: {
+                            v0: VariableMeta { name: Some("a"), ty: t3 },
+                            v1: VariableMeta { name: Some("b"), ty: t3 },
+                            v2: VariableMeta { name: None, ty: t3 },
+                            v3: VariableMeta { name: Some("c"), ty: t3 },
+                            v4: VariableMeta { name: None, ty: t3 },
+                            v5: VariableMeta { name: None, ty: t3 },
+                            v6: VariableMeta { name: None, ty: t3 },
+                        },
+                        unify: [],
+                    },
+                ],
+                relations: {
+                    r0: + { columns: [i64, i64, i64], kind: Primitive(i64_add012), implicit_rules: {n0: [_, _, !]} },
+                    r1: & { columns: [i64, i64, i64], kind: Primitive(i64_bitand012), implicit_rules: {n0: [_, _, !]} },
+                    r2: not-i64 { columns: [i64, i64], kind: Primitive(i64_bitnot01), implicit_rules: {n0: [_, !]} },
+                    r3: | { columns: [i64, i64, i64], kind: Primitive(i64_bitor012), implicit_rules: {n0: [_, _, !]} },
+                    r4: << { columns: [i64, i64, i64], kind: Primitive(i64_bitshl012), implicit_rules: {n0: [_, _, !]} },
+                    r5: >> { columns: [i64, i64, i64], kind: Primitive(i64_bitshr012), implicit_rules: {n0: [_, _, !]} },
+                    r6: ^ { columns: [i64, i64, i64], kind: Primitive(i64_bitxor012), implicit_rules: {n0: [_, _, !]} },
+                    r7: / { columns: [i64, i64, i64], kind: Primitive(i64_div012), implicit_rules: {n0: [_, _, !]} },
+                    r8: log2 { columns: [i64, i64], kind: Primitive(i64_log01), implicit_rules: {n0: [_, !]} },
+                    r9: max { columns: [i64, i64, i64], kind: Primitive(i64_max012), implicit_rules: {n0: [_, _, !]} },
+                    r10: min { columns: [i64, i64, i64], kind: Primitive(i64_min012), implicit_rules: {n0: [_, _, !]} },
+                    r11: * { columns: [i64, i64, i64], kind: Primitive(i64_mul012), implicit_rules: {n0: [_, _, !]} },
+                    r12: % { columns: [i64, i64, i64], kind: Primitive(i64_rem012), implicit_rules: {n0: [_, _, !]} },
+                    r13: - { columns: [i64, i64, i64], kind: Primitive(i64_sub012), implicit_rules: {n0: [_, _, !]} },
+                    r14: Math { columns: [Math], kind: Forall(t3), implicit_rules: {} },
+                    r15: Add { columns: [Math, Math, Math], kind: Table, implicit_rules: {n0: [_, _, U]} },
+                    r16: Mul { columns: [Math, Math, Math], kind: Table, implicit_rules: {n0: [_, _, U]} },
+                },
+            }"#]]),
         expected_lir: None,
         expected_codegen: None,
     }
@@ -396,32 +468,50 @@ fn hir_userspace_implicit_functionality() {
             (rule ((Add a b c) (Add a b d)) ((union c d)))
         "#,
         expected_hir: Some(expect![[r#"
-            Theory:
-
-            +(i64, i64, i64)
-            &(i64, i64, i64)
-            not-i64(i64, i64)
-            |(i64, i64, i64)
-            <<(i64, i64, i64)
-            >>(i64, i64, i64)
-            ^(i64, i64, i64)
-            /(i64, i64, i64)
-            log2(i64, i64)
-            max(i64, i64, i64)
-            min(i64, i64, i64)
-            *(i64, i64, i64)
-            %(i64, i64, i64)
-            -(i64, i64, i64)
-            Math(Math)
-            Add(Math, Math, Math)
-
-            Rule:
-            Premise: Add(a, b, c), Add(a, b, d)
-            __: a
-            __: b
-            __: c, d
-
-        "#]]),
+            Theory {
+                types: {
+                    [t0, ()]: std::primitive::unit,
+                    [t1, i64]: std::primitive::i64,
+                    [t2, String]: runtime::IString,
+                    [t3, Math]: [symbolic],
+                },
+                symbolic_rules: [
+                    SymbolicRule {
+                        src: "( rule ( ( Add a b c ) ( Add a b d ) ) ( ( union c d ) ) )",
+                        atoms: [
+                            Premise { relation: Add, columns: [a, b, c] },
+                            Premise { relation: Add, columns: [a, b, d] },
+                        ],
+                        variables: {
+                            v0: VariableMeta { name: Some("a"), ty: t3 },
+                            v1: VariableMeta { name: Some("b"), ty: t3 },
+                            v2: VariableMeta { name: Some("c"), ty: t3 },
+                            v3: VariableMeta { name: Some("d"), ty: t3 },
+                        },
+                        unify: [
+                            [c, d],
+                        ],
+                    },
+                ],
+                relations: {
+                    r0: + { columns: [i64, i64, i64], kind: Primitive(i64_add012), implicit_rules: {n0: [_, _, !]} },
+                    r1: & { columns: [i64, i64, i64], kind: Primitive(i64_bitand012), implicit_rules: {n0: [_, _, !]} },
+                    r2: not-i64 { columns: [i64, i64], kind: Primitive(i64_bitnot01), implicit_rules: {n0: [_, !]} },
+                    r3: | { columns: [i64, i64, i64], kind: Primitive(i64_bitor012), implicit_rules: {n0: [_, _, !]} },
+                    r4: << { columns: [i64, i64, i64], kind: Primitive(i64_bitshl012), implicit_rules: {n0: [_, _, !]} },
+                    r5: >> { columns: [i64, i64, i64], kind: Primitive(i64_bitshr012), implicit_rules: {n0: [_, _, !]} },
+                    r6: ^ { columns: [i64, i64, i64], kind: Primitive(i64_bitxor012), implicit_rules: {n0: [_, _, !]} },
+                    r7: / { columns: [i64, i64, i64], kind: Primitive(i64_div012), implicit_rules: {n0: [_, _, !]} },
+                    r8: log2 { columns: [i64, i64], kind: Primitive(i64_log01), implicit_rules: {n0: [_, !]} },
+                    r9: max { columns: [i64, i64, i64], kind: Primitive(i64_max012), implicit_rules: {n0: [_, _, !]} },
+                    r10: min { columns: [i64, i64, i64], kind: Primitive(i64_min012), implicit_rules: {n0: [_, _, !]} },
+                    r11: * { columns: [i64, i64, i64], kind: Primitive(i64_mul012), implicit_rules: {n0: [_, _, !]} },
+                    r12: % { columns: [i64, i64, i64], kind: Primitive(i64_rem012), implicit_rules: {n0: [_, _, !]} },
+                    r13: - { columns: [i64, i64, i64], kind: Primitive(i64_sub012), implicit_rules: {n0: [_, _, !]} },
+                    r14: Math { columns: [Math], kind: Forall(t3), implicit_rules: {} },
+                    r15: Add { columns: [Math, Math, Math], kind: Table, implicit_rules: {} },
+                },
+            }"#]]),
         expected_lir: None,
         expected_codegen: None,
     }
@@ -436,42 +526,67 @@ fn hir_global() {
                 (Mul Math Math)
                 (Add Math Math)
                 (Const i64)
+                (Var String)
             )
             (let one 1)
-            (rewrite (Const one) (Add b a))
+            (rewrite (Const one) (Add (Var "a") (Var "b")))
         "#,
         expected_hir: Some(expect![[r#"
-            Theory:
-
-            +(i64, i64, i64)
-            &(i64, i64, i64)
-            not-i64(i64, i64)
-            |(i64, i64, i64)
-            <<(i64, i64, i64)
-            >>(i64, i64, i64)
-            ^(i64, i64, i64)
-            /(i64, i64, i64)
-            log2(i64, i64)
-            max(i64, i64, i64)
-            min(i64, i64, i64)
-            *(i64, i64, i64)
-            %(i64, i64, i64)
-            -(i64, i64, i64)
-            Math(Math)
-            Mul(Math, Math, Math)
-            Add(Math, Math, Math)
-            Const(i64, Math)
-            one(i64)
-
-            Rule:
-            Premise: Const(one, p1), one(one)
-            __: one
-            a0: p1
-            b: __
-            a: __
-            Insert: Add(b, a, a0).n0
-
-        "#]]),
+            Theory {
+                types: {
+                    [t0, ()]: std::primitive::unit,
+                    [t1, i64]: std::primitive::i64,
+                    [t2, String]: runtime::IString,
+                    [t3, Math]: [symbolic],
+                },
+                symbolic_rules: [
+                    SymbolicRule {
+                        src: "( rewrite ( Const one ) ( Add ( Var \"a\" ) ( Var \"b\" ) ) )",
+                        atoms: [
+                            Premise { relation: Const, columns: [one, v1] },
+                            Premise { relation: one, columns: [one] },
+                            Action { relation: Add, columns: [v3, v5, v1], entry: [_, _, U] },
+                            Action { relation: Var, columns: [v2, v3], entry: [_, U] },
+                            Action { relation: Var, columns: [v4, v5], entry: [_, U] },
+                            Action { relation: g1, columns: [v2], entry: [!] },
+                            Action { relation: g2, columns: [v4], entry: [!] },
+                        ],
+                        variables: {
+                            v0: VariableMeta { name: Some("one"), ty: t1 },
+                            v1: VariableMeta { name: None, ty: t3 },
+                            v2: VariableMeta { name: None, ty: t2 },
+                            v3: VariableMeta { name: None, ty: t3 },
+                            v4: VariableMeta { name: None, ty: t2 },
+                            v5: VariableMeta { name: None, ty: t3 },
+                        },
+                        unify: [],
+                    },
+                ],
+                relations: {
+                    r0: + { columns: [i64, i64, i64], kind: Primitive(i64_add012), implicit_rules: {n0: [_, _, !]} },
+                    r1: & { columns: [i64, i64, i64], kind: Primitive(i64_bitand012), implicit_rules: {n0: [_, _, !]} },
+                    r2: not-i64 { columns: [i64, i64], kind: Primitive(i64_bitnot01), implicit_rules: {n0: [_, !]} },
+                    r3: | { columns: [i64, i64, i64], kind: Primitive(i64_bitor012), implicit_rules: {n0: [_, _, !]} },
+                    r4: << { columns: [i64, i64, i64], kind: Primitive(i64_bitshl012), implicit_rules: {n0: [_, _, !]} },
+                    r5: >> { columns: [i64, i64, i64], kind: Primitive(i64_bitshr012), implicit_rules: {n0: [_, _, !]} },
+                    r6: ^ { columns: [i64, i64, i64], kind: Primitive(i64_bitxor012), implicit_rules: {n0: [_, _, !]} },
+                    r7: / { columns: [i64, i64, i64], kind: Primitive(i64_div012), implicit_rules: {n0: [_, _, !]} },
+                    r8: log2 { columns: [i64, i64], kind: Primitive(i64_log01), implicit_rules: {n0: [_, !]} },
+                    r9: max { columns: [i64, i64, i64], kind: Primitive(i64_max012), implicit_rules: {n0: [_, _, !]} },
+                    r10: min { columns: [i64, i64, i64], kind: Primitive(i64_min012), implicit_rules: {n0: [_, _, !]} },
+                    r11: * { columns: [i64, i64, i64], kind: Primitive(i64_mul012), implicit_rules: {n0: [_, _, !]} },
+                    r12: % { columns: [i64, i64, i64], kind: Primitive(i64_rem012), implicit_rules: {n0: [_, _, !]} },
+                    r13: - { columns: [i64, i64, i64], kind: Primitive(i64_sub012), implicit_rules: {n0: [_, _, !]} },
+                    r14: Math { columns: [Math], kind: Forall(t3), implicit_rules: {} },
+                    r15: Mul { columns: [Math, Math, Math], kind: Table, implicit_rules: {n0: [_, _, U]} },
+                    r16: Add { columns: [Math, Math, Math], kind: Table, implicit_rules: {n0: [_, _, U]} },
+                    r17: Const { columns: [i64, Math], kind: Table, implicit_rules: {n0: [_, U]} },
+                    r18: Var { columns: [String, Math], kind: Table, implicit_rules: {n0: [_, U]} },
+                    r19: one { columns: [i64], kind: Global(g0), implicit_rules: {n0: [!]} },
+                    r20: g1 { columns: [String], kind: Global(g1), implicit_rules: {n0: [!]} },
+                    r21: g2 { columns: [String], kind: Global(g2), implicit_rules: {n0: [!]} },
+                },
+            }"#]]),
         expected_lir: Some(expect![[r#"
             Theory {
                 name: None,
@@ -599,43 +714,77 @@ fn hir_global() {
                         },
                     },
                     r18: RelationData {
+                        name: "Var",
+                        param_types: {c0: t2, c1: t3},
+                        kind: Table {
+                            index_to_info: {ir0: 0_1 conflict[..1] => [1:union], ir1: 1_0},
+                            usage_to_info: {
+                                iu0: ir0[..1],
+                                iu1: ir0[..1],
+                                iu2: ir1[..1],
+                                iu3: ir0[..1],
+                            },
+                            column_back_reference: {c0: iu1, c1: iu2},
+                        },
+                    },
+                    r19: RelationData {
                         name: "g0",
                         param_types: {c0: t1},
                         kind: [Global, g0],
                     },
+                    r20: RelationData {
+                        name: "g1",
+                        param_types: {c0: t2},
+                        kind: [Global, g1],
+                    },
+                    r21: RelationData {
+                        name: "g2",
+                        param_types: {c0: t2},
+                        kind: [Global, g2],
+                    },
                 },
                 rule_variables: {
                     [v0, one]: t1,
-                    [v1, p1]: t3,
-                    [v2, b]: t3,
-                    [v3, a]: t3,
-                    [v4, one_2]: t1,
-                    [v5, p1_2]: t3,
-                    [v6, b_2]: t3,
-                    [v7, a_2]: t3,
+                    [v1, v1]: t3,
+                    [v10, v4_2]: t2,
+                    [v11, v5_2]: t3,
+                    [v2, v2]: t2,
+                    [v3, v3]: t3,
+                    [v4, v4]: t2,
+                    [v5, v5]: t3,
+                    [v6, one_2]: t1,
+                    [v7, v1_2]: t3,
+                    [v8, v2_2]: t2,
+                    [v9, v3_2]: t3,
                 },
                 global_variable_types: {
                     g0: t1,
+                    g1: t2,
+                    g2: t2,
                 },
                 rule_tries: [
-                    meta: "( rewrite ( Const one ) ( Add b a ) )"
+                    meta: "( rewrite ( Const one ) ( Add ( Var \"a\" ) ( Var \"b\" ) ) )"
                     atom: [PremiseNew, r17(v0, v1)]
                     then: [
-                        atom: [PremiseAny, r18(v0), iu_bogus]
+                        atom: [PremiseAny, r19(v0), iu_bogus]
                         then: [
-                            atom: [Action::Make, v3],
-                            atom: [Action::Make, v2],
-                            atom: [Action::Insert, r16(v2, v3, v1)],
+                            atom: [Action::Insert, r20(v2) on iu0],
+                            atom: [Action::Insert, r21(v4) on iu0],
+                            atom: [Action::Insert, r18(v2, v3) on iu0],
+                            atom: [Action::Insert, r18(v4, v5) on iu0],
+                            atom: [Action::Insert, r16(v3, v5, v1)],
                         ],
                     ],
-                    meta: "( rewrite ( Const one ) ( Add b a ) )"
-                    atom: [PremiseNew, r18(v4)]
+                    meta: "( rewrite ( Const one ) ( Add ( Var \"a\" ) ( Var \"b\" ) ) )"
+                    atom: [PremiseNew, r19(v6)]
                     then: [
-                        atom: [Premise, r17(v4, v5), iu1]
+                        atom: [Premise, r17(v6, v7), iu1]
                         then: [
-                            atom: [Action::Make, v7],
-                            atom: [Action::Make, v6],
-                            atom: [Action::Insert, r16(v6, v7, v5)],
+                            atom: [Action::Insert, r20(v8) on iu0],
+                            atom: [Action::Insert, r21(v10) on iu0],
+                            atom: [Action::Insert, r18(v8, v9) on iu0],
+                            atom: [Action::Insert, r18(v10, v11) on iu0],
+                            atom: [Action::Insert, r16(v9, v11, v7)],
                         ],
                     ],
                 ],
@@ -645,6 +794,26 @@ fn hir_global() {
                         compute: Literal(
                             I64(
                                 1,
+                            ),
+                        ),
+                    },
+                    ComputeGlobal {
+                        global_id: g1,
+                        compute: Literal(
+                            String(
+                                IString(
+                                    0,
+                                ),
+                            ),
+                        ),
+                    },
+                    ComputeGlobal {
+                        global_id: g2,
+                        compute: Literal(
+                            String(
+                                IString(
+                                    1,
+                                ),
                             ),
                         ),
                     },
@@ -664,35 +833,50 @@ fn regression_elim_problematic() {
             (rule ((= a (Mul zero c))) ((union a zero)))
         "#,
         expected_hir: Some(expect![[r#"
-            Theory:
-
-            +(i64, i64, i64)
-            &(i64, i64, i64)
-            not-i64(i64, i64)
-            |(i64, i64, i64)
-            <<(i64, i64, i64)
-            >>(i64, i64, i64)
-            ^(i64, i64, i64)
-            /(i64, i64, i64)
-            log2(i64, i64)
-            max(i64, i64, i64)
-            min(i64, i64, i64)
-            *(i64, i64, i64)
-            %(i64, i64, i64)
-            -(i64, i64, i64)
-            Math(Math)
-            Mul(Math, Math, Math)
-            Zero(Math)
-            zero(Math)
-
-            Rule:
-            Premise: Mul(zero, c, a), zero(zero)
-            azero: a
-            __: zero
-            __: c
-            Insert: zero(azero).n0
-
-        "#]]),
+            Theory {
+                types: {
+                    [t0, ()]: std::primitive::unit,
+                    [t1, i64]: std::primitive::i64,
+                    [t2, String]: runtime::IString,
+                    [t3, Math]: [symbolic],
+                },
+                symbolic_rules: [
+                    SymbolicRule {
+                        src: "( rule ( ( = a ( Mul zero c ) ) ) ( ( union a zero ) ) )",
+                        atoms: [
+                            Premise { relation: Mul, columns: [zero, c, azero] },
+                            Premise { relation: zero, columns: [zero] },
+                            Action { relation: zero, columns: [azero], entry: [!] },
+                        ],
+                        variables: {
+                            v0: VariableMeta { name: Some("azero"), ty: t3 },
+                            v1: VariableMeta { name: Some("zero"), ty: t3 },
+                            v2: VariableMeta { name: Some("c"), ty: t3 },
+                        },
+                        unify: [],
+                    },
+                ],
+                relations: {
+                    r0: + { columns: [i64, i64, i64], kind: Primitive(i64_add012), implicit_rules: {n0: [_, _, !]} },
+                    r1: & { columns: [i64, i64, i64], kind: Primitive(i64_bitand012), implicit_rules: {n0: [_, _, !]} },
+                    r2: not-i64 { columns: [i64, i64], kind: Primitive(i64_bitnot01), implicit_rules: {n0: [_, !]} },
+                    r3: | { columns: [i64, i64, i64], kind: Primitive(i64_bitor012), implicit_rules: {n0: [_, _, !]} },
+                    r4: << { columns: [i64, i64, i64], kind: Primitive(i64_bitshl012), implicit_rules: {n0: [_, _, !]} },
+                    r5: >> { columns: [i64, i64, i64], kind: Primitive(i64_bitshr012), implicit_rules: {n0: [_, _, !]} },
+                    r6: ^ { columns: [i64, i64, i64], kind: Primitive(i64_bitxor012), implicit_rules: {n0: [_, _, !]} },
+                    r7: / { columns: [i64, i64, i64], kind: Primitive(i64_div012), implicit_rules: {n0: [_, _, !]} },
+                    r8: log2 { columns: [i64, i64], kind: Primitive(i64_log01), implicit_rules: {n0: [_, !]} },
+                    r9: max { columns: [i64, i64, i64], kind: Primitive(i64_max012), implicit_rules: {n0: [_, _, !]} },
+                    r10: min { columns: [i64, i64, i64], kind: Primitive(i64_min012), implicit_rules: {n0: [_, _, !]} },
+                    r11: * { columns: [i64, i64, i64], kind: Primitive(i64_mul012), implicit_rules: {n0: [_, _, !]} },
+                    r12: % { columns: [i64, i64, i64], kind: Primitive(i64_rem012), implicit_rules: {n0: [_, _, !]} },
+                    r13: - { columns: [i64, i64, i64], kind: Primitive(i64_sub012), implicit_rules: {n0: [_, _, !]} },
+                    r14: Math { columns: [Math], kind: Forall(t3), implicit_rules: {} },
+                    r15: Mul { columns: [Math, Math, Math], kind: Table, implicit_rules: {n0: [_, _, U]} },
+                    r16: Zero { columns: [Math], kind: Table, implicit_rules: {n0: [U]} },
+                    r17: zero { columns: [Math], kind: Global(g0), implicit_rules: {n0: [!]} },
+                },
+            }"#]]),
         expected_lir: None,
         expected_codegen: None,
     }
@@ -725,48 +909,74 @@ fn codegen_constant_propagation() {
             (rule ((= e (Mul (Const a) (Const b)))) ((union e (Const (* a b)))))
         "#,
         expected_hir: Some(expect![[r#"
-            Theory:
-
-            +(i64, i64, i64)
-            &(i64, i64, i64)
-            not-i64(i64, i64)
-            |(i64, i64, i64)
-            <<(i64, i64, i64)
-            >>(i64, i64, i64)
-            ^(i64, i64, i64)
-            /(i64, i64, i64)
-            log2(i64, i64)
-            max(i64, i64, i64)
-            min(i64, i64, i64)
-            *(i64, i64, i64)
-            %(i64, i64, i64)
-            -(i64, i64, i64)
-            Math(Math)
-            Add(Math, Math, Math)
-            Mul(Math, Math, Math)
-            Const(i64, Math)
-
-            Rule:
-            Premise: Add(p2, p4, e), Const(a, p2), Const(b, p4)
-            e: e
-            a: a
-            __: p2
-            b: b
-            __: p4
-            a3: __
-            Insert: +(a, b, a3).n0, Const(a3, e).n0
-
-            Rule:
-            Premise: Mul(p2, p4, e), Const(a, p2), Const(b, p4)
-            e: e
-            a: a
-            __: p2
-            b: b
-            __: p4
-            a3: __
-            Insert: *(a, b, a3).n0, Const(a3, e).n0
-
-        "#]]),
+            Theory {
+                types: {
+                    [t0, ()]: std::primitive::unit,
+                    [t1, i64]: std::primitive::i64,
+                    [t2, String]: runtime::IString,
+                    [t3, Math]: [symbolic],
+                },
+                symbolic_rules: [
+                    SymbolicRule {
+                        src: "( rule ( ( = e ( Add ( Const a ) ( Const b ) ) ) ) ( ( union e ( Const ( + a b ) ) ) ) )",
+                        atoms: [
+                            Premise { relation: Add, columns: [v2, v4, e] },
+                            Premise { relation: Const, columns: [a, v2] },
+                            Premise { relation: Const, columns: [b, v4] },
+                            Action { relation: +, columns: [a, b, v5], entry: [_, _, !] },
+                            Action { relation: Const, columns: [v5, e], entry: [_, U] },
+                        ],
+                        variables: {
+                            v0: VariableMeta { name: Some("e"), ty: t3 },
+                            v1: VariableMeta { name: Some("a"), ty: t1 },
+                            v2: VariableMeta { name: None, ty: t3 },
+                            v3: VariableMeta { name: Some("b"), ty: t1 },
+                            v4: VariableMeta { name: None, ty: t3 },
+                            v5: VariableMeta { name: None, ty: t1 },
+                        },
+                        unify: [],
+                    },
+                    SymbolicRule {
+                        src: "( rule ( ( = e ( Mul ( Const a ) ( Const b ) ) ) ) ( ( union e ( Const ( * a b ) ) ) ) )",
+                        atoms: [
+                            Premise { relation: Mul, columns: [v2, v4, e] },
+                            Premise { relation: Const, columns: [a, v2] },
+                            Premise { relation: Const, columns: [b, v4] },
+                            Action { relation: *, columns: [a, b, v5], entry: [_, _, !] },
+                            Action { relation: Const, columns: [v5, e], entry: [_, U] },
+                        ],
+                        variables: {
+                            v0: VariableMeta { name: Some("e"), ty: t3 },
+                            v1: VariableMeta { name: Some("a"), ty: t1 },
+                            v2: VariableMeta { name: None, ty: t3 },
+                            v3: VariableMeta { name: Some("b"), ty: t1 },
+                            v4: VariableMeta { name: None, ty: t3 },
+                            v5: VariableMeta { name: None, ty: t1 },
+                        },
+                        unify: [],
+                    },
+                ],
+                relations: {
+                    r0: + { columns: [i64, i64, i64], kind: Primitive(i64_add012), implicit_rules: {n0: [_, _, !]} },
+                    r1: & { columns: [i64, i64, i64], kind: Primitive(i64_bitand012), implicit_rules: {n0: [_, _, !]} },
+                    r2: not-i64 { columns: [i64, i64], kind: Primitive(i64_bitnot01), implicit_rules: {n0: [_, !]} },
+                    r3: | { columns: [i64, i64, i64], kind: Primitive(i64_bitor012), implicit_rules: {n0: [_, _, !]} },
+                    r4: << { columns: [i64, i64, i64], kind: Primitive(i64_bitshl012), implicit_rules: {n0: [_, _, !]} },
+                    r5: >> { columns: [i64, i64, i64], kind: Primitive(i64_bitshr012), implicit_rules: {n0: [_, _, !]} },
+                    r6: ^ { columns: [i64, i64, i64], kind: Primitive(i64_bitxor012), implicit_rules: {n0: [_, _, !]} },
+                    r7: / { columns: [i64, i64, i64], kind: Primitive(i64_div012), implicit_rules: {n0: [_, _, !]} },
+                    r8: log2 { columns: [i64, i64], kind: Primitive(i64_log01), implicit_rules: {n0: [_, !]} },
+                    r9: max { columns: [i64, i64, i64], kind: Primitive(i64_max012), implicit_rules: {n0: [_, _, !]} },
+                    r10: min { columns: [i64, i64, i64], kind: Primitive(i64_min012), implicit_rules: {n0: [_, _, !]} },
+                    r11: * { columns: [i64, i64, i64], kind: Primitive(i64_mul012), implicit_rules: {n0: [_, _, !]} },
+                    r12: % { columns: [i64, i64, i64], kind: Primitive(i64_rem012), implicit_rules: {n0: [_, _, !]} },
+                    r13: - { columns: [i64, i64, i64], kind: Primitive(i64_sub012), implicit_rules: {n0: [_, _, !]} },
+                    r14: Math { columns: [Math], kind: Forall(t3), implicit_rules: {} },
+                    r15: Add { columns: [Math, Math, Math], kind: Table, implicit_rules: {n0: [_, _, U]} },
+                    r16: Mul { columns: [Math, Math, Math], kind: Table, implicit_rules: {n0: [_, _, U]} },
+                    r17: Const { columns: [i64, Math], kind: Table, implicit_rules: {n0: [_, U]} },
+                },
+            }"#]]),
         expected_lir: Some(expect![[r#"
             Theory {
                 name: None,
@@ -910,39 +1120,39 @@ fn codegen_constant_propagation() {
                 rule_variables: {
                     [v0, e]: t3,
                     [v1, a]: t1,
-                    [v10, p4_2]: t3,
-                    [v11, a3_2]: t1,
+                    [v10, v4_2]: t3,
+                    [v11, v5_2]: t1,
                     [v12, e_3]: t3,
                     [v13, a_3]: t1,
-                    [v14, p2_3]: t3,
+                    [v14, v2_3]: t3,
                     [v15, b_3]: t1,
-                    [v16, p4_3]: t3,
-                    [v17, a3_3]: t1,
+                    [v16, v4_3]: t3,
+                    [v17, v5_3]: t1,
                     [v18, e_4]: t3,
                     [v19, a_4]: t1,
-                    [v2, p2]: t3,
-                    [v20, p2_4]: t3,
+                    [v2, v2]: t3,
+                    [v20, v2_4]: t3,
                     [v21, b_4]: t1,
-                    [v22, p4_4]: t3,
-                    [v23, a3_4]: t1,
+                    [v22, v4_4]: t3,
+                    [v23, v5_4]: t1,
                     [v24, e_5]: t3,
                     [v25, a_5]: t1,
-                    [v26, p2_5]: t3,
+                    [v26, v2_5]: t3,
                     [v27, b_5]: t1,
-                    [v28, p4_5]: t3,
-                    [v29, a3_5]: t1,
+                    [v28, v4_5]: t3,
+                    [v29, v5_5]: t1,
                     [v3, b]: t1,
                     [v30, e_6]: t3,
                     [v31, a_6]: t1,
-                    [v32, p2_6]: t3,
+                    [v32, v2_6]: t3,
                     [v33, b_6]: t1,
-                    [v34, p4_6]: t3,
-                    [v35, a3_6]: t1,
-                    [v4, p4]: t3,
-                    [v5, a3]: t1,
+                    [v34, v4_6]: t3,
+                    [v35, v5_6]: t1,
+                    [v4, v4]: t3,
+                    [v5, v5]: t1,
                     [v6, e_2]: t3,
                     [v7, a_2]: t1,
-                    [v8, p2_2]: t3,
+                    [v8, v2_2]: t3,
                     [v9, b_2]: t1,
                 },
                 global_variable_types: {},
@@ -1564,60 +1774,60 @@ fn codegen_constant_propagation() {
                 #[inline(never)]
                 pub fn apply_rules(&mut self) {
                     #[doc = "( rule ( ( = e ( Add ( Const a ) ( Const b ) ) ) ) ( ( union e ( Const ( + a b ) ) ) ) )"]
-                    for (p2, p4, e) in self.add_.iter_new() {
-                        if self.const_.check1_1_0(p4) {
-                            for (a,) in self.const_.iter1_1_0(p2) {
-                                for (b,) in self.const_.iter1_1_0(p4) {
-                                    let (a3,) = i64_add012(a, b).next().unwrap();
-                                    self.delta.insert_const((a3, e));
+                    for (v2, v4, e) in self.add_.iter_new() {
+                        if self.const_.check1_1_0(v4) {
+                            for (a,) in self.const_.iter1_1_0(v2) {
+                                for (b,) in self.const_.iter1_1_0(v4) {
+                                    let (v5,) = i64_add012(a, b).next().unwrap();
+                                    self.delta.insert_const((v5, e));
                                 }
                             }
                         }
                     }
                     #[doc = "( rule ( ( = e ( Add ( Const a ) ( Const b ) ) ) ) ( ( union e ( Const ( + a b ) ) ) ) )"]
-                    for (a_2, p2_2) in self.const_.iter_new() {
-                        for (p4_2, e_2) in self.add_.iter1_0_1_2(p2_2) {
-                            for (b_2,) in self.const_.iter1_1_0(p4_2) {
-                                let (a3_2,) = i64_add012(a_2, b_2).next().unwrap();
-                                self.delta.insert_const((a3_2, e_2));
+                    for (a_2, v2_2) in self.const_.iter_new() {
+                        for (v4_2, e_2) in self.add_.iter1_0_1_2(v2_2) {
+                            for (b_2,) in self.const_.iter1_1_0(v4_2) {
+                                let (v5_2,) = i64_add012(a_2, b_2).next().unwrap();
+                                self.delta.insert_const((v5_2, e_2));
                             }
                         }
                     }
                     #[doc = "( rule ( ( = e ( Add ( Const a ) ( Const b ) ) ) ) ( ( union e ( Const ( + a b ) ) ) ) )"]
-                    for (b_3, p4_3) in self.const_.iter_new() {
-                        for (p2_3, e_3) in self.add_.iter1_1_0_2(p4_3) {
-                            for (a_3,) in self.const_.iter1_1_0(p2_3) {
-                                let (a3_3,) = i64_add012(a_3, b_3).next().unwrap();
-                                self.delta.insert_const((a3_3, e_3));
+                    for (b_3, v4_3) in self.const_.iter_new() {
+                        for (v2_3, e_3) in self.add_.iter1_1_0_2(v4_3) {
+                            for (a_3,) in self.const_.iter1_1_0(v2_3) {
+                                let (v5_3,) = i64_add012(a_3, b_3).next().unwrap();
+                                self.delta.insert_const((v5_3, e_3));
                             }
                         }
                     }
                     #[doc = "( rule ( ( = e ( Mul ( Const a ) ( Const b ) ) ) ) ( ( union e ( Const ( * a b ) ) ) ) )"]
-                    for (p2_4, p4_4, e_4) in self.mul_.iter_new() {
-                        if self.const_.check1_1_0(p4_4) {
-                            for (a_4,) in self.const_.iter1_1_0(p2_4) {
-                                for (b_4,) in self.const_.iter1_1_0(p4_4) {
-                                    let (a3_4,) = i64_mul012(a_4, b_4).next().unwrap();
-                                    self.delta.insert_const((a3_4, e_4));
+                    for (v2_4, v4_4, e_4) in self.mul_.iter_new() {
+                        if self.const_.check1_1_0(v4_4) {
+                            for (a_4,) in self.const_.iter1_1_0(v2_4) {
+                                for (b_4,) in self.const_.iter1_1_0(v4_4) {
+                                    let (v5_4,) = i64_mul012(a_4, b_4).next().unwrap();
+                                    self.delta.insert_const((v5_4, e_4));
                                 }
                             }
                         }
                     }
                     #[doc = "( rule ( ( = e ( Mul ( Const a ) ( Const b ) ) ) ) ( ( union e ( Const ( * a b ) ) ) ) )"]
-                    for (a_5, p2_5) in self.const_.iter_new() {
-                        for (p4_5, e_5) in self.mul_.iter1_0_1_2(p2_5) {
-                            for (b_5,) in self.const_.iter1_1_0(p4_5) {
-                                let (a3_5,) = i64_mul012(a_5, b_5).next().unwrap();
-                                self.delta.insert_const((a3_5, e_5));
+                    for (a_5, v2_5) in self.const_.iter_new() {
+                        for (v4_5, e_5) in self.mul_.iter1_0_1_2(v2_5) {
+                            for (b_5,) in self.const_.iter1_1_0(v4_5) {
+                                let (v5_5,) = i64_mul012(a_5, b_5).next().unwrap();
+                                self.delta.insert_const((v5_5, e_5));
                             }
                         }
                     }
                     #[doc = "( rule ( ( = e ( Mul ( Const a ) ( Const b ) ) ) ) ( ( union e ( Const ( * a b ) ) ) ) )"]
-                    for (b_6, p4_6) in self.const_.iter_new() {
-                        for (p2_6, e_6) in self.mul_.iter1_1_0_2(p4_6) {
-                            for (a_6,) in self.const_.iter1_1_0(p2_6) {
-                                let (a3_6,) = i64_mul012(a_6, b_6).next().unwrap();
-                                self.delta.insert_const((a3_6, e_6));
+                    for (b_6, v4_6) in self.const_.iter_new() {
+                        for (v2_6, e_6) in self.mul_.iter1_1_0_2(v4_6) {
+                            for (a_6,) in self.const_.iter1_1_0(v2_6) {
+                                let (v5_6,) = i64_mul012(a_6, b_6).next().unwrap();
+                                self.delta.insert_const((v5_6, e_6));
                             }
                         }
                     }
@@ -2038,36 +2248,51 @@ fn regression_entry2() {
             (rewrite (Sub a b) (Const -1))
         "#,
         expected_hir: Some(expect![[r#"
-            Theory:
-
-            +(i64, i64, i64)
-            &(i64, i64, i64)
-            not-i64(i64, i64)
-            |(i64, i64, i64)
-            <<(i64, i64, i64)
-            >>(i64, i64, i64)
-            ^(i64, i64, i64)
-            /(i64, i64, i64)
-            log2(i64, i64)
-            max(i64, i64, i64)
-            min(i64, i64, i64)
-            *(i64, i64, i64)
-            %(i64, i64, i64)
-            -(i64, i64, i64)
-            Math(Math)
-            Sub(Math, Math, Math)
-            Const(i64, Math)
-            g0(i64)
-
-            Rule:
-            Premise: Sub(a, b, p2)
-            __: a
-            __: b
-            a0: p2
-            a1: __
-            Insert: Const(a1, a0).n0, g0(a1).n0
-
-        "#]]),
+            Theory {
+                types: {
+                    [t0, ()]: std::primitive::unit,
+                    [t1, i64]: std::primitive::i64,
+                    [t2, String]: runtime::IString,
+                    [t3, Math]: [symbolic],
+                },
+                symbolic_rules: [
+                    SymbolicRule {
+                        src: "( rewrite ( Sub a b ) ( Const -1 ) )",
+                        atoms: [
+                            Premise { relation: Sub, columns: [a, b, v2] },
+                            Action { relation: Const, columns: [v3, v2], entry: [_, U] },
+                            Action { relation: g0, columns: [v3], entry: [!] },
+                        ],
+                        variables: {
+                            v0: VariableMeta { name: Some("a"), ty: t3 },
+                            v1: VariableMeta { name: Some("b"), ty: t3 },
+                            v2: VariableMeta { name: None, ty: t3 },
+                            v3: VariableMeta { name: None, ty: t1 },
+                        },
+                        unify: [],
+                    },
+                ],
+                relations: {
+                    r0: + { columns: [i64, i64, i64], kind: Primitive(i64_add012), implicit_rules: {n0: [_, _, !]} },
+                    r1: & { columns: [i64, i64, i64], kind: Primitive(i64_bitand012), implicit_rules: {n0: [_, _, !]} },
+                    r2: not-i64 { columns: [i64, i64], kind: Primitive(i64_bitnot01), implicit_rules: {n0: [_, !]} },
+                    r3: | { columns: [i64, i64, i64], kind: Primitive(i64_bitor012), implicit_rules: {n0: [_, _, !]} },
+                    r4: << { columns: [i64, i64, i64], kind: Primitive(i64_bitshl012), implicit_rules: {n0: [_, _, !]} },
+                    r5: >> { columns: [i64, i64, i64], kind: Primitive(i64_bitshr012), implicit_rules: {n0: [_, _, !]} },
+                    r6: ^ { columns: [i64, i64, i64], kind: Primitive(i64_bitxor012), implicit_rules: {n0: [_, _, !]} },
+                    r7: / { columns: [i64, i64, i64], kind: Primitive(i64_div012), implicit_rules: {n0: [_, _, !]} },
+                    r8: log2 { columns: [i64, i64], kind: Primitive(i64_log01), implicit_rules: {n0: [_, !]} },
+                    r9: max { columns: [i64, i64, i64], kind: Primitive(i64_max012), implicit_rules: {n0: [_, _, !]} },
+                    r10: min { columns: [i64, i64, i64], kind: Primitive(i64_min012), implicit_rules: {n0: [_, _, !]} },
+                    r11: * { columns: [i64, i64, i64], kind: Primitive(i64_mul012), implicit_rules: {n0: [_, _, !]} },
+                    r12: % { columns: [i64, i64, i64], kind: Primitive(i64_rem012), implicit_rules: {n0: [_, _, !]} },
+                    r13: - { columns: [i64, i64, i64], kind: Primitive(i64_sub012), implicit_rules: {n0: [_, _, !]} },
+                    r14: Math { columns: [Math], kind: Forall(t3), implicit_rules: {} },
+                    r15: Sub { columns: [Math, Math, Math], kind: Table, implicit_rules: {n0: [_, _, U]} },
+                    r16: Const { columns: [i64, Math], kind: Table, implicit_rules: {n0: [_, U]} },
+                    r17: g0 { columns: [i64], kind: Global(g0), implicit_rules: {n0: [!]} },
+                },
+            }"#]]),
         expected_lir: Some(expect![[r#"
             Theory {
                 name: None,
@@ -2187,8 +2412,8 @@ fn regression_entry2() {
                 rule_variables: {
                     [v0, a]: t3,
                     [v1, b]: t3,
-                    [v2, p2]: t3,
-                    [v3, a1]: t1,
+                    [v2, v2]: t3,
+                    [v3, v3]: t1,
                 },
                 global_variable_types: {
                     g0: t1,
@@ -2601,9 +2826,9 @@ fn regression_entry2() {
                 #[inline(never)]
                 pub fn apply_rules(&mut self) {
                     #[doc = "( rewrite ( Sub a b ) ( Const -1 ) )"]
-                    for (a, b, p2) in self.sub_.iter_new() {
-                        let a1 = self.global_i64.get(0usize);
-                        self.delta.insert_const((a1, p2));
+                    for (a, b, v2) in self.sub_.iter_new() {
+                        let v3 = self.global_i64.get(0usize);
+                        self.delta.insert_const((v3, v2));
                     }
                 }
                 fn emit_graphviz(&self) -> String {
@@ -2684,35 +2909,50 @@ fn regression_entry() {
             (rewrite (Add f g) (Add (Integral f f) g))
         "#,
         expected_hir: Some(expect![[r#"
-            Theory:
-
-            +(i64, i64, i64)
-            &(i64, i64, i64)
-            not-i64(i64, i64)
-            |(i64, i64, i64)
-            <<(i64, i64, i64)
-            >>(i64, i64, i64)
-            ^(i64, i64, i64)
-            /(i64, i64, i64)
-            log2(i64, i64)
-            max(i64, i64, i64)
-            min(i64, i64, i64)
-            *(i64, i64, i64)
-            %(i64, i64, i64)
-            -(i64, i64, i64)
-            Math(Math)
-            Integral(Math, Math, Math)
-            Add(Math, Math, Math)
-
-            Rule:
-            Premise: Add(f, g, p2)
-            f: f
-            g: g
-            a2: p2
-            a3: __
-            Insert: Integral(f, f, a3).n0, Add(a3, g, a2).n0
-
-        "#]]),
+            Theory {
+                types: {
+                    [t0, ()]: std::primitive::unit,
+                    [t1, i64]: std::primitive::i64,
+                    [t2, String]: runtime::IString,
+                    [t3, Math]: [symbolic],
+                },
+                symbolic_rules: [
+                    SymbolicRule {
+                        src: "( rewrite ( Add f g ) ( Add ( Integral f f ) g ) )",
+                        atoms: [
+                            Premise { relation: Add, columns: [f, g, v2] },
+                            Action { relation: Integral, columns: [f, f, v3], entry: [_, _, U] },
+                            Action { relation: Add, columns: [v3, g, v2], entry: [_, _, U] },
+                        ],
+                        variables: {
+                            v0: VariableMeta { name: Some("f"), ty: t3 },
+                            v1: VariableMeta { name: Some("g"), ty: t3 },
+                            v2: VariableMeta { name: None, ty: t3 },
+                            v3: VariableMeta { name: None, ty: t3 },
+                        },
+                        unify: [],
+                    },
+                ],
+                relations: {
+                    r0: + { columns: [i64, i64, i64], kind: Primitive(i64_add012), implicit_rules: {n0: [_, _, !]} },
+                    r1: & { columns: [i64, i64, i64], kind: Primitive(i64_bitand012), implicit_rules: {n0: [_, _, !]} },
+                    r2: not-i64 { columns: [i64, i64], kind: Primitive(i64_bitnot01), implicit_rules: {n0: [_, !]} },
+                    r3: | { columns: [i64, i64, i64], kind: Primitive(i64_bitor012), implicit_rules: {n0: [_, _, !]} },
+                    r4: << { columns: [i64, i64, i64], kind: Primitive(i64_bitshl012), implicit_rules: {n0: [_, _, !]} },
+                    r5: >> { columns: [i64, i64, i64], kind: Primitive(i64_bitshr012), implicit_rules: {n0: [_, _, !]} },
+                    r6: ^ { columns: [i64, i64, i64], kind: Primitive(i64_bitxor012), implicit_rules: {n0: [_, _, !]} },
+                    r7: / { columns: [i64, i64, i64], kind: Primitive(i64_div012), implicit_rules: {n0: [_, _, !]} },
+                    r8: log2 { columns: [i64, i64], kind: Primitive(i64_log01), implicit_rules: {n0: [_, !]} },
+                    r9: max { columns: [i64, i64, i64], kind: Primitive(i64_max012), implicit_rules: {n0: [_, _, !]} },
+                    r10: min { columns: [i64, i64, i64], kind: Primitive(i64_min012), implicit_rules: {n0: [_, _, !]} },
+                    r11: * { columns: [i64, i64, i64], kind: Primitive(i64_mul012), implicit_rules: {n0: [_, _, !]} },
+                    r12: % { columns: [i64, i64, i64], kind: Primitive(i64_rem012), implicit_rules: {n0: [_, _, !]} },
+                    r13: - { columns: [i64, i64, i64], kind: Primitive(i64_sub012), implicit_rules: {n0: [_, _, !]} },
+                    r14: Math { columns: [Math], kind: Forall(t3), implicit_rules: {} },
+                    r15: Integral { columns: [Math, Math, Math], kind: Table, implicit_rules: {n0: [_, _, U]} },
+                    r16: Add { columns: [Math, Math, Math], kind: Table, implicit_rules: {n0: [_, _, U]} },
+                },
+            }"#]]),
         expected_lir: Some(expect![[r#"
             Theory {
                 name: None,
@@ -2828,8 +3068,8 @@ fn regression_entry() {
                 rule_variables: {
                     [v0, f]: t3,
                     [v1, g]: t3,
-                    [v2, p2]: t3,
-                    [v3, a3]: t3,
+                    [v2, v2]: t3,
+                    [v3, v3]: t3,
                 },
                 global_variable_types: {},
                 rule_tries: [
@@ -3247,11 +3487,11 @@ fn regression_entry() {
                 #[inline(never)]
                 pub fn apply_rules(&mut self) {
                     #[doc = "( rewrite ( Add f g ) ( Add ( Integral f f ) g ) )"]
-                    for (f, g, p2) in self.add_.iter_new() {
-                        let (a3,) = self
+                    for (f, g, v2) in self.add_.iter_new() {
+                        let (v3,) = self
                             .integral_
                             .entry2_0_1_2(f, f, &mut self.delta, &mut self.uf);
-                        self.delta.insert_add((a3, g, p2));
+                        self.delta.insert_add((v3, g, v2));
                     }
                 }
                 fn emit_graphviz(&self) -> String {
@@ -3333,30 +3573,47 @@ fn test_bind_variable_multiple_times() {
             (rewrite (Same x x) x)
         "#,
         expected_hir: Some(expect![[r#"
-            Theory:
-
-            +(i64, i64, i64)
-            &(i64, i64, i64)
-            not-i64(i64, i64)
-            |(i64, i64, i64)
-            <<(i64, i64, i64)
-            >>(i64, i64, i64)
-            ^(i64, i64, i64)
-            /(i64, i64, i64)
-            log2(i64, i64)
-            max(i64, i64, i64)
-            min(i64, i64, i64)
-            *(i64, i64, i64)
-            %(i64, i64, i64)
-            -(i64, i64, i64)
-            Foo(Foo)
-            Same(Foo, Foo, Foo)
-
-            Rule:
-            Premise: Same(x, x, p1)
-            __: p1, x
-
-        "#]]),
+            Theory {
+                types: {
+                    [t0, ()]: std::primitive::unit,
+                    [t1, i64]: std::primitive::i64,
+                    [t2, String]: runtime::IString,
+                    [t3, Foo]: [symbolic],
+                },
+                symbolic_rules: [
+                    SymbolicRule {
+                        src: "( rewrite ( Same x x ) x )",
+                        atoms: [
+                            Premise { relation: Same, columns: [x, x, v1] },
+                        ],
+                        variables: {
+                            v0: VariableMeta { name: Some("x"), ty: t3 },
+                            v1: VariableMeta { name: None, ty: t3 },
+                        },
+                        unify: [
+                            [v1, x],
+                        ],
+                    },
+                ],
+                relations: {
+                    r0: + { columns: [i64, i64, i64], kind: Primitive(i64_add012), implicit_rules: {n0: [_, _, !]} },
+                    r1: & { columns: [i64, i64, i64], kind: Primitive(i64_bitand012), implicit_rules: {n0: [_, _, !]} },
+                    r2: not-i64 { columns: [i64, i64], kind: Primitive(i64_bitnot01), implicit_rules: {n0: [_, !]} },
+                    r3: | { columns: [i64, i64, i64], kind: Primitive(i64_bitor012), implicit_rules: {n0: [_, _, !]} },
+                    r4: << { columns: [i64, i64, i64], kind: Primitive(i64_bitshl012), implicit_rules: {n0: [_, _, !]} },
+                    r5: >> { columns: [i64, i64, i64], kind: Primitive(i64_bitshr012), implicit_rules: {n0: [_, _, !]} },
+                    r6: ^ { columns: [i64, i64, i64], kind: Primitive(i64_bitxor012), implicit_rules: {n0: [_, _, !]} },
+                    r7: / { columns: [i64, i64, i64], kind: Primitive(i64_div012), implicit_rules: {n0: [_, _, !]} },
+                    r8: log2 { columns: [i64, i64], kind: Primitive(i64_log01), implicit_rules: {n0: [_, !]} },
+                    r9: max { columns: [i64, i64, i64], kind: Primitive(i64_max012), implicit_rules: {n0: [_, _, !]} },
+                    r10: min { columns: [i64, i64, i64], kind: Primitive(i64_min012), implicit_rules: {n0: [_, _, !]} },
+                    r11: * { columns: [i64, i64, i64], kind: Primitive(i64_mul012), implicit_rules: {n0: [_, _, !]} },
+                    r12: % { columns: [i64, i64, i64], kind: Primitive(i64_rem012), implicit_rules: {n0: [_, _, !]} },
+                    r13: - { columns: [i64, i64, i64], kind: Primitive(i64_sub012), implicit_rules: {n0: [_, _, !]} },
+                    r14: Foo { columns: [Foo], kind: Forall(t3), implicit_rules: {} },
+                    r15: Same { columns: [Foo, Foo, Foo], kind: Table, implicit_rules: {n0: [_, _, U]} },
+                },
+            }"#]]),
         expected_lir: Some(expect![[r#"
             Theory {
                 name: None,
@@ -3456,7 +3713,7 @@ fn test_bind_variable_multiple_times() {
                 },
                 rule_variables: {
                     [v0, x]: t3,
-                    [v1, p1]: t3,
+                    [v1, v1]: t3,
                     [v2, internal1_x]: t3,
                 },
                 global_variable_types: {},
@@ -3727,9 +3984,9 @@ fn test_bind_variable_multiple_times() {
                 #[inline(never)]
                 pub fn apply_rules(&mut self) {
                     #[doc = "( rewrite ( Same x x ) x )"]
-                    for (x, internal1_x, p1) in self.same_.iter_new() {
+                    for (x, internal1_x, v1) in self.same_.iter_new() {
                         if x == internal1_x {
-                            self.uf.foo_.union(p1, x);
+                            self.uf.foo_.union(v1, x);
                         }
                     }
                 }
@@ -3806,39 +4063,52 @@ fn test_negative_i64_tokens() {
             (rewrite (Const -1) (Const -1))
         "#,
         expected_hir: Some(expect![[r#"
-            Theory:
-
-            +(i64, i64, i64)
-            &(i64, i64, i64)
-            not-i64(i64, i64)
-            |(i64, i64, i64)
-            <<(i64, i64, i64)
-            >>(i64, i64, i64)
-            ^(i64, i64, i64)
-            /(i64, i64, i64)
-            log2(i64, i64)
-            max(i64, i64, i64)
-            min(i64, i64, i64)
-            *(i64, i64, i64)
-            %(i64, i64, i64)
-            -(i64, i64, i64)
-            Math(Math)
-            Mul(Math, Math, Math)
-            Add(Math, Math, Math)
-            Sub(Math, Math, Math)
-            Const(i64, Math)
-            g0(i64)
-            neg_two(Math)
-            g2(i64)
-
-            Rule:
-            Premise: Const(p0, p1), g2(p0)
-            __: p0
-            a0: p1
-            a1: __
-            Insert: Const(a1, a0).n0, g2(a1).n0
-
-        "#]]),
+            Theory {
+                types: {
+                    [t0, ()]: std::primitive::unit,
+                    [t1, i64]: std::primitive::i64,
+                    [t2, String]: runtime::IString,
+                    [t3, Math]: [symbolic],
+                },
+                symbolic_rules: [
+                    SymbolicRule {
+                        src: "( rewrite ( Const -1 ) ( Const -1 ) )",
+                        atoms: [
+                            Premise { relation: Const, columns: [v1, v0] },
+                            Premise { relation: g2, columns: [v1] },
+                        ],
+                        variables: {
+                            v0: VariableMeta { name: None, ty: t3 },
+                            v1: VariableMeta { name: None, ty: t1 },
+                        },
+                        unify: [],
+                    },
+                ],
+                relations: {
+                    r0: + { columns: [i64, i64, i64], kind: Primitive(i64_add012), implicit_rules: {n0: [_, _, !]} },
+                    r1: & { columns: [i64, i64, i64], kind: Primitive(i64_bitand012), implicit_rules: {n0: [_, _, !]} },
+                    r2: not-i64 { columns: [i64, i64], kind: Primitive(i64_bitnot01), implicit_rules: {n0: [_, !]} },
+                    r3: | { columns: [i64, i64, i64], kind: Primitive(i64_bitor012), implicit_rules: {n0: [_, _, !]} },
+                    r4: << { columns: [i64, i64, i64], kind: Primitive(i64_bitshl012), implicit_rules: {n0: [_, _, !]} },
+                    r5: >> { columns: [i64, i64, i64], kind: Primitive(i64_bitshr012), implicit_rules: {n0: [_, _, !]} },
+                    r6: ^ { columns: [i64, i64, i64], kind: Primitive(i64_bitxor012), implicit_rules: {n0: [_, _, !]} },
+                    r7: / { columns: [i64, i64, i64], kind: Primitive(i64_div012), implicit_rules: {n0: [_, _, !]} },
+                    r8: log2 { columns: [i64, i64], kind: Primitive(i64_log01), implicit_rules: {n0: [_, !]} },
+                    r9: max { columns: [i64, i64, i64], kind: Primitive(i64_max012), implicit_rules: {n0: [_, _, !]} },
+                    r10: min { columns: [i64, i64, i64], kind: Primitive(i64_min012), implicit_rules: {n0: [_, _, !]} },
+                    r11: * { columns: [i64, i64, i64], kind: Primitive(i64_mul012), implicit_rules: {n0: [_, _, !]} },
+                    r12: % { columns: [i64, i64, i64], kind: Primitive(i64_rem012), implicit_rules: {n0: [_, _, !]} },
+                    r13: - { columns: [i64, i64, i64], kind: Primitive(i64_sub012), implicit_rules: {n0: [_, _, !]} },
+                    r14: Math { columns: [Math], kind: Forall(t3), implicit_rules: {} },
+                    r15: Mul { columns: [Math, Math, Math], kind: Table, implicit_rules: {n0: [_, _, U]} },
+                    r16: Add { columns: [Math, Math, Math], kind: Table, implicit_rules: {n0: [_, _, U]} },
+                    r17: Sub { columns: [Math, Math, Math], kind: Table, implicit_rules: {n0: [_, _, U]} },
+                    r18: Const { columns: [i64, Math], kind: Table, implicit_rules: {n0: [_, U]} },
+                    r19: g0 { columns: [i64], kind: Global(g0), implicit_rules: {n0: [!]} },
+                    r20: neg_two { columns: [Math], kind: Global(g1), implicit_rules: {n0: [!]} },
+                    r21: g2 { columns: [i64], kind: Global(g2), implicit_rules: {n0: [!]} },
+                },
+            }"#]]),
         expected_lir: None,
         expected_codegen: None,
     }
@@ -3855,35 +4125,49 @@ fn codegen_variable_reuse_bug() {
             (rule ((= zero (Add zero x))) ((union x (Zero))))
         "#,
         expected_hir: Some(expect![[r#"
-            Theory:
-
-            +(i64, i64, i64)
-            &(i64, i64, i64)
-            not-i64(i64, i64)
-            |(i64, i64, i64)
-            <<(i64, i64, i64)
-            >>(i64, i64, i64)
-            ^(i64, i64, i64)
-            /(i64, i64, i64)
-            log2(i64, i64)
-            max(i64, i64, i64)
-            min(i64, i64, i64)
-            *(i64, i64, i64)
-            %(i64, i64, i64)
-            -(i64, i64, i64)
-            Math(Math)
-            Add(Math, Math, Math)
-            Zero(Math)
-            zero(Math)
-
-            Rule:
-            Premise: Add(zero, x, zero), zero(zero), zero(zero)
-            __: zero
-            __: zero
-            x: x
-            Insert: Zero(x).n0
-
-        "#]]),
+            Theory {
+                types: {
+                    [t0, ()]: std::primitive::unit,
+                    [t1, i64]: std::primitive::i64,
+                    [t2, String]: runtime::IString,
+                    [t3, Math]: [symbolic],
+                },
+                symbolic_rules: [
+                    SymbolicRule {
+                        src: "( rule ( ( = zero ( Add zero x ) ) ) ( ( union x ( Zero ) ) ) )",
+                        atoms: [
+                            Premise { relation: Add, columns: [zerozero, x, zerozero] },
+                            Premise { relation: zero, columns: [zerozero] },
+                            Action { relation: Zero, columns: [x], entry: [U] },
+                        ],
+                        variables: {
+                            v0: VariableMeta { name: Some("zerozero"), ty: t3 },
+                            v1: VariableMeta { name: Some("x"), ty: t3 },
+                        },
+                        unify: [],
+                    },
+                ],
+                relations: {
+                    r0: + { columns: [i64, i64, i64], kind: Primitive(i64_add012), implicit_rules: {n0: [_, _, !]} },
+                    r1: & { columns: [i64, i64, i64], kind: Primitive(i64_bitand012), implicit_rules: {n0: [_, _, !]} },
+                    r2: not-i64 { columns: [i64, i64], kind: Primitive(i64_bitnot01), implicit_rules: {n0: [_, !]} },
+                    r3: | { columns: [i64, i64, i64], kind: Primitive(i64_bitor012), implicit_rules: {n0: [_, _, !]} },
+                    r4: << { columns: [i64, i64, i64], kind: Primitive(i64_bitshl012), implicit_rules: {n0: [_, _, !]} },
+                    r5: >> { columns: [i64, i64, i64], kind: Primitive(i64_bitshr012), implicit_rules: {n0: [_, _, !]} },
+                    r6: ^ { columns: [i64, i64, i64], kind: Primitive(i64_bitxor012), implicit_rules: {n0: [_, _, !]} },
+                    r7: / { columns: [i64, i64, i64], kind: Primitive(i64_div012), implicit_rules: {n0: [_, _, !]} },
+                    r8: log2 { columns: [i64, i64], kind: Primitive(i64_log01), implicit_rules: {n0: [_, !]} },
+                    r9: max { columns: [i64, i64, i64], kind: Primitive(i64_max012), implicit_rules: {n0: [_, _, !]} },
+                    r10: min { columns: [i64, i64, i64], kind: Primitive(i64_min012), implicit_rules: {n0: [_, _, !]} },
+                    r11: * { columns: [i64, i64, i64], kind: Primitive(i64_mul012), implicit_rules: {n0: [_, _, !]} },
+                    r12: % { columns: [i64, i64, i64], kind: Primitive(i64_rem012), implicit_rules: {n0: [_, _, !]} },
+                    r13: - { columns: [i64, i64, i64], kind: Primitive(i64_sub012), implicit_rules: {n0: [_, _, !]} },
+                    r14: Math { columns: [Math], kind: Forall(t3), implicit_rules: {} },
+                    r15: Add { columns: [Math, Math, Math], kind: Table, implicit_rules: {n0: [_, _, U]} },
+                    r16: Zero { columns: [Math], kind: Table, implicit_rules: {n0: [U]} },
+                    r17: zero { columns: [Math], kind: Global(g0), implicit_rules: {n0: [!]} },
+                },
+            }"#]]),
         expected_lir: Some(expect![[r#"
             Theory {
                 name: None,
@@ -3969,19 +4253,16 @@ fn codegen_variable_reuse_bug() {
                         name: "Add",
                         param_types: {c0: t3, c1: t3, c2: t3},
                         kind: Table {
-                            index_to_info: {ir0: 0_1_2 conflict[..2] => [2:union], ir1: 1_0_2, ir2: 2_0_1},
+                            index_to_info: {ir0: 0_2_1, ir1: 1_0_2 conflict[..2] => [2:union], ir2: 2_0_1},
                             usage_to_info: {
-                                iu0: ir0[..2],
-                                iu1: ir2[..2],
-                                iu2: ir2[..1],
-                                iu3: ir2[..2],
-                                iu4: ir0[..1],
-                                iu5: ir0[..1],
-                                iu6: ir1[..1],
-                                iu7: ir2[..1],
-                                iu8: ir0[..2],
+                                iu0: ir1[..2],
+                                iu1: ir0[..2],
+                                iu2: ir0[..1],
+                                iu3: ir1[..1],
+                                iu4: ir2[..1],
+                                iu5: ir1[..2],
                             },
-                            column_back_reference: {c0: iu5, c1: iu6, c2: iu7},
+                            column_back_reference: {c0: iu2, c1: iu3, c2: iu4},
                         },
                     },
                     r16: RelationData {
@@ -4004,57 +4285,33 @@ fn codegen_variable_reuse_bug() {
                     },
                 },
                 rule_variables: {
-                    [v0, zero]: t3,
-                    [v1, zero_2]: t3,
-                    [v2, x]: t3,
-                    [v3, zero_3]: t3,
-                    [v4, zero_4]: t3,
-                    [v5, x_2]: t3,
-                    [v6, zero_5]: t3,
-                    [v7, zero_6]: t3,
-                    [v8, x_3]: t3,
+                    [v0, zerozero]: t3,
+                    [v1, x]: t3,
+                    [v2, internal2_zerozero]: t3,
+                    [v3, zerozero_2]: t3,
+                    [v4, x_2]: t3,
                 },
                 global_variable_types: {
                     g0: t3,
                 },
                 rule_tries: [
                     meta: "( rule ( ( = zero ( Add zero x ) ) ) ( ( union x ( Zero ) ) ) )"
-                    atom: [PremiseNew, r15(v1, v2, v0)]
+                    atom: [PremiseNew, r15(v0, v1, v2)]
                     then: [
-                        atom: [PremiseAny, r17(v0), iu_bogus]
+                        atom: [IfEq, v0=v2]
                         then: [
-                            atom: [PremiseAny, r17(v1), iu_bogus]
+                            atom: [PremiseAny, r17(v0), iu_bogus]
                             then: [
-                                atom: [Action::Insert, r16(v2)],
+                                atom: [Action::Insert, r16(v1)],
                             ],
                         ],
                     ],
                     meta: "( rule ( ( = zero ( Add zero x ) ) ) ( ( union x ( Zero ) ) ) )"
                     atom: [PremiseNew, r17(v3)]
                     then: [
-                        atom: [PremiseAny, r15(v4, v5, v3), iu2]
+                        atom: [Premise, r15(v3, v4, v3), iu1]
                         then: [
-                            atom: [Premise, r17(v4), iu_bogus]
-                            then: [
-                                atom: [Premise, r15(v4, v5, v3), iu1]
-                                then: [
-                                    atom: [Action::Insert, r16(v5)],
-                                ],
-                            ],
-                        ],
-                    ],
-                    meta: "( rule ( ( = zero ( Add zero x ) ) ) ( ( union x ( Zero ) ) ) )"
-                    atom: [PremiseNew, r17(v7)]
-                    then: [
-                        atom: [PremiseAny, r15(v7, v8, v6), iu4]
-                        then: [
-                            atom: [Premise, r17(v6), iu_bogus]
-                            then: [
-                                atom: [Premise, r15(v7, v8, v6), iu3]
-                                then: [
-                                    atom: [Action::Insert, r16(v8)],
-                                ],
-                            ],
+                            atom: [Action::Insert, r16(v4)],
                         ],
                     ],
                 ],
@@ -4071,8 +4328,8 @@ fn codegen_variable_reuse_bug() {
         expected_codegen: Some(expect![[r#"
             use oatlog::runtime::{self, *};
             decl_row ! (Row1 < T0 first 0 > () (0) () (T0) fc = (0) (T0) where u32 = s => ((s . 0 . inner () as u32) << 0));
-            decl_row ! (Row3_0_1 < T0 first 0 , T1 , T2 > (0 , 1) (2) (T0 , T1) (T2) fc = (0) (T0) where u128 = s => ((s . 0 . inner () as u128) << 64) + ((s . 1 . inner () as u128) << 32) + ((s . 2 . inner () as u128) << 0));
-            decl_row ! (Row3_1_0_2 < T0 , T1 first 1 , T2 > (1 , 0 , 2) () (T1 , T0 , T2) () fc = (1) (T1) where u128 = s => ((s . 1 . inner () as u128) << 64) + ((s . 0 . inner () as u128) << 32) + ((s . 2 . inner () as u128) << 0));
+            decl_row ! (Row3_0_2_1 < T0 first 0 , T1 , T2 > (0 , 2 , 1) () (T0 , T2 , T1) () fc = (0) (T0) where u128 = s => ((s . 0 . inner () as u128) << 64) + ((s . 2 . inner () as u128) << 32) + ((s . 1 . inner () as u128) << 0));
+            decl_row ! (Row3_1_0 < T0 , T1 first 1 , T2 > (1 , 0) (2) (T1 , T0) (T2) fc = (1) (T1) where u128 = s => ((s . 1 . inner () as u128) << 64) + ((s . 0 . inner () as u128) << 32) + ((s . 2 . inner () as u128) << 0));
             decl_row ! (Row3_2_0_1 < T0 , T1 , T2 first 2 > (2 , 0 , 1) () (T2 , T0 , T1) () fc = (2) (T2) where u128 = s => ((s . 2 . inner () as u128) << 64) + ((s . 0 . inner () as u128) << 32) + ((s . 1 . inner () as u128) << 0));
             eclass_wrapper_ty!(Math);
             fn i64_add012(a: i64, b: i64) -> impl Iterator<Item = (i64,)> {
@@ -4124,14 +4381,14 @@ fn codegen_variable_reuse_bug() {
             #[derive(Debug, Default)]
             struct AddRelation {
                 new: Vec<<Self as Relation>::Row>,
-                all_index_0_1_2: SortedVec<RadixSortCtx<Row3_0_1<Math, Math, Math>, u128>>,
-                all_index_1_0_2: SortedVec<RadixSortCtx<Row3_1_0_2<Math, Math, Math>, u128>>,
+                all_index_0_2_1: SortedVec<RadixSortCtx<Row3_0_2_1<Math, Math, Math>, u128>>,
+                all_index_1_0_2: SortedVec<RadixSortCtx<Row3_1_0<Math, Math, Math>, u128>>,
                 all_index_2_0_1: SortedVec<RadixSortCtx<Row3_2_0_1<Math, Math, Math>, u128>>,
             }
             struct AddUpdateCtx {
                 scratch: Vec<(Math, Math, Math)>,
                 deferred_insertions: Vec<(Math, Math, Math)>,
-                old: SortedVec<RadixSortCtx<Row3_0_1<Math, Math, Math>, u128>>,
+                old: SortedVec<RadixSortCtx<Row3_1_0<Math, Math, Math>, u128>>,
             }
             impl Relation for AddRelation {
                 type Row = (Math, Math, Math);
@@ -4151,14 +4408,14 @@ fn codegen_variable_reuse_bug() {
                     self.new.iter().copied()
                 }
                 fn len(&self) -> usize {
-                    self.all_index_0_1_2.len()
+                    self.all_index_0_2_1.len()
                 }
                 fn emit_graphviz(&self, buf: &mut String) {
                     use std::fmt::Write;
-                    for (i, (x0, x1, x2)) in self.all_index_0_1_2.iter().enumerate() {
+                    for (i, (x0, x2, x1)) in self.all_index_0_2_1.iter().enumerate() {
                         writeln!(buf, "{}_{i} -> {}_{};", "add", "math", x0).unwrap();
-                        writeln!(buf, "{}_{i} -> {}_{};", "add", "math", x1).unwrap();
                         writeln!(buf, "{}_{i} -> {}_{};", "add", "math", x2).unwrap();
+                        writeln!(buf, "{}_{i} -> {}_{};", "add", "math", x1).unwrap();
                         writeln!(buf, "{}_{i} [shape = box];", "add").unwrap();
                     }
                 }
@@ -4180,7 +4437,7 @@ fn codegen_variable_reuse_bug() {
                     };
                     let mut ran_merge = false;
                     loop {
-                        self.all_index_0_1_2.sorted_vec_update(
+                        self.all_index_1_0_2.sorted_vec_update(
                             insertions,
                             &mut ctx.deferred_insertions,
                             &mut ctx.scratch,
@@ -4208,64 +4465,64 @@ fn codegen_variable_reuse_bug() {
                     AddUpdateCtx {
                         scratch: Vec::new(),
                         deferred_insertions: Vec::new(),
-                        old: self.all_index_0_1_2.clone(),
+                        old: self.all_index_1_0_2.clone(),
                     }
                 }
                 fn update_finalize(&mut self, ctx: Self::UpdateCtx, uf: &mut Unification) {
-                    self.all_index_0_1_2.finalize();
-                    self.all_index_1_0_2
-                        .recreate_from(&self.all_index_0_1_2.as_slice());
+                    self.all_index_1_0_2.finalize();
+                    self.all_index_0_2_1
+                        .recreate_from(&self.all_index_1_0_2.as_slice());
                     self.all_index_2_0_1
-                        .recreate_from(&self.all_index_0_1_2.as_slice());
-                    assert_eq!(self.all_index_1_0_2.len(), self.all_index_0_1_2.len());
-                    assert_eq!(self.all_index_2_0_1.len(), self.all_index_0_1_2.len());
-                    self.new.extend(self.all_index_0_1_2.minus(&ctx.old));
+                        .recreate_from(&self.all_index_1_0_2.as_slice());
+                    assert_eq!(self.all_index_0_2_1.len(), self.all_index_1_0_2.len());
+                    assert_eq!(self.all_index_2_0_1.len(), self.all_index_1_0_2.len());
+                    self.new.extend(self.all_index_1_0_2.minus(&ctx.old));
                 }
             }
             impl AddRelation {
-                fn iter2_0_1_2(&self, x0: Math, x1: Math) -> impl Iterator<Item = (Math,)> + use<'_> {
-                    self.all_index_0_1_2
+                fn iter2_1_0_2(&self, x1: Math, x0: Math) -> impl Iterator<Item = (Math,)> + use<'_> {
+                    self.all_index_1_0_2
                         .range((x0, x1, Math::MIN_ID)..=(x0, x1, Math::MAX_ID))
                         .map(|(x0, x1, x2)| (x2,))
                 }
-                fn iter2_2_0_1(&self, x2: Math, x0: Math) -> impl Iterator<Item = (Math,)> + use<'_> {
-                    self.all_index_2_0_1
+                fn iter2_0_2_1(&self, x0: Math, x2: Math) -> impl Iterator<Item = (Math,)> + use<'_> {
+                    self.all_index_0_2_1
                         .range((x0, Math::MIN_ID, x2)..=(x0, Math::MAX_ID, x2))
                         .map(|(x0, x1, x2)| (x1,))
                 }
-                fn iter1_2_0_1(&self, x2: Math) -> impl Iterator<Item = (Math, Math)> + use<'_> {
-                    self.all_index_2_0_1
-                        .range((Math::MIN_ID, Math::MIN_ID, x2)..=(Math::MAX_ID, Math::MAX_ID, x2))
-                        .map(|(x0, x1, x2)| (x0, x1))
-                }
-                fn iter1_0_1_2(&self, x0: Math) -> impl Iterator<Item = (Math, Math)> + use<'_> {
-                    self.all_index_0_1_2
+                fn iter1_0_2_1(&self, x0: Math) -> impl Iterator<Item = (Math, Math)> + use<'_> {
+                    self.all_index_0_2_1
                         .range((x0, Math::MIN_ID, Math::MIN_ID)..=(x0, Math::MAX_ID, Math::MAX_ID))
-                        .map(|(x0, x1, x2)| (x1, x2))
+                        .map(|(x0, x1, x2)| (x2, x1))
                 }
                 fn iter1_1_0_2(&self, x1: Math) -> impl Iterator<Item = (Math, Math)> + use<'_> {
                     self.all_index_1_0_2
                         .range((Math::MIN_ID, x1, Math::MIN_ID)..=(Math::MAX_ID, x1, Math::MAX_ID))
                         .map(|(x0, x1, x2)| (x0, x2))
                 }
-                fn check2_0_1_2(&self, x0: Math, x1: Math) -> bool {
-                    self.iter2_0_1_2(x0, x1).next().is_some()
+                fn iter1_2_0_1(&self, x2: Math) -> impl Iterator<Item = (Math, Math)> + use<'_> {
+                    self.all_index_2_0_1
+                        .range((Math::MIN_ID, Math::MIN_ID, x2)..=(Math::MAX_ID, Math::MAX_ID, x2))
+                        .map(|(x0, x1, x2)| (x0, x1))
                 }
-                fn check2_2_0_1(&self, x2: Math, x0: Math) -> bool {
-                    self.iter2_2_0_1(x2, x0).next().is_some()
+                fn check2_1_0_2(&self, x1: Math, x0: Math) -> bool {
+                    self.iter2_1_0_2(x1, x0).next().is_some()
                 }
-                fn check1_2_0_1(&self, x2: Math) -> bool {
-                    self.iter1_2_0_1(x2).next().is_some()
+                fn check2_0_2_1(&self, x0: Math, x2: Math) -> bool {
+                    self.iter2_0_2_1(x0, x2).next().is_some()
                 }
-                fn check1_0_1_2(&self, x0: Math) -> bool {
-                    self.iter1_0_1_2(x0).next().is_some()
+                fn check1_0_2_1(&self, x0: Math) -> bool {
+                    self.iter1_0_2_1(x0).next().is_some()
                 }
                 fn check1_1_0_2(&self, x1: Math) -> bool {
                     self.iter1_1_0_2(x1).next().is_some()
                 }
+                fn check1_2_0_1(&self, x2: Math) -> bool {
+                    self.iter1_2_0_1(x2).next().is_some()
+                }
                 #[allow(unreachable_code)]
-                fn entry2_0_1_2(&self, x0: Math, x1: Math, delta: &mut Delta, uf: &mut Unification) -> (Math,) {
-                    if let Some((x2,)) = self.iter2_0_1_2(x0, x1).next() {
+                fn entry2_1_0_2(&self, x1: Math, x0: Math, delta: &mut Delta, uf: &mut Unification) -> (Math,) {
+                    if let Some((x2,)) = self.iter2_1_0_2(x1, x0).next() {
                         return (x2,);
                     }
                     let x2 = uf.math_.add_eclass();
@@ -4464,29 +4721,17 @@ fn codegen_variable_reuse_bug() {
                 #[inline(never)]
                 pub fn apply_rules(&mut self) {
                     #[doc = "( rule ( ( = zero ( Add zero x ) ) ) ( ( union x ( Zero ) ) ) )"]
-                    for (zero_2, x, zero) in self.add_.iter_new() {
-                        if zero == self.global_math.get(0usize) {
-                            if zero_2 == self.global_math.get(0usize) {
+                    for (zerozero, x, internal2_zerozero) in self.add_.iter_new() {
+                        if zerozero == internal2_zerozero {
+                            if zerozero == self.global_math.get(0usize) {
                                 self.delta.insert_zero((x,));
                             }
                         }
                     }
                     #[doc = "( rule ( ( = zero ( Add zero x ) ) ) ( ( union x ( Zero ) ) ) )"]
-                    if let Some(zero_3) = self.global_math.get_new(0usize) {
-                        if self.add_.check1_2_0_1(zero_3) {
-                            let zero_4 = self.global_math.get(0usize);
-                            for (x_2,) in self.add_.iter2_2_0_1(zero_3, zero_4) {
-                                self.delta.insert_zero((x_2,));
-                            }
-                        }
-                    }
-                    #[doc = "( rule ( ( = zero ( Add zero x ) ) ) ( ( union x ( Zero ) ) ) )"]
-                    if let Some(zero_6) = self.global_math.get_new(0usize) {
-                        if self.add_.check1_0_1_2(zero_6) {
-                            let zero_5 = self.global_math.get(0usize);
-                            for (x_3,) in self.add_.iter2_2_0_1(zero_5, zero_6) {
-                                self.delta.insert_zero((x_3,));
-                            }
+                    if let Some(zerozero_2) = self.global_math.get_new(0usize) {
+                        for (x_2,) in self.add_.iter2_0_2_1(zerozero_2, zerozero_2) {
+                            self.delta.insert_zero((x_2,));
                         }
                     }
                 }
@@ -4572,39 +4817,46 @@ fn initial_exprs() {
             (Mul (Var "x") (Var "y"))
         "#,
         expected_hir: Some(expect![[r#"
-            Theory:
-
-            +(i64, i64, i64)
-            &(i64, i64, i64)
-            not-i64(i64, i64)
-            |(i64, i64, i64)
-            <<(i64, i64, i64)
-            >>(i64, i64, i64)
-            ^(i64, i64, i64)
-            /(i64, i64, i64)
-            log2(i64, i64)
-            max(i64, i64, i64)
-            min(i64, i64, i64)
-            *(i64, i64, i64)
-            %(i64, i64, i64)
-            -(i64, i64, i64)
-            Math(Math)
-            Add(Math, Math, Math)
-            Mul(Math, Math, Math)
-            Const(i64, Math)
-            Var(String, Math)
-            g0(i64)
-            g1(Math)
-            g2(i64)
-            g3(Math)
-            g4(Math)
-            g5(String)
-            g6(Math)
-            g7(String)
-            g8(Math)
-            g9(Math)
-
-        "#]]),
+            Theory {
+                types: {
+                    [t0, ()]: std::primitive::unit,
+                    [t1, i64]: std::primitive::i64,
+                    [t2, String]: runtime::IString,
+                    [t3, Math]: [symbolic],
+                },
+                symbolic_rules: [],
+                relations: {
+                    r0: + { columns: [i64, i64, i64], kind: Primitive(i64_add012), implicit_rules: {n0: [_, _, !]} },
+                    r1: & { columns: [i64, i64, i64], kind: Primitive(i64_bitand012), implicit_rules: {n0: [_, _, !]} },
+                    r2: not-i64 { columns: [i64, i64], kind: Primitive(i64_bitnot01), implicit_rules: {n0: [_, !]} },
+                    r3: | { columns: [i64, i64, i64], kind: Primitive(i64_bitor012), implicit_rules: {n0: [_, _, !]} },
+                    r4: << { columns: [i64, i64, i64], kind: Primitive(i64_bitshl012), implicit_rules: {n0: [_, _, !]} },
+                    r5: >> { columns: [i64, i64, i64], kind: Primitive(i64_bitshr012), implicit_rules: {n0: [_, _, !]} },
+                    r6: ^ { columns: [i64, i64, i64], kind: Primitive(i64_bitxor012), implicit_rules: {n0: [_, _, !]} },
+                    r7: / { columns: [i64, i64, i64], kind: Primitive(i64_div012), implicit_rules: {n0: [_, _, !]} },
+                    r8: log2 { columns: [i64, i64], kind: Primitive(i64_log01), implicit_rules: {n0: [_, !]} },
+                    r9: max { columns: [i64, i64, i64], kind: Primitive(i64_max012), implicit_rules: {n0: [_, _, !]} },
+                    r10: min { columns: [i64, i64, i64], kind: Primitive(i64_min012), implicit_rules: {n0: [_, _, !]} },
+                    r11: * { columns: [i64, i64, i64], kind: Primitive(i64_mul012), implicit_rules: {n0: [_, _, !]} },
+                    r12: % { columns: [i64, i64, i64], kind: Primitive(i64_rem012), implicit_rules: {n0: [_, _, !]} },
+                    r13: - { columns: [i64, i64, i64], kind: Primitive(i64_sub012), implicit_rules: {n0: [_, _, !]} },
+                    r14: Math { columns: [Math], kind: Forall(t3), implicit_rules: {} },
+                    r15: Add { columns: [Math, Math, Math], kind: Table, implicit_rules: {n0: [_, _, U]} },
+                    r16: Mul { columns: [Math, Math, Math], kind: Table, implicit_rules: {n0: [_, _, U]} },
+                    r17: Const { columns: [i64, Math], kind: Table, implicit_rules: {n0: [_, U]} },
+                    r18: Var { columns: [String, Math], kind: Table, implicit_rules: {n0: [_, U]} },
+                    r19: g0 { columns: [i64], kind: Global(g0), implicit_rules: {n0: [!]} },
+                    r20: g1 { columns: [Math], kind: Global(g1), implicit_rules: {n0: [!]} },
+                    r21: g2 { columns: [i64], kind: Global(g2), implicit_rules: {n0: [!]} },
+                    r22: g3 { columns: [Math], kind: Global(g3), implicit_rules: {n0: [!]} },
+                    r23: g4 { columns: [Math], kind: Global(g4), implicit_rules: {n0: [!]} },
+                    r24: g5 { columns: [String], kind: Global(g5), implicit_rules: {n0: [!]} },
+                    r25: g6 { columns: [Math], kind: Global(g6), implicit_rules: {n0: [!]} },
+                    r26: g7 { columns: [String], kind: Global(g7), implicit_rules: {n0: [!]} },
+                    r27: g8 { columns: [Math], kind: Global(g8), implicit_rules: {n0: [!]} },
+                    r28: g9 { columns: [Math], kind: Global(g9), implicit_rules: {n0: [!]} },
+                },
+            }"#]]),
         expected_lir: None,
         expected_codegen: Some(expect![[r#"
             use oatlog::runtime::{self, *};
@@ -5615,28 +5867,37 @@ fn codegen_bug1() {
             (relation Foo (T0 T1 T2))
         "#,
         expected_hir: Some(expect![[r#"
-            Theory:
-
-            +(i64, i64, i64)
-            &(i64, i64, i64)
-            not-i64(i64, i64)
-            |(i64, i64, i64)
-            <<(i64, i64, i64)
-            >>(i64, i64, i64)
-            ^(i64, i64, i64)
-            /(i64, i64, i64)
-            log2(i64, i64)
-            max(i64, i64, i64)
-            min(i64, i64, i64)
-            *(i64, i64, i64)
-            %(i64, i64, i64)
-            -(i64, i64, i64)
-            T0(T0)
-            T1(T1)
-            T2(T2)
-            Foo(T0, T1, T2)
-
-        "#]]),
+            Theory {
+                types: {
+                    [t0, ()]: std::primitive::unit,
+                    [t1, i64]: std::primitive::i64,
+                    [t2, String]: runtime::IString,
+                    [t3, T0]: [symbolic],
+                    [t4, T1]: [symbolic],
+                    [t5, T2]: [symbolic],
+                },
+                symbolic_rules: [],
+                relations: {
+                    r0: + { columns: [i64, i64, i64], kind: Primitive(i64_add012), implicit_rules: {n0: [_, _, !]} },
+                    r1: & { columns: [i64, i64, i64], kind: Primitive(i64_bitand012), implicit_rules: {n0: [_, _, !]} },
+                    r2: not-i64 { columns: [i64, i64], kind: Primitive(i64_bitnot01), implicit_rules: {n0: [_, !]} },
+                    r3: | { columns: [i64, i64, i64], kind: Primitive(i64_bitor012), implicit_rules: {n0: [_, _, !]} },
+                    r4: << { columns: [i64, i64, i64], kind: Primitive(i64_bitshl012), implicit_rules: {n0: [_, _, !]} },
+                    r5: >> { columns: [i64, i64, i64], kind: Primitive(i64_bitshr012), implicit_rules: {n0: [_, _, !]} },
+                    r6: ^ { columns: [i64, i64, i64], kind: Primitive(i64_bitxor012), implicit_rules: {n0: [_, _, !]} },
+                    r7: / { columns: [i64, i64, i64], kind: Primitive(i64_div012), implicit_rules: {n0: [_, _, !]} },
+                    r8: log2 { columns: [i64, i64], kind: Primitive(i64_log01), implicit_rules: {n0: [_, !]} },
+                    r9: max { columns: [i64, i64, i64], kind: Primitive(i64_max012), implicit_rules: {n0: [_, _, !]} },
+                    r10: min { columns: [i64, i64, i64], kind: Primitive(i64_min012), implicit_rules: {n0: [_, _, !]} },
+                    r11: * { columns: [i64, i64, i64], kind: Primitive(i64_mul012), implicit_rules: {n0: [_, _, !]} },
+                    r12: % { columns: [i64, i64, i64], kind: Primitive(i64_rem012), implicit_rules: {n0: [_, _, !]} },
+                    r13: - { columns: [i64, i64, i64], kind: Primitive(i64_sub012), implicit_rules: {n0: [_, _, !]} },
+                    r14: T0 { columns: [T0], kind: Forall(t3), implicit_rules: {} },
+                    r15: T1 { columns: [T1], kind: Forall(t4), implicit_rules: {} },
+                    r16: T2 { columns: [T2], kind: Forall(t5), implicit_rules: {} },
+                    r17: Foo { columns: [T0, T1, T2], kind: Table, implicit_rules: {} },
+                },
+            }"#]]),
         expected_lir: None,
         expected_codegen: Some(expect![[r#"
             use oatlog::runtime::{self, *};
@@ -5983,26 +6244,33 @@ fn initial() {
             (run 42)
         "#,
         expected_hir: Some(expect![[r#"
-            Theory:
-
-            +(i64, i64, i64)
-            &(i64, i64, i64)
-            not-i64(i64, i64)
-            |(i64, i64, i64)
-            <<(i64, i64, i64)
-            >>(i64, i64, i64)
-            ^(i64, i64, i64)
-            /(i64, i64, i64)
-            log2(i64, i64)
-            max(i64, i64, i64)
-            min(i64, i64, i64)
-            *(i64, i64, i64)
-            %(i64, i64, i64)
-            -(i64, i64, i64)
-            Math(Math)
-            Const(i64, Math)
-
-        "#]]),
+            Theory {
+                types: {
+                    [t0, ()]: std::primitive::unit,
+                    [t1, i64]: std::primitive::i64,
+                    [t2, String]: runtime::IString,
+                    [t3, Math]: [symbolic],
+                },
+                symbolic_rules: [],
+                relations: {
+                    r0: + { columns: [i64, i64, i64], kind: Primitive(i64_add012), implicit_rules: {n0: [_, _, !]} },
+                    r1: & { columns: [i64, i64, i64], kind: Primitive(i64_bitand012), implicit_rules: {n0: [_, _, !]} },
+                    r2: not-i64 { columns: [i64, i64], kind: Primitive(i64_bitnot01), implicit_rules: {n0: [_, !]} },
+                    r3: | { columns: [i64, i64, i64], kind: Primitive(i64_bitor012), implicit_rules: {n0: [_, _, !]} },
+                    r4: << { columns: [i64, i64, i64], kind: Primitive(i64_bitshl012), implicit_rules: {n0: [_, _, !]} },
+                    r5: >> { columns: [i64, i64, i64], kind: Primitive(i64_bitshr012), implicit_rules: {n0: [_, _, !]} },
+                    r6: ^ { columns: [i64, i64, i64], kind: Primitive(i64_bitxor012), implicit_rules: {n0: [_, _, !]} },
+                    r7: / { columns: [i64, i64, i64], kind: Primitive(i64_div012), implicit_rules: {n0: [_, _, !]} },
+                    r8: log2 { columns: [i64, i64], kind: Primitive(i64_log01), implicit_rules: {n0: [_, !]} },
+                    r9: max { columns: [i64, i64, i64], kind: Primitive(i64_max012), implicit_rules: {n0: [_, _, !]} },
+                    r10: min { columns: [i64, i64, i64], kind: Primitive(i64_min012), implicit_rules: {n0: [_, _, !]} },
+                    r11: * { columns: [i64, i64, i64], kind: Primitive(i64_mul012), implicit_rules: {n0: [_, _, !]} },
+                    r12: % { columns: [i64, i64, i64], kind: Primitive(i64_rem012), implicit_rules: {n0: [_, _, !]} },
+                    r13: - { columns: [i64, i64, i64], kind: Primitive(i64_sub012), implicit_rules: {n0: [_, _, !]} },
+                    r14: Math { columns: [Math], kind: Forall(t3), implicit_rules: {} },
+                    r15: Const { columns: [i64, Math], kind: Table, implicit_rules: {n0: [_, U]} },
+                },
+            }"#]]),
         expected_lir: None,
         expected_codegen: Some(expect![[r#"
             use oatlog::runtime::{self, *};
@@ -6311,72 +6579,117 @@ fn test_primitives_simple() {
 
             (let two (Const 2))
             (let one 1)
-            (rewrite (Const one) (Add x x))
-            (rewrite (Const 2) (Add z z))
+            (rewrite (Const one) (Add (Var "q") (Var "q")))
+            (rewrite (Const 2) (Add (Var "z") (Var "z")))
             (rewrite (Var "x") (Var "y"))
 
             (rewrite (Mul a (Const 0)) (Const 0))
         "#,
         expected_hir :Some( expect![[r#"
-            Theory:
-
-            +(i64, i64, i64)
-            &(i64, i64, i64)
-            not-i64(i64, i64)
-            |(i64, i64, i64)
-            <<(i64, i64, i64)
-            >>(i64, i64, i64)
-            ^(i64, i64, i64)
-            /(i64, i64, i64)
-            log2(i64, i64)
-            max(i64, i64, i64)
-            min(i64, i64, i64)
-            *(i64, i64, i64)
-            %(i64, i64, i64)
-            -(i64, i64, i64)
-            Math(Math)
-            Mul(Math, Math, Math)
-            Add(Math, Math, Math)
-            Const(i64, Math)
-            Var(String, Math)
-            g0(i64)
-            two(Math)
-            one(i64)
-            g3(String)
-            g4(String)
-            g5(i64)
-
-            Rule:
-            Premise: Const(one, p1), one(one)
-            __: one
-            a0: p1
-            x: __
-            Insert: Add(x, x, a0).n0
-
-            Rule:
-            Premise: Const(p0, p1), g0(p0)
-            __: p0
-            a0: p1
-            z: __
-            Insert: Add(z, z, a0).n0
-
-            Rule:
-            Premise: Var(p0, p1), g3(p0)
-            __: p0
-            a0: p1
-            a1: __
-            Insert: Var(a1, a0).n0, g4(a1).n0
-
-            Rule:
-            Premise: Mul(a, p2, p3), Const(p1, p2), g5(p1)
-            __: a
-            __: p1
-            __: p2
-            a0: p3
-            a1: __
-            Insert: Const(a1, a0).n0, g5(a1).n0
-
-        "#]]),
+            Theory {
+                types: {
+                    [t0, ()]: std::primitive::unit,
+                    [t1, i64]: std::primitive::i64,
+                    [t2, String]: runtime::IString,
+                    [t3, Math]: [symbolic],
+                },
+                symbolic_rules: [
+                    SymbolicRule {
+                        src: "( rewrite ( Const one ) ( Add ( Var \"q\" ) ( Var \"q\" ) ) )",
+                        atoms: [
+                            Premise { relation: Const, columns: [one, v1] },
+                            Premise { relation: one, columns: [one] },
+                            Action { relation: Add, columns: [v3, v3, v1], entry: [_, _, U] },
+                            Action { relation: Var, columns: [v2, v3], entry: [_, U] },
+                            Action { relation: g3, columns: [v2], entry: [!] },
+                        ],
+                        variables: {
+                            v0: VariableMeta { name: Some("one"), ty: t1 },
+                            v1: VariableMeta { name: None, ty: t3 },
+                            v2: VariableMeta { name: None, ty: t2 },
+                            v3: VariableMeta { name: None, ty: t3 },
+                        },
+                        unify: [],
+                    },
+                    SymbolicRule {
+                        src: "( rewrite ( Const 2 ) ( Add ( Var \"z\" ) ( Var \"z\" ) ) )",
+                        atoms: [
+                            Premise { relation: Const, columns: [v0, v1] },
+                            Premise { relation: g0, columns: [v0] },
+                            Action { relation: Add, columns: [v3, v3, v1], entry: [_, _, U] },
+                            Action { relation: Var, columns: [v2, v3], entry: [_, U] },
+                            Action { relation: g4, columns: [v2], entry: [!] },
+                        ],
+                        variables: {
+                            v0: VariableMeta { name: None, ty: t1 },
+                            v1: VariableMeta { name: None, ty: t3 },
+                            v2: VariableMeta { name: None, ty: t2 },
+                            v3: VariableMeta { name: None, ty: t3 },
+                        },
+                        unify: [],
+                    },
+                    SymbolicRule {
+                        src: "( rewrite ( Var \"x\" ) ( Var \"y\" ) )",
+                        atoms: [
+                            Premise { relation: Var, columns: [v0, v1] },
+                            Premise { relation: g5, columns: [v0] },
+                            Action { relation: Var, columns: [v2, v1], entry: [_, U] },
+                            Action { relation: g6, columns: [v2], entry: [!] },
+                        ],
+                        variables: {
+                            v0: VariableMeta { name: None, ty: t2 },
+                            v1: VariableMeta { name: None, ty: t3 },
+                            v2: VariableMeta { name: None, ty: t2 },
+                        },
+                        unify: [],
+                    },
+                    SymbolicRule {
+                        src: "( rewrite ( Mul a ( Const 0 ) ) ( Const 0 ) )",
+                        atoms: [
+                            Premise { relation: Mul, columns: [a, v1, v2] },
+                            Premise { relation: Const, columns: [v3, v1] },
+                            Premise { relation: g7, columns: [v3] },
+                            Action { relation: Const, columns: [v3, v2], entry: [_, U] },
+                        ],
+                        variables: {
+                            v0: VariableMeta { name: Some("a"), ty: t3 },
+                            v1: VariableMeta { name: None, ty: t3 },
+                            v2: VariableMeta { name: None, ty: t3 },
+                            v3: VariableMeta { name: None, ty: t1 },
+                        },
+                        unify: [],
+                    },
+                ],
+                relations: {
+                    r0: + { columns: [i64, i64, i64], kind: Primitive(i64_add012), implicit_rules: {n0: [_, _, !]} },
+                    r1: & { columns: [i64, i64, i64], kind: Primitive(i64_bitand012), implicit_rules: {n0: [_, _, !]} },
+                    r2: not-i64 { columns: [i64, i64], kind: Primitive(i64_bitnot01), implicit_rules: {n0: [_, !]} },
+                    r3: | { columns: [i64, i64, i64], kind: Primitive(i64_bitor012), implicit_rules: {n0: [_, _, !]} },
+                    r4: << { columns: [i64, i64, i64], kind: Primitive(i64_bitshl012), implicit_rules: {n0: [_, _, !]} },
+                    r5: >> { columns: [i64, i64, i64], kind: Primitive(i64_bitshr012), implicit_rules: {n0: [_, _, !]} },
+                    r6: ^ { columns: [i64, i64, i64], kind: Primitive(i64_bitxor012), implicit_rules: {n0: [_, _, !]} },
+                    r7: / { columns: [i64, i64, i64], kind: Primitive(i64_div012), implicit_rules: {n0: [_, _, !]} },
+                    r8: log2 { columns: [i64, i64], kind: Primitive(i64_log01), implicit_rules: {n0: [_, !]} },
+                    r9: max { columns: [i64, i64, i64], kind: Primitive(i64_max012), implicit_rules: {n0: [_, _, !]} },
+                    r10: min { columns: [i64, i64, i64], kind: Primitive(i64_min012), implicit_rules: {n0: [_, _, !]} },
+                    r11: * { columns: [i64, i64, i64], kind: Primitive(i64_mul012), implicit_rules: {n0: [_, _, !]} },
+                    r12: % { columns: [i64, i64, i64], kind: Primitive(i64_rem012), implicit_rules: {n0: [_, _, !]} },
+                    r13: - { columns: [i64, i64, i64], kind: Primitive(i64_sub012), implicit_rules: {n0: [_, _, !]} },
+                    r14: Math { columns: [Math], kind: Forall(t3), implicit_rules: {} },
+                    r15: Mul { columns: [Math, Math, Math], kind: Table, implicit_rules: {n0: [_, _, U]} },
+                    r16: Add { columns: [Math, Math, Math], kind: Table, implicit_rules: {n0: [_, _, U]} },
+                    r17: Const { columns: [i64, Math], kind: Table, implicit_rules: {n0: [_, U]} },
+                    r18: Var { columns: [String, Math], kind: Table, implicit_rules: {n0: [_, U]} },
+                    r19: g0 { columns: [i64], kind: Global(g0), implicit_rules: {n0: [!]} },
+                    r20: two { columns: [Math], kind: Global(g1), implicit_rules: {n0: [!]} },
+                    r21: one { columns: [i64], kind: Global(g2), implicit_rules: {n0: [!]} },
+                    r22: g3 { columns: [String], kind: Global(g3), implicit_rules: {n0: [!]} },
+                    r23: g4 { columns: [String], kind: Global(g4), implicit_rules: {n0: [!]} },
+                    r24: g5 { columns: [String], kind: Global(g5), implicit_rules: {n0: [!]} },
+                    r25: g6 { columns: [String], kind: Global(g6), implicit_rules: {n0: [!]} },
+                    r26: g7 { columns: [i64], kind: Global(g7), implicit_rules: {n0: [!]} },
+                },
+            }"#]]),
         expected_lir: None,
         expected_codegen : Some(expect![[r#"
             use oatlog::runtime::{self, *};
@@ -7056,6 +7369,8 @@ fn test_primitives_simple() {
                     theory.global_i64.define(1usize, 1i64);
                     theory.global_string.define(0usize, IString(0u32));
                     theory.global_string.define(1usize, IString(1u32));
+                    theory.global_string.define(2usize, IString(2u32));
+                    theory.global_string.define(3usize, IString(3u32));
                     theory.global_i64.define(2usize, 0i64);
                     theory.canonicalize();
                     theory
@@ -7076,73 +7391,74 @@ fn test_primitives_simple() {
                 }
                 #[inline(never)]
                 pub fn apply_rules(&mut self) {
-                    #[doc = "( rewrite ( Const one ) ( Add x x ) )"]
-                    for (one, p1) in self.const_.iter_new() {
+                    #[doc = "( rewrite ( Const one ) ( Add ( Var \"q\" ) ( Var \"q\" ) ) )"]
+                    for (one, v1) in self.const_.iter_new() {
                         if one == self.global_i64.get(1usize) {
-                            let x = self.uf.math_.add_eclass();
-                            self.delta.insert_add((x, x, p1));
+                            let v2 = self.global_string.get(0usize);
+                            let (v3,) = self.var_.entry1_0_1(v2, &mut self.delta, &mut self.uf);
+                            self.delta.insert_add((v3, v3, v1));
                         }
                     }
-                    #[doc = "( rewrite ( Const one ) ( Add x x ) )"]
+                    #[doc = "( rewrite ( Const one ) ( Add ( Var \"q\" ) ( Var \"q\" ) ) )"]
                     if let Some(one_2) = self.global_i64.get_new(1usize) {
-                        for (p1_2,) in self.const_.iter1_0_1(one_2) {
-                            let x_2 = self.uf.math_.add_eclass();
-                            self.delta.insert_add((x_2, x_2, p1_2));
+                        for (v1_2,) in self.const_.iter1_0_1(one_2) {
+                            let v2_2 = self.global_string.get(0usize);
+                            let (v3_2,) = self.var_.entry1_0_1(v2_2, &mut self.delta, &mut self.uf);
+                            self.delta.insert_add((v3_2, v3_2, v1_2));
                         }
                     }
-                    #[doc = "( rewrite ( Const 2 ) ( Add z z ) )"]
-                    for (p0, p1_3) in self.const_.iter_new() {
-                        if p0 == self.global_i64.get(0usize) {
-                            let z = self.uf.math_.add_eclass();
-                            self.delta.insert_add((z, z, p1_3));
+                    #[doc = "( rewrite ( Const 2 ) ( Add ( Var \"z\" ) ( Var \"z\" ) ) )"]
+                    for (v0, v1_3) in self.const_.iter_new() {
+                        if v0 == self.global_i64.get(0usize) {
+                            let v2_3 = self.global_string.get(1usize);
+                            let (v3_3,) = self.var_.entry1_0_1(v2_3, &mut self.delta, &mut self.uf);
+                            self.delta.insert_add((v3_3, v3_3, v1_3));
                         }
                     }
-                    #[doc = "( rewrite ( Const 2 ) ( Add z z ) )"]
-                    if let Some(p0_2) = self.global_i64.get_new(0usize) {
-                        for (p1_4,) in self.const_.iter1_0_1(p0_2) {
-                            let z_2 = self.uf.math_.add_eclass();
-                            self.delta.insert_add((z_2, z_2, p1_4));
-                        }
-                    }
-                    #[doc = "( rewrite ( Var \"x\" ) ( Var \"y\" ) )"]
-                    for (p0_3, p1_5) in self.var_.iter_new() {
-                        if p0_3 == self.global_string.get(0usize) {
-                            let a1 = self.global_string.get(1usize);
-                            self.delta.insert_var((a1, p1_5));
+                    #[doc = "( rewrite ( Const 2 ) ( Add ( Var \"z\" ) ( Var \"z\" ) ) )"]
+                    if let Some(v0_2) = self.global_i64.get_new(0usize) {
+                        for (v1_4,) in self.const_.iter1_0_1(v0_2) {
+                            let v2_4 = self.global_string.get(1usize);
+                            let (v3_4,) = self.var_.entry1_0_1(v2_4, &mut self.delta, &mut self.uf);
+                            self.delta.insert_add((v3_4, v3_4, v1_4));
                         }
                     }
                     #[doc = "( rewrite ( Var \"x\" ) ( Var \"y\" ) )"]
-                    if let Some(p0_4) = self.global_string.get_new(0usize) {
-                        for (p1_6,) in self.var_.iter1_0_1(p0_4) {
-                            let a1_2 = self.global_string.get(1usize);
-                            self.delta.insert_var((a1_2, p1_6));
+                    for (v0_3, v1_5) in self.var_.iter_new() {
+                        if v0_3 == self.global_string.get(2usize) {
+                            let v2_5 = self.global_string.get(3usize);
+                            self.delta.insert_var((v2_5, v1_5));
+                        }
+                    }
+                    #[doc = "( rewrite ( Var \"x\" ) ( Var \"y\" ) )"]
+                    if let Some(v0_4) = self.global_string.get_new(2usize) {
+                        for (v1_6,) in self.var_.iter1_0_1(v0_4) {
+                            let v2_6 = self.global_string.get(3usize);
+                            self.delta.insert_var((v2_6, v1_6));
                         }
                     }
                     #[doc = "( rewrite ( Mul a ( Const 0 ) ) ( Const 0 ) )"]
-                    for (a, p2, p3) in self.mul_.iter_new() {
-                        if self.const_.check1_1_0(p2) {
-                            let p1_7 = self.global_i64.get(2usize);
-                            if self.const_.check2_0_1(p1_7, p2) {
-                                let a1_3 = self.global_i64.get(2usize);
-                                self.delta.insert_const((a1_3, p3));
+                    for (a, v1_7, v2_7) in self.mul_.iter_new() {
+                        if self.const_.check1_1_0(v1_7) {
+                            let v3_5 = self.global_i64.get(2usize);
+                            if self.const_.check2_0_1(v3_5, v1_7) {
+                                self.delta.insert_const((v3_5, v2_7));
                             }
                         }
                     }
                     #[doc = "( rewrite ( Mul a ( Const 0 ) ) ( Const 0 ) )"]
-                    for (p1_8, p2_2) in self.const_.iter_new() {
-                        if p1_8 == self.global_i64.get(2usize) {
-                            for (a_2, p3_2) in self.mul_.iter1_1_0_2(p2_2) {
-                                let a1_4 = self.global_i64.get(2usize);
-                                self.delta.insert_const((a1_4, p3_2));
+                    for (v3_6, v1_8) in self.const_.iter_new() {
+                        if v3_6 == self.global_i64.get(2usize) {
+                            for (a_2, v2_8) in self.mul_.iter1_1_0_2(v1_8) {
+                                self.delta.insert_const((v3_6, v2_8));
                             }
                         }
                     }
                     #[doc = "( rewrite ( Mul a ( Const 0 ) ) ( Const 0 ) )"]
-                    if let Some(p1_9) = self.global_i64.get_new(2usize) {
-                        for (p2_3,) in self.const_.iter1_0_1(p1_9) {
-                            for (a_3, p3_3) in self.mul_.iter1_1_0_2(p2_3) {
-                                let a1_5 = self.global_i64.get(2usize);
-                                self.delta.insert_const((a1_5, p3_3));
+                    if let Some(v3_7) = self.global_i64.get_new(2usize) {
+                        for (v1_9,) in self.const_.iter1_0_1(v3_7) {
+                            for (a_3, v2_9) in self.mul_.iter1_1_0_2(v1_9) {
+                                self.delta.insert_const((v3_7, v2_9));
                             }
                         }
                     }
@@ -7256,36 +7572,52 @@ fn triangle_join() {
             (rule ((Foo a b) (Bar b c) (Baz c a)) ((Triangle a b c)))
         "#,
         expected_hir: Some(expect![[r#"
-            Theory:
-
-            +(i64, i64, i64)
-            &(i64, i64, i64)
-            not-i64(i64, i64)
-            |(i64, i64, i64)
-            <<(i64, i64, i64)
-            >>(i64, i64, i64)
-            ^(i64, i64, i64)
-            /(i64, i64, i64)
-            log2(i64, i64)
-            max(i64, i64, i64)
-            min(i64, i64, i64)
-            *(i64, i64, i64)
-            %(i64, i64, i64)
-            -(i64, i64, i64)
-            Math(Math)
-            Foo(Math, Math)
-            Bar(Math, Math)
-            Baz(Math, Math)
-            Triangle(Math, Math, Math)
-
-            Rule:
-            Premise: Foo(a, b), Bar(b, c), Baz(c, a)
-            a: a
-            b: b
-            c: c
-            Insert: Triangle(a, b, c)._
-
-        "#]]),
+            Theory {
+                types: {
+                    [t0, ()]: std::primitive::unit,
+                    [t1, i64]: std::primitive::i64,
+                    [t2, String]: runtime::IString,
+                    [t3, Math]: [symbolic],
+                },
+                symbolic_rules: [
+                    SymbolicRule {
+                        src: "( rule ( ( Foo a b ) ( Bar b c ) ( Baz c a ) ) ( ( Triangle a b c ) ) )",
+                        atoms: [
+                            Premise { relation: Foo, columns: [a, b] },
+                            Premise { relation: Bar, columns: [b, c] },
+                            Premise { relation: Baz, columns: [c, a] },
+                            Action { relation: Triangle, columns: [a, b, c] },
+                        ],
+                        variables: {
+                            v0: VariableMeta { name: Some("a"), ty: t3 },
+                            v1: VariableMeta { name: Some("b"), ty: t3 },
+                            v2: VariableMeta { name: Some("c"), ty: t3 },
+                        },
+                        unify: [],
+                    },
+                ],
+                relations: {
+                    r0: + { columns: [i64, i64, i64], kind: Primitive(i64_add012), implicit_rules: {n0: [_, _, !]} },
+                    r1: & { columns: [i64, i64, i64], kind: Primitive(i64_bitand012), implicit_rules: {n0: [_, _, !]} },
+                    r2: not-i64 { columns: [i64, i64], kind: Primitive(i64_bitnot01), implicit_rules: {n0: [_, !]} },
+                    r3: | { columns: [i64, i64, i64], kind: Primitive(i64_bitor012), implicit_rules: {n0: [_, _, !]} },
+                    r4: << { columns: [i64, i64, i64], kind: Primitive(i64_bitshl012), implicit_rules: {n0: [_, _, !]} },
+                    r5: >> { columns: [i64, i64, i64], kind: Primitive(i64_bitshr012), implicit_rules: {n0: [_, _, !]} },
+                    r6: ^ { columns: [i64, i64, i64], kind: Primitive(i64_bitxor012), implicit_rules: {n0: [_, _, !]} },
+                    r7: / { columns: [i64, i64, i64], kind: Primitive(i64_div012), implicit_rules: {n0: [_, _, !]} },
+                    r8: log2 { columns: [i64, i64], kind: Primitive(i64_log01), implicit_rules: {n0: [_, !]} },
+                    r9: max { columns: [i64, i64, i64], kind: Primitive(i64_max012), implicit_rules: {n0: [_, _, !]} },
+                    r10: min { columns: [i64, i64, i64], kind: Primitive(i64_min012), implicit_rules: {n0: [_, _, !]} },
+                    r11: * { columns: [i64, i64, i64], kind: Primitive(i64_mul012), implicit_rules: {n0: [_, _, !]} },
+                    r12: % { columns: [i64, i64, i64], kind: Primitive(i64_rem012), implicit_rules: {n0: [_, _, !]} },
+                    r13: - { columns: [i64, i64, i64], kind: Primitive(i64_sub012), implicit_rules: {n0: [_, _, !]} },
+                    r14: Math { columns: [Math], kind: Forall(t3), implicit_rules: {} },
+                    r15: Foo { columns: [Math, Math], kind: Table, implicit_rules: {} },
+                    r16: Bar { columns: [Math, Math], kind: Table, implicit_rules: {} },
+                    r17: Baz { columns: [Math, Math], kind: Table, implicit_rules: {} },
+                    r18: Triangle { columns: [Math, Math, Math], kind: Table, implicit_rules: {} },
+                },
+            }"#]]),
         expected_lir: None,
         expected_codegen: Some(expect![[r#"
             use oatlog::runtime::{self, *};
@@ -8058,38 +8390,55 @@ fn edgecase0() {
             (rewrite (Add (Mul a b) (Mul a c)) (Mul a (Add b c)))
         "#,
         expected_hir :Some( expect![[r#"
-            Theory:
-
-            +(i64, i64, i64)
-            &(i64, i64, i64)
-            not-i64(i64, i64)
-            |(i64, i64, i64)
-            <<(i64, i64, i64)
-            >>(i64, i64, i64)
-            ^(i64, i64, i64)
-            /(i64, i64, i64)
-            log2(i64, i64)
-            max(i64, i64, i64)
-            min(i64, i64, i64)
-            *(i64, i64, i64)
-            %(i64, i64, i64)
-            -(i64, i64, i64)
-            Math(Math)
-            Mul(Math, Math, Math)
-            Add(Math, Math, Math)
-
-            Rule:
-            Premise: Mul(a, b, p2), Mul(a, c, p4), Add(p2, p4, p5)
-            a: a
-            b: b
-            __: p2
-            c: c
-            __: p4
-            a3: p5
-            a4: __
-            Insert: Mul(a, a4, a3).n0, Add(b, c, a4).n0
-
-        "#]]),
+            Theory {
+                types: {
+                    [t0, ()]: std::primitive::unit,
+                    [t1, i64]: std::primitive::i64,
+                    [t2, String]: runtime::IString,
+                    [t3, Math]: [symbolic],
+                },
+                symbolic_rules: [
+                    SymbolicRule {
+                        src: "( rewrite ( Add ( Mul a b ) ( Mul a c ) ) ( Mul a ( Add b c ) ) )",
+                        atoms: [
+                            Premise { relation: Mul, columns: [a, b, v2] },
+                            Premise { relation: Mul, columns: [a, c, v4] },
+                            Premise { relation: Add, columns: [v2, v4, v5] },
+                            Action { relation: Mul, columns: [a, v6, v5], entry: [_, _, U] },
+                            Action { relation: Add, columns: [b, c, v6], entry: [_, _, U] },
+                        ],
+                        variables: {
+                            v0: VariableMeta { name: Some("a"), ty: t3 },
+                            v1: VariableMeta { name: Some("b"), ty: t3 },
+                            v2: VariableMeta { name: None, ty: t3 },
+                            v3: VariableMeta { name: Some("c"), ty: t3 },
+                            v4: VariableMeta { name: None, ty: t3 },
+                            v5: VariableMeta { name: None, ty: t3 },
+                            v6: VariableMeta { name: None, ty: t3 },
+                        },
+                        unify: [],
+                    },
+                ],
+                relations: {
+                    r0: + { columns: [i64, i64, i64], kind: Primitive(i64_add012), implicit_rules: {n0: [_, _, !]} },
+                    r1: & { columns: [i64, i64, i64], kind: Primitive(i64_bitand012), implicit_rules: {n0: [_, _, !]} },
+                    r2: not-i64 { columns: [i64, i64], kind: Primitive(i64_bitnot01), implicit_rules: {n0: [_, !]} },
+                    r3: | { columns: [i64, i64, i64], kind: Primitive(i64_bitor012), implicit_rules: {n0: [_, _, !]} },
+                    r4: << { columns: [i64, i64, i64], kind: Primitive(i64_bitshl012), implicit_rules: {n0: [_, _, !]} },
+                    r5: >> { columns: [i64, i64, i64], kind: Primitive(i64_bitshr012), implicit_rules: {n0: [_, _, !]} },
+                    r6: ^ { columns: [i64, i64, i64], kind: Primitive(i64_bitxor012), implicit_rules: {n0: [_, _, !]} },
+                    r7: / { columns: [i64, i64, i64], kind: Primitive(i64_div012), implicit_rules: {n0: [_, _, !]} },
+                    r8: log2 { columns: [i64, i64], kind: Primitive(i64_log01), implicit_rules: {n0: [_, !]} },
+                    r9: max { columns: [i64, i64, i64], kind: Primitive(i64_max012), implicit_rules: {n0: [_, _, !]} },
+                    r10: min { columns: [i64, i64, i64], kind: Primitive(i64_min012), implicit_rules: {n0: [_, _, !]} },
+                    r11: * { columns: [i64, i64, i64], kind: Primitive(i64_mul012), implicit_rules: {n0: [_, _, !]} },
+                    r12: % { columns: [i64, i64, i64], kind: Primitive(i64_rem012), implicit_rules: {n0: [_, _, !]} },
+                    r13: - { columns: [i64, i64, i64], kind: Primitive(i64_sub012), implicit_rules: {n0: [_, _, !]} },
+                    r14: Math { columns: [Math], kind: Forall(t3), implicit_rules: {} },
+                    r15: Mul { columns: [Math, Math, Math], kind: Table, implicit_rules: {n0: [_, _, U]} },
+                    r16: Add { columns: [Math, Math, Math], kind: Table, implicit_rules: {n0: [_, _, U]} },
+                },
+            }"#]]),
         expected_lir: None,
         expected_codegen : Some(expect![[r#"
             use oatlog::runtime::{self, *};
@@ -8504,38 +8853,38 @@ fn edgecase0() {
                 #[inline(never)]
                 pub fn apply_rules(&mut self) {
                     #[doc = "( rewrite ( Add ( Mul a b ) ( Mul a c ) ) ( Mul a ( Add b c ) ) )"]
-                    for (a, b, p2) in self.mul_.iter_new() {
-                        if self.add_.check1_0_1_2(p2) {
-                            for (c, p4) in self.mul_.iter1_0_1_2(a) {
-                                for (p5,) in self.add_.iter2_0_1_2(p2, p4) {
-                                    let (a4,) = self.add_.entry2_0_1_2(b, c, &mut self.delta, &mut self.uf);
-                                    self.delta.insert_mul((a, a4, p5));
+                    for (a, b, v2) in self.mul_.iter_new() {
+                        if self.add_.check1_0_1_2(v2) {
+                            for (c, v4) in self.mul_.iter1_0_1_2(a) {
+                                for (v5,) in self.add_.iter2_0_1_2(v2, v4) {
+                                    let (v6,) = self.add_.entry2_0_1_2(b, c, &mut self.delta, &mut self.uf);
+                                    self.delta.insert_mul((a, v6, v5));
                                 }
                             }
                         }
                     }
                     #[doc = "( rewrite ( Add ( Mul a b ) ( Mul a c ) ) ( Mul a ( Add b c ) ) )"]
-                    for (a_2, c_2, p4_2) in self.mul_.iter_new() {
+                    for (a_2, c_2, v4_2) in self.mul_.iter_new() {
                         if self.mul_.check1_0_1_2(a_2) {
-                            for (p2_2, p5_2) in self.add_.iter1_1_0_2(p4_2) {
-                                for (b_2,) in self.mul_.iter2_2_0_1(p2_2, a_2) {
-                                    let (a4_2,) =
+                            for (v2_2, v5_2) in self.add_.iter1_1_0_2(v4_2) {
+                                for (b_2,) in self.mul_.iter2_2_0_1(v2_2, a_2) {
+                                    let (v6_2,) =
                                         self.add_
                                             .entry2_0_1_2(b_2, c_2, &mut self.delta, &mut self.uf);
-                                    self.delta.insert_mul((a_2, a4_2, p5_2));
+                                    self.delta.insert_mul((a_2, v6_2, v5_2));
                                 }
                             }
                         }
                     }
                     #[doc = "( rewrite ( Add ( Mul a b ) ( Mul a c ) ) ( Mul a ( Add b c ) ) )"]
-                    for (p2_3, p4_3, p5_3) in self.add_.iter_new() {
-                        if self.mul_.check1_2_0_1(p2_3) {
-                            for (a_3, c_3) in self.mul_.iter1_2_0_1(p4_3) {
-                                for (b_3,) in self.mul_.iter2_2_0_1(p2_3, a_3) {
-                                    let (a4_3,) =
+                    for (v2_3, v4_3, v5_3) in self.add_.iter_new() {
+                        if self.mul_.check1_2_0_1(v2_3) {
+                            for (a_3, c_3) in self.mul_.iter1_2_0_1(v4_3) {
+                                for (b_3,) in self.mul_.iter2_2_0_1(v2_3, a_3) {
+                                    let (v6_3,) =
                                         self.add_
                                             .entry2_0_1_2(b_3, c_3, &mut self.delta, &mut self.uf);
-                                    self.delta.insert_mul((a_3, a4_3, p5_3));
+                                    self.delta.insert_mul((a_3, v6_3, v5_3));
                                 }
                             }
                         }
@@ -8618,38 +8967,55 @@ fn test_into_codegen() {
             (rewrite (Mul (Add a b) c) (Add (Mul a c) (Mul b c)))
         "#,
         expected_hir: Some(expect![[r#"
-            Theory:
-
-            +(i64, i64, i64)
-            &(i64, i64, i64)
-            not-i64(i64, i64)
-            |(i64, i64, i64)
-            <<(i64, i64, i64)
-            >>(i64, i64, i64)
-            ^(i64, i64, i64)
-            /(i64, i64, i64)
-            log2(i64, i64)
-            max(i64, i64, i64)
-            min(i64, i64, i64)
-            *(i64, i64, i64)
-            %(i64, i64, i64)
-            -(i64, i64, i64)
-            Math(Math)
-            Mul(Math, Math, Math)
-            Add(Math, Math, Math)
-
-            Rule:
-            Premise: Mul(p2, c, p4), Add(a, b, p2)
-            a: a
-            b: b
-            __: p2
-            c: c
-            a3: p4
-            a4: __
-            a5: __
-            Insert: Mul(a, c, a4).n0, Mul(b, c, a5).n0, Add(a4, a5, a3).n0
-
-        "#]]),
+            Theory {
+                types: {
+                    [t0, ()]: std::primitive::unit,
+                    [t1, i64]: std::primitive::i64,
+                    [t2, String]: runtime::IString,
+                    [t3, Math]: [symbolic],
+                },
+                symbolic_rules: [
+                    SymbolicRule {
+                        src: "( rewrite ( Mul ( Add a b ) c ) ( Add ( Mul a c ) ( Mul b c ) ) )",
+                        atoms: [
+                            Premise { relation: Mul, columns: [v2, c, v4] },
+                            Premise { relation: Add, columns: [a, b, v2] },
+                            Action { relation: Mul, columns: [a, c, v5], entry: [_, _, U] },
+                            Action { relation: Mul, columns: [b, c, v6], entry: [_, _, U] },
+                            Action { relation: Add, columns: [v5, v6, v4], entry: [_, _, U] },
+                        ],
+                        variables: {
+                            v0: VariableMeta { name: Some("a"), ty: t3 },
+                            v1: VariableMeta { name: Some("b"), ty: t3 },
+                            v2: VariableMeta { name: None, ty: t3 },
+                            v3: VariableMeta { name: Some("c"), ty: t3 },
+                            v4: VariableMeta { name: None, ty: t3 },
+                            v5: VariableMeta { name: None, ty: t3 },
+                            v6: VariableMeta { name: None, ty: t3 },
+                        },
+                        unify: [],
+                    },
+                ],
+                relations: {
+                    r0: + { columns: [i64, i64, i64], kind: Primitive(i64_add012), implicit_rules: {n0: [_, _, !]} },
+                    r1: & { columns: [i64, i64, i64], kind: Primitive(i64_bitand012), implicit_rules: {n0: [_, _, !]} },
+                    r2: not-i64 { columns: [i64, i64], kind: Primitive(i64_bitnot01), implicit_rules: {n0: [_, !]} },
+                    r3: | { columns: [i64, i64, i64], kind: Primitive(i64_bitor012), implicit_rules: {n0: [_, _, !]} },
+                    r4: << { columns: [i64, i64, i64], kind: Primitive(i64_bitshl012), implicit_rules: {n0: [_, _, !]} },
+                    r5: >> { columns: [i64, i64, i64], kind: Primitive(i64_bitshr012), implicit_rules: {n0: [_, _, !]} },
+                    r6: ^ { columns: [i64, i64, i64], kind: Primitive(i64_bitxor012), implicit_rules: {n0: [_, _, !]} },
+                    r7: / { columns: [i64, i64, i64], kind: Primitive(i64_div012), implicit_rules: {n0: [_, _, !]} },
+                    r8: log2 { columns: [i64, i64], kind: Primitive(i64_log01), implicit_rules: {n0: [_, !]} },
+                    r9: max { columns: [i64, i64, i64], kind: Primitive(i64_max012), implicit_rules: {n0: [_, _, !]} },
+                    r10: min { columns: [i64, i64, i64], kind: Primitive(i64_min012), implicit_rules: {n0: [_, _, !]} },
+                    r11: * { columns: [i64, i64, i64], kind: Primitive(i64_mul012), implicit_rules: {n0: [_, _, !]} },
+                    r12: % { columns: [i64, i64, i64], kind: Primitive(i64_rem012), implicit_rules: {n0: [_, _, !]} },
+                    r13: - { columns: [i64, i64, i64], kind: Primitive(i64_sub012), implicit_rules: {n0: [_, _, !]} },
+                    r14: Math { columns: [Math], kind: Forall(t3), implicit_rules: {} },
+                    r15: Mul { columns: [Math, Math, Math], kind: Table, implicit_rules: {n0: [_, _, U]} },
+                    r16: Add { columns: [Math, Math, Math], kind: Table, implicit_rules: {n0: [_, _, U]} },
+                },
+            }"#]]),
         expected_lir: None,
         expected_codegen: Some(expect![[r#"
             use oatlog::runtime::{self, *};
@@ -9056,23 +9422,23 @@ fn test_into_codegen() {
                 #[inline(never)]
                 pub fn apply_rules(&mut self) {
                     #[doc = "( rewrite ( Mul ( Add a b ) c ) ( Add ( Mul a c ) ( Mul b c ) ) )"]
-                    for (p2, c, p4) in self.mul_.iter_new() {
-                        for (a, b) in self.add_.iter1_2_0_1(p2) {
-                            let (a4,) = self.mul_.entry2_0_1_2(a, c, &mut self.delta, &mut self.uf);
-                            let (a5,) = self.mul_.entry2_0_1_2(b, c, &mut self.delta, &mut self.uf);
-                            self.delta.insert_add((a4, a5, p4));
+                    for (v2, c, v4) in self.mul_.iter_new() {
+                        for (a, b) in self.add_.iter1_2_0_1(v2) {
+                            let (v5,) = self.mul_.entry2_0_1_2(a, c, &mut self.delta, &mut self.uf);
+                            let (v6,) = self.mul_.entry2_0_1_2(b, c, &mut self.delta, &mut self.uf);
+                            self.delta.insert_add((v5, v6, v4));
                         }
                     }
                     #[doc = "( rewrite ( Mul ( Add a b ) c ) ( Add ( Mul a c ) ( Mul b c ) ) )"]
-                    for (a_2, b_2, p2_2) in self.add_.iter_new() {
-                        for (c_2, p4_2) in self.mul_.iter1_0_1_2(p2_2) {
-                            let (a4_2,) = self
+                    for (a_2, b_2, v2_2) in self.add_.iter_new() {
+                        for (c_2, v4_2) in self.mul_.iter1_0_1_2(v2_2) {
+                            let (v5_2,) = self
                                 .mul_
                                 .entry2_0_1_2(a_2, c_2, &mut self.delta, &mut self.uf);
-                            let (a5_2,) = self
+                            let (v6_2,) = self
                                 .mul_
                                 .entry2_0_1_2(b_2, c_2, &mut self.delta, &mut self.uf);
-                            self.delta.insert_add((a4_2, a5_2, p4_2));
+                            self.delta.insert_add((v5_2, v6_2, v4_2));
                         }
                     }
                 }

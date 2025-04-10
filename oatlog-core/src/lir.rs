@@ -25,6 +25,8 @@ pub(crate) struct Theory {
     pub(crate) types: TVec<TypeId, TypeData>,
     // TODO loke: not all HIR relations become LIR relations, so the `RelationId` keyspace changes
     // between HIR and LIR. We should actually implement this, not do this `Option` hack.
+    // TODO erik: is it actually critical that we have a contagious keyspace? We can just use a
+    // BTreeMap<RelationId, RelationData> here.
     pub(crate) relations: TVec<RelationId, Option<RelationData>>,
     pub(crate) rule_variables: TVec<VariableId, VariableData>,
     pub(crate) global_variable_types: TVec<GlobalId, TypeId>,
@@ -316,17 +318,8 @@ pub(crate) enum Action {
     },
     /// Equate two bound variables.
     Equate(VariableId, VariableId),
-    // /// Insert into a relation with a functional dependency
-    // /// Returns existing e-class or creates a new e-class.
-    // Entry {
-    //     relation: RelationId,
-    //     args: &'static [VariableId],
-    //     result: VariableId,
-    //     index: IndexUsageId,
-    // },
-    /// Make a new E-class.
-    Make(VariableId),
-
+    // /// Make a new E-class.
+    // Make(VariableId),
     Entry {
         relation: RelationId,
         index: IndexUsageId,
@@ -561,13 +554,13 @@ impl Theory {
                             DbgStr(["Action::Equate".to_string(), format!("{a}={b}")])
                         )
                     }
-                    RuleAtom::Action(Action::Make(e)) => {
-                        write!(
-                            f,
-                            "{:?}",
-                            DbgStr(["Action::Make".to_string(), e.to_string()])
-                        )
-                    }
+                    // RuleAtom::Action(Action::Make(e)) => {
+                    //     write!(
+                    //         f,
+                    //         "{:?}",
+                    //         DbgStr(["Action::Make".to_string(), e.to_string()])
+                    //     )
+                    // }
                     RuleAtom::Action(Action::Entry {
                         relation,
                         index,

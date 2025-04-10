@@ -36,6 +36,7 @@ impl<K: Id, V> TVec<K, V> {
     pub(crate) fn iter(&self) -> impl Iterator<Item = &V> {
         self.x.iter()
     }
+    #[allow(unused)]
     pub(crate) fn iter_mut(&mut self) -> impl Iterator<Item = &mut V> {
         self.x.iter_mut()
     }
@@ -91,30 +92,6 @@ impl<K: Id, V: Ord> TVec<K, V> {
             ret[src] = dest.into();
         }
         ret
-    }
-}
-impl<K: Id, V> TVec<K, V> {
-    pub(crate) fn map_key<F: FnMut(K) -> Option<K>>(
-        self,
-        _f: &mut F,
-        _merge: impl FnMut(K, V, V) -> V,
-    ) -> Self {
-        todo!()
-        // let mut map: BTreeMap<K, V> = BTreeMap::new();
-        // for (i, e) in (0..).zip(self.x.into_iter()) {
-        //     let i = f(K::from(i));
-
-        //     match map.entry(i) {
-        //         Vacant(entry) => {
-        //             entry.insert(e);
-        //         },
-        //         Occupied(entry) => {
-        //             let merged = merge(i, entry.remove(), e);
-        //             map.insert(i, merged);
-        //         },
-        //     }
-        // }
-        // Self::from_iter_unordered(map.into_iter())
     }
 }
 impl<K: Id, V: Clone> TVec<K, V> {

@@ -1,5 +1,17 @@
 //! Frontend, parse source text into HIR.
 
+// TODO erik: After we have optimizations that introduce entry, we should probably make these
+// equivalent:
+//
+// ```
+// (= c (Add a b))
+// (let f (Mul d e))
+// ```
+// ```
+// (Add a b c)
+// (Mul d e f)
+// ```
+
 #![allow(clippy::zero_sized_map_values, reason = "MapExt trait usage")]
 #![allow(
     clippy::match_same_arms,
@@ -242,13 +254,13 @@ const BUILTIN_STRING: &str = "String";
 const BUILTIN_BOOL: &str = "bool";
 const BUILTIN_UNIT: &str = "()"; // TODO: "()" -> "unit" to avoid fixup in backend.
 
-const TYPE_UNIT: TypeId = TypeId(0);
+pub(crate) const TYPE_UNIT: TypeId = TypeId(0);
 
 const BUILTIN_SORTS: [(&str, &str, TypeId); 3] = [
     (BUILTIN_UNIT, "std::primitive::unit", TYPE_UNIT),
     (BUILTIN_I64, "std::primitive::i64", TypeId(1)),
-    // TODO: we could trivially add more here for all sizes of ints/floats.
     // (BUILTIN_F64, "std::primitive::f64"),
+    // TODO: bool seems to work fine in tests.
     // (BUILTIN_BOOL, "std::primitive::bool"),
     (BUILTIN_STRING, "runtime::IString", TypeId(2)),
 ];
@@ -791,6 +803,7 @@ impl Parser {
                 let output_column = ColumnId(inputs.len());
                 let columns: TVec<ColumnId, TypeId> =
                     inputs.iter().copied().chain(output).collect();
+                let num_columns = columns.len();
 
                 let relation_id = self.hir_relations.push(hir::Relation::table(
                     *name,
@@ -798,7 +811,7 @@ impl Parser {
                     match kind {
                         EggFunctionKind::Constructor { output, cost: _ } => {
                             assert!(self.types[output].can_unify());
-                            tvec![hir::ImplicitRule::new_unify(output_column)]
+                            tvec![hir::ImplicitRule::new_unify(output_column, num_columns)]
                         }
                         EggFunctionKind::Function {
                             output,
@@ -808,10 +821,10 @@ impl Parser {
                                 // eqsort type => unification
                                 // hir::ImplicitRule::new_unify(inputs.len())
                                 // panic!("should we allow lattice on an eqsort?")
-                                tvec![hir::ImplicitRule::new_panic(output_column)]
+                                tvec![hir::ImplicitRule::new_panic(output_column, num_columns)]
                             } else {
                                 // unify primitive => panic if disagree
-                                tvec![hir::ImplicitRule::new_panic(output_column)]
+                                tvec![hir::ImplicitRule::new_panic(output_column, num_columns)]
                             }
                         }
                         EggFunctionKind::Function {
@@ -819,7 +832,7 @@ impl Parser {
                             merge: Some(_),
                         } => {
                             // TODO: do something with lattice.
-                            tvec![hir::ImplicitRule::new_lattice(output_column)]
+                            tvec![hir::ImplicitRule::new_lattice(output_column, num_columns)]
                         }
                         EggFunctionKind::Relation => tvec![],
                     },
@@ -1296,14 +1309,14 @@ mod compile_rule {
             type_uf: Types(UFData::new()),
         };
 
-        let mut premise_merge = vec![];
+        let mut to_merge = vec![];
         for fact in facts {
             register_span!(fact.span);
             match fact.x {
                 egglog_ast::Fact::Eq(e1, e2) => {
                     let e1 = flat.flatten(&e1);
                     let e2 = flat.flatten(&e2);
-                    premise_merge.push((e1, e2, span!()));
+                    to_merge.push((e1, e2, span!()));
                 }
                 egglog_ast::Fact::Expr(expr) => {
                     let _: VariableId = flat.flatten(&expr);
@@ -1331,7 +1344,7 @@ mod compile_rule {
                     // set means insert, so we promote it to insert after typechecking.
                     promote_insert.insert(id);
                     let res = flat.flatten(&result);
-                    premise_merge.push((id, res, span!()));
+                    to_merge.push((id, res, span!()));
                 }
                 egglog_ast::Action::Panic { .. } => return err!("panic not implemented"),
                 egglog_ast::Action::Union { lhs, rhs } => {
@@ -1357,11 +1370,7 @@ mod compile_rule {
             mut type_uf,
         } = flat;
         let n = flattened.len();
-        for (a, b, span) in action_union
-            .iter()
-            .copied()
-            .chain(premise_merge.iter().copied())
-        {
+        for (a, b, span) in action_union.iter().copied().chain(to_merge.iter().copied()) {
             type_uf.merge(parser, a, b, span)?;
         }
         loop {
@@ -1424,11 +1433,10 @@ mod compile_rule {
             action_inserts.push((f, args.clone(), i));
         })?;
 
-        let unit_ty = TYPE_UNIT;
-
         let rule = hir::RuleArgs {
             name: name.map(|x| *x),
-            sort_vars: (0..n_fact).map(VariableId).collect(),
+            // TODO: do forall for these.
+            // sort_vars: (0..n_fact).map(VariableId).collect(),
             variables: (0..n)
                 .map(VariableId)
                 .map(|x| (type_uf.0[x].expect("unresolved type"), labels[x]))
@@ -1436,17 +1444,17 @@ mod compile_rule {
             premise: conjunctive_query
                 .into_iter()
                 .map(|(relation, mut args, ret)| {
-                    if type_uf.0[ret].expect("unresolved type") != unit_ty {
+                    if type_uf.0[ret].expect("unresolved type") != TYPE_UNIT {
                         args.push(ret);
                     }
                     (relation, args)
                 })
                 .collect(),
-            premise_unify: premise_merge.iter().map(|&(a, b, _)| vec![a, b]).collect(),
+            merge_variables: to_merge.iter().map(|&(a, b, _)| (a, b)).collect(),
             action: action_inserts
                 .into_iter()
                 .map(|(relation, mut args, ret)| {
-                    if type_uf.0[ret].expect("unresolved type") != unit_ty {
+                    if type_uf.0[ret].expect("unresolved type") != TYPE_UNIT {
                         args.push(ret);
                         // to test without entry: matches!(parser.relations_hir_and_func[relation].0.ty, hir::RelationTy::Global { .. })
                         (relation, args, true)
@@ -1455,11 +1463,7 @@ mod compile_rule {
                     }
                 })
                 .collect(),
-            action_unify: action_union.iter().map(|&(a, b, _)| vec![a, b]).collect(),
-            delete: (0..n)
-                .map(VariableId)
-                .filter(|&x| type_uf.0[x].expect("unresolved type") == unit_ty)
-                .collect(),
+            action_unify: action_union.iter().map(|&(a, b, _)| (a, b)).collect(),
             src: span.map(|x| x.text_compact).unwrap_or(""),
         }
         .build();
