@@ -1022,10 +1022,55 @@ egglog_test!(nogenerate, repro_typechecking_schedule, expect![[r#"
     ( include "comparative-test/egglog-testsuite/repro-typechecking-schedule.egg" )
 
 "#]], r#"(include "comparative-test/egglog-testsuite/repro-typechecking-schedule.egg")"#);// index OOB
-// egglog_test!(mismatched, repro_unsound, expect![[r#"
-//     Div: 8654 (egglog) != 8658 (oatlog)
-//     Mul: 2811 (egglog) != 2818 (oatlog)
-// "#]], r#"(include "comparative-test/egglog-testsuite/repro-unsound.egg")"#, limit = 0);// not used because it's too slow
+egglog_test!(allcorrect, repro_unsound, expect![[r#"
+    Acos: 0
+    Add: 1
+    And: 0
+    Asin: 0
+    Atan: 0
+    Atan2: 0
+    Cbrt: 0
+    Ceil: 0
+    Cos: 0
+    Cosh: 0
+    Div: 8654
+    E: 0
+    Eq: 0
+    Exp: 2
+    Expm1: 2
+    FALSE: 0
+    Fabs: 0
+    Floor: 0
+    Fma: 416
+    Greater: 0
+    GreaterEq: 0
+    Hypot: 0
+    INFINITY: 0
+    If: 1
+    Less: 0
+    LessEq: 0
+    Log: 0
+    Log1p: 0
+    Mul: 2811
+    Neg: 186
+    Not: 0
+    NotEq: 1
+    Num: 3
+    Or: 0
+    PI: 0
+    Pow: 0
+    Round: 0
+    Sin: 0
+    Sinh: 0
+    Sqrt: 0
+    Sub: 8580
+    TRUE: 0
+    Tan: 0
+    Tanh: 0
+    Type: 1
+    Var: 1
+    universe: 2
+"#]], r#"(include "comparative-test/egglog-testsuite/repro-unsound.egg")"#, limit = 0);
 egglog_test!(allcorrect, repro_unsound_htutorial, expect![[r#"
     Add: 1
     Div: 0
