@@ -49,6 +49,9 @@ darling = "0.20.11"
 [profile.release]
 debug = true
 
+[profile.test.package.partial-integration-fueled]
+opt-level = 1
+
 [profile.test.package.proptest]
 opt-level = 3
 
