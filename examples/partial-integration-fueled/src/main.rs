@@ -1,4 +1,4 @@
-oatlog::compile_egraph!(((include "oatlog-bench/input/fuel_math.egg")));
+oatlog::compile_egraph!(((include "oatlog-bench/input/fuel3_math.egg")));
 
 fn run(sink: &mut impl std::io::Write) {
     let mut theory = Theory::new();
