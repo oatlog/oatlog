@@ -1,48 +1,54 @@
-#import "mastery-chs/lib.typ": template, appendices, flex-caption
-
 #let TODO(msg) = {
   [#text(fill: red, weight: "bold", size: 12pt)[TODO: #msg]]
-}
-#let NOTE(msg) = {
-  [#text(fill: blue, weight: "bold", size: 12pt)[NOTE: #msg]]
 }
 
 #show "naive": "naïve"
 
 #set document(title: [Oatlog])
 
+#set page(numbering: "1")
+#set heading(numbering: "1.")
+
 #set raw(syntaxes: "egglog.sublime-syntax")
 #set raw(syntaxes: "datalog.sublime-syntax")
 
-#let department = "Department of Computer Science and Engineering"
-#show: template.with(
-  title: [Oatlog: Ahead-of-time compiled #box[e-graphs] with primitives],
-  subtitle: [Implementing a high-performance relational #box[e-graph] engine],
-  authors: ("Loke Gustafsson", "Erik Magnusson"),
-  department: department,
-  supervisor: ("Hazem Torfah", department),
-  advisor: ("Alejandro Luque Cerpa", department),
-  examiner: ("Matti Karppa", department),
-  abstract: [
-    // Abstract text about your project in Computer Science and Engineering
-    #TODO[Write abstract]
-
-    #TODO[We have made an egglog compatible e-graph engine]
-  ],
-  keywords: ("e-graphs", "equality saturation", "datalog", "program optimization", "rewrite rules"),
-  acknowledgements: [
-    // Here, you can say thank you to your supervisor(s), company advisors and other people that
-    // supported you during your project.
-    #TODO[Write acknowledgements]
-  ],
+#text(
+  20pt,
+  align(
+    center,
+    [Oatlog: Performant ahead-of-time compiled e-graphs implementing the
+      `egglog` language],
+  ),
+)
+#grid(
+  columns: (1fr, 1fr),
+  align: center,
+  (
+    [Loke Gustafsson],
+    [Chalmers University of Technology],
+    link("mailto:lokeg@chalmers.se"),
+  ).join("\n"),
+  (
+    [Erik Magnusson],
+    [Chalmers University of Technology],
+    link("mailto:ermagn@chalmers.se"),
+  ).join("\n"),
 )
 
-// #TODO[conceptual background: how things developed historically.]
-// #TODO[background: frontend, mid-end, backend.]
+#align(center, [*Abstract*])
+#align(
+  center,
+  box(
+    width: 90%,
+    align(
+      left,
+      [
+        #lorem(20) #TODO[write abstract]
+      ],
+    ),
+  ),
+)
 
-#TODO[introduce relevant references]
-
-#TODO[Clearly present motivation for this work]
 
 = Introduction
 
@@ -169,8 +175,6 @@ work.
 
 == This thesis
 
-#NOTE[This section talks about report sections that aren't finished as if they were.]
-
 @conceptual_background extends this introduction with a conceptual background. This is a
 step-by-step explanation of what e-graphs are and how they have been implement prior to their
 unification to Datalog. We then motivate the idea of e-graphs as relational databases, culminating
@@ -185,8 +189,6 @@ in addition to showing what oatlog can do and how it is used. @oatlog_evaluation
 evaluating oatlog through its test suite and benchmarks.
 
 #TODO[Elaborate on evaluation once that's possible.]
-
-#NOTE[The midpoint draft is too early for a conclusion.]
 
 = Conceptual background <conceptual_background>
 
@@ -248,28 +250,26 @@ can have unknown inputs but known outputs.
 
 #figure(
   image("../figures/egraph_cluster.svg", width: 60%),
-  caption: flex-caption(
-    [Example of an equivalence-class-formulation e-graph that initially contains
-      $(a+2) dot c$.],
-    [
-      The sharp boxes are e-nodes and the rounded boxes are e-classes. E-classes
-      contain e-nodes evaluating to the same value and the input to an e-node can be computed from any
-      of the e-nodes in its input e-class.
-    ],
-  ),
+  caption: [
+    Example of an equivalence-class-formulation e-graph that initially contains
+    $(a+2) dot c$.
+
+    The sharp boxes are e-nodes and the rounded boxes are e-classes. E-classes
+    contain e-nodes evaluating to the same value and the input to an e-node can be computed from any
+    of the e-nodes in its input e-class.
+  ],
 ) <informal-egraph-figure-non-bipartite>
 
 #figure(
   image("../figures/egraph_example.svg", width: 75%),
-  caption: flex-caption(
-    [The same e-graph as in @informal-egraph-figure-non-bipartite, but drawn as a bipartite graph.],
-    [
-      The oval shapes are e-classes, representing a set of equivalent expressions, with incoming edges
-      denoting e-node members.
-      The rectangle shapes are e-nodes, which have e-classes as arguments.
-      The orange-colored edges and shapes are those added due to the applied rules.
-    ],
-  ),
+  caption: [
+    The same e-graph as in @informal-egraph-figure-non-bipartite, but drawn as a bipartite graph.
+
+    The oval shapes are e-classes, representing a set of equivalent expressions, with incoming edges
+    denoting e-node members.
+    The rectangle shapes are e-nodes, which have e-classes as arguments.
+    The orange-colored edges and shapes are those added due to the applied rules.
+  ],
 ) <informal-egraph-figure>
 
 == Recursive e-matching and canonicalization <conceptual_background_nonrelational>
@@ -342,8 +342,6 @@ for its input e-classes. For general e-graphs extraction is NP-hard, but there a
 and algorithms that perform in practice on some types of e-graphs @fastextract.
 
 == E-graphs as relational databases <conceptual_background_relational>
-
-#NOTE[The introduction of recursive e-matching is not actually written yet]
 
 Recursive e-matching as introduced in the previous section could be implemented as in
 @listing_recursive_ematching.
@@ -437,15 +435,14 @@ index based on their discriminant. But we could instead use an enum-of-array rep
       }
     ```,
   ),
-  caption: flex-caption(
-    [Illustrating enum-of-array (EoA) representations for e-nodes, a representation reminicient of
-      the more known struct-of-array (SoA) representation.],
-    [
-      SoA is often motivated by avoiding bloating structs with padding, while also often simplifying
-      SIMD processing. EoA has similar but possibly greater benefits, avoiding both branching and
-      padding due to differently large enum variants.
-    ],
-  ),
+  caption: [
+    Illustrating enum-of-array (EoA) representations for e-nodes, a representation reminicient of
+    the more known struct-of-array (SoA) representation.
+
+    SoA is often motivated by avoiding bloating structs with padding, while also often simplifying
+    SIMD processing. EoA has similar but possibly greater benefits, avoiding both branching and
+    padding due to differently large enum variants.
+  ],
 ) <listing_enode_enum_of_array>
 
 As shown in @listing_enode_enum_of_array, we can store e-nodes more compactly by storing different
@@ -854,8 +851,6 @@ for _ in b_new(..) {
 
 === Merging rules with identical premises
 
-#NOTE[Not implemented yet.]
-
 It is very rare that the user provides rules with identical premises, but with semi-naive evaluation
 we produce many very similar rules that can potentially be merged. To merge rules, we compare the
 premises of the rules and, if they are equal, replace them with a rule that combines the actions of
@@ -941,8 +936,6 @@ A theory only containing surjective rules is guaranteed to terminate @eqlog.
 #TODO[]
 
 === Semi-naive without running all rules all the time.
-
-#NOTE[this is not implemented yet, right now all rules run at the same time]
 
 Given the previous definition of semi-naive evaluation, it's not obvious how to
 discard the *new* set before all rules have been run.
@@ -1061,10 +1054,10 @@ constant for all practical inputs.] if they are applied together @fastunionfind
   assert!(uf.find(4) == uf.find(3)); // 4 and 3 belong to the same set.
   assert!(uf.find(4) != uf.find(1)); // 4 and 1 belong to different sets.
   ```,
-  caption: flex-caption(
-    [Union-find with path compression. ],
-    [If `repr[i] == i` then `i` is a representative of the set. Initially `repr[i] = i`, so all elements belong to disjoint sets of size 1.],
-  ),
+  caption: [
+    Union-find with path compression.
+    If `repr[i] == i` then `i` is a representative of the set. Initially `repr[i] = i`, so all elements belong to disjoint sets of size 1.
+  ],
 ) <union-find-path-compression>
 
 In the context of e-graphs, it makes sense to apply path compression to avoid walking a linked list
@@ -1133,21 +1126,17 @@ See @index-datastructures.
     [sorted list ], [$N + M$ ], [$N + M$ ], [$log N$ ], [$log N$],
     [compressed sparse row/column ], [$N + M + E$ ], [$N + M + E$ ], [$log sqrt(N)$], [$1$],
   ),
-  caption: flex-caption(
-    [Big-$O$ costs for various index data structures.],
-    [
-      $N$ is the number of tuples, $E$ is the highest value stored in the relation.
-      Range query ignores the $M$ term since it would be mandatory.
-      Assuming relation with two columns containing random tuples.
-    ],
-  ),
+  caption: [Big-$O$ costs for various index data structures.
+
+    $N$ is the number of tuples, $E$ is the highest value stored in the relation.
+    Range query ignores the $M$ term since it would be mandatory.
+    Assuming relation with two columns containing random tuples.
+  ],
 ) <index-datastructures>
 
 #TODO[elaborate]
 
 == Extraction
-
-#NOTE[We have not implemented extraction yet.]
 
 Extraction is the process of selecting an expression from an e-graph. Doing so non-optimally is
 trivial, but selecting an optimal expression, even with simple cost functions is NP-hard
@@ -1277,14 +1266,12 @@ support for
     let no = box(outset: 2pt, radius: 2pt, fill: red.lighten(20%))[no]
     let ignored = box(outset: 2pt, radius: 2pt, fill: gray.lighten(30%))[ignored]
     let wont = box(outset: 2pt, radius: 2pt, fill: blue.lighten(40%))[won't]
-    flex-caption(
-      [Egglog support in oatlog, by language keyword.],
-      [
-        Rows marked #no could make sense to implement, at the very
-        least for unit tests. Rows marked #ignored are currently no-ops but should be implemented while
-        rows marked #wont are not sensible to implement outside a REPL.
-      ],
-    )
+    [Egglog support in oatlog, by language keyword.
+
+      Rows marked #no could make sense to implement, at the very
+      least for unit tests. Rows marked #ignored are currently no-ops but should be implemented while
+      rows marked #wont are not sensible to implement outside a REPL.
+    ]
   },
 ) <oatlog_egglog_compatibility>
 
@@ -1313,12 +1300,11 @@ implemented and unimplemented features of the oatlog run-time API.
   },
   caption: {
     let no = box(outset: 2pt, radius: 2pt, fill: red.lighten(20%))[no]
-    flex-caption(
-      [Oatlog run-time API feature implementation status.],
-      [
-        Rows marked #no are not yet implemented.
-      ],
-    )
+    [
+      Oatlog run-time API feature implementation status.
+
+      Rows marked #no are not yet implemented.
+    ]
   },
 ) <oatlog_runtime_api_features>
 
@@ -1346,7 +1332,7 @@ inserts and unifications. HIR is lowered into LIR and that process also performs
 
 === QIR, Query-plan IR
 
-#NOTE[The current implementation is a very ad-hoc generic join and will be replaced by something
+#TODO[The current implementation is a very ad-hoc generic join and will be replaced by something
   similar to free-join, except entirely static (only a single cover)]
 
 #TODO[We need to have explained query planning in the background and refer to that here.]
@@ -1401,13 +1387,12 @@ Overall, our comparative testing infrastructure (against egglog) can handle the 
     [`zrocorrect`], [Oatlog and egglog produce zero e-nodes],
     [`allcorrect`], [Oatlog and egglog produce the same non-zero number of e-nodes],
   ),
-  caption: flex-caption(
-    [Possible outcomes for comparative testing of oatlog and egglog.],
-    [
-      The `zrocorrect` verdict is broken out from `allcorrect` since oatlog ignores the `check`
-      command, which usually is used in those tests.
-    ],
-  ),
+  caption: [
+    Possible outcomes for comparative testing of oatlog and egglog.
+
+    The `zrocorrect` verdict is broken out from `allcorrect` since oatlog ignores the `check`
+    command, which usually is used in those tests.
+  ],
 ) <oatlog_comparative_testing_conditions>
 
 // === Relation taxonomy.
@@ -1489,7 +1474,10 @@ For a list of currently passing tests, see @passingtests.
 #TODO[Nothing here yet..]
 
 #bibliography("refs.bib")
-#show: appendices
+
+#counter(heading).update(0)
+#set heading(numbering: "A.1", supplement: [Appendix])
+
 
 = Distributive law example in many languages <rosettaexample>
 
@@ -1758,7 +1746,7 @@ insertion, the current run-time API is very unergonomic.
 
 = Passing egglog tests <passingtests>
 
-#NOTE[`(check <fact>)` is not yet implemented (since it is not vital for most use-cases and would require running rules out-of-order, which we also do not support yet.), we only compare the number of e-nodes for all the relations.]
+#TODO[`(check <fact>)` is not yet implemented (since it is not vital for most use-cases and would require running rules out-of-order, which we also do not support yet.), we only compare the number of e-nodes for all the relations.]
 
 These are the currently passing tests from the egglog testsuite
 

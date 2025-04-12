@@ -1,0 +1,58 @@
+%YAML 1.2
+---
+# http://www.sublimetext.com/docs/3/syntax.html
+name: Datalog
+file_extensions:
+  - dtlg
+  - dl
+scope: source.datalog
+variables:
+  const: '\b(?:[a-z]+[a-zA-Z_0-9]*|[0-9]+)\b'
+  variable: '\b(?:[A-Z](?:[a-zA-Z_0-9])*)|_\b'
+  predicate: '\b[a-z][a-zA-Z_0-9]*\b'
+contexts:
+  prototype:
+    - include: comment
+  comment: 
+    - match: (%).*$\n?
+      scope: comment
+  
+  main:
+    - match: '(\bnot\b|\bv\b|\||;)'
+      captures: 
+        1: keyword
+    - match: '#import|#export'
+      scope: keyword
+    - match: '"'
+      scope: string
+      push: string
+    - include: rule
+    - match: '\('
+      push: clause
+
+  rule:
+    - match: '#append|#delnth|#flatten|#getnth|#head|#insLast|#insnth|#last|#length|#member|#reverse|#subList|#tail|{{predicate}}'
+      scope: entity.name.function
+    - match: ':-|!=|\.|-|~|\?'
+      scope: keyword.operator
+
+  clause:
+    - include: term
+    - match: '\)'
+      pop: true 
+    - match: '"'
+      scope: string
+      push: string
+
+  string:
+    - match: '"'
+      scope: string
+      pop: true 
+    - match: '[^"]*'
+      scope: string
+
+  term: 
+    - match: '({{variable}})|({{const}})'
+      captures: 
+        1: variable
+        2: string
