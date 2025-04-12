@@ -72,7 +72,11 @@ struct Rule {
 
 #[derive(Clone, Eq, PartialEq, Ord, PartialOrd, Debug)]
 enum TrieLink {
+    /// Loop join
+    /// `for ... in ... { ... }`
     Primary(Atom),
+    /// Semi-join
+    /// `if ... { ... }`
     Semi(Atom),
 }
 use TrieLink::*;

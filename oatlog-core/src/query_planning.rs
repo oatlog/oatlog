@@ -848,11 +848,11 @@ fn symbolic_rules_as_semi_naive(
         .flat_map(|rule| {
             let semi_naive_for_rule: Vec<_> = (0..rule.atoms.len())
                 .filter(|x| rule.atoms[*x].premise == hir::IsPremise::Premise)
-                .map(|i| {
+                .filter_map(|i| {
                     let mut rule = rule.clone();
                     let relation_id = &mut rule.atoms[i].relation;
-                    *relation_id = old_to_new[&*relation_id];
-                    rule
+                    *relation_id = *old_to_new.get(&*relation_id)?;
+                    Some(rule)
                 })
                 .collect();
             assert_ne!(
@@ -873,10 +873,12 @@ impl Theory {
     fn add_delta_relations_in_place(&mut self) -> BTreeMap<RelationId, RelationId> {
         self.relations
             .enumerate()
-            .map(|old| {
-                let new_relation = self.relations[old].as_new(old);
+            .filter_map(|old| {
+                // We simply ignore cases where we have new for a relation without
+                // a concept of new.
+                let new_relation = self.relations[old].as_new(old)?;
                 let new = self.relations.push(new_relation);
-                (old, new)
+                Some((old, new))
             })
             .collect()
     }

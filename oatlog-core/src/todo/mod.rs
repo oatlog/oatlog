@@ -25,7 +25,7 @@
 
 // mod todo_hir;
 mod todo_join;
-//mod todo_mathset;
+// mod todo_mathset;
 mod todo_scratch;
-//mod todo_seminaive;
-//mod todo_tir;
+// mod todo_seminaive;
+// mod todo_tir;
