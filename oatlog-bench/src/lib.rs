@@ -76,6 +76,7 @@ macro_rules! benchmarks {
 }
 
 benchmarks! {
+    bench!(fuel_math, r#"(include "oatlog-bench/input/fuel_math.egg") (run 22)"#);
     bench!(math, r#"(include "oatlog-bench/input/math.egg") (run 9)"#);
     bench!(boolean_adder, r#"(include "oatlog-bench/input/boolean_adder.egg") (run 9)"#);
 }
