@@ -370,6 +370,34 @@ impl Atom {
             vec![]
         }
     }
+    /// Equality modulo implicit functionality
+    /// Mapping is self -> other
+    pub(crate) fn apply_modulo(
+        &self,
+        other: &Self,
+        relations: &TVec<RelationId, Relation>,
+        mut mapping: impl FnMut(VariableId, VariableId),
+    ) -> bool {
+        if self.relation != other.relation {
+            return false;
+        }
+        if self.columns == other.columns {
+            return true;
+        }
+
+        let mut eq = false;
+        for im in relations[self.relation].implicit_rules.iter().filter(|im| {
+            im.key_columns()
+                .into_iter()
+                .all(|c| self.columns[c] == other.columns[c])
+        }) {
+            eq = true;
+            for c in im.value_columns() {
+                mapping(self.columns[c], other.columns[c]);
+            }
+        }
+        eq
+    }
 }
 
 #[must_use]
