@@ -49,11 +49,11 @@
 (rewrite (Integral (Fuel fuel) (Sub f g) x) (Sub (Integral fuel f x) (Integral fuel g x)))
 (rewrite (Integral (Fuel fuel) (Mul a b) x) (Sub (Mul a (Integral fuel b x)) (Integral fuel (Mul (Diff x a) (Integral fuel b x)) x)))
 
-(let fuel5 (Fuel (Fuel (Fuel (ZeroFuel)))))
+(let fuel3 (Fuel (Fuel (Fuel (ZeroFuel)))))
 
-(Integral fuel5 (Ln (Var "x")) (Var "x"))
-(Integral fuel5 (Add (Var "x") (Cos (Var "x"))) (Var "x"))
-(Integral fuel5 (Mul (Cos (Var "x")) (Var "x")) (Var "x"))
+(Integral fuel3 (Ln (Var "x")) (Var "x"))
+(Integral fuel3 (Add (Var "x") (Cos (Var "x"))) (Var "x"))
+(Integral fuel3 (Mul (Cos (Var "x")) (Var "x")) (Var "x"))
 (Diff (Var "x") (Add (Const 1) (Mul (Const 2) (Var "x"))))
 (Diff (Var "x") (Sub (Pow (Var "x") (Const 3)) (Mul (Const 7) (Pow (Var "x") (Const 2)))))
 (Add (Mul (Var "y") (Add (Var "x") (Var "y"))) (Sub (Add (Var "x") (Const 2)) (Add (Var "x") (Var "x"))))

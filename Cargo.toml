@@ -3,6 +3,7 @@ members = [
     "comparative-test",
     "examples/boolean-adder",
     "examples/partial-integration",
+    "examples/partial-integration-fueled",
     "examples/quadratic-formula",
     "examples/simple-forall",
     "examples/test-api",

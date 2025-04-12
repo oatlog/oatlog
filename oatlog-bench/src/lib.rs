@@ -35,29 +35,31 @@ fn bench_custom(
 }
 
 macro_rules! benchmarks {
-    ($(bench!($name:ident, $program:literal);)*) => {
+    ($(bench!($name:ident, $(samples=$samples:literal,)? $program:literal);)*) => {
         // separate modules to avoid compiling theory twice.
         $(mod $name {
             oatlog::compile_egraph!($program);
         })*
         pub fn comparative_benchmark(c: &mut Criterion) {
             std::env::set_current_dir(concat!(env!("CARGO_MANIFEST_DIR"), "/..")).unwrap();
-        $({
-            let mut group = c.benchmark_group(stringify!($name));
-            bench_custom(&mut group, "oatlog", || {
-                let theory = $name::Theory::new();
-                black_box(theory);
-            });
-            bench_custom(&mut group, "egglog", || {
-                let mut egglog = egglog::EGraph::default();
-                egglog
-                    .parse_and_run_program(None, $program)
-                    .into_iter()
-                    .for_each(|_| ());
-                black_box(egglog);
-            });
-            group.finish();
-        })*}
+            $({
+                let mut group = c.benchmark_group(stringify!($name));
+                $(group.sample_size($samples);)?
+                bench_custom(&mut group, "oatlog", || {
+                    let theory = $name::Theory::new();
+                    black_box(theory);
+                });
+                bench_custom(&mut group, "egglog", || {
+                    let mut egglog = egglog::EGraph::default();
+                    egglog
+                        .parse_and_run_program(None, $program)
+                        .into_iter()
+                        .for_each(|_| ());
+                    black_box(egglog);
+                });
+                group.finish();
+            })*
+        }
         pub fn run_main(_steps: usize) {$({
             std::env::set_current_dir(concat!(env!("CARGO_MANIFEST_DIR"), "/..")).unwrap();
             println!("\nrunning {}: egglog\n", stringify!($name));
@@ -76,7 +78,7 @@ macro_rules! benchmarks {
 }
 
 benchmarks! {
-    bench!(fuel_math, r#"(include "oatlog-bench/input/fuel_math.egg") (run 22)"#);
+    bench!(fuel_math, samples=30, r#"(include "oatlog-bench/input/fuel_math.egg") (run 100)"#);
     bench!(math, r#"(include "oatlog-bench/input/math.egg") (run 9)"#);
     bench!(boolean_adder, r#"(include "oatlog-bench/input/boolean_adder.egg") (run 9)"#);
 }
