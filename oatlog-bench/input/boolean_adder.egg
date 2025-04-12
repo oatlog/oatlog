@@ -1,5 +1,4 @@
 ; https://byjus.com/maths/boolean-algebra-laws/
-; This maybe even terminates if somewhat reasonable rules are picked?
 
 (datatype Math
     (And Math Math)
@@ -26,9 +25,8 @@
 (rewrite (Xor x (False)) x)
 (rewrite (Xor x (True)) (Not x))
 
-; assertion fails in oatlog
-; (rewrite (And x x) x)
-; (rewrite (Or x x) x)
+(rewrite (And x x) x)
+(rewrite (Or x x) x)
 
 (rewrite (And x (Not x)) (False))
 (rewrite (Or x (Not x)) (True))
@@ -43,7 +41,7 @@
 (rewrite (And x (Or x y)) x)
 (rewrite (Or x (And x y)) x)
 
-; can not be a bi-rewrite because of a lack of forall
+; can not be a bi-rewrite because of a lack of forall in egglog
 (rewrite (Not (Not x)) x)
 
 (birewrite (Not (And x y)) (Or (Not x) (Not y)))
@@ -105,4 +103,3 @@
 
 (let s10 (FullAddSum c9 (Var "x10") (Var "y10")))
 (let c10 (FullAddCarry c9 (Var "x10") (Var "y10")))
-
