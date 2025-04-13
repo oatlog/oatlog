@@ -18,7 +18,7 @@
   20pt,
   align(
     center,
-    [Oatlog: A performant ahead-of-time compiled e-graph engine implementing the egglog language],
+    [Oatlog: A performant ahead-of-time compiled #box[e-graph] engine implementing the egglog language],
   ),
 )
 #grid(
@@ -44,13 +44,33 @@
     align(
       left,
       [
-        - IN PROGRESS WORK
-        - Implements egglog @egglog language
-        - Current state lacks rulesets/check/extraction/merge.
-        - Faster than egglog for fast-growing theories
-        - SIMD btree and dynamic btree remains
-        - Compiler vs interpreter, decoupling planning from execution. Arguably simpler. Tradeoff, less dynamic
-        - Utilizing knowing more at once - example index selection, query planning
+
+        We introduce oatlog, an e-graph engine implementing the egglog language. Like the egglog
+        library, it is intended for equality saturation (EqSat) and is implemented as a relational
+        database using semi-naive evaluation. While egglog is implemented as an interpreter to ease
+        interactive use-cases, oatlog is a Rust procedural macro that embeds EqSat theories into
+        applications.
+
+        At the cost of some dynamism, its ahead-of-time compilation of theories makes it easier to
+        understand and debug theory synthesis as one can inspect the relatively readable generated
+        Rust code. In particular, this greatly simplifies performance engineering for oatlog.
+        Additionally, although it is entirely possible in an interpreter, the ahead-of-time
+        architecture naturally lends itself to relation and whole-ruleset optimization. Relation
+        indexes can for example be found equal given some rule, such as $"Add"(a,b,c)="Add"(b,a,c)$
+        given commutativity or $"Add"(a,b,c) = "Sub"(c,b,a)$. Rewrites within a ruleset can also be
+        optimized assuming the existence of other rewrites in the ruleset.
+
+        Oatlog is in-progress work and lacks many features present in egglog. Important features not
+        yet implemented include executing rulesets other than the entire set of rules, extraction
+        and `:merge` which is necessary for lattice-based reasoning.
+
+        In microbenchmarks, particularly for fast-growing theories, oatlog is faster than egglog.
+        This is primarily due to using static indexes, specifically static BTrees, that are
+        recreated rather than mutated during rebuilding. We are planning to address this further, by
+        accelerating the innermost loop of BTree traversal with SIMD and by adaptively using a
+        dynamic instead of static index data structure, in addition to other ongoing work on
+        whole-ruleset optimization and on improving egglog parity.
+
       ],
     ),
   ),
@@ -112,8 +132,8 @@
       [*speedup*]
     ),
 
-    [fuel2 math, 10 steps, saturation], [7.0921 ms], [2.0271 ms], table.cell(fill: green.lighten(40%))[3.50x],
-    [fuel3 math, 21 steps, saturation], [189.86 ms], [385.15 ms], table.cell(fill: red.lighten(50%))[0.49x],
+    [fuel2 math, 10 steps, saturated], [7.0921 ms], [2.0271 ms], table.cell(fill: green.lighten(40%))[3.50x],
+    [fuel3 math, 21 steps, saturated], [189.86 ms], [385.15 ms], table.cell(fill: red.lighten(50%))[0.49x],
     [math, 9 steps], [16.419 ms], [13.434 ms], table.cell(fill: green.lighten(60%))[1.22x],
     [boolean adder, 9 steps], [20.265 ms], [6.3821 ms], table.cell(fill: green.lighten(40%))[3.18x],
   ),
@@ -233,91 +253,6 @@ realized through functions implemented on the `Theory` type in the code generate
   caption: [A coarse overview of the current oatlog architecture.],
 ) <oatlog-architecture>
 
-=== Egglog AST
-
-Either Rust tokens or strings are parsed into S-expressions and then parsed into an egglog AST. The
-AST represents the source-level language without simplifications and does not remove syntax sugar.
-
-=== HIR, High-level Intermediate Representation
-
-The main purpose of HIR is for normalization and optimization. Here, a rule consist of a set of
-premises and a set of actions, where premises are conjunctive queries (joins) and actions are
-inserts and unifications. HIR is lowered into LIR and that process also performs query planning.
-
-=== QIR, Query-plan IR
-
-#TODO[The current implementation is a very ad-hoc generic join and will be replaced by something
-  similar to free-join, except entirely static (only a single cover)]
-
-#TODO[We need to have explained query planning in the background and refer to that here.]
-
-Represents all the choices made to transform a conjunctive query to LIR, specifically the order of
-joins and how the joins are performed. Note that this IR only contains queries and other
-information, such as relation properties are lowered directly from HIR.
-
-=== LIR, Low-level Intermediate Representation
-
-LIR is a low-level description of the actual code that is to be generated.
-
-// string or Rust tokens -> Sexp -> egglog ast -> hir -> query plan -> lir -> Rust code.
-
-== Selected algorithms
-
-#TODO[]
-
-== Selected implementation details
-
-#TODO[]
-
-=== Rustc spans across files
-
-Rust proc-macros work on Rust tokens which are annotated with spans that essentially are byte ranges
-of the original source code. However, if the proc-macro tokenizes additional strings through
-`proc_macro::TokenStream::from_str`, for example to implement the egglog `(include ..)`
-functionality, when tokenizing arbitrary strings, no such spans are provided.
-
-We solve this by both supporting parsing Rust tokens as well as tokenizing and parsing strings as
-sexp directly, inserting our own byte ranges. This has another problem, in that since our spans are
-not from rustc our error locations are no longer correct. This is solved by implementing displaying
-error contexts ourselves, so that context information is part of the compile error but with a bogus
-rustc span.
-
-=== Testing infrastructure
-
-Since oatlog is implemented using a proc-macro, errors result in Rust compilation errors rather than
-single test failures. This means we require some mechanism to compile test cases separately.
-Luckily, Rust doctests do exactly this and so we use those for test cases expected to not compile.
-Overall, our comparative testing infrastructure (against egglog) can handle the 6 cases laid out in
-@oatlog_comparative_testing_conditions.
-
-
-// === Relation taxonomy.
-//
-// #TODO[@function-taxonomy]
-//
-// #figure(
-//   table(
-//     columns: (auto, auto, auto, auto),
-//     [], [signature], [inserts], [get-or-default],
-//     [function], [`[*] -> *`], [yes], [no],
-//     [constructor], [`[*] -> E`], [yes], [yes, make eclass],
-//     [relation], [`[*] -> ()`], [yes], [yes, performs insert],
-//     [], [], [], [],
-//     [function], [`[] -> *`], [yes], [yes if statically initialized.],
-//     [global], [`[] -> *`], [yes], [yes if statically initialized.],
-//     [], [], [], [],
-//     [primitive], [`[*] -> *`], [not supported], [yes, allows side effects (eg insert)],
-//   ),
-//   caption: flex-caption(
-//     [
-//       Different types of functions.
-//     ],
-//     [
-//       () means unit, \* means any, E means eclass, P means primitive.
-//     ],
-//   ),
-// ) <function-taxonomy>
-
 = Oatlog evaluation <oatlog_evaluation>
 
 #TODO[Section summary]
@@ -334,10 +269,6 @@ Right now, we fail most tests because primitive functions are not implemented. A
 tests are not very relevant for AOT compilation and supporting them is not really desirable. An
 example of this are extraction commands, since egglog-language-level commands are run at oatlog
 startup and oatlog extraction is better handled using the run-time API.
-
-= Conclusion <conclusion>
-
-#TODO[Nothing here yet..]
 
 #bibliography("refs.bib")
 
