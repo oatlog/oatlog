@@ -64,20 +64,17 @@
         yet implemented include executing rulesets other than the entire set of rules, extraction
         and `:merge` which is necessary for lattice-based reasoning.
 
-        In microbenchmarks, particularly for fast-growing theories, oatlog is faster than egglog.
-        This is primarily due to using static indexes, specifically static BTrees, that are
-        recreated rather than mutated during rebuilding. We are planning to address this further, by
-        accelerating the innermost loop of BTree traversal with SIMD and by adaptively using a
-        dynamic instead of static index data structure, in addition to other ongoing work on
+        In microbenchmarks, oatlog is faster than egglog for small e-graphs and for fast-growing
+        theories. This is primarily due to oatlog using static indexes, specifically static BTrees,
+        that are recreated rather than mutated during rebuilding. We are planning to address this
+        further, by accelerating the innermost loop of BTree traversal with SIMD and by adaptively
+        using a dynamic instead of static index data structure, in addition to other ongoing work on
         whole-ruleset optimization and on improving egglog parity.
 
       ],
     ),
   ),
 )
-
-//= Background
-//#TODO[Equality saturation, egglog, interpreter, embeddability. Language vs engine]
 
 = Introducing oatlog
 
@@ -99,8 +96,8 @@ representation, but it has advantages over its equivalents in an engine implemen
 interpreter similar to egglog. A code generator is a program that constructs a program for any
 theory while an interpreter in some sense is a program for all theories. This makes the interpreter
 more abstract, introducing trade-offs between for example run-time memory representation compactness
-and uniformity, while the code generator can simply piggy-back on rustc and emit code similar to
-what one would write manually. Additionally, the generated code for an EqSat theory is remarkably
+and uniformity, while the code generator can simply piggyback on rustc and emit code similar to what
+one would write manually. Additionally, the generated code for an EqSat theory is remarkably
 readable and can be used to understand how the engine works and to sketch out modifications to it.
 
 Taken together, oatlog is an experiment in achieving better performance at lower effort by
@@ -112,6 +109,8 @@ As a consequence of egglog's popularity it is natural for oatlog to be interface
 egglog language. Concretely, one passes a string literal or S-expression directly to the
 `oatlog::compile_egraph!` procedural macro which generates a concrete `Theory` type that the
 surrounding program can interact with. A full example is provided in @appendix_example.
+
+#TODO[Show generated code??]
 
 Oatlog's ahead-of-time nature makes it slightly semantically different from egglog. Sort, relation
 and function declarations are semantically executed first, as part of code generation, while global
@@ -126,29 +125,37 @@ implementable, and as a temporary workaround it is therefore compiled to a no-op
 crucial for tests, oatlog instead verifies its correctness by comparing its number of e-nodes in
 each relation after each application of rules.
 
+#pagebreak()
+
 = Performance evaluation
 
 We are developing oatlog with the help of microbenchmarks comparing it to egglog, shown in
 @benchmark-results.
 
 #figure(
-  table(
-    columns: (auto, auto, auto, auto),
-    table.header(
-      [*benchmark*],
-      [*egglog*#footnote[egglog version 0.4.0]],
-      [*oatlog*],
-      [*speedup*]
-    ),
+  text(
+    size: 11pt,
+    table(
+      columns: (auto, auto, auto, auto),
+      table.header(
+        [*benchmark*],
+        [*egglog*#footnote[egglog version 0.4.0]],
+        [*oatlog*],
+        [*speedup*],
+      ),
 
-    [`fuel2-math`, 10 steps, saturated], [7.0921 ms], [2.0271 ms], table.cell(fill: green.lighten(40%))[3.50x],
-    [`fuel3-math`, 21 steps, saturated], [189.86 ms], [385.15 ms], table.cell(fill: red.lighten(50%))[0.49x],
-    [`math`, 9 steps], [16.419 ms], [13.434 ms], table.cell(fill: green.lighten(60%))[1.22x],
-    [`boolean-adder`, 9 steps], [20.265 ms], [6.3821 ms], table.cell(fill: green.lighten(40%))[3.18x],
+      [`fuel2-math`, 10 steps, saturated], [7.0921 ms], [2.0271 ms], table.cell(fill: green.lighten(40%))[3.50x],
+      [`fuel3-math`, 21 steps, saturated], [189.86 ms], [385.15 ms], table.cell(fill: red.lighten(50%))[0.49x],
+      [`math`, 9 steps], [16.419 ms], [13.434 ms], table.cell(fill: green.lighten(60%))[1.22x],
+      [`math`, 10 steps], [63.961 ms], [136.27 ms], table.cell(fill: red.lighten(50%))[0.47x],
+      [`boolean-adder`, 9 steps], [20.265 ms], [6.3821 ms], table.cell(fill: green.lighten(40%))[3.18x],
+      [`boolean-adder`, 10 steps], [55.801 ms], [28.193 ms], table.cell(fill: green.lighten(60%))[1.98x],
+      [`boolean-adder`, 11 steps], [407.41 ms], [464.29 ms], table.cell(fill: red.lighten(80%))[0.88x],
+    ),
   ),
   caption: [
-    Microbenchmark results comparing egglog with oatlog. The results are the average of 100
-    iterations (30 for `fuel3-math`).
+    Microbenchmark results comparing egglog with oatlog. The results are the average of many
+    iterations.
   ],
 ) <benchmark-results>
 
@@ -157,22 +164,21 @@ all rewrite rules once, then applying the delta and rebuilding the relation inde
 benchmarks are run until saturation, i.e. until the rewrite rules produce no more inserts or
 uproots.
 
-#TODO[Slow vs fast-growing. Static vs dynamic indexes.]
+Oatlog is faster in earlier steps than in later steps, i.e. it appears to be less scalable than
+egglog #footnote[As one might guess, we stumbled into this by setting up small benchmarks,
+implementing our indexes and only then scaling up the benchmarks.]. Our interpretation is that this
+is due to static rather than dynamic indexes, which have better constant factors but scale with the
+size of the table rather than the size of the insertion.
 
-#TODO[Opportunity for SIMD in Btree traversal.]
+While performant small e-graphs are useful for some applications, these results highlight the need
+for us to implement dynamic indexes. Additionally, there is low-hanging fruit in that the intermost
+loop of the current BTree traversal implementation is essentially
+`|node: &[R; B], key: R| node.iter().filter(|r| r < key).count()` for a tuple `R`, which is
+incredibly amendable to SIMD.
 
-= Conclusions and ongoing work
+= Conclusions and ongoing work #TODO[What title??]
 
-#TODO[Compiler vs interpreter (not really technical difference, but nudges). Ruleset-wide
-  optimization.
-
-  Compiler may or may not be more complicated than an interpreter, but an interpreter is more
-  complicated than the generated code.]
-
-#TODO[Master's thesis. Rulesets, check command, merge allowing lattice computation. Rule
-  optimization, relation aliases, commutativity, surjective-preferring scheduling.]
-
-#TODO[Containers likely out of scope, extraction minimal at best]
+#TODO[Talk about whole-ruleset optimization?]
 
 #figure(
   image("../figures/architecture.svg"),
@@ -183,6 +189,8 @@ uproots.
 
 #counter(heading).update(0)
 #set heading(numbering: "A.1", supplement: [Appendix])
+
+#pagebreak()
 
 = Benchmarks <appendix_benchmarks>
 
@@ -196,70 +204,76 @@ The `math` benchmark is adapted from egglog's `math-microbenchmark.egg`. The ben
 `fuel2-math` and `fuel3-math` are variants that limit how many levels of integration by parts are
 performed, giving a theory that converges.
 
-#columns(2, text(9pt, ```egglog
-(datatype FuelUnit
-    (Fuel FuelUnit)
-    (ZeroFuel)
+#columns(
+  2,
+  text(
+    9pt,
+    ```egglog
+    (datatype FuelUnit
+        (Fuel FuelUnit)
+        (ZeroFuel)
+    )
+
+    (datatype Math
+        (Diff Math Math)
+        (Integral FuelUnit Math Math)
+
+        (Add Math Math)
+        (Sub Math Math)
+        (Mul Math Math)
+        (Div Math Math)
+        (Pow Math Math)
+        (Ln Math)
+        (Sqrt Math)
+
+        (Sin Math)
+        (Cos Math)
+
+        (Const i64)
+        (Var String)
+    )
+
+    (rewrite (Integral fuel (Sin x) x) (Mul (Const -1) (Cos x)))
+    (rewrite (Sub a b) (Add a (Mul (Const -1) b)))
+    (rewrite (Diff x (Cos x)) (Mul (Const -1) (Sin x)))
+
+    (rewrite (Add a b) (Add b a))
+    (rewrite (Mul a b) (Mul b a))
+    (rewrite (Add a (Add b c)) (Add (Add a b) c))
+    (rewrite (Mul a (Mul b c)) (Mul (Mul a b) c))
+    (rewrite (Add a (Const 0)) a)
+    (rewrite (Mul a (Const 0)) (Const 0))
+    (rewrite (Mul a (Const 1)) a)
+    (rewrite (Mul a (Add b c)) (Add (Mul a b) (Mul a c)))
+    (rewrite (Add (Mul a b) (Mul a c)) (Mul a (Add b c)))
+
+    (rewrite (Mul (Pow a b) (Pow a c)) (Pow a (Add b c)))
+    (rewrite (Pow x (Const 1)) x)
+
+    (rewrite (Pow x (Const 2)) (Mul x x))
+    (rewrite (Diff x (Add a b)) (Add (Diff x a) (Diff x b)))
+    (rewrite (Diff x (Mul a b)) (Add (Mul a (Diff x b)) (Mul b (Diff x a))))
+    (rewrite (Diff x (Sin x)) (Cos x))
+    (rewrite (Integral (Fuel fuel) (Const 1) x) x)
+    (rewrite (Integral (Fuel fuel) (Cos x) x) (Sin x))
+    (rewrite (Integral (Fuel fuel) (Add f g) x) (Add (Integral fuel f x) (Integral fuel g x)))
+    (rewrite (Integral (Fuel fuel) (Sub f g) x) (Sub (Integral fuel f x) (Integral fuel g x)))
+    (rewrite (Integral (Fuel fuel) (Mul a b) x) (Sub (Mul a (Integral fuel b x)) (Integral fuel (Mul (Diff x a) (Integral fuel b x)) x)))
+
+    (let init-fuel (Fuel (Fuel (ZeroFuel)))) ; for `fuel2-math`
+    ; (let init-fuel (Fuel (Fuel (Fuel (ZeroFuel))))) ; for `fuel3-math`
+    ; remove fuel arguments everywhere for `math` benchmark
+
+    (Integral init-fuel (Ln (Var "x")) (Var "x"))
+    (Integral init-fuel (Add (Var "x") (Cos (Var "x"))) (Var "x"))
+    (Integral init-fuel (Mul (Cos (Var "x")) (Var "x")) (Var "x"))
+    (Diff (Var "x") (Add (Const 1) (Mul (Const 2) (Var "x"))))
+    (Diff (Var "x") (Sub (Pow (Var "x") (Const 3)) (Mul (Const 7) (Pow (Var "x") (Const 2)))))
+    (Add (Mul (Var "y") (Add (Var "x") (Var "y"))) (Sub (Add (Var "x") (Const 2)) (Add (Var "x") (Var "x"))))
+    (Div (Const 1) (Sub (Div (Add (Const 1) (Sqrt (Var "z"))) (Const 2)) (Div (Sub (Const 1) (Sqrt (Var "z"))) (Const 2))))
+    ```,
+  ),
 )
-
-(datatype Math
-    (Diff Math Math)
-    (Integral FuelUnit Math Math)
-
-    (Add Math Math)
-    (Sub Math Math)
-    (Mul Math Math)
-    (Div Math Math)
-    (Pow Math Math)
-    (Ln Math)
-    (Sqrt Math)
-
-    (Sin Math)
-    (Cos Math)
-
-    (Const i64)
-    (Var String)
-)
-
-(rewrite (Integral fuel (Sin x) x) (Mul (Const -1) (Cos x)))
-(rewrite (Sub a b) (Add a (Mul (Const -1) b)))
-(rewrite (Diff x (Cos x)) (Mul (Const -1) (Sin x)))
-
-(rewrite (Add a b) (Add b a))
-(rewrite (Mul a b) (Mul b a))
-(rewrite (Add a (Add b c)) (Add (Add a b) c))
-(rewrite (Mul a (Mul b c)) (Mul (Mul a b) c))
-(rewrite (Add a (Const 0)) a)
-(rewrite (Mul a (Const 0)) (Const 0))
-(rewrite (Mul a (Const 1)) a)
-(rewrite (Mul a (Add b c)) (Add (Mul a b) (Mul a c)))
-(rewrite (Add (Mul a b) (Mul a c)) (Mul a (Add b c)))
-
-(rewrite (Mul (Pow a b) (Pow a c)) (Pow a (Add b c)))
-(rewrite (Pow x (Const 1)) x)
-
-(rewrite (Pow x (Const 2)) (Mul x x))
-(rewrite (Diff x (Add a b)) (Add (Diff x a) (Diff x b)))
-(rewrite (Diff x (Mul a b)) (Add (Mul a (Diff x b)) (Mul b (Diff x a))))
-(rewrite (Diff x (Sin x)) (Cos x))
-(rewrite (Integral (Fuel fuel) (Const 1) x) x)
-(rewrite (Integral (Fuel fuel) (Cos x) x) (Sin x))
-(rewrite (Integral (Fuel fuel) (Add f g) x) (Add (Integral fuel f x) (Integral fuel g x)))
-(rewrite (Integral (Fuel fuel) (Sub f g) x) (Sub (Integral fuel f x) (Integral fuel g x)))
-(rewrite (Integral (Fuel fuel) (Mul a b) x) (Sub (Mul a (Integral fuel b x)) (Integral fuel (Mul (Diff x a) (Integral fuel b x)) x)))
-
-(let init-fuel (Fuel (Fuel (ZeroFuel)))) ; for `fuel2-math`
-; (let init-fuel (Fuel (Fuel (Fuel (ZeroFuel))))) ; for `fuel3-math`
-; remove fuel arguments everywhere for `math` benchmark
-
-(Integral init-fuel (Ln (Var "x")) (Var "x"))
-(Integral init-fuel (Add (Var "x") (Cos (Var "x"))) (Var "x"))
-(Integral init-fuel (Mul (Cos (Var "x")) (Var "x")) (Var "x"))
-(Diff (Var "x") (Add (Const 1) (Mul (Const 2) (Var "x"))))
-(Diff (Var "x") (Sub (Pow (Var "x") (Const 3)) (Mul (Const 7) (Pow (Var "x") (Const 2)))))
-(Add (Mul (Var "y") (Add (Var "x") (Var "y"))) (Sub (Add (Var "x") (Const 2)) (Add (Var "x") (Var "x"))))
-(Div (Const 1) (Sub (Div (Add (Const 1) (Sqrt (Var "z"))) (Const 2)) (Div (Sub (Const 1) (Sqrt (Var "z"))) (Const 2))))
-```))
 
 == Boolean adder
 
