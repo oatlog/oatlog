@@ -279,11 +279,11 @@ startup and oatlog extraction is better handled using the run-time API.
 
 Benchmarks involve running oatlog and egglog on the same inputs, the theories specified below, and
 taking the average time over many runs. The `fuel2-math` and `fuel3-math` benchmarks run until
-convergence while the `math` and `boolean_adder` benchmarks are run for $9$ steps.
+convergence while the `math` and `boolean-adder` benchmarks are run for $9$ steps.
 
 == `fuel2-math`, `fuel3-math` and `math`
 
-The `math` benchmark is adapted from `egglog`'s `tests/math-microbenchmark.egg`. The benchmarks
+The `math` benchmark is adapted from egglog's `math-microbenchmark.egg`. The benchmarks
 `fuel2-math` and `fuel3-math` are variants that limit how many levels of integration by parts are
 performed, giving a theory that converges.
 
