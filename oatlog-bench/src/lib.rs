@@ -80,6 +80,9 @@ macro_rules! benchmarks {
 benchmarks! {
     bench!(fuel2_math, r#"(include "oatlog-bench/input/fuel2_math.egg") (run 100)"#);
     bench!(fuel3_math, samples=30, r#"(include "oatlog-bench/input/fuel3_math.egg") (run 100)"#);
-    bench!(math, r#"(include "oatlog-bench/input/math.egg") (run 9)"#);
-    bench!(boolean_adder, r#"(include "oatlog-bench/input/boolean_adder.egg") (run 9)"#);
+    bench!(math9, r#"(include "oatlog-bench/input/math.egg") (run 9)"#);
+    bench!(math10, samples=60, r#"(include "oatlog-bench/input/math.egg") (run 10)"#);
+    bench!(boolean_adder9, r#"(include "oatlog-bench/input/boolean_adder.egg") (run 9)"#);
+    bench!(boolean_adder10, samples=80, r#"(include "oatlog-bench/input/boolean_adder.egg") (run 10)"#);
+    bench!(boolean_adder11, samples=20, r#"(include "oatlog-bench/input/boolean_adder.egg") (run 11)"#);
 }
