@@ -56,13 +56,9 @@
         Rust code. In particular, this greatly simplifies performance engineering for oatlog.
         Additionally, although it is entirely possible in an interpreter, the ahead-of-time
         architecture naturally lends itself to relation and whole-ruleset optimization. Relation
-        indexes can for example be found equal given some rule, such as $"Add"(a,b,c) <===> "Add"(b,a,c)$
+        indexes can for example be found equal given some rule, such as $"Add"(a,b,c) <==> "Add"(b,a,c)$
         given commutativity or $"Add"(a,b,c) <==> "Sub"(c,b,a)$. Rewrites within a ruleset can also be
         optimized assuming the existence of other rewrites in the ruleset.
-
-        Oatlog is in-progress work and lacks many features present in egglog. Important features not
-        yet implemented include executing rulesets other than the entire set of rules, extraction
-        and `:merge` which is necessary for lattice-based reasoning.
 
         In microbenchmarks, oatlog is faster than egglog for small e-graphs and for fast-growing
         theories. This is primarily due to oatlog using static indexes, specifically static BTrees,
@@ -71,12 +67,20 @@
         using a dynamic instead of static index data structure, in addition to other ongoing work on
         whole-ruleset optimization and on improving egglog parity.
 
+        Oatlog is in-progress work and lacks many features present in egglog. Important features not
+        yet implemented include executing rulesets other than the entire set of rules, extraction
+        and `:merge` which is necessary for lattice-based reasoning.
+
       ],
     ),
   ),
 )
 
 = Introducing oatlog
+
+#TODO[omit mentioning master's thesis]
+
+#TODO[motivation: optimizing compilers short sentence]
 
 We are building oatlog as our master's thesis. It is an e-graph engine based on relational
 e-matching @relationalematching and uses semi-naive evaluation, similar to eqlog @eqlog and egglog
@@ -110,8 +114,6 @@ egglog language. Concretely, one passes a string literal or S-expression directl
 `oatlog::compile_egraph!` procedural macro which generates a concrete `Theory` type that the
 surrounding program can interact with. A full example is provided in @appendix_example.
 
-#TODO[Show generated code??]
-
 Oatlog's ahead-of-time nature makes it slightly semantically different from egglog. Sort, relation
 and function declarations are semantically executed first, as part of code generation, while global
 variables definitions and `(run <num>)`-commands are run in declaration order at theory
@@ -125,9 +127,30 @@ implementable, and as a temporary workaround it is therefore compiled to a no-op
 crucial for tests, oatlog instead verifies its correctness by comparing its number of e-nodes in
 each relation after each application of rules.
 
+
+#TODO[reference listing, talk about generated code, better caption]
+#figure(
+  ```rust
+  /// (rewrite (Mul (Add a b) c) (Add (Mul a c) (Mul b c)))
+  for (v2, c, v4) in self.mul_.iter_new() {
+      for (a, b) in self.add_.iter1_2_0_1(v2) {
+          let (v5,) = self.mul_.entry2_0_1_2(a, c, &mut self.delta, &mut self.uf);
+          let (v6,) = self.mul_.entry2_0_1_2(b, c, &mut self.delta, &mut self.uf);
+          self.delta.insert_add((v5, v6, v4));
+      }
+  }
+  ```,
+  caption: [
+    What the actual generated code looks like.
+  ],
+)
 #pagebreak()
 
 = Performance evaluation
+
+#TODO[omit footnote about using small benchmarks]
+
+#TODO[explain number of times benchmark is run]
 
 We are developing oatlog with the help of microbenchmarks comparing it to egglog, shown in
 @benchmark-results.
@@ -170,23 +193,28 @@ implementing our indexes and only then scaling up the benchmarks.]. Our interpre
 is due to static rather than dynamic indexes, which have better constant factors but scale with the
 size of the table rather than the size of the insertion.
 
+#TODO[talk about us being fast for compilers on smaller parts of a program]
+
 While performant small e-graphs are useful for some applications, these results highlight the need
 for us to implement dynamic indexes. Additionally, there is low-hanging fruit in that the intermost
 loop of the current BTree traversal implementation is essentially
 `|node: &[R; B], key: R| node.iter().filter(|r| r < key).count()` for a tuple `R`, which is
 incredibly amendable to SIMD.
 
-= Ongoing work #TODO[What title??]
+= Improvements and ongoing work
 
 #figure(
   image("../figures/architecture.svg"),
   caption: [A coarse overview of the current oatlog architecture.],
 ) <oatlog-architecture>
 
+#TODO[consider architecture or omit]
 
 None of the following sections have been fully implemented yet and we expect significant performance benefits from them.
 
 == Multiple implicit functionality and Multiple return
+
+#TODO[merge this and "Merging relations and equality modulo permutation"]
 
 For a relation such as $"Add"(a, b, c)$ (meaning $a + b = c$), there is an implicit functionality rule $a,b -> c$ which is applied until closure during canonicalization.
 There is nothing preventing this rule from being implemented in userspace, but that would have worse performance because it involves a join:
@@ -207,6 +235,8 @@ This motivates merging relations along with a permutation group#footnote[Slotted
 This results in less work during canonicalization due to having fewer indexes.
 
 == Rule transformation
+
+#TODO[show a transformation]
 
 We model a rewrite rule as a set of premise atoms, insertions and unifications.
 This becomes an IR (Internal Representation) that we can apply optimizations to, in the same way as an optimizing compiler.
