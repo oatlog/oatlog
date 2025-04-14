@@ -56,8 +56,8 @@
         Rust code. In particular, this greatly simplifies performance engineering for oatlog.
         Additionally, although it is entirely possible in an interpreter, the ahead-of-time
         architecture naturally lends itself to relation and whole-ruleset optimization. Relation
-        indexes can for example be found equal given some rule, such as $"Add"(a,b,c)="Add"(b,a,c)$
-        given commutativity or $"Add"(a,b,c) = "Sub"(c,b,a)$. Rewrites within a ruleset can also be
+        indexes can for example be found equal given some rule, such as $"Add"(a,b,c) <===> "Add"(b,a,c)$
+        given commutativity or $"Add"(a,b,c) <==> "Sub"(c,b,a)$. Rewrites within a ruleset can also be
         optimized assuming the existence of other rewrites in the ruleset.
 
         Oatlog is in-progress work and lacks many features present in egglog. Important features not
@@ -90,7 +90,7 @@ of scheduling, query planning and index implementation details that noticably im
 This means that future developments in e-graph engines are likely to be increasingly sophisticated,
 and it is crucial for a performant e-graph engine to be simple to debug, understand and modify.
 
-Oatlog, like eqlog and the datalog engine Soufflé @souffle, compiles theories to native code -- Rust
+Oatlog, like eqlog and the datalog engine Soufflé @souffle, compiles theories to native code -- Rust,
 or C++ in the case of Soufflé. This generated code can to some extent be seen as a intermediate
 representation, but it has advantages over its equivalents in an engine implemented as an
 interpreter similar to egglog. A code generator is a program that constructs a program for any
@@ -177,6 +177,40 @@ loop of the current BTree traversal implementation is essentially
 incredibly amendable to SIMD.
 
 = Conclusions and ongoing work #TODO[What title??]
+
+None of the following sections have been fully implemented yet with the exception of rule simplification and we expect significant performance benefits from them.
+
+== Multiple implicit functionality and Multiple return
+
+For a relation such as $"Add"(a, b, c)$ (meaning $a + b = c$), there is an implicit functionality rule $a,b -> c$ which is applied until closure during canonicalization.
+There is nothing preventing this rule from being implemented in userspace, but that would have worse performance because it involves a join:
+
+```
+(rule ((= c1 (Add a b)) (= c2 (Add a b))) ((union c1 c2)))
+```
+
+A user might also want to implement the implicit functionality rule $b,c -> c$ (due to $b - c = a$) and $c,a -> b$ (due to $c - a = b$).
+This motivates allowing multiple implicit functionality rules which oatlog supports by implementing each rule as a functional dependence on one of the indexes.
+Because implicit functionality is implemented in the indexes, we support multiple return for free, since multiple return would for example be $x -> y,z$.
+
+== Merging relations and equality modulo permutation.
+
+For the relations Add and Sub we have $"Add"(a,b,c) <==> "Sub"(c,b,a)$ (due to $a + b = c <==> c - a = b$), meaning that Add and Sub are really just the same relation but with permuted columns. Additionally we might have rules on commutativity, $"Add"(a,b,c) <==> "Add"(b,a,c)$.
+
+This motivates merging relations along with a permutation group#footnote[Slotted E-graphs @slotted_egraph ] and preprocessing all rules such that when inserting a row, all permutations of that row are also inserted.
+This results in less work during canonicalization due to having fewer indexes.
+
+== Whole-ruleset optimizations
+
+We model a rewrite rule as a set of premise atoms, insertions and unifications.
+This becomes an IR (Internal Representation) that we can apply optimizations to, in the same way as an optimizing compiler.
+
+#TODO[erik: I am continuing this section]
+
+
+
+and alias relations.
+Multiple return and m
 
 #TODO[Talk about whole-ruleset optimization?]
 
