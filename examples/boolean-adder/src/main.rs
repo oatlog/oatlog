@@ -52,17 +52,17 @@ fn test() {
         i=5 size=1332
         i=6 size=2374
         i=7 size=5246
-        i=8 size=15897
-        i=9 size=75756
+        i=8 size=15778
+        i=9 size=77091
 
-        And: 29540
+        And: 29296
         False: 0
         FullAddCarry: 10
         FullAddSum: 10
         HalfAddCarry: 1
         HalfAddSum: 1
-        Not: 7074
-        Or: 38850
+        Not: 6836
+        Or: 40667
         True: 0
         Var: 22
         Xor: 248
