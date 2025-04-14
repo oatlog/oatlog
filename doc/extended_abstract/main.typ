@@ -84,18 +84,18 @@
 
 We are building oatlog as our master's thesis. It is an e-graph engine based on relational
 e-matching @relationalematching and uses semi-naive evaluation, similar to eqlog @eqlog and egglog
-@egglog. In fact, it can and should be seen as strongly inspired by both of these. While egglog is
+@egglog. It can and should be seen as strongly inspired by both of these. While egglog is
 clearly the more feature-complete of the two and receives more usage, we believe that there are
 architectural advantages in eqlog's approach that should not be ignored.
 
 In reducing the problem of implementing an e-graph engine to implementing a relational database
 engine, one must accept that just as in the latter, there will in an e-graph engine be a long tail
-of scheduling, query planning and index implementation details that noticably impact run-time performance.
+of scheduling, query planning and index implementation details that noticeably impact run-time performance.
 This means that future developments in e-graph engines are likely to be increasingly sophisticated,
 and it is crucial for a performant e-graph engine to be simple to debug, understand and modify.
 
 Oatlog, like eqlog and the datalog engine Soufflé @souffle, compiles theories to native code -- Rust,
-or C++ in the case of Soufflé. This generated code can to some extent be seen as a intermediate
+or C++ in the case of Soufflé. This generated code can to some extent be seen as an intermediate
 representation, but it has advantages over its equivalents in an engine implemented as an
 interpreter similar to egglog. A code generator is a program that constructs a program for any
 theory while an interpreter in some sense is a program for all theories. This makes the interpreter
@@ -109,7 +109,7 @@ leveraging a code generation architecture.
 
 = Using oatlog
 
-As a consequence of egglog's popularity it is natural for oatlog to be interfaced with using the
+As a consequence of egglog's popularity, it is natural for oatlog to be interfaced with using the
 egglog language. Concretely, one passes a string literal or S-expression directly to the
 `oatlog::compile_egraph!` procedural macro which generates a concrete `Theory` type that the
 surrounding program can interact with. A full example is provided in @appendix_example.
@@ -122,8 +122,8 @@ instantiation time.
 Oatlog is in-progress work and is missing many features of the egglog language. This is well
 illustrated by its performance on the egglog test suite, with oatlog passing 16 of the 93 tests.
 Almost all test failures are due to oatlog not yet implementing extraction, `:merge` or rulesets.
-The fact that oatlog runs all rules together in fact prevents `(check <expr>)` from being
-implementable, and as a temporary workaround it is therefore compiled to a no-op. Since `check` is
+The fact that oatlog runs all rules together prevents `(check <expr>)` from being
+implementable, and as a temporary workaround, it is therefore compiled to a no-op. Since `check` is
 crucial for tests, oatlog instead verifies its correctness by comparing its number of e-nodes in
 each relation after each application of rules.
 
@@ -196,7 +196,7 @@ size of the table rather than the size of the insertion.
 #TODO[talk about us being fast for compilers on smaller parts of a program]
 
 While performant small e-graphs are useful for some applications, these results highlight the need
-for us to implement dynamic indexes. Additionally, there is low-hanging fruit in that the intermost
+for us to implement dynamic indexes. Additionally, there is low-hanging fruit in that the innermost
 loop of the current BTree traversal implementation is essentially
 `|node: &[R; B], key: R| node.iter().filter(|r| r < key).count()` for a tuple `R`, which is
 incredibly amendable to SIMD.
@@ -247,7 +247,7 @@ More interesting transformations include turning rules into implicit functionali
 
 Typically, rules have overlapping premises, in particular when generating copies of a rule for semi-naive evaluation.
 To benefit from this, rules can form a trie in terms of their premise atoms, concretely, this is shown in @trie-ir.
-This reduces the number joins and removes redundant actions.
+This reduces the number of joins and removes redundant actions.
 
 #figure(
   grid(
