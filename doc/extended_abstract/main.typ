@@ -176,9 +176,15 @@ loop of the current BTree traversal implementation is essentially
 `|node: &[R; B], key: R| node.iter().filter(|r| r < key).count()` for a tuple `R`, which is
 incredibly amendable to SIMD.
 
-= Conclusions and ongoing work #TODO[What title??]
+= Ongoing work #TODO[What title??]
 
-None of the following sections have been fully implemented yet with the exception of rule simplification and we expect significant performance benefits from them.
+#figure(
+  image("../figures/architecture.svg"),
+  caption: [A coarse overview of the current oatlog architecture.],
+) <oatlog-architecture>
+
+
+None of the following sections have been fully implemented yet and we expect significant performance benefits from them.
 
 == Multiple implicit functionality and Multiple return
 
@@ -200,24 +206,66 @@ For the relations Add and Sub we have $"Add"(a,b,c) <==> "Sub"(c,b,a)$ (due to $
 This motivates merging relations along with a permutation group#footnote[Slotted E-graphs @slotted_egraph ] and preprocessing all rules such that when inserting a row, all permutations of that row are also inserted.
 This results in less work during canonicalization due to having fewer indexes.
 
-== Whole-ruleset optimizations
+== Rule transformation
 
 We model a rewrite rule as a set of premise atoms, insertions and unifications.
 This becomes an IR (Internal Representation) that we can apply optimizations to, in the same way as an optimizing compiler.
+Implicit functionality rules can be applied to this IR and duplicate premise atoms and insertions can be removed to simplify it.
+More interesting transformations include turning rules into implicit functionality or discovering that rules imply that two relations are equal.
 
-#TODO[erik: I am continuing this section]
+== Merging rules during query planning
 
+// Typically, user provided rewrite rules are full of redundancies and one approach to simplify them is to use e-graphs to pick a minimal set of rewrite rules #TODO[CITATION NEEDED].
 
+// However, that does not simplify rules with very similar queries or the almost identical queries that are created due to semi-naive evaluation.
 
-and alias relations.
-Multiple return and m
-
-#TODO[Talk about whole-ruleset optimization?]
+Typically, rules have overlapping premises, in particular when generating copies of a rule for semi-naive evaluation.
+To benefit from this, rules can form a trie in terms of their premise atoms, concretely, this is shown in @trie-ir.
+This reduces the number joins and removes redundant actions.
 
 #figure(
-  image("../figures/architecture.svg"),
-  caption: [A coarse overview of the current oatlog architecture.],
-) <oatlog-architecture>
+  grid(
+    columns: (auto, auto, auto, auto),
+    ```python
+    # rule 1
+    for _ in A:
+        for _ in B:
+            for _ in C:
+                X()
+                Y()
+    ```,
+    ```python
+    # rule 2
+    for _ in A:
+        for _ in B:
+            for _ in D:
+                X()
+                Z()
+    ```,
+    ```python
+    # rule 3
+    for _ in A:
+        for _ in B:
+            X()
+    ```,
+    ```python
+    # rule 1 + rule 2 + rule 3
+    for _ in A:
+        for _ in B:
+            X()
+            for _ in C:
+                Y()
+            for _ in D:
+                Z()
+    ```,
+  ),
+  caption: [
+    Merging similar rules to avoid repeated joins and actions where A,B,C,D are premises and X,Y,Z are actions (inserts and unifications).
+  ],
+) <trie-ir>
+
+
+#TODO[index selection?]
 
 #bibliography("refs.bib")
 
