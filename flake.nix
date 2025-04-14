@@ -48,6 +48,7 @@
           in [
             p.bashInteractive
             p.cargo-flamegraph
+            p.cargo-show-asm
             p.tinymist
             p.typstyle
             (p.crate2nix.override { cargo = rust-stable; })

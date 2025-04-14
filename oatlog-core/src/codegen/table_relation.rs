@@ -42,9 +42,9 @@ pub fn codegen_table_relation(
                     3 | 4 => quote! { u128 },
                     _ => unreachable!(),
                 };
-                quote! { SortedVec<RadixSortCtx<#row_choice<#(#fields_ty,)*>, #radix_key>> }
+                quote! { SortedVec<EclassCtx<#row_choice<#(#fields_ty,)*>, #radix_key>> }
             } else {
-                quote! { SortedVec<StdSortCtx<#row_choice<#(#fields_ty,)*>>> }
+                quote! { SortedVec<GeneralCtx<#row_choice<#(#fields_ty,)*>>> }
             };
             (attr_name, ty)
         })

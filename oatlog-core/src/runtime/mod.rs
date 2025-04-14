@@ -12,10 +12,10 @@ pub use crate::{
         generic::{Eclass, EclassProvider, RelationElement},
         global_vars::GlobalVars,
         index::{
-            Index, IndexStatic, RadixSortCtx, RowCtx, SortedVec, SortedVec as IndexImpl,
-            StdSortCtx, dedup_suffix,
+            EclassCtx, GeneralCtx, Index, IndexStatic, RowCtx, SortedVec, SortedVec as IndexImpl,
+            dedup_suffix,
         },
-        row::IndexRow,
+        row::{IndexRow, SimdRow},
         uf::UnionFind,
     },
 };

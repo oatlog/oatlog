@@ -84,31 +84,69 @@ pub unsafe trait IndexRow: PreReqs {
     fn col_val_range(fc: Self::FirstColumn) -> std::ops::RangeInclusive<Self>;
     fn first_col(self) -> Self::FirstColumn;
 }
+pub trait SimdRow: IndexRow {
+    type RowBlock: Clone + std::fmt::Debug;
+    const INFINITY: Self::RowBlock;
+    fn new_block(rows: [Self; 4]) -> Self::RowBlock;
+    fn count_less_than(block: &Self::RowBlock, key: Self) -> usize;
+}
 
-// FC = First Column
-//
-//                first column     key columns   key types    first column key, type
-//                       vvvvv           vvvv       vvvvvv             v   vv
-// decl_row!(Row3_0_1<T0 first, T1, T2> (0, 1) (2) (T0, T1) (T2) fc = (0) (T0));
-//           ^^^^^^^^^^^^^^^^^^^^^^^^^^         ^            ^^
-//                generated type        value columns     value types
-//
-
-// old syntax
-// decl_row!(Row3_0_1<T0 first 0, T1, T2> (0, 1) (2) (T0, T1) (T2) fc = (0) (T0));
-//
-// new syntax
-// decl_row!(Row3_0_1<T0 first 0, T1, T2> (T0 0, T1 1) (T2 2));
+//                first column     key types and columns
+//                       vvvvv           vvvvvvvvvv
+// decl_row!(Row3_0_1<T0 first, T1, T2> (T0 0, T1 1) (T2 2));
+//           ^^^^^^^^^^^^^^^^^^^^^^^^^^               ^^^^
+//                generated type        value types and columns
 
 #[macro_export]
 macro_rules! decl_row {
-    (radix_impl $row_ty:ident ($($repr_ty:ident),*)) => {};
-    (radix_impl $row_ty:ident ($($repr_ty:ident),*) $radix_key:ident $inner:ident $radix_impl:expr) => {
+    (radix_impl $row_ty:ident ($($repr_ty:ident),*) ($($col_ty:tt $col_i:tt,)*) ($($ii:tt)*) ($($irev:tt)*)) => {};
+    (radix_impl $row_ty:ident ($($repr_ty:ident),*) ($($col_ty:tt $col_i:tt,)*) ($($ii:tt)*) ($($irev:tt)*) $radix_key:ident $inner:ident $radix_impl:expr) => {
         impl<$($repr_ty : Eclass),*> $crate::runtime::Radixable<$radix_key> for $row_ty<$($repr_ty),*> {
             type Key = $radix_key;
             fn key(&self) -> Self::Key {
                 let $inner = self.inner;
                 $radix_impl
+            }
+        }
+        impl<$($repr_ty : Eclass),*> $crate::runtime::SimdRow for $row_ty<$($repr_ty),*> {
+            type RowBlock = ($([$col_ty; 4],)*);
+            const INFINITY: Self::RowBlock = ($([$col_ty::MAX_ID; 4],)*);
+            fn new_block(rows: [Self; 4]) -> <Self as $crate::runtime::SimdRow>::RowBlock {
+                ($(
+                    rows.map(|r| r.inner.$col_i),
+                )*)
+            }
+            #[allow(unsafe_code)]
+            fn count_less_than(block: &Self::RowBlock, key: Self) -> usize {
+                // NOTE: i32x4 is faster than both i32x5 and i32x8 using AVX2.
+                use std::arch::x86_64::{__m128i, _mm_loadu_si128, _mm_cmpeq_epi32, _mm_cmpgt_epi32,
+                    _mm_movemask_epi8, _mm_set1_epi32, _mm_or_si128, _mm_and_si128};
+
+                // SAFETY: Only unaligned loads and simd compute intrinsics.
+                unsafe {
+                    // NOTE: i32 compare is identical to u32 compare for eclasses,
+                    // assuming less than i32::MAX eclasses have been created.
+                    let vectors = ($(
+                        _mm_loadu_si128(&block.$ii as *const _ as *const __m128i),
+                    )*);
+                    let key = ($(_mm_set1_epi32({
+                        let k: u32 = key.inner.$col_i.inner();
+                        k as i32
+                    }),)*);
+
+                    let vless = ($(_mm_cmpgt_epi32(key.$ii, vectors.$ii),)*);
+                    let vequal = ($(_mm_cmpeq_epi32(key.$ii, vectors.$ii),)*);
+
+                    let mut ans = _mm_set1_epi32(0);
+                    // NOTE: Reverse direction
+                    $(
+                        ans = _mm_or_si128(
+                            vless.$irev,
+                            _mm_and_si128(vequal.$irev, ans),
+                        );
+                    )*
+                    _mm_movemask_epi8(ans).count_ones() as usize / 4
+                }
             }
         }
     };
@@ -124,27 +162,10 @@ macro_rules! decl_row {
     (minmax $minmax:ident $repr_ty:ident $fc:ident) => { <$repr_ty as RelationElement>::$minmax };
     (minmax $minmax:ident $repr_ty:ident $fc:ident $repr_i:tt) => { $fc };
 
-    // convert to new syntax
     (
         $(#[$($annotations:tt)*])*
         $row_ty:ident<$($repr_ty:ident $(first $repr_i:tt)?),*>
-        ($($key_i:tt),*) ($($value_i:tt),*)
-        ($($key_ty:tt),*) ($($value_ty:tt),*)
-        fc=($fci:tt) ($fci_t:tt)
-        $(where $radix_key:ident = $inner:ident => $radix_impl:expr)?
-    ) => {
-        decl_row! {
-            $(#[$($annotations)*])*
-            $row_ty<$($repr_ty $(first $repr_i)?),*>
-            ($($key_ty $key_i),*) ($($value_ty $value_i),*)
-            $(where $radix_key = $inner => $radix_impl)?
-        }
-    };
-
-    (
-        $(#[$($annotations:tt)*])*
-        $row_ty:ident<$($repr_ty:ident $(first $repr_i:tt)?),*>
-        ($($key_ty:tt $key_i:tt),*) ($($value_ty:tt $value_i:tt),*)
+        ($($key_ty:tt $key_i:tt),*) ($($value_ty:tt $value_i:tt),*) ($($ii:tt)*) ($($irev:tt)*)
         $(where $radix_key:ident = $inner:ident => $radix_impl:expr)?
     ) => {
         $(#[$($annotations)*])*
@@ -192,7 +213,7 @@ macro_rules! decl_row {
             }
             $(decl_row!(first_col $repr_ty $($repr_i)?);)*
         }
-        decl_row!(radix_impl $row_ty ($($repr_ty),*) $($radix_key $inner $radix_impl)?);
+        decl_row!(radix_impl $row_ty ($($repr_ty),*) ($($key_ty $key_i,)* $($value_ty $value_i,)*) ($($ii)*) ($($irev)*) $($radix_key $inner $radix_impl)?);
 
         impl<$($repr_ty : RelationElement),*> Ord for $row_ty<$($repr_ty),*> {
             fn cmp(&self, other: &Self) -> std::cmp::Ordering {

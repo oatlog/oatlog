@@ -18,19 +18,6 @@ pub trait Eclass: RelationElement {
     fn inner(self) -> u32;
 }
 
-impl RelationElement for u32 {
-    const MAX_ID: Self = 0;
-    const MIN_ID: Self = 0;
-}
-impl Eclass for u32 {
-    fn new(x: u32) -> u32 {
-        x
-    }
-    fn inner(self) -> u32 {
-        self
-    }
-}
-
 // f64 not strictly required
 impl RelationElement for i64 {
     const MIN_ID: Self = i64::MIN;
@@ -64,7 +51,8 @@ macro_rules! relation_element_wrapper_ty {
 
             impl RelationElement for $name {
                 const MIN_ID: Self = Self(0);
-                const MAX_ID: Self = Self(u32::MAX);
+                // NOTE: Correct assuming less than `i32::MAX` e-classes are created.
+                const MAX_ID: Self = Self(i32::MAX as u32);
             }
 
             impl std::fmt::Display for $name {

@@ -534,7 +534,6 @@ fn codegen_declare_row(
         .map(|&ColumnId(i)| num_and_t(i))
         .collect_vecs();
     assert!(permuted_columns.inner()[primary_key_prefix_len..].is_sorted());
-    let (fci, fci_t) = num_and_t(fc);
     let radix_implementation = {
         let ct = match permuted_columns.len() {
             0 => unreachable!(),
@@ -561,12 +560,16 @@ fn codegen_declare_row(
             quote! {}
         }
     };
+    let ii = (0..permuted_columns.len()).map(proc_macro2::Literal::usize_unsuffixed);
+    let irev = (0..permuted_columns.len())
+        .rev()
+        .map(proc_macro2::Literal::usize_unsuffixed);
     quote! {
         decl_row!(
             #row_name < #(#type_vars_with_first),*>
-            (#(#keys),*)(#(#values),*)
-            (#(#keys_t),*)(#(#values_t),*)
-            fc=(#fci)(#fci_t)
+            (#(#keys_t #keys),*)
+            (#(#values_t #values),*)
+            (#(#ii)*) (#(#irev)*)
             #radix_implementation
         );
     }

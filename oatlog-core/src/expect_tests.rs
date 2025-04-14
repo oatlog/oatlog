@@ -1240,11 +1240,11 @@ fn codegen_constant_propagation() {
             }"#]]),
         expected_codegen: Some(expect![[r#"
             use oatlog::runtime::{self, *};
-            decl_row ! (Row2_0 < T0 first 0 , T1 > (0) (1) (T0) (T1) fc = (0) (T0) where u64 = s => ((s . 0 . inner () as u64) << 32) + ((s . 1 . inner () as u64) << 0));
-            decl_row ! (Row2_1_0 < T0 , T1 first 1 > (1 , 0) () (T1 , T0) () fc = (1) (T1) where u64 = s => ((s . 1 . inner () as u64) << 32) + ((s . 0 . inner () as u64) << 0));
-            decl_row ! (Row3_0_1 < T0 first 0 , T1 , T2 > (0 , 1) (2) (T0 , T1) (T2) fc = (0) (T0) where u128 = s => ((s . 0 . inner () as u128) << 64) + ((s . 1 . inner () as u128) << 32) + ((s . 2 . inner () as u128) << 0));
-            decl_row ! (Row3_1_0_2 < T0 , T1 first 1 , T2 > (1 , 0 , 2) () (T1 , T0 , T2) () fc = (1) (T1) where u128 = s => ((s . 1 . inner () as u128) << 64) + ((s . 0 . inner () as u128) << 32) + ((s . 2 . inner () as u128) << 0));
-            decl_row ! (Row3_2_0_1 < T0 , T1 , T2 first 2 > (2 , 0 , 1) () (T2 , T0 , T1) () fc = (2) (T2) where u128 = s => ((s . 2 . inner () as u128) << 64) + ((s . 0 . inner () as u128) << 32) + ((s . 1 . inner () as u128) << 0));
+            decl_row ! (Row2_0 < T0 first 0 , T1 > (T0 0) (T1 1) (0 1) (1 0) where u64 = s => ((s . 0 . inner () as u64) << 32) + ((s . 1 . inner () as u64) << 0));
+            decl_row ! (Row2_1_0 < T0 , T1 first 1 > (T1 1 , T0 0) () (0 1) (1 0) where u64 = s => ((s . 1 . inner () as u64) << 32) + ((s . 0 . inner () as u64) << 0));
+            decl_row ! (Row3_0_1 < T0 first 0 , T1 , T2 > (T0 0 , T1 1) (T2 2) (0 1 2) (2 1 0) where u128 = s => ((s . 0 . inner () as u128) << 64) + ((s . 1 . inner () as u128) << 32) + ((s . 2 . inner () as u128) << 0));
+            decl_row ! (Row3_1_0_2 < T0 , T1 first 1 , T2 > (T1 1 , T0 0 , T2 2) () (0 1 2) (2 1 0) where u128 = s => ((s . 1 . inner () as u128) << 64) + ((s . 0 . inner () as u128) << 32) + ((s . 2 . inner () as u128) << 0));
+            decl_row ! (Row3_2_0_1 < T0 , T1 , T2 first 2 > (T2 2 , T0 0 , T1 1) () (0 1 2) (2 1 0) where u128 = s => ((s . 2 . inner () as u128) << 64) + ((s . 0 . inner () as u128) << 32) + ((s . 1 . inner () as u128) << 0));
             eclass_wrapper_ty!(Math);
             fn i64_add012(a: i64, b: i64) -> impl Iterator<Item = (i64,)> {
                 a.checked_add(b).map(|x| (x,)).into_iter()
@@ -1295,14 +1295,14 @@ fn codegen_constant_propagation() {
             #[derive(Debug, Default)]
             struct AddRelation {
                 new: Vec<<Self as Relation>::Row>,
-                all_index_0_1_2: SortedVec<RadixSortCtx<Row3_0_1<Math, Math, Math>, u128>>,
-                all_index_1_0_2: SortedVec<RadixSortCtx<Row3_1_0_2<Math, Math, Math>, u128>>,
-                all_index_2_0_1: SortedVec<RadixSortCtx<Row3_2_0_1<Math, Math, Math>, u128>>,
+                all_index_0_1_2: SortedVec<EclassCtx<Row3_0_1<Math, Math, Math>, u128>>,
+                all_index_1_0_2: SortedVec<EclassCtx<Row3_1_0_2<Math, Math, Math>, u128>>,
+                all_index_2_0_1: SortedVec<EclassCtx<Row3_2_0_1<Math, Math, Math>, u128>>,
             }
             struct AddUpdateCtx {
                 scratch: Vec<(Math, Math, Math)>,
                 deferred_insertions: Vec<(Math, Math, Math)>,
-                old: SortedVec<RadixSortCtx<Row3_0_1<Math, Math, Math>, u128>>,
+                old: SortedVec<EclassCtx<Row3_0_1<Math, Math, Math>, u128>>,
             }
             impl Relation for AddRelation {
                 type Row = (Math, Math, Math);
@@ -1439,14 +1439,14 @@ fn codegen_constant_propagation() {
             #[derive(Debug, Default)]
             struct MulRelation {
                 new: Vec<<Self as Relation>::Row>,
-                all_index_0_1_2: SortedVec<RadixSortCtx<Row3_0_1<Math, Math, Math>, u128>>,
-                all_index_1_0_2: SortedVec<RadixSortCtx<Row3_1_0_2<Math, Math, Math>, u128>>,
-                all_index_2_0_1: SortedVec<RadixSortCtx<Row3_2_0_1<Math, Math, Math>, u128>>,
+                all_index_0_1_2: SortedVec<EclassCtx<Row3_0_1<Math, Math, Math>, u128>>,
+                all_index_1_0_2: SortedVec<EclassCtx<Row3_1_0_2<Math, Math, Math>, u128>>,
+                all_index_2_0_1: SortedVec<EclassCtx<Row3_2_0_1<Math, Math, Math>, u128>>,
             }
             struct MulUpdateCtx {
                 scratch: Vec<(Math, Math, Math)>,
                 deferred_insertions: Vec<(Math, Math, Math)>,
-                old: SortedVec<RadixSortCtx<Row3_0_1<Math, Math, Math>, u128>>,
+                old: SortedVec<EclassCtx<Row3_0_1<Math, Math, Math>, u128>>,
             }
             impl Relation for MulRelation {
                 type Row = (Math, Math, Math);
@@ -1583,13 +1583,13 @@ fn codegen_constant_propagation() {
             #[derive(Debug, Default)]
             struct ConstRelation {
                 new: Vec<<Self as Relation>::Row>,
-                all_index_0_1: SortedVec<StdSortCtx<Row2_0<std::primitive::i64, Math>>>,
-                all_index_1_0: SortedVec<StdSortCtx<Row2_1_0<std::primitive::i64, Math>>>,
+                all_index_0_1: SortedVec<GeneralCtx<Row2_0<std::primitive::i64, Math>>>,
+                all_index_1_0: SortedVec<GeneralCtx<Row2_1_0<std::primitive::i64, Math>>>,
             }
             struct ConstUpdateCtx {
                 scratch: Vec<(std::primitive::i64, Math)>,
                 deferred_insertions: Vec<(std::primitive::i64, Math)>,
-                old: SortedVec<StdSortCtx<Row2_0<std::primitive::i64, Math>>>,
+                old: SortedVec<GeneralCtx<Row2_0<std::primitive::i64, Math>>>,
             }
             impl Relation for ConstRelation {
                 type Row = (std::primitive::i64, Math);
@@ -1924,9 +1924,9 @@ fn codegen_commutative() {
         expected_lir: None,
         expected_codegen: Some(expect![[r#"
             use oatlog::runtime::{self, *};
-            decl_row ! (Row3_0_1 < T0 first 0 , T1 , T2 > (0 , 1) (2) (T0 , T1) (T2) fc = (0) (T0) where u128 = s => ((s . 0 . inner () as u128) << 64) + ((s . 1 . inner () as u128) << 32) + ((s . 2 . inner () as u128) << 0));
-            decl_row ! (Row3_1_0_2 < T0 , T1 first 1 , T2 > (1 , 0 , 2) () (T1 , T0 , T2) () fc = (1) (T1) where u128 = s => ((s . 1 . inner () as u128) << 64) + ((s . 0 . inner () as u128) << 32) + ((s . 2 . inner () as u128) << 0));
-            decl_row ! (Row3_2_0_1 < T0 , T1 , T2 first 2 > (2 , 0 , 1) () (T2 , T0 , T1) () fc = (2) (T2) where u128 = s => ((s . 2 . inner () as u128) << 64) + ((s . 0 . inner () as u128) << 32) + ((s . 1 . inner () as u128) << 0));
+            decl_row ! (Row3_0_1 < T0 first 0 , T1 , T2 > (T0 0 , T1 1) (T2 2) (0 1 2) (2 1 0) where u128 = s => ((s . 0 . inner () as u128) << 64) + ((s . 1 . inner () as u128) << 32) + ((s . 2 . inner () as u128) << 0));
+            decl_row ! (Row3_1_0_2 < T0 , T1 first 1 , T2 > (T1 1 , T0 0 , T2 2) () (0 1 2) (2 1 0) where u128 = s => ((s . 1 . inner () as u128) << 64) + ((s . 0 . inner () as u128) << 32) + ((s . 2 . inner () as u128) << 0));
+            decl_row ! (Row3_2_0_1 < T0 , T1 , T2 first 2 > (T2 2 , T0 0 , T1 1) () (0 1 2) (2 1 0) where u128 = s => ((s . 2 . inner () as u128) << 64) + ((s . 0 . inner () as u128) << 32) + ((s . 1 . inner () as u128) << 0));
             eclass_wrapper_ty!(Math);
             fn i64_add012(a: i64, b: i64) -> impl Iterator<Item = (i64,)> {
                 a.checked_add(b).map(|x| (x,)).into_iter()
@@ -1977,14 +1977,14 @@ fn codegen_commutative() {
             #[derive(Debug, Default)]
             struct AddRelation {
                 new: Vec<<Self as Relation>::Row>,
-                all_index_0_1_2: SortedVec<RadixSortCtx<Row3_0_1<Math, Math, Math>, u128>>,
-                all_index_1_0_2: SortedVec<RadixSortCtx<Row3_1_0_2<Math, Math, Math>, u128>>,
-                all_index_2_0_1: SortedVec<RadixSortCtx<Row3_2_0_1<Math, Math, Math>, u128>>,
+                all_index_0_1_2: SortedVec<EclassCtx<Row3_0_1<Math, Math, Math>, u128>>,
+                all_index_1_0_2: SortedVec<EclassCtx<Row3_1_0_2<Math, Math, Math>, u128>>,
+                all_index_2_0_1: SortedVec<EclassCtx<Row3_2_0_1<Math, Math, Math>, u128>>,
             }
             struct AddUpdateCtx {
                 scratch: Vec<(Math, Math, Math)>,
                 deferred_insertions: Vec<(Math, Math, Math)>,
-                old: SortedVec<RadixSortCtx<Row3_0_1<Math, Math, Math>, u128>>,
+                old: SortedVec<EclassCtx<Row3_0_1<Math, Math, Math>, u128>>,
             }
             impl Relation for AddRelation {
                 type Row = (Math, Math, Math);
@@ -2439,11 +2439,11 @@ fn regression_entry2() {
             }"#]]),
         expected_codegen: Some(expect![[r#"
             use oatlog::runtime::{self, *};
-            decl_row ! (Row2_0 < T0 first 0 , T1 > (0) (1) (T0) (T1) fc = (0) (T0) where u64 = s => ((s . 0 . inner () as u64) << 32) + ((s . 1 . inner () as u64) << 0));
-            decl_row ! (Row2_1_0 < T0 , T1 first 1 > (1 , 0) () (T1 , T0) () fc = (1) (T1) where u64 = s => ((s . 1 . inner () as u64) << 32) + ((s . 0 . inner () as u64) << 0));
-            decl_row ! (Row3_0_1 < T0 first 0 , T1 , T2 > (0 , 1) (2) (T0 , T1) (T2) fc = (0) (T0) where u128 = s => ((s . 0 . inner () as u128) << 64) + ((s . 1 . inner () as u128) << 32) + ((s . 2 . inner () as u128) << 0));
-            decl_row ! (Row3_1_0_2 < T0 , T1 first 1 , T2 > (1 , 0 , 2) () (T1 , T0 , T2) () fc = (1) (T1) where u128 = s => ((s . 1 . inner () as u128) << 64) + ((s . 0 . inner () as u128) << 32) + ((s . 2 . inner () as u128) << 0));
-            decl_row ! (Row3_2_0_1 < T0 , T1 , T2 first 2 > (2 , 0 , 1) () (T2 , T0 , T1) () fc = (2) (T2) where u128 = s => ((s . 2 . inner () as u128) << 64) + ((s . 0 . inner () as u128) << 32) + ((s . 1 . inner () as u128) << 0));
+            decl_row ! (Row2_0 < T0 first 0 , T1 > (T0 0) (T1 1) (0 1) (1 0) where u64 = s => ((s . 0 . inner () as u64) << 32) + ((s . 1 . inner () as u64) << 0));
+            decl_row ! (Row2_1_0 < T0 , T1 first 1 > (T1 1 , T0 0) () (0 1) (1 0) where u64 = s => ((s . 1 . inner () as u64) << 32) + ((s . 0 . inner () as u64) << 0));
+            decl_row ! (Row3_0_1 < T0 first 0 , T1 , T2 > (T0 0 , T1 1) (T2 2) (0 1 2) (2 1 0) where u128 = s => ((s . 0 . inner () as u128) << 64) + ((s . 1 . inner () as u128) << 32) + ((s . 2 . inner () as u128) << 0));
+            decl_row ! (Row3_1_0_2 < T0 , T1 first 1 , T2 > (T1 1 , T0 0 , T2 2) () (0 1 2) (2 1 0) where u128 = s => ((s . 1 . inner () as u128) << 64) + ((s . 0 . inner () as u128) << 32) + ((s . 2 . inner () as u128) << 0));
+            decl_row ! (Row3_2_0_1 < T0 , T1 , T2 first 2 > (T2 2 , T0 0 , T1 1) () (0 1 2) (2 1 0) where u128 = s => ((s . 2 . inner () as u128) << 64) + ((s . 0 . inner () as u128) << 32) + ((s . 1 . inner () as u128) << 0));
             eclass_wrapper_ty!(Math);
             fn i64_add012(a: i64, b: i64) -> impl Iterator<Item = (i64,)> {
                 a.checked_add(b).map(|x| (x,)).into_iter()
@@ -2494,14 +2494,14 @@ fn regression_entry2() {
             #[derive(Debug, Default)]
             struct SubRelation {
                 new: Vec<<Self as Relation>::Row>,
-                all_index_0_1_2: SortedVec<RadixSortCtx<Row3_0_1<Math, Math, Math>, u128>>,
-                all_index_1_0_2: SortedVec<RadixSortCtx<Row3_1_0_2<Math, Math, Math>, u128>>,
-                all_index_2_0_1: SortedVec<RadixSortCtx<Row3_2_0_1<Math, Math, Math>, u128>>,
+                all_index_0_1_2: SortedVec<EclassCtx<Row3_0_1<Math, Math, Math>, u128>>,
+                all_index_1_0_2: SortedVec<EclassCtx<Row3_1_0_2<Math, Math, Math>, u128>>,
+                all_index_2_0_1: SortedVec<EclassCtx<Row3_2_0_1<Math, Math, Math>, u128>>,
             }
             struct SubUpdateCtx {
                 scratch: Vec<(Math, Math, Math)>,
                 deferred_insertions: Vec<(Math, Math, Math)>,
-                old: SortedVec<RadixSortCtx<Row3_0_1<Math, Math, Math>, u128>>,
+                old: SortedVec<EclassCtx<Row3_0_1<Math, Math, Math>, u128>>,
             }
             impl Relation for SubRelation {
                 type Row = (Math, Math, Math);
@@ -2638,13 +2638,13 @@ fn regression_entry2() {
             #[derive(Debug, Default)]
             struct ConstRelation {
                 new: Vec<<Self as Relation>::Row>,
-                all_index_0_1: SortedVec<StdSortCtx<Row2_0<std::primitive::i64, Math>>>,
-                all_index_1_0: SortedVec<StdSortCtx<Row2_1_0<std::primitive::i64, Math>>>,
+                all_index_0_1: SortedVec<GeneralCtx<Row2_0<std::primitive::i64, Math>>>,
+                all_index_1_0: SortedVec<GeneralCtx<Row2_1_0<std::primitive::i64, Math>>>,
             }
             struct ConstUpdateCtx {
                 scratch: Vec<(std::primitive::i64, Math)>,
                 deferred_insertions: Vec<(std::primitive::i64, Math)>,
-                old: SortedVec<StdSortCtx<Row2_0<std::primitive::i64, Math>>>,
+                old: SortedVec<GeneralCtx<Row2_0<std::primitive::i64, Math>>>,
             }
             impl Relation for ConstRelation {
                 type Row = (std::primitive::i64, Math);
@@ -3084,9 +3084,9 @@ fn regression_entry() {
             }"#]]),
         expected_codegen: Some(expect![[r#"
             use oatlog::runtime::{self, *};
-            decl_row ! (Row3_0_1 < T0 first 0 , T1 , T2 > (0 , 1) (2) (T0 , T1) (T2) fc = (0) (T0) where u128 = s => ((s . 0 . inner () as u128) << 64) + ((s . 1 . inner () as u128) << 32) + ((s . 2 . inner () as u128) << 0));
-            decl_row ! (Row3_1_0_2 < T0 , T1 first 1 , T2 > (1 , 0 , 2) () (T1 , T0 , T2) () fc = (1) (T1) where u128 = s => ((s . 1 . inner () as u128) << 64) + ((s . 0 . inner () as u128) << 32) + ((s . 2 . inner () as u128) << 0));
-            decl_row ! (Row3_2_0_1 < T0 , T1 , T2 first 2 > (2 , 0 , 1) () (T2 , T0 , T1) () fc = (2) (T2) where u128 = s => ((s . 2 . inner () as u128) << 64) + ((s . 0 . inner () as u128) << 32) + ((s . 1 . inner () as u128) << 0));
+            decl_row ! (Row3_0_1 < T0 first 0 , T1 , T2 > (T0 0 , T1 1) (T2 2) (0 1 2) (2 1 0) where u128 = s => ((s . 0 . inner () as u128) << 64) + ((s . 1 . inner () as u128) << 32) + ((s . 2 . inner () as u128) << 0));
+            decl_row ! (Row3_1_0_2 < T0 , T1 first 1 , T2 > (T1 1 , T0 0 , T2 2) () (0 1 2) (2 1 0) where u128 = s => ((s . 1 . inner () as u128) << 64) + ((s . 0 . inner () as u128) << 32) + ((s . 2 . inner () as u128) << 0));
+            decl_row ! (Row3_2_0_1 < T0 , T1 , T2 first 2 > (T2 2 , T0 0 , T1 1) () (0 1 2) (2 1 0) where u128 = s => ((s . 2 . inner () as u128) << 64) + ((s . 0 . inner () as u128) << 32) + ((s . 1 . inner () as u128) << 0));
             eclass_wrapper_ty!(Math);
             fn i64_add012(a: i64, b: i64) -> impl Iterator<Item = (i64,)> {
                 a.checked_add(b).map(|x| (x,)).into_iter()
@@ -3137,14 +3137,14 @@ fn regression_entry() {
             #[derive(Debug, Default)]
             struct IntegralRelation {
                 new: Vec<<Self as Relation>::Row>,
-                all_index_0_1_2: SortedVec<RadixSortCtx<Row3_0_1<Math, Math, Math>, u128>>,
-                all_index_1_0_2: SortedVec<RadixSortCtx<Row3_1_0_2<Math, Math, Math>, u128>>,
-                all_index_2_0_1: SortedVec<RadixSortCtx<Row3_2_0_1<Math, Math, Math>, u128>>,
+                all_index_0_1_2: SortedVec<EclassCtx<Row3_0_1<Math, Math, Math>, u128>>,
+                all_index_1_0_2: SortedVec<EclassCtx<Row3_1_0_2<Math, Math, Math>, u128>>,
+                all_index_2_0_1: SortedVec<EclassCtx<Row3_2_0_1<Math, Math, Math>, u128>>,
             }
             struct IntegralUpdateCtx {
                 scratch: Vec<(Math, Math, Math)>,
                 deferred_insertions: Vec<(Math, Math, Math)>,
-                old: SortedVec<RadixSortCtx<Row3_0_1<Math, Math, Math>, u128>>,
+                old: SortedVec<EclassCtx<Row3_0_1<Math, Math, Math>, u128>>,
             }
             impl Relation for IntegralRelation {
                 type Row = (Math, Math, Math);
@@ -3281,14 +3281,14 @@ fn regression_entry() {
             #[derive(Debug, Default)]
             struct AddRelation {
                 new: Vec<<Self as Relation>::Row>,
-                all_index_0_1_2: SortedVec<RadixSortCtx<Row3_0_1<Math, Math, Math>, u128>>,
-                all_index_1_0_2: SortedVec<RadixSortCtx<Row3_1_0_2<Math, Math, Math>, u128>>,
-                all_index_2_0_1: SortedVec<RadixSortCtx<Row3_2_0_1<Math, Math, Math>, u128>>,
+                all_index_0_1_2: SortedVec<EclassCtx<Row3_0_1<Math, Math, Math>, u128>>,
+                all_index_1_0_2: SortedVec<EclassCtx<Row3_1_0_2<Math, Math, Math>, u128>>,
+                all_index_2_0_1: SortedVec<EclassCtx<Row3_2_0_1<Math, Math, Math>, u128>>,
             }
             struct AddUpdateCtx {
                 scratch: Vec<(Math, Math, Math)>,
                 deferred_insertions: Vec<(Math, Math, Math)>,
-                old: SortedVec<RadixSortCtx<Row3_0_1<Math, Math, Math>, u128>>,
+                old: SortedVec<EclassCtx<Row3_0_1<Math, Math, Math>, u128>>,
             }
             impl Relation for AddRelation {
                 type Row = (Math, Math, Math);
@@ -3731,9 +3731,9 @@ fn test_bind_variable_multiple_times() {
             }"#]]),
         expected_codegen: Some(expect![[r#"
             use oatlog::runtime::{self, *};
-            decl_row ! (Row3_0_1 < T0 first 0 , T1 , T2 > (0 , 1) (2) (T0 , T1) (T2) fc = (0) (T0) where u128 = s => ((s . 0 . inner () as u128) << 64) + ((s . 1 . inner () as u128) << 32) + ((s . 2 . inner () as u128) << 0));
-            decl_row ! (Row3_1_0_2 < T0 , T1 first 1 , T2 > (1 , 0 , 2) () (T1 , T0 , T2) () fc = (1) (T1) where u128 = s => ((s . 1 . inner () as u128) << 64) + ((s . 0 . inner () as u128) << 32) + ((s . 2 . inner () as u128) << 0));
-            decl_row ! (Row3_2_0_1 < T0 , T1 , T2 first 2 > (2 , 0 , 1) () (T2 , T0 , T1) () fc = (2) (T2) where u128 = s => ((s . 2 . inner () as u128) << 64) + ((s . 0 . inner () as u128) << 32) + ((s . 1 . inner () as u128) << 0));
+            decl_row ! (Row3_0_1 < T0 first 0 , T1 , T2 > (T0 0 , T1 1) (T2 2) (0 1 2) (2 1 0) where u128 = s => ((s . 0 . inner () as u128) << 64) + ((s . 1 . inner () as u128) << 32) + ((s . 2 . inner () as u128) << 0));
+            decl_row ! (Row3_1_0_2 < T0 , T1 first 1 , T2 > (T1 1 , T0 0 , T2 2) () (0 1 2) (2 1 0) where u128 = s => ((s . 1 . inner () as u128) << 64) + ((s . 0 . inner () as u128) << 32) + ((s . 2 . inner () as u128) << 0));
+            decl_row ! (Row3_2_0_1 < T0 , T1 , T2 first 2 > (T2 2 , T0 0 , T1 1) () (0 1 2) (2 1 0) where u128 = s => ((s . 2 . inner () as u128) << 64) + ((s . 0 . inner () as u128) << 32) + ((s . 1 . inner () as u128) << 0));
             eclass_wrapper_ty!(Foo);
             fn i64_add012(a: i64, b: i64) -> impl Iterator<Item = (i64,)> {
                 a.checked_add(b).map(|x| (x,)).into_iter()
@@ -3784,14 +3784,14 @@ fn test_bind_variable_multiple_times() {
             #[derive(Debug, Default)]
             struct SameRelation {
                 new: Vec<<Self as Relation>::Row>,
-                all_index_0_1_2: SortedVec<RadixSortCtx<Row3_0_1<Foo, Foo, Foo>, u128>>,
-                all_index_1_0_2: SortedVec<RadixSortCtx<Row3_1_0_2<Foo, Foo, Foo>, u128>>,
-                all_index_2_0_1: SortedVec<RadixSortCtx<Row3_2_0_1<Foo, Foo, Foo>, u128>>,
+                all_index_0_1_2: SortedVec<EclassCtx<Row3_0_1<Foo, Foo, Foo>, u128>>,
+                all_index_1_0_2: SortedVec<EclassCtx<Row3_1_0_2<Foo, Foo, Foo>, u128>>,
+                all_index_2_0_1: SortedVec<EclassCtx<Row3_2_0_1<Foo, Foo, Foo>, u128>>,
             }
             struct SameUpdateCtx {
                 scratch: Vec<(Foo, Foo, Foo)>,
                 deferred_insertions: Vec<(Foo, Foo, Foo)>,
-                old: SortedVec<RadixSortCtx<Row3_0_1<Foo, Foo, Foo>, u128>>,
+                old: SortedVec<EclassCtx<Row3_0_1<Foo, Foo, Foo>, u128>>,
             }
             impl Relation for SameRelation {
                 type Row = (Foo, Foo, Foo);
@@ -4327,10 +4327,10 @@ fn codegen_variable_reuse_bug() {
             }"#]]),
         expected_codegen: Some(expect![[r#"
             use oatlog::runtime::{self, *};
-            decl_row ! (Row1 < T0 first 0 > () (0) () (T0) fc = (0) (T0) where u32 = s => ((s . 0 . inner () as u32) << 0));
-            decl_row ! (Row3_0_2_1 < T0 first 0 , T1 , T2 > (0 , 2 , 1) () (T0 , T2 , T1) () fc = (0) (T0) where u128 = s => ((s . 0 . inner () as u128) << 64) + ((s . 2 . inner () as u128) << 32) + ((s . 1 . inner () as u128) << 0));
-            decl_row ! (Row3_1_0 < T0 , T1 first 1 , T2 > (1 , 0) (2) (T1 , T0) (T2) fc = (1) (T1) where u128 = s => ((s . 1 . inner () as u128) << 64) + ((s . 0 . inner () as u128) << 32) + ((s . 2 . inner () as u128) << 0));
-            decl_row ! (Row3_2_0_1 < T0 , T1 , T2 first 2 > (2 , 0 , 1) () (T2 , T0 , T1) () fc = (2) (T2) where u128 = s => ((s . 2 . inner () as u128) << 64) + ((s . 0 . inner () as u128) << 32) + ((s . 1 . inner () as u128) << 0));
+            decl_row ! (Row1 < T0 first 0 > () (T0 0) (0) (0) where u32 = s => ((s . 0 . inner () as u32) << 0));
+            decl_row ! (Row3_0_2_1 < T0 first 0 , T1 , T2 > (T0 0 , T2 2 , T1 1) () (0 1 2) (2 1 0) where u128 = s => ((s . 0 . inner () as u128) << 64) + ((s . 2 . inner () as u128) << 32) + ((s . 1 . inner () as u128) << 0));
+            decl_row ! (Row3_1_0 < T0 , T1 first 1 , T2 > (T1 1 , T0 0) (T2 2) (0 1 2) (2 1 0) where u128 = s => ((s . 1 . inner () as u128) << 64) + ((s . 0 . inner () as u128) << 32) + ((s . 2 . inner () as u128) << 0));
+            decl_row ! (Row3_2_0_1 < T0 , T1 , T2 first 2 > (T2 2 , T0 0 , T1 1) () (0 1 2) (2 1 0) where u128 = s => ((s . 2 . inner () as u128) << 64) + ((s . 0 . inner () as u128) << 32) + ((s . 1 . inner () as u128) << 0));
             eclass_wrapper_ty!(Math);
             fn i64_add012(a: i64, b: i64) -> impl Iterator<Item = (i64,)> {
                 a.checked_add(b).map(|x| (x,)).into_iter()
@@ -4381,14 +4381,14 @@ fn codegen_variable_reuse_bug() {
             #[derive(Debug, Default)]
             struct AddRelation {
                 new: Vec<<Self as Relation>::Row>,
-                all_index_0_2_1: SortedVec<RadixSortCtx<Row3_0_2_1<Math, Math, Math>, u128>>,
-                all_index_1_0_2: SortedVec<RadixSortCtx<Row3_1_0<Math, Math, Math>, u128>>,
-                all_index_2_0_1: SortedVec<RadixSortCtx<Row3_2_0_1<Math, Math, Math>, u128>>,
+                all_index_0_2_1: SortedVec<EclassCtx<Row3_0_2_1<Math, Math, Math>, u128>>,
+                all_index_1_0_2: SortedVec<EclassCtx<Row3_1_0<Math, Math, Math>, u128>>,
+                all_index_2_0_1: SortedVec<EclassCtx<Row3_2_0_1<Math, Math, Math>, u128>>,
             }
             struct AddUpdateCtx {
                 scratch: Vec<(Math, Math, Math)>,
                 deferred_insertions: Vec<(Math, Math, Math)>,
-                old: SortedVec<RadixSortCtx<Row3_1_0<Math, Math, Math>, u128>>,
+                old: SortedVec<EclassCtx<Row3_1_0<Math, Math, Math>, u128>>,
             }
             impl Relation for AddRelation {
                 type Row = (Math, Math, Math);
@@ -4533,12 +4533,12 @@ fn codegen_variable_reuse_bug() {
             #[derive(Debug, Default)]
             struct ZeroRelation {
                 new: Vec<<Self as Relation>::Row>,
-                all_index_0: SortedVec<RadixSortCtx<Row1<Math>, u32>>,
+                all_index_0: SortedVec<EclassCtx<Row1<Math>, u32>>,
             }
             struct ZeroUpdateCtx {
                 scratch: Vec<(Math,)>,
                 deferred_insertions: Vec<(Math,)>,
-                old: SortedVec<RadixSortCtx<Row1<Math>, u32>>,
+                old: SortedVec<EclassCtx<Row1<Math>, u32>>,
             }
             impl Relation for ZeroRelation {
                 type Row = (Math,);
@@ -4860,11 +4860,11 @@ fn initial_exprs() {
         expected_lir: None,
         expected_codegen: Some(expect![[r#"
             use oatlog::runtime::{self, *};
-            decl_row ! (Row2_0 < T0 first 0 , T1 > (0) (1) (T0) (T1) fc = (0) (T0) where u64 = s => ((s . 0 . inner () as u64) << 32) + ((s . 1 . inner () as u64) << 0));
-            decl_row ! (Row2_1_0 < T0 , T1 first 1 > (1 , 0) () (T1 , T0) () fc = (1) (T1) where u64 = s => ((s . 1 . inner () as u64) << 32) + ((s . 0 . inner () as u64) << 0));
-            decl_row ! (Row3_0_1 < T0 first 0 , T1 , T2 > (0 , 1) (2) (T0 , T1) (T2) fc = (0) (T0) where u128 = s => ((s . 0 . inner () as u128) << 64) + ((s . 1 . inner () as u128) << 32) + ((s . 2 . inner () as u128) << 0));
-            decl_row ! (Row3_1_0_2 < T0 , T1 first 1 , T2 > (1 , 0 , 2) () (T1 , T0 , T2) () fc = (1) (T1) where u128 = s => ((s . 1 . inner () as u128) << 64) + ((s . 0 . inner () as u128) << 32) + ((s . 2 . inner () as u128) << 0));
-            decl_row ! (Row3_2_0_1 < T0 , T1 , T2 first 2 > (2 , 0 , 1) () (T2 , T0 , T1) () fc = (2) (T2) where u128 = s => ((s . 2 . inner () as u128) << 64) + ((s . 0 . inner () as u128) << 32) + ((s . 1 . inner () as u128) << 0));
+            decl_row ! (Row2_0 < T0 first 0 , T1 > (T0 0) (T1 1) (0 1) (1 0) where u64 = s => ((s . 0 . inner () as u64) << 32) + ((s . 1 . inner () as u64) << 0));
+            decl_row ! (Row2_1_0 < T0 , T1 first 1 > (T1 1 , T0 0) () (0 1) (1 0) where u64 = s => ((s . 1 . inner () as u64) << 32) + ((s . 0 . inner () as u64) << 0));
+            decl_row ! (Row3_0_1 < T0 first 0 , T1 , T2 > (T0 0 , T1 1) (T2 2) (0 1 2) (2 1 0) where u128 = s => ((s . 0 . inner () as u128) << 64) + ((s . 1 . inner () as u128) << 32) + ((s . 2 . inner () as u128) << 0));
+            decl_row ! (Row3_1_0_2 < T0 , T1 first 1 , T2 > (T1 1 , T0 0 , T2 2) () (0 1 2) (2 1 0) where u128 = s => ((s . 1 . inner () as u128) << 64) + ((s . 0 . inner () as u128) << 32) + ((s . 2 . inner () as u128) << 0));
+            decl_row ! (Row3_2_0_1 < T0 , T1 , T2 first 2 > (T2 2 , T0 0 , T1 1) () (0 1 2) (2 1 0) where u128 = s => ((s . 2 . inner () as u128) << 64) + ((s . 0 . inner () as u128) << 32) + ((s . 1 . inner () as u128) << 0));
             eclass_wrapper_ty!(Math);
             fn i64_add012(a: i64, b: i64) -> impl Iterator<Item = (i64,)> {
                 a.checked_add(b).map(|x| (x,)).into_iter()
@@ -4915,14 +4915,14 @@ fn initial_exprs() {
             #[derive(Debug, Default)]
             struct AddRelation {
                 new: Vec<<Self as Relation>::Row>,
-                all_index_0_1_2: SortedVec<RadixSortCtx<Row3_0_1<Math, Math, Math>, u128>>,
-                all_index_1_0_2: SortedVec<RadixSortCtx<Row3_1_0_2<Math, Math, Math>, u128>>,
-                all_index_2_0_1: SortedVec<RadixSortCtx<Row3_2_0_1<Math, Math, Math>, u128>>,
+                all_index_0_1_2: SortedVec<EclassCtx<Row3_0_1<Math, Math, Math>, u128>>,
+                all_index_1_0_2: SortedVec<EclassCtx<Row3_1_0_2<Math, Math, Math>, u128>>,
+                all_index_2_0_1: SortedVec<EclassCtx<Row3_2_0_1<Math, Math, Math>, u128>>,
             }
             struct AddUpdateCtx {
                 scratch: Vec<(Math, Math, Math)>,
                 deferred_insertions: Vec<(Math, Math, Math)>,
-                old: SortedVec<RadixSortCtx<Row3_0_1<Math, Math, Math>, u128>>,
+                old: SortedVec<EclassCtx<Row3_0_1<Math, Math, Math>, u128>>,
             }
             impl Relation for AddRelation {
                 type Row = (Math, Math, Math);
@@ -5059,14 +5059,14 @@ fn initial_exprs() {
             #[derive(Debug, Default)]
             struct MulRelation {
                 new: Vec<<Self as Relation>::Row>,
-                all_index_0_1_2: SortedVec<RadixSortCtx<Row3_0_1<Math, Math, Math>, u128>>,
-                all_index_1_0_2: SortedVec<RadixSortCtx<Row3_1_0_2<Math, Math, Math>, u128>>,
-                all_index_2_0_1: SortedVec<RadixSortCtx<Row3_2_0_1<Math, Math, Math>, u128>>,
+                all_index_0_1_2: SortedVec<EclassCtx<Row3_0_1<Math, Math, Math>, u128>>,
+                all_index_1_0_2: SortedVec<EclassCtx<Row3_1_0_2<Math, Math, Math>, u128>>,
+                all_index_2_0_1: SortedVec<EclassCtx<Row3_2_0_1<Math, Math, Math>, u128>>,
             }
             struct MulUpdateCtx {
                 scratch: Vec<(Math, Math, Math)>,
                 deferred_insertions: Vec<(Math, Math, Math)>,
-                old: SortedVec<RadixSortCtx<Row3_0_1<Math, Math, Math>, u128>>,
+                old: SortedVec<EclassCtx<Row3_0_1<Math, Math, Math>, u128>>,
             }
             impl Relation for MulRelation {
                 type Row = (Math, Math, Math);
@@ -5203,13 +5203,13 @@ fn initial_exprs() {
             #[derive(Debug, Default)]
             struct ConstRelation {
                 new: Vec<<Self as Relation>::Row>,
-                all_index_0_1: SortedVec<StdSortCtx<Row2_0<std::primitive::i64, Math>>>,
-                all_index_1_0: SortedVec<StdSortCtx<Row2_1_0<std::primitive::i64, Math>>>,
+                all_index_0_1: SortedVec<GeneralCtx<Row2_0<std::primitive::i64, Math>>>,
+                all_index_1_0: SortedVec<GeneralCtx<Row2_1_0<std::primitive::i64, Math>>>,
             }
             struct ConstUpdateCtx {
                 scratch: Vec<(std::primitive::i64, Math)>,
                 deferred_insertions: Vec<(std::primitive::i64, Math)>,
-                old: SortedVec<StdSortCtx<Row2_0<std::primitive::i64, Math>>>,
+                old: SortedVec<GeneralCtx<Row2_0<std::primitive::i64, Math>>>,
             }
             impl Relation for ConstRelation {
                 type Row = (std::primitive::i64, Math);
@@ -5326,13 +5326,13 @@ fn initial_exprs() {
             #[derive(Debug, Default)]
             struct VarRelation {
                 new: Vec<<Self as Relation>::Row>,
-                all_index_0_1: SortedVec<StdSortCtx<Row2_0<runtime::IString, Math>>>,
-                all_index_1_0: SortedVec<StdSortCtx<Row2_1_0<runtime::IString, Math>>>,
+                all_index_0_1: SortedVec<GeneralCtx<Row2_0<runtime::IString, Math>>>,
+                all_index_1_0: SortedVec<GeneralCtx<Row2_1_0<runtime::IString, Math>>>,
             }
             struct VarUpdateCtx {
                 scratch: Vec<(runtime::IString, Math)>,
                 deferred_insertions: Vec<(runtime::IString, Math)>,
-                old: SortedVec<StdSortCtx<Row2_0<runtime::IString, Math>>>,
+                old: SortedVec<GeneralCtx<Row2_0<runtime::IString, Math>>>,
             }
             impl Relation for VarRelation {
                 type Row = (runtime::IString, Math);
@@ -5901,9 +5901,9 @@ fn codegen_bug1() {
         expected_lir: None,
         expected_codegen: Some(expect![[r#"
             use oatlog::runtime::{self, *};
-            decl_row ! (Row3_0_1_2 < T0 first 0 , T1 , T2 > (0 , 1 , 2) () (T0 , T1 , T2) () fc = (0) (T0) where u128 = s => ((s . 0 . inner () as u128) << 64) + ((s . 1 . inner () as u128) << 32) + ((s . 2 . inner () as u128) << 0));
-            decl_row ! (Row3_1_0_2 < T0 , T1 first 1 , T2 > (1 , 0 , 2) () (T1 , T0 , T2) () fc = (1) (T1) where u128 = s => ((s . 1 . inner () as u128) << 64) + ((s . 0 . inner () as u128) << 32) + ((s . 2 . inner () as u128) << 0));
-            decl_row ! (Row3_2_0_1 < T0 , T1 , T2 first 2 > (2 , 0 , 1) () (T2 , T0 , T1) () fc = (2) (T2) where u128 = s => ((s . 2 . inner () as u128) << 64) + ((s . 0 . inner () as u128) << 32) + ((s . 1 . inner () as u128) << 0));
+            decl_row ! (Row3_0_1_2 < T0 first 0 , T1 , T2 > (T0 0 , T1 1 , T2 2) () (0 1 2) (2 1 0) where u128 = s => ((s . 0 . inner () as u128) << 64) + ((s . 1 . inner () as u128) << 32) + ((s . 2 . inner () as u128) << 0));
+            decl_row ! (Row3_1_0_2 < T0 , T1 first 1 , T2 > (T1 1 , T0 0 , T2 2) () (0 1 2) (2 1 0) where u128 = s => ((s . 1 . inner () as u128) << 64) + ((s . 0 . inner () as u128) << 32) + ((s . 2 . inner () as u128) << 0));
+            decl_row ! (Row3_2_0_1 < T0 , T1 , T2 first 2 > (T2 2 , T0 0 , T1 1) () (0 1 2) (2 1 0) where u128 = s => ((s . 2 . inner () as u128) << 64) + ((s . 0 . inner () as u128) << 32) + ((s . 1 . inner () as u128) << 0));
             eclass_wrapper_ty!(T0);
             eclass_wrapper_ty!(T1);
             eclass_wrapper_ty!(T2);
@@ -5956,14 +5956,14 @@ fn codegen_bug1() {
             #[derive(Debug, Default)]
             struct FooRelation {
                 new: Vec<<Self as Relation>::Row>,
-                all_index_0_1_2: SortedVec<RadixSortCtx<Row3_0_1_2<T0, T1, T2>, u128>>,
-                all_index_1_0_2: SortedVec<RadixSortCtx<Row3_1_0_2<T0, T1, T2>, u128>>,
-                all_index_2_0_1: SortedVec<RadixSortCtx<Row3_2_0_1<T0, T1, T2>, u128>>,
+                all_index_0_1_2: SortedVec<EclassCtx<Row3_0_1_2<T0, T1, T2>, u128>>,
+                all_index_1_0_2: SortedVec<EclassCtx<Row3_1_0_2<T0, T1, T2>, u128>>,
+                all_index_2_0_1: SortedVec<EclassCtx<Row3_2_0_1<T0, T1, T2>, u128>>,
             }
             struct FooUpdateCtx {
                 scratch: Vec<(T0, T1, T2)>,
                 deferred_insertions: Vec<(T0, T1, T2)>,
-                old: SortedVec<RadixSortCtx<Row3_0_1_2<T0, T1, T2>, u128>>,
+                old: SortedVec<EclassCtx<Row3_0_1_2<T0, T1, T2>, u128>>,
             }
             impl Relation for FooRelation {
                 type Row = (T0, T1, T2);
@@ -6274,8 +6274,8 @@ fn initial() {
         expected_lir: None,
         expected_codegen: Some(expect![[r#"
             use oatlog::runtime::{self, *};
-            decl_row ! (Row2_0 < T0 first 0 , T1 > (0) (1) (T0) (T1) fc = (0) (T0) where u64 = s => ((s . 0 . inner () as u64) << 32) + ((s . 1 . inner () as u64) << 0));
-            decl_row ! (Row2_1_0 < T0 , T1 first 1 > (1 , 0) () (T1 , T0) () fc = (1) (T1) where u64 = s => ((s . 1 . inner () as u64) << 32) + ((s . 0 . inner () as u64) << 0));
+            decl_row ! (Row2_0 < T0 first 0 , T1 > (T0 0) (T1 1) (0 1) (1 0) where u64 = s => ((s . 0 . inner () as u64) << 32) + ((s . 1 . inner () as u64) << 0));
+            decl_row ! (Row2_1_0 < T0 , T1 first 1 > (T1 1 , T0 0) () (0 1) (1 0) where u64 = s => ((s . 1 . inner () as u64) << 32) + ((s . 0 . inner () as u64) << 0));
             eclass_wrapper_ty!(Math);
             fn i64_add012(a: i64, b: i64) -> impl Iterator<Item = (i64,)> {
                 a.checked_add(b).map(|x| (x,)).into_iter()
@@ -6326,13 +6326,13 @@ fn initial() {
             #[derive(Debug, Default)]
             struct ConstRelation {
                 new: Vec<<Self as Relation>::Row>,
-                all_index_0_1: SortedVec<StdSortCtx<Row2_0<std::primitive::i64, Math>>>,
-                all_index_1_0: SortedVec<StdSortCtx<Row2_1_0<std::primitive::i64, Math>>>,
+                all_index_0_1: SortedVec<GeneralCtx<Row2_0<std::primitive::i64, Math>>>,
+                all_index_1_0: SortedVec<GeneralCtx<Row2_1_0<std::primitive::i64, Math>>>,
             }
             struct ConstUpdateCtx {
                 scratch: Vec<(std::primitive::i64, Math)>,
                 deferred_insertions: Vec<(std::primitive::i64, Math)>,
-                old: SortedVec<StdSortCtx<Row2_0<std::primitive::i64, Math>>>,
+                old: SortedVec<GeneralCtx<Row2_0<std::primitive::i64, Math>>>,
             }
             impl Relation for ConstRelation {
                 type Row = (std::primitive::i64, Math);
@@ -6693,13 +6693,13 @@ fn test_primitives_simple() {
         expected_lir: None,
         expected_codegen : Some(expect![[r#"
             use oatlog::runtime::{self, *};
-            decl_row ! (Row2_0 < T0 first 0 , T1 > (0) (1) (T0) (T1) fc = (0) (T0) where u64 = s => ((s . 0 . inner () as u64) << 32) + ((s . 1 . inner () as u64) << 0));
-            decl_row ! (Row2_1_0 < T0 , T1 first 1 > (1 , 0) () (T1 , T0) () fc = (1) (T1) where u64 = s => ((s . 1 . inner () as u64) << 32) + ((s . 0 . inner () as u64) << 0));
-            decl_row ! (Row3_0_1 < T0 first 0 , T1 , T2 > (0 , 1) (2) (T0 , T1) (T2) fc = (0) (T0) where u128 = s => ((s . 0 . inner () as u128) << 64) + ((s . 1 . inner () as u128) << 32) + ((s . 2 . inner () as u128) << 0));
-            decl_row ! (Row3_0_1_2 < T0 first 0 , T1 , T2 > (0 , 1 , 2) () (T0 , T1 , T2) () fc = (0) (T0) where u128 = s => ((s . 0 . inner () as u128) << 64) + ((s . 1 . inner () as u128) << 32) + ((s . 2 . inner () as u128) << 0));
-            decl_row ! (Row3_1_0 < T0 , T1 first 1 , T2 > (1 , 0) (2) (T1 , T0) (T2) fc = (1) (T1) where u128 = s => ((s . 1 . inner () as u128) << 64) + ((s . 0 . inner () as u128) << 32) + ((s . 2 . inner () as u128) << 0));
-            decl_row ! (Row3_1_0_2 < T0 , T1 first 1 , T2 > (1 , 0 , 2) () (T1 , T0 , T2) () fc = (1) (T1) where u128 = s => ((s . 1 . inner () as u128) << 64) + ((s . 0 . inner () as u128) << 32) + ((s . 2 . inner () as u128) << 0));
-            decl_row ! (Row3_2_0_1 < T0 , T1 , T2 first 2 > (2 , 0 , 1) () (T2 , T0 , T1) () fc = (2) (T2) where u128 = s => ((s . 2 . inner () as u128) << 64) + ((s . 0 . inner () as u128) << 32) + ((s . 1 . inner () as u128) << 0));
+            decl_row ! (Row2_0 < T0 first 0 , T1 > (T0 0) (T1 1) (0 1) (1 0) where u64 = s => ((s . 0 . inner () as u64) << 32) + ((s . 1 . inner () as u64) << 0));
+            decl_row ! (Row2_1_0 < T0 , T1 first 1 > (T1 1 , T0 0) () (0 1) (1 0) where u64 = s => ((s . 1 . inner () as u64) << 32) + ((s . 0 . inner () as u64) << 0));
+            decl_row ! (Row3_0_1 < T0 first 0 , T1 , T2 > (T0 0 , T1 1) (T2 2) (0 1 2) (2 1 0) where u128 = s => ((s . 0 . inner () as u128) << 64) + ((s . 1 . inner () as u128) << 32) + ((s . 2 . inner () as u128) << 0));
+            decl_row ! (Row3_0_1_2 < T0 first 0 , T1 , T2 > (T0 0 , T1 1 , T2 2) () (0 1 2) (2 1 0) where u128 = s => ((s . 0 . inner () as u128) << 64) + ((s . 1 . inner () as u128) << 32) + ((s . 2 . inner () as u128) << 0));
+            decl_row ! (Row3_1_0 < T0 , T1 first 1 , T2 > (T1 1 , T0 0) (T2 2) (0 1 2) (2 1 0) where u128 = s => ((s . 1 . inner () as u128) << 64) + ((s . 0 . inner () as u128) << 32) + ((s . 2 . inner () as u128) << 0));
+            decl_row ! (Row3_1_0_2 < T0 , T1 first 1 , T2 > (T1 1 , T0 0 , T2 2) () (0 1 2) (2 1 0) where u128 = s => ((s . 1 . inner () as u128) << 64) + ((s . 0 . inner () as u128) << 32) + ((s . 2 . inner () as u128) << 0));
+            decl_row ! (Row3_2_0_1 < T0 , T1 , T2 first 2 > (T2 2 , T0 0 , T1 1) () (0 1 2) (2 1 0) where u128 = s => ((s . 2 . inner () as u128) << 64) + ((s . 0 . inner () as u128) << 32) + ((s . 1 . inner () as u128) << 0));
             eclass_wrapper_ty!(Math);
             fn i64_add012(a: i64, b: i64) -> impl Iterator<Item = (i64,)> {
                 a.checked_add(b).map(|x| (x,)).into_iter()
@@ -6750,14 +6750,14 @@ fn test_primitives_simple() {
             #[derive(Debug, Default)]
             struct MulRelation {
                 new: Vec<<Self as Relation>::Row>,
-                all_index_0_1_2: SortedVec<RadixSortCtx<Row3_0_1_2<Math, Math, Math>, u128>>,
-                all_index_1_0_2: SortedVec<RadixSortCtx<Row3_1_0<Math, Math, Math>, u128>>,
-                all_index_2_0_1: SortedVec<RadixSortCtx<Row3_2_0_1<Math, Math, Math>, u128>>,
+                all_index_0_1_2: SortedVec<EclassCtx<Row3_0_1_2<Math, Math, Math>, u128>>,
+                all_index_1_0_2: SortedVec<EclassCtx<Row3_1_0<Math, Math, Math>, u128>>,
+                all_index_2_0_1: SortedVec<EclassCtx<Row3_2_0_1<Math, Math, Math>, u128>>,
             }
             struct MulUpdateCtx {
                 scratch: Vec<(Math, Math, Math)>,
                 deferred_insertions: Vec<(Math, Math, Math)>,
-                old: SortedVec<RadixSortCtx<Row3_1_0<Math, Math, Math>, u128>>,
+                old: SortedVec<EclassCtx<Row3_1_0<Math, Math, Math>, u128>>,
             }
             impl Relation for MulRelation {
                 type Row = (Math, Math, Math);
@@ -6894,14 +6894,14 @@ fn test_primitives_simple() {
             #[derive(Debug, Default)]
             struct AddRelation {
                 new: Vec<<Self as Relation>::Row>,
-                all_index_0_1_2: SortedVec<RadixSortCtx<Row3_0_1<Math, Math, Math>, u128>>,
-                all_index_1_0_2: SortedVec<RadixSortCtx<Row3_1_0_2<Math, Math, Math>, u128>>,
-                all_index_2_0_1: SortedVec<RadixSortCtx<Row3_2_0_1<Math, Math, Math>, u128>>,
+                all_index_0_1_2: SortedVec<EclassCtx<Row3_0_1<Math, Math, Math>, u128>>,
+                all_index_1_0_2: SortedVec<EclassCtx<Row3_1_0_2<Math, Math, Math>, u128>>,
+                all_index_2_0_1: SortedVec<EclassCtx<Row3_2_0_1<Math, Math, Math>, u128>>,
             }
             struct AddUpdateCtx {
                 scratch: Vec<(Math, Math, Math)>,
                 deferred_insertions: Vec<(Math, Math, Math)>,
-                old: SortedVec<RadixSortCtx<Row3_0_1<Math, Math, Math>, u128>>,
+                old: SortedVec<EclassCtx<Row3_0_1<Math, Math, Math>, u128>>,
             }
             impl Relation for AddRelation {
                 type Row = (Math, Math, Math);
@@ -7038,13 +7038,13 @@ fn test_primitives_simple() {
             #[derive(Debug, Default)]
             struct ConstRelation {
                 new: Vec<<Self as Relation>::Row>,
-                all_index_0_1: SortedVec<StdSortCtx<Row2_0<std::primitive::i64, Math>>>,
-                all_index_1_0: SortedVec<StdSortCtx<Row2_1_0<std::primitive::i64, Math>>>,
+                all_index_0_1: SortedVec<GeneralCtx<Row2_0<std::primitive::i64, Math>>>,
+                all_index_1_0: SortedVec<GeneralCtx<Row2_1_0<std::primitive::i64, Math>>>,
             }
             struct ConstUpdateCtx {
                 scratch: Vec<(std::primitive::i64, Math)>,
                 deferred_insertions: Vec<(std::primitive::i64, Math)>,
-                old: SortedVec<StdSortCtx<Row2_0<std::primitive::i64, Math>>>,
+                old: SortedVec<GeneralCtx<Row2_0<std::primitive::i64, Math>>>,
             }
             impl Relation for ConstRelation {
                 type Row = (std::primitive::i64, Math);
@@ -7183,13 +7183,13 @@ fn test_primitives_simple() {
             #[derive(Debug, Default)]
             struct VarRelation {
                 new: Vec<<Self as Relation>::Row>,
-                all_index_0_1: SortedVec<StdSortCtx<Row2_0<runtime::IString, Math>>>,
-                all_index_1_0: SortedVec<StdSortCtx<Row2_1_0<runtime::IString, Math>>>,
+                all_index_0_1: SortedVec<GeneralCtx<Row2_0<runtime::IString, Math>>>,
+                all_index_1_0: SortedVec<GeneralCtx<Row2_1_0<runtime::IString, Math>>>,
             }
             struct VarUpdateCtx {
                 scratch: Vec<(runtime::IString, Math)>,
                 deferred_insertions: Vec<(runtime::IString, Math)>,
-                old: SortedVec<StdSortCtx<Row2_0<runtime::IString, Math>>>,
+                old: SortedVec<GeneralCtx<Row2_0<runtime::IString, Math>>>,
             }
             impl Relation for VarRelation {
                 type Row = (runtime::IString, Math);
@@ -7621,11 +7621,11 @@ fn triangle_join() {
         expected_lir: None,
         expected_codegen: Some(expect![[r#"
             use oatlog::runtime::{self, *};
-            decl_row ! (Row2_0_1 < T0 first 0 , T1 > (0 , 1) () (T0 , T1) () fc = (0) (T0) where u64 = s => ((s . 0 . inner () as u64) << 32) + ((s . 1 . inner () as u64) << 0));
-            decl_row ! (Row2_1_0 < T0 , T1 first 1 > (1 , 0) () (T1 , T0) () fc = (1) (T1) where u64 = s => ((s . 1 . inner () as u64) << 32) + ((s . 0 . inner () as u64) << 0));
-            decl_row ! (Row3_0_1_2 < T0 first 0 , T1 , T2 > (0 , 1 , 2) () (T0 , T1 , T2) () fc = (0) (T0) where u128 = s => ((s . 0 . inner () as u128) << 64) + ((s . 1 . inner () as u128) << 32) + ((s . 2 . inner () as u128) << 0));
-            decl_row ! (Row3_1_0_2 < T0 , T1 first 1 , T2 > (1 , 0 , 2) () (T1 , T0 , T2) () fc = (1) (T1) where u128 = s => ((s . 1 . inner () as u128) << 64) + ((s . 0 . inner () as u128) << 32) + ((s . 2 . inner () as u128) << 0));
-            decl_row ! (Row3_2_0_1 < T0 , T1 , T2 first 2 > (2 , 0 , 1) () (T2 , T0 , T1) () fc = (2) (T2) where u128 = s => ((s . 2 . inner () as u128) << 64) + ((s . 0 . inner () as u128) << 32) + ((s . 1 . inner () as u128) << 0));
+            decl_row ! (Row2_0_1 < T0 first 0 , T1 > (T0 0 , T1 1) () (0 1) (1 0) where u64 = s => ((s . 0 . inner () as u64) << 32) + ((s . 1 . inner () as u64) << 0));
+            decl_row ! (Row2_1_0 < T0 , T1 first 1 > (T1 1 , T0 0) () (0 1) (1 0) where u64 = s => ((s . 1 . inner () as u64) << 32) + ((s . 0 . inner () as u64) << 0));
+            decl_row ! (Row3_0_1_2 < T0 first 0 , T1 , T2 > (T0 0 , T1 1 , T2 2) () (0 1 2) (2 1 0) where u128 = s => ((s . 0 . inner () as u128) << 64) + ((s . 1 . inner () as u128) << 32) + ((s . 2 . inner () as u128) << 0));
+            decl_row ! (Row3_1_0_2 < T0 , T1 first 1 , T2 > (T1 1 , T0 0 , T2 2) () (0 1 2) (2 1 0) where u128 = s => ((s . 1 . inner () as u128) << 64) + ((s . 0 . inner () as u128) << 32) + ((s . 2 . inner () as u128) << 0));
+            decl_row ! (Row3_2_0_1 < T0 , T1 , T2 first 2 > (T2 2 , T0 0 , T1 1) () (0 1 2) (2 1 0) where u128 = s => ((s . 2 . inner () as u128) << 64) + ((s . 0 . inner () as u128) << 32) + ((s . 1 . inner () as u128) << 0));
             eclass_wrapper_ty!(Math);
             fn i64_add012(a: i64, b: i64) -> impl Iterator<Item = (i64,)> {
                 a.checked_add(b).map(|x| (x,)).into_iter()
@@ -7676,13 +7676,13 @@ fn triangle_join() {
             #[derive(Debug, Default)]
             struct FooRelation {
                 new: Vec<<Self as Relation>::Row>,
-                all_index_0_1: SortedVec<RadixSortCtx<Row2_0_1<Math, Math>, u64>>,
-                all_index_1_0: SortedVec<RadixSortCtx<Row2_1_0<Math, Math>, u64>>,
+                all_index_0_1: SortedVec<EclassCtx<Row2_0_1<Math, Math>, u64>>,
+                all_index_1_0: SortedVec<EclassCtx<Row2_1_0<Math, Math>, u64>>,
             }
             struct FooUpdateCtx {
                 scratch: Vec<(Math, Math)>,
                 deferred_insertions: Vec<(Math, Math)>,
-                old: SortedVec<RadixSortCtx<Row2_0_1<Math, Math>, u64>>,
+                old: SortedVec<EclassCtx<Row2_0_1<Math, Math>, u64>>,
             }
             impl Relation for FooRelation {
                 type Row = (Math, Math);
@@ -7805,13 +7805,13 @@ fn triangle_join() {
             #[derive(Debug, Default)]
             struct BarRelation {
                 new: Vec<<Self as Relation>::Row>,
-                all_index_0_1: SortedVec<RadixSortCtx<Row2_0_1<Math, Math>, u64>>,
-                all_index_1_0: SortedVec<RadixSortCtx<Row2_1_0<Math, Math>, u64>>,
+                all_index_0_1: SortedVec<EclassCtx<Row2_0_1<Math, Math>, u64>>,
+                all_index_1_0: SortedVec<EclassCtx<Row2_1_0<Math, Math>, u64>>,
             }
             struct BarUpdateCtx {
                 scratch: Vec<(Math, Math)>,
                 deferred_insertions: Vec<(Math, Math)>,
-                old: SortedVec<RadixSortCtx<Row2_0_1<Math, Math>, u64>>,
+                old: SortedVec<EclassCtx<Row2_0_1<Math, Math>, u64>>,
             }
             impl Relation for BarRelation {
                 type Row = (Math, Math);
@@ -7918,13 +7918,13 @@ fn triangle_join() {
             #[derive(Debug, Default)]
             struct BazRelation {
                 new: Vec<<Self as Relation>::Row>,
-                all_index_0_1: SortedVec<RadixSortCtx<Row2_0_1<Math, Math>, u64>>,
-                all_index_1_0: SortedVec<RadixSortCtx<Row2_1_0<Math, Math>, u64>>,
+                all_index_0_1: SortedVec<EclassCtx<Row2_0_1<Math, Math>, u64>>,
+                all_index_1_0: SortedVec<EclassCtx<Row2_1_0<Math, Math>, u64>>,
             }
             struct BazUpdateCtx {
                 scratch: Vec<(Math, Math)>,
                 deferred_insertions: Vec<(Math, Math)>,
-                old: SortedVec<RadixSortCtx<Row2_0_1<Math, Math>, u64>>,
+                old: SortedVec<EclassCtx<Row2_0_1<Math, Math>, u64>>,
             }
             impl Relation for BazRelation {
                 type Row = (Math, Math);
@@ -8047,14 +8047,14 @@ fn triangle_join() {
             #[derive(Debug, Default)]
             struct TriangleRelation {
                 new: Vec<<Self as Relation>::Row>,
-                all_index_0_1_2: SortedVec<RadixSortCtx<Row3_0_1_2<Math, Math, Math>, u128>>,
-                all_index_1_0_2: SortedVec<RadixSortCtx<Row3_1_0_2<Math, Math, Math>, u128>>,
-                all_index_2_0_1: SortedVec<RadixSortCtx<Row3_2_0_1<Math, Math, Math>, u128>>,
+                all_index_0_1_2: SortedVec<EclassCtx<Row3_0_1_2<Math, Math, Math>, u128>>,
+                all_index_1_0_2: SortedVec<EclassCtx<Row3_1_0_2<Math, Math, Math>, u128>>,
+                all_index_2_0_1: SortedVec<EclassCtx<Row3_2_0_1<Math, Math, Math>, u128>>,
             }
             struct TriangleUpdateCtx {
                 scratch: Vec<(Math, Math, Math)>,
                 deferred_insertions: Vec<(Math, Math, Math)>,
-                old: SortedVec<RadixSortCtx<Row3_0_1_2<Math, Math, Math>, u128>>,
+                old: SortedVec<EclassCtx<Row3_0_1_2<Math, Math, Math>, u128>>,
             }
             impl Relation for TriangleRelation {
                 type Row = (Math, Math, Math);
@@ -8442,9 +8442,9 @@ fn edgecase0() {
         expected_lir: None,
         expected_codegen : Some(expect![[r#"
             use oatlog::runtime::{self, *};
-            decl_row ! (Row3_0_1 < T0 first 0 , T1 , T2 > (0 , 1) (2) (T0 , T1) (T2) fc = (0) (T0) where u128 = s => ((s . 0 . inner () as u128) << 64) + ((s . 1 . inner () as u128) << 32) + ((s . 2 . inner () as u128) << 0));
-            decl_row ! (Row3_1_0_2 < T0 , T1 first 1 , T2 > (1 , 0 , 2) () (T1 , T0 , T2) () fc = (1) (T1) where u128 = s => ((s . 1 . inner () as u128) << 64) + ((s . 0 . inner () as u128) << 32) + ((s . 2 . inner () as u128) << 0));
-            decl_row ! (Row3_2_0_1 < T0 , T1 , T2 first 2 > (2 , 0 , 1) () (T2 , T0 , T1) () fc = (2) (T2) where u128 = s => ((s . 2 . inner () as u128) << 64) + ((s . 0 . inner () as u128) << 32) + ((s . 1 . inner () as u128) << 0));
+            decl_row ! (Row3_0_1 < T0 first 0 , T1 , T2 > (T0 0 , T1 1) (T2 2) (0 1 2) (2 1 0) where u128 = s => ((s . 0 . inner () as u128) << 64) + ((s . 1 . inner () as u128) << 32) + ((s . 2 . inner () as u128) << 0));
+            decl_row ! (Row3_1_0_2 < T0 , T1 first 1 , T2 > (T1 1 , T0 0 , T2 2) () (0 1 2) (2 1 0) where u128 = s => ((s . 1 . inner () as u128) << 64) + ((s . 0 . inner () as u128) << 32) + ((s . 2 . inner () as u128) << 0));
+            decl_row ! (Row3_2_0_1 < T0 , T1 , T2 first 2 > (T2 2 , T0 0 , T1 1) () (0 1 2) (2 1 0) where u128 = s => ((s . 2 . inner () as u128) << 64) + ((s . 0 . inner () as u128) << 32) + ((s . 1 . inner () as u128) << 0));
             eclass_wrapper_ty!(Math);
             fn i64_add012(a: i64, b: i64) -> impl Iterator<Item = (i64,)> {
                 a.checked_add(b).map(|x| (x,)).into_iter()
@@ -8495,14 +8495,14 @@ fn edgecase0() {
             #[derive(Debug, Default)]
             struct MulRelation {
                 new: Vec<<Self as Relation>::Row>,
-                all_index_0_1_2: SortedVec<RadixSortCtx<Row3_0_1<Math, Math, Math>, u128>>,
-                all_index_1_0_2: SortedVec<RadixSortCtx<Row3_1_0_2<Math, Math, Math>, u128>>,
-                all_index_2_0_1: SortedVec<RadixSortCtx<Row3_2_0_1<Math, Math, Math>, u128>>,
+                all_index_0_1_2: SortedVec<EclassCtx<Row3_0_1<Math, Math, Math>, u128>>,
+                all_index_1_0_2: SortedVec<EclassCtx<Row3_1_0_2<Math, Math, Math>, u128>>,
+                all_index_2_0_1: SortedVec<EclassCtx<Row3_2_0_1<Math, Math, Math>, u128>>,
             }
             struct MulUpdateCtx {
                 scratch: Vec<(Math, Math, Math)>,
                 deferred_insertions: Vec<(Math, Math, Math)>,
-                old: SortedVec<RadixSortCtx<Row3_0_1<Math, Math, Math>, u128>>,
+                old: SortedVec<EclassCtx<Row3_0_1<Math, Math, Math>, u128>>,
             }
             impl Relation for MulRelation {
                 type Row = (Math, Math, Math);
@@ -8647,14 +8647,14 @@ fn edgecase0() {
             #[derive(Debug, Default)]
             struct AddRelation {
                 new: Vec<<Self as Relation>::Row>,
-                all_index_0_1_2: SortedVec<RadixSortCtx<Row3_0_1<Math, Math, Math>, u128>>,
-                all_index_1_0_2: SortedVec<RadixSortCtx<Row3_1_0_2<Math, Math, Math>, u128>>,
-                all_index_2_0_1: SortedVec<RadixSortCtx<Row3_2_0_1<Math, Math, Math>, u128>>,
+                all_index_0_1_2: SortedVec<EclassCtx<Row3_0_1<Math, Math, Math>, u128>>,
+                all_index_1_0_2: SortedVec<EclassCtx<Row3_1_0_2<Math, Math, Math>, u128>>,
+                all_index_2_0_1: SortedVec<EclassCtx<Row3_2_0_1<Math, Math, Math>, u128>>,
             }
             struct AddUpdateCtx {
                 scratch: Vec<(Math, Math, Math)>,
                 deferred_insertions: Vec<(Math, Math, Math)>,
-                old: SortedVec<RadixSortCtx<Row3_0_1<Math, Math, Math>, u128>>,
+                old: SortedVec<EclassCtx<Row3_0_1<Math, Math, Math>, u128>>,
             }
             impl Relation for AddRelation {
                 type Row = (Math, Math, Math);
@@ -9019,9 +9019,9 @@ fn test_into_codegen() {
         expected_lir: None,
         expected_codegen: Some(expect![[r#"
             use oatlog::runtime::{self, *};
-            decl_row ! (Row3_0_1 < T0 first 0 , T1 , T2 > (0 , 1) (2) (T0 , T1) (T2) fc = (0) (T0) where u128 = s => ((s . 0 . inner () as u128) << 64) + ((s . 1 . inner () as u128) << 32) + ((s . 2 . inner () as u128) << 0));
-            decl_row ! (Row3_1_0_2 < T0 , T1 first 1 , T2 > (1 , 0 , 2) () (T1 , T0 , T2) () fc = (1) (T1) where u128 = s => ((s . 1 . inner () as u128) << 64) + ((s . 0 . inner () as u128) << 32) + ((s . 2 . inner () as u128) << 0));
-            decl_row ! (Row3_2_0_1 < T0 , T1 , T2 first 2 > (2 , 0 , 1) () (T2 , T0 , T1) () fc = (2) (T2) where u128 = s => ((s . 2 . inner () as u128) << 64) + ((s . 0 . inner () as u128) << 32) + ((s . 1 . inner () as u128) << 0));
+            decl_row ! (Row3_0_1 < T0 first 0 , T1 , T2 > (T0 0 , T1 1) (T2 2) (0 1 2) (2 1 0) where u128 = s => ((s . 0 . inner () as u128) << 64) + ((s . 1 . inner () as u128) << 32) + ((s . 2 . inner () as u128) << 0));
+            decl_row ! (Row3_1_0_2 < T0 , T1 first 1 , T2 > (T1 1 , T0 0 , T2 2) () (0 1 2) (2 1 0) where u128 = s => ((s . 1 . inner () as u128) << 64) + ((s . 0 . inner () as u128) << 32) + ((s . 2 . inner () as u128) << 0));
+            decl_row ! (Row3_2_0_1 < T0 , T1 , T2 first 2 > (T2 2 , T0 0 , T1 1) () (0 1 2) (2 1 0) where u128 = s => ((s . 2 . inner () as u128) << 64) + ((s . 0 . inner () as u128) << 32) + ((s . 1 . inner () as u128) << 0));
             eclass_wrapper_ty!(Math);
             fn i64_add012(a: i64, b: i64) -> impl Iterator<Item = (i64,)> {
                 a.checked_add(b).map(|x| (x,)).into_iter()
@@ -9072,14 +9072,14 @@ fn test_into_codegen() {
             #[derive(Debug, Default)]
             struct MulRelation {
                 new: Vec<<Self as Relation>::Row>,
-                all_index_0_1_2: SortedVec<RadixSortCtx<Row3_0_1<Math, Math, Math>, u128>>,
-                all_index_1_0_2: SortedVec<RadixSortCtx<Row3_1_0_2<Math, Math, Math>, u128>>,
-                all_index_2_0_1: SortedVec<RadixSortCtx<Row3_2_0_1<Math, Math, Math>, u128>>,
+                all_index_0_1_2: SortedVec<EclassCtx<Row3_0_1<Math, Math, Math>, u128>>,
+                all_index_1_0_2: SortedVec<EclassCtx<Row3_1_0_2<Math, Math, Math>, u128>>,
+                all_index_2_0_1: SortedVec<EclassCtx<Row3_2_0_1<Math, Math, Math>, u128>>,
             }
             struct MulUpdateCtx {
                 scratch: Vec<(Math, Math, Math)>,
                 deferred_insertions: Vec<(Math, Math, Math)>,
-                old: SortedVec<RadixSortCtx<Row3_0_1<Math, Math, Math>, u128>>,
+                old: SortedVec<EclassCtx<Row3_0_1<Math, Math, Math>, u128>>,
             }
             impl Relation for MulRelation {
                 type Row = (Math, Math, Math);
@@ -9216,14 +9216,14 @@ fn test_into_codegen() {
             #[derive(Debug, Default)]
             struct AddRelation {
                 new: Vec<<Self as Relation>::Row>,
-                all_index_0_1_2: SortedVec<RadixSortCtx<Row3_0_1<Math, Math, Math>, u128>>,
-                all_index_1_0_2: SortedVec<RadixSortCtx<Row3_1_0_2<Math, Math, Math>, u128>>,
-                all_index_2_0_1: SortedVec<RadixSortCtx<Row3_2_0_1<Math, Math, Math>, u128>>,
+                all_index_0_1_2: SortedVec<EclassCtx<Row3_0_1<Math, Math, Math>, u128>>,
+                all_index_1_0_2: SortedVec<EclassCtx<Row3_1_0_2<Math, Math, Math>, u128>>,
+                all_index_2_0_1: SortedVec<EclassCtx<Row3_2_0_1<Math, Math, Math>, u128>>,
             }
             struct AddUpdateCtx {
                 scratch: Vec<(Math, Math, Math)>,
                 deferred_insertions: Vec<(Math, Math, Math)>,
-                old: SortedVec<RadixSortCtx<Row3_0_1<Math, Math, Math>, u128>>,
+                old: SortedVec<EclassCtx<Row3_0_1<Math, Math, Math>, u128>>,
             }
             impl Relation for AddRelation {
                 type Row = (Math, Math, Math);

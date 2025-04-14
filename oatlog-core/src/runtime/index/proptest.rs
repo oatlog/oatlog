@@ -12,7 +12,7 @@ use crate::{
     runtime::{
         IndexRow, UnionFind,
         index::{
-            IndexStatic, RadixSortCtx, RowCtx, StdSortCtx, fallback_static::FallbackStatic,
+            EclassCtx, GeneralCtx, IndexStatic, RowCtx, fallback_static::FallbackStatic,
             sorted_vec::SortedVec,
         },
     },
@@ -25,7 +25,10 @@ use std::ops::RangeInclusive;
 
 mod macro_gen {
     use crate::runtime::*;
-    decl_row!(Row3_0_1 < T0 first 0 , T1 , T2 > (0 , 1) (2) (T0 , T1) (T2) fc = (0) (T0) where u128 = s => ((s . 0 . inner () as u128) << 64) + ((s . 1 . inner () as u128) << 32) + ((s . 2 . inner () as u128) << 0));
+    decl_row!(
+        Row3_0_1<T0 first 0, T1, T2> (T0 0, T1 1) (T2 2) (0 1 2) (2 1 0)
+        where u128 = s => ((s.0.inner() as u128) << 64) + ((s.1.inner() as u128) << 32) + ((s.2.inner() as u128) << 0)
+    );
     eclass_wrapper_ty!(Math);
 }
 use macro_gen::{Math, Row3_0_1};
@@ -192,7 +195,7 @@ const CASES: u32 = if cfg!(feature = "proptest-intense") {
 #[test]
 fn test_with_radix() {
     type Row = Row3_0_1<Math, Math, Math>;
-    type RC = RadixSortCtx<Row, u128>;
+    type RC = EclassCtx<Row, u128>;
 
     proptest!(
         ProptestConfig::with_cases(CASES),
@@ -205,7 +208,7 @@ fn test_with_radix() {
 #[test]
 fn test_with_std() {
     type Row = Row3_0_1<Math, Math, Math>;
-    type RC = StdSortCtx<Row>;
+    type RC = GeneralCtx<Row>;
 
     let proptest_config = ProptestConfig {
         max_shrink_iters: 16 * CASES,

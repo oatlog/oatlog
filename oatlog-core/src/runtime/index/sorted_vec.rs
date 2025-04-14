@@ -138,7 +138,7 @@ impl<RC: RowCtx> Index for SortedVec<RC> {
             debug_assert!(
                 conservative_start <= debug_start,
                 "conservative overshot convervative={conservative_start} precise={debug_start} levels={}",
-                self.interior_levels
+                self.interior_levels,
             );
             debug_assert!(
                 conservative_start + RC::B > debug_start,

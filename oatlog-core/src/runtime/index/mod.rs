@@ -1,4 +1,4 @@
-use crate::runtime::IndexRow;
+use crate::runtime::{IndexRow, SimdRow};
 use std::{marker::PhantomData, ops::RangeInclusive};
 
 mod fallback_static;
@@ -51,15 +51,15 @@ pub trait RowCtx: Default + std::fmt::Debug {
     fn sort(slice: &mut [Self::Row]);
 
     const B: usize;
-    type BTreeNode: Clone;
+    type BTreeNode: Clone + std::fmt::Debug;
     const BTREE_INFINITY: Self::BTreeNode;
     fn btree_node(rows: impl ExactSizeIterator<Item = Self::Row>) -> Self::BTreeNode;
     fn count_less_than(block: &Self::BTreeNode, key: Self::Row) -> usize;
 }
 
 #[derive(Default, Debug, Clone)]
-pub struct StdSortCtx<R: Ord>(PhantomData<*const R>);
-impl<R: IndexRow> RowCtx for StdSortCtx<R> {
+pub struct GeneralCtx<R: Ord>(PhantomData<*const R>);
+impl<R: IndexRow> RowCtx for GeneralCtx<R> {
     type Row = R;
     fn sort(slice: &mut [Self::Row]) {
         slice.sort_unstable();
@@ -80,14 +80,14 @@ impl<R: IndexRow> RowCtx for StdSortCtx<R> {
 }
 
 #[derive(Default, Debug, Clone)]
-pub struct RadixSortCtx<
-    R: Ord + Copy + voracious_radix_sort::Radixable<K>,
+pub struct EclassCtx<
+    R: Ord + Copy + voracious_radix_sort::Radixable<K> + SimdRow,
     K: Default + std::fmt::Debug + voracious_radix_sort::RadixKey,
 >(PhantomData<*const (R, K)>);
 impl<
     K: Default + std::fmt::Debug + voracious_radix_sort::RadixKey,
-    R: IndexRow + voracious_radix_sort::Radixable<K>,
-> RowCtx for RadixSortCtx<R, K>
+    R: IndexRow + voracious_radix_sort::Radixable<K> + SimdRow,
+> RowCtx for EclassCtx<R, K>
 {
     type Row = R;
     fn sort(slice: &mut [Self::Row]) {
@@ -95,18 +95,23 @@ impl<
         slice.voracious_sort();
     }
 
-    const B: usize = 2;
-    type BTreeNode = [R; 2];
-    const BTREE_INFINITY: Self::BTreeNode = [R::MAX; 2];
+    // 4 appears optimal, and it also aligns well with SSE2s i32x4.
+    const B: usize = 4;
+    type BTreeNode = <R as SimdRow>::RowBlock;
+    const BTREE_INFINITY: Self::BTreeNode = <R as SimdRow>::INFINITY;
     fn btree_node(mut rows: impl ExactSizeIterator<Item = Self::Row>) -> Self::BTreeNode {
         assert_eq!(rows.len(), Self::B);
-        let ret = [rows.next().unwrap(), rows.next().unwrap()];
+        let ret = [
+            rows.next().unwrap(),
+            rows.next().unwrap(),
+            rows.next().unwrap(),
+            rows.next().unwrap(),
+        ];
         assert!(rows.next().is_none());
-        ret
+        SimdRow::new_block(ret)
     }
-    // TODO loke: SIMD here
     fn count_less_than(block: &Self::BTreeNode, key: Self::Row) -> usize {
-        block.iter().take_while(|r| **r < key).count()
+        SimdRow::count_less_than(block, key)
     }
 }
 
