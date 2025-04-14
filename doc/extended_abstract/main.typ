@@ -212,9 +212,7 @@ incredibly amendable to SIMD.
 
 None of the following sections have been fully implemented yet and we expect significant performance benefits from them.
 
-== Multiple implicit functionality and Multiple return
-
-#TODO[merge this and "Merging relations and equality modulo permutation"]
+== Multiple implicit functionality and merging relations
 
 For a relation such as $"Add"(a, b, c)$ (meaning $a + b = c$), there is an implicit functionality rule $a,b -> c$ which is applied until closure during canonicalization.
 There is nothing preventing this rule from being implemented in userspace, but that would have worse performance because it involves a join:
@@ -223,16 +221,14 @@ There is nothing preventing this rule from being implemented in userspace, but t
 (rule ((= c1 (Add a b)) (= c2 (Add a b))) ((union c1 c2)))
 ```
 
-A user might also want to implement the implicit functionality rule $b,c -> c$ (due to $b - c = a$) and $c,a -> b$ (due to $c - a = b$).
-This motivates allowing multiple implicit functionality rules which oatlog supports by implementing each rule as a functional dependence on one of the indexes.
-Because implicit functionality is implemented in the indexes, we support multiple return for free, since multiple return would for example be $x -> y,z$.
-
-== Merging relations and equality modulo permutation.
-
 For the relations Add and Sub we have $"Add"(a,b,c) <==> "Sub"(c,b,a)$ (due to $a + b = c <==> c - a = b$), meaning that Add and Sub are really just the same relation but with permuted columns. Additionally we might have rules on commutativity, $"Add"(a,b,c) <==> "Add"(b,a,c)$.
 
-This motivates merging relations along with a permutation group#footnote[Slotted E-graphs @slotted_egraph ] and preprocessing all rules such that when inserting a row, all permutations of that row are also inserted.
+This motivates merging relations along with a permutation group#footnote[Slotted E-graphs @slotted_egraph generalize this and avoids storing the same permuted e-node multiple times.] and preprocessing all rules such that when inserting a row, all permutations of that row are also inserted.
 This results in less work during canonicalization due to having fewer indexes.
+This motivates allowing multiple implicit functionality rules which oatlog supports by implementing each rule as a functional dependence on one of the indexes.
+
+// A user might also want to implement the implicit functionality rule $b,c -> c$ (due to $b - c = a$) and $c,a -> b$ (due to $c - a = b$).
+// Because implicit functionality is implemented in the indexes, we support multiple return for free, since multiple return would for example be $x -> y,z$.
 
 == Rule transformation
 
