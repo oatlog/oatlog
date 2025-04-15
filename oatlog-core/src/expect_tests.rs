@@ -672,59 +672,53 @@ fn hir_global() {
                         name: "Mul",
                         param_types: {c0: t3, c1: t3, c2: t3},
                         kind: Table {
-                            index_to_info: {ir0: 0_1_2 conflict[..2] => [2:union], ir1: 1_0_2, ir2: 2_0_1},
+                            index_to_info: {ir0: 0_1_2 conflict[..2] => [2:union]},
                             usage_to_info: {
                                 iu0: ir0[..2],
-                                iu1: ir0[..1],
-                                iu2: ir1[..1],
-                                iu3: ir2[..1],
-                                iu4: ir0[..2],
+                                iu1: ir0[..3],
+                                iu2: ir0[..2],
                             },
-                            column_back_reference: {c0: iu1, c1: iu2, c2: iu3},
+                            column_back_reference: {},
                         },
                     },
                     r16: RelationData {
                         name: "Add",
                         param_types: {c0: t3, c1: t3, c2: t3},
                         kind: Table {
-                            index_to_info: {ir0: 0_1_2 conflict[..2] => [2:union], ir1: 1_0_2, ir2: 2_0_1},
+                            index_to_info: {ir0: 0_1_2 conflict[..2] => [2:union]},
                             usage_to_info: {
                                 iu0: ir0[..2],
-                                iu1: ir0[..1],
-                                iu2: ir1[..1],
-                                iu3: ir2[..1],
-                                iu4: ir0[..2],
+                                iu1: ir0[..3],
+                                iu2: ir0[..2],
                             },
-                            column_back_reference: {c0: iu1, c1: iu2, c2: iu3},
+                            column_back_reference: {},
                         },
                     },
                     r17: RelationData {
                         name: "Const",
                         param_types: {c0: t1, c1: t3},
                         kind: Table {
-                            index_to_info: {ir0: 0_1 conflict[..1] => [1:union], ir1: 1_0},
+                            index_to_info: {ir0: 0_1 conflict[..1] => [1:union]},
                             usage_to_info: {
                                 iu0: ir0[..1],
                                 iu1: ir0[..1],
-                                iu2: ir0[..1],
-                                iu3: ir1[..1],
-                                iu4: ir0[..1],
+                                iu2: ir0[..2],
+                                iu3: ir0[..1],
                             },
-                            column_back_reference: {c0: iu2, c1: iu3},
+                            column_back_reference: {},
                         },
                     },
                     r18: RelationData {
                         name: "Var",
                         param_types: {c0: t2, c1: t3},
                         kind: Table {
-                            index_to_info: {ir0: 0_1 conflict[..1] => [1:union], ir1: 1_0},
+                            index_to_info: {ir0: 0_1 conflict[..1] => [1:union]},
                             usage_to_info: {
                                 iu0: ir0[..1],
-                                iu1: ir0[..1],
-                                iu2: ir1[..1],
-                                iu3: ir0[..1],
+                                iu1: ir0[..2],
+                                iu2: ir0[..1],
                             },
-                            column_back_reference: {c0: iu1, c1: iu2},
+                            column_back_reference: {},
                         },
                     },
                     r19: RelationData {
@@ -1062,34 +1056,30 @@ fn codegen_constant_propagation() {
                         name: "Add",
                         param_types: {c0: t3, c1: t3, c2: t3},
                         kind: Table {
-                            index_to_info: {ir0: 0_1_2 conflict[..2] => [2:union], ir1: 1_0_2, ir2: 2_0_1},
+                            index_to_info: {ir0: 0_1_2 conflict[..2] => [2:union], ir1: 1_0_2},
                             usage_to_info: {
                                 iu0: ir0[..2],
                                 iu1: ir0[..1],
                                 iu2: ir1[..1],
-                                iu3: ir0[..1],
-                                iu4: ir1[..1],
-                                iu5: ir2[..1],
-                                iu6: ir0[..2],
+                                iu3: ir0[..3],
+                                iu4: ir0[..2],
                             },
-                            column_back_reference: {c0: iu3, c1: iu4, c2: iu5},
+                            column_back_reference: {},
                         },
                     },
                     r16: RelationData {
                         name: "Mul",
                         param_types: {c0: t3, c1: t3, c2: t3},
                         kind: Table {
-                            index_to_info: {ir0: 0_1_2 conflict[..2] => [2:union], ir1: 1_0_2, ir2: 2_0_1},
+                            index_to_info: {ir0: 0_1_2 conflict[..2] => [2:union], ir1: 1_0_2},
                             usage_to_info: {
                                 iu0: ir0[..2],
                                 iu1: ir0[..1],
                                 iu2: ir1[..1],
-                                iu3: ir0[..1],
-                                iu4: ir1[..1],
-                                iu5: ir2[..1],
-                                iu6: ir0[..2],
+                                iu3: ir0[..3],
+                                iu4: ir0[..2],
                             },
-                            column_back_reference: {c0: iu3, c1: iu4, c2: iu5},
+                            column_back_reference: {},
                         },
                     },
                     r17: RelationData {
@@ -1109,11 +1099,10 @@ fn codegen_constant_propagation() {
                                 iu8: ir1[..1],
                                 iu9: ir1[..1],
                                 iu10: ir1[..1],
-                                iu11: ir0[..1],
-                                iu12: ir1[..1],
-                                iu13: ir0[..1],
+                                iu11: ir0[..2],
+                                iu12: ir0[..1],
                             },
-                            column_back_reference: {c0: iu11, c1: iu12},
+                            column_back_reference: {},
                         },
                     },
                 },
@@ -1244,7 +1233,6 @@ fn codegen_constant_propagation() {
             decl_row ! (Row2_1_0 < T0 , T1 first 1 > (T1 1 , T0 0) () (0 1) (1 0) where u64 = s => ((s . 1 . inner () as u64) << 32) + ((s . 0 . inner () as u64) << 0));
             decl_row ! (Row3_0_1 < T0 first 0 , T1 , T2 > (T0 0 , T1 1) (T2 2) (0 1 2) (2 1 0) where u128 = s => ((s . 0 . inner () as u128) << 64) + ((s . 1 . inner () as u128) << 32) + ((s . 2 . inner () as u128) << 0));
             decl_row ! (Row3_1_0_2 < T0 , T1 first 1 , T2 > (T1 1 , T0 0 , T2 2) () (0 1 2) (2 1 0) where u128 = s => ((s . 1 . inner () as u128) << 64) + ((s . 0 . inner () as u128) << 32) + ((s . 2 . inner () as u128) << 0));
-            decl_row ! (Row3_2_0_1 < T0 , T1 , T2 first 2 > (T2 2 , T0 0 , T1 1) () (0 1 2) (2 1 0) where u128 = s => ((s . 2 . inner () as u128) << 64) + ((s . 0 . inner () as u128) << 32) + ((s . 1 . inner () as u128) << 0));
             eclass_wrapper_ty!(Math);
             fn i64_add012(a: i64, b: i64) -> impl Iterator<Item = (i64,)> {
                 a.checked_add(b).map(|x| (x,)).into_iter()
@@ -1297,7 +1285,6 @@ fn codegen_constant_propagation() {
                 new: Vec<<Self as Relation>::Row>,
                 all_index_0_1_2: SortedVec<EclassCtx<Row3_0_1<Math, Math, Math>, u128>>,
                 all_index_1_0_2: SortedVec<EclassCtx<Row3_1_0_2<Math, Math, Math>, u128>>,
-                all_index_2_0_1: SortedVec<EclassCtx<Row3_2_0_1<Math, Math, Math>, u128>>,
             }
             struct AddUpdateCtx {
                 scratch: Vec<(Math, Math, Math)>,
@@ -1308,7 +1295,7 @@ fn codegen_constant_propagation() {
                 type Row = (Math, Math, Math);
                 type UpdateCtx = AddUpdateCtx;
                 type Unification = Unification;
-                const COST: u32 = 9u32;
+                const COST: u32 = 6u32;
                 fn new() -> Self {
                     Self::default()
                 }
@@ -1386,10 +1373,7 @@ fn codegen_constant_propagation() {
                     self.all_index_0_1_2.finalize();
                     self.all_index_1_0_2
                         .recreate_from(&self.all_index_0_1_2.as_slice());
-                    self.all_index_2_0_1
-                        .recreate_from(&self.all_index_0_1_2.as_slice());
                     assert_eq!(self.all_index_1_0_2.len(), self.all_index_0_1_2.len());
-                    assert_eq!(self.all_index_2_0_1.len(), self.all_index_0_1_2.len());
                     self.new.extend(self.all_index_0_1_2.minus(&ctx.old));
                 }
             }
@@ -1409,10 +1393,10 @@ fn codegen_constant_propagation() {
                         .range((Math::MIN_ID, x1, Math::MIN_ID)..=(Math::MAX_ID, x1, Math::MAX_ID))
                         .map(|(x0, x1, x2)| (x0, x2))
                 }
-                fn iter1_2_0_1(&self, x2: Math) -> impl Iterator<Item = (Math, Math)> + use<'_> {
-                    self.all_index_2_0_1
-                        .range((Math::MIN_ID, Math::MIN_ID, x2)..=(Math::MAX_ID, Math::MAX_ID, x2))
-                        .map(|(x0, x1, x2)| (x0, x1))
+                fn iter3_0_1_2(&self, x0: Math, x1: Math, x2: Math) -> impl Iterator<Item = ()> + use<'_> {
+                    self.all_index_0_1_2
+                        .range((x0, x1, x2)..=(x0, x1, x2))
+                        .map(|(x0, x1, x2)| ())
                 }
                 fn check2_0_1_2(&self, x0: Math, x1: Math) -> bool {
                     self.iter2_0_1_2(x0, x1).next().is_some()
@@ -1423,8 +1407,8 @@ fn codegen_constant_propagation() {
                 fn check1_1_0_2(&self, x1: Math) -> bool {
                     self.iter1_1_0_2(x1).next().is_some()
                 }
-                fn check1_2_0_1(&self, x2: Math) -> bool {
-                    self.iter1_2_0_1(x2).next().is_some()
+                fn check3_0_1_2(&self, x0: Math, x1: Math, x2: Math) -> bool {
+                    self.iter3_0_1_2(x0, x1, x2).next().is_some()
                 }
                 #[allow(unreachable_code)]
                 fn entry2_0_1_2(&self, x0: Math, x1: Math, delta: &mut Delta, uf: &mut Unification) -> (Math,) {
@@ -1435,13 +1419,27 @@ fn codegen_constant_propagation() {
                     delta.add_.push((x0, x1, x2));
                     (x2,)
                 }
+                #[allow(unreachable_code)]
+                fn entry3_0_1_2(
+                    &self,
+                    x0: Math,
+                    x1: Math,
+                    x2: Math,
+                    delta: &mut Delta,
+                    uf: &mut Unification,
+                ) -> () {
+                    if let Some(()) = self.iter3_0_1_2(x0, x1, x2).next() {
+                        return ();
+                    }
+                    delta.add_.push((x0, x1, x2));
+                    ()
+                }
             }
             #[derive(Debug, Default)]
             struct MulRelation {
                 new: Vec<<Self as Relation>::Row>,
                 all_index_0_1_2: SortedVec<EclassCtx<Row3_0_1<Math, Math, Math>, u128>>,
                 all_index_1_0_2: SortedVec<EclassCtx<Row3_1_0_2<Math, Math, Math>, u128>>,
-                all_index_2_0_1: SortedVec<EclassCtx<Row3_2_0_1<Math, Math, Math>, u128>>,
             }
             struct MulUpdateCtx {
                 scratch: Vec<(Math, Math, Math)>,
@@ -1452,7 +1450,7 @@ fn codegen_constant_propagation() {
                 type Row = (Math, Math, Math);
                 type UpdateCtx = MulUpdateCtx;
                 type Unification = Unification;
-                const COST: u32 = 9u32;
+                const COST: u32 = 6u32;
                 fn new() -> Self {
                     Self::default()
                 }
@@ -1530,10 +1528,7 @@ fn codegen_constant_propagation() {
                     self.all_index_0_1_2.finalize();
                     self.all_index_1_0_2
                         .recreate_from(&self.all_index_0_1_2.as_slice());
-                    self.all_index_2_0_1
-                        .recreate_from(&self.all_index_0_1_2.as_slice());
                     assert_eq!(self.all_index_1_0_2.len(), self.all_index_0_1_2.len());
-                    assert_eq!(self.all_index_2_0_1.len(), self.all_index_0_1_2.len());
                     self.new.extend(self.all_index_0_1_2.minus(&ctx.old));
                 }
             }
@@ -1553,10 +1548,10 @@ fn codegen_constant_propagation() {
                         .range((Math::MIN_ID, x1, Math::MIN_ID)..=(Math::MAX_ID, x1, Math::MAX_ID))
                         .map(|(x0, x1, x2)| (x0, x2))
                 }
-                fn iter1_2_0_1(&self, x2: Math) -> impl Iterator<Item = (Math, Math)> + use<'_> {
-                    self.all_index_2_0_1
-                        .range((Math::MIN_ID, Math::MIN_ID, x2)..=(Math::MAX_ID, Math::MAX_ID, x2))
-                        .map(|(x0, x1, x2)| (x0, x1))
+                fn iter3_0_1_2(&self, x0: Math, x1: Math, x2: Math) -> impl Iterator<Item = ()> + use<'_> {
+                    self.all_index_0_1_2
+                        .range((x0, x1, x2)..=(x0, x1, x2))
+                        .map(|(x0, x1, x2)| ())
                 }
                 fn check2_0_1_2(&self, x0: Math, x1: Math) -> bool {
                     self.iter2_0_1_2(x0, x1).next().is_some()
@@ -1567,8 +1562,8 @@ fn codegen_constant_propagation() {
                 fn check1_1_0_2(&self, x1: Math) -> bool {
                     self.iter1_1_0_2(x1).next().is_some()
                 }
-                fn check1_2_0_1(&self, x2: Math) -> bool {
-                    self.iter1_2_0_1(x2).next().is_some()
+                fn check3_0_1_2(&self, x0: Math, x1: Math, x2: Math) -> bool {
+                    self.iter3_0_1_2(x0, x1, x2).next().is_some()
                 }
                 #[allow(unreachable_code)]
                 fn entry2_0_1_2(&self, x0: Math, x1: Math, delta: &mut Delta, uf: &mut Unification) -> (Math,) {
@@ -1578,6 +1573,21 @@ fn codegen_constant_propagation() {
                     let x2 = uf.math_.add_eclass();
                     delta.mul_.push((x0, x1, x2));
                     (x2,)
+                }
+                #[allow(unreachable_code)]
+                fn entry3_0_1_2(
+                    &self,
+                    x0: Math,
+                    x1: Math,
+                    x2: Math,
+                    delta: &mut Delta,
+                    uf: &mut Unification,
+                ) -> () {
+                    if let Some(()) = self.iter3_0_1_2(x0, x1, x2).next() {
+                        return ();
+                    }
+                    delta.mul_.push((x0, x1, x2));
+                    ()
                 }
             }
             #[derive(Debug, Default)]
@@ -1682,11 +1692,19 @@ fn codegen_constant_propagation() {
                         .range((std::primitive::i64::MIN_ID, x1)..=(std::primitive::i64::MAX_ID, x1))
                         .map(|(x0, x1)| (x0,))
                 }
+                fn iter2_0_1(&self, x0: std::primitive::i64, x1: Math) -> impl Iterator<Item = ()> + use<'_> {
+                    self.all_index_0_1
+                        .range((x0, x1)..=(x0, x1))
+                        .map(|(x0, x1)| ())
+                }
                 fn check1_0_1(&self, x0: std::primitive::i64) -> bool {
                     self.iter1_0_1(x0).next().is_some()
                 }
                 fn check1_1_0(&self, x1: Math) -> bool {
                     self.iter1_1_0(x1).next().is_some()
+                }
+                fn check2_0_1(&self, x0: std::primitive::i64, x1: Math) -> bool {
+                    self.iter2_0_1(x0, x1).next().is_some()
                 }
                 #[allow(unreachable_code)]
                 fn entry1_0_1(
@@ -1701,6 +1719,20 @@ fn codegen_constant_propagation() {
                     let x1 = uf.math_.add_eclass();
                     delta.const_.push((x0, x1));
                     (x1,)
+                }
+                #[allow(unreachable_code)]
+                fn entry2_0_1(
+                    &self,
+                    x0: std::primitive::i64,
+                    x1: Math,
+                    delta: &mut Delta,
+                    uf: &mut Unification,
+                ) -> () {
+                    if let Some(()) = self.iter2_0_1(x0, x1).next() {
+                        return ();
+                    }
+                    delta.const_.push((x0, x1));
+                    ()
                 }
             }
             #[derive(Debug, Default)]
@@ -1925,8 +1957,6 @@ fn codegen_commutative() {
         expected_codegen: Some(expect![[r#"
             use oatlog::runtime::{self, *};
             decl_row ! (Row3_0_1 < T0 first 0 , T1 , T2 > (T0 0 , T1 1) (T2 2) (0 1 2) (2 1 0) where u128 = s => ((s . 0 . inner () as u128) << 64) + ((s . 1 . inner () as u128) << 32) + ((s . 2 . inner () as u128) << 0));
-            decl_row ! (Row3_1_0_2 < T0 , T1 first 1 , T2 > (T1 1 , T0 0 , T2 2) () (0 1 2) (2 1 0) where u128 = s => ((s . 1 . inner () as u128) << 64) + ((s . 0 . inner () as u128) << 32) + ((s . 2 . inner () as u128) << 0));
-            decl_row ! (Row3_2_0_1 < T0 , T1 , T2 first 2 > (T2 2 , T0 0 , T1 1) () (0 1 2) (2 1 0) where u128 = s => ((s . 2 . inner () as u128) << 64) + ((s . 0 . inner () as u128) << 32) + ((s . 1 . inner () as u128) << 0));
             eclass_wrapper_ty!(Math);
             fn i64_add012(a: i64, b: i64) -> impl Iterator<Item = (i64,)> {
                 a.checked_add(b).map(|x| (x,)).into_iter()
@@ -1978,8 +2008,6 @@ fn codegen_commutative() {
             struct AddRelation {
                 new: Vec<<Self as Relation>::Row>,
                 all_index_0_1_2: SortedVec<EclassCtx<Row3_0_1<Math, Math, Math>, u128>>,
-                all_index_1_0_2: SortedVec<EclassCtx<Row3_1_0_2<Math, Math, Math>, u128>>,
-                all_index_2_0_1: SortedVec<EclassCtx<Row3_2_0_1<Math, Math, Math>, u128>>,
             }
             struct AddUpdateCtx {
                 scratch: Vec<(Math, Math, Math)>,
@@ -1990,7 +2018,7 @@ fn codegen_commutative() {
                 type Row = (Math, Math, Math);
                 type UpdateCtx = AddUpdateCtx;
                 type Unification = Unification;
-                const COST: u32 = 9u32;
+                const COST: u32 = 3u32;
                 fn new() -> Self {
                     Self::default()
                 }
@@ -2066,12 +2094,6 @@ fn codegen_commutative() {
                 }
                 fn update_finalize(&mut self, ctx: Self::UpdateCtx, uf: &mut Unification) {
                     self.all_index_0_1_2.finalize();
-                    self.all_index_1_0_2
-                        .recreate_from(&self.all_index_0_1_2.as_slice());
-                    self.all_index_2_0_1
-                        .recreate_from(&self.all_index_0_1_2.as_slice());
-                    assert_eq!(self.all_index_1_0_2.len(), self.all_index_0_1_2.len());
-                    assert_eq!(self.all_index_2_0_1.len(), self.all_index_0_1_2.len());
                     self.new.extend(self.all_index_0_1_2.minus(&ctx.old));
                 }
             }
@@ -2081,32 +2103,16 @@ fn codegen_commutative() {
                         .range((x0, x1, Math::MIN_ID)..=(x0, x1, Math::MAX_ID))
                         .map(|(x0, x1, x2)| (x2,))
                 }
-                fn iter1_0_1_2(&self, x0: Math) -> impl Iterator<Item = (Math, Math)> + use<'_> {
+                fn iter3_0_1_2(&self, x0: Math, x1: Math, x2: Math) -> impl Iterator<Item = ()> + use<'_> {
                     self.all_index_0_1_2
-                        .range((x0, Math::MIN_ID, Math::MIN_ID)..=(x0, Math::MAX_ID, Math::MAX_ID))
-                        .map(|(x0, x1, x2)| (x1, x2))
-                }
-                fn iter1_1_0_2(&self, x1: Math) -> impl Iterator<Item = (Math, Math)> + use<'_> {
-                    self.all_index_1_0_2
-                        .range((Math::MIN_ID, x1, Math::MIN_ID)..=(Math::MAX_ID, x1, Math::MAX_ID))
-                        .map(|(x0, x1, x2)| (x0, x2))
-                }
-                fn iter1_2_0_1(&self, x2: Math) -> impl Iterator<Item = (Math, Math)> + use<'_> {
-                    self.all_index_2_0_1
-                        .range((Math::MIN_ID, Math::MIN_ID, x2)..=(Math::MAX_ID, Math::MAX_ID, x2))
-                        .map(|(x0, x1, x2)| (x0, x1))
+                        .range((x0, x1, x2)..=(x0, x1, x2))
+                        .map(|(x0, x1, x2)| ())
                 }
                 fn check2_0_1_2(&self, x0: Math, x1: Math) -> bool {
                     self.iter2_0_1_2(x0, x1).next().is_some()
                 }
-                fn check1_0_1_2(&self, x0: Math) -> bool {
-                    self.iter1_0_1_2(x0).next().is_some()
-                }
-                fn check1_1_0_2(&self, x1: Math) -> bool {
-                    self.iter1_1_0_2(x1).next().is_some()
-                }
-                fn check1_2_0_1(&self, x2: Math) -> bool {
-                    self.iter1_2_0_1(x2).next().is_some()
+                fn check3_0_1_2(&self, x0: Math, x1: Math, x2: Math) -> bool {
+                    self.iter3_0_1_2(x0, x1, x2).next().is_some()
                 }
                 #[allow(unreachable_code)]
                 fn entry2_0_1_2(&self, x0: Math, x1: Math, delta: &mut Delta, uf: &mut Unification) -> (Math,) {
@@ -2116,6 +2122,21 @@ fn codegen_commutative() {
                     let x2 = uf.math_.add_eclass();
                     delta.add_.push((x0, x1, x2));
                     (x2,)
+                }
+                #[allow(unreachable_code)]
+                fn entry3_0_1_2(
+                    &self,
+                    x0: Math,
+                    x1: Math,
+                    x2: Math,
+                    delta: &mut Delta,
+                    uf: &mut Unification,
+                ) -> () {
+                    if let Some(()) = self.iter3_0_1_2(x0, x1, x2).next() {
+                        return ();
+                    }
+                    delta.add_.push((x0, x1, x2));
+                    ()
                 }
             }
             #[derive(Debug, Default)]
@@ -2378,29 +2399,26 @@ fn regression_entry2() {
                         name: "Sub",
                         param_types: {c0: t3, c1: t3, c2: t3},
                         kind: Table {
-                            index_to_info: {ir0: 0_1_2 conflict[..2] => [2:union], ir1: 1_0_2, ir2: 2_0_1},
+                            index_to_info: {ir0: 0_1_2 conflict[..2] => [2:union]},
                             usage_to_info: {
                                 iu0: ir0[..2],
-                                iu1: ir0[..1],
-                                iu2: ir1[..1],
-                                iu3: ir2[..1],
-                                iu4: ir0[..2],
+                                iu1: ir0[..3],
+                                iu2: ir0[..2],
                             },
-                            column_back_reference: {c0: iu1, c1: iu2, c2: iu3},
+                            column_back_reference: {},
                         },
                     },
                     r16: RelationData {
                         name: "Const",
                         param_types: {c0: t1, c1: t3},
                         kind: Table {
-                            index_to_info: {ir0: 0_1 conflict[..1] => [1:union], ir1: 1_0},
+                            index_to_info: {ir0: 0_1 conflict[..1] => [1:union]},
                             usage_to_info: {
                                 iu0: ir0[..1],
-                                iu1: ir0[..1],
-                                iu2: ir1[..1],
-                                iu3: ir0[..1],
+                                iu1: ir0[..2],
+                                iu2: ir0[..1],
                             },
-                            column_back_reference: {c0: iu1, c1: iu2},
+                            column_back_reference: {},
                         },
                     },
                     r17: RelationData {
@@ -2440,10 +2458,7 @@ fn regression_entry2() {
         expected_codegen: Some(expect![[r#"
             use oatlog::runtime::{self, *};
             decl_row ! (Row2_0 < T0 first 0 , T1 > (T0 0) (T1 1) (0 1) (1 0) where u64 = s => ((s . 0 . inner () as u64) << 32) + ((s . 1 . inner () as u64) << 0));
-            decl_row ! (Row2_1_0 < T0 , T1 first 1 > (T1 1 , T0 0) () (0 1) (1 0) where u64 = s => ((s . 1 . inner () as u64) << 32) + ((s . 0 . inner () as u64) << 0));
             decl_row ! (Row3_0_1 < T0 first 0 , T1 , T2 > (T0 0 , T1 1) (T2 2) (0 1 2) (2 1 0) where u128 = s => ((s . 0 . inner () as u128) << 64) + ((s . 1 . inner () as u128) << 32) + ((s . 2 . inner () as u128) << 0));
-            decl_row ! (Row3_1_0_2 < T0 , T1 first 1 , T2 > (T1 1 , T0 0 , T2 2) () (0 1 2) (2 1 0) where u128 = s => ((s . 1 . inner () as u128) << 64) + ((s . 0 . inner () as u128) << 32) + ((s . 2 . inner () as u128) << 0));
-            decl_row ! (Row3_2_0_1 < T0 , T1 , T2 first 2 > (T2 2 , T0 0 , T1 1) () (0 1 2) (2 1 0) where u128 = s => ((s . 2 . inner () as u128) << 64) + ((s . 0 . inner () as u128) << 32) + ((s . 1 . inner () as u128) << 0));
             eclass_wrapper_ty!(Math);
             fn i64_add012(a: i64, b: i64) -> impl Iterator<Item = (i64,)> {
                 a.checked_add(b).map(|x| (x,)).into_iter()
@@ -2495,8 +2510,6 @@ fn regression_entry2() {
             struct SubRelation {
                 new: Vec<<Self as Relation>::Row>,
                 all_index_0_1_2: SortedVec<EclassCtx<Row3_0_1<Math, Math, Math>, u128>>,
-                all_index_1_0_2: SortedVec<EclassCtx<Row3_1_0_2<Math, Math, Math>, u128>>,
-                all_index_2_0_1: SortedVec<EclassCtx<Row3_2_0_1<Math, Math, Math>, u128>>,
             }
             struct SubUpdateCtx {
                 scratch: Vec<(Math, Math, Math)>,
@@ -2507,7 +2520,7 @@ fn regression_entry2() {
                 type Row = (Math, Math, Math);
                 type UpdateCtx = SubUpdateCtx;
                 type Unification = Unification;
-                const COST: u32 = 9u32;
+                const COST: u32 = 3u32;
                 fn new() -> Self {
                     Self::default()
                 }
@@ -2583,12 +2596,6 @@ fn regression_entry2() {
                 }
                 fn update_finalize(&mut self, ctx: Self::UpdateCtx, uf: &mut Unification) {
                     self.all_index_0_1_2.finalize();
-                    self.all_index_1_0_2
-                        .recreate_from(&self.all_index_0_1_2.as_slice());
-                    self.all_index_2_0_1
-                        .recreate_from(&self.all_index_0_1_2.as_slice());
-                    assert_eq!(self.all_index_1_0_2.len(), self.all_index_0_1_2.len());
-                    assert_eq!(self.all_index_2_0_1.len(), self.all_index_0_1_2.len());
                     self.new.extend(self.all_index_0_1_2.minus(&ctx.old));
                 }
             }
@@ -2598,32 +2605,16 @@ fn regression_entry2() {
                         .range((x0, x1, Math::MIN_ID)..=(x0, x1, Math::MAX_ID))
                         .map(|(x0, x1, x2)| (x2,))
                 }
-                fn iter1_0_1_2(&self, x0: Math) -> impl Iterator<Item = (Math, Math)> + use<'_> {
+                fn iter3_0_1_2(&self, x0: Math, x1: Math, x2: Math) -> impl Iterator<Item = ()> + use<'_> {
                     self.all_index_0_1_2
-                        .range((x0, Math::MIN_ID, Math::MIN_ID)..=(x0, Math::MAX_ID, Math::MAX_ID))
-                        .map(|(x0, x1, x2)| (x1, x2))
-                }
-                fn iter1_1_0_2(&self, x1: Math) -> impl Iterator<Item = (Math, Math)> + use<'_> {
-                    self.all_index_1_0_2
-                        .range((Math::MIN_ID, x1, Math::MIN_ID)..=(Math::MAX_ID, x1, Math::MAX_ID))
-                        .map(|(x0, x1, x2)| (x0, x2))
-                }
-                fn iter1_2_0_1(&self, x2: Math) -> impl Iterator<Item = (Math, Math)> + use<'_> {
-                    self.all_index_2_0_1
-                        .range((Math::MIN_ID, Math::MIN_ID, x2)..=(Math::MAX_ID, Math::MAX_ID, x2))
-                        .map(|(x0, x1, x2)| (x0, x1))
+                        .range((x0, x1, x2)..=(x0, x1, x2))
+                        .map(|(x0, x1, x2)| ())
                 }
                 fn check2_0_1_2(&self, x0: Math, x1: Math) -> bool {
                     self.iter2_0_1_2(x0, x1).next().is_some()
                 }
-                fn check1_0_1_2(&self, x0: Math) -> bool {
-                    self.iter1_0_1_2(x0).next().is_some()
-                }
-                fn check1_1_0_2(&self, x1: Math) -> bool {
-                    self.iter1_1_0_2(x1).next().is_some()
-                }
-                fn check1_2_0_1(&self, x2: Math) -> bool {
-                    self.iter1_2_0_1(x2).next().is_some()
+                fn check3_0_1_2(&self, x0: Math, x1: Math, x2: Math) -> bool {
+                    self.iter3_0_1_2(x0, x1, x2).next().is_some()
                 }
                 #[allow(unreachable_code)]
                 fn entry2_0_1_2(&self, x0: Math, x1: Math, delta: &mut Delta, uf: &mut Unification) -> (Math,) {
@@ -2634,12 +2625,26 @@ fn regression_entry2() {
                     delta.sub_.push((x0, x1, x2));
                     (x2,)
                 }
+                #[allow(unreachable_code)]
+                fn entry3_0_1_2(
+                    &self,
+                    x0: Math,
+                    x1: Math,
+                    x2: Math,
+                    delta: &mut Delta,
+                    uf: &mut Unification,
+                ) -> () {
+                    if let Some(()) = self.iter3_0_1_2(x0, x1, x2).next() {
+                        return ();
+                    }
+                    delta.sub_.push((x0, x1, x2));
+                    ()
+                }
             }
             #[derive(Debug, Default)]
             struct ConstRelation {
                 new: Vec<<Self as Relation>::Row>,
                 all_index_0_1: SortedVec<GeneralCtx<Row2_0<std::primitive::i64, Math>>>,
-                all_index_1_0: SortedVec<GeneralCtx<Row2_1_0<std::primitive::i64, Math>>>,
             }
             struct ConstUpdateCtx {
                 scratch: Vec<(std::primitive::i64, Math)>,
@@ -2650,7 +2655,7 @@ fn regression_entry2() {
                 type Row = (std::primitive::i64, Math);
                 type UpdateCtx = ConstUpdateCtx;
                 type Unification = Unification;
-                const COST: u32 = 4u32;
+                const COST: u32 = 2u32;
                 fn new() -> Self {
                     Self::default()
                 }
@@ -2720,9 +2725,6 @@ fn regression_entry2() {
                 }
                 fn update_finalize(&mut self, ctx: Self::UpdateCtx, uf: &mut Unification) {
                     self.all_index_0_1.finalize();
-                    self.all_index_1_0
-                        .recreate_from(&self.all_index_0_1.as_slice());
-                    assert_eq!(self.all_index_1_0.len(), self.all_index_0_1.len());
                     self.new.extend(self.all_index_0_1.minus(&ctx.old));
                 }
             }
@@ -2732,16 +2734,16 @@ fn regression_entry2() {
                         .range((x0, Math::MIN_ID)..=(x0, Math::MAX_ID))
                         .map(|(x0, x1)| (x1,))
                 }
-                fn iter1_1_0(&self, x1: Math) -> impl Iterator<Item = (std::primitive::i64,)> + use<'_> {
-                    self.all_index_1_0
-                        .range((std::primitive::i64::MIN_ID, x1)..=(std::primitive::i64::MAX_ID, x1))
-                        .map(|(x0, x1)| (x0,))
+                fn iter2_0_1(&self, x0: std::primitive::i64, x1: Math) -> impl Iterator<Item = ()> + use<'_> {
+                    self.all_index_0_1
+                        .range((x0, x1)..=(x0, x1))
+                        .map(|(x0, x1)| ())
                 }
                 fn check1_0_1(&self, x0: std::primitive::i64) -> bool {
                     self.iter1_0_1(x0).next().is_some()
                 }
-                fn check1_1_0(&self, x1: Math) -> bool {
-                    self.iter1_1_0(x1).next().is_some()
+                fn check2_0_1(&self, x0: std::primitive::i64, x1: Math) -> bool {
+                    self.iter2_0_1(x0, x1).next().is_some()
                 }
                 #[allow(unreachable_code)]
                 fn entry1_0_1(
@@ -2756,6 +2758,20 @@ fn regression_entry2() {
                     let x1 = uf.math_.add_eclass();
                     delta.const_.push((x0, x1));
                     (x1,)
+                }
+                #[allow(unreachable_code)]
+                fn entry2_0_1(
+                    &self,
+                    x0: std::primitive::i64,
+                    x1: Math,
+                    delta: &mut Delta,
+                    uf: &mut Unification,
+                ) -> () {
+                    if let Some(()) = self.iter2_0_1(x0, x1).next() {
+                        return ();
+                    }
+                    delta.const_.push((x0, x1));
+                    ()
                 }
             }
             #[derive(Debug, Default)]
@@ -3038,30 +3054,26 @@ fn regression_entry() {
                         name: "Integral",
                         param_types: {c0: t3, c1: t3, c2: t3},
                         kind: Table {
-                            index_to_info: {ir0: 0_1_2 conflict[..2] => [2:union], ir1: 1_0_2, ir2: 2_0_1},
+                            index_to_info: {ir0: 0_1_2 conflict[..2] => [2:union]},
                             usage_to_info: {
                                 iu0: ir0[..2],
-                                iu1: ir0[..1],
-                                iu2: ir1[..1],
-                                iu3: ir2[..1],
-                                iu4: ir0[..2],
+                                iu1: ir0[..3],
+                                iu2: ir0[..2],
                             },
-                            column_back_reference: {c0: iu1, c1: iu2, c2: iu3},
+                            column_back_reference: {},
                         },
                     },
                     r16: RelationData {
                         name: "Add",
                         param_types: {c0: t3, c1: t3, c2: t3},
                         kind: Table {
-                            index_to_info: {ir0: 0_1_2 conflict[..2] => [2:union], ir1: 1_0_2, ir2: 2_0_1},
+                            index_to_info: {ir0: 0_1_2 conflict[..2] => [2:union]},
                             usage_to_info: {
                                 iu0: ir0[..2],
-                                iu1: ir0[..1],
-                                iu2: ir1[..1],
-                                iu3: ir2[..1],
-                                iu4: ir0[..2],
+                                iu1: ir0[..3],
+                                iu2: ir0[..2],
                             },
-                            column_back_reference: {c0: iu1, c1: iu2, c2: iu3},
+                            column_back_reference: {},
                         },
                     },
                 },
@@ -3085,8 +3097,6 @@ fn regression_entry() {
         expected_codegen: Some(expect![[r#"
             use oatlog::runtime::{self, *};
             decl_row ! (Row3_0_1 < T0 first 0 , T1 , T2 > (T0 0 , T1 1) (T2 2) (0 1 2) (2 1 0) where u128 = s => ((s . 0 . inner () as u128) << 64) + ((s . 1 . inner () as u128) << 32) + ((s . 2 . inner () as u128) << 0));
-            decl_row ! (Row3_1_0_2 < T0 , T1 first 1 , T2 > (T1 1 , T0 0 , T2 2) () (0 1 2) (2 1 0) where u128 = s => ((s . 1 . inner () as u128) << 64) + ((s . 0 . inner () as u128) << 32) + ((s . 2 . inner () as u128) << 0));
-            decl_row ! (Row3_2_0_1 < T0 , T1 , T2 first 2 > (T2 2 , T0 0 , T1 1) () (0 1 2) (2 1 0) where u128 = s => ((s . 2 . inner () as u128) << 64) + ((s . 0 . inner () as u128) << 32) + ((s . 1 . inner () as u128) << 0));
             eclass_wrapper_ty!(Math);
             fn i64_add012(a: i64, b: i64) -> impl Iterator<Item = (i64,)> {
                 a.checked_add(b).map(|x| (x,)).into_iter()
@@ -3138,8 +3148,6 @@ fn regression_entry() {
             struct IntegralRelation {
                 new: Vec<<Self as Relation>::Row>,
                 all_index_0_1_2: SortedVec<EclassCtx<Row3_0_1<Math, Math, Math>, u128>>,
-                all_index_1_0_2: SortedVec<EclassCtx<Row3_1_0_2<Math, Math, Math>, u128>>,
-                all_index_2_0_1: SortedVec<EclassCtx<Row3_2_0_1<Math, Math, Math>, u128>>,
             }
             struct IntegralUpdateCtx {
                 scratch: Vec<(Math, Math, Math)>,
@@ -3150,7 +3158,7 @@ fn regression_entry() {
                 type Row = (Math, Math, Math);
                 type UpdateCtx = IntegralUpdateCtx;
                 type Unification = Unification;
-                const COST: u32 = 9u32;
+                const COST: u32 = 3u32;
                 fn new() -> Self {
                     Self::default()
                 }
@@ -3226,12 +3234,6 @@ fn regression_entry() {
                 }
                 fn update_finalize(&mut self, ctx: Self::UpdateCtx, uf: &mut Unification) {
                     self.all_index_0_1_2.finalize();
-                    self.all_index_1_0_2
-                        .recreate_from(&self.all_index_0_1_2.as_slice());
-                    self.all_index_2_0_1
-                        .recreate_from(&self.all_index_0_1_2.as_slice());
-                    assert_eq!(self.all_index_1_0_2.len(), self.all_index_0_1_2.len());
-                    assert_eq!(self.all_index_2_0_1.len(), self.all_index_0_1_2.len());
                     self.new.extend(self.all_index_0_1_2.minus(&ctx.old));
                 }
             }
@@ -3241,32 +3243,16 @@ fn regression_entry() {
                         .range((x0, x1, Math::MIN_ID)..=(x0, x1, Math::MAX_ID))
                         .map(|(x0, x1, x2)| (x2,))
                 }
-                fn iter1_0_1_2(&self, x0: Math) -> impl Iterator<Item = (Math, Math)> + use<'_> {
+                fn iter3_0_1_2(&self, x0: Math, x1: Math, x2: Math) -> impl Iterator<Item = ()> + use<'_> {
                     self.all_index_0_1_2
-                        .range((x0, Math::MIN_ID, Math::MIN_ID)..=(x0, Math::MAX_ID, Math::MAX_ID))
-                        .map(|(x0, x1, x2)| (x1, x2))
-                }
-                fn iter1_1_0_2(&self, x1: Math) -> impl Iterator<Item = (Math, Math)> + use<'_> {
-                    self.all_index_1_0_2
-                        .range((Math::MIN_ID, x1, Math::MIN_ID)..=(Math::MAX_ID, x1, Math::MAX_ID))
-                        .map(|(x0, x1, x2)| (x0, x2))
-                }
-                fn iter1_2_0_1(&self, x2: Math) -> impl Iterator<Item = (Math, Math)> + use<'_> {
-                    self.all_index_2_0_1
-                        .range((Math::MIN_ID, Math::MIN_ID, x2)..=(Math::MAX_ID, Math::MAX_ID, x2))
-                        .map(|(x0, x1, x2)| (x0, x1))
+                        .range((x0, x1, x2)..=(x0, x1, x2))
+                        .map(|(x0, x1, x2)| ())
                 }
                 fn check2_0_1_2(&self, x0: Math, x1: Math) -> bool {
                     self.iter2_0_1_2(x0, x1).next().is_some()
                 }
-                fn check1_0_1_2(&self, x0: Math) -> bool {
-                    self.iter1_0_1_2(x0).next().is_some()
-                }
-                fn check1_1_0_2(&self, x1: Math) -> bool {
-                    self.iter1_1_0_2(x1).next().is_some()
-                }
-                fn check1_2_0_1(&self, x2: Math) -> bool {
-                    self.iter1_2_0_1(x2).next().is_some()
+                fn check3_0_1_2(&self, x0: Math, x1: Math, x2: Math) -> bool {
+                    self.iter3_0_1_2(x0, x1, x2).next().is_some()
                 }
                 #[allow(unreachable_code)]
                 fn entry2_0_1_2(&self, x0: Math, x1: Math, delta: &mut Delta, uf: &mut Unification) -> (Math,) {
@@ -3277,13 +3263,26 @@ fn regression_entry() {
                     delta.integral_.push((x0, x1, x2));
                     (x2,)
                 }
+                #[allow(unreachable_code)]
+                fn entry3_0_1_2(
+                    &self,
+                    x0: Math,
+                    x1: Math,
+                    x2: Math,
+                    delta: &mut Delta,
+                    uf: &mut Unification,
+                ) -> () {
+                    if let Some(()) = self.iter3_0_1_2(x0, x1, x2).next() {
+                        return ();
+                    }
+                    delta.integral_.push((x0, x1, x2));
+                    ()
+                }
             }
             #[derive(Debug, Default)]
             struct AddRelation {
                 new: Vec<<Self as Relation>::Row>,
                 all_index_0_1_2: SortedVec<EclassCtx<Row3_0_1<Math, Math, Math>, u128>>,
-                all_index_1_0_2: SortedVec<EclassCtx<Row3_1_0_2<Math, Math, Math>, u128>>,
-                all_index_2_0_1: SortedVec<EclassCtx<Row3_2_0_1<Math, Math, Math>, u128>>,
             }
             struct AddUpdateCtx {
                 scratch: Vec<(Math, Math, Math)>,
@@ -3294,7 +3293,7 @@ fn regression_entry() {
                 type Row = (Math, Math, Math);
                 type UpdateCtx = AddUpdateCtx;
                 type Unification = Unification;
-                const COST: u32 = 9u32;
+                const COST: u32 = 3u32;
                 fn new() -> Self {
                     Self::default()
                 }
@@ -3370,12 +3369,6 @@ fn regression_entry() {
                 }
                 fn update_finalize(&mut self, ctx: Self::UpdateCtx, uf: &mut Unification) {
                     self.all_index_0_1_2.finalize();
-                    self.all_index_1_0_2
-                        .recreate_from(&self.all_index_0_1_2.as_slice());
-                    self.all_index_2_0_1
-                        .recreate_from(&self.all_index_0_1_2.as_slice());
-                    assert_eq!(self.all_index_1_0_2.len(), self.all_index_0_1_2.len());
-                    assert_eq!(self.all_index_2_0_1.len(), self.all_index_0_1_2.len());
                     self.new.extend(self.all_index_0_1_2.minus(&ctx.old));
                 }
             }
@@ -3385,32 +3378,16 @@ fn regression_entry() {
                         .range((x0, x1, Math::MIN_ID)..=(x0, x1, Math::MAX_ID))
                         .map(|(x0, x1, x2)| (x2,))
                 }
-                fn iter1_0_1_2(&self, x0: Math) -> impl Iterator<Item = (Math, Math)> + use<'_> {
+                fn iter3_0_1_2(&self, x0: Math, x1: Math, x2: Math) -> impl Iterator<Item = ()> + use<'_> {
                     self.all_index_0_1_2
-                        .range((x0, Math::MIN_ID, Math::MIN_ID)..=(x0, Math::MAX_ID, Math::MAX_ID))
-                        .map(|(x0, x1, x2)| (x1, x2))
-                }
-                fn iter1_1_0_2(&self, x1: Math) -> impl Iterator<Item = (Math, Math)> + use<'_> {
-                    self.all_index_1_0_2
-                        .range((Math::MIN_ID, x1, Math::MIN_ID)..=(Math::MAX_ID, x1, Math::MAX_ID))
-                        .map(|(x0, x1, x2)| (x0, x2))
-                }
-                fn iter1_2_0_1(&self, x2: Math) -> impl Iterator<Item = (Math, Math)> + use<'_> {
-                    self.all_index_2_0_1
-                        .range((Math::MIN_ID, Math::MIN_ID, x2)..=(Math::MAX_ID, Math::MAX_ID, x2))
-                        .map(|(x0, x1, x2)| (x0, x1))
+                        .range((x0, x1, x2)..=(x0, x1, x2))
+                        .map(|(x0, x1, x2)| ())
                 }
                 fn check2_0_1_2(&self, x0: Math, x1: Math) -> bool {
                     self.iter2_0_1_2(x0, x1).next().is_some()
                 }
-                fn check1_0_1_2(&self, x0: Math) -> bool {
-                    self.iter1_0_1_2(x0).next().is_some()
-                }
-                fn check1_1_0_2(&self, x1: Math) -> bool {
-                    self.iter1_1_0_2(x1).next().is_some()
-                }
-                fn check1_2_0_1(&self, x2: Math) -> bool {
-                    self.iter1_2_0_1(x2).next().is_some()
+                fn check3_0_1_2(&self, x0: Math, x1: Math, x2: Math) -> bool {
+                    self.iter3_0_1_2(x0, x1, x2).next().is_some()
                 }
                 #[allow(unreachable_code)]
                 fn entry2_0_1_2(&self, x0: Math, x1: Math, delta: &mut Delta, uf: &mut Unification) -> (Math,) {
@@ -3420,6 +3397,21 @@ fn regression_entry() {
                     let x2 = uf.math_.add_eclass();
                     delta.add_.push((x0, x1, x2));
                     (x2,)
+                }
+                #[allow(unreachable_code)]
+                fn entry3_0_1_2(
+                    &self,
+                    x0: Math,
+                    x1: Math,
+                    x2: Math,
+                    delta: &mut Delta,
+                    uf: &mut Unification,
+                ) -> () {
+                    if let Some(()) = self.iter3_0_1_2(x0, x1, x2).next() {
+                        return ();
+                    }
+                    delta.add_.push((x0, x1, x2));
+                    ()
                 }
             }
             #[derive(Debug, Default)]
@@ -3699,15 +3691,13 @@ fn test_bind_variable_multiple_times() {
                         name: "Same",
                         param_types: {c0: t3, c1: t3, c2: t3},
                         kind: Table {
-                            index_to_info: {ir0: 0_1_2 conflict[..2] => [2:union], ir1: 1_0_2, ir2: 2_0_1},
+                            index_to_info: {ir0: 0_1_2 conflict[..2] => [2:union]},
                             usage_to_info: {
                                 iu0: ir0[..2],
-                                iu1: ir0[..1],
-                                iu2: ir1[..1],
-                                iu3: ir2[..1],
-                                iu4: ir0[..2],
+                                iu1: ir0[..3],
+                                iu2: ir0[..2],
                             },
-                            column_back_reference: {c0: iu1, c1: iu2, c2: iu3},
+                            column_back_reference: {},
                         },
                     },
                 },
@@ -3732,8 +3722,6 @@ fn test_bind_variable_multiple_times() {
         expected_codegen: Some(expect![[r#"
             use oatlog::runtime::{self, *};
             decl_row ! (Row3_0_1 < T0 first 0 , T1 , T2 > (T0 0 , T1 1) (T2 2) (0 1 2) (2 1 0) where u128 = s => ((s . 0 . inner () as u128) << 64) + ((s . 1 . inner () as u128) << 32) + ((s . 2 . inner () as u128) << 0));
-            decl_row ! (Row3_1_0_2 < T0 , T1 first 1 , T2 > (T1 1 , T0 0 , T2 2) () (0 1 2) (2 1 0) where u128 = s => ((s . 1 . inner () as u128) << 64) + ((s . 0 . inner () as u128) << 32) + ((s . 2 . inner () as u128) << 0));
-            decl_row ! (Row3_2_0_1 < T0 , T1 , T2 first 2 > (T2 2 , T0 0 , T1 1) () (0 1 2) (2 1 0) where u128 = s => ((s . 2 . inner () as u128) << 64) + ((s . 0 . inner () as u128) << 32) + ((s . 1 . inner () as u128) << 0));
             eclass_wrapper_ty!(Foo);
             fn i64_add012(a: i64, b: i64) -> impl Iterator<Item = (i64,)> {
                 a.checked_add(b).map(|x| (x,)).into_iter()
@@ -3785,8 +3773,6 @@ fn test_bind_variable_multiple_times() {
             struct SameRelation {
                 new: Vec<<Self as Relation>::Row>,
                 all_index_0_1_2: SortedVec<EclassCtx<Row3_0_1<Foo, Foo, Foo>, u128>>,
-                all_index_1_0_2: SortedVec<EclassCtx<Row3_1_0_2<Foo, Foo, Foo>, u128>>,
-                all_index_2_0_1: SortedVec<EclassCtx<Row3_2_0_1<Foo, Foo, Foo>, u128>>,
             }
             struct SameUpdateCtx {
                 scratch: Vec<(Foo, Foo, Foo)>,
@@ -3797,7 +3783,7 @@ fn test_bind_variable_multiple_times() {
                 type Row = (Foo, Foo, Foo);
                 type UpdateCtx = SameUpdateCtx;
                 type Unification = Unification;
-                const COST: u32 = 9u32;
+                const COST: u32 = 3u32;
                 fn new() -> Self {
                     Self::default()
                 }
@@ -3873,12 +3859,6 @@ fn test_bind_variable_multiple_times() {
                 }
                 fn update_finalize(&mut self, ctx: Self::UpdateCtx, uf: &mut Unification) {
                     self.all_index_0_1_2.finalize();
-                    self.all_index_1_0_2
-                        .recreate_from(&self.all_index_0_1_2.as_slice());
-                    self.all_index_2_0_1
-                        .recreate_from(&self.all_index_0_1_2.as_slice());
-                    assert_eq!(self.all_index_1_0_2.len(), self.all_index_0_1_2.len());
-                    assert_eq!(self.all_index_2_0_1.len(), self.all_index_0_1_2.len());
                     self.new.extend(self.all_index_0_1_2.minus(&ctx.old));
                 }
             }
@@ -3888,32 +3868,16 @@ fn test_bind_variable_multiple_times() {
                         .range((x0, x1, Foo::MIN_ID)..=(x0, x1, Foo::MAX_ID))
                         .map(|(x0, x1, x2)| (x2,))
                 }
-                fn iter1_0_1_2(&self, x0: Foo) -> impl Iterator<Item = (Foo, Foo)> + use<'_> {
+                fn iter3_0_1_2(&self, x0: Foo, x1: Foo, x2: Foo) -> impl Iterator<Item = ()> + use<'_> {
                     self.all_index_0_1_2
-                        .range((x0, Foo::MIN_ID, Foo::MIN_ID)..=(x0, Foo::MAX_ID, Foo::MAX_ID))
-                        .map(|(x0, x1, x2)| (x1, x2))
-                }
-                fn iter1_1_0_2(&self, x1: Foo) -> impl Iterator<Item = (Foo, Foo)> + use<'_> {
-                    self.all_index_1_0_2
-                        .range((Foo::MIN_ID, x1, Foo::MIN_ID)..=(Foo::MAX_ID, x1, Foo::MAX_ID))
-                        .map(|(x0, x1, x2)| (x0, x2))
-                }
-                fn iter1_2_0_1(&self, x2: Foo) -> impl Iterator<Item = (Foo, Foo)> + use<'_> {
-                    self.all_index_2_0_1
-                        .range((Foo::MIN_ID, Foo::MIN_ID, x2)..=(Foo::MAX_ID, Foo::MAX_ID, x2))
-                        .map(|(x0, x1, x2)| (x0, x1))
+                        .range((x0, x1, x2)..=(x0, x1, x2))
+                        .map(|(x0, x1, x2)| ())
                 }
                 fn check2_0_1_2(&self, x0: Foo, x1: Foo) -> bool {
                     self.iter2_0_1_2(x0, x1).next().is_some()
                 }
-                fn check1_0_1_2(&self, x0: Foo) -> bool {
-                    self.iter1_0_1_2(x0).next().is_some()
-                }
-                fn check1_1_0_2(&self, x1: Foo) -> bool {
-                    self.iter1_1_0_2(x1).next().is_some()
-                }
-                fn check1_2_0_1(&self, x2: Foo) -> bool {
-                    self.iter1_2_0_1(x2).next().is_some()
+                fn check3_0_1_2(&self, x0: Foo, x1: Foo, x2: Foo) -> bool {
+                    self.iter3_0_1_2(x0, x1, x2).next().is_some()
                 }
                 #[allow(unreachable_code)]
                 fn entry2_0_1_2(&self, x0: Foo, x1: Foo, delta: &mut Delta, uf: &mut Unification) -> (Foo,) {
@@ -3923,6 +3887,21 @@ fn test_bind_variable_multiple_times() {
                     let x2 = uf.foo_.add_eclass();
                     delta.same_.push((x0, x1, x2));
                     (x2,)
+                }
+                #[allow(unreachable_code)]
+                fn entry3_0_1_2(
+                    &self,
+                    x0: Foo,
+                    x1: Foo,
+                    x2: Foo,
+                    delta: &mut Delta,
+                    uf: &mut Unification,
+                ) -> () {
+                    if let Some(()) = self.iter3_0_1_2(x0, x1, x2).next() {
+                        return ();
+                    }
+                    delta.same_.push((x0, x1, x2));
+                    ()
                 }
             }
             #[derive(Debug, Default)]
@@ -4253,16 +4232,14 @@ fn codegen_variable_reuse_bug() {
                         name: "Add",
                         param_types: {c0: t3, c1: t3, c2: t3},
                         kind: Table {
-                            index_to_info: {ir0: 0_2_1, ir1: 1_0_2 conflict[..2] => [2:union], ir2: 2_0_1},
+                            index_to_info: {ir0: 0_1_2 conflict[..2] => [2:union], ir1: 0_2_1},
                             usage_to_info: {
-                                iu0: ir1[..2],
-                                iu1: ir0[..2],
-                                iu2: ir0[..1],
-                                iu3: ir1[..1],
-                                iu4: ir2[..1],
-                                iu5: ir1[..2],
+                                iu0: ir0[..2],
+                                iu1: ir1[..2],
+                                iu2: ir0[..3],
+                                iu3: ir0[..2],
                             },
-                            column_back_reference: {c0: iu2, c1: iu3, c2: iu4},
+                            column_back_reference: {},
                         },
                     },
                     r16: RelationData {
@@ -4275,7 +4252,7 @@ fn codegen_variable_reuse_bug() {
                                 iu1: ir0[..1],
                                 iu2: ir0[..0],
                             },
-                            column_back_reference: {c0: iu1},
+                            column_back_reference: {},
                         },
                     },
                     r17: RelationData {
@@ -4328,9 +4305,8 @@ fn codegen_variable_reuse_bug() {
         expected_codegen: Some(expect![[r#"
             use oatlog::runtime::{self, *};
             decl_row ! (Row1 < T0 first 0 > () (T0 0) (0) (0) where u32 = s => ((s . 0 . inner () as u32) << 0));
+            decl_row ! (Row3_0_1 < T0 first 0 , T1 , T2 > (T0 0 , T1 1) (T2 2) (0 1 2) (2 1 0) where u128 = s => ((s . 0 . inner () as u128) << 64) + ((s . 1 . inner () as u128) << 32) + ((s . 2 . inner () as u128) << 0));
             decl_row ! (Row3_0_2_1 < T0 first 0 , T1 , T2 > (T0 0 , T2 2 , T1 1) () (0 1 2) (2 1 0) where u128 = s => ((s . 0 . inner () as u128) << 64) + ((s . 2 . inner () as u128) << 32) + ((s . 1 . inner () as u128) << 0));
-            decl_row ! (Row3_1_0 < T0 , T1 first 1 , T2 > (T1 1 , T0 0) (T2 2) (0 1 2) (2 1 0) where u128 = s => ((s . 1 . inner () as u128) << 64) + ((s . 0 . inner () as u128) << 32) + ((s . 2 . inner () as u128) << 0));
-            decl_row ! (Row3_2_0_1 < T0 , T1 , T2 first 2 > (T2 2 , T0 0 , T1 1) () (0 1 2) (2 1 0) where u128 = s => ((s . 2 . inner () as u128) << 64) + ((s . 0 . inner () as u128) << 32) + ((s . 1 . inner () as u128) << 0));
             eclass_wrapper_ty!(Math);
             fn i64_add012(a: i64, b: i64) -> impl Iterator<Item = (i64,)> {
                 a.checked_add(b).map(|x| (x,)).into_iter()
@@ -4381,20 +4357,19 @@ fn codegen_variable_reuse_bug() {
             #[derive(Debug, Default)]
             struct AddRelation {
                 new: Vec<<Self as Relation>::Row>,
+                all_index_0_1_2: SortedVec<EclassCtx<Row3_0_1<Math, Math, Math>, u128>>,
                 all_index_0_2_1: SortedVec<EclassCtx<Row3_0_2_1<Math, Math, Math>, u128>>,
-                all_index_1_0_2: SortedVec<EclassCtx<Row3_1_0<Math, Math, Math>, u128>>,
-                all_index_2_0_1: SortedVec<EclassCtx<Row3_2_0_1<Math, Math, Math>, u128>>,
             }
             struct AddUpdateCtx {
                 scratch: Vec<(Math, Math, Math)>,
                 deferred_insertions: Vec<(Math, Math, Math)>,
-                old: SortedVec<EclassCtx<Row3_1_0<Math, Math, Math>, u128>>,
+                old: SortedVec<EclassCtx<Row3_0_1<Math, Math, Math>, u128>>,
             }
             impl Relation for AddRelation {
                 type Row = (Math, Math, Math);
                 type UpdateCtx = AddUpdateCtx;
                 type Unification = Unification;
-                const COST: u32 = 9u32;
+                const COST: u32 = 6u32;
                 fn new() -> Self {
                     Self::default()
                 }
@@ -4408,14 +4383,14 @@ fn codegen_variable_reuse_bug() {
                     self.new.iter().copied()
                 }
                 fn len(&self) -> usize {
-                    self.all_index_0_2_1.len()
+                    self.all_index_0_1_2.len()
                 }
                 fn emit_graphviz(&self, buf: &mut String) {
                     use std::fmt::Write;
-                    for (i, (x0, x2, x1)) in self.all_index_0_2_1.iter().enumerate() {
+                    for (i, (x0, x1, x2)) in self.all_index_0_1_2.iter().enumerate() {
                         writeln!(buf, "{}_{i} -> {}_{};", "add", "math", x0).unwrap();
-                        writeln!(buf, "{}_{i} -> {}_{};", "add", "math", x2).unwrap();
                         writeln!(buf, "{}_{i} -> {}_{};", "add", "math", x1).unwrap();
+                        writeln!(buf, "{}_{i} -> {}_{};", "add", "math", x2).unwrap();
                         writeln!(buf, "{}_{i} [shape = box];", "add").unwrap();
                     }
                 }
@@ -4437,7 +4412,7 @@ fn codegen_variable_reuse_bug() {
                     };
                     let mut ran_merge = false;
                     loop {
-                        self.all_index_1_0_2.sorted_vec_update(
+                        self.all_index_0_1_2.sorted_vec_update(
                             insertions,
                             &mut ctx.deferred_insertions,
                             &mut ctx.scratch,
@@ -4465,23 +4440,20 @@ fn codegen_variable_reuse_bug() {
                     AddUpdateCtx {
                         scratch: Vec::new(),
                         deferred_insertions: Vec::new(),
-                        old: self.all_index_1_0_2.clone(),
+                        old: self.all_index_0_1_2.clone(),
                     }
                 }
                 fn update_finalize(&mut self, ctx: Self::UpdateCtx, uf: &mut Unification) {
-                    self.all_index_1_0_2.finalize();
+                    self.all_index_0_1_2.finalize();
                     self.all_index_0_2_1
-                        .recreate_from(&self.all_index_1_0_2.as_slice());
-                    self.all_index_2_0_1
-                        .recreate_from(&self.all_index_1_0_2.as_slice());
-                    assert_eq!(self.all_index_0_2_1.len(), self.all_index_1_0_2.len());
-                    assert_eq!(self.all_index_2_0_1.len(), self.all_index_1_0_2.len());
-                    self.new.extend(self.all_index_1_0_2.minus(&ctx.old));
+                        .recreate_from(&self.all_index_0_1_2.as_slice());
+                    assert_eq!(self.all_index_0_2_1.len(), self.all_index_0_1_2.len());
+                    self.new.extend(self.all_index_0_1_2.minus(&ctx.old));
                 }
             }
             impl AddRelation {
-                fn iter2_1_0_2(&self, x1: Math, x0: Math) -> impl Iterator<Item = (Math,)> + use<'_> {
-                    self.all_index_1_0_2
+                fn iter2_0_1_2(&self, x0: Math, x1: Math) -> impl Iterator<Item = (Math,)> + use<'_> {
+                    self.all_index_0_1_2
                         .range((x0, x1, Math::MIN_ID)..=(x0, x1, Math::MAX_ID))
                         .map(|(x0, x1, x2)| (x2,))
                 }
@@ -4490,44 +4462,43 @@ fn codegen_variable_reuse_bug() {
                         .range((x0, Math::MIN_ID, x2)..=(x0, Math::MAX_ID, x2))
                         .map(|(x0, x1, x2)| (x1,))
                 }
-                fn iter1_0_2_1(&self, x0: Math) -> impl Iterator<Item = (Math, Math)> + use<'_> {
-                    self.all_index_0_2_1
-                        .range((x0, Math::MIN_ID, Math::MIN_ID)..=(x0, Math::MAX_ID, Math::MAX_ID))
-                        .map(|(x0, x1, x2)| (x2, x1))
+                fn iter3_0_1_2(&self, x0: Math, x1: Math, x2: Math) -> impl Iterator<Item = ()> + use<'_> {
+                    self.all_index_0_1_2
+                        .range((x0, x1, x2)..=(x0, x1, x2))
+                        .map(|(x0, x1, x2)| ())
                 }
-                fn iter1_1_0_2(&self, x1: Math) -> impl Iterator<Item = (Math, Math)> + use<'_> {
-                    self.all_index_1_0_2
-                        .range((Math::MIN_ID, x1, Math::MIN_ID)..=(Math::MAX_ID, x1, Math::MAX_ID))
-                        .map(|(x0, x1, x2)| (x0, x2))
-                }
-                fn iter1_2_0_1(&self, x2: Math) -> impl Iterator<Item = (Math, Math)> + use<'_> {
-                    self.all_index_2_0_1
-                        .range((Math::MIN_ID, Math::MIN_ID, x2)..=(Math::MAX_ID, Math::MAX_ID, x2))
-                        .map(|(x0, x1, x2)| (x0, x1))
-                }
-                fn check2_1_0_2(&self, x1: Math, x0: Math) -> bool {
-                    self.iter2_1_0_2(x1, x0).next().is_some()
+                fn check2_0_1_2(&self, x0: Math, x1: Math) -> bool {
+                    self.iter2_0_1_2(x0, x1).next().is_some()
                 }
                 fn check2_0_2_1(&self, x0: Math, x2: Math) -> bool {
                     self.iter2_0_2_1(x0, x2).next().is_some()
                 }
-                fn check1_0_2_1(&self, x0: Math) -> bool {
-                    self.iter1_0_2_1(x0).next().is_some()
-                }
-                fn check1_1_0_2(&self, x1: Math) -> bool {
-                    self.iter1_1_0_2(x1).next().is_some()
-                }
-                fn check1_2_0_1(&self, x2: Math) -> bool {
-                    self.iter1_2_0_1(x2).next().is_some()
+                fn check3_0_1_2(&self, x0: Math, x1: Math, x2: Math) -> bool {
+                    self.iter3_0_1_2(x0, x1, x2).next().is_some()
                 }
                 #[allow(unreachable_code)]
-                fn entry2_1_0_2(&self, x1: Math, x0: Math, delta: &mut Delta, uf: &mut Unification) -> (Math,) {
-                    if let Some((x2,)) = self.iter2_1_0_2(x1, x0).next() {
+                fn entry2_0_1_2(&self, x0: Math, x1: Math, delta: &mut Delta, uf: &mut Unification) -> (Math,) {
+                    if let Some((x2,)) = self.iter2_0_1_2(x0, x1).next() {
                         return (x2,);
                     }
                     let x2 = uf.math_.add_eclass();
                     delta.add_.push((x0, x1, x2));
                     (x2,)
+                }
+                #[allow(unreachable_code)]
+                fn entry3_0_1_2(
+                    &self,
+                    x0: Math,
+                    x1: Math,
+                    x2: Math,
+                    delta: &mut Delta,
+                    uf: &mut Unification,
+                ) -> () {
+                    if let Some(()) = self.iter3_0_1_2(x0, x1, x2).next() {
+                        return ();
+                    }
+                    delta.add_.push((x0, x1, x2));
+                    ()
                 }
             }
             #[derive(Debug, Default)]
@@ -4861,10 +4832,7 @@ fn initial_exprs() {
         expected_codegen: Some(expect![[r#"
             use oatlog::runtime::{self, *};
             decl_row ! (Row2_0 < T0 first 0 , T1 > (T0 0) (T1 1) (0 1) (1 0) where u64 = s => ((s . 0 . inner () as u64) << 32) + ((s . 1 . inner () as u64) << 0));
-            decl_row ! (Row2_1_0 < T0 , T1 first 1 > (T1 1 , T0 0) () (0 1) (1 0) where u64 = s => ((s . 1 . inner () as u64) << 32) + ((s . 0 . inner () as u64) << 0));
             decl_row ! (Row3_0_1 < T0 first 0 , T1 , T2 > (T0 0 , T1 1) (T2 2) (0 1 2) (2 1 0) where u128 = s => ((s . 0 . inner () as u128) << 64) + ((s . 1 . inner () as u128) << 32) + ((s . 2 . inner () as u128) << 0));
-            decl_row ! (Row3_1_0_2 < T0 , T1 first 1 , T2 > (T1 1 , T0 0 , T2 2) () (0 1 2) (2 1 0) where u128 = s => ((s . 1 . inner () as u128) << 64) + ((s . 0 . inner () as u128) << 32) + ((s . 2 . inner () as u128) << 0));
-            decl_row ! (Row3_2_0_1 < T0 , T1 , T2 first 2 > (T2 2 , T0 0 , T1 1) () (0 1 2) (2 1 0) where u128 = s => ((s . 2 . inner () as u128) << 64) + ((s . 0 . inner () as u128) << 32) + ((s . 1 . inner () as u128) << 0));
             eclass_wrapper_ty!(Math);
             fn i64_add012(a: i64, b: i64) -> impl Iterator<Item = (i64,)> {
                 a.checked_add(b).map(|x| (x,)).into_iter()
@@ -4916,8 +4884,6 @@ fn initial_exprs() {
             struct AddRelation {
                 new: Vec<<Self as Relation>::Row>,
                 all_index_0_1_2: SortedVec<EclassCtx<Row3_0_1<Math, Math, Math>, u128>>,
-                all_index_1_0_2: SortedVec<EclassCtx<Row3_1_0_2<Math, Math, Math>, u128>>,
-                all_index_2_0_1: SortedVec<EclassCtx<Row3_2_0_1<Math, Math, Math>, u128>>,
             }
             struct AddUpdateCtx {
                 scratch: Vec<(Math, Math, Math)>,
@@ -4928,7 +4894,7 @@ fn initial_exprs() {
                 type Row = (Math, Math, Math);
                 type UpdateCtx = AddUpdateCtx;
                 type Unification = Unification;
-                const COST: u32 = 9u32;
+                const COST: u32 = 3u32;
                 fn new() -> Self {
                     Self::default()
                 }
@@ -5004,12 +4970,6 @@ fn initial_exprs() {
                 }
                 fn update_finalize(&mut self, ctx: Self::UpdateCtx, uf: &mut Unification) {
                     self.all_index_0_1_2.finalize();
-                    self.all_index_1_0_2
-                        .recreate_from(&self.all_index_0_1_2.as_slice());
-                    self.all_index_2_0_1
-                        .recreate_from(&self.all_index_0_1_2.as_slice());
-                    assert_eq!(self.all_index_1_0_2.len(), self.all_index_0_1_2.len());
-                    assert_eq!(self.all_index_2_0_1.len(), self.all_index_0_1_2.len());
                     self.new.extend(self.all_index_0_1_2.minus(&ctx.old));
                 }
             }
@@ -5019,32 +4979,16 @@ fn initial_exprs() {
                         .range((x0, x1, Math::MIN_ID)..=(x0, x1, Math::MAX_ID))
                         .map(|(x0, x1, x2)| (x2,))
                 }
-                fn iter1_0_1_2(&self, x0: Math) -> impl Iterator<Item = (Math, Math)> + use<'_> {
+                fn iter3_0_1_2(&self, x0: Math, x1: Math, x2: Math) -> impl Iterator<Item = ()> + use<'_> {
                     self.all_index_0_1_2
-                        .range((x0, Math::MIN_ID, Math::MIN_ID)..=(x0, Math::MAX_ID, Math::MAX_ID))
-                        .map(|(x0, x1, x2)| (x1, x2))
-                }
-                fn iter1_1_0_2(&self, x1: Math) -> impl Iterator<Item = (Math, Math)> + use<'_> {
-                    self.all_index_1_0_2
-                        .range((Math::MIN_ID, x1, Math::MIN_ID)..=(Math::MAX_ID, x1, Math::MAX_ID))
-                        .map(|(x0, x1, x2)| (x0, x2))
-                }
-                fn iter1_2_0_1(&self, x2: Math) -> impl Iterator<Item = (Math, Math)> + use<'_> {
-                    self.all_index_2_0_1
-                        .range((Math::MIN_ID, Math::MIN_ID, x2)..=(Math::MAX_ID, Math::MAX_ID, x2))
-                        .map(|(x0, x1, x2)| (x0, x1))
+                        .range((x0, x1, x2)..=(x0, x1, x2))
+                        .map(|(x0, x1, x2)| ())
                 }
                 fn check2_0_1_2(&self, x0: Math, x1: Math) -> bool {
                     self.iter2_0_1_2(x0, x1).next().is_some()
                 }
-                fn check1_0_1_2(&self, x0: Math) -> bool {
-                    self.iter1_0_1_2(x0).next().is_some()
-                }
-                fn check1_1_0_2(&self, x1: Math) -> bool {
-                    self.iter1_1_0_2(x1).next().is_some()
-                }
-                fn check1_2_0_1(&self, x2: Math) -> bool {
-                    self.iter1_2_0_1(x2).next().is_some()
+                fn check3_0_1_2(&self, x0: Math, x1: Math, x2: Math) -> bool {
+                    self.iter3_0_1_2(x0, x1, x2).next().is_some()
                 }
                 #[allow(unreachable_code)]
                 fn entry2_0_1_2(&self, x0: Math, x1: Math, delta: &mut Delta, uf: &mut Unification) -> (Math,) {
@@ -5055,13 +4999,26 @@ fn initial_exprs() {
                     delta.add_.push((x0, x1, x2));
                     (x2,)
                 }
+                #[allow(unreachable_code)]
+                fn entry3_0_1_2(
+                    &self,
+                    x0: Math,
+                    x1: Math,
+                    x2: Math,
+                    delta: &mut Delta,
+                    uf: &mut Unification,
+                ) -> () {
+                    if let Some(()) = self.iter3_0_1_2(x0, x1, x2).next() {
+                        return ();
+                    }
+                    delta.add_.push((x0, x1, x2));
+                    ()
+                }
             }
             #[derive(Debug, Default)]
             struct MulRelation {
                 new: Vec<<Self as Relation>::Row>,
                 all_index_0_1_2: SortedVec<EclassCtx<Row3_0_1<Math, Math, Math>, u128>>,
-                all_index_1_0_2: SortedVec<EclassCtx<Row3_1_0_2<Math, Math, Math>, u128>>,
-                all_index_2_0_1: SortedVec<EclassCtx<Row3_2_0_1<Math, Math, Math>, u128>>,
             }
             struct MulUpdateCtx {
                 scratch: Vec<(Math, Math, Math)>,
@@ -5072,7 +5029,7 @@ fn initial_exprs() {
                 type Row = (Math, Math, Math);
                 type UpdateCtx = MulUpdateCtx;
                 type Unification = Unification;
-                const COST: u32 = 9u32;
+                const COST: u32 = 3u32;
                 fn new() -> Self {
                     Self::default()
                 }
@@ -5148,12 +5105,6 @@ fn initial_exprs() {
                 }
                 fn update_finalize(&mut self, ctx: Self::UpdateCtx, uf: &mut Unification) {
                     self.all_index_0_1_2.finalize();
-                    self.all_index_1_0_2
-                        .recreate_from(&self.all_index_0_1_2.as_slice());
-                    self.all_index_2_0_1
-                        .recreate_from(&self.all_index_0_1_2.as_slice());
-                    assert_eq!(self.all_index_1_0_2.len(), self.all_index_0_1_2.len());
-                    assert_eq!(self.all_index_2_0_1.len(), self.all_index_0_1_2.len());
                     self.new.extend(self.all_index_0_1_2.minus(&ctx.old));
                 }
             }
@@ -5163,32 +5114,16 @@ fn initial_exprs() {
                         .range((x0, x1, Math::MIN_ID)..=(x0, x1, Math::MAX_ID))
                         .map(|(x0, x1, x2)| (x2,))
                 }
-                fn iter1_0_1_2(&self, x0: Math) -> impl Iterator<Item = (Math, Math)> + use<'_> {
+                fn iter3_0_1_2(&self, x0: Math, x1: Math, x2: Math) -> impl Iterator<Item = ()> + use<'_> {
                     self.all_index_0_1_2
-                        .range((x0, Math::MIN_ID, Math::MIN_ID)..=(x0, Math::MAX_ID, Math::MAX_ID))
-                        .map(|(x0, x1, x2)| (x1, x2))
-                }
-                fn iter1_1_0_2(&self, x1: Math) -> impl Iterator<Item = (Math, Math)> + use<'_> {
-                    self.all_index_1_0_2
-                        .range((Math::MIN_ID, x1, Math::MIN_ID)..=(Math::MAX_ID, x1, Math::MAX_ID))
-                        .map(|(x0, x1, x2)| (x0, x2))
-                }
-                fn iter1_2_0_1(&self, x2: Math) -> impl Iterator<Item = (Math, Math)> + use<'_> {
-                    self.all_index_2_0_1
-                        .range((Math::MIN_ID, Math::MIN_ID, x2)..=(Math::MAX_ID, Math::MAX_ID, x2))
-                        .map(|(x0, x1, x2)| (x0, x1))
+                        .range((x0, x1, x2)..=(x0, x1, x2))
+                        .map(|(x0, x1, x2)| ())
                 }
                 fn check2_0_1_2(&self, x0: Math, x1: Math) -> bool {
                     self.iter2_0_1_2(x0, x1).next().is_some()
                 }
-                fn check1_0_1_2(&self, x0: Math) -> bool {
-                    self.iter1_0_1_2(x0).next().is_some()
-                }
-                fn check1_1_0_2(&self, x1: Math) -> bool {
-                    self.iter1_1_0_2(x1).next().is_some()
-                }
-                fn check1_2_0_1(&self, x2: Math) -> bool {
-                    self.iter1_2_0_1(x2).next().is_some()
+                fn check3_0_1_2(&self, x0: Math, x1: Math, x2: Math) -> bool {
+                    self.iter3_0_1_2(x0, x1, x2).next().is_some()
                 }
                 #[allow(unreachable_code)]
                 fn entry2_0_1_2(&self, x0: Math, x1: Math, delta: &mut Delta, uf: &mut Unification) -> (Math,) {
@@ -5199,12 +5134,26 @@ fn initial_exprs() {
                     delta.mul_.push((x0, x1, x2));
                     (x2,)
                 }
+                #[allow(unreachable_code)]
+                fn entry3_0_1_2(
+                    &self,
+                    x0: Math,
+                    x1: Math,
+                    x2: Math,
+                    delta: &mut Delta,
+                    uf: &mut Unification,
+                ) -> () {
+                    if let Some(()) = self.iter3_0_1_2(x0, x1, x2).next() {
+                        return ();
+                    }
+                    delta.mul_.push((x0, x1, x2));
+                    ()
+                }
             }
             #[derive(Debug, Default)]
             struct ConstRelation {
                 new: Vec<<Self as Relation>::Row>,
                 all_index_0_1: SortedVec<GeneralCtx<Row2_0<std::primitive::i64, Math>>>,
-                all_index_1_0: SortedVec<GeneralCtx<Row2_1_0<std::primitive::i64, Math>>>,
             }
             struct ConstUpdateCtx {
                 scratch: Vec<(std::primitive::i64, Math)>,
@@ -5215,7 +5164,7 @@ fn initial_exprs() {
                 type Row = (std::primitive::i64, Math);
                 type UpdateCtx = ConstUpdateCtx;
                 type Unification = Unification;
-                const COST: u32 = 4u32;
+                const COST: u32 = 2u32;
                 fn new() -> Self {
                     Self::default()
                 }
@@ -5285,9 +5234,6 @@ fn initial_exprs() {
                 }
                 fn update_finalize(&mut self, ctx: Self::UpdateCtx, uf: &mut Unification) {
                     self.all_index_0_1.finalize();
-                    self.all_index_1_0
-                        .recreate_from(&self.all_index_0_1.as_slice());
-                    assert_eq!(self.all_index_1_0.len(), self.all_index_0_1.len());
                     self.new.extend(self.all_index_0_1.minus(&ctx.old));
                 }
             }
@@ -5297,16 +5243,16 @@ fn initial_exprs() {
                         .range((x0, Math::MIN_ID)..=(x0, Math::MAX_ID))
                         .map(|(x0, x1)| (x1,))
                 }
-                fn iter1_1_0(&self, x1: Math) -> impl Iterator<Item = (std::primitive::i64,)> + use<'_> {
-                    self.all_index_1_0
-                        .range((std::primitive::i64::MIN_ID, x1)..=(std::primitive::i64::MAX_ID, x1))
-                        .map(|(x0, x1)| (x0,))
+                fn iter2_0_1(&self, x0: std::primitive::i64, x1: Math) -> impl Iterator<Item = ()> + use<'_> {
+                    self.all_index_0_1
+                        .range((x0, x1)..=(x0, x1))
+                        .map(|(x0, x1)| ())
                 }
                 fn check1_0_1(&self, x0: std::primitive::i64) -> bool {
                     self.iter1_0_1(x0).next().is_some()
                 }
-                fn check1_1_0(&self, x1: Math) -> bool {
-                    self.iter1_1_0(x1).next().is_some()
+                fn check2_0_1(&self, x0: std::primitive::i64, x1: Math) -> bool {
+                    self.iter2_0_1(x0, x1).next().is_some()
                 }
                 #[allow(unreachable_code)]
                 fn entry1_0_1(
@@ -5322,12 +5268,25 @@ fn initial_exprs() {
                     delta.const_.push((x0, x1));
                     (x1,)
                 }
+                #[allow(unreachable_code)]
+                fn entry2_0_1(
+                    &self,
+                    x0: std::primitive::i64,
+                    x1: Math,
+                    delta: &mut Delta,
+                    uf: &mut Unification,
+                ) -> () {
+                    if let Some(()) = self.iter2_0_1(x0, x1).next() {
+                        return ();
+                    }
+                    delta.const_.push((x0, x1));
+                    ()
+                }
             }
             #[derive(Debug, Default)]
             struct VarRelation {
                 new: Vec<<Self as Relation>::Row>,
                 all_index_0_1: SortedVec<GeneralCtx<Row2_0<runtime::IString, Math>>>,
-                all_index_1_0: SortedVec<GeneralCtx<Row2_1_0<runtime::IString, Math>>>,
             }
             struct VarUpdateCtx {
                 scratch: Vec<(runtime::IString, Math)>,
@@ -5338,7 +5297,7 @@ fn initial_exprs() {
                 type Row = (runtime::IString, Math);
                 type UpdateCtx = VarUpdateCtx;
                 type Unification = Unification;
-                const COST: u32 = 4u32;
+                const COST: u32 = 2u32;
                 fn new() -> Self {
                     Self::default()
                 }
@@ -5408,9 +5367,6 @@ fn initial_exprs() {
                 }
                 fn update_finalize(&mut self, ctx: Self::UpdateCtx, uf: &mut Unification) {
                     self.all_index_0_1.finalize();
-                    self.all_index_1_0
-                        .recreate_from(&self.all_index_0_1.as_slice());
-                    assert_eq!(self.all_index_1_0.len(), self.all_index_0_1.len());
                     self.new.extend(self.all_index_0_1.minus(&ctx.old));
                 }
             }
@@ -5420,16 +5376,16 @@ fn initial_exprs() {
                         .range((x0, Math::MIN_ID)..=(x0, Math::MAX_ID))
                         .map(|(x0, x1)| (x1,))
                 }
-                fn iter1_1_0(&self, x1: Math) -> impl Iterator<Item = (runtime::IString,)> + use<'_> {
-                    self.all_index_1_0
-                        .range((runtime::IString::MIN_ID, x1)..=(runtime::IString::MAX_ID, x1))
-                        .map(|(x0, x1)| (x0,))
+                fn iter2_0_1(&self, x0: runtime::IString, x1: Math) -> impl Iterator<Item = ()> + use<'_> {
+                    self.all_index_0_1
+                        .range((x0, x1)..=(x0, x1))
+                        .map(|(x0, x1)| ())
                 }
                 fn check1_0_1(&self, x0: runtime::IString) -> bool {
                     self.iter1_0_1(x0).next().is_some()
                 }
-                fn check1_1_0(&self, x1: Math) -> bool {
-                    self.iter1_1_0(x1).next().is_some()
+                fn check2_0_1(&self, x0: runtime::IString, x1: Math) -> bool {
+                    self.iter2_0_1(x0, x1).next().is_some()
                 }
                 #[allow(unreachable_code)]
                 fn entry1_0_1(&self, x0: runtime::IString, delta: &mut Delta, uf: &mut Unification) -> (Math,) {
@@ -5439,6 +5395,20 @@ fn initial_exprs() {
                     let x1 = uf.math_.add_eclass();
                     delta.var_.push((x0, x1));
                     (x1,)
+                }
+                #[allow(unreachable_code)]
+                fn entry2_0_1(
+                    &self,
+                    x0: runtime::IString,
+                    x1: Math,
+                    delta: &mut Delta,
+                    uf: &mut Unification,
+                ) -> () {
+                    if let Some(()) = self.iter2_0_1(x0, x1).next() {
+                        return ();
+                    }
+                    delta.var_.push((x0, x1));
+                    ()
                 }
             }
             #[derive(Debug, Default)]
@@ -5902,8 +5872,6 @@ fn codegen_bug1() {
         expected_codegen: Some(expect![[r#"
             use oatlog::runtime::{self, *};
             decl_row ! (Row3_0_1_2 < T0 first 0 , T1 , T2 > (T0 0 , T1 1 , T2 2) () (0 1 2) (2 1 0) where u128 = s => ((s . 0 . inner () as u128) << 64) + ((s . 1 . inner () as u128) << 32) + ((s . 2 . inner () as u128) << 0));
-            decl_row ! (Row3_1_0_2 < T0 , T1 first 1 , T2 > (T1 1 , T0 0 , T2 2) () (0 1 2) (2 1 0) where u128 = s => ((s . 1 . inner () as u128) << 64) + ((s . 0 . inner () as u128) << 32) + ((s . 2 . inner () as u128) << 0));
-            decl_row ! (Row3_2_0_1 < T0 , T1 , T2 first 2 > (T2 2 , T0 0 , T1 1) () (0 1 2) (2 1 0) where u128 = s => ((s . 2 . inner () as u128) << 64) + ((s . 0 . inner () as u128) << 32) + ((s . 1 . inner () as u128) << 0));
             eclass_wrapper_ty!(T0);
             eclass_wrapper_ty!(T1);
             eclass_wrapper_ty!(T2);
@@ -5957,8 +5925,6 @@ fn codegen_bug1() {
             struct FooRelation {
                 new: Vec<<Self as Relation>::Row>,
                 all_index_0_1_2: SortedVec<EclassCtx<Row3_0_1_2<T0, T1, T2>, u128>>,
-                all_index_1_0_2: SortedVec<EclassCtx<Row3_1_0_2<T0, T1, T2>, u128>>,
-                all_index_2_0_1: SortedVec<EclassCtx<Row3_2_0_1<T0, T1, T2>, u128>>,
             }
             struct FooUpdateCtx {
                 scratch: Vec<(T0, T1, T2)>,
@@ -5969,7 +5935,7 @@ fn codegen_bug1() {
                 type Row = (T0, T1, T2);
                 type UpdateCtx = FooUpdateCtx;
                 type Unification = Unification;
-                const COST: u32 = 9u32;
+                const COST: u32 = 3u32;
                 fn new() -> Self {
                     Self::default()
                 }
@@ -6020,22 +5986,6 @@ fn codegen_bug1() {
                             already_canon,
                             |_, _, _| unreachable!(),
                         );
-                        self.all_index_1_0_2.sorted_vec_update(
-                            insertions,
-                            &mut ctx.deferred_insertions,
-                            &mut ctx.scratch,
-                            uf,
-                            already_canon,
-                            |_, _, _| unreachable!(),
-                        );
-                        self.all_index_2_0_1.sorted_vec_update(
-                            insertions,
-                            &mut ctx.deferred_insertions,
-                            &mut ctx.scratch,
-                            uf,
-                            already_canon,
-                            |_, _, _| unreachable!(),
-                        );
                         if ctx.deferred_insertions.is_empty() && ran_merge == false {
                             break;
                         }
@@ -6056,37 +6006,25 @@ fn codegen_bug1() {
                 }
                 fn update_finalize(&mut self, ctx: Self::UpdateCtx, uf: &mut Unification) {
                     self.all_index_0_1_2.finalize();
-                    self.all_index_1_0_2.finalize();
-                    self.all_index_2_0_1.finalize();
-                    assert_eq!(self.all_index_1_0_2.len(), self.all_index_0_1_2.len());
-                    assert_eq!(self.all_index_2_0_1.len(), self.all_index_0_1_2.len());
                     self.new.extend(self.all_index_0_1_2.minus(&ctx.old));
                 }
             }
             impl FooRelation {
-                fn iter1_0_1_2(&self, x0: T0) -> impl Iterator<Item = (T1, T2)> + use<'_> {
+                fn iter3_0_1_2(&self, x0: T0, x1: T1, x2: T2) -> impl Iterator<Item = ()> + use<'_> {
                     self.all_index_0_1_2
-                        .range((x0, T1::MIN_ID, T2::MIN_ID)..=(x0, T1::MAX_ID, T2::MAX_ID))
-                        .map(|(x0, x1, x2)| (x1, x2))
+                        .range((x0, x1, x2)..=(x0, x1, x2))
+                        .map(|(x0, x1, x2)| ())
                 }
-                fn iter1_1_0_2(&self, x1: T1) -> impl Iterator<Item = (T0, T2)> + use<'_> {
-                    self.all_index_1_0_2
-                        .range((T0::MIN_ID, x1, T2::MIN_ID)..=(T0::MAX_ID, x1, T2::MAX_ID))
-                        .map(|(x0, x1, x2)| (x0, x2))
+                fn check3_0_1_2(&self, x0: T0, x1: T1, x2: T2) -> bool {
+                    self.iter3_0_1_2(x0, x1, x2).next().is_some()
                 }
-                fn iter1_2_0_1(&self, x2: T2) -> impl Iterator<Item = (T0, T1)> + use<'_> {
-                    self.all_index_2_0_1
-                        .range((T0::MIN_ID, T1::MIN_ID, x2)..=(T0::MAX_ID, T1::MAX_ID, x2))
-                        .map(|(x0, x1, x2)| (x0, x1))
-                }
-                fn check1_0_1_2(&self, x0: T0) -> bool {
-                    self.iter1_0_1_2(x0).next().is_some()
-                }
-                fn check1_1_0_2(&self, x1: T1) -> bool {
-                    self.iter1_1_0_2(x1).next().is_some()
-                }
-                fn check1_2_0_1(&self, x2: T2) -> bool {
-                    self.iter1_2_0_1(x2).next().is_some()
+                #[allow(unreachable_code)]
+                fn entry3_0_1_2(&self, x0: T0, x1: T1, x2: T2, delta: &mut Delta, uf: &mut Unification) -> () {
+                    if let Some(()) = self.iter3_0_1_2(x0, x1, x2).next() {
+                        return ();
+                    }
+                    delta.foo_.push((x0, x1, x2));
+                    ()
                 }
             }
             #[derive(Debug, Default)]
@@ -6275,7 +6213,6 @@ fn initial() {
         expected_codegen: Some(expect![[r#"
             use oatlog::runtime::{self, *};
             decl_row ! (Row2_0 < T0 first 0 , T1 > (T0 0) (T1 1) (0 1) (1 0) where u64 = s => ((s . 0 . inner () as u64) << 32) + ((s . 1 . inner () as u64) << 0));
-            decl_row ! (Row2_1_0 < T0 , T1 first 1 > (T1 1 , T0 0) () (0 1) (1 0) where u64 = s => ((s . 1 . inner () as u64) << 32) + ((s . 0 . inner () as u64) << 0));
             eclass_wrapper_ty!(Math);
             fn i64_add012(a: i64, b: i64) -> impl Iterator<Item = (i64,)> {
                 a.checked_add(b).map(|x| (x,)).into_iter()
@@ -6327,7 +6264,6 @@ fn initial() {
             struct ConstRelation {
                 new: Vec<<Self as Relation>::Row>,
                 all_index_0_1: SortedVec<GeneralCtx<Row2_0<std::primitive::i64, Math>>>,
-                all_index_1_0: SortedVec<GeneralCtx<Row2_1_0<std::primitive::i64, Math>>>,
             }
             struct ConstUpdateCtx {
                 scratch: Vec<(std::primitive::i64, Math)>,
@@ -6338,7 +6274,7 @@ fn initial() {
                 type Row = (std::primitive::i64, Math);
                 type UpdateCtx = ConstUpdateCtx;
                 type Unification = Unification;
-                const COST: u32 = 4u32;
+                const COST: u32 = 2u32;
                 fn new() -> Self {
                     Self::default()
                 }
@@ -6408,9 +6344,6 @@ fn initial() {
                 }
                 fn update_finalize(&mut self, ctx: Self::UpdateCtx, uf: &mut Unification) {
                     self.all_index_0_1.finalize();
-                    self.all_index_1_0
-                        .recreate_from(&self.all_index_0_1.as_slice());
-                    assert_eq!(self.all_index_1_0.len(), self.all_index_0_1.len());
                     self.new.extend(self.all_index_0_1.minus(&ctx.old));
                 }
             }
@@ -6420,16 +6353,16 @@ fn initial() {
                         .range((x0, Math::MIN_ID)..=(x0, Math::MAX_ID))
                         .map(|(x0, x1)| (x1,))
                 }
-                fn iter1_1_0(&self, x1: Math) -> impl Iterator<Item = (std::primitive::i64,)> + use<'_> {
-                    self.all_index_1_0
-                        .range((std::primitive::i64::MIN_ID, x1)..=(std::primitive::i64::MAX_ID, x1))
-                        .map(|(x0, x1)| (x0,))
+                fn iter2_0_1(&self, x0: std::primitive::i64, x1: Math) -> impl Iterator<Item = ()> + use<'_> {
+                    self.all_index_0_1
+                        .range((x0, x1)..=(x0, x1))
+                        .map(|(x0, x1)| ())
                 }
                 fn check1_0_1(&self, x0: std::primitive::i64) -> bool {
                     self.iter1_0_1(x0).next().is_some()
                 }
-                fn check1_1_0(&self, x1: Math) -> bool {
-                    self.iter1_1_0(x1).next().is_some()
+                fn check2_0_1(&self, x0: std::primitive::i64, x1: Math) -> bool {
+                    self.iter2_0_1(x0, x1).next().is_some()
                 }
                 #[allow(unreachable_code)]
                 fn entry1_0_1(
@@ -6444,6 +6377,20 @@ fn initial() {
                     let x1 = uf.math_.add_eclass();
                     delta.const_.push((x0, x1));
                     (x1,)
+                }
+                #[allow(unreachable_code)]
+                fn entry2_0_1(
+                    &self,
+                    x0: std::primitive::i64,
+                    x1: Math,
+                    delta: &mut Delta,
+                    uf: &mut Unification,
+                ) -> () {
+                    if let Some(()) = self.iter2_0_1(x0, x1).next() {
+                        return ();
+                    }
+                    delta.const_.push((x0, x1));
+                    ()
                 }
             }
             #[derive(Debug, Default)]
@@ -6696,10 +6643,7 @@ fn test_primitives_simple() {
             decl_row ! (Row2_0 < T0 first 0 , T1 > (T0 0) (T1 1) (0 1) (1 0) where u64 = s => ((s . 0 . inner () as u64) << 32) + ((s . 1 . inner () as u64) << 0));
             decl_row ! (Row2_1_0 < T0 , T1 first 1 > (T1 1 , T0 0) () (0 1) (1 0) where u64 = s => ((s . 1 . inner () as u64) << 32) + ((s . 0 . inner () as u64) << 0));
             decl_row ! (Row3_0_1 < T0 first 0 , T1 , T2 > (T0 0 , T1 1) (T2 2) (0 1 2) (2 1 0) where u128 = s => ((s . 0 . inner () as u128) << 64) + ((s . 1 . inner () as u128) << 32) + ((s . 2 . inner () as u128) << 0));
-            decl_row ! (Row3_0_1_2 < T0 first 0 , T1 , T2 > (T0 0 , T1 1 , T2 2) () (0 1 2) (2 1 0) where u128 = s => ((s . 0 . inner () as u128) << 64) + ((s . 1 . inner () as u128) << 32) + ((s . 2 . inner () as u128) << 0));
             decl_row ! (Row3_1_0 < T0 , T1 first 1 , T2 > (T1 1 , T0 0) (T2 2) (0 1 2) (2 1 0) where u128 = s => ((s . 1 . inner () as u128) << 64) + ((s . 0 . inner () as u128) << 32) + ((s . 2 . inner () as u128) << 0));
-            decl_row ! (Row3_1_0_2 < T0 , T1 first 1 , T2 > (T1 1 , T0 0 , T2 2) () (0 1 2) (2 1 0) where u128 = s => ((s . 1 . inner () as u128) << 64) + ((s . 0 . inner () as u128) << 32) + ((s . 2 . inner () as u128) << 0));
-            decl_row ! (Row3_2_0_1 < T0 , T1 , T2 first 2 > (T2 2 , T0 0 , T1 1) () (0 1 2) (2 1 0) where u128 = s => ((s . 2 . inner () as u128) << 64) + ((s . 0 . inner () as u128) << 32) + ((s . 1 . inner () as u128) << 0));
             eclass_wrapper_ty!(Math);
             fn i64_add012(a: i64, b: i64) -> impl Iterator<Item = (i64,)> {
                 a.checked_add(b).map(|x| (x,)).into_iter()
@@ -6750,9 +6694,7 @@ fn test_primitives_simple() {
             #[derive(Debug, Default)]
             struct MulRelation {
                 new: Vec<<Self as Relation>::Row>,
-                all_index_0_1_2: SortedVec<EclassCtx<Row3_0_1_2<Math, Math, Math>, u128>>,
                 all_index_1_0_2: SortedVec<EclassCtx<Row3_1_0<Math, Math, Math>, u128>>,
-                all_index_2_0_1: SortedVec<EclassCtx<Row3_2_0_1<Math, Math, Math>, u128>>,
             }
             struct MulUpdateCtx {
                 scratch: Vec<(Math, Math, Math)>,
@@ -6763,7 +6705,7 @@ fn test_primitives_simple() {
                 type Row = (Math, Math, Math);
                 type UpdateCtx = MulUpdateCtx;
                 type Unification = Unification;
-                const COST: u32 = 9u32;
+                const COST: u32 = 3u32;
                 fn new() -> Self {
                     Self::default()
                 }
@@ -6777,13 +6719,13 @@ fn test_primitives_simple() {
                     self.new.iter().copied()
                 }
                 fn len(&self) -> usize {
-                    self.all_index_0_1_2.len()
+                    self.all_index_1_0_2.len()
                 }
                 fn emit_graphviz(&self, buf: &mut String) {
                     use std::fmt::Write;
-                    for (i, (x0, x1, x2)) in self.all_index_0_1_2.iter().enumerate() {
-                        writeln!(buf, "{}_{i} -> {}_{};", "mul", "math", x0).unwrap();
+                    for (i, (x1, x0, x2)) in self.all_index_1_0_2.iter().enumerate() {
                         writeln!(buf, "{}_{i} -> {}_{};", "mul", "math", x1).unwrap();
+                        writeln!(buf, "{}_{i} -> {}_{};", "mul", "math", x0).unwrap();
                         writeln!(buf, "{}_{i} -> {}_{};", "mul", "math", x2).unwrap();
                         writeln!(buf, "{}_{i} [shape = box];", "mul").unwrap();
                     }
@@ -6839,12 +6781,6 @@ fn test_primitives_simple() {
                 }
                 fn update_finalize(&mut self, ctx: Self::UpdateCtx, uf: &mut Unification) {
                     self.all_index_1_0_2.finalize();
-                    self.all_index_0_1_2
-                        .recreate_from(&self.all_index_1_0_2.as_slice());
-                    self.all_index_2_0_1
-                        .recreate_from(&self.all_index_1_0_2.as_slice());
-                    assert_eq!(self.all_index_0_1_2.len(), self.all_index_1_0_2.len());
-                    assert_eq!(self.all_index_2_0_1.len(), self.all_index_1_0_2.len());
                     self.new.extend(self.all_index_1_0_2.minus(&ctx.old));
                 }
             }
@@ -6859,15 +6795,10 @@ fn test_primitives_simple() {
                         .range((Math::MIN_ID, x1, Math::MIN_ID)..=(Math::MAX_ID, x1, Math::MAX_ID))
                         .map(|(x0, x1, x2)| (x0, x2))
                 }
-                fn iter1_0_1_2(&self, x0: Math) -> impl Iterator<Item = (Math, Math)> + use<'_> {
-                    self.all_index_0_1_2
-                        .range((x0, Math::MIN_ID, Math::MIN_ID)..=(x0, Math::MAX_ID, Math::MAX_ID))
-                        .map(|(x0, x1, x2)| (x1, x2))
-                }
-                fn iter1_2_0_1(&self, x2: Math) -> impl Iterator<Item = (Math, Math)> + use<'_> {
-                    self.all_index_2_0_1
-                        .range((Math::MIN_ID, Math::MIN_ID, x2)..=(Math::MAX_ID, Math::MAX_ID, x2))
-                        .map(|(x0, x1, x2)| (x0, x1))
+                fn iter3_1_0_2(&self, x1: Math, x0: Math, x2: Math) -> impl Iterator<Item = ()> + use<'_> {
+                    self.all_index_1_0_2
+                        .range((x0, x1, x2)..=(x0, x1, x2))
+                        .map(|(x0, x1, x2)| ())
                 }
                 fn check2_1_0_2(&self, x1: Math, x0: Math) -> bool {
                     self.iter2_1_0_2(x1, x0).next().is_some()
@@ -6875,11 +6806,8 @@ fn test_primitives_simple() {
                 fn check1_1_0_2(&self, x1: Math) -> bool {
                     self.iter1_1_0_2(x1).next().is_some()
                 }
-                fn check1_0_1_2(&self, x0: Math) -> bool {
-                    self.iter1_0_1_2(x0).next().is_some()
-                }
-                fn check1_2_0_1(&self, x2: Math) -> bool {
-                    self.iter1_2_0_1(x2).next().is_some()
+                fn check3_1_0_2(&self, x1: Math, x0: Math, x2: Math) -> bool {
+                    self.iter3_1_0_2(x1, x0, x2).next().is_some()
                 }
                 #[allow(unreachable_code)]
                 fn entry2_1_0_2(&self, x1: Math, x0: Math, delta: &mut Delta, uf: &mut Unification) -> (Math,) {
@@ -6890,13 +6818,26 @@ fn test_primitives_simple() {
                     delta.mul_.push((x0, x1, x2));
                     (x2,)
                 }
+                #[allow(unreachable_code)]
+                fn entry3_1_0_2(
+                    &self,
+                    x1: Math,
+                    x0: Math,
+                    x2: Math,
+                    delta: &mut Delta,
+                    uf: &mut Unification,
+                ) -> () {
+                    if let Some(()) = self.iter3_1_0_2(x1, x0, x2).next() {
+                        return ();
+                    }
+                    delta.mul_.push((x0, x1, x2));
+                    ()
+                }
             }
             #[derive(Debug, Default)]
             struct AddRelation {
                 new: Vec<<Self as Relation>::Row>,
                 all_index_0_1_2: SortedVec<EclassCtx<Row3_0_1<Math, Math, Math>, u128>>,
-                all_index_1_0_2: SortedVec<EclassCtx<Row3_1_0_2<Math, Math, Math>, u128>>,
-                all_index_2_0_1: SortedVec<EclassCtx<Row3_2_0_1<Math, Math, Math>, u128>>,
             }
             struct AddUpdateCtx {
                 scratch: Vec<(Math, Math, Math)>,
@@ -6907,7 +6848,7 @@ fn test_primitives_simple() {
                 type Row = (Math, Math, Math);
                 type UpdateCtx = AddUpdateCtx;
                 type Unification = Unification;
-                const COST: u32 = 9u32;
+                const COST: u32 = 3u32;
                 fn new() -> Self {
                     Self::default()
                 }
@@ -6983,12 +6924,6 @@ fn test_primitives_simple() {
                 }
                 fn update_finalize(&mut self, ctx: Self::UpdateCtx, uf: &mut Unification) {
                     self.all_index_0_1_2.finalize();
-                    self.all_index_1_0_2
-                        .recreate_from(&self.all_index_0_1_2.as_slice());
-                    self.all_index_2_0_1
-                        .recreate_from(&self.all_index_0_1_2.as_slice());
-                    assert_eq!(self.all_index_1_0_2.len(), self.all_index_0_1_2.len());
-                    assert_eq!(self.all_index_2_0_1.len(), self.all_index_0_1_2.len());
                     self.new.extend(self.all_index_0_1_2.minus(&ctx.old));
                 }
             }
@@ -6998,32 +6933,16 @@ fn test_primitives_simple() {
                         .range((x0, x1, Math::MIN_ID)..=(x0, x1, Math::MAX_ID))
                         .map(|(x0, x1, x2)| (x2,))
                 }
-                fn iter1_0_1_2(&self, x0: Math) -> impl Iterator<Item = (Math, Math)> + use<'_> {
+                fn iter3_0_1_2(&self, x0: Math, x1: Math, x2: Math) -> impl Iterator<Item = ()> + use<'_> {
                     self.all_index_0_1_2
-                        .range((x0, Math::MIN_ID, Math::MIN_ID)..=(x0, Math::MAX_ID, Math::MAX_ID))
-                        .map(|(x0, x1, x2)| (x1, x2))
-                }
-                fn iter1_1_0_2(&self, x1: Math) -> impl Iterator<Item = (Math, Math)> + use<'_> {
-                    self.all_index_1_0_2
-                        .range((Math::MIN_ID, x1, Math::MIN_ID)..=(Math::MAX_ID, x1, Math::MAX_ID))
-                        .map(|(x0, x1, x2)| (x0, x2))
-                }
-                fn iter1_2_0_1(&self, x2: Math) -> impl Iterator<Item = (Math, Math)> + use<'_> {
-                    self.all_index_2_0_1
-                        .range((Math::MIN_ID, Math::MIN_ID, x2)..=(Math::MAX_ID, Math::MAX_ID, x2))
-                        .map(|(x0, x1, x2)| (x0, x1))
+                        .range((x0, x1, x2)..=(x0, x1, x2))
+                        .map(|(x0, x1, x2)| ())
                 }
                 fn check2_0_1_2(&self, x0: Math, x1: Math) -> bool {
                     self.iter2_0_1_2(x0, x1).next().is_some()
                 }
-                fn check1_0_1_2(&self, x0: Math) -> bool {
-                    self.iter1_0_1_2(x0).next().is_some()
-                }
-                fn check1_1_0_2(&self, x1: Math) -> bool {
-                    self.iter1_1_0_2(x1).next().is_some()
-                }
-                fn check1_2_0_1(&self, x2: Math) -> bool {
-                    self.iter1_2_0_1(x2).next().is_some()
+                fn check3_0_1_2(&self, x0: Math, x1: Math, x2: Math) -> bool {
+                    self.iter3_0_1_2(x0, x1, x2).next().is_some()
                 }
                 #[allow(unreachable_code)]
                 fn entry2_0_1_2(&self, x0: Math, x1: Math, delta: &mut Delta, uf: &mut Unification) -> (Math,) {
@@ -7033,6 +6952,21 @@ fn test_primitives_simple() {
                     let x2 = uf.math_.add_eclass();
                     delta.add_.push((x0, x1, x2));
                     (x2,)
+                }
+                #[allow(unreachable_code)]
+                fn entry3_0_1_2(
+                    &self,
+                    x0: Math,
+                    x1: Math,
+                    x2: Math,
+                    delta: &mut Delta,
+                    uf: &mut Unification,
+                ) -> () {
+                    if let Some(()) = self.iter3_0_1_2(x0, x1, x2).next() {
+                        return ();
+                    }
+                    delta.add_.push((x0, x1, x2));
+                    ()
                 }
             }
             #[derive(Debug, Default)]
@@ -7184,7 +7118,6 @@ fn test_primitives_simple() {
             struct VarRelation {
                 new: Vec<<Self as Relation>::Row>,
                 all_index_0_1: SortedVec<GeneralCtx<Row2_0<runtime::IString, Math>>>,
-                all_index_1_0: SortedVec<GeneralCtx<Row2_1_0<runtime::IString, Math>>>,
             }
             struct VarUpdateCtx {
                 scratch: Vec<(runtime::IString, Math)>,
@@ -7195,7 +7128,7 @@ fn test_primitives_simple() {
                 type Row = (runtime::IString, Math);
                 type UpdateCtx = VarUpdateCtx;
                 type Unification = Unification;
-                const COST: u32 = 4u32;
+                const COST: u32 = 2u32;
                 fn new() -> Self {
                     Self::default()
                 }
@@ -7265,9 +7198,6 @@ fn test_primitives_simple() {
                 }
                 fn update_finalize(&mut self, ctx: Self::UpdateCtx, uf: &mut Unification) {
                     self.all_index_0_1.finalize();
-                    self.all_index_1_0
-                        .recreate_from(&self.all_index_0_1.as_slice());
-                    assert_eq!(self.all_index_1_0.len(), self.all_index_0_1.len());
                     self.new.extend(self.all_index_0_1.minus(&ctx.old));
                 }
             }
@@ -7277,16 +7207,16 @@ fn test_primitives_simple() {
                         .range((x0, Math::MIN_ID)..=(x0, Math::MAX_ID))
                         .map(|(x0, x1)| (x1,))
                 }
-                fn iter1_1_0(&self, x1: Math) -> impl Iterator<Item = (runtime::IString,)> + use<'_> {
-                    self.all_index_1_0
-                        .range((runtime::IString::MIN_ID, x1)..=(runtime::IString::MAX_ID, x1))
-                        .map(|(x0, x1)| (x0,))
+                fn iter2_0_1(&self, x0: runtime::IString, x1: Math) -> impl Iterator<Item = ()> + use<'_> {
+                    self.all_index_0_1
+                        .range((x0, x1)..=(x0, x1))
+                        .map(|(x0, x1)| ())
                 }
                 fn check1_0_1(&self, x0: runtime::IString) -> bool {
                     self.iter1_0_1(x0).next().is_some()
                 }
-                fn check1_1_0(&self, x1: Math) -> bool {
-                    self.iter1_1_0(x1).next().is_some()
+                fn check2_0_1(&self, x0: runtime::IString, x1: Math) -> bool {
+                    self.iter2_0_1(x0, x1).next().is_some()
                 }
                 #[allow(unreachable_code)]
                 fn entry1_0_1(&self, x0: runtime::IString, delta: &mut Delta, uf: &mut Unification) -> (Math,) {
@@ -7296,6 +7226,20 @@ fn test_primitives_simple() {
                     let x1 = uf.math_.add_eclass();
                     delta.var_.push((x0, x1));
                     (x1,)
+                }
+                #[allow(unreachable_code)]
+                fn entry2_0_1(
+                    &self,
+                    x0: runtime::IString,
+                    x1: Math,
+                    delta: &mut Delta,
+                    uf: &mut Unification,
+                ) -> () {
+                    if let Some(()) = self.iter2_0_1(x0, x1).next() {
+                        return ();
+                    }
+                    delta.var_.push((x0, x1));
+                    ()
                 }
             }
             #[derive(Debug, Default)]
@@ -7624,8 +7568,6 @@ fn triangle_join() {
             decl_row ! (Row2_0_1 < T0 first 0 , T1 > (T0 0 , T1 1) () (0 1) (1 0) where u64 = s => ((s . 0 . inner () as u64) << 32) + ((s . 1 . inner () as u64) << 0));
             decl_row ! (Row2_1_0 < T0 , T1 first 1 > (T1 1 , T0 0) () (0 1) (1 0) where u64 = s => ((s . 1 . inner () as u64) << 32) + ((s . 0 . inner () as u64) << 0));
             decl_row ! (Row3_0_1_2 < T0 first 0 , T1 , T2 > (T0 0 , T1 1 , T2 2) () (0 1 2) (2 1 0) where u128 = s => ((s . 0 . inner () as u128) << 64) + ((s . 1 . inner () as u128) << 32) + ((s . 2 . inner () as u128) << 0));
-            decl_row ! (Row3_1_0_2 < T0 , T1 first 1 , T2 > (T1 1 , T0 0 , T2 2) () (0 1 2) (2 1 0) where u128 = s => ((s . 1 . inner () as u128) << 64) + ((s . 0 . inner () as u128) << 32) + ((s . 2 . inner () as u128) << 0));
-            decl_row ! (Row3_2_0_1 < T0 , T1 , T2 first 2 > (T2 2 , T0 0 , T1 1) () (0 1 2) (2 1 0) where u128 = s => ((s . 2 . inner () as u128) << 64) + ((s . 0 . inner () as u128) << 32) + ((s . 1 . inner () as u128) << 0));
             eclass_wrapper_ty!(Math);
             fn i64_add012(a: i64, b: i64) -> impl Iterator<Item = (i64,)> {
                 a.checked_add(b).map(|x| (x,)).into_iter()
@@ -7908,11 +7850,27 @@ fn triangle_join() {
                         .range((Math::MIN_ID, x1)..=(Math::MAX_ID, x1))
                         .map(|(x0, x1)| (x0,))
                 }
+                fn iter2_0_1(&self, x0: Math, x1: Math) -> impl Iterator<Item = ()> + use<'_> {
+                    self.all_index_0_1
+                        .range((x0, x1)..=(x0, x1))
+                        .map(|(x0, x1)| ())
+                }
                 fn check1_0_1(&self, x0: Math) -> bool {
                     self.iter1_0_1(x0).next().is_some()
                 }
                 fn check1_1_0(&self, x1: Math) -> bool {
                     self.iter1_1_0(x1).next().is_some()
+                }
+                fn check2_0_1(&self, x0: Math, x1: Math) -> bool {
+                    self.iter2_0_1(x0, x1).next().is_some()
+                }
+                #[allow(unreachable_code)]
+                fn entry2_0_1(&self, x0: Math, x1: Math, delta: &mut Delta, uf: &mut Unification) -> () {
+                    if let Some(()) = self.iter2_0_1(x0, x1).next() {
+                        return ();
+                    }
+                    delta.bar_.push((x0, x1));
+                    ()
                 }
             }
             #[derive(Debug, Default)]
@@ -8048,8 +8006,6 @@ fn triangle_join() {
             struct TriangleRelation {
                 new: Vec<<Self as Relation>::Row>,
                 all_index_0_1_2: SortedVec<EclassCtx<Row3_0_1_2<Math, Math, Math>, u128>>,
-                all_index_1_0_2: SortedVec<EclassCtx<Row3_1_0_2<Math, Math, Math>, u128>>,
-                all_index_2_0_1: SortedVec<EclassCtx<Row3_2_0_1<Math, Math, Math>, u128>>,
             }
             struct TriangleUpdateCtx {
                 scratch: Vec<(Math, Math, Math)>,
@@ -8060,7 +8016,7 @@ fn triangle_join() {
                 type Row = (Math, Math, Math);
                 type UpdateCtx = TriangleUpdateCtx;
                 type Unification = Unification;
-                const COST: u32 = 9u32;
+                const COST: u32 = 3u32;
                 fn new() -> Self {
                     Self::default()
                 }
@@ -8111,22 +8067,6 @@ fn triangle_join() {
                             already_canon,
                             |_, _, _| unreachable!(),
                         );
-                        self.all_index_1_0_2.sorted_vec_update(
-                            insertions,
-                            &mut ctx.deferred_insertions,
-                            &mut ctx.scratch,
-                            uf,
-                            already_canon,
-                            |_, _, _| unreachable!(),
-                        );
-                        self.all_index_2_0_1.sorted_vec_update(
-                            insertions,
-                            &mut ctx.deferred_insertions,
-                            &mut ctx.scratch,
-                            uf,
-                            already_canon,
-                            |_, _, _| unreachable!(),
-                        );
                         if ctx.deferred_insertions.is_empty() && ran_merge == false {
                             break;
                         }
@@ -8147,37 +8087,32 @@ fn triangle_join() {
                 }
                 fn update_finalize(&mut self, ctx: Self::UpdateCtx, uf: &mut Unification) {
                     self.all_index_0_1_2.finalize();
-                    self.all_index_1_0_2.finalize();
-                    self.all_index_2_0_1.finalize();
-                    assert_eq!(self.all_index_1_0_2.len(), self.all_index_0_1_2.len());
-                    assert_eq!(self.all_index_2_0_1.len(), self.all_index_0_1_2.len());
                     self.new.extend(self.all_index_0_1_2.minus(&ctx.old));
                 }
             }
             impl TriangleRelation {
-                fn iter1_0_1_2(&self, x0: Math) -> impl Iterator<Item = (Math, Math)> + use<'_> {
+                fn iter3_0_1_2(&self, x0: Math, x1: Math, x2: Math) -> impl Iterator<Item = ()> + use<'_> {
                     self.all_index_0_1_2
-                        .range((x0, Math::MIN_ID, Math::MIN_ID)..=(x0, Math::MAX_ID, Math::MAX_ID))
-                        .map(|(x0, x1, x2)| (x1, x2))
+                        .range((x0, x1, x2)..=(x0, x1, x2))
+                        .map(|(x0, x1, x2)| ())
                 }
-                fn iter1_1_0_2(&self, x1: Math) -> impl Iterator<Item = (Math, Math)> + use<'_> {
-                    self.all_index_1_0_2
-                        .range((Math::MIN_ID, x1, Math::MIN_ID)..=(Math::MAX_ID, x1, Math::MAX_ID))
-                        .map(|(x0, x1, x2)| (x0, x2))
+                fn check3_0_1_2(&self, x0: Math, x1: Math, x2: Math) -> bool {
+                    self.iter3_0_1_2(x0, x1, x2).next().is_some()
                 }
-                fn iter1_2_0_1(&self, x2: Math) -> impl Iterator<Item = (Math, Math)> + use<'_> {
-                    self.all_index_2_0_1
-                        .range((Math::MIN_ID, Math::MIN_ID, x2)..=(Math::MAX_ID, Math::MAX_ID, x2))
-                        .map(|(x0, x1, x2)| (x0, x1))
-                }
-                fn check1_0_1_2(&self, x0: Math) -> bool {
-                    self.iter1_0_1_2(x0).next().is_some()
-                }
-                fn check1_1_0_2(&self, x1: Math) -> bool {
-                    self.iter1_1_0_2(x1).next().is_some()
-                }
-                fn check1_2_0_1(&self, x2: Math) -> bool {
-                    self.iter1_2_0_1(x2).next().is_some()
+                #[allow(unreachable_code)]
+                fn entry3_0_1_2(
+                    &self,
+                    x0: Math,
+                    x1: Math,
+                    x2: Math,
+                    delta: &mut Delta,
+                    uf: &mut Unification,
+                ) -> () {
+                    if let Some(()) = self.iter3_0_1_2(x0, x1, x2).next() {
+                        return ();
+                    }
+                    delta.triangle_.push((x0, x1, x2));
+                    ()
                 }
             }
             #[derive(Debug, Default)]
@@ -8496,7 +8431,6 @@ fn edgecase0() {
             struct MulRelation {
                 new: Vec<<Self as Relation>::Row>,
                 all_index_0_1_2: SortedVec<EclassCtx<Row3_0_1<Math, Math, Math>, u128>>,
-                all_index_1_0_2: SortedVec<EclassCtx<Row3_1_0_2<Math, Math, Math>, u128>>,
                 all_index_2_0_1: SortedVec<EclassCtx<Row3_2_0_1<Math, Math, Math>, u128>>,
             }
             struct MulUpdateCtx {
@@ -8508,7 +8442,7 @@ fn edgecase0() {
                 type Row = (Math, Math, Math);
                 type UpdateCtx = MulUpdateCtx;
                 type Unification = Unification;
-                const COST: u32 = 9u32;
+                const COST: u32 = 6u32;
                 fn new() -> Self {
                     Self::default()
                 }
@@ -8584,11 +8518,8 @@ fn edgecase0() {
                 }
                 fn update_finalize(&mut self, ctx: Self::UpdateCtx, uf: &mut Unification) {
                     self.all_index_0_1_2.finalize();
-                    self.all_index_1_0_2
-                        .recreate_from(&self.all_index_0_1_2.as_slice());
                     self.all_index_2_0_1
                         .recreate_from(&self.all_index_0_1_2.as_slice());
-                    assert_eq!(self.all_index_1_0_2.len(), self.all_index_0_1_2.len());
                     assert_eq!(self.all_index_2_0_1.len(), self.all_index_0_1_2.len());
                     self.new.extend(self.all_index_0_1_2.minus(&ctx.old));
                 }
@@ -8614,10 +8545,10 @@ fn edgecase0() {
                         .range((Math::MIN_ID, Math::MIN_ID, x2)..=(Math::MAX_ID, Math::MAX_ID, x2))
                         .map(|(x0, x1, x2)| (x0, x1))
                 }
-                fn iter1_1_0_2(&self, x1: Math) -> impl Iterator<Item = (Math, Math)> + use<'_> {
-                    self.all_index_1_0_2
-                        .range((Math::MIN_ID, x1, Math::MIN_ID)..=(Math::MAX_ID, x1, Math::MAX_ID))
-                        .map(|(x0, x1, x2)| (x0, x2))
+                fn iter3_0_1_2(&self, x0: Math, x1: Math, x2: Math) -> impl Iterator<Item = ()> + use<'_> {
+                    self.all_index_0_1_2
+                        .range((x0, x1, x2)..=(x0, x1, x2))
+                        .map(|(x0, x1, x2)| ())
                 }
                 fn check2_0_1_2(&self, x0: Math, x1: Math) -> bool {
                     self.iter2_0_1_2(x0, x1).next().is_some()
@@ -8631,8 +8562,8 @@ fn edgecase0() {
                 fn check1_2_0_1(&self, x2: Math) -> bool {
                     self.iter1_2_0_1(x2).next().is_some()
                 }
-                fn check1_1_0_2(&self, x1: Math) -> bool {
-                    self.iter1_1_0_2(x1).next().is_some()
+                fn check3_0_1_2(&self, x0: Math, x1: Math, x2: Math) -> bool {
+                    self.iter3_0_1_2(x0, x1, x2).next().is_some()
                 }
                 #[allow(unreachable_code)]
                 fn entry2_0_1_2(&self, x0: Math, x1: Math, delta: &mut Delta, uf: &mut Unification) -> (Math,) {
@@ -8643,13 +8574,27 @@ fn edgecase0() {
                     delta.mul_.push((x0, x1, x2));
                     (x2,)
                 }
+                #[allow(unreachable_code)]
+                fn entry3_0_1_2(
+                    &self,
+                    x0: Math,
+                    x1: Math,
+                    x2: Math,
+                    delta: &mut Delta,
+                    uf: &mut Unification,
+                ) -> () {
+                    if let Some(()) = self.iter3_0_1_2(x0, x1, x2).next() {
+                        return ();
+                    }
+                    delta.mul_.push((x0, x1, x2));
+                    ()
+                }
             }
             #[derive(Debug, Default)]
             struct AddRelation {
                 new: Vec<<Self as Relation>::Row>,
                 all_index_0_1_2: SortedVec<EclassCtx<Row3_0_1<Math, Math, Math>, u128>>,
                 all_index_1_0_2: SortedVec<EclassCtx<Row3_1_0_2<Math, Math, Math>, u128>>,
-                all_index_2_0_1: SortedVec<EclassCtx<Row3_2_0_1<Math, Math, Math>, u128>>,
             }
             struct AddUpdateCtx {
                 scratch: Vec<(Math, Math, Math)>,
@@ -8660,7 +8605,7 @@ fn edgecase0() {
                 type Row = (Math, Math, Math);
                 type UpdateCtx = AddUpdateCtx;
                 type Unification = Unification;
-                const COST: u32 = 9u32;
+                const COST: u32 = 6u32;
                 fn new() -> Self {
                     Self::default()
                 }
@@ -8738,10 +8683,7 @@ fn edgecase0() {
                     self.all_index_0_1_2.finalize();
                     self.all_index_1_0_2
                         .recreate_from(&self.all_index_0_1_2.as_slice());
-                    self.all_index_2_0_1
-                        .recreate_from(&self.all_index_0_1_2.as_slice());
                     assert_eq!(self.all_index_1_0_2.len(), self.all_index_0_1_2.len());
-                    assert_eq!(self.all_index_2_0_1.len(), self.all_index_0_1_2.len());
                     self.new.extend(self.all_index_0_1_2.minus(&ctx.old));
                 }
             }
@@ -8761,10 +8703,10 @@ fn edgecase0() {
                         .range((Math::MIN_ID, x1, Math::MIN_ID)..=(Math::MAX_ID, x1, Math::MAX_ID))
                         .map(|(x0, x1, x2)| (x0, x2))
                 }
-                fn iter1_2_0_1(&self, x2: Math) -> impl Iterator<Item = (Math, Math)> + use<'_> {
-                    self.all_index_2_0_1
-                        .range((Math::MIN_ID, Math::MIN_ID, x2)..=(Math::MAX_ID, Math::MAX_ID, x2))
-                        .map(|(x0, x1, x2)| (x0, x1))
+                fn iter3_0_1_2(&self, x0: Math, x1: Math, x2: Math) -> impl Iterator<Item = ()> + use<'_> {
+                    self.all_index_0_1_2
+                        .range((x0, x1, x2)..=(x0, x1, x2))
+                        .map(|(x0, x1, x2)| ())
                 }
                 fn check2_0_1_2(&self, x0: Math, x1: Math) -> bool {
                     self.iter2_0_1_2(x0, x1).next().is_some()
@@ -8775,8 +8717,8 @@ fn edgecase0() {
                 fn check1_1_0_2(&self, x1: Math) -> bool {
                     self.iter1_1_0_2(x1).next().is_some()
                 }
-                fn check1_2_0_1(&self, x2: Math) -> bool {
-                    self.iter1_2_0_1(x2).next().is_some()
+                fn check3_0_1_2(&self, x0: Math, x1: Math, x2: Math) -> bool {
+                    self.iter3_0_1_2(x0, x1, x2).next().is_some()
                 }
                 #[allow(unreachable_code)]
                 fn entry2_0_1_2(&self, x0: Math, x1: Math, delta: &mut Delta, uf: &mut Unification) -> (Math,) {
@@ -8786,6 +8728,21 @@ fn edgecase0() {
                     let x2 = uf.math_.add_eclass();
                     delta.add_.push((x0, x1, x2));
                     (x2,)
+                }
+                #[allow(unreachable_code)]
+                fn entry3_0_1_2(
+                    &self,
+                    x0: Math,
+                    x1: Math,
+                    x2: Math,
+                    delta: &mut Delta,
+                    uf: &mut Unification,
+                ) -> () {
+                    if let Some(()) = self.iter3_0_1_2(x0, x1, x2).next() {
+                        return ();
+                    }
+                    delta.add_.push((x0, x1, x2));
+                    ()
                 }
             }
             #[derive(Debug, Default)]
@@ -9020,7 +8977,6 @@ fn test_into_codegen() {
         expected_codegen: Some(expect![[r#"
             use oatlog::runtime::{self, *};
             decl_row ! (Row3_0_1 < T0 first 0 , T1 , T2 > (T0 0 , T1 1) (T2 2) (0 1 2) (2 1 0) where u128 = s => ((s . 0 . inner () as u128) << 64) + ((s . 1 . inner () as u128) << 32) + ((s . 2 . inner () as u128) << 0));
-            decl_row ! (Row3_1_0_2 < T0 , T1 first 1 , T2 > (T1 1 , T0 0 , T2 2) () (0 1 2) (2 1 0) where u128 = s => ((s . 1 . inner () as u128) << 64) + ((s . 0 . inner () as u128) << 32) + ((s . 2 . inner () as u128) << 0));
             decl_row ! (Row3_2_0_1 < T0 , T1 , T2 first 2 > (T2 2 , T0 0 , T1 1) () (0 1 2) (2 1 0) where u128 = s => ((s . 2 . inner () as u128) << 64) + ((s . 0 . inner () as u128) << 32) + ((s . 1 . inner () as u128) << 0));
             eclass_wrapper_ty!(Math);
             fn i64_add012(a: i64, b: i64) -> impl Iterator<Item = (i64,)> {
@@ -9073,8 +9029,6 @@ fn test_into_codegen() {
             struct MulRelation {
                 new: Vec<<Self as Relation>::Row>,
                 all_index_0_1_2: SortedVec<EclassCtx<Row3_0_1<Math, Math, Math>, u128>>,
-                all_index_1_0_2: SortedVec<EclassCtx<Row3_1_0_2<Math, Math, Math>, u128>>,
-                all_index_2_0_1: SortedVec<EclassCtx<Row3_2_0_1<Math, Math, Math>, u128>>,
             }
             struct MulUpdateCtx {
                 scratch: Vec<(Math, Math, Math)>,
@@ -9085,7 +9039,7 @@ fn test_into_codegen() {
                 type Row = (Math, Math, Math);
                 type UpdateCtx = MulUpdateCtx;
                 type Unification = Unification;
-                const COST: u32 = 9u32;
+                const COST: u32 = 3u32;
                 fn new() -> Self {
                     Self::default()
                 }
@@ -9161,12 +9115,6 @@ fn test_into_codegen() {
                 }
                 fn update_finalize(&mut self, ctx: Self::UpdateCtx, uf: &mut Unification) {
                     self.all_index_0_1_2.finalize();
-                    self.all_index_1_0_2
-                        .recreate_from(&self.all_index_0_1_2.as_slice());
-                    self.all_index_2_0_1
-                        .recreate_from(&self.all_index_0_1_2.as_slice());
-                    assert_eq!(self.all_index_1_0_2.len(), self.all_index_0_1_2.len());
-                    assert_eq!(self.all_index_2_0_1.len(), self.all_index_0_1_2.len());
                     self.new.extend(self.all_index_0_1_2.minus(&ctx.old));
                 }
             }
@@ -9181,15 +9129,10 @@ fn test_into_codegen() {
                         .range((x0, Math::MIN_ID, Math::MIN_ID)..=(x0, Math::MAX_ID, Math::MAX_ID))
                         .map(|(x0, x1, x2)| (x1, x2))
                 }
-                fn iter1_1_0_2(&self, x1: Math) -> impl Iterator<Item = (Math, Math)> + use<'_> {
-                    self.all_index_1_0_2
-                        .range((Math::MIN_ID, x1, Math::MIN_ID)..=(Math::MAX_ID, x1, Math::MAX_ID))
-                        .map(|(x0, x1, x2)| (x0, x2))
-                }
-                fn iter1_2_0_1(&self, x2: Math) -> impl Iterator<Item = (Math, Math)> + use<'_> {
-                    self.all_index_2_0_1
-                        .range((Math::MIN_ID, Math::MIN_ID, x2)..=(Math::MAX_ID, Math::MAX_ID, x2))
-                        .map(|(x0, x1, x2)| (x0, x1))
+                fn iter3_0_1_2(&self, x0: Math, x1: Math, x2: Math) -> impl Iterator<Item = ()> + use<'_> {
+                    self.all_index_0_1_2
+                        .range((x0, x1, x2)..=(x0, x1, x2))
+                        .map(|(x0, x1, x2)| ())
                 }
                 fn check2_0_1_2(&self, x0: Math, x1: Math) -> bool {
                     self.iter2_0_1_2(x0, x1).next().is_some()
@@ -9197,11 +9140,8 @@ fn test_into_codegen() {
                 fn check1_0_1_2(&self, x0: Math) -> bool {
                     self.iter1_0_1_2(x0).next().is_some()
                 }
-                fn check1_1_0_2(&self, x1: Math) -> bool {
-                    self.iter1_1_0_2(x1).next().is_some()
-                }
-                fn check1_2_0_1(&self, x2: Math) -> bool {
-                    self.iter1_2_0_1(x2).next().is_some()
+                fn check3_0_1_2(&self, x0: Math, x1: Math, x2: Math) -> bool {
+                    self.iter3_0_1_2(x0, x1, x2).next().is_some()
                 }
                 #[allow(unreachable_code)]
                 fn entry2_0_1_2(&self, x0: Math, x1: Math, delta: &mut Delta, uf: &mut Unification) -> (Math,) {
@@ -9212,12 +9152,26 @@ fn test_into_codegen() {
                     delta.mul_.push((x0, x1, x2));
                     (x2,)
                 }
+                #[allow(unreachable_code)]
+                fn entry3_0_1_2(
+                    &self,
+                    x0: Math,
+                    x1: Math,
+                    x2: Math,
+                    delta: &mut Delta,
+                    uf: &mut Unification,
+                ) -> () {
+                    if let Some(()) = self.iter3_0_1_2(x0, x1, x2).next() {
+                        return ();
+                    }
+                    delta.mul_.push((x0, x1, x2));
+                    ()
+                }
             }
             #[derive(Debug, Default)]
             struct AddRelation {
                 new: Vec<<Self as Relation>::Row>,
                 all_index_0_1_2: SortedVec<EclassCtx<Row3_0_1<Math, Math, Math>, u128>>,
-                all_index_1_0_2: SortedVec<EclassCtx<Row3_1_0_2<Math, Math, Math>, u128>>,
                 all_index_2_0_1: SortedVec<EclassCtx<Row3_2_0_1<Math, Math, Math>, u128>>,
             }
             struct AddUpdateCtx {
@@ -9229,7 +9183,7 @@ fn test_into_codegen() {
                 type Row = (Math, Math, Math);
                 type UpdateCtx = AddUpdateCtx;
                 type Unification = Unification;
-                const COST: u32 = 9u32;
+                const COST: u32 = 6u32;
                 fn new() -> Self {
                     Self::default()
                 }
@@ -9305,11 +9259,8 @@ fn test_into_codegen() {
                 }
                 fn update_finalize(&mut self, ctx: Self::UpdateCtx, uf: &mut Unification) {
                     self.all_index_0_1_2.finalize();
-                    self.all_index_1_0_2
-                        .recreate_from(&self.all_index_0_1_2.as_slice());
                     self.all_index_2_0_1
                         .recreate_from(&self.all_index_0_1_2.as_slice());
-                    assert_eq!(self.all_index_1_0_2.len(), self.all_index_0_1_2.len());
                     assert_eq!(self.all_index_2_0_1.len(), self.all_index_0_1_2.len());
                     self.new.extend(self.all_index_0_1_2.minus(&ctx.old));
                 }
@@ -9325,15 +9276,10 @@ fn test_into_codegen() {
                         .range((Math::MIN_ID, Math::MIN_ID, x2)..=(Math::MAX_ID, Math::MAX_ID, x2))
                         .map(|(x0, x1, x2)| (x0, x1))
                 }
-                fn iter1_0_1_2(&self, x0: Math) -> impl Iterator<Item = (Math, Math)> + use<'_> {
+                fn iter3_0_1_2(&self, x0: Math, x1: Math, x2: Math) -> impl Iterator<Item = ()> + use<'_> {
                     self.all_index_0_1_2
-                        .range((x0, Math::MIN_ID, Math::MIN_ID)..=(x0, Math::MAX_ID, Math::MAX_ID))
-                        .map(|(x0, x1, x2)| (x1, x2))
-                }
-                fn iter1_1_0_2(&self, x1: Math) -> impl Iterator<Item = (Math, Math)> + use<'_> {
-                    self.all_index_1_0_2
-                        .range((Math::MIN_ID, x1, Math::MIN_ID)..=(Math::MAX_ID, x1, Math::MAX_ID))
-                        .map(|(x0, x1, x2)| (x0, x2))
+                        .range((x0, x1, x2)..=(x0, x1, x2))
+                        .map(|(x0, x1, x2)| ())
                 }
                 fn check2_0_1_2(&self, x0: Math, x1: Math) -> bool {
                     self.iter2_0_1_2(x0, x1).next().is_some()
@@ -9341,11 +9287,8 @@ fn test_into_codegen() {
                 fn check1_2_0_1(&self, x2: Math) -> bool {
                     self.iter1_2_0_1(x2).next().is_some()
                 }
-                fn check1_0_1_2(&self, x0: Math) -> bool {
-                    self.iter1_0_1_2(x0).next().is_some()
-                }
-                fn check1_1_0_2(&self, x1: Math) -> bool {
-                    self.iter1_1_0_2(x1).next().is_some()
+                fn check3_0_1_2(&self, x0: Math, x1: Math, x2: Math) -> bool {
+                    self.iter3_0_1_2(x0, x1, x2).next().is_some()
                 }
                 #[allow(unreachable_code)]
                 fn entry2_0_1_2(&self, x0: Math, x1: Math, delta: &mut Delta, uf: &mut Unification) -> (Math,) {
@@ -9355,6 +9298,21 @@ fn test_into_codegen() {
                     let x2 = uf.math_.add_eclass();
                     delta.add_.push((x0, x1, x2));
                     (x2,)
+                }
+                #[allow(unreachable_code)]
+                fn entry3_0_1_2(
+                    &self,
+                    x0: Math,
+                    x1: Math,
+                    x2: Math,
+                    delta: &mut Delta,
+                    uf: &mut Unification,
+                ) -> () {
+                    if let Some(()) = self.iter3_0_1_2(x0, x1, x2).next() {
+                        return ();
+                    }
+                    delta.add_.push((x0, x1, x2));
+                    ()
                 }
             }
             #[derive(Debug, Default)]

@@ -129,11 +129,14 @@ pub(crate) fn emit_lir_theory(mut theory: hir::Theory) -> (hir::Theory, lir::The
             RelationTy::Table => {
                 let uses = &mut table_uses[relation_id];
 
-                let column_back_references: TVec<ColumnId, IndexUsageId> = relation
-                    .columns
-                    .enumerate()
-                    .map(|i| uses.push(BTreeSet::from_iter([i])))
-                    .collect();
+                //let column_back_references: TVec<ColumnId, IndexUsageId> = relation
+                //    .columns
+                //    .enumerate()
+                //    .map(|i| uses.push(BTreeSet::from_iter([i])))
+                //    .collect();
+                let column_back_references: TVec<ColumnId, IndexUsageId> = TVec::new();
+                // Guarantee some column
+                let _ = uses.push(BTreeSet::from_iter(relation.columns.enumerate()));
 
                 let implicit_with_index = relation.implicit_rules.map(|x| {
                     let index_usage = uses.push(x.key_columns());
