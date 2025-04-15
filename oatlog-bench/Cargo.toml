@@ -6,11 +6,10 @@ edition = "2024"
 [dependencies]
 oatlog.workspace = true
 egglog.workspace = true
-criterion.workspace = true
-rayon.workspace = true
 
 [dev-dependencies]
-expect-test.workspace = true
+#expect-test.workspace = true
+criterion.workspace = true
 
 [[bench]]
 name = "comparative"

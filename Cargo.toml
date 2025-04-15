@@ -20,9 +20,9 @@ resolver = "2"
 oatlog.path = "oatlog"
 oatlog-core.path = "oatlog-core"
 oatlog-macro.path = "oatlog-macro"
-oatlog-test.path = "oatlog-test"
-oatlog-bench.path = "oatlog-bench"
-comparative-test.path = "comparative-test"
+# oatlog-test.path = "oatlog-test"
+# oatlog-bench.path = "oatlog-bench"
+# comparative-test.path = "comparative-test"
 
 clap = { version = "4", features = ["derive"]}
 criterion = "0.5.1"
