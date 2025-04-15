@@ -25,7 +25,8 @@ oatlog-macro.path = "oatlog-macro"
 # comparative-test.path = "comparative-test"
 
 clap = { version = "4", features = ["derive"]}
-criterion = "0.5.1"
+criterion = "0.5"
+darling = "0.20"
 derive_more = { version = "2", features = ["full"] }
 educe = "0.6"
 egglog = "0.4"
@@ -35,16 +36,15 @@ heck = "0.5"
 itertools = "0.14"
 paste = "1"
 proc-macro2 = { version = "1", features = ["span-locations"], default-features = false }
+proptest = "1"
+proptest-derive = "0.5"
 quote = "1"
+rand = "0.9"
 rayon = "1"
 regex = "1"
 smallvec = { version = "1", features = ["union"] }
 syn = { version = "2", features = ["full", "extra-traits"] }
 voracious_radix_sort = "1"
-proptest = "1.6.0"
-proptest-derive = "0.5.1"
-rand = "0.9.0"
-darling = "0.20.11"
 
 [profile.release]
 debug = true
