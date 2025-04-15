@@ -109,15 +109,6 @@ impl ImplicitRule {
             columns,
         }
     }
-    pub(crate) fn new_new(columns: usize) -> Self {
-        Self {
-            out: (0..columns)
-                .map(ColumnId)
-                .map(|i| (i, ImplicitRuleAction::Panic))
-                .collect(),
-            columns,
-        }
-    }
     /// AKA outputs
     pub(crate) fn value_columns(&self) -> BTreeSet<ColumnId> {
         self.out.keys().copied().collect()
@@ -240,10 +231,10 @@ impl Relation {
             name: format!("New{}", self.name).leak(),
             columns: self.columns.clone(),
             kind: RelationTy::NewOf { id },
-            // all instances of AddNew are the same, so we have an implicit rule of [] -> [row].
-            // NOTE: this is unsound if we have multiple "new" instances in the same
-            // rule, but that will not happen, so this is fine.
-            implicit_rules: tvec![ImplicitRule::new_new(self.columns.len())],
+            // at the point of introducing semi-naive, there is no simplification
+            // benefit to implicit rules, so it's just for entry, but it's not possible
+            // to use entry on new.
+            implicit_rules: tvec![],
         })
     }
     /// Is it sound to turn entry on this into an insert.
