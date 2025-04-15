@@ -40,24 +40,6 @@ impl<RC: RowCtx> BTree<RC> {
     const fn leaf_nodes(levels: u32) -> usize {
         RC::B * (RC::B + 1).pow(levels)
     }
-    #[allow(unsafe_code)]
-    fn walk_down<const LEVELS: u32>(btree: &[RC::BTreeNode], key: RC::Row) -> usize {
-        debug_assert_eq!(btree.len(), Self::level_offset(LEVELS));
-
-        let mut idx = 0;
-        // NOTE: Exactly `self.interior_levels` loop iterations
-        //for _ in 0..self.interior_levels {
-        //while idx < btree.len() {
-        for _ in 0..LEVELS {
-            unsafe {
-                std::hint::assert_unchecked(idx < btree.len());
-            }
-            let step = RC::count_less_than(&btree[idx], key);
-            idx = Self::walk_down_index(idx, step);
-        }
-
-        (idx - btree.len()) * RC::B
-    }
 }
 
 impl<RC: RowCtx> Index for SortedVec<RC> {
@@ -84,32 +66,7 @@ impl<RC: RowCtx> Index for SortedVec<RC> {
         let start = Self::Row::new(start);
         let end = Self::Row::new(end);
 
-        // TODO loke: decide whether to monomorphise (worse for icache) or not (worse unrolling) AFTER doing SIMD
-        // With scalar comparison, monomorphization on `interior_levels` is NOT worth it.
-        let conservative_start = if false {
-            match self.interior_levels {
-                0 => 0,
-                1 => BTree::<RC>::walk_down::<1>(&self.header_btree, start),
-                2 => BTree::<RC>::walk_down::<2>(&self.header_btree, start),
-                3 => BTree::<RC>::walk_down::<3>(&self.header_btree, start),
-                4 => BTree::<RC>::walk_down::<4>(&self.header_btree, start),
-                5 => BTree::<RC>::walk_down::<5>(&self.header_btree, start),
-                6 => BTree::<RC>::walk_down::<6>(&self.header_btree, start),
-                7 => BTree::<RC>::walk_down::<7>(&self.header_btree, start),
-                8 => BTree::<RC>::walk_down::<8>(&self.header_btree, start),
-                9 => BTree::<RC>::walk_down::<9>(&self.header_btree, start),
-                10 => BTree::<RC>::walk_down::<10>(&self.header_btree, start),
-                11 => BTree::<RC>::walk_down::<11>(&self.header_btree, start),
-                12 => BTree::<RC>::walk_down::<12>(&self.header_btree, start),
-                13 => BTree::<RC>::walk_down::<13>(&self.header_btree, start),
-                14 => BTree::<RC>::walk_down::<14>(&self.header_btree, start),
-                15 => BTree::<RC>::walk_down::<15>(&self.header_btree, start),
-                _ => unreachable!(
-                    "too large interior_levels={} for per-level dispatch",
-                    self.interior_levels
-                ),
-            }
-        } else {
+        let conservative_start = {
             debug_assert_eq!(
                 self.header_btree.len(),
                 BTree::<RC>::level_offset(self.interior_levels),
