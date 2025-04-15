@@ -19,13 +19,13 @@
 #![allow(non_snake_case)]
 #![allow(private_interfaces)]
 #![allow(unsafe_code)]
-#![allow(unused)]
-#![allow(unused_parens)]
-#![allow(unused_variables)]
+// #![allow(unused)]
+// #![allow(unused_parens)]
+// #![allow(unused_variables)]
 
 // mod todo_hir;
-//mod todo_join;
+// mod todo_join;
 // mod todo_mathset;
-mod todo_scratch;
+// mod todo_scratch;
 // mod todo_seminaive;
 // mod todo_tir;
