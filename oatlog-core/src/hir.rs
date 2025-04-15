@@ -349,7 +349,7 @@ impl Atom {
         atoms.into_iter().min().unwrap().clone()
     }
 
-    fn map_v(&self, f: impl FnMut(VariableId) -> VariableId) -> Self {
+    pub(crate) fn map_v(&self, f: impl FnMut(VariableId) -> VariableId) -> Self {
         Self {
             premise: self.premise,
             relation: self.relation,

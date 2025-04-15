@@ -3,10 +3,16 @@ use itertools::Itertools as _;
 use std::{cmp::Eq, fmt::Debug, marker::PhantomData};
 
 /// Vec with typed indexes.
-#[derive(Clone, Eq, PartialEq, Ord, PartialOrd, Hash, Default)]
+#[derive(Clone, Eq, PartialEq, Ord, PartialOrd, Hash)]
 pub(crate) struct TVec<K, V> {
     x: Vec<V>,
     _marker: PhantomData<K>,
+}
+
+impl<K: Id, V> Default for TVec<K, V> {
+    fn default() -> Self {
+        Self::new()
+    }
 }
 
 macro_rules! tvec {

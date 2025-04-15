@@ -1,15 +1,17 @@
-use itertools::{Either::*, Itertools};
+use itertools::Itertools as _;
 
-use crate::{
-    hir::{self, Atom, Relation, SymbolicRule},
-    ids::{RelationId, VariableId},
-    typed_vec::*,
-    union_find::*,
-    MultiMapCollect as _, 
-};
 use std::{
     collections::{BTreeMap, BTreeSet},
     hash::Hash,
+    mem::replace,
+};
+
+use crate::{
+    MultiMapCollect as _,
+    hir::{self, Atom, IsPremise, Relation, SymbolicRule, VariableMeta},
+    ids::{ColumnId, IndexUsageId, RelationId, VariableId},
+    lir,
+    typed_vec::{TVec, tvec},
 };
 
 #[derive(Clone, Eq, PartialEq, Ord, PartialOrd, Debug)]
@@ -47,9 +49,12 @@ impl<T: Copy + Eq + Ord + Hash> SparseUf<T> {
 // actions then unify then perform queries for each map.
 #[derive(Clone, Eq, PartialEq, Ord, PartialOrd, Debug, Default)]
 struct Trie {
-    actions: BTreeSet<Atom>,
+    actions: Vec<Atom>,
     unify: Vec<(VariableId, VariableId)>,
     map: BTreeMap<TrieLink, Trie>,
+
+    // could be computed, but this is easier:
+    bound_premise: BTreeSet<VariableId>,
 }
 impl Trie {
     fn new() -> Self {
@@ -57,14 +62,409 @@ impl Trie {
     }
 }
 
-pub(crate) fn schedule_rules(rules: Vec<SymbolicRule>) -> Trie {
-    // TODO: pass to make NEW the same for all rules (assuming bijective conversion (assume_true
-    // map thing)).
-    todo!()
+pub(crate) fn schedule_rules(
+    rules: Vec<SymbolicRule>,
+    relations: &TVec<RelationId, hir::Relation>,
+) -> (TVec<VariableId, hir::VariableMeta>, Trie) {
+    let mut variables: TVec<VariableId, VariableMeta> = tvec![];
+    let rules: Vec<Rule> = rules
+        .into_iter()
+        .map(
+            |SymbolicRule {
+                 meta,
+                 atoms,
+                 unify,
+                 variables: local_variables,
+             }| {
+                let n = variables.len();
+                let f = |VariableId(x)| VariableId(x + n);
+                let (premise, action): (Vec<_>, Vec<_>) = atoms
+                    .into_iter()
+                    .map(|x| x.map_v(f))
+                    .partition(|x| x.premise == IsPremise::Premise);
+                let unify: Vec<_> = unify.iter_all().map(|(a, b, _)| (f(a), f(b))).collect();
+                variables.extend(local_variables.into_iter());
+                Rule {
+                    meta,
+                    premise,
+                    action,
+                    unify,
+                    semi: vec![],
+                }
+            },
+        )
+        .collect();
+
+    let ctx = Ctx {
+        bound_premise: BTreeSet::new(),
+        relations,
+    };
+    let trie = inner(ctx, &rules);
+    (variables, trie)
+}
+
+fn scc_group_size<'a>(
+    actions: impl Iterator<Item = &'a hir::Atom>,
+    relations: &TVec<RelationId, hir::Relation>,
+) -> BTreeMap<hir::Atom, usize> {
+    fn strongly_connected_components(adj: &[Vec<usize>]) -> Vec<Vec<usize>> {
+        fn adj_reverse(adj: &[Vec<usize>]) -> Vec<Vec<usize>> {
+            let n = adj.len();
+            let mut adj_inv = vec![vec![]; n];
+            for i in 0..n {
+                for &a in &adj[i] {
+                    adj_inv[a].push(i);
+                }
+            }
+            adj_inv
+        }
+        fn dfs(i: usize, adj: &[Vec<usize>], out: &mut Vec<usize>, visited: &mut Vec<bool>) {
+            if replace(&mut visited[i], true) {
+                return;
+            }
+            for &a in &adj[i] {
+                dfs(a, adj, out, visited);
+            }
+            out.push(i);
+        }
+        let n = adj.len();
+        let mut order = Vec::new();
+        let mut visited = vec![false; n];
+        for i in 0..n {
+            dfs(i, adj, &mut order, &mut visited);
+        }
+        let adj_inv = adj_reverse(&adj);
+
+        visited.fill(false);
+
+        let mut components = Vec::new();
+        for &i in order.iter().rev() {
+            if visited[i] {
+                continue;
+            }
+            let mut component = Vec::new();
+            dfs(i, &adj_inv, &mut component, &mut visited);
+            components.push(component);
+        }
+        components
+    }
+
+    let mut var_to_action: BTreeMap<VariableId, Vec<&Atom>> = BTreeMap::new();
+    let (idx_to_action, action_to_idx): (BTreeMap<usize, &Atom>, BTreeMap<&Atom, usize>) = actions
+        .enumerate()
+        .map(|(i, a)| {
+            a.entry_inputs(relations).into_iter().for_each(|input| {
+                var_to_action.entry(input).or_default().push(a);
+            });
+            ((i, a), (a, i))
+        })
+        .collect();
+
+    let n = idx_to_action.len();
+    let mut adj: Vec<Vec<usize>> = vec![vec![]; n];
+
+    for (&i, &a) in &idx_to_action {
+        for output in a.entry_outputs(relations) {
+            let Some(actions) = var_to_action.get(&output) else {
+                continue;
+            };
+            for action in actions {
+                let j = action_to_idx[action];
+                adj[i].push(j);
+            }
+        }
+    }
+    adj.iter_mut().for_each(|x| {
+        x.sort();
+        x.dedup()
+    });
+
+    strongly_connected_components(&adj)
+        .into_iter()
+        .flat_map(|v| {
+            let idx_to_action = &idx_to_action;
+            let n = v.len();
+            v.iter()
+                .copied()
+                .map(move |i| (idx_to_action[&i].clone(), n))
+                .collect::<Vec<_>>()
+        })
+        .collect()
+}
+
+fn action_topo_resolve<'a>(
+    actions: &[Atom],
+    bound_premise: &BTreeSet<VariableId>,
+    relations: &TVec<RelationId, hir::Relation>,
+    unify: &mut Vec<(VariableId, VariableId)>,
+    variables: &mut TVec<VariableId, VariableMeta>,
+) -> Vec<Atom> {
+    let actions: BTreeSet<Atom> = actions.into_iter().cloned().collect();
+
+    let mut schedule: Vec<Atom> = vec![];
+    let mut conflict_free: Vec<Atom> = vec![];
+    let mut problematic: Vec<_> = actions.into_iter().collect();
+
+    while !problematic.is_empty() || !conflict_free.is_empty() {
+        let mut write_deg: BTreeMap<VariableId, usize>;
+
+        loop {
+            write_deg = BTreeMap::new();
+            for v in problematic
+                .iter()
+                .chain(conflict_free.iter())
+                .flat_map(|x| x.entry_outputs(relations))
+            {
+                *write_deg.entry(v).or_default() += 1;
+            }
+            if conflict_free.is_empty() {
+                break;
+            }
+            let n = conflict_free.len();
+            conflict_free.retain(|x| {
+                let inputs = x.entry_inputs(relations);
+                let can_schedule = inputs.into_iter().all(|x| write_deg[&x] == 0);
+                if can_schedule {
+                    schedule.push(x.clone());
+                }
+                !can_schedule
+            });
+            assert_ne!(n, conflict_free.len());
+        }
+
+        let scc_sizes = scc_group_size(problematic.iter(), relations);
+
+        problematic.retain(|x| {
+            let inputs = x.entry_inputs(relations);
+            let outputs = x.entry_outputs(relations);
+
+            let is_problematic = scc_sizes[x] > 1
+                || outputs.into_iter().any(|output| {
+                    let write_conflict = write_deg[&output] > 1 || bound_premise.contains(&output);
+                    let self_cycle = inputs.contains(&output);
+                    write_conflict || self_cycle
+                });
+            if !is_problematic {
+                conflict_free.push(x.clone());
+            }
+
+            is_problematic
+        });
+        if problematic.is_empty() {
+            continue;
+        }
+
+        let mut ok = false;
+
+        for x in &mut problematic {
+            let im = x.entry.expect("problematic has entry");
+            let relation_ = &relations[x.relation];
+            if relation_.can_become_insert(im)
+                && x.entry_outputs(relations).iter().all(|x| write_deg[x] > 0)
+            {
+                x.entry = None;
+                ok = true;
+                break;
+            }
+        }
+        assert!(ok, "could not remove cycles");
+    }
+    schedule
+}
+
+pub(crate) fn lowering(
+    Trie {
+        actions,
+        mut unify,
+        map,
+        bound_premise,
+    }: Trie,
+    variables: &mut TVec<VariableId, VariableMeta>,
+    relations: &TVec<RelationId, hir::Relation>,
+    table_uses: &mut TVec<RelationId, TVec<IndexUsageId, BTreeSet<ColumnId>>>,
+) -> &'static [lir::RuleTrie] {
+
+    let schedule = action_topo_resolve(&actions, &bound_premise, relations, &mut unify, variables);
+
+    let lir_trie: Vec<_> = schedule
+        .into_iter()
+        .map(
+            |hir::Atom {
+                 premise: _,
+                 relation,
+                 columns,
+                 entry,
+             }| {
+                // let () = ();
+
+                // match &relations[atom.relation].kind {
+                //     hir::RelationTy::Forall { .. }
+                //     | hir::RelationTy::NewOf { .. }
+                //     | hir::RelationTy::Alias { .. } => panic!("does not make sense for action"),
+                //     hir::RelationTy::Table => todo!(),
+                //     hir::RelationTy::Global { id } => todo!(),
+                //     hir::RelationTy::Primitive { syn, ident } => todo!(),
+                // }
+                let args = columns.inner().clone().leak();
+                if let Some(entry) = entry {
+                    // NOTE: this is safe because the implicit rules are the first ones to be
+                    // assigned an IndexUsageId.
+                    let index = IndexUsageId(entry.0);
+
+                    lir::Action::Entry {
+                        relation,
+                        index,
+                        args,
+                    }
+                } else {
+                    lir::Action::Insert { relation, args }
+                }
+            },
+        )
+        .chain(unify.into_iter().map(|(a, b)| lir::Action::Equate(a, b)))
+        .map(lir::RuleAtom::Action)
+        .map(|atom| lir::RuleTrie {
+            meta: None,
+            atom,
+            then: &[],
+        })
+        .chain(map.into_iter().map(|(mut link, trie)| {
+            match &mut link {
+                Primary(atom) => {
+                    // transform
+                    // for (x, x) in .. { .. }
+                    // into
+                    // for (x, y) in .. { if x == y { .. } }
+                    let mut to_equate: Vec<(VariableId, VariableId)> = vec![];
+                    loop {
+                        let mut progress = false;
+                        for i in 0..atom.columns.len() {
+                            if bound_premise.contains(&atom.columns[ColumnId(i)]) {
+                                continue;
+                            }
+                            for j in (i + 1)..atom.columns.len() {
+                                if bound_premise.contains(&atom.columns[ColumnId(j)]) {
+                                    continue;
+                                }
+                                if atom.columns[ColumnId(i)] == atom.columns[ColumnId(j)] {
+                                    continue;
+                                }
+                                progress = true;
+
+                                let old_id = atom.columns[ColumnId(i)];
+                                let new_id = variables.push(variables[old_id].clone());
+
+                                atom.columns[ColumnId(j)] = new_id;
+
+                                to_equate.push((old_id, new_id));
+                            }
+                        }
+                        if !progress {
+                            break;
+                        }
+                    }
+
+                    let args = &*atom.columns.inner().clone().leak();
+
+                    let mut make_index_use = || {
+                        table_uses[atom.relation].push(
+                            args.iter()
+                                .map(|x| bound_premise.contains(x))
+                                .enumerate()
+                                .filter_map(|(i, b)| b.then_some(i))
+                                .map(ColumnId)
+                                .collect(),
+                        )
+                    };
+
+                    let mut trie = {
+                        let atom = match &relations[atom.relation].kind {
+                            hir::RelationTy::Alias {} => panic!("primary join on alias"),
+                            hir::RelationTy::Forall { .. } => panic!("primary join on forall"),
+                            hir::RelationTy::Primitive { .. } => {
+                                todo!("primary join on primitive")
+                            }
+                            hir::RelationTy::NewOf { id } => lir::RuleAtom::PremiseNew {
+                                relation: *id,
+                                args,
+                            },
+                            hir::RelationTy::Table => lir::RuleAtom::Premise {
+                                relation: atom.relation,
+                                args,
+                                index: make_index_use(),
+                            },
+                            hir::RelationTy::Global { .. } => lir::RuleAtom::Premise {
+                                relation: atom.relation,
+                                args,
+                                index: IndexUsageId::bogus(),
+                            },
+                        };
+                        let then = lowering(trie, variables, relations, table_uses);
+
+                        vec![lir::RuleTrie {
+                            meta: None,
+                            atom,
+                            then,
+                        }]
+                        .leak()
+                    };
+                    for (a, b) in to_equate {
+                        trie = vec![lir::RuleTrie {
+                            meta: None,
+                            atom: lir::RuleAtom::IfEq(a, b),
+                            then: trie,
+                        }]
+                        .leak();
+                    }
+                    trie[0]
+                }
+                Semi(atom) => {
+                    let args = &*atom.columns.inner().clone().leak();
+
+                    let mut make_index_use = || {
+                        table_uses[atom.relation].push(
+                            args.iter()
+                                .map(|x| bound_premise.contains(x))
+                                .enumerate()
+                                .filter_map(|(i, b)| b.then_some(i))
+                                .map(ColumnId)
+                                .collect(),
+                        )
+                    };
+                    let atom = match &relations[atom.relation].kind {
+                        hir::RelationTy::NewOf { .. } => panic!("semi-join new"),
+                        hir::RelationTy::Primitive { .. } => panic!("semi-join primitive"),
+                        hir::RelationTy::Forall { .. } => panic!("semi-join forall"),
+                        hir::RelationTy::Alias {} => panic!("semi-join alias"),
+                        hir::RelationTy::Table => lir::RuleAtom::PremiseAny {
+                            relation: atom.relation,
+                            args,
+                            index: make_index_use(),
+                        },
+                        hir::RelationTy::Global { .. } => lir::RuleAtom::PremiseAny {
+                            relation: atom.relation,
+                            args,
+                            index: IndexUsageId::bogus(),
+                        },
+                    };
+
+                    let then = lowering(trie, variables, relations, table_uses);
+                    lir::RuleTrie {
+                        meta: None,
+                        atom,
+                        then,
+                    }
+                }
+            }
+        }))
+        .collect();
+
+    lir_trie.leak()
 }
 
 #[derive(Clone, Eq, PartialEq, Ord, PartialOrd, Debug)]
 struct Rule {
+    meta: hir::RuleMeta,
     premise: Vec<Atom>,
     action: Vec<Atom>,
     unify: Vec<(VariableId, VariableId)>,
@@ -98,11 +498,11 @@ impl TrieLink {
 }
 
 #[derive(Clone, Eq, PartialEq, Ord, PartialOrd, Debug)]
-struct Ctx {
-    unify: UF<VariableId>,
+struct Ctx<'a> {
     bound_premise: BTreeSet<VariableId>,
+    relations: &'a TVec<RelationId, Relation>,
 }
-impl Ctx {
+impl Ctx<'_> {
     fn apply(&self, link: &TrieLink) -> Self {
         match link {
             Primary(atom) => {
@@ -115,92 +515,79 @@ impl Ctx {
     }
 }
 
-fn inner(mut ctx: Ctx, rules: Vec<Rule>, relations: &TVec<RelationId, Relation>) -> Trie {
-    let mut unify: Vec<(VariableId, VariableId)> = vec![];
-    let (actions, rules): (Vec<Vec<_>>, Vec<_>) = rules
-        .into_iter()
-        .filter(|rule| rule.has_action())
-        .partition_map(|rule| {
-            if rule.has_premise() {
-                unify.extend(rule.unify);
-                Left(rule.action)
-            } else {
-                Right(rule)
-            }
-        });
+fn inner(mut ctx: Ctx<'_>, rules: &[Rule]) -> Trie {
+    let (finished, map) = election(&ctx, &rules);
 
-    let actions = actions.into_iter().flatten().collect();
+    let mut actions = vec![];
+    let mut unify = vec![];
 
-    let mut map: BTreeMap<TrieLink, Trie> = BTreeMap::new();
-
-    let mut rules = rules;
-    while !rules.is_empty() {
-        let link = election(&ctx, &rules, relations).unwrap();
-        let part_of_link: Vec<_>;
-        (part_of_link, rules) = rules
-            .into_iter()
-            .partition(|x| /*x.can_apply(&link, relations)*/ todo!());
-        let trie = {
-            let rules = part_of_link
-                .into_iter()
-                .map(|rule| /*rule.apply(&link, relations).unwrap()*/ todo!())
-                .collect();
-            let ctx = ctx.apply(&link);
-            inner(ctx, rules, relations)
-        };
-        map.insert(link, trie);
+    for Rule {
+        premise: _,
+        action: action_,
+        unify: unify_,
+        semi: _,
+        meta: _,
+    } in finished
+    {
+        actions.extend(action_);
+        unify.extend(unify_);
     }
+
+    let map = map
+        .into_iter()
+        .map(|(link, rules)| {
+            let ctx = ctx.apply(&link);
+            (link, inner(ctx, &rules))
+        })
+        .collect();
 
     Trie {
         actions,
         unify,
         map,
+        bound_premise: ctx.bound_premise,
     }
 }
 
-// TODO: rules insert votes for semi-joins later.
-// (0..self.premise.len())
-//     .map(|i| {
-//         let primary = self.premise[i].clone();
-//         // let semi: Vec<_> = (0..self.premise.len())
-//         //     .filter(|&j| i != j)
-//         //     .map(|j| self.premise[j].clone())
-//         //     .filter(|semi| {
-//         //         semi.columns
-//         //             .iter()
-//         //             .copied()
-//         //             .any(|v| primary.columns.inner().contains(&v))
-//         //     })
-//         //     .sorted()
-//         //     .collect();
-//         Vote { link: Primary(primary) }
-//     })
-//     .collect()
-
 impl Rule {
-    fn has_premise(&self) -> bool {
-        todo!()
-    }
-    fn has_action(&self) -> bool {
-        todo!()
-    }
     fn variables(&self) -> BTreeSet<VariableId> {
-        todo!()
+        let Self {
+            premise,
+            action,
+            unify,
+            semi,
+            meta: _,
+        } = self;
+        premise
+            .iter()
+            .flat_map(|x| x.columns.iter().copied())
+            .chain(action.iter().flat_map(|x| x.columns.iter().copied()))
+            .chain(semi.iter().flat_map(|x| x.columns.iter().copied()))
+            .chain(unify.iter().copied().flat_map(|(a, b)| [a, b]))
+            .collect()
     }
-    fn map_v(self, f: impl FnMut(VariableId) -> VariableId) -> Self {
-        todo!()
+    fn map_v(self, mut f: impl FnMut(VariableId) -> VariableId) -> Self {
+        let Self {
+            premise,
+            action,
+            unify,
+            semi,
+            meta,
+        } = self;
+        Self {
+            premise: premise.into_iter().map(|x| x.map_v(&mut f)).collect(),
+            action: action.into_iter().map(|x| x.map_v(&mut f)).collect(),
+            unify: unify.into_iter().map(|(a, b)| (f(a), f(b))).collect(),
+            semi: semi.into_iter().map(|x| x.map_v(&mut f)).collect(),
+            meta,
+        }
     }
-    fn apply(
-        &self,
-        link: &TrieLink,
-        ctx: &Ctx,
-        relations: &TVec<RelationId, Relation>,
-    ) -> Option<Self> {
+    fn apply(&self, link: &TrieLink, ctx: &Ctx<'_>) -> Option<Self> {
         // link "wins" on variable collisions
 
         // NOTE: mapping should be a SparseUf actually
 
-        let supported = self.make_votes(ctx, relations);
+        let supported = self.make_votes(ctx);
 
         match link {
             Primary(other) => {
@@ -278,34 +665,8 @@ impl Rule {
                 }
             }
         }
-
-        // let lhs = self.variables();
-        // match link {
-        //     Primary(atom) => {
-        //         for i in 0..self.premise.len() {
-        //         }
-        //     },
-        //     Semi(atom) => {
-
-        //     },
-        // }
-
-        // let mut apply_ok = false;
-        // for atom in self.premise.iter().chain(self.semi.iter()) {
-        //     apply_ok |= atom.apply_modulo(link_atom, relations, |from, to| uf.union(from, to));
-        // }
-
-        // let bijective = uf.iter().all(|from| {
-        //     let to = uf.find(from);
-        //     to == from || !(lhs.contains(&to) && lhs.contains(&from))
-        // });
-
-        // (apply_ok && bijective).then(|| {
-        //     let this = self.map_v(|x| uf.find(x));
-        // })
     }
-    fn make_votes(&self, ctx: &Ctx, relations: &TVec<RelationId, Relation>) -> Vec<TrieLink> {
-        // TODO: emit ONLY primary for last semi.
+    fn make_votes(&self, ctx: &Ctx) -> Vec<TrieLink> {
         match self.semi.as_slice() {
             [] => {
                 // TODO: allbound should probably be a semi-join.
@@ -317,56 +678,104 @@ impl Rule {
                     AllBound,
                     New,
                 }
-                use RelationScore::*;
                 #[derive(Copy, Clone, Ord, PartialOrd, PartialEq, Eq, Debug)]
                 enum IsConnected {
                     Disconnected,
                     Connected,
                 }
-                use IsConnected::*;
 
-                let scores = self.premise.iter().map(|atom| {
-                    let connected = if atom.columns.iter().any(|x| ctx.bound_premise.contains(x)) {
-                        Connected
-                    } else {
-                        Disconnected
-                    };
+                #[derive(Copy, Clone, Ord, PartialOrd, PartialEq, Eq, Debug)]
+                enum CompoundRelationScore {
+                    NoQuery,
+                    IndexedDisconnected,
+                    SingleElementDisconnected,
+                    IndexedConnected,
+                    SingleElementConnected,
+                    AllBound,
+                    New,
+                }
 
-                    let mut score = NoQuery;
+                let scores = self
+                    .premise
+                    .iter()
+                    .map(|atom| {
+                        use IsConnected::*;
+                        use RelationScore::*;
+                        let connected =
+                            if atom.columns.iter().any(|x| ctx.bound_premise.contains(x)) {
+                                Connected
+                            } else {
+                                Disconnected
+                            };
 
-                    let relation = &relations[atom.relation];
-                    match &relation.kind {
-                        hir::RelationTy::NewOf { id: _ } => {
-                            score = score.max(New);
+                        let mut score = NoQuery;
+
+                        let relation = &ctx.relations[atom.relation];
+                        match &relation.kind {
+                            hir::RelationTy::NewOf { id: _ } => {
+                                score = score.max(New);
+                            }
+                            hir::RelationTy::Table => {
+                                score = score.max(Indexed);
+                            }
+                            hir::RelationTy::Alias {} => {
+                                unreachable!();
+                            }
+                            hir::RelationTy::Global { id: _ } => {
+                                score = score.max(Indexed);
+                            }
+                            hir::RelationTy::Primitive { syn: _, ident: _ } => {
+                                panic!("primitive premise not implemented")
+                            }
+                            hir::RelationTy::Forall { ty: _ } => panic!("forall unimplemented"),
                         }
-                        hir::RelationTy::Table => {
-                            score = score.max(Indexed);
+                        for im in &relation.implicit_rules {
+                            if im
+                                .key_columns()
+                                .into_iter()
+                                .all(|c| ctx.bound_premise.contains(&atom.columns[c]))
+                            {
+                                score = score.max(SingleElement);
+                            }
                         }
-                        hir::RelationTy::Alias {} => {
-                            unreachable!();
+                        if atom.columns.iter().all(|v| ctx.bound_premise.contains(v)) {
+                            score = score.max(AllBound);
                         }
-                        hir::RelationTy::Global { id: _ } => {
-                            score = score.max(Indexed);
-                        }
-                        hir::RelationTy::Primitive { syn: _, ident: _ } => {
-                            panic!("primitive premise not implemented")
-                        }
-                        hir::RelationTy::Forall { ty: _ } => panic!("forall unimplemented"),
+
+                        let score = match (score, connected) {
+                            (NoQuery, _) => CompoundRelationScore::NoQuery,
+                            (Indexed, Disconnected) => CompoundRelationScore::IndexedDisconnected,
+                            (SingleElement, Disconnected) => {
+                                CompoundRelationScore::SingleElementDisconnected
+                            }
+                            (Indexed, Connected) => CompoundRelationScore::IndexedConnected,
+                            (SingleElement, Connected) => {
+                                CompoundRelationScore::SingleElementConnected
+                            }
+                            (AllBound, _) => CompoundRelationScore::AllBound,
+                            (New, _) => CompoundRelationScore::New,
+                        };
+
+                        (score, atom)
+                    })
+                    .collect_multimap();
+
+                let (score, best) = scores.into_iter().max().unwrap();
+                match score {
+                    CompoundRelationScore::NoQuery => panic!("NoQuery: could not pick a vote"),
+                    CompoundRelationScore::IndexedDisconnected => {
+                        panic!("query is disconnected (valid but surprising)")
                     }
-                    for im in &relation.implicit_rules {
-                        if im.key_columns().into_iter().all(|c| ctx.bound_premise.contains(&atom.columns[c])) {
-                            score = score.max(SingleElement);
-                        }
+                    CompoundRelationScore::SingleElementDisconnected => {
+                        panic!("query is disconnected (valid but surprising)")
                     }
-                    if atom.columns.iter().all(|v| ctx.bound_premise.contains(v)) {
-                        score = score.max(AllBound);
-                    }
+                    CompoundRelationScore::IndexedConnected => (),
+                    CompoundRelationScore::SingleElementConnected => (),
+                    CompoundRelationScore::AllBound => (),
+                    CompoundRelationScore::New => (),
+                }
 
-                    let thing = ((score, connected), atom);
-                    thing
-                }).collect_multimap();
-
-                todo!()
+                best.into_iter().cloned().map(TrieLink::Primary).collect()
             }
             [atom] => {
                 // if there is a single semi-join left, it's better to just iterate that then to do
@@ -375,13 +784,6 @@ impl Rule {
             }
             _ => self.semi.iter().cloned().map(|x| Semi(x)).collect(),
         }
-    }
-
-    // do we support applying link?
-    fn can_apply(&self, link: &TrieLink, relations: &TVec<RelationId, Relation>) -> bool {
-        // optimize is hard
-        // self.apply(link, relations).is_some()
-        todo!()
     }
 }
 
@@ -398,22 +800,64 @@ impl Rule {
 /// For each rule, pick what the next step should be (if any)
 ///
 /// If we want to do random sampling, we might want to use a PDF here or something.
-fn election(ctx: &Ctx, rules: &[Rule], relations: &TVec<RelationId, Relation>) -> Option<TrieLink> {
-    // let votes: Vec<_> = rules.iter().map(|rule| rule.make_votes(&ctx)).collect();
+fn election(ctx: &Ctx, rules: &[Rule]) -> (Vec<Rule>, BTreeMap<TrieLink, Vec<Rule>>) {
+    use crate::ids::id_wrap;
+    use itertools::Either::*;
+    id_wrap!(RuleId, "y", "id for a rule");
+    id_wrap!(VoteId, "e", "id for a vote (TrieLink)");
 
-    // let votes: Vec<_> = votes.into_iter().flatten().collect();
+    let (finished, (rules, votes)): (Vec<Rule>, (TVec<RuleId, &Rule>, Vec<Vec<TrieLink>>)) =
+        rules.iter().partition_map(|rule| {
+            let votes = rule.make_votes(ctx);
 
-    todo!()
+            if votes.is_empty() {
+                Left(rule.clone())
+            } else {
+                Right((rule, votes))
+            }
+        });
+    let votes: TVec<VoteId, TrieLink> = votes.into_iter().flatten().collect();
 
-    // votes
-    //     .iter()
-    //     .max_by_key(|vote| {
-    //         rules
-    //             .iter()
-    //             .map(|rule| rule.can_apply(*vote, relations))
-    //             .count()
-    //     })
-    //     .cloned()
+    let mut remaining_rules: BTreeSet<RuleId> = rules.enumerate().collect();
+
+    let matrix: TVec<VoteId, TVec<RuleId, Option<Rule>>> = {
+        votes
+            .iter()
+            .map(|vote| rules.iter().map(|rule| rule.apply(vote, ctx)).collect())
+            .collect()
+    };
+
+    let mut map: BTreeMap<TrieLink, Vec<Rule>> = BTreeMap::new();
+
+    while let Some(vote) = votes
+        .enumerate()
+        .map(|v| {
+            (
+                v,
+                matrix[v]
+                    .iter_enumerate()
+                    .filter(|(i, x)| x.is_some() && remaining_rules.contains(&i))
+                    .count(),
+            )
+        })
+        .filter(|(_, count)| *count > 0)
+        .max_by_key(|(_, count)| *count)
+        .map(|(vote, _)| vote)
+    {
+        let existing = map.insert(
+            votes[vote].clone(),
+            matrix[vote]
+                .iter_enumerate()
+                .filter_map(|(i, rule)| rule.clone().map(|rule| (i, rule)))
+                .filter_map(|(i, rule)| remaining_rules.remove(&i).then_some(rule))
+                .collect(),
+        );
+        assert!(existing.is_none());
+    }
+
+    assert!(remaining_rules.is_empty());
+
+    (finished, map)
 }
 
 // RULES:
