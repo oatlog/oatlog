@@ -650,6 +650,20 @@ fn update(
         )
     };
 
+    let iter_cols_superset_new = if let (Some(index), Some(keys), Some(vals)) = (
+        indexes_fd.first(),
+        indexes_fd_keys.first(),
+        indexes_fd_vals.first(),
+    ) {
+        quote! {
+            self.#index.iter().map(|(&(#(#keys,)*), &(#(#vals,)*))| (#(#cols_find,)*))
+        }
+    } else {
+        quote! {
+            insertions.iter().map(|&(#(#cols,)*)| (#(#cols_find,)*))
+        }
+    };
+
     quote! {
         // Called once at beginning of canonicalization.
         fn update_begin(
@@ -693,9 +707,7 @@ fn update(
             use std::collections::hash_map::Entry;
 
             assert!(self.new.is_empty());
-            self.new.extend(insertions
-                .iter()
-                .map(|&(#(#cols,)*)| (#(#cols_find,)*))
+            self.new.extend(#iter_cols_superset_new
                 .filter(|&(#(#cols,)*)| !self.#allset.contains_key(&(#(#allset_cols,)*)))
             );
             insertions.clear();

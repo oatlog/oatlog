@@ -3122,9 +3122,11 @@ fn codegen_constant_propagation() {
                     use std::collections::hash_map::Entry;
                     assert!(self.new.is_empty());
                     self.new.extend(
-                        insertions
+                        self.hash_index_0_1
                             .iter()
-                            .map(|&(x0, x1, x2)| (uf.math_.find(x0), uf.math_.find(x1), uf.math_.find(x2)))
+                            .map(|(&(x0, x1), &(x2,))| {
+                                (uf.math_.find(x0), uf.math_.find(x1), uf.math_.find(x2))
+                            })
                             .filter(|&(x0, x1, x2)| !self.hash_index_0_1_2.contains_key(&(x0, x1, x2))),
                     );
                     insertions.clear();
@@ -3310,9 +3312,11 @@ fn codegen_constant_propagation() {
                     use std::collections::hash_map::Entry;
                     assert!(self.new.is_empty());
                     self.new.extend(
-                        insertions
+                        self.hash_index_0_1
                             .iter()
-                            .map(|&(x0, x1, x2)| (uf.math_.find(x0), uf.math_.find(x1), uf.math_.find(x2)))
+                            .map(|(&(x0, x1), &(x2,))| {
+                                (uf.math_.find(x0), uf.math_.find(x1), uf.math_.find(x2))
+                            })
                             .filter(|&(x0, x1, x2)| !self.hash_index_0_1_2.contains_key(&(x0, x1, x2))),
                     );
                     insertions.clear();
@@ -3494,9 +3498,9 @@ fn codegen_constant_propagation() {
                     use std::collections::hash_map::Entry;
                     assert!(self.new.is_empty());
                     self.new.extend(
-                        insertions
+                        self.hash_index_0
                             .iter()
-                            .map(|&(x0, x1)| (x0, uf.math_.find(x1)))
+                            .map(|(&(x0,), &(x1,))| (x0, uf.math_.find(x1)))
                             .filter(|&(x0, x1)| !self.hash_index_0_1.contains_key(&(x0, x1))),
                     );
                     insertions.clear();
@@ -3925,9 +3929,11 @@ fn codegen_commutative() {
                     use std::collections::hash_map::Entry;
                     assert!(self.new.is_empty());
                     self.new.extend(
-                        insertions
+                        self.hash_index_0_1
                             .iter()
-                            .map(|&(x0, x1, x2)| (uf.math_.find(x0), uf.math_.find(x1), uf.math_.find(x2)))
+                            .map(|(&(x0, x1), &(x2,))| {
+                                (uf.math_.find(x0), uf.math_.find(x1), uf.math_.find(x2))
+                            })
                             .filter(|&(x0, x1, x2)| !self.hash_index_0_1_2.contains_key(&(x0, x1, x2))),
                     );
                     insertions.clear();
@@ -4432,9 +4438,11 @@ fn regression_entry2() {
                     use std::collections::hash_map::Entry;
                     assert!(self.new.is_empty());
                     self.new.extend(
-                        insertions
+                        self.hash_index_0_1
                             .iter()
-                            .map(|&(x0, x1, x2)| (uf.math_.find(x0), uf.math_.find(x1), uf.math_.find(x2)))
+                            .map(|(&(x0, x1), &(x2,))| {
+                                (uf.math_.find(x0), uf.math_.find(x1), uf.math_.find(x2))
+                            })
                             .filter(|&(x0, x1, x2)| !self.hash_index_0_1_2.contains_key(&(x0, x1, x2))),
                     );
                     insertions.clear();
@@ -4571,9 +4579,9 @@ fn regression_entry2() {
                     use std::collections::hash_map::Entry;
                     assert!(self.new.is_empty());
                     self.new.extend(
-                        insertions
+                        self.hash_index_0
                             .iter()
-                            .map(|&(x0, x1)| (x0, uf.math_.find(x1)))
+                            .map(|(&(x0,), &(x1,))| (x0, uf.math_.find(x1)))
                             .filter(|&(x0, x1)| !self.hash_index_0_1.contains_key(&(x0, x1))),
                     );
                     insertions.clear();
@@ -5087,9 +5095,11 @@ fn regression_entry() {
                     use std::collections::hash_map::Entry;
                     assert!(self.new.is_empty());
                     self.new.extend(
-                        insertions
+                        self.hash_index_0_1
                             .iter()
-                            .map(|&(x0, x1, x2)| (uf.math_.find(x0), uf.math_.find(x1), uf.math_.find(x2)))
+                            .map(|(&(x0, x1), &(x2,))| {
+                                (uf.math_.find(x0), uf.math_.find(x1), uf.math_.find(x2))
+                            })
                             .filter(|&(x0, x1, x2)| !self.hash_index_0_1_2.contains_key(&(x0, x1, x2))),
                     );
                     insertions.clear();
@@ -5229,9 +5239,11 @@ fn regression_entry() {
                     use std::collections::hash_map::Entry;
                     assert!(self.new.is_empty());
                     self.new.extend(
-                        insertions
+                        self.hash_index_0_1
                             .iter()
-                            .map(|&(x0, x1, x2)| (uf.math_.find(x0), uf.math_.find(x1), uf.math_.find(x2)))
+                            .map(|(&(x0, x1), &(x2,))| {
+                                (uf.math_.find(x0), uf.math_.find(x1), uf.math_.find(x2))
+                            })
                             .filter(|&(x0, x1, x2)| !self.hash_index_0_1_2.contains_key(&(x0, x1, x2))),
                     );
                     insertions.clear();
@@ -5728,9 +5740,9 @@ fn test_bind_variable_multiple_times() {
                     use std::collections::hash_map::Entry;
                     assert!(self.new.is_empty());
                     self.new.extend(
-                        insertions
+                        self.hash_index_0_1
                             .iter()
-                            .map(|&(x0, x1, x2)| (uf.foo_.find(x0), uf.foo_.find(x1), uf.foo_.find(x2)))
+                            .map(|(&(x0, x1), &(x2,))| (uf.foo_.find(x0), uf.foo_.find(x1), uf.foo_.find(x2)))
                             .filter(|&(x0, x1, x2)| !self.hash_index_0_1_2.contains_key(&(x0, x1, x2))),
                     );
                     insertions.clear();
@@ -6318,9 +6330,11 @@ fn codegen_variable_reuse_bug() {
                     use std::collections::hash_map::Entry;
                     assert!(self.new.is_empty());
                     self.new.extend(
-                        insertions
+                        self.hash_index_0_1
                             .iter()
-                            .map(|&(x0, x1, x2)| (uf.math_.find(x0), uf.math_.find(x1), uf.math_.find(x2)))
+                            .map(|(&(x0, x1), &(x2,))| {
+                                (uf.math_.find(x0), uf.math_.find(x1), uf.math_.find(x2))
+                            })
                             .filter(|&(x0, x1, x2)| !self.hash_index_0_1_2.contains_key(&(x0, x1, x2))),
                     );
                     insertions.clear();
@@ -6481,9 +6495,9 @@ fn codegen_variable_reuse_bug() {
                     use std::collections::hash_map::Entry;
                     assert!(self.new.is_empty());
                     self.new.extend(
-                        insertions
+                        self.hash_index_
                             .iter()
-                            .map(|&(x0,)| (uf.math_.find(x0),))
+                            .map(|(&(), &(x0,))| (uf.math_.find(x0),))
                             .filter(|&(x0,)| !self.hash_index_0.contains_key(&(x0,))),
                     );
                     insertions.clear();
@@ -6870,9 +6884,11 @@ fn initial_exprs() {
                     use std::collections::hash_map::Entry;
                     assert!(self.new.is_empty());
                     self.new.extend(
-                        insertions
+                        self.hash_index_0_1
                             .iter()
-                            .map(|&(x0, x1, x2)| (uf.math_.find(x0), uf.math_.find(x1), uf.math_.find(x2)))
+                            .map(|(&(x0, x1), &(x2,))| {
+                                (uf.math_.find(x0), uf.math_.find(x1), uf.math_.find(x2))
+                            })
                             .filter(|&(x0, x1, x2)| !self.hash_index_0_1_2.contains_key(&(x0, x1, x2))),
                     );
                     insertions.clear();
@@ -7012,9 +7028,11 @@ fn initial_exprs() {
                     use std::collections::hash_map::Entry;
                     assert!(self.new.is_empty());
                     self.new.extend(
-                        insertions
+                        self.hash_index_0_1
                             .iter()
-                            .map(|&(x0, x1, x2)| (uf.math_.find(x0), uf.math_.find(x1), uf.math_.find(x2)))
+                            .map(|(&(x0, x1), &(x2,))| {
+                                (uf.math_.find(x0), uf.math_.find(x1), uf.math_.find(x2))
+                            })
                             .filter(|&(x0, x1, x2)| !self.hash_index_0_1_2.contains_key(&(x0, x1, x2))),
                     );
                     insertions.clear();
@@ -7151,9 +7169,9 @@ fn initial_exprs() {
                     use std::collections::hash_map::Entry;
                     assert!(self.new.is_empty());
                     self.new.extend(
-                        insertions
+                        self.hash_index_0
                             .iter()
-                            .map(|&(x0, x1)| (x0, uf.math_.find(x1)))
+                            .map(|(&(x0,), &(x1,))| (x0, uf.math_.find(x1)))
                             .filter(|&(x0, x1)| !self.hash_index_0_1.contains_key(&(x0, x1))),
                     );
                     insertions.clear();
@@ -7294,9 +7312,9 @@ fn initial_exprs() {
                     use std::collections::hash_map::Entry;
                     assert!(self.new.is_empty());
                     self.new.extend(
-                        insertions
+                        self.hash_index_0
                             .iter()
-                            .map(|&(x0, x1)| (x0, uf.math_.find(x1)))
+                            .map(|(&(x0,), &(x1,))| (x0, uf.math_.find(x1)))
                             .filter(|&(x0, x1)| !self.hash_index_0_1.contains_key(&(x0, x1))),
                     );
                     insertions.clear();
@@ -8285,9 +8303,9 @@ fn initial() {
                     use std::collections::hash_map::Entry;
                     assert!(self.new.is_empty());
                     self.new.extend(
-                        insertions
+                        self.hash_index_0
                             .iter()
-                            .map(|&(x0, x1)| (x0, uf.math_.find(x1)))
+                            .map(|(&(x0,), &(x1,))| (x0, uf.math_.find(x1)))
                             .filter(|&(x0, x1)| !self.hash_index_0_1.contains_key(&(x0, x1))),
                     );
                     insertions.clear();
@@ -8727,9 +8745,11 @@ fn test_primitives_simple() {
                     use std::collections::hash_map::Entry;
                     assert!(self.new.is_empty());
                     self.new.extend(
-                        insertions
+                        self.hash_index_1_0
                             .iter()
-                            .map(|&(x0, x1, x2)| (uf.math_.find(x0), uf.math_.find(x1), uf.math_.find(x2)))
+                            .map(|(&(x1, x0), &(x2,))| {
+                                (uf.math_.find(x0), uf.math_.find(x1), uf.math_.find(x2))
+                            })
                             .filter(|&(x0, x1, x2)| !self.hash_index_1_0_2.contains_key(&(x1, x0, x2))),
                     );
                     insertions.clear();
@@ -8891,9 +8911,11 @@ fn test_primitives_simple() {
                     use std::collections::hash_map::Entry;
                     assert!(self.new.is_empty());
                     self.new.extend(
-                        insertions
+                        self.hash_index_0_1
                             .iter()
-                            .map(|&(x0, x1, x2)| (uf.math_.find(x0), uf.math_.find(x1), uf.math_.find(x2)))
+                            .map(|(&(x0, x1), &(x2,))| {
+                                (uf.math_.find(x0), uf.math_.find(x1), uf.math_.find(x2))
+                            })
                             .filter(|&(x0, x1, x2)| !self.hash_index_0_1_2.contains_key(&(x0, x1, x2))),
                     );
                     insertions.clear();
@@ -9031,9 +9053,9 @@ fn test_primitives_simple() {
                     use std::collections::hash_map::Entry;
                     assert!(self.new.is_empty());
                     self.new.extend(
-                        insertions
+                        self.hash_index_0
                             .iter()
-                            .map(|&(x0, x1)| (x0, uf.math_.find(x1)))
+                            .map(|(&(x0,), &(x1,))| (x0, uf.math_.find(x1)))
                             .filter(|&(x0, x1)| !self.hash_index_0_1.contains_key(&(x0, x1))),
                     );
                     insertions.clear();
@@ -9196,9 +9218,9 @@ fn test_primitives_simple() {
                     use std::collections::hash_map::Entry;
                     assert!(self.new.is_empty());
                     self.new.extend(
-                        insertions
+                        self.hash_index_0
                             .iter()
-                            .map(|&(x0, x1)| (x0, uf.math_.find(x1)))
+                            .map(|(&(x0,), &(x1,))| (x0, uf.math_.find(x1)))
                             .filter(|&(x0, x1)| !self.hash_index_0_1.contains_key(&(x0, x1))),
                     );
                     insertions.clear();
@@ -10570,9 +10592,11 @@ fn edgecase0() {
                     use std::collections::hash_map::Entry;
                     assert!(self.new.is_empty());
                     self.new.extend(
-                        insertions
+                        self.hash_index_0_1
                             .iter()
-                            .map(|&(x0, x1, x2)| (uf.math_.find(x0), uf.math_.find(x1), uf.math_.find(x2)))
+                            .map(|(&(x0, x1), &(x2,))| {
+                                (uf.math_.find(x0), uf.math_.find(x1), uf.math_.find(x2))
+                            })
                             .filter(|&(x0, x1, x2)| !self.hash_index_0_1_2.contains_key(&(x0, x1, x2))),
                     );
                     insertions.clear();
@@ -10784,9 +10808,11 @@ fn edgecase0() {
                     use std::collections::hash_map::Entry;
                     assert!(self.new.is_empty());
                     self.new.extend(
-                        insertions
+                        self.hash_index_0_1
                             .iter()
-                            .map(|&(x0, x1, x2)| (uf.math_.find(x0), uf.math_.find(x1), uf.math_.find(x2)))
+                            .map(|(&(x0, x1), &(x2,))| {
+                                (uf.math_.find(x0), uf.math_.find(x1), uf.math_.find(x2))
+                            })
                             .filter(|&(x0, x1, x2)| !self.hash_index_0_1_2.contains_key(&(x0, x1, x2))),
                     );
                     insertions.clear();
@@ -11245,9 +11271,11 @@ fn test_into_codegen() {
                     use std::collections::hash_map::Entry;
                     assert!(self.new.is_empty());
                     self.new.extend(
-                        insertions
+                        self.hash_index_0_1
                             .iter()
-                            .map(|&(x0, x1, x2)| (uf.math_.find(x0), uf.math_.find(x1), uf.math_.find(x2)))
+                            .map(|(&(x0, x1), &(x2,))| {
+                                (uf.math_.find(x0), uf.math_.find(x1), uf.math_.find(x2))
+                            })
                             .filter(|&(x0, x1, x2)| !self.hash_index_0_1_2.contains_key(&(x0, x1, x2))),
                     );
                     insertions.clear();
@@ -11410,9 +11438,11 @@ fn test_into_codegen() {
                     use std::collections::hash_map::Entry;
                     assert!(self.new.is_empty());
                     self.new.extend(
-                        insertions
+                        self.hash_index_0_1
                             .iter()
-                            .map(|&(x0, x1, x2)| (uf.math_.find(x0), uf.math_.find(x1), uf.math_.find(x2)))
+                            .map(|(&(x0, x1), &(x2,))| {
+                                (uf.math_.find(x0), uf.math_.find(x1), uf.math_.find(x2))
+                            })
                             .filter(|&(x0, x1, x2)| !self.hash_index_0_1_2.contains_key(&(x0, x1, x2))),
                     );
                     insertions.clear();
