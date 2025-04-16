@@ -1229,10 +1229,6 @@ fn codegen_constant_propagation() {
             }"#]]),
         expected_codegen: Some(expect![[r#"
             use oatlog::runtime::{self, *};
-            decl_row ! (Row2_0 < T0 first 0 , T1 > (T0 0) (T1 1) (0 1) (1 0) where u64 = s => ((s . 0 . inner () as u64) << 32) + ((s . 1 . inner () as u64) << 0));
-            decl_row ! (Row2_1_0 < T0 , T1 first 1 > (T1 1 , T0 0) () (0 1) (1 0) where u64 = s => ((s . 1 . inner () as u64) << 32) + ((s . 0 . inner () as u64) << 0));
-            decl_row ! (Row3_0_1 < T0 first 0 , T1 , T2 > (T0 0 , T1 1) (T2 2) (0 1 2) (2 1 0) where u128 = s => ((s . 0 . inner () as u128) << 64) + ((s . 1 . inner () as u128) << 32) + ((s . 2 . inner () as u128) << 0));
-            decl_row ! (Row3_1_0_2 < T0 , T1 first 1 , T2 > (T1 1 , T0 0 , T2 2) () (0 1 2) (2 1 0) where u128 = s => ((s . 1 . inner () as u128) << 64) + ((s . 0 . inner () as u128) << 32) + ((s . 2 . inner () as u128) << 0));
             eclass_wrapper_ty!(Math);
             fn i64_add012(a: i64, b: i64) -> impl Iterator<Item = (i64,)> {
                 a.checked_add(b).map(|x| (x,)).into_iter()
@@ -2044,7 +2040,6 @@ fn codegen_commutative() {
         expected_lir: None,
         expected_codegen: Some(expect![[r#"
             use oatlog::runtime::{self, *};
-            decl_row ! (Row3_0_1 < T0 first 0 , T1 , T2 > (T0 0 , T1 1) (T2 2) (0 1 2) (2 1 0) where u128 = s => ((s . 0 . inner () as u128) << 64) + ((s . 1 . inner () as u128) << 32) + ((s . 2 . inner () as u128) << 0));
             eclass_wrapper_ty!(Math);
             fn i64_add012(a: i64, b: i64) -> impl Iterator<Item = (i64,)> {
                 a.checked_add(b).map(|x| (x,)).into_iter()
@@ -2552,8 +2547,6 @@ fn regression_entry2() {
             }"#]]),
         expected_codegen: Some(expect![[r#"
             use oatlog::runtime::{self, *};
-            decl_row ! (Row2_0 < T0 first 0 , T1 > (T0 0) (T1 1) (0 1) (1 0) where u64 = s => ((s . 0 . inner () as u64) << 32) + ((s . 1 . inner () as u64) << 0));
-            decl_row ! (Row3_0_1 < T0 first 0 , T1 , T2 > (T0 0 , T1 1) (T2 2) (0 1 2) (2 1 0) where u128 = s => ((s . 0 . inner () as u128) << 64) + ((s . 1 . inner () as u128) << 32) + ((s . 2 . inner () as u128) << 0));
             eclass_wrapper_ty!(Math);
             fn i64_add012(a: i64, b: i64) -> impl Iterator<Item = (i64,)> {
                 a.checked_add(b).map(|x| (x,)).into_iter()
@@ -3209,7 +3202,6 @@ fn regression_entry() {
             }"#]]),
         expected_codegen: Some(expect![[r#"
             use oatlog::runtime::{self, *};
-            decl_row ! (Row3_0_1 < T0 first 0 , T1 , T2 > (T0 0 , T1 1) (T2 2) (0 1 2) (2 1 0) where u128 = s => ((s . 0 . inner () as u128) << 64) + ((s . 1 . inner () as u128) << 32) + ((s . 2 . inner () as u128) << 0));
             eclass_wrapper_ty!(Math);
             fn i64_add012(a: i64, b: i64) -> impl Iterator<Item = (i64,)> {
                 a.checked_add(b).map(|x| (x,)).into_iter()
@@ -3851,7 +3843,6 @@ fn test_bind_variable_multiple_times() {
             }"#]]),
         expected_codegen: Some(expect![[r#"
             use oatlog::runtime::{self, *};
-            decl_row ! (Row3_0_1 < T0 first 0 , T1 , T2 > (T0 0 , T1 1) (T2 2) (0 1 2) (2 1 0) where u128 = s => ((s . 0 . inner () as u128) << 64) + ((s . 1 . inner () as u128) << 32) + ((s . 2 . inner () as u128) << 0));
             eclass_wrapper_ty!(Foo);
             fn i64_add012(a: i64, b: i64) -> impl Iterator<Item = (i64,)> {
                 a.checked_add(b).map(|x| (x,)).into_iter()
@@ -4441,9 +4432,6 @@ fn codegen_variable_reuse_bug() {
             }"#]]),
         expected_codegen: Some(expect![[r#"
             use oatlog::runtime::{self, *};
-            decl_row ! (Row1 < T0 first 0 > () (T0 0) (0) (0) where u32 = s => ((s . 0 . inner () as u32) << 0));
-            decl_row ! (Row3_0_1 < T0 first 0 , T1 , T2 > (T0 0 , T1 1) (T2 2) (0 1 2) (2 1 0) where u128 = s => ((s . 0 . inner () as u128) << 64) + ((s . 1 . inner () as u128) << 32) + ((s . 2 . inner () as u128) << 0));
-            decl_row ! (Row3_0_2_1 < T0 first 0 , T1 , T2 > (T0 0 , T2 2 , T1 1) () (0 1 2) (2 1 0) where u128 = s => ((s . 0 . inner () as u128) << 64) + ((s . 2 . inner () as u128) << 32) + ((s . 1 . inner () as u128) << 0));
             eclass_wrapper_ty!(Math);
             fn i64_add012(a: i64, b: i64) -> impl Iterator<Item = (i64,)> {
                 a.checked_add(b).map(|x| (x,)).into_iter()
@@ -4997,8 +4985,6 @@ fn initial_exprs() {
         expected_lir: None,
         expected_codegen: Some(expect![[r#"
             use oatlog::runtime::{self, *};
-            decl_row ! (Row2_0 < T0 first 0 , T1 > (T0 0) (T1 1) (0 1) (1 0) where u64 = s => ((s . 0 . inner () as u64) << 32) + ((s . 1 . inner () as u64) << 0));
-            decl_row ! (Row3_0_1 < T0 first 0 , T1 , T2 > (T0 0 , T1 1) (T2 2) (0 1 2) (2 1 0) where u128 = s => ((s . 0 . inner () as u128) << 64) + ((s . 1 . inner () as u128) << 32) + ((s . 2 . inner () as u128) << 0));
             eclass_wrapper_ty!(Math);
             fn i64_add012(a: i64, b: i64) -> impl Iterator<Item = (i64,)> {
                 a.checked_add(b).map(|x| (x,)).into_iter()
@@ -6072,7 +6058,6 @@ fn codegen_bug1() {
         expected_lir: None,
         expected_codegen: Some(expect![[r#"
             use oatlog::runtime::{self, *};
-            decl_row ! (Row3_0_1_2 < T0 first 0 , T1 , T2 > (T0 0 , T1 1 , T2 2) () (0 1 2) (2 1 0) where u128 = s => ((s . 0 . inner () as u128) << 64) + ((s . 1 . inner () as u128) << 32) + ((s . 2 . inner () as u128) << 0));
             eclass_wrapper_ty!(T0);
             eclass_wrapper_ty!(T1);
             eclass_wrapper_ty!(T2);
@@ -6418,7 +6403,6 @@ fn initial() {
         expected_lir: None,
         expected_codegen: Some(expect![[r#"
             use oatlog::runtime::{self, *};
-            decl_row ! (Row2_0 < T0 first 0 , T1 > (T0 0) (T1 1) (0 1) (1 0) where u64 = s => ((s . 0 . inner () as u64) << 32) + ((s . 1 . inner () as u64) << 0));
             eclass_wrapper_ty!(Math);
             fn i64_add012(a: i64, b: i64) -> impl Iterator<Item = (i64,)> {
                 a.checked_add(b).map(|x| (x,)).into_iter()
@@ -6857,10 +6841,6 @@ fn test_primitives_simple() {
         expected_lir: None,
         expected_codegen : Some(expect![[r#"
             use oatlog::runtime::{self, *};
-            decl_row ! (Row2_0 < T0 first 0 , T1 > (T0 0) (T1 1) (0 1) (1 0) where u64 = s => ((s . 0 . inner () as u64) << 32) + ((s . 1 . inner () as u64) << 0));
-            decl_row ! (Row2_1_0 < T0 , T1 first 1 > (T1 1 , T0 0) () (0 1) (1 0) where u64 = s => ((s . 1 . inner () as u64) << 32) + ((s . 0 . inner () as u64) << 0));
-            decl_row ! (Row3_0_1 < T0 first 0 , T1 , T2 > (T0 0 , T1 1) (T2 2) (0 1 2) (2 1 0) where u128 = s => ((s . 0 . inner () as u128) << 64) + ((s . 1 . inner () as u128) << 32) + ((s . 2 . inner () as u128) << 0));
-            decl_row ! (Row3_1_0 < T0 , T1 first 1 , T2 > (T1 1 , T0 0) (T2 2) (0 1 2) (2 1 0) where u128 = s => ((s . 1 . inner () as u128) << 64) + ((s . 0 . inner () as u128) << 32) + ((s . 2 . inner () as u128) << 0));
             eclass_wrapper_ty!(Math);
             fn i64_add012(a: i64, b: i64) -> impl Iterator<Item = (i64,)> {
                 a.checked_add(b).map(|x| (x,)).into_iter()
@@ -7843,9 +7823,6 @@ fn triangle_join() {
         expected_lir: None,
         expected_codegen: Some(expect![[r#"
             use oatlog::runtime::{self, *};
-            decl_row ! (Row2_0_1 < T0 first 0 , T1 > (T0 0 , T1 1) () (0 1) (1 0) where u64 = s => ((s . 0 . inner () as u64) << 32) + ((s . 1 . inner () as u64) << 0));
-            decl_row ! (Row2_1_0 < T0 , T1 first 1 > (T1 1 , T0 0) () (0 1) (1 0) where u64 = s => ((s . 1 . inner () as u64) << 32) + ((s . 0 . inner () as u64) << 0));
-            decl_row ! (Row3_0_1_2 < T0 first 0 , T1 , T2 > (T0 0 , T1 1 , T2 2) () (0 1 2) (2 1 0) where u128 = s => ((s . 0 . inner () as u128) << 64) + ((s . 1 . inner () as u128) << 32) + ((s . 2 . inner () as u128) << 0));
             eclass_wrapper_ty!(Math);
             fn i64_add012(a: i64, b: i64) -> impl Iterator<Item = (i64,)> {
                 a.checked_add(b).map(|x| (x,)).into_iter()
@@ -8708,9 +8685,6 @@ fn edgecase0() {
         expected_lir: None,
         expected_codegen : Some(expect![[r#"
             use oatlog::runtime::{self, *};
-            decl_row ! (Row3_0_1 < T0 first 0 , T1 , T2 > (T0 0 , T1 1) (T2 2) (0 1 2) (2 1 0) where u128 = s => ((s . 0 . inner () as u128) << 64) + ((s . 1 . inner () as u128) << 32) + ((s . 2 . inner () as u128) << 0));
-            decl_row ! (Row3_1_0_2 < T0 , T1 first 1 , T2 > (T1 1 , T0 0 , T2 2) () (0 1 2) (2 1 0) where u128 = s => ((s . 1 . inner () as u128) << 64) + ((s . 0 . inner () as u128) << 32) + ((s . 2 . inner () as u128) << 0));
-            decl_row ! (Row3_2_0_1 < T0 , T1 , T2 first 2 > (T2 2 , T0 0 , T1 1) () (0 1 2) (2 1 0) where u128 = s => ((s . 2 . inner () as u128) << 64) + ((s . 0 . inner () as u128) << 32) + ((s . 1 . inner () as u128) << 0));
             eclass_wrapper_ty!(Math);
             fn i64_add012(a: i64, b: i64) -> impl Iterator<Item = (i64,)> {
                 a.checked_add(b).map(|x| (x,)).into_iter()
@@ -9392,8 +9366,6 @@ fn test_into_codegen() {
         expected_lir: None,
         expected_codegen: Some(expect![[r#"
             use oatlog::runtime::{self, *};
-            decl_row ! (Row3_0_1 < T0 first 0 , T1 , T2 > (T0 0 , T1 1) (T2 2) (0 1 2) (2 1 0) where u128 = s => ((s . 0 . inner () as u128) << 64) + ((s . 1 . inner () as u128) << 32) + ((s . 2 . inner () as u128) << 0));
-            decl_row ! (Row3_2_0_1 < T0 , T1 , T2 first 2 > (T2 2 , T0 0 , T1 1) () (0 1 2) (2 1 0) where u128 = s => ((s . 2 . inner () as u128) << 64) + ((s . 0 . inner () as u128) << 32) + ((s . 1 . inner () as u128) << 0));
             eclass_wrapper_ty!(Math);
             fn i64_add012(a: i64, b: i64) -> impl Iterator<Item = (i64,)> {
                 a.checked_add(b).map(|x| (x,)).into_iter()

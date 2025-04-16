@@ -42,15 +42,11 @@ pub fn codegen(theory: &Theory) -> TokenStream {
     let (global_variable_fields, global_variables_map, theory_initial) =
         codegen_globals_and_initial(theory);
 
-    let mut declare_rows = BTreeMap::new();
-
     let relations = theory
         .relations
         .iter()
-        .filter_map(|rel| Some(codegen_relation(rel.as_ref()?, theory, &mut declare_rows)))
+        .filter_map(|rel| Some(codegen_relation(rel.as_ref()?, theory)))
         .collect_vec();
-
-    let declare_rows = declare_rows.into_iter().map(codegen_declare_row);
 
     let rule_contents = query::CodegenRuleTrieCtx {
         types: &theory.types,
@@ -115,18 +111,16 @@ pub fn codegen(theory: &Theory) -> TokenStream {
     };
 
     let canonicalize = {
-        let (relation_ident, rel_ctx_ident, delta_row) = theory
+        let (relation_ident, delta_row) = theory
             .relations
             .iter()
             .filter_map(|rel| {
                 let rel = rel.as_ref()?;
                 match &rel.kind {
                     RelationKind::Global { .. } => None,
-                    RelationKind::Table { .. } => Some((
-                        ident::rel_var(rel),
-                        ident::rel_ctx_ident(rel),
-                        ident::delta_row(rel),
-                    )),
+                    RelationKind::Table { .. } => {
+                        Some((ident::rel_var(rel), ident::delta_row(rel)))
+                    }
                     RelationKind::Primitive { .. } => None,
                 }
             })
@@ -202,7 +196,6 @@ pub fn codegen(theory: &Theory) -> TokenStream {
     quote! {
         use oatlog::runtime::{self, *};
 
-        #(#declare_rows)*
         #(eclass_wrapper_ty!(#uf_ty);)*
         #(#relations)*
 
@@ -467,11 +460,7 @@ fn codegen_globals_and_initial(
     (global_variable_fields, assigned_indices, theory_initial)
 }
 
-fn codegen_relation(
-    rel: &RelationData,
-    theory: &Theory,
-    declare_rows: &mut BTreeMap<Ident, IndexInfo>,
-) -> TokenStream {
+fn codegen_relation(rel: &RelationData, theory: &Theory) -> TokenStream {
     match &rel.kind {
         RelationKind::Global { .. } => {
             // will codegen into a single big struct.
@@ -481,13 +470,7 @@ fn codegen_relation(
             usage_to_info,
             index_to_info,
             column_back_reference: _,
-        } => table_relation::codegen_table_relation(
-            rel,
-            theory,
-            declare_rows,
-            usage_to_info,
-            index_to_info,
-        ),
+        } => table_relation::codegen_table_relation(rel, theory, usage_to_info, index_to_info),
         RelationKind::Primitive {
             codegen,
             out_col: _,
@@ -495,6 +478,8 @@ fn codegen_relation(
     }
 }
 
+// TODO loke: Is declare_row now unused. Will we use it or should it be removed?
+#[allow(unused)]
 fn codegen_declare_row(
     (
         row_name,
@@ -614,16 +599,9 @@ mod ident {
     pub fn rel_ty(rel: &RelationData) -> Ident {
         format_ident!("{}Relation", rel.name.to_pascal_case())
     }
-    /// `AddUpdateCtx`
-    pub fn rel_update_ctx_ty(rel: &RelationData) -> Ident {
-        format_ident!("{}UpdateCtx", rel.name.to_pascal_case())
-    }
     /// `add_`
     pub fn rel_var(rel: &RelationData) -> Ident {
         format_ident!("{}_", rel.name.to_snake_case())
-    }
-    pub fn rel_ctx_ident(rel: &RelationData) -> Ident {
-        format_ident!("{}_ctx", rel.name.to_snake_case())
     }
     /// `add`, `mul`
     pub fn rel_get(rel: &RelationData) -> Ident {
@@ -645,15 +623,6 @@ mod ident {
             format_ident!("Delta")
         }
     }
-    /// `all_index_2_0_1`
-    pub fn index_all_field(index: &IndexInfo) -> Ident {
-        let perm = index
-            .permuted_columns
-            .iter()
-            .map(|ColumnId(x)| format!("{x}"))
-            .join("_");
-        format_ident!("all_index_{perm}")
-    }
     /// `hash_index_0_1`
     pub fn index_usage_field(key_columns: &[ColumnId]) -> Ident {
         let keys = key_columns
@@ -661,18 +630,6 @@ mod ident {
             .map(|ColumnId(x)| format!("{x}"))
             .join("_");
         format_ident!("hash_index_{keys}")
-    }
-    /// `Row3_2_0`
-    pub fn index_all_row(index: &IndexInfo) -> Ident {
-        let arity = index.permuted_columns.len();
-        let pk_arity = index.primary_key_prefix_len;
-        let primary_key_in_order = index
-            .permuted_columns
-            .iter()
-            .take(pk_arity)
-            .map(|ColumnId(x)| format!("_{x}"))
-            .join("");
-        format_ident!("Row{arity}{primary_key_in_order}")
     }
     /// `iter2_2_0_1`
     pub fn index_all_iter(usage: &IndexUsageInfo, index: &IndexInfo) -> Ident {

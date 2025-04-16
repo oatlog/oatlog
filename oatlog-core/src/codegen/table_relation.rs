@@ -1,3 +1,5 @@
+#![allow(unstable_name_collisions, reason = "itertools `intersperse`")]
+
 use crate::{
     codegen::{MultiUnzipVec, ident},
     ids::{ColumnId, IndexId, IndexUsageId, TypeId},
@@ -5,50 +7,17 @@ use crate::{
     typed_vec::TVec,
 };
 use itertools::Itertools as _;
-use proc_macro2::{Ident, TokenStream};
+use proc_macro2::TokenStream;
 use quote::quote;
-use std::{collections::BTreeMap, iter};
+use std::iter;
 
 pub fn codegen_table_relation(
     rel: &RelationData,
     theory: &Theory,
-    declare_rows: &mut BTreeMap<Ident, IndexInfo>,
     usage_to_info: &TVec<IndexUsageId, IndexUsageInfo>,
     index_to_info: &TVec<IndexId, IndexInfo>,
 ) -> TokenStream {
     assert!(matches!(rel.kind, RelationKind::Table { .. }));
-
-    let (index_fields_name, index_fields_ty) = index_to_info
-        .iter()
-        .map(|index_info| {
-            let attr_name = ident::index_all_field(index_info);
-            let row_choice = ident::index_all_row(index_info);
-            let fields_ty = rel
-                .columns
-                .iter()
-                .map(|&ty| ident::type_ty(&theory.types[ty]));
-            declare_rows
-                .entry(row_choice.clone())
-                .or_insert_with(|| index_info.clone());
-            let ty = if rel.columns.len() <= 4
-                && rel
-                    .columns
-                    .iter()
-                    .all(|&ty| matches!(theory.types[ty].kind, TypeKind::Symbolic))
-            {
-                let radix_key = match rel.columns.len() {
-                    1 => quote! { u32 },
-                    2 => quote! { u64 },
-                    3 | 4 => quote! { u128 },
-                    _ => unreachable!(),
-                };
-                quote! { SortedVec<EclassCtx<#row_choice<#(#fields_ty,)*>, #radix_key>> }
-            } else {
-                quote! { SortedVec<GeneralCtx<#row_choice<#(#fields_ty,)*>>> }
-            };
-            (attr_name, ty)
-        })
-        .collect_vecs();
 
     let (params, column_types) = rel
         .columns
@@ -776,7 +745,6 @@ fn per_usage(
     usage_info: &IndexUsageInfo,
 ) -> (TokenStream, TokenStream, TokenStream) {
     let index_info = &index_to_info[usage_info.index];
-    let index_field = ident::index_all_field(index_info);
 
     let call_args = index_info.permuted_columns.inner()[0..usage_info.prefix]
         .iter()
