@@ -1,9 +1,13 @@
+use educe::Educe;
 use itertools::Itertools as _;
+use rand::{SeedableRng, prelude::IndexedRandom as _};
 
 use std::{
+    cell::RefCell,
     collections::{BTreeMap, BTreeSet},
     hash::Hash,
     mem::replace,
+    rc::Rc,
 };
 
 use crate::{
@@ -79,6 +83,9 @@ impl Trie {
             );
         }
     }
+    fn size(&self) -> usize {
+        1 + self.map.values().map(|trie| trie.size()).sum::<usize>()
+    }
 }
 
 pub(crate) fn schedule_rules(
@@ -114,11 +121,36 @@ pub(crate) fn schedule_rules(
         )
         .collect();
 
+    let rng = rand_chacha::ChaCha20Rng::seed_from_u64(99387277);
+
     let ctx = Ctx {
         bound_premise: BTreeSet::new(),
         relations,
         uf: SparseUf::new(),
+        rng: Rc::new(RefCell::new(rng)),
     };
+    // {
+    //     eprintln!("===========");
+    //     for _ in 0..100 {
+    //         let trie = inner(ctx.clone(), &rules);
+
+    //         let mut index_usage: TVec<RelationId, _> = relations
+    //             .iter()
+    //             .map(|x| {
+    //                 x.implicit_rules
+    //                     .iter()
+    //                     .map(|x| x.out.keys().cloned().collect())
+    //                     .collect()
+    //             })
+    //             .collect();
+    //         trie.index_usage(&mut index_usage);
+    //         // dbg!(&index_usage);
+    //         dbg!(index_usage.iter().map(|x| x.len()).sum::<usize>());
+    //         dbg!(trie.size());
+
+    //     }
+
+    // }
     let trie = inner(ctx, &rules);
 
     // let mut index_usage: TVec<RelationId, _> = relations
@@ -131,7 +163,7 @@ pub(crate) fn schedule_rules(
     //     })
     //     .collect();
     // trie.index_usage(&mut index_usage);
-    // dbg!(&index_usage);
+    // // dbg!(&index_usage);
     // dbg!(index_usage.iter().map(|x| x.len()).sum::<usize>());
 
     (variables, trie)
@@ -608,11 +640,12 @@ impl TrieLink {
     }
 }
 
-#[derive(Clone, Eq, PartialEq, Ord, PartialOrd, Debug)]
+#[derive(Clone, Debug)]
 struct Ctx<'a> {
     bound_premise: BTreeSet<VariableId>,
     relations: &'a TVec<RelationId, Relation>,
     uf: SparseUf<VariableId>,
+    rng: Rc<RefCell<rand_chacha::ChaCha20Rng>>,
 }
 impl Ctx<'_> {
     fn apply(&self, link: &TrieLink) -> Self {
@@ -842,7 +875,7 @@ impl Rule {
             }
         }
     }
-    fn make_votes(&self, ctx: &Ctx) -> Vec<(Salt, TrieLink)> {
+    fn make_votes(&self, ctx: &Ctx<'_>) -> Vec<(Salt, TrieLink)> {
         (match self.semi.as_slice() {
             [] => {
                 // TODO: allbound should probably be a semi-join.
@@ -989,7 +1022,7 @@ impl Rule {
 /// For each rule, pick what the next step should be (if any)
 ///
 /// If we want to do random sampling, we might want to use a PDF here or something.
-fn election(ctx: &Ctx, rules: &[Rule]) -> (Vec<Rule>, BTreeMap<TrieLink, Vec<Rule>>) {
+fn election(ctx: &Ctx<'_>, rules: &[Rule]) -> (Vec<Rule>, BTreeMap<TrieLink, Vec<Rule>>) {
     use crate::ids::id_wrap;
     use itertools::Either::*;
     id_wrap!(RuleId, "y", "id for a rule");
@@ -1029,21 +1062,58 @@ fn election(ctx: &Ctx, rules: &[Rule]) -> (Vec<Rule>, BTreeMap<TrieLink, Vec<Rul
 
     let mut map: BTreeMap<TrieLink, Vec<Rule>> = BTreeMap::new();
 
-    while let Some(vote) = votes
+    while let Some((_count, vote)) = votes
         .enumerate()
         .map(|v| {
             (
-                v,
                 matrix[v]
                     .iter_enumerate()
                     .filter(|(i, x)| x.is_some() && remaining_rules.contains(&i))
                     .count(),
+                v,
             )
         })
-        .filter(|(_, count)| *count > 0)
-        .max_by_key(|(_, count)| *count)
-        .map(|(vote, _)| vote)
+        .filter(|(count, _)| *count > 0)
+        .collect_multimap()
+        .pop_last()
     {
+        {
+            // let vote: Vec<_> = vote
+            //     .iter()
+            //     .cloned()
+            //     .filter(|&x| {
+            //         !matches!(
+            //             ctx.relations[votes[x].1.clone().atom().relation].kind,
+            //             hir::RelationTy::NewOf { .. }
+            //         )
+            //     })
+            //     .collect();
+            if _count > 1 && vote.len() > 1 {
+                let indexes = vote
+                    .iter()
+                    .cloned()
+                    .map(|x| votes[x].1.clone().atom())
+                    .map(|atom| {
+                        (
+                            ctx.relations[atom.relation].name,
+                            atom.columns
+                                .iter_enumerate()
+                                .filter_map(|(i, v)| ctx.bound_premise.contains(v).then_some(i))
+                                .collect::<BTreeSet<_>>(),
+                        )
+                    })
+                    .collect::<BTreeSet<_>>();
+                // eprintln!("count: {_count} indexes: {indexes:?}");
+
+                //         x.implicit_rules
+                //             .iter()
+                //             .map(|x| x.out.keys().cloned().collect())
+                //             .collect()
+            }
+        }
+        // let mut rng = ctx.rng.borrow_mut();
+        // let vote = *vote.choose(&mut rng).unwrap();
+        let vote = vote[0];
         let existing = map.insert(
             votes[vote].1.clone(),
             matrix[vote]

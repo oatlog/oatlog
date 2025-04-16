@@ -46,6 +46,7 @@ regex = "1"
 smallvec = { version = "1", features = ["union"] }
 syn = { version = "2", features = ["full", "extra-traits"] }
 voracious_radix_sort = "1"
+rand_chacha = "0.9.0" # portable deterministic random
 
 [profile.release]
 debug = true
