@@ -1000,8 +1000,9 @@ fn regression_tir2() {
                                 iu0: ir0[..2],
                                 iu1: ir0[..1],
                                 iu2: ir0[..1],
-                                iu3: ir0[..3],
-                                iu4: ir0[..2],
+                                iu3: ir0[..1],
+                                iu4: ir0[..3],
+                                iu5: ir0[..2],
                             },
                             column_back_reference: {},
                         },
@@ -1088,11 +1089,11 @@ fn regression_tir2() {
                     ],
                     atom: [PremiseNew, r17(v5, v6)]
                     then: [
-                        atom: [PremiseAny, r18(v5), iu_bogus]
+                        atom: [PremiseAny, r16(v4, v6, v7), iu1]
                         then: [
-                            atom: [Premise, r16(v4, v6, v7), iu1]
+                            atom: [PremiseAny, r18(v5), iu_bogus]
                             then: [
-                                atom: [PremiseAny, r18(v5), iu_bogus]
+                                atom: [Premise, r16(v4, v6, v7), iu2]
                                 then: [
                                     meta: "( rewrite ( Pow x ( Const 2 ) ) ( Mul x x ) )"
                                     atom: [Action::Insert, r15(v4, v4, v7)],
@@ -1104,7 +1105,7 @@ fn regression_tir2() {
                     then: [
                         atom: [Premise, r17(v9, v10), iu2]
                         then: [
-                            atom: [Premise, r16(v8, v10, v11), iu2]
+                            atom: [Premise, r16(v8, v10, v11), iu3]
                             then: [
                                 meta: "( rewrite ( Pow x ( Const 2 ) ) ( Mul x x ) )"
                                 atom: [Action::Insert, r15(v8, v8, v11)],
@@ -1793,9 +1794,9 @@ fn regression_tir2() {
                         }
                     }
                     for (v5, v6) in self.const_.iter_new() {
-                        if v5 == self.global_i64.get(0usize) {
-                            for (x_2, v7) in self.pow_.iter1_1_0_2(v6) {
-                                if v5 == self.global_i64.get(0usize) {
+                        if self.pow_.check1_1_0_2(v6) {
+                            if v5 == self.global_i64.get(0usize) {
+                                for (x_2, v7) in self.pow_.iter1_1_0_2(v6) {
                                     #[doc = "( rewrite ( Pow x ( Const 2 ) ) ( Mul x x ) )"]
                                     self.delta.insert_mul((x_2, x_2, v7));
                                 }
@@ -2835,13 +2836,13 @@ fn codegen_constant_propagation() {
                         name: "Add",
                         param_types: {c0: t3, c1: t3, c2: t3},
                         kind: Table {
-                            index_to_info: {ir0: 0_1_2, ir1: 1_0_2 conflict[..2] => [2:union]},
+                            index_to_info: {ir0: 0_1_2 conflict[..2] => [2:union], ir1: 1_0_2},
                             usage_to_info: {
-                                iu0: ir1[..2],
-                                iu1: ir1[..1],
-                                iu2: ir0[..1],
-                                iu3: ir1[..3],
-                                iu4: ir1[..2],
+                                iu0: ir0[..2],
+                                iu1: ir0[..1],
+                                iu2: ir1[..1],
+                                iu3: ir0[..3],
+                                iu4: ir0[..2],
                             },
                             column_back_reference: {},
                         },
@@ -2850,13 +2851,13 @@ fn codegen_constant_propagation() {
                         name: "Mul",
                         param_types: {c0: t3, c1: t3, c2: t3},
                         kind: Table {
-                            index_to_info: {ir0: 0_1_2, ir1: 1_0_2 conflict[..2] => [2:union]},
+                            index_to_info: {ir0: 0_1_2 conflict[..2] => [2:union], ir1: 1_0_2},
                             usage_to_info: {
-                                iu0: ir1[..2],
-                                iu1: ir1[..1],
-                                iu2: ir0[..1],
-                                iu3: ir1[..3],
-                                iu4: ir1[..2],
+                                iu0: ir0[..2],
+                                iu1: ir0[..1],
+                                iu2: ir1[..1],
+                                iu3: ir0[..3],
+                                iu4: ir0[..2],
                             },
                             column_back_reference: {},
                         },
@@ -2927,11 +2928,11 @@ fn codegen_constant_propagation() {
                 rule_tries: [
                     atom: [PremiseNew, r15(v2, v4, v0)]
                     then: [
-                        atom: [PremiseAny, r17(v3, v4), iu1]
+                        atom: [PremiseAny, r17(v1, v2), iu1]
                         then: [
-                            atom: [Premise, r17(v1, v2), iu3]
+                            atom: [Premise, r17(v3, v4), iu3]
                             then: [
-                                atom: [Premise, r17(v3, v4), iu2]
+                                atom: [Premise, r17(v1, v2), iu2]
                                 then: [
                                     meta: "( rule ( ( = e ( Add ( Const a ) ( Const b ) ) ) ) ( ( union e ( Const ( + a b ) ) ) ) )"
                                     atom: [Action::Insert, r0(v1, v3, v5) on iu0],
@@ -2942,11 +2943,11 @@ fn codegen_constant_propagation() {
                     ],
                     atom: [PremiseNew, r16(v20, v22, v18)]
                     then: [
-                        atom: [PremiseAny, r17(v21, v22), iu4]
+                        atom: [PremiseAny, r17(v19, v20), iu4]
                         then: [
-                            atom: [Premise, r17(v19, v20), iu6]
+                            atom: [Premise, r17(v21, v22), iu6]
                             then: [
-                                atom: [Premise, r17(v21, v22), iu5]
+                                atom: [Premise, r17(v19, v20), iu5]
                                 then: [
                                     meta: "( rule ( ( = e ( Mul ( Const a ) ( Const b ) ) ) ) ( ( union e ( Const ( * a b ) ) ) ) )"
                                     atom: [Action::Insert, r11(v19, v21, v23) on iu0],
@@ -2955,42 +2956,42 @@ fn codegen_constant_propagation() {
                             ],
                         ],
                     ],
-                    atom: [PremiseNew, r17(v33, v34)]
+                    atom: [PremiseNew, r17(v7, v8)]
                     then: [
-                        atom: [Premise, r15(v14, v34, v12), iu1]
+                        atom: [Premise, r15(v8, v10, v6), iu1]
                         then: [
-                            atom: [Premise, r17(v13, v14), iu7]
+                            atom: [Premise, r17(v9, v10), iu7]
                             then: [
                                 meta: "( rule ( ( = e ( Add ( Const a ) ( Const b ) ) ) ) ( ( union e ( Const ( + a b ) ) ) ) )"
-                                atom: [Action::Insert, r0(v13, v33, v17) on iu0],
-                                atom: [Action::Insert, r17(v17, v12)],
-                            ],
-                        ],
-                        atom: [Premise, r15(v34, v10, v6), iu2]
-                        then: [
-                            atom: [Premise, r17(v9, v10), iu8]
-                            then: [
-                                meta: "( rule ( ( = e ( Add ( Const a ) ( Const b ) ) ) ) ( ( union e ( Const ( + a b ) ) ) ) )"
-                                atom: [Action::Insert, r0(v33, v9, v11) on iu0],
+                                atom: [Action::Insert, r0(v7, v9, v11) on iu0],
                                 atom: [Action::Insert, r17(v11, v6)],
                             ],
                         ],
-                        atom: [Premise, r16(v32, v34, v30), iu1]
+                        atom: [Premise, r15(v14, v8, v12), iu2]
                         then: [
-                            atom: [Premise, r17(v31, v32), iu9]
+                            atom: [Premise, r17(v13, v14), iu8]
                             then: [
-                                meta: "( rule ( ( = e ( Mul ( Const a ) ( Const b ) ) ) ) ( ( union e ( Const ( * a b ) ) ) ) )"
-                                atom: [Action::Insert, r11(v31, v33, v35) on iu0],
-                                atom: [Action::Insert, r17(v35, v30)],
+                                meta: "( rule ( ( = e ( Add ( Const a ) ( Const b ) ) ) ) ( ( union e ( Const ( + a b ) ) ) ) )"
+                                atom: [Action::Insert, r0(v13, v7, v17) on iu0],
+                                atom: [Action::Insert, r17(v17, v12)],
                             ],
                         ],
-                        atom: [Premise, r16(v34, v28, v24), iu2]
+                        atom: [Premise, r16(v8, v28, v24), iu1]
                         then: [
-                            atom: [Premise, r17(v27, v28), iu10]
+                            atom: [Premise, r17(v27, v28), iu9]
                             then: [
                                 meta: "( rule ( ( = e ( Mul ( Const a ) ( Const b ) ) ) ) ( ( union e ( Const ( * a b ) ) ) ) )"
-                                atom: [Action::Insert, r11(v33, v27, v29) on iu0],
+                                atom: [Action::Insert, r11(v7, v27, v29) on iu0],
                                 atom: [Action::Insert, r17(v29, v24)],
+                            ],
+                        ],
+                        atom: [Premise, r16(v32, v8, v30), iu2]
+                        then: [
+                            atom: [Premise, r17(v31, v32), iu10]
+                            then: [
+                                meta: "( rule ( ( = e ( Mul ( Const a ) ( Const b ) ) ) ) ( ( union e ( Const ( * a b ) ) ) ) )"
+                                atom: [Action::Insert, r11(v31, v7, v35) on iu0],
+                                atom: [Action::Insert, r17(v35, v30)],
                             ],
                         ],
                     ],
@@ -3049,10 +3050,10 @@ fn codegen_constant_propagation() {
             #[derive(Debug, Default)]
             struct AddRelation {
                 new: Vec<<Self as Relation>::Row>,
-                hash_index_1_0: runtime::FnvHashMap<(Math, Math), (Math,)>,
-                hash_index_1: runtime::FnvHashMap<(Math,), runtime::SmallVec<[(Math, Math); 1]>>,
+                hash_index_0_1: runtime::FnvHashMap<(Math, Math), (Math,)>,
                 hash_index_0: runtime::FnvHashMap<(Math,), runtime::SmallVec<[(Math, Math); 1]>>,
-                hash_index_1_0_2: runtime::FnvHashMap<(Math, Math, Math), runtime::SmallVec<[(); 1]>>,
+                hash_index_1: runtime::FnvHashMap<(Math,), runtime::SmallVec<[(Math, Math); 1]>>,
+                hash_index_0_1_2: runtime::FnvHashMap<(Math, Math, Math), runtime::SmallVec<[(); 1]>>,
                 math_num_uprooted_at_latest_retain: usize,
             }
             impl Relation for AddRelation {
@@ -3072,13 +3073,13 @@ fn codegen_constant_propagation() {
                     self.new.iter().copied()
                 }
                 fn len(&self) -> usize {
-                    self.hash_index_1_0.len()
+                    self.hash_index_0_1.len()
                 }
                 fn emit_graphviz(&self, buf: &mut String) {
                     use std::fmt::Write;
-                    for (i, ((x1, x0), (x2,))) in self.hash_index_1_0.iter().enumerate() {
-                        writeln!(buf, "{}_{i} -> {}_{};", "add", "math", x1).unwrap();
+                    for (i, ((x0, x1), (x2,))) in self.hash_index_0_1.iter().enumerate() {
                         writeln!(buf, "{}_{i} -> {}_{};", "add", "math", x0).unwrap();
+                        writeln!(buf, "{}_{i} -> {}_{};", "add", "math", x1).unwrap();
                         writeln!(buf, "{}_{i} -> {}_{};", "add", "math", x2).unwrap();
                         writeln!(buf, "{}_{i} [shape = box];", "add").unwrap();
                     }
@@ -3087,8 +3088,8 @@ fn codegen_constant_propagation() {
                     use std::collections::hash_map::Entry;
                     for &(mut x0, mut x1, mut x2) in &*insertions {
                         match self
-                            .hash_index_1_0
-                            .entry((uf.math_.find(x1), uf.math_.find(x0)))
+                            .hash_index_0_1
+                            .entry((uf.math_.find(x0), uf.math_.find(x1)))
                         {
                             Entry::Occupied(mut entry) => {
                                 let (y2,) = entry.get_mut();
@@ -3106,7 +3107,7 @@ fn codegen_constant_propagation() {
                     }
                     self.math_num_uprooted_at_latest_retain = uf.math_.num_uprooted();
                     let offset = insertions.len();
-                    self.hash_index_1_0.retain(|&(x1, x0), &mut (x2,)| {
+                    self.hash_index_0_1.retain(|&(x0, x1), &mut (x2,)| {
                         if uf.math_.is_root(x0) && uf.math_.is_root(x1) && uf.math_.is_root(x2) {
                             true
                         } else {
@@ -3124,27 +3125,11 @@ fn codegen_constant_propagation() {
                         insertions
                             .iter()
                             .map(|&(x0, x1, x2)| (uf.math_.find(x0), uf.math_.find(x1), uf.math_.find(x2)))
-                            .filter(|&(x0, x1, x2)| !self.hash_index_1_0_2.contains_key(&(x1, x0, x2))),
+                            .filter(|&(x0, x1, x2)| !self.hash_index_0_1_2.contains_key(&(x0, x1, x2))),
                     );
                     insertions.clear();
                     RadixSortable::wrap(&mut self.new).voracious_sort();
                     self.new.dedup();
-                    for &(x0, x1, x2) in &self.new {
-                        self.hash_index_1
-                            .entry((uf.math_.find(x1),))
-                            .or_default()
-                            .push((uf.math_.find(x0), uf.math_.find(x2)));
-                    }
-                    self.hash_index_1.retain(|&(x1,), v| {
-                        if uf.math_.is_root(x1) {
-                            v.retain(|&mut (x0, x2)| uf.math_.is_root(x0) && uf.math_.is_root(x2));
-                            v.sort_unstable();
-                            v.dedup();
-                            true
-                        } else {
-                            false
-                        }
-                    });
                     for &(x0, x1, x2) in &self.new {
                         self.hash_index_0
                             .entry((uf.math_.find(x0),))
@@ -3162,13 +3147,29 @@ fn codegen_constant_propagation() {
                         }
                     });
                     for &(x0, x1, x2) in &self.new {
-                        self.hash_index_1_0_2
-                            .entry((uf.math_.find(x1), uf.math_.find(x0), uf.math_.find(x2)))
+                        self.hash_index_1
+                            .entry((uf.math_.find(x1),))
+                            .or_default()
+                            .push((uf.math_.find(x0), uf.math_.find(x2)));
+                    }
+                    self.hash_index_1.retain(|&(x1,), v| {
+                        if uf.math_.is_root(x1) {
+                            v.retain(|&mut (x0, x2)| uf.math_.is_root(x0) && uf.math_.is_root(x2));
+                            v.sort_unstable();
+                            v.dedup();
+                            true
+                        } else {
+                            false
+                        }
+                    });
+                    for &(x0, x1, x2) in &self.new {
+                        self.hash_index_0_1_2
+                            .entry((uf.math_.find(x0), uf.math_.find(x1), uf.math_.find(x2)))
                             .or_default()
                             .push(());
                     }
-                    self.hash_index_1_0_2.retain(|&(x1, x0, x2), v| {
-                        if uf.math_.is_root(x1) && uf.math_.is_root(x0) && uf.math_.is_root(x2) {
+                    self.hash_index_0_1_2.retain(|&(x0, x1, x2), v| {
+                        if uf.math_.is_root(x0) && uf.math_.is_root(x1) && uf.math_.is_root(x2) {
                             v.retain(|&mut ()| true);
                             v.sort_unstable();
                             v.dedup();
@@ -3181,37 +3182,37 @@ fn codegen_constant_propagation() {
                 }
             }
             impl AddRelation {
-                fn iter2_1_0_2(&self, x1: Math, x0: Math) -> impl Iterator<Item = (Math,)> + use<'_> {
-                    self.hash_index_1_0.get(&(x1, x0)).into_iter().copied()
-                }
-                fn iter1_1_0_2(&self, x1: Math) -> impl Iterator<Item = (Math, Math)> + use<'_> {
-                    self.hash_index_1.get(&(x1,)).into_iter().flatten().copied()
+                fn iter2_0_1_2(&self, x0: Math, x1: Math) -> impl Iterator<Item = (Math,)> + use<'_> {
+                    self.hash_index_0_1.get(&(x0, x1)).into_iter().copied()
                 }
                 fn iter1_0_1_2(&self, x0: Math) -> impl Iterator<Item = (Math, Math)> + use<'_> {
                     self.hash_index_0.get(&(x0,)).into_iter().flatten().copied()
                 }
-                fn iter3_1_0_2(&self, x1: Math, x0: Math, x2: Math) -> impl Iterator<Item = ()> + use<'_> {
-                    self.hash_index_1_0_2
-                        .get(&(x1, x0, x2))
+                fn iter1_1_0_2(&self, x1: Math) -> impl Iterator<Item = (Math, Math)> + use<'_> {
+                    self.hash_index_1.get(&(x1,)).into_iter().flatten().copied()
+                }
+                fn iter3_0_1_2(&self, x0: Math, x1: Math, x2: Math) -> impl Iterator<Item = ()> + use<'_> {
+                    self.hash_index_0_1_2
+                        .get(&(x0, x1, x2))
                         .into_iter()
                         .flatten()
                         .copied()
                 }
-                fn check2_1_0_2(&self, x1: Math, x0: Math) -> bool {
-                    self.iter2_1_0_2(x1, x0).next().is_some()
-                }
-                fn check1_1_0_2(&self, x1: Math) -> bool {
-                    self.iter1_1_0_2(x1).next().is_some()
+                fn check2_0_1_2(&self, x0: Math, x1: Math) -> bool {
+                    self.iter2_0_1_2(x0, x1).next().is_some()
                 }
                 fn check1_0_1_2(&self, x0: Math) -> bool {
                     self.iter1_0_1_2(x0).next().is_some()
                 }
-                fn check3_1_0_2(&self, x1: Math, x0: Math, x2: Math) -> bool {
-                    self.iter3_1_0_2(x1, x0, x2).next().is_some()
+                fn check1_1_0_2(&self, x1: Math) -> bool {
+                    self.iter1_1_0_2(x1).next().is_some()
+                }
+                fn check3_0_1_2(&self, x0: Math, x1: Math, x2: Math) -> bool {
+                    self.iter3_0_1_2(x0, x1, x2).next().is_some()
                 }
                 #[allow(unreachable_code)]
-                fn entry2_1_0_2(&self, x1: Math, x0: Math, delta: &mut Delta, uf: &mut Unification) -> (Math,) {
-                    if let Some((x2,)) = self.iter2_1_0_2(x1, x0).next() {
+                fn entry2_0_1_2(&self, x0: Math, x1: Math, delta: &mut Delta, uf: &mut Unification) -> (Math,) {
+                    if let Some((x2,)) = self.iter2_0_1_2(x0, x1).next() {
                         return (x2,);
                     }
                     let x2 = uf.math_.add_eclass();
@@ -3219,15 +3220,15 @@ fn codegen_constant_propagation() {
                     (x2,)
                 }
                 #[allow(unreachable_code)]
-                fn entry3_1_0_2(
+                fn entry3_0_1_2(
                     &self,
-                    x1: Math,
                     x0: Math,
+                    x1: Math,
                     x2: Math,
                     delta: &mut Delta,
                     uf: &mut Unification,
                 ) -> () {
-                    if let Some(()) = self.iter3_1_0_2(x1, x0, x2).next() {
+                    if let Some(()) = self.iter3_0_1_2(x0, x1, x2).next() {
                         return ();
                     }
                     delta.add_.push((x0, x1, x2));
@@ -3237,10 +3238,10 @@ fn codegen_constant_propagation() {
             #[derive(Debug, Default)]
             struct MulRelation {
                 new: Vec<<Self as Relation>::Row>,
-                hash_index_1_0: runtime::FnvHashMap<(Math, Math), (Math,)>,
-                hash_index_1: runtime::FnvHashMap<(Math,), runtime::SmallVec<[(Math, Math); 1]>>,
+                hash_index_0_1: runtime::FnvHashMap<(Math, Math), (Math,)>,
                 hash_index_0: runtime::FnvHashMap<(Math,), runtime::SmallVec<[(Math, Math); 1]>>,
-                hash_index_1_0_2: runtime::FnvHashMap<(Math, Math, Math), runtime::SmallVec<[(); 1]>>,
+                hash_index_1: runtime::FnvHashMap<(Math,), runtime::SmallVec<[(Math, Math); 1]>>,
+                hash_index_0_1_2: runtime::FnvHashMap<(Math, Math, Math), runtime::SmallVec<[(); 1]>>,
                 math_num_uprooted_at_latest_retain: usize,
             }
             impl Relation for MulRelation {
@@ -3260,13 +3261,13 @@ fn codegen_constant_propagation() {
                     self.new.iter().copied()
                 }
                 fn len(&self) -> usize {
-                    self.hash_index_1_0.len()
+                    self.hash_index_0_1.len()
                 }
                 fn emit_graphviz(&self, buf: &mut String) {
                     use std::fmt::Write;
-                    for (i, ((x1, x0), (x2,))) in self.hash_index_1_0.iter().enumerate() {
-                        writeln!(buf, "{}_{i} -> {}_{};", "mul", "math", x1).unwrap();
+                    for (i, ((x0, x1), (x2,))) in self.hash_index_0_1.iter().enumerate() {
                         writeln!(buf, "{}_{i} -> {}_{};", "mul", "math", x0).unwrap();
+                        writeln!(buf, "{}_{i} -> {}_{};", "mul", "math", x1).unwrap();
                         writeln!(buf, "{}_{i} -> {}_{};", "mul", "math", x2).unwrap();
                         writeln!(buf, "{}_{i} [shape = box];", "mul").unwrap();
                     }
@@ -3275,8 +3276,8 @@ fn codegen_constant_propagation() {
                     use std::collections::hash_map::Entry;
                     for &(mut x0, mut x1, mut x2) in &*insertions {
                         match self
-                            .hash_index_1_0
-                            .entry((uf.math_.find(x1), uf.math_.find(x0)))
+                            .hash_index_0_1
+                            .entry((uf.math_.find(x0), uf.math_.find(x1)))
                         {
                             Entry::Occupied(mut entry) => {
                                 let (y2,) = entry.get_mut();
@@ -3294,7 +3295,7 @@ fn codegen_constant_propagation() {
                     }
                     self.math_num_uprooted_at_latest_retain = uf.math_.num_uprooted();
                     let offset = insertions.len();
-                    self.hash_index_1_0.retain(|&(x1, x0), &mut (x2,)| {
+                    self.hash_index_0_1.retain(|&(x0, x1), &mut (x2,)| {
                         if uf.math_.is_root(x0) && uf.math_.is_root(x1) && uf.math_.is_root(x2) {
                             true
                         } else {
@@ -3312,27 +3313,11 @@ fn codegen_constant_propagation() {
                         insertions
                             .iter()
                             .map(|&(x0, x1, x2)| (uf.math_.find(x0), uf.math_.find(x1), uf.math_.find(x2)))
-                            .filter(|&(x0, x1, x2)| !self.hash_index_1_0_2.contains_key(&(x1, x0, x2))),
+                            .filter(|&(x0, x1, x2)| !self.hash_index_0_1_2.contains_key(&(x0, x1, x2))),
                     );
                     insertions.clear();
                     RadixSortable::wrap(&mut self.new).voracious_sort();
                     self.new.dedup();
-                    for &(x0, x1, x2) in &self.new {
-                        self.hash_index_1
-                            .entry((uf.math_.find(x1),))
-                            .or_default()
-                            .push((uf.math_.find(x0), uf.math_.find(x2)));
-                    }
-                    self.hash_index_1.retain(|&(x1,), v| {
-                        if uf.math_.is_root(x1) {
-                            v.retain(|&mut (x0, x2)| uf.math_.is_root(x0) && uf.math_.is_root(x2));
-                            v.sort_unstable();
-                            v.dedup();
-                            true
-                        } else {
-                            false
-                        }
-                    });
                     for &(x0, x1, x2) in &self.new {
                         self.hash_index_0
                             .entry((uf.math_.find(x0),))
@@ -3350,13 +3335,29 @@ fn codegen_constant_propagation() {
                         }
                     });
                     for &(x0, x1, x2) in &self.new {
-                        self.hash_index_1_0_2
-                            .entry((uf.math_.find(x1), uf.math_.find(x0), uf.math_.find(x2)))
+                        self.hash_index_1
+                            .entry((uf.math_.find(x1),))
+                            .or_default()
+                            .push((uf.math_.find(x0), uf.math_.find(x2)));
+                    }
+                    self.hash_index_1.retain(|&(x1,), v| {
+                        if uf.math_.is_root(x1) {
+                            v.retain(|&mut (x0, x2)| uf.math_.is_root(x0) && uf.math_.is_root(x2));
+                            v.sort_unstable();
+                            v.dedup();
+                            true
+                        } else {
+                            false
+                        }
+                    });
+                    for &(x0, x1, x2) in &self.new {
+                        self.hash_index_0_1_2
+                            .entry((uf.math_.find(x0), uf.math_.find(x1), uf.math_.find(x2)))
                             .or_default()
                             .push(());
                     }
-                    self.hash_index_1_0_2.retain(|&(x1, x0, x2), v| {
-                        if uf.math_.is_root(x1) && uf.math_.is_root(x0) && uf.math_.is_root(x2) {
+                    self.hash_index_0_1_2.retain(|&(x0, x1, x2), v| {
+                        if uf.math_.is_root(x0) && uf.math_.is_root(x1) && uf.math_.is_root(x2) {
                             v.retain(|&mut ()| true);
                             v.sort_unstable();
                             v.dedup();
@@ -3369,37 +3370,37 @@ fn codegen_constant_propagation() {
                 }
             }
             impl MulRelation {
-                fn iter2_1_0_2(&self, x1: Math, x0: Math) -> impl Iterator<Item = (Math,)> + use<'_> {
-                    self.hash_index_1_0.get(&(x1, x0)).into_iter().copied()
-                }
-                fn iter1_1_0_2(&self, x1: Math) -> impl Iterator<Item = (Math, Math)> + use<'_> {
-                    self.hash_index_1.get(&(x1,)).into_iter().flatten().copied()
+                fn iter2_0_1_2(&self, x0: Math, x1: Math) -> impl Iterator<Item = (Math,)> + use<'_> {
+                    self.hash_index_0_1.get(&(x0, x1)).into_iter().copied()
                 }
                 fn iter1_0_1_2(&self, x0: Math) -> impl Iterator<Item = (Math, Math)> + use<'_> {
                     self.hash_index_0.get(&(x0,)).into_iter().flatten().copied()
                 }
-                fn iter3_1_0_2(&self, x1: Math, x0: Math, x2: Math) -> impl Iterator<Item = ()> + use<'_> {
-                    self.hash_index_1_0_2
-                        .get(&(x1, x0, x2))
+                fn iter1_1_0_2(&self, x1: Math) -> impl Iterator<Item = (Math, Math)> + use<'_> {
+                    self.hash_index_1.get(&(x1,)).into_iter().flatten().copied()
+                }
+                fn iter3_0_1_2(&self, x0: Math, x1: Math, x2: Math) -> impl Iterator<Item = ()> + use<'_> {
+                    self.hash_index_0_1_2
+                        .get(&(x0, x1, x2))
                         .into_iter()
                         .flatten()
                         .copied()
                 }
-                fn check2_1_0_2(&self, x1: Math, x0: Math) -> bool {
-                    self.iter2_1_0_2(x1, x0).next().is_some()
-                }
-                fn check1_1_0_2(&self, x1: Math) -> bool {
-                    self.iter1_1_0_2(x1).next().is_some()
+                fn check2_0_1_2(&self, x0: Math, x1: Math) -> bool {
+                    self.iter2_0_1_2(x0, x1).next().is_some()
                 }
                 fn check1_0_1_2(&self, x0: Math) -> bool {
                     self.iter1_0_1_2(x0).next().is_some()
                 }
-                fn check3_1_0_2(&self, x1: Math, x0: Math, x2: Math) -> bool {
-                    self.iter3_1_0_2(x1, x0, x2).next().is_some()
+                fn check1_1_0_2(&self, x1: Math) -> bool {
+                    self.iter1_1_0_2(x1).next().is_some()
+                }
+                fn check3_0_1_2(&self, x0: Math, x1: Math, x2: Math) -> bool {
+                    self.iter3_0_1_2(x0, x1, x2).next().is_some()
                 }
                 #[allow(unreachable_code)]
-                fn entry2_1_0_2(&self, x1: Math, x0: Math, delta: &mut Delta, uf: &mut Unification) -> (Math,) {
-                    if let Some((x2,)) = self.iter2_1_0_2(x1, x0).next() {
+                fn entry2_0_1_2(&self, x0: Math, x1: Math, delta: &mut Delta, uf: &mut Unification) -> (Math,) {
+                    if let Some((x2,)) = self.iter2_0_1_2(x0, x1).next() {
                         return (x2,);
                     }
                     let x2 = uf.math_.add_eclass();
@@ -3407,15 +3408,15 @@ fn codegen_constant_propagation() {
                     (x2,)
                 }
                 #[allow(unreachable_code)]
-                fn entry3_1_0_2(
+                fn entry3_0_1_2(
                     &self,
-                    x1: Math,
                     x0: Math,
+                    x1: Math,
                     x2: Math,
                     delta: &mut Delta,
                     uf: &mut Unification,
                 ) -> () {
-                    if let Some(()) = self.iter3_1_0_2(x1, x0, x2).next() {
+                    if let Some(()) = self.iter3_0_1_2(x0, x1, x2).next() {
                         return ();
                     }
                     delta.mul_.push((x0, x1, x2));
@@ -3659,9 +3660,9 @@ fn codegen_constant_propagation() {
                 #[inline(never)]
                 pub fn apply_rules(&mut self) {
                     for (v2, v4, e) in self.add_.iter_new() {
-                        if self.const_.check1_1_0(v4) {
-                            for (a,) in self.const_.iter1_1_0(v2) {
-                                for (b,) in self.const_.iter1_1_0(v4) {
+                        if self.const_.check1_1_0(v2) {
+                            for (b,) in self.const_.iter1_1_0(v4) {
+                                for (a,) in self.const_.iter1_1_0(v2) {
                                     #[doc = "( rule ( ( = e ( Add ( Const a ) ( Const b ) ) ) ) ( ( union e ( Const ( + a b ) ) ) ) )"]
                                     let (v5,) = i64_add012(a, b).next().unwrap();
                                     self.delta.insert_const((v5, e));
@@ -3670,9 +3671,9 @@ fn codegen_constant_propagation() {
                         }
                     }
                     for (v20, v22, e_4) in self.mul_.iter_new() {
-                        if self.const_.check1_1_0(v22) {
-                            for (a_4,) in self.const_.iter1_1_0(v20) {
-                                for (b_4,) in self.const_.iter1_1_0(v22) {
+                        if self.const_.check1_1_0(v20) {
+                            for (b_4,) in self.const_.iter1_1_0(v22) {
+                                for (a_4,) in self.const_.iter1_1_0(v20) {
                                     #[doc = "( rule ( ( = e ( Mul ( Const a ) ( Const b ) ) ) ) ( ( union e ( Const ( * a b ) ) ) ) )"]
                                     let (v23,) = i64_mul012(a_4, b_4).next().unwrap();
                                     self.delta.insert_const((v23, e_4));
@@ -3680,33 +3681,33 @@ fn codegen_constant_propagation() {
                             }
                         }
                     }
-                    for (b_6, v34) in self.const_.iter_new() {
-                        for (v14, e_3) in self.add_.iter1_1_0_2(v34) {
-                            for (a_3,) in self.const_.iter1_1_0(v14) {
-                                #[doc = "( rule ( ( = e ( Add ( Const a ) ( Const b ) ) ) ) ( ( union e ( Const ( + a b ) ) ) ) )"]
-                                let (v17,) = i64_add012(a_3, b_6).next().unwrap();
-                                self.delta.insert_const((v17, e_3));
-                            }
-                        }
-                        for (v10, e_2) in self.add_.iter1_0_1_2(v34) {
+                    for (a_2, v8) in self.const_.iter_new() {
+                        for (v10, e_2) in self.add_.iter1_0_1_2(v8) {
                             for (b_2,) in self.const_.iter1_1_0(v10) {
                                 #[doc = "( rule ( ( = e ( Add ( Const a ) ( Const b ) ) ) ) ( ( union e ( Const ( + a b ) ) ) ) )"]
-                                let (v11,) = i64_add012(b_6, b_2).next().unwrap();
+                                let (v11,) = i64_add012(a_2, b_2).next().unwrap();
                                 self.delta.insert_const((v11, e_2));
                             }
                         }
-                        for (v32, e_6) in self.mul_.iter1_1_0_2(v34) {
-                            for (a_6,) in self.const_.iter1_1_0(v32) {
-                                #[doc = "( rule ( ( = e ( Mul ( Const a ) ( Const b ) ) ) ) ( ( union e ( Const ( * a b ) ) ) ) )"]
-                                let (v35,) = i64_mul012(a_6, b_6).next().unwrap();
-                                self.delta.insert_const((v35, e_6));
+                        for (v14, e_3) in self.add_.iter1_1_0_2(v8) {
+                            for (a_3,) in self.const_.iter1_1_0(v14) {
+                                #[doc = "( rule ( ( = e ( Add ( Const a ) ( Const b ) ) ) ) ( ( union e ( Const ( + a b ) ) ) ) )"]
+                                let (v17,) = i64_add012(a_3, a_2).next().unwrap();
+                                self.delta.insert_const((v17, e_3));
                             }
                         }
-                        for (v28, e_5) in self.mul_.iter1_0_1_2(v34) {
+                        for (v28, e_5) in self.mul_.iter1_0_1_2(v8) {
                             for (b_5,) in self.const_.iter1_1_0(v28) {
                                 #[doc = "( rule ( ( = e ( Mul ( Const a ) ( Const b ) ) ) ) ( ( union e ( Const ( * a b ) ) ) ) )"]
-                                let (v29,) = i64_mul012(b_6, b_5).next().unwrap();
+                                let (v29,) = i64_mul012(a_2, b_5).next().unwrap();
                                 self.delta.insert_const((v29, e_5));
+                            }
+                        }
+                        for (v32, e_6) in self.mul_.iter1_1_0_2(v8) {
+                            for (a_6,) in self.const_.iter1_1_0(v32) {
+                                #[doc = "( rule ( ( = e ( Mul ( Const a ) ( Const b ) ) ) ) ( ( union e ( Const ( * a b ) ) ) ) )"]
+                                let (v35,) = i64_mul012(a_6, a_2).next().unwrap();
+                                self.delta.insert_const((v35, e_6));
                             }
                         }
                     }
@@ -9364,24 +9365,24 @@ fn test_primitives_simple() {
                             }
                         }
                     }
-                    for (v29, v27) in self.const_.iter_new() {
-                        if v29 == self.global_i64.get(0usize) {
+                    for (one, v1) in self.const_.iter_new() {
+                        if one == self.global_i64.get(0usize) {
                             #[doc = "( rewrite ( Const 2 ) ( Add ( Var \"z\" ) ( Var \"z\" ) ) )"]
                             let v10 = self.global_string.get(1usize);
                             let (v11,) = self.var_.entry1_0_1(v10, &mut self.delta, &mut self.uf);
-                            self.delta.insert_add((v11, v11, v27));
+                            self.delta.insert_add((v11, v11, v1));
                         }
-                        if v29 == self.global_i64.get(1usize) {
+                        if one == self.global_i64.get(1usize) {
                             #[doc = "( rewrite ( Const one ) ( Add ( Var \"q\" ) ( Var \"q\" ) ) )"]
                             let v2 = self.global_string.get(0usize);
                             let (v3,) = self.var_.entry1_0_1(v2, &mut self.delta, &mut self.uf);
-                            self.delta.insert_add((v3, v3, v27));
+                            self.delta.insert_add((v3, v3, v1));
                         }
-                        if v29 == self.global_i64.get(2usize) {
-                            for (a_2, v28) in self.mul_.iter1_1_0_2(v27) {
-                                if v29 == self.global_i64.get(2usize) {
+                        if self.mul_.check1_1_0_2(v1) {
+                            if one == self.global_i64.get(2usize) {
+                                for (a_2, v28) in self.mul_.iter1_1_0_2(v1) {
                                     #[doc = "( rewrite ( Mul a ( Const 0 ) ) ( Const 0 ) )"]
-                                    self.delta.insert_const((v29, v28));
+                                    self.delta.insert_const((one, v28));
                                 }
                             }
                         }
@@ -9635,8 +9636,8 @@ fn triangle_join() {
             struct FooRelation {
                 new: Vec<<Self as Relation>::Row>,
                 hash_index_1: runtime::FnvHashMap<(Math,), runtime::SmallVec<[(Math,); 1]>>,
-                hash_index_0: runtime::FnvHashMap<(Math,), runtime::SmallVec<[(Math,); 1]>>,
                 hash_index_1_0: runtime::FnvHashMap<(Math, Math), runtime::SmallVec<[(); 1]>>,
+                hash_index_0: runtime::FnvHashMap<(Math,), runtime::SmallVec<[(Math,); 1]>>,
                 math_num_uprooted_at_latest_retain: usize,
             }
             impl Relation for FooRelation {
@@ -9712,22 +9713,6 @@ fn triangle_join() {
                         }
                     });
                     for &(x0, x1) in &self.new {
-                        self.hash_index_0
-                            .entry((uf.math_.find(x0),))
-                            .or_default()
-                            .push((uf.math_.find(x1),));
-                    }
-                    self.hash_index_0.retain(|&(x0,), v| {
-                        if uf.math_.is_root(x0) {
-                            v.retain(|&mut (x1,)| uf.math_.is_root(x1));
-                            v.sort_unstable();
-                            v.dedup();
-                            true
-                        } else {
-                            false
-                        }
-                    });
-                    for &(x0, x1) in &self.new {
                         self.hash_index_1_0
                             .entry((uf.math_.find(x1), uf.math_.find(x0)))
                             .or_default()
@@ -9743,15 +9728,28 @@ fn triangle_join() {
                             false
                         }
                     });
+                    for &(x0, x1) in &self.new {
+                        self.hash_index_0
+                            .entry((uf.math_.find(x0),))
+                            .or_default()
+                            .push((uf.math_.find(x1),));
+                    }
+                    self.hash_index_0.retain(|&(x0,), v| {
+                        if uf.math_.is_root(x0) {
+                            v.retain(|&mut (x1,)| uf.math_.is_root(x1));
+                            v.sort_unstable();
+                            v.dedup();
+                            true
+                        } else {
+                            false
+                        }
+                    });
                     self.math_num_uprooted_at_latest_retain = 0;
                 }
             }
             impl FooRelation {
                 fn iter1_1_0(&self, x1: Math) -> impl Iterator<Item = (Math,)> + use<'_> {
                     self.hash_index_1.get(&(x1,)).into_iter().flatten().copied()
-                }
-                fn iter1_0_1(&self, x0: Math) -> impl Iterator<Item = (Math,)> + use<'_> {
-                    self.hash_index_0.get(&(x0,)).into_iter().flatten().copied()
                 }
                 fn iter2_1_0(&self, x1: Math, x0: Math) -> impl Iterator<Item = ()> + use<'_> {
                     self.hash_index_1_0
@@ -9760,14 +9758,17 @@ fn triangle_join() {
                         .flatten()
                         .copied()
                 }
+                fn iter1_0_1(&self, x0: Math) -> impl Iterator<Item = (Math,)> + use<'_> {
+                    self.hash_index_0.get(&(x0,)).into_iter().flatten().copied()
+                }
                 fn check1_1_0(&self, x1: Math) -> bool {
                     self.iter1_1_0(x1).next().is_some()
                 }
-                fn check1_0_1(&self, x0: Math) -> bool {
-                    self.iter1_0_1(x0).next().is_some()
-                }
                 fn check2_1_0(&self, x1: Math, x0: Math) -> bool {
                     self.iter2_1_0(x1, x0).next().is_some()
+                }
+                fn check1_0_1(&self, x0: Math) -> bool {
+                    self.iter1_0_1(x0).next().is_some()
                 }
                 #[allow(unreachable_code)]
                 fn entry2_1_0(&self, x1: Math, x0: Math, delta: &mut Delta, uf: &mut Unification) -> () {
@@ -9782,8 +9783,8 @@ fn triangle_join() {
             struct BarRelation {
                 new: Vec<<Self as Relation>::Row>,
                 hash_index_0: runtime::FnvHashMap<(Math,), runtime::SmallVec<[(Math,); 1]>>,
-                hash_index_1: runtime::FnvHashMap<(Math,), runtime::SmallVec<[(Math,); 1]>>,
                 hash_index_0_1: runtime::FnvHashMap<(Math, Math), runtime::SmallVec<[(); 1]>>,
+                hash_index_1: runtime::FnvHashMap<(Math,), runtime::SmallVec<[(Math,); 1]>>,
                 math_num_uprooted_at_latest_retain: usize,
             }
             impl Relation for BarRelation {
@@ -9859,22 +9860,6 @@ fn triangle_join() {
                         }
                     });
                     for &(x0, x1) in &self.new {
-                        self.hash_index_1
-                            .entry((uf.math_.find(x1),))
-                            .or_default()
-                            .push((uf.math_.find(x0),));
-                    }
-                    self.hash_index_1.retain(|&(x1,), v| {
-                        if uf.math_.is_root(x1) {
-                            v.retain(|&mut (x0,)| uf.math_.is_root(x0));
-                            v.sort_unstable();
-                            v.dedup();
-                            true
-                        } else {
-                            false
-                        }
-                    });
-                    for &(x0, x1) in &self.new {
                         self.hash_index_0_1
                             .entry((uf.math_.find(x0), uf.math_.find(x1)))
                             .or_default()
@@ -9890,15 +9875,28 @@ fn triangle_join() {
                             false
                         }
                     });
+                    for &(x0, x1) in &self.new {
+                        self.hash_index_1
+                            .entry((uf.math_.find(x1),))
+                            .or_default()
+                            .push((uf.math_.find(x0),));
+                    }
+                    self.hash_index_1.retain(|&(x1,), v| {
+                        if uf.math_.is_root(x1) {
+                            v.retain(|&mut (x0,)| uf.math_.is_root(x0));
+                            v.sort_unstable();
+                            v.dedup();
+                            true
+                        } else {
+                            false
+                        }
+                    });
                     self.math_num_uprooted_at_latest_retain = 0;
                 }
             }
             impl BarRelation {
                 fn iter1_0_1(&self, x0: Math) -> impl Iterator<Item = (Math,)> + use<'_> {
                     self.hash_index_0.get(&(x0,)).into_iter().flatten().copied()
-                }
-                fn iter1_1_0(&self, x1: Math) -> impl Iterator<Item = (Math,)> + use<'_> {
-                    self.hash_index_1.get(&(x1,)).into_iter().flatten().copied()
                 }
                 fn iter2_0_1(&self, x0: Math, x1: Math) -> impl Iterator<Item = ()> + use<'_> {
                     self.hash_index_0_1
@@ -9907,14 +9905,17 @@ fn triangle_join() {
                         .flatten()
                         .copied()
                 }
+                fn iter1_1_0(&self, x1: Math) -> impl Iterator<Item = (Math,)> + use<'_> {
+                    self.hash_index_1.get(&(x1,)).into_iter().flatten().copied()
+                }
                 fn check1_0_1(&self, x0: Math) -> bool {
                     self.iter1_0_1(x0).next().is_some()
                 }
-                fn check1_1_0(&self, x1: Math) -> bool {
-                    self.iter1_1_0(x1).next().is_some()
-                }
                 fn check2_0_1(&self, x0: Math, x1: Math) -> bool {
                     self.iter2_0_1(x0, x1).next().is_some()
+                }
+                fn check1_1_0(&self, x1: Math) -> bool {
+                    self.iter1_1_0(x1).next().is_some()
                 }
                 #[allow(unreachable_code)]
                 fn entry2_0_1(&self, x0: Math, x1: Math, delta: &mut Delta, uf: &mut Unification) -> () {
@@ -9929,8 +9930,8 @@ fn triangle_join() {
             struct BazRelation {
                 new: Vec<<Self as Relation>::Row>,
                 hash_index_1: runtime::FnvHashMap<(Math,), runtime::SmallVec<[(Math,); 1]>>,
-                hash_index_1_0: runtime::FnvHashMap<(Math, Math), runtime::SmallVec<[(); 1]>>,
                 hash_index_0: runtime::FnvHashMap<(Math,), runtime::SmallVec<[(Math,); 1]>>,
+                hash_index_1_0: runtime::FnvHashMap<(Math, Math), runtime::SmallVec<[(); 1]>>,
                 math_num_uprooted_at_latest_retain: usize,
             }
             impl Relation for BazRelation {
@@ -10006,22 +10007,6 @@ fn triangle_join() {
                         }
                     });
                     for &(x0, x1) in &self.new {
-                        self.hash_index_1_0
-                            .entry((uf.math_.find(x1), uf.math_.find(x0)))
-                            .or_default()
-                            .push(());
-                    }
-                    self.hash_index_1_0.retain(|&(x1, x0), v| {
-                        if uf.math_.is_root(x1) && uf.math_.is_root(x0) {
-                            v.retain(|&mut ()| true);
-                            v.sort_unstable();
-                            v.dedup();
-                            true
-                        } else {
-                            false
-                        }
-                    });
-                    for &(x0, x1) in &self.new {
                         self.hash_index_0
                             .entry((uf.math_.find(x0),))
                             .or_default()
@@ -10037,12 +10022,31 @@ fn triangle_join() {
                             false
                         }
                     });
+                    for &(x0, x1) in &self.new {
+                        self.hash_index_1_0
+                            .entry((uf.math_.find(x1), uf.math_.find(x0)))
+                            .or_default()
+                            .push(());
+                    }
+                    self.hash_index_1_0.retain(|&(x1, x0), v| {
+                        if uf.math_.is_root(x1) && uf.math_.is_root(x0) {
+                            v.retain(|&mut ()| true);
+                            v.sort_unstable();
+                            v.dedup();
+                            true
+                        } else {
+                            false
+                        }
+                    });
                     self.math_num_uprooted_at_latest_retain = 0;
                 }
             }
             impl BazRelation {
                 fn iter1_1_0(&self, x1: Math) -> impl Iterator<Item = (Math,)> + use<'_> {
                     self.hash_index_1.get(&(x1,)).into_iter().flatten().copied()
+                }
+                fn iter1_0_1(&self, x0: Math) -> impl Iterator<Item = (Math,)> + use<'_> {
+                    self.hash_index_0.get(&(x0,)).into_iter().flatten().copied()
                 }
                 fn iter2_1_0(&self, x1: Math, x0: Math) -> impl Iterator<Item = ()> + use<'_> {
                     self.hash_index_1_0
@@ -10051,17 +10055,14 @@ fn triangle_join() {
                         .flatten()
                         .copied()
                 }
-                fn iter1_0_1(&self, x0: Math) -> impl Iterator<Item = (Math,)> + use<'_> {
-                    self.hash_index_0.get(&(x0,)).into_iter().flatten().copied()
-                }
                 fn check1_1_0(&self, x1: Math) -> bool {
                     self.iter1_1_0(x1).next().is_some()
                 }
-                fn check2_1_0(&self, x1: Math, x0: Math) -> bool {
-                    self.iter2_1_0(x1, x0).next().is_some()
-                }
                 fn check1_0_1(&self, x0: Math) -> bool {
                     self.iter1_0_1(x0).next().is_some()
+                }
+                fn check2_1_0(&self, x1: Math, x0: Math) -> bool {
+                    self.iter2_1_0(x1, x0).next().is_some()
                 }
                 #[allow(unreachable_code)]
                 fn entry2_1_0(&self, x1: Math, x0: Math, delta: &mut Delta, uf: &mut Unification) -> () {
@@ -10258,9 +10259,9 @@ fn triangle_join() {
                 #[inline(never)]
                 pub fn apply_rules(&mut self) {
                     for (a, b) in self.foo_.iter_new() {
-                        if self.baz_.check1_1_0(a) {
-                            for (c,) in self.bar_.iter1_0_1(b) {
-                                for () in self.baz_.iter2_1_0(a, c) {
+                        if self.bar_.check1_0_1(b) {
+                            for (c,) in self.baz_.iter1_1_0(a) {
+                                for () in self.bar_.iter2_0_1(b, c) {
                                     #[doc = "( rule ( ( Foo a b ) ( Bar b c ) ( Baz c a ) ) ( ( Triangle a b c ) ) )"]
                                     self.delta.insert_triangle((a, b, c));
                                 }
@@ -10268,9 +10269,9 @@ fn triangle_join() {
                         }
                     }
                     for (b_2, c_2) in self.bar_.iter_new() {
-                        if self.baz_.check1_0_1(c_2) {
-                            for (a_2,) in self.foo_.iter1_1_0(b_2) {
-                                for () in self.baz_.iter2_1_0(a_2, c_2) {
+                        if self.foo_.check1_1_0(b_2) {
+                            for (a_2,) in self.baz_.iter1_0_1(c_2) {
+                                for () in self.foo_.iter2_1_0(b_2, a_2) {
                                     #[doc = "( rule ( ( Foo a b ) ( Bar b c ) ( Baz c a ) ) ( ( Triangle a b c ) ) )"]
                                     self.delta.insert_triangle((a_2, b_2, c_2));
                                 }
@@ -10278,9 +10279,9 @@ fn triangle_join() {
                         }
                     }
                     for (c_3, a_3) in self.baz_.iter_new() {
-                        if self.bar_.check1_1_0(c_3) {
-                            for (b_3,) in self.foo_.iter1_0_1(a_3) {
-                                for () in self.bar_.iter2_0_1(b_3, c_3) {
+                        if self.foo_.check1_0_1(a_3) {
+                            for (b_3,) in self.bar_.iter1_1_0(c_3) {
+                                for () in self.foo_.iter2_1_0(b_3, a_3) {
                                     #[doc = "( rule ( ( Foo a b ) ( Bar b c ) ( Baz c a ) ) ( ( Triangle a b c ) ) )"]
                                     self.delta.insert_triangle((a_3, b_3, c_3));
                                 }
@@ -10711,10 +10712,10 @@ fn edgecase0() {
             #[derive(Debug, Default)]
             struct AddRelation {
                 new: Vec<<Self as Relation>::Row>,
-                hash_index_1_0: runtime::FnvHashMap<(Math, Math), (Math,)>,
-                hash_index_1: runtime::FnvHashMap<(Math,), runtime::SmallVec<[(Math, Math); 1]>>,
+                hash_index_0_1: runtime::FnvHashMap<(Math, Math), (Math,)>,
                 hash_index_0: runtime::FnvHashMap<(Math,), runtime::SmallVec<[(Math, Math); 1]>>,
-                hash_index_1_0_2: runtime::FnvHashMap<(Math, Math, Math), runtime::SmallVec<[(); 1]>>,
+                hash_index_1: runtime::FnvHashMap<(Math,), runtime::SmallVec<[(Math, Math); 1]>>,
+                hash_index_0_1_2: runtime::FnvHashMap<(Math, Math, Math), runtime::SmallVec<[(); 1]>>,
                 math_num_uprooted_at_latest_retain: usize,
             }
             impl Relation for AddRelation {
@@ -10734,13 +10735,13 @@ fn edgecase0() {
                     self.new.iter().copied()
                 }
                 fn len(&self) -> usize {
-                    self.hash_index_1_0.len()
+                    self.hash_index_0_1.len()
                 }
                 fn emit_graphviz(&self, buf: &mut String) {
                     use std::fmt::Write;
-                    for (i, ((x1, x0), (x2,))) in self.hash_index_1_0.iter().enumerate() {
-                        writeln!(buf, "{}_{i} -> {}_{};", "add", "math", x1).unwrap();
+                    for (i, ((x0, x1), (x2,))) in self.hash_index_0_1.iter().enumerate() {
                         writeln!(buf, "{}_{i} -> {}_{};", "add", "math", x0).unwrap();
+                        writeln!(buf, "{}_{i} -> {}_{};", "add", "math", x1).unwrap();
                         writeln!(buf, "{}_{i} -> {}_{};", "add", "math", x2).unwrap();
                         writeln!(buf, "{}_{i} [shape = box];", "add").unwrap();
                     }
@@ -10749,8 +10750,8 @@ fn edgecase0() {
                     use std::collections::hash_map::Entry;
                     for &(mut x0, mut x1, mut x2) in &*insertions {
                         match self
-                            .hash_index_1_0
-                            .entry((uf.math_.find(x1), uf.math_.find(x0)))
+                            .hash_index_0_1
+                            .entry((uf.math_.find(x0), uf.math_.find(x1)))
                         {
                             Entry::Occupied(mut entry) => {
                                 let (y2,) = entry.get_mut();
@@ -10768,7 +10769,7 @@ fn edgecase0() {
                     }
                     self.math_num_uprooted_at_latest_retain = uf.math_.num_uprooted();
                     let offset = insertions.len();
-                    self.hash_index_1_0.retain(|&(x1, x0), &mut (x2,)| {
+                    self.hash_index_0_1.retain(|&(x0, x1), &mut (x2,)| {
                         if uf.math_.is_root(x0) && uf.math_.is_root(x1) && uf.math_.is_root(x2) {
                             true
                         } else {
@@ -10786,27 +10787,11 @@ fn edgecase0() {
                         insertions
                             .iter()
                             .map(|&(x0, x1, x2)| (uf.math_.find(x0), uf.math_.find(x1), uf.math_.find(x2)))
-                            .filter(|&(x0, x1, x2)| !self.hash_index_1_0_2.contains_key(&(x1, x0, x2))),
+                            .filter(|&(x0, x1, x2)| !self.hash_index_0_1_2.contains_key(&(x0, x1, x2))),
                     );
                     insertions.clear();
                     RadixSortable::wrap(&mut self.new).voracious_sort();
                     self.new.dedup();
-                    for &(x0, x1, x2) in &self.new {
-                        self.hash_index_1
-                            .entry((uf.math_.find(x1),))
-                            .or_default()
-                            .push((uf.math_.find(x0), uf.math_.find(x2)));
-                    }
-                    self.hash_index_1.retain(|&(x1,), v| {
-                        if uf.math_.is_root(x1) {
-                            v.retain(|&mut (x0, x2)| uf.math_.is_root(x0) && uf.math_.is_root(x2));
-                            v.sort_unstable();
-                            v.dedup();
-                            true
-                        } else {
-                            false
-                        }
-                    });
                     for &(x0, x1, x2) in &self.new {
                         self.hash_index_0
                             .entry((uf.math_.find(x0),))
@@ -10824,13 +10809,29 @@ fn edgecase0() {
                         }
                     });
                     for &(x0, x1, x2) in &self.new {
-                        self.hash_index_1_0_2
-                            .entry((uf.math_.find(x1), uf.math_.find(x0), uf.math_.find(x2)))
+                        self.hash_index_1
+                            .entry((uf.math_.find(x1),))
+                            .or_default()
+                            .push((uf.math_.find(x0), uf.math_.find(x2)));
+                    }
+                    self.hash_index_1.retain(|&(x1,), v| {
+                        if uf.math_.is_root(x1) {
+                            v.retain(|&mut (x0, x2)| uf.math_.is_root(x0) && uf.math_.is_root(x2));
+                            v.sort_unstable();
+                            v.dedup();
+                            true
+                        } else {
+                            false
+                        }
+                    });
+                    for &(x0, x1, x2) in &self.new {
+                        self.hash_index_0_1_2
+                            .entry((uf.math_.find(x0), uf.math_.find(x1), uf.math_.find(x2)))
                             .or_default()
                             .push(());
                     }
-                    self.hash_index_1_0_2.retain(|&(x1, x0, x2), v| {
-                        if uf.math_.is_root(x1) && uf.math_.is_root(x0) && uf.math_.is_root(x2) {
+                    self.hash_index_0_1_2.retain(|&(x0, x1, x2), v| {
+                        if uf.math_.is_root(x0) && uf.math_.is_root(x1) && uf.math_.is_root(x2) {
                             v.retain(|&mut ()| true);
                             v.sort_unstable();
                             v.dedup();
@@ -10843,37 +10844,37 @@ fn edgecase0() {
                 }
             }
             impl AddRelation {
-                fn iter2_1_0_2(&self, x1: Math, x0: Math) -> impl Iterator<Item = (Math,)> + use<'_> {
-                    self.hash_index_1_0.get(&(x1, x0)).into_iter().copied()
-                }
-                fn iter1_1_0_2(&self, x1: Math) -> impl Iterator<Item = (Math, Math)> + use<'_> {
-                    self.hash_index_1.get(&(x1,)).into_iter().flatten().copied()
+                fn iter2_0_1_2(&self, x0: Math, x1: Math) -> impl Iterator<Item = (Math,)> + use<'_> {
+                    self.hash_index_0_1.get(&(x0, x1)).into_iter().copied()
                 }
                 fn iter1_0_1_2(&self, x0: Math) -> impl Iterator<Item = (Math, Math)> + use<'_> {
                     self.hash_index_0.get(&(x0,)).into_iter().flatten().copied()
                 }
-                fn iter3_1_0_2(&self, x1: Math, x0: Math, x2: Math) -> impl Iterator<Item = ()> + use<'_> {
-                    self.hash_index_1_0_2
-                        .get(&(x1, x0, x2))
+                fn iter1_1_0_2(&self, x1: Math) -> impl Iterator<Item = (Math, Math)> + use<'_> {
+                    self.hash_index_1.get(&(x1,)).into_iter().flatten().copied()
+                }
+                fn iter3_0_1_2(&self, x0: Math, x1: Math, x2: Math) -> impl Iterator<Item = ()> + use<'_> {
+                    self.hash_index_0_1_2
+                        .get(&(x0, x1, x2))
                         .into_iter()
                         .flatten()
                         .copied()
                 }
-                fn check2_1_0_2(&self, x1: Math, x0: Math) -> bool {
-                    self.iter2_1_0_2(x1, x0).next().is_some()
-                }
-                fn check1_1_0_2(&self, x1: Math) -> bool {
-                    self.iter1_1_0_2(x1).next().is_some()
+                fn check2_0_1_2(&self, x0: Math, x1: Math) -> bool {
+                    self.iter2_0_1_2(x0, x1).next().is_some()
                 }
                 fn check1_0_1_2(&self, x0: Math) -> bool {
                     self.iter1_0_1_2(x0).next().is_some()
                 }
-                fn check3_1_0_2(&self, x1: Math, x0: Math, x2: Math) -> bool {
-                    self.iter3_1_0_2(x1, x0, x2).next().is_some()
+                fn check1_1_0_2(&self, x1: Math) -> bool {
+                    self.iter1_1_0_2(x1).next().is_some()
+                }
+                fn check3_0_1_2(&self, x0: Math, x1: Math, x2: Math) -> bool {
+                    self.iter3_0_1_2(x0, x1, x2).next().is_some()
                 }
                 #[allow(unreachable_code)]
-                fn entry2_1_0_2(&self, x1: Math, x0: Math, delta: &mut Delta, uf: &mut Unification) -> (Math,) {
-                    if let Some((x2,)) = self.iter2_1_0_2(x1, x0).next() {
+                fn entry2_0_1_2(&self, x0: Math, x1: Math, delta: &mut Delta, uf: &mut Unification) -> (Math,) {
+                    if let Some((x2,)) = self.iter2_0_1_2(x0, x1).next() {
                         return (x2,);
                     }
                     let x2 = uf.math_.add_eclass();
@@ -10881,15 +10882,15 @@ fn edgecase0() {
                     (x2,)
                 }
                 #[allow(unreachable_code)]
-                fn entry3_1_0_2(
+                fn entry3_0_1_2(
                     &self,
-                    x1: Math,
                     x0: Math,
+                    x1: Math,
                     x2: Math,
                     delta: &mut Delta,
                     uf: &mut Unification,
                 ) -> () {
-                    if let Some(()) = self.iter3_1_0_2(x1, x0, x2).next() {
+                    if let Some(()) = self.iter3_0_1_2(x0, x1, x2).next() {
                         return ();
                     }
                     delta.add_.push((x0, x1, x2));
@@ -10960,36 +10961,34 @@ fn edgecase0() {
                 }
                 #[inline(never)]
                 pub fn apply_rules(&mut self) {
-                    for (a_2, c_2, v11) in self.mul_.iter_new() {
-                        if self.mul_.check1_0_1_2(a_2) {
-                            for (v9, v12) in self.add_.iter1_1_0_2(v11) {
-                                for (b_2,) in self.mul_.iter2_2_0_1(v9, a_2) {
+                    for (a, b, v2) in self.mul_.iter_new() {
+                        if self.mul_.check1_0_1_2(a) {
+                            for (v4, v5) in self.add_.iter1_0_1_2(v2) {
+                                for (c,) in self.mul_.iter2_2_0_1(v4, a) {
                                     #[doc = "( rewrite ( Add ( Mul a b ) ( Mul a c ) ) ( Mul a ( Add b c ) ) )"]
-                                    let (v13,) =
-                                        self.add_
-                                            .entry2_1_0_2(c_2, b_2, &mut self.delta, &mut self.uf);
-                                    self.delta.insert_mul((a_2, v13, v12));
+                                    let (v6,) = self.add_.entry2_0_1_2(b, c, &mut self.delta, &mut self.uf);
+                                    self.delta.insert_mul((a, v6, v5));
                                 }
                             }
-                            for (v4, v5) in self.add_.iter1_0_1_2(v11) {
-                                for (c,) in self.mul_.iter2_2_0_1(v4, a_2) {
+                            for (v9, v12) in self.add_.iter1_1_0_2(v2) {
+                                for (b_2,) in self.mul_.iter2_2_0_1(v9, a) {
                                     #[doc = "( rewrite ( Add ( Mul a b ) ( Mul a c ) ) ( Mul a ( Add b c ) ) )"]
-                                    let (v6,) = self
+                                    let (v13,) = self
                                         .add_
-                                        .entry2_1_0_2(c, c_2, &mut self.delta, &mut self.uf);
-                                    self.delta.insert_mul((a_2, v6, v5));
+                                        .entry2_0_1_2(b_2, b, &mut self.delta, &mut self.uf);
+                                    self.delta.insert_mul((a, v13, v12));
                                 }
                             }
                         }
                     }
                     for (v16, v18, v19) in self.add_.iter_new() {
-                        if self.mul_.check1_2_0_1(v18) {
-                            for (a_3, b_3) in self.mul_.iter1_2_0_1(v16) {
-                                for (c_3,) in self.mul_.iter2_2_0_1(v18, a_3) {
+                        if self.mul_.check1_2_0_1(v16) {
+                            for (a_3, c_3) in self.mul_.iter1_2_0_1(v18) {
+                                for (b_3,) in self.mul_.iter2_2_0_1(v16, a_3) {
                                     #[doc = "( rewrite ( Add ( Mul a b ) ( Mul a c ) ) ( Mul a ( Add b c ) ) )"]
                                     let (v20,) =
                                         self.add_
-                                            .entry2_1_0_2(c_3, b_3, &mut self.delta, &mut self.uf);
+                                            .entry2_0_1_2(b_3, c_3, &mut self.delta, &mut self.uf);
                                     self.delta.insert_mul((a_3, v20, v19));
                                 }
                             }
