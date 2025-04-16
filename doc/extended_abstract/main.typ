@@ -38,25 +38,28 @@
     ),
   )
 
-  #text(10pt, grid(
-    columns: (1fr, 1fr, 1fr),
-    align: center,
-    (
-      text(12pt, [Loke Gustafsson]),
-      link("mailto:lokeg@chalmers.se"),
-      [Chalmers University of Technology],
-    ).join("\n"),
-    (
-      text(12pt, [Erik Magnusson]),
-      link("mailto:ermagn@chalmers.se"),
-      [Chalmers University of Technology],
-    ).join("\n"),
-    (
-      text(12pt, [Alejandro Luque Cerpa]),
-      link("mailto:luque@chalmers.se"),
-      [Chalmers University of Technology],
-    ).join("\n"),
-  ))
+  #text(
+    10pt,
+    grid(
+      columns: (1fr, 1fr, 1fr),
+      align: center,
+      (
+        text(12pt, [Loke Gustafsson]),
+        link("mailto:lokeg@chalmers.se"),
+        [Chalmers University of Technology],
+      ).join("\n"),
+      (
+        text(12pt, [Erik Magnusson]),
+        link("mailto:ermagn@chalmers.se"),
+        [Chalmers University of Technology],
+      ).join("\n"),
+      (
+        text(12pt, [Alejandro Luque Cerpa]),
+        link("mailto:luque@chalmers.se"),
+        [Chalmers University of Technology],
+      ).join("\n"),
+    ),
+  )
 
 ]
 
@@ -185,8 +188,12 @@ We are developing oatlog with the help of microbenchmarks comparing it to egglog
         [*speedup*],
       ),
 
-      [`fuel2-math`, 10 steps, saturated], [1516], [7.0778 ms], [1.1579 ms], table.cell(fill: green.lighten(40%))[6.11x],
-      [`fuel3-math`, 21 steps, saturated], [50021], [192.50 ms], [52.954 ms], table.cell(fill: green.lighten(40%))[3.63x],
+      [`fuel2-math`, 10 steps, saturated], [1516], [7.0778 ms], [1.1579 ms], table.cell(
+        fill: green.lighten(40%),
+      )[6.11x],
+      [`fuel3-math`, 21 steps, saturated], [50021], [192.50 ms], [52.954 ms], table.cell(
+        fill: green.lighten(40%),
+      )[3.63x],
 
       //[`math`, 0 steps], [35], [550.71 µs], [6.0900 µs], table.cell(fill: green.lighten(20%))[90.47x],
       [`math`, 1 step], [69], [688.83 µs], [17.055 µs], table.cell(fill: green.lighten(20%))[40.39x],
@@ -379,71 +386,71 @@ The `math` benchmark is adapted from egglog's `math-microbenchmark.egg`. The ben
 performed, giving a theory that converges.
 
 #text(
-    8pt,
-    ```egglog
-    (datatype FuelUnit
-        (Fuel FuelUnit)
-        (ZeroFuel)
-    )
+  8pt,
+  ```egglog
+  (datatype FuelUnit
+      (Fuel FuelUnit)
+      (ZeroFuel)
+  )
 
-    (datatype Math
-        (Diff Math Math)
-        (Integral FuelUnit Math Math)
+  (datatype Math
+      (Diff Math Math)
+      (Integral FuelUnit Math Math)
 
-        (Add Math Math)
-        (Sub Math Math)
-        (Mul Math Math)
-        (Div Math Math)
-        (Pow Math Math)
-        (Ln Math)
-        (Sqrt Math)
+      (Add Math Math)
+      (Sub Math Math)
+      (Mul Math Math)
+      (Div Math Math)
+      (Pow Math Math)
+      (Ln Math)
+      (Sqrt Math)
 
-        (Sin Math)
-        (Cos Math)
+      (Sin Math)
+      (Cos Math)
 
-        (Const i64)
-        (Var String)
-    )
+      (Const i64)
+      (Var String)
+  )
 
-    (rewrite (Integral fuel (Sin x) x) (Mul (Const -1) (Cos x)))
-    (rewrite (Sub a b) (Add a (Mul (Const -1) b)))
-    (rewrite (Diff x (Cos x)) (Mul (Const -1) (Sin x)))
+  (rewrite (Integral fuel (Sin x) x) (Mul (Const -1) (Cos x)))
+  (rewrite (Sub a b) (Add a (Mul (Const -1) b)))
+  (rewrite (Diff x (Cos x)) (Mul (Const -1) (Sin x)))
 
-    (rewrite (Add a b) (Add b a))
-    (rewrite (Mul a b) (Mul b a))
-    (rewrite (Add a (Add b c)) (Add (Add a b) c))
-    (rewrite (Mul a (Mul b c)) (Mul (Mul a b) c))
-    (rewrite (Add a (Const 0)) a)
-    (rewrite (Mul a (Const 0)) (Const 0))
-    (rewrite (Mul a (Const 1)) a)
-    (rewrite (Mul a (Add b c)) (Add (Mul a b) (Mul a c)))
-    (rewrite (Add (Mul a b) (Mul a c)) (Mul a (Add b c)))
+  (rewrite (Add a b) (Add b a))
+  (rewrite (Mul a b) (Mul b a))
+  (rewrite (Add a (Add b c)) (Add (Add a b) c))
+  (rewrite (Mul a (Mul b c)) (Mul (Mul a b) c))
+  (rewrite (Add a (Const 0)) a)
+  (rewrite (Mul a (Const 0)) (Const 0))
+  (rewrite (Mul a (Const 1)) a)
+  (rewrite (Mul a (Add b c)) (Add (Mul a b) (Mul a c)))
+  (rewrite (Add (Mul a b) (Mul a c)) (Mul a (Add b c)))
 
-    (rewrite (Mul (Pow a b) (Pow a c)) (Pow a (Add b c)))
-    (rewrite (Pow x (Const 1)) x)
+  (rewrite (Mul (Pow a b) (Pow a c)) (Pow a (Add b c)))
+  (rewrite (Pow x (Const 1)) x)
 
-    (rewrite (Pow x (Const 2)) (Mul x x))
-    (rewrite (Diff x (Add a b)) (Add (Diff x a) (Diff x b)))
-    (rewrite (Diff x (Mul a b)) (Add (Mul a (Diff x b)) (Mul b (Diff x a))))
-    (rewrite (Diff x (Sin x)) (Cos x))
-    (rewrite (Integral (Fuel fuel) (Const 1) x) x)
-    (rewrite (Integral (Fuel fuel) (Cos x) x) (Sin x))
-    (rewrite (Integral (Fuel fuel) (Add f g) x) (Add (Integral fuel f x) (Integral fuel g x)))
-    (rewrite (Integral (Fuel fuel) (Sub f g) x) (Sub (Integral fuel f x) (Integral fuel g x)))
-    (rewrite (Integral (Fuel fuel) (Mul a b) x) (Sub (Mul a (Integral fuel b x)) (Integral fuel (Mul (Diff x a) (Integral fuel b x)) x)))
+  (rewrite (Pow x (Const 2)) (Mul x x))
+  (rewrite (Diff x (Add a b)) (Add (Diff x a) (Diff x b)))
+  (rewrite (Diff x (Mul a b)) (Add (Mul a (Diff x b)) (Mul b (Diff x a))))
+  (rewrite (Diff x (Sin x)) (Cos x))
+  (rewrite (Integral (Fuel fuel) (Const 1) x) x)
+  (rewrite (Integral (Fuel fuel) (Cos x) x) (Sin x))
+  (rewrite (Integral (Fuel fuel) (Add f g) x) (Add (Integral fuel f x) (Integral fuel g x)))
+  (rewrite (Integral (Fuel fuel) (Sub f g) x) (Sub (Integral fuel f x) (Integral fuel g x)))
+  (rewrite (Integral (Fuel fuel) (Mul a b) x) (Sub (Mul a (Integral fuel b x)) (Integral fuel (Mul (Diff x a) (Integral fuel b x)) x)))
 
-    (let init-fuel (Fuel (Fuel (ZeroFuel)))) ; for `fuel2-math`
-    ; (let init-fuel (Fuel (Fuel (Fuel (ZeroFuel))))) ; for `fuel3-math`
-    ; remove fuel arguments everywhere for `math` benchmark
+  (let init-fuel (Fuel (Fuel (ZeroFuel)))) ; for `fuel2-math`
+  ; (let init-fuel (Fuel (Fuel (Fuel (ZeroFuel))))) ; for `fuel3-math`
+  ; remove fuel arguments everywhere for `math` benchmark
 
-    (Integral init-fuel (Ln (Var "x")) (Var "x"))
-    (Integral init-fuel (Add (Var "x") (Cos (Var "x"))) (Var "x"))
-    (Integral init-fuel (Mul (Cos (Var "x")) (Var "x")) (Var "x"))
-    (Diff (Var "x") (Add (Const 1) (Mul (Const 2) (Var "x"))))
-    (Diff (Var "x") (Sub (Pow (Var "x") (Const 3)) (Mul (Const 7) (Pow (Var "x") (Const 2)))))
-    (Add (Mul (Var "y") (Add (Var "x") (Var "y"))) (Sub (Add (Var "x") (Const 2)) (Add (Var "x") (Var "x"))))
-    (Div (Const 1) (Sub (Div (Add (Const 1) (Sqrt (Var "z"))) (Const 2)) (Div (Sub (Const 1) (Sqrt (Var "z"))) (Const 2))))
-    ```,
+  (Integral init-fuel (Ln (Var "x")) (Var "x"))
+  (Integral init-fuel (Add (Var "x") (Cos (Var "x"))) (Var "x"))
+  (Integral init-fuel (Mul (Cos (Var "x")) (Var "x")) (Var "x"))
+  (Diff (Var "x") (Add (Const 1) (Mul (Const 2) (Var "x"))))
+  (Diff (Var "x") (Sub (Pow (Var "x") (Const 3)) (Mul (Const 7) (Pow (Var "x") (Const 2)))))
+  (Add (Mul (Var "y") (Add (Var "x") (Var "y"))) (Sub (Add (Var "x") (Const 2)) (Add (Var "x") (Var "x"))))
+  (Div (Const 1) (Sub (Div (Add (Const 1) (Sqrt (Var "z"))) (Const 2)) (Div (Sub (Const 1) (Sqrt (Var "z"))) (Const 2))))
+  ```,
 )
 
 == Boolean adder
