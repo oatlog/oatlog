@@ -672,7 +672,7 @@ egglog_test!(nogenerate, looking_up_global, expect![[r#"
     ( include "comparative-test/egglog-testsuite/looking_up_global.egg" )
 
 "#]], r#"(include "comparative-test/egglog-testsuite/looking_up_global.egg")"#);// panics on a todo!()?
-egglog_test!(nogenerate, looking_up_nonconstructor_in_rewrite_good, expect!["PANIC: not yet implemented: primitive not implemented for premise, need HIR changes"], r#"(include "comparative-test/egglog-testsuite/looking_up_nonconstructor_in_rewrite_good.egg" )"#);//primitive functions
+egglog_test!(nogenerate, looking_up_nonconstructor_in_rewrite_good, expect!["PANIC: primitive premise not implemented"], r#"(include "comparative-test/egglog-testsuite/looking_up_nonconstructor_in_rewrite_good.egg" )"#);//primitive functions
 
 egglog_test!(nogenerate, map, expect![[r#"
     comparative-test/egglog-testsuite/map.egg: collections are not supported yet: ("Map", [Var("i64"), Var("String")])

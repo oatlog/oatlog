@@ -87,7 +87,7 @@ pub(crate) fn emit_lir_theory(mut theory: hir::Theory) -> (hir::Theory, lir::The
     let mut lir_variables: TVec<VariableId, lir::VariableData>;
 
     let mut tries: Vec<lir::RuleTrie>;
-    if true {
+    if false {
         // cargo bench --bench comparative -- --baseline pretir
         // OLD METHOD
         lir_variables = TVec::new();

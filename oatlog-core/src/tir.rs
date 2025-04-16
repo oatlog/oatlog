@@ -48,7 +48,7 @@ impl<T: Copy + Eq + Ord + Hash> SparseUf<T> {
 /// only rules with matching salt may merge.
 #[derive(Clone, Eq, PartialEq, Ord, PartialOrd, Debug)]
 struct Salt {
-    inner: Rule,
+    inner: (), // Rule,
 }
 
 // SEMANTICS:
@@ -63,9 +63,21 @@ pub(crate) struct Trie {
     bound_premise: BTreeSet<VariableId>,
     meta: Vec<hir::RuleMeta>,
 }
+
 impl Trie {
-    fn new() -> Self {
-        Default::default()
+    fn index_usage(&self, index_usage: &mut TVec<RelationId, BTreeSet<BTreeSet<ColumnId>>>) {
+        for (link, trie) in self.map.iter() {
+            trie.index_usage(index_usage);
+            let bound = &self.bound_premise;
+            let atom = link.clone().atom();
+
+            index_usage[atom.relation].insert(
+                atom.columns
+                    .iter_enumerate()
+                    .filter_map(|(i, v)| bound.contains(v).then_some(i))
+                    .collect(),
+            );
+        }
     }
 }
 
@@ -108,6 +120,20 @@ pub(crate) fn schedule_rules(
         uf: SparseUf::new(),
     };
     let trie = inner(ctx, &rules);
+
+    // let mut index_usage: TVec<RelationId, _> = relations
+    //     .iter()
+    //     .map(|x| {
+    //         x.implicit_rules
+    //             .iter()
+    //             .map(|x| x.out.keys().cloned().collect())
+    //             .collect()
+    //     })
+    //     .collect();
+    // trie.index_usage(&mut index_usage);
+    // dbg!(&index_usage);
+    // dbg!(index_usage.iter().map(|x| x.len()).sum::<usize>());
+
     (variables, trie)
 }
 
@@ -574,6 +600,12 @@ impl TrieLink {
             Semi(atom) => Some(atom),
         }
     }
+    fn atom(self) -> Atom {
+        match self {
+            Primary(atom) => atom,
+            Semi(atom) => atom,
+        }
+    }
 }
 
 #[derive(Clone, Eq, PartialEq, Ord, PartialOrd, Debug)]
@@ -637,7 +669,7 @@ fn inner(mut ctx: Ctx<'_>, rules: &[Rule]) -> Trie {
 impl Rule {
     fn salt(&self) -> Salt {
         Salt {
-            inner: self.clone(), // self.premise.iter().map(|x| x.relation).collect(),
+            inner: (), //self.clone(), // self.premise.iter().map(|x| x.relation).collect(),
         }
     }
     fn variables(&self) -> BTreeSet<VariableId> {
@@ -736,16 +768,29 @@ impl Rule {
                         assert!(this_rule.semi.len() <= 1);
                         this_rule.semi = vec![];
 
+                        let tmp = other.columns.iter().copied().collect::<BTreeSet<_>>();
+                        let introduced_vars: BTreeSet<_> =
+                            tmp.difference(&ctx.bound_premise).collect();
+
+                        this_rule.semi = this_rule
+                            .premise
+                            .iter()
+                            .cloned()
+                            .filter(|x| x.columns.iter().any(|v| introduced_vars.contains(v)))
+                            .collect();
+
                         return Some(this_rule);
                     }
                 }
                 None
             }
             Semi(other) => {
+                // semi should be able to accept anything
                 let supported: Vec<_> = supported
                     .into_iter()
                     .filter_map(|(_, x)| x.semi())
                     .collect();
+
                 // Semi-joins are equivalent if the *bound* columns match by being exactly the
                 // same.
                 //
@@ -756,30 +801,42 @@ impl Rule {
 
                 let mut semi = self.semi.clone();
                 semi.retain(|this| {
-                    if !supported.contains(this) || this.relation != other.relation {
-                        true
+                    let matching;
+                    if !supported.contains(this) {
+                        matching = false;
+                        return !matching;
+                    }
+
+                    if this.relation != other.relation {
+                        matching = false;
+                        return !matching;
+                    }
+
+                    let matching =
+                        this.columns
+                            .iter()
+                            .zip(other.columns.iter())
+                            .all(|(&this, &other)| {
+                                if (&ctx.bound_premise).contains(&this)
+                                    || (&ctx.bound_premise).contains(&other)
+                                {
+                                    this == other
+                                } else {
+                                    true
+                                }
+                            });
+                    if matching {
+                        return false;
                     } else {
-                        let matching =
-                            this.columns
-                                .iter()
-                                .zip(other.columns.iter())
-                                .all(|(&this, &other)| {
-                                    if (&ctx.bound_premise).contains(&this)
-                                        || (&ctx.bound_premise).contains(&other)
-                                    {
-                                        this == other
-                                    } else {
-                                        true
-                                    }
-                                });
-                        !matching
+                        return true;
                     }
                 });
-                if semi.len() == n {
+                if semi.len() < n {
                     let mut this = self.clone();
                     this.semi = semi;
                     Some(this)
                 } else {
+                    // assert!(!supported.contains(other));
                     None
                 }
             }
@@ -940,7 +997,13 @@ fn election(ctx: &Ctx, rules: &[Rule]) -> (Vec<Rule>, BTreeMap<TrieLink, Vec<Rul
 
     let (finished, (rules, votes)): (Vec<Rule>, (TVec<RuleId, &Rule>, Vec<Vec<(Salt, TrieLink)>>)) =
         rules.iter().partition_map(|rule| {
+            // if rule.semi.len() != 0 {
+            //     eprintln!("semi = {:?}", &rule.semi);
+            // } else {
+            //     eprintln!("NOSEMI");
+            // }
             let votes = rule.make_votes(ctx);
+            // eprintln!("votes = {}, rule = {}", votes.len(), rule.meta.src);
 
             if votes.is_empty() {
                 Left(rule.clone())
