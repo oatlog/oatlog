@@ -8,79 +8,94 @@
 #set text(size: 11pt, font: "New Computer Modern")
 #set document(title: [Oatlog])
 
-#set page(numbering: "1")
+#set page(
+  numbering: "1",
+  columns: 2,
+  paper: "a4",
+)
 #set heading(numbering: "1.")
 
 #set raw(syntaxes: "egglog.sublime-syntax")
 #set raw(syntaxes: "datalog.sublime-syntax")
 
-#text(
-  20pt,
-  align(
-    center,
-    // [Oatlog: A performant ahead-of-time compiled #box[e-graph] engine implementing the egglog language],
-    [Oatlog: A Performant Ahead-of-Time Compiled #box[E-Graph] Engine],
-  ),
-)
-#grid(
-  columns: (1fr, 1fr, 1fr),
-  align: center,
-  (
-    [Loke Gustafsson],
-    [Chalmers University of Technology],
-    link("mailto:lokeg@chalmers.se"),
-  ).join("\n"),
-  (
-    [Erik Magnusson],
-    [Chalmers University of Technology],
-    link("mailto:ermagn@chalmers.se"),
-  ).join("\n"),
-  (
-    [Alejandro Luque Cerpa],
-    [Chalmers University of Technology],
-    link("mailto:luque@chalmers.se"),
-  ).join("\n"),
-)
-
-#align(center, [*Abstract*])
-#align(
-  center,
-  box(
-    width: 90%,
+#place(
+  top + center,
+  float: true,
+  scope: "parent",
+  clearance: 2em,
+)[
+  #text(
+    20pt,
     align(
-      left,
-      [
-
-        We introduce oatlog, an e-graph engine implementing the egglog language. Like the egglog
-        library, it is intended for equality saturation (EqSat) and is implemented as a relational
-        database using semi-naive evaluation. While egglog is implemented as an interpreter to ease
-        interactive use-cases, oatlog is a Rust procedural macro that embeds EqSat theories into
-        applications.
-
-        At the cost of some dynamism, its ahead-of-time compilation of theories makes it easier to
-        understand and debug theory synthesis as one can inspect the relatively readable generated
-        Rust code. In particular, this greatly simplifies performance engineering for oatlog.
-        Additionally, although it is entirely possible in an interpreter, the ahead-of-time
-        architecture naturally lends itself to relation and whole-ruleset optimization. Relation
-        indexes can for example be found equal given some rule, such as $"Add"(a,b,c) <==> "Add"(b,a,c)$
-        given commutativity or $"Add"(a,b,c) <==> "Sub"(c,b,a)$. Rewrites within a ruleset can also be
-        optimized assuming the existence of other rewrites in the ruleset.
-
-        In microbenchmarks, oatlog is faster than egglog for small e-graphs and for fast-growing
-        theories. This is primarily due to oatlog using static indexes, specifically static BTrees,
-        that are recreated rather than mutated during rebuilding. We are planning to address this
-        further, by accelerating the innermost loop of BTree traversal with SIMD and by adaptively
-        using a dynamic instead of static index data structure, in addition to other ongoing work on
-        whole-ruleset optimization and on improving egglog parity.
-
-        Oatlog is in-progress work and lacks many features present in egglog. Important features not
-        yet implemented include executing rulesets other than the entire set of rules, extraction
-        and `:merge` which is necessary for lattice-based reasoning.
-
-      ],
+      center,
+      // [Oatlog: A performant ahead-of-time compiled #box[e-graph] engine implementing the egglog language],
+      [Oatlog: A Performant Ahead-of-Time Compiled #box[E-Graph] Engine],
     ),
-  ),
-)
+  )
+
+  #grid(
+    columns: (1fr, 1fr, 1fr),
+    align: center,
+    (
+      [Loke Gustafsson],
+      [Chalmers University of Technology],
+      link("mailto:lokeg@chalmers.se"),
+    ).join("\n"),
+    (
+      [Erik Magnusson],
+      [Chalmers University of Technology],
+      link("mailto:ermagn@chalmers.se"),
+    ).join("\n"),
+    (
+      [Alejandro Luque Cerpa],
+      [Chalmers University of Technology],
+      link("mailto:luque@chalmers.se"),
+    ).join("\n"),
+  )
+
+]
+
+//
+// #align(
+//   center,
+//   box(
+//     width: 90%,
+//     align(
+//       left,
+//       [
+
+*Abstract*
+
+We introduce oatlog, an e-graph engine implementing the egglog language. Like the egglog
+library, it is intended for equality saturation (EqSat) and is implemented as a relational
+database using semi-naive evaluation. While egglog is implemented as an interpreter to ease
+interactive use-cases, oatlog is a Rust procedural macro that embeds EqSat theories into
+applications.
+
+At the cost of some dynamism, its ahead-of-time compilation of theories makes it easier to
+understand and debug theory synthesis as one can inspect the relatively readable generated
+Rust code. In particular, this greatly simplifies performance engineering for oatlog.
+Additionally, although it is entirely possible in an interpreter, the ahead-of-time
+architecture naturally lends itself to relation and whole-ruleset optimization. Relation
+indexes can for example be found equal given some rule, such as $"Add"(a,b,c) <==> "Add"(b,a,c)$
+given commutativity or $"Add"(a,b,c) <==> "Sub"(c,b,a)$. Rewrites within a ruleset can also be
+optimized assuming the existence of other rewrites in the ruleset.
+
+In microbenchmarks, oatlog is faster than egglog for small e-graphs and for fast-growing
+theories. This is primarily due to oatlog using static indexes, specifically static BTrees,
+that are recreated rather than mutated during rebuilding. We are planning to address this
+further, by accelerating the innermost loop of BTree traversal with SIMD and by adaptively
+using a dynamic instead of static index data structure, in addition to other ongoing work on
+whole-ruleset optimization and on improving egglog parity.
+
+Oatlog is in-progress work and lacks many features present in egglog. Important features not
+yet implemented include executing rulesets other than the entire set of rules, extraction
+and `:merge` which is necessary for lattice-based reasoning.
+
+//       ],
+//     ),
+//   ),
+// )
 
 = Introducing oatlog
 
@@ -136,6 +151,8 @@ each relation after each application of rules.
 
 #TODO[reference listing, talk about generated code, better caption]
 #figure(
+  placement: auto,
+  scope: "parent",
   ```rust
   /// (rewrite (Mul (Add a b) c) (Add (Mul a c) (Mul b c)))
   for (v2, c, v4) in self.mul_.iter_new() {
@@ -162,6 +179,8 @@ We are developing oatlog with the help of microbenchmarks comparing it to egglog
 @benchmark-results.
 
 #figure(
+  placement: auto,
+  scope: "parent",
   text(
     size: 11pt,
     table(
@@ -212,6 +231,8 @@ incredibly amendable to SIMD.
 = Improvements and ongoing work
 
 #figure(
+  placement: auto,
+  scope: "parent",
   image("../figures/architecture.svg"),
   caption: [A coarse overview of the current oatlog architecture.],
 ) <oatlog-architecture>
@@ -226,6 +247,8 @@ For a relation such as $"Add"(a, b, c)$ (meaning $a + b = c$), there is an impli
 There is nothing preventing this rule from being implemented in userspace, but that would have worse performance because it involves a join, see @functionality-as-rule.
 
 #figure(
+  placement: auto,
+  scope: "parent",
   ```egglog
   (rule ((= c1 (Add a b)) (= c2 (Add a b))) ((union c1 c2)))
   ```,
@@ -248,6 +271,8 @@ This motivates allowing multiple implicit functionality rules which oatlog suppo
 
 
 #figure(
+  placement: auto,
+  scope: "parent",
   ```egglog
   ; user provided rule
   (rewrite (Mul x (Const 1)) (Const 1))
@@ -277,6 +302,8 @@ To benefit from this, rules can form a trie in terms of their premise atoms, con
 This reduces the number of joins and removes redundant actions.
 
 #figure(
+  placement: auto,
+  scope: "parent",
   grid(
     columns: (auto, auto, auto, auto),
     ```python
