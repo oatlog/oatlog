@@ -19,7 +19,7 @@ pub use crate::{
         uf::UnionFind,
     },
 };
-pub use fnv::FnvHashMap;
+pub use hashbrown::{HashMap, hash_map::Entry as HashMapEntry};
 pub use smallvec::SmallVec;
 pub use std::{
     convert::Infallible,

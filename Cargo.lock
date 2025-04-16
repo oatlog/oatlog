@@ -899,7 +899,7 @@ dependencies = [
  "derive_more",
  "educe",
  "expect-test",
- "fnv",
+ "hashbrown",
  "heck",
  "itertools 0.14.0",
  "proc-macro2",

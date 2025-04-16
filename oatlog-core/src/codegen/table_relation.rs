@@ -120,9 +120,9 @@ pub fn codegen_table_relation(
             (
                 ident::index_usage_field(&permuted_columns.inner()[..prefix]),
                 if index_to_info[index].has_any_fd(index_info) {
-                    quote! { runtime::FnvHashMap<(#(#key_cols_ty,)*), (#(#value_cols_ty,)*)> }
+                    quote! { runtime::HashMap<(#(#key_cols_ty,)*), (#(#value_cols_ty,)*)> }
                 } else {
-                    quote! { runtime::FnvHashMap<(#(#key_cols_ty,)*), runtime::SmallVec<[(#(#value_cols_ty,)*); 1]>> }
+                    quote! { runtime::HashMap<(#(#key_cols_ty,)*), runtime::SmallVec<[(#(#value_cols_ty,)*); 1]>> }
                 }
             )
         })
@@ -666,17 +666,12 @@ fn update(
 
     quote! {
         // Called once at beginning of canonicalization.
-        fn update_begin(
-            &mut self,
-            insertions: &[Self::Row],
-            uf: &mut Unification,
-        ) {
-            use std::collections::hash_map::Entry;
+        fn update_begin(&mut self, insertions: &[Self::Row], uf: &mut Unification) {
             #(
-                for &(#(mut #indexes_fd_cols,)*) in &*insertions {
+                for &(#(mut #indexes_fd_cols,)*) in insertions {
                     match self.#indexes_fd.entry(#indexes_fd_find_keys) {
-                        Entry::Occupied(mut entry) => #indexes_fd_merge,
-                        Entry::Vacant(entry) => { entry.insert(#indexes_fd_find_values); }
+                        runtime::HashMapEntry::Occupied(mut entry) => #indexes_fd_merge,
+                        runtime::HashMapEntry::Vacant(entry) => { entry.insert(#indexes_fd_find_values); }
                     }
                 }
             )*
@@ -704,8 +699,6 @@ fn update(
         }
         // Called once at end of canonicalization.
         fn update_finalize(&mut self, insertions: &mut Vec<Self::Row>, uf: &mut Unification) {
-            use std::collections::hash_map::Entry;
-
             assert!(self.new.is_empty());
             self.new.extend(#iter_cols_superset_new
                 .filter(|&(#(#cols,)*)| !self.#allset.contains_key(&(#(#allset_cols,)*)))
@@ -736,8 +729,8 @@ fn update(
             #(
                 for &(#(mut #indexes_othfd_cols,)*) in &self.new {
                     match self.#indexes_othfd.entry((#(#indexes_othfd_keys,)*)) {
-                        Entry::Occupied(mut entry) => #indexes_othfd_merge,
-                        Entry::Vacant(entry) => { entry.insert(#indexes_othfd_find); }
+                        runtime::HashMapEntry::Occupied(mut entry) => #indexes_othfd_merge,
+                        runtime::HashMapEntry::Vacant(entry) => { entry.insert(#indexes_othfd_find); }
                     }
                 }
                 self.#indexes_othfd.retain(|&(#(#indexes_othfd_keys,)*), v| {

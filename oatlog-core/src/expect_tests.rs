@@ -1220,8 +1220,8 @@ fn regression_tir2() {
             #[derive(Debug, Default)]
             struct MulRelation {
                 new: Vec<<Self as Relation>::Row>,
-                hash_index_0_1: runtime::FnvHashMap<(Math, Math), (Math,)>,
-                hash_index_0_1_2: runtime::FnvHashMap<(Math, Math, Math), runtime::SmallVec<[(); 1]>>,
+                hash_index_0_1: runtime::HashMap<(Math, Math), (Math,)>,
+                hash_index_0_1_2: runtime::HashMap<(Math, Math, Math), runtime::SmallVec<[(); 1]>>,
                 math_num_uprooted_at_latest_retain: usize,
             }
             impl Relation for MulRelation {
@@ -1253,17 +1253,16 @@ fn regression_tir2() {
                     }
                 }
                 fn update_begin(&mut self, insertions: &[Self::Row], uf: &mut Unification) {
-                    use std::collections::hash_map::Entry;
-                    for &(mut x0, mut x1, mut x2) in &*insertions {
+                    for &(mut x0, mut x1, mut x2) in insertions {
                         match self
                             .hash_index_0_1
                             .entry((uf.math_.find(x0), uf.math_.find(x1)))
                         {
-                            Entry::Occupied(mut entry) => {
+                            runtime::HashMapEntry::Occupied(mut entry) => {
                                 let (y2,) = entry.get_mut();
                                 uf.math_.union_mut(&mut x2, y2);
                             }
-                            Entry::Vacant(entry) => {
+                            runtime::HashMapEntry::Vacant(entry) => {
                                 entry.insert((uf.math_.find(x2),));
                             }
                         }
@@ -1287,12 +1286,13 @@ fn regression_tir2() {
                     true
                 }
                 fn update_finalize(&mut self, insertions: &mut Vec<Self::Row>, uf: &mut Unification) {
-                    use std::collections::hash_map::Entry;
                     assert!(self.new.is_empty());
                     self.new.extend(
-                        insertions
+                        self.hash_index_0_1
                             .iter()
-                            .map(|&(x0, x1, x2)| (uf.math_.find(x0), uf.math_.find(x1), uf.math_.find(x2)))
+                            .map(|(&(x0, x1), &(x2,))| {
+                                (uf.math_.find(x0), uf.math_.find(x1), uf.math_.find(x2))
+                            })
                             .filter(|&(x0, x1, x2)| !self.hash_index_0_1_2.contains_key(&(x0, x1, x2))),
                     );
                     insertions.clear();
@@ -1362,9 +1362,9 @@ fn regression_tir2() {
             #[derive(Debug, Default)]
             struct PowRelation {
                 new: Vec<<Self as Relation>::Row>,
-                hash_index_1_0: runtime::FnvHashMap<(Math, Math), (Math,)>,
-                hash_index_1: runtime::FnvHashMap<(Math,), runtime::SmallVec<[(Math, Math); 1]>>,
-                hash_index_1_0_2: runtime::FnvHashMap<(Math, Math, Math), runtime::SmallVec<[(); 1]>>,
+                hash_index_1_0: runtime::HashMap<(Math, Math), (Math,)>,
+                hash_index_1: runtime::HashMap<(Math,), runtime::SmallVec<[(Math, Math); 1]>>,
+                hash_index_1_0_2: runtime::HashMap<(Math, Math, Math), runtime::SmallVec<[(); 1]>>,
                 math_num_uprooted_at_latest_retain: usize,
             }
             impl Relation for PowRelation {
@@ -1396,17 +1396,16 @@ fn regression_tir2() {
                     }
                 }
                 fn update_begin(&mut self, insertions: &[Self::Row], uf: &mut Unification) {
-                    use std::collections::hash_map::Entry;
-                    for &(mut x0, mut x1, mut x2) in &*insertions {
+                    for &(mut x0, mut x1, mut x2) in insertions {
                         match self
                             .hash_index_1_0
                             .entry((uf.math_.find(x1), uf.math_.find(x0)))
                         {
-                            Entry::Occupied(mut entry) => {
+                            runtime::HashMapEntry::Occupied(mut entry) => {
                                 let (y2,) = entry.get_mut();
                                 uf.math_.union_mut(&mut x2, y2);
                             }
-                            Entry::Vacant(entry) => {
+                            runtime::HashMapEntry::Vacant(entry) => {
                                 entry.insert((uf.math_.find(x2),));
                             }
                         }
@@ -1430,12 +1429,13 @@ fn regression_tir2() {
                     true
                 }
                 fn update_finalize(&mut self, insertions: &mut Vec<Self::Row>, uf: &mut Unification) {
-                    use std::collections::hash_map::Entry;
                     assert!(self.new.is_empty());
                     self.new.extend(
-                        insertions
+                        self.hash_index_1_0
                             .iter()
-                            .map(|&(x0, x1, x2)| (uf.math_.find(x0), uf.math_.find(x1), uf.math_.find(x2)))
+                            .map(|(&(x1, x0), &(x2,))| {
+                                (uf.math_.find(x0), uf.math_.find(x1), uf.math_.find(x2))
+                            })
                             .filter(|&(x0, x1, x2)| !self.hash_index_1_0_2.contains_key(&(x1, x0, x2))),
                     );
                     insertions.clear();
@@ -1527,9 +1527,9 @@ fn regression_tir2() {
             #[derive(Debug, Default)]
             struct ConstRelation {
                 new: Vec<<Self as Relation>::Row>,
-                hash_index_0: runtime::FnvHashMap<(std::primitive::i64,), (Math,)>,
-                hash_index_1: runtime::FnvHashMap<(Math,), runtime::SmallVec<[(std::primitive::i64,); 1]>>,
-                hash_index_0_1: runtime::FnvHashMap<(std::primitive::i64, Math), runtime::SmallVec<[(); 1]>>,
+                hash_index_0: runtime::HashMap<(std::primitive::i64,), (Math,)>,
+                hash_index_1: runtime::HashMap<(Math,), runtime::SmallVec<[(std::primitive::i64,); 1]>>,
+                hash_index_0_1: runtime::HashMap<(std::primitive::i64, Math), runtime::SmallVec<[(); 1]>>,
                 i64_num_uprooted_at_latest_retain: usize,
                 math_num_uprooted_at_latest_retain: usize,
             }
@@ -1561,14 +1561,13 @@ fn regression_tir2() {
                     }
                 }
                 fn update_begin(&mut self, insertions: &[Self::Row], uf: &mut Unification) {
-                    use std::collections::hash_map::Entry;
-                    for &(mut x0, mut x1) in &*insertions {
+                    for &(mut x0, mut x1) in insertions {
                         match self.hash_index_0.entry((x0,)) {
-                            Entry::Occupied(mut entry) => {
+                            runtime::HashMapEntry::Occupied(mut entry) => {
                                 let (y1,) = entry.get_mut();
                                 uf.math_.union_mut(&mut x1, y1);
                             }
-                            Entry::Vacant(entry) => {
+                            runtime::HashMapEntry::Vacant(entry) => {
                                 entry.insert((uf.math_.find(x1),));
                             }
                         }
@@ -1592,12 +1591,11 @@ fn regression_tir2() {
                     true
                 }
                 fn update_finalize(&mut self, insertions: &mut Vec<Self::Row>, uf: &mut Unification) {
-                    use std::collections::hash_map::Entry;
                     assert!(self.new.is_empty());
                     self.new.extend(
-                        insertions
+                        self.hash_index_0
                             .iter()
-                            .map(|&(x0, x1)| (x0, uf.math_.find(x1)))
+                            .map(|(&(x0,), &(x1,))| (x0, uf.math_.find(x1)))
                             .filter(|&(x0, x1)| !self.hash_index_0_1.contains_key(&(x0, x1))),
                     );
                     insertions.clear();
@@ -1898,7 +1896,7 @@ fn regression_tir2() {
 #[test]
 fn regression_tir1() {
     Steps {
-        code: r#" 
+        code: r#"
             (datatype Math (Sub Math Math) (Const i64))
             (rewrite (Sub a a) (Const 0))
             (rewrite (Sub f g) g)
@@ -2166,8 +2164,8 @@ fn regression_tir1() {
             #[derive(Debug, Default)]
             struct SubRelation {
                 new: Vec<<Self as Relation>::Row>,
-                hash_index_0_1: runtime::FnvHashMap<(Math, Math), (Math,)>,
-                hash_index_0_1_2: runtime::FnvHashMap<(Math, Math, Math), runtime::SmallVec<[(); 1]>>,
+                hash_index_0_1: runtime::HashMap<(Math, Math), (Math,)>,
+                hash_index_0_1_2: runtime::HashMap<(Math, Math, Math), runtime::SmallVec<[(); 1]>>,
                 math_num_uprooted_at_latest_retain: usize,
             }
             impl Relation for SubRelation {
@@ -2199,17 +2197,16 @@ fn regression_tir1() {
                     }
                 }
                 fn update_begin(&mut self, insertions: &[Self::Row], uf: &mut Unification) {
-                    use std::collections::hash_map::Entry;
-                    for &(mut x0, mut x1, mut x2) in &*insertions {
+                    for &(mut x0, mut x1, mut x2) in insertions {
                         match self
                             .hash_index_0_1
                             .entry((uf.math_.find(x0), uf.math_.find(x1)))
                         {
-                            Entry::Occupied(mut entry) => {
+                            runtime::HashMapEntry::Occupied(mut entry) => {
                                 let (y2,) = entry.get_mut();
                                 uf.math_.union_mut(&mut x2, y2);
                             }
-                            Entry::Vacant(entry) => {
+                            runtime::HashMapEntry::Vacant(entry) => {
                                 entry.insert((uf.math_.find(x2),));
                             }
                         }
@@ -2233,12 +2230,13 @@ fn regression_tir1() {
                     true
                 }
                 fn update_finalize(&mut self, insertions: &mut Vec<Self::Row>, uf: &mut Unification) {
-                    use std::collections::hash_map::Entry;
                     assert!(self.new.is_empty());
                     self.new.extend(
-                        insertions
+                        self.hash_index_0_1
                             .iter()
-                            .map(|&(x0, x1, x2)| (uf.math_.find(x0), uf.math_.find(x1), uf.math_.find(x2)))
+                            .map(|(&(x0, x1), &(x2,))| {
+                                (uf.math_.find(x0), uf.math_.find(x1), uf.math_.find(x2))
+                            })
                             .filter(|&(x0, x1, x2)| !self.hash_index_0_1_2.contains_key(&(x0, x1, x2))),
                     );
                     insertions.clear();
@@ -2308,8 +2306,8 @@ fn regression_tir1() {
             #[derive(Debug, Default)]
             struct ConstRelation {
                 new: Vec<<Self as Relation>::Row>,
-                hash_index_0: runtime::FnvHashMap<(std::primitive::i64,), (Math,)>,
-                hash_index_0_1: runtime::FnvHashMap<(std::primitive::i64, Math), runtime::SmallVec<[(); 1]>>,
+                hash_index_0: runtime::HashMap<(std::primitive::i64,), (Math,)>,
+                hash_index_0_1: runtime::HashMap<(std::primitive::i64, Math), runtime::SmallVec<[(); 1]>>,
                 i64_num_uprooted_at_latest_retain: usize,
                 math_num_uprooted_at_latest_retain: usize,
             }
@@ -2341,14 +2339,13 @@ fn regression_tir1() {
                     }
                 }
                 fn update_begin(&mut self, insertions: &[Self::Row], uf: &mut Unification) {
-                    use std::collections::hash_map::Entry;
-                    for &(mut x0, mut x1) in &*insertions {
+                    for &(mut x0, mut x1) in insertions {
                         match self.hash_index_0.entry((x0,)) {
-                            Entry::Occupied(mut entry) => {
+                            runtime::HashMapEntry::Occupied(mut entry) => {
                                 let (y1,) = entry.get_mut();
                                 uf.math_.union_mut(&mut x1, y1);
                             }
-                            Entry::Vacant(entry) => {
+                            runtime::HashMapEntry::Vacant(entry) => {
                                 entry.insert((uf.math_.find(x1),));
                             }
                         }
@@ -2372,12 +2369,11 @@ fn regression_tir1() {
                     true
                 }
                 fn update_finalize(&mut self, insertions: &mut Vec<Self::Row>, uf: &mut Unification) {
-                    use std::collections::hash_map::Entry;
                     assert!(self.new.is_empty());
                     self.new.extend(
-                        insertions
+                        self.hash_index_0
                             .iter()
-                            .map(|&(x0, x1)| (x0, uf.math_.find(x1)))
+                            .map(|(&(x0,), &(x1,))| (x0, uf.math_.find(x1)))
                             .filter(|&(x0, x1)| !self.hash_index_0_1.contains_key(&(x0, x1))),
                     );
                     insertions.clear();
@@ -2601,7 +2597,7 @@ fn regression_tir1() {
 #[test]
 fn regression_elim_problematic() {
     Steps {
-        code: r#" 
+        code: r#"
             (datatype Math (Mul Math Math) (Zero ))
             (let zero (Zero ))
             (rule ((= a (Mul zero c))) ((union a zero)))
@@ -2661,7 +2657,7 @@ fn regression_elim_problematic() {
 #[test]
 fn codegen_template() {
     Steps {
-        code: r#" 
+        code: r#"
         "#,
         expected_hir: Some(expect![[r#""#]]),
         expected_lir: Some(expect![[r#""#]]),
@@ -2673,7 +2669,7 @@ fn codegen_template() {
 #[test]
 fn codegen_constant_propagation() {
     Steps {
-        code: r#" 
+        code: r#"
             (datatype Math
                 (Add Math Math)
                 (Mul Math Math)
@@ -3050,10 +3046,10 @@ fn codegen_constant_propagation() {
             #[derive(Debug, Default)]
             struct AddRelation {
                 new: Vec<<Self as Relation>::Row>,
-                hash_index_0_1: runtime::FnvHashMap<(Math, Math), (Math,)>,
-                hash_index_0: runtime::FnvHashMap<(Math,), runtime::SmallVec<[(Math, Math); 1]>>,
-                hash_index_1: runtime::FnvHashMap<(Math,), runtime::SmallVec<[(Math, Math); 1]>>,
-                hash_index_0_1_2: runtime::FnvHashMap<(Math, Math, Math), runtime::SmallVec<[(); 1]>>,
+                hash_index_0_1: runtime::HashMap<(Math, Math), (Math,)>,
+                hash_index_0: runtime::HashMap<(Math,), runtime::SmallVec<[(Math, Math); 1]>>,
+                hash_index_1: runtime::HashMap<(Math,), runtime::SmallVec<[(Math, Math); 1]>>,
+                hash_index_0_1_2: runtime::HashMap<(Math, Math, Math), runtime::SmallVec<[(); 1]>>,
                 math_num_uprooted_at_latest_retain: usize,
             }
             impl Relation for AddRelation {
@@ -3085,17 +3081,16 @@ fn codegen_constant_propagation() {
                     }
                 }
                 fn update_begin(&mut self, insertions: &[Self::Row], uf: &mut Unification) {
-                    use std::collections::hash_map::Entry;
-                    for &(mut x0, mut x1, mut x2) in &*insertions {
+                    for &(mut x0, mut x1, mut x2) in insertions {
                         match self
                             .hash_index_0_1
                             .entry((uf.math_.find(x0), uf.math_.find(x1)))
                         {
-                            Entry::Occupied(mut entry) => {
+                            runtime::HashMapEntry::Occupied(mut entry) => {
                                 let (y2,) = entry.get_mut();
                                 uf.math_.union_mut(&mut x2, y2);
                             }
-                            Entry::Vacant(entry) => {
+                            runtime::HashMapEntry::Vacant(entry) => {
                                 entry.insert((uf.math_.find(x2),));
                             }
                         }
@@ -3119,7 +3114,6 @@ fn codegen_constant_propagation() {
                     true
                 }
                 fn update_finalize(&mut self, insertions: &mut Vec<Self::Row>, uf: &mut Unification) {
-                    use std::collections::hash_map::Entry;
                     assert!(self.new.is_empty());
                     self.new.extend(
                         self.hash_index_0_1
@@ -3240,10 +3234,10 @@ fn codegen_constant_propagation() {
             #[derive(Debug, Default)]
             struct MulRelation {
                 new: Vec<<Self as Relation>::Row>,
-                hash_index_0_1: runtime::FnvHashMap<(Math, Math), (Math,)>,
-                hash_index_0: runtime::FnvHashMap<(Math,), runtime::SmallVec<[(Math, Math); 1]>>,
-                hash_index_1: runtime::FnvHashMap<(Math,), runtime::SmallVec<[(Math, Math); 1]>>,
-                hash_index_0_1_2: runtime::FnvHashMap<(Math, Math, Math), runtime::SmallVec<[(); 1]>>,
+                hash_index_0_1: runtime::HashMap<(Math, Math), (Math,)>,
+                hash_index_0: runtime::HashMap<(Math,), runtime::SmallVec<[(Math, Math); 1]>>,
+                hash_index_1: runtime::HashMap<(Math,), runtime::SmallVec<[(Math, Math); 1]>>,
+                hash_index_0_1_2: runtime::HashMap<(Math, Math, Math), runtime::SmallVec<[(); 1]>>,
                 math_num_uprooted_at_latest_retain: usize,
             }
             impl Relation for MulRelation {
@@ -3275,17 +3269,16 @@ fn codegen_constant_propagation() {
                     }
                 }
                 fn update_begin(&mut self, insertions: &[Self::Row], uf: &mut Unification) {
-                    use std::collections::hash_map::Entry;
-                    for &(mut x0, mut x1, mut x2) in &*insertions {
+                    for &(mut x0, mut x1, mut x2) in insertions {
                         match self
                             .hash_index_0_1
                             .entry((uf.math_.find(x0), uf.math_.find(x1)))
                         {
-                            Entry::Occupied(mut entry) => {
+                            runtime::HashMapEntry::Occupied(mut entry) => {
                                 let (y2,) = entry.get_mut();
                                 uf.math_.union_mut(&mut x2, y2);
                             }
-                            Entry::Vacant(entry) => {
+                            runtime::HashMapEntry::Vacant(entry) => {
                                 entry.insert((uf.math_.find(x2),));
                             }
                         }
@@ -3309,7 +3302,6 @@ fn codegen_constant_propagation() {
                     true
                 }
                 fn update_finalize(&mut self, insertions: &mut Vec<Self::Row>, uf: &mut Unification) {
-                    use std::collections::hash_map::Entry;
                     assert!(self.new.is_empty());
                     self.new.extend(
                         self.hash_index_0_1
@@ -3430,9 +3422,9 @@ fn codegen_constant_propagation() {
             #[derive(Debug, Default)]
             struct ConstRelation {
                 new: Vec<<Self as Relation>::Row>,
-                hash_index_0: runtime::FnvHashMap<(std::primitive::i64,), (Math,)>,
-                hash_index_1: runtime::FnvHashMap<(Math,), runtime::SmallVec<[(std::primitive::i64,); 1]>>,
-                hash_index_0_1: runtime::FnvHashMap<(std::primitive::i64, Math), runtime::SmallVec<[(); 1]>>,
+                hash_index_0: runtime::HashMap<(std::primitive::i64,), (Math,)>,
+                hash_index_1: runtime::HashMap<(Math,), runtime::SmallVec<[(std::primitive::i64,); 1]>>,
+                hash_index_0_1: runtime::HashMap<(std::primitive::i64, Math), runtime::SmallVec<[(); 1]>>,
                 i64_num_uprooted_at_latest_retain: usize,
                 math_num_uprooted_at_latest_retain: usize,
             }
@@ -3464,14 +3456,13 @@ fn codegen_constant_propagation() {
                     }
                 }
                 fn update_begin(&mut self, insertions: &[Self::Row], uf: &mut Unification) {
-                    use std::collections::hash_map::Entry;
-                    for &(mut x0, mut x1) in &*insertions {
+                    for &(mut x0, mut x1) in insertions {
                         match self.hash_index_0.entry((x0,)) {
-                            Entry::Occupied(mut entry) => {
+                            runtime::HashMapEntry::Occupied(mut entry) => {
                                 let (y1,) = entry.get_mut();
                                 uf.math_.union_mut(&mut x1, y1);
                             }
-                            Entry::Vacant(entry) => {
+                            runtime::HashMapEntry::Vacant(entry) => {
                                 entry.insert((uf.math_.find(x1),));
                             }
                         }
@@ -3495,7 +3486,6 @@ fn codegen_constant_propagation() {
                     true
                 }
                 fn update_finalize(&mut self, insertions: &mut Vec<Self::Row>, uf: &mut Unification) {
-                    use std::collections::hash_map::Entry;
                     assert!(self.new.is_empty());
                     self.new.extend(
                         self.hash_index_0
@@ -3859,8 +3849,8 @@ fn codegen_commutative() {
             #[derive(Debug, Default)]
             struct AddRelation {
                 new: Vec<<Self as Relation>::Row>,
-                hash_index_0_1: runtime::FnvHashMap<(Math, Math), (Math,)>,
-                hash_index_0_1_2: runtime::FnvHashMap<(Math, Math, Math), runtime::SmallVec<[(); 1]>>,
+                hash_index_0_1: runtime::HashMap<(Math, Math), (Math,)>,
+                hash_index_0_1_2: runtime::HashMap<(Math, Math, Math), runtime::SmallVec<[(); 1]>>,
                 math_num_uprooted_at_latest_retain: usize,
             }
             impl Relation for AddRelation {
@@ -3892,17 +3882,16 @@ fn codegen_commutative() {
                     }
                 }
                 fn update_begin(&mut self, insertions: &[Self::Row], uf: &mut Unification) {
-                    use std::collections::hash_map::Entry;
-                    for &(mut x0, mut x1, mut x2) in &*insertions {
+                    for &(mut x0, mut x1, mut x2) in insertions {
                         match self
                             .hash_index_0_1
                             .entry((uf.math_.find(x0), uf.math_.find(x1)))
                         {
-                            Entry::Occupied(mut entry) => {
+                            runtime::HashMapEntry::Occupied(mut entry) => {
                                 let (y2,) = entry.get_mut();
                                 uf.math_.union_mut(&mut x2, y2);
                             }
-                            Entry::Vacant(entry) => {
+                            runtime::HashMapEntry::Vacant(entry) => {
                                 entry.insert((uf.math_.find(x2),));
                             }
                         }
@@ -3926,7 +3915,6 @@ fn codegen_commutative() {
                     true
                 }
                 fn update_finalize(&mut self, insertions: &mut Vec<Self::Row>, uf: &mut Unification) {
-                    use std::collections::hash_map::Entry;
                     assert!(self.new.is_empty());
                     self.new.extend(
                         self.hash_index_0_1
@@ -4125,7 +4113,7 @@ fn codegen_commutative() {
 #[test]
 fn regression_entry2() {
     Steps {
-        code: r#" 
+        code: r#"
             (datatype Math (Sub Math Math) (Const i64))
             (rewrite (Sub a b) (Const -1))
         "#,
@@ -4368,8 +4356,8 @@ fn regression_entry2() {
             #[derive(Debug, Default)]
             struct SubRelation {
                 new: Vec<<Self as Relation>::Row>,
-                hash_index_0_1: runtime::FnvHashMap<(Math, Math), (Math,)>,
-                hash_index_0_1_2: runtime::FnvHashMap<(Math, Math, Math), runtime::SmallVec<[(); 1]>>,
+                hash_index_0_1: runtime::HashMap<(Math, Math), (Math,)>,
+                hash_index_0_1_2: runtime::HashMap<(Math, Math, Math), runtime::SmallVec<[(); 1]>>,
                 math_num_uprooted_at_latest_retain: usize,
             }
             impl Relation for SubRelation {
@@ -4401,17 +4389,16 @@ fn regression_entry2() {
                     }
                 }
                 fn update_begin(&mut self, insertions: &[Self::Row], uf: &mut Unification) {
-                    use std::collections::hash_map::Entry;
-                    for &(mut x0, mut x1, mut x2) in &*insertions {
+                    for &(mut x0, mut x1, mut x2) in insertions {
                         match self
                             .hash_index_0_1
                             .entry((uf.math_.find(x0), uf.math_.find(x1)))
                         {
-                            Entry::Occupied(mut entry) => {
+                            runtime::HashMapEntry::Occupied(mut entry) => {
                                 let (y2,) = entry.get_mut();
                                 uf.math_.union_mut(&mut x2, y2);
                             }
-                            Entry::Vacant(entry) => {
+                            runtime::HashMapEntry::Vacant(entry) => {
                                 entry.insert((uf.math_.find(x2),));
                             }
                         }
@@ -4435,7 +4422,6 @@ fn regression_entry2() {
                     true
                 }
                 fn update_finalize(&mut self, insertions: &mut Vec<Self::Row>, uf: &mut Unification) {
-                    use std::collections::hash_map::Entry;
                     assert!(self.new.is_empty());
                     self.new.extend(
                         self.hash_index_0_1
@@ -4512,8 +4498,8 @@ fn regression_entry2() {
             #[derive(Debug, Default)]
             struct ConstRelation {
                 new: Vec<<Self as Relation>::Row>,
-                hash_index_0: runtime::FnvHashMap<(std::primitive::i64,), (Math,)>,
-                hash_index_0_1: runtime::FnvHashMap<(std::primitive::i64, Math), runtime::SmallVec<[(); 1]>>,
+                hash_index_0: runtime::HashMap<(std::primitive::i64,), (Math,)>,
+                hash_index_0_1: runtime::HashMap<(std::primitive::i64, Math), runtime::SmallVec<[(); 1]>>,
                 i64_num_uprooted_at_latest_retain: usize,
                 math_num_uprooted_at_latest_retain: usize,
             }
@@ -4545,14 +4531,13 @@ fn regression_entry2() {
                     }
                 }
                 fn update_begin(&mut self, insertions: &[Self::Row], uf: &mut Unification) {
-                    use std::collections::hash_map::Entry;
-                    for &(mut x0, mut x1) in &*insertions {
+                    for &(mut x0, mut x1) in insertions {
                         match self.hash_index_0.entry((x0,)) {
-                            Entry::Occupied(mut entry) => {
+                            runtime::HashMapEntry::Occupied(mut entry) => {
                                 let (y1,) = entry.get_mut();
                                 uf.math_.union_mut(&mut x1, y1);
                             }
-                            Entry::Vacant(entry) => {
+                            runtime::HashMapEntry::Vacant(entry) => {
                                 entry.insert((uf.math_.find(x1),));
                             }
                         }
@@ -4576,7 +4561,6 @@ fn regression_entry2() {
                     true
                 }
                 fn update_finalize(&mut self, insertions: &mut Vec<Self::Row>, uf: &mut Unification) {
-                    use std::collections::hash_map::Entry;
                     assert!(self.new.is_empty());
                     self.new.extend(
                         self.hash_index_0
@@ -4799,7 +4783,7 @@ fn regression_entry2() {
 #[test]
 fn regression_entry() {
     Steps {
-        code: r#" 
+        code: r#"
             (datatype Math (Integral Math Math) (Add Math Math))
             (rewrite (Add f g) (Add (Integral f f) g))
         "#,
@@ -5025,8 +5009,8 @@ fn regression_entry() {
             #[derive(Debug, Default)]
             struct IntegralRelation {
                 new: Vec<<Self as Relation>::Row>,
-                hash_index_0_1: runtime::FnvHashMap<(Math, Math), (Math,)>,
-                hash_index_0_1_2: runtime::FnvHashMap<(Math, Math, Math), runtime::SmallVec<[(); 1]>>,
+                hash_index_0_1: runtime::HashMap<(Math, Math), (Math,)>,
+                hash_index_0_1_2: runtime::HashMap<(Math, Math, Math), runtime::SmallVec<[(); 1]>>,
                 math_num_uprooted_at_latest_retain: usize,
             }
             impl Relation for IntegralRelation {
@@ -5058,17 +5042,16 @@ fn regression_entry() {
                     }
                 }
                 fn update_begin(&mut self, insertions: &[Self::Row], uf: &mut Unification) {
-                    use std::collections::hash_map::Entry;
-                    for &(mut x0, mut x1, mut x2) in &*insertions {
+                    for &(mut x0, mut x1, mut x2) in insertions {
                         match self
                             .hash_index_0_1
                             .entry((uf.math_.find(x0), uf.math_.find(x1)))
                         {
-                            Entry::Occupied(mut entry) => {
+                            runtime::HashMapEntry::Occupied(mut entry) => {
                                 let (y2,) = entry.get_mut();
                                 uf.math_.union_mut(&mut x2, y2);
                             }
-                            Entry::Vacant(entry) => {
+                            runtime::HashMapEntry::Vacant(entry) => {
                                 entry.insert((uf.math_.find(x2),));
                             }
                         }
@@ -5092,7 +5075,6 @@ fn regression_entry() {
                     true
                 }
                 fn update_finalize(&mut self, insertions: &mut Vec<Self::Row>, uf: &mut Unification) {
-                    use std::collections::hash_map::Entry;
                     assert!(self.new.is_empty());
                     self.new.extend(
                         self.hash_index_0_1
@@ -5169,8 +5151,8 @@ fn regression_entry() {
             #[derive(Debug, Default)]
             struct AddRelation {
                 new: Vec<<Self as Relation>::Row>,
-                hash_index_0_1: runtime::FnvHashMap<(Math, Math), (Math,)>,
-                hash_index_0_1_2: runtime::FnvHashMap<(Math, Math, Math), runtime::SmallVec<[(); 1]>>,
+                hash_index_0_1: runtime::HashMap<(Math, Math), (Math,)>,
+                hash_index_0_1_2: runtime::HashMap<(Math, Math, Math), runtime::SmallVec<[(); 1]>>,
                 math_num_uprooted_at_latest_retain: usize,
             }
             impl Relation for AddRelation {
@@ -5202,17 +5184,16 @@ fn regression_entry() {
                     }
                 }
                 fn update_begin(&mut self, insertions: &[Self::Row], uf: &mut Unification) {
-                    use std::collections::hash_map::Entry;
-                    for &(mut x0, mut x1, mut x2) in &*insertions {
+                    for &(mut x0, mut x1, mut x2) in insertions {
                         match self
                             .hash_index_0_1
                             .entry((uf.math_.find(x0), uf.math_.find(x1)))
                         {
-                            Entry::Occupied(mut entry) => {
+                            runtime::HashMapEntry::Occupied(mut entry) => {
                                 let (y2,) = entry.get_mut();
                                 uf.math_.union_mut(&mut x2, y2);
                             }
-                            Entry::Vacant(entry) => {
+                            runtime::HashMapEntry::Vacant(entry) => {
                                 entry.insert((uf.math_.find(x2),));
                             }
                         }
@@ -5236,7 +5217,6 @@ fn regression_entry() {
                     true
                 }
                 fn update_finalize(&mut self, insertions: &mut Vec<Self::Row>, uf: &mut Unification) {
-                    use std::collections::hash_map::Entry;
                     assert!(self.new.is_empty());
                     self.new.extend(
                         self.hash_index_0_1
@@ -5670,8 +5650,8 @@ fn test_bind_variable_multiple_times() {
             #[derive(Debug, Default)]
             struct SameRelation {
                 new: Vec<<Self as Relation>::Row>,
-                hash_index_0_1: runtime::FnvHashMap<(Foo, Foo), (Foo,)>,
-                hash_index_0_1_2: runtime::FnvHashMap<(Foo, Foo, Foo), runtime::SmallVec<[(); 1]>>,
+                hash_index_0_1: runtime::HashMap<(Foo, Foo), (Foo,)>,
+                hash_index_0_1_2: runtime::HashMap<(Foo, Foo, Foo), runtime::SmallVec<[(); 1]>>,
                 foo_num_uprooted_at_latest_retain: usize,
             }
             impl Relation for SameRelation {
@@ -5703,17 +5683,16 @@ fn test_bind_variable_multiple_times() {
                     }
                 }
                 fn update_begin(&mut self, insertions: &[Self::Row], uf: &mut Unification) {
-                    use std::collections::hash_map::Entry;
-                    for &(mut x0, mut x1, mut x2) in &*insertions {
+                    for &(mut x0, mut x1, mut x2) in insertions {
                         match self
                             .hash_index_0_1
                             .entry((uf.foo_.find(x0), uf.foo_.find(x1)))
                         {
-                            Entry::Occupied(mut entry) => {
+                            runtime::HashMapEntry::Occupied(mut entry) => {
                                 let (y2,) = entry.get_mut();
                                 uf.foo_.union_mut(&mut x2, y2);
                             }
-                            Entry::Vacant(entry) => {
+                            runtime::HashMapEntry::Vacant(entry) => {
                                 entry.insert((uf.foo_.find(x2),));
                             }
                         }
@@ -5737,7 +5716,6 @@ fn test_bind_variable_multiple_times() {
                     true
                 }
                 fn update_finalize(&mut self, insertions: &mut Vec<Self::Row>, uf: &mut Unification) {
-                    use std::collections::hash_map::Entry;
                     assert!(self.new.is_empty());
                     self.new.extend(
                         self.hash_index_0_1
@@ -6259,9 +6237,9 @@ fn codegen_variable_reuse_bug() {
             #[derive(Debug, Default)]
             struct AddRelation {
                 new: Vec<<Self as Relation>::Row>,
-                hash_index_0_1: runtime::FnvHashMap<(Math, Math), (Math,)>,
-                hash_index_0_2: runtime::FnvHashMap<(Math, Math), runtime::SmallVec<[(Math,); 1]>>,
-                hash_index_0_1_2: runtime::FnvHashMap<(Math, Math, Math), runtime::SmallVec<[(); 1]>>,
+                hash_index_0_1: runtime::HashMap<(Math, Math), (Math,)>,
+                hash_index_0_2: runtime::HashMap<(Math, Math), runtime::SmallVec<[(Math,); 1]>>,
+                hash_index_0_1_2: runtime::HashMap<(Math, Math, Math), runtime::SmallVec<[(); 1]>>,
                 math_num_uprooted_at_latest_retain: usize,
             }
             impl Relation for AddRelation {
@@ -6293,17 +6271,16 @@ fn codegen_variable_reuse_bug() {
                     }
                 }
                 fn update_begin(&mut self, insertions: &[Self::Row], uf: &mut Unification) {
-                    use std::collections::hash_map::Entry;
-                    for &(mut x0, mut x1, mut x2) in &*insertions {
+                    for &(mut x0, mut x1, mut x2) in insertions {
                         match self
                             .hash_index_0_1
                             .entry((uf.math_.find(x0), uf.math_.find(x1)))
                         {
-                            Entry::Occupied(mut entry) => {
+                            runtime::HashMapEntry::Occupied(mut entry) => {
                                 let (y2,) = entry.get_mut();
                                 uf.math_.union_mut(&mut x2, y2);
                             }
-                            Entry::Vacant(entry) => {
+                            runtime::HashMapEntry::Vacant(entry) => {
                                 entry.insert((uf.math_.find(x2),));
                             }
                         }
@@ -6327,7 +6304,6 @@ fn codegen_variable_reuse_bug() {
                     true
                 }
                 fn update_finalize(&mut self, insertions: &mut Vec<Self::Row>, uf: &mut Unification) {
-                    use std::collections::hash_map::Entry;
                     assert!(self.new.is_empty());
                     self.new.extend(
                         self.hash_index_0_1
@@ -6430,8 +6406,8 @@ fn codegen_variable_reuse_bug() {
             #[derive(Debug, Default)]
             struct ZeroRelation {
                 new: Vec<<Self as Relation>::Row>,
-                hash_index_: runtime::FnvHashMap<(), (Math,)>,
-                hash_index_0: runtime::FnvHashMap<(Math,), runtime::SmallVec<[(); 1]>>,
+                hash_index_: runtime::HashMap<(), (Math,)>,
+                hash_index_0: runtime::HashMap<(Math,), runtime::SmallVec<[(); 1]>>,
                 math_num_uprooted_at_latest_retain: usize,
             }
             impl Relation for ZeroRelation {
@@ -6461,14 +6437,13 @@ fn codegen_variable_reuse_bug() {
                     }
                 }
                 fn update_begin(&mut self, insertions: &[Self::Row], uf: &mut Unification) {
-                    use std::collections::hash_map::Entry;
-                    for &(mut x0,) in &*insertions {
+                    for &(mut x0,) in insertions {
                         match self.hash_index_.entry(()) {
-                            Entry::Occupied(mut entry) => {
+                            runtime::HashMapEntry::Occupied(mut entry) => {
                                 let (y0,) = entry.get_mut();
                                 uf.math_.union_mut(&mut x0, y0);
                             }
-                            Entry::Vacant(entry) => {
+                            runtime::HashMapEntry::Vacant(entry) => {
                                 entry.insert((uf.math_.find(x0),));
                             }
                         }
@@ -6492,7 +6467,6 @@ fn codegen_variable_reuse_bug() {
                     true
                 }
                 fn update_finalize(&mut self, insertions: &mut Vec<Self::Row>, uf: &mut Unification) {
-                    use std::collections::hash_map::Entry;
                     assert!(self.new.is_empty());
                     self.new.extend(
                         self.hash_index_
@@ -6814,8 +6788,8 @@ fn initial_exprs() {
             #[derive(Debug, Default)]
             struct AddRelation {
                 new: Vec<<Self as Relation>::Row>,
-                hash_index_0_1: runtime::FnvHashMap<(Math, Math), (Math,)>,
-                hash_index_0_1_2: runtime::FnvHashMap<(Math, Math, Math), runtime::SmallVec<[(); 1]>>,
+                hash_index_0_1: runtime::HashMap<(Math, Math), (Math,)>,
+                hash_index_0_1_2: runtime::HashMap<(Math, Math, Math), runtime::SmallVec<[(); 1]>>,
                 math_num_uprooted_at_latest_retain: usize,
             }
             impl Relation for AddRelation {
@@ -6847,17 +6821,16 @@ fn initial_exprs() {
                     }
                 }
                 fn update_begin(&mut self, insertions: &[Self::Row], uf: &mut Unification) {
-                    use std::collections::hash_map::Entry;
-                    for &(mut x0, mut x1, mut x2) in &*insertions {
+                    for &(mut x0, mut x1, mut x2) in insertions {
                         match self
                             .hash_index_0_1
                             .entry((uf.math_.find(x0), uf.math_.find(x1)))
                         {
-                            Entry::Occupied(mut entry) => {
+                            runtime::HashMapEntry::Occupied(mut entry) => {
                                 let (y2,) = entry.get_mut();
                                 uf.math_.union_mut(&mut x2, y2);
                             }
-                            Entry::Vacant(entry) => {
+                            runtime::HashMapEntry::Vacant(entry) => {
                                 entry.insert((uf.math_.find(x2),));
                             }
                         }
@@ -6881,7 +6854,6 @@ fn initial_exprs() {
                     true
                 }
                 fn update_finalize(&mut self, insertions: &mut Vec<Self::Row>, uf: &mut Unification) {
-                    use std::collections::hash_map::Entry;
                     assert!(self.new.is_empty());
                     self.new.extend(
                         self.hash_index_0_1
@@ -6958,8 +6930,8 @@ fn initial_exprs() {
             #[derive(Debug, Default)]
             struct MulRelation {
                 new: Vec<<Self as Relation>::Row>,
-                hash_index_0_1: runtime::FnvHashMap<(Math, Math), (Math,)>,
-                hash_index_0_1_2: runtime::FnvHashMap<(Math, Math, Math), runtime::SmallVec<[(); 1]>>,
+                hash_index_0_1: runtime::HashMap<(Math, Math), (Math,)>,
+                hash_index_0_1_2: runtime::HashMap<(Math, Math, Math), runtime::SmallVec<[(); 1]>>,
                 math_num_uprooted_at_latest_retain: usize,
             }
             impl Relation for MulRelation {
@@ -6991,17 +6963,16 @@ fn initial_exprs() {
                     }
                 }
                 fn update_begin(&mut self, insertions: &[Self::Row], uf: &mut Unification) {
-                    use std::collections::hash_map::Entry;
-                    for &(mut x0, mut x1, mut x2) in &*insertions {
+                    for &(mut x0, mut x1, mut x2) in insertions {
                         match self
                             .hash_index_0_1
                             .entry((uf.math_.find(x0), uf.math_.find(x1)))
                         {
-                            Entry::Occupied(mut entry) => {
+                            runtime::HashMapEntry::Occupied(mut entry) => {
                                 let (y2,) = entry.get_mut();
                                 uf.math_.union_mut(&mut x2, y2);
                             }
-                            Entry::Vacant(entry) => {
+                            runtime::HashMapEntry::Vacant(entry) => {
                                 entry.insert((uf.math_.find(x2),));
                             }
                         }
@@ -7025,7 +6996,6 @@ fn initial_exprs() {
                     true
                 }
                 fn update_finalize(&mut self, insertions: &mut Vec<Self::Row>, uf: &mut Unification) {
-                    use std::collections::hash_map::Entry;
                     assert!(self.new.is_empty());
                     self.new.extend(
                         self.hash_index_0_1
@@ -7102,8 +7072,8 @@ fn initial_exprs() {
             #[derive(Debug, Default)]
             struct ConstRelation {
                 new: Vec<<Self as Relation>::Row>,
-                hash_index_0: runtime::FnvHashMap<(std::primitive::i64,), (Math,)>,
-                hash_index_0_1: runtime::FnvHashMap<(std::primitive::i64, Math), runtime::SmallVec<[(); 1]>>,
+                hash_index_0: runtime::HashMap<(std::primitive::i64,), (Math,)>,
+                hash_index_0_1: runtime::HashMap<(std::primitive::i64, Math), runtime::SmallVec<[(); 1]>>,
                 i64_num_uprooted_at_latest_retain: usize,
                 math_num_uprooted_at_latest_retain: usize,
             }
@@ -7135,14 +7105,13 @@ fn initial_exprs() {
                     }
                 }
                 fn update_begin(&mut self, insertions: &[Self::Row], uf: &mut Unification) {
-                    use std::collections::hash_map::Entry;
-                    for &(mut x0, mut x1) in &*insertions {
+                    for &(mut x0, mut x1) in insertions {
                         match self.hash_index_0.entry((x0,)) {
-                            Entry::Occupied(mut entry) => {
+                            runtime::HashMapEntry::Occupied(mut entry) => {
                                 let (y1,) = entry.get_mut();
                                 uf.math_.union_mut(&mut x1, y1);
                             }
-                            Entry::Vacant(entry) => {
+                            runtime::HashMapEntry::Vacant(entry) => {
                                 entry.insert((uf.math_.find(x1),));
                             }
                         }
@@ -7166,7 +7135,6 @@ fn initial_exprs() {
                     true
                 }
                 fn update_finalize(&mut self, insertions: &mut Vec<Self::Row>, uf: &mut Unification) {
-                    use std::collections::hash_map::Entry;
                     assert!(self.new.is_empty());
                     self.new.extend(
                         self.hash_index_0
@@ -7245,8 +7213,8 @@ fn initial_exprs() {
             #[derive(Debug, Default)]
             struct VarRelation {
                 new: Vec<<Self as Relation>::Row>,
-                hash_index_0: runtime::FnvHashMap<(runtime::IString,), (Math,)>,
-                hash_index_0_1: runtime::FnvHashMap<(runtime::IString, Math), runtime::SmallVec<[(); 1]>>,
+                hash_index_0: runtime::HashMap<(runtime::IString,), (Math,)>,
+                hash_index_0_1: runtime::HashMap<(runtime::IString, Math), runtime::SmallVec<[(); 1]>>,
                 string_num_uprooted_at_latest_retain: usize,
                 math_num_uprooted_at_latest_retain: usize,
             }
@@ -7278,14 +7246,13 @@ fn initial_exprs() {
                     }
                 }
                 fn update_begin(&mut self, insertions: &[Self::Row], uf: &mut Unification) {
-                    use std::collections::hash_map::Entry;
-                    for &(mut x0, mut x1) in &*insertions {
+                    for &(mut x0, mut x1) in insertions {
                         match self.hash_index_0.entry((x0,)) {
-                            Entry::Occupied(mut entry) => {
+                            runtime::HashMapEntry::Occupied(mut entry) => {
                                 let (y1,) = entry.get_mut();
                                 uf.math_.union_mut(&mut x1, y1);
                             }
-                            Entry::Vacant(entry) => {
+                            runtime::HashMapEntry::Vacant(entry) => {
                                 entry.insert((uf.math_.find(x1),));
                             }
                         }
@@ -7309,7 +7276,6 @@ fn initial_exprs() {
                     true
                 }
                 fn update_finalize(&mut self, insertions: &mut Vec<Self::Row>, uf: &mut Unification) {
-                    use std::collections::hash_map::Entry;
                     assert!(self.new.is_empty());
                     self.new.extend(
                         self.hash_index_0
@@ -7893,7 +7859,7 @@ fn codegen_bug1() {
             #[derive(Debug, Default)]
             struct FooRelation {
                 new: Vec<<Self as Relation>::Row>,
-                hash_index_0_1_2: runtime::FnvHashMap<(T0, T1, T2), runtime::SmallVec<[(); 1]>>,
+                hash_index_0_1_2: runtime::HashMap<(T0, T1, T2), runtime::SmallVec<[(); 1]>>,
                 t0_num_uprooted_at_latest_retain: usize,
                 t1_num_uprooted_at_latest_retain: usize,
                 t2_num_uprooted_at_latest_retain: usize,
@@ -7931,9 +7897,7 @@ fn codegen_bug1() {
                         writeln!(buf, "{}_{i} [shape = box];", "foo").unwrap();
                     }
                 }
-                fn update_begin(&mut self, insertions: &[Self::Row], uf: &mut Unification) {
-                    use std::collections::hash_map::Entry;
-                }
+                fn update_begin(&mut self, insertions: &[Self::Row], uf: &mut Unification) {}
                 fn update(&mut self, insertions: &mut Vec<Self::Row>, uf: &mut Unification) -> bool {
                     if self.t0_num_uprooted_at_latest_retain == uf.t0_.num_uprooted()
                         && self.t1_num_uprooted_at_latest_retain == uf.t1_.num_uprooted()
@@ -7949,7 +7913,6 @@ fn codegen_bug1() {
                     true
                 }
                 fn update_finalize(&mut self, insertions: &mut Vec<Self::Row>, uf: &mut Unification) {
-                    use std::collections::hash_map::Entry;
                     assert!(self.new.is_empty());
                     self.new.extend(
                         insertions
@@ -8236,8 +8199,8 @@ fn initial() {
             #[derive(Debug, Default)]
             struct ConstRelation {
                 new: Vec<<Self as Relation>::Row>,
-                hash_index_0: runtime::FnvHashMap<(std::primitive::i64,), (Math,)>,
-                hash_index_0_1: runtime::FnvHashMap<(std::primitive::i64, Math), runtime::SmallVec<[(); 1]>>,
+                hash_index_0: runtime::HashMap<(std::primitive::i64,), (Math,)>,
+                hash_index_0_1: runtime::HashMap<(std::primitive::i64, Math), runtime::SmallVec<[(); 1]>>,
                 i64_num_uprooted_at_latest_retain: usize,
                 math_num_uprooted_at_latest_retain: usize,
             }
@@ -8269,14 +8232,13 @@ fn initial() {
                     }
                 }
                 fn update_begin(&mut self, insertions: &[Self::Row], uf: &mut Unification) {
-                    use std::collections::hash_map::Entry;
-                    for &(mut x0, mut x1) in &*insertions {
+                    for &(mut x0, mut x1) in insertions {
                         match self.hash_index_0.entry((x0,)) {
-                            Entry::Occupied(mut entry) => {
+                            runtime::HashMapEntry::Occupied(mut entry) => {
                                 let (y1,) = entry.get_mut();
                                 uf.math_.union_mut(&mut x1, y1);
                             }
-                            Entry::Vacant(entry) => {
+                            runtime::HashMapEntry::Vacant(entry) => {
                                 entry.insert((uf.math_.find(x1),));
                             }
                         }
@@ -8300,7 +8262,6 @@ fn initial() {
                     true
                 }
                 fn update_finalize(&mut self, insertions: &mut Vec<Self::Row>, uf: &mut Unification) {
-                    use std::collections::hash_map::Entry;
                     assert!(self.new.is_empty());
                     self.new.extend(
                         self.hash_index_0
@@ -8674,9 +8635,9 @@ fn test_primitives_simple() {
             #[derive(Debug, Default)]
             struct MulRelation {
                 new: Vec<<Self as Relation>::Row>,
-                hash_index_1_0: runtime::FnvHashMap<(Math, Math), (Math,)>,
-                hash_index_1: runtime::FnvHashMap<(Math,), runtime::SmallVec<[(Math, Math); 1]>>,
-                hash_index_1_0_2: runtime::FnvHashMap<(Math, Math, Math), runtime::SmallVec<[(); 1]>>,
+                hash_index_1_0: runtime::HashMap<(Math, Math), (Math,)>,
+                hash_index_1: runtime::HashMap<(Math,), runtime::SmallVec<[(Math, Math); 1]>>,
+                hash_index_1_0_2: runtime::HashMap<(Math, Math, Math), runtime::SmallVec<[(); 1]>>,
                 math_num_uprooted_at_latest_retain: usize,
             }
             impl Relation for MulRelation {
@@ -8708,17 +8669,16 @@ fn test_primitives_simple() {
                     }
                 }
                 fn update_begin(&mut self, insertions: &[Self::Row], uf: &mut Unification) {
-                    use std::collections::hash_map::Entry;
-                    for &(mut x0, mut x1, mut x2) in &*insertions {
+                    for &(mut x0, mut x1, mut x2) in insertions {
                         match self
                             .hash_index_1_0
                             .entry((uf.math_.find(x1), uf.math_.find(x0)))
                         {
-                            Entry::Occupied(mut entry) => {
+                            runtime::HashMapEntry::Occupied(mut entry) => {
                                 let (y2,) = entry.get_mut();
                                 uf.math_.union_mut(&mut x2, y2);
                             }
-                            Entry::Vacant(entry) => {
+                            runtime::HashMapEntry::Vacant(entry) => {
                                 entry.insert((uf.math_.find(x2),));
                             }
                         }
@@ -8742,7 +8702,6 @@ fn test_primitives_simple() {
                     true
                 }
                 fn update_finalize(&mut self, insertions: &mut Vec<Self::Row>, uf: &mut Unification) {
-                    use std::collections::hash_map::Entry;
                     assert!(self.new.is_empty());
                     self.new.extend(
                         self.hash_index_1_0
@@ -8841,8 +8800,8 @@ fn test_primitives_simple() {
             #[derive(Debug, Default)]
             struct AddRelation {
                 new: Vec<<Self as Relation>::Row>,
-                hash_index_0_1: runtime::FnvHashMap<(Math, Math), (Math,)>,
-                hash_index_0_1_2: runtime::FnvHashMap<(Math, Math, Math), runtime::SmallVec<[(); 1]>>,
+                hash_index_0_1: runtime::HashMap<(Math, Math), (Math,)>,
+                hash_index_0_1_2: runtime::HashMap<(Math, Math, Math), runtime::SmallVec<[(); 1]>>,
                 math_num_uprooted_at_latest_retain: usize,
             }
             impl Relation for AddRelation {
@@ -8874,17 +8833,16 @@ fn test_primitives_simple() {
                     }
                 }
                 fn update_begin(&mut self, insertions: &[Self::Row], uf: &mut Unification) {
-                    use std::collections::hash_map::Entry;
-                    for &(mut x0, mut x1, mut x2) in &*insertions {
+                    for &(mut x0, mut x1, mut x2) in insertions {
                         match self
                             .hash_index_0_1
                             .entry((uf.math_.find(x0), uf.math_.find(x1)))
                         {
-                            Entry::Occupied(mut entry) => {
+                            runtime::HashMapEntry::Occupied(mut entry) => {
                                 let (y2,) = entry.get_mut();
                                 uf.math_.union_mut(&mut x2, y2);
                             }
-                            Entry::Vacant(entry) => {
+                            runtime::HashMapEntry::Vacant(entry) => {
                                 entry.insert((uf.math_.find(x2),));
                             }
                         }
@@ -8908,7 +8866,6 @@ fn test_primitives_simple() {
                     true
                 }
                 fn update_finalize(&mut self, insertions: &mut Vec<Self::Row>, uf: &mut Unification) {
-                    use std::collections::hash_map::Entry;
                     assert!(self.new.is_empty());
                     self.new.extend(
                         self.hash_index_0_1
@@ -8985,9 +8942,9 @@ fn test_primitives_simple() {
             #[derive(Debug, Default)]
             struct ConstRelation {
                 new: Vec<<Self as Relation>::Row>,
-                hash_index_0: runtime::FnvHashMap<(std::primitive::i64,), (Math,)>,
-                hash_index_1: runtime::FnvHashMap<(Math,), runtime::SmallVec<[(std::primitive::i64,); 1]>>,
-                hash_index_0_1: runtime::FnvHashMap<(std::primitive::i64, Math), runtime::SmallVec<[(); 1]>>,
+                hash_index_0: runtime::HashMap<(std::primitive::i64,), (Math,)>,
+                hash_index_1: runtime::HashMap<(Math,), runtime::SmallVec<[(std::primitive::i64,); 1]>>,
+                hash_index_0_1: runtime::HashMap<(std::primitive::i64, Math), runtime::SmallVec<[(); 1]>>,
                 i64_num_uprooted_at_latest_retain: usize,
                 math_num_uprooted_at_latest_retain: usize,
             }
@@ -9019,14 +8976,13 @@ fn test_primitives_simple() {
                     }
                 }
                 fn update_begin(&mut self, insertions: &[Self::Row], uf: &mut Unification) {
-                    use std::collections::hash_map::Entry;
-                    for &(mut x0, mut x1) in &*insertions {
+                    for &(mut x0, mut x1) in insertions {
                         match self.hash_index_0.entry((x0,)) {
-                            Entry::Occupied(mut entry) => {
+                            runtime::HashMapEntry::Occupied(mut entry) => {
                                 let (y1,) = entry.get_mut();
                                 uf.math_.union_mut(&mut x1, y1);
                             }
-                            Entry::Vacant(entry) => {
+                            runtime::HashMapEntry::Vacant(entry) => {
                                 entry.insert((uf.math_.find(x1),));
                             }
                         }
@@ -9050,7 +9006,6 @@ fn test_primitives_simple() {
                     true
                 }
                 fn update_finalize(&mut self, insertions: &mut Vec<Self::Row>, uf: &mut Unification) {
-                    use std::collections::hash_map::Entry;
                     assert!(self.new.is_empty());
                     self.new.extend(
                         self.hash_index_0
@@ -9151,8 +9106,8 @@ fn test_primitives_simple() {
             #[derive(Debug, Default)]
             struct VarRelation {
                 new: Vec<<Self as Relation>::Row>,
-                hash_index_0: runtime::FnvHashMap<(runtime::IString,), (Math,)>,
-                hash_index_0_1: runtime::FnvHashMap<(runtime::IString, Math), runtime::SmallVec<[(); 1]>>,
+                hash_index_0: runtime::HashMap<(runtime::IString,), (Math,)>,
+                hash_index_0_1: runtime::HashMap<(runtime::IString, Math), runtime::SmallVec<[(); 1]>>,
                 string_num_uprooted_at_latest_retain: usize,
                 math_num_uprooted_at_latest_retain: usize,
             }
@@ -9184,14 +9139,13 @@ fn test_primitives_simple() {
                     }
                 }
                 fn update_begin(&mut self, insertions: &[Self::Row], uf: &mut Unification) {
-                    use std::collections::hash_map::Entry;
-                    for &(mut x0, mut x1) in &*insertions {
+                    for &(mut x0, mut x1) in insertions {
                         match self.hash_index_0.entry((x0,)) {
-                            Entry::Occupied(mut entry) => {
+                            runtime::HashMapEntry::Occupied(mut entry) => {
                                 let (y1,) = entry.get_mut();
                                 uf.math_.union_mut(&mut x1, y1);
                             }
-                            Entry::Vacant(entry) => {
+                            runtime::HashMapEntry::Vacant(entry) => {
                                 entry.insert((uf.math_.find(x1),));
                             }
                         }
@@ -9215,7 +9169,6 @@ fn test_primitives_simple() {
                     true
                 }
                 fn update_finalize(&mut self, insertions: &mut Vec<Self::Row>, uf: &mut Unification) {
-                    use std::collections::hash_map::Entry;
                     assert!(self.new.is_empty());
                     self.new.extend(
                         self.hash_index_0
@@ -9657,9 +9610,9 @@ fn triangle_join() {
             #[derive(Debug, Default)]
             struct FooRelation {
                 new: Vec<<Self as Relation>::Row>,
-                hash_index_1: runtime::FnvHashMap<(Math,), runtime::SmallVec<[(Math,); 1]>>,
-                hash_index_1_0: runtime::FnvHashMap<(Math, Math), runtime::SmallVec<[(); 1]>>,
-                hash_index_0: runtime::FnvHashMap<(Math,), runtime::SmallVec<[(Math,); 1]>>,
+                hash_index_1: runtime::HashMap<(Math,), runtime::SmallVec<[(Math,); 1]>>,
+                hash_index_1_0: runtime::HashMap<(Math, Math), runtime::SmallVec<[(); 1]>>,
+                hash_index_0: runtime::HashMap<(Math,), runtime::SmallVec<[(Math,); 1]>>,
                 math_num_uprooted_at_latest_retain: usize,
             }
             impl Relation for FooRelation {
@@ -9694,9 +9647,7 @@ fn triangle_join() {
                         writeln!(buf, "{}_{i} [shape = box];", "foo").unwrap();
                     }
                 }
-                fn update_begin(&mut self, insertions: &[Self::Row], uf: &mut Unification) {
-                    use std::collections::hash_map::Entry;
-                }
+                fn update_begin(&mut self, insertions: &[Self::Row], uf: &mut Unification) {}
                 fn update(&mut self, insertions: &mut Vec<Self::Row>, uf: &mut Unification) -> bool {
                     if self.math_num_uprooted_at_latest_retain == uf.math_.num_uprooted() {
                         return false;
@@ -9707,7 +9658,6 @@ fn triangle_join() {
                     true
                 }
                 fn update_finalize(&mut self, insertions: &mut Vec<Self::Row>, uf: &mut Unification) {
-                    use std::collections::hash_map::Entry;
                     assert!(self.new.is_empty());
                     self.new.extend(
                         insertions
@@ -9804,9 +9754,9 @@ fn triangle_join() {
             #[derive(Debug, Default)]
             struct BarRelation {
                 new: Vec<<Self as Relation>::Row>,
-                hash_index_0: runtime::FnvHashMap<(Math,), runtime::SmallVec<[(Math,); 1]>>,
-                hash_index_0_1: runtime::FnvHashMap<(Math, Math), runtime::SmallVec<[(); 1]>>,
-                hash_index_1: runtime::FnvHashMap<(Math,), runtime::SmallVec<[(Math,); 1]>>,
+                hash_index_0: runtime::HashMap<(Math,), runtime::SmallVec<[(Math,); 1]>>,
+                hash_index_0_1: runtime::HashMap<(Math, Math), runtime::SmallVec<[(); 1]>>,
+                hash_index_1: runtime::HashMap<(Math,), runtime::SmallVec<[(Math,); 1]>>,
                 math_num_uprooted_at_latest_retain: usize,
             }
             impl Relation for BarRelation {
@@ -9841,9 +9791,7 @@ fn triangle_join() {
                         writeln!(buf, "{}_{i} [shape = box];", "bar").unwrap();
                     }
                 }
-                fn update_begin(&mut self, insertions: &[Self::Row], uf: &mut Unification) {
-                    use std::collections::hash_map::Entry;
-                }
+                fn update_begin(&mut self, insertions: &[Self::Row], uf: &mut Unification) {}
                 fn update(&mut self, insertions: &mut Vec<Self::Row>, uf: &mut Unification) -> bool {
                     if self.math_num_uprooted_at_latest_retain == uf.math_.num_uprooted() {
                         return false;
@@ -9854,7 +9802,6 @@ fn triangle_join() {
                     true
                 }
                 fn update_finalize(&mut self, insertions: &mut Vec<Self::Row>, uf: &mut Unification) {
-                    use std::collections::hash_map::Entry;
                     assert!(self.new.is_empty());
                     self.new.extend(
                         insertions
@@ -9951,9 +9898,9 @@ fn triangle_join() {
             #[derive(Debug, Default)]
             struct BazRelation {
                 new: Vec<<Self as Relation>::Row>,
-                hash_index_1: runtime::FnvHashMap<(Math,), runtime::SmallVec<[(Math,); 1]>>,
-                hash_index_0: runtime::FnvHashMap<(Math,), runtime::SmallVec<[(Math,); 1]>>,
-                hash_index_1_0: runtime::FnvHashMap<(Math, Math), runtime::SmallVec<[(); 1]>>,
+                hash_index_1: runtime::HashMap<(Math,), runtime::SmallVec<[(Math,); 1]>>,
+                hash_index_0: runtime::HashMap<(Math,), runtime::SmallVec<[(Math,); 1]>>,
+                hash_index_1_0: runtime::HashMap<(Math, Math), runtime::SmallVec<[(); 1]>>,
                 math_num_uprooted_at_latest_retain: usize,
             }
             impl Relation for BazRelation {
@@ -9988,9 +9935,7 @@ fn triangle_join() {
                         writeln!(buf, "{}_{i} [shape = box];", "baz").unwrap();
                     }
                 }
-                fn update_begin(&mut self, insertions: &[Self::Row], uf: &mut Unification) {
-                    use std::collections::hash_map::Entry;
-                }
+                fn update_begin(&mut self, insertions: &[Self::Row], uf: &mut Unification) {}
                 fn update(&mut self, insertions: &mut Vec<Self::Row>, uf: &mut Unification) -> bool {
                     if self.math_num_uprooted_at_latest_retain == uf.math_.num_uprooted() {
                         return false;
@@ -10001,7 +9946,6 @@ fn triangle_join() {
                     true
                 }
                 fn update_finalize(&mut self, insertions: &mut Vec<Self::Row>, uf: &mut Unification) {
-                    use std::collections::hash_map::Entry;
                     assert!(self.new.is_empty());
                     self.new.extend(
                         insertions
@@ -10098,7 +10042,7 @@ fn triangle_join() {
             #[derive(Debug, Default)]
             struct TriangleRelation {
                 new: Vec<<Self as Relation>::Row>,
-                hash_index_0_1_2: runtime::FnvHashMap<(Math, Math, Math), runtime::SmallVec<[(); 1]>>,
+                hash_index_0_1_2: runtime::HashMap<(Math, Math, Math), runtime::SmallVec<[(); 1]>>,
                 math_num_uprooted_at_latest_retain: usize,
             }
             impl Relation for TriangleRelation {
@@ -10134,9 +10078,7 @@ fn triangle_join() {
                         writeln!(buf, "{}_{i} [shape = box];", "triangle").unwrap();
                     }
                 }
-                fn update_begin(&mut self, insertions: &[Self::Row], uf: &mut Unification) {
-                    use std::collections::hash_map::Entry;
-                }
+                fn update_begin(&mut self, insertions: &[Self::Row], uf: &mut Unification) {}
                 fn update(&mut self, insertions: &mut Vec<Self::Row>, uf: &mut Unification) -> bool {
                     if self.math_num_uprooted_at_latest_retain == uf.math_.num_uprooted() {
                         return false;
@@ -10147,7 +10089,6 @@ fn triangle_join() {
                     true
                 }
                 fn update_finalize(&mut self, insertions: &mut Vec<Self::Row>, uf: &mut Unification) {
-                    use std::collections::hash_map::Entry;
                     assert!(self.new.is_empty());
                     self.new.extend(
                         insertions
@@ -10519,11 +10460,11 @@ fn edgecase0() {
             #[derive(Debug, Default)]
             struct MulRelation {
                 new: Vec<<Self as Relation>::Row>,
-                hash_index_0_1: runtime::FnvHashMap<(Math, Math), (Math,)>,
-                hash_index_0: runtime::FnvHashMap<(Math,), runtime::SmallVec<[(Math, Math); 1]>>,
-                hash_index_2_0: runtime::FnvHashMap<(Math, Math), runtime::SmallVec<[(Math,); 1]>>,
-                hash_index_2: runtime::FnvHashMap<(Math,), runtime::SmallVec<[(Math, Math); 1]>>,
-                hash_index_0_1_2: runtime::FnvHashMap<(Math, Math, Math), runtime::SmallVec<[(); 1]>>,
+                hash_index_0_1: runtime::HashMap<(Math, Math), (Math,)>,
+                hash_index_0: runtime::HashMap<(Math,), runtime::SmallVec<[(Math, Math); 1]>>,
+                hash_index_2_0: runtime::HashMap<(Math, Math), runtime::SmallVec<[(Math,); 1]>>,
+                hash_index_2: runtime::HashMap<(Math,), runtime::SmallVec<[(Math, Math); 1]>>,
+                hash_index_0_1_2: runtime::HashMap<(Math, Math, Math), runtime::SmallVec<[(); 1]>>,
                 math_num_uprooted_at_latest_retain: usize,
             }
             impl Relation for MulRelation {
@@ -10555,17 +10496,16 @@ fn edgecase0() {
                     }
                 }
                 fn update_begin(&mut self, insertions: &[Self::Row], uf: &mut Unification) {
-                    use std::collections::hash_map::Entry;
-                    for &(mut x0, mut x1, mut x2) in &*insertions {
+                    for &(mut x0, mut x1, mut x2) in insertions {
                         match self
                             .hash_index_0_1
                             .entry((uf.math_.find(x0), uf.math_.find(x1)))
                         {
-                            Entry::Occupied(mut entry) => {
+                            runtime::HashMapEntry::Occupied(mut entry) => {
                                 let (y2,) = entry.get_mut();
                                 uf.math_.union_mut(&mut x2, y2);
                             }
-                            Entry::Vacant(entry) => {
+                            runtime::HashMapEntry::Vacant(entry) => {
                                 entry.insert((uf.math_.find(x2),));
                             }
                         }
@@ -10589,7 +10529,6 @@ fn edgecase0() {
                     true
                 }
                 fn update_finalize(&mut self, insertions: &mut Vec<Self::Row>, uf: &mut Unification) {
-                    use std::collections::hash_map::Entry;
                     assert!(self.new.is_empty());
                     self.new.extend(
                         self.hash_index_0_1
@@ -10736,10 +10675,10 @@ fn edgecase0() {
             #[derive(Debug, Default)]
             struct AddRelation {
                 new: Vec<<Self as Relation>::Row>,
-                hash_index_0_1: runtime::FnvHashMap<(Math, Math), (Math,)>,
-                hash_index_0: runtime::FnvHashMap<(Math,), runtime::SmallVec<[(Math, Math); 1]>>,
-                hash_index_1: runtime::FnvHashMap<(Math,), runtime::SmallVec<[(Math, Math); 1]>>,
-                hash_index_0_1_2: runtime::FnvHashMap<(Math, Math, Math), runtime::SmallVec<[(); 1]>>,
+                hash_index_0_1: runtime::HashMap<(Math, Math), (Math,)>,
+                hash_index_0: runtime::HashMap<(Math,), runtime::SmallVec<[(Math, Math); 1]>>,
+                hash_index_1: runtime::HashMap<(Math,), runtime::SmallVec<[(Math, Math); 1]>>,
+                hash_index_0_1_2: runtime::HashMap<(Math, Math, Math), runtime::SmallVec<[(); 1]>>,
                 math_num_uprooted_at_latest_retain: usize,
             }
             impl Relation for AddRelation {
@@ -10771,17 +10710,16 @@ fn edgecase0() {
                     }
                 }
                 fn update_begin(&mut self, insertions: &[Self::Row], uf: &mut Unification) {
-                    use std::collections::hash_map::Entry;
-                    for &(mut x0, mut x1, mut x2) in &*insertions {
+                    for &(mut x0, mut x1, mut x2) in insertions {
                         match self
                             .hash_index_0_1
                             .entry((uf.math_.find(x0), uf.math_.find(x1)))
                         {
-                            Entry::Occupied(mut entry) => {
+                            runtime::HashMapEntry::Occupied(mut entry) => {
                                 let (y2,) = entry.get_mut();
                                 uf.math_.union_mut(&mut x2, y2);
                             }
-                            Entry::Vacant(entry) => {
+                            runtime::HashMapEntry::Vacant(entry) => {
                                 entry.insert((uf.math_.find(x2),));
                             }
                         }
@@ -10805,7 +10743,6 @@ fn edgecase0() {
                     true
                 }
                 fn update_finalize(&mut self, insertions: &mut Vec<Self::Row>, uf: &mut Unification) {
-                    use std::collections::hash_map::Entry;
                     assert!(self.new.is_empty());
                     self.new.extend(
                         self.hash_index_0_1
@@ -11200,9 +11137,9 @@ fn test_into_codegen() {
             #[derive(Debug, Default)]
             struct MulRelation {
                 new: Vec<<Self as Relation>::Row>,
-                hash_index_0_1: runtime::FnvHashMap<(Math, Math), (Math,)>,
-                hash_index_0: runtime::FnvHashMap<(Math,), runtime::SmallVec<[(Math, Math); 1]>>,
-                hash_index_0_1_2: runtime::FnvHashMap<(Math, Math, Math), runtime::SmallVec<[(); 1]>>,
+                hash_index_0_1: runtime::HashMap<(Math, Math), (Math,)>,
+                hash_index_0: runtime::HashMap<(Math,), runtime::SmallVec<[(Math, Math); 1]>>,
+                hash_index_0_1_2: runtime::HashMap<(Math, Math, Math), runtime::SmallVec<[(); 1]>>,
                 math_num_uprooted_at_latest_retain: usize,
             }
             impl Relation for MulRelation {
@@ -11234,17 +11171,16 @@ fn test_into_codegen() {
                     }
                 }
                 fn update_begin(&mut self, insertions: &[Self::Row], uf: &mut Unification) {
-                    use std::collections::hash_map::Entry;
-                    for &(mut x0, mut x1, mut x2) in &*insertions {
+                    for &(mut x0, mut x1, mut x2) in insertions {
                         match self
                             .hash_index_0_1
                             .entry((uf.math_.find(x0), uf.math_.find(x1)))
                         {
-                            Entry::Occupied(mut entry) => {
+                            runtime::HashMapEntry::Occupied(mut entry) => {
                                 let (y2,) = entry.get_mut();
                                 uf.math_.union_mut(&mut x2, y2);
                             }
-                            Entry::Vacant(entry) => {
+                            runtime::HashMapEntry::Vacant(entry) => {
                                 entry.insert((uf.math_.find(x2),));
                             }
                         }
@@ -11268,7 +11204,6 @@ fn test_into_codegen() {
                     true
                 }
                 fn update_finalize(&mut self, insertions: &mut Vec<Self::Row>, uf: &mut Unification) {
-                    use std::collections::hash_map::Entry;
                     assert!(self.new.is_empty());
                     self.new.extend(
                         self.hash_index_0_1
@@ -11367,9 +11302,9 @@ fn test_into_codegen() {
             #[derive(Debug, Default)]
             struct AddRelation {
                 new: Vec<<Self as Relation>::Row>,
-                hash_index_0_1: runtime::FnvHashMap<(Math, Math), (Math,)>,
-                hash_index_2: runtime::FnvHashMap<(Math,), runtime::SmallVec<[(Math, Math); 1]>>,
-                hash_index_0_1_2: runtime::FnvHashMap<(Math, Math, Math), runtime::SmallVec<[(); 1]>>,
+                hash_index_0_1: runtime::HashMap<(Math, Math), (Math,)>,
+                hash_index_2: runtime::HashMap<(Math,), runtime::SmallVec<[(Math, Math); 1]>>,
+                hash_index_0_1_2: runtime::HashMap<(Math, Math, Math), runtime::SmallVec<[(); 1]>>,
                 math_num_uprooted_at_latest_retain: usize,
             }
             impl Relation for AddRelation {
@@ -11401,17 +11336,16 @@ fn test_into_codegen() {
                     }
                 }
                 fn update_begin(&mut self, insertions: &[Self::Row], uf: &mut Unification) {
-                    use std::collections::hash_map::Entry;
-                    for &(mut x0, mut x1, mut x2) in &*insertions {
+                    for &(mut x0, mut x1, mut x2) in insertions {
                         match self
                             .hash_index_0_1
                             .entry((uf.math_.find(x0), uf.math_.find(x1)))
                         {
-                            Entry::Occupied(mut entry) => {
+                            runtime::HashMapEntry::Occupied(mut entry) => {
                                 let (y2,) = entry.get_mut();
                                 uf.math_.union_mut(&mut x2, y2);
                             }
-                            Entry::Vacant(entry) => {
+                            runtime::HashMapEntry::Vacant(entry) => {
                                 entry.insert((uf.math_.find(x2),));
                             }
                         }
@@ -11435,7 +11369,6 @@ fn test_into_codegen() {
                     true
                 }
                 fn update_finalize(&mut self, insertions: &mut Vec<Self::Row>, uf: &mut Unification) {
-                    use std::collections::hash_map::Entry;
                     assert!(self.new.is_empty());
                     self.new.extend(
                         self.hash_index_0_1
