@@ -1,4 +1,4 @@
-use crate::runtime::RelationElement;
+use crate::runtime::{Eclass, RelationElement};
 
 /// Requirements to be used as an element in an index.
 /// Either a tuple or an element in a tuple.
@@ -96,6 +96,40 @@ pub trait SimdRow: IndexRow {
 // decl_row!(Row3_0_1<T0 first, T1, T2> (T0 0, T1 1) (T2 2));
 //           ^^^^^^^^^^^^^^^^^^^^^^^^^^               ^^^^
 //                generated type        value types and columns
+
+#[derive(Clone, Copy, PartialOrd, Ord, PartialEq, Eq)]
+#[repr(transparent)]
+pub struct RadixSortable<T>(T);
+#[allow(unsafe_code)]
+impl<T> RadixSortable<T> {
+    pub fn wrap<'a>(slice: &'a mut [T]) -> &'a mut [Self] {
+        // SAFETY: `Self` is `repr(transparent)` around `T`.
+        unsafe {
+            let slice: &'a mut [T] = slice;
+            let ptr: *mut T = slice.as_mut_ptr();
+            let len = slice.len();
+            let ptr: *mut Self = ptr as _;
+            let ret: &'a mut [Self] = std::slice::from_raw_parts_mut(ptr, len);
+            ret
+        }
+    }
+}
+
+macro_rules! radix_sortable_raw_row {
+    ($($ty_var:ident),*: $radix_key:ident; $inner:ident => $radix_impl:expr) => {
+        impl<$($ty_var : Eclass),*> $crate::runtime::Radixable<$radix_key> for RadixSortable<($($ty_var,)*)> {
+            type Key = $radix_key;
+            fn key(&self) -> Self::Key {
+                let $inner = self.0;
+                $radix_impl
+            }
+        }
+    }
+}
+radix_sortable_raw_row!(T1: u32; s => s.0.inner());
+radix_sortable_raw_row!(T1, T2: u64; s => ((s.0.inner() as u64) << 32) + (s.1.inner() as u64));
+radix_sortable_raw_row!(T1, T2, T3: u128; s => ((s.0.inner() as u128) << 64) + ((s.1.inner() as u128) << 32) + (s.2.inner() as u128));
+radix_sortable_raw_row!(T1, T2, T3, T4: u128; s => ((s.0.inner() as u128) << 96) + ((s.1.inner() as u128) << 64) + ((s.2.inner() as u128) << 32) + (s.3.inner() as u128));
 
 #[macro_export]
 macro_rules! decl_row {

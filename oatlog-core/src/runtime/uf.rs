@@ -11,10 +11,7 @@ pub struct UnionFind<T> {
     repr: Vec<u32>,
     /// Newly created eclasses since last `take_new`
     new: Vec<T>,
-    /// Uprooted eclasses as of before starting the latest canonicalization round.
-    uprooted_snapshot: Vec<T>,
-    /// Uprooted eclasses since last `uprooted` snapshotting.
-    uprooted: Vec<T>,
+    num_uprooted: usize,
 }
 impl<T> std::fmt::Debug for UnionFind<T> {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
@@ -37,8 +34,7 @@ impl<T: Eclass> UnionFind<T> {
         Self {
             repr: Vec::new(),
             new: Vec::new(),
-            uprooted_snapshot: Vec::new(),
-            uprooted: Vec::new(),
+            num_uprooted: 0,
         }
     }
     /// Sugar
@@ -64,16 +60,11 @@ impl<T: Eclass> UnionFind<T> {
         self.find(t) == t
     }
     #[inline]
-    pub fn already_canonical(&mut self, t: &mut T) -> bool {
-        let i = t.inner();
-        if self.repr[i as usize] == i {
-            true
-        } else {
-            let root = self.find_inner(self.repr[i as usize]);
-            self.repr[i as usize] = root;
-            *t = T::new(root);
-            false
-        }
+    pub fn is_root_mut(&mut self, t: &mut T) -> bool {
+        let r = self.find(*t);
+        let ret = r == *t;
+        *t = r;
+        ret
     }
     #[inline]
     fn find_inner(&mut self, i: u32) -> u32 {
@@ -94,7 +85,7 @@ impl<T: Eclass> UnionFind<T> {
         }
         let (root, uprooted) = (u32::min(a, b), u32::max(a, b));
         self.repr[uprooted as usize] = self.repr[root as usize];
-        self.uprooted.push(T::new(uprooted));
+        self.num_uprooted += 1;
         T::new(root)
     }
     #[inline]
@@ -114,18 +105,11 @@ impl<T: Eclass> UnionFind<T> {
         ret
     }
     #[inline]
-    pub fn create_uprooted_snapshot(&mut self) {
-        self.uprooted_snapshot.clear();
-        self.uprooted_snapshot.extend_from_slice(&self.uprooted);
-        self.uprooted_snapshot.sort_unstable();
-        self.uprooted.clear();
+    pub fn num_uprooted(&self) -> usize {
+        self.num_uprooted
     }
     #[inline]
-    pub fn get_uprooted_snapshot(&self) -> &[T] {
-        &self.uprooted_snapshot
-    }
-    #[inline]
-    pub fn has_new_uproots(&self) -> bool {
-        !self.uprooted.is_empty()
+    pub fn reset_num_uprooted(&mut self) {
+        self.num_uprooted = 0;
     }
 }

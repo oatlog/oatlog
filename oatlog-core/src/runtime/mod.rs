@@ -15,11 +15,17 @@ pub use crate::{
             EclassCtx, GeneralCtx, Index, IndexStatic, RowCtx, SortedVec, SortedVec as IndexImpl,
             dedup_suffix,
         },
-        row::{IndexRow, SimdRow},
+        row::{IndexRow, RadixSortable, SimdRow},
         uf::UnionFind,
     },
 };
-pub use std::{hash::Hash, mem::swap, mem::take};
+pub use fnv::FnvHashMap;
+pub use smallvec::SmallVec;
+pub use std::{
+    convert::Infallible,
+    hash::Hash,
+    mem::{swap, take},
+};
 pub use voracious_radix_sort::{RadixSort, Radixable};
 
 pub trait Clear: Sized {
@@ -39,7 +45,6 @@ impl<T> Clear for Vec<T> {
 
 pub trait Relation {
     type Row;
-    type UpdateCtx;
     type Unification;
 
     const COST: u32;
@@ -49,15 +54,10 @@ pub trait Relation {
     fn clear_new(&mut self);
     fn iter_new(&self) -> impl '_ + Iterator<Item = Self::Row>;
     fn len(&self) -> usize;
-    fn update(
-        &mut self,
-        insertions: &mut Vec<Self::Row>,
-        ctx: &mut Self::UpdateCtx,
-        uf: &mut Self::Unification,
-    );
-    fn update_begin(&self) -> Self::UpdateCtx;
-    fn update_finalize(&mut self, ctx: Self::UpdateCtx, uf: &mut Self::Unification);
     fn emit_graphviz(&self, buf: &mut String);
+    fn update_begin(&mut self, insertions: &[Self::Row], uf: &mut Self::Unification);
+    fn update(&mut self, insertions: &mut Vec<Self::Row>, uf: &mut Self::Unification) -> bool;
+    fn update_finalize(&mut self, insertions: &mut Vec<Self::Row>, uf: &mut Self::Unification);
 }
 
 relation_element_wrapper_ty!(IString);

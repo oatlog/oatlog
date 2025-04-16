@@ -135,9 +135,9 @@ fn comparative_test<
                     &mut scratch,
                     &mut $uf,
                     |uf: &mut UnionFind<Math>, row: &mut (Math, Math, Math)| {
-                        uf.already_canonical(&mut row.0)
-                            && uf.already_canonical(&mut row.1)
-                            && uf.already_canonical(&mut row.2)
+                        uf.is_root_mut(&mut row.0)
+                            && uf.is_root_mut(&mut row.1)
+                            && uf.is_root_mut(&mut row.2)
                     },
                     |uf: &mut UnionFind<Math>,
                      x: &mut Row3_0_1<_, _, _>,

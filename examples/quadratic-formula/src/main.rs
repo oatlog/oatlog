@@ -84,7 +84,7 @@ fn run(sink: &mut impl std::io::Write) {
     let zero = theory.make();
     theory.insert_zero((zero,));
 
-    const ITERS: usize = 100;
+    const ITERS: usize = 10;
     let mut last = 0;
     for i in 0..ITERS {
         theory.step();

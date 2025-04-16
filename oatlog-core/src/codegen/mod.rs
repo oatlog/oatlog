@@ -155,28 +155,24 @@ pub fn codegen(theory: &Theory) -> TokenStream {
             #[inline(never)]
             pub fn canonicalize(&mut self) {
                 #(self.#relation_ident.clear_new();)*
-                if !self.delta.has_new_inserts() && !self.uf.has_new_uproots() {
+                if !self.delta.has_new_inserts() && self.uf.num_uprooted() == 0 {
                     return;
                 }
-                #(let mut #rel_ctx_ident = self.#relation_ident.update_begin();)*
+                #(self.#relation_ident.update_begin(&mut self.delta.#delta_row, &mut self.uf);)*
                 loop {
-                    self.uf.snapshot_all_uprooted();
-                    #(
-                        self.#relation_ident.update(&mut self.delta.#delta_row, &mut #rel_ctx_ident, &mut self.uf);
-                    )*
-                    if !self.uf.has_new_uproots() {
+                    let mut progress = false;
+                    #(progress |= self.#relation_ident.update(&mut self.delta.#delta_row, &mut self.uf);)*
+                    if !progress {
                         break;
                     }
                 }
-                // clear snapshots
-                self.uf.snapshot_all_uprooted();
+                #(self.#relation_ident.update_finalize(&mut self.delta.#delta_row, &mut self.uf);)*
 
                 #(
                     self.#global_type_symbolic.update(&mut self.uf.#global_type_symbolic_uf);
                 )*
                 #( self.#global_type.update_finalize(); )*
-
-                #(self.#relation_ident.update_finalize(#rel_ctx_ident, &mut self.uf);)*
+                self.uf.reset_num_uprooted();
             }
         }
     };
@@ -217,13 +213,13 @@ pub fn codegen(theory: &Theory) -> TokenStream {
             #(pub #uf_ident: UnionFind<#uf_ty>,)*
         }
         impl Unification {
-            fn has_new_uproots(&mut self) -> bool {
-                let mut ret = false;
-                #(ret |= self.#uf_ident.has_new_uproots();)*
+            fn num_uprooted(&mut self) -> usize {
+                let mut ret = 0;
+                #(ret += self.#uf_ident.num_uprooted();)*
                 ret
             }
-            fn snapshot_all_uprooted(&mut self) {
-                #(self.#uf_ident.create_uprooted_snapshot();)*
+            fn reset_num_uprooted(&mut self) {
+                #(self.#uf_ident.reset_num_uprooted();)*
             }
         }
 
@@ -610,6 +606,10 @@ mod ident {
     pub fn type_uf(ty: &TypeData) -> Ident {
         format_ident!("{}_", ty.name.to_snake_case())
     }
+    /// `math_num_uprooted_at_latest_retain`
+    pub fn type_num_uprooted_at_latest_retain(ty: &TypeData) -> Ident {
+        format_ident!("{}_num_uprooted_at_latest_retain", ty.name.to_snake_case())
+    }
     /// `MathRelation`, `AddRelation`
     pub fn rel_ty(rel: &RelationData) -> Ident {
         format_ident!("{}Relation", rel.name.to_pascal_case())
@@ -653,6 +653,14 @@ mod ident {
             .map(|ColumnId(x)| format!("{x}"))
             .join("_");
         format_ident!("all_index_{perm}")
+    }
+    /// `hash_index_0_1`
+    pub fn index_usage_field(key_columns: &[ColumnId]) -> Ident {
+        let keys = key_columns
+            .iter()
+            .map(|ColumnId(x)| format!("{x}"))
+            .join("_");
+        format_ident!("hash_index_{keys}")
     }
     /// `Row3_2_0`
     pub fn index_all_row(index: &IndexInfo) -> Ident {

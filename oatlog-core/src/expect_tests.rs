@@ -1283,17 +1283,14 @@ fn codegen_constant_propagation() {
             #[derive(Debug, Default)]
             struct AddRelation {
                 new: Vec<<Self as Relation>::Row>,
-                all_index_0_1_2: SortedVec<EclassCtx<Row3_0_1<Math, Math, Math>, u128>>,
-                all_index_1_0_2: SortedVec<EclassCtx<Row3_1_0_2<Math, Math, Math>, u128>>,
-            }
-            struct AddUpdateCtx {
-                scratch: Vec<(Math, Math, Math)>,
-                deferred_insertions: Vec<(Math, Math, Math)>,
-                old: SortedVec<EclassCtx<Row3_0_1<Math, Math, Math>, u128>>,
+                hash_index_0_1: runtime::FnvHashMap<(Math, Math), (Math,)>,
+                hash_index_0: runtime::FnvHashMap<(Math,), runtime::SmallVec<[(Math, Math); 1]>>,
+                hash_index_1: runtime::FnvHashMap<(Math,), runtime::SmallVec<[(Math, Math); 1]>>,
+                hash_index_0_1_2: runtime::FnvHashMap<(Math, Math, Math), runtime::SmallVec<[(); 1]>>,
+                math_num_uprooted_at_latest_retain: usize,
             }
             impl Relation for AddRelation {
                 type Row = (Math, Math, Math);
-                type UpdateCtx = AddUpdateCtx;
                 type Unification = Unification;
                 const COST: u32 = 6u32;
                 fn new() -> Self {
@@ -1309,94 +1306,130 @@ fn codegen_constant_propagation() {
                     self.new.iter().copied()
                 }
                 fn len(&self) -> usize {
-                    self.all_index_0_1_2.len()
+                    self.hash_index_0_1.len()
                 }
                 fn emit_graphviz(&self, buf: &mut String) {
                     use std::fmt::Write;
-                    for (i, (x0, x1, x2)) in self.all_index_0_1_2.iter().enumerate() {
+                    for (i, ((x0, x1), (x2,))) in self.hash_index_0_1.iter().enumerate() {
                         writeln!(buf, "{}_{i} -> {}_{};", "add", "math", x0).unwrap();
                         writeln!(buf, "{}_{i} -> {}_{};", "add", "math", x1).unwrap();
                         writeln!(buf, "{}_{i} -> {}_{};", "add", "math", x2).unwrap();
                         writeln!(buf, "{}_{i} [shape = box];", "add").unwrap();
                     }
                 }
-                fn update(
-                    &mut self,
-                    insertions: &mut Vec<Self::Row>,
-                    ctx: &mut Self::UpdateCtx,
-                    uf: &mut Unification,
-                ) {
-                    insertions.iter_mut().for_each(|row| {
-                        row.0 = uf.math_.find(row.0);
-                        row.1 = uf.math_.find(row.1);
-                        row.2 = uf.math_.find(row.2);
-                    });
-                    let already_canon = |uf: &mut Unification, row: &mut Self::Row| {
-                        uf.math_.already_canonical(&mut row.0)
-                            && uf.math_.already_canonical(&mut row.1)
-                            && uf.math_.already_canonical(&mut row.2)
-                    };
-                    let mut ran_merge = false;
-                    loop {
-                        self.all_index_0_1_2.sorted_vec_update(
-                            insertions,
-                            &mut ctx.deferred_insertions,
-                            &mut ctx.scratch,
-                            uf,
-                            already_canon,
-                            |uf, x, mut y| {
-                                ran_merge = true;
-                                let (x2,) = x.value_mut();
-                                let (y2,) = y.value_mut();
-                                uf.math_.union_mut(x2, y2);
-                            },
-                        );
-                        if ctx.deferred_insertions.is_empty() && ran_merge == false {
-                            break;
+                fn update_begin(&mut self, insertions: &[Self::Row], uf: &mut Unification) {
+                    use std::collections::hash_map::Entry;
+                    for &(mut x0, mut x1, mut x2) in &*insertions {
+                        match self
+                            .hash_index_0_1
+                            .entry((uf.math_.find(x0), uf.math_.find(x1)))
+                        {
+                            Entry::Occupied(mut entry) => {
+                                let (y2,) = entry.get_mut();
+                                uf.math_.union_mut(&mut x2, y2);
+                            }
+                            Entry::Vacant(entry) => {
+                                entry.insert((uf.math_.find(x2),));
+                            }
                         }
-                        ran_merge = false;
-                        std::mem::swap(insertions, &mut ctx.deferred_insertions);
-                        ctx.deferred_insertions.clear();
                     }
+                }
+                fn update(&mut self, insertions: &mut Vec<Self::Row>, uf: &mut Unification) -> bool {
+                    if self.math_num_uprooted_at_latest_retain == uf.math_.num_uprooted() {
+                        return false;
+                    }
+                    self.math_num_uprooted_at_latest_retain = uf.math_.num_uprooted();
+                    let offset = insertions.len();
+                    self.hash_index_0_1.retain(|&(x0, x1), &mut (x2,)| {
+                        if uf.math_.is_root(x0) && uf.math_.is_root(x1) && uf.math_.is_root(x2) {
+                            true
+                        } else {
+                            insertions.push((x0, x1, x2));
+                            false
+                        }
+                    });
+                    self.update_begin(&insertions[offset..], uf);
+                    true
+                }
+                fn update_finalize(&mut self, insertions: &mut Vec<Self::Row>, uf: &mut Unification) {
+                    use std::collections::hash_map::Entry;
+                    assert!(self.new.is_empty());
+                    self.new.extend(
+                        insertions
+                            .iter()
+                            .map(|&(x0, x1, x2)| (uf.math_.find(x0), uf.math_.find(x1), uf.math_.find(x2)))
+                            .filter(|&(x0, x1, x2)| !self.hash_index_0_1_2.contains_key(&(x0, x1, x2))),
+                    );
                     insertions.clear();
-                    assert!(ctx.scratch.is_empty());
-                    assert!(ctx.deferred_insertions.is_empty());
-                }
-                fn update_begin(&self) -> Self::UpdateCtx {
-                    AddUpdateCtx {
-                        scratch: Vec::new(),
-                        deferred_insertions: Vec::new(),
-                        old: self.all_index_0_1_2.clone(),
+                    RadixSortable::wrap(&mut self.new).voracious_sort();
+                    self.new.dedup();
+                    for &(x0, x1, x2) in &self.new {
+                        self.hash_index_0
+                            .entry((uf.math_.find(x0),))
+                            .or_default()
+                            .push((uf.math_.find(x1), uf.math_.find(x2)));
                     }
-                }
-                fn update_finalize(&mut self, ctx: Self::UpdateCtx, uf: &mut Unification) {
-                    self.all_index_0_1_2.finalize();
-                    self.all_index_1_0_2
-                        .recreate_from(&self.all_index_0_1_2.as_slice());
-                    assert_eq!(self.all_index_1_0_2.len(), self.all_index_0_1_2.len());
-                    self.new.extend(self.all_index_0_1_2.minus(&ctx.old));
+                    self.hash_index_0.retain(|&(x0,), v| {
+                        if uf.math_.is_root(x0) {
+                            v.retain(|&mut (x1, x2)| uf.math_.is_root(x1) && uf.math_.is_root(x2));
+                            v.sort_unstable();
+                            v.dedup();
+                            true
+                        } else {
+                            false
+                        }
+                    });
+                    for &(x0, x1, x2) in &self.new {
+                        self.hash_index_1
+                            .entry((uf.math_.find(x1),))
+                            .or_default()
+                            .push((uf.math_.find(x0), uf.math_.find(x2)));
+                    }
+                    self.hash_index_1.retain(|&(x1,), v| {
+                        if uf.math_.is_root(x1) {
+                            v.retain(|&mut (x0, x2)| uf.math_.is_root(x0) && uf.math_.is_root(x2));
+                            v.sort_unstable();
+                            v.dedup();
+                            true
+                        } else {
+                            false
+                        }
+                    });
+                    for &(x0, x1, x2) in &self.new {
+                        self.hash_index_0_1_2
+                            .entry((uf.math_.find(x0), uf.math_.find(x1), uf.math_.find(x2)))
+                            .or_default()
+                            .push(());
+                    }
+                    self.hash_index_0_1_2.retain(|&(x0, x1, x2), v| {
+                        if uf.math_.is_root(x0) && uf.math_.is_root(x1) && uf.math_.is_root(x2) {
+                            v.retain(|&mut ()| true);
+                            v.sort_unstable();
+                            v.dedup();
+                            true
+                        } else {
+                            false
+                        }
+                    });
+                    self.math_num_uprooted_at_latest_retain = 0;
                 }
             }
             impl AddRelation {
                 fn iter2_0_1_2(&self, x0: Math, x1: Math) -> impl Iterator<Item = (Math,)> + use<'_> {
-                    self.all_index_0_1_2
-                        .range((x0, x1, Math::MIN_ID)..=(x0, x1, Math::MAX_ID))
-                        .map(|(x0, x1, x2)| (x2,))
+                    self.hash_index_0_1.get(&(x0, x1)).into_iter().copied()
                 }
                 fn iter1_0_1_2(&self, x0: Math) -> impl Iterator<Item = (Math, Math)> + use<'_> {
-                    self.all_index_0_1_2
-                        .range((x0, Math::MIN_ID, Math::MIN_ID)..=(x0, Math::MAX_ID, Math::MAX_ID))
-                        .map(|(x0, x1, x2)| (x1, x2))
+                    self.hash_index_0.get(&(x0,)).into_iter().flatten().copied()
                 }
                 fn iter1_1_0_2(&self, x1: Math) -> impl Iterator<Item = (Math, Math)> + use<'_> {
-                    self.all_index_1_0_2
-                        .range((Math::MIN_ID, x1, Math::MIN_ID)..=(Math::MAX_ID, x1, Math::MAX_ID))
-                        .map(|(x0, x1, x2)| (x0, x2))
+                    self.hash_index_1.get(&(x1,)).into_iter().flatten().copied()
                 }
                 fn iter3_0_1_2(&self, x0: Math, x1: Math, x2: Math) -> impl Iterator<Item = ()> + use<'_> {
-                    self.all_index_0_1_2
-                        .range((x0, x1, x2)..=(x0, x1, x2))
-                        .map(|(x0, x1, x2)| ())
+                    self.hash_index_0_1_2
+                        .get(&(x0, x1, x2))
+                        .into_iter()
+                        .flatten()
+                        .copied()
                 }
                 fn check2_0_1_2(&self, x0: Math, x1: Math) -> bool {
                     self.iter2_0_1_2(x0, x1).next().is_some()
@@ -1438,17 +1471,14 @@ fn codegen_constant_propagation() {
             #[derive(Debug, Default)]
             struct MulRelation {
                 new: Vec<<Self as Relation>::Row>,
-                all_index_0_1_2: SortedVec<EclassCtx<Row3_0_1<Math, Math, Math>, u128>>,
-                all_index_1_0_2: SortedVec<EclassCtx<Row3_1_0_2<Math, Math, Math>, u128>>,
-            }
-            struct MulUpdateCtx {
-                scratch: Vec<(Math, Math, Math)>,
-                deferred_insertions: Vec<(Math, Math, Math)>,
-                old: SortedVec<EclassCtx<Row3_0_1<Math, Math, Math>, u128>>,
+                hash_index_0_1: runtime::FnvHashMap<(Math, Math), (Math,)>,
+                hash_index_0: runtime::FnvHashMap<(Math,), runtime::SmallVec<[(Math, Math); 1]>>,
+                hash_index_1: runtime::FnvHashMap<(Math,), runtime::SmallVec<[(Math, Math); 1]>>,
+                hash_index_0_1_2: runtime::FnvHashMap<(Math, Math, Math), runtime::SmallVec<[(); 1]>>,
+                math_num_uprooted_at_latest_retain: usize,
             }
             impl Relation for MulRelation {
                 type Row = (Math, Math, Math);
-                type UpdateCtx = MulUpdateCtx;
                 type Unification = Unification;
                 const COST: u32 = 6u32;
                 fn new() -> Self {
@@ -1464,94 +1494,130 @@ fn codegen_constant_propagation() {
                     self.new.iter().copied()
                 }
                 fn len(&self) -> usize {
-                    self.all_index_0_1_2.len()
+                    self.hash_index_0_1.len()
                 }
                 fn emit_graphviz(&self, buf: &mut String) {
                     use std::fmt::Write;
-                    for (i, (x0, x1, x2)) in self.all_index_0_1_2.iter().enumerate() {
+                    for (i, ((x0, x1), (x2,))) in self.hash_index_0_1.iter().enumerate() {
                         writeln!(buf, "{}_{i} -> {}_{};", "mul", "math", x0).unwrap();
                         writeln!(buf, "{}_{i} -> {}_{};", "mul", "math", x1).unwrap();
                         writeln!(buf, "{}_{i} -> {}_{};", "mul", "math", x2).unwrap();
                         writeln!(buf, "{}_{i} [shape = box];", "mul").unwrap();
                     }
                 }
-                fn update(
-                    &mut self,
-                    insertions: &mut Vec<Self::Row>,
-                    ctx: &mut Self::UpdateCtx,
-                    uf: &mut Unification,
-                ) {
-                    insertions.iter_mut().for_each(|row| {
-                        row.0 = uf.math_.find(row.0);
-                        row.1 = uf.math_.find(row.1);
-                        row.2 = uf.math_.find(row.2);
-                    });
-                    let already_canon = |uf: &mut Unification, row: &mut Self::Row| {
-                        uf.math_.already_canonical(&mut row.0)
-                            && uf.math_.already_canonical(&mut row.1)
-                            && uf.math_.already_canonical(&mut row.2)
-                    };
-                    let mut ran_merge = false;
-                    loop {
-                        self.all_index_0_1_2.sorted_vec_update(
-                            insertions,
-                            &mut ctx.deferred_insertions,
-                            &mut ctx.scratch,
-                            uf,
-                            already_canon,
-                            |uf, x, mut y| {
-                                ran_merge = true;
-                                let (x2,) = x.value_mut();
-                                let (y2,) = y.value_mut();
-                                uf.math_.union_mut(x2, y2);
-                            },
-                        );
-                        if ctx.deferred_insertions.is_empty() && ran_merge == false {
-                            break;
+                fn update_begin(&mut self, insertions: &[Self::Row], uf: &mut Unification) {
+                    use std::collections::hash_map::Entry;
+                    for &(mut x0, mut x1, mut x2) in &*insertions {
+                        match self
+                            .hash_index_0_1
+                            .entry((uf.math_.find(x0), uf.math_.find(x1)))
+                        {
+                            Entry::Occupied(mut entry) => {
+                                let (y2,) = entry.get_mut();
+                                uf.math_.union_mut(&mut x2, y2);
+                            }
+                            Entry::Vacant(entry) => {
+                                entry.insert((uf.math_.find(x2),));
+                            }
                         }
-                        ran_merge = false;
-                        std::mem::swap(insertions, &mut ctx.deferred_insertions);
-                        ctx.deferred_insertions.clear();
                     }
+                }
+                fn update(&mut self, insertions: &mut Vec<Self::Row>, uf: &mut Unification) -> bool {
+                    if self.math_num_uprooted_at_latest_retain == uf.math_.num_uprooted() {
+                        return false;
+                    }
+                    self.math_num_uprooted_at_latest_retain = uf.math_.num_uprooted();
+                    let offset = insertions.len();
+                    self.hash_index_0_1.retain(|&(x0, x1), &mut (x2,)| {
+                        if uf.math_.is_root(x0) && uf.math_.is_root(x1) && uf.math_.is_root(x2) {
+                            true
+                        } else {
+                            insertions.push((x0, x1, x2));
+                            false
+                        }
+                    });
+                    self.update_begin(&insertions[offset..], uf);
+                    true
+                }
+                fn update_finalize(&mut self, insertions: &mut Vec<Self::Row>, uf: &mut Unification) {
+                    use std::collections::hash_map::Entry;
+                    assert!(self.new.is_empty());
+                    self.new.extend(
+                        insertions
+                            .iter()
+                            .map(|&(x0, x1, x2)| (uf.math_.find(x0), uf.math_.find(x1), uf.math_.find(x2)))
+                            .filter(|&(x0, x1, x2)| !self.hash_index_0_1_2.contains_key(&(x0, x1, x2))),
+                    );
                     insertions.clear();
-                    assert!(ctx.scratch.is_empty());
-                    assert!(ctx.deferred_insertions.is_empty());
-                }
-                fn update_begin(&self) -> Self::UpdateCtx {
-                    MulUpdateCtx {
-                        scratch: Vec::new(),
-                        deferred_insertions: Vec::new(),
-                        old: self.all_index_0_1_2.clone(),
+                    RadixSortable::wrap(&mut self.new).voracious_sort();
+                    self.new.dedup();
+                    for &(x0, x1, x2) in &self.new {
+                        self.hash_index_0
+                            .entry((uf.math_.find(x0),))
+                            .or_default()
+                            .push((uf.math_.find(x1), uf.math_.find(x2)));
                     }
-                }
-                fn update_finalize(&mut self, ctx: Self::UpdateCtx, uf: &mut Unification) {
-                    self.all_index_0_1_2.finalize();
-                    self.all_index_1_0_2
-                        .recreate_from(&self.all_index_0_1_2.as_slice());
-                    assert_eq!(self.all_index_1_0_2.len(), self.all_index_0_1_2.len());
-                    self.new.extend(self.all_index_0_1_2.minus(&ctx.old));
+                    self.hash_index_0.retain(|&(x0,), v| {
+                        if uf.math_.is_root(x0) {
+                            v.retain(|&mut (x1, x2)| uf.math_.is_root(x1) && uf.math_.is_root(x2));
+                            v.sort_unstable();
+                            v.dedup();
+                            true
+                        } else {
+                            false
+                        }
+                    });
+                    for &(x0, x1, x2) in &self.new {
+                        self.hash_index_1
+                            .entry((uf.math_.find(x1),))
+                            .or_default()
+                            .push((uf.math_.find(x0), uf.math_.find(x2)));
+                    }
+                    self.hash_index_1.retain(|&(x1,), v| {
+                        if uf.math_.is_root(x1) {
+                            v.retain(|&mut (x0, x2)| uf.math_.is_root(x0) && uf.math_.is_root(x2));
+                            v.sort_unstable();
+                            v.dedup();
+                            true
+                        } else {
+                            false
+                        }
+                    });
+                    for &(x0, x1, x2) in &self.new {
+                        self.hash_index_0_1_2
+                            .entry((uf.math_.find(x0), uf.math_.find(x1), uf.math_.find(x2)))
+                            .or_default()
+                            .push(());
+                    }
+                    self.hash_index_0_1_2.retain(|&(x0, x1, x2), v| {
+                        if uf.math_.is_root(x0) && uf.math_.is_root(x1) && uf.math_.is_root(x2) {
+                            v.retain(|&mut ()| true);
+                            v.sort_unstable();
+                            v.dedup();
+                            true
+                        } else {
+                            false
+                        }
+                    });
+                    self.math_num_uprooted_at_latest_retain = 0;
                 }
             }
             impl MulRelation {
                 fn iter2_0_1_2(&self, x0: Math, x1: Math) -> impl Iterator<Item = (Math,)> + use<'_> {
-                    self.all_index_0_1_2
-                        .range((x0, x1, Math::MIN_ID)..=(x0, x1, Math::MAX_ID))
-                        .map(|(x0, x1, x2)| (x2,))
+                    self.hash_index_0_1.get(&(x0, x1)).into_iter().copied()
                 }
                 fn iter1_0_1_2(&self, x0: Math) -> impl Iterator<Item = (Math, Math)> + use<'_> {
-                    self.all_index_0_1_2
-                        .range((x0, Math::MIN_ID, Math::MIN_ID)..=(x0, Math::MAX_ID, Math::MAX_ID))
-                        .map(|(x0, x1, x2)| (x1, x2))
+                    self.hash_index_0.get(&(x0,)).into_iter().flatten().copied()
                 }
                 fn iter1_1_0_2(&self, x1: Math) -> impl Iterator<Item = (Math, Math)> + use<'_> {
-                    self.all_index_1_0_2
-                        .range((Math::MIN_ID, x1, Math::MIN_ID)..=(Math::MAX_ID, x1, Math::MAX_ID))
-                        .map(|(x0, x1, x2)| (x0, x2))
+                    self.hash_index_1.get(&(x1,)).into_iter().flatten().copied()
                 }
                 fn iter3_0_1_2(&self, x0: Math, x1: Math, x2: Math) -> impl Iterator<Item = ()> + use<'_> {
-                    self.all_index_0_1_2
-                        .range((x0, x1, x2)..=(x0, x1, x2))
-                        .map(|(x0, x1, x2)| ())
+                    self.hash_index_0_1_2
+                        .get(&(x0, x1, x2))
+                        .into_iter()
+                        .flatten()
+                        .copied()
                 }
                 fn check2_0_1_2(&self, x0: Math, x1: Math) -> bool {
                     self.iter2_0_1_2(x0, x1).next().is_some()
@@ -1593,17 +1659,14 @@ fn codegen_constant_propagation() {
             #[derive(Debug, Default)]
             struct ConstRelation {
                 new: Vec<<Self as Relation>::Row>,
-                all_index_0_1: SortedVec<GeneralCtx<Row2_0<std::primitive::i64, Math>>>,
-                all_index_1_0: SortedVec<GeneralCtx<Row2_1_0<std::primitive::i64, Math>>>,
-            }
-            struct ConstUpdateCtx {
-                scratch: Vec<(std::primitive::i64, Math)>,
-                deferred_insertions: Vec<(std::primitive::i64, Math)>,
-                old: SortedVec<GeneralCtx<Row2_0<std::primitive::i64, Math>>>,
+                hash_index_0: runtime::FnvHashMap<(std::primitive::i64,), (Math,)>,
+                hash_index_1: runtime::FnvHashMap<(Math,), runtime::SmallVec<[(std::primitive::i64,); 1]>>,
+                hash_index_0_1: runtime::FnvHashMap<(std::primitive::i64, Math), runtime::SmallVec<[(); 1]>>,
+                i64_num_uprooted_at_latest_retain: usize,
+                math_num_uprooted_at_latest_retain: usize,
             }
             impl Relation for ConstRelation {
                 type Row = (std::primitive::i64, Math);
-                type UpdateCtx = ConstUpdateCtx;
                 type Unification = Unification;
                 const COST: u32 = 4u32;
                 fn new() -> Self {
@@ -1619,83 +1682,107 @@ fn codegen_constant_propagation() {
                     self.new.iter().copied()
                 }
                 fn len(&self) -> usize {
-                    self.all_index_0_1.len()
+                    self.hash_index_0.len()
                 }
                 fn emit_graphviz(&self, buf: &mut String) {
                     use std::fmt::Write;
-                    for (i, (x0, x1)) in self.all_index_0_1.iter().enumerate() {
+                    for (i, ((x0,), (x1,))) in self.hash_index_0.iter().enumerate() {
                         writeln!(buf, "{}_{i} -> {}_{};", "const", "i64", x0).unwrap();
                         writeln!(buf, "{}_{i} -> {}_{};", "const", "math", x1).unwrap();
                         writeln!(buf, "{}_{i} [shape = box];", "const").unwrap();
                     }
                 }
-                fn update(
-                    &mut self,
-                    insertions: &mut Vec<Self::Row>,
-                    ctx: &mut Self::UpdateCtx,
-                    uf: &mut Unification,
-                ) {
-                    insertions.iter_mut().for_each(|row| {
-                        row.1 = uf.math_.find(row.1);
-                    });
-                    let already_canon =
-                        |uf: &mut Unification, row: &mut Self::Row| uf.math_.already_canonical(&mut row.1);
-                    let mut ran_merge = false;
-                    loop {
-                        self.all_index_0_1.sorted_vec_update(
-                            insertions,
-                            &mut ctx.deferred_insertions,
-                            &mut ctx.scratch,
-                            uf,
-                            already_canon,
-                            |uf, x, mut y| {
-                                ran_merge = true;
-                                let (x1,) = x.value_mut();
-                                let (y1,) = y.value_mut();
-                                uf.math_.union_mut(x1, y1);
-                            },
-                        );
-                        if ctx.deferred_insertions.is_empty() && ran_merge == false {
-                            break;
+                fn update_begin(&mut self, insertions: &[Self::Row], uf: &mut Unification) {
+                    use std::collections::hash_map::Entry;
+                    for &(mut x0, mut x1) in &*insertions {
+                        match self.hash_index_0.entry((x0,)) {
+                            Entry::Occupied(mut entry) => {
+                                let (y1,) = entry.get_mut();
+                                uf.math_.union_mut(&mut x1, y1);
+                            }
+                            Entry::Vacant(entry) => {
+                                entry.insert((uf.math_.find(x1),));
+                            }
                         }
-                        ran_merge = false;
-                        std::mem::swap(insertions, &mut ctx.deferred_insertions);
-                        ctx.deferred_insertions.clear();
                     }
+                }
+                fn update(&mut self, insertions: &mut Vec<Self::Row>, uf: &mut Unification) -> bool {
+                    if self.math_num_uprooted_at_latest_retain == uf.math_.num_uprooted() {
+                        return false;
+                    }
+                    self.math_num_uprooted_at_latest_retain = uf.math_.num_uprooted();
+                    let offset = insertions.len();
+                    self.hash_index_0.retain(|&(x0,), &mut (x1,)| {
+                        if uf.math_.is_root(x1) {
+                            true
+                        } else {
+                            insertions.push((x0, x1));
+                            false
+                        }
+                    });
+                    self.update_begin(&insertions[offset..], uf);
+                    true
+                }
+                fn update_finalize(&mut self, insertions: &mut Vec<Self::Row>, uf: &mut Unification) {
+                    use std::collections::hash_map::Entry;
+                    assert!(self.new.is_empty());
+                    self.new.extend(
+                        insertions
+                            .iter()
+                            .map(|&(x0, x1)| (x0, uf.math_.find(x1)))
+                            .filter(|&(x0, x1)| !self.hash_index_0_1.contains_key(&(x0, x1))),
+                    );
                     insertions.clear();
-                    assert!(ctx.scratch.is_empty());
-                    assert!(ctx.deferred_insertions.is_empty());
-                }
-                fn update_begin(&self) -> Self::UpdateCtx {
-                    ConstUpdateCtx {
-                        scratch: Vec::new(),
-                        deferred_insertions: Vec::new(),
-                        old: self.all_index_0_1.clone(),
+                    self.new.sort_unstable();
+                    self.new.dedup();
+                    for &(x0, x1) in &self.new {
+                        self.hash_index_1
+                            .entry((uf.math_.find(x1),))
+                            .or_default()
+                            .push((x0,));
                     }
-                }
-                fn update_finalize(&mut self, ctx: Self::UpdateCtx, uf: &mut Unification) {
-                    self.all_index_0_1.finalize();
-                    self.all_index_1_0
-                        .recreate_from(&self.all_index_0_1.as_slice());
-                    assert_eq!(self.all_index_1_0.len(), self.all_index_0_1.len());
-                    self.new.extend(self.all_index_0_1.minus(&ctx.old));
+                    self.hash_index_1.retain(|&(x1,), v| {
+                        if uf.math_.is_root(x1) {
+                            v.retain(|&mut (x0,)| true);
+                            v.sort_unstable();
+                            v.dedup();
+                            true
+                        } else {
+                            false
+                        }
+                    });
+                    for &(x0, x1) in &self.new {
+                        self.hash_index_0_1
+                            .entry((x0, uf.math_.find(x1)))
+                            .or_default()
+                            .push(());
+                    }
+                    self.hash_index_0_1.retain(|&(x0, x1), v| {
+                        if uf.math_.is_root(x1) {
+                            v.retain(|&mut ()| true);
+                            v.sort_unstable();
+                            v.dedup();
+                            true
+                        } else {
+                            false
+                        }
+                    });
+                    self.math_num_uprooted_at_latest_retain = 0;
                 }
             }
             impl ConstRelation {
                 fn iter1_0_1(&self, x0: std::primitive::i64) -> impl Iterator<Item = (Math,)> + use<'_> {
-                    self.all_index_0_1
-                        .range((x0, Math::MIN_ID)..=(x0, Math::MAX_ID))
-                        .map(|(x0, x1)| (x1,))
+                    self.hash_index_0.get(&(x0,)).into_iter().copied()
                 }
                 fn iter1_1_0(&self, x1: Math) -> impl Iterator<Item = (std::primitive::i64,)> + use<'_> {
-                    self.all_index_1_0
-                        .range((std::primitive::i64::MIN_ID, x1)..=(std::primitive::i64::MAX_ID, x1))
-                        .map(|(x0, x1)| (x0,))
+                    self.hash_index_1.get(&(x1,)).into_iter().flatten().copied()
                 }
                 fn iter2_0_1(&self, x0: std::primitive::i64, x1: Math) -> impl Iterator<Item = ()> + use<'_> {
-                    self.all_index_0_1
-                        .range((x0, x1)..=(x0, x1))
-                        .map(|(x0, x1)| ())
+                    self.hash_index_0_1
+                        .get(&(x0, x1))
+                        .into_iter()
+                        .flatten()
+                        .copied()
                 }
                 fn check1_0_1(&self, x0: std::primitive::i64) -> bool {
                     self.iter1_0_1(x0).next().is_some()
@@ -1767,13 +1854,13 @@ fn codegen_constant_propagation() {
                 pub math_: UnionFind<Math>,
             }
             impl Unification {
-                fn has_new_uproots(&mut self) -> bool {
-                    let mut ret = false;
-                    ret |= self.math_.has_new_uproots();
+                fn num_uprooted(&mut self) -> usize {
+                    let mut ret = 0;
+                    ret += self.math_.num_uprooted();
                     ret
                 }
-                fn snapshot_all_uprooted(&mut self) {
-                    self.math_.create_uprooted_snapshot();
+                fn reset_num_uprooted(&mut self) {
+                    self.math_.reset_num_uprooted();
                 }
             }
             #[derive(Debug, Default)]
@@ -1892,28 +1979,29 @@ fn codegen_constant_propagation() {
                     self.add_.clear_new();
                     self.mul_.clear_new();
                     self.const_.clear_new();
-                    if !self.delta.has_new_inserts() && !self.uf.has_new_uproots() {
+                    if !self.delta.has_new_inserts() && self.uf.num_uprooted() == 0 {
                         return;
                     }
-                    let mut add_ctx = self.add_.update_begin();
-                    let mut mul_ctx = self.mul_.update_begin();
-                    let mut const_ctx = self.const_.update_begin();
+                    self.add_.update_begin(&mut self.delta.add_, &mut self.uf);
+                    self.mul_.update_begin(&mut self.delta.mul_, &mut self.uf);
+                    self.const_
+                        .update_begin(&mut self.delta.const_, &mut self.uf);
                     loop {
-                        self.uf.snapshot_all_uprooted();
-                        self.add_
-                            .update(&mut self.delta.add_, &mut add_ctx, &mut self.uf);
-                        self.mul_
-                            .update(&mut self.delta.mul_, &mut mul_ctx, &mut self.uf);
-                        self.const_
-                            .update(&mut self.delta.const_, &mut const_ctx, &mut self.uf);
-                        if !self.uf.has_new_uproots() {
+                        let mut progress = false;
+                        progress |= self.add_.update(&mut self.delta.add_, &mut self.uf);
+                        progress |= self.mul_.update(&mut self.delta.mul_, &mut self.uf);
+                        progress |= self.const_.update(&mut self.delta.const_, &mut self.uf);
+                        if !progress {
                             break;
                         }
                     }
-                    self.uf.snapshot_all_uprooted();
-                    self.add_.update_finalize(add_ctx, &mut self.uf);
-                    self.mul_.update_finalize(mul_ctx, &mut self.uf);
-                    self.const_.update_finalize(const_ctx, &mut self.uf);
+                    self.add_
+                        .update_finalize(&mut self.delta.add_, &mut self.uf);
+                    self.mul_
+                        .update_finalize(&mut self.delta.mul_, &mut self.uf);
+                    self.const_
+                        .update_finalize(&mut self.delta.const_, &mut self.uf);
+                    self.uf.reset_num_uprooted();
                 }
             }
             impl EclassProvider<Math> for Theory {
@@ -2007,16 +2095,12 @@ fn codegen_commutative() {
             #[derive(Debug, Default)]
             struct AddRelation {
                 new: Vec<<Self as Relation>::Row>,
-                all_index_0_1_2: SortedVec<EclassCtx<Row3_0_1<Math, Math, Math>, u128>>,
-            }
-            struct AddUpdateCtx {
-                scratch: Vec<(Math, Math, Math)>,
-                deferred_insertions: Vec<(Math, Math, Math)>,
-                old: SortedVec<EclassCtx<Row3_0_1<Math, Math, Math>, u128>>,
+                hash_index_0_1: runtime::FnvHashMap<(Math, Math), (Math,)>,
+                hash_index_0_1_2: runtime::FnvHashMap<(Math, Math, Math), runtime::SmallVec<[(); 1]>>,
+                math_num_uprooted_at_latest_retain: usize,
             }
             impl Relation for AddRelation {
                 type Row = (Math, Math, Math);
-                type UpdateCtx = AddUpdateCtx;
                 type Unification = Unification;
                 const COST: u32 = 3u32;
                 fn new() -> Self {
@@ -2032,81 +2116,92 @@ fn codegen_commutative() {
                     self.new.iter().copied()
                 }
                 fn len(&self) -> usize {
-                    self.all_index_0_1_2.len()
+                    self.hash_index_0_1.len()
                 }
                 fn emit_graphviz(&self, buf: &mut String) {
                     use std::fmt::Write;
-                    for (i, (x0, x1, x2)) in self.all_index_0_1_2.iter().enumerate() {
+                    for (i, ((x0, x1), (x2,))) in self.hash_index_0_1.iter().enumerate() {
                         writeln!(buf, "{}_{i} -> {}_{};", "add", "math", x0).unwrap();
                         writeln!(buf, "{}_{i} -> {}_{};", "add", "math", x1).unwrap();
                         writeln!(buf, "{}_{i} -> {}_{};", "add", "math", x2).unwrap();
                         writeln!(buf, "{}_{i} [shape = box];", "add").unwrap();
                     }
                 }
-                fn update(
-                    &mut self,
-                    insertions: &mut Vec<Self::Row>,
-                    ctx: &mut Self::UpdateCtx,
-                    uf: &mut Unification,
-                ) {
-                    insertions.iter_mut().for_each(|row| {
-                        row.0 = uf.math_.find(row.0);
-                        row.1 = uf.math_.find(row.1);
-                        row.2 = uf.math_.find(row.2);
-                    });
-                    let already_canon = |uf: &mut Unification, row: &mut Self::Row| {
-                        uf.math_.already_canonical(&mut row.0)
-                            && uf.math_.already_canonical(&mut row.1)
-                            && uf.math_.already_canonical(&mut row.2)
-                    };
-                    let mut ran_merge = false;
-                    loop {
-                        self.all_index_0_1_2.sorted_vec_update(
-                            insertions,
-                            &mut ctx.deferred_insertions,
-                            &mut ctx.scratch,
-                            uf,
-                            already_canon,
-                            |uf, x, mut y| {
-                                ran_merge = true;
-                                let (x2,) = x.value_mut();
-                                let (y2,) = y.value_mut();
-                                uf.math_.union_mut(x2, y2);
-                            },
-                        );
-                        if ctx.deferred_insertions.is_empty() && ran_merge == false {
-                            break;
+                fn update_begin(&mut self, insertions: &[Self::Row], uf: &mut Unification) {
+                    use std::collections::hash_map::Entry;
+                    for &(mut x0, mut x1, mut x2) in &*insertions {
+                        match self
+                            .hash_index_0_1
+                            .entry((uf.math_.find(x0), uf.math_.find(x1)))
+                        {
+                            Entry::Occupied(mut entry) => {
+                                let (y2,) = entry.get_mut();
+                                uf.math_.union_mut(&mut x2, y2);
+                            }
+                            Entry::Vacant(entry) => {
+                                entry.insert((uf.math_.find(x2),));
+                            }
                         }
-                        ran_merge = false;
-                        std::mem::swap(insertions, &mut ctx.deferred_insertions);
-                        ctx.deferred_insertions.clear();
                     }
+                }
+                fn update(&mut self, insertions: &mut Vec<Self::Row>, uf: &mut Unification) -> bool {
+                    if self.math_num_uprooted_at_latest_retain == uf.math_.num_uprooted() {
+                        return false;
+                    }
+                    self.math_num_uprooted_at_latest_retain = uf.math_.num_uprooted();
+                    let offset = insertions.len();
+                    self.hash_index_0_1.retain(|&(x0, x1), &mut (x2,)| {
+                        if uf.math_.is_root(x0) && uf.math_.is_root(x1) && uf.math_.is_root(x2) {
+                            true
+                        } else {
+                            insertions.push((x0, x1, x2));
+                            false
+                        }
+                    });
+                    self.update_begin(&insertions[offset..], uf);
+                    true
+                }
+                fn update_finalize(&mut self, insertions: &mut Vec<Self::Row>, uf: &mut Unification) {
+                    use std::collections::hash_map::Entry;
+                    assert!(self.new.is_empty());
+                    self.new.extend(
+                        insertions
+                            .iter()
+                            .map(|&(x0, x1, x2)| (uf.math_.find(x0), uf.math_.find(x1), uf.math_.find(x2)))
+                            .filter(|&(x0, x1, x2)| !self.hash_index_0_1_2.contains_key(&(x0, x1, x2))),
+                    );
                     insertions.clear();
-                    assert!(ctx.scratch.is_empty());
-                    assert!(ctx.deferred_insertions.is_empty());
-                }
-                fn update_begin(&self) -> Self::UpdateCtx {
-                    AddUpdateCtx {
-                        scratch: Vec::new(),
-                        deferred_insertions: Vec::new(),
-                        old: self.all_index_0_1_2.clone(),
+                    RadixSortable::wrap(&mut self.new).voracious_sort();
+                    self.new.dedup();
+                    for &(x0, x1, x2) in &self.new {
+                        self.hash_index_0_1_2
+                            .entry((uf.math_.find(x0), uf.math_.find(x1), uf.math_.find(x2)))
+                            .or_default()
+                            .push(());
                     }
-                }
-                fn update_finalize(&mut self, ctx: Self::UpdateCtx, uf: &mut Unification) {
-                    self.all_index_0_1_2.finalize();
-                    self.new.extend(self.all_index_0_1_2.minus(&ctx.old));
+                    self.hash_index_0_1_2.retain(|&(x0, x1, x2), v| {
+                        if uf.math_.is_root(x0) && uf.math_.is_root(x1) && uf.math_.is_root(x2) {
+                            v.retain(|&mut ()| true);
+                            v.sort_unstable();
+                            v.dedup();
+                            true
+                        } else {
+                            false
+                        }
+                    });
+                    self.math_num_uprooted_at_latest_retain = 0;
                 }
             }
             impl AddRelation {
                 fn iter2_0_1_2(&self, x0: Math, x1: Math) -> impl Iterator<Item = (Math,)> + use<'_> {
-                    self.all_index_0_1_2
-                        .range((x0, x1, Math::MIN_ID)..=(x0, x1, Math::MAX_ID))
-                        .map(|(x0, x1, x2)| (x2,))
+                    self.hash_index_0_1.get(&(x0, x1)).into_iter().copied()
                 }
                 fn iter3_0_1_2(&self, x0: Math, x1: Math, x2: Math) -> impl Iterator<Item = ()> + use<'_> {
-                    self.all_index_0_1_2
-                        .range((x0, x1, x2)..=(x0, x1, x2))
-                        .map(|(x0, x1, x2)| ())
+                    self.hash_index_0_1_2
+                        .get(&(x0, x1, x2))
+                        .into_iter()
+                        .flatten()
+                        .copied()
                 }
                 fn check2_0_1_2(&self, x0: Math, x1: Math) -> bool {
                     self.iter2_0_1_2(x0, x1).next().is_some()
@@ -2161,13 +2256,13 @@ fn codegen_commutative() {
                 pub math_: UnionFind<Math>,
             }
             impl Unification {
-                fn has_new_uproots(&mut self) -> bool {
-                    let mut ret = false;
-                    ret |= self.math_.has_new_uproots();
+                fn num_uprooted(&mut self) -> usize {
+                    let mut ret = 0;
+                    ret += self.math_.num_uprooted();
                     ret
                 }
-                fn snapshot_all_uprooted(&mut self) {
-                    self.math_.create_uprooted_snapshot();
+                fn reset_num_uprooted(&mut self) {
+                    self.math_.reset_num_uprooted();
                 }
             }
             #[derive(Debug, Default)]
@@ -2218,20 +2313,20 @@ fn codegen_commutative() {
                 #[inline(never)]
                 pub fn canonicalize(&mut self) {
                     self.add_.clear_new();
-                    if !self.delta.has_new_inserts() && !self.uf.has_new_uproots() {
+                    if !self.delta.has_new_inserts() && self.uf.num_uprooted() == 0 {
                         return;
                     }
-                    let mut add_ctx = self.add_.update_begin();
+                    self.add_.update_begin(&mut self.delta.add_, &mut self.uf);
                     loop {
-                        self.uf.snapshot_all_uprooted();
-                        self.add_
-                            .update(&mut self.delta.add_, &mut add_ctx, &mut self.uf);
-                        if !self.uf.has_new_uproots() {
+                        let mut progress = false;
+                        progress |= self.add_.update(&mut self.delta.add_, &mut self.uf);
+                        if !progress {
                             break;
                         }
                     }
-                    self.uf.snapshot_all_uprooted();
-                    self.add_.update_finalize(add_ctx, &mut self.uf);
+                    self.add_
+                        .update_finalize(&mut self.delta.add_, &mut self.uf);
+                    self.uf.reset_num_uprooted();
                 }
             }
             impl EclassProvider<Math> for Theory {
@@ -2509,16 +2604,12 @@ fn regression_entry2() {
             #[derive(Debug, Default)]
             struct SubRelation {
                 new: Vec<<Self as Relation>::Row>,
-                all_index_0_1_2: SortedVec<EclassCtx<Row3_0_1<Math, Math, Math>, u128>>,
-            }
-            struct SubUpdateCtx {
-                scratch: Vec<(Math, Math, Math)>,
-                deferred_insertions: Vec<(Math, Math, Math)>,
-                old: SortedVec<EclassCtx<Row3_0_1<Math, Math, Math>, u128>>,
+                hash_index_0_1: runtime::FnvHashMap<(Math, Math), (Math,)>,
+                hash_index_0_1_2: runtime::FnvHashMap<(Math, Math, Math), runtime::SmallVec<[(); 1]>>,
+                math_num_uprooted_at_latest_retain: usize,
             }
             impl Relation for SubRelation {
                 type Row = (Math, Math, Math);
-                type UpdateCtx = SubUpdateCtx;
                 type Unification = Unification;
                 const COST: u32 = 3u32;
                 fn new() -> Self {
@@ -2534,81 +2625,92 @@ fn regression_entry2() {
                     self.new.iter().copied()
                 }
                 fn len(&self) -> usize {
-                    self.all_index_0_1_2.len()
+                    self.hash_index_0_1.len()
                 }
                 fn emit_graphviz(&self, buf: &mut String) {
                     use std::fmt::Write;
-                    for (i, (x0, x1, x2)) in self.all_index_0_1_2.iter().enumerate() {
+                    for (i, ((x0, x1), (x2,))) in self.hash_index_0_1.iter().enumerate() {
                         writeln!(buf, "{}_{i} -> {}_{};", "sub", "math", x0).unwrap();
                         writeln!(buf, "{}_{i} -> {}_{};", "sub", "math", x1).unwrap();
                         writeln!(buf, "{}_{i} -> {}_{};", "sub", "math", x2).unwrap();
                         writeln!(buf, "{}_{i} [shape = box];", "sub").unwrap();
                     }
                 }
-                fn update(
-                    &mut self,
-                    insertions: &mut Vec<Self::Row>,
-                    ctx: &mut Self::UpdateCtx,
-                    uf: &mut Unification,
-                ) {
-                    insertions.iter_mut().for_each(|row| {
-                        row.0 = uf.math_.find(row.0);
-                        row.1 = uf.math_.find(row.1);
-                        row.2 = uf.math_.find(row.2);
-                    });
-                    let already_canon = |uf: &mut Unification, row: &mut Self::Row| {
-                        uf.math_.already_canonical(&mut row.0)
-                            && uf.math_.already_canonical(&mut row.1)
-                            && uf.math_.already_canonical(&mut row.2)
-                    };
-                    let mut ran_merge = false;
-                    loop {
-                        self.all_index_0_1_2.sorted_vec_update(
-                            insertions,
-                            &mut ctx.deferred_insertions,
-                            &mut ctx.scratch,
-                            uf,
-                            already_canon,
-                            |uf, x, mut y| {
-                                ran_merge = true;
-                                let (x2,) = x.value_mut();
-                                let (y2,) = y.value_mut();
-                                uf.math_.union_mut(x2, y2);
-                            },
-                        );
-                        if ctx.deferred_insertions.is_empty() && ran_merge == false {
-                            break;
+                fn update_begin(&mut self, insertions: &[Self::Row], uf: &mut Unification) {
+                    use std::collections::hash_map::Entry;
+                    for &(mut x0, mut x1, mut x2) in &*insertions {
+                        match self
+                            .hash_index_0_1
+                            .entry((uf.math_.find(x0), uf.math_.find(x1)))
+                        {
+                            Entry::Occupied(mut entry) => {
+                                let (y2,) = entry.get_mut();
+                                uf.math_.union_mut(&mut x2, y2);
+                            }
+                            Entry::Vacant(entry) => {
+                                entry.insert((uf.math_.find(x2),));
+                            }
                         }
-                        ran_merge = false;
-                        std::mem::swap(insertions, &mut ctx.deferred_insertions);
-                        ctx.deferred_insertions.clear();
                     }
+                }
+                fn update(&mut self, insertions: &mut Vec<Self::Row>, uf: &mut Unification) -> bool {
+                    if self.math_num_uprooted_at_latest_retain == uf.math_.num_uprooted() {
+                        return false;
+                    }
+                    self.math_num_uprooted_at_latest_retain = uf.math_.num_uprooted();
+                    let offset = insertions.len();
+                    self.hash_index_0_1.retain(|&(x0, x1), &mut (x2,)| {
+                        if uf.math_.is_root(x0) && uf.math_.is_root(x1) && uf.math_.is_root(x2) {
+                            true
+                        } else {
+                            insertions.push((x0, x1, x2));
+                            false
+                        }
+                    });
+                    self.update_begin(&insertions[offset..], uf);
+                    true
+                }
+                fn update_finalize(&mut self, insertions: &mut Vec<Self::Row>, uf: &mut Unification) {
+                    use std::collections::hash_map::Entry;
+                    assert!(self.new.is_empty());
+                    self.new.extend(
+                        insertions
+                            .iter()
+                            .map(|&(x0, x1, x2)| (uf.math_.find(x0), uf.math_.find(x1), uf.math_.find(x2)))
+                            .filter(|&(x0, x1, x2)| !self.hash_index_0_1_2.contains_key(&(x0, x1, x2))),
+                    );
                     insertions.clear();
-                    assert!(ctx.scratch.is_empty());
-                    assert!(ctx.deferred_insertions.is_empty());
-                }
-                fn update_begin(&self) -> Self::UpdateCtx {
-                    SubUpdateCtx {
-                        scratch: Vec::new(),
-                        deferred_insertions: Vec::new(),
-                        old: self.all_index_0_1_2.clone(),
+                    RadixSortable::wrap(&mut self.new).voracious_sort();
+                    self.new.dedup();
+                    for &(x0, x1, x2) in &self.new {
+                        self.hash_index_0_1_2
+                            .entry((uf.math_.find(x0), uf.math_.find(x1), uf.math_.find(x2)))
+                            .or_default()
+                            .push(());
                     }
-                }
-                fn update_finalize(&mut self, ctx: Self::UpdateCtx, uf: &mut Unification) {
-                    self.all_index_0_1_2.finalize();
-                    self.new.extend(self.all_index_0_1_2.minus(&ctx.old));
+                    self.hash_index_0_1_2.retain(|&(x0, x1, x2), v| {
+                        if uf.math_.is_root(x0) && uf.math_.is_root(x1) && uf.math_.is_root(x2) {
+                            v.retain(|&mut ()| true);
+                            v.sort_unstable();
+                            v.dedup();
+                            true
+                        } else {
+                            false
+                        }
+                    });
+                    self.math_num_uprooted_at_latest_retain = 0;
                 }
             }
             impl SubRelation {
                 fn iter2_0_1_2(&self, x0: Math, x1: Math) -> impl Iterator<Item = (Math,)> + use<'_> {
-                    self.all_index_0_1_2
-                        .range((x0, x1, Math::MIN_ID)..=(x0, x1, Math::MAX_ID))
-                        .map(|(x0, x1, x2)| (x2,))
+                    self.hash_index_0_1.get(&(x0, x1)).into_iter().copied()
                 }
                 fn iter3_0_1_2(&self, x0: Math, x1: Math, x2: Math) -> impl Iterator<Item = ()> + use<'_> {
-                    self.all_index_0_1_2
-                        .range((x0, x1, x2)..=(x0, x1, x2))
-                        .map(|(x0, x1, x2)| ())
+                    self.hash_index_0_1_2
+                        .get(&(x0, x1, x2))
+                        .into_iter()
+                        .flatten()
+                        .copied()
                 }
                 fn check2_0_1_2(&self, x0: Math, x1: Math) -> bool {
                     self.iter2_0_1_2(x0, x1).next().is_some()
@@ -2644,16 +2746,13 @@ fn regression_entry2() {
             #[derive(Debug, Default)]
             struct ConstRelation {
                 new: Vec<<Self as Relation>::Row>,
-                all_index_0_1: SortedVec<GeneralCtx<Row2_0<std::primitive::i64, Math>>>,
-            }
-            struct ConstUpdateCtx {
-                scratch: Vec<(std::primitive::i64, Math)>,
-                deferred_insertions: Vec<(std::primitive::i64, Math)>,
-                old: SortedVec<GeneralCtx<Row2_0<std::primitive::i64, Math>>>,
+                hash_index_0: runtime::FnvHashMap<(std::primitive::i64,), (Math,)>,
+                hash_index_0_1: runtime::FnvHashMap<(std::primitive::i64, Math), runtime::SmallVec<[(); 1]>>,
+                i64_num_uprooted_at_latest_retain: usize,
+                math_num_uprooted_at_latest_retain: usize,
             }
             impl Relation for ConstRelation {
                 type Row = (std::primitive::i64, Math);
-                type UpdateCtx = ConstUpdateCtx;
                 type Unification = Unification;
                 const COST: u32 = 2u32;
                 fn new() -> Self {
@@ -2669,75 +2768,88 @@ fn regression_entry2() {
                     self.new.iter().copied()
                 }
                 fn len(&self) -> usize {
-                    self.all_index_0_1.len()
+                    self.hash_index_0.len()
                 }
                 fn emit_graphviz(&self, buf: &mut String) {
                     use std::fmt::Write;
-                    for (i, (x0, x1)) in self.all_index_0_1.iter().enumerate() {
+                    for (i, ((x0,), (x1,))) in self.hash_index_0.iter().enumerate() {
                         writeln!(buf, "{}_{i} -> {}_{};", "const", "i64", x0).unwrap();
                         writeln!(buf, "{}_{i} -> {}_{};", "const", "math", x1).unwrap();
                         writeln!(buf, "{}_{i} [shape = box];", "const").unwrap();
                     }
                 }
-                fn update(
-                    &mut self,
-                    insertions: &mut Vec<Self::Row>,
-                    ctx: &mut Self::UpdateCtx,
-                    uf: &mut Unification,
-                ) {
-                    insertions.iter_mut().for_each(|row| {
-                        row.1 = uf.math_.find(row.1);
-                    });
-                    let already_canon =
-                        |uf: &mut Unification, row: &mut Self::Row| uf.math_.already_canonical(&mut row.1);
-                    let mut ran_merge = false;
-                    loop {
-                        self.all_index_0_1.sorted_vec_update(
-                            insertions,
-                            &mut ctx.deferred_insertions,
-                            &mut ctx.scratch,
-                            uf,
-                            already_canon,
-                            |uf, x, mut y| {
-                                ran_merge = true;
-                                let (x1,) = x.value_mut();
-                                let (y1,) = y.value_mut();
-                                uf.math_.union_mut(x1, y1);
-                            },
-                        );
-                        if ctx.deferred_insertions.is_empty() && ran_merge == false {
-                            break;
+                fn update_begin(&mut self, insertions: &[Self::Row], uf: &mut Unification) {
+                    use std::collections::hash_map::Entry;
+                    for &(mut x0, mut x1) in &*insertions {
+                        match self.hash_index_0.entry((x0,)) {
+                            Entry::Occupied(mut entry) => {
+                                let (y1,) = entry.get_mut();
+                                uf.math_.union_mut(&mut x1, y1);
+                            }
+                            Entry::Vacant(entry) => {
+                                entry.insert((uf.math_.find(x1),));
+                            }
                         }
-                        ran_merge = false;
-                        std::mem::swap(insertions, &mut ctx.deferred_insertions);
-                        ctx.deferred_insertions.clear();
                     }
+                }
+                fn update(&mut self, insertions: &mut Vec<Self::Row>, uf: &mut Unification) -> bool {
+                    if self.math_num_uprooted_at_latest_retain == uf.math_.num_uprooted() {
+                        return false;
+                    }
+                    self.math_num_uprooted_at_latest_retain = uf.math_.num_uprooted();
+                    let offset = insertions.len();
+                    self.hash_index_0.retain(|&(x0,), &mut (x1,)| {
+                        if uf.math_.is_root(x1) {
+                            true
+                        } else {
+                            insertions.push((x0, x1));
+                            false
+                        }
+                    });
+                    self.update_begin(&insertions[offset..], uf);
+                    true
+                }
+                fn update_finalize(&mut self, insertions: &mut Vec<Self::Row>, uf: &mut Unification) {
+                    use std::collections::hash_map::Entry;
+                    assert!(self.new.is_empty());
+                    self.new.extend(
+                        insertions
+                            .iter()
+                            .map(|&(x0, x1)| (x0, uf.math_.find(x1)))
+                            .filter(|&(x0, x1)| !self.hash_index_0_1.contains_key(&(x0, x1))),
+                    );
                     insertions.clear();
-                    assert!(ctx.scratch.is_empty());
-                    assert!(ctx.deferred_insertions.is_empty());
-                }
-                fn update_begin(&self) -> Self::UpdateCtx {
-                    ConstUpdateCtx {
-                        scratch: Vec::new(),
-                        deferred_insertions: Vec::new(),
-                        old: self.all_index_0_1.clone(),
+                    self.new.sort_unstable();
+                    self.new.dedup();
+                    for &(x0, x1) in &self.new {
+                        self.hash_index_0_1
+                            .entry((x0, uf.math_.find(x1)))
+                            .or_default()
+                            .push(());
                     }
-                }
-                fn update_finalize(&mut self, ctx: Self::UpdateCtx, uf: &mut Unification) {
-                    self.all_index_0_1.finalize();
-                    self.new.extend(self.all_index_0_1.minus(&ctx.old));
+                    self.hash_index_0_1.retain(|&(x0, x1), v| {
+                        if uf.math_.is_root(x1) {
+                            v.retain(|&mut ()| true);
+                            v.sort_unstable();
+                            v.dedup();
+                            true
+                        } else {
+                            false
+                        }
+                    });
+                    self.math_num_uprooted_at_latest_retain = 0;
                 }
             }
             impl ConstRelation {
                 fn iter1_0_1(&self, x0: std::primitive::i64) -> impl Iterator<Item = (Math,)> + use<'_> {
-                    self.all_index_0_1
-                        .range((x0, Math::MIN_ID)..=(x0, Math::MAX_ID))
-                        .map(|(x0, x1)| (x1,))
+                    self.hash_index_0.get(&(x0,)).into_iter().copied()
                 }
                 fn iter2_0_1(&self, x0: std::primitive::i64, x1: Math) -> impl Iterator<Item = ()> + use<'_> {
-                    self.all_index_0_1
-                        .range((x0, x1)..=(x0, x1))
-                        .map(|(x0, x1)| ())
+                    self.hash_index_0_1
+                        .get(&(x0, x1))
+                        .into_iter()
+                        .flatten()
+                        .copied()
                 }
                 fn check1_0_1(&self, x0: std::primitive::i64) -> bool {
                     self.iter1_0_1(x0).next().is_some()
@@ -2801,13 +2913,13 @@ fn regression_entry2() {
                 pub math_: UnionFind<Math>,
             }
             impl Unification {
-                fn has_new_uproots(&mut self) -> bool {
-                    let mut ret = false;
-                    ret |= self.math_.has_new_uproots();
+                fn num_uprooted(&mut self) -> usize {
+                    let mut ret = 0;
+                    ret += self.math_.num_uprooted();
                     ret
                 }
-                fn snapshot_all_uprooted(&mut self) {
-                    self.math_.create_uprooted_snapshot();
+                fn reset_num_uprooted(&mut self) {
+                    self.math_.reset_num_uprooted();
                 }
             }
             #[derive(Debug, Default)]
@@ -2869,25 +2981,26 @@ fn regression_entry2() {
                 pub fn canonicalize(&mut self) {
                     self.sub_.clear_new();
                     self.const_.clear_new();
-                    if !self.delta.has_new_inserts() && !self.uf.has_new_uproots() {
+                    if !self.delta.has_new_inserts() && self.uf.num_uprooted() == 0 {
                         return;
                     }
-                    let mut sub_ctx = self.sub_.update_begin();
-                    let mut const_ctx = self.const_.update_begin();
+                    self.sub_.update_begin(&mut self.delta.sub_, &mut self.uf);
+                    self.const_
+                        .update_begin(&mut self.delta.const_, &mut self.uf);
                     loop {
-                        self.uf.snapshot_all_uprooted();
-                        self.sub_
-                            .update(&mut self.delta.sub_, &mut sub_ctx, &mut self.uf);
-                        self.const_
-                            .update(&mut self.delta.const_, &mut const_ctx, &mut self.uf);
-                        if !self.uf.has_new_uproots() {
+                        let mut progress = false;
+                        progress |= self.sub_.update(&mut self.delta.sub_, &mut self.uf);
+                        progress |= self.const_.update(&mut self.delta.const_, &mut self.uf);
+                        if !progress {
                             break;
                         }
                     }
-                    self.uf.snapshot_all_uprooted();
+                    self.sub_
+                        .update_finalize(&mut self.delta.sub_, &mut self.uf);
+                    self.const_
+                        .update_finalize(&mut self.delta.const_, &mut self.uf);
                     self.global_i64.update_finalize();
-                    self.sub_.update_finalize(sub_ctx, &mut self.uf);
-                    self.const_.update_finalize(const_ctx, &mut self.uf);
+                    self.uf.reset_num_uprooted();
                 }
             }
             impl EclassProvider<Math> for Theory {
@@ -3147,16 +3260,12 @@ fn regression_entry() {
             #[derive(Debug, Default)]
             struct IntegralRelation {
                 new: Vec<<Self as Relation>::Row>,
-                all_index_0_1_2: SortedVec<EclassCtx<Row3_0_1<Math, Math, Math>, u128>>,
-            }
-            struct IntegralUpdateCtx {
-                scratch: Vec<(Math, Math, Math)>,
-                deferred_insertions: Vec<(Math, Math, Math)>,
-                old: SortedVec<EclassCtx<Row3_0_1<Math, Math, Math>, u128>>,
+                hash_index_0_1: runtime::FnvHashMap<(Math, Math), (Math,)>,
+                hash_index_0_1_2: runtime::FnvHashMap<(Math, Math, Math), runtime::SmallVec<[(); 1]>>,
+                math_num_uprooted_at_latest_retain: usize,
             }
             impl Relation for IntegralRelation {
                 type Row = (Math, Math, Math);
-                type UpdateCtx = IntegralUpdateCtx;
                 type Unification = Unification;
                 const COST: u32 = 3u32;
                 fn new() -> Self {
@@ -3172,81 +3281,92 @@ fn regression_entry() {
                     self.new.iter().copied()
                 }
                 fn len(&self) -> usize {
-                    self.all_index_0_1_2.len()
+                    self.hash_index_0_1.len()
                 }
                 fn emit_graphviz(&self, buf: &mut String) {
                     use std::fmt::Write;
-                    for (i, (x0, x1, x2)) in self.all_index_0_1_2.iter().enumerate() {
+                    for (i, ((x0, x1), (x2,))) in self.hash_index_0_1.iter().enumerate() {
                         writeln!(buf, "{}_{i} -> {}_{};", "integral", "math", x0).unwrap();
                         writeln!(buf, "{}_{i} -> {}_{};", "integral", "math", x1).unwrap();
                         writeln!(buf, "{}_{i} -> {}_{};", "integral", "math", x2).unwrap();
                         writeln!(buf, "{}_{i} [shape = box];", "integral").unwrap();
                     }
                 }
-                fn update(
-                    &mut self,
-                    insertions: &mut Vec<Self::Row>,
-                    ctx: &mut Self::UpdateCtx,
-                    uf: &mut Unification,
-                ) {
-                    insertions.iter_mut().for_each(|row| {
-                        row.0 = uf.math_.find(row.0);
-                        row.1 = uf.math_.find(row.1);
-                        row.2 = uf.math_.find(row.2);
-                    });
-                    let already_canon = |uf: &mut Unification, row: &mut Self::Row| {
-                        uf.math_.already_canonical(&mut row.0)
-                            && uf.math_.already_canonical(&mut row.1)
-                            && uf.math_.already_canonical(&mut row.2)
-                    };
-                    let mut ran_merge = false;
-                    loop {
-                        self.all_index_0_1_2.sorted_vec_update(
-                            insertions,
-                            &mut ctx.deferred_insertions,
-                            &mut ctx.scratch,
-                            uf,
-                            already_canon,
-                            |uf, x, mut y| {
-                                ran_merge = true;
-                                let (x2,) = x.value_mut();
-                                let (y2,) = y.value_mut();
-                                uf.math_.union_mut(x2, y2);
-                            },
-                        );
-                        if ctx.deferred_insertions.is_empty() && ran_merge == false {
-                            break;
+                fn update_begin(&mut self, insertions: &[Self::Row], uf: &mut Unification) {
+                    use std::collections::hash_map::Entry;
+                    for &(mut x0, mut x1, mut x2) in &*insertions {
+                        match self
+                            .hash_index_0_1
+                            .entry((uf.math_.find(x0), uf.math_.find(x1)))
+                        {
+                            Entry::Occupied(mut entry) => {
+                                let (y2,) = entry.get_mut();
+                                uf.math_.union_mut(&mut x2, y2);
+                            }
+                            Entry::Vacant(entry) => {
+                                entry.insert((uf.math_.find(x2),));
+                            }
                         }
-                        ran_merge = false;
-                        std::mem::swap(insertions, &mut ctx.deferred_insertions);
-                        ctx.deferred_insertions.clear();
                     }
+                }
+                fn update(&mut self, insertions: &mut Vec<Self::Row>, uf: &mut Unification) -> bool {
+                    if self.math_num_uprooted_at_latest_retain == uf.math_.num_uprooted() {
+                        return false;
+                    }
+                    self.math_num_uprooted_at_latest_retain = uf.math_.num_uprooted();
+                    let offset = insertions.len();
+                    self.hash_index_0_1.retain(|&(x0, x1), &mut (x2,)| {
+                        if uf.math_.is_root(x0) && uf.math_.is_root(x1) && uf.math_.is_root(x2) {
+                            true
+                        } else {
+                            insertions.push((x0, x1, x2));
+                            false
+                        }
+                    });
+                    self.update_begin(&insertions[offset..], uf);
+                    true
+                }
+                fn update_finalize(&mut self, insertions: &mut Vec<Self::Row>, uf: &mut Unification) {
+                    use std::collections::hash_map::Entry;
+                    assert!(self.new.is_empty());
+                    self.new.extend(
+                        insertions
+                            .iter()
+                            .map(|&(x0, x1, x2)| (uf.math_.find(x0), uf.math_.find(x1), uf.math_.find(x2)))
+                            .filter(|&(x0, x1, x2)| !self.hash_index_0_1_2.contains_key(&(x0, x1, x2))),
+                    );
                     insertions.clear();
-                    assert!(ctx.scratch.is_empty());
-                    assert!(ctx.deferred_insertions.is_empty());
-                }
-                fn update_begin(&self) -> Self::UpdateCtx {
-                    IntegralUpdateCtx {
-                        scratch: Vec::new(),
-                        deferred_insertions: Vec::new(),
-                        old: self.all_index_0_1_2.clone(),
+                    RadixSortable::wrap(&mut self.new).voracious_sort();
+                    self.new.dedup();
+                    for &(x0, x1, x2) in &self.new {
+                        self.hash_index_0_1_2
+                            .entry((uf.math_.find(x0), uf.math_.find(x1), uf.math_.find(x2)))
+                            .or_default()
+                            .push(());
                     }
-                }
-                fn update_finalize(&mut self, ctx: Self::UpdateCtx, uf: &mut Unification) {
-                    self.all_index_0_1_2.finalize();
-                    self.new.extend(self.all_index_0_1_2.minus(&ctx.old));
+                    self.hash_index_0_1_2.retain(|&(x0, x1, x2), v| {
+                        if uf.math_.is_root(x0) && uf.math_.is_root(x1) && uf.math_.is_root(x2) {
+                            v.retain(|&mut ()| true);
+                            v.sort_unstable();
+                            v.dedup();
+                            true
+                        } else {
+                            false
+                        }
+                    });
+                    self.math_num_uprooted_at_latest_retain = 0;
                 }
             }
             impl IntegralRelation {
                 fn iter2_0_1_2(&self, x0: Math, x1: Math) -> impl Iterator<Item = (Math,)> + use<'_> {
-                    self.all_index_0_1_2
-                        .range((x0, x1, Math::MIN_ID)..=(x0, x1, Math::MAX_ID))
-                        .map(|(x0, x1, x2)| (x2,))
+                    self.hash_index_0_1.get(&(x0, x1)).into_iter().copied()
                 }
                 fn iter3_0_1_2(&self, x0: Math, x1: Math, x2: Math) -> impl Iterator<Item = ()> + use<'_> {
-                    self.all_index_0_1_2
-                        .range((x0, x1, x2)..=(x0, x1, x2))
-                        .map(|(x0, x1, x2)| ())
+                    self.hash_index_0_1_2
+                        .get(&(x0, x1, x2))
+                        .into_iter()
+                        .flatten()
+                        .copied()
                 }
                 fn check2_0_1_2(&self, x0: Math, x1: Math) -> bool {
                     self.iter2_0_1_2(x0, x1).next().is_some()
@@ -3282,16 +3402,12 @@ fn regression_entry() {
             #[derive(Debug, Default)]
             struct AddRelation {
                 new: Vec<<Self as Relation>::Row>,
-                all_index_0_1_2: SortedVec<EclassCtx<Row3_0_1<Math, Math, Math>, u128>>,
-            }
-            struct AddUpdateCtx {
-                scratch: Vec<(Math, Math, Math)>,
-                deferred_insertions: Vec<(Math, Math, Math)>,
-                old: SortedVec<EclassCtx<Row3_0_1<Math, Math, Math>, u128>>,
+                hash_index_0_1: runtime::FnvHashMap<(Math, Math), (Math,)>,
+                hash_index_0_1_2: runtime::FnvHashMap<(Math, Math, Math), runtime::SmallVec<[(); 1]>>,
+                math_num_uprooted_at_latest_retain: usize,
             }
             impl Relation for AddRelation {
                 type Row = (Math, Math, Math);
-                type UpdateCtx = AddUpdateCtx;
                 type Unification = Unification;
                 const COST: u32 = 3u32;
                 fn new() -> Self {
@@ -3307,81 +3423,92 @@ fn regression_entry() {
                     self.new.iter().copied()
                 }
                 fn len(&self) -> usize {
-                    self.all_index_0_1_2.len()
+                    self.hash_index_0_1.len()
                 }
                 fn emit_graphviz(&self, buf: &mut String) {
                     use std::fmt::Write;
-                    for (i, (x0, x1, x2)) in self.all_index_0_1_2.iter().enumerate() {
+                    for (i, ((x0, x1), (x2,))) in self.hash_index_0_1.iter().enumerate() {
                         writeln!(buf, "{}_{i} -> {}_{};", "add", "math", x0).unwrap();
                         writeln!(buf, "{}_{i} -> {}_{};", "add", "math", x1).unwrap();
                         writeln!(buf, "{}_{i} -> {}_{};", "add", "math", x2).unwrap();
                         writeln!(buf, "{}_{i} [shape = box];", "add").unwrap();
                     }
                 }
-                fn update(
-                    &mut self,
-                    insertions: &mut Vec<Self::Row>,
-                    ctx: &mut Self::UpdateCtx,
-                    uf: &mut Unification,
-                ) {
-                    insertions.iter_mut().for_each(|row| {
-                        row.0 = uf.math_.find(row.0);
-                        row.1 = uf.math_.find(row.1);
-                        row.2 = uf.math_.find(row.2);
-                    });
-                    let already_canon = |uf: &mut Unification, row: &mut Self::Row| {
-                        uf.math_.already_canonical(&mut row.0)
-                            && uf.math_.already_canonical(&mut row.1)
-                            && uf.math_.already_canonical(&mut row.2)
-                    };
-                    let mut ran_merge = false;
-                    loop {
-                        self.all_index_0_1_2.sorted_vec_update(
-                            insertions,
-                            &mut ctx.deferred_insertions,
-                            &mut ctx.scratch,
-                            uf,
-                            already_canon,
-                            |uf, x, mut y| {
-                                ran_merge = true;
-                                let (x2,) = x.value_mut();
-                                let (y2,) = y.value_mut();
-                                uf.math_.union_mut(x2, y2);
-                            },
-                        );
-                        if ctx.deferred_insertions.is_empty() && ran_merge == false {
-                            break;
+                fn update_begin(&mut self, insertions: &[Self::Row], uf: &mut Unification) {
+                    use std::collections::hash_map::Entry;
+                    for &(mut x0, mut x1, mut x2) in &*insertions {
+                        match self
+                            .hash_index_0_1
+                            .entry((uf.math_.find(x0), uf.math_.find(x1)))
+                        {
+                            Entry::Occupied(mut entry) => {
+                                let (y2,) = entry.get_mut();
+                                uf.math_.union_mut(&mut x2, y2);
+                            }
+                            Entry::Vacant(entry) => {
+                                entry.insert((uf.math_.find(x2),));
+                            }
                         }
-                        ran_merge = false;
-                        std::mem::swap(insertions, &mut ctx.deferred_insertions);
-                        ctx.deferred_insertions.clear();
                     }
+                }
+                fn update(&mut self, insertions: &mut Vec<Self::Row>, uf: &mut Unification) -> bool {
+                    if self.math_num_uprooted_at_latest_retain == uf.math_.num_uprooted() {
+                        return false;
+                    }
+                    self.math_num_uprooted_at_latest_retain = uf.math_.num_uprooted();
+                    let offset = insertions.len();
+                    self.hash_index_0_1.retain(|&(x0, x1), &mut (x2,)| {
+                        if uf.math_.is_root(x0) && uf.math_.is_root(x1) && uf.math_.is_root(x2) {
+                            true
+                        } else {
+                            insertions.push((x0, x1, x2));
+                            false
+                        }
+                    });
+                    self.update_begin(&insertions[offset..], uf);
+                    true
+                }
+                fn update_finalize(&mut self, insertions: &mut Vec<Self::Row>, uf: &mut Unification) {
+                    use std::collections::hash_map::Entry;
+                    assert!(self.new.is_empty());
+                    self.new.extend(
+                        insertions
+                            .iter()
+                            .map(|&(x0, x1, x2)| (uf.math_.find(x0), uf.math_.find(x1), uf.math_.find(x2)))
+                            .filter(|&(x0, x1, x2)| !self.hash_index_0_1_2.contains_key(&(x0, x1, x2))),
+                    );
                     insertions.clear();
-                    assert!(ctx.scratch.is_empty());
-                    assert!(ctx.deferred_insertions.is_empty());
-                }
-                fn update_begin(&self) -> Self::UpdateCtx {
-                    AddUpdateCtx {
-                        scratch: Vec::new(),
-                        deferred_insertions: Vec::new(),
-                        old: self.all_index_0_1_2.clone(),
+                    RadixSortable::wrap(&mut self.new).voracious_sort();
+                    self.new.dedup();
+                    for &(x0, x1, x2) in &self.new {
+                        self.hash_index_0_1_2
+                            .entry((uf.math_.find(x0), uf.math_.find(x1), uf.math_.find(x2)))
+                            .or_default()
+                            .push(());
                     }
-                }
-                fn update_finalize(&mut self, ctx: Self::UpdateCtx, uf: &mut Unification) {
-                    self.all_index_0_1_2.finalize();
-                    self.new.extend(self.all_index_0_1_2.minus(&ctx.old));
+                    self.hash_index_0_1_2.retain(|&(x0, x1, x2), v| {
+                        if uf.math_.is_root(x0) && uf.math_.is_root(x1) && uf.math_.is_root(x2) {
+                            v.retain(|&mut ()| true);
+                            v.sort_unstable();
+                            v.dedup();
+                            true
+                        } else {
+                            false
+                        }
+                    });
+                    self.math_num_uprooted_at_latest_retain = 0;
                 }
             }
             impl AddRelation {
                 fn iter2_0_1_2(&self, x0: Math, x1: Math) -> impl Iterator<Item = (Math,)> + use<'_> {
-                    self.all_index_0_1_2
-                        .range((x0, x1, Math::MIN_ID)..=(x0, x1, Math::MAX_ID))
-                        .map(|(x0, x1, x2)| (x2,))
+                    self.hash_index_0_1.get(&(x0, x1)).into_iter().copied()
                 }
                 fn iter3_0_1_2(&self, x0: Math, x1: Math, x2: Math) -> impl Iterator<Item = ()> + use<'_> {
-                    self.all_index_0_1_2
-                        .range((x0, x1, x2)..=(x0, x1, x2))
-                        .map(|(x0, x1, x2)| ())
+                    self.hash_index_0_1_2
+                        .get(&(x0, x1, x2))
+                        .into_iter()
+                        .flatten()
+                        .copied()
                 }
                 fn check2_0_1_2(&self, x0: Math, x1: Math) -> bool {
                     self.iter2_0_1_2(x0, x1).next().is_some()
@@ -3441,13 +3568,13 @@ fn regression_entry() {
                 pub math_: UnionFind<Math>,
             }
             impl Unification {
-                fn has_new_uproots(&mut self) -> bool {
-                    let mut ret = false;
-                    ret |= self.math_.has_new_uproots();
+                fn num_uprooted(&mut self) -> usize {
+                    let mut ret = 0;
+                    ret += self.math_.num_uprooted();
                     ret
                 }
-                fn snapshot_all_uprooted(&mut self) {
-                    self.math_.create_uprooted_snapshot();
+                fn reset_num_uprooted(&mut self) {
+                    self.math_.reset_num_uprooted();
                 }
             }
             #[derive(Debug, Default)]
@@ -3508,24 +3635,27 @@ fn regression_entry() {
                 pub fn canonicalize(&mut self) {
                     self.integral_.clear_new();
                     self.add_.clear_new();
-                    if !self.delta.has_new_inserts() && !self.uf.has_new_uproots() {
+                    if !self.delta.has_new_inserts() && self.uf.num_uprooted() == 0 {
                         return;
                     }
-                    let mut integral_ctx = self.integral_.update_begin();
-                    let mut add_ctx = self.add_.update_begin();
+                    self.integral_
+                        .update_begin(&mut self.delta.integral_, &mut self.uf);
+                    self.add_.update_begin(&mut self.delta.add_, &mut self.uf);
                     loop {
-                        self.uf.snapshot_all_uprooted();
-                        self.integral_
-                            .update(&mut self.delta.integral_, &mut integral_ctx, &mut self.uf);
-                        self.add_
-                            .update(&mut self.delta.add_, &mut add_ctx, &mut self.uf);
-                        if !self.uf.has_new_uproots() {
+                        let mut progress = false;
+                        progress |= self
+                            .integral_
+                            .update(&mut self.delta.integral_, &mut self.uf);
+                        progress |= self.add_.update(&mut self.delta.add_, &mut self.uf);
+                        if !progress {
                             break;
                         }
                     }
-                    self.uf.snapshot_all_uprooted();
-                    self.integral_.update_finalize(integral_ctx, &mut self.uf);
-                    self.add_.update_finalize(add_ctx, &mut self.uf);
+                    self.integral_
+                        .update_finalize(&mut self.delta.integral_, &mut self.uf);
+                    self.add_
+                        .update_finalize(&mut self.delta.add_, &mut self.uf);
+                    self.uf.reset_num_uprooted();
                 }
             }
             impl EclassProvider<Math> for Theory {
@@ -3772,16 +3902,12 @@ fn test_bind_variable_multiple_times() {
             #[derive(Debug, Default)]
             struct SameRelation {
                 new: Vec<<Self as Relation>::Row>,
-                all_index_0_1_2: SortedVec<EclassCtx<Row3_0_1<Foo, Foo, Foo>, u128>>,
-            }
-            struct SameUpdateCtx {
-                scratch: Vec<(Foo, Foo, Foo)>,
-                deferred_insertions: Vec<(Foo, Foo, Foo)>,
-                old: SortedVec<EclassCtx<Row3_0_1<Foo, Foo, Foo>, u128>>,
+                hash_index_0_1: runtime::FnvHashMap<(Foo, Foo), (Foo,)>,
+                hash_index_0_1_2: runtime::FnvHashMap<(Foo, Foo, Foo), runtime::SmallVec<[(); 1]>>,
+                foo_num_uprooted_at_latest_retain: usize,
             }
             impl Relation for SameRelation {
                 type Row = (Foo, Foo, Foo);
-                type UpdateCtx = SameUpdateCtx;
                 type Unification = Unification;
                 const COST: u32 = 3u32;
                 fn new() -> Self {
@@ -3797,81 +3923,92 @@ fn test_bind_variable_multiple_times() {
                     self.new.iter().copied()
                 }
                 fn len(&self) -> usize {
-                    self.all_index_0_1_2.len()
+                    self.hash_index_0_1.len()
                 }
                 fn emit_graphviz(&self, buf: &mut String) {
                     use std::fmt::Write;
-                    for (i, (x0, x1, x2)) in self.all_index_0_1_2.iter().enumerate() {
+                    for (i, ((x0, x1), (x2,))) in self.hash_index_0_1.iter().enumerate() {
                         writeln!(buf, "{}_{i} -> {}_{};", "same", "foo", x0).unwrap();
                         writeln!(buf, "{}_{i} -> {}_{};", "same", "foo", x1).unwrap();
                         writeln!(buf, "{}_{i} -> {}_{};", "same", "foo", x2).unwrap();
                         writeln!(buf, "{}_{i} [shape = box];", "same").unwrap();
                     }
                 }
-                fn update(
-                    &mut self,
-                    insertions: &mut Vec<Self::Row>,
-                    ctx: &mut Self::UpdateCtx,
-                    uf: &mut Unification,
-                ) {
-                    insertions.iter_mut().for_each(|row| {
-                        row.0 = uf.foo_.find(row.0);
-                        row.1 = uf.foo_.find(row.1);
-                        row.2 = uf.foo_.find(row.2);
-                    });
-                    let already_canon = |uf: &mut Unification, row: &mut Self::Row| {
-                        uf.foo_.already_canonical(&mut row.0)
-                            && uf.foo_.already_canonical(&mut row.1)
-                            && uf.foo_.already_canonical(&mut row.2)
-                    };
-                    let mut ran_merge = false;
-                    loop {
-                        self.all_index_0_1_2.sorted_vec_update(
-                            insertions,
-                            &mut ctx.deferred_insertions,
-                            &mut ctx.scratch,
-                            uf,
-                            already_canon,
-                            |uf, x, mut y| {
-                                ran_merge = true;
-                                let (x2,) = x.value_mut();
-                                let (y2,) = y.value_mut();
-                                uf.foo_.union_mut(x2, y2);
-                            },
-                        );
-                        if ctx.deferred_insertions.is_empty() && ran_merge == false {
-                            break;
+                fn update_begin(&mut self, insertions: &[Self::Row], uf: &mut Unification) {
+                    use std::collections::hash_map::Entry;
+                    for &(mut x0, mut x1, mut x2) in &*insertions {
+                        match self
+                            .hash_index_0_1
+                            .entry((uf.foo_.find(x0), uf.foo_.find(x1)))
+                        {
+                            Entry::Occupied(mut entry) => {
+                                let (y2,) = entry.get_mut();
+                                uf.foo_.union_mut(&mut x2, y2);
+                            }
+                            Entry::Vacant(entry) => {
+                                entry.insert((uf.foo_.find(x2),));
+                            }
                         }
-                        ran_merge = false;
-                        std::mem::swap(insertions, &mut ctx.deferred_insertions);
-                        ctx.deferred_insertions.clear();
                     }
+                }
+                fn update(&mut self, insertions: &mut Vec<Self::Row>, uf: &mut Unification) -> bool {
+                    if self.foo_num_uprooted_at_latest_retain == uf.foo_.num_uprooted() {
+                        return false;
+                    }
+                    self.foo_num_uprooted_at_latest_retain = uf.foo_.num_uprooted();
+                    let offset = insertions.len();
+                    self.hash_index_0_1.retain(|&(x0, x1), &mut (x2,)| {
+                        if uf.foo_.is_root(x0) && uf.foo_.is_root(x1) && uf.foo_.is_root(x2) {
+                            true
+                        } else {
+                            insertions.push((x0, x1, x2));
+                            false
+                        }
+                    });
+                    self.update_begin(&insertions[offset..], uf);
+                    true
+                }
+                fn update_finalize(&mut self, insertions: &mut Vec<Self::Row>, uf: &mut Unification) {
+                    use std::collections::hash_map::Entry;
+                    assert!(self.new.is_empty());
+                    self.new.extend(
+                        insertions
+                            .iter()
+                            .map(|&(x0, x1, x2)| (uf.foo_.find(x0), uf.foo_.find(x1), uf.foo_.find(x2)))
+                            .filter(|&(x0, x1, x2)| !self.hash_index_0_1_2.contains_key(&(x0, x1, x2))),
+                    );
                     insertions.clear();
-                    assert!(ctx.scratch.is_empty());
-                    assert!(ctx.deferred_insertions.is_empty());
-                }
-                fn update_begin(&self) -> Self::UpdateCtx {
-                    SameUpdateCtx {
-                        scratch: Vec::new(),
-                        deferred_insertions: Vec::new(),
-                        old: self.all_index_0_1_2.clone(),
+                    RadixSortable::wrap(&mut self.new).voracious_sort();
+                    self.new.dedup();
+                    for &(x0, x1, x2) in &self.new {
+                        self.hash_index_0_1_2
+                            .entry((uf.foo_.find(x0), uf.foo_.find(x1), uf.foo_.find(x2)))
+                            .or_default()
+                            .push(());
                     }
-                }
-                fn update_finalize(&mut self, ctx: Self::UpdateCtx, uf: &mut Unification) {
-                    self.all_index_0_1_2.finalize();
-                    self.new.extend(self.all_index_0_1_2.minus(&ctx.old));
+                    self.hash_index_0_1_2.retain(|&(x0, x1, x2), v| {
+                        if uf.foo_.is_root(x0) && uf.foo_.is_root(x1) && uf.foo_.is_root(x2) {
+                            v.retain(|&mut ()| true);
+                            v.sort_unstable();
+                            v.dedup();
+                            true
+                        } else {
+                            false
+                        }
+                    });
+                    self.foo_num_uprooted_at_latest_retain = 0;
                 }
             }
             impl SameRelation {
                 fn iter2_0_1_2(&self, x0: Foo, x1: Foo) -> impl Iterator<Item = (Foo,)> + use<'_> {
-                    self.all_index_0_1_2
-                        .range((x0, x1, Foo::MIN_ID)..=(x0, x1, Foo::MAX_ID))
-                        .map(|(x0, x1, x2)| (x2,))
+                    self.hash_index_0_1.get(&(x0, x1)).into_iter().copied()
                 }
                 fn iter3_0_1_2(&self, x0: Foo, x1: Foo, x2: Foo) -> impl Iterator<Item = ()> + use<'_> {
-                    self.all_index_0_1_2
-                        .range((x0, x1, x2)..=(x0, x1, x2))
-                        .map(|(x0, x1, x2)| ())
+                    self.hash_index_0_1_2
+                        .get(&(x0, x1, x2))
+                        .into_iter()
+                        .flatten()
+                        .copied()
                 }
                 fn check2_0_1_2(&self, x0: Foo, x1: Foo) -> bool {
                     self.iter2_0_1_2(x0, x1).next().is_some()
@@ -3926,13 +4063,13 @@ fn test_bind_variable_multiple_times() {
                 pub foo_: UnionFind<Foo>,
             }
             impl Unification {
-                fn has_new_uproots(&mut self) -> bool {
-                    let mut ret = false;
-                    ret |= self.foo_.has_new_uproots();
+                fn num_uprooted(&mut self) -> usize {
+                    let mut ret = 0;
+                    ret += self.foo_.num_uprooted();
                     ret
                 }
-                fn snapshot_all_uprooted(&mut self) {
-                    self.foo_.create_uprooted_snapshot();
+                fn reset_num_uprooted(&mut self) {
+                    self.foo_.reset_num_uprooted();
                 }
             }
             #[derive(Debug, Default)]
@@ -3985,20 +4122,20 @@ fn test_bind_variable_multiple_times() {
                 #[inline(never)]
                 pub fn canonicalize(&mut self) {
                     self.same_.clear_new();
-                    if !self.delta.has_new_inserts() && !self.uf.has_new_uproots() {
+                    if !self.delta.has_new_inserts() && self.uf.num_uprooted() == 0 {
                         return;
                     }
-                    let mut same_ctx = self.same_.update_begin();
+                    self.same_.update_begin(&mut self.delta.same_, &mut self.uf);
                     loop {
-                        self.uf.snapshot_all_uprooted();
-                        self.same_
-                            .update(&mut self.delta.same_, &mut same_ctx, &mut self.uf);
-                        if !self.uf.has_new_uproots() {
+                        let mut progress = false;
+                        progress |= self.same_.update(&mut self.delta.same_, &mut self.uf);
+                        if !progress {
                             break;
                         }
                     }
-                    self.uf.snapshot_all_uprooted();
-                    self.same_.update_finalize(same_ctx, &mut self.uf);
+                    self.same_
+                        .update_finalize(&mut self.delta.same_, &mut self.uf);
+                    self.uf.reset_num_uprooted();
                 }
             }
             impl EclassProvider<Foo> for Theory {
@@ -4357,17 +4494,13 @@ fn codegen_variable_reuse_bug() {
             #[derive(Debug, Default)]
             struct AddRelation {
                 new: Vec<<Self as Relation>::Row>,
-                all_index_0_1_2: SortedVec<EclassCtx<Row3_0_1<Math, Math, Math>, u128>>,
-                all_index_0_2_1: SortedVec<EclassCtx<Row3_0_2_1<Math, Math, Math>, u128>>,
-            }
-            struct AddUpdateCtx {
-                scratch: Vec<(Math, Math, Math)>,
-                deferred_insertions: Vec<(Math, Math, Math)>,
-                old: SortedVec<EclassCtx<Row3_0_1<Math, Math, Math>, u128>>,
+                hash_index_0_1: runtime::FnvHashMap<(Math, Math), (Math,)>,
+                hash_index_0_2: runtime::FnvHashMap<(Math, Math), runtime::SmallVec<[(Math,); 1]>>,
+                hash_index_0_1_2: runtime::FnvHashMap<(Math, Math, Math), runtime::SmallVec<[(); 1]>>,
+                math_num_uprooted_at_latest_retain: usize,
             }
             impl Relation for AddRelation {
                 type Row = (Math, Math, Math);
-                type UpdateCtx = AddUpdateCtx;
                 type Unification = Unification;
                 const COST: u32 = 6u32;
                 fn new() -> Self {
@@ -4383,89 +4516,115 @@ fn codegen_variable_reuse_bug() {
                     self.new.iter().copied()
                 }
                 fn len(&self) -> usize {
-                    self.all_index_0_1_2.len()
+                    self.hash_index_0_1.len()
                 }
                 fn emit_graphviz(&self, buf: &mut String) {
                     use std::fmt::Write;
-                    for (i, (x0, x1, x2)) in self.all_index_0_1_2.iter().enumerate() {
+                    for (i, ((x0, x1), (x2,))) in self.hash_index_0_1.iter().enumerate() {
                         writeln!(buf, "{}_{i} -> {}_{};", "add", "math", x0).unwrap();
                         writeln!(buf, "{}_{i} -> {}_{};", "add", "math", x1).unwrap();
                         writeln!(buf, "{}_{i} -> {}_{};", "add", "math", x2).unwrap();
                         writeln!(buf, "{}_{i} [shape = box];", "add").unwrap();
                     }
                 }
-                fn update(
-                    &mut self,
-                    insertions: &mut Vec<Self::Row>,
-                    ctx: &mut Self::UpdateCtx,
-                    uf: &mut Unification,
-                ) {
-                    insertions.iter_mut().for_each(|row| {
-                        row.0 = uf.math_.find(row.0);
-                        row.1 = uf.math_.find(row.1);
-                        row.2 = uf.math_.find(row.2);
-                    });
-                    let already_canon = |uf: &mut Unification, row: &mut Self::Row| {
-                        uf.math_.already_canonical(&mut row.0)
-                            && uf.math_.already_canonical(&mut row.1)
-                            && uf.math_.already_canonical(&mut row.2)
-                    };
-                    let mut ran_merge = false;
-                    loop {
-                        self.all_index_0_1_2.sorted_vec_update(
-                            insertions,
-                            &mut ctx.deferred_insertions,
-                            &mut ctx.scratch,
-                            uf,
-                            already_canon,
-                            |uf, x, mut y| {
-                                ran_merge = true;
-                                let (x2,) = x.value_mut();
-                                let (y2,) = y.value_mut();
-                                uf.math_.union_mut(x2, y2);
-                            },
-                        );
-                        if ctx.deferred_insertions.is_empty() && ran_merge == false {
-                            break;
+                fn update_begin(&mut self, insertions: &[Self::Row], uf: &mut Unification) {
+                    use std::collections::hash_map::Entry;
+                    for &(mut x0, mut x1, mut x2) in &*insertions {
+                        match self
+                            .hash_index_0_1
+                            .entry((uf.math_.find(x0), uf.math_.find(x1)))
+                        {
+                            Entry::Occupied(mut entry) => {
+                                let (y2,) = entry.get_mut();
+                                uf.math_.union_mut(&mut x2, y2);
+                            }
+                            Entry::Vacant(entry) => {
+                                entry.insert((uf.math_.find(x2),));
+                            }
                         }
-                        ran_merge = false;
-                        std::mem::swap(insertions, &mut ctx.deferred_insertions);
-                        ctx.deferred_insertions.clear();
                     }
+                }
+                fn update(&mut self, insertions: &mut Vec<Self::Row>, uf: &mut Unification) -> bool {
+                    if self.math_num_uprooted_at_latest_retain == uf.math_.num_uprooted() {
+                        return false;
+                    }
+                    self.math_num_uprooted_at_latest_retain = uf.math_.num_uprooted();
+                    let offset = insertions.len();
+                    self.hash_index_0_1.retain(|&(x0, x1), &mut (x2,)| {
+                        if uf.math_.is_root(x0) && uf.math_.is_root(x1) && uf.math_.is_root(x2) {
+                            true
+                        } else {
+                            insertions.push((x0, x1, x2));
+                            false
+                        }
+                    });
+                    self.update_begin(&insertions[offset..], uf);
+                    true
+                }
+                fn update_finalize(&mut self, insertions: &mut Vec<Self::Row>, uf: &mut Unification) {
+                    use std::collections::hash_map::Entry;
+                    assert!(self.new.is_empty());
+                    self.new.extend(
+                        insertions
+                            .iter()
+                            .map(|&(x0, x1, x2)| (uf.math_.find(x0), uf.math_.find(x1), uf.math_.find(x2)))
+                            .filter(|&(x0, x1, x2)| !self.hash_index_0_1_2.contains_key(&(x0, x1, x2))),
+                    );
                     insertions.clear();
-                    assert!(ctx.scratch.is_empty());
-                    assert!(ctx.deferred_insertions.is_empty());
-                }
-                fn update_begin(&self) -> Self::UpdateCtx {
-                    AddUpdateCtx {
-                        scratch: Vec::new(),
-                        deferred_insertions: Vec::new(),
-                        old: self.all_index_0_1_2.clone(),
+                    RadixSortable::wrap(&mut self.new).voracious_sort();
+                    self.new.dedup();
+                    for &(x0, x1, x2) in &self.new {
+                        self.hash_index_0_2
+                            .entry((uf.math_.find(x0), uf.math_.find(x2)))
+                            .or_default()
+                            .push((uf.math_.find(x1),));
                     }
-                }
-                fn update_finalize(&mut self, ctx: Self::UpdateCtx, uf: &mut Unification) {
-                    self.all_index_0_1_2.finalize();
-                    self.all_index_0_2_1
-                        .recreate_from(&self.all_index_0_1_2.as_slice());
-                    assert_eq!(self.all_index_0_2_1.len(), self.all_index_0_1_2.len());
-                    self.new.extend(self.all_index_0_1_2.minus(&ctx.old));
+                    self.hash_index_0_2.retain(|&(x0, x2), v| {
+                        if uf.math_.is_root(x0) && uf.math_.is_root(x2) {
+                            v.retain(|&mut (x1,)| uf.math_.is_root(x1));
+                            v.sort_unstable();
+                            v.dedup();
+                            true
+                        } else {
+                            false
+                        }
+                    });
+                    for &(x0, x1, x2) in &self.new {
+                        self.hash_index_0_1_2
+                            .entry((uf.math_.find(x0), uf.math_.find(x1), uf.math_.find(x2)))
+                            .or_default()
+                            .push(());
+                    }
+                    self.hash_index_0_1_2.retain(|&(x0, x1, x2), v| {
+                        if uf.math_.is_root(x0) && uf.math_.is_root(x1) && uf.math_.is_root(x2) {
+                            v.retain(|&mut ()| true);
+                            v.sort_unstable();
+                            v.dedup();
+                            true
+                        } else {
+                            false
+                        }
+                    });
+                    self.math_num_uprooted_at_latest_retain = 0;
                 }
             }
             impl AddRelation {
                 fn iter2_0_1_2(&self, x0: Math, x1: Math) -> impl Iterator<Item = (Math,)> + use<'_> {
-                    self.all_index_0_1_2
-                        .range((x0, x1, Math::MIN_ID)..=(x0, x1, Math::MAX_ID))
-                        .map(|(x0, x1, x2)| (x2,))
+                    self.hash_index_0_1.get(&(x0, x1)).into_iter().copied()
                 }
                 fn iter2_0_2_1(&self, x0: Math, x2: Math) -> impl Iterator<Item = (Math,)> + use<'_> {
-                    self.all_index_0_2_1
-                        .range((x0, Math::MIN_ID, x2)..=(x0, Math::MAX_ID, x2))
-                        .map(|(x0, x1, x2)| (x1,))
+                    self.hash_index_0_2
+                        .get(&(x0, x2))
+                        .into_iter()
+                        .flatten()
+                        .copied()
                 }
                 fn iter3_0_1_2(&self, x0: Math, x1: Math, x2: Math) -> impl Iterator<Item = ()> + use<'_> {
-                    self.all_index_0_1_2
-                        .range((x0, x1, x2)..=(x0, x1, x2))
-                        .map(|(x0, x1, x2)| ())
+                    self.hash_index_0_1_2
+                        .get(&(x0, x1, x2))
+                        .into_iter()
+                        .flatten()
+                        .copied()
                 }
                 fn check2_0_1_2(&self, x0: Math, x1: Math) -> bool {
                     self.iter2_0_1_2(x0, x1).next().is_some()
@@ -4504,16 +4663,12 @@ fn codegen_variable_reuse_bug() {
             #[derive(Debug, Default)]
             struct ZeroRelation {
                 new: Vec<<Self as Relation>::Row>,
-                all_index_0: SortedVec<EclassCtx<Row1<Math>, u32>>,
-            }
-            struct ZeroUpdateCtx {
-                scratch: Vec<(Math,)>,
-                deferred_insertions: Vec<(Math,)>,
-                old: SortedVec<EclassCtx<Row1<Math>, u32>>,
+                hash_index_: runtime::FnvHashMap<(), (Math,)>,
+                hash_index_0: runtime::FnvHashMap<(Math,), runtime::SmallVec<[(); 1]>>,
+                math_num_uprooted_at_latest_retain: usize,
             }
             impl Relation for ZeroRelation {
                 type Row = (Math,);
-                type UpdateCtx = ZeroUpdateCtx;
                 type Unification = Unification;
                 const COST: u32 = 1u32;
                 fn new() -> Self {
@@ -4529,72 +4684,83 @@ fn codegen_variable_reuse_bug() {
                     self.new.iter().copied()
                 }
                 fn len(&self) -> usize {
-                    self.all_index_0.len()
+                    self.hash_index_.len()
                 }
                 fn emit_graphviz(&self, buf: &mut String) {
                     use std::fmt::Write;
-                    for (i, (x0,)) in self.all_index_0.iter().enumerate() {
+                    for (i, ((), (x0,))) in self.hash_index_.iter().enumerate() {
                         writeln!(buf, "{}_{i} -> {}_{};", "zero", "math", x0).unwrap();
                         writeln!(buf, "{}_{i} [shape = box];", "zero").unwrap();
                     }
                 }
-                fn update(
-                    &mut self,
-                    insertions: &mut Vec<Self::Row>,
-                    ctx: &mut Self::UpdateCtx,
-                    uf: &mut Unification,
-                ) {
-                    insertions.iter_mut().for_each(|row| {
-                        row.0 = uf.math_.find(row.0);
-                    });
-                    let already_canon =
-                        |uf: &mut Unification, row: &mut Self::Row| uf.math_.already_canonical(&mut row.0);
-                    let mut ran_merge = false;
-                    loop {
-                        self.all_index_0.sorted_vec_update(
-                            insertions,
-                            &mut ctx.deferred_insertions,
-                            &mut ctx.scratch,
-                            uf,
-                            already_canon,
-                            |uf, x, mut y| {
-                                ran_merge = true;
-                                let (x0,) = x.value_mut();
-                                let (y0,) = y.value_mut();
-                                uf.math_.union_mut(x0, y0);
-                            },
-                        );
-                        if ctx.deferred_insertions.is_empty() && ran_merge == false {
-                            break;
+                fn update_begin(&mut self, insertions: &[Self::Row], uf: &mut Unification) {
+                    use std::collections::hash_map::Entry;
+                    for &(mut x0,) in &*insertions {
+                        match self.hash_index_.entry(()) {
+                            Entry::Occupied(mut entry) => {
+                                let (y0,) = entry.get_mut();
+                                uf.math_.union_mut(&mut x0, y0);
+                            }
+                            Entry::Vacant(entry) => {
+                                entry.insert((uf.math_.find(x0),));
+                            }
                         }
-                        ran_merge = false;
-                        std::mem::swap(insertions, &mut ctx.deferred_insertions);
-                        ctx.deferred_insertions.clear();
                     }
+                }
+                fn update(&mut self, insertions: &mut Vec<Self::Row>, uf: &mut Unification) -> bool {
+                    if self.math_num_uprooted_at_latest_retain == uf.math_.num_uprooted() {
+                        return false;
+                    }
+                    self.math_num_uprooted_at_latest_retain = uf.math_.num_uprooted();
+                    let offset = insertions.len();
+                    self.hash_index_.retain(|&(), &mut (x0,)| {
+                        if uf.math_.is_root(x0) {
+                            true
+                        } else {
+                            insertions.push((x0,));
+                            false
+                        }
+                    });
+                    self.update_begin(&insertions[offset..], uf);
+                    true
+                }
+                fn update_finalize(&mut self, insertions: &mut Vec<Self::Row>, uf: &mut Unification) {
+                    use std::collections::hash_map::Entry;
+                    assert!(self.new.is_empty());
+                    self.new.extend(
+                        insertions
+                            .iter()
+                            .map(|&(x0,)| (uf.math_.find(x0),))
+                            .filter(|&(x0,)| !self.hash_index_0.contains_key(&(x0,))),
+                    );
                     insertions.clear();
-                    assert!(ctx.scratch.is_empty());
-                    assert!(ctx.deferred_insertions.is_empty());
-                }
-                fn update_begin(&self) -> Self::UpdateCtx {
-                    ZeroUpdateCtx {
-                        scratch: Vec::new(),
-                        deferred_insertions: Vec::new(),
-                        old: self.all_index_0.clone(),
+                    RadixSortable::wrap(&mut self.new).voracious_sort();
+                    self.new.dedup();
+                    for &(x0,) in &self.new {
+                        self.hash_index_0
+                            .entry((uf.math_.find(x0),))
+                            .or_default()
+                            .push(());
                     }
-                }
-                fn update_finalize(&mut self, ctx: Self::UpdateCtx, uf: &mut Unification) {
-                    self.all_index_0.finalize();
-                    self.new.extend(self.all_index_0.minus(&ctx.old));
+                    self.hash_index_0.retain(|&(x0,), v| {
+                        if uf.math_.is_root(x0) {
+                            v.retain(|&mut ()| true);
+                            v.sort_unstable();
+                            v.dedup();
+                            true
+                        } else {
+                            false
+                        }
+                    });
+                    self.math_num_uprooted_at_latest_retain = 0;
                 }
             }
             impl ZeroRelation {
                 fn iter0_0(&self) -> impl Iterator<Item = (Math,)> + use<'_> {
-                    self.all_index_0
-                        .range((Math::MIN_ID,)..=(Math::MAX_ID,))
-                        .map(|(x0,)| (x0,))
+                    self.hash_index_.get(&()).into_iter().copied()
                 }
                 fn iter1_0(&self, x0: Math) -> impl Iterator<Item = ()> + use<'_> {
-                    self.all_index_0.range((x0,)..=(x0,)).map(|(x0,)| ())
+                    self.hash_index_0.get(&(x0,)).into_iter().flatten().copied()
                 }
                 fn check0_0(&self) -> bool {
                     self.iter0_0().next().is_some()
@@ -4647,13 +4813,13 @@ fn codegen_variable_reuse_bug() {
                 pub math_: UnionFind<Math>,
             }
             impl Unification {
-                fn has_new_uproots(&mut self) -> bool {
-                    let mut ret = false;
-                    ret |= self.math_.has_new_uproots();
+                fn num_uprooted(&mut self) -> usize {
+                    let mut ret = 0;
+                    ret += self.math_.num_uprooted();
                     ret
                 }
-                fn snapshot_all_uprooted(&mut self) {
-                    self.math_.create_uprooted_snapshot();
+                fn reset_num_uprooted(&mut self) {
+                    self.math_.reset_num_uprooted();
                 }
             }
             #[derive(Debug, Default)]
@@ -4728,26 +4894,26 @@ fn codegen_variable_reuse_bug() {
                 pub fn canonicalize(&mut self) {
                     self.add_.clear_new();
                     self.zero_.clear_new();
-                    if !self.delta.has_new_inserts() && !self.uf.has_new_uproots() {
+                    if !self.delta.has_new_inserts() && self.uf.num_uprooted() == 0 {
                         return;
                     }
-                    let mut add_ctx = self.add_.update_begin();
-                    let mut zero_ctx = self.zero_.update_begin();
+                    self.add_.update_begin(&mut self.delta.add_, &mut self.uf);
+                    self.zero_.update_begin(&mut self.delta.zero_, &mut self.uf);
                     loop {
-                        self.uf.snapshot_all_uprooted();
-                        self.add_
-                            .update(&mut self.delta.add_, &mut add_ctx, &mut self.uf);
-                        self.zero_
-                            .update(&mut self.delta.zero_, &mut zero_ctx, &mut self.uf);
-                        if !self.uf.has_new_uproots() {
+                        let mut progress = false;
+                        progress |= self.add_.update(&mut self.delta.add_, &mut self.uf);
+                        progress |= self.zero_.update(&mut self.delta.zero_, &mut self.uf);
+                        if !progress {
                             break;
                         }
                     }
-                    self.uf.snapshot_all_uprooted();
+                    self.add_
+                        .update_finalize(&mut self.delta.add_, &mut self.uf);
+                    self.zero_
+                        .update_finalize(&mut self.delta.zero_, &mut self.uf);
                     self.global_math.update(&mut self.uf.math_);
                     self.global_math.update_finalize();
-                    self.add_.update_finalize(add_ctx, &mut self.uf);
-                    self.zero_.update_finalize(zero_ctx, &mut self.uf);
+                    self.uf.reset_num_uprooted();
                 }
             }
             impl EclassProvider<Math> for Theory {
@@ -4883,16 +5049,12 @@ fn initial_exprs() {
             #[derive(Debug, Default)]
             struct AddRelation {
                 new: Vec<<Self as Relation>::Row>,
-                all_index_0_1_2: SortedVec<EclassCtx<Row3_0_1<Math, Math, Math>, u128>>,
-            }
-            struct AddUpdateCtx {
-                scratch: Vec<(Math, Math, Math)>,
-                deferred_insertions: Vec<(Math, Math, Math)>,
-                old: SortedVec<EclassCtx<Row3_0_1<Math, Math, Math>, u128>>,
+                hash_index_0_1: runtime::FnvHashMap<(Math, Math), (Math,)>,
+                hash_index_0_1_2: runtime::FnvHashMap<(Math, Math, Math), runtime::SmallVec<[(); 1]>>,
+                math_num_uprooted_at_latest_retain: usize,
             }
             impl Relation for AddRelation {
                 type Row = (Math, Math, Math);
-                type UpdateCtx = AddUpdateCtx;
                 type Unification = Unification;
                 const COST: u32 = 3u32;
                 fn new() -> Self {
@@ -4908,81 +5070,92 @@ fn initial_exprs() {
                     self.new.iter().copied()
                 }
                 fn len(&self) -> usize {
-                    self.all_index_0_1_2.len()
+                    self.hash_index_0_1.len()
                 }
                 fn emit_graphviz(&self, buf: &mut String) {
                     use std::fmt::Write;
-                    for (i, (x0, x1, x2)) in self.all_index_0_1_2.iter().enumerate() {
+                    for (i, ((x0, x1), (x2,))) in self.hash_index_0_1.iter().enumerate() {
                         writeln!(buf, "{}_{i} -> {}_{};", "add", "math", x0).unwrap();
                         writeln!(buf, "{}_{i} -> {}_{};", "add", "math", x1).unwrap();
                         writeln!(buf, "{}_{i} -> {}_{};", "add", "math", x2).unwrap();
                         writeln!(buf, "{}_{i} [shape = box];", "add").unwrap();
                     }
                 }
-                fn update(
-                    &mut self,
-                    insertions: &mut Vec<Self::Row>,
-                    ctx: &mut Self::UpdateCtx,
-                    uf: &mut Unification,
-                ) {
-                    insertions.iter_mut().for_each(|row| {
-                        row.0 = uf.math_.find(row.0);
-                        row.1 = uf.math_.find(row.1);
-                        row.2 = uf.math_.find(row.2);
-                    });
-                    let already_canon = |uf: &mut Unification, row: &mut Self::Row| {
-                        uf.math_.already_canonical(&mut row.0)
-                            && uf.math_.already_canonical(&mut row.1)
-                            && uf.math_.already_canonical(&mut row.2)
-                    };
-                    let mut ran_merge = false;
-                    loop {
-                        self.all_index_0_1_2.sorted_vec_update(
-                            insertions,
-                            &mut ctx.deferred_insertions,
-                            &mut ctx.scratch,
-                            uf,
-                            already_canon,
-                            |uf, x, mut y| {
-                                ran_merge = true;
-                                let (x2,) = x.value_mut();
-                                let (y2,) = y.value_mut();
-                                uf.math_.union_mut(x2, y2);
-                            },
-                        );
-                        if ctx.deferred_insertions.is_empty() && ran_merge == false {
-                            break;
+                fn update_begin(&mut self, insertions: &[Self::Row], uf: &mut Unification) {
+                    use std::collections::hash_map::Entry;
+                    for &(mut x0, mut x1, mut x2) in &*insertions {
+                        match self
+                            .hash_index_0_1
+                            .entry((uf.math_.find(x0), uf.math_.find(x1)))
+                        {
+                            Entry::Occupied(mut entry) => {
+                                let (y2,) = entry.get_mut();
+                                uf.math_.union_mut(&mut x2, y2);
+                            }
+                            Entry::Vacant(entry) => {
+                                entry.insert((uf.math_.find(x2),));
+                            }
                         }
-                        ran_merge = false;
-                        std::mem::swap(insertions, &mut ctx.deferred_insertions);
-                        ctx.deferred_insertions.clear();
                     }
+                }
+                fn update(&mut self, insertions: &mut Vec<Self::Row>, uf: &mut Unification) -> bool {
+                    if self.math_num_uprooted_at_latest_retain == uf.math_.num_uprooted() {
+                        return false;
+                    }
+                    self.math_num_uprooted_at_latest_retain = uf.math_.num_uprooted();
+                    let offset = insertions.len();
+                    self.hash_index_0_1.retain(|&(x0, x1), &mut (x2,)| {
+                        if uf.math_.is_root(x0) && uf.math_.is_root(x1) && uf.math_.is_root(x2) {
+                            true
+                        } else {
+                            insertions.push((x0, x1, x2));
+                            false
+                        }
+                    });
+                    self.update_begin(&insertions[offset..], uf);
+                    true
+                }
+                fn update_finalize(&mut self, insertions: &mut Vec<Self::Row>, uf: &mut Unification) {
+                    use std::collections::hash_map::Entry;
+                    assert!(self.new.is_empty());
+                    self.new.extend(
+                        insertions
+                            .iter()
+                            .map(|&(x0, x1, x2)| (uf.math_.find(x0), uf.math_.find(x1), uf.math_.find(x2)))
+                            .filter(|&(x0, x1, x2)| !self.hash_index_0_1_2.contains_key(&(x0, x1, x2))),
+                    );
                     insertions.clear();
-                    assert!(ctx.scratch.is_empty());
-                    assert!(ctx.deferred_insertions.is_empty());
-                }
-                fn update_begin(&self) -> Self::UpdateCtx {
-                    AddUpdateCtx {
-                        scratch: Vec::new(),
-                        deferred_insertions: Vec::new(),
-                        old: self.all_index_0_1_2.clone(),
+                    RadixSortable::wrap(&mut self.new).voracious_sort();
+                    self.new.dedup();
+                    for &(x0, x1, x2) in &self.new {
+                        self.hash_index_0_1_2
+                            .entry((uf.math_.find(x0), uf.math_.find(x1), uf.math_.find(x2)))
+                            .or_default()
+                            .push(());
                     }
-                }
-                fn update_finalize(&mut self, ctx: Self::UpdateCtx, uf: &mut Unification) {
-                    self.all_index_0_1_2.finalize();
-                    self.new.extend(self.all_index_0_1_2.minus(&ctx.old));
+                    self.hash_index_0_1_2.retain(|&(x0, x1, x2), v| {
+                        if uf.math_.is_root(x0) && uf.math_.is_root(x1) && uf.math_.is_root(x2) {
+                            v.retain(|&mut ()| true);
+                            v.sort_unstable();
+                            v.dedup();
+                            true
+                        } else {
+                            false
+                        }
+                    });
+                    self.math_num_uprooted_at_latest_retain = 0;
                 }
             }
             impl AddRelation {
                 fn iter2_0_1_2(&self, x0: Math, x1: Math) -> impl Iterator<Item = (Math,)> + use<'_> {
-                    self.all_index_0_1_2
-                        .range((x0, x1, Math::MIN_ID)..=(x0, x1, Math::MAX_ID))
-                        .map(|(x0, x1, x2)| (x2,))
+                    self.hash_index_0_1.get(&(x0, x1)).into_iter().copied()
                 }
                 fn iter3_0_1_2(&self, x0: Math, x1: Math, x2: Math) -> impl Iterator<Item = ()> + use<'_> {
-                    self.all_index_0_1_2
-                        .range((x0, x1, x2)..=(x0, x1, x2))
-                        .map(|(x0, x1, x2)| ())
+                    self.hash_index_0_1_2
+                        .get(&(x0, x1, x2))
+                        .into_iter()
+                        .flatten()
+                        .copied()
                 }
                 fn check2_0_1_2(&self, x0: Math, x1: Math) -> bool {
                     self.iter2_0_1_2(x0, x1).next().is_some()
@@ -5018,16 +5191,12 @@ fn initial_exprs() {
             #[derive(Debug, Default)]
             struct MulRelation {
                 new: Vec<<Self as Relation>::Row>,
-                all_index_0_1_2: SortedVec<EclassCtx<Row3_0_1<Math, Math, Math>, u128>>,
-            }
-            struct MulUpdateCtx {
-                scratch: Vec<(Math, Math, Math)>,
-                deferred_insertions: Vec<(Math, Math, Math)>,
-                old: SortedVec<EclassCtx<Row3_0_1<Math, Math, Math>, u128>>,
+                hash_index_0_1: runtime::FnvHashMap<(Math, Math), (Math,)>,
+                hash_index_0_1_2: runtime::FnvHashMap<(Math, Math, Math), runtime::SmallVec<[(); 1]>>,
+                math_num_uprooted_at_latest_retain: usize,
             }
             impl Relation for MulRelation {
                 type Row = (Math, Math, Math);
-                type UpdateCtx = MulUpdateCtx;
                 type Unification = Unification;
                 const COST: u32 = 3u32;
                 fn new() -> Self {
@@ -5043,81 +5212,92 @@ fn initial_exprs() {
                     self.new.iter().copied()
                 }
                 fn len(&self) -> usize {
-                    self.all_index_0_1_2.len()
+                    self.hash_index_0_1.len()
                 }
                 fn emit_graphviz(&self, buf: &mut String) {
                     use std::fmt::Write;
-                    for (i, (x0, x1, x2)) in self.all_index_0_1_2.iter().enumerate() {
+                    for (i, ((x0, x1), (x2,))) in self.hash_index_0_1.iter().enumerate() {
                         writeln!(buf, "{}_{i} -> {}_{};", "mul", "math", x0).unwrap();
                         writeln!(buf, "{}_{i} -> {}_{};", "mul", "math", x1).unwrap();
                         writeln!(buf, "{}_{i} -> {}_{};", "mul", "math", x2).unwrap();
                         writeln!(buf, "{}_{i} [shape = box];", "mul").unwrap();
                     }
                 }
-                fn update(
-                    &mut self,
-                    insertions: &mut Vec<Self::Row>,
-                    ctx: &mut Self::UpdateCtx,
-                    uf: &mut Unification,
-                ) {
-                    insertions.iter_mut().for_each(|row| {
-                        row.0 = uf.math_.find(row.0);
-                        row.1 = uf.math_.find(row.1);
-                        row.2 = uf.math_.find(row.2);
-                    });
-                    let already_canon = |uf: &mut Unification, row: &mut Self::Row| {
-                        uf.math_.already_canonical(&mut row.0)
-                            && uf.math_.already_canonical(&mut row.1)
-                            && uf.math_.already_canonical(&mut row.2)
-                    };
-                    let mut ran_merge = false;
-                    loop {
-                        self.all_index_0_1_2.sorted_vec_update(
-                            insertions,
-                            &mut ctx.deferred_insertions,
-                            &mut ctx.scratch,
-                            uf,
-                            already_canon,
-                            |uf, x, mut y| {
-                                ran_merge = true;
-                                let (x2,) = x.value_mut();
-                                let (y2,) = y.value_mut();
-                                uf.math_.union_mut(x2, y2);
-                            },
-                        );
-                        if ctx.deferred_insertions.is_empty() && ran_merge == false {
-                            break;
+                fn update_begin(&mut self, insertions: &[Self::Row], uf: &mut Unification) {
+                    use std::collections::hash_map::Entry;
+                    for &(mut x0, mut x1, mut x2) in &*insertions {
+                        match self
+                            .hash_index_0_1
+                            .entry((uf.math_.find(x0), uf.math_.find(x1)))
+                        {
+                            Entry::Occupied(mut entry) => {
+                                let (y2,) = entry.get_mut();
+                                uf.math_.union_mut(&mut x2, y2);
+                            }
+                            Entry::Vacant(entry) => {
+                                entry.insert((uf.math_.find(x2),));
+                            }
                         }
-                        ran_merge = false;
-                        std::mem::swap(insertions, &mut ctx.deferred_insertions);
-                        ctx.deferred_insertions.clear();
                     }
+                }
+                fn update(&mut self, insertions: &mut Vec<Self::Row>, uf: &mut Unification) -> bool {
+                    if self.math_num_uprooted_at_latest_retain == uf.math_.num_uprooted() {
+                        return false;
+                    }
+                    self.math_num_uprooted_at_latest_retain = uf.math_.num_uprooted();
+                    let offset = insertions.len();
+                    self.hash_index_0_1.retain(|&(x0, x1), &mut (x2,)| {
+                        if uf.math_.is_root(x0) && uf.math_.is_root(x1) && uf.math_.is_root(x2) {
+                            true
+                        } else {
+                            insertions.push((x0, x1, x2));
+                            false
+                        }
+                    });
+                    self.update_begin(&insertions[offset..], uf);
+                    true
+                }
+                fn update_finalize(&mut self, insertions: &mut Vec<Self::Row>, uf: &mut Unification) {
+                    use std::collections::hash_map::Entry;
+                    assert!(self.new.is_empty());
+                    self.new.extend(
+                        insertions
+                            .iter()
+                            .map(|&(x0, x1, x2)| (uf.math_.find(x0), uf.math_.find(x1), uf.math_.find(x2)))
+                            .filter(|&(x0, x1, x2)| !self.hash_index_0_1_2.contains_key(&(x0, x1, x2))),
+                    );
                     insertions.clear();
-                    assert!(ctx.scratch.is_empty());
-                    assert!(ctx.deferred_insertions.is_empty());
-                }
-                fn update_begin(&self) -> Self::UpdateCtx {
-                    MulUpdateCtx {
-                        scratch: Vec::new(),
-                        deferred_insertions: Vec::new(),
-                        old: self.all_index_0_1_2.clone(),
+                    RadixSortable::wrap(&mut self.new).voracious_sort();
+                    self.new.dedup();
+                    for &(x0, x1, x2) in &self.new {
+                        self.hash_index_0_1_2
+                            .entry((uf.math_.find(x0), uf.math_.find(x1), uf.math_.find(x2)))
+                            .or_default()
+                            .push(());
                     }
-                }
-                fn update_finalize(&mut self, ctx: Self::UpdateCtx, uf: &mut Unification) {
-                    self.all_index_0_1_2.finalize();
-                    self.new.extend(self.all_index_0_1_2.minus(&ctx.old));
+                    self.hash_index_0_1_2.retain(|&(x0, x1, x2), v| {
+                        if uf.math_.is_root(x0) && uf.math_.is_root(x1) && uf.math_.is_root(x2) {
+                            v.retain(|&mut ()| true);
+                            v.sort_unstable();
+                            v.dedup();
+                            true
+                        } else {
+                            false
+                        }
+                    });
+                    self.math_num_uprooted_at_latest_retain = 0;
                 }
             }
             impl MulRelation {
                 fn iter2_0_1_2(&self, x0: Math, x1: Math) -> impl Iterator<Item = (Math,)> + use<'_> {
-                    self.all_index_0_1_2
-                        .range((x0, x1, Math::MIN_ID)..=(x0, x1, Math::MAX_ID))
-                        .map(|(x0, x1, x2)| (x2,))
+                    self.hash_index_0_1.get(&(x0, x1)).into_iter().copied()
                 }
                 fn iter3_0_1_2(&self, x0: Math, x1: Math, x2: Math) -> impl Iterator<Item = ()> + use<'_> {
-                    self.all_index_0_1_2
-                        .range((x0, x1, x2)..=(x0, x1, x2))
-                        .map(|(x0, x1, x2)| ())
+                    self.hash_index_0_1_2
+                        .get(&(x0, x1, x2))
+                        .into_iter()
+                        .flatten()
+                        .copied()
                 }
                 fn check2_0_1_2(&self, x0: Math, x1: Math) -> bool {
                     self.iter2_0_1_2(x0, x1).next().is_some()
@@ -5153,16 +5333,13 @@ fn initial_exprs() {
             #[derive(Debug, Default)]
             struct ConstRelation {
                 new: Vec<<Self as Relation>::Row>,
-                all_index_0_1: SortedVec<GeneralCtx<Row2_0<std::primitive::i64, Math>>>,
-            }
-            struct ConstUpdateCtx {
-                scratch: Vec<(std::primitive::i64, Math)>,
-                deferred_insertions: Vec<(std::primitive::i64, Math)>,
-                old: SortedVec<GeneralCtx<Row2_0<std::primitive::i64, Math>>>,
+                hash_index_0: runtime::FnvHashMap<(std::primitive::i64,), (Math,)>,
+                hash_index_0_1: runtime::FnvHashMap<(std::primitive::i64, Math), runtime::SmallVec<[(); 1]>>,
+                i64_num_uprooted_at_latest_retain: usize,
+                math_num_uprooted_at_latest_retain: usize,
             }
             impl Relation for ConstRelation {
                 type Row = (std::primitive::i64, Math);
-                type UpdateCtx = ConstUpdateCtx;
                 type Unification = Unification;
                 const COST: u32 = 2u32;
                 fn new() -> Self {
@@ -5178,75 +5355,88 @@ fn initial_exprs() {
                     self.new.iter().copied()
                 }
                 fn len(&self) -> usize {
-                    self.all_index_0_1.len()
+                    self.hash_index_0.len()
                 }
                 fn emit_graphviz(&self, buf: &mut String) {
                     use std::fmt::Write;
-                    for (i, (x0, x1)) in self.all_index_0_1.iter().enumerate() {
+                    for (i, ((x0,), (x1,))) in self.hash_index_0.iter().enumerate() {
                         writeln!(buf, "{}_{i} -> {}_{};", "const", "i64", x0).unwrap();
                         writeln!(buf, "{}_{i} -> {}_{};", "const", "math", x1).unwrap();
                         writeln!(buf, "{}_{i} [shape = box];", "const").unwrap();
                     }
                 }
-                fn update(
-                    &mut self,
-                    insertions: &mut Vec<Self::Row>,
-                    ctx: &mut Self::UpdateCtx,
-                    uf: &mut Unification,
-                ) {
-                    insertions.iter_mut().for_each(|row| {
-                        row.1 = uf.math_.find(row.1);
-                    });
-                    let already_canon =
-                        |uf: &mut Unification, row: &mut Self::Row| uf.math_.already_canonical(&mut row.1);
-                    let mut ran_merge = false;
-                    loop {
-                        self.all_index_0_1.sorted_vec_update(
-                            insertions,
-                            &mut ctx.deferred_insertions,
-                            &mut ctx.scratch,
-                            uf,
-                            already_canon,
-                            |uf, x, mut y| {
-                                ran_merge = true;
-                                let (x1,) = x.value_mut();
-                                let (y1,) = y.value_mut();
-                                uf.math_.union_mut(x1, y1);
-                            },
-                        );
-                        if ctx.deferred_insertions.is_empty() && ran_merge == false {
-                            break;
+                fn update_begin(&mut self, insertions: &[Self::Row], uf: &mut Unification) {
+                    use std::collections::hash_map::Entry;
+                    for &(mut x0, mut x1) in &*insertions {
+                        match self.hash_index_0.entry((x0,)) {
+                            Entry::Occupied(mut entry) => {
+                                let (y1,) = entry.get_mut();
+                                uf.math_.union_mut(&mut x1, y1);
+                            }
+                            Entry::Vacant(entry) => {
+                                entry.insert((uf.math_.find(x1),));
+                            }
                         }
-                        ran_merge = false;
-                        std::mem::swap(insertions, &mut ctx.deferred_insertions);
-                        ctx.deferred_insertions.clear();
                     }
+                }
+                fn update(&mut self, insertions: &mut Vec<Self::Row>, uf: &mut Unification) -> bool {
+                    if self.math_num_uprooted_at_latest_retain == uf.math_.num_uprooted() {
+                        return false;
+                    }
+                    self.math_num_uprooted_at_latest_retain = uf.math_.num_uprooted();
+                    let offset = insertions.len();
+                    self.hash_index_0.retain(|&(x0,), &mut (x1,)| {
+                        if uf.math_.is_root(x1) {
+                            true
+                        } else {
+                            insertions.push((x0, x1));
+                            false
+                        }
+                    });
+                    self.update_begin(&insertions[offset..], uf);
+                    true
+                }
+                fn update_finalize(&mut self, insertions: &mut Vec<Self::Row>, uf: &mut Unification) {
+                    use std::collections::hash_map::Entry;
+                    assert!(self.new.is_empty());
+                    self.new.extend(
+                        insertions
+                            .iter()
+                            .map(|&(x0, x1)| (x0, uf.math_.find(x1)))
+                            .filter(|&(x0, x1)| !self.hash_index_0_1.contains_key(&(x0, x1))),
+                    );
                     insertions.clear();
-                    assert!(ctx.scratch.is_empty());
-                    assert!(ctx.deferred_insertions.is_empty());
-                }
-                fn update_begin(&self) -> Self::UpdateCtx {
-                    ConstUpdateCtx {
-                        scratch: Vec::new(),
-                        deferred_insertions: Vec::new(),
-                        old: self.all_index_0_1.clone(),
+                    self.new.sort_unstable();
+                    self.new.dedup();
+                    for &(x0, x1) in &self.new {
+                        self.hash_index_0_1
+                            .entry((x0, uf.math_.find(x1)))
+                            .or_default()
+                            .push(());
                     }
-                }
-                fn update_finalize(&mut self, ctx: Self::UpdateCtx, uf: &mut Unification) {
-                    self.all_index_0_1.finalize();
-                    self.new.extend(self.all_index_0_1.minus(&ctx.old));
+                    self.hash_index_0_1.retain(|&(x0, x1), v| {
+                        if uf.math_.is_root(x1) {
+                            v.retain(|&mut ()| true);
+                            v.sort_unstable();
+                            v.dedup();
+                            true
+                        } else {
+                            false
+                        }
+                    });
+                    self.math_num_uprooted_at_latest_retain = 0;
                 }
             }
             impl ConstRelation {
                 fn iter1_0_1(&self, x0: std::primitive::i64) -> impl Iterator<Item = (Math,)> + use<'_> {
-                    self.all_index_0_1
-                        .range((x0, Math::MIN_ID)..=(x0, Math::MAX_ID))
-                        .map(|(x0, x1)| (x1,))
+                    self.hash_index_0.get(&(x0,)).into_iter().copied()
                 }
                 fn iter2_0_1(&self, x0: std::primitive::i64, x1: Math) -> impl Iterator<Item = ()> + use<'_> {
-                    self.all_index_0_1
-                        .range((x0, x1)..=(x0, x1))
-                        .map(|(x0, x1)| ())
+                    self.hash_index_0_1
+                        .get(&(x0, x1))
+                        .into_iter()
+                        .flatten()
+                        .copied()
                 }
                 fn check1_0_1(&self, x0: std::primitive::i64) -> bool {
                     self.iter1_0_1(x0).next().is_some()
@@ -5286,16 +5476,13 @@ fn initial_exprs() {
             #[derive(Debug, Default)]
             struct VarRelation {
                 new: Vec<<Self as Relation>::Row>,
-                all_index_0_1: SortedVec<GeneralCtx<Row2_0<runtime::IString, Math>>>,
-            }
-            struct VarUpdateCtx {
-                scratch: Vec<(runtime::IString, Math)>,
-                deferred_insertions: Vec<(runtime::IString, Math)>,
-                old: SortedVec<GeneralCtx<Row2_0<runtime::IString, Math>>>,
+                hash_index_0: runtime::FnvHashMap<(runtime::IString,), (Math,)>,
+                hash_index_0_1: runtime::FnvHashMap<(runtime::IString, Math), runtime::SmallVec<[(); 1]>>,
+                string_num_uprooted_at_latest_retain: usize,
+                math_num_uprooted_at_latest_retain: usize,
             }
             impl Relation for VarRelation {
                 type Row = (runtime::IString, Math);
-                type UpdateCtx = VarUpdateCtx;
                 type Unification = Unification;
                 const COST: u32 = 2u32;
                 fn new() -> Self {
@@ -5311,75 +5498,88 @@ fn initial_exprs() {
                     self.new.iter().copied()
                 }
                 fn len(&self) -> usize {
-                    self.all_index_0_1.len()
+                    self.hash_index_0.len()
                 }
                 fn emit_graphviz(&self, buf: &mut String) {
                     use std::fmt::Write;
-                    for (i, (x0, x1)) in self.all_index_0_1.iter().enumerate() {
+                    for (i, ((x0,), (x1,))) in self.hash_index_0.iter().enumerate() {
                         writeln!(buf, "{}_{i} -> {}_{};", "var", "string", x0).unwrap();
                         writeln!(buf, "{}_{i} -> {}_{};", "var", "math", x1).unwrap();
                         writeln!(buf, "{}_{i} [shape = box];", "var").unwrap();
                     }
                 }
-                fn update(
-                    &mut self,
-                    insertions: &mut Vec<Self::Row>,
-                    ctx: &mut Self::UpdateCtx,
-                    uf: &mut Unification,
-                ) {
-                    insertions.iter_mut().for_each(|row| {
-                        row.1 = uf.math_.find(row.1);
-                    });
-                    let already_canon =
-                        |uf: &mut Unification, row: &mut Self::Row| uf.math_.already_canonical(&mut row.1);
-                    let mut ran_merge = false;
-                    loop {
-                        self.all_index_0_1.sorted_vec_update(
-                            insertions,
-                            &mut ctx.deferred_insertions,
-                            &mut ctx.scratch,
-                            uf,
-                            already_canon,
-                            |uf, x, mut y| {
-                                ran_merge = true;
-                                let (x1,) = x.value_mut();
-                                let (y1,) = y.value_mut();
-                                uf.math_.union_mut(x1, y1);
-                            },
-                        );
-                        if ctx.deferred_insertions.is_empty() && ran_merge == false {
-                            break;
+                fn update_begin(&mut self, insertions: &[Self::Row], uf: &mut Unification) {
+                    use std::collections::hash_map::Entry;
+                    for &(mut x0, mut x1) in &*insertions {
+                        match self.hash_index_0.entry((x0,)) {
+                            Entry::Occupied(mut entry) => {
+                                let (y1,) = entry.get_mut();
+                                uf.math_.union_mut(&mut x1, y1);
+                            }
+                            Entry::Vacant(entry) => {
+                                entry.insert((uf.math_.find(x1),));
+                            }
                         }
-                        ran_merge = false;
-                        std::mem::swap(insertions, &mut ctx.deferred_insertions);
-                        ctx.deferred_insertions.clear();
                     }
+                }
+                fn update(&mut self, insertions: &mut Vec<Self::Row>, uf: &mut Unification) -> bool {
+                    if self.math_num_uprooted_at_latest_retain == uf.math_.num_uprooted() {
+                        return false;
+                    }
+                    self.math_num_uprooted_at_latest_retain = uf.math_.num_uprooted();
+                    let offset = insertions.len();
+                    self.hash_index_0.retain(|&(x0,), &mut (x1,)| {
+                        if uf.math_.is_root(x1) {
+                            true
+                        } else {
+                            insertions.push((x0, x1));
+                            false
+                        }
+                    });
+                    self.update_begin(&insertions[offset..], uf);
+                    true
+                }
+                fn update_finalize(&mut self, insertions: &mut Vec<Self::Row>, uf: &mut Unification) {
+                    use std::collections::hash_map::Entry;
+                    assert!(self.new.is_empty());
+                    self.new.extend(
+                        insertions
+                            .iter()
+                            .map(|&(x0, x1)| (x0, uf.math_.find(x1)))
+                            .filter(|&(x0, x1)| !self.hash_index_0_1.contains_key(&(x0, x1))),
+                    );
                     insertions.clear();
-                    assert!(ctx.scratch.is_empty());
-                    assert!(ctx.deferred_insertions.is_empty());
-                }
-                fn update_begin(&self) -> Self::UpdateCtx {
-                    VarUpdateCtx {
-                        scratch: Vec::new(),
-                        deferred_insertions: Vec::new(),
-                        old: self.all_index_0_1.clone(),
+                    self.new.sort_unstable();
+                    self.new.dedup();
+                    for &(x0, x1) in &self.new {
+                        self.hash_index_0_1
+                            .entry((x0, uf.math_.find(x1)))
+                            .or_default()
+                            .push(());
                     }
-                }
-                fn update_finalize(&mut self, ctx: Self::UpdateCtx, uf: &mut Unification) {
-                    self.all_index_0_1.finalize();
-                    self.new.extend(self.all_index_0_1.minus(&ctx.old));
+                    self.hash_index_0_1.retain(|&(x0, x1), v| {
+                        if uf.math_.is_root(x1) {
+                            v.retain(|&mut ()| true);
+                            v.sort_unstable();
+                            v.dedup();
+                            true
+                        } else {
+                            false
+                        }
+                    });
+                    self.math_num_uprooted_at_latest_retain = 0;
                 }
             }
             impl VarRelation {
                 fn iter1_0_1(&self, x0: runtime::IString) -> impl Iterator<Item = (Math,)> + use<'_> {
-                    self.all_index_0_1
-                        .range((x0, Math::MIN_ID)..=(x0, Math::MAX_ID))
-                        .map(|(x0, x1)| (x1,))
+                    self.hash_index_0.get(&(x0,)).into_iter().copied()
                 }
                 fn iter2_0_1(&self, x0: runtime::IString, x1: Math) -> impl Iterator<Item = ()> + use<'_> {
-                    self.all_index_0_1
-                        .range((x0, x1)..=(x0, x1))
-                        .map(|(x0, x1)| ())
+                    self.hash_index_0_1
+                        .get(&(x0, x1))
+                        .into_iter()
+                        .flatten()
+                        .copied()
                 }
                 fn check1_0_1(&self, x0: runtime::IString) -> bool {
                     self.iter1_0_1(x0).next().is_some()
@@ -5448,13 +5648,13 @@ fn initial_exprs() {
                 pub math_: UnionFind<Math>,
             }
             impl Unification {
-                fn has_new_uproots(&mut self) -> bool {
-                    let mut ret = false;
-                    ret |= self.math_.has_new_uproots();
+                fn num_uprooted(&mut self) -> usize {
+                    let mut ret = 0;
+                    ret += self.math_.num_uprooted();
                     ret
                 }
-                fn snapshot_all_uprooted(&mut self) {
-                    self.math_.create_uprooted_snapshot();
+                fn reset_num_uprooted(&mut self) {
+                    self.math_.reset_num_uprooted();
                 }
             }
             #[derive(Debug, Default)]
@@ -5569,36 +5769,37 @@ fn initial_exprs() {
                     self.mul_.clear_new();
                     self.const_.clear_new();
                     self.var_.clear_new();
-                    if !self.delta.has_new_inserts() && !self.uf.has_new_uproots() {
+                    if !self.delta.has_new_inserts() && self.uf.num_uprooted() == 0 {
                         return;
                     }
-                    let mut add_ctx = self.add_.update_begin();
-                    let mut mul_ctx = self.mul_.update_begin();
-                    let mut const_ctx = self.const_.update_begin();
-                    let mut var_ctx = self.var_.update_begin();
+                    self.add_.update_begin(&mut self.delta.add_, &mut self.uf);
+                    self.mul_.update_begin(&mut self.delta.mul_, &mut self.uf);
+                    self.const_
+                        .update_begin(&mut self.delta.const_, &mut self.uf);
+                    self.var_.update_begin(&mut self.delta.var_, &mut self.uf);
                     loop {
-                        self.uf.snapshot_all_uprooted();
-                        self.add_
-                            .update(&mut self.delta.add_, &mut add_ctx, &mut self.uf);
-                        self.mul_
-                            .update(&mut self.delta.mul_, &mut mul_ctx, &mut self.uf);
-                        self.const_
-                            .update(&mut self.delta.const_, &mut const_ctx, &mut self.uf);
-                        self.var_
-                            .update(&mut self.delta.var_, &mut var_ctx, &mut self.uf);
-                        if !self.uf.has_new_uproots() {
+                        let mut progress = false;
+                        progress |= self.add_.update(&mut self.delta.add_, &mut self.uf);
+                        progress |= self.mul_.update(&mut self.delta.mul_, &mut self.uf);
+                        progress |= self.const_.update(&mut self.delta.const_, &mut self.uf);
+                        progress |= self.var_.update(&mut self.delta.var_, &mut self.uf);
+                        if !progress {
                             break;
                         }
                     }
-                    self.uf.snapshot_all_uprooted();
+                    self.add_
+                        .update_finalize(&mut self.delta.add_, &mut self.uf);
+                    self.mul_
+                        .update_finalize(&mut self.delta.mul_, &mut self.uf);
+                    self.const_
+                        .update_finalize(&mut self.delta.const_, &mut self.uf);
+                    self.var_
+                        .update_finalize(&mut self.delta.var_, &mut self.uf);
                     self.global_math.update(&mut self.uf.math_);
                     self.global_i64.update_finalize();
                     self.global_string.update_finalize();
                     self.global_math.update_finalize();
-                    self.add_.update_finalize(add_ctx, &mut self.uf);
-                    self.mul_.update_finalize(mul_ctx, &mut self.uf);
-                    self.const_.update_finalize(const_ctx, &mut self.uf);
-                    self.var_.update_finalize(var_ctx, &mut self.uf);
+                    self.uf.reset_num_uprooted();
                 }
             }
             impl EclassProvider<Math> for Theory {
@@ -5924,16 +6125,13 @@ fn codegen_bug1() {
             #[derive(Debug, Default)]
             struct FooRelation {
                 new: Vec<<Self as Relation>::Row>,
-                all_index_0_1_2: SortedVec<EclassCtx<Row3_0_1_2<T0, T1, T2>, u128>>,
-            }
-            struct FooUpdateCtx {
-                scratch: Vec<(T0, T1, T2)>,
-                deferred_insertions: Vec<(T0, T1, T2)>,
-                old: SortedVec<EclassCtx<Row3_0_1_2<T0, T1, T2>, u128>>,
+                hash_index_0_1_2: runtime::FnvHashMap<(T0, T1, T2), runtime::SmallVec<[(); 1]>>,
+                t0_num_uprooted_at_latest_retain: usize,
+                t1_num_uprooted_at_latest_retain: usize,
+                t2_num_uprooted_at_latest_retain: usize,
             }
             impl Relation for FooRelation {
                 type Row = (T0, T1, T2);
-                type UpdateCtx = FooUpdateCtx;
                 type Unification = Unification;
                 const COST: u32 = 3u32;
                 fn new() -> Self {
@@ -5949,71 +6147,79 @@ fn codegen_bug1() {
                     self.new.iter().copied()
                 }
                 fn len(&self) -> usize {
-                    self.all_index_0_1_2.len()
+                    self.hash_index_0_1_2.values().map(|v| v.len()).sum()
                 }
                 fn emit_graphviz(&self, buf: &mut String) {
                     use std::fmt::Write;
-                    for (i, (x0, x1, x2)) in self.all_index_0_1_2.iter().enumerate() {
+                    for (i, ((x0, x1, x2), ())) in self
+                        .hash_index_0_1_2
+                        .iter()
+                        .flat_map(|(k, v)| v.iter().map(move |v| (k, v)))
+                        .enumerate()
+                    {
                         writeln!(buf, "{}_{i} -> {}_{};", "foo", "t0", x0).unwrap();
                         writeln!(buf, "{}_{i} -> {}_{};", "foo", "t1", x1).unwrap();
                         writeln!(buf, "{}_{i} -> {}_{};", "foo", "t2", x2).unwrap();
                         writeln!(buf, "{}_{i} [shape = box];", "foo").unwrap();
                     }
                 }
-                fn update(
-                    &mut self,
-                    insertions: &mut Vec<Self::Row>,
-                    ctx: &mut Self::UpdateCtx,
-                    uf: &mut Unification,
-                ) {
-                    insertions.iter_mut().for_each(|row| {
-                        row.0 = uf.t0_.find(row.0);
-                        row.1 = uf.t1_.find(row.1);
-                        row.2 = uf.t2_.find(row.2);
-                    });
-                    let already_canon = |uf: &mut Unification, row: &mut Self::Row| {
-                        uf.t0_.already_canonical(&mut row.0)
-                            && uf.t1_.already_canonical(&mut row.1)
-                            && uf.t2_.already_canonical(&mut row.2)
-                    };
-                    let mut ran_merge = false;
-                    loop {
-                        self.all_index_0_1_2.sorted_vec_update(
-                            insertions,
-                            &mut ctx.deferred_insertions,
-                            &mut ctx.scratch,
-                            uf,
-                            already_canon,
-                            |_, _, _| unreachable!(),
-                        );
-                        if ctx.deferred_insertions.is_empty() && ran_merge == false {
-                            break;
-                        }
-                        ran_merge = false;
-                        std::mem::swap(insertions, &mut ctx.deferred_insertions);
-                        ctx.deferred_insertions.clear();
+                fn update_begin(&mut self, insertions: &[Self::Row], uf: &mut Unification) {
+                    use std::collections::hash_map::Entry;
+                }
+                fn update(&mut self, insertions: &mut Vec<Self::Row>, uf: &mut Unification) -> bool {
+                    if self.t0_num_uprooted_at_latest_retain == uf.t0_.num_uprooted()
+                        && self.t1_num_uprooted_at_latest_retain == uf.t1_.num_uprooted()
+                        && self.t2_num_uprooted_at_latest_retain == uf.t2_.num_uprooted()
+                    {
+                        return false;
                     }
+                    self.t0_num_uprooted_at_latest_retain = uf.t0_.num_uprooted();
+                    self.t1_num_uprooted_at_latest_retain = uf.t1_.num_uprooted();
+                    self.t2_num_uprooted_at_latest_retain = uf.t2_.num_uprooted();
+                    let offset = insertions.len();
+                    self.update_begin(&insertions[offset..], uf);
+                    true
+                }
+                fn update_finalize(&mut self, insertions: &mut Vec<Self::Row>, uf: &mut Unification) {
+                    use std::collections::hash_map::Entry;
+                    assert!(self.new.is_empty());
+                    self.new.extend(
+                        insertions
+                            .iter()
+                            .map(|&(x0, x1, x2)| (uf.t0_.find(x0), uf.t1_.find(x1), uf.t2_.find(x2)))
+                            .filter(|&(x0, x1, x2)| !self.hash_index_0_1_2.contains_key(&(x0, x1, x2))),
+                    );
                     insertions.clear();
-                    assert!(ctx.scratch.is_empty());
-                    assert!(ctx.deferred_insertions.is_empty());
-                }
-                fn update_begin(&self) -> Self::UpdateCtx {
-                    FooUpdateCtx {
-                        scratch: Vec::new(),
-                        deferred_insertions: Vec::new(),
-                        old: self.all_index_0_1_2.clone(),
+                    RadixSortable::wrap(&mut self.new).voracious_sort();
+                    self.new.dedup();
+                    for &(x0, x1, x2) in &self.new {
+                        self.hash_index_0_1_2
+                            .entry((uf.t0_.find(x0), uf.t1_.find(x1), uf.t2_.find(x2)))
+                            .or_default()
+                            .push(());
                     }
-                }
-                fn update_finalize(&mut self, ctx: Self::UpdateCtx, uf: &mut Unification) {
-                    self.all_index_0_1_2.finalize();
-                    self.new.extend(self.all_index_0_1_2.minus(&ctx.old));
+                    self.hash_index_0_1_2.retain(|&(x0, x1, x2), v| {
+                        if uf.t0_.is_root(x0) && uf.t1_.is_root(x1) && uf.t2_.is_root(x2) {
+                            v.retain(|&mut ()| true);
+                            v.sort_unstable();
+                            v.dedup();
+                            true
+                        } else {
+                            false
+                        }
+                    });
+                    self.t0_num_uprooted_at_latest_retain = 0;
+                    self.t1_num_uprooted_at_latest_retain = 0;
+                    self.t2_num_uprooted_at_latest_retain = 0;
                 }
             }
             impl FooRelation {
                 fn iter3_0_1_2(&self, x0: T0, x1: T1, x2: T2) -> impl Iterator<Item = ()> + use<'_> {
-                    self.all_index_0_1_2
-                        .range((x0, x1, x2)..=(x0, x1, x2))
-                        .map(|(x0, x1, x2)| ())
+                    self.hash_index_0_1_2
+                        .get(&(x0, x1, x2))
+                        .into_iter()
+                        .flatten()
+                        .copied()
                 }
                 fn check3_0_1_2(&self, x0: T0, x1: T1, x2: T2) -> bool {
                     self.iter3_0_1_2(x0, x1, x2).next().is_some()
@@ -6051,17 +6257,17 @@ fn codegen_bug1() {
                 pub t2_: UnionFind<T2>,
             }
             impl Unification {
-                fn has_new_uproots(&mut self) -> bool {
-                    let mut ret = false;
-                    ret |= self.t0_.has_new_uproots();
-                    ret |= self.t1_.has_new_uproots();
-                    ret |= self.t2_.has_new_uproots();
+                fn num_uprooted(&mut self) -> usize {
+                    let mut ret = 0;
+                    ret += self.t0_.num_uprooted();
+                    ret += self.t1_.num_uprooted();
+                    ret += self.t2_.num_uprooted();
                     ret
                 }
-                fn snapshot_all_uprooted(&mut self) {
-                    self.t0_.create_uprooted_snapshot();
-                    self.t1_.create_uprooted_snapshot();
-                    self.t2_.create_uprooted_snapshot();
+                fn reset_num_uprooted(&mut self) {
+                    self.t0_.reset_num_uprooted();
+                    self.t1_.reset_num_uprooted();
+                    self.t2_.reset_num_uprooted();
                 }
             }
             #[derive(Debug, Default)]
@@ -6107,20 +6313,20 @@ fn codegen_bug1() {
                 #[inline(never)]
                 pub fn canonicalize(&mut self) {
                     self.foo_.clear_new();
-                    if !self.delta.has_new_inserts() && !self.uf.has_new_uproots() {
+                    if !self.delta.has_new_inserts() && self.uf.num_uprooted() == 0 {
                         return;
                     }
-                    let mut foo_ctx = self.foo_.update_begin();
+                    self.foo_.update_begin(&mut self.delta.foo_, &mut self.uf);
                     loop {
-                        self.uf.snapshot_all_uprooted();
-                        self.foo_
-                            .update(&mut self.delta.foo_, &mut foo_ctx, &mut self.uf);
-                        if !self.uf.has_new_uproots() {
+                        let mut progress = false;
+                        progress |= self.foo_.update(&mut self.delta.foo_, &mut self.uf);
+                        if !progress {
                             break;
                         }
                     }
-                    self.uf.snapshot_all_uprooted();
-                    self.foo_.update_finalize(foo_ctx, &mut self.uf);
+                    self.foo_
+                        .update_finalize(&mut self.delta.foo_, &mut self.uf);
+                    self.uf.reset_num_uprooted();
                 }
             }
             impl EclassProvider<T0> for Theory {
@@ -6263,16 +6469,13 @@ fn initial() {
             #[derive(Debug, Default)]
             struct ConstRelation {
                 new: Vec<<Self as Relation>::Row>,
-                all_index_0_1: SortedVec<GeneralCtx<Row2_0<std::primitive::i64, Math>>>,
-            }
-            struct ConstUpdateCtx {
-                scratch: Vec<(std::primitive::i64, Math)>,
-                deferred_insertions: Vec<(std::primitive::i64, Math)>,
-                old: SortedVec<GeneralCtx<Row2_0<std::primitive::i64, Math>>>,
+                hash_index_0: runtime::FnvHashMap<(std::primitive::i64,), (Math,)>,
+                hash_index_0_1: runtime::FnvHashMap<(std::primitive::i64, Math), runtime::SmallVec<[(); 1]>>,
+                i64_num_uprooted_at_latest_retain: usize,
+                math_num_uprooted_at_latest_retain: usize,
             }
             impl Relation for ConstRelation {
                 type Row = (std::primitive::i64, Math);
-                type UpdateCtx = ConstUpdateCtx;
                 type Unification = Unification;
                 const COST: u32 = 2u32;
                 fn new() -> Self {
@@ -6288,75 +6491,88 @@ fn initial() {
                     self.new.iter().copied()
                 }
                 fn len(&self) -> usize {
-                    self.all_index_0_1.len()
+                    self.hash_index_0.len()
                 }
                 fn emit_graphviz(&self, buf: &mut String) {
                     use std::fmt::Write;
-                    for (i, (x0, x1)) in self.all_index_0_1.iter().enumerate() {
+                    for (i, ((x0,), (x1,))) in self.hash_index_0.iter().enumerate() {
                         writeln!(buf, "{}_{i} -> {}_{};", "const", "i64", x0).unwrap();
                         writeln!(buf, "{}_{i} -> {}_{};", "const", "math", x1).unwrap();
                         writeln!(buf, "{}_{i} [shape = box];", "const").unwrap();
                     }
                 }
-                fn update(
-                    &mut self,
-                    insertions: &mut Vec<Self::Row>,
-                    ctx: &mut Self::UpdateCtx,
-                    uf: &mut Unification,
-                ) {
-                    insertions.iter_mut().for_each(|row| {
-                        row.1 = uf.math_.find(row.1);
-                    });
-                    let already_canon =
-                        |uf: &mut Unification, row: &mut Self::Row| uf.math_.already_canonical(&mut row.1);
-                    let mut ran_merge = false;
-                    loop {
-                        self.all_index_0_1.sorted_vec_update(
-                            insertions,
-                            &mut ctx.deferred_insertions,
-                            &mut ctx.scratch,
-                            uf,
-                            already_canon,
-                            |uf, x, mut y| {
-                                ran_merge = true;
-                                let (x1,) = x.value_mut();
-                                let (y1,) = y.value_mut();
-                                uf.math_.union_mut(x1, y1);
-                            },
-                        );
-                        if ctx.deferred_insertions.is_empty() && ran_merge == false {
-                            break;
+                fn update_begin(&mut self, insertions: &[Self::Row], uf: &mut Unification) {
+                    use std::collections::hash_map::Entry;
+                    for &(mut x0, mut x1) in &*insertions {
+                        match self.hash_index_0.entry((x0,)) {
+                            Entry::Occupied(mut entry) => {
+                                let (y1,) = entry.get_mut();
+                                uf.math_.union_mut(&mut x1, y1);
+                            }
+                            Entry::Vacant(entry) => {
+                                entry.insert((uf.math_.find(x1),));
+                            }
                         }
-                        ran_merge = false;
-                        std::mem::swap(insertions, &mut ctx.deferred_insertions);
-                        ctx.deferred_insertions.clear();
                     }
+                }
+                fn update(&mut self, insertions: &mut Vec<Self::Row>, uf: &mut Unification) -> bool {
+                    if self.math_num_uprooted_at_latest_retain == uf.math_.num_uprooted() {
+                        return false;
+                    }
+                    self.math_num_uprooted_at_latest_retain = uf.math_.num_uprooted();
+                    let offset = insertions.len();
+                    self.hash_index_0.retain(|&(x0,), &mut (x1,)| {
+                        if uf.math_.is_root(x1) {
+                            true
+                        } else {
+                            insertions.push((x0, x1));
+                            false
+                        }
+                    });
+                    self.update_begin(&insertions[offset..], uf);
+                    true
+                }
+                fn update_finalize(&mut self, insertions: &mut Vec<Self::Row>, uf: &mut Unification) {
+                    use std::collections::hash_map::Entry;
+                    assert!(self.new.is_empty());
+                    self.new.extend(
+                        insertions
+                            .iter()
+                            .map(|&(x0, x1)| (x0, uf.math_.find(x1)))
+                            .filter(|&(x0, x1)| !self.hash_index_0_1.contains_key(&(x0, x1))),
+                    );
                     insertions.clear();
-                    assert!(ctx.scratch.is_empty());
-                    assert!(ctx.deferred_insertions.is_empty());
-                }
-                fn update_begin(&self) -> Self::UpdateCtx {
-                    ConstUpdateCtx {
-                        scratch: Vec::new(),
-                        deferred_insertions: Vec::new(),
-                        old: self.all_index_0_1.clone(),
+                    self.new.sort_unstable();
+                    self.new.dedup();
+                    for &(x0, x1) in &self.new {
+                        self.hash_index_0_1
+                            .entry((x0, uf.math_.find(x1)))
+                            .or_default()
+                            .push(());
                     }
-                }
-                fn update_finalize(&mut self, ctx: Self::UpdateCtx, uf: &mut Unification) {
-                    self.all_index_0_1.finalize();
-                    self.new.extend(self.all_index_0_1.minus(&ctx.old));
+                    self.hash_index_0_1.retain(|&(x0, x1), v| {
+                        if uf.math_.is_root(x1) {
+                            v.retain(|&mut ()| true);
+                            v.sort_unstable();
+                            v.dedup();
+                            true
+                        } else {
+                            false
+                        }
+                    });
+                    self.math_num_uprooted_at_latest_retain = 0;
                 }
             }
             impl ConstRelation {
                 fn iter1_0_1(&self, x0: std::primitive::i64) -> impl Iterator<Item = (Math,)> + use<'_> {
-                    self.all_index_0_1
-                        .range((x0, Math::MIN_ID)..=(x0, Math::MAX_ID))
-                        .map(|(x0, x1)| (x1,))
+                    self.hash_index_0.get(&(x0,)).into_iter().copied()
                 }
                 fn iter2_0_1(&self, x0: std::primitive::i64, x1: Math) -> impl Iterator<Item = ()> + use<'_> {
-                    self.all_index_0_1
-                        .range((x0, x1)..=(x0, x1))
-                        .map(|(x0, x1)| ())
+                    self.hash_index_0_1
+                        .get(&(x0, x1))
+                        .into_iter()
+                        .flatten()
+                        .copied()
                 }
                 fn check1_0_1(&self, x0: std::primitive::i64) -> bool {
                     self.iter1_0_1(x0).next().is_some()
@@ -6415,13 +6631,13 @@ fn initial() {
                 pub math_: UnionFind<Math>,
             }
             impl Unification {
-                fn has_new_uproots(&mut self) -> bool {
-                    let mut ret = false;
-                    ret |= self.math_.has_new_uproots();
+                fn num_uprooted(&mut self) -> usize {
+                    let mut ret = 0;
+                    ret += self.math_.num_uprooted();
                     ret
                 }
-                fn snapshot_all_uprooted(&mut self) {
-                    self.math_.create_uprooted_snapshot();
+                fn reset_num_uprooted(&mut self) {
+                    self.math_.reset_num_uprooted();
                 }
             }
             #[derive(Debug, Default)]
@@ -6470,20 +6686,21 @@ fn initial() {
                 #[inline(never)]
                 pub fn canonicalize(&mut self) {
                     self.const_.clear_new();
-                    if !self.delta.has_new_inserts() && !self.uf.has_new_uproots() {
+                    if !self.delta.has_new_inserts() && self.uf.num_uprooted() == 0 {
                         return;
                     }
-                    let mut const_ctx = self.const_.update_begin();
+                    self.const_
+                        .update_begin(&mut self.delta.const_, &mut self.uf);
                     loop {
-                        self.uf.snapshot_all_uprooted();
-                        self.const_
-                            .update(&mut self.delta.const_, &mut const_ctx, &mut self.uf);
-                        if !self.uf.has_new_uproots() {
+                        let mut progress = false;
+                        progress |= self.const_.update(&mut self.delta.const_, &mut self.uf);
+                        if !progress {
                             break;
                         }
                     }
-                    self.uf.snapshot_all_uprooted();
-                    self.const_.update_finalize(const_ctx, &mut self.uf);
+                    self.const_
+                        .update_finalize(&mut self.delta.const_, &mut self.uf);
+                    self.uf.reset_num_uprooted();
                 }
             }
             impl EclassProvider<Math> for Theory {
@@ -6694,16 +6911,13 @@ fn test_primitives_simple() {
             #[derive(Debug, Default)]
             struct MulRelation {
                 new: Vec<<Self as Relation>::Row>,
-                all_index_1_0_2: SortedVec<EclassCtx<Row3_1_0<Math, Math, Math>, u128>>,
-            }
-            struct MulUpdateCtx {
-                scratch: Vec<(Math, Math, Math)>,
-                deferred_insertions: Vec<(Math, Math, Math)>,
-                old: SortedVec<EclassCtx<Row3_1_0<Math, Math, Math>, u128>>,
+                hash_index_1_0: runtime::FnvHashMap<(Math, Math), (Math,)>,
+                hash_index_1: runtime::FnvHashMap<(Math,), runtime::SmallVec<[(Math, Math); 1]>>,
+                hash_index_1_0_2: runtime::FnvHashMap<(Math, Math, Math), runtime::SmallVec<[(); 1]>>,
+                math_num_uprooted_at_latest_retain: usize,
             }
             impl Relation for MulRelation {
                 type Row = (Math, Math, Math);
-                type UpdateCtx = MulUpdateCtx;
                 type Unification = Unification;
                 const COST: u32 = 3u32;
                 fn new() -> Self {
@@ -6719,86 +6933,111 @@ fn test_primitives_simple() {
                     self.new.iter().copied()
                 }
                 fn len(&self) -> usize {
-                    self.all_index_1_0_2.len()
+                    self.hash_index_1_0.len()
                 }
                 fn emit_graphviz(&self, buf: &mut String) {
                     use std::fmt::Write;
-                    for (i, (x1, x0, x2)) in self.all_index_1_0_2.iter().enumerate() {
+                    for (i, ((x1, x0), (x2,))) in self.hash_index_1_0.iter().enumerate() {
                         writeln!(buf, "{}_{i} -> {}_{};", "mul", "math", x1).unwrap();
                         writeln!(buf, "{}_{i} -> {}_{};", "mul", "math", x0).unwrap();
                         writeln!(buf, "{}_{i} -> {}_{};", "mul", "math", x2).unwrap();
                         writeln!(buf, "{}_{i} [shape = box];", "mul").unwrap();
                     }
                 }
-                fn update(
-                    &mut self,
-                    insertions: &mut Vec<Self::Row>,
-                    ctx: &mut Self::UpdateCtx,
-                    uf: &mut Unification,
-                ) {
-                    insertions.iter_mut().for_each(|row| {
-                        row.0 = uf.math_.find(row.0);
-                        row.1 = uf.math_.find(row.1);
-                        row.2 = uf.math_.find(row.2);
-                    });
-                    let already_canon = |uf: &mut Unification, row: &mut Self::Row| {
-                        uf.math_.already_canonical(&mut row.0)
-                            && uf.math_.already_canonical(&mut row.1)
-                            && uf.math_.already_canonical(&mut row.2)
-                    };
-                    let mut ran_merge = false;
-                    loop {
-                        self.all_index_1_0_2.sorted_vec_update(
-                            insertions,
-                            &mut ctx.deferred_insertions,
-                            &mut ctx.scratch,
-                            uf,
-                            already_canon,
-                            |uf, x, mut y| {
-                                ran_merge = true;
-                                let (x2,) = x.value_mut();
-                                let (y2,) = y.value_mut();
-                                uf.math_.union_mut(x2, y2);
-                            },
-                        );
-                        if ctx.deferred_insertions.is_empty() && ran_merge == false {
-                            break;
+                fn update_begin(&mut self, insertions: &[Self::Row], uf: &mut Unification) {
+                    use std::collections::hash_map::Entry;
+                    for &(mut x0, mut x1, mut x2) in &*insertions {
+                        match self
+                            .hash_index_1_0
+                            .entry((uf.math_.find(x1), uf.math_.find(x0)))
+                        {
+                            Entry::Occupied(mut entry) => {
+                                let (y2,) = entry.get_mut();
+                                uf.math_.union_mut(&mut x2, y2);
+                            }
+                            Entry::Vacant(entry) => {
+                                entry.insert((uf.math_.find(x2),));
+                            }
                         }
-                        ran_merge = false;
-                        std::mem::swap(insertions, &mut ctx.deferred_insertions);
-                        ctx.deferred_insertions.clear();
                     }
+                }
+                fn update(&mut self, insertions: &mut Vec<Self::Row>, uf: &mut Unification) -> bool {
+                    if self.math_num_uprooted_at_latest_retain == uf.math_.num_uprooted() {
+                        return false;
+                    }
+                    self.math_num_uprooted_at_latest_retain = uf.math_.num_uprooted();
+                    let offset = insertions.len();
+                    self.hash_index_1_0.retain(|&(x1, x0), &mut (x2,)| {
+                        if uf.math_.is_root(x0) && uf.math_.is_root(x1) && uf.math_.is_root(x2) {
+                            true
+                        } else {
+                            insertions.push((x0, x1, x2));
+                            false
+                        }
+                    });
+                    self.update_begin(&insertions[offset..], uf);
+                    true
+                }
+                fn update_finalize(&mut self, insertions: &mut Vec<Self::Row>, uf: &mut Unification) {
+                    use std::collections::hash_map::Entry;
+                    assert!(self.new.is_empty());
+                    self.new.extend(
+                        insertions
+                            .iter()
+                            .map(|&(x0, x1, x2)| (uf.math_.find(x0), uf.math_.find(x1), uf.math_.find(x2)))
+                            .filter(|&(x0, x1, x2)| !self.hash_index_1_0_2.contains_key(&(x1, x0, x2))),
+                    );
                     insertions.clear();
-                    assert!(ctx.scratch.is_empty());
-                    assert!(ctx.deferred_insertions.is_empty());
-                }
-                fn update_begin(&self) -> Self::UpdateCtx {
-                    MulUpdateCtx {
-                        scratch: Vec::new(),
-                        deferred_insertions: Vec::new(),
-                        old: self.all_index_1_0_2.clone(),
+                    RadixSortable::wrap(&mut self.new).voracious_sort();
+                    self.new.dedup();
+                    for &(x0, x1, x2) in &self.new {
+                        self.hash_index_1
+                            .entry((uf.math_.find(x1),))
+                            .or_default()
+                            .push((uf.math_.find(x0), uf.math_.find(x2)));
                     }
-                }
-                fn update_finalize(&mut self, ctx: Self::UpdateCtx, uf: &mut Unification) {
-                    self.all_index_1_0_2.finalize();
-                    self.new.extend(self.all_index_1_0_2.minus(&ctx.old));
+                    self.hash_index_1.retain(|&(x1,), v| {
+                        if uf.math_.is_root(x1) {
+                            v.retain(|&mut (x0, x2)| uf.math_.is_root(x0) && uf.math_.is_root(x2));
+                            v.sort_unstable();
+                            v.dedup();
+                            true
+                        } else {
+                            false
+                        }
+                    });
+                    for &(x0, x1, x2) in &self.new {
+                        self.hash_index_1_0_2
+                            .entry((uf.math_.find(x1), uf.math_.find(x0), uf.math_.find(x2)))
+                            .or_default()
+                            .push(());
+                    }
+                    self.hash_index_1_0_2.retain(|&(x1, x0, x2), v| {
+                        if uf.math_.is_root(x1) && uf.math_.is_root(x0) && uf.math_.is_root(x2) {
+                            v.retain(|&mut ()| true);
+                            v.sort_unstable();
+                            v.dedup();
+                            true
+                        } else {
+                            false
+                        }
+                    });
+                    self.math_num_uprooted_at_latest_retain = 0;
                 }
             }
             impl MulRelation {
                 fn iter2_1_0_2(&self, x1: Math, x0: Math) -> impl Iterator<Item = (Math,)> + use<'_> {
-                    self.all_index_1_0_2
-                        .range((x0, x1, Math::MIN_ID)..=(x0, x1, Math::MAX_ID))
-                        .map(|(x0, x1, x2)| (x2,))
+                    self.hash_index_1_0.get(&(x1, x0)).into_iter().copied()
                 }
                 fn iter1_1_0_2(&self, x1: Math) -> impl Iterator<Item = (Math, Math)> + use<'_> {
-                    self.all_index_1_0_2
-                        .range((Math::MIN_ID, x1, Math::MIN_ID)..=(Math::MAX_ID, x1, Math::MAX_ID))
-                        .map(|(x0, x1, x2)| (x0, x2))
+                    self.hash_index_1.get(&(x1,)).into_iter().flatten().copied()
                 }
                 fn iter3_1_0_2(&self, x1: Math, x0: Math, x2: Math) -> impl Iterator<Item = ()> + use<'_> {
-                    self.all_index_1_0_2
-                        .range((x0, x1, x2)..=(x0, x1, x2))
-                        .map(|(x0, x1, x2)| ())
+                    self.hash_index_1_0_2
+                        .get(&(x1, x0, x2))
+                        .into_iter()
+                        .flatten()
+                        .copied()
                 }
                 fn check2_1_0_2(&self, x1: Math, x0: Math) -> bool {
                     self.iter2_1_0_2(x1, x0).next().is_some()
@@ -6837,16 +7076,12 @@ fn test_primitives_simple() {
             #[derive(Debug, Default)]
             struct AddRelation {
                 new: Vec<<Self as Relation>::Row>,
-                all_index_0_1_2: SortedVec<EclassCtx<Row3_0_1<Math, Math, Math>, u128>>,
-            }
-            struct AddUpdateCtx {
-                scratch: Vec<(Math, Math, Math)>,
-                deferred_insertions: Vec<(Math, Math, Math)>,
-                old: SortedVec<EclassCtx<Row3_0_1<Math, Math, Math>, u128>>,
+                hash_index_0_1: runtime::FnvHashMap<(Math, Math), (Math,)>,
+                hash_index_0_1_2: runtime::FnvHashMap<(Math, Math, Math), runtime::SmallVec<[(); 1]>>,
+                math_num_uprooted_at_latest_retain: usize,
             }
             impl Relation for AddRelation {
                 type Row = (Math, Math, Math);
-                type UpdateCtx = AddUpdateCtx;
                 type Unification = Unification;
                 const COST: u32 = 3u32;
                 fn new() -> Self {
@@ -6862,81 +7097,92 @@ fn test_primitives_simple() {
                     self.new.iter().copied()
                 }
                 fn len(&self) -> usize {
-                    self.all_index_0_1_2.len()
+                    self.hash_index_0_1.len()
                 }
                 fn emit_graphviz(&self, buf: &mut String) {
                     use std::fmt::Write;
-                    for (i, (x0, x1, x2)) in self.all_index_0_1_2.iter().enumerate() {
+                    for (i, ((x0, x1), (x2,))) in self.hash_index_0_1.iter().enumerate() {
                         writeln!(buf, "{}_{i} -> {}_{};", "add", "math", x0).unwrap();
                         writeln!(buf, "{}_{i} -> {}_{};", "add", "math", x1).unwrap();
                         writeln!(buf, "{}_{i} -> {}_{};", "add", "math", x2).unwrap();
                         writeln!(buf, "{}_{i} [shape = box];", "add").unwrap();
                     }
                 }
-                fn update(
-                    &mut self,
-                    insertions: &mut Vec<Self::Row>,
-                    ctx: &mut Self::UpdateCtx,
-                    uf: &mut Unification,
-                ) {
-                    insertions.iter_mut().for_each(|row| {
-                        row.0 = uf.math_.find(row.0);
-                        row.1 = uf.math_.find(row.1);
-                        row.2 = uf.math_.find(row.2);
-                    });
-                    let already_canon = |uf: &mut Unification, row: &mut Self::Row| {
-                        uf.math_.already_canonical(&mut row.0)
-                            && uf.math_.already_canonical(&mut row.1)
-                            && uf.math_.already_canonical(&mut row.2)
-                    };
-                    let mut ran_merge = false;
-                    loop {
-                        self.all_index_0_1_2.sorted_vec_update(
-                            insertions,
-                            &mut ctx.deferred_insertions,
-                            &mut ctx.scratch,
-                            uf,
-                            already_canon,
-                            |uf, x, mut y| {
-                                ran_merge = true;
-                                let (x2,) = x.value_mut();
-                                let (y2,) = y.value_mut();
-                                uf.math_.union_mut(x2, y2);
-                            },
-                        );
-                        if ctx.deferred_insertions.is_empty() && ran_merge == false {
-                            break;
+                fn update_begin(&mut self, insertions: &[Self::Row], uf: &mut Unification) {
+                    use std::collections::hash_map::Entry;
+                    for &(mut x0, mut x1, mut x2) in &*insertions {
+                        match self
+                            .hash_index_0_1
+                            .entry((uf.math_.find(x0), uf.math_.find(x1)))
+                        {
+                            Entry::Occupied(mut entry) => {
+                                let (y2,) = entry.get_mut();
+                                uf.math_.union_mut(&mut x2, y2);
+                            }
+                            Entry::Vacant(entry) => {
+                                entry.insert((uf.math_.find(x2),));
+                            }
                         }
-                        ran_merge = false;
-                        std::mem::swap(insertions, &mut ctx.deferred_insertions);
-                        ctx.deferred_insertions.clear();
                     }
+                }
+                fn update(&mut self, insertions: &mut Vec<Self::Row>, uf: &mut Unification) -> bool {
+                    if self.math_num_uprooted_at_latest_retain == uf.math_.num_uprooted() {
+                        return false;
+                    }
+                    self.math_num_uprooted_at_latest_retain = uf.math_.num_uprooted();
+                    let offset = insertions.len();
+                    self.hash_index_0_1.retain(|&(x0, x1), &mut (x2,)| {
+                        if uf.math_.is_root(x0) && uf.math_.is_root(x1) && uf.math_.is_root(x2) {
+                            true
+                        } else {
+                            insertions.push((x0, x1, x2));
+                            false
+                        }
+                    });
+                    self.update_begin(&insertions[offset..], uf);
+                    true
+                }
+                fn update_finalize(&mut self, insertions: &mut Vec<Self::Row>, uf: &mut Unification) {
+                    use std::collections::hash_map::Entry;
+                    assert!(self.new.is_empty());
+                    self.new.extend(
+                        insertions
+                            .iter()
+                            .map(|&(x0, x1, x2)| (uf.math_.find(x0), uf.math_.find(x1), uf.math_.find(x2)))
+                            .filter(|&(x0, x1, x2)| !self.hash_index_0_1_2.contains_key(&(x0, x1, x2))),
+                    );
                     insertions.clear();
-                    assert!(ctx.scratch.is_empty());
-                    assert!(ctx.deferred_insertions.is_empty());
-                }
-                fn update_begin(&self) -> Self::UpdateCtx {
-                    AddUpdateCtx {
-                        scratch: Vec::new(),
-                        deferred_insertions: Vec::new(),
-                        old: self.all_index_0_1_2.clone(),
+                    RadixSortable::wrap(&mut self.new).voracious_sort();
+                    self.new.dedup();
+                    for &(x0, x1, x2) in &self.new {
+                        self.hash_index_0_1_2
+                            .entry((uf.math_.find(x0), uf.math_.find(x1), uf.math_.find(x2)))
+                            .or_default()
+                            .push(());
                     }
-                }
-                fn update_finalize(&mut self, ctx: Self::UpdateCtx, uf: &mut Unification) {
-                    self.all_index_0_1_2.finalize();
-                    self.new.extend(self.all_index_0_1_2.minus(&ctx.old));
+                    self.hash_index_0_1_2.retain(|&(x0, x1, x2), v| {
+                        if uf.math_.is_root(x0) && uf.math_.is_root(x1) && uf.math_.is_root(x2) {
+                            v.retain(|&mut ()| true);
+                            v.sort_unstable();
+                            v.dedup();
+                            true
+                        } else {
+                            false
+                        }
+                    });
+                    self.math_num_uprooted_at_latest_retain = 0;
                 }
             }
             impl AddRelation {
                 fn iter2_0_1_2(&self, x0: Math, x1: Math) -> impl Iterator<Item = (Math,)> + use<'_> {
-                    self.all_index_0_1_2
-                        .range((x0, x1, Math::MIN_ID)..=(x0, x1, Math::MAX_ID))
-                        .map(|(x0, x1, x2)| (x2,))
+                    self.hash_index_0_1.get(&(x0, x1)).into_iter().copied()
                 }
                 fn iter3_0_1_2(&self, x0: Math, x1: Math, x2: Math) -> impl Iterator<Item = ()> + use<'_> {
-                    self.all_index_0_1_2
-                        .range((x0, x1, x2)..=(x0, x1, x2))
-                        .map(|(x0, x1, x2)| ())
+                    self.hash_index_0_1_2
+                        .get(&(x0, x1, x2))
+                        .into_iter()
+                        .flatten()
+                        .copied()
                 }
                 fn check2_0_1_2(&self, x0: Math, x1: Math) -> bool {
                     self.iter2_0_1_2(x0, x1).next().is_some()
@@ -6972,17 +7218,14 @@ fn test_primitives_simple() {
             #[derive(Debug, Default)]
             struct ConstRelation {
                 new: Vec<<Self as Relation>::Row>,
-                all_index_0_1: SortedVec<GeneralCtx<Row2_0<std::primitive::i64, Math>>>,
-                all_index_1_0: SortedVec<GeneralCtx<Row2_1_0<std::primitive::i64, Math>>>,
-            }
-            struct ConstUpdateCtx {
-                scratch: Vec<(std::primitive::i64, Math)>,
-                deferred_insertions: Vec<(std::primitive::i64, Math)>,
-                old: SortedVec<GeneralCtx<Row2_0<std::primitive::i64, Math>>>,
+                hash_index_0: runtime::FnvHashMap<(std::primitive::i64,), (Math,)>,
+                hash_index_0_1: runtime::FnvHashMap<(std::primitive::i64, Math), runtime::SmallVec<[(); 1]>>,
+                hash_index_1: runtime::FnvHashMap<(Math,), runtime::SmallVec<[(std::primitive::i64,); 1]>>,
+                i64_num_uprooted_at_latest_retain: usize,
+                math_num_uprooted_at_latest_retain: usize,
             }
             impl Relation for ConstRelation {
                 type Row = (std::primitive::i64, Math);
-                type UpdateCtx = ConstUpdateCtx;
                 type Unification = Unification;
                 const COST: u32 = 4u32;
                 fn new() -> Self {
@@ -6998,83 +7241,107 @@ fn test_primitives_simple() {
                     self.new.iter().copied()
                 }
                 fn len(&self) -> usize {
-                    self.all_index_0_1.len()
+                    self.hash_index_0.len()
                 }
                 fn emit_graphviz(&self, buf: &mut String) {
                     use std::fmt::Write;
-                    for (i, (x0, x1)) in self.all_index_0_1.iter().enumerate() {
+                    for (i, ((x0,), (x1,))) in self.hash_index_0.iter().enumerate() {
                         writeln!(buf, "{}_{i} -> {}_{};", "const", "i64", x0).unwrap();
                         writeln!(buf, "{}_{i} -> {}_{};", "const", "math", x1).unwrap();
                         writeln!(buf, "{}_{i} [shape = box];", "const").unwrap();
                     }
                 }
-                fn update(
-                    &mut self,
-                    insertions: &mut Vec<Self::Row>,
-                    ctx: &mut Self::UpdateCtx,
-                    uf: &mut Unification,
-                ) {
-                    insertions.iter_mut().for_each(|row| {
-                        row.1 = uf.math_.find(row.1);
-                    });
-                    let already_canon =
-                        |uf: &mut Unification, row: &mut Self::Row| uf.math_.already_canonical(&mut row.1);
-                    let mut ran_merge = false;
-                    loop {
-                        self.all_index_0_1.sorted_vec_update(
-                            insertions,
-                            &mut ctx.deferred_insertions,
-                            &mut ctx.scratch,
-                            uf,
-                            already_canon,
-                            |uf, x, mut y| {
-                                ran_merge = true;
-                                let (x1,) = x.value_mut();
-                                let (y1,) = y.value_mut();
-                                uf.math_.union_mut(x1, y1);
-                            },
-                        );
-                        if ctx.deferred_insertions.is_empty() && ran_merge == false {
-                            break;
+                fn update_begin(&mut self, insertions: &[Self::Row], uf: &mut Unification) {
+                    use std::collections::hash_map::Entry;
+                    for &(mut x0, mut x1) in &*insertions {
+                        match self.hash_index_0.entry((x0,)) {
+                            Entry::Occupied(mut entry) => {
+                                let (y1,) = entry.get_mut();
+                                uf.math_.union_mut(&mut x1, y1);
+                            }
+                            Entry::Vacant(entry) => {
+                                entry.insert((uf.math_.find(x1),));
+                            }
                         }
-                        ran_merge = false;
-                        std::mem::swap(insertions, &mut ctx.deferred_insertions);
-                        ctx.deferred_insertions.clear();
                     }
+                }
+                fn update(&mut self, insertions: &mut Vec<Self::Row>, uf: &mut Unification) -> bool {
+                    if self.math_num_uprooted_at_latest_retain == uf.math_.num_uprooted() {
+                        return false;
+                    }
+                    self.math_num_uprooted_at_latest_retain = uf.math_.num_uprooted();
+                    let offset = insertions.len();
+                    self.hash_index_0.retain(|&(x0,), &mut (x1,)| {
+                        if uf.math_.is_root(x1) {
+                            true
+                        } else {
+                            insertions.push((x0, x1));
+                            false
+                        }
+                    });
+                    self.update_begin(&insertions[offset..], uf);
+                    true
+                }
+                fn update_finalize(&mut self, insertions: &mut Vec<Self::Row>, uf: &mut Unification) {
+                    use std::collections::hash_map::Entry;
+                    assert!(self.new.is_empty());
+                    self.new.extend(
+                        insertions
+                            .iter()
+                            .map(|&(x0, x1)| (x0, uf.math_.find(x1)))
+                            .filter(|&(x0, x1)| !self.hash_index_0_1.contains_key(&(x0, x1))),
+                    );
                     insertions.clear();
-                    assert!(ctx.scratch.is_empty());
-                    assert!(ctx.deferred_insertions.is_empty());
-                }
-                fn update_begin(&self) -> Self::UpdateCtx {
-                    ConstUpdateCtx {
-                        scratch: Vec::new(),
-                        deferred_insertions: Vec::new(),
-                        old: self.all_index_0_1.clone(),
+                    self.new.sort_unstable();
+                    self.new.dedup();
+                    for &(x0, x1) in &self.new {
+                        self.hash_index_0_1
+                            .entry((x0, uf.math_.find(x1)))
+                            .or_default()
+                            .push(());
                     }
-                }
-                fn update_finalize(&mut self, ctx: Self::UpdateCtx, uf: &mut Unification) {
-                    self.all_index_0_1.finalize();
-                    self.all_index_1_0
-                        .recreate_from(&self.all_index_0_1.as_slice());
-                    assert_eq!(self.all_index_1_0.len(), self.all_index_0_1.len());
-                    self.new.extend(self.all_index_0_1.minus(&ctx.old));
+                    self.hash_index_0_1.retain(|&(x0, x1), v| {
+                        if uf.math_.is_root(x1) {
+                            v.retain(|&mut ()| true);
+                            v.sort_unstable();
+                            v.dedup();
+                            true
+                        } else {
+                            false
+                        }
+                    });
+                    for &(x0, x1) in &self.new {
+                        self.hash_index_1
+                            .entry((uf.math_.find(x1),))
+                            .or_default()
+                            .push((x0,));
+                    }
+                    self.hash_index_1.retain(|&(x1,), v| {
+                        if uf.math_.is_root(x1) {
+                            v.retain(|&mut (x0,)| true);
+                            v.sort_unstable();
+                            v.dedup();
+                            true
+                        } else {
+                            false
+                        }
+                    });
+                    self.math_num_uprooted_at_latest_retain = 0;
                 }
             }
             impl ConstRelation {
                 fn iter1_0_1(&self, x0: std::primitive::i64) -> impl Iterator<Item = (Math,)> + use<'_> {
-                    self.all_index_0_1
-                        .range((x0, Math::MIN_ID)..=(x0, Math::MAX_ID))
-                        .map(|(x0, x1)| (x1,))
+                    self.hash_index_0.get(&(x0,)).into_iter().copied()
                 }
                 fn iter2_0_1(&self, x0: std::primitive::i64, x1: Math) -> impl Iterator<Item = ()> + use<'_> {
-                    self.all_index_0_1
-                        .range((x0, x1)..=(x0, x1))
-                        .map(|(x0, x1)| ())
+                    self.hash_index_0_1
+                        .get(&(x0, x1))
+                        .into_iter()
+                        .flatten()
+                        .copied()
                 }
                 fn iter1_1_0(&self, x1: Math) -> impl Iterator<Item = (std::primitive::i64,)> + use<'_> {
-                    self.all_index_1_0
-                        .range((std::primitive::i64::MIN_ID, x1)..=(std::primitive::i64::MAX_ID, x1))
-                        .map(|(x0, x1)| (x0,))
+                    self.hash_index_1.get(&(x1,)).into_iter().flatten().copied()
                 }
                 fn check1_0_1(&self, x0: std::primitive::i64) -> bool {
                     self.iter1_0_1(x0).next().is_some()
@@ -7117,16 +7384,13 @@ fn test_primitives_simple() {
             #[derive(Debug, Default)]
             struct VarRelation {
                 new: Vec<<Self as Relation>::Row>,
-                all_index_0_1: SortedVec<GeneralCtx<Row2_0<runtime::IString, Math>>>,
-            }
-            struct VarUpdateCtx {
-                scratch: Vec<(runtime::IString, Math)>,
-                deferred_insertions: Vec<(runtime::IString, Math)>,
-                old: SortedVec<GeneralCtx<Row2_0<runtime::IString, Math>>>,
+                hash_index_0: runtime::FnvHashMap<(runtime::IString,), (Math,)>,
+                hash_index_0_1: runtime::FnvHashMap<(runtime::IString, Math), runtime::SmallVec<[(); 1]>>,
+                string_num_uprooted_at_latest_retain: usize,
+                math_num_uprooted_at_latest_retain: usize,
             }
             impl Relation for VarRelation {
                 type Row = (runtime::IString, Math);
-                type UpdateCtx = VarUpdateCtx;
                 type Unification = Unification;
                 const COST: u32 = 2u32;
                 fn new() -> Self {
@@ -7142,75 +7406,88 @@ fn test_primitives_simple() {
                     self.new.iter().copied()
                 }
                 fn len(&self) -> usize {
-                    self.all_index_0_1.len()
+                    self.hash_index_0.len()
                 }
                 fn emit_graphviz(&self, buf: &mut String) {
                     use std::fmt::Write;
-                    for (i, (x0, x1)) in self.all_index_0_1.iter().enumerate() {
+                    for (i, ((x0,), (x1,))) in self.hash_index_0.iter().enumerate() {
                         writeln!(buf, "{}_{i} -> {}_{};", "var", "string", x0).unwrap();
                         writeln!(buf, "{}_{i} -> {}_{};", "var", "math", x1).unwrap();
                         writeln!(buf, "{}_{i} [shape = box];", "var").unwrap();
                     }
                 }
-                fn update(
-                    &mut self,
-                    insertions: &mut Vec<Self::Row>,
-                    ctx: &mut Self::UpdateCtx,
-                    uf: &mut Unification,
-                ) {
-                    insertions.iter_mut().for_each(|row| {
-                        row.1 = uf.math_.find(row.1);
-                    });
-                    let already_canon =
-                        |uf: &mut Unification, row: &mut Self::Row| uf.math_.already_canonical(&mut row.1);
-                    let mut ran_merge = false;
-                    loop {
-                        self.all_index_0_1.sorted_vec_update(
-                            insertions,
-                            &mut ctx.deferred_insertions,
-                            &mut ctx.scratch,
-                            uf,
-                            already_canon,
-                            |uf, x, mut y| {
-                                ran_merge = true;
-                                let (x1,) = x.value_mut();
-                                let (y1,) = y.value_mut();
-                                uf.math_.union_mut(x1, y1);
-                            },
-                        );
-                        if ctx.deferred_insertions.is_empty() && ran_merge == false {
-                            break;
+                fn update_begin(&mut self, insertions: &[Self::Row], uf: &mut Unification) {
+                    use std::collections::hash_map::Entry;
+                    for &(mut x0, mut x1) in &*insertions {
+                        match self.hash_index_0.entry((x0,)) {
+                            Entry::Occupied(mut entry) => {
+                                let (y1,) = entry.get_mut();
+                                uf.math_.union_mut(&mut x1, y1);
+                            }
+                            Entry::Vacant(entry) => {
+                                entry.insert((uf.math_.find(x1),));
+                            }
                         }
-                        ran_merge = false;
-                        std::mem::swap(insertions, &mut ctx.deferred_insertions);
-                        ctx.deferred_insertions.clear();
                     }
+                }
+                fn update(&mut self, insertions: &mut Vec<Self::Row>, uf: &mut Unification) -> bool {
+                    if self.math_num_uprooted_at_latest_retain == uf.math_.num_uprooted() {
+                        return false;
+                    }
+                    self.math_num_uprooted_at_latest_retain = uf.math_.num_uprooted();
+                    let offset = insertions.len();
+                    self.hash_index_0.retain(|&(x0,), &mut (x1,)| {
+                        if uf.math_.is_root(x1) {
+                            true
+                        } else {
+                            insertions.push((x0, x1));
+                            false
+                        }
+                    });
+                    self.update_begin(&insertions[offset..], uf);
+                    true
+                }
+                fn update_finalize(&mut self, insertions: &mut Vec<Self::Row>, uf: &mut Unification) {
+                    use std::collections::hash_map::Entry;
+                    assert!(self.new.is_empty());
+                    self.new.extend(
+                        insertions
+                            .iter()
+                            .map(|&(x0, x1)| (x0, uf.math_.find(x1)))
+                            .filter(|&(x0, x1)| !self.hash_index_0_1.contains_key(&(x0, x1))),
+                    );
                     insertions.clear();
-                    assert!(ctx.scratch.is_empty());
-                    assert!(ctx.deferred_insertions.is_empty());
-                }
-                fn update_begin(&self) -> Self::UpdateCtx {
-                    VarUpdateCtx {
-                        scratch: Vec::new(),
-                        deferred_insertions: Vec::new(),
-                        old: self.all_index_0_1.clone(),
+                    self.new.sort_unstable();
+                    self.new.dedup();
+                    for &(x0, x1) in &self.new {
+                        self.hash_index_0_1
+                            .entry((x0, uf.math_.find(x1)))
+                            .or_default()
+                            .push(());
                     }
-                }
-                fn update_finalize(&mut self, ctx: Self::UpdateCtx, uf: &mut Unification) {
-                    self.all_index_0_1.finalize();
-                    self.new.extend(self.all_index_0_1.minus(&ctx.old));
+                    self.hash_index_0_1.retain(|&(x0, x1), v| {
+                        if uf.math_.is_root(x1) {
+                            v.retain(|&mut ()| true);
+                            v.sort_unstable();
+                            v.dedup();
+                            true
+                        } else {
+                            false
+                        }
+                    });
+                    self.math_num_uprooted_at_latest_retain = 0;
                 }
             }
             impl VarRelation {
                 fn iter1_0_1(&self, x0: runtime::IString) -> impl Iterator<Item = (Math,)> + use<'_> {
-                    self.all_index_0_1
-                        .range((x0, Math::MIN_ID)..=(x0, Math::MAX_ID))
-                        .map(|(x0, x1)| (x1,))
+                    self.hash_index_0.get(&(x0,)).into_iter().copied()
                 }
                 fn iter2_0_1(&self, x0: runtime::IString, x1: Math) -> impl Iterator<Item = ()> + use<'_> {
-                    self.all_index_0_1
-                        .range((x0, x1)..=(x0, x1))
-                        .map(|(x0, x1)| ())
+                    self.hash_index_0_1
+                        .get(&(x0, x1))
+                        .into_iter()
+                        .flatten()
+                        .copied()
                 }
                 fn check1_0_1(&self, x0: runtime::IString) -> bool {
                     self.iter1_0_1(x0).next().is_some()
@@ -7279,13 +7556,13 @@ fn test_primitives_simple() {
                 pub math_: UnionFind<Math>,
             }
             impl Unification {
-                fn has_new_uproots(&mut self) -> bool {
-                    let mut ret = false;
-                    ret |= self.math_.has_new_uproots();
+                fn num_uprooted(&mut self) -> usize {
+                    let mut ret = 0;
+                    ret += self.math_.num_uprooted();
                     ret
                 }
-                fn snapshot_all_uprooted(&mut self) {
-                    self.math_.create_uprooted_snapshot();
+                fn reset_num_uprooted(&mut self) {
+                    self.math_.reset_num_uprooted();
                 }
             }
             #[derive(Debug, Default)]
@@ -7443,36 +7720,37 @@ fn test_primitives_simple() {
                     self.add_.clear_new();
                     self.const_.clear_new();
                     self.var_.clear_new();
-                    if !self.delta.has_new_inserts() && !self.uf.has_new_uproots() {
+                    if !self.delta.has_new_inserts() && self.uf.num_uprooted() == 0 {
                         return;
                     }
-                    let mut mul_ctx = self.mul_.update_begin();
-                    let mut add_ctx = self.add_.update_begin();
-                    let mut const_ctx = self.const_.update_begin();
-                    let mut var_ctx = self.var_.update_begin();
+                    self.mul_.update_begin(&mut self.delta.mul_, &mut self.uf);
+                    self.add_.update_begin(&mut self.delta.add_, &mut self.uf);
+                    self.const_
+                        .update_begin(&mut self.delta.const_, &mut self.uf);
+                    self.var_.update_begin(&mut self.delta.var_, &mut self.uf);
                     loop {
-                        self.uf.snapshot_all_uprooted();
-                        self.mul_
-                            .update(&mut self.delta.mul_, &mut mul_ctx, &mut self.uf);
-                        self.add_
-                            .update(&mut self.delta.add_, &mut add_ctx, &mut self.uf);
-                        self.const_
-                            .update(&mut self.delta.const_, &mut const_ctx, &mut self.uf);
-                        self.var_
-                            .update(&mut self.delta.var_, &mut var_ctx, &mut self.uf);
-                        if !self.uf.has_new_uproots() {
+                        let mut progress = false;
+                        progress |= self.mul_.update(&mut self.delta.mul_, &mut self.uf);
+                        progress |= self.add_.update(&mut self.delta.add_, &mut self.uf);
+                        progress |= self.const_.update(&mut self.delta.const_, &mut self.uf);
+                        progress |= self.var_.update(&mut self.delta.var_, &mut self.uf);
+                        if !progress {
                             break;
                         }
                     }
-                    self.uf.snapshot_all_uprooted();
+                    self.mul_
+                        .update_finalize(&mut self.delta.mul_, &mut self.uf);
+                    self.add_
+                        .update_finalize(&mut self.delta.add_, &mut self.uf);
+                    self.const_
+                        .update_finalize(&mut self.delta.const_, &mut self.uf);
+                    self.var_
+                        .update_finalize(&mut self.delta.var_, &mut self.uf);
                     self.global_math.update(&mut self.uf.math_);
                     self.global_i64.update_finalize();
                     self.global_string.update_finalize();
                     self.global_math.update_finalize();
-                    self.mul_.update_finalize(mul_ctx, &mut self.uf);
-                    self.add_.update_finalize(add_ctx, &mut self.uf);
-                    self.const_.update_finalize(const_ctx, &mut self.uf);
-                    self.var_.update_finalize(var_ctx, &mut self.uf);
+                    self.uf.reset_num_uprooted();
                 }
             }
             impl EclassProvider<Math> for Theory {
@@ -7618,17 +7896,13 @@ fn triangle_join() {
             #[derive(Debug, Default)]
             struct FooRelation {
                 new: Vec<<Self as Relation>::Row>,
-                all_index_0_1: SortedVec<EclassCtx<Row2_0_1<Math, Math>, u64>>,
-                all_index_1_0: SortedVec<EclassCtx<Row2_1_0<Math, Math>, u64>>,
-            }
-            struct FooUpdateCtx {
-                scratch: Vec<(Math, Math)>,
-                deferred_insertions: Vec<(Math, Math)>,
-                old: SortedVec<EclassCtx<Row2_0_1<Math, Math>, u64>>,
+                hash_index_1_0: runtime::FnvHashMap<(Math, Math), runtime::SmallVec<[(); 1]>>,
+                hash_index_1: runtime::FnvHashMap<(Math,), runtime::SmallVec<[(Math,); 1]>>,
+                hash_index_0: runtime::FnvHashMap<(Math,), runtime::SmallVec<[(Math,); 1]>>,
+                math_num_uprooted_at_latest_retain: usize,
             }
             impl Relation for FooRelation {
                 type Row = (Math, Math);
-                type UpdateCtx = FooUpdateCtx;
                 type Unification = Unification;
                 const COST: u32 = 4u32;
                 fn new() -> Self {
@@ -7644,87 +7918,109 @@ fn triangle_join() {
                     self.new.iter().copied()
                 }
                 fn len(&self) -> usize {
-                    self.all_index_0_1.len()
+                    self.hash_index_0.values().map(|v| v.len()).sum()
                 }
                 fn emit_graphviz(&self, buf: &mut String) {
                     use std::fmt::Write;
-                    for (i, (x0, x1)) in self.all_index_0_1.iter().enumerate() {
-                        writeln!(buf, "{}_{i} -> {}_{};", "foo", "math", x0).unwrap();
+                    for (i, ((x1, x0), ())) in self
+                        .hash_index_1_0
+                        .iter()
+                        .flat_map(|(k, v)| v.iter().map(move |v| (k, v)))
+                        .enumerate()
+                    {
                         writeln!(buf, "{}_{i} -> {}_{};", "foo", "math", x1).unwrap();
+                        writeln!(buf, "{}_{i} -> {}_{};", "foo", "math", x0).unwrap();
                         writeln!(buf, "{}_{i} [shape = box];", "foo").unwrap();
                     }
                 }
-                fn update(
-                    &mut self,
-                    insertions: &mut Vec<Self::Row>,
-                    ctx: &mut Self::UpdateCtx,
-                    uf: &mut Unification,
-                ) {
-                    insertions.iter_mut().for_each(|row| {
-                        row.0 = uf.math_.find(row.0);
-                        row.1 = uf.math_.find(row.1);
-                    });
-                    let already_canon = |uf: &mut Unification, row: &mut Self::Row| {
-                        uf.math_.already_canonical(&mut row.0) && uf.math_.already_canonical(&mut row.1)
-                    };
-                    let mut ran_merge = false;
-                    loop {
-                        self.all_index_0_1.sorted_vec_update(
-                            insertions,
-                            &mut ctx.deferred_insertions,
-                            &mut ctx.scratch,
-                            uf,
-                            already_canon,
-                            |_, _, _| unreachable!(),
-                        );
-                        self.all_index_1_0.sorted_vec_update(
-                            insertions,
-                            &mut ctx.deferred_insertions,
-                            &mut ctx.scratch,
-                            uf,
-                            already_canon,
-                            |_, _, _| unreachable!(),
-                        );
-                        if ctx.deferred_insertions.is_empty() && ran_merge == false {
-                            break;
-                        }
-                        ran_merge = false;
-                        std::mem::swap(insertions, &mut ctx.deferred_insertions);
-                        ctx.deferred_insertions.clear();
+                fn update_begin(&mut self, insertions: &[Self::Row], uf: &mut Unification) {
+                    use std::collections::hash_map::Entry;
+                }
+                fn update(&mut self, insertions: &mut Vec<Self::Row>, uf: &mut Unification) -> bool {
+                    if self.math_num_uprooted_at_latest_retain == uf.math_.num_uprooted() {
+                        return false;
                     }
+                    self.math_num_uprooted_at_latest_retain = uf.math_.num_uprooted();
+                    let offset = insertions.len();
+                    self.update_begin(&insertions[offset..], uf);
+                    true
+                }
+                fn update_finalize(&mut self, insertions: &mut Vec<Self::Row>, uf: &mut Unification) {
+                    use std::collections::hash_map::Entry;
+                    assert!(self.new.is_empty());
+                    self.new.extend(
+                        insertions
+                            .iter()
+                            .map(|&(x0, x1)| (uf.math_.find(x0), uf.math_.find(x1)))
+                            .filter(|&(x0, x1)| !self.hash_index_1_0.contains_key(&(x1, x0))),
+                    );
                     insertions.clear();
-                    assert!(ctx.scratch.is_empty());
-                    assert!(ctx.deferred_insertions.is_empty());
-                }
-                fn update_begin(&self) -> Self::UpdateCtx {
-                    FooUpdateCtx {
-                        scratch: Vec::new(),
-                        deferred_insertions: Vec::new(),
-                        old: self.all_index_0_1.clone(),
+                    RadixSortable::wrap(&mut self.new).voracious_sort();
+                    self.new.dedup();
+                    for &(x0, x1) in &self.new {
+                        self.hash_index_1_0
+                            .entry((uf.math_.find(x1), uf.math_.find(x0)))
+                            .or_default()
+                            .push(());
                     }
-                }
-                fn update_finalize(&mut self, ctx: Self::UpdateCtx, uf: &mut Unification) {
-                    self.all_index_0_1.finalize();
-                    self.all_index_1_0.finalize();
-                    assert_eq!(self.all_index_1_0.len(), self.all_index_0_1.len());
-                    self.new.extend(self.all_index_0_1.minus(&ctx.old));
+                    self.hash_index_1_0.retain(|&(x1, x0), v| {
+                        if uf.math_.is_root(x1) && uf.math_.is_root(x0) {
+                            v.retain(|&mut ()| true);
+                            v.sort_unstable();
+                            v.dedup();
+                            true
+                        } else {
+                            false
+                        }
+                    });
+                    for &(x0, x1) in &self.new {
+                        self.hash_index_1
+                            .entry((uf.math_.find(x1),))
+                            .or_default()
+                            .push((uf.math_.find(x0),));
+                    }
+                    self.hash_index_1.retain(|&(x1,), v| {
+                        if uf.math_.is_root(x1) {
+                            v.retain(|&mut (x0,)| uf.math_.is_root(x0));
+                            v.sort_unstable();
+                            v.dedup();
+                            true
+                        } else {
+                            false
+                        }
+                    });
+                    for &(x0, x1) in &self.new {
+                        self.hash_index_0
+                            .entry((uf.math_.find(x0),))
+                            .or_default()
+                            .push((uf.math_.find(x1),));
+                    }
+                    self.hash_index_0.retain(|&(x0,), v| {
+                        if uf.math_.is_root(x0) {
+                            v.retain(|&mut (x1,)| uf.math_.is_root(x1));
+                            v.sort_unstable();
+                            v.dedup();
+                            true
+                        } else {
+                            false
+                        }
+                    });
+                    self.math_num_uprooted_at_latest_retain = 0;
                 }
             }
             impl FooRelation {
                 fn iter2_1_0(&self, x1: Math, x0: Math) -> impl Iterator<Item = ()> + use<'_> {
-                    self.all_index_1_0
-                        .range((x0, x1)..=(x0, x1))
-                        .map(|(x0, x1)| ())
+                    self.hash_index_1_0
+                        .get(&(x1, x0))
+                        .into_iter()
+                        .flatten()
+                        .copied()
                 }
                 fn iter1_1_0(&self, x1: Math) -> impl Iterator<Item = (Math,)> + use<'_> {
-                    self.all_index_1_0
-                        .range((Math::MIN_ID, x1)..=(Math::MAX_ID, x1))
-                        .map(|(x0, x1)| (x0,))
+                    self.hash_index_1.get(&(x1,)).into_iter().flatten().copied()
                 }
                 fn iter1_0_1(&self, x0: Math) -> impl Iterator<Item = (Math,)> + use<'_> {
-                    self.all_index_0_1
-                        .range((x0, Math::MIN_ID)..=(x0, Math::MAX_ID))
-                        .map(|(x0, x1)| (x1,))
+                    self.hash_index_0.get(&(x0,)).into_iter().flatten().copied()
                 }
                 fn check2_1_0(&self, x1: Math, x0: Math) -> bool {
                     self.iter2_1_0(x1, x0).next().is_some()
@@ -7747,17 +8043,13 @@ fn triangle_join() {
             #[derive(Debug, Default)]
             struct BarRelation {
                 new: Vec<<Self as Relation>::Row>,
-                all_index_0_1: SortedVec<EclassCtx<Row2_0_1<Math, Math>, u64>>,
-                all_index_1_0: SortedVec<EclassCtx<Row2_1_0<Math, Math>, u64>>,
-            }
-            struct BarUpdateCtx {
-                scratch: Vec<(Math, Math)>,
-                deferred_insertions: Vec<(Math, Math)>,
-                old: SortedVec<EclassCtx<Row2_0_1<Math, Math>, u64>>,
+                hash_index_0: runtime::FnvHashMap<(Math,), runtime::SmallVec<[(Math,); 1]>>,
+                hash_index_1: runtime::FnvHashMap<(Math,), runtime::SmallVec<[(Math,); 1]>>,
+                hash_index_0_1: runtime::FnvHashMap<(Math, Math), runtime::SmallVec<[(); 1]>>,
+                math_num_uprooted_at_latest_retain: usize,
             }
             impl Relation for BarRelation {
                 type Row = (Math, Math);
-                type UpdateCtx = BarUpdateCtx;
                 type Unification = Unification;
                 const COST: u32 = 4u32;
                 fn new() -> Self {
@@ -7773,87 +8065,109 @@ fn triangle_join() {
                     self.new.iter().copied()
                 }
                 fn len(&self) -> usize {
-                    self.all_index_0_1.len()
+                    self.hash_index_0.values().map(|v| v.len()).sum()
                 }
                 fn emit_graphviz(&self, buf: &mut String) {
                     use std::fmt::Write;
-                    for (i, (x0, x1)) in self.all_index_0_1.iter().enumerate() {
+                    for (i, ((x0,), (x1,))) in self
+                        .hash_index_0
+                        .iter()
+                        .flat_map(|(k, v)| v.iter().map(move |v| (k, v)))
+                        .enumerate()
+                    {
                         writeln!(buf, "{}_{i} -> {}_{};", "bar", "math", x0).unwrap();
                         writeln!(buf, "{}_{i} -> {}_{};", "bar", "math", x1).unwrap();
                         writeln!(buf, "{}_{i} [shape = box];", "bar").unwrap();
                     }
                 }
-                fn update(
-                    &mut self,
-                    insertions: &mut Vec<Self::Row>,
-                    ctx: &mut Self::UpdateCtx,
-                    uf: &mut Unification,
-                ) {
-                    insertions.iter_mut().for_each(|row| {
-                        row.0 = uf.math_.find(row.0);
-                        row.1 = uf.math_.find(row.1);
-                    });
-                    let already_canon = |uf: &mut Unification, row: &mut Self::Row| {
-                        uf.math_.already_canonical(&mut row.0) && uf.math_.already_canonical(&mut row.1)
-                    };
-                    let mut ran_merge = false;
-                    loop {
-                        self.all_index_0_1.sorted_vec_update(
-                            insertions,
-                            &mut ctx.deferred_insertions,
-                            &mut ctx.scratch,
-                            uf,
-                            already_canon,
-                            |_, _, _| unreachable!(),
-                        );
-                        self.all_index_1_0.sorted_vec_update(
-                            insertions,
-                            &mut ctx.deferred_insertions,
-                            &mut ctx.scratch,
-                            uf,
-                            already_canon,
-                            |_, _, _| unreachable!(),
-                        );
-                        if ctx.deferred_insertions.is_empty() && ran_merge == false {
-                            break;
-                        }
-                        ran_merge = false;
-                        std::mem::swap(insertions, &mut ctx.deferred_insertions);
-                        ctx.deferred_insertions.clear();
+                fn update_begin(&mut self, insertions: &[Self::Row], uf: &mut Unification) {
+                    use std::collections::hash_map::Entry;
+                }
+                fn update(&mut self, insertions: &mut Vec<Self::Row>, uf: &mut Unification) -> bool {
+                    if self.math_num_uprooted_at_latest_retain == uf.math_.num_uprooted() {
+                        return false;
                     }
+                    self.math_num_uprooted_at_latest_retain = uf.math_.num_uprooted();
+                    let offset = insertions.len();
+                    self.update_begin(&insertions[offset..], uf);
+                    true
+                }
+                fn update_finalize(&mut self, insertions: &mut Vec<Self::Row>, uf: &mut Unification) {
+                    use std::collections::hash_map::Entry;
+                    assert!(self.new.is_empty());
+                    self.new.extend(
+                        insertions
+                            .iter()
+                            .map(|&(x0, x1)| (uf.math_.find(x0), uf.math_.find(x1)))
+                            .filter(|&(x0, x1)| !self.hash_index_0_1.contains_key(&(x0, x1))),
+                    );
                     insertions.clear();
-                    assert!(ctx.scratch.is_empty());
-                    assert!(ctx.deferred_insertions.is_empty());
-                }
-                fn update_begin(&self) -> Self::UpdateCtx {
-                    BarUpdateCtx {
-                        scratch: Vec::new(),
-                        deferred_insertions: Vec::new(),
-                        old: self.all_index_0_1.clone(),
+                    RadixSortable::wrap(&mut self.new).voracious_sort();
+                    self.new.dedup();
+                    for &(x0, x1) in &self.new {
+                        self.hash_index_0
+                            .entry((uf.math_.find(x0),))
+                            .or_default()
+                            .push((uf.math_.find(x1),));
                     }
-                }
-                fn update_finalize(&mut self, ctx: Self::UpdateCtx, uf: &mut Unification) {
-                    self.all_index_0_1.finalize();
-                    self.all_index_1_0.finalize();
-                    assert_eq!(self.all_index_1_0.len(), self.all_index_0_1.len());
-                    self.new.extend(self.all_index_0_1.minus(&ctx.old));
+                    self.hash_index_0.retain(|&(x0,), v| {
+                        if uf.math_.is_root(x0) {
+                            v.retain(|&mut (x1,)| uf.math_.is_root(x1));
+                            v.sort_unstable();
+                            v.dedup();
+                            true
+                        } else {
+                            false
+                        }
+                    });
+                    for &(x0, x1) in &self.new {
+                        self.hash_index_1
+                            .entry((uf.math_.find(x1),))
+                            .or_default()
+                            .push((uf.math_.find(x0),));
+                    }
+                    self.hash_index_1.retain(|&(x1,), v| {
+                        if uf.math_.is_root(x1) {
+                            v.retain(|&mut (x0,)| uf.math_.is_root(x0));
+                            v.sort_unstable();
+                            v.dedup();
+                            true
+                        } else {
+                            false
+                        }
+                    });
+                    for &(x0, x1) in &self.new {
+                        self.hash_index_0_1
+                            .entry((uf.math_.find(x0), uf.math_.find(x1)))
+                            .or_default()
+                            .push(());
+                    }
+                    self.hash_index_0_1.retain(|&(x0, x1), v| {
+                        if uf.math_.is_root(x0) && uf.math_.is_root(x1) {
+                            v.retain(|&mut ()| true);
+                            v.sort_unstable();
+                            v.dedup();
+                            true
+                        } else {
+                            false
+                        }
+                    });
+                    self.math_num_uprooted_at_latest_retain = 0;
                 }
             }
             impl BarRelation {
                 fn iter1_0_1(&self, x0: Math) -> impl Iterator<Item = (Math,)> + use<'_> {
-                    self.all_index_0_1
-                        .range((x0, Math::MIN_ID)..=(x0, Math::MAX_ID))
-                        .map(|(x0, x1)| (x1,))
+                    self.hash_index_0.get(&(x0,)).into_iter().flatten().copied()
                 }
                 fn iter1_1_0(&self, x1: Math) -> impl Iterator<Item = (Math,)> + use<'_> {
-                    self.all_index_1_0
-                        .range((Math::MIN_ID, x1)..=(Math::MAX_ID, x1))
-                        .map(|(x0, x1)| (x0,))
+                    self.hash_index_1.get(&(x1,)).into_iter().flatten().copied()
                 }
                 fn iter2_0_1(&self, x0: Math, x1: Math) -> impl Iterator<Item = ()> + use<'_> {
-                    self.all_index_0_1
-                        .range((x0, x1)..=(x0, x1))
-                        .map(|(x0, x1)| ())
+                    self.hash_index_0_1
+                        .get(&(x0, x1))
+                        .into_iter()
+                        .flatten()
+                        .copied()
                 }
                 fn check1_0_1(&self, x0: Math) -> bool {
                     self.iter1_0_1(x0).next().is_some()
@@ -7876,17 +8190,13 @@ fn triangle_join() {
             #[derive(Debug, Default)]
             struct BazRelation {
                 new: Vec<<Self as Relation>::Row>,
-                all_index_0_1: SortedVec<EclassCtx<Row2_0_1<Math, Math>, u64>>,
-                all_index_1_0: SortedVec<EclassCtx<Row2_1_0<Math, Math>, u64>>,
-            }
-            struct BazUpdateCtx {
-                scratch: Vec<(Math, Math)>,
-                deferred_insertions: Vec<(Math, Math)>,
-                old: SortedVec<EclassCtx<Row2_0_1<Math, Math>, u64>>,
+                hash_index_1_0: runtime::FnvHashMap<(Math, Math), runtime::SmallVec<[(); 1]>>,
+                hash_index_1: runtime::FnvHashMap<(Math,), runtime::SmallVec<[(Math,); 1]>>,
+                hash_index_0: runtime::FnvHashMap<(Math,), runtime::SmallVec<[(Math,); 1]>>,
+                math_num_uprooted_at_latest_retain: usize,
             }
             impl Relation for BazRelation {
                 type Row = (Math, Math);
-                type UpdateCtx = BazUpdateCtx;
                 type Unification = Unification;
                 const COST: u32 = 4u32;
                 fn new() -> Self {
@@ -7902,87 +8212,109 @@ fn triangle_join() {
                     self.new.iter().copied()
                 }
                 fn len(&self) -> usize {
-                    self.all_index_0_1.len()
+                    self.hash_index_0.values().map(|v| v.len()).sum()
                 }
                 fn emit_graphviz(&self, buf: &mut String) {
                     use std::fmt::Write;
-                    for (i, (x0, x1)) in self.all_index_0_1.iter().enumerate() {
-                        writeln!(buf, "{}_{i} -> {}_{};", "baz", "math", x0).unwrap();
+                    for (i, ((x1, x0), ())) in self
+                        .hash_index_1_0
+                        .iter()
+                        .flat_map(|(k, v)| v.iter().map(move |v| (k, v)))
+                        .enumerate()
+                    {
                         writeln!(buf, "{}_{i} -> {}_{};", "baz", "math", x1).unwrap();
+                        writeln!(buf, "{}_{i} -> {}_{};", "baz", "math", x0).unwrap();
                         writeln!(buf, "{}_{i} [shape = box];", "baz").unwrap();
                     }
                 }
-                fn update(
-                    &mut self,
-                    insertions: &mut Vec<Self::Row>,
-                    ctx: &mut Self::UpdateCtx,
-                    uf: &mut Unification,
-                ) {
-                    insertions.iter_mut().for_each(|row| {
-                        row.0 = uf.math_.find(row.0);
-                        row.1 = uf.math_.find(row.1);
-                    });
-                    let already_canon = |uf: &mut Unification, row: &mut Self::Row| {
-                        uf.math_.already_canonical(&mut row.0) && uf.math_.already_canonical(&mut row.1)
-                    };
-                    let mut ran_merge = false;
-                    loop {
-                        self.all_index_0_1.sorted_vec_update(
-                            insertions,
-                            &mut ctx.deferred_insertions,
-                            &mut ctx.scratch,
-                            uf,
-                            already_canon,
-                            |_, _, _| unreachable!(),
-                        );
-                        self.all_index_1_0.sorted_vec_update(
-                            insertions,
-                            &mut ctx.deferred_insertions,
-                            &mut ctx.scratch,
-                            uf,
-                            already_canon,
-                            |_, _, _| unreachable!(),
-                        );
-                        if ctx.deferred_insertions.is_empty() && ran_merge == false {
-                            break;
-                        }
-                        ran_merge = false;
-                        std::mem::swap(insertions, &mut ctx.deferred_insertions);
-                        ctx.deferred_insertions.clear();
+                fn update_begin(&mut self, insertions: &[Self::Row], uf: &mut Unification) {
+                    use std::collections::hash_map::Entry;
+                }
+                fn update(&mut self, insertions: &mut Vec<Self::Row>, uf: &mut Unification) -> bool {
+                    if self.math_num_uprooted_at_latest_retain == uf.math_.num_uprooted() {
+                        return false;
                     }
+                    self.math_num_uprooted_at_latest_retain = uf.math_.num_uprooted();
+                    let offset = insertions.len();
+                    self.update_begin(&insertions[offset..], uf);
+                    true
+                }
+                fn update_finalize(&mut self, insertions: &mut Vec<Self::Row>, uf: &mut Unification) {
+                    use std::collections::hash_map::Entry;
+                    assert!(self.new.is_empty());
+                    self.new.extend(
+                        insertions
+                            .iter()
+                            .map(|&(x0, x1)| (uf.math_.find(x0), uf.math_.find(x1)))
+                            .filter(|&(x0, x1)| !self.hash_index_1_0.contains_key(&(x1, x0))),
+                    );
                     insertions.clear();
-                    assert!(ctx.scratch.is_empty());
-                    assert!(ctx.deferred_insertions.is_empty());
-                }
-                fn update_begin(&self) -> Self::UpdateCtx {
-                    BazUpdateCtx {
-                        scratch: Vec::new(),
-                        deferred_insertions: Vec::new(),
-                        old: self.all_index_0_1.clone(),
+                    RadixSortable::wrap(&mut self.new).voracious_sort();
+                    self.new.dedup();
+                    for &(x0, x1) in &self.new {
+                        self.hash_index_1_0
+                            .entry((uf.math_.find(x1), uf.math_.find(x0)))
+                            .or_default()
+                            .push(());
                     }
-                }
-                fn update_finalize(&mut self, ctx: Self::UpdateCtx, uf: &mut Unification) {
-                    self.all_index_0_1.finalize();
-                    self.all_index_1_0.finalize();
-                    assert_eq!(self.all_index_1_0.len(), self.all_index_0_1.len());
-                    self.new.extend(self.all_index_0_1.minus(&ctx.old));
+                    self.hash_index_1_0.retain(|&(x1, x0), v| {
+                        if uf.math_.is_root(x1) && uf.math_.is_root(x0) {
+                            v.retain(|&mut ()| true);
+                            v.sort_unstable();
+                            v.dedup();
+                            true
+                        } else {
+                            false
+                        }
+                    });
+                    for &(x0, x1) in &self.new {
+                        self.hash_index_1
+                            .entry((uf.math_.find(x1),))
+                            .or_default()
+                            .push((uf.math_.find(x0),));
+                    }
+                    self.hash_index_1.retain(|&(x1,), v| {
+                        if uf.math_.is_root(x1) {
+                            v.retain(|&mut (x0,)| uf.math_.is_root(x0));
+                            v.sort_unstable();
+                            v.dedup();
+                            true
+                        } else {
+                            false
+                        }
+                    });
+                    for &(x0, x1) in &self.new {
+                        self.hash_index_0
+                            .entry((uf.math_.find(x0),))
+                            .or_default()
+                            .push((uf.math_.find(x1),));
+                    }
+                    self.hash_index_0.retain(|&(x0,), v| {
+                        if uf.math_.is_root(x0) {
+                            v.retain(|&mut (x1,)| uf.math_.is_root(x1));
+                            v.sort_unstable();
+                            v.dedup();
+                            true
+                        } else {
+                            false
+                        }
+                    });
+                    self.math_num_uprooted_at_latest_retain = 0;
                 }
             }
             impl BazRelation {
                 fn iter2_1_0(&self, x1: Math, x0: Math) -> impl Iterator<Item = ()> + use<'_> {
-                    self.all_index_1_0
-                        .range((x0, x1)..=(x0, x1))
-                        .map(|(x0, x1)| ())
+                    self.hash_index_1_0
+                        .get(&(x1, x0))
+                        .into_iter()
+                        .flatten()
+                        .copied()
                 }
                 fn iter1_1_0(&self, x1: Math) -> impl Iterator<Item = (Math,)> + use<'_> {
-                    self.all_index_1_0
-                        .range((Math::MIN_ID, x1)..=(Math::MAX_ID, x1))
-                        .map(|(x0, x1)| (x0,))
+                    self.hash_index_1.get(&(x1,)).into_iter().flatten().copied()
                 }
                 fn iter1_0_1(&self, x0: Math) -> impl Iterator<Item = (Math,)> + use<'_> {
-                    self.all_index_0_1
-                        .range((x0, Math::MIN_ID)..=(x0, Math::MAX_ID))
-                        .map(|(x0, x1)| (x1,))
+                    self.hash_index_0.get(&(x0,)).into_iter().flatten().copied()
                 }
                 fn check2_1_0(&self, x1: Math, x0: Math) -> bool {
                     self.iter2_1_0(x1, x0).next().is_some()
@@ -8005,16 +8337,11 @@ fn triangle_join() {
             #[derive(Debug, Default)]
             struct TriangleRelation {
                 new: Vec<<Self as Relation>::Row>,
-                all_index_0_1_2: SortedVec<EclassCtx<Row3_0_1_2<Math, Math, Math>, u128>>,
-            }
-            struct TriangleUpdateCtx {
-                scratch: Vec<(Math, Math, Math)>,
-                deferred_insertions: Vec<(Math, Math, Math)>,
-                old: SortedVec<EclassCtx<Row3_0_1_2<Math, Math, Math>, u128>>,
+                hash_index_0_1_2: runtime::FnvHashMap<(Math, Math, Math), runtime::SmallVec<[(); 1]>>,
+                math_num_uprooted_at_latest_retain: usize,
             }
             impl Relation for TriangleRelation {
                 type Row = (Math, Math, Math);
-                type UpdateCtx = TriangleUpdateCtx;
                 type Unification = Unification;
                 const COST: u32 = 3u32;
                 fn new() -> Self {
@@ -8030,71 +8357,72 @@ fn triangle_join() {
                     self.new.iter().copied()
                 }
                 fn len(&self) -> usize {
-                    self.all_index_0_1_2.len()
+                    self.hash_index_0_1_2.values().map(|v| v.len()).sum()
                 }
                 fn emit_graphviz(&self, buf: &mut String) {
                     use std::fmt::Write;
-                    for (i, (x0, x1, x2)) in self.all_index_0_1_2.iter().enumerate() {
+                    for (i, ((x0, x1, x2), ())) in self
+                        .hash_index_0_1_2
+                        .iter()
+                        .flat_map(|(k, v)| v.iter().map(move |v| (k, v)))
+                        .enumerate()
+                    {
                         writeln!(buf, "{}_{i} -> {}_{};", "triangle", "math", x0).unwrap();
                         writeln!(buf, "{}_{i} -> {}_{};", "triangle", "math", x1).unwrap();
                         writeln!(buf, "{}_{i} -> {}_{};", "triangle", "math", x2).unwrap();
                         writeln!(buf, "{}_{i} [shape = box];", "triangle").unwrap();
                     }
                 }
-                fn update(
-                    &mut self,
-                    insertions: &mut Vec<Self::Row>,
-                    ctx: &mut Self::UpdateCtx,
-                    uf: &mut Unification,
-                ) {
-                    insertions.iter_mut().for_each(|row| {
-                        row.0 = uf.math_.find(row.0);
-                        row.1 = uf.math_.find(row.1);
-                        row.2 = uf.math_.find(row.2);
-                    });
-                    let already_canon = |uf: &mut Unification, row: &mut Self::Row| {
-                        uf.math_.already_canonical(&mut row.0)
-                            && uf.math_.already_canonical(&mut row.1)
-                            && uf.math_.already_canonical(&mut row.2)
-                    };
-                    let mut ran_merge = false;
-                    loop {
-                        self.all_index_0_1_2.sorted_vec_update(
-                            insertions,
-                            &mut ctx.deferred_insertions,
-                            &mut ctx.scratch,
-                            uf,
-                            already_canon,
-                            |_, _, _| unreachable!(),
-                        );
-                        if ctx.deferred_insertions.is_empty() && ran_merge == false {
-                            break;
-                        }
-                        ran_merge = false;
-                        std::mem::swap(insertions, &mut ctx.deferred_insertions);
-                        ctx.deferred_insertions.clear();
+                fn update_begin(&mut self, insertions: &[Self::Row], uf: &mut Unification) {
+                    use std::collections::hash_map::Entry;
+                }
+                fn update(&mut self, insertions: &mut Vec<Self::Row>, uf: &mut Unification) -> bool {
+                    if self.math_num_uprooted_at_latest_retain == uf.math_.num_uprooted() {
+                        return false;
                     }
+                    self.math_num_uprooted_at_latest_retain = uf.math_.num_uprooted();
+                    let offset = insertions.len();
+                    self.update_begin(&insertions[offset..], uf);
+                    true
+                }
+                fn update_finalize(&mut self, insertions: &mut Vec<Self::Row>, uf: &mut Unification) {
+                    use std::collections::hash_map::Entry;
+                    assert!(self.new.is_empty());
+                    self.new.extend(
+                        insertions
+                            .iter()
+                            .map(|&(x0, x1, x2)| (uf.math_.find(x0), uf.math_.find(x1), uf.math_.find(x2)))
+                            .filter(|&(x0, x1, x2)| !self.hash_index_0_1_2.contains_key(&(x0, x1, x2))),
+                    );
                     insertions.clear();
-                    assert!(ctx.scratch.is_empty());
-                    assert!(ctx.deferred_insertions.is_empty());
-                }
-                fn update_begin(&self) -> Self::UpdateCtx {
-                    TriangleUpdateCtx {
-                        scratch: Vec::new(),
-                        deferred_insertions: Vec::new(),
-                        old: self.all_index_0_1_2.clone(),
+                    RadixSortable::wrap(&mut self.new).voracious_sort();
+                    self.new.dedup();
+                    for &(x0, x1, x2) in &self.new {
+                        self.hash_index_0_1_2
+                            .entry((uf.math_.find(x0), uf.math_.find(x1), uf.math_.find(x2)))
+                            .or_default()
+                            .push(());
                     }
-                }
-                fn update_finalize(&mut self, ctx: Self::UpdateCtx, uf: &mut Unification) {
-                    self.all_index_0_1_2.finalize();
-                    self.new.extend(self.all_index_0_1_2.minus(&ctx.old));
+                    self.hash_index_0_1_2.retain(|&(x0, x1, x2), v| {
+                        if uf.math_.is_root(x0) && uf.math_.is_root(x1) && uf.math_.is_root(x2) {
+                            v.retain(|&mut ()| true);
+                            v.sort_unstable();
+                            v.dedup();
+                            true
+                        } else {
+                            false
+                        }
+                    });
+                    self.math_num_uprooted_at_latest_retain = 0;
                 }
             }
             impl TriangleRelation {
                 fn iter3_0_1_2(&self, x0: Math, x1: Math, x2: Math) -> impl Iterator<Item = ()> + use<'_> {
-                    self.all_index_0_1_2
-                        .range((x0, x1, x2)..=(x0, x1, x2))
-                        .map(|(x0, x1, x2)| ())
+                    self.hash_index_0_1_2
+                        .get(&(x0, x1, x2))
+                        .into_iter()
+                        .flatten()
+                        .copied()
                 }
                 fn check3_0_1_2(&self, x0: Math, x1: Math, x2: Math) -> bool {
                     self.iter3_0_1_2(x0, x1, x2).next().is_some()
@@ -8152,13 +8480,13 @@ fn triangle_join() {
                 pub math_: UnionFind<Math>,
             }
             impl Unification {
-                fn has_new_uproots(&mut self) -> bool {
-                    let mut ret = false;
-                    ret |= self.math_.has_new_uproots();
+                fn num_uprooted(&mut self) -> usize {
+                    let mut ret = 0;
+                    ret += self.math_.num_uprooted();
                     ret
                 }
-                fn snapshot_all_uprooted(&mut self) {
-                    self.math_.create_uprooted_snapshot();
+                fn reset_num_uprooted(&mut self) {
+                    self.math_.reset_num_uprooted();
                 }
             }
             #[derive(Debug, Default)]
@@ -8258,32 +8586,35 @@ fn triangle_join() {
                     self.bar_.clear_new();
                     self.baz_.clear_new();
                     self.triangle_.clear_new();
-                    if !self.delta.has_new_inserts() && !self.uf.has_new_uproots() {
+                    if !self.delta.has_new_inserts() && self.uf.num_uprooted() == 0 {
                         return;
                     }
-                    let mut foo_ctx = self.foo_.update_begin();
-                    let mut bar_ctx = self.bar_.update_begin();
-                    let mut baz_ctx = self.baz_.update_begin();
-                    let mut triangle_ctx = self.triangle_.update_begin();
+                    self.foo_.update_begin(&mut self.delta.foo_, &mut self.uf);
+                    self.bar_.update_begin(&mut self.delta.bar_, &mut self.uf);
+                    self.baz_.update_begin(&mut self.delta.baz_, &mut self.uf);
+                    self.triangle_
+                        .update_begin(&mut self.delta.triangle_, &mut self.uf);
                     loop {
-                        self.uf.snapshot_all_uprooted();
-                        self.foo_
-                            .update(&mut self.delta.foo_, &mut foo_ctx, &mut self.uf);
-                        self.bar_
-                            .update(&mut self.delta.bar_, &mut bar_ctx, &mut self.uf);
-                        self.baz_
-                            .update(&mut self.delta.baz_, &mut baz_ctx, &mut self.uf);
-                        self.triangle_
-                            .update(&mut self.delta.triangle_, &mut triangle_ctx, &mut self.uf);
-                        if !self.uf.has_new_uproots() {
+                        let mut progress = false;
+                        progress |= self.foo_.update(&mut self.delta.foo_, &mut self.uf);
+                        progress |= self.bar_.update(&mut self.delta.bar_, &mut self.uf);
+                        progress |= self.baz_.update(&mut self.delta.baz_, &mut self.uf);
+                        progress |= self
+                            .triangle_
+                            .update(&mut self.delta.triangle_, &mut self.uf);
+                        if !progress {
                             break;
                         }
                     }
-                    self.uf.snapshot_all_uprooted();
-                    self.foo_.update_finalize(foo_ctx, &mut self.uf);
-                    self.bar_.update_finalize(bar_ctx, &mut self.uf);
-                    self.baz_.update_finalize(baz_ctx, &mut self.uf);
-                    self.triangle_.update_finalize(triangle_ctx, &mut self.uf);
+                    self.foo_
+                        .update_finalize(&mut self.delta.foo_, &mut self.uf);
+                    self.bar_
+                        .update_finalize(&mut self.delta.bar_, &mut self.uf);
+                    self.baz_
+                        .update_finalize(&mut self.delta.baz_, &mut self.uf);
+                    self.triangle_
+                        .update_finalize(&mut self.delta.triangle_, &mut self.uf);
+                    self.uf.reset_num_uprooted();
                 }
             }
             impl EclassProvider<Math> for Theory {
@@ -8430,17 +8761,15 @@ fn edgecase0() {
             #[derive(Debug, Default)]
             struct MulRelation {
                 new: Vec<<Self as Relation>::Row>,
-                all_index_0_1_2: SortedVec<EclassCtx<Row3_0_1<Math, Math, Math>, u128>>,
-                all_index_2_0_1: SortedVec<EclassCtx<Row3_2_0_1<Math, Math, Math>, u128>>,
-            }
-            struct MulUpdateCtx {
-                scratch: Vec<(Math, Math, Math)>,
-                deferred_insertions: Vec<(Math, Math, Math)>,
-                old: SortedVec<EclassCtx<Row3_0_1<Math, Math, Math>, u128>>,
+                hash_index_0_1: runtime::FnvHashMap<(Math, Math), (Math,)>,
+                hash_index_0: runtime::FnvHashMap<(Math,), runtime::SmallVec<[(Math, Math); 1]>>,
+                hash_index_2_0: runtime::FnvHashMap<(Math, Math), runtime::SmallVec<[(Math,); 1]>>,
+                hash_index_2: runtime::FnvHashMap<(Math,), runtime::SmallVec<[(Math, Math); 1]>>,
+                hash_index_0_1_2: runtime::FnvHashMap<(Math, Math, Math), runtime::SmallVec<[(); 1]>>,
+                math_num_uprooted_at_latest_retain: usize,
             }
             impl Relation for MulRelation {
                 type Row = (Math, Math, Math);
-                type UpdateCtx = MulUpdateCtx;
                 type Unification = Unification;
                 const COST: u32 = 6u32;
                 fn new() -> Self {
@@ -8456,99 +8785,153 @@ fn edgecase0() {
                     self.new.iter().copied()
                 }
                 fn len(&self) -> usize {
-                    self.all_index_0_1_2.len()
+                    self.hash_index_0_1.len()
                 }
                 fn emit_graphviz(&self, buf: &mut String) {
                     use std::fmt::Write;
-                    for (i, (x0, x1, x2)) in self.all_index_0_1_2.iter().enumerate() {
+                    for (i, ((x0, x1), (x2,))) in self.hash_index_0_1.iter().enumerate() {
                         writeln!(buf, "{}_{i} -> {}_{};", "mul", "math", x0).unwrap();
                         writeln!(buf, "{}_{i} -> {}_{};", "mul", "math", x1).unwrap();
                         writeln!(buf, "{}_{i} -> {}_{};", "mul", "math", x2).unwrap();
                         writeln!(buf, "{}_{i} [shape = box];", "mul").unwrap();
                     }
                 }
-                fn update(
-                    &mut self,
-                    insertions: &mut Vec<Self::Row>,
-                    ctx: &mut Self::UpdateCtx,
-                    uf: &mut Unification,
-                ) {
-                    insertions.iter_mut().for_each(|row| {
-                        row.0 = uf.math_.find(row.0);
-                        row.1 = uf.math_.find(row.1);
-                        row.2 = uf.math_.find(row.2);
-                    });
-                    let already_canon = |uf: &mut Unification, row: &mut Self::Row| {
-                        uf.math_.already_canonical(&mut row.0)
-                            && uf.math_.already_canonical(&mut row.1)
-                            && uf.math_.already_canonical(&mut row.2)
-                    };
-                    let mut ran_merge = false;
-                    loop {
-                        self.all_index_0_1_2.sorted_vec_update(
-                            insertions,
-                            &mut ctx.deferred_insertions,
-                            &mut ctx.scratch,
-                            uf,
-                            already_canon,
-                            |uf, x, mut y| {
-                                ran_merge = true;
-                                let (x2,) = x.value_mut();
-                                let (y2,) = y.value_mut();
-                                uf.math_.union_mut(x2, y2);
-                            },
-                        );
-                        if ctx.deferred_insertions.is_empty() && ran_merge == false {
-                            break;
+                fn update_begin(&mut self, insertions: &[Self::Row], uf: &mut Unification) {
+                    use std::collections::hash_map::Entry;
+                    for &(mut x0, mut x1, mut x2) in &*insertions {
+                        match self
+                            .hash_index_0_1
+                            .entry((uf.math_.find(x0), uf.math_.find(x1)))
+                        {
+                            Entry::Occupied(mut entry) => {
+                                let (y2,) = entry.get_mut();
+                                uf.math_.union_mut(&mut x2, y2);
+                            }
+                            Entry::Vacant(entry) => {
+                                entry.insert((uf.math_.find(x2),));
+                            }
                         }
-                        ran_merge = false;
-                        std::mem::swap(insertions, &mut ctx.deferred_insertions);
-                        ctx.deferred_insertions.clear();
                     }
+                }
+                fn update(&mut self, insertions: &mut Vec<Self::Row>, uf: &mut Unification) -> bool {
+                    if self.math_num_uprooted_at_latest_retain == uf.math_.num_uprooted() {
+                        return false;
+                    }
+                    self.math_num_uprooted_at_latest_retain = uf.math_.num_uprooted();
+                    let offset = insertions.len();
+                    self.hash_index_0_1.retain(|&(x0, x1), &mut (x2,)| {
+                        if uf.math_.is_root(x0) && uf.math_.is_root(x1) && uf.math_.is_root(x2) {
+                            true
+                        } else {
+                            insertions.push((x0, x1, x2));
+                            false
+                        }
+                    });
+                    self.update_begin(&insertions[offset..], uf);
+                    true
+                }
+                fn update_finalize(&mut self, insertions: &mut Vec<Self::Row>, uf: &mut Unification) {
+                    use std::collections::hash_map::Entry;
+                    assert!(self.new.is_empty());
+                    self.new.extend(
+                        insertions
+                            .iter()
+                            .map(|&(x0, x1, x2)| (uf.math_.find(x0), uf.math_.find(x1), uf.math_.find(x2)))
+                            .filter(|&(x0, x1, x2)| !self.hash_index_0_1_2.contains_key(&(x0, x1, x2))),
+                    );
                     insertions.clear();
-                    assert!(ctx.scratch.is_empty());
-                    assert!(ctx.deferred_insertions.is_empty());
-                }
-                fn update_begin(&self) -> Self::UpdateCtx {
-                    MulUpdateCtx {
-                        scratch: Vec::new(),
-                        deferred_insertions: Vec::new(),
-                        old: self.all_index_0_1_2.clone(),
+                    RadixSortable::wrap(&mut self.new).voracious_sort();
+                    self.new.dedup();
+                    for &(x0, x1, x2) in &self.new {
+                        self.hash_index_0
+                            .entry((uf.math_.find(x0),))
+                            .or_default()
+                            .push((uf.math_.find(x1), uf.math_.find(x2)));
                     }
-                }
-                fn update_finalize(&mut self, ctx: Self::UpdateCtx, uf: &mut Unification) {
-                    self.all_index_0_1_2.finalize();
-                    self.all_index_2_0_1
-                        .recreate_from(&self.all_index_0_1_2.as_slice());
-                    assert_eq!(self.all_index_2_0_1.len(), self.all_index_0_1_2.len());
-                    self.new.extend(self.all_index_0_1_2.minus(&ctx.old));
+                    self.hash_index_0.retain(|&(x0,), v| {
+                        if uf.math_.is_root(x0) {
+                            v.retain(|&mut (x1, x2)| uf.math_.is_root(x1) && uf.math_.is_root(x2));
+                            v.sort_unstable();
+                            v.dedup();
+                            true
+                        } else {
+                            false
+                        }
+                    });
+                    for &(x0, x1, x2) in &self.new {
+                        self.hash_index_2_0
+                            .entry((uf.math_.find(x2), uf.math_.find(x0)))
+                            .or_default()
+                            .push((uf.math_.find(x1),));
+                    }
+                    self.hash_index_2_0.retain(|&(x2, x0), v| {
+                        if uf.math_.is_root(x2) && uf.math_.is_root(x0) {
+                            v.retain(|&mut (x1,)| uf.math_.is_root(x1));
+                            v.sort_unstable();
+                            v.dedup();
+                            true
+                        } else {
+                            false
+                        }
+                    });
+                    for &(x0, x1, x2) in &self.new {
+                        self.hash_index_2
+                            .entry((uf.math_.find(x2),))
+                            .or_default()
+                            .push((uf.math_.find(x0), uf.math_.find(x1)));
+                    }
+                    self.hash_index_2.retain(|&(x2,), v| {
+                        if uf.math_.is_root(x2) {
+                            v.retain(|&mut (x0, x1)| uf.math_.is_root(x0) && uf.math_.is_root(x1));
+                            v.sort_unstable();
+                            v.dedup();
+                            true
+                        } else {
+                            false
+                        }
+                    });
+                    for &(x0, x1, x2) in &self.new {
+                        self.hash_index_0_1_2
+                            .entry((uf.math_.find(x0), uf.math_.find(x1), uf.math_.find(x2)))
+                            .or_default()
+                            .push(());
+                    }
+                    self.hash_index_0_1_2.retain(|&(x0, x1, x2), v| {
+                        if uf.math_.is_root(x0) && uf.math_.is_root(x1) && uf.math_.is_root(x2) {
+                            v.retain(|&mut ()| true);
+                            v.sort_unstable();
+                            v.dedup();
+                            true
+                        } else {
+                            false
+                        }
+                    });
+                    self.math_num_uprooted_at_latest_retain = 0;
                 }
             }
             impl MulRelation {
                 fn iter2_0_1_2(&self, x0: Math, x1: Math) -> impl Iterator<Item = (Math,)> + use<'_> {
-                    self.all_index_0_1_2
-                        .range((x0, x1, Math::MIN_ID)..=(x0, x1, Math::MAX_ID))
-                        .map(|(x0, x1, x2)| (x2,))
+                    self.hash_index_0_1.get(&(x0, x1)).into_iter().copied()
                 }
                 fn iter1_0_1_2(&self, x0: Math) -> impl Iterator<Item = (Math, Math)> + use<'_> {
-                    self.all_index_0_1_2
-                        .range((x0, Math::MIN_ID, Math::MIN_ID)..=(x0, Math::MAX_ID, Math::MAX_ID))
-                        .map(|(x0, x1, x2)| (x1, x2))
+                    self.hash_index_0.get(&(x0,)).into_iter().flatten().copied()
                 }
                 fn iter2_2_0_1(&self, x2: Math, x0: Math) -> impl Iterator<Item = (Math,)> + use<'_> {
-                    self.all_index_2_0_1
-                        .range((x0, Math::MIN_ID, x2)..=(x0, Math::MAX_ID, x2))
-                        .map(|(x0, x1, x2)| (x1,))
+                    self.hash_index_2_0
+                        .get(&(x2, x0))
+                        .into_iter()
+                        .flatten()
+                        .copied()
                 }
                 fn iter1_2_0_1(&self, x2: Math) -> impl Iterator<Item = (Math, Math)> + use<'_> {
-                    self.all_index_2_0_1
-                        .range((Math::MIN_ID, Math::MIN_ID, x2)..=(Math::MAX_ID, Math::MAX_ID, x2))
-                        .map(|(x0, x1, x2)| (x0, x1))
+                    self.hash_index_2.get(&(x2,)).into_iter().flatten().copied()
                 }
                 fn iter3_0_1_2(&self, x0: Math, x1: Math, x2: Math) -> impl Iterator<Item = ()> + use<'_> {
-                    self.all_index_0_1_2
-                        .range((x0, x1, x2)..=(x0, x1, x2))
-                        .map(|(x0, x1, x2)| ())
+                    self.hash_index_0_1_2
+                        .get(&(x0, x1, x2))
+                        .into_iter()
+                        .flatten()
+                        .copied()
                 }
                 fn check2_0_1_2(&self, x0: Math, x1: Math) -> bool {
                     self.iter2_0_1_2(x0, x1).next().is_some()
@@ -8593,17 +8976,14 @@ fn edgecase0() {
             #[derive(Debug, Default)]
             struct AddRelation {
                 new: Vec<<Self as Relation>::Row>,
-                all_index_0_1_2: SortedVec<EclassCtx<Row3_0_1<Math, Math, Math>, u128>>,
-                all_index_1_0_2: SortedVec<EclassCtx<Row3_1_0_2<Math, Math, Math>, u128>>,
-            }
-            struct AddUpdateCtx {
-                scratch: Vec<(Math, Math, Math)>,
-                deferred_insertions: Vec<(Math, Math, Math)>,
-                old: SortedVec<EclassCtx<Row3_0_1<Math, Math, Math>, u128>>,
+                hash_index_0_1: runtime::FnvHashMap<(Math, Math), (Math,)>,
+                hash_index_0: runtime::FnvHashMap<(Math,), runtime::SmallVec<[(Math, Math); 1]>>,
+                hash_index_1: runtime::FnvHashMap<(Math,), runtime::SmallVec<[(Math, Math); 1]>>,
+                hash_index_0_1_2: runtime::FnvHashMap<(Math, Math, Math), runtime::SmallVec<[(); 1]>>,
+                math_num_uprooted_at_latest_retain: usize,
             }
             impl Relation for AddRelation {
                 type Row = (Math, Math, Math);
-                type UpdateCtx = AddUpdateCtx;
                 type Unification = Unification;
                 const COST: u32 = 6u32;
                 fn new() -> Self {
@@ -8619,94 +8999,130 @@ fn edgecase0() {
                     self.new.iter().copied()
                 }
                 fn len(&self) -> usize {
-                    self.all_index_0_1_2.len()
+                    self.hash_index_0_1.len()
                 }
                 fn emit_graphviz(&self, buf: &mut String) {
                     use std::fmt::Write;
-                    for (i, (x0, x1, x2)) in self.all_index_0_1_2.iter().enumerate() {
+                    for (i, ((x0, x1), (x2,))) in self.hash_index_0_1.iter().enumerate() {
                         writeln!(buf, "{}_{i} -> {}_{};", "add", "math", x0).unwrap();
                         writeln!(buf, "{}_{i} -> {}_{};", "add", "math", x1).unwrap();
                         writeln!(buf, "{}_{i} -> {}_{};", "add", "math", x2).unwrap();
                         writeln!(buf, "{}_{i} [shape = box];", "add").unwrap();
                     }
                 }
-                fn update(
-                    &mut self,
-                    insertions: &mut Vec<Self::Row>,
-                    ctx: &mut Self::UpdateCtx,
-                    uf: &mut Unification,
-                ) {
-                    insertions.iter_mut().for_each(|row| {
-                        row.0 = uf.math_.find(row.0);
-                        row.1 = uf.math_.find(row.1);
-                        row.2 = uf.math_.find(row.2);
-                    });
-                    let already_canon = |uf: &mut Unification, row: &mut Self::Row| {
-                        uf.math_.already_canonical(&mut row.0)
-                            && uf.math_.already_canonical(&mut row.1)
-                            && uf.math_.already_canonical(&mut row.2)
-                    };
-                    let mut ran_merge = false;
-                    loop {
-                        self.all_index_0_1_2.sorted_vec_update(
-                            insertions,
-                            &mut ctx.deferred_insertions,
-                            &mut ctx.scratch,
-                            uf,
-                            already_canon,
-                            |uf, x, mut y| {
-                                ran_merge = true;
-                                let (x2,) = x.value_mut();
-                                let (y2,) = y.value_mut();
-                                uf.math_.union_mut(x2, y2);
-                            },
-                        );
-                        if ctx.deferred_insertions.is_empty() && ran_merge == false {
-                            break;
+                fn update_begin(&mut self, insertions: &[Self::Row], uf: &mut Unification) {
+                    use std::collections::hash_map::Entry;
+                    for &(mut x0, mut x1, mut x2) in &*insertions {
+                        match self
+                            .hash_index_0_1
+                            .entry((uf.math_.find(x0), uf.math_.find(x1)))
+                        {
+                            Entry::Occupied(mut entry) => {
+                                let (y2,) = entry.get_mut();
+                                uf.math_.union_mut(&mut x2, y2);
+                            }
+                            Entry::Vacant(entry) => {
+                                entry.insert((uf.math_.find(x2),));
+                            }
                         }
-                        ran_merge = false;
-                        std::mem::swap(insertions, &mut ctx.deferred_insertions);
-                        ctx.deferred_insertions.clear();
                     }
+                }
+                fn update(&mut self, insertions: &mut Vec<Self::Row>, uf: &mut Unification) -> bool {
+                    if self.math_num_uprooted_at_latest_retain == uf.math_.num_uprooted() {
+                        return false;
+                    }
+                    self.math_num_uprooted_at_latest_retain = uf.math_.num_uprooted();
+                    let offset = insertions.len();
+                    self.hash_index_0_1.retain(|&(x0, x1), &mut (x2,)| {
+                        if uf.math_.is_root(x0) && uf.math_.is_root(x1) && uf.math_.is_root(x2) {
+                            true
+                        } else {
+                            insertions.push((x0, x1, x2));
+                            false
+                        }
+                    });
+                    self.update_begin(&insertions[offset..], uf);
+                    true
+                }
+                fn update_finalize(&mut self, insertions: &mut Vec<Self::Row>, uf: &mut Unification) {
+                    use std::collections::hash_map::Entry;
+                    assert!(self.new.is_empty());
+                    self.new.extend(
+                        insertions
+                            .iter()
+                            .map(|&(x0, x1, x2)| (uf.math_.find(x0), uf.math_.find(x1), uf.math_.find(x2)))
+                            .filter(|&(x0, x1, x2)| !self.hash_index_0_1_2.contains_key(&(x0, x1, x2))),
+                    );
                     insertions.clear();
-                    assert!(ctx.scratch.is_empty());
-                    assert!(ctx.deferred_insertions.is_empty());
-                }
-                fn update_begin(&self) -> Self::UpdateCtx {
-                    AddUpdateCtx {
-                        scratch: Vec::new(),
-                        deferred_insertions: Vec::new(),
-                        old: self.all_index_0_1_2.clone(),
+                    RadixSortable::wrap(&mut self.new).voracious_sort();
+                    self.new.dedup();
+                    for &(x0, x1, x2) in &self.new {
+                        self.hash_index_0
+                            .entry((uf.math_.find(x0),))
+                            .or_default()
+                            .push((uf.math_.find(x1), uf.math_.find(x2)));
                     }
-                }
-                fn update_finalize(&mut self, ctx: Self::UpdateCtx, uf: &mut Unification) {
-                    self.all_index_0_1_2.finalize();
-                    self.all_index_1_0_2
-                        .recreate_from(&self.all_index_0_1_2.as_slice());
-                    assert_eq!(self.all_index_1_0_2.len(), self.all_index_0_1_2.len());
-                    self.new.extend(self.all_index_0_1_2.minus(&ctx.old));
+                    self.hash_index_0.retain(|&(x0,), v| {
+                        if uf.math_.is_root(x0) {
+                            v.retain(|&mut (x1, x2)| uf.math_.is_root(x1) && uf.math_.is_root(x2));
+                            v.sort_unstable();
+                            v.dedup();
+                            true
+                        } else {
+                            false
+                        }
+                    });
+                    for &(x0, x1, x2) in &self.new {
+                        self.hash_index_1
+                            .entry((uf.math_.find(x1),))
+                            .or_default()
+                            .push((uf.math_.find(x0), uf.math_.find(x2)));
+                    }
+                    self.hash_index_1.retain(|&(x1,), v| {
+                        if uf.math_.is_root(x1) {
+                            v.retain(|&mut (x0, x2)| uf.math_.is_root(x0) && uf.math_.is_root(x2));
+                            v.sort_unstable();
+                            v.dedup();
+                            true
+                        } else {
+                            false
+                        }
+                    });
+                    for &(x0, x1, x2) in &self.new {
+                        self.hash_index_0_1_2
+                            .entry((uf.math_.find(x0), uf.math_.find(x1), uf.math_.find(x2)))
+                            .or_default()
+                            .push(());
+                    }
+                    self.hash_index_0_1_2.retain(|&(x0, x1, x2), v| {
+                        if uf.math_.is_root(x0) && uf.math_.is_root(x1) && uf.math_.is_root(x2) {
+                            v.retain(|&mut ()| true);
+                            v.sort_unstable();
+                            v.dedup();
+                            true
+                        } else {
+                            false
+                        }
+                    });
+                    self.math_num_uprooted_at_latest_retain = 0;
                 }
             }
             impl AddRelation {
                 fn iter2_0_1_2(&self, x0: Math, x1: Math) -> impl Iterator<Item = (Math,)> + use<'_> {
-                    self.all_index_0_1_2
-                        .range((x0, x1, Math::MIN_ID)..=(x0, x1, Math::MAX_ID))
-                        .map(|(x0, x1, x2)| (x2,))
+                    self.hash_index_0_1.get(&(x0, x1)).into_iter().copied()
                 }
                 fn iter1_0_1_2(&self, x0: Math) -> impl Iterator<Item = (Math, Math)> + use<'_> {
-                    self.all_index_0_1_2
-                        .range((x0, Math::MIN_ID, Math::MIN_ID)..=(x0, Math::MAX_ID, Math::MAX_ID))
-                        .map(|(x0, x1, x2)| (x1, x2))
+                    self.hash_index_0.get(&(x0,)).into_iter().flatten().copied()
                 }
                 fn iter1_1_0_2(&self, x1: Math) -> impl Iterator<Item = (Math, Math)> + use<'_> {
-                    self.all_index_1_0_2
-                        .range((Math::MIN_ID, x1, Math::MIN_ID)..=(Math::MAX_ID, x1, Math::MAX_ID))
-                        .map(|(x0, x1, x2)| (x0, x2))
+                    self.hash_index_1.get(&(x1,)).into_iter().flatten().copied()
                 }
                 fn iter3_0_1_2(&self, x0: Math, x1: Math, x2: Math) -> impl Iterator<Item = ()> + use<'_> {
-                    self.all_index_0_1_2
-                        .range((x0, x1, x2)..=(x0, x1, x2))
-                        .map(|(x0, x1, x2)| ())
+                    self.hash_index_0_1_2
+                        .get(&(x0, x1, x2))
+                        .into_iter()
+                        .flatten()
+                        .copied()
                 }
                 fn check2_0_1_2(&self, x0: Math, x1: Math) -> bool {
                     self.iter2_0_1_2(x0, x1).next().is_some()
@@ -8772,13 +9188,13 @@ fn edgecase0() {
                 pub math_: UnionFind<Math>,
             }
             impl Unification {
-                fn has_new_uproots(&mut self) -> bool {
-                    let mut ret = false;
-                    ret |= self.math_.has_new_uproots();
+                fn num_uprooted(&mut self) -> usize {
+                    let mut ret = 0;
+                    ret += self.math_.num_uprooted();
                     ret
                 }
-                fn snapshot_all_uprooted(&mut self) {
-                    self.math_.create_uprooted_snapshot();
+                fn reset_num_uprooted(&mut self) {
+                    self.math_.reset_num_uprooted();
                 }
             }
             #[derive(Debug, Default)]
@@ -8869,24 +9285,24 @@ fn edgecase0() {
                 pub fn canonicalize(&mut self) {
                     self.mul_.clear_new();
                     self.add_.clear_new();
-                    if !self.delta.has_new_inserts() && !self.uf.has_new_uproots() {
+                    if !self.delta.has_new_inserts() && self.uf.num_uprooted() == 0 {
                         return;
                     }
-                    let mut mul_ctx = self.mul_.update_begin();
-                    let mut add_ctx = self.add_.update_begin();
+                    self.mul_.update_begin(&mut self.delta.mul_, &mut self.uf);
+                    self.add_.update_begin(&mut self.delta.add_, &mut self.uf);
                     loop {
-                        self.uf.snapshot_all_uprooted();
-                        self.mul_
-                            .update(&mut self.delta.mul_, &mut mul_ctx, &mut self.uf);
-                        self.add_
-                            .update(&mut self.delta.add_, &mut add_ctx, &mut self.uf);
-                        if !self.uf.has_new_uproots() {
+                        let mut progress = false;
+                        progress |= self.mul_.update(&mut self.delta.mul_, &mut self.uf);
+                        progress |= self.add_.update(&mut self.delta.add_, &mut self.uf);
+                        if !progress {
                             break;
                         }
                     }
-                    self.uf.snapshot_all_uprooted();
-                    self.mul_.update_finalize(mul_ctx, &mut self.uf);
-                    self.add_.update_finalize(add_ctx, &mut self.uf);
+                    self.mul_
+                        .update_finalize(&mut self.delta.mul_, &mut self.uf);
+                    self.add_
+                        .update_finalize(&mut self.delta.add_, &mut self.uf);
+                    self.uf.reset_num_uprooted();
                 }
             }
             impl EclassProvider<Math> for Theory {
@@ -9028,16 +9444,13 @@ fn test_into_codegen() {
             #[derive(Debug, Default)]
             struct MulRelation {
                 new: Vec<<Self as Relation>::Row>,
-                all_index_0_1_2: SortedVec<EclassCtx<Row3_0_1<Math, Math, Math>, u128>>,
-            }
-            struct MulUpdateCtx {
-                scratch: Vec<(Math, Math, Math)>,
-                deferred_insertions: Vec<(Math, Math, Math)>,
-                old: SortedVec<EclassCtx<Row3_0_1<Math, Math, Math>, u128>>,
+                hash_index_0_1: runtime::FnvHashMap<(Math, Math), (Math,)>,
+                hash_index_0: runtime::FnvHashMap<(Math,), runtime::SmallVec<[(Math, Math); 1]>>,
+                hash_index_0_1_2: runtime::FnvHashMap<(Math, Math, Math), runtime::SmallVec<[(); 1]>>,
+                math_num_uprooted_at_latest_retain: usize,
             }
             impl Relation for MulRelation {
                 type Row = (Math, Math, Math);
-                type UpdateCtx = MulUpdateCtx;
                 type Unification = Unification;
                 const COST: u32 = 3u32;
                 fn new() -> Self {
@@ -9053,86 +9466,111 @@ fn test_into_codegen() {
                     self.new.iter().copied()
                 }
                 fn len(&self) -> usize {
-                    self.all_index_0_1_2.len()
+                    self.hash_index_0_1.len()
                 }
                 fn emit_graphviz(&self, buf: &mut String) {
                     use std::fmt::Write;
-                    for (i, (x0, x1, x2)) in self.all_index_0_1_2.iter().enumerate() {
+                    for (i, ((x0, x1), (x2,))) in self.hash_index_0_1.iter().enumerate() {
                         writeln!(buf, "{}_{i} -> {}_{};", "mul", "math", x0).unwrap();
                         writeln!(buf, "{}_{i} -> {}_{};", "mul", "math", x1).unwrap();
                         writeln!(buf, "{}_{i} -> {}_{};", "mul", "math", x2).unwrap();
                         writeln!(buf, "{}_{i} [shape = box];", "mul").unwrap();
                     }
                 }
-                fn update(
-                    &mut self,
-                    insertions: &mut Vec<Self::Row>,
-                    ctx: &mut Self::UpdateCtx,
-                    uf: &mut Unification,
-                ) {
-                    insertions.iter_mut().for_each(|row| {
-                        row.0 = uf.math_.find(row.0);
-                        row.1 = uf.math_.find(row.1);
-                        row.2 = uf.math_.find(row.2);
-                    });
-                    let already_canon = |uf: &mut Unification, row: &mut Self::Row| {
-                        uf.math_.already_canonical(&mut row.0)
-                            && uf.math_.already_canonical(&mut row.1)
-                            && uf.math_.already_canonical(&mut row.2)
-                    };
-                    let mut ran_merge = false;
-                    loop {
-                        self.all_index_0_1_2.sorted_vec_update(
-                            insertions,
-                            &mut ctx.deferred_insertions,
-                            &mut ctx.scratch,
-                            uf,
-                            already_canon,
-                            |uf, x, mut y| {
-                                ran_merge = true;
-                                let (x2,) = x.value_mut();
-                                let (y2,) = y.value_mut();
-                                uf.math_.union_mut(x2, y2);
-                            },
-                        );
-                        if ctx.deferred_insertions.is_empty() && ran_merge == false {
-                            break;
+                fn update_begin(&mut self, insertions: &[Self::Row], uf: &mut Unification) {
+                    use std::collections::hash_map::Entry;
+                    for &(mut x0, mut x1, mut x2) in &*insertions {
+                        match self
+                            .hash_index_0_1
+                            .entry((uf.math_.find(x0), uf.math_.find(x1)))
+                        {
+                            Entry::Occupied(mut entry) => {
+                                let (y2,) = entry.get_mut();
+                                uf.math_.union_mut(&mut x2, y2);
+                            }
+                            Entry::Vacant(entry) => {
+                                entry.insert((uf.math_.find(x2),));
+                            }
                         }
-                        ran_merge = false;
-                        std::mem::swap(insertions, &mut ctx.deferred_insertions);
-                        ctx.deferred_insertions.clear();
                     }
+                }
+                fn update(&mut self, insertions: &mut Vec<Self::Row>, uf: &mut Unification) -> bool {
+                    if self.math_num_uprooted_at_latest_retain == uf.math_.num_uprooted() {
+                        return false;
+                    }
+                    self.math_num_uprooted_at_latest_retain = uf.math_.num_uprooted();
+                    let offset = insertions.len();
+                    self.hash_index_0_1.retain(|&(x0, x1), &mut (x2,)| {
+                        if uf.math_.is_root(x0) && uf.math_.is_root(x1) && uf.math_.is_root(x2) {
+                            true
+                        } else {
+                            insertions.push((x0, x1, x2));
+                            false
+                        }
+                    });
+                    self.update_begin(&insertions[offset..], uf);
+                    true
+                }
+                fn update_finalize(&mut self, insertions: &mut Vec<Self::Row>, uf: &mut Unification) {
+                    use std::collections::hash_map::Entry;
+                    assert!(self.new.is_empty());
+                    self.new.extend(
+                        insertions
+                            .iter()
+                            .map(|&(x0, x1, x2)| (uf.math_.find(x0), uf.math_.find(x1), uf.math_.find(x2)))
+                            .filter(|&(x0, x1, x2)| !self.hash_index_0_1_2.contains_key(&(x0, x1, x2))),
+                    );
                     insertions.clear();
-                    assert!(ctx.scratch.is_empty());
-                    assert!(ctx.deferred_insertions.is_empty());
-                }
-                fn update_begin(&self) -> Self::UpdateCtx {
-                    MulUpdateCtx {
-                        scratch: Vec::new(),
-                        deferred_insertions: Vec::new(),
-                        old: self.all_index_0_1_2.clone(),
+                    RadixSortable::wrap(&mut self.new).voracious_sort();
+                    self.new.dedup();
+                    for &(x0, x1, x2) in &self.new {
+                        self.hash_index_0
+                            .entry((uf.math_.find(x0),))
+                            .or_default()
+                            .push((uf.math_.find(x1), uf.math_.find(x2)));
                     }
-                }
-                fn update_finalize(&mut self, ctx: Self::UpdateCtx, uf: &mut Unification) {
-                    self.all_index_0_1_2.finalize();
-                    self.new.extend(self.all_index_0_1_2.minus(&ctx.old));
+                    self.hash_index_0.retain(|&(x0,), v| {
+                        if uf.math_.is_root(x0) {
+                            v.retain(|&mut (x1, x2)| uf.math_.is_root(x1) && uf.math_.is_root(x2));
+                            v.sort_unstable();
+                            v.dedup();
+                            true
+                        } else {
+                            false
+                        }
+                    });
+                    for &(x0, x1, x2) in &self.new {
+                        self.hash_index_0_1_2
+                            .entry((uf.math_.find(x0), uf.math_.find(x1), uf.math_.find(x2)))
+                            .or_default()
+                            .push(());
+                    }
+                    self.hash_index_0_1_2.retain(|&(x0, x1, x2), v| {
+                        if uf.math_.is_root(x0) && uf.math_.is_root(x1) && uf.math_.is_root(x2) {
+                            v.retain(|&mut ()| true);
+                            v.sort_unstable();
+                            v.dedup();
+                            true
+                        } else {
+                            false
+                        }
+                    });
+                    self.math_num_uprooted_at_latest_retain = 0;
                 }
             }
             impl MulRelation {
                 fn iter2_0_1_2(&self, x0: Math, x1: Math) -> impl Iterator<Item = (Math,)> + use<'_> {
-                    self.all_index_0_1_2
-                        .range((x0, x1, Math::MIN_ID)..=(x0, x1, Math::MAX_ID))
-                        .map(|(x0, x1, x2)| (x2,))
+                    self.hash_index_0_1.get(&(x0, x1)).into_iter().copied()
                 }
                 fn iter1_0_1_2(&self, x0: Math) -> impl Iterator<Item = (Math, Math)> + use<'_> {
-                    self.all_index_0_1_2
-                        .range((x0, Math::MIN_ID, Math::MIN_ID)..=(x0, Math::MAX_ID, Math::MAX_ID))
-                        .map(|(x0, x1, x2)| (x1, x2))
+                    self.hash_index_0.get(&(x0,)).into_iter().flatten().copied()
                 }
                 fn iter3_0_1_2(&self, x0: Math, x1: Math, x2: Math) -> impl Iterator<Item = ()> + use<'_> {
-                    self.all_index_0_1_2
-                        .range((x0, x1, x2)..=(x0, x1, x2))
-                        .map(|(x0, x1, x2)| ())
+                    self.hash_index_0_1_2
+                        .get(&(x0, x1, x2))
+                        .into_iter()
+                        .flatten()
+                        .copied()
                 }
                 fn check2_0_1_2(&self, x0: Math, x1: Math) -> bool {
                     self.iter2_0_1_2(x0, x1).next().is_some()
@@ -9171,17 +9609,13 @@ fn test_into_codegen() {
             #[derive(Debug, Default)]
             struct AddRelation {
                 new: Vec<<Self as Relation>::Row>,
-                all_index_0_1_2: SortedVec<EclassCtx<Row3_0_1<Math, Math, Math>, u128>>,
-                all_index_2_0_1: SortedVec<EclassCtx<Row3_2_0_1<Math, Math, Math>, u128>>,
-            }
-            struct AddUpdateCtx {
-                scratch: Vec<(Math, Math, Math)>,
-                deferred_insertions: Vec<(Math, Math, Math)>,
-                old: SortedVec<EclassCtx<Row3_0_1<Math, Math, Math>, u128>>,
+                hash_index_0_1: runtime::FnvHashMap<(Math, Math), (Math,)>,
+                hash_index_2: runtime::FnvHashMap<(Math,), runtime::SmallVec<[(Math, Math); 1]>>,
+                hash_index_0_1_2: runtime::FnvHashMap<(Math, Math, Math), runtime::SmallVec<[(); 1]>>,
+                math_num_uprooted_at_latest_retain: usize,
             }
             impl Relation for AddRelation {
                 type Row = (Math, Math, Math);
-                type UpdateCtx = AddUpdateCtx;
                 type Unification = Unification;
                 const COST: u32 = 6u32;
                 fn new() -> Self {
@@ -9197,89 +9631,111 @@ fn test_into_codegen() {
                     self.new.iter().copied()
                 }
                 fn len(&self) -> usize {
-                    self.all_index_0_1_2.len()
+                    self.hash_index_0_1.len()
                 }
                 fn emit_graphviz(&self, buf: &mut String) {
                     use std::fmt::Write;
-                    for (i, (x0, x1, x2)) in self.all_index_0_1_2.iter().enumerate() {
+                    for (i, ((x0, x1), (x2,))) in self.hash_index_0_1.iter().enumerate() {
                         writeln!(buf, "{}_{i} -> {}_{};", "add", "math", x0).unwrap();
                         writeln!(buf, "{}_{i} -> {}_{};", "add", "math", x1).unwrap();
                         writeln!(buf, "{}_{i} -> {}_{};", "add", "math", x2).unwrap();
                         writeln!(buf, "{}_{i} [shape = box];", "add").unwrap();
                     }
                 }
-                fn update(
-                    &mut self,
-                    insertions: &mut Vec<Self::Row>,
-                    ctx: &mut Self::UpdateCtx,
-                    uf: &mut Unification,
-                ) {
-                    insertions.iter_mut().for_each(|row| {
-                        row.0 = uf.math_.find(row.0);
-                        row.1 = uf.math_.find(row.1);
-                        row.2 = uf.math_.find(row.2);
-                    });
-                    let already_canon = |uf: &mut Unification, row: &mut Self::Row| {
-                        uf.math_.already_canonical(&mut row.0)
-                            && uf.math_.already_canonical(&mut row.1)
-                            && uf.math_.already_canonical(&mut row.2)
-                    };
-                    let mut ran_merge = false;
-                    loop {
-                        self.all_index_0_1_2.sorted_vec_update(
-                            insertions,
-                            &mut ctx.deferred_insertions,
-                            &mut ctx.scratch,
-                            uf,
-                            already_canon,
-                            |uf, x, mut y| {
-                                ran_merge = true;
-                                let (x2,) = x.value_mut();
-                                let (y2,) = y.value_mut();
-                                uf.math_.union_mut(x2, y2);
-                            },
-                        );
-                        if ctx.deferred_insertions.is_empty() && ran_merge == false {
-                            break;
+                fn update_begin(&mut self, insertions: &[Self::Row], uf: &mut Unification) {
+                    use std::collections::hash_map::Entry;
+                    for &(mut x0, mut x1, mut x2) in &*insertions {
+                        match self
+                            .hash_index_0_1
+                            .entry((uf.math_.find(x0), uf.math_.find(x1)))
+                        {
+                            Entry::Occupied(mut entry) => {
+                                let (y2,) = entry.get_mut();
+                                uf.math_.union_mut(&mut x2, y2);
+                            }
+                            Entry::Vacant(entry) => {
+                                entry.insert((uf.math_.find(x2),));
+                            }
                         }
-                        ran_merge = false;
-                        std::mem::swap(insertions, &mut ctx.deferred_insertions);
-                        ctx.deferred_insertions.clear();
                     }
+                }
+                fn update(&mut self, insertions: &mut Vec<Self::Row>, uf: &mut Unification) -> bool {
+                    if self.math_num_uprooted_at_latest_retain == uf.math_.num_uprooted() {
+                        return false;
+                    }
+                    self.math_num_uprooted_at_latest_retain = uf.math_.num_uprooted();
+                    let offset = insertions.len();
+                    self.hash_index_0_1.retain(|&(x0, x1), &mut (x2,)| {
+                        if uf.math_.is_root(x0) && uf.math_.is_root(x1) && uf.math_.is_root(x2) {
+                            true
+                        } else {
+                            insertions.push((x0, x1, x2));
+                            false
+                        }
+                    });
+                    self.update_begin(&insertions[offset..], uf);
+                    true
+                }
+                fn update_finalize(&mut self, insertions: &mut Vec<Self::Row>, uf: &mut Unification) {
+                    use std::collections::hash_map::Entry;
+                    assert!(self.new.is_empty());
+                    self.new.extend(
+                        insertions
+                            .iter()
+                            .map(|&(x0, x1, x2)| (uf.math_.find(x0), uf.math_.find(x1), uf.math_.find(x2)))
+                            .filter(|&(x0, x1, x2)| !self.hash_index_0_1_2.contains_key(&(x0, x1, x2))),
+                    );
                     insertions.clear();
-                    assert!(ctx.scratch.is_empty());
-                    assert!(ctx.deferred_insertions.is_empty());
-                }
-                fn update_begin(&self) -> Self::UpdateCtx {
-                    AddUpdateCtx {
-                        scratch: Vec::new(),
-                        deferred_insertions: Vec::new(),
-                        old: self.all_index_0_1_2.clone(),
+                    RadixSortable::wrap(&mut self.new).voracious_sort();
+                    self.new.dedup();
+                    for &(x0, x1, x2) in &self.new {
+                        self.hash_index_2
+                            .entry((uf.math_.find(x2),))
+                            .or_default()
+                            .push((uf.math_.find(x0), uf.math_.find(x1)));
                     }
-                }
-                fn update_finalize(&mut self, ctx: Self::UpdateCtx, uf: &mut Unification) {
-                    self.all_index_0_1_2.finalize();
-                    self.all_index_2_0_1
-                        .recreate_from(&self.all_index_0_1_2.as_slice());
-                    assert_eq!(self.all_index_2_0_1.len(), self.all_index_0_1_2.len());
-                    self.new.extend(self.all_index_0_1_2.minus(&ctx.old));
+                    self.hash_index_2.retain(|&(x2,), v| {
+                        if uf.math_.is_root(x2) {
+                            v.retain(|&mut (x0, x1)| uf.math_.is_root(x0) && uf.math_.is_root(x1));
+                            v.sort_unstable();
+                            v.dedup();
+                            true
+                        } else {
+                            false
+                        }
+                    });
+                    for &(x0, x1, x2) in &self.new {
+                        self.hash_index_0_1_2
+                            .entry((uf.math_.find(x0), uf.math_.find(x1), uf.math_.find(x2)))
+                            .or_default()
+                            .push(());
+                    }
+                    self.hash_index_0_1_2.retain(|&(x0, x1, x2), v| {
+                        if uf.math_.is_root(x0) && uf.math_.is_root(x1) && uf.math_.is_root(x2) {
+                            v.retain(|&mut ()| true);
+                            v.sort_unstable();
+                            v.dedup();
+                            true
+                        } else {
+                            false
+                        }
+                    });
+                    self.math_num_uprooted_at_latest_retain = 0;
                 }
             }
             impl AddRelation {
                 fn iter2_0_1_2(&self, x0: Math, x1: Math) -> impl Iterator<Item = (Math,)> + use<'_> {
-                    self.all_index_0_1_2
-                        .range((x0, x1, Math::MIN_ID)..=(x0, x1, Math::MAX_ID))
-                        .map(|(x0, x1, x2)| (x2,))
+                    self.hash_index_0_1.get(&(x0, x1)).into_iter().copied()
                 }
                 fn iter1_2_0_1(&self, x2: Math) -> impl Iterator<Item = (Math, Math)> + use<'_> {
-                    self.all_index_2_0_1
-                        .range((Math::MIN_ID, Math::MIN_ID, x2)..=(Math::MAX_ID, Math::MAX_ID, x2))
-                        .map(|(x0, x1, x2)| (x0, x1))
+                    self.hash_index_2.get(&(x2,)).into_iter().flatten().copied()
                 }
                 fn iter3_0_1_2(&self, x0: Math, x1: Math, x2: Math) -> impl Iterator<Item = ()> + use<'_> {
-                    self.all_index_0_1_2
-                        .range((x0, x1, x2)..=(x0, x1, x2))
-                        .map(|(x0, x1, x2)| ())
+                    self.hash_index_0_1_2
+                        .get(&(x0, x1, x2))
+                        .into_iter()
+                        .flatten()
+                        .copied()
                 }
                 fn check2_0_1_2(&self, x0: Math, x1: Math) -> bool {
                     self.iter2_0_1_2(x0, x1).next().is_some()
@@ -9342,13 +9798,13 @@ fn test_into_codegen() {
                 pub math_: UnionFind<Math>,
             }
             impl Unification {
-                fn has_new_uproots(&mut self) -> bool {
-                    let mut ret = false;
-                    ret |= self.math_.has_new_uproots();
+                fn num_uprooted(&mut self) -> usize {
+                    let mut ret = 0;
+                    ret += self.math_.num_uprooted();
                     ret
                 }
-                fn snapshot_all_uprooted(&mut self) {
-                    self.math_.create_uprooted_snapshot();
+                fn reset_num_uprooted(&mut self) {
+                    self.math_.reset_num_uprooted();
                 }
             }
             #[derive(Debug, Default)]
@@ -9422,24 +9878,24 @@ fn test_into_codegen() {
                 pub fn canonicalize(&mut self) {
                     self.mul_.clear_new();
                     self.add_.clear_new();
-                    if !self.delta.has_new_inserts() && !self.uf.has_new_uproots() {
+                    if !self.delta.has_new_inserts() && self.uf.num_uprooted() == 0 {
                         return;
                     }
-                    let mut mul_ctx = self.mul_.update_begin();
-                    let mut add_ctx = self.add_.update_begin();
+                    self.mul_.update_begin(&mut self.delta.mul_, &mut self.uf);
+                    self.add_.update_begin(&mut self.delta.add_, &mut self.uf);
                     loop {
-                        self.uf.snapshot_all_uprooted();
-                        self.mul_
-                            .update(&mut self.delta.mul_, &mut mul_ctx, &mut self.uf);
-                        self.add_
-                            .update(&mut self.delta.add_, &mut add_ctx, &mut self.uf);
-                        if !self.uf.has_new_uproots() {
+                        let mut progress = false;
+                        progress |= self.mul_.update(&mut self.delta.mul_, &mut self.uf);
+                        progress |= self.add_.update(&mut self.delta.add_, &mut self.uf);
+                        if !progress {
                             break;
                         }
                     }
-                    self.uf.snapshot_all_uprooted();
-                    self.mul_.update_finalize(mul_ctx, &mut self.uf);
-                    self.add_.update_finalize(add_ctx, &mut self.uf);
+                    self.mul_
+                        .update_finalize(&mut self.delta.mul_, &mut self.uf);
+                    self.add_
+                        .update_finalize(&mut self.delta.add_, &mut self.uf);
+                    self.uf.reset_num_uprooted();
                 }
             }
             impl EclassProvider<Math> for Theory {

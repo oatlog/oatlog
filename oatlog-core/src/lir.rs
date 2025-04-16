@@ -186,6 +186,19 @@ pub(crate) struct IndexInfo {
     /// the columns are in the MAIN column space.
     pub(crate) primary_key_violation_merge: BTreeMap<ColumnId, MergeTy>,
 }
+impl IndexInfo {
+    pub fn has_union_fd(&self, usage: &IndexUsageInfo) -> bool {
+        self.has_any_fd(usage)
+            && self
+                .primary_key_violation_merge
+                .values()
+                .all(|m| matches!(m, MergeTy::Union))
+    }
+    pub fn has_any_fd(&self, usage: &IndexUsageInfo) -> bool {
+        !self.primary_key_violation_merge.is_empty() && usage.prefix == self.primary_key_prefix_len
+    }
+}
+
 #[derive(Clone, Eq, PartialEq, Ord, PartialOrd, Hash, Debug)]
 pub enum MergeTy {
     Union,

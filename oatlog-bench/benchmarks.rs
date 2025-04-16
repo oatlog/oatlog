@@ -23,6 +23,6 @@ benchmarks! {
     bench!(math9, r#"(include "oatlog-bench/input/math.egg") (run 9)"#);
     bench!(math10, samples=60, r#"(include "oatlog-bench/input/math.egg") (run 10)"#);
     bench!(boolean_adder9, r#"(include "oatlog-bench/input/boolean_adder.egg") (run 9)"#);
-    bench!(boolean_adder10, samples=80, r#"(include "oatlog-bench/input/boolean_adder.egg") (run 10)"#);
+    bench!(boolean_adder10, r#"(include "oatlog-bench/input/boolean_adder.egg") (run 10)"#);
     bench!(boolean_adder11, samples=20, r#"(include "oatlog-bench/input/boolean_adder.egg") (run 11)"#);
 }
