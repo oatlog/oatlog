@@ -18,11 +18,12 @@
   20pt,
   align(
     center,
-    [Oatlog: A performant ahead-of-time compiled #box[e-graph] engine implementing the egglog language],
+    // [Oatlog: A performant ahead-of-time compiled #box[e-graph] engine implementing the egglog language],
+    [Oatlog: A Performant Ahead-of-Time Compiled #box[E-Graph] Engine],
   ),
 )
 #grid(
-  columns: (1fr, 1fr),
+  columns: (1fr, 1fr, 1fr),
   align: center,
   (
     [Loke Gustafsson],
@@ -33,6 +34,11 @@
     [Erik Magnusson],
     [Chalmers University of Technology],
     link("mailto:ermagn@chalmers.se"),
+  ).join("\n"),
+  (
+    [Alejandro Luque Cerpa],
+    [Chalmers University of Technology],
+    link("mailto:luque@chalmers.se"),
   ).join("\n"),
 )
 
@@ -182,10 +188,12 @@ We are developing oatlog with the help of microbenchmarks comparing it to egglog
   ],
 ) <benchmark-results>
 
-The egglog code for the benchmarks is provided in @appendix_benchmarks. Each step involves matching
-all rewrite rules once, then applying the delta and rebuilding the relation indexes. The fueled
-benchmarks are run until saturation, i.e. until the rewrite rules produce no more inserts or
-uproots.
+The egglog code for the benchmarks is provided in @appendix_benchmarks.
+// Each step involves matching all rewrite rules once, then applying the delta and rebuilding the relation indexes.
+The `fuel*` benchmarks run until saturation, i.e. until the rewrite rules produce no more inserts or unifications.
+// The fueled
+// benchmarks are run until saturation, i.e. until the rewrite rules produce no more inserts or
+// uproots.
 
 Oatlog is faster in earlier steps than in later steps, i.e. it appears to be less scalable than
 egglog #footnote[As one might guess, we stumbled into this by setting up small benchmarks,
@@ -215,16 +223,20 @@ None of the following sections have been fully implemented yet and we expect sig
 == Multiple implicit functionality and merging relations
 
 For a relation such as $"Add"(a, b, c)$ (meaning $a + b = c$), there is an implicit functionality rule $a,b -> c$ which is applied until closure during canonicalization.
-There is nothing preventing this rule from being implemented in userspace, but that would have worse performance because it involves a join:
+There is nothing preventing this rule from being implemented in userspace, but that would have worse performance because it involves a join, see @functionality-as-rule.
 
-```
-(rule ((= c1 (Add a b)) (= c2 (Add a b))) ((union c1 c2)))
-```
+#figure(
+  ```egglog
+  (rule ((= c1 (Add a b)) (= c2 (Add a b))) ((union c1 c2)))
+  ```,
+  caption: [Implicit functionality as an explicit rule.],
+) <functionality-as-rule>
 
 For the relations Add and Sub we have $"Add"(a,b,c) <==> "Sub"(c,b,a)$ (due to $a + b = c <==> c - a = b$), meaning that Add and Sub are really just the same relation but with permuted columns. Additionally we might have rules on commutativity, $"Add"(a,b,c) <==> "Add"(b,a,c)$.
 
-This motivates merging relations along with a permutation group#footnote[Slotted E-graphs @slotted_egraph generalize this and avoids storing the same permuted e-node multiple times.] and preprocessing all rules such that when inserting a row, all permutations of that row are also inserted.
+This motivates merging relations along with a permutation group#footnote[Similar to what is done with Slotted E-graphs @slotted_egraph which additionally avoids storing the same permuted e-node multiple times.] and preprocessing all rules such that when inserting a row, all permutations of that row are also inserted.
 This results in less work during canonicalization due to having fewer indexes.
+For example with the relation $"Add"(a, b, c)$, having both the indexes $a, b -> c$ and $b, a -> c$ is unnecessary since they will be identical.
 This motivates allowing multiple implicit functionality rules which oatlog supports by implementing each rule as a functional dependence on one of the indexes.
 
 // A user might also want to implement the implicit functionality rule $b,c -> c$ (due to $b - c = a$) and $c,a -> b$ (due to $c - a = b$).
@@ -232,11 +244,26 @@ This motivates allowing multiple implicit functionality rules which oatlog suppo
 
 == Rule transformation
 
-#TODO[show a transformation]
+// #TODO[show a transformation]
+
+
+#figure(
+  ```egglog
+  ; user provided rule
+  (rewrite (Mul x (Const 1)) (Const 1))
+  ; after desugaring
+  (rule ((= e (Mul x (Const 1)))) ((union e (Const 1))))
+  ; after simplification (shown as egglog code)
+  (rule ((= one (Const 1)) (= e (Mul x one))) ((union e one)))
+  ```,
+  caption: [Example of rule simplification. The insert of `(Const 1)` is avoided.],
+) <rule-simplify-example>
 
 We model a rewrite rule as a set of premise atoms, insertions and unifications.
 This becomes an IR (Internal Representation) that we can apply optimizations to, in the same way as an optimizing compiler.
-Implicit functionality rules can be applied to this IR and duplicate premise atoms and insertions can be removed to simplify it.
+Implicit functionality rules can be applied to this IR and duplicate premise atoms and insertions can be removed to simplify it, as shown in @rule-simplify-example.
+
+
 More interesting transformations include turning rules into implicit functionality or discovering that rules imply that two relations are equal.
 
 == Merging rules during query planning
