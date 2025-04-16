@@ -12,6 +12,7 @@
   numbering: "1",
   columns: 2,
   paper: "a4",
+  margin: 1.59cm,
 )
 #set heading(numbering: "1.")
 
@@ -268,10 +269,11 @@ For a relation such as $"Add"(a, b, c)$ (meaning $a + b = c$), there is an impli
 There is nothing preventing this rule from being implemented in userspace, but that would have worse performance because it involves a join, see @functionality-as-rule.
 
 #figure(
-  placement: auto,
-  scope: "parent",
+  // placement: auto,
+  // scope: "parent",
   ```egglog
-  (rule ((= c1 (Add a b)) (= c2 (Add a b))) ((union c1 c2)))
+  (rule ((= c1 (Add a b)) (= c2 (Add a b)))
+      ((union c1 c2)))
   ```,
   caption: [Implicit functionality as an explicit rule.],
 ) <functionality-as-rule>
@@ -287,9 +289,6 @@ This motivates allowing multiple implicit functionality rules which oatlog suppo
 // Because implicit functionality is implemented in the indexes, we support multiple return for free, since multiple return would for example be $x -> y,z$.
 
 == Rule transformation
-
-// #TODO[show a transformation]
-
 
 #figure(
   placement: auto,
@@ -309,7 +308,6 @@ We model a rewrite rule as a set of premise atoms, insertions and unifications.
 This becomes an IR (Internal Representation) that we can apply optimizations to, in the same way as an optimizing compiler.
 Implicit functionality rules can be applied to this IR and duplicate premise atoms and insertions can be removed to simplify it, as shown in @rule-simplify-example.
 
-
 More interesting transformations include turning rules into implicit functionality or discovering that rules imply that two relations are equal.
 
 == Merging rules during query planning
@@ -321,6 +319,7 @@ More interesting transformations include turning rules into implicit functionali
 Typically, rules have overlapping premises, in particular when generating copies of a rule for semi-naive evaluation.
 To benefit from this, rules can form a trie in terms of their premise atoms, concretely, this is shown in @trie-ir.
 This reduces the number of joins and removes redundant actions.
+
 
 #figure(
   placement: auto,
@@ -365,8 +364,17 @@ This reduces the number of joins and removes redundant actions.
   ],
 ) <trie-ir>
 
-
 #TODO[index selection?]
+
+= Conclusions and future work
+
+something like this?
+- we have shown that a faster e-graph engine can be built.
+- equality modulo permutation can reduce indexes, merge more in TIR, and unlock more degrees of freedom for TIR to optimize to minimize indexes/trie size further.
+- better query planning (general DB stuff)
+- make us semi-naive (our engine specifically)
+- always run unifying rules to closure.
+- dynamic indexes, better indexes.
 
 #bibliography("refs.bib")
 
