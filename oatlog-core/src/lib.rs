@@ -7,6 +7,7 @@ mod ids;
 mod index_selection;
 mod lir;
 mod query_planning;
+mod tir;
 mod todo;
 mod typed_vec;
 mod union_find;

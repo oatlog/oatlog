@@ -9,7 +9,7 @@ use std::{
 use crate::{
     MultiMapCollect as _,
     hir::{self, Atom, IsPremise, Relation, SymbolicRule, VariableMeta},
-    ids::{ColumnId, IndexUsageId, RelationId, VariableId},
+    ids::{ColumnId, IndexUsageId, RelationId, TypeId, VariableId},
     lir,
     typed_vec::{TVec, tvec},
 };
@@ -26,14 +26,14 @@ impl<T: Copy + Eq + Ord + Hash> SparseUf<T> {
             t
         }
     }
-    fn union(&mut self, from: T, to: T) {
-        // intentionally not balanced to maintain direction.
+    fn union(&mut self, from: T, to: T) -> bool {
         let from = self.find(from);
         let to = self.find(to);
         if from == to {
-            return;
+            return false;
         }
         self.repr.insert(from, to);
+        true
     }
     fn iter(&self) -> impl Iterator<Item = T> {
         self.repr.iter().flat_map(|(&a, &b)| [a, b]).unique()
@@ -45,16 +45,23 @@ impl<T: Copy + Eq + Ord + Hash> SparseUf<T> {
     }
 }
 
+/// only rules with matching salt may merge.
+#[derive(Clone, Eq, PartialEq, Ord, PartialOrd, Debug)]
+struct Salt {
+    inner: Rule,
+}
+
 // SEMANTICS:
 // actions then unify then perform queries for each map.
 #[derive(Clone, Eq, PartialEq, Ord, PartialOrd, Debug, Default)]
-struct Trie {
+pub(crate) struct Trie {
     actions: Vec<Atom>,
     unify: Vec<(VariableId, VariableId)>,
     map: BTreeMap<TrieLink, Trie>,
 
-    // could be computed, but this is easier:
+    // meta
     bound_premise: BTreeSet<VariableId>,
+    meta: Vec<hir::RuleMeta>,
 }
 impl Trie {
     fn new() -> Self {
@@ -98,6 +105,7 @@ pub(crate) fn schedule_rules(
     let ctx = Ctx {
         bound_premise: BTreeSet::new(),
         relations,
+        uf: SparseUf::new(),
     };
     let trie = inner(ctx, &rules);
     (variables, trie)
@@ -198,6 +206,7 @@ fn action_topo_resolve<'a>(
     relations: &TVec<RelationId, hir::Relation>,
     unify: &mut Vec<(VariableId, VariableId)>,
     variables: &mut TVec<VariableId, VariableMeta>,
+    types: &TVec<TypeId, hir::Type>,
 ) -> Vec<Atom> {
     let actions: BTreeSet<Atom> = actions.into_iter().cloned().collect();
 
@@ -216,6 +225,13 @@ fn action_topo_resolve<'a>(
                 .flat_map(|x| x.entry_outputs(relations))
             {
                 *write_deg.entry(v).or_default() += 1;
+            }
+            for v in problematic
+                .iter()
+                .chain(conflict_free.iter())
+                .flat_map(|x| x.entry_inputs(relations))
+            {
+                write_deg.entry(v).or_default();
             }
             if conflict_free.is_empty() {
                 break;
@@ -267,26 +283,73 @@ fn action_topo_resolve<'a>(
                 break;
             }
         }
+        if !ok {
+            for x in &mut problematic {
+                if x.entry_outputs(relations)
+                    .iter()
+                    .all(|x| types[variables[x].ty].kind == hir::TypeKind::Symbolic)
+                {
+                    let relation_ = &relations[x.relation];
+                    let im = &relation_.implicit_rules[x.entry.unwrap()];
+                    for c in im.out.iter().map(|(c, _)| *c) {
+                        let old_id = x.columns[c];
+                        let new_id = variables.push(variables[old_id]);
+                        x.columns[c] = new_id;
+                        unify.push((old_id, new_id));
+                    }
+                    ok = true;
+                    break;
+                }
+            }
+        }
         assert!(ok, "could not remove cycles");
     }
     schedule
 }
 
 pub(crate) fn lowering(
+    trie: Trie,
+    variables: &mut TVec<VariableId, VariableMeta>,
+    relations: &TVec<RelationId, hir::Relation>,
+    table_uses: &mut TVec<RelationId, TVec<IndexUsageId, BTreeSet<ColumnId>>>,
+    types: &TVec<TypeId, hir::Type>,
+) -> (
+    &'static [lir::RuleTrie],
+    TVec<VariableId, lir::VariableData>,
+) {
+    let trie = lowering_rec(trie, variables, relations, table_uses, types);
+
+    let variables: TVec<VariableId, lir::VariableData> = variables
+        .iter_enumerate()
+        .map(|(i, x)| x.into_lir(i))
+        .collect();
+
+    (trie, variables)
+}
+
+pub(crate) fn lowering_rec(
     Trie {
         actions,
         mut unify,
         map,
         bound_premise,
+        meta,
     }: Trie,
     variables: &mut TVec<VariableId, VariableMeta>,
     relations: &TVec<RelationId, hir::Relation>,
     table_uses: &mut TVec<RelationId, TVec<IndexUsageId, BTreeSet<ColumnId>>>,
+    types: &TVec<TypeId, hir::Type>,
 ) -> &'static [lir::RuleTrie] {
+    let schedule = action_topo_resolve(
+        &actions,
+        &bound_premise,
+        relations,
+        &mut unify,
+        variables,
+        types,
+    );
 
-    let schedule = action_topo_resolve(&actions, &bound_premise, relations, &mut unify, variables);
-
-    let lir_trie: Vec<_> = schedule
+    let mut lir_trie: Vec<_> = schedule
         .into_iter()
         .map(
             |hir::Atom {
@@ -346,7 +409,7 @@ pub(crate) fn lowering(
                                 if bound_premise.contains(&atom.columns[ColumnId(j)]) {
                                     continue;
                                 }
-                                if atom.columns[ColumnId(i)] == atom.columns[ColumnId(j)] {
+                                if atom.columns[ColumnId(i)] != atom.columns[ColumnId(j)] {
                                     continue;
                                 }
                                 progress = true;
@@ -366,6 +429,8 @@ pub(crate) fn lowering(
 
                     let args = &*atom.columns.inner().clone().leak();
 
+                    let mut trie = lowering_rec(trie, variables, relations, table_uses, types);
+
                     let mut make_index_use = || {
                         table_uses[atom.relation].push(
                             args.iter()
@@ -377,7 +442,16 @@ pub(crate) fn lowering(
                         )
                     };
 
-                    let mut trie = {
+                    for (a, b) in to_equate {
+                        trie = vec![lir::RuleTrie {
+                            meta: None,
+                            atom: lir::RuleAtom::IfEq(a, b),
+                            then: trie,
+                        }]
+                        .leak();
+                    }
+
+                    trie = {
                         let atom = match &relations[atom.relation].kind {
                             hir::RelationTy::Alias {} => panic!("primary join on alias"),
                             hir::RelationTy::Forall { .. } => panic!("primary join on forall"),
@@ -393,29 +467,30 @@ pub(crate) fn lowering(
                                 args,
                                 index: make_index_use(),
                             },
-                            hir::RelationTy::Global { .. } => lir::RuleAtom::Premise {
-                                relation: atom.relation,
-                                args,
-                                index: IndexUsageId::bogus(),
-                            },
+                            hir::RelationTy::Global { .. } => {
+                                if bound_premise.contains(&args[0]) {
+                                    lir::RuleAtom::PremiseAny {
+                                        relation: atom.relation,
+                                        args,
+                                        index: IndexUsageId::bogus(),
+                                    }
+                                } else {
+                                    lir::RuleAtom::Premise {
+                                        relation: atom.relation,
+                                        args,
+                                        index: IndexUsageId::bogus(),
+                                    }
+                                }
+                            }
                         };
-                        let then = lowering(trie, variables, relations, table_uses);
 
                         vec![lir::RuleTrie {
                             meta: None,
                             atom,
-                            then,
+                            then: trie,
                         }]
                         .leak()
                     };
-                    for (a, b) in to_equate {
-                        trie = vec![lir::RuleTrie {
-                            meta: None,
-                            atom: lir::RuleAtom::IfEq(a, b),
-                            then: trie,
-                        }]
-                        .leak();
-                    }
                     trie[0]
                 }
                 Semi(atom) => {
@@ -448,7 +523,7 @@ pub(crate) fn lowering(
                         },
                     };
 
-                    let then = lowering(trie, variables, relations, table_uses);
+                    let then = lowering_rec(trie, variables, relations, table_uses, types);
                     lir::RuleTrie {
                         meta: None,
                         atom,
@@ -458,6 +533,10 @@ pub(crate) fn lowering(
             }
         }))
         .collect();
+
+    if !lir_trie.is_empty() && !meta.is_empty() {
+        lir_trie[0].meta = Some(meta.into_iter().map(|x| x.src).join("\n").leak())
+    }
 
     lir_trie.leak()
 }
@@ -501,6 +580,7 @@ impl TrieLink {
 struct Ctx<'a> {
     bound_premise: BTreeSet<VariableId>,
     relations: &'a TVec<RelationId, Relation>,
+    uf: SparseUf<VariableId>,
 }
 impl Ctx<'_> {
     fn apply(&self, link: &TrieLink) -> Self {
@@ -520,18 +600,22 @@ fn inner(mut ctx: Ctx<'_>, rules: &[Rule]) -> Trie {
 
     let mut actions = vec![];
     let mut unify = vec![];
+    let mut meta = vec![];
 
     for Rule {
         premise: _,
         action: action_,
         unify: unify_,
         semi: _,
-        meta: _,
+        meta: meta_,
     } in finished
     {
         actions.extend(action_);
         unify.extend(unify_);
+        meta.push(meta_);
     }
+
+    unify.retain(|&(a, b)| ctx.uf.union(a, b));
 
     let map = map
         .into_iter()
@@ -546,10 +630,16 @@ fn inner(mut ctx: Ctx<'_>, rules: &[Rule]) -> Trie {
         unify,
         map,
         bound_premise: ctx.bound_premise,
+        meta,
     }
 }
 
 impl Rule {
+    fn salt(&self) -> Salt {
+        Salt {
+            inner: self.clone(), // self.premise.iter().map(|x| x.relation).collect(),
+        }
+    }
     fn variables(&self) -> BTreeSet<VariableId> {
         let Self {
             premise,
@@ -582,7 +672,10 @@ impl Rule {
             meta,
         }
     }
-    fn apply(&self, link: &TrieLink, ctx: &Ctx<'_>) -> Option<Self> {
+    fn apply(&self, link: &TrieLink, salt: &Salt, ctx: &Ctx<'_>) -> Option<Self> {
+        if salt != &self.salt() {
+            return None;
+        }
         // link "wins" on variable collisions
 
         // NOTE: mapping should be a SparseUf actually
@@ -591,7 +684,10 @@ impl Rule {
 
         match link {
             Primary(other) => {
-                let supported: Vec<_> = supported.into_iter().filter_map(|x| x.primary()).collect();
+                let supported: Vec<_> = supported
+                    .into_iter()
+                    .filter_map(|(_, x)| x.primary())
+                    .collect();
                 for this in &self.premise {
                     if !supported.contains(this) || this.relation != other.relation {
                         continue;
@@ -606,6 +702,7 @@ impl Rule {
 
                     let mut this_rule = self.clone();
                     let mut ok = true;
+                    let mut transform_to = BTreeSet::new();
                     for (from, to) in this.columns.iter().zip(other.columns.iter()) {
                         if from == to {
                             continue;
@@ -614,19 +711,41 @@ impl Rule {
                             ok = false;
                             break;
                         }
+                        if this_rule.variables().contains(to) {
+                            ok = false;
+                            break;
+                        }
+                        if !transform_to.insert(to) {
+                            // if to = v0 then we tried BOTH:
+                            // * v3 -> v0
+                            // * v4 -> v0
+                            //
+                            // ergo bad
+                            ok = false;
+                            break;
+                        }
                         this_rule = this_rule.map_v(|v| if v == *from { *to } else { v });
                     }
                     if ok {
+                        let n = this_rule.premise.len();
                         this_rule.premise.retain(|x| x != other);
+                        if n == this_rule.premise.len() {
+                            // TODO erik: HACK TO HIDE A BUG.
+                            return None;
+                        }
                         assert!(this_rule.semi.len() <= 1);
                         this_rule.semi = vec![];
+
                         return Some(this_rule);
                     }
                 }
                 None
             }
             Semi(other) => {
-                let supported: Vec<_> = supported.into_iter().filter_map(|x| x.semi()).collect();
+                let supported: Vec<_> = supported
+                    .into_iter()
+                    .filter_map(|(_, x)| x.semi())
+                    .collect();
                 // Semi-joins are equivalent if the *bound* columns match by being exactly the
                 // same.
                 //
@@ -666,8 +785,8 @@ impl Rule {
             }
         }
     }
-    fn make_votes(&self, ctx: &Ctx) -> Vec<TrieLink> {
-        match self.semi.as_slice() {
+    fn make_votes(&self, ctx: &Ctx) -> Vec<(Salt, TrieLink)> {
+        (match self.semi.as_slice() {
             [] => {
                 // TODO: allbound should probably be a semi-join.
                 #[derive(Copy, Clone, Ord, PartialOrd, PartialEq, Eq, Debug)]
@@ -676,6 +795,7 @@ impl Rule {
                     Indexed,
                     SingleElement,
                     AllBound,
+                    Global,
                     New,
                 }
                 #[derive(Copy, Clone, Ord, PartialOrd, PartialEq, Eq, Debug)]
@@ -692,6 +812,7 @@ impl Rule {
                     IndexedConnected,
                     SingleElementConnected,
                     AllBound,
+                    Global,
                     New,
                 }
 
@@ -722,7 +843,7 @@ impl Rule {
                                 unreachable!();
                             }
                             hir::RelationTy::Global { id: _ } => {
-                                score = score.max(Indexed);
+                                score = score.max(Global);
                             }
                             hir::RelationTy::Primitive { syn: _, ident: _ } => {
                                 panic!("primitive premise not implemented")
@@ -754,28 +875,36 @@ impl Rule {
                             }
                             (AllBound, _) => CompoundRelationScore::AllBound,
                             (New, _) => CompoundRelationScore::New,
+                            (Global, _) => CompoundRelationScore::Global,
                         };
 
                         (score, atom)
                     })
                     .collect_multimap();
 
-                let (score, best) = scores.into_iter().max().unwrap();
-                match score {
-                    CompoundRelationScore::NoQuery => panic!("NoQuery: could not pick a vote"),
-                    CompoundRelationScore::IndexedDisconnected => {
-                        panic!("query is disconnected (valid but surprising)")
-                    }
-                    CompoundRelationScore::SingleElementDisconnected => {
-                        panic!("query is disconnected (valid but surprising)")
-                    }
-                    CompoundRelationScore::IndexedConnected => (),
-                    CompoundRelationScore::SingleElementConnected => (),
-                    CompoundRelationScore::AllBound => (),
-                    CompoundRelationScore::New => (),
-                }
-
-                best.into_iter().cloned().map(TrieLink::Primary).collect()
+                scores
+                    .into_iter()
+                    .max()
+                    .map(|(score, best)| {
+                        match score {
+                            CompoundRelationScore::NoQuery => {
+                                panic!("NoQuery: could not pick a vote")
+                            }
+                            CompoundRelationScore::IndexedDisconnected => {
+                                panic!("query is disconnected (valid but surprising)")
+                            }
+                            CompoundRelationScore::SingleElementDisconnected => {
+                                panic!("query is disconnected (valid but surprising)")
+                            }
+                            CompoundRelationScore::IndexedConnected => (),
+                            CompoundRelationScore::SingleElementConnected => (),
+                            CompoundRelationScore::AllBound => (),
+                            CompoundRelationScore::New => (),
+                            CompoundRelationScore::Global => (),
+                        }
+                        best.into_iter().cloned().map(TrieLink::Primary).collect()
+                    })
+                    .unwrap_or(vec![])
             }
             [atom] => {
                 // if there is a single semi-join left, it's better to just iterate that then to do
@@ -783,7 +912,10 @@ impl Rule {
                 vec![Primary(atom.clone())]
             }
             _ => self.semi.iter().cloned().map(|x| Semi(x)).collect(),
-        }
+        })
+        .into_iter()
+        .map(|x| (self.salt(), x))
+        .collect()
     }
 }
 
@@ -806,7 +938,7 @@ fn election(ctx: &Ctx, rules: &[Rule]) -> (Vec<Rule>, BTreeMap<TrieLink, Vec<Rul
     id_wrap!(RuleId, "y", "id for a rule");
     id_wrap!(VoteId, "e", "id for a vote (TrieLink)");
 
-    let (finished, (rules, votes)): (Vec<Rule>, (TVec<RuleId, &Rule>, Vec<Vec<TrieLink>>)) =
+    let (finished, (rules, votes)): (Vec<Rule>, (TVec<RuleId, &Rule>, Vec<Vec<(Salt, TrieLink)>>)) =
         rules.iter().partition_map(|rule| {
             let votes = rule.make_votes(ctx);
 
@@ -816,14 +948,19 @@ fn election(ctx: &Ctx, rules: &[Rule]) -> (Vec<Rule>, BTreeMap<TrieLink, Vec<Rul
                 Right((rule, votes))
             }
         });
-    let votes: TVec<VoteId, TrieLink> = votes.into_iter().flatten().collect();
+    let votes: TVec<VoteId, (Salt, TrieLink)> = votes.into_iter().flatten().collect();
 
     let mut remaining_rules: BTreeSet<RuleId> = rules.enumerate().collect();
 
     let matrix: TVec<VoteId, TVec<RuleId, Option<Rule>>> = {
         votes
             .iter()
-            .map(|vote| rules.iter().map(|rule| rule.apply(vote, ctx)).collect())
+            .map(|(salt, vote)| {
+                rules
+                    .iter()
+                    .map(|rule| rule.apply(vote, salt, ctx))
+                    .collect()
+            })
             .collect()
     };
 
@@ -845,7 +982,7 @@ fn election(ctx: &Ctx, rules: &[Rule]) -> (Vec<Rule>, BTreeMap<TrieLink, Vec<Rul
         .map(|(vote, _)| vote)
     {
         let existing = map.insert(
-            votes[vote].clone(),
+            votes[vote].1.clone(),
             matrix[vote]
                 .iter_enumerate()
                 .filter_map(|(i, rule)| rule.clone().map(|rule| (i, rule)))

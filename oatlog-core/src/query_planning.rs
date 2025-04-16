@@ -2,7 +2,7 @@
 use crate::{
     hir::{self, Atom, RelationTy, SymbolicRule, Theory},
     ids::{ColumnId, ImplicitRuleId, IndexUsageId, RelationId, VariableId},
-    index_selection, lir,
+    index_selection, lir, tir,
     typed_vec::{TVec, tvec},
 };
 use std::{
@@ -84,17 +84,37 @@ pub(crate) fn emit_lir_theory(mut theory: hir::Theory) -> (hir::Theory, lir::The
         }
     }
 
-    let mut lir_variables: TVec<VariableId, lir::VariableData> = TVec::new();
+    let mut lir_variables: TVec<VariableId, lir::VariableData>;
 
-    let mut tries: Vec<lir::RuleTrie> = Vec::new();
+    let mut tries: Vec<lir::RuleTrie>;
+    if true {
+        // cargo bench --bench comparative -- --baseline pretir
+        // OLD METHOD
+        lir_variables = TVec::new();
+        tries = Vec::new();
 
-    generate_tries(
-        rules,
-        &mut lir_variables,
-        &theory,
-        &mut table_uses,
-        &mut tries,
-    );
+        generate_tries(
+            rules,
+            &mut lir_variables,
+            &theory,
+            &mut table_uses,
+            &mut tries,
+        );
+    } else {
+        // NEW METHOD
+        let (mut variables, trie) = tir::schedule_rules(rules, &theory.relations);
+
+        let (lir_tries, variables) = tir::lowering(
+            trie,
+            &mut variables,
+            &theory.relations,
+            &mut table_uses,
+            &theory.types,
+        );
+
+        lir_variables = variables;
+        tries = lir_tries.into_iter().copied().collect();
+    }
 
     // compute indexes for relations.
     let mut lir_relations: TVec<RelationId, Option<lir::RelationData>> = TVec::new();
