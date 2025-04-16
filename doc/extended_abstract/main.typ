@@ -5,7 +5,7 @@
 #show "naive": "naïve"
 #show "egglog": `egglog`
 
-#set text(size: 11pt, font: "New Computer Modern")
+#set text(size: 10pt, font: "New Computer Modern")
 #set document(title: [Oatlog])
 
 #set page(
@@ -14,6 +14,9 @@
   paper: "a4",
 )
 #set heading(numbering: "1.")
+
+#show heading.where(level: 1): set text(size: 12pt)
+#show heading.where(level: 2): set text(size: 10pt)
 
 #set raw(syntaxes: "egglog.sublime-syntax")
 #set raw(syntaxes: "datalog.sublime-syntax")
@@ -25,46 +28,41 @@
   clearance: 2em,
 )[
   #text(
-    20pt,
+    size: 20pt,
+    weight: "bold",
     align(
       center,
       // [Oatlog: A performant ahead-of-time compiled #box[e-graph] engine implementing the egglog language],
-      [Oatlog: A Performant Ahead-of-Time Compiled #box[E-Graph] Engine],
+      //[Oatlog: A Performant Ahead-of-Time Compiled #box[E-Graph] Engine],
+      [Oatlog: A performant ahead-of-time compiled #box[e-graph] engine],
     ),
   )
 
-  #grid(
+  #text(10pt, grid(
     columns: (1fr, 1fr, 1fr),
     align: center,
     (
-      [Loke Gustafsson],
-      [Chalmers University of Technology],
+      text(12pt, [Loke Gustafsson]),
       link("mailto:lokeg@chalmers.se"),
+      [Chalmers University of Technology],
     ).join("\n"),
     (
-      [Erik Magnusson],
-      [Chalmers University of Technology],
+      text(12pt, [Erik Magnusson]),
       link("mailto:ermagn@chalmers.se"),
+      [Chalmers University of Technology],
     ).join("\n"),
     (
-      [Alejandro Luque Cerpa],
-      [Chalmers University of Technology],
+      text(12pt, [Alejandro Luque Cerpa]),
       link("mailto:luque@chalmers.se"),
+      [Chalmers University of Technology],
     ).join("\n"),
-  )
+  ))
 
 ]
 
-//
-// #align(
-//   center,
-//   box(
-//     width: 90%,
-//     align(
-//       left,
-//       [
+#heading(numbering: none, [Abstract])
 
-*Abstract*
+#TODO[shorter abstract]
 
 We introduce oatlog, an e-graph engine implementing the egglog language. Like the egglog
 library, it is intended for equality saturation (EqSat) and is implemented as a relational
@@ -91,11 +89,6 @@ whole-ruleset optimization and on improving egglog parity.
 Oatlog is in-progress work and lacks many features present in egglog. Important features not
 yet implemented include executing rulesets other than the entire set of rules, extraction
 and `:merge` which is necessary for lattice-based reasoning.
-
-//       ],
-//     ),
-//   ),
-// )
 
 = Introducing oatlog
 
@@ -167,7 +160,6 @@ each relation after each application of rules.
     What the actual generated code looks like.
   ],
 )
-#pagebreak()
 
 = Performance evaluation
 
@@ -182,7 +174,7 @@ We are developing oatlog with the help of microbenchmarks comparing it to egglog
   placement: auto,
   scope: "parent",
   text(
-    size: 11pt,
+    size: 9pt,
     table(
       columns: (auto, auto, auto, auto, auto),
       table.header(
@@ -196,8 +188,8 @@ We are developing oatlog with the help of microbenchmarks comparing it to egglog
       [`fuel2-math`, 10 steps, saturated], [1516], [7.0778 ms], [1.1579 ms], table.cell(fill: green.lighten(40%))[6.11x],
       [`fuel3-math`, 21 steps, saturated], [50021], [192.50 ms], [52.954 ms], table.cell(fill: green.lighten(40%))[3.63x],
 
-      [`math`, 0 steps], [35], [550.71 µs], [6.0900 µs], table.cell(fill: green.lighten(20%))[90.47x],
-      [`math`, 1 steps], [69], [688.83 µs], [17.055 µs], table.cell(fill: green.lighten(20%))[40.39x],
+      //[`math`, 0 steps], [35], [550.71 µs], [6.0900 µs], table.cell(fill: green.lighten(20%))[90.47x],
+      [`math`, 1 step], [69], [688.83 µs], [17.055 µs], table.cell(fill: green.lighten(20%))[40.39x],
       [`math`, 2 steps], [118], [871.97 µs], [32.492 µs], table.cell(fill: green.lighten(20%))[26.83x],
       [`math`, 3 steps], [208], [1.0845 ms], [61.145 µs], table.cell(fill: green.lighten(20%))[17.74x],
       [`math`, 4 steps], [389], [1.3692 ms], [122.53 µs], table.cell(fill: green.lighten(20%))[11.18x],
@@ -209,8 +201,8 @@ We are developing oatlog with the help of microbenchmarks comparing it to egglog
       [`math`, 10 steps], [136446], [63.135 ms], [53.112 ms], table.cell(fill: green.lighten(80%))[1.19x],
       [`math`, 11 steps], [1047896], [448.77 ms], [563.93 ms], table.cell(fill: red.lighten(60%))[0.80x],
 
-      [`boolean-adder`, 0 steps], [44], [781.55 µs], [4.8048 µs], table.cell(fill: green.lighten(20%))[162.66x],
-      [`boolean-adder`, 1 steps], [106], [936.01 µs], [19.588 µs], table.cell(fill: green.lighten(20%))[47.78x],
+      //[`boolean-adder`, 0 steps], [44], [781.55 µs], [4.8048 µs], table.cell(fill: green.lighten(20%))[162.66x],
+      [`boolean-adder`, 1 step], [106], [936.01 µs], [19.588 µs], table.cell(fill: green.lighten(20%))[47.78x],
       [`boolean-adder`, 2 steps], [241], [1.1303 ms], [49.379 µs], table.cell(fill: green.lighten(20%))[22.90x],
       [`boolean-adder`, 3 steps], [511], [1.5437 ms], [120.61 µs], table.cell(fill: green.lighten(20%))[12.80x],
       [`boolean-adder`, 4 steps], [727], [2.2988 ms], [226.53 µs], table.cell(fill: green.lighten(20%))[10.15x],
@@ -374,8 +366,6 @@ This reduces the number of joins and removes redundant actions.
 #counter(heading).update(0)
 #set heading(numbering: "A.1", supplement: [Appendix])
 
-#pagebreak()
-
 = Benchmarks <appendix_benchmarks>
 
 Benchmarks involve running oatlog and egglog on the same inputs, the theories specified below, and
@@ -388,10 +378,8 @@ The `math` benchmark is adapted from egglog's `math-microbenchmark.egg`. The ben
 `fuel2-math` and `fuel3-math` are variants that limit how many levels of integration by parts are
 performed, giving a theory that converges.
 
-#columns(
-  2,
-  text(
-    9pt,
+#text(
+    8pt,
     ```egglog
     (datatype FuelUnit
         (Fuel FuelUnit)
@@ -456,7 +444,6 @@ performed, giving a theory that converges.
     (Add (Mul (Var "y") (Add (Var "x") (Var "y"))) (Sub (Add (Var "x") (Const 2)) (Add (Var "x") (Var "x"))))
     (Div (Const 1) (Sub (Div (Add (Const 1) (Sqrt (Var "z"))) (Const 2)) (Div (Sub (Const 1) (Sqrt (Var "z"))) (Const 2))))
     ```,
-  ),
 )
 
 == Boolean adder
@@ -464,12 +451,12 @@ performed, giving a theory that converges.
 We wrote the boolean adder benchmark ourselves and it shows the advantage of static
 (non-incrementally-updated) indexes for fast-growing theories.
 
-#columns(2, text(9pt, raw(read("../../oatlog-bench/input/boolean_adder.egg"), lang: "egglog")))
+#text(8pt, raw(read("../../oatlog-bench/input/boolean_adder.egg"), lang: "egglog"))
 
 = Oatlog example usage <appendix_example>
 
 This example proves that if $x = -b + sqrt(b^2 - c)$ then $x^2 + 2 b x + c = 0$. If oatlog
 implemented extraction this example could be adapted to not just verify this, but to find the
-quadratic equation itself, but that is not (yet) the case.
+quadratic equation itself.
 
-#columns(2, text(7.4pt, raw(read("../../examples/quadratic-formula/src/main.rs"), lang: "rust")))
+#text(7.4pt, raw(read("../../examples/quadratic-formula/src/main.rs"), lang: "rust"))
