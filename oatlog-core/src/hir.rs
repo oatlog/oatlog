@@ -152,6 +152,49 @@ pub(crate) enum ImplicitRuleAction {
     },
 }
 
+#[derive(Clone, Eq, PartialEq, Ord, PartialOrd, Hash, Debug)]
+pub(crate) struct PermutationGroup {
+    inner: Vec<Vec<usize>>,
+}
+impl PermutationGroup {
+    fn new(n: usize) -> Self {
+        Self {
+            inner: vec![(0..n).collect()],
+        }
+    }
+    fn add(&mut self, perm: Vec<usize>) {
+        if false {
+            self.inner.push(perm);
+            self.close();
+        }
+    }
+    fn close(&mut self) {
+        loop {
+            let n = self.inner.len();
+            self.inner.sort();
+            self.inner.dedup();
+            for i in 0..n {
+                for j in 0..n {
+                    let a = &self.inner[i];
+                    let b = &self.inner[j];
+                    let c = a.iter().copied().map(|i| b[i]).collect();
+                    self.inner.push(c);
+                }
+            }
+            self.inner.sort();
+            self.inner.dedup();
+            if n == self.inner.len() {
+                break;
+            }
+        }
+    }
+    fn apply<T: Copy>(&self, x: &[T]) -> impl Iterator<Item = Vec<T>> {
+        self.inner
+            .iter()
+            .map(|perm| perm.iter().map(|i| x[*i]).collect())
+    }
+}
+
 /// All relations have some notion of "new" and "all"
 /// "new" is never indexed, only iteration is possible.
 /// "all" is sometimes indexed.
@@ -159,11 +202,13 @@ pub(crate) enum ImplicitRuleAction {
 pub(crate) struct Relation {
     /// name from egglog (eg Add)
     pub(crate) name: &'static str,
-    /// Types of columns
-    pub(crate) columns: TVec<ColumnId, TypeId>,
     pub(crate) kind: RelationTy,
 
     pub(crate) implicit_rules: TVec<ImplicitRuleId, ImplicitRule>,
+    pub(crate) permutation_group: PermutationGroup,
+
+    /// Types of columns
+    pub(crate) columns: TVec<ColumnId, TypeId>,
 }
 impl Relation {
     // TODO: introduce implicit_rules in these constructors
@@ -174,9 +219,10 @@ impl Relation {
     ) -> Self {
         Self {
             name,
-            columns,
             kind: RelationTy::Table,
             implicit_rules,
+            permutation_group: PermutationGroup::new(columns.len()),
+            columns,
         }
     }
     pub(crate) fn primitive(
@@ -189,29 +235,34 @@ impl Relation {
         Self {
             name,
             implicit_rules: tvec![ImplicitRule::new_panic(out_col, columns.len())],
-            columns,
             kind: RelationTy::Primitive {
                 syn: IgnoreBox(syn.to_token_stream()),
                 ident,
             },
+            permutation_group: PermutationGroup::new(columns.len()),
+            columns,
         }
     }
     pub(crate) fn forall(name: &'static str, ty: TypeId) -> Self {
+        let columns = tvec![ty];
         Self {
             name,
-            columns: tvec![ty],
             kind: RelationTy::Forall { ty },
             // forall is [x] -> (), so no implicit rules
             implicit_rules: TVec::new(),
+            permutation_group: PermutationGroup::new(columns.len()),
+            columns,
         }
     }
     pub(crate) fn global(name: &'static str, id: GlobalId, ty: TypeId) -> Self {
+        let columns = tvec![ty];
         Self {
             name,
-            columns: tvec![ty],
             kind: RelationTy::Global { id },
             // global is [] -> (x), so we have a implicit (panicing) rule.
             implicit_rules: tvec![ImplicitRule::new_panic(ColumnId(0), 1)],
+            permutation_group: PermutationGroup::new(columns.len()),
+            columns,
         }
     }
     /// Returns Some(..) if relation has a "new".
@@ -235,6 +286,8 @@ impl Relation {
             // benefit to implicit rules, so it's just for entry, but it's not possible
             // to use entry on new.
             implicit_rules: tvec![],
+            // we probably don't need this.
+            permutation_group: PermutationGroup::new(self.columns.len()),
         })
     }
     /// Is it sound to turn entry on this into an insert.
@@ -339,7 +392,7 @@ impl Atom {
     // that.
     //
     // Alias and similar can just switch directly to the canonical relation.
-    fn equivalent_atoms(&self) -> Vec<Atom> {
+    fn equivalent_atoms(&self, relations: &TVec<RelationId, Relation>) -> Vec<Atom> {
         // TODO: impl
         vec![self.clone()]
     }
@@ -491,7 +544,7 @@ impl SymbolicRule {
             let mut progress = false;
             let mut assumed_true: BTreeSet<Atom> = BTreeSet::new();
             for atom in queue.into_iter() {
-                let equivalent = atom.equivalent_atoms();
+                let equivalent = atom.equivalent_atoms(relations);
                 let mut deleted = false;
                 'iter_assumed: for assumed in assumed_true.iter().cloned() {
                     for atom in equivalent.iter().filter(|x| x.relation == assumed.relation) {
@@ -719,6 +772,50 @@ impl Theory {
         for rule in this.symbolic_rules.iter_mut() {
             *rule = rule.optimize(&self.relations);
         }
+
+        for rule in &this.symbolic_rules {
+            let premises: Vec<_> = rule.premise_atoms().collect();
+            let [premise] = premises.as_slice() else {
+                continue;
+            };
+            let premise_v = premise.columns.inner();
+            let premise_s: BTreeSet<_> = premise.columns.iter().copied().collect();
+            if premise_v.len() != premise_s.len() {
+                continue;
+            }
+            for action in rule.action_atoms() {
+                if action.relation != premise.relation {
+                    continue;
+                }
+                let action_v = action.columns.inner();
+                let action_s: BTreeSet<_> = action.columns.iter().copied().collect();
+                if action_v.len() != action_s.len() {
+                    continue;
+                }
+                if premise_s != action_s {
+                    continue;
+                }
+                // dbg!(premise_v, action_v, self.relations[action.relation].name);
+
+                let perm: Vec<usize> = premise_v
+                    .iter()
+                    .copied()
+                    .map(|v| {
+                        action_v
+                            .iter()
+                            .copied()
+                            .enumerate()
+                            .find_map(|(i, x)| (x == v).then_some(i))
+                            .unwrap()
+                    })
+                    .collect();
+                this.relations[action.relation].permutation_group.add(perm);
+            }
+        }
+
+        for rule in this.symbolic_rules.iter_mut() {
+            *rule = rule.optimize(&self.relations);
+        }
         this
     }
 }
@@ -919,6 +1016,7 @@ mod debug_print {
                     columns,
                     kind,
                     implicit_rules,
+                    permutation_group: _,
                 },
             ) = self;
 
