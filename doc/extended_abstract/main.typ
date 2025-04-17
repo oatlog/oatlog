@@ -74,8 +74,8 @@ evaluation. Concretely, oatlog is a Rust procedural macro that embeds EqSat theo
 applications. We find that its ahead-of-time compilation of theories is a key asset, simplifying
 debugging and prototyping and improving our ability to practice performance engineering.
 Additionally, the ahead-of-time architecture naturally lends itself to relation and whole-ruleset
-optimization. Our experiments show that oatlog is faster than egglog for small e-graphs of less
-than about $10^5$ e-nodes.
+optimization. Our experiments show that oatlog is faster than egglog for small e-graphs of up
+to about $10^5$ e-nodes.
 
 = Introduction
 
@@ -248,7 +248,7 @@ matching all rewrite rules once.
 
 Oatlog's relative speedup is the highest for small e-graphs, with the 11th step of `math` and
 `boolean-adder` being reached more quickly with egglog than with oatlog. While oatlog is less
-scalable than egglog, it is significantly faster for e-graphs with less than $10^5$ e-nodes. Such
+scalable than egglog, it is significantly faster for e-graphs with up to $10^5$ e-nodes. Such
 e-graphs dominate, by necessity, in use-cases in which only tens of milliseconds are available for
 the computation -- like optimizing individual functions in an optimizing compiler. Note that it is the size of
 the e-graph that matters rather than the number of steps, with oatlog achieving a large speedup on
