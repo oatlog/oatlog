@@ -323,7 +323,7 @@ For the relations Add and Sub we have $"Add"(a,b,c) <==> "Sub"(c,b,a)$ (due to $
 Additionally, we might have rules providing commutativity, $"Add"(a,b,c) <==> "Add"(b,a,c)$, or
 otherwise permuting the columns of a relation. These can be seen as motivating merging relations
 with a permutation of themselves. Doing this involves noting that some column subsets are equal to
-each other, like ${a,c}$ and ${b,c}$ in the previous example, so indexes $a,c -> b$ and $b,c -> a$
+each other, like ${a,c}$ and ${b,c}$ in the previous example, so indexes with keys ${a, c}$ and ${b,c}$
 are identical and only one must be stored. Also, any insertion to the relation must be extended to
 add all equivalent permutations of itself #footnote[Merging relations like this is similar to
 slotted e-graphs @slotted_egraph, which are even more efficient since they also avoid duplicating
