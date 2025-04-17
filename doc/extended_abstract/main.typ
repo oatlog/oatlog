@@ -77,34 +77,11 @@ ahead-of-time architecture naturally lends itself to relation and whole-ruleset 
 experiments show that oatlog is faster than egglog for small e-graphs of less than about $10^5$
 e-nodes.
 
-// We introduce oatlog, an e-graph engine implementing the egglog language.
-// Like the egglog library, it is intended for equality saturation (EqSat) and is implemented as a relational
-// database using semi-naive evaluation.
-// While egglog is implemented as an interpreter to ease
-// interactive use-cases, oatlog is a Rust procedural macro that embeds EqSat theories into
-// applications.
-
-// Relation
-// indexes can for example be found equal given some rule, such as $"Add"(a,b,c) <==> "Add"(b,a,c)$
-// given commutativity or $"Add"(a,b,c) <==> "Sub"(c,b,a)$. Rewrites within a ruleset can also be
-// optimized assuming the existence of other rewrites in the ruleset.
-
-// This is primarily due to oatlog using static indexes, specifically static BTrees,
-// that are recreated rather than mutated during rebuilding.
-// We are planning to address this
-// further, by accelerating the innermost loop of BTree traversal with SIMD and by adaptively
-// using a dynamic instead of static index data structure, in addition to other ongoing work on
-// whole-ruleset optimization and on improving egglog parity.
-//
-// Oatlog is in-progress work and lacks many features present in egglog. Important features not
-// yet implemented include executing rulesets other than the entire set of rules, extraction
-// and `:merge` which is necessary for lattice-based reasoning.
-
 = Introduction
 
 There has been a surge of interest in e-graphs since the advent of egg @egg and the EGRAPHS
 community, with equality saturation finding use in applications from general-purpose compiler
-optimization @acyclic_egraphs to specialized synthesis @spores. Different use-cases apply e-graphs
+optimization @acyclic_egraphs to specialized synthesis @spores. Different use cases apply e-graphs
 in different ways -- from many small equality saturation problems to a single large one -- relying
 on different additional features such as proof production or e-class analyses.
 
@@ -128,7 +105,7 @@ e-graph-specific optimizations.
 We are building oatlog, an e-graph engine focused on incrementally improving upon egglog @egglog and
 eqlog @eqlog by exploring this space of implementation refinements.
 
-Like egg @egg and eqlog @eqlog/* but unlike egglog @egglog*/, oatlog is architected as a compiler that
+Like egg @egg and eqlog @eqlog, oatlog is architected as a compiler that
 generates Rust code. While interpreter-based engines like egglog support interactive use (e.g. in a
 REPL) and allow for more dynamic manipulation of the theory, they also lose out on some advantages
 of the ahead-of-time compiler architecture.
@@ -139,7 +116,7 @@ readable, and debugging becomes easier when one can read concrete generated code
 abstract compiler or interpreter code.
 
 Additionally, generating code allows one to leverage existing optimizing compilers such as
-rustc/LLVM. There is less standing in ones way when generating high-performance code for a specific
+rustc/LLVM. There is less standing in one's way when generating high-performance code for a specific
 theory compared to when writing a high-performance interpreter for any theory.
 
 Finally, although entirely achievable in an interpreter, a compiler naturally has a whole-theory
@@ -341,12 +318,9 @@ This results in less work during canonicalization due to having fewer indexes.
 For example with the relation $"Add"(a, b, c)$, having both the indexes $a, b -> c$ and $b, a -> c$ is unnecessary since they will be identical.
 This motivates allowing multiple implicit functionality rules which oatlog supports by implementing each rule as a functional dependence on one of the indexes.
 
-// A user might also want to implement the implicit functionality rule $b,c -> c$ (due to $b - c = a$) and $c,a -> b$ (due to $c - a = b$).
-// Because implicit functionality is implemented in the indexes, we support multiple return for free, since multiple return would for example be $x -> y,z$.
+More interesting transformations include turning rules into implicit functionality or deducing that relations are equivalent.
 
-More interesting transformations include turning rules into implicit functionality or deducing that relations are equivalent.//discovering that rules imply that two relations are equal.
-
-== Rule simplification <rule-simplify> // <idea_assume_other_rewrite>
+== Rule simplification <rule-simplify>
 
 #figure(
   placement: auto,
@@ -366,23 +340,13 @@ More interesting transformations include turning rules into implicit functionali
 ) <rule-simplify-example>
 
 At the HIR, level (see @oatlog_architecture) we model a rewrite rule as a set of premise atoms, and actions (insertions and unifications).
-// This becomes an IR (Internal Representation) that we can apply optimizations to, in the same way as an optimizing compiler.
 Implicit functionality rules can be applied to this IR to merge variables and duplicate premise atoms and insertions can be removed to simplify it, as shown in @rule-simplify-example.
 We additionally attempt to remove unifications by merging variables directly, which fails if both variables are mentioned in the premise, since that would change the semantics of the rule.
 For `rewrite` statements (example in @rule-simplify-example), this is essentially equivalent to common subexpression elimination where we additionally remove actions that also appear in the premise.
 Unfortunately, this can cause variables to be written twice or even introduce cycles.
 This can be solved by replacing entry (get-or-default for the the eclass of an enode) with a plain insert. This occured in @example_generated_code, the last action is an insert into `add` instead of entry.
 
-// #TODO[
-// - Freeze rule A. Rewrite premises of rule B assuming A ran just before (inline to premises)
-// - Rewrite actions of rule B to get effect of running A just after (inline to action)
-// ]
-
 == Merging rules during query planning #footnote[Eqlog @eqlog does a simpler version of this where it eliminates identical rules.] <idea_trie_queries>
-
-// Typically, user provided rewrite rules are full of redundancies and one approach to simplify them is to use e-graphs to pick a minimal set of rewrite rules #TODO[CITATION NEEDED].
-
-// However, that does not simplify rules with very similar queries or the almost identical queries that are created due to semi-naive evaluation.
 
 Typically, rules have overlapping premises, in particular when generating copies of a rule for semi-naive evaluation.
 To benefit from this, rules can form a trie (prefix tree) in terms of their premise atoms, concretely, this is shown in @trie-ir.
@@ -449,21 +413,11 @@ While this might help shrink the e-graph faster, it's unclear if the extra query
   ```,
   caption: [Deriving unifying rules from rewrites.],
 )<unifyderive>
-// #TODO[refer to eqlog, termination, surjectivity. Practical union>insert>entry]
 
 = Conclusion and future work
 
 We have shown that significantly faster e-graph engines are possible and there are still significant potential improvements.
 Future work includes merging relations, better scheduling, and standard database improvements such as better indexes and query planning.
-
-// #TODO[something like this?
-//   - we have shown that a faster e-graph engine can be built.
-//   - equality modulo permutation can reduce indexes, merge more in TIR, and unlock more degrees of freedom for TIR to optimize to minimize indexes/trie size further.
-//   - better query planning (general DB stuff)
-//   - make us semi-naive (our engine specifically)
-//   - always run unifying rules to closure.
-//   - dynamic indexes, better indexes.
-// ]
 
 #bibliography("refs.bib")
 
