@@ -457,7 +457,7 @@ scheduling to more standard database improvements in the form of better indexes 
 = Oatlog example usage <appendix_example>
 
 This example proves that if $x = -b + sqrt(b^2 - c)$ then $x^2 + 2 b x + c = 0$. If oatlog
-implemented extraction this example could be adapted so that oatlog itself discovers rather than
+implemented extraction, this example could be adapted so that oatlog itself discovers rather than
 just verifies the solution.
 
 #text(7.2pt, raw(read("../../examples/quadratic-formula/src/main.rs"), lang: "rust"))
