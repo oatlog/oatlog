@@ -233,8 +233,8 @@ function `Theory::apply_rules` that executes all queries and which alternates wi
   caption: [
     Microbenchmark results comparing egglog with oatlog. The reported timings are maximum likelihood
     estimates over $100$ samples or $5$ seconds, whichever is greater, computed by Criterion.rs
-    @criterionrs. Oatlog is compared with nondeterministic egglog since oatlog internally iterates
-    `hashbrown::HashMap`s.
+    @criterionrs on an AMD Ryzen 5900X CPU. Oatlog is compared with nondeterministic egglog since
+    it internally iterates `hashbrown::HashMap`s.
   ],
 ) <benchmark-results>
 
