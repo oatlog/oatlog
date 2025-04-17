@@ -3,6 +3,7 @@
 }
 
 #show "naive": "naïve"
+#show "e-graph": box[e-graph]
 // #show "egglog": `egglog`
 
 #set text(size: 10pt, font: "New Computer Modern")
