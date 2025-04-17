@@ -306,7 +306,7 @@ e-nodes in each relation after each application of rules.
 As oatlog is ongoing work we have up to this point mostly focused on basics, but there are many
 interesting avenues for further optimization. The following sections highlight some optimizations
 that we find conceptually interesting. Note that among them, only @idea_trie_queries "Trie queries"
-have yet been implemented in oatlog.
+and @rule-simplify "Rule simplification" have yet been implemented in oatlog.
 
 #figure(
   placement: auto,
@@ -362,7 +362,7 @@ This motivates allowing multiple implicit functionality rules which oatlog suppo
 
 More interesting transformations include turning rules into implicit functionality or deducing that relations are equivalent.//discovering that rules imply that two relations are equal.
 
-== Rule simplification // <idea_assume_other_rewrite>
+== Rule simplification <rule-simplify> // <idea_assume_other_rewrite>
 
 #figure(
   placement: auto,
@@ -381,9 +381,13 @@ More interesting transformations include turning rules into implicit functionali
   ],
 ) <rule-simplify-example>
 
-We model a rewrite rule as a set of premise atoms, insertions and unifications.
-This becomes an IR (Internal Representation) that we can apply optimizations to, in the same way as an optimizing compiler.
-Implicit functionality rules can be applied to this IR and duplicate premise atoms and insertions can be removed to simplify it, as shown in @rule-simplify-example.
+At the HIR, level (see @oatlog_architecture) we model a rewrite rule as a set of premise atoms, and actions (insertions and unifications).
+// This becomes an IR (Internal Representation) that we can apply optimizations to, in the same way as an optimizing compiler.
+Implicit functionality rules can be applied to this IR to merge variables and duplicate premise atoms and insertions can be removed to simplify it, as shown in @rule-simplify-example.
+We additionally attempt to remove unifications by merging variables directly, which fails if both variables are mentioned in the premise, since that would change the semantics of the rule.
+For `rewrite` statements (example in @rule-simplify-example), this is essentially equivalent to common subexpression elimination where we additionally remove actions that also appear in the premise.
+Unfortunately, this can cause variables to be written twice or even introduce cycles.
+This can be solved by replacing entry (get-or-default for the the eclass of an enode) with a plain insert. This occured in @example_generated_code, the last action is an insert into `add` instead of entry.
 
 // #TODO[
 // - Freeze rule A. Rewrite premises of rule B assuming A ran just before (inline to premises)
