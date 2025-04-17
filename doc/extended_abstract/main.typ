@@ -449,7 +449,23 @@ This reduces the number of joins and removes redundant actions.
 
 == Termination and scheduling <idea_scheduling_surjectivity>
 
-#TODO[refer to eqlog, termination, surjectivity. Practical union>insert>entry]
+Theories with rules that only perform unification and inserts, never create e-classes and are guaranteed to terminate @eqlog.
+Intuitively, this is because if there are finitely many e-classes then there are finitely many inserts that are possible into the database.
+Eqlog @eqlog calls these rules surjective and run them until closure before applying any non-surjective rules.
+But if most rules are rewrites, then very few rules will be surjective, but we can still derive unifying rules by turning all inserts into premises and keeping the unifications, see @unifyderive.
+While this might help shrink the e-graph faster, it's unclear if the extra query is too costly.
+
+#figure(
+  ```egglog
+  ; user provided
+  (rewrite (Add a b) (Add b a))
+  ; as a unifying rule
+  (rule ((= e1 (Add a b)) (= e2 (Add b a)))
+      ((union e1 e2)))
+  ```,
+  caption: [Deriving unifying rules from rewrites.],
+)<unifyderive>
+// #TODO[refer to eqlog, termination, surjectivity. Practical union>insert>entry]
 
 = Conclusion and future work
 
