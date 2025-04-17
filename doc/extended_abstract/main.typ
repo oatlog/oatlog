@@ -451,16 +451,19 @@ This reduces the number of joins and removes redundant actions.
 
 #TODO[refer to eqlog, termination, surjectivity. Practical union>insert>entry]
 
-= Conclusions and future work
+= Conclusion and future work
 
-#TODO[something like this?
-  - we have shown that a faster e-graph engine can be built.
-  - equality modulo permutation can reduce indexes, merge more in TIR, and unlock more degrees of freedom for TIR to optimize to minimize indexes/trie size further.
-  - better query planning (general DB stuff)
-  - make us semi-naive (our engine specifically)
-  - always run unifying rules to closure.
-  - dynamic indexes, better indexes.
-]
+We have shown that significantly faster e-graph engines are possible and there are still significant potential improvements.
+Future work includes merging relations, better scheduling, and standard database improvements such as better indexes and query planning.
+
+// #TODO[something like this?
+//   - we have shown that a faster e-graph engine can be built.
+//   - equality modulo permutation can reduce indexes, merge more in TIR, and unlock more degrees of freedom for TIR to optimize to minimize indexes/trie size further.
+//   - better query planning (general DB stuff)
+//   - make us semi-naive (our engine specifically)
+//   - always run unifying rules to closure.
+//   - dynamic indexes, better indexes.
+// ]
 
 #bibliography("refs.bib")
 
