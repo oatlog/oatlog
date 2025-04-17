@@ -69,13 +69,12 @@
 #heading(numbering: none, [Abstract])
 
 We introduce oatlog, an e-graph engine implementing the egglog language. Oatlog is intended for
-equality saturation (EqSat) and is implemented as a relational database using semi-naive
-evaluation. Concretely, oatlog is a Rust procedural macro that embeds EqSat theories into
-applications. We find that its ahead-of-time compilation of theories is a key asset, simplifying
-debugging and prototyping and improving our ability to practice performance engineering.
-Additionally, the ahead-of-time architecture naturally lends itself to relation and whole-ruleset
-optimization. Our experiments show that oatlog is faster than egglog for small e-graphs of up
-to about $10^5$ e-nodes.
+equality saturation (EqSat) and is implemented as a relational database using semi-naive evaluation.
+Concretely, oatlog is a Rust procedural macro that embeds EqSat theories into applications. We find
+that its ahead-of-time compilation of theories is a key asset, simplifying debugging and prototyping
+while being more amendable to performance engineering. Additionally, the ahead-of-time architecture
+  naturally lends itself to relation and whole-ruleset optimization. Our experiments show that
+  oatlog is faster than egglog for small e-graphs of up to about $10^5$ e-nodes.
 
 = Introduction
 
@@ -111,7 +110,7 @@ REPL) and allow for more dynamic manipulation of the theory, they also lose out 
 of the ahead-of-time compiler architecture.
 
 High-level generated code can be seen as a compiler intermediate representation like any other, but
-it has advantages over for example the bytecode in an interpreter. Generated code can be remarkably
+it has advantages over, for example, the bytecode of an interpreter. Generated code can be remarkably
 readable, and debugging becomes easier when one can read concrete generated code rather than
 abstract compiler or interpreter code.
 
@@ -133,7 +132,7 @@ the surrounding program can interact with, as in the full usage example in @appe
 
 Oatlog's ahead-of-time nature makes it slightly semantically different from egglog. Sort, relation
 and function declarations are semantically executed first, as part of code generation, while global
-variables definitions and `(run <num>)`-commands are run in declaration order at theory
+variable definitions and `(run <num>)`-commands are run in declaration order at theory
 instantiation time.
 
 To illustrate how oatlog works and the readability of its generated code, we highlight
@@ -246,15 +245,14 @@ We are developing oatlog with the help of microbenchmarks comparing it to egglog
 inserts or unifications. The other benchmarks are run for a fixed number of steps, with each step
 matching all rewrite rules once.
 
-Oatlog's relative speedup is the highest for small e-graphs, with the 11th step of `math` and
-`boolean-adder` being reached more quickly with egglog than with oatlog. While oatlog is less
-scalable than egglog, it is significantly faster for e-graphs with up to $10^5$ e-nodes. Such
-e-graphs dominate, by necessity, in use-cases in which only tens of milliseconds are available for
-the computation -- like optimizing individual functions in an optimizing compiler. Note that it is the size of
-the e-graph that matters rather than the number of steps, with oatlog achieving a large speedup on
-`fuel3-math`.
+Oatlog's relative speedup is the highest for small e-graphs, with oatlog on the 11th step of `math`
+and `boolean-adder` being outperformed by egglog. While oatlog is less scalable than egglog, it is
+significantly faster for e-graphs with up to $10^5$ e-nodes. Such e-graphs dominate, by necessity,
+in use cases in which only tens of milliseconds are available for the computation -- like optimizing
+individual functions in a production compiler. Note that it is the size of the e-graph that matters
+rather than the number of steps, with oatlog achieving a large speedup on `fuel3-math`.
 
-Oatlog is in-progress work and is missing many features of the egglog language. This is well
+Oatlog is a work in progress and is missing many features of the egglog language. This is well
 illustrated by the egglog test suite, with oatlog passing 16 of the 93 tests. Almost all test
 failures are due to oatlog not yet implementing extraction, `:merge`, or rulesets. The fact that
 oatlog currently runs all rules together prevents `(check <expr>)` from being implementable, so as a temporary
@@ -282,13 +280,12 @@ Oatlog is architected as a compiler that processes an entire theory in multiple 
 intermediate representations, as shown in @oatlog_architecture. The frontend is self-explanatory, as
 it implements the existing egglog language.
 
-The primary responsibility of the midend is to expand queries for semi-naive
-evaluation and to perform query planning. Oatlog's query planning currently
-uses a statically scheduled form of generic join @worstcaseoptimaljoin #footnote[which
-is only worst-case optimal assuming all relations have equal sizes]. The midend can
-also apply optimizations at both the HIR (high-level intermediate
-representation) and TIR (trie intermediate representation) stages. The
-subsequent sections discuss such optimizations.
+The primary responsibility of the midend is to expand queries for semi-naive evaluation and to
+perform query planning. Oatlog's query planning currently uses a statically scheduled form of
+generic join @worstcaseoptimaljoin, which is worst-case optimal only when assuming that all
+relations have equal sizes. The midend can also apply optimizations at both the HIR (high-level
+intermediate representation) and TIR (trie intermediate representation) stages. The subsequent
+sections discuss such optimizations.
 
 The backend and runtime library contain plenty of important low-level optimization details,
 especially around achieving fast canonicalization (also known as rebuilding). Currently all indexes
@@ -299,7 +296,7 @@ have found that faster querying is the more important factor for most theories.
 
 == Multiple functional dependency and merging relations <idea_multiple_fundep_mergerel>
 
-For a relation such as $"Add"(a, b, c)$ (meaning $a + b = c$), there is an functional dependency
+For a relation such as $"Add"(a, b, c)$ (meaning $a + b = c$), there is a functional dependency
 rule $a,b -> c$ which is applied to fixpoint during canonicalization. There is nothing preventing
 this rule from being implemented in userspace, but that would have worse performance because it
 involves a join, see @functionality-as-rule.
@@ -351,7 +348,7 @@ insertions and e-node storage.].
   ],
 ) <rule-simplify-example>
 
-At the HIR level, (see @oatlog_architecture) we model a rewrite rule as a set of premise atoms, and
+At the HIR level, see @oatlog_architecture, we model a rewrite rule as a set of premise atoms, and
 actions (insertions and unifications). Functional dependency rules can be applied to this IR to
 merge variables, and duplicated premise atoms and insertions can be removed to simplify it, as shown
 in @rule-simplify-example. We additionally attempt to remove unifications by merging variables
@@ -424,7 +421,7 @@ with rules that only perform unification and inserts, never creating new e-class
 to converge as there are only a bounded number of e-nodes that one could construct from a bounded
 number of e-classes.
 
-Eqlog @eqlog calls these actions surjective and run them to fixpoint before applying any
+Eqlog @eqlog calls these actions surjective and runs them to fixpoint before applying any
 non-surjective rules, i.e. rules that create new e-classes.
 
 If most rules are rewrites then few rules will be surjective, but we can still derive unifying rules
