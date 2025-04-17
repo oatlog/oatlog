@@ -12,7 +12,8 @@
   numbering: "1",
   columns: 2,
   paper: "a4",
-  margin: 1.59cm,
+  // loke: I think this margin is ugly, 2-line Chalmers is acceptable tradeoff to avoid it
+  //margin: 1.59cm,
 )
 #set heading(numbering: "1.")
 
@@ -66,7 +67,7 @@
 
 #heading(numbering: none, [Abstract])
 
-#TODO[shorter abstract]
+#TODO[rewritten and shorter abstract]
 
 We introduce oatlog, an e-graph engine implementing the egglog language. Like the egglog
 library, it is intended for equality saturation (EqSat) and is implemented as a relational
@@ -155,7 +156,7 @@ instantiation time.
 
 Oatlog is in-progress work and is missing many features of the egglog language. This is well
 illustrated by the egglog test suite, with oatlog passing 16 of the 93 tests. Almost all test
-failures are due to oatlog not yet implementing extraction, `:merge` or rulesets. The fact that
+failures are due to oatlog not yet implementing extraction, `:merge`, or rulesets. The fact that
 oatlog runs all rules together prevents `(check <expr>)` from being implementable, so as a temporary
 workaround it is therefore compiled to a no-op. Since `check` is crucial for tests, we instead
 verify oatlog's correctness by executing it and egglog in lockstep and comparing the number of
@@ -195,53 +196,48 @@ We are developing oatlog with the help of microbenchmarks comparing it to egglog
   text(
     size: 9pt,
     table(
-      columns: (auto, auto, auto, auto, auto),
+      columns: (auto, auto, auto, auto, auto, auto),
       table.header(
         [*benchmark*],
         [*e-nodes*],
+        [*egglog 0.4 deterministic*],
         [*egglog 0.4*],
         [*oatlog*],
         [*speedup*],
       ),
+      [`fuel2-math`, 10 steps, saturated], [1516], [7.0778 ms], [5.8908 ms], [1.1579 ms], table.cell(fill: green.lighten(40%))[5.09x],
+      [`fuel3-math`, 21 steps, saturated], [50021], [192.50 ms], [170.06 ms], [52.954 ms], table.cell(fill: green.lighten(40%))[3.21x],
 
-      [`fuel2-math`, 10 steps, saturated], [1516], [7.0778 ms], [1.1579 ms], table.cell(
-        fill: green.lighten(40%),
-      )[6.11x],
-      [`fuel3-math`, 21 steps, saturated], [50021], [192.50 ms], [52.954 ms], table.cell(
-        fill: green.lighten(40%),
-      )[3.63x],
+      [`math`, 1 step], [69], [688.83 µs], [660.76 µs], [17.055 µs], table.cell(fill: green.lighten(20%))[38.75x],
+      [`math`, 2 steps], [118], [871.97 µs], [828.21 µs], [32.492 µs], table.cell(fill: green.lighten(20%))[25.49x],
+      [`math`, 3 steps], [208], [1.0845 ms], [1.0066 ms], [61.145 µs], table.cell(fill: green.lighten(20%))[16.47x],
+      [`math`, 4 steps], [389], [1.3692 ms], [1.2498 ms], [122.53 µs], table.cell(fill: green.lighten(20%))[10.20x],
+      [`math`, 5 steps], [784], [1.8410 ms], [1.6360 ms], [253.68 µs], table.cell(fill: green.lighten(40%))[6.45x],
+      [`math`, 6 steps], [1576], [2.6639 ms], [2.3093 ms], [539.74 µs], table.cell(fill: green.lighten(40%))[4.28x],
+      [`math`, 7 steps], [3160], [4.3486 ms], [3.6846 ms], [1.1199 ms], table.cell(fill: green.lighten(40%))[3.29x],
+      [`math`, 8 steps], [8113], [7.6845 ms], [6.4288 ms], [2.6543 ms], table.cell(fill: green.lighten(40%))[2.42x],
+      [`math`, 9 steps], [28303], [16.224 ms], [13.825 ms], [8.6804 ms], table.cell(fill: green.lighten(60%))[1.59x],
+      [`math`, 10 steps], [136446], [63.135 ms], [54.481 ms], [53.112 ms], table.cell(fill: green.lighten(80%))[1.03x],
+      [`math`, 11 steps], [1047896], [448.77 ms], [436.24 ms], [563.93 ms], table.cell(fill: red.lighten(60%))[0.77x],
 
-      //[`math`, 0 steps], [35], [550.71 µs], [6.0900 µs], table.cell(fill: green.lighten(20%))[90.47x],
-      [`math`, 1 step], [69], [688.83 µs], [17.055 µs], table.cell(fill: green.lighten(20%))[40.39x],
-      [`math`, 2 steps], [118], [871.97 µs], [32.492 µs], table.cell(fill: green.lighten(20%))[26.83x],
-      [`math`, 3 steps], [208], [1.0845 ms], [61.145 µs], table.cell(fill: green.lighten(20%))[17.74x],
-      [`math`, 4 steps], [389], [1.3692 ms], [122.53 µs], table.cell(fill: green.lighten(20%))[11.18x],
-      [`math`, 5 steps], [784], [1.8410 ms], [253.68 µs], table.cell(fill: green.lighten(40%))[7.26x],
-      [`math`, 6 steps], [1576], [2.6639 ms], [539.74 µs], table.cell(fill: green.lighten(40%))[4.94x],
-      [`math`, 7 steps], [3160], [4.3486 ms], [1.1199 ms], table.cell(fill: green.lighten(40%))[3.88x],
-      [`math`, 8 steps], [8113], [7.6845 ms], [2.6543 ms], table.cell(fill: green.lighten(40%))[2.90x],
-      [`math`, 9 steps], [28303], [16.224 ms], [8.6804 ms], table.cell(fill: green.lighten(60%))[1.87x],
-      [`math`, 10 steps], [136446], [63.135 ms], [53.112 ms], table.cell(fill: green.lighten(80%))[1.19x],
-      [`math`, 11 steps], [1047896], [448.77 ms], [563.93 ms], table.cell(fill: red.lighten(60%))[0.80x],
-
-      //[`boolean-adder`, 0 steps], [44], [781.55 µs], [4.8048 µs], table.cell(fill: green.lighten(20%))[162.66x],
-      [`boolean-adder`, 1 step], [106], [936.01 µs], [19.588 µs], table.cell(fill: green.lighten(20%))[47.78x],
-      [`boolean-adder`, 2 steps], [241], [1.1303 ms], [49.379 µs], table.cell(fill: green.lighten(20%))[22.90x],
-      [`boolean-adder`, 3 steps], [511], [1.5437 ms], [120.61 µs], table.cell(fill: green.lighten(20%))[12.80x],
-      [`boolean-adder`, 4 steps], [727], [2.2988 ms], [226.53 µs], table.cell(fill: green.lighten(20%))[10.15x],
-      [`boolean-adder`, 5 steps], [906], [3.7199 ms], [370.08 µs], table.cell(fill: green.lighten(20%))[10.05x],
-      [`boolean-adder`, 6 steps], [1332], [5.1971 ms], [530.71 µs], table.cell(fill: green.lighten(20%))[9.79x],
-      [`boolean-adder`, 7 steps], [2374], [6.9556 ms], [919.43 µs], table.cell(fill: green.lighten(40%))[7.57x],
-      [`boolean-adder`, 8 steps], [5246], [10.596 ms], [2.0239 ms], table.cell(fill: green.lighten(40%))[5.24x],
-      [`boolean-adder`, 9 steps], [15778], [20.219 ms], [5.5787 ms], table.cell(fill: green.lighten(40%))[3.62x],
-      [`boolean-adder`, 10 steps], [77091], [52.227 ms], [25.410 ms], table.cell(fill: green.lighten(60%))[2.06x],
-      [`boolean-adder`, 11 steps], [854974], [406.15 ms], [478.83 ms], table.cell(fill: red.lighten(60%))[0.85x],
+      [`boolean-adder`, 1 step], [106], [936.01 µs], [902.80 µs], [19.588 µs], table.cell(fill: green.lighten(20%))[46.07x],
+      [`boolean-adder`, 2 steps], [241], [1.1303 ms], [1.0787 ms], [49.379 µs], table.cell(fill: green.lighten(20%))[21.84x],
+      [`boolean-adder`, 3 steps], [511], [1.5437 ms], [1.4349 ms], [120.61 µs], table.cell(fill: green.lighten(20%))[11.89x],
+      [`boolean-adder`, 4 steps], [727], [2.2988 ms], [2.0731 ms], [226.53 µs], table.cell(fill: green.lighten(20%))[9.15x],
+      [`boolean-adder`, 5 steps], [906], [3.7199 ms], [3.2451 ms], [370.08 µs], table.cell(fill: green.lighten(20%))[8.77x],
+      [`boolean-adder`, 6 steps], [1332], [5.1971 ms], [4.4394 ms], [530.71 µs], table.cell(fill: green.lighten(20%))[8.36x],
+      [`boolean-adder`, 7 steps], [2374], [6.9556 ms], [5.9033 ms], [919.43 µs], table.cell(fill: green.lighten(40%))[6.42x],
+      [`boolean-adder`, 8 steps], [5246], [10.596 ms], [8.9572 ms], [2.0239 ms], table.cell(fill: green.lighten(40%))[4.43x],
+      [`boolean-adder`, 9 steps], [15778], [20.219 ms], [17.294 ms], [5.5787 ms], table.cell(fill: green.lighten(40%))[3.10x],
+      [`boolean-adder`, 10 steps], [77091], [52.227 ms], [45.194 ms], [25.410 ms], table.cell(fill: green.lighten(60%))[1.78x],
+      [`boolean-adder`, 11 steps], [854974], [406.15 ms], [395.05 ms], [478.83 ms], table.cell(fill: red.lighten(60%))[0.82x],
     ),
   ),
   caption: [
     Microbenchmark results comparing egglog with oatlog. The reported timings are maximum likelihood
     estimates over $100$ samples or $5$ seconds, whichever is greater, computed by Criterion.rs
-    @criterionrs.
+    @criterionrs. Oatlog is compared with nondeterministic egglog since oatlog internally iterates
+    `hashbrown::HashTable`.
   ],
 ) <benchmark-results>
 
@@ -257,28 +253,66 @@ the computation -- like optimizing functions in an optimizing compiler. Note tha
 the e-graph that matters rather than the number of steps, with oatlog achieving a large speedup on
 `fuel3-math`.
 
-#TODO[address scalability how??]
+= Ongoing work and key optimizations
 
-While performant small e-graphs are useful for some applications, these results highlight the need
-for us to implement dynamic indexes. Additionally, there is low-hanging fruit in that the innermost
-loop of the current BTree traversal implementation is essentially
-`|node: &[R; B], key: R| node.iter().filter(|r| r < key).count()` for a tuple `R`, which is
-incredibly amendable to SIMD.
-
-= Improvements and ongoing work
+As oatlog is ongoing work we have up to this point mostly focused on basics, but there are many
+interesting avenues for further optimization. The following sections highlight some optimizations
+that we find conceptually interesting. Note that among them, only @idea_trie_queries "Trie queries"
+have yet been implemented in oatlog.
 
 #figure(
   placement: auto,
-  scope: "parent",
+  scope: "column",
   image("../figures/architecture.svg"),
   caption: [A coarse overview of the current oatlog architecture.],
-) <oatlog-architecture>
+) <oatlog_architecture>
 
-#TODO[consider architecture or omit]
+Oatlog is architected as a compiler that processes an entire theory in multiple steps with multiple
+intermediate representations, as shown in @oatlog_architecture. The frontend is self-explanatory, as
+it implements the existing egglog language.
 
-None of the following sections have been fully implemented yet and we expect significant performance benefits from them.
+The backend and runtime library contain plenty of important low-level optimization details,
+especially around achieving fast canonicalization or e-graph rebuilding. While oatlog has previously
+used static BTree indexes @algorithmica_strees, currently all indexes are implemented as
+`hashbrown::HashMap<K, V>`. Note that this is not the column-oriented lazy trie (COLT) described
+@freejoin1.
 
-== Multiple implicit functionality and merging relations
+The primary responsibility of the midend is to expand queries for semi-naive evaluation and to
+perform query planning. Oatlog's query planning currently uses a generic join @worstcaseoptimaljoin.
+The midend can also apply optimizations at both the HIR (high-level intermediate representation) and
+TIR (trie intermediate representation) stages. The subsequent sections discuss such optimizations.
+
+== Rule transformation <idea_assume_other_rewrite>
+
+#TODO[
+- Freeze rule A. Rewrite premises of rule B assuming A ran just before (inline to premises)
+- Rewrite actions of rule B to get effect of running A just after (inline to action)
+]
+
+/*
+#figure(
+  placement: auto,
+  scope: "parent",
+  ```egglog
+  ; "frozen" rule
+  (rewrite (Mul x (Const 1)) (Const 1))
+  ; optimizable rule
+  (rule ((= e (Mul x (Const 1)))) ((union e (Const 1))))
+  ; optimized rule
+  (rule ((= one (Const 1)) (= e (Mul x one))) ((union e one)))
+  ```,
+  caption: [
+    Example of rule simplification. The insert of `(Const 1)` is avoided. In general,
+    insertions of atoms that already are matched in the premise are unnecessary.
+  ],
+) <rule-simplify-example>
+
+We model a rewrite rule as a set of premise atoms, insertions and unifications.
+This becomes an IR (Internal Representation) that we can apply optimizations to, in the same way as an optimizing compiler.
+Implicit functionality rules can be applied to this IR and duplicate premise atoms and insertions can be removed to simplify it, as shown in @rule-simplify-example.
+*/
+
+== Multiple functional dependency and merging relations <idea_multiple_fundep_mergerel>
 
 For a relation such as $"Add"(a, b, c)$ (meaning $a + b = c$), there is an implicit functionality rule $a,b -> c$ which is applied until closure during canonicalization.
 There is nothing preventing this rule from being implemented in userspace, but that would have worse performance because it involves a join, see @functionality-as-rule.
@@ -303,29 +337,9 @@ This motivates allowing multiple implicit functionality rules which oatlog suppo
 // A user might also want to implement the implicit functionality rule $b,c -> c$ (due to $b - c = a$) and $c,a -> b$ (due to $c - a = b$).
 // Because implicit functionality is implemented in the indexes, we support multiple return for free, since multiple return would for example be $x -> y,z$.
 
-== Rule transformation
-
-#figure(
-  placement: auto,
-  scope: "parent",
-  ```egglog
-  ; user provided rule
-  (rewrite (Mul x (Const 1)) (Const 1))
-  ; after desugaring
-  (rule ((= e (Mul x (Const 1)))) ((union e (Const 1))))
-  ; after simplification (shown as egglog code)
-  (rule ((= one (Const 1)) (= e (Mul x one))) ((union e one)))
-  ```,
-  caption: [Example of rule simplification. The insert of `(Const 1)` is avoided.],
-) <rule-simplify-example>
-
-We model a rewrite rule as a set of premise atoms, insertions and unifications.
-This becomes an IR (Internal Representation) that we can apply optimizations to, in the same way as an optimizing compiler.
-Implicit functionality rules can be applied to this IR and duplicate premise atoms and insertions can be removed to simplify it, as shown in @rule-simplify-example.
-
 More interesting transformations include turning rules into implicit functionality or discovering that rules imply that two relations are equal.
 
-== Merging rules during query planning
+== Merging rules during query planning <idea_trie_queries>
 
 // Typically, user provided rewrite rules are full of redundancies and one approach to simplify them is to use e-graphs to pick a minimal set of rewrite rules #TODO[CITATION NEEDED].
 
@@ -379,7 +393,9 @@ This reduces the number of joins and removes redundant actions.
   ],
 ) <trie-ir>
 
-#TODO[index selection?]
+== Termination and scheduling <idea_scheduling_surjectivity>
+
+#TODO[refer to eqlog, termination, surjectivity. Practical union>insert>entry]
 
 = Conclusions and future work
 
@@ -399,16 +415,14 @@ something like this?
 = Oatlog example usage <appendix_example>
 
 This example proves that if $x = -b + sqrt(b^2 - c)$ then $x^2 + 2 b x + c = 0$. If oatlog
-implemented extraction this example could be adapted to not just verify this, but to find the
-quadratic equation itself.
+implemented extraction this example could be adapted so that oatlog itself discovers rather than
+just verifies the solution.
 
 #text(7.4pt, raw(read("../../examples/quadratic-formula/src/main.rs"), lang: "rust"))
 
 = Benchmarks <appendix_benchmarks>
 
-Benchmarks involve running oatlog and egglog on the same inputs, the theories specified below, and
-taking the average time over many runs. The `fuel2-math` and `fuel3-math` benchmarks run until
-convergence while the `math` and `boolean-adder` benchmarks are run for $9$ steps.
+Oatlog is benchmarked against egglog with the following theories.
 
 == `fuel2-math`, `fuel3-math` and `math`
 
@@ -485,8 +499,5 @@ performed, giving a theory that converges.
 )
 
 == Boolean adder
-
-We wrote the boolean adder benchmark ourselves and it shows the advantage of static
-(non-incrementally-updated) indexes for fast-growing theories.
 
 #text(8pt, raw(read("../../oatlog-bench/input/boolean_adder.egg"), lang: "egglog"))
