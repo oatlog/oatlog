@@ -73,8 +73,8 @@ equality saturation (EqSat) and is implemented as a relational database using se
 Concretely, oatlog is a Rust procedural macro that embeds EqSat theories into applications. We find
 that its ahead-of-time compilation of theories is a key asset, simplifying debugging and prototyping
 while being more amendable to performance engineering. Additionally, the ahead-of-time architecture
-  naturally lends itself to relation and whole-ruleset optimization. Our experiments show that
-  oatlog is faster than egglog for small e-graphs of up to about $10^5$ e-nodes.
+naturally lends itself to relation and whole-ruleset optimization. Our experiments show that
+oatlog is faster than egglog for small e-graphs of up to about $10^5$ e-nodes.
 
 = Introduction
 
@@ -313,16 +313,18 @@ involves a join, see @functionality-as-rule.
 
 For the relations Add and Sub we have $"Add"(a,b,c) <==> "Sub"(c,b,a)$ (due to $a + b = c <==> c
 - a = b$), meaning that Add and Sub are really just the same relation but with permuted columns.
-  This motivates merging relations, which in this case involves modifying all rules mentioning Sub
-  to instead use Add or vice versa. The rules that must be modified include the functional
-  dependency on Sub, which is added as a secondary functional dependency on Add. Hence in order to
-  merge relations like this, we really want the e-graph engine to support multiple functional
-  dependencies on a relation. Merging relations does not only save memory but also improves
-  performance by causing unifications to happen earlier.
+This motivates merging relations, which in this case involves modifying all rules mentioning Sub
+to instead use Add or vice versa. The rules that must be modified include the functional
+dependency on Sub, which is added as a secondary functional dependency on Add. Hence in order to
+merge relations like this, we really want the e-graph engine to support multiple functional
+dependencies on a relation. Merging relations does not only save memory but also improves
+performance by causing unifications to happen earlier.
 
 Additionally, we might have rules providing commutativity, $"Add"(a,b,c) <==> "Add"(b,a,c)$, or
-otherwise permuting the columns of a relation. These can be seen as motivating merging relations
-with a permutation of themselves. Doing this involves noting that some column subsets are equal to
+otherwise permuting the columns of a relation.
+// These can be seen as motivating merging relations with a permutation of themselves.
+These single-relation rewrite rules are good candidates for being promoted to something built-in, similar to functional dependencies.
+Exploiting this involves noting that some column subsets are equal to
 each other, like ${a,c}$ and ${b,c}$ in the previous example, so indexes with keys ${a, c}$ and ${b,c}$
 are identical and only one must be stored. Also, any insertion to the relation must be extended to
 add all equivalent permutations of itself #footnote[Merging relations like this is similar to
