@@ -393,8 +393,17 @@ impl Atom {
     //
     // Alias and similar can just switch directly to the canonical relation.
     fn equivalent_atoms(&self, relations: &TVec<RelationId, Relation>) -> Vec<Atom> {
-        // TODO: impl
-        vec![self.clone()]
+        relations[self.relation]
+            .permutation_group
+            .apply(self.columns.inner())
+            .map(|columns| Atom {
+                premise: self.premise,
+                relation: self.relation,
+                columns: columns.into(),
+                entry: self.entry,
+            })
+            .collect()
+        // vec![self.clone()]
     }
 
     // Among the possible atoms, pick the one that we consider canonical.
@@ -545,6 +554,9 @@ impl SymbolicRule {
             let mut assumed_true: BTreeSet<Atom> = BTreeSet::new();
             for atom in queue.into_iter() {
                 let equivalent = atom.equivalent_atoms(relations);
+                // if equivalent.len() > 1 {
+                //     panic!("{equivalent:?}");
+                // }
                 let mut deleted = false;
                 'iter_assumed: for assumed in assumed_true.iter().cloned() {
                     for atom in equivalent.iter().filter(|x| x.relation == assumed.relation) {
@@ -770,7 +782,7 @@ impl Theory {
     pub(crate) fn optimize(&self) -> Self {
         let mut this = self.clone();
         for rule in this.symbolic_rules.iter_mut() {
-            *rule = rule.optimize(&self.relations);
+            *rule = rule.optimize(&this.relations);
         }
 
         for rule in &this.symbolic_rules {
@@ -795,7 +807,7 @@ impl Theory {
                 if premise_s != action_s {
                     continue;
                 }
-                // dbg!(premise_v, action_v, self.relations[action.relation].name);
+                // dbg!(premise_v, action_v, this.relations[action.relation].name);
 
                 let perm: Vec<usize> = premise_v
                     .iter()
@@ -814,7 +826,7 @@ impl Theory {
         }
 
         for rule in this.symbolic_rules.iter_mut() {
-            *rule = rule.optimize(&self.relations);
+            *rule = rule.optimize(&this.relations);
         }
         this
     }
