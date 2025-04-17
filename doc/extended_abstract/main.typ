@@ -250,7 +250,7 @@ Oatlog's relative speedup is the highest for small e-graphs, with the 11th step 
 `boolean-adder` being reached more quickly with egglog than with oatlog. While oatlog is less
 scalable than egglog, it is significantly faster for e-graphs with less than $10^5$ e-nodes. Such
 e-graphs dominate, by necessity, in use-cases in which only tens of milliseconds are available for
-the computation -- like optimizing functions in an optimizing compiler. Note that it is the size of
+the computation -- like optimizing individual functions in an optimizing compiler. Note that it is the size of
 the e-graph that matters rather than the number of steps, with oatlog achieving a large speedup on
 `fuel3-math`.
 
@@ -282,13 +282,6 @@ Oatlog is architected as a compiler that processes an entire theory in multiple 
 intermediate representations, as shown in @oatlog_architecture. The frontend is self-explanatory, as
 it implements the existing egglog language.
 
-The backend and runtime library contain plenty of important low-level optimization details,
-especially around achieving fast canonicalization (also known as rebuilding). Currently all indexes
-are implemented as `hashbrown::HashMap<K, V>`. Note that this is not the COLT (column-oriented lazy
-trie) index described in @freejoin1. There is a trade-off between indexes that are fast to build, in
-particular static BTrees @algorithmica_strees, and hashmap indexes which are faster to query, and we
-have found that faster querying is the more important factor for most theories.
-
 The primary responsibility of the midend is to expand queries for semi-naive
 evaluation and to perform query planning. Oatlog's query planning currently
 uses a statically scheduled form of generic join @worstcaseoptimaljoin #footnote[which
@@ -297,6 +290,12 @@ also apply optimizations at both the HIR (high-level intermediate
 representation) and TIR (trie intermediate representation) stages. The
 subsequent sections discuss such optimizations.
 
+The backend and runtime library contain plenty of important low-level optimization details,
+especially around achieving fast canonicalization (also known as rebuilding). Currently all indexes
+are implemented as `hashbrown::HashMap<K, V>`. Note that this is not the COLT (column-oriented lazy
+trie) index described in @freejoin1. There is a trade-off between indexes that are fast to build, in
+particular static BTrees @algorithmica_strees, and hashmap indexes which are faster to query, and we
+have found that faster querying is the more important factor for most theories.
 
 == Multiple functional dependency and merging relations <idea_multiple_fundep_mergerel>
 
@@ -352,7 +351,7 @@ insertions and e-node storage.].
   ],
 ) <rule-simplify-example>
 
-At the HIR, level (see @oatlog_architecture) we model a rewrite rule as a set of premise atoms, and
+At the HIR level, (see @oatlog_architecture) we model a rewrite rule as a set of premise atoms, and
 actions (insertions and unifications). Functional dependency rules can be applied to this IR to
 merge variables, and duplicated premise atoms and insertions can be removed to simplify it, as shown
 in @rule-simplify-example. We additionally attempt to remove unifications by merging variables
@@ -363,6 +362,10 @@ in the premise.
 //Unfortunately, this can cause variables to be written twice or even introduce cycles. This can be
 //solved by replacing entry (get-or-default for the the eclass of an enode) with a plain insert.
 //This occured in @example_generated_code, the last action is an insert into `add` instead of entry.
+
+// However, arbitrarily merging variables can introduce cycles or cause conflicts where variables are written to multiple times.
+// This is solved by replacing entry (the get-or-default lookup for enodes) with an insert in the problematic situations.
+// This occurred in @example_generated_code, the last action is an insert into `add` instead of entry.
 
 == Trie queries <idea_trie_queries>
 
