@@ -94,43 +94,59 @@ Oatlog is in-progress work and lacks many features present in egglog. Important 
 yet implemented include executing rulesets other than the entire set of rules, extraction
 and `:merge` which is necessary for lattice-based reasoning.
 
+= Introduction
+
+There has been a surge of interest in e-graphs since the advent of egg @egg and the EGRAPHS
+community, with equality saturation finding use in applications from general-purpose compiler
+optimization @acyclic_egraphs to specialized synthesis @spores. Different use-cases apply e-graphs
+in different ways -- from many small equality saturation problems to a single large one -- relying
+on different additional features such as proof production or e-class analyses.
+
+Many equality saturation applications are limited by the performance of their underlying e-graph
+engine. This is largely due to the combinatorial explosion in e-graph size with increasing input
+size and additional rewrite rules, and addressing this is a major goal of continued e-graph
+development. Egg @egg introduced batched evaluation, improving performance over earlier
+implementations. Eqlog @eqlog and egglog @egglog brought additional improvements through relational
+e-matching @relationalematching and semi-naive evaluation.
+
+Future advances in e-graph performance may come from fundamentally different e-graph variants that
+sidestep core scalability issues -- such as containers @linear_grobner_egraph or slotted e-graphs
+@slotted_egraph -- but they can also come from iterative refinements to existing engine
+architectures. The formulation of e-graphs as datalog, and hence e-graph engines as specialized
+relational databases, opens up a large design space for such improvements. There is considerable
+room for innovation in query scheduling, query planning and index implementation, in addition to any
+e-graph-specific optimizations.
+
 = Introducing oatlog
 
-#TODO[omit mentioning master's thesis]
+We are building oatlog, an e-graph engine focused on incrementally improving upon egglog @egglog and
+eqlog @eqlog by exploring this space of implementation refinements.
 
-#TODO[motivation: optimizing compilers short sentence]
+Like egg @egg and eqlog @eqlog but unlike egglog @egglog, oatlog is architected as a compiler that
+generates Rust code. While interpreter-based engines like egglog support interactive use (e.g. in a
+REPL) and allow for more dynamic manipulation of the theory, they also lose out on some advantages
+of the ahead-of-time compiler architecture.
 
-We are building oatlog as our master's thesis. It is an e-graph engine based on relational
-e-matching @relationalematching and uses semi-naive evaluation, similar to eqlog @eqlog and egglog
-@egglog. It can and should be seen as strongly inspired by both of these. While egglog is
-clearly the more feature-complete of the two and receives more usage, we believe that there are
-architectural advantages in eqlog's approach that should not be ignored.
+High-level generated code can be seen as a compiler intermediate representation like any other, but
+it has advantages over for example the bytecode in an interpreter. Generated code can be remarkably
+readable, and debugging becomes easier when one can read concrete generated code rather than
+abstract compiler or interpreter code.
 
-In reducing the problem of implementing an e-graph engine to implementing a relational database
-engine, one must accept that just as in the latter, there will in an e-graph engine be a long tail
-of scheduling, query planning and index implementation details that noticeably impact run-time performance.
-This means that future developments in e-graph engines are likely to be increasingly sophisticated,
-and it is crucial for a performant e-graph engine to be simple to debug, understand and modify.
+Additionally, generating code allows one to leverage existing optimizing compilers such as
+rustc/LLVM. There is less standing in ones way when generating high-performance code for a specific
+theory compared to when writing a high-performance interpreter for any theory.
 
-Oatlog, like eqlog and the datalog engine Soufflé @souffle, compiles theories to native code -- Rust,
-or C++ in the case of Soufflé. This generated code can to some extent be seen as an intermediate
-representation, but it has advantages over its equivalents in an engine implemented as an
-interpreter similar to egglog. A code generator is a program that constructs a program for any
-theory while an interpreter in some sense is a program for all theories. This makes the interpreter
-more abstract, introducing trade-offs between for example run-time memory representation compactness
-and uniformity, while the code generator can simply piggyback on rustc and emit code similar to what
-one would write manually. Additionally, the generated code for an EqSat theory is remarkably
-readable and can be used to understand how the engine works and to sketch out modifications to it.
+Finally, although entirely achievable in an interpreter, a compiler naturally has a whole-theory
+perspective. Rather than compiling one relation or rewrite rule at a time, it compiles an entire
+theory at once. This unlocks a wide range of optimizations -- a rewrite rule can be optimized based
+on the existence of another rewrite rule, indexes can be selected based on how exactly a relation
+will be queried, and so on.
 
-Taken together, oatlog is an experiment in achieving better performance at lower effort by
-leveraging a code generation architecture.
-
-= Using oatlog
-
-As a consequence of egglog's popularity, it is natural for oatlog to be interfaced with using the
-egglog language. Concretely, one passes a string literal or S-expression directly to the
-`oatlog::compile_egraph!` procedural macro which generates a concrete `Theory` type that the
-surrounding program can interact with. A full example is provided in @appendix_example.
+Oatlog takes advantage of all of these aspects. It is an e-graph engine based on relational
+e-matching @relationalematching and uses semi-naive evaluation like eqlog @eqlog and @egglog. It is
+implemented as a Rust procedural macro, `oatlog::compile_egraph!`, that takes a string literal or
+S-expression describing a theory in the egglog language. The macro generates a `Theory` type that
+the surrounding program can interact with, as in the full usage example in @appendix_example.
 
 Oatlog's ahead-of-time nature makes it slightly semantically different from egglog. Sort, relation
 and function declarations are semantically executed first, as part of code generation, while global
@@ -138,15 +154,18 @@ variables definitions and `(run <num>)`-commands are run in declaration order at
 instantiation time.
 
 Oatlog is in-progress work and is missing many features of the egglog language. This is well
-illustrated by its performance on the egglog test suite, with oatlog passing 16 of the 93 tests.
-Almost all test failures are due to oatlog not yet implementing extraction, `:merge` or rulesets.
-The fact that oatlog runs all rules together prevents `(check <expr>)` from being
-implementable, and as a temporary workaround, it is therefore compiled to a no-op. Since `check` is
-crucial for tests, oatlog instead verifies its correctness by comparing its number of e-nodes in
-each relation after each application of rules.
+illustrated by the egglog test suite, with oatlog passing 16 of the 93 tests. Almost all test
+failures are due to oatlog not yet implementing extraction, `:merge` or rulesets. The fact that
+oatlog runs all rules together prevents `(check <expr>)` from being implementable, so as a temporary
+workaround it is therefore compiled to a no-op. Since `check` is crucial for tests, we instead
+verify oatlog's correctness by executing it and egglog in lockstep and comparing the number of
+e-nodes in each relation after each application of rules.
 
+To illustrate how oatlog works and the readability of its generated code, we highlight
+@example_generated_code that shows generated code for the distributive law. This is part of the
+function `Theory::apply_rules` that executes all queries and which alternates with the function
+`Theory::canonicalize` to compute the congruence closure of the theory.
 
-#TODO[reference listing, talk about generated code, better caption]
 #figure(
   placement: auto,
   scope: "parent",
@@ -161,15 +180,11 @@ each relation after each application of rules.
   }
   ```,
   caption: [
-    What the actual generated code looks like.
+    A part of the generated code for a rewrite rule describing the distributive law.
   ],
-)
+) <example_generated_code>
 
 = Performance evaluation
-
-#TODO[omit footnote about using small benchmarks]
-
-#TODO[explain number of times benchmark is run]
 
 We are developing oatlog with the help of microbenchmarks comparing it to egglog, shown in
 @benchmark-results.
@@ -184,7 +199,7 @@ We are developing oatlog with the help of microbenchmarks comparing it to egglog
       table.header(
         [*benchmark*],
         [*e-nodes*],
-        [*egglog*#footnote[egglog version 0.4.0]],
+        [*egglog 0.4*],
         [*oatlog*],
         [*speedup*],
       ),
@@ -224,25 +239,25 @@ We are developing oatlog with the help of microbenchmarks comparing it to egglog
     ),
   ),
   caption: [
-    Microbenchmark results comparing egglog with oatlog. The results are the average of many
-    iterations.
+    Microbenchmark results comparing egglog with oatlog. The reported timings are maximum likelihood
+    estimates over $100$ samples or $5$ seconds, whichever is greater, computed by Criterion.rs
+    @criterionrs.
   ],
 ) <benchmark-results>
 
-The egglog code for the benchmarks is provided in @appendix_benchmarks.
-// Each step involves matching all rewrite rules once, then applying the delta and rebuilding the relation indexes.
-The `fuel*` benchmarks run until saturation, i.e. until the rewrite rules produce no more inserts or unifications.
-// The fueled
-// benchmarks are run until saturation, i.e. until the rewrite rules produce no more inserts or
-// uproots.
+The egglog code for the benchmarks is provided in @appendix_benchmarks. Each step involves matching
+all rewrite rules once. The `fuel*-math` benchmarks run until saturation, i.e. until the rewrite
+rules produce no more inserts or unifications.
 
-Oatlog is faster in earlier steps than in later steps, i.e. it appears to be less scalable than
-egglog #footnote[As one might guess, we stumbled into this by setting up small benchmarks,
-implementing our indexes and only then scaling up the benchmarks.]. Our interpretation is that this
-is due to static rather than dynamic indexes, which have better constant factors but scale with the
-size of the table rather than the size of the insertion.
+Oatlog's relative speedup is the highest for small e-graphs, with the 11th step of `math` and
+`boolean-adder` being reached more quickly with egglog than with oatlog. While oatlog is less
+scalable than egglog, it is significantly faster for e-graphs with less than $10^5$ e-nodes. Such
+e-graphs dominate, by necessity, in use-cases in which only tens of milliseconds are available for
+the computation -- like optimizing functions in an optimizing compiler. Note that it is the size of
+the e-graph that matters rather than the number of steps, with oatlog achieving a large speedup on
+`fuel3-math`.
 
-#TODO[talk about us being fast for compilers on smaller parts of a program]
+#TODO[address scalability how??]
 
 While performant small e-graphs are useful for some applications, these results highlight the need
 for us to implement dynamic indexes. Additionally, there is low-hanging fruit in that the innermost
@@ -381,6 +396,14 @@ something like this?
 #counter(heading).update(0)
 #set heading(numbering: "A.1", supplement: [Appendix])
 
+= Oatlog example usage <appendix_example>
+
+This example proves that if $x = -b + sqrt(b^2 - c)$ then $x^2 + 2 b x + c = 0$. If oatlog
+implemented extraction this example could be adapted to not just verify this, but to find the
+quadratic equation itself.
+
+#text(7.4pt, raw(read("../../examples/quadratic-formula/src/main.rs"), lang: "rust"))
+
 = Benchmarks <appendix_benchmarks>
 
 Benchmarks involve running oatlog and egglog on the same inputs, the theories specified below, and
@@ -467,11 +490,3 @@ We wrote the boolean adder benchmark ourselves and it shows the advantage of sta
 (non-incrementally-updated) indexes for fast-growing theories.
 
 #text(8pt, raw(read("../../oatlog-bench/input/boolean_adder.egg"), lang: "egglog"))
-
-= Oatlog example usage <appendix_example>
-
-This example proves that if $x = -b + sqrt(b^2 - c)$ then $x^2 + 2 b x + c = 0$. If oatlog
-implemented extraction this example could be adapted to not just verify this, but to find the
-quadratic equation itself.
-
-#text(7.4pt, raw(read("../../examples/quadratic-formula/src/main.rs"), lang: "rust"))
