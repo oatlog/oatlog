@@ -68,30 +68,14 @@
 
 #heading(numbering: none, [Abstract])
 
-// #TODO[rewritten and shorter abstract]
-
-We introduce oatlog, an e-graph engine implementing the egglog language. Oatlog
-is a Rust procedural macro that embeds EqSat theories into applications.
-// Like the egglog library,
-It is intended for equality saturation (EqSat) and is
-implemented as a relational database using semi-naive evaluation.
-//
-// At the cost of some dynamism,
-Its ahead-of-time compilation of theories makes
-it easier to understand and debug theory synthesis as one can inspect the
-relatively readable generated Rust code.
-In particular, this greatly simplifies
-performance engineering for oatlog.
-Additionally,
-// although it is entirely
-// possible in an interpreter,
-the ahead-of-time architecture naturally lends
-itself to relation and whole-ruleset optimization.
-//
-Our experiments show that, /*in microbenchmarks,*/ oatlog is faster than egglog for
-small e-graphs and for fast-growing theories. /*Oatlog is in-progress work and
-lacks some features present in egglog, notably executing only specific
-rulesets, extraction and `:merge`.*/
+We introduce oatlog, an e-graph engine implementing the egglog language. Oatlog is intended for
+equality saturation (EqSat) and is implemented as a relational database using semi-naive evaluation.
+Concretely, oatlog is a Rust procedural macro that embeds EqSat theories into applications. We find
+that its ahead-of-time compilation of theories is a key asset, simplifying debugging and
+prototyping, improving our ability to practice performance engineering. Additionally, the
+ahead-of-time architecture naturally lends itself to relation and whole-ruleset optimization. Our
+experiments show that oatlog is faster than egglog for small e-graphs of less than about $10^5$
+e-nodes.
 
 // We introduce oatlog, an e-graph engine implementing the egglog language.
 // Like the egglog library, it is intended for equality saturation (EqSat) and is implemented as a relational
