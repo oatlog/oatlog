@@ -158,8 +158,8 @@ on the existence of another rewrite rule, indexes can be selected based on how e
 will be queried, and so on.
 
 Oatlog takes advantage of all of these aspects. It is an e-graph engine based on relational
-e-matching @relationalematching and uses semi-naive evaluation like eqlog @eqlog and @egglog. It is
-implemented as a Rust procedural macro, `oatlog::compile_egraph!`, that takes a string literal or
+e-matching @relationalematching and uses semi-naive evaluation like eqlog @eqlog and egglog @egglog. It is
+implemented as a Rust procedural macro, `compile_egraph!`, that takes a string literal or
 S-expression describing a theory in the egglog language. The macro generates a `Theory` type that
 the surrounding program can interact with, as in the full usage example in @appendix_example.
 
@@ -171,7 +171,7 @@ instantiation time.
 Oatlog is in-progress work and is missing many features of the egglog language. This is well
 illustrated by the egglog test suite, with oatlog passing 16 of the 93 tests. Almost all test
 failures are due to oatlog not yet implementing extraction, `:merge`, or rulesets. The fact that
-oatlog runs all rules together prevents `(check <expr>)` from being implementable, so as a temporary
+oatlog currently runs all rules together prevents `(check <expr>)` from being implementable, so as a temporary
 workaround it is therefore compiled to a no-op. Since `check` is crucial for tests, we instead
 verify oatlog's correctness by executing it and egglog in lockstep and comparing the number of
 e-nodes in each relation after each application of rules.
@@ -416,13 +416,14 @@ This reduces the number of joins and removes redundant actions.
 
 = Conclusions and future work
 
-something like this?
+#TODO[something like this?
 - we have shown that a faster e-graph engine can be built.
 - equality modulo permutation can reduce indexes, merge more in TIR, and unlock more degrees of freedom for TIR to optimize to minimize indexes/trie size further.
 - better query planning (general DB stuff)
 - make us semi-naive (our engine specifically)
 - always run unifying rules to closure.
 - dynamic indexes, better indexes.
+]
 
 #bibliography("refs.bib")
 
