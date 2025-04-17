@@ -3,7 +3,7 @@
 }
 
 #show "naive": "naïve"
-#show "egglog": `egglog`
+// #show "egglog": `egglog`
 
 #set text(size: 10pt, font: "New Computer Modern")
 #set document(title: [Oatlog])
@@ -11,7 +11,8 @@
 #set page(
   numbering: "1",
   columns: 2,
-  paper: "a4",
+  paper: "us-letter",
+  margin: (x: (8.5 - 7) / 2 * 1in, y: (11 - 9) / 2 * 1in),
   // loke: I think this margin is ugly, 2-line Chalmers is acceptable tradeoff to avoid it
   //margin: 1.59cm,
 )
@@ -137,7 +138,7 @@ e-graph-specific optimizations.
 We are building oatlog, an e-graph engine focused on incrementally improving upon egglog @egglog and
 eqlog @eqlog by exploring this space of implementation refinements.
 
-Like egg @egg and eqlog @eqlog but unlike egglog @egglog, oatlog is architected as a compiler that
+Like egg @egg and eqlog @eqlog/* but unlike egglog @egglog*/, oatlog is architected as a compiler that
 generates Rust code. While interpreter-based engines like egglog support interactive use (e.g. in a
 REPL) and allow for more dynamic manipulation of the theory, they also lose out on some advantages
 of the ahead-of-time compiler architecture.
@@ -293,29 +294,23 @@ used static BTree indexes @algorithmica_strees, currently all indexes are implem
 
 The primary responsibility of the midend is to expand queries for semi-naive
 evaluation and to perform query planning. Oatlog's query planning currently
-uses a statically scheduled form of generic join @worstcaseoptimaljoin, which
-is only worst-case optimal assuming all relations have equal sizes. The midend can
+uses a statically scheduled form of generic join @worstcaseoptimaljoin #footnote[which
+is only worst-case optimal assuming all relations have equal sizes]. The midend can
 also apply optimizations at both the HIR (high-level intermediate
 representation) and TIR (trie intermediate representation) stages. The
 subsequent sections discuss such optimizations.
 
-== Rule transformation <idea_assume_other_rewrite>
+== Rule transformation // <idea_assume_other_rewrite>
 
-#TODO[
-- Freeze rule A. Rewrite premises of rule B assuming A ran just before (inline to premises)
-- Rewrite actions of rule B to get effect of running A just after (inline to action)
-]
-
-/*
 #figure(
   placement: auto,
   scope: "parent",
   ```egglog
-  ; "frozen" rule
+  ; user provided rule
   (rewrite (Mul x (Const 1)) (Const 1))
-  ; optimizable rule
+  ; after desugaring
   (rule ((= e (Mul x (Const 1)))) ((union e (Const 1))))
-  ; optimized rule
+  ; optimized rule (shown as egglog code)
   (rule ((= one (Const 1)) (= e (Mul x one))) ((union e one)))
   ```,
   caption: [
@@ -327,7 +322,11 @@ subsequent sections discuss such optimizations.
 We model a rewrite rule as a set of premise atoms, insertions and unifications.
 This becomes an IR (Internal Representation) that we can apply optimizations to, in the same way as an optimizing compiler.
 Implicit functionality rules can be applied to this IR and duplicate premise atoms and insertions can be removed to simplify it, as shown in @rule-simplify-example.
-*/
+
+// #TODO[
+// - Freeze rule A. Rewrite premises of rule B assuming A ran just before (inline to premises)
+// - Rewrite actions of rule B to get effect of running A just after (inline to action)
+// ]
 
 == Multiple functional dependency and merging relations <idea_multiple_fundep_mergerel>
 
@@ -430,6 +429,7 @@ This reduces the number of joins and removes redundant actions.
 #counter(heading).update(0)
 #set heading(numbering: "A.1", supplement: [Appendix])
 
+#pagebreak()
 = Oatlog example usage <appendix_example>
 
 This example proves that if $x = -b + sqrt(b^2 - c)$ then $x^2 + 2 b x + c = 0$. If oatlog
