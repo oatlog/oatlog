@@ -288,16 +288,16 @@ intermediate representation) and TIR (trie intermediate representation) stages. 
 sections discuss such optimizations.
 
 The backend and runtime library contain plenty of important low-level optimization details,
-especially around achieving fast canonicalization (also known as rebuilding). Currently all indexes
+especially around achieving fast canonicalization (also known as rebuilding). Currently, all indexes
 are implemented as `hashbrown::HashMap<K, V>`. Note that this is not the COLT (column-oriented lazy
 trie) index described in @freejoin1. There is a trade-off between indexes that are fast to build, in
 particular static BTrees @algorithmica_strees, and hashmap indexes which are faster to query, and we
 have found that faster querying is the more important factor for most theories.
 
-== Multiple functional dependency and merging relations <idea_multiple_fundep_mergerel>
+== Multiple functional dependencies and merging relations <idea_multiple_fundep_mergerel>
 
 For a relation such as $"Add"(a, b, c)$ (meaning $a + b = c$), there is a functional dependency
-rule $a,b -> c$ which is applied to fixpoint during canonicalization. There is nothing preventing
+rule $a,b -> c$ which is applied to fixpoint during canonicalization. Nothing is preventing
 this rule from being implemented in userspace, but that would have worse performance because it
 involves a join, see @functionality-as-rule.
 
@@ -315,7 +315,7 @@ For the relations Add and Sub we have $"Add"(a,b,c) <==> "Sub"(c,b,a)$ (due to $
 - a = b$), meaning that Add and Sub are really just the same relation but with permuted columns.
 This motivates merging relations, which in this case involves modifying all rules mentioning Sub
 to instead use Add or vice versa. The rules that must be modified include the functional
-dependency on Sub, which is added as a secondary functional dependency on Add. Hence in order to
+dependency on Sub, which is added as a secondary functional dependency on Add. Hence, in order to
 merge relations like this, we really want the e-graph engine to support multiple functional
 dependencies on a relation. Merging relations does not only save memory but also improves
 performance by causing unifications to happen earlier.
@@ -354,7 +354,7 @@ At the HIR level, see @oatlog_architecture, we model a rewrite rule as a set of 
 actions (insertions and unifications). Functional dependency rules can be applied to this IR to
 merge variables, and duplicated premise atoms and insertions can be removed to simplify it, as shown
 in @rule-simplify-example. We additionally attempt to remove unifications by merging variables
-directly, which fails if both variables are mentioned in the premise, since that would change the
+directly, which fails if both variables are mentioned in the premise since that would change the
 semantics of the rule. For `rewrite` statements (as in @rule-simplify-example), this is essentially
 equivalent to common subexpression elimination where we additionally remove actions that also appear
 in the premise.
@@ -368,7 +368,7 @@ in the premise.
 
 == Trie queries <idea_trie_queries>
 
-Rules typically have overlapping premises, in particular when generating many slightly different
+Rules typically have overlapping premises, particularly when generating many slightly different
 variants of rules for semi-naive evaluation. To benefit from this, rules can be run together as a
 trie (prefix tree) of premise atoms. As shown in @trie-ir, this reduces the number of joins and
 removes redundant actions.
