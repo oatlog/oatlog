@@ -57,7 +57,7 @@
         [Chalmers University of Technology],
       ).join("\n"),
       (
-        text(12pt, [Alejandro Luque Cerpa]),
+        text(12pt, [Alejandro Luque-Cerpa]),
         link("mailto:luque@chalmers.se"),
         [Chalmers University of Technology],
       ).join("\n"),
@@ -71,25 +71,31 @@
 // #TODO[rewritten and shorter abstract]
 
 We introduce oatlog, an e-graph engine implementing the egglog language. Oatlog
-is a Rust procedural macro that embeds EqSat theories into applications. Like
-the egglog library, it is intended for equality saturation (EqSat) and is
-implemented as a relational database using semi-naive evaluation. 
+is a Rust procedural macro that embeds EqSat theories into applications.
+// Like the egglog library,
+It is intended for equality saturation (EqSat) and is
+implemented as a relational database using semi-naive evaluation.
 //
-At the cost of some dynamism, its ahead-of-time compilation of theories makes
+// At the cost of some dynamism,
+Its ahead-of-time compilation of theories makes
 it easier to understand and debug theory synthesis as one can inspect the
-relatively readable generated Rust code. In particular, this greatly simplifies
-performance engineering for oatlog. Additionally, although it is entirely
-possible in an interpreter, the ahead-of-time architecture naturally lends
+relatively readable generated Rust code.
+In particular, this greatly simplifies
+performance engineering for oatlog.
+Additionally,
+// although it is entirely
+// possible in an interpreter,
+the ahead-of-time architecture naturally lends
 itself to relation and whole-ruleset optimization.
 //
-Our experiments show that, in microbenchmarks, oatlog is faster than egglog for
-small e-graphs and for fast-growing theories. Oatlog is in-progress work and
+Our experiments show that, /*in microbenchmarks,*/ oatlog is faster than egglog for
+small e-graphs and for fast-growing theories. /*Oatlog is in-progress work and
 lacks some features present in egglog, notably executing only specific
-rulesets, extraction and `:merge`.
+rulesets, extraction and `:merge`.*/
 
-// We introduce oatlog, an e-graph engine implementing the egglog language. 
+// We introduce oatlog, an e-graph engine implementing the egglog language.
 // Like the egglog library, it is intended for equality saturation (EqSat) and is implemented as a relational
-// database using semi-naive evaluation. 
+// database using semi-naive evaluation.
 // While egglog is implemented as an interpreter to ease
 // interactive use-cases, oatlog is a Rust procedural macro that embeds EqSat theories into
 // applications.
@@ -100,12 +106,12 @@ rulesets, extraction and `:merge`.
 // optimized assuming the existence of other rewrites in the ruleset.
 
 // This is primarily due to oatlog using static indexes, specifically static BTrees,
-// that are recreated rather than mutated during rebuilding. 
+// that are recreated rather than mutated during rebuilding.
 // We are planning to address this
 // further, by accelerating the innermost loop of BTree traversal with SIMD and by adaptively
 // using a dynamic instead of static index data structure, in addition to other ongoing work on
 // whole-ruleset optimization and on improving egglog parity.
-// 
+//
 // Oatlog is in-progress work and lacks many features present in egglog. Important features not
 // yet implemented include executing rulesets other than the entire set of rules, extraction
 // and `:merge` which is necessary for lattice-based reasoning.
@@ -128,7 +134,7 @@ e-matching @relationalematching and semi-naive evaluation.
 Future advances in e-graph performance may come from fundamentally different e-graph variants that
 sidestep core scalability issues -- such as containers @linear_grobner_egraph or slotted e-graphs
 @slotted_egraph -- but they can also come from iterative refinements to existing engine
-architectures. The formulation of e-graphs as datalog, and hence e-graph engines as specialized
+architectures. The formulation of e-graphs as datalog @egglog, and hence e-graph engines as specialized
 relational databases, opens up a large design space for such improvements. There is considerable
 room for innovation in query scheduling, query planning and index implementation, in addition to any
 e-graph-specific optimizations.
@@ -169,14 +175,6 @@ and function declarations are semantically executed first, as part of code gener
 variables definitions and `(run <num>)`-commands are run in declaration order at theory
 instantiation time.
 
-Oatlog is in-progress work and is missing many features of the egglog language. This is well
-illustrated by the egglog test suite, with oatlog passing 16 of the 93 tests. Almost all test
-failures are due to oatlog not yet implementing extraction, `:merge`, or rulesets. The fact that
-oatlog currently runs all rules together prevents `(check <expr>)` from being implementable, so as a temporary
-workaround it is therefore compiled to a no-op. Since `check` is crucial for tests, we instead
-verify oatlog's correctness by executing it and egglog in lockstep and comparing the number of
-e-nodes in each relation after each application of rules.
-
 To illustrate how oatlog works and the readability of its generated code, we highlight
 @example_generated_code that shows generated code for the distributive law. This is part of the
 function `Theory::apply_rules` that executes all queries and which alternates with the function
@@ -200,10 +198,8 @@ function `Theory::apply_rules` that executes all queries and which alternates wi
   ],
 ) <example_generated_code>
 
-= Performance evaluation
+= Evaluation
 
-We are developing oatlog with the help of microbenchmarks comparing it to egglog, shown in
-@benchmark-results.
 
 #figure(
   placement: auto,
@@ -220,8 +216,12 @@ We are developing oatlog with the help of microbenchmarks comparing it to egglog
         [*oatlog*],
         [*speedup*],
       ),
-      [`fuel2-math`, 10 steps, saturated], [1516], [7.0778 ms], [5.8908 ms], [1.1579 ms], table.cell(fill: green.lighten(40%))[5.09x],
-      [`fuel3-math`, 21 steps, saturated], [50021], [192.50 ms], [170.06 ms], [52.954 ms], table.cell(fill: green.lighten(40%))[3.21x],
+      [`fuel2-math`, 10 steps, saturated], [1516], [7.0778 ms], [5.8908 ms], [1.1579 ms], table.cell(
+        fill: green.lighten(40%),
+      )[5.09x],
+      [`fuel3-math`, 21 steps, saturated], [50021], [192.50 ms], [170.06 ms], [52.954 ms], table.cell(
+        fill: green.lighten(40%),
+      )[3.21x],
 
       [`math`, 1 step], [69], [688.83 µs], [660.76 µs], [17.055 µs], table.cell(fill: green.lighten(20%))[38.75x],
       [`math`, 2 steps], [118], [871.97 µs], [828.21 µs], [32.492 µs], table.cell(fill: green.lighten(20%))[25.49x],
@@ -235,17 +235,39 @@ We are developing oatlog with the help of microbenchmarks comparing it to egglog
       [`math`, 10 steps], [136446], [63.135 ms], [54.481 ms], [53.112 ms], table.cell(fill: green.lighten(80%))[1.03x],
       [`math`, 11 steps], [1047896], [448.77 ms], [436.24 ms], [563.93 ms], table.cell(fill: red.lighten(60%))[0.77x],
 
-      [`boolean-adder`, 1 step], [106], [936.01 µs], [902.80 µs], [19.588 µs], table.cell(fill: green.lighten(20%))[46.07x],
-      [`boolean-adder`, 2 steps], [241], [1.1303 ms], [1.0787 ms], [49.379 µs], table.cell(fill: green.lighten(20%))[21.84x],
-      [`boolean-adder`, 3 steps], [511], [1.5437 ms], [1.4349 ms], [120.61 µs], table.cell(fill: green.lighten(20%))[11.89x],
-      [`boolean-adder`, 4 steps], [727], [2.2988 ms], [2.0731 ms], [226.53 µs], table.cell(fill: green.lighten(20%))[9.15x],
-      [`boolean-adder`, 5 steps], [906], [3.7199 ms], [3.2451 ms], [370.08 µs], table.cell(fill: green.lighten(20%))[8.77x],
-      [`boolean-adder`, 6 steps], [1332], [5.1971 ms], [4.4394 ms], [530.71 µs], table.cell(fill: green.lighten(20%))[8.36x],
-      [`boolean-adder`, 7 steps], [2374], [6.9556 ms], [5.9033 ms], [919.43 µs], table.cell(fill: green.lighten(40%))[6.42x],
-      [`boolean-adder`, 8 steps], [5246], [10.596 ms], [8.9572 ms], [2.0239 ms], table.cell(fill: green.lighten(40%))[4.43x],
-      [`boolean-adder`, 9 steps], [15778], [20.219 ms], [17.294 ms], [5.5787 ms], table.cell(fill: green.lighten(40%))[3.10x],
-      [`boolean-adder`, 10 steps], [77091], [52.227 ms], [45.194 ms], [25.410 ms], table.cell(fill: green.lighten(60%))[1.78x],
-      [`boolean-adder`, 11 steps], [854974], [406.15 ms], [395.05 ms], [478.83 ms], table.cell(fill: red.lighten(60%))[0.82x],
+      [`boolean-adder`, 1 step], [106], [936.01 µs], [902.80 µs], [19.588 µs], table.cell(
+        fill: green.lighten(20%),
+      )[46.07x],
+      [`boolean-adder`, 2 steps], [241], [1.1303 ms], [1.0787 ms], [49.379 µs], table.cell(
+        fill: green.lighten(20%),
+      )[21.84x],
+      [`boolean-adder`, 3 steps], [511], [1.5437 ms], [1.4349 ms], [120.61 µs], table.cell(
+        fill: green.lighten(20%),
+      )[11.89x],
+      [`boolean-adder`, 4 steps], [727], [2.2988 ms], [2.0731 ms], [226.53 µs], table.cell(
+        fill: green.lighten(20%),
+      )[9.15x],
+      [`boolean-adder`, 5 steps], [906], [3.7199 ms], [3.2451 ms], [370.08 µs], table.cell(
+        fill: green.lighten(20%),
+      )[8.77x],
+      [`boolean-adder`, 6 steps], [1332], [5.1971 ms], [4.4394 ms], [530.71 µs], table.cell(
+        fill: green.lighten(20%),
+      )[8.36x],
+      [`boolean-adder`, 7 steps], [2374], [6.9556 ms], [5.9033 ms], [919.43 µs], table.cell(
+        fill: green.lighten(40%),
+      )[6.42x],
+      [`boolean-adder`, 8 steps], [5246], [10.596 ms], [8.9572 ms], [2.0239 ms], table.cell(
+        fill: green.lighten(40%),
+      )[4.43x],
+      [`boolean-adder`, 9 steps], [15778], [20.219 ms], [17.294 ms], [5.5787 ms], table.cell(
+        fill: green.lighten(40%),
+      )[3.10x],
+      [`boolean-adder`, 10 steps], [77091], [52.227 ms], [45.194 ms], [25.410 ms], table.cell(
+        fill: green.lighten(60%),
+      )[1.78x],
+      [`boolean-adder`, 11 steps], [854974], [406.15 ms], [395.05 ms], [478.83 ms], table.cell(
+        fill: red.lighten(60%),
+      )[0.82x],
     ),
   ),
   caption: [
@@ -256,6 +278,9 @@ We are developing oatlog with the help of microbenchmarks comparing it to egglog
   ],
 ) <benchmark-results>
 
+
+We are developing oatlog with the help of microbenchmarks comparing it to egglog, shown in
+@benchmark-results.
 The egglog code for the benchmarks is provided in @appendix_benchmarks. Each step involves matching
 all rewrite rules once. The `fuel*-math` benchmarks run until saturation, i.e. until the rewrite
 rules produce no more inserts or unifications.
@@ -268,6 +293,14 @@ the computation -- like optimizing functions in an optimizing compiler. Note tha
 the e-graph that matters rather than the number of steps, with oatlog achieving a large speedup on
 `fuel3-math`.
 
+Oatlog is in-progress work and is missing many features of the egglog language. This is well
+illustrated by the egglog test suite, with oatlog passing 16 of the 93 tests. Almost all test
+failures are due to oatlog not yet implementing extraction, `:merge`, or rulesets. The fact that
+oatlog currently runs all rules together prevents `(check <expr>)` from being implementable, so as a temporary
+workaround it is therefore compiled to a no-op. Since `check` is crucial for tests, we instead
+verify oatlog's correctness by executing it and egglog in lockstep and comparing the number of
+e-nodes in each relation after each application of rules.
+
 = Ongoing work and key optimizations
 
 As oatlog is ongoing work we have up to this point mostly focused on basics, but there are many
@@ -277,7 +310,7 @@ have yet been implemented in oatlog.
 
 #figure(
   placement: auto,
-  scope: "column",
+  scope: "parent",
   image("../figures/architecture.svg"),
   caption: [A coarse overview of the current oatlog architecture.],
 ) <oatlog_architecture>
@@ -287,10 +320,11 @@ intermediate representations, as shown in @oatlog_architecture. The frontend is 
 it implements the existing egglog language.
 
 The backend and runtime library contain plenty of important low-level optimization details,
-especially around achieving fast canonicalization or e-graph rebuilding. While oatlog has previously
-used static BTree indexes @algorithmica_strees, currently all indexes are implemented as
-`hashbrown::HashMap<K, V>`. Note that this is not the column-oriented lazy trie (COLT) described
-@freejoin1.
+especially around achieving fast canonicalization or e-graph rebuilding.
+// While oatlog has previously
+// used static BTree indexes @algorithmica_strees,
+Currently all indexes are implemented as `hashbrown::HashMap<K, V>`.
+Note that this is not the COLT (column-oriented lazy trie) index described @freejoin1.
 
 The primary responsibility of the midend is to expand queries for semi-naive
 evaluation and to perform query planning. Oatlog's query planning currently
@@ -300,7 +334,35 @@ also apply optimizations at both the HIR (high-level intermediate
 representation) and TIR (trie intermediate representation) stages. The
 subsequent sections discuss such optimizations.
 
-== Rule transformation // <idea_assume_other_rewrite>
+
+== Multiple functional dependency and merging relations <idea_multiple_fundep_mergerel>
+
+For a relation such as $"Add"(a, b, c)$ (meaning $a + b = c$), there is an implicit functionality rule $a,b -> c$ which is applied until closure during canonicalization.
+There is nothing preventing this rule from being implemented in userspace, but that would have worse performance because it involves a join, see @functionality-as-rule.
+
+#figure(
+  // placement: auto,
+  // scope: "parent",
+  ```egglog
+  (rule ((= c1 (Add a b)) (= c2 (Add a b)))
+      ((union c1 c2)))
+  ```,
+  caption: [Implicit functionality as an explicit rule.],
+) <functionality-as-rule>
+
+For the relations Add and Sub we have $"Add"(a,b,c) <==> "Sub"(c,b,a)$ (due to $a + b = c <==> c - a = b$), meaning that Add and Sub are really just the same relation but with permuted columns. Additionally we might have rules on commutativity, $"Add"(a,b,c) <==> "Add"(b,a,c)$.
+
+This motivates merging relations along with a permutation group#footnote[Similar to what is done with Slotted E-graphs @slotted_egraph which additionally avoids storing the same permuted e-node multiple times.] and preprocessing all rules such that when inserting a row, all permutations of that row are also inserted.
+This results in less work during canonicalization due to having fewer indexes.
+For example with the relation $"Add"(a, b, c)$, having both the indexes $a, b -> c$ and $b, a -> c$ is unnecessary since they will be identical.
+This motivates allowing multiple implicit functionality rules which oatlog supports by implementing each rule as a functional dependence on one of the indexes.
+
+// A user might also want to implement the implicit functionality rule $b,c -> c$ (due to $b - c = a$) and $c,a -> b$ (due to $c - a = b$).
+// Because implicit functionality is implemented in the indexes, we support multiple return for free, since multiple return would for example be $x -> y,z$.
+
+More interesting transformations include turning rules into implicit functionality or deducing that relations are equivalent.//discovering that rules imply that two relations are equal.
+
+== Rule simplification // <idea_assume_other_rewrite>
 
 #figure(
   placement: auto,
@@ -328,46 +390,18 @@ Implicit functionality rules can be applied to this IR and duplicate premise ato
 // - Rewrite actions of rule B to get effect of running A just after (inline to action)
 // ]
 
-== Multiple functional dependency and merging relations <idea_multiple_fundep_mergerel>
-
-For a relation such as $"Add"(a, b, c)$ (meaning $a + b = c$), there is an implicit functionality rule $a,b -> c$ which is applied until closure during canonicalization.
-There is nothing preventing this rule from being implemented in userspace, but that would have worse performance because it involves a join, see @functionality-as-rule.
-
-#figure(
-  // placement: auto,
-  // scope: "parent",
-  ```egglog
-  (rule ((= c1 (Add a b)) (= c2 (Add a b)))
-      ((union c1 c2)))
-  ```,
-  caption: [Implicit functionality as an explicit rule.],
-) <functionality-as-rule>
-
-For the relations Add and Sub we have $"Add"(a,b,c) <==> "Sub"(c,b,a)$ (due to $a + b = c <==> c - a = b$), meaning that Add and Sub are really just the same relation but with permuted columns. Additionally we might have rules on commutativity, $"Add"(a,b,c) <==> "Add"(b,a,c)$.
-
-This motivates merging relations along with a permutation group#footnote[Similar to what is done with Slotted E-graphs @slotted_egraph which additionally avoids storing the same permuted e-node multiple times.] and preprocessing all rules such that when inserting a row, all permutations of that row are also inserted.
-This results in less work during canonicalization due to having fewer indexes.
-For example with the relation $"Add"(a, b, c)$, having both the indexes $a, b -> c$ and $b, a -> c$ is unnecessary since they will be identical.
-This motivates allowing multiple implicit functionality rules which oatlog supports by implementing each rule as a functional dependence on one of the indexes.
-
-// A user might also want to implement the implicit functionality rule $b,c -> c$ (due to $b - c = a$) and $c,a -> b$ (due to $c - a = b$).
-// Because implicit functionality is implemented in the indexes, we support multiple return for free, since multiple return would for example be $x -> y,z$.
-
-More interesting transformations include turning rules into implicit functionality or discovering that rules imply that two relations are equal.
-
-== Merging rules during query planning <idea_trie_queries>
+== Merging rules during query planning #footnote[Eqlog @eqlog does a simpler version of this where it eliminates identical rules.] <idea_trie_queries>
 
 // Typically, user provided rewrite rules are full of redundancies and one approach to simplify them is to use e-graphs to pick a minimal set of rewrite rules #TODO[CITATION NEEDED].
 
 // However, that does not simplify rules with very similar queries or the almost identical queries that are created due to semi-naive evaluation.
 
 Typically, rules have overlapping premises, in particular when generating copies of a rule for semi-naive evaluation.
-To benefit from this, rules can form a trie in terms of their premise atoms, concretely, this is shown in @trie-ir.
+To benefit from this, rules can form a trie (prefix tree) in terms of their premise atoms, concretely, this is shown in @trie-ir.
 This reduces the number of joins and removes redundant actions.
 
-
 #figure(
-  placement: auto,
+  placement: top,
   scope: "parent",
   grid(
     columns: (auto, auto, auto, auto),
@@ -416,12 +450,12 @@ This reduces the number of joins and removes redundant actions.
 = Conclusions and future work
 
 #TODO[something like this?
-- we have shown that a faster e-graph engine can be built.
-- equality modulo permutation can reduce indexes, merge more in TIR, and unlock more degrees of freedom for TIR to optimize to minimize indexes/trie size further.
-- better query planning (general DB stuff)
-- make us semi-naive (our engine specifically)
-- always run unifying rules to closure.
-- dynamic indexes, better indexes.
+  - we have shown that a faster e-graph engine can be built.
+  - equality modulo permutation can reduce indexes, merge more in TIR, and unlock more degrees of freedom for TIR to optimize to minimize indexes/trie size further.
+  - better query planning (general DB stuff)
+  - make us semi-naive (our engine specifically)
+  - always run unifying rules to closure.
+  - dynamic indexes, better indexes.
 ]
 
 #bibliography("refs.bib")
