@@ -163,7 +163,7 @@ impl PermutationGroup {
         }
     }
     fn add(&mut self, perm: Vec<usize>) {
-        if false {
+        if true {
             self.inner.push(perm);
             self.close();
         }

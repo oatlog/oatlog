@@ -129,29 +129,48 @@ pub(crate) fn schedule_rules(
         uf: SparseUf::new(),
         rng: Rc::new(RefCell::new(rng)),
     };
-    // {
-    //     eprintln!("===========");
-    //     for _ in 0..100 {
-    //         let trie = inner(ctx.clone(), &rules);
+    let trie = {
+        let mut best_trie = inner(ctx.clone(), &rules);
+        let mut best_sum = (usize::MAX, usize::MAX);
 
-    //         let mut index_usage: TVec<RelationId, _> = relations
-    //             .iter()
-    //             .map(|x| {
-    //                 x.implicit_rules
-    //                     .iter()
-    //                     .map(|x| x.out.keys().cloned().collect())
-    //                     .collect()
-    //             })
-    //             .collect();
-    //         trie.index_usage(&mut index_usage);
-    //         // dbg!(&index_usage);
-    //         dbg!(index_usage.iter().map(|x| x.len()).sum::<usize>());
-    //         dbg!(trie.size());
+        let mut iterations = 0;
 
-    //     }
+        eprintln!("===========");
+        loop {
+            let trie = inner(ctx.clone(), &rules);
 
-    // }
-    let trie = inner(ctx, &rules);
+            let mut index_usage: TVec<RelationId, _> = relations
+                .iter()
+                .map(|x| {
+                    x.implicit_rules
+                        .iter()
+                        .map(|x| x.out.keys().cloned().collect())
+                        .collect()
+                })
+                .collect();
+            trie.index_usage(&mut index_usage);
+            // dbg!(&index_usage);
+            let sum = (
+                index_usage.iter().map(|x| x.len()).sum::<usize>(),
+                trie.size(),
+            );
+            // trie.size();
+            iterations += 1;
+
+            if sum < best_sum {
+                dbg!(sum);
+                best_sum = sum;
+                best_trie = trie;
+            }
+
+            if iterations > 100 {
+                break;
+            }
+        }
+
+        best_trie
+    };
+    // let trie = inner(ctx, &rules);
 
     // let mut index_usage: TVec<RelationId, _> = relations
     //     .iter()
@@ -1157,6 +1176,18 @@ impl Rule {
         })
         .into_iter()
         .map(|x| (self.salt(), x))
+        .flat_map(|(salt, link)| match link {
+            Primary(atom) => atom
+                .equivalent_atoms(&ctx.relations)
+                .into_iter()
+                .map(move |atom| (salt.clone(), Primary(atom)))
+                .collect::<Vec<_>>(),
+            Semi(atom) => atom
+                .equivalent_atoms(&ctx.relations)
+                .into_iter()
+                .map(move |atom| (salt.clone(), Semi(atom)))
+                .collect::<Vec<_>>(),
+        })
         .collect()
     }
 }
@@ -1263,9 +1294,9 @@ fn election(ctx: &Ctx<'_>, rules: &[Rule]) -> (Vec<Rule>, BTreeMap<TrieLink, Vec
                 //             .collect()
             }
         }
-        // let mut rng = ctx.rng.borrow_mut();
-        // let vote = *vote.choose(&mut rng).unwrap();
-        let vote = vote[0];
+        let mut rng = ctx.rng.borrow_mut();
+        let vote = *vote.choose(&mut rng).unwrap();
+        // let vote = vote[0];
         let existing = map.insert(
             votes[vote].1.clone(),
             matrix[vote]

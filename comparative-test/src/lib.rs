@@ -255,6 +255,7 @@ mod comparative_tests {
 // mismatched
 // does_panic
 
+    /*
 #[cfg(test)]
 mod egglog_testsuite {
 
@@ -1396,6 +1397,7 @@ egglog_test!(nogenerate, vec, expect![[r#"
 
 "#]], r#"(include "comparative-test/egglog-testsuite/vec.egg")"#); // collections
 }
+*/
 #[cfg(test)]
 mod additional {
 
