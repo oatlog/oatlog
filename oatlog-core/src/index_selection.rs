@@ -4,6 +4,7 @@
 #![allow(dead_code, reason = "temporary noise")]
 
 use crate::{
+    hir::PermutationGroup,
     ids::{ColumnId, IndexId, IndexUsageId, IuDedupId},
     lir,
     typed_vec::TVec,
@@ -103,6 +104,94 @@ pub(crate) fn index_selection(
     // exist in
     columns: usize,
     // what logical "primary keys" are needed.
+    uses: &TVec<IndexUsageId, BTreeSet<ColumnId>>,
+    perm: &PermutationGroup,
+) -> (
+    TVec<IndexUsageId, lir::IndexUsageInfo>,
+    TVec<IndexId, lir::IndexInfo>,
+) {
+    curried_index(columns, uses)
+    // all_usages(columns, uses, perm)
+}
+
+fn all_column_permutations(
+    perm: &PermutationGroup,
+    columns: &BTreeSet<ColumnId>,
+) -> BTreeSet<BTreeSet<ColumnId>> {
+    perm.inner
+        .iter()
+        .map(|inner| columns.iter().map(|x| ColumnId(inner[x.0])).collect())
+        .collect()
+}
+
+fn all_usages(
+    columns: usize,
+    uses: &TVec<IndexUsageId, BTreeSet<ColumnId>>,
+    perm: &PermutationGroup,
+) -> (
+    TVec<IndexUsageId, lir::IndexUsageInfo>,
+    TVec<IndexId, lir::IndexInfo>,
+) {
+    let mut index_usage_dedup: BTreeMap<BTreeSet<BTreeSet<ColumnId>>, IndexId> = BTreeMap::new();
+    let mut index_usage_to_dedup: TVec<IndexUsageId, IndexId> = uses.new_same_size();
+
+    let mut dedup_id = 0;
+    for (iu, columns) in uses.iter_enumerate() {
+        let iud = *index_usage_dedup
+            .entry(all_column_permutations(perm, columns))
+            .or_insert_with(|| {
+                let ret = IndexId(dedup_id);
+                dedup_id += 1;
+                ret
+            });
+        index_usage_to_dedup[iu] = iud;
+    }
+    assert_eq!(dedup_id, index_usage_dedup.len());
+
+    // let iud_to_columns: TVec<IndexId, &BTreeSet<ColumnId>> =
+    //     TVec::from_iter_unordered(index_usage_dedup.iter().map(|(cols, &id)| (id, cols)));
+
+    let index_usage_to_dedup_inv: BTreeMap<_, _> = index_usage_dedup
+        .clone()
+        .into_iter()
+        .map(|(a, b)| (b, a))
+        .collect();
+
+    (
+        index_usage_to_dedup
+            .iter_enumerate()
+            .map(|(iu, iud)| lir::IndexUsageInfo {
+                prefix: uses[iu].len(),
+                index: index_usage_to_dedup[iu],
+            })
+            .collect(),
+        index_usage_to_dedup_inv
+            .into_iter()
+            .map(|(_, cols)| {
+                let cols = cols.into_iter().next().unwrap();
+                let mut perm: TVec<ColumnId, ColumnId> = cols.iter().copied().collect();
+                perm.extend((0..columns).map(ColumnId).filter(|x| !cols.contains(&x)));
+                lir::IndexInfo {
+                    permuted_columns: perm,
+                    primary_key_prefix_len: columns,
+                    primary_key_violation_merge: BTreeMap::new(),
+                }
+            })
+            .collect(),
+    )
+
+    // indexes.map(|permuted_columns| {
+    //     assert_eq!(columns, permuted_columns.len());
+    //     lir::IndexInfo {
+    //         permuted_columns: permuted_columns.iter().copied().collect(),
+    //         primary_key_prefix_len: columns,
+    //         primary_key_violation_merge: BTreeMap::new(),
+    //     }
+    // }),
+}
+
+fn curried_index(
+    columns: usize,
     uses: &TVec<IndexUsageId, BTreeSet<ColumnId>>,
 ) -> (
     TVec<IndexUsageId, lir::IndexUsageInfo>,
@@ -214,7 +303,9 @@ pub(crate) fn index_selection(
 
 #[cfg(test)]
 mod test {
-    use super::{BipartiteMatching, ColumnId, IndexUsageId, IuDedupId, index_selection};
+    use super::{
+        BipartiteMatching, ColumnId, IndexUsageId, IuDedupId, curried_index, index_selection,
+    };
     use crate::typed_vec::TVec;
     use expect_test::expect;
     use itertools::Itertools as _;
@@ -281,7 +372,7 @@ mod test {
                 .into_iter()
                 .map(|x| x.into_iter().copied().map(ColumnId).collect())
                 .collect();
-        let (logical_to_physical, physical_indexes) = index_selection(columns, &uses);
+        let (logical_to_physical, physical_indexes) = curried_index(columns, &uses);
         expect![[r#"
             {
                 iu0: IndexUsageInfo {

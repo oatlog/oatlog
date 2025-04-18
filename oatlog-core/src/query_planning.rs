@@ -163,8 +163,11 @@ pub(crate) fn emit_lir_theory(mut theory: hir::Theory) -> (hir::Theory, lir::The
                     (index_usage, x)
                 });
 
-                let (usage_to_info, mut index_to_info) =
-                    index_selection::index_selection(relation.columns.len(), uses);
+                let (usage_to_info, mut index_to_info) = index_selection::index_selection(
+                    relation.columns.len(),
+                    uses,
+                    &relation.permutation_group,
+                );
 
                 for (index_usage, implicit_rule) in implicit_with_index {
                     let lir::IndexInfo {

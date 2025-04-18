@@ -1396,7 +1396,6 @@ egglog_test!(nogenerate, vec, expect![[r#"
 
 "#]], r#"(include "comparative-test/egglog-testsuite/vec.egg")"#); // collections
 }
-
 #[cfg(test)]
 mod additional {
 

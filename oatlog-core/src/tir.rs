@@ -266,7 +266,91 @@ fn action_topo_resolve<'a>(
     variables: &mut TVec<VariableId, VariableMeta>,
     types: &TVec<TypeId, hir::Type>,
 ) -> Vec<Atom> {
-    let actions: BTreeSet<Atom> = actions.into_iter().cloned().collect();
+    let actions = {
+        use crate::union_find::*;
+        use hir::IsPremise::*;
+        let mut to_merge: UFData<VariableId, IsPremise> =
+            variables.iter().cloned().map(|_| Action).collect();
+
+        let merge = |pa: &IsPremise, pb: &IsPremise| IsPremise::merge(*pa, *pb);
+
+        for &v in bound_premise {
+            to_merge[v] = Premise;
+        }
+        let mut queue = actions.to_owned();
+
+        loop {
+            let pre = queue.clone();
+            let mut progress = false;
+            let mut assumed_true: BTreeSet<Atom> = BTreeSet::new();
+            for atom in queue.into_iter() {
+                let equivalent = vec![atom]; // .equivalent_atoms(relations);
+                let mut deleted = false;
+                'iter_assumed: for assumed in assumed_true.iter().cloned() {
+                    for atom in equivalent.iter().filter(|x| x.relation == assumed.relation) {
+                        for implicit_rule in &relations[atom.relation].implicit_rules {
+                            if !implicit_rule
+                                .key_columns()
+                                .into_iter()
+                                .all(|c| atom.columns[c] == assumed.columns[c])
+                            {
+                                continue;
+                            }
+                            deleted = true;
+                            for c in implicit_rule.value_columns().into_iter() {
+                                let lhs = atom.columns[c];
+                                let rhs = assumed.columns[c];
+                                if lhs == rhs {
+                                    continue;
+                                }
+                                match (atom.premise, to_merge[lhs], to_merge[rhs]) {
+                                    (Premise, _, _) => {
+                                        progress = true;
+                                        to_merge.union_merge(lhs, rhs, |a, b| merge(a, b));
+                                    }
+                                    (Action, Premise, Premise) => {
+                                        deleted = false;
+                                        // We don't want contents of action to cause a merge of two premise variables
+
+                                        // Example:
+                                        //
+                                        // Premise: (Add a b c)
+                                        // Action: (Neg a b), (Neg a c)
+                                        //
+                                        // Premise: (Add a b b)
+                                        // Action: (Neg a b), (Neg a c)
+                                        //
+                                    }
+                                    (Action, Action, _) | (Action, _, Action) => {
+                                        progress = true;
+                                        to_merge.union_merge(lhs, rhs, |a, b| merge(a, b));
+                                    }
+                                }
+                            }
+                            if deleted {
+                                break 'iter_assumed;
+                            }
+                        }
+                    }
+                }
+                if !deleted {
+                    assumed_true.insert(Atom::canonial_atom(&equivalent));
+                }
+            }
+            queue = assumed_true
+                .into_iter()
+                .map(|x| x.map_v(|v| to_merge.find(v)))
+                .collect();
+
+            if !progress {
+                break;
+            }
+            panic!("{pre:?} {queue:?}");
+        }
+        queue
+    };
+
+    let actions: BTreeSet<Atom> = actions.into_iter().collect();
 
     let mut schedule: Vec<Atom> = vec![];
     let mut conflict_free: Vec<Atom> = vec![];
@@ -409,39 +493,76 @@ pub(crate) fn lowering_rec(
 
     let mut lir_trie: Vec<_> = schedule
         .into_iter()
-        .map(
-            |hir::Atom {
-                 premise: _,
-                 relation,
-                 columns,
-                 entry,
-             }| {
-                // let () = ();
+        .flat_map(|atom| {
+            // let () = ();
 
-                // match &relations[atom.relation].kind {
-                //     hir::RelationTy::Forall { .. }
-                //     | hir::RelationTy::NewOf { .. }
-                //     | hir::RelationTy::Alias { .. } => panic!("does not make sense for action"),
-                //     hir::RelationTy::Table => todo!(),
-                //     hir::RelationTy::Global { id } => todo!(),
-                //     hir::RelationTy::Primitive { syn, ident } => todo!(),
-                // }
-                let args = columns.inner().clone().leak();
-                if let Some(entry) = entry {
-                    // NOTE: this is safe because the implicit rules are the first ones to be
-                    // assigned an IndexUsageId.
-                    let index = IndexUsageId(entry.0);
+            // TODO: UNSOUND IF WE HAVE HIR OPTIMIZATIONS THAT REMOVE PERMUTATIONS.
 
-                    lir::Action::Entry {
-                        relation,
-                        index,
-                        args,
-                    }
-                } else {
-                    lir::Action::Insert { relation, args }
-                }
-            },
-        )
+            let equivalent = vec![atom]; //.equivalent_atoms(relations);
+            // if equivalent.len() > 1 {
+            //     dbg!(&equivalent, relations[atom.relation].name);
+            // }
+
+            let mut first = true;
+            equivalent
+                .into_iter()
+                .map(
+                    |hir::Atom {
+                         premise: _,
+                         relation,
+                         columns,
+                         entry,
+                     }| {
+                        let args = columns.inner().clone().leak();
+                        if first {
+                            if let Some(entry) = entry {
+                                // NOTE: this is safe because the implicit rules are the first ones to be
+                                // assigned an IndexUsageId.
+                                let index = IndexUsageId(entry.0);
+
+                                return lir::Action::Entry {
+                                    relation,
+                                    index,
+                                    args,
+                                };
+                            }
+                        }
+                        first = false;
+                        return lir::Action::Insert { relation, args };
+                    },
+                )
+                .collect::<Vec<_>>()
+
+            // let hir::Atom {
+            //     premise: _,
+            //     relation,
+            //     columns,
+            //     entry,
+            // } = atom;
+
+            // // match &relations[atom.relation].kind {
+            // //     hir::RelationTy::Forall { .. }
+            // //     | hir::RelationTy::NewOf { .. }
+            // //     | hir::RelationTy::Alias { .. } => panic!("does not make sense for action"),
+            // //     hir::RelationTy::Table => todo!(),
+            // //     hir::RelationTy::Global { id } => todo!(),
+            // //     hir::RelationTy::Primitive { syn, ident } => todo!(),
+            // // }
+            // let args = columns.inner().clone().leak();
+            // if let Some(entry) = entry {
+            //     // NOTE: this is safe because the implicit rules are the first ones to be
+            //     // assigned an IndexUsageId.
+            //     let index = IndexUsageId(entry.0);
+
+            //     lir::Action::Entry {
+            //         relation,
+            //         index,
+            //         args,
+            //     }
+            // } else {
+            //     lir::Action::Insert { relation, args }
+            // }
+        })
         .chain(unify.into_iter().map(|(a, b)| lir::Action::Equate(a, b)))
         .map(lir::RuleAtom::Action)
         .map(|atom| lir::RuleTrie {
@@ -745,7 +866,21 @@ impl Rule {
 
         // NOTE: mapping should be a SparseUf actually
 
-        let supported = self.make_votes(ctx);
+        let supported = self
+            .make_votes(ctx)
+            .into_iter()
+            .flat_map(|(salt, link)| match link {
+                Primary(atom) => atom
+                    .equivalent_atoms(&ctx.relations)
+                    .into_iter()
+                    .map(move |atom| (salt.clone(), Primary(atom)))
+                    .collect::<Vec<_>>(),
+                Semi(atom) => atom
+                    .equivalent_atoms(&ctx.relations)
+                    .into_iter()
+                    .map(move |atom| (salt.clone(), Semi(atom)))
+                    .collect::<Vec<_>>(),
+            });
 
         match link {
             Primary(other) => {
@@ -753,7 +888,12 @@ impl Rule {
                     .into_iter()
                     .filter_map(|(_, x)| x.primary())
                     .collect();
-                for this in &self.premise {
+                for this in self
+                    .premise
+                    .iter()
+                    .flat_map(|x| x.equivalent_atoms(&ctx.relations))
+                {
+                    let this = &this;
                     if !supported.contains(this) || this.relation != other.relation {
                         continue;
                     }
@@ -793,7 +933,11 @@ impl Rule {
                     }
                     if ok {
                         let n = this_rule.premise.len();
-                        this_rule.premise.retain(|x| x != other);
+                        this_rule.premise.retain(|x| {
+                            !x.equivalent_atoms(&ctx.relations)
+                                .into_iter()
+                                .any(|x| &x == other)
+                        });
                         if n == this_rule.premise.len() {
                             // TODO erik: HACK TO HIDE A BUG.
                             return None;
@@ -834,35 +978,43 @@ impl Rule {
 
                 let mut semi = self.semi.clone();
                 semi.retain(|this| {
-                    let matching;
-                    if !supported.contains(this) {
-                        matching = false;
-                        return !matching;
-                    }
+                    let should_retain =
+                        |this| {
+                            let this = &this;
+                            let matching;
+                            if !supported.contains(this) {
+                                matching = false;
+                                return !matching;
+                            }
 
-                    if this.relation != other.relation {
-                        matching = false;
-                        return !matching;
-                    }
+                            if this.relation != other.relation {
+                                matching = false;
+                                return !matching;
+                            }
 
-                    let matching =
-                        this.columns
-                            .iter()
-                            .zip(other.columns.iter())
-                            .all(|(&this, &other)| {
-                                if (&ctx.bound_premise).contains(&this)
-                                    || (&ctx.bound_premise).contains(&other)
-                                {
-                                    this == other
-                                } else {
-                                    true
-                                }
-                            });
-                    if matching {
-                        return false;
-                    } else {
-                        return true;
+                            let matching = this.columns.iter().zip(other.columns.iter()).all(
+                                |(&this, &other)| {
+                                    if (&ctx.bound_premise).contains(&this)
+                                        || (&ctx.bound_premise).contains(&other)
+                                    {
+                                        this == other
+                                    } else {
+                                        true
+                                    }
+                                },
+                            );
+                            if matching {
+                                return false;
+                            } else {
+                                return true;
+                            }
+                        };
+                    for equiv in this.equivalent_atoms(&ctx.relations) {
+                        if !should_retain(equiv) {
+                            return false;
+                        }
                     }
+                    true
                 });
                 if semi.len() < n {
                     let mut this = self.clone();

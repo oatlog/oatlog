@@ -154,7 +154,7 @@ pub(crate) enum ImplicitRuleAction {
 
 #[derive(Clone, Eq, PartialEq, Ord, PartialOrd, Hash, Debug)]
 pub(crate) struct PermutationGroup {
-    inner: Vec<Vec<usize>>,
+    pub(crate) inner: Vec<Vec<usize>>,
 }
 impl PermutationGroup {
     fn new(n: usize) -> Self {
@@ -355,14 +355,14 @@ pub(crate) struct RuleMeta {
     pub(crate) src: &'static str,
 }
 
-#[derive(Copy, Clone, Eq, PartialEq, Ord, PartialOrd, Debug)]
+#[derive(Copy, Clone, Eq, PartialEq, Ord, PartialOrd, Debug, Hash)]
 pub(crate) enum IsPremise {
     Premise,
     Action,
 }
 use IsPremise::*;
 impl IsPremise {
-    fn merge(a: Self, b: Self) -> Self {
+    pub(crate) fn merge(a: Self, b: Self) -> Self {
         match (a, b) {
             (Premise, _) | (_, Premise) => Premise,
             (Action, Action) => Action,
@@ -372,7 +372,7 @@ impl IsPremise {
 
 /// Unifies action insert/entry and premise.
 #[must_use]
-#[derive(Clone, Eq, PartialEq, Ord, PartialOrd, Debug)]
+#[derive(Clone, Eq, PartialEq, Ord, PartialOrd, Debug, Hash)]
 pub(crate) struct Atom {
     pub(crate) premise: IsPremise,
     pub(crate) relation: RelationId,
@@ -392,7 +392,7 @@ impl Atom {
     // that.
     //
     // Alias and similar can just switch directly to the canonical relation.
-    fn equivalent_atoms(&self, relations: &TVec<RelationId, Relation>) -> Vec<Atom> {
+    pub(crate) fn equivalent_atoms(&self, relations: &TVec<RelationId, Relation>) -> Vec<Atom> {
         relations[self.relation]
             .permutation_group
             .apply(self.columns.inner())
@@ -402,12 +402,13 @@ impl Atom {
                 columns: columns.into(),
                 entry: self.entry,
             })
+            .unique()
             .collect()
         // vec![self.clone()]
     }
 
     // Among the possible atoms, pick the one that we consider canonical.
-    fn canonial_atom(atoms: &[Atom]) -> Atom {
+    pub(crate) fn canonial_atom(atoms: &[Atom]) -> Atom {
         // pick the one without permutation because changing what we write to is scary (eg for sub).
         atoms[0].clone()
         // .into_iter().min().unwrap().clone()
@@ -446,34 +447,34 @@ impl Atom {
             vec![]
         }
     }
-    /// Equality modulo implicit functionality
-    /// Mapping is self -> other
-    pub(crate) fn apply_modulo(
-        &self,
-        other: &Self,
-        relations: &TVec<RelationId, Relation>,
-        mut mapping: impl FnMut(VariableId, VariableId),
-    ) -> bool {
-        if self.relation != other.relation {
-            return false;
-        }
-        if self.columns == other.columns {
-            return true;
-        }
+    // /// Equality modulo implicit functionality
+    // /// Mapping is self -> other
+    // pub(crate) fn apply_modulo(
+    //     &self,
+    //     other: &Self,
+    //     relations: &TVec<RelationId, Relation>,
+    //     mut mapping: impl FnMut(VariableId, VariableId),
+    // ) -> bool {
+    //     if self.relation != other.relation {
+    //         return false;
+    //     }
+    //     if self.columns == other.columns {
+    //         return true;
+    //     }
 
-        let mut eq = false;
-        for im in relations[self.relation].implicit_rules.iter().filter(|im| {
-            im.key_columns()
-                .into_iter()
-                .all(|c| self.columns[c] == other.columns[c])
-        }) {
-            eq = true;
-            for c in im.value_columns() {
-                mapping(self.columns[c], other.columns[c]);
-            }
-        }
-        eq
-    }
+    //     let mut eq = false;
+    //     for im in relations[self.relation].implicit_rules.iter().filter(|im| {
+    //         im.key_columns()
+    //             .into_iter()
+    //             .all(|c| self.columns[c] == other.columns[c])
+    //     }) {
+    //         eq = true;
+    //         for c in im.value_columns() {
+    //             mapping(self.columns[c], other.columns[c]);
+    //         }
+    //     }
+    //     eq
+    // }
 }
 
 #[must_use]
@@ -555,7 +556,7 @@ impl SymbolicRule {
             let mut progress = false;
             let mut assumed_true: BTreeSet<Atom> = BTreeSet::new();
             for atom in queue.into_iter() {
-                let equivalent = atom.equivalent_atoms(relations);
+                let equivalent = vec![atom]; // .equivalent_atoms(relations);
                 let mut deleted = false;
                 'iter_assumed: for assumed in assumed_true.iter().cloned() {
                     for atom in equivalent.iter().filter(|x| x.relation == assumed.relation) {
