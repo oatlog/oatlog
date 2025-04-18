@@ -169,6 +169,7 @@ function `Theory::apply_rules` that executes all queries and which alternates wi
     size: 9pt,
     table(
       columns: (auto, auto, auto, auto, auto, auto),
+      inset: 4pt,
       table.header(
         [*benchmark*],
         [*e-nodes*],
@@ -268,12 +269,9 @@ that we find conceptually interesting. Note that among them, only @rule-simplify
 simplification" and @idea_trie_queries "Trie queries" have yet been implemented in oatlog.
 
 #figure(
-  placement: auto,
-  scope: "column",
-  [
-    #v(3em)
-    #image("../figures/architecture.svg")
-  ],
+  placement: bottom,
+  scope: "parent",
+  image("../figures/architecture.svg", height: 34.8%),
   caption: [A coarse overview of the oatlog architecture.],
 ) <oatlog_architecture>
 
