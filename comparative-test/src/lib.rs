@@ -7,6 +7,7 @@ enum Verdict {
     AllCorrect,
     ZeroCorrect,
     Mismatched,
+    SaturateEq,
     Panics,
 }
 
@@ -89,14 +90,17 @@ macro_rules! comparative_test {
                 theory.get_total_relation_entry_count()
             );
 
-            let mismatched = crate::compare_egglog_oatlog(
-                &mut egglog,
-                theory.get_relation_entry_count(),
-                verdict,
-                expected.as_ref(),
-            );
-            if mismatched {
-                return;
+            if verdict != Verdict::SaturateEq {
+                let mismatched = crate::compare_egglog_oatlog(
+                    &mut egglog,
+                    theory.get_relation_entry_count(),
+                    verdict,
+                    expected.as_ref(),
+                );
+                if mismatched {
+                    assert_eq!(verdict, Verdict::Mismatched, "unexpected mismatch");
+                    return;
+                }
             }
             // {
             //     let egglog = egglog.num_tuples();
@@ -122,6 +126,23 @@ macro_rules! comparative_test {
                 "expected cardinality of zero"
             );
             expected.unwrap().assert_eq("");
+        } else if verdict == Verdict::SaturateEq {
+            let mismatched = crate::compare_egglog_oatlog(
+                &mut egglog,
+                theory.get_relation_entry_count(),
+                verdict,
+                expected.as_ref(),
+            );
+            if mismatched {
+                assert_eq!(verdict, Verdict::Mismatched, "unexpected mismatch");
+                return;
+            }
+            let desc = theory
+                .get_relation_entry_count()
+                .into_iter()
+                .map(|(relation, count)| format!("{relation}: {count}\n"))
+                .collect::<String>();
+            expected.unwrap().assert_eq(&desc);
         } else {
             assert_eq!(verdict, Verdict::AllCorrect, "expected all correct");
             let desc = theory
@@ -213,6 +234,13 @@ macro_rules! egglog_test {
         fn $egglog_test_name() {
             println!("{}", stringify!($egglog_test_name));
             comparative_test!($egglog_test_path, Verdict::Panics, None $(, $limit)?);
+        }
+    };
+    (saturat_eq, $egglog_test_name:ident, $expected:expr, $egglog_test_path:literal $(, limit = $limit:literal)?) => {
+        #[test]
+        fn $egglog_test_name() {
+            println!("{}", stringify!($egglog_test_name));
+            comparative_test!($egglog_test_path, Verdict::SaturateEq, Some($expected) $(, $limit)?);
         }
     };
 }
@@ -1411,6 +1439,112 @@ egglog_test!(allcorrect, quadratic, expect![[r#"
 
 "#,
 limit = 5);
+
+egglog_test!(allcorrect, fuel3, expect![[r#"
+    Add: 4160
+    Const: 5
+    Cos: 1
+    Diff: 79
+    Div: 3
+    Fuel: 3
+    Integral: 98
+    Ln: 1
+    Mul: 3803
+    Pow: 2
+    Sin: 1
+    Sqrt: 1
+    Sub: 49
+    Var: 3
+    ZeroFuel: 1
+"#]], "(include \"oatlog-bench/input/fuel3_math.egg\")", limit = 10);
+egglog_test!(allcorrect, fuel2, expect![[r#"
+    Add: 741
+    Const: 5
+    Cos: 1
+    Diff: 24
+    Div: 3
+    Fuel: 2
+    Integral: 22
+    Ln: 1
+    Mul: 693
+    Pow: 2
+    Sin: 1
+    Sqrt: 1
+    Sub: 14
+    Var: 3
+    ZeroFuel: 1
+"#]], "(include \"oatlog-bench/input/fuel2_math.egg\")", limit = 10);
+egglog_test!(allcorrect, fuel1, expect![[r#"
+    Add: 613
+    Const: 5
+    Cos: 1
+    Diff: 18
+    Div: 3
+    Fuel: 1
+    Integral: 7
+    Ln: 1
+    Mul: 310
+    Pow: 2
+    Sin: 1
+    Sqrt: 1
+    Sub: 6
+    Var: 3
+    ZeroFuel: 1
+"#]], "(include \"oatlog-bench/input/fuel1_math.egg\")", limit = 10);
+
+// too slow
+// egglog_test!(saturat_eq, fuel3_saturate, expect![[r#"
+//     Add: 35323
+//     Const: 5
+//     Cos: 1
+//     Diff: 84
+//     Div: 3
+//     Fuel: 3
+//     Integral: 109
+//     Ln: 1
+//     Mul: 14182
+//     Pow: 2
+//     Sin: 1
+//     Sqrt: 1
+//     Sub: 56
+//     Var: 3
+//     ZeroFuel: 1
+// "#]], "(include \"oatlog-bench/input/fuel3_math.egg\")", limit = 100);
+egglog_test!(saturat_eq, fuel2_saturating, expect![[r#"
+    Add: 743
+    Const: 5
+    Cos: 1
+    Diff: 24
+    Div: 3
+    Fuel: 2
+    Integral: 22
+    Ln: 1
+    Mul: 693
+    Pow: 2
+    Sin: 1
+    Sqrt: 1
+    Sub: 14
+    Var: 3
+    ZeroFuel: 1
+"#]], "(include \"oatlog-bench/input/fuel2_math.egg\")", limit = 100);
+
+egglog_test!(saturat_eq, fuel1_saturating, expect![[r#"
+    Add: 613
+    Const: 5
+    Cos: 1
+    Diff: 18
+    Div: 3
+    Fuel: 1
+    Integral: 7
+    Ln: 1
+    Mul: 310
+    Pow: 2
+    Sin: 1
+    Sqrt: 1
+    Sub: 6
+    Var: 3
+    ZeroFuel: 1
+"#]], "(include \"oatlog-bench/input/fuel1_math.egg\")", limit = 100);
 
 }
 }

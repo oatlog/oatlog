@@ -408,7 +408,9 @@ impl Atom {
 
     // Among the possible atoms, pick the one that we consider canonical.
     fn canonial_atom(atoms: &[Atom]) -> Atom {
-        atoms.into_iter().min().unwrap().clone()
+        // pick the one without permutation because changing what we write to is scary (eg for sub).
+        atoms[0].clone()
+        // .into_iter().min().unwrap().clone()
     }
 
     pub(crate) fn map_v(&self, f: impl FnMut(VariableId) -> VariableId) -> Self {
@@ -554,9 +556,6 @@ impl SymbolicRule {
             let mut assumed_true: BTreeSet<Atom> = BTreeSet::new();
             for atom in queue.into_iter() {
                 let equivalent = atom.equivalent_atoms(relations);
-                // if equivalent.len() > 1 {
-                //     panic!("{equivalent:?}");
-                // }
                 let mut deleted = false;
                 'iter_assumed: for assumed in assumed_true.iter().cloned() {
                     for atom in equivalent.iter().filter(|x| x.relation == assumed.relation) {
