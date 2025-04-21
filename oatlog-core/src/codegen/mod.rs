@@ -30,12 +30,12 @@ impl_unzip_iter!(A, B, C, D, E, F, G, H, I, J, K, L);
 // TODO: emit identifiers with correct spans.
 
 pub fn codegen(theory: &Theory) -> TokenStream {
-    let (uf_ident, uf_ty) = theory
+    let (uf_ident, uf_ty, uf_ty_names) = theory
         .types
         .iter()
         .filter_map(|type_| match type_.kind {
             TypeKind::Primitive { type_path: _ } => None,
-            TypeKind::Symbolic => Some((ident::type_uf(type_), ident::type_ty(type_))),
+            TypeKind::Symbolic => Some((ident::type_uf(type_), ident::type_ty(type_), type_.name)),
         })
         .collect_vecs();
 
@@ -187,12 +187,6 @@ pub fn codegen(theory: &Theory) -> TokenStream {
     let theory_ty = ident::theory_ty(theory);
     let theory_delta_ty = ident::theory_delta_ty(theory);
 
-    let get_total_relation_entry_count_body = if stored_relations.is_empty() {
-        quote! { 0 }
-    } else {
-        quote! {[#(self.#stored_relations.len(),)*].into_iter().sum::<usize>()}
-    };
-
     quote! {
         use oatlog::runtime::{self, *};
 
@@ -253,7 +247,7 @@ pub fn codegen(theory: &Theory) -> TokenStream {
                 buf
             }
             pub fn get_total_relation_entry_count(&self) -> usize {
-                #get_total_relation_entry_count_body
+                self.get_relation_entry_count().values().sum()
             }
             pub fn get_relation_entry_count(&self) -> std::collections::BTreeMap<&'static str, usize> {
                 [
@@ -261,6 +255,19 @@ pub fn codegen(theory: &Theory) -> TokenStream {
                         (
                             #stored_relations_names,
                             self.#stored_relations.len()
+                        ),
+                    )*
+                ].into_iter().collect()
+            }
+            pub fn get_total_uf_count(&self) -> (usize, usize) {
+                self.get_uf_count().values().fold((0,0), |(at, ar), (t, r)| (at+t, ar+r))
+            }
+            pub fn get_uf_count(&self) -> std::collections::BTreeMap<&'static str, (usize, usize)> {
+                [
+                    #(
+                        (
+                            #uf_ty_names,
+                            (self.uf.#uf_ident.len(), self.uf.#uf_ident.num_roots()),
                         ),
                     )*
                 ].into_iter().collect()

@@ -12,6 +12,7 @@ pub struct UnionFind<T> {
     /// Newly created eclasses since last `take_new`
     new: Vec<T>,
     num_uprooted: usize,
+    num_roots: usize,
 }
 impl<T> std::fmt::Debug for UnionFind<T> {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
@@ -35,7 +36,18 @@ impl<T: Eclass> UnionFind<T> {
             repr: Vec::new(),
             new: Vec::new(),
             num_uprooted: 0,
+            num_roots: 0,
         }
+    }
+    #[inline]
+    #[must_use]
+    pub fn len(&self) -> usize {
+        self.repr.len()
+    }
+    #[inline]
+    #[must_use]
+    pub fn num_roots(&self) -> usize {
+        self.num_roots
     }
     /// Sugar
     #[inline]
@@ -86,6 +98,7 @@ impl<T: Eclass> UnionFind<T> {
         let (root, uprooted) = (u32::min(a, b), u32::max(a, b));
         self.repr[uprooted as usize] = self.repr[root as usize];
         self.num_uprooted += 1;
+        self.num_roots -= 1;
         T::new(root)
     }
     #[inline]
@@ -93,6 +106,7 @@ impl<T: Eclass> UnionFind<T> {
         let id = u32::try_from(self.repr.len()).expect("out of u32 ids");
         self.repr.push(id);
         self.new.push(T::new(id));
+        self.num_roots += 1;
         T::new(id)
     }
     /// Called within rule matching. Since query planning constructs at most one `forall x` of a

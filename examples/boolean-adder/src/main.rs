@@ -26,6 +26,19 @@ fn run(sink: &mut impl std::io::Write, iters: usize) {
         .collect::<Vec<String>>()
         .join("\n");
     writeln!(sink, "\n{}", relation_entry_count).unwrap();
+    writeln!(
+        sink,
+        "\ntotal e-nodes: {}",
+        theory.get_total_relation_entry_count()
+    )
+    .unwrap();
+    let uf_count = theory
+        .get_uf_count()
+        .into_iter()
+        .map(|(name, (tot, roots))| format!("{name}: tot={tot} roots={roots}"))
+        .collect::<Vec<String>>()
+        .join("\n");
+    writeln!(sink, "\n{}", uf_count).unwrap();
 }
 
 fn main() {
