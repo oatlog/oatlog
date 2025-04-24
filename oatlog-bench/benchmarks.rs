@@ -1,8 +1,8 @@
 
 benchmarks! {
-    bench!(fuel1_math, r#"(include "oatlog-bench/input/fuel1_math.egg") (run 100)"#);
-    bench!(fuel2_math, r#"(include "oatlog-bench/input/fuel2_math.egg") (run 100)"#);
-    bench!(fuel3_math, samples=30, r#"(include "oatlog-bench/input/fuel3_math.egg") (run 100)"#);
+    bench!(fuel1_math, :saturation, r#"(include "oatlog-bench/input/fuel1_math.egg") (run 100)"#);
+    bench!(fuel2_math, :saturation, r#"(include "oatlog-bench/input/fuel2_math.egg") (run 100)"#);
+    bench!(fuel3_math, :saturation, samples=30, r#"(include "oatlog-bench/input/fuel3_math.egg") (run 100)"#);
     // bench!(math0, r#"(include "oatlog-bench/input/math.egg")"#);
     // bench!(math1, r#"(include "oatlog-bench/input/math.egg") (run 1)"#);
     // bench!(math2, r#"(include "oatlog-bench/input/math.egg") (run 2)"#);

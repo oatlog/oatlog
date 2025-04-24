@@ -2,6 +2,7 @@
 //! Desugared, flattened rules.
 
 use crate::{
+    Configuration,
     ids::{ColumnId, GlobalId, ImplicitRuleId, RelationId, TypeId, VariableId},
     lir,
     typed_vec::{TVec, tvec},
@@ -533,6 +534,47 @@ impl SymbolicRule {
             .unique()
     }
 
+    fn extract_invariant_permutations(&self, mut callback: impl FnMut(RelationId, Vec<usize>)) {
+        let Ok(single_premise) = self.premise_atoms().exactly_one() else {
+            return;
+        };
+        let premise_variables = single_premise.columns.inner();
+        let premise_variable_set: BTreeSet<VariableId> =
+            single_premise.columns.iter().copied().collect();
+        if premise_variables.len() != premise_variable_set.len() {
+            return;
+        }
+        for action_variables in self.action_atoms().filter_map(|action| {
+            if action.relation != single_premise.relation {
+                return None;
+            }
+            let action_variables = action.columns.inner();
+            let action_variable_set: BTreeSet<VariableId> =
+                action.columns.iter().copied().collect();
+            if action_variables.len() != action_variable_set.len() {
+                return None;
+            }
+            if premise_variable_set != action_variable_set {
+                return None;
+            }
+            Some(action_variables)
+        }) {
+            let perm = premise_variables
+                .iter()
+                .copied()
+                .map(|v| {
+                    action_variables
+                        .iter()
+                        .copied()
+                        .enumerate()
+                        .find_map(|(i, x)| (x == v).then_some(i))
+                        .unwrap()
+                })
+                .collect();
+            callback(single_premise.relation, perm);
+        }
+    }
+
     fn optimize(&self, relations: &TVec<RelationId, Relation>) -> Self {
         let mut to_merge: UFData<VariableId, (IsPremise, VariableMeta)> = self
             .variables
@@ -812,60 +854,26 @@ impl RuleArgs {
 }
 
 impl Theory {
-    // TODO loke: add egglog-strict flag.
-    pub(crate) fn optimize(&self) -> Self {
+    pub(crate) fn optimize(&self, config: Configuration) -> Self {
         let mut this = self.clone();
         for rule in this.symbolic_rules.iter_mut() {
             *rule = rule.optimize(&this.relations);
         }
 
-        // Detect symbolic rules defining invariant permutations on relations.
-        for rule in &this.symbolic_rules {
-            let Ok(single_premise) = rule.premise_atoms().exactly_one() else {
-                continue;
-            };
-            let premise_variables = single_premise.columns.inner();
-            let premise_variable_set: BTreeSet<VariableId> =
-                single_premise.columns.iter().copied().collect();
-            if premise_variables.len() != premise_variable_set.len() {
-                continue;
-            }
-            for action in rule.action_atoms() {
-                if action.relation != single_premise.relation {
-                    continue;
-                }
-                let action_variables = action.columns.inner();
-                let action_variable_set: BTreeSet<VariableId> =
-                    action.columns.iter().copied().collect();
-                if action_variables.len() != action_variable_set.len() {
-                    continue;
-                }
-                if premise_variable_set != action_variable_set {
-                    continue;
-                }
+        if config.egglog_compat.allow_column_invariant_permutations() {
+            for rule in &this.symbolic_rules {
                 // TODO loke: proper optimization logging
                 // dbg!(premise_v, action_v, this.relations[action.relation].name);
-
-                let perm: Vec<usize> = premise_variables
-                    .iter()
-                    .copied()
-                    .map(|v| {
-                        action_variables
-                            .iter()
-                            .copied()
-                            .enumerate()
-                            .find_map(|(i, x)| (x == v).then_some(i))
-                            .unwrap()
-                    })
-                    .collect();
-                this.relations[action.relation]
-                    .invariant_permutations
-                    .add_invariant_permutations(perm);
+                rule.extract_invariant_permutations(|relation, perm| {
+                    this.relations[relation]
+                        .invariant_permutations
+                        .add_invariant_permutations(perm)
+                });
             }
-        }
 
-        for rule in this.symbolic_rules.iter_mut() {
-            *rule = rule.optimize(&this.relations);
+            for rule in this.symbolic_rules.iter_mut() {
+                *rule = rule.optimize(&this.relations);
+            }
         }
         this
     }

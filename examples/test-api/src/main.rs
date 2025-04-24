@@ -156,7 +156,7 @@
 // diverges due to unification rules not running to convergence.
 
 fn run_fuel() {
-    oatlog::compile_egraph!((
+    oatlog::compile_egraph_relaxed!((
 
         (datatype FuelUnit
             (Fuel FuelUnit)
@@ -239,7 +239,7 @@ fn run_fuel() {
 }
 
 fn run() {
-    oatlog::compile_egraph!((
+    oatlog::compile_egraph_relaxed!((
         (datatype Math
             (Mul Math Math)
             (Add Math Math)
@@ -432,7 +432,7 @@ fn main() {
 
 #[test]
 fn test_basic_rewrite() {
-    oatlog::compile_egraph!((
+    oatlog::compile_egraph_relaxed!((
         (datatype Math
            (Mul Math Math)
            (Add Math Math)

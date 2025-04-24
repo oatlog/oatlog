@@ -3,7 +3,7 @@ mod test {
     mod test_simple_math {
         use oatlog::runtime::EclassProvider;
 
-        oatlog::compile_egraph!((
+        oatlog::compile_egraph_relaxed!((
             (datatype Math
                  (Mul Math Math)
                  (Add Math Math)
@@ -54,7 +54,7 @@ mod test {
         }
     }
     mod test_advanced_math {
-        oatlog::compile_egraph!((
+        oatlog::compile_egraph_relaxed!((
             (datatype Math
                 (Diff Math Math)
                 (Integral Math Math)

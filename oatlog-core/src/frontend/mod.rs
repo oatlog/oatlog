@@ -79,7 +79,7 @@ pub(crate) fn parse(sexps: Vec<ParseInput>, config: Configuration) -> MResult<hi
             }
         }
     }
-    Ok(parser.emit_hir())
+    Ok(parser.emit_hir(config))
 }
 pub(crate) fn parse_str_to_sexps(s: &'static str) -> MResult<Vec<ParseInput>> {
     let span = QSpan::new(Span::call_site(), s.to_string());
@@ -415,7 +415,7 @@ impl Parser {
         parser
     }
 
-    pub(crate) fn emit_hir(&self) -> hir::Theory {
+    pub(crate) fn emit_hir(&self, config: Configuration) -> hir::Theory {
         let types: TVec<TypeId, hir::Type> = self
             .types
             .iter()
@@ -439,7 +439,7 @@ impl Parser {
             initial: self.initial.clone(),
             interner: self.interner.clone(),
         }
-        .optimize()
+        .optimize(config)
     }
 
     // TODO: parse to AST + forward declarations here

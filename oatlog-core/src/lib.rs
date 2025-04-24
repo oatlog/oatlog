@@ -54,6 +54,7 @@ pub fn try_compile(input: &str) -> Result<(), String> {
     let config = Configuration {
         file_not_found: FileNotFoundAction::EmitError,
         panic_backtrace: BackTraceAction::ForceBacktraceErr,
+        egglog_compat: EgglogCompatibility::PostStep,
     };
 
     match universal(input, config) {
@@ -67,11 +68,16 @@ pub fn try_compile(input: &str) -> Result<(), String> {
 }
 
 #[must_use]
-pub fn compile_str(input: &str) -> String {
+pub fn compile_str(input: &str, strict_egglog_compat: bool) -> String {
     let input = Input::String(input.to_string().leak());
     let config = Configuration {
         file_not_found: FileNotFoundAction::EmitError,
         panic_backtrace: BackTraceAction::Passthrough,
+        egglog_compat: if strict_egglog_compat {
+            EgglogCompatibility::PostStep
+        } else {
+            EgglogCompatibility::PostSaturation
+        },
     };
 
     match universal(input, config) {
@@ -84,11 +90,19 @@ pub fn compile_str(input: &str) -> String {
 }
 
 #[must_use]
-pub fn compile(input: proc_macro2::TokenStream) -> proc_macro2::TokenStream {
+pub fn compile(
+    input: proc_macro2::TokenStream,
+    strict_egglog_compat: bool,
+) -> proc_macro2::TokenStream {
     let input = Input::Tokens(input);
     let config = Configuration {
         file_not_found: FileNotFoundAction::EmitError,
         panic_backtrace: BackTraceAction::ForceBacktracePanic,
+        egglog_compat: if strict_egglog_compat {
+            EgglogCompatibility::PostStep
+        } else {
+            EgglogCompatibility::PostSaturation
+        },
     };
 
     match universal(input, config) {
@@ -106,6 +120,7 @@ pub fn compile_rustdoc(input: proc_macro2::TokenStream) -> proc_macro2::TokenStr
     let config = Configuration {
         file_not_found: FileNotFoundAction::ImmediatePanic,
         panic_backtrace: BackTraceAction::Passthrough,
+        egglog_compat: EgglogCompatibility::PostStep,
     };
 
     match universal(input, config) {
@@ -152,11 +167,33 @@ enum BackTraceAction {
     Passthrough,
 }
 
+/// Specify when oatlog matches egglog (after every step, or after saturation).
+#[allow(dead_code)]
+#[derive(Copy, Clone, Default)]
+enum EgglogCompatibility {
+    /// Create identical e-nodes, modulo e-class naming, after each `(run 1)`.
+    #[default]
+    PostStep,
+    /// Create identical e-graph after saturation.
+    ///
+    /// Necessary to optimize relations using invariant column permutations.
+    PostSaturation,
+}
+impl EgglogCompatibility {
+    fn allow_column_invariant_permutations(self) -> bool {
+        match self {
+            Self::PostStep => false,
+            Self::PostSaturation => true,
+        }
+    }
+}
+
 #[allow(dead_code)]
 #[derive(Copy, Clone, Default)]
 struct Configuration {
     file_not_found: FileNotFoundAction,
     panic_backtrace: BackTraceAction,
+    egglog_compat: EgglogCompatibility,
 }
 
 #[allow(dead_code)]

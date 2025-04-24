@@ -1,4 +1,4 @@
-use clap::{Parser, ValueEnum};
+use clap::{Parser, Subcommand, ValueEnum};
 use std::{
     fs::{self, File},
     io::{self, Read as _, Write as _},
@@ -12,13 +12,23 @@ struct Cli {
     /// Input file (.egg), if not stdin.
     input: Option<PathBuf>,
 
-    /// Output file (.rs), if not stdout.
-    #[arg(short, long, value_name = "FILE")]
-    output: Option<PathBuf>,
+    #[command(subcommand)]
+    command: Commands,
+}
+#[derive(Subcommand)]
+enum Commands {
+    Compile {
+        /// Output file (.rs), if not stdout.
+        #[arg(short, long, value_name = "FILE")]
+        output: Option<PathBuf>,
+    },
+    Shrink {
+        /// Take an egglog program that does not match egglog and shrink it.
+        expected: Verdict,
 
-    /// Take an egglog program that does not match egglog and shrink it.
-    #[arg(long)]
-    shrink: Option<Verdict>,
+        /// shrink needs an output file (../shrink_scratch/src/main.rs)
+        output: PathBuf,
+    },
 }
 
 fn main() {
@@ -53,9 +63,11 @@ fn main() {
                 if egglog.is_empty() {
                     panic!("provided .rs file appears to lack `compile_egraph!((..))`");
                 }
+                println!("/*");
                 println!("===== EXTRACTED EGGLOG START =====");
                 println!("{egglog}");
                 println!("===== EXTRACTED EGGLOG END   =====");
+                println!("*/");
                 egglog
             }
             Some("egglog" | "egg") => fs::read_to_string(path).unwrap(),
@@ -70,20 +82,19 @@ fn main() {
         input
     };
 
-    if let Some(expected) = cli.shrink {
-        shrink(input, cli.output, expected);
-        return;
-    }
-
-    let output = oatlog::compile_str(&input);
-
-    match cli.output {
-        Some(path) => fs::write(path, output).unwrap(),
-        None => io::stdout().lock().write_all(output.as_bytes()).unwrap(),
+    match cli.command {
+        Commands::Compile { output } => {
+            let ret = oatlog::compile_str(&input, true);
+            match output {
+                Some(path) => fs::write(path, ret).unwrap(),
+                None => io::stdout().lock().write_all(ret.as_bytes()).unwrap(),
+            }
+        }
+        Commands::Shrink { expected, output } => shrink(input, output, expected),
     }
 }
 
-fn shrink(program: String, output: Option<PathBuf>, wanted_verdict: Verdict) {
+fn shrink(program: String, output: PathBuf, wanted_verdict: Verdict) {
     static FILE_LOCK: std::sync::Mutex<()> = std::sync::Mutex::new(());
     let file_lock = FILE_LOCK.try_lock().unwrap();
 
@@ -96,8 +107,6 @@ fn shrink(program: String, output: Option<PathBuf>, wanted_verdict: Verdict) {
     //     println!("(when no output is pro
     //     return;
     // };
-
-    let output = output.expect("shrink needs an output file (../shrink_scratch/src/main.rs)");
 
     let output = output.canonicalize().unwrap();
     let wd = output.parent().unwrap();

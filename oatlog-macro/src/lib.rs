@@ -1,17 +1,25 @@
-macro_rules! proc_macro_wrapper {
-    ($($(#[$($tt:tt)*])* let $new_ident:ident = $old_ident:ident; )*) => {
-        $(
-            $(#[$($tt)*])*
-            #[proc_macro]
-            pub fn $new_ident(x: proc_macro::TokenStream) -> proc_macro::TokenStream {
-                proc_macro::TokenStream::from(oatlog_core::$old_ident(proc_macro2::TokenStream::from(x)))
-            }
-        )*
-    }
+/// Compile egglog code into a theory.
+#[proc_macro]
+pub fn compile_egraph_strict(x: proc_macro::TokenStream) -> proc_macro::TokenStream {
+    proc_macro::TokenStream::from(oatlog_core::compile(
+        proc_macro2::TokenStream::from(x),
+        true,
+    ))
 }
-proc_macro_wrapper! {
-    /// Compile egglog code into a theory.
-    let compile_egraph = compile;
-    /// For rustdoc tests to check if output compiles.
-    let compile_rustdoc = compile_rustdoc;
+
+/// Compile egglog code into a theory.
+#[proc_macro]
+pub fn compile_egraph_relaxed(x: proc_macro::TokenStream) -> proc_macro::TokenStream {
+    proc_macro::TokenStream::from(oatlog_core::compile(
+        proc_macro2::TokenStream::from(x),
+        false,
+    ))
+}
+
+/// For rustdoc tests to check if output compiles.
+#[proc_macro]
+pub fn compile_rustdoc(x: proc_macro::TokenStream) -> proc_macro::TokenStream {
+    proc_macro::TokenStream::from(oatlog_core::compile_rustdoc(
+        proc_macro2::TokenStream::from(x),
+    ))
 }

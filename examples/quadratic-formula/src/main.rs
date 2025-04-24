@@ -1,4 +1,4 @@
-oatlog::compile_egraph!((
+oatlog::compile_egraph_relaxed!((
     (datatype Math
         (Mul Math Math)
         (Add Math Math)

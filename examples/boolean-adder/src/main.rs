@@ -1,4 +1,4 @@
-oatlog::compile_egraph!(((include "oatlog-bench/input/boolean_adder.egg")));
+oatlog::compile_egraph_strict!(((include "oatlog-bench/input/boolean_adder.egg")));
 
 fn run(sink: &mut impl std::io::Write, iters: usize) {
     let mut theory = Theory::new();

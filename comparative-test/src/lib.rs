@@ -72,7 +72,7 @@ macro_rules! comparative_test {
 
         std::env::set_current_dir(concat!(env!("CARGO_MANIFEST_DIR"), "/..")).unwrap();
 
-        oatlog::compile_egraph!($egglog_source_literal);
+        oatlog::compile_egraph_strict!($egglog_source_literal);
         let mut theory = Theory::new();
 
         let mut egglog = egglog::EGraph::default();

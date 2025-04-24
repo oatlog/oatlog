@@ -35,10 +35,16 @@ use std::hint::black_box;
 // }
 
 macro_rules! benchmarks {
-    ($(bench!($name:ident, $(samples=$samples:literal,)? $program:literal);)*) => {
+    (impl $name:ident, saturation, $(samples=$samples:literal,)? $program:literal) => {
+        oatlog::compile_egraph_relaxed!($program);
+    };
+    (impl $name:ident, $(samples=$samples:literal,)? $program:literal) => {
+        oatlog::compile_egraph_strict!($program);
+    };
+    ($(bench!($name:ident, $(:$saturation:ident,)? $(samples=$samples:literal,)? $program:literal);)*) => {
         // separate modules to avoid compiling theory twice.
         $(mod $name {
-            oatlog::compile_egraph!($program);
+            benchmarks!(impl $name, $($saturation,)? $(samples=$samples,)? $program);
         })*
         fn comparative_benchmark(c: &mut Criterion) {
             fn bench_custom(
