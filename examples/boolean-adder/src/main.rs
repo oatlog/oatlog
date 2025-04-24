@@ -79,6 +79,10 @@ fn test() {
         True: 0
         Var: 22
         Xor: 248
+
+        total e-nodes: 77091
+
+        Math: tot=121458 roots=25899
     "#])
     .assert_eq(&sink);
 }

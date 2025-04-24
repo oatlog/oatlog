@@ -1820,9 +1820,7 @@ fn regression_tir2() {
                     buf
                 }
                 pub fn get_total_relation_entry_count(&self) -> usize {
-                    [self.mul_.len(), self.pow_.len(), self.const_.len()]
-                        .into_iter()
-                        .sum::<usize>()
+                    self.get_relation_entry_count().values().sum()
                 }
                 pub fn get_relation_entry_count(&self) -> std::collections::BTreeMap<&'static str, usize> {
                     [
@@ -1832,6 +1830,16 @@ fn regression_tir2() {
                     ]
                     .into_iter()
                     .collect()
+                }
+                pub fn get_total_uf_count(&self) -> (usize, usize) {
+                    self.get_uf_count()
+                        .values()
+                        .fold((0, 0), |(at, ar), (t, r)| (at + t, ar + r))
+                }
+                pub fn get_uf_count(&self) -> std::collections::BTreeMap<&'static str, (usize, usize)> {
+                    [("Math", (self.uf.math_.len(), self.uf.math_.num_roots()))]
+                        .into_iter()
+                        .collect()
                 }
                 #[inline(never)]
                 pub fn canonicalize(&mut self) {
@@ -2532,12 +2540,20 @@ fn regression_tir1() {
                     buf
                 }
                 pub fn get_total_relation_entry_count(&self) -> usize {
-                    [self.sub_.len(), self.const_.len()]
-                        .into_iter()
-                        .sum::<usize>()
+                    self.get_relation_entry_count().values().sum()
                 }
                 pub fn get_relation_entry_count(&self) -> std::collections::BTreeMap<&'static str, usize> {
                     [("Sub", self.sub_.len()), ("Const", self.const_.len())]
+                        .into_iter()
+                        .collect()
+                }
+                pub fn get_total_uf_count(&self) -> (usize, usize) {
+                    self.get_uf_count()
+                        .values()
+                        .fold((0, 0), |(at, ar), (t, r)| (at + t, ar + r))
+                }
+                pub fn get_uf_count(&self) -> std::collections::BTreeMap<&'static str, (usize, usize)> {
+                    [("Math", (self.uf.math_.len(), self.uf.math_.num_roots()))]
                         .into_iter()
                         .collect()
                 }
@@ -3716,9 +3732,7 @@ fn codegen_constant_propagation() {
                     buf
                 }
                 pub fn get_total_relation_entry_count(&self) -> usize {
-                    [self.add_.len(), self.mul_.len(), self.const_.len()]
-                        .into_iter()
-                        .sum::<usize>()
+                    self.get_relation_entry_count().values().sum()
                 }
                 pub fn get_relation_entry_count(&self) -> std::collections::BTreeMap<&'static str, usize> {
                     [
@@ -3728,6 +3742,16 @@ fn codegen_constant_propagation() {
                     ]
                     .into_iter()
                     .collect()
+                }
+                pub fn get_total_uf_count(&self) -> (usize, usize) {
+                    self.get_uf_count()
+                        .values()
+                        .fold((0, 0), |(at, ar), (t, r)| (at + t, ar + r))
+                }
+                pub fn get_uf_count(&self) -> std::collections::BTreeMap<&'static str, (usize, usize)> {
+                    [("Math", (self.uf.math_.len(), self.uf.math_.num_roots()))]
+                        .into_iter()
+                        .collect()
                 }
                 #[inline(never)]
                 pub fn canonicalize(&mut self) {
@@ -4059,10 +4083,20 @@ fn codegen_commutative() {
                     buf
                 }
                 pub fn get_total_relation_entry_count(&self) -> usize {
-                    [self.add_.len()].into_iter().sum::<usize>()
+                    self.get_relation_entry_count().values().sum()
                 }
                 pub fn get_relation_entry_count(&self) -> std::collections::BTreeMap<&'static str, usize> {
                     [("Add", self.add_.len())].into_iter().collect()
+                }
+                pub fn get_total_uf_count(&self) -> (usize, usize) {
+                    self.get_uf_count()
+                        .values()
+                        .fold((0, 0), |(at, ar), (t, r)| (at + t, ar + r))
+                }
+                pub fn get_uf_count(&self) -> std::collections::BTreeMap<&'static str, (usize, usize)> {
+                    [("Math", (self.uf.math_.len(), self.uf.math_.num_roots()))]
+                        .into_iter()
+                        .collect()
                 }
                 #[inline(never)]
                 pub fn canonicalize(&mut self) {
@@ -4718,12 +4752,20 @@ fn regression_entry2() {
                     buf
                 }
                 pub fn get_total_relation_entry_count(&self) -> usize {
-                    [self.sub_.len(), self.const_.len()]
-                        .into_iter()
-                        .sum::<usize>()
+                    self.get_relation_entry_count().values().sum()
                 }
                 pub fn get_relation_entry_count(&self) -> std::collections::BTreeMap<&'static str, usize> {
                     [("Sub", self.sub_.len()), ("Const", self.const_.len())]
+                        .into_iter()
+                        .collect()
+                }
+                pub fn get_total_uf_count(&self) -> (usize, usize) {
+                    self.get_uf_count()
+                        .values()
+                        .fold((0, 0), |(at, ar), (t, r)| (at + t, ar + r))
+                }
+                pub fn get_uf_count(&self) -> std::collections::BTreeMap<&'static str, (usize, usize)> {
+                    [("Math", (self.uf.math_.len(), self.uf.math_.num_roots()))]
                         .into_iter()
                         .collect()
                 }
@@ -5371,12 +5413,20 @@ fn regression_entry() {
                     buf
                 }
                 pub fn get_total_relation_entry_count(&self) -> usize {
-                    [self.integral_.len(), self.add_.len()]
-                        .into_iter()
-                        .sum::<usize>()
+                    self.get_relation_entry_count().values().sum()
                 }
                 pub fn get_relation_entry_count(&self) -> std::collections::BTreeMap<&'static str, usize> {
                     [("Integral", self.integral_.len()), ("Add", self.add_.len())]
+                        .into_iter()
+                        .collect()
+                }
+                pub fn get_total_uf_count(&self) -> (usize, usize) {
+                    self.get_uf_count()
+                        .values()
+                        .fold((0, 0), |(at, ar), (t, r)| (at + t, ar + r))
+                }
+                pub fn get_uf_count(&self) -> std::collections::BTreeMap<&'static str, (usize, usize)> {
+                    [("Math", (self.uf.math_.len(), self.uf.math_.num_roots()))]
                         .into_iter()
                         .collect()
                 }
@@ -5860,10 +5910,20 @@ fn test_bind_variable_multiple_times() {
                     buf
                 }
                 pub fn get_total_relation_entry_count(&self) -> usize {
-                    [self.same_.len()].into_iter().sum::<usize>()
+                    self.get_relation_entry_count().values().sum()
                 }
                 pub fn get_relation_entry_count(&self) -> std::collections::BTreeMap<&'static str, usize> {
                     [("Same", self.same_.len())].into_iter().collect()
+                }
+                pub fn get_total_uf_count(&self) -> (usize, usize) {
+                    self.get_uf_count()
+                        .values()
+                        .fold((0, 0), |(at, ar), (t, r)| (at + t, ar + r))
+                }
+                pub fn get_uf_count(&self) -> std::collections::BTreeMap<&'static str, (usize, usize)> {
+                    [("Foo", (self.uf.foo_.len(), self.uf.foo_.num_roots()))]
+                        .into_iter()
+                        .collect()
                 }
                 #[inline(never)]
                 pub fn canonicalize(&mut self) {
@@ -6622,12 +6682,20 @@ fn codegen_variable_reuse_bug() {
                     buf
                 }
                 pub fn get_total_relation_entry_count(&self) -> usize {
-                    [self.add_.len(), self.zero_.len()]
-                        .into_iter()
-                        .sum::<usize>()
+                    self.get_relation_entry_count().values().sum()
                 }
                 pub fn get_relation_entry_count(&self) -> std::collections::BTreeMap<&'static str, usize> {
                     [("Add", self.add_.len()), ("Zero", self.zero_.len())]
+                        .into_iter()
+                        .collect()
+                }
+                pub fn get_total_uf_count(&self) -> (usize, usize) {
+                    self.get_uf_count()
+                        .values()
+                        .fold((0, 0), |(at, ar), (t, r)| (at + t, ar + r))
+                }
+                pub fn get_uf_count(&self) -> std::collections::BTreeMap<&'static str, (usize, usize)> {
+                    [("Math", (self.uf.math_.len(), self.uf.math_.num_roots()))]
                         .into_iter()
                         .collect()
                 }
@@ -7479,14 +7547,7 @@ fn initial_exprs() {
                     buf
                 }
                 pub fn get_total_relation_entry_count(&self) -> usize {
-                    [
-                        self.add_.len(),
-                        self.mul_.len(),
-                        self.const_.len(),
-                        self.var_.len(),
-                    ]
-                    .into_iter()
-                    .sum::<usize>()
+                    self.get_relation_entry_count().values().sum()
                 }
                 pub fn get_relation_entry_count(&self) -> std::collections::BTreeMap<&'static str, usize> {
                     [
@@ -7497,6 +7558,16 @@ fn initial_exprs() {
                     ]
                     .into_iter()
                     .collect()
+                }
+                pub fn get_total_uf_count(&self) -> (usize, usize) {
+                    self.get_uf_count()
+                        .values()
+                        .fold((0, 0), |(at, ar), (t, r)| (at + t, ar + r))
+                }
+                pub fn get_uf_count(&self) -> std::collections::BTreeMap<&'static str, (usize, usize)> {
+                    [("Math", (self.uf.math_.len(), self.uf.math_.num_roots()))]
+                        .into_iter()
+                        .collect()
                 }
                 #[inline(never)]
                 pub fn canonicalize(&mut self) {
@@ -8036,10 +8107,24 @@ fn codegen_bug1() {
                     buf
                 }
                 pub fn get_total_relation_entry_count(&self) -> usize {
-                    [self.foo_.len()].into_iter().sum::<usize>()
+                    self.get_relation_entry_count().values().sum()
                 }
                 pub fn get_relation_entry_count(&self) -> std::collections::BTreeMap<&'static str, usize> {
                     [("Foo", self.foo_.len())].into_iter().collect()
+                }
+                pub fn get_total_uf_count(&self) -> (usize, usize) {
+                    self.get_uf_count()
+                        .values()
+                        .fold((0, 0), |(at, ar), (t, r)| (at + t, ar + r))
+                }
+                pub fn get_uf_count(&self) -> std::collections::BTreeMap<&'static str, (usize, usize)> {
+                    [
+                        ("T0", (self.uf.t0_.len(), self.uf.t0_.num_roots())),
+                        ("T1", (self.uf.t1_.len(), self.uf.t1_.num_roots())),
+                        ("T2", (self.uf.t2_.len(), self.uf.t2_.num_roots())),
+                    ]
+                    .into_iter()
+                    .collect()
                 }
                 #[inline(never)]
                 pub fn canonicalize(&mut self) {
@@ -8406,10 +8491,20 @@ fn initial() {
                     buf
                 }
                 pub fn get_total_relation_entry_count(&self) -> usize {
-                    [self.const_.len()].into_iter().sum::<usize>()
+                    self.get_relation_entry_count().values().sum()
                 }
                 pub fn get_relation_entry_count(&self) -> std::collections::BTreeMap<&'static str, usize> {
                     [("Const", self.const_.len())].into_iter().collect()
+                }
+                pub fn get_total_uf_count(&self) -> (usize, usize) {
+                    self.get_uf_count()
+                        .values()
+                        .fold((0, 0), |(at, ar), (t, r)| (at + t, ar + r))
+                }
+                pub fn get_uf_count(&self) -> std::collections::BTreeMap<&'static str, (usize, usize)> {
+                    [("Math", (self.uf.math_.len(), self.uf.math_.num_roots()))]
+                        .into_iter()
+                        .collect()
                 }
                 #[inline(never)]
                 pub fn canonicalize(&mut self) {
@@ -9412,14 +9507,7 @@ fn test_primitives_simple() {
                     buf
                 }
                 pub fn get_total_relation_entry_count(&self) -> usize {
-                    [
-                        self.mul_.len(),
-                        self.add_.len(),
-                        self.const_.len(),
-                        self.var_.len(),
-                    ]
-                    .into_iter()
-                    .sum::<usize>()
+                    self.get_relation_entry_count().values().sum()
                 }
                 pub fn get_relation_entry_count(&self) -> std::collections::BTreeMap<&'static str, usize> {
                     [
@@ -9430,6 +9518,16 @@ fn test_primitives_simple() {
                     ]
                     .into_iter()
                     .collect()
+                }
+                pub fn get_total_uf_count(&self) -> (usize, usize) {
+                    self.get_uf_count()
+                        .values()
+                        .fold((0, 0), |(at, ar), (t, r)| (at + t, ar + r))
+                }
+                pub fn get_uf_count(&self) -> std::collections::BTreeMap<&'static str, (usize, usize)> {
+                    [("Math", (self.uf.math_.len(), self.uf.math_.num_roots()))]
+                        .into_iter()
+                        .collect()
                 }
                 #[inline(never)]
                 pub fn canonicalize(&mut self) {
@@ -10263,14 +10361,7 @@ fn triangle_join() {
                     buf
                 }
                 pub fn get_total_relation_entry_count(&self) -> usize {
-                    [
-                        self.foo_.len(),
-                        self.bar_.len(),
-                        self.baz_.len(),
-                        self.triangle_.len(),
-                    ]
-                    .into_iter()
-                    .sum::<usize>()
+                    self.get_relation_entry_count().values().sum()
                 }
                 pub fn get_relation_entry_count(&self) -> std::collections::BTreeMap<&'static str, usize> {
                     [
@@ -10281,6 +10372,16 @@ fn triangle_join() {
                     ]
                     .into_iter()
                     .collect()
+                }
+                pub fn get_total_uf_count(&self) -> (usize, usize) {
+                    self.get_uf_count()
+                        .values()
+                        .fold((0, 0), |(at, ar), (t, r)| (at + t, ar + r))
+                }
+                pub fn get_uf_count(&self) -> std::collections::BTreeMap<&'static str, (usize, usize)> {
+                    [("Math", (self.uf.math_.len(), self.uf.math_.num_roots()))]
+                        .into_iter()
+                        .collect()
                 }
                 #[inline(never)]
                 pub fn canonicalize(&mut self) {
@@ -10967,12 +11068,20 @@ fn edgecase0() {
                     buf
                 }
                 pub fn get_total_relation_entry_count(&self) -> usize {
-                    [self.mul_.len(), self.add_.len()]
-                        .into_iter()
-                        .sum::<usize>()
+                    self.get_relation_entry_count().values().sum()
                 }
                 pub fn get_relation_entry_count(&self) -> std::collections::BTreeMap<&'static str, usize> {
                     [("Mul", self.mul_.len()), ("Add", self.add_.len())]
+                        .into_iter()
+                        .collect()
+                }
+                pub fn get_total_uf_count(&self) -> (usize, usize) {
+                    self.get_uf_count()
+                        .values()
+                        .fold((0, 0), |(at, ar), (t, r)| (at + t, ar + r))
+                }
+                pub fn get_uf_count(&self) -> std::collections::BTreeMap<&'static str, (usize, usize)> {
+                    [("Math", (self.uf.math_.len(), self.uf.math_.num_roots()))]
                         .into_iter()
                         .collect()
                 }
@@ -11558,12 +11667,20 @@ fn test_into_codegen() {
                     buf
                 }
                 pub fn get_total_relation_entry_count(&self) -> usize {
-                    [self.mul_.len(), self.add_.len()]
-                        .into_iter()
-                        .sum::<usize>()
+                    self.get_relation_entry_count().values().sum()
                 }
                 pub fn get_relation_entry_count(&self) -> std::collections::BTreeMap<&'static str, usize> {
                     [("Mul", self.mul_.len()), ("Add", self.add_.len())]
+                        .into_iter()
+                        .collect()
+                }
+                pub fn get_total_uf_count(&self) -> (usize, usize) {
+                    self.get_uf_count()
+                        .values()
+                        .fold((0, 0), |(at, ar), (t, r)| (at + t, ar + r))
+                }
+                pub fn get_uf_count(&self) -> std::collections::BTreeMap<&'static str, (usize, usize)> {
+                    [("Math", (self.uf.math_.len(), self.uf.math_.num_roots()))]
                         .into_iter()
                         .collect()
                 }
@@ -17497,25 +17614,7 @@ fn lir_math() {
                     buf
                 }
                 pub fn get_total_relation_entry_count(&self) -> usize {
-                    [
-                        self.fuel_.len(),
-                        self.zero_fuel_.len(),
-                        self.diff_.len(),
-                        self.integral_.len(),
-                        self.add_.len(),
-                        self.sub_.len(),
-                        self.mul_.len(),
-                        self.div_.len(),
-                        self.pow_.len(),
-                        self.ln_.len(),
-                        self.sqrt_.len(),
-                        self.sin_.len(),
-                        self.cos_.len(),
-                        self.const_.len(),
-                        self.var_.len(),
-                    ]
-                    .into_iter()
-                    .sum::<usize>()
+                    self.get_relation_entry_count().values().sum()
                 }
                 pub fn get_relation_entry_count(&self) -> std::collections::BTreeMap<&'static str, usize> {
                     [
@@ -17534,6 +17633,22 @@ fn lir_math() {
                         ("Cos", self.cos_.len()),
                         ("Const", self.const_.len()),
                         ("Var", self.var_.len()),
+                    ]
+                    .into_iter()
+                    .collect()
+                }
+                pub fn get_total_uf_count(&self) -> (usize, usize) {
+                    self.get_uf_count()
+                        .values()
+                        .fold((0, 0), |(at, ar), (t, r)| (at + t, ar + r))
+                }
+                pub fn get_uf_count(&self) -> std::collections::BTreeMap<&'static str, (usize, usize)> {
+                    [
+                        (
+                            "FuelUnit",
+                            (self.uf.fuel_unit_.len(), self.uf.fuel_unit_.num_roots()),
+                        ),
+                        ("Math", (self.uf.math_.len(), self.uf.math_.num_roots())),
                     ]
                     .into_iter()
                     .collect()

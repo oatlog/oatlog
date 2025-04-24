@@ -1,12 +1,9 @@
 use itertools::Itertools as _;
-use rand::{SeedableRng, prelude::IndexedRandom as _};
 
 use std::{
-    cell::RefCell,
     collections::{BTreeMap, BTreeSet},
     hash::Hash,
     mem::replace,
-    rc::Rc,
 };
 
 use crate::{
@@ -68,9 +65,12 @@ pub(crate) struct Trie {
 }
 
 impl Trie {
-    fn index_usage(&self, index_usage: &mut TVec<RelationId, BTreeSet<BTreeSet<ColumnId>>>) {
+    fn register_index_usages(
+        &self,
+        index_usage: &mut TVec<RelationId, BTreeSet<BTreeSet<ColumnId>>>,
+    ) {
         for (link, trie) in self.map.iter() {
-            trie.index_usage(index_usage);
+            trie.register_index_usages(index_usage);
             let bound = &self.bound_premise;
             let atom = link.clone().atom();
 
@@ -120,69 +120,43 @@ pub(crate) fn schedule_rules(
         )
         .collect();
 
-    let rng = rand_chacha::ChaCha20Rng::seed_from_u64(99387277);
+    //let rng = rand_chacha::ChaCha20Rng::seed_from_u64(99387277);
 
     let ctx = Ctx {
         bound_premise: BTreeSet::new(),
         relations,
         uf: SparseUf::new(),
-        rng: Rc::new(RefCell::new(rng)),
+        //rng: Rc::new(RefCell::new(rng)),
     };
     let trie = {
-        let mut best_trie = inner(ctx.clone(), &rules);
-        let mut best_sum = (usize::MAX, usize::MAX);
-
-        let mut iterations = 0;
-
-        eprintln!("===========");
-        loop {
-            let trie = inner(ctx.clone(), &rules);
-
-            let mut index_usage: TVec<RelationId, _> = relations
-                .iter()
-                .map(|x| {
-                    x.implicit_rules
-                        .iter()
-                        .map(|x| x.out.keys().cloned().collect())
-                        .collect()
-                })
-                .collect();
-            trie.index_usage(&mut index_usage);
-            // dbg!(&index_usage);
-            let sum = (
+        let base_index_usage: TVec<RelationId, BTreeSet<BTreeSet<ColumnId>>> =
+            relations.map(|x| x.implicit_rules.iter().map(|x| x.key_columns()).collect());
+        let score_for_trie = |trie: &Trie| {
+            let mut index_usage = base_index_usage.clone();
+            trie.register_index_usages(&mut index_usage);
+            (
                 index_usage.iter().map(|x| x.len()).sum::<usize>(),
                 trie.size(),
-            );
-            // trie.size();
-            iterations += 1;
+            )
+        };
 
-            if sum < best_sum {
-                dbg!(sum);
-                best_sum = sum;
+        let mut best_trie = inner(ctx.clone(), &rules);
+        let mut best_score = score_for_trie(&best_trie);
+
+        const TRIE_BUILDING_IMPROVEMENT_ITERATIONS: usize = 0;
+        for _ in 0..TRIE_BUILDING_IMPROVEMENT_ITERATIONS {
+            let trie = inner(ctx.clone(), &rules);
+            let score = score_for_trie(&trie);
+
+            if score < best_score {
+                println!("trie improved to {:?}, previous {:?}", score, best_score);
+                best_score = score;
                 best_trie = trie;
-            }
-
-            if iterations > 100 {
-                break;
             }
         }
 
         best_trie
     };
-    // let trie = inner(ctx, &rules);
-
-    // let mut index_usage: TVec<RelationId, _> = relations
-    //     .iter()
-    //     .map(|x| {
-    //         x.implicit_rules
-    //             .iter()
-    //             .map(|x| x.out.keys().cloned().collect())
-    //             .collect()
-    //     })
-    //     .collect();
-    // trie.index_usage(&mut index_usage);
-    // // dbg!(&index_usage);
-    // dbg!(index_usage.iter().map(|x| x.len()).sum::<usize>());
 
     (variables, trie)
 }
@@ -784,7 +758,7 @@ struct Ctx<'a> {
     bound_premise: BTreeSet<VariableId>,
     relations: &'a TVec<RelationId, Relation>,
     uf: SparseUf<VariableId>,
-    rng: Rc<RefCell<rand_chacha::ChaCha20Rng>>,
+    //rng: Rc<RefCell<rand_chacha::ChaCha20Rng>>,
 }
 impl Ctx<'_> {
     fn apply(&self, link: &TrieLink) -> Self {
@@ -1293,9 +1267,11 @@ fn election(ctx: &Ctx<'_>, rules: &[Rule]) -> (Vec<Rule>, BTreeMap<TrieLink, Vec
                 //             .collect()
             }
         }
-        let mut rng = ctx.rng.borrow_mut();
-        let vote = *vote.choose(&mut rng).unwrap();
-        // let vote = vote[0];
+        // NOTE: Possible randomize selection here in the future, currently avoided because it does
+        // not seem to improve things.
+        // let mut rng = ctx.rng.borrow_mut();
+        // let vote = *vote.choose(&mut rng).unwrap();
+        let vote = vote[0];
         let existing = map.insert(
             votes[vote].1.clone(),
             matrix[vote]

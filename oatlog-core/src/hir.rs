@@ -184,7 +184,8 @@ impl InvariantPermutationSubgroup {
         }
     }
     fn add_invariant_permutations(&mut self, perm: Vec<usize>) {
-        if false {
+        const DERIVE_AND_OPTIMIZE_USING_INVARIANT_PERMUTATIONS: bool = false;
+        if DERIVE_AND_OPTIMIZE_USING_INVARIANT_PERMUTATIONS {
             self.inner.push(perm);
             self.close_permutation_subgroup();
         }
