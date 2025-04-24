@@ -11,13 +11,6 @@ pub(crate) enum Uninhabited {}
 /// Type alias for union-find without data.
 pub(crate) type UF<T> = UFData<T, ()>;
 
-macro_rules! uf {
-    [] => { UFData::new() };
-    [$elem:expr; $n:expr] => { UFData::new_with_size($n, $elem) };
-    [$n:expr] => { UFData::new_with_size($n, ()) }
-}
-pub(crate) use uf;
-
 /// Union Find with optional attached data.
 ///
 /// Indexing canonicalizes the index and returns the associated data for that index.
