@@ -4,7 +4,7 @@
 #![allow(dead_code, reason = "temporary noise")]
 
 use crate::{
-    hir::PermutationGroup,
+    hir::InvariantPermutationSubgroup,
     ids::{ColumnId, IndexId, IndexUsageId, IuDedupId},
     lir,
     typed_vec::TVec,
@@ -105,7 +105,7 @@ pub(crate) fn index_selection(
     columns: usize,
     // what logical "primary keys" are needed.
     uses: &TVec<IndexUsageId, BTreeSet<ColumnId>>,
-    perm: &PermutationGroup,
+    perm: &InvariantPermutationSubgroup,
 ) -> (
     TVec<IndexUsageId, lir::IndexUsageInfo>,
     TVec<IndexId, lir::IndexInfo>,
@@ -115,7 +115,7 @@ pub(crate) fn index_selection(
 }
 
 fn all_column_permutations(
-    perm: &PermutationGroup,
+    perm: &InvariantPermutationSubgroup,
     columns: &BTreeSet<ColumnId>,
 ) -> BTreeSet<BTreeSet<ColumnId>> {
     perm.inner
@@ -127,7 +127,7 @@ fn all_column_permutations(
 fn all_usages(
     columns: usize,
     uses: &TVec<IndexUsageId, BTreeSet<ColumnId>>,
-    perm: &PermutationGroup,
+    perm: &InvariantPermutationSubgroup,
 ) -> (
     TVec<IndexUsageId, lir::IndexUsageInfo>,
     TVec<IndexId, lir::IndexInfo>,

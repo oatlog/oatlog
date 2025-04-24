@@ -1,4 +1,3 @@
-use educe::Educe;
 use itertools::Itertools as _;
 use rand::{SeedableRng, prelude::IndexedRandom as _};
 
@@ -106,8 +105,8 @@ pub(crate) fn schedule_rules(
                 let f = |VariableId(x)| VariableId(x + n);
                 let (premise, action): (Vec<_>, Vec<_>) = atoms
                     .into_iter()
-                    .map(|x| x.map_v(f))
-                    .partition(|x| x.premise == IsPremise::Premise);
+                    .map(|x| x.map_columns(f))
+                    .partition(|x| x.is_premise == IsPremise::Premise);
                 let unify: Vec<_> = unify.iter_all().map(|(a, b, _)| (f(a), f(b))).collect();
                 variables.extend(local_variables.into_iter());
                 Rule {
@@ -322,7 +321,7 @@ fn action_topo_resolve<'a>(
                                 if lhs == rhs {
                                     continue;
                                 }
-                                match (atom.premise, to_merge[lhs], to_merge[rhs]) {
+                                match (atom.is_premise, to_merge[lhs], to_merge[rhs]) {
                                     (Premise, _, _) => {
                                         progress = true;
                                         to_merge.union_merge(lhs, rhs, |a, b| merge(a, b));
@@ -353,12 +352,12 @@ fn action_topo_resolve<'a>(
                     }
                 }
                 if !deleted {
-                    assumed_true.insert(Atom::canonial_atom(&equivalent));
+                    assumed_true.insert(Atom::canonical_atom(&equivalent));
                 }
             }
             queue = assumed_true
                 .into_iter()
-                .map(|x| x.map_v(|v| to_merge.find(v)))
+                .map(|x| x.map_columns(|v| to_merge.find(v)))
                 .collect();
 
             if !progress {
@@ -527,7 +526,7 @@ pub(crate) fn lowering_rec(
                 .into_iter()
                 .map(
                     |hir::Atom {
-                         premise: _,
+                         is_premise: _,
                          relation,
                          columns,
                          entry,
@@ -870,10 +869,10 @@ impl Rule {
             meta,
         } = self;
         Self {
-            premise: premise.into_iter().map(|x| x.map_v(&mut f)).collect(),
-            action: action.into_iter().map(|x| x.map_v(&mut f)).collect(),
+            premise: premise.into_iter().map(|x| x.map_columns(&mut f)).collect(),
+            action: action.into_iter().map(|x| x.map_columns(&mut f)).collect(),
             unify: unify.into_iter().map(|(a, b)| (f(a), f(b))).collect(),
-            semi: semi.into_iter().map(|x| x.map_v(&mut f)).collect(),
+            semi: semi.into_iter().map(|x| x.map_columns(&mut f)).collect(),
             meta,
         }
     }

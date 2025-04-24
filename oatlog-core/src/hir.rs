@@ -42,7 +42,7 @@ pub(crate) struct Theory {
 
 #[derive(Copy, Clone, Eq, PartialEq, Ord, PartialOrd, Hash)]
 pub(crate) struct Type {
-    /// Name of type (sort Math) -> "Math"
+    /// Name of type. E.g. `(sort Math)` -> `"Math"`.
     pub(crate) name: &'static str,
     pub(crate) kind: TypeKind,
 }
@@ -63,10 +63,10 @@ impl Type {
 
 #[derive(Copy, Clone, Eq, PartialEq, Ord, PartialOrd, Hash, Debug)]
 pub(crate) enum TypeKind {
-    /// can be unified by user
-    /// always a wrapper around a u32
+    /// Can be unified by user.
+    /// Always a wrapper around a u32.
     Symbolic,
-    /// Some rust type that implements: `RelationElement` trait.
+    /// Some rust type that implements the `RelationElement` trait.
     Primitive { type_path: &'static str },
 }
 
@@ -84,9 +84,9 @@ pub(crate) enum TypeKind {
 /// TODO: add optimization pass to turn symbolic rules to implicit rules.
 #[derive(Clone, Eq, PartialEq, Ord, PartialOrd, Hash)]
 pub(crate) struct ImplicitRule {
-    /// If all colums other than the ones mentioned here are equal, trigger rule for each column.
+    /// If all columns other than the ones mentioned here are equal, trigger rule for each column.
     pub(crate) out: BTreeMap<ColumnId, ImplicitRuleAction>,
-    // Just to make key_columns more ergonomic.
+    // Required to make `ImplicitRule::key_columns` more ergonomic.
     pub(crate) columns: usize,
 }
 impl ImplicitRule {
@@ -129,9 +129,9 @@ impl ImplicitRule {
 pub(crate) enum ImplicitRuleAction {
     /// Panics immediately.
     ///
-    /// TODO: should this avoid panic if only other columns mismatch?
+    /// TODO loke: should this avoid panic if only other columns mismatch?
     Panic,
-    /// Unifies all columns not mentioned in `on`
+    /// Merge with a union-find unification.
     Union,
     /// Run computation to figure out what to write.
     #[allow(unused)]
@@ -153,22 +153,43 @@ pub(crate) enum ImplicitRuleAction {
 }
 
 #[derive(Clone, Eq, PartialEq, Ord, PartialOrd, Hash, Debug)]
-pub(crate) struct PermutationGroup {
+pub(crate) struct InvariantPermutationSubgroup {
+    /// A list of permutations that leave rows semantically identical.
+    ///
+    /// Since this list is maximal, it must be closed under permutation composition
+    /// and hence stores the elements of a subgroup of the symmetric group.
+    ///
+    /// In pseudo-code:
+    /// ```ignore
+    /// let column_seq: Vec<ColumnId> = ...;
+    /// for perm in permutation_group.inner {
+    ///     let alt_seq = column_seq.iter().map(|c| perm[c]).collect();
+    ///     let rows: Set = relation.select(column_seq).collect();
+    ///     let alt_rows: Set = relation.select(alt_seq).collect();
+    ///     assert_eq!(rows, alt_rows);
+    /// }
+    /// ```
+    ///
+    /// For example, for addition
+    /// 1. `a+b=c` and `b+a=c` occur together.
+    /// 2. The permutation group is `{[0,1,2], [1,0,2]}`.
+    /// 3. Whenever `a+b=c` is inserted into the relation, `b+a=c` should be inserted too.
+    /// 4. Querying triplets `b+a=c` returns the same set (possibly different order) as querying `a+b=c`.
     pub(crate) inner: Vec<Vec<usize>>,
 }
-impl PermutationGroup {
-    fn new(n: usize) -> Self {
+impl InvariantPermutationSubgroup {
+    fn new_identity(n: usize) -> Self {
         Self {
             inner: vec![(0..n).collect()],
         }
     }
-    fn add(&mut self, perm: Vec<usize>) {
-        if true {
+    fn add_invariant_permutations(&mut self, perm: Vec<usize>) {
+        if false {
             self.inner.push(perm);
-            self.close();
+            self.close_permutation_subgroup();
         }
     }
-    fn close(&mut self) {
+    fn close_permutation_subgroup(&mut self) {
         loop {
             let n = self.inner.len();
             self.inner.sort();
@@ -189,9 +210,11 @@ impl PermutationGroup {
         }
     }
     fn apply<T: Copy>(&self, x: &[T]) -> impl Iterator<Item = Vec<T>> {
+        // NOTE: `self` stores all permutations and their inverses, so whether we permute or
+        // inverse permute here does not matter.
         self.inner
             .iter()
-            .map(|perm| perm.iter().map(|i| x[*i]).collect())
+            .map(|perm| perm.iter().map(|&i| x[i]).collect())
     }
 }
 
@@ -200,18 +223,17 @@ impl PermutationGroup {
 /// "all" is sometimes indexed.
 #[derive(Clone, Eq, PartialEq, Ord, PartialOrd, Hash, Debug)]
 pub(crate) struct Relation {
-    /// name from egglog (eg Add)
+    /// name from egglog (eg `Add`)
     pub(crate) name: &'static str,
     pub(crate) kind: RelationTy,
 
     pub(crate) implicit_rules: TVec<ImplicitRuleId, ImplicitRule>,
-    pub(crate) permutation_group: PermutationGroup,
+    pub(crate) invariant_permutations: InvariantPermutationSubgroup,
 
     /// Types of columns
     pub(crate) columns: TVec<ColumnId, TypeId>,
 }
 impl Relation {
-    // TODO: introduce implicit_rules in these constructors
     pub(crate) fn table(
         name: &'static str,
         columns: TVec<ColumnId, TypeId>,
@@ -221,7 +243,7 @@ impl Relation {
             name,
             kind: RelationTy::Table,
             implicit_rules,
-            permutation_group: PermutationGroup::new(columns.len()),
+            invariant_permutations: InvariantPermutationSubgroup::new_identity(columns.len()),
             columns,
         }
     }
@@ -236,10 +258,10 @@ impl Relation {
             name,
             implicit_rules: tvec![ImplicitRule::new_panic(out_col, columns.len())],
             kind: RelationTy::Primitive {
-                syn: IgnoreBox(syn.to_token_stream()),
+                syn: WrapIgnore(syn.to_token_stream()),
                 ident,
             },
-            permutation_group: PermutationGroup::new(columns.len()),
+            invariant_permutations: InvariantPermutationSubgroup::new_identity(columns.len()),
             columns,
         }
     }
@@ -250,7 +272,7 @@ impl Relation {
             kind: RelationTy::Forall { ty },
             // forall is [x] -> (), so no implicit rules
             implicit_rules: TVec::new(),
-            permutation_group: PermutationGroup::new(columns.len()),
+            invariant_permutations: InvariantPermutationSubgroup::new_identity(columns.len()),
             columns,
         }
     }
@@ -261,7 +283,7 @@ impl Relation {
             kind: RelationTy::Global { id },
             // global is [] -> (x), so we have a implicit (panicing) rule.
             implicit_rules: tvec![ImplicitRule::new_panic(ColumnId(0), 1)],
-            permutation_group: PermutationGroup::new(columns.len()),
+            invariant_permutations: InvariantPermutationSubgroup::new_identity(columns.len()),
             columns,
         }
     }
@@ -269,28 +291,29 @@ impl Relation {
     pub(crate) fn as_new(&self, id: RelationId) -> Option<Self> {
         match self.kind {
             RelationTy::NewOf { .. } => unreachable!("new of new?"),
-            RelationTy::Table => {}
             RelationTy::Alias { .. } => unreachable!("new of alias?"),
-            RelationTy::Global { .. } => {}
             RelationTy::Primitive { .. } => {
                 // primitive has no new.
-                return None;
+                None
             }
-            RelationTy::Forall { .. } => {}
+            RelationTy::Table | RelationTy::Global { .. } | RelationTy::Forall { .. } => {
+                Some(Self {
+                    name: format!("New{}", self.name).leak(),
+                    columns: self.columns.clone(),
+                    kind: RelationTy::NewOf { id },
+                    // At the point of introducing semi-naive, there is no simplification
+                    // benefit to implicit rules, so it's just for entry, but it's not possible
+                    // to use entry on new.
+                    implicit_rules: tvec![],
+                    // We probably don't need this.
+                    invariant_permutations: InvariantPermutationSubgroup::new_identity(
+                        self.columns.len(),
+                    ),
+                })
+            }
         }
-        Some(Self {
-            name: format!("New{}", self.name).leak(),
-            columns: self.columns.clone(),
-            kind: RelationTy::NewOf { id },
-            // at the point of introducing semi-naive, there is no simplification
-            // benefit to implicit rules, so it's just for entry, but it's not possible
-            // to use entry on new.
-            implicit_rules: tvec![],
-            // we probably don't need this.
-            permutation_group: PermutationGroup::new(self.columns.len()),
-        })
     }
-    /// Is it sound to turn entry on this into an insert.
+    /// Whether it is sound to turn entry on this into an insert.
     pub(crate) fn can_become_insert(&self, _im: ImplicitRuleId) -> bool {
         match &self.kind {
             RelationTy::NewOf { .. } => unreachable!(),
@@ -311,7 +334,7 @@ impl Relation {
 
 #[derive(Educe, Clone, Debug)]
 #[educe(Ord, PartialOrd, Hash, Eq, PartialEq)]
-pub(crate) struct IgnoreBox<T>(#[educe(Ord(ignore), Hash(ignore), Eq(ignore))] pub(crate) T);
+pub(crate) struct WrapIgnore<T>(#[educe(Ord(ignore), Hash(ignore), Eq(ignore))] pub(crate) T);
 
 #[derive(Clone, Eq, PartialEq, Ord, PartialOrd, Hash, Debug)]
 pub(crate) enum RelationTy {
@@ -335,14 +358,12 @@ pub(crate) enum RelationTy {
     Global { id: GlobalId },
     Primitive {
         /// Rust function as tokens.
-        syn: IgnoreBox<proc_macro2::TokenStream>,
+        syn: WrapIgnore<proc_macro2::TokenStream>,
         /// Name of rust function to call.
         ident: &'static str,
     },
-    /// Conceptually a database view for everything with this type
-    /// Points to relations and relevant columns? (fine assuming we do not create more
-    /// relations)
-    /// Supports iteration (lookup desugars to no-op)
+    /// Conceptually a database view for everything with this type.
+    /// Supports iteration (lookup desugars to no-op, since mentioning the key implies that it exists)
     Forall { ty: TypeId },
     // desugars to a table + insert/delete rules.
     // MaterializedView {/* ... */}
@@ -351,7 +372,7 @@ pub(crate) enum RelationTy {
 #[derive(Clone, Eq, PartialEq, Ord, PartialOrd, Debug)]
 pub(crate) struct RuleMeta {
     pub(crate) name: Option<&'static str>,
-    // source text for this rule for debug information.
+    // Source text for this rule, for debug information.
     pub(crate) src: &'static str,
 }
 
@@ -374,8 +395,9 @@ impl IsPremise {
 #[must_use]
 #[derive(Clone, Eq, PartialEq, Ord, PartialOrd, Debug, Hash)]
 pub(crate) struct Atom {
-    pub(crate) premise: IsPremise,
+    pub(crate) is_premise: IsPremise,
     pub(crate) relation: RelationId,
+    // TODO loke: consider not TVec.
     pub(crate) columns: TVec<ColumnId, VariableId>,
     /// Entry refers to a specific index.
     /// It means slightly different things for premise and action:
@@ -384,20 +406,20 @@ pub(crate) struct Atom {
     pub(crate) entry: Option<ImplicitRuleId>,
 }
 impl Atom {
-    // list all atoms we consider equivalent to this atom.
-    // includes permutations etc.
-    //
-    // We can't just pick the canonical one since we specifically want to find pairs of atoms
-    // where keys match but values don't and the lexicographically smallest atom might miss
-    // that.
-    //
-    // Alias and similar can just switch directly to the canonical relation.
+    /// List all atoms we consider equivalent to this atom.
+    /// This includes permutations, etc.
+    ///
+    /// We can't just pick the canonical one since we specifically want to find pairs of atoms
+    /// where keys match but values don't and the lexicographically smallest atom might miss
+    /// that.
+    ///
+    /// Alias and similar can just switch directly to the canonical relation.
     pub(crate) fn equivalent_atoms(&self, relations: &TVec<RelationId, Relation>) -> Vec<Atom> {
         relations[self.relation]
-            .permutation_group
+            .invariant_permutations
             .apply(self.columns.inner())
             .map(|columns| Atom {
-                premise: self.premise,
+                is_premise: self.is_premise,
                 relation: self.relation,
                 columns: columns.into(),
                 entry: self.entry,
@@ -408,15 +430,16 @@ impl Atom {
     }
 
     // Among the possible atoms, pick the one that we consider canonical.
-    pub(crate) fn canonial_atom(atoms: &[Atom]) -> Atom {
+    pub(crate) fn canonical_atom(atoms: &[Atom]) -> Atom {
+        // TODO loke: revisit
         // pick the one without permutation because changing what we write to is scary (eg for sub).
         atoms[0].clone()
         // .into_iter().min().unwrap().clone()
     }
 
-    pub(crate) fn map_v(&self, f: impl FnMut(VariableId) -> VariableId) -> Self {
+    pub(crate) fn map_columns(&self, f: impl FnMut(VariableId) -> VariableId) -> Self {
         Self {
-            premise: self.premise,
+            is_premise: self.is_premise,
             relation: self.relation,
             columns: self.columns.iter().copied().map(f).collect(),
             entry: self.entry,
@@ -481,20 +504,25 @@ impl Atom {
 #[derive(Clone, Eq, PartialEq, Ord, PartialOrd, Debug)]
 pub(crate) struct SymbolicRule {
     pub(crate) meta: RuleMeta,
+    /// Unstructured list of atoms, with some being premises and some actions.
     pub(crate) atoms: Vec<Atom>,
+    /// Unifications to apply in actions.
     pub(crate) unify: UF<VariableId>,
     pub(crate) variables: TVec<VariableId, VariableMeta>,
 }
 impl SymbolicRule {
     pub(crate) fn action_atoms(&self) -> impl Iterator<Item = &Atom> {
-        self.atoms.iter().filter(|x| x.premise == Action)
+        self.atoms.iter().filter(|x| x.is_premise == Action)
     }
 
     pub(crate) fn premise_atoms(&self) -> impl Iterator<Item = &Atom> {
-        self.atoms.iter().filter(|x| x.premise == Premise).map(|x| {
-            assert!(x.entry.is_none(), "entry in premise not implemented yet");
-            x
-        })
+        self.atoms
+            .iter()
+            .filter(|x| x.is_premise == Premise)
+            .map(|x| {
+                assert!(x.entry.is_none(), "entry in premise not implemented yet");
+                x
+            })
     }
 
     /// Variables that are bound by the premise.
@@ -519,7 +547,7 @@ impl SymbolicRule {
         for v in self
             .atoms
             .iter()
-            .filter(|x| x.premise == Premise)
+            .filter(|x| x.is_premise == Premise)
             .flat_map(|x| x.columns.iter().copied())
         {
             to_merge[v].0 = Premise;
@@ -531,7 +559,7 @@ impl SymbolicRule {
         for (a, b) in self.unify.iter_edges_fully_connected() {
             match (to_merge[a].0, to_merge[b].0) {
                 (Premise, Premise) => {
-                    // NOTE: we are missing opts that make all action atoms use the same premise
+                    // NOTE: we are missing optimizations that make all action atoms use the same premise
                     // variable.
                 }
                 (_, Action) | (Action, _) => {
@@ -540,7 +568,7 @@ impl SymbolicRule {
             }
         }
 
-        // NOTE: we are missing opts that turn PREMISE into ACTION when it is infallible (eg
+        // NOTE: we are missing optimizations that turn PREMISE into ACTION when it is infallible (eg
         // globals that don't filter).
 
         let mut queue = self.atoms.clone();
@@ -550,8 +578,11 @@ impl SymbolicRule {
             .flat_map(|x| x.columns.iter().copied())
             .collect();
 
+        // TODO loke for erik: Explain the large loop below in one or more comments.
+
         loop {
-            queue.sort_by_key(|x| x.premise /* start with premise */);
+            // start with premise
+            queue.sort_by_key(|x| x.is_premise);
 
             let mut progress = false;
             let mut assumed_true: BTreeSet<Atom> = BTreeSet::new();
@@ -561,10 +592,10 @@ impl SymbolicRule {
                 'iter_assumed: for assumed in assumed_true.iter().cloned() {
                     for atom in equivalent.iter().filter(|x| x.relation == assumed.relation) {
                         for implicit_rule in &relations[atom.relation].implicit_rules {
-                            if !implicit_rule
+                            if implicit_rule
                                 .key_columns()
                                 .into_iter()
-                                .all(|c| atom.columns[c] == assumed.columns[c])
+                                .any(|c| atom.columns[c] != assumed.columns[c])
                             {
                                 continue;
                             }
@@ -575,15 +606,17 @@ impl SymbolicRule {
                                 if lhs == rhs {
                                     continue;
                                 }
-                                match (atom.premise, to_merge[lhs].0, to_merge[rhs].0) {
+                                match (atom.is_premise, to_merge[lhs].0, to_merge[rhs].0) {
                                     (Premise, _, _) => {
                                         progress = true;
                                         to_merge.union_merge(lhs, rhs, |a, b| merge(a, b));
                                     }
                                     (Action, Premise, Premise) => {
                                         deleted = false;
-                                        // We don't want contents of action to cause a merge of two premise variables
+                                        // TODO loke for erik: I don't understand this comment.
 
+                                        // We don't want contents of action to cause a merge of two premise variables
+                                        //
                                         // Example:
                                         //
                                         // Premise: (Add a b c)
@@ -591,7 +624,6 @@ impl SymbolicRule {
                                         //
                                         // Premise: (Add a b b)
                                         // Action: (Neg a b), (Neg a c)
-                                        //
                                     }
                                     (Action, Action, _) | (Action, _, Action) => {
                                         progress = true;
@@ -606,12 +638,12 @@ impl SymbolicRule {
                     }
                 }
                 if !deleted {
-                    assumed_true.insert(Atom::canonial_atom(&equivalent));
+                    assumed_true.insert(Atom::canonical_atom(&equivalent));
                 }
             }
             queue = assumed_true
                 .into_iter()
-                .map(|x| x.map_v(|v| to_merge.find(v)))
+                .map(|x| x.map_columns(|v| to_merge.find(v)))
                 .collect();
             if !progress {
                 break;
@@ -633,7 +665,7 @@ impl SymbolicRule {
             meta: self.meta.clone(),
             atoms: queue
                 .into_iter()
-                .map(|atom| atom.map_v(|x| old_to_new[&x]))
+                .map(|atom| atom.map_columns(|x| old_to_new[&x]))
                 .collect(),
             unify: UF::from_pairs(
                 n,
@@ -742,18 +774,18 @@ impl RuleArgs {
             .premise
             .into_iter()
             .map(|(relation, args)| Atom {
-                premise: Premise,
+                is_premise: Premise,
                 relation,
                 columns: args.into_iter().collect(),
                 entry: None,
             })
             .chain(self.action.into_iter().map(|(relation, args, entry)| Atom {
-                premise: Action,
+                is_premise: Action,
                 relation,
                 columns: args.into_iter().collect(),
                 entry: entry.then_some(ImplicitRuleId(0)),
             }))
-            .map(|atom| atom.map_v(|v| to_merge.find(v)))
+            .map(|atom| atom.map_columns(|v| to_merge.find(v)))
             .collect();
 
         let unify = UF::from_pairs(
@@ -779,41 +811,45 @@ impl RuleArgs {
 }
 
 impl Theory {
+    // TODO loke: add egglog-strict flag.
     pub(crate) fn optimize(&self) -> Self {
         let mut this = self.clone();
         for rule in this.symbolic_rules.iter_mut() {
             *rule = rule.optimize(&this.relations);
         }
 
+        // Detect symbolic rules defining invariant permutations on relations.
         for rule in &this.symbolic_rules {
-            let premises: Vec<_> = rule.premise_atoms().collect();
-            let [premise] = premises.as_slice() else {
+            let Ok(single_premise) = rule.premise_atoms().exactly_one() else {
                 continue;
             };
-            let premise_v = premise.columns.inner();
-            let premise_s: BTreeSet<_> = premise.columns.iter().copied().collect();
-            if premise_v.len() != premise_s.len() {
+            let premise_variables = single_premise.columns.inner();
+            let premise_variable_set: BTreeSet<VariableId> =
+                single_premise.columns.iter().copied().collect();
+            if premise_variables.len() != premise_variable_set.len() {
                 continue;
             }
             for action in rule.action_atoms() {
-                if action.relation != premise.relation {
+                if action.relation != single_premise.relation {
                     continue;
                 }
-                let action_v = action.columns.inner();
-                let action_s: BTreeSet<_> = action.columns.iter().copied().collect();
-                if action_v.len() != action_s.len() {
+                let action_variables = action.columns.inner();
+                let action_variable_set: BTreeSet<VariableId> =
+                    action.columns.iter().copied().collect();
+                if action_variables.len() != action_variable_set.len() {
                     continue;
                 }
-                if premise_s != action_s {
+                if premise_variable_set != action_variable_set {
                     continue;
                 }
+                // TODO loke: proper optimization logging
                 // dbg!(premise_v, action_v, this.relations[action.relation].name);
 
-                let perm: Vec<usize> = premise_v
+                let perm: Vec<usize> = premise_variables
                     .iter()
                     .copied()
                     .map(|v| {
-                        action_v
+                        action_variables
                             .iter()
                             .copied()
                             .enumerate()
@@ -821,7 +857,9 @@ impl Theory {
                             .unwrap()
                     })
                     .collect();
-                this.relations[action.relation].permutation_group.add(perm);
+                this.relations[action.relation]
+                    .invariant_permutations
+                    .add_invariant_permutations(perm);
             }
         }
 
@@ -1028,7 +1066,7 @@ mod debug_print {
                     columns,
                     kind,
                     implicit_rules,
-                    permutation_group: _,
+                    invariant_permutations: _,
                 },
             ) = self;
 
@@ -1068,7 +1106,7 @@ mod debug_print {
             let Self(
                 (theory, rule),
                 Atom {
-                    premise,
+                    is_premise: premise,
                     relation,
                     columns,
                     entry,

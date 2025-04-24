@@ -166,7 +166,7 @@ pub(crate) fn emit_lir_theory(mut theory: hir::Theory) -> (hir::Theory, lir::The
                 let (usage_to_info, mut index_to_info) = index_selection::index_selection(
                     relation.columns.len(),
                     uses,
-                    &relation.permutation_group,
+                    &relation.invariant_permutations,
                 );
 
                 for (index_usage, implicit_rule) in implicit_with_index {
@@ -361,7 +361,7 @@ fn action_topo_resolve<'a>(
         .into_iter()
         .cloned()
         .map(|x| {
-            assert_eq!(hir::IsPremise::Action, x.premise);
+            assert_eq!(hir::IsPremise::Action, x.is_premise);
             x
         })
         .collect();
@@ -551,7 +551,7 @@ fn generate_tries(
 
         lir_actions.extend(schedule.iter().rev().map(
             |hir::Atom {
-                 premise: _,
+                 is_premise: _,
                  relation,
                  columns,
                  entry,
@@ -776,7 +776,7 @@ fn make_simple_query_plan(
             .map(
                 |Atom {
                      relation,
-                     premise: _,
+                     is_premise: _,
                      columns,
                      entry: _,
                  }| {
@@ -873,7 +873,7 @@ fn symbolic_rules_as_semi_naive(
         .iter()
         .flat_map(|rule| {
             let semi_naive_for_rule: Vec<_> = (0..rule.atoms.len())
-                .filter(|x| rule.atoms[*x].premise == hir::IsPremise::Premise)
+                .filter(|x| rule.atoms[*x].is_premise == hir::IsPremise::Premise)
                 .filter_map(|i| {
                     let mut rule = rule.clone();
                     let relation_id = &mut rule.atoms[i].relation;
