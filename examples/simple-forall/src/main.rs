@@ -1,3 +1,5 @@
+#![allow(clippy::dbg_macro)]
+
 oatlog::compile_egraph_relaxed!((
     (sort Math)
     (relation Le (Math Math))

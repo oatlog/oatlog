@@ -1,4 +1,5 @@
 #![allow(unused)]
+#![allow(clippy::dbg_macro)]
 
 // oatlog::compile_egraph!((
 //     (datatype Math

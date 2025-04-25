@@ -1,7 +1,7 @@
 use clap::{Parser, Subcommand, ValueEnum};
 use std::{
     fs::{self, File},
-    io::{self, Read as _, Write as _},
+    io::{self, Read as _},
     path::{Path, PathBuf},
     process::{Command, Stdio},
 };
@@ -32,8 +32,12 @@ enum Commands {
 }
 
 fn main() {
+    use std::fmt::Write;
+    init_logging();
+
     let cli = Cli::parse();
 
+    let mut ret = String::new();
     let input = if let Some(path) = cli.input {
         match path.extension().and_then(std::ffi::OsStr::to_str) {
             Some("rs") => {
@@ -45,7 +49,6 @@ fn main() {
                 let egglog = regex
                     .captures_iter(&rust_file_content)
                     .flat_map(|m| {
-                        //dbg!(m.get(0));
                         let egglog = m
                             .get(1)
                             .expect("egglog source code within rust file")
@@ -63,11 +66,22 @@ fn main() {
                 if egglog.is_empty() {
                     panic!("provided .rs file appears to lack `compile_egraph!((..))`");
                 }
-                println!("/*");
-                println!("===== EXTRACTED EGGLOG START =====");
-                println!("{egglog}");
-                println!("===== EXTRACTED EGGLOG END   =====");
-                println!("*/");
+                writeln!(
+                    ret,
+                    concat!(
+                        "/*",
+                        "\n",
+                        "===== EXTRACTED EGGLOG START =====",
+                        "\n",
+                        "{}",
+                        "\n",
+                        "===== EXTRACTED EGGLOG END   =====",
+                        "\n",
+                        "*/"
+                    ),
+                    egglog
+                )
+                .unwrap();
                 egglog
             }
             Some("egglog" | "egg") => fs::read_to_string(path).unwrap(),
@@ -84,14 +98,47 @@ fn main() {
 
     match cli.command {
         Commands::Compile { output } => {
-            let ret = oatlog::compile_str(&input, true);
+            ret.push_str(&oatlog::compile_str(&input, true));
+            use std::io::Write as _;
             match output {
                 Some(path) => fs::write(path, ret).unwrap(),
                 None => io::stdout().lock().write_all(ret.as_bytes()).unwrap(),
             }
         }
-        Commands::Shrink { expected, output } => shrink(input, output, expected),
+        Commands::Shrink { expected, output } => {
+            println!("{ret}");
+            shrink(input, output, expected);
+        }
     }
+}
+
+fn init_logging() {
+    use std::time::Instant;
+    use tracing_subscriber::{filter::targets::Targets, fmt, layer::Layer};
+
+    /// A timer to add `{ms}ms` to logs.
+    #[derive(Debug, Clone, Copy, Eq, PartialEq)]
+    pub struct UptimeMilliseconds(Instant);
+
+    impl fmt::time::FormatTime for UptimeMilliseconds {
+        fn format_time(&self, w: &mut fmt::format::Writer<'_>) -> std::fmt::Result {
+            let ms = self.0.elapsed().as_millis();
+            write!(w, "[{ms}ms]")
+        }
+    }
+
+    tracing::subscriber::set_global_default(
+        Targets::new()
+            //.with_target("h2", tracing::Level::INFO)
+            .with_default(tracing::Level::TRACE)
+            .with_subscriber(
+                tracing_subscriber::FmtSubscriber::builder()
+                    .with_max_level(tracing::Level::TRACE)
+                    .with_timer(UptimeMilliseconds(Instant::now()))
+                    .finish(),
+            ),
+    )
+    .expect("enable global logger");
 }
 
 fn shrink(program: String, output: PathBuf, wanted_verdict: Verdict) {
@@ -113,7 +160,7 @@ fn shrink(program: String, output: PathBuf, wanted_verdict: Verdict) {
 
     // make sure we do not overwrite the wrong file.
 
-    dbg!(wd);
+    tracing::info!(?wd);
 
     let mut file = open_source_file_checked(&output);
     set_file_contents(&mut file, &empty_contents());
@@ -129,7 +176,9 @@ fn shrink(program: String, output: PathBuf, wanted_verdict: Verdict) {
         loop {
             let mut progress = false;
             for smaller in oatlog_core::shrink(program.clone()) {
-                if dbg!(get_verdict(smaller.clone())) == wanted_verdict {
+                let got_verdict = get_verdict(smaller.clone());
+                tracing::info!(?got_verdict);
+                if got_verdict == wanted_verdict {
                     progress = true;
                     println!("smaller:\n{program}\n");
                     program = smaller;

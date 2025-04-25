@@ -8,6 +8,8 @@ clap.workspace = true
 oatlog-core.workspace = true
 oatlog-macro.workspace = true
 regex.workspace = true
+tracing-subscriber.workspace = true
+tracing.workspace = true
 
 [lints]
 workspace = true

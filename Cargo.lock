@@ -930,6 +930,8 @@ dependencies = [
  "oatlog-core",
  "oatlog-macro",
  "regex",
+ "tracing",
+ "tracing-subscriber",
 ]
 
 [[package]]
