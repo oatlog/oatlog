@@ -236,7 +236,7 @@ fn run_fuel() {
         .map(|(name, count)| format!("\t{name}: {count}"))
         .collect::<Vec<String>>()
         .join("\n");
-    println!("\n{}", relation_entry_count);
+    println!("\n{relation_entry_count}");
 }
 
 fn run() {
@@ -386,7 +386,7 @@ fn run() {
                 .map(|(name, count)| format!("\t{name}: {count}"))
                 .collect::<Vec<String>>()
                 .join("\n");
-            println!("\n{}", relation_entry_count);
+            println!("\n{relation_entry_count}");
         }
         dbg!(theory.add_.new.len());
 
@@ -420,7 +420,7 @@ fn run() {
 }
 
 fn main() {
-    run_fuel()
+    run_fuel();
 }
 
 // NOTE: The index implementation rework, while bringing speedups, changed the scheduling a little

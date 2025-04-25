@@ -11,7 +11,7 @@ use crate::{
 
 use educe::Educe;
 use itertools::Itertools as _;
-use quote::ToTokens;
+use quote::ToTokens as _;
 
 use std::{
     collections::{BTreeMap, BTreeSet},
@@ -383,7 +383,7 @@ pub(crate) enum IsPremise {
     Premise,
     Action,
 }
-use IsPremise::*;
+use IsPremise::{Action, Premise};
 impl IsPremise {
     pub(crate) fn merge(a: Self, b: Self) -> Self {
         match (a, b) {
@@ -521,9 +521,8 @@ impl SymbolicRule {
         self.atoms
             .iter()
             .filter(|x| x.is_premise == Premise)
-            .map(|x| {
+            .inspect(|x| {
                 assert!(x.entry.is_none(), "entry in premise not implemented yet");
-                x
             })
     }
 
@@ -579,7 +578,7 @@ impl SymbolicRule {
         let mut to_merge: UFData<VariableId, (IsPremise, VariableMeta)> = self
             .variables
             .iter()
-            .cloned()
+            .copied()
             .map(|v| (Action, v))
             .collect();
 
@@ -606,7 +605,7 @@ impl SymbolicRule {
                     // variable.
                 }
                 (_, Action) | (Action, _) => {
-                    to_merge.union_merge(a, b, |a, b| merge(a, b));
+                    to_merge.union_merge(a, b, &merge);
                 }
             }
         }
@@ -629,7 +628,7 @@ impl SymbolicRule {
 
             let mut progress = false;
             let mut assumed_true: BTreeSet<Atom> = BTreeSet::new();
-            for atom in queue.into_iter() {
+            for atom in queue {
                 let equivalent = vec![atom]; // .equivalent_atoms(relations);
                 let mut deleted = false;
                 'iter_assumed: for assumed in assumed_true.iter().cloned() {
@@ -643,7 +642,7 @@ impl SymbolicRule {
                                 continue;
                             }
                             deleted = true;
-                            for c in implicit_rule.value_columns().into_iter() {
+                            for c in implicit_rule.value_columns() {
                                 let lhs = atom.columns[c];
                                 let rhs = assumed.columns[c];
                                 if lhs == rhs {
@@ -652,7 +651,7 @@ impl SymbolicRule {
                                 match (atom.is_premise, to_merge[lhs].0, to_merge[rhs].0) {
                                     (Premise, _, _) => {
                                         progress = true;
-                                        to_merge.union_merge(lhs, rhs, |a, b| merge(a, b));
+                                        to_merge.union_merge(lhs, rhs, &merge);
                                     }
                                     (Action, Premise, Premise) => {
                                         deleted = false;
@@ -670,7 +669,7 @@ impl SymbolicRule {
                                     }
                                     (Action, Action, _) | (Action, _, Action) => {
                                         progress = true;
-                                        to_merge.union_merge(lhs, rhs, |a, b| merge(a, b));
+                                        to_merge.union_merge(lhs, rhs, &merge);
                                     }
                                 }
                             }
@@ -723,7 +722,7 @@ impl SymbolicRule {
             variables: TVec::from_iter_unordered(
                 to_merge
                     .iter_roots()
-                    .filter_map(|(id, (_, meta))| Some((*old_to_new.get(&id)?, meta.clone()))),
+                    .filter_map(|(id, (_, meta))| Some((*old_to_new.get(&id)?, *meta))),
             ),
         }
     }
@@ -749,7 +748,7 @@ impl VariableMeta {
             Self { name: None, ty }
         } else {
             Self {
-                name: (name != "").then_some(name),
+                name: (!name.is_empty()).then_some(name),
                 ty,
             }
         }
@@ -841,7 +840,7 @@ impl RuleArgs {
         let variables = to_merge
             .iter_all()
             .map(|(_, _, meta)| meta)
-            .cloned()
+            .copied()
             .collect();
 
         SymbolicRule {
@@ -856,22 +855,22 @@ impl RuleArgs {
 impl Theory {
     pub(crate) fn optimize(&self, config: Configuration) -> Self {
         let mut this = self.clone();
-        for rule in this.symbolic_rules.iter_mut() {
+        for rule in &mut this.symbolic_rules {
             *rule = rule.optimize(&this.relations);
         }
 
         if config.egglog_compat.allow_column_invariant_permutations() {
             for rule in &this.symbolic_rules {
                 rule.extract_invariant_permutations(|relation, perm| {
-                    tracing::debug!(?relation, perm = ?&perm[..]);
+                    tracing::debug!(?relation, perm = ?&*perm);
 
                     this.relations[relation]
                         .invariant_permutations
-                        .add_invariant_permutations(perm)
+                        .add_invariant_permutations(perm);
                 });
             }
 
-            for rule in this.symbolic_rules.iter_mut() {
+            for rule in &mut this.symbolic_rules {
                 *rule = rule.optimize(&this.relations);
             }
         }
@@ -898,12 +897,11 @@ impl Debug for ImplicitRule {
                     .map(|i| {
                         Dbg(out
                             .get(&i)
-                            .map(|x| match x {
+                            .map_or("_", |x| match x {
                                 ImplicitRuleAction::Panic => "!",
                                 ImplicitRuleAction::Union => "U",
                                 ImplicitRuleAction::Lattice {} => "+",
                             })
-                            .unwrap_or("_")
                             .to_string())
                     })
                     .collect::<Vec<_>>(),
@@ -925,7 +923,7 @@ impl Debug for Type {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
         let Self { name, kind } = self;
         f.debug_struct("Type")
-            .field("name", &Dbg(name.to_string()))
+            .field("name", &Dbg((*name).to_string()))
             .field("kind", &Dbg(format!("{kind}")))
             .finish()
     }
@@ -1033,7 +1031,7 @@ mod debug_print {
             ) = self;
             let mut dbg = &mut f.debug_struct("SymbolicRule");
             if let Some(name) = meta.name {
-                dbg = dbg.field("name", &name)
+                dbg = dbg.field("name", &name);
             }
 
             dbg = dbg.field("src", &this.meta.src);
@@ -1053,7 +1051,7 @@ mod debug_print {
                     .map(|v| {
                         Dbg(format!(
                             "{:?}",
-                            v.into_iter()
+                            v.iter()
                                 .map(|v| variables[v].name_or_id(*v))
                                 .map(Dbg)
                                 .collect::<Vec<_>>()
@@ -1081,11 +1079,11 @@ mod debug_print {
 
             let kind = match kind {
                 RelationTy::NewOf { id } => format!("NewOf({id:?})"),
-                RelationTy::Table => format!("Table"),
-                RelationTy::Alias {} => format!("Alias"),
-                RelationTy::Global { id } => format!("Global({})", id),
+                RelationTy::Table => "Table".to_string(),
+                RelationTy::Alias {} => "Alias".to_string(),
+                RelationTy::Global { id } => format!("Global({id})"),
                 RelationTy::Primitive { syn: _, ident } => format!("Primitive({ident})"),
-                RelationTy::Forall { ty } => format!("Forall({})", ty),
+                RelationTy::Forall { ty } => format!("Forall({ty})"),
             };
             f.debug_struct(name)
                 .field(
@@ -1100,10 +1098,7 @@ mod debug_print {
                     "implicit_rules",
                     &Dbg(format!(
                         "{:?}",
-                        implicit_rules
-                            .iter_enumerate()
-                            .map(|(i, x)| (i, x))
-                            .collect::<BTreeMap<_, _>>()
+                        implicit_rules.iter_enumerate().collect::<BTreeMap<_, _>>()
                     )),
                 )
                 .finish()

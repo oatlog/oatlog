@@ -58,6 +58,10 @@ pub trait Relation {
     fn update_begin(&mut self, insertions: &[Self::Row], uf: &mut Self::Unification);
     fn update(&mut self, insertions: &mut Vec<Self::Row>, uf: &mut Self::Unification) -> bool;
     fn update_finalize(&mut self, insertions: &mut Vec<Self::Row>, uf: &mut Self::Unification);
+
+    fn is_empty(&self) -> bool {
+        self.len() == 0
+    }
 }
 
 relation_element_wrapper_ty!(IString);

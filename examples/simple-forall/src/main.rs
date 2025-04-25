@@ -21,7 +21,7 @@ fn run() {
 }
 
 fn main() {
-    run()
+    run();
 }
 
 // NOTE: This test is currently broken, as the check (commented out above) cannot compile, as `iter1_0_1` is missing.

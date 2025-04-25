@@ -14,9 +14,8 @@ fn run(sink: &mut impl std::io::Write, iters: usize) {
 
         if last == size {
             break;
-        } else {
-            last = size;
         }
+        last = size;
     }
 
     let relation_entry_count = theory
@@ -25,7 +24,7 @@ fn run(sink: &mut impl std::io::Write, iters: usize) {
         .map(|(name, count)| format!("{name}: {count}"))
         .collect::<Vec<String>>()
         .join("\n");
-    writeln!(sink, "\n{}", relation_entry_count).unwrap();
+    writeln!(sink, "\n{relation_entry_count}").unwrap();
     writeln!(
         sink,
         "\ntotal e-nodes: {}",
@@ -38,7 +37,7 @@ fn run(sink: &mut impl std::io::Write, iters: usize) {
         .map(|(name, (tot, roots))| format!("{name}: tot={tot} roots={roots}"))
         .collect::<Vec<String>>()
         .join("\n");
-    writeln!(sink, "\n{}", uf_count).unwrap();
+    writeln!(sink, "\n{uf_count}").unwrap();
 }
 
 fn main() {
@@ -47,7 +46,7 @@ fn main() {
         .and_then(|s| s.parse().ok())
         .unwrap_or(10);
 
-    run(&mut std::io::stdout(), iters)
+    run(&mut std::io::stdout(), iters);
 }
 
 #[test]
@@ -55,7 +54,7 @@ fn test() {
     let mut sink = Vec::new();
     run(&mut sink, 10);
     let sink = String::from_utf8(sink).unwrap();
-    expect_test::expect!([r#"
+    expect_test::expect!([r"
         running with iters=10
         i=0 size=106
         i=1 size=241
@@ -83,6 +82,6 @@ fn test() {
         total e-nodes: 77091
 
         Math: tot=121458 roots=25899
-    "#])
+    "])
     .assert_eq(&sink);
 }

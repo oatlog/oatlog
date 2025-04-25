@@ -35,15 +35,11 @@ impl BipartiteMatching {
         for left_origin in graph.enumerate() {
             let mut visited_right: TVec<IuDedupId, bool> = graph.new_same_size();
 
-            match dfs(left_origin, graph, &mut match_back, &mut visited_right) {
-                Ok(()) => matched += 1,
-                Err(()) => {}
+            if let Ok(()) = dfs(left_origin, graph, &mut match_back, &mut visited_right) {
+                matched += 1;
             }
         }
-        assert_eq!(
-            matched,
-            match_back.iter().copied().filter(Option::is_some).count()
-        );
+        assert_eq!(matched, match_back.iter().copied().flatten().count());
 
         fn dfs(
             left: IuDedupId,
@@ -83,7 +79,7 @@ impl BipartiteMatching {
                 }
                 next
             },
-            has_prev: match_back.map(|left| left.is_some()),
+            has_prev: match_back.map(std::option::Option::is_some),
         }
     }
 }
@@ -166,11 +162,11 @@ fn all_usages(
             })
             .collect(),
         index_usage_to_dedup_inv
-            .into_iter()
-            .map(|(_, cols)| {
+            .into_values()
+            .map(|cols| {
                 let cols = cols.into_iter().next().unwrap();
                 let mut perm: TVec<ColumnId, ColumnId> = cols.iter().copied().collect();
-                perm.extend((0..columns).map(ColumnId).filter(|x| !cols.contains(&x)));
+                perm.extend((0..columns).map(ColumnId).filter(|x| !cols.contains(x)));
                 lir::IndexInfo {
                     permuted_columns: perm,
                     primary_key_prefix_len: columns,
@@ -303,9 +299,7 @@ fn curried_index(
 
 #[cfg(test)]
 mod test {
-    use super::{
-        BipartiteMatching, ColumnId, IndexUsageId, IuDedupId, curried_index, index_selection,
-    };
+    use super::{BipartiteMatching, ColumnId, IndexUsageId, IuDedupId, curried_index};
     use crate::typed_vec::TVec;
     use expect_test::expect;
     use itertools::Itertools as _;
@@ -314,7 +308,7 @@ mod test {
     fn test_bipartite<const N: usize>(graph: [&[usize]; N], expected: expect_test::Expect) {
         let graph: TVec<IuDedupId, Vec<IuDedupId>> = graph
             .iter()
-            .map(|inner| inner.into_iter().copied().map(IuDedupId).collect_vec())
+            .map(|inner| inner.iter().copied().map(IuDedupId).collect_vec())
             .collect();
         let result: String = BipartiteMatching::compute_maximum_bipartite_matching(&graph)
             .next
@@ -370,10 +364,10 @@ mod test {
         let uses: TVec<IndexUsageId, BTreeSet<ColumnId>> =
             [&[0][..], &[0, 1], &[1], &[1, 3], &[2], &[3]]
                 .into_iter()
-                .map(|x| x.into_iter().copied().map(ColumnId).collect())
+                .map(|x| x.iter().copied().map(ColumnId).collect())
                 .collect();
         let (logical_to_physical, physical_indexes) = curried_index(columns, &uses);
-        expect![[r#"
+        expect![[r"
             {
                 iu0: IndexUsageInfo {
                     prefix: 1,
@@ -400,13 +394,13 @@ mod test {
                     index: ir3,
                 },
             }
-        "#]]
+        "]]
         .assert_debug_eq(&logical_to_physical);
-        expect![[r#"
+        expect![[r"
             0 1 2 3
             1 3 0 2
             2 0 1 3
-            3 0 1 2"#]]
+            3 0 1 2"]]
         .assert_eq(
             &physical_indexes
                 .iter()

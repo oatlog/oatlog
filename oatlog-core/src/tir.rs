@@ -21,7 +21,7 @@ struct SparseUf<T> {
 impl<T: Copy + Eq + Ord + Hash> SparseUf<T> {
     fn find(&self, t: T) -> T {
         if let Some(t2) = self.repr.get(&t) {
-            if *t2 != t { self.find(*t2) } else { *t2 }
+            if *t2 == t { *t2 } else { self.find(*t2) }
         } else {
             t
         }
@@ -69,7 +69,7 @@ impl Trie {
         &self,
         index_usage: &mut TVec<RelationId, BTreeSet<BTreeSet<ColumnId>>>,
     ) {
-        for (link, trie) in self.map.iter() {
+        for (link, trie) in &self.map {
             trie.register_index_usages(index_usage);
             let bound = &self.bound_premise;
             let atom = link.clone().atom();
@@ -83,7 +83,7 @@ impl Trie {
         }
     }
     fn size(&self) -> usize {
-        1 + self.map.values().map(|trie| trie.size()).sum::<usize>()
+        1 + self.map.values().map(Trie::size).sum::<usize>()
     }
 }
 
@@ -107,8 +107,8 @@ pub(crate) fn schedule_rules(
                     .into_iter()
                     .map(|x| x.map_columns(f))
                     .partition(|x| x.is_premise == IsPremise::Premise);
-                let unify: Vec<_> = unify.iter_all().map(|(a, b, _)| (f(a), f(b))).collect();
-                variables.extend(local_variables.into_iter());
+                let unify: Vec<_> = unify.iter_all().map(|(a, b, ())| (f(a), f(b))).collect();
+                variables.extend(local_variables);
                 Rule {
                     meta,
                     premise,
@@ -129,13 +129,20 @@ pub(crate) fn schedule_rules(
         //rng: Rc::new(RefCell::new(rng)),
     };
     let trie = {
-        let base_index_usage: TVec<RelationId, BTreeSet<BTreeSet<ColumnId>>> =
-            relations.map(|x| x.implicit_rules.iter().map(|x| x.key_columns()).collect());
+        let base_index_usage: TVec<RelationId, BTreeSet<BTreeSet<ColumnId>>> = relations.map(|x| {
+            x.implicit_rules
+                .iter()
+                .map(super::hir::ImplicitRule::key_columns)
+                .collect()
+        });
         let score_for_trie = |trie: &Trie| {
             let mut index_usage = base_index_usage.clone();
             trie.register_index_usages(&mut index_usage);
             (
-                index_usage.iter().map(|x| x.len()).sum::<usize>(),
+                index_usage
+                    .iter()
+                    .map(std::collections::BTreeSet::len)
+                    .sum::<usize>(),
                 trie.size(),
             )
         };
@@ -192,7 +199,7 @@ fn scc_group_size<'a>(
         for i in 0..n {
             dfs(i, adj, &mut order, &mut visited);
         }
-        let adj_inv = adj_reverse(&adj);
+        let adj_inv = adj_reverse(adj);
 
         visited.fill(false);
 
@@ -233,10 +240,10 @@ fn scc_group_size<'a>(
             }
         }
     }
-    adj.iter_mut().for_each(|x| {
-        x.sort();
-        x.dedup()
-    });
+    for x in &mut adj {
+        x.sort_unstable();
+        x.dedup();
+    }
 
     strongly_connected_components(&adj)
         .into_iter()
@@ -260,10 +267,10 @@ fn action_topo_resolve<'a>(
     types: &TVec<TypeId, hir::Type>,
 ) -> Vec<Atom> {
     let actions = {
-        use crate::union_find::*;
-        use hir::IsPremise::*;
+        use crate::union_find::UFData;
+        use hir::IsPremise::{Action, Premise};
         let mut to_merge: UFData<VariableId, IsPremise> =
-            variables.iter().cloned().map(|_| Action).collect();
+            variables.iter().copied().map(|_| Action).collect();
 
         let merge = |pa: &IsPremise, pb: &IsPremise| IsPremise::merge(*pa, *pb);
 
@@ -276,7 +283,7 @@ fn action_topo_resolve<'a>(
             let pre = queue.clone();
             let mut progress = false;
             let mut assumed_true: BTreeSet<Atom> = BTreeSet::new();
-            for atom in queue.into_iter() {
+            for atom in queue {
                 let equivalent = vec![atom]; // .equivalent_atoms(relations);
                 let mut deleted = false;
                 'iter_assumed: for assumed in assumed_true.iter().cloned() {
@@ -290,7 +297,7 @@ fn action_topo_resolve<'a>(
                                 continue;
                             }
                             deleted = true;
-                            for c in implicit_rule.value_columns().into_iter() {
+                            for c in implicit_rule.value_columns() {
                                 let lhs = atom.columns[c];
                                 let rhs = assumed.columns[c];
                                 if lhs == rhs {
@@ -299,7 +306,7 @@ fn action_topo_resolve<'a>(
                                 match (atom.is_premise, to_merge[lhs], to_merge[rhs]) {
                                     (Premise, _, _) => {
                                         progress = true;
-                                        to_merge.union_merge(lhs, rhs, |a, b| merge(a, b));
+                                        to_merge.union_merge(lhs, rhs, &merge);
                                     }
                                     (Action, Premise, Premise) => {
                                         deleted = false;
@@ -316,7 +323,7 @@ fn action_topo_resolve<'a>(
                                     }
                                     (Action, Action, _) | (Action, _, Action) => {
                                         progress = true;
-                                        to_merge.union_merge(lhs, rhs, |a, b| merge(a, b));
+                                        to_merge.union_merge(lhs, rhs, &merge);
                                     }
                                 }
                             }
@@ -426,7 +433,7 @@ fn action_topo_resolve<'a>(
                 {
                     let relation_ = &relations[x.relation];
                     let im = &relation_.implicit_rules[x.entry.unwrap()];
-                    for c in im.out.iter().map(|(c, _)| *c) {
+                    for c in im.out.keys().copied() {
                         let old_id = x.columns[c];
                         let new_id = variables.push(variables[old_id]);
                         x.columns[c] = new_id;
@@ -521,7 +528,7 @@ pub(crate) fn lowering_rec(
                             }
                         }
                         first = false;
-                        return lir::Action::Insert { relation, args };
+                        lir::Action::Insert { relation, args }
                     },
                 )
                 .collect::<Vec<_>>()
@@ -587,7 +594,7 @@ pub(crate) fn lowering_rec(
                                 progress = true;
 
                                 let old_id = atom.columns[ColumnId(i)];
-                                let new_id = variables.push(variables[old_id].clone());
+                                let new_id = variables.push(variables[old_id]);
 
                                 atom.columns[ColumnId(j)] = new_id;
 
@@ -707,7 +714,7 @@ pub(crate) fn lowering_rec(
         .collect();
 
     if !lir_trie.is_empty() && !meta.is_empty() {
-        lir_trie[0].meta = Some(meta.into_iter().map(|x| x.src).join("\n").leak())
+        lir_trie[0].meta = Some(meta.into_iter().map(|x| x.src).join("\n").leak());
     }
 
     lir_trie.leak()
@@ -732,7 +739,7 @@ enum TrieLink {
     /// `if ... { ... }`
     Semi(Atom),
 }
-use TrieLink::*;
+use TrieLink::{Primary, Semi};
 impl TrieLink {
     fn primary(self) -> Option<Atom> {
         match self {
@@ -748,8 +755,7 @@ impl TrieLink {
     }
     fn atom(self) -> Atom {
         match self {
-            Primary(atom) => atom,
-            Semi(atom) => atom,
+            Primary(atom) | Semi(atom) => atom,
         }
     }
 }
@@ -775,7 +781,7 @@ impl Ctx<'_> {
 }
 
 fn inner(mut ctx: Ctx<'_>, rules: &[Rule]) -> Trie {
-    let (finished, map) = election(&ctx, &rules);
+    let (finished, map) = election(&ctx, rules);
 
     let mut actions = vec![];
     let mut unify = vec![];
@@ -864,12 +870,12 @@ impl Rule {
             .into_iter()
             .flat_map(|(salt, link)| match link {
                 Primary(atom) => atom
-                    .equivalent_atoms(&ctx.relations)
+                    .equivalent_atoms(ctx.relations)
                     .into_iter()
                     .map(move |atom| (salt.clone(), Primary(atom)))
                     .collect::<Vec<_>>(),
                 Semi(atom) => atom
-                    .equivalent_atoms(&ctx.relations)
+                    .equivalent_atoms(ctx.relations)
                     .into_iter()
                     .map(move |atom| (salt.clone(), Semi(atom)))
                     .collect::<Vec<_>>(),
@@ -884,7 +890,7 @@ impl Rule {
                 for this in self
                     .premise
                     .iter()
-                    .flat_map(|x| x.equivalent_atoms(&ctx.relations))
+                    .flat_map(|x| x.equivalent_atoms(ctx.relations))
                 {
                     let this = &this;
                     if !supported.contains(this) || this.relation != other.relation {
@@ -927,7 +933,7 @@ impl Rule {
                     if ok {
                         let n = this_rule.premise.len();
                         this_rule.premise.retain(|x| {
-                            !x.equivalent_atoms(&ctx.relations)
+                            !x.equivalent_atoms(ctx.relations)
                                 .into_iter()
                                 .any(|x| &x == other)
                         });
@@ -945,8 +951,8 @@ impl Rule {
                         this_rule.semi = this_rule
                             .premise
                             .iter()
+                            .filter(|&x| x.columns.iter().any(|v| introduced_vars.contains(v)))
                             .cloned()
-                            .filter(|x| x.columns.iter().any(|v| introduced_vars.contains(v)))
                             .collect();
 
                         return Some(this_rule);
@@ -987,8 +993,8 @@ impl Rule {
 
                             let matching = this.columns.iter().zip(other.columns.iter()).all(
                                 |(&this, &other)| {
-                                    if (&ctx.bound_premise).contains(&this)
-                                        || (&ctx.bound_premise).contains(&other)
+                                    if ctx.bound_premise.contains(&this)
+                                        || ctx.bound_premise.contains(&other)
                                     {
                                         this == other
                                     } else {
@@ -996,13 +1002,9 @@ impl Rule {
                                     }
                                 },
                             );
-                            if matching {
-                                return false;
-                            } else {
-                                return true;
-                            }
+                            !matching
                         };
-                    for equiv in this.equivalent_atoms(&ctx.relations) {
+                    for equiv in this.equivalent_atoms(ctx.relations) {
                         if !should_retain(equiv) {
                             return false;
                         }
@@ -1055,8 +1057,10 @@ impl Rule {
                     .premise
                     .iter()
                     .map(|atom| {
-                        use IsConnected::*;
-                        use RelationScore::*;
+                        use IsConnected::{Connected, Disconnected};
+                        use RelationScore::{
+                            AllBound, Global, Indexed, New, NoQuery, SingleElement,
+                        };
                         let connected =
                             if atom.columns.iter().any(|x| ctx.bound_premise.contains(x)) {
                                 Connected
@@ -1131,11 +1135,11 @@ impl Rule {
                             CompoundRelationScore::SingleElementDisconnected => {
                                 panic!("query is disconnected (valid but surprising)")
                             }
-                            CompoundRelationScore::IndexedConnected => (),
-                            CompoundRelationScore::SingleElementConnected => (),
-                            CompoundRelationScore::AllBound => (),
-                            CompoundRelationScore::New => (),
-                            CompoundRelationScore::Global => (),
+                            CompoundRelationScore::IndexedConnected
+                            | CompoundRelationScore::SingleElementConnected
+                            | CompoundRelationScore::AllBound
+                            | CompoundRelationScore::New
+                            | CompoundRelationScore::Global => (),
                         }
                         best.into_iter().cloned().map(TrieLink::Primary).collect()
                     })
@@ -1146,18 +1150,18 @@ impl Rule {
                 // a check.
                 vec![Primary(atom.clone())]
             }
-            _ => self.semi.iter().cloned().map(|x| Semi(x)).collect(),
+            _ => self.semi.iter().cloned().map(Semi).collect(),
         })
         .into_iter()
         .map(|x| (self.salt(), x))
         .flat_map(|(salt, link)| match link {
             Primary(atom) => atom
-                .equivalent_atoms(&ctx.relations)
+                .equivalent_atoms(ctx.relations)
                 .into_iter()
                 .map(move |atom| (salt.clone(), Primary(atom)))
                 .collect::<Vec<_>>(),
             Semi(atom) => atom
-                .equivalent_atoms(&ctx.relations)
+                .equivalent_atoms(ctx.relations)
                 .into_iter()
                 .map(move |atom| (salt.clone(), Semi(atom)))
                 .collect::<Vec<_>>(),
@@ -1181,7 +1185,7 @@ impl Rule {
 /// If we want to do random sampling, we might want to use a PDF here or something.
 fn election(ctx: &Ctx<'_>, rules: &[Rule]) -> (Vec<Rule>, BTreeMap<TrieLink, Vec<Rule>>) {
     use crate::ids::id_wrap;
-    use itertools::Either::*;
+    use itertools::Either::{Left, Right};
     id_wrap!(RuleId, "y", "id for a rule");
     id_wrap!(VoteId, "e", "id for a vote (TrieLink)");
 
@@ -1225,7 +1229,7 @@ fn election(ctx: &Ctx<'_>, rules: &[Rule]) -> (Vec<Rule>, BTreeMap<TrieLink, Vec
             (
                 matrix[v]
                     .iter_enumerate()
-                    .filter(|(i, x)| x.is_some() && remaining_rules.contains(&i))
+                    .filter(|(i, x)| x.is_some() && remaining_rules.contains(i))
                     .count(),
                 v,
             )
@@ -1248,7 +1252,7 @@ fn election(ctx: &Ctx<'_>, rules: &[Rule]) -> (Vec<Rule>, BTreeMap<TrieLink, Vec
             if _count > 1 && vote.len() > 1 {
                 let indexes = vote
                     .iter()
-                    .cloned()
+                    .copied()
                     .map(|x| votes[x].1.clone().atom())
                     .map(|atom| {
                         (

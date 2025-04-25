@@ -18,7 +18,7 @@ pub mod runtime;
 mod expect_tests;
 
 use frontend::MResult;
-use itertools::Itertools;
+use itertools::Itertools as _;
 use std::{collections::BTreeMap, panic::UnwindSafe, time::Instant};
 
 fn to_egglog_ast(program: &str) -> frontend::egglog_ast::Program {
@@ -28,7 +28,7 @@ fn to_egglog_ast(program: &str) -> frontend::egglog_ast::Program {
             frontend::parse_str_to_sexps(program)
                 .unwrap()
                 .into_iter()
-                .flat_map(|x| x.unwrap())
+                .flat_map(frontend::ParseInput::unwrap)
                 .collect_vec(),
         )
         .unwrap(),
@@ -38,13 +38,15 @@ fn from_egglog_ast(ast: frontend::egglog_ast::Program) -> String {
     ast.to_string()
 }
 
+#[must_use]
 pub fn shrink(program: String) -> Box<impl Iterator<Item = String>> {
-    use frontend::egglog_ast::Shrink;
+    use frontend::egglog_ast::Shrink as _;
     let ast = to_egglog_ast(&program);
 
-    Box::new(ast.shrink().map(|x| from_egglog_ast(x)))
+    Box::new(ast.shrink().map(from_egglog_ast))
 }
 
+#[must_use]
 pub fn format_program(program: String) -> String {
     from_egglog_ast(to_egglog_ast(&program))
 }
@@ -137,7 +139,7 @@ enum Input {
     String(&'static str),
 }
 impl Input {
-    fn to_sexp(self) -> frontend::MResult<Vec<frontend::ParseInput>> {
+    fn into_sexp(self) -> frontend::MResult<Vec<frontend::ParseInput>> {
         match self {
             Input::Tokens(x) => frontend::parse_to_sexps(x),
             Input::String(x) => frontend::parse_str_to_sexps(x),
@@ -222,7 +224,7 @@ fn universal(input: Input, config: Configuration) -> Result<Output, CompileError
     let epoch = Instant::now();
 
     return tracing::info_span!("oatlog", digest = input.digest()).in_scope(|| {
-        let compile = || compile_impl(input.to_sexp()?, config);
+        let compile = || compile_impl(input.into_sexp()?, config);
         let output = match config.panic_backtrace {
             BackTraceAction::ForceBacktracePanic => match panic_to_err(compile) {
                 Ok(output) => output.map_err(CompileError::Err),

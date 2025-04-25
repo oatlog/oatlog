@@ -961,7 +961,11 @@ fn comma<A: IntoIterator<Item = B>, B: Display>(x: A) -> String {
 }
 impl Display for Program {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        let s = self.statements.iter().map(|x| x.to_string()).join("\n");
+        let s = self
+            .statements
+            .iter()
+            .map(std::string::ToString::to_string)
+            .join("\n");
         s.fmt(f)
     }
 }
@@ -1044,7 +1048,7 @@ impl Display for Statement {
                     Some(expr) => {
                         format!(":merge {expr}")
                     }
-                    None => format!(":no-merge"),
+                    None => ":no-merge".to_string(),
                 };
                 let input = comma(input);
                 write!(f, "(function {name} ({input}) {output} {merge})")
@@ -1170,7 +1174,7 @@ pub(crate) trait Shrink: Eq + Ord + Clone + 'static {
         use std::collections::BTreeSet;
         let mut dedup = BTreeSet::new();
         Box::new(std::iter::from_fn(move || {
-            while let Some(nxt) = iter.next() {
+            for nxt in iter.by_ref() {
                 if dedup.insert(nxt.clone()) && nxt != this {
                     return Some(nxt);
                 }
@@ -1188,13 +1192,13 @@ trait ShuffleExt<T>: Iterator<Item = T> + Sized + 'static {
         let mut rhs: Box<dyn Iterator<Item = T>> = Box::new(other);
         std::iter::from_fn(move || {
             if rng.random() {
-                std::mem::swap(&mut lhs, &mut rhs)
+                std::mem::swap(&mut lhs, &mut rhs);
             }
             lhs.next().or_else(|| rhs.next())
         })
     }
     fn shuffle(self) -> impl Iterator<Item = T> {
-        use rand::{rng, seq::SliceRandom};
+        use rand::{rng, seq::SliceRandom as _};
         let mut elems: Vec<_> = self.collect();
         elems.shuffle(&mut rng());
         elems.into_iter()
@@ -1246,7 +1250,7 @@ impl Shrink for Expr {
                     .chain_rand(args.shrink().flatten())
                     .map(move |x| x.x.clone())
                     .chain_rand({
-                        let name = name.clone();
+                        let name = *name;
                         args.shrink().map(move |args| Expr::Call(name, args))
                     }),
             ),
@@ -1263,7 +1267,7 @@ impl Shrink for Statement {
                 primitive: _,
             } => none,
             Statement::Datatype { name, variants } => {
-                let name = name.clone();
+                let name = *name;
                 Box::new(
                     variants
                         .clone()
@@ -1292,8 +1296,8 @@ impl Shrink for Statement {
                 ruleset,
                 rule,
             } => {
-                let name = name.clone();
-                let ruleset = ruleset.clone();
+                let name = *name;
+                let ruleset = *ruleset;
                 Box::new(rule.shrink().map(move |rule| Statement::Rule {
                     name,
                     ruleset,
@@ -1305,8 +1309,8 @@ impl Shrink for Statement {
                 rewrite,
                 subsume,
             } => {
-                let ruleset = ruleset.clone();
-                let subsume = subsume.clone();
+                let ruleset = *ruleset;
+                let subsume = *subsume;
                 Box::new(rewrite.shrink().map(move |rewrite| Statement::Rewrite {
                     ruleset,
                     rewrite,
@@ -1314,7 +1318,7 @@ impl Shrink for Statement {
                 }))
             }
             Statement::BiRewrite { ruleset, rewrite } => {
-                let ruleset = ruleset.clone();
+                let ruleset = *ruleset;
                 Box::new(
                     rewrite
                         .shrink()
@@ -1376,7 +1380,7 @@ impl Shrink for Fact {
                     Box::new(e2.clone().shrink().map(move |e2| Fact::Eq(e1.clone(), e2)))
                 }),
             ),
-            Fact::Expr(e) => Box::new(e.clone().shrink().map(|e| Fact::Expr(e))),
+            Fact::Expr(e) => Box::new(e.clone().shrink().map(Fact::Expr)),
         }
     }
 }
@@ -1405,7 +1409,7 @@ impl Shrink for Action {
         let none = Box::new(None.into_iter());
         match self {
             Action::Let { name, expr } => {
-                let name = name.clone();
+                let name = *name;
                 Box::new(expr.shrink().map(move |expr| Action::Let { name, expr }))
             }
             Action::Set {
@@ -1413,7 +1417,7 @@ impl Shrink for Action {
                 args,
                 result,
             } => {
-                let table = table.clone();
+                let table = *table;
                 Box::new(
                     ({
                         let result = result.clone();
@@ -1438,7 +1442,7 @@ impl Shrink for Action {
                 lhs.clone()
                     .shrink()
                     .chain_rand(rhs.clone().shrink())
-                    .map(|expr| Action::Expr(expr))
+                    .map(Action::Expr)
                     .chain_rand({
                         let lhs = lhs.clone();
                         rhs.shrink().map(move |rhs| Action::Union {

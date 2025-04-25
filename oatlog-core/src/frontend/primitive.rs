@@ -4,11 +4,11 @@ use std::{collections::BTreeSet, mem::take};
 
 use darling::FromMeta;
 use educe::Educe;
-use quote::ToTokens;
+use quote::ToTokens as _;
 use syn::spanned::Spanned as _;
 
 use crate::{
-    MultiMapCollect,
+    MultiMapCollect as _,
     frontend::span::MResult,
     frontend::span::{self, QSpan, Spanned, Str},
     ids::{ColumnId, ImplicitRuleId, TypeId},
@@ -69,8 +69,8 @@ pub(crate) fn parse_prim_funcs(
             (attr.id.clone(), (attr, item_fn, Some(span)))
         })
         .collect_multimap()
-        .into_iter()
-        .map(|(_, attr)| {
+        .into_values()
+        .map(|attr| {
             let mut expected_types = None;
             let mut expected_name = None;
             let indexes: TVec<ImplicitRuleId, PrimIndex> = attr
@@ -84,14 +84,14 @@ pub(crate) fn parse_prim_funcs(
 
                     let types_index: TVec<ColumnId, Str> = inputs
                         .iter()
-                        .cloned()
-                        .chain(outputs.iter().cloned())
+                        .copied()
+                        .chain(outputs.iter().copied())
                         .collect();
 
                     let types_main: TVec<ColumnId, Str> = TVec::from_iter_unordered(
                         types_index
                             .iter_enumerate()
-                            .map(|(i, x)| (index_to_main[i], x.clone())),
+                            .map(|(i, x)| (index_to_main[i], *x)),
                     );
 
                     if let Some(e) = expected_types.as_ref() {
@@ -397,7 +397,7 @@ mod tests {
 
         let parsed = parse_prim_funcs(prim_funcs, |x| {
             // just to get different types for different strings
-            use std::hash::{DefaultHasher, Hash, Hasher};
+            use std::hash::{DefaultHasher, Hash as _, Hasher as _};
             let mut hasher = DefaultHasher::new();
             x.hash(&mut hasher);
             TypeId(hasher.finish() as usize)

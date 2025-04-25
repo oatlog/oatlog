@@ -27,7 +27,7 @@ impl<RC: RowCtx> Index for FallbackStatic<RC> {
     fn len(&self) -> usize {
         self.inner.len()
     }
-    fn iter<'a>(&'a self) -> impl 'a + Iterator<Item = Self::Repr> {
+    fn iter(&self) -> impl '_ + Iterator<Item = Self::Repr> {
         self.inner.iter().copied().map(Self::Row::inner)
     }
     fn range(&self, r: RangeInclusive<Self::Repr>) -> impl Iterator<Item = Self::Repr> {

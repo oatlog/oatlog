@@ -59,7 +59,7 @@ impl<RC: RowCtx> Index for SortedVec<RC> {
         self.inner.len()
     }
     fn iter(&self) -> impl Iterator<Item = Self::Repr> {
-        RC::Row::inner_slice(&self.inner).into_iter().copied()
+        RC::Row::inner_slice(&self.inner).iter().copied()
     }
     fn range(&self, range: RangeInclusive<Self::Repr>) -> impl Iterator<Item = Self::Repr> {
         let (start, end) = range.into_inner();
@@ -124,7 +124,7 @@ impl<RC: RowCtx> IndexStatic for SortedVec<RC> {
                 while i < rhs.inner.len() && rhs.inner[i] < row {
                     i += 1;
                 }
-                rhs.inner.get(i).map_or(true, |&other| other != row)
+                rhs.inner.get(i).is_none_or(|&other| other != row)
             })
             .map(RC::Row::inner)
     }
@@ -167,17 +167,17 @@ impl<RC: RowCtx> IndexStatic for SortedVec<RC> {
                         let src = (target_outer * (RC::B + 1) + target_inner + 1) * small_step - 1;
 
                         self.inner.get(src).copied().unwrap_or(infinity)
-                    }))
+                    }));
             }
         }
     }
 
     /// Arguments
     /// - insertions: permuted.
-    /// - deferred_insertions: initially empty, pushed to when `already_canon(existing_row) == false`.
+    /// - `deferred_insertions`: initially empty, pushed to when `already_canon(existing_row) == false`.
     /// - uf
     /// - scratch: initially and finally empty, used to avoid allocation.
-    /// - already_canon: canonicalize a row and return whether it already was canonical.
+    /// - `already_canon`: canonicalize a row and return whether it already was canonical.
     /// - merge
     // TODO: Maybe remove from `insertions` entries that already exist (can be done efficiently with some extra bookkeeping)
     fn sorted_vec_update<UF>(
@@ -211,7 +211,7 @@ impl<RC: RowCtx> IndexStatic for SortedVec<RC> {
 
         let mut i = 0;
         let mut j = 0;
-        if insertions.len() > 0 && self.inner.len() > 0 {
+        if !insertions.is_empty() && !self.inner.is_empty() {
             'done: loop {
                 while insertions[i] <= self.inner[j] {
                     push_item(insertions[i]);

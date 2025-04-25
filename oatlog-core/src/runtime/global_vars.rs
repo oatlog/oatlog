@@ -25,7 +25,7 @@ impl<T: RelationElement> GlobalVars<T> {
         if val == x.val {
             return;
         }
-        x.next = Some(merge(x.next.unwrap_or_else(|| x.val), val));
+        x.next = Some(merge(x.next.unwrap_or(x.val), val));
     }
     pub fn update_finalize(&mut self) {
         for GlobalVar { val, new, next } in &mut self.0 {
@@ -39,9 +39,11 @@ impl<T: RelationElement> GlobalVars<T> {
             }
         }
     }
+    #[must_use]
     pub fn get(&self, id: usize) -> T {
         self.0[id].val
     }
+    #[must_use]
     pub fn get_new(&self, id: usize) -> Option<T> {
         let x = self.0[id];
         x.new.then_some(x.val)

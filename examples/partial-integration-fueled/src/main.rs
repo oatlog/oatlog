@@ -12,9 +12,8 @@ fn run(sink: &mut impl std::io::Write) {
 
         if last == size {
             break;
-        } else {
-            last = size;
         }
+        last = size;
     }
 
     let relation_entry_count = theory
@@ -23,11 +22,11 @@ fn run(sink: &mut impl std::io::Write) {
         .map(|(name, count)| format!("{name}: {count}"))
         .collect::<Vec<String>>()
         .join("\n");
-    writeln!(sink, "\n{}", relation_entry_count).unwrap();
+    writeln!(sink, "\n{relation_entry_count}").unwrap();
 }
 
 fn main() {
-    run(&mut std::io::stdout())
+    run(&mut std::io::stdout());
 }
 
 #[test]
@@ -35,7 +34,7 @@ fn test() {
     let mut sink = Vec::new();
     run(&mut sink);
     let sink = String::from_utf8(sink).unwrap();
-    expect_test::expect!([r#"
+    expect_test::expect!([r"
         i=0 size=73
         i=1 size=122
         i=2 size=212
@@ -75,6 +74,6 @@ fn test() {
         Sub: 56
         Var: 3
         ZeroFuel: 1
-    "#])
+    "])
     .assert_eq(&sink);
 }

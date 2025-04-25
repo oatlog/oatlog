@@ -29,7 +29,7 @@ pub fn compile_rustdoc(x: proc_macro::TokenStream) -> proc_macro::TokenStream {
 
 fn init_logging() {
     use std::time::Instant;
-    use tracing_subscriber::{filter::targets::Targets, fmt, layer::Layer};
+    use tracing_subscriber::{filter::targets::Targets, fmt, layer::Layer as _};
 
     /// A timer to add `{ms}ms` to logs.
     #[derive(Debug, Clone, Copy, Eq, PartialEq)]

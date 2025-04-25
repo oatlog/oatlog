@@ -51,7 +51,7 @@ fn run(sink: &mut impl std::io::Write) {
     let x = theory.make();
     let b = theory.make();
     let c = theory.make();
-    writeln!(sink, "{}", HEADER).unwrap();
+    writeln!(sink, "{HEADER}").unwrap();
 
     // b^2
     let b2 = theory.make();
@@ -96,7 +96,7 @@ fn run(sink: &mut impl std::io::Write) {
                 .map(|(name, count)| format!("\t{name}: {count}"))
                 .collect::<Vec<String>>()
                 .join("\n");
-            writeln!(sink, "\n{}", relation_entry_count).unwrap();
+            writeln!(sink, "\n{relation_entry_count}").unwrap();
         }
 
         let size = theory.get_total_relation_entry_count();
@@ -109,9 +109,8 @@ fn run(sink: &mut impl std::io::Write) {
 
         if last == size {
             break;
-        } else {
-            last = size;
         }
+        last = size;
     }
     panic!("\nFailed to verify in {ITERS} iterations..");
 }
@@ -125,7 +124,7 @@ fn test() {
     let mut sink = Vec::new();
     run(&mut sink);
     let sink = String::from_utf8(sink).unwrap();
-    expect_test::expect!([r#"
+    expect_test::expect!([r"
 
         >> x^2 + 2bx + c = 0
         >> (x+b)^2 = b^2 - c
@@ -145,6 +144,6 @@ fn test() {
         i=8 size=4459
 
         Verified!
-    "#])
+    "])
     .assert_eq(&sink);
 }

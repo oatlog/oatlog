@@ -196,7 +196,7 @@ impl LangFunction {
     }
 }
 
-/// To be used as args for add_function
+/// To be used as args for `add_function`
 enum EggFunctionKind {
     Constructor {
         output: TypeId,
@@ -211,7 +211,7 @@ enum EggFunctionKind {
     Relation,
 }
 
-/// To be used as args for add_function
+/// To be used as args for `add_function`
 enum FunctionKind {
     Primitive(primitive::PrimFunc),
     Egg {
@@ -742,7 +742,7 @@ impl Parser {
         }
         // Override dummy name with real name
         // TODO erik: look at this.
-        self.hir_relations[self.global_variables[global_id].relation_id].name = &*name;
+        self.hir_relations[self.global_variables[global_id].relation_id].name = *name;
 
         self.global_variable_names.insert(name, global_id);
 
@@ -762,7 +762,7 @@ impl Parser {
                         relation_id: {
                             let name = &*new_id.to_string().leak();
                             self.hir_relations
-                                .push(hir::Relation::global(&name, new_id, ty))
+                                .push(hir::Relation::global(name, new_id, ty))
                         },
                     },
                 );
@@ -1454,17 +1454,17 @@ mod compile_rule {
             action: action_inserts
                 .into_iter()
                 .map(|(relation, mut args, ret)| {
-                    if type_uf.0[ret].expect("unresolved type") != TYPE_UNIT {
+                    if type_uf.0[ret].expect("unresolved type") == TYPE_UNIT {
+                        (relation, args, false)
+                    } else {
                         args.push(ret);
                         // to test without entry: matches!(parser.relations_hir_and_func[relation].0.ty, hir::RelationTy::Global { .. })
                         (relation, args, true)
-                    } else {
-                        (relation, args, false)
                     }
                 })
                 .collect(),
             action_unify: action_union.iter().map(|&(a, b, _)| (a, b)).collect(),
-            src: span.map(|x| x.text_compact).unwrap_or(""),
+            src: span.map_or("", |x| x.text_compact),
         }
         .build();
 

@@ -1407,14 +1407,14 @@ egglog_test!(valid_tests_compile_ok, should_compile, expect![], "(sort Math)");
 
 egglog_test!(zrocorrect, permutation_bugs, expect![], "(include \"comparative-test/additional/permutation_bugs.egg\")");
 
-egglog_test!(allcorrect, quadratic, expect![[r#"
+egglog_test!(allcorrect, quadratic, expect![[r"
     Add: 504
     Mul: 16
     Sqrt: 1
     Sub: 2
     Var: 3
     Zero: 0
-"#]], r#"
+"]], r#"
 (datatype Math
     (Mul Math Math)
     (Add Math Math)
@@ -1441,7 +1441,7 @@ egglog_test!(allcorrect, quadratic, expect![[r#"
 "#,
 limit = 5);
 
-egglog_test!(allcorrect, fuel3, expect![[r#"
+egglog_test!(allcorrect, fuel3, expect![[r"
     Add: 4160
     Const: 5
     Cos: 1
@@ -1457,8 +1457,8 @@ egglog_test!(allcorrect, fuel3, expect![[r#"
     Sub: 49
     Var: 3
     ZeroFuel: 1
-"#]], "(include \"oatlog-bench/input/fuel3_math.egg\")", limit = 10);
-egglog_test!(allcorrect, fuel2, expect![[r#"
+"]], "(include \"oatlog-bench/input/fuel3_math.egg\")", limit = 10);
+egglog_test!(allcorrect, fuel2, expect![[r"
     Add: 741
     Const: 5
     Cos: 1
@@ -1474,8 +1474,8 @@ egglog_test!(allcorrect, fuel2, expect![[r#"
     Sub: 14
     Var: 3
     ZeroFuel: 1
-"#]], "(include \"oatlog-bench/input/fuel2_math.egg\")", limit = 10);
-egglog_test!(allcorrect, fuel1, expect![[r#"
+"]], "(include \"oatlog-bench/input/fuel2_math.egg\")", limit = 10);
+egglog_test!(allcorrect, fuel1, expect![[r"
     Add: 613
     Const: 5
     Cos: 1
@@ -1491,7 +1491,7 @@ egglog_test!(allcorrect, fuel1, expect![[r#"
     Sub: 6
     Var: 3
     ZeroFuel: 1
-"#]], "(include \"oatlog-bench/input/fuel1_math.egg\")", limit = 10);
+"]], "(include \"oatlog-bench/input/fuel1_math.egg\")", limit = 10);
 
 // too slow
 // egglog_test!(saturat_eq, fuel3_saturate, expect![[r#"
@@ -1511,7 +1511,7 @@ egglog_test!(allcorrect, fuel1, expect![[r#"
 //     Var: 3
 //     ZeroFuel: 1
 // "#]], "(include \"oatlog-bench/input/fuel3_math.egg\")", limit = 100);
-egglog_test!(saturat_eq, fuel2_saturating, expect![[r#"
+egglog_test!(saturat_eq, fuel2_saturating, expect![[r"
     Add: 743
     Const: 5
     Cos: 1
@@ -1527,9 +1527,9 @@ egglog_test!(saturat_eq, fuel2_saturating, expect![[r#"
     Sub: 14
     Var: 3
     ZeroFuel: 1
-"#]], "(include \"oatlog-bench/input/fuel2_math.egg\")", limit = 100);
+"]], "(include \"oatlog-bench/input/fuel2_math.egg\")", limit = 100);
 
-egglog_test!(saturat_eq, fuel1_saturating, expect![[r#"
+egglog_test!(saturat_eq, fuel1_saturating, expect![[r"
     Add: 613
     Const: 5
     Cos: 1
@@ -1545,7 +1545,7 @@ egglog_test!(saturat_eq, fuel1_saturating, expect![[r#"
     Sub: 6
     Var: 3
     ZeroFuel: 1
-"#]], "(include \"oatlog-bench/input/fuel1_math.egg\")", limit = 100);
+"]], "(include \"oatlog-bench/input/fuel1_math.egg\")", limit = 100);
 
 }
 }

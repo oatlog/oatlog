@@ -1,7 +1,7 @@
 #![allow(unstable_name_collisions, reason = "itertools `intersperse`")]
 
 use crate::{
-    codegen::{MultiUnzipVec, ident},
+    codegen::{MultiUnzipVec as _, ident},
     ids::{ColumnId, IndexId, IndexUsageId, TypeId},
     lir::{IndexInfo, IndexUsageInfo, MergeTy, RelationData, RelationKind, Theory, TypeKind},
     typed_vec::TVec,
@@ -63,7 +63,7 @@ pub fn codegen_table_relation(
             &primary_index.permuted_columns.inner()[..primary_index_usage.prefix],
         );
 
-        let primary_index_iter_flatten = if primary_index.has_any_fd(&primary_index_usage) {
+        let primary_index_iter_flatten = if primary_index.has_any_fd(primary_index_usage) {
             quote! {}
         } else {
             quote! { .flat_map(|(k,v)| v.iter().map(move |v| (k,v))) }
@@ -640,7 +640,7 @@ fn update(
         let index_info = &index_to_info[usage_info.index];
         assert_eq!(index_info.permuted_columns.len(), usage_info.prefix);
         (
-            ident::index_usage_field(&index_info.permuted_columns.inner()),
+            ident::index_usage_field(index_info.permuted_columns.inner()),
             index_info
                 .permuted_columns
                 .iter()
@@ -754,7 +754,7 @@ fn per_usage(
     let call_args = index_info.permuted_columns.inner()[0..usage_info.prefix]
         .iter()
         .copied()
-        .map(|x| ident::column(x))
+        .map(ident::column)
         .collect_vec();
 
     // let input_columns = vec![];
@@ -814,7 +814,7 @@ fn per_usage(
         let index_usage_field =
             ident::index_usage_field(&index_info.permuted_columns.inner()[..usage_info.prefix]);
 
-        if index_info.has_any_fd(&usage_info) {
+        if index_info.has_any_fd(usage_info) {
             quote! {
                 fn #iter_all_ident(#(#args,)*) -> impl Iterator<Item = (#(#out_ty,)*)> + use<'_> {
                     self.#index_usage_field.get(&(#(#call_args,)*)).into_iter().copied()
@@ -838,7 +838,7 @@ fn per_usage(
     };
     let entry_all = {
         let entry_all_ident = ident::index_all_entry(usage_info, index_info);
-        let relation_delta = ident::delta_row(&rel);
+        let relation_delta = ident::delta_row(rel);
         let all_columns = (0..index_info.permuted_columns.len())
             .map(ColumnId)
             .map(ident::column);

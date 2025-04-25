@@ -26,13 +26,13 @@ enum Commands {
         /// Take an egglog program that does not match egglog and shrink it.
         expected: Verdict,
 
-        /// shrink needs an output file (../shrink_scratch/src/main.rs)
+        /// shrink needs an output file (../`shrink_scratch/src/main.rs`)
         output: PathBuf,
     },
 }
 
 fn main() {
-    use std::fmt::Write;
+    use std::fmt::Write as _;
     init_logging();
 
     let cli = Cli::parse();
@@ -63,9 +63,10 @@ fn main() {
                     })
                     .collect::<Vec<&str>>()
                     .join("\n");
-                if egglog.is_empty() {
-                    panic!("provided .rs file appears to lack `compile_egraph!((..))`");
-                }
+                assert!(
+                    !egglog.is_empty(),
+                    "provided .rs file appears to lack `compile_egraph!((..))`"
+                );
                 writeln!(
                     ret,
                     concat!(
@@ -114,7 +115,7 @@ fn main() {
 
 fn init_logging() {
     use std::time::Instant;
-    use tracing_subscriber::{filter::targets::Targets, fmt, layer::Layer};
+    use tracing_subscriber::{filter::targets::Targets, fmt, layer::Layer as _};
 
     /// A timer to add `{ms}ms` to logs.
     #[derive(Debug, Clone, Copy, Eq, PartialEq)]
@@ -200,11 +201,11 @@ enum Verdict {
     NoCompile,
     GenErr,
 }
-use Verdict::*;
+use Verdict::{AllCorrect, GenErr, Mismatched, NoCompile};
 
 fn get_verdict(program: String, file: &mut File, wd: &Path) -> Verdict {
     // println!("testing program:\n{program}\n");
-    if let Err(_) = oatlog_core::try_compile(&program) {
+    if oatlog_core::try_compile(&program).is_err() {
         return GenErr;
     }
     let contents = test_contents(&program);
@@ -232,7 +233,7 @@ fn get_verdict(program: String, file: &mut File, wd: &Path) -> Verdict {
 }
 
 fn set_file_contents(file: &mut fs::File, contents: &str) {
-    use std::io::{Seek, Write};
+    use std::io::{Seek as _, Write as _};
     file.rewind().unwrap();
     file.set_len(0).unwrap();
     write!(file, "{contents}").unwrap();

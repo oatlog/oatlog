@@ -19,7 +19,7 @@ impl<T> std::fmt::Debug for UnionFind<T> {
         writeln!(f)?;
         for i in 0..self.repr.len() {
             let repr = self.repr[i];
-            if repr == i as u32 {
+            if repr as usize == i {
                 writeln!(f, "{i}")?;
             } else {
                 writeln!(f, "{i}: {repr}")?;
@@ -43,6 +43,10 @@ impl<T: Eclass> UnionFind<T> {
     #[must_use]
     pub fn len(&self) -> usize {
         self.repr.len()
+    }
+    #[must_use]
+    pub fn is_empty(&self) -> bool {
+        self.len() == 0
     }
     #[inline]
     #[must_use]
@@ -119,6 +123,7 @@ impl<T: Eclass> UnionFind<T> {
         ret
     }
     #[inline]
+    #[must_use]
     pub fn num_uprooted(&self) -> usize {
         self.num_uprooted
     }

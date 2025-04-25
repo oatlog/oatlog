@@ -10,7 +10,7 @@
 use crate::{
     decl_row,
     runtime::{
-        IndexRow, UnionFind,
+        IndexRow as _, UnionFind,
         index::{
             EclassCtx, GeneralCtx, IndexStatic, RowCtx, fallback_static::FallbackStatic,
             sorted_vec::SortedVec,
@@ -27,7 +27,7 @@ mod macro_gen {
     use crate::runtime::*;
     decl_row!(
         Row3_0_1<T0 first 0, T1, T2> (T0 0, T1 1) (T2 2) (0 1 2) (2 1 0)
-        where u128 = s => ((s.0.inner() as u128) << 64) + ((s.1.inner() as u128) << 32) + ((s.2.inner() as u128) << 0)
+        where u128 = s => (u128::from(s.0.inner()) << 64) + (u128::from(s.1.inner()) << 32) + u128::from(s.2.inner())
     );
     eclass_wrapper_ty!(Math);
 }
@@ -43,8 +43,8 @@ fn debug_assert_is_enabled() {
 proptest! {
     #[test]
     fn test_dedup_suffix((v, idx) in any::<Vec<u32>>()
-        .prop_filter("len>0", |x| x.len() > 0)
-        .prop_map(|mut x| { x.sort(); x })
+        .prop_filter("len>0", |x| !x.is_empty())
+        .prop_map(|mut x| { x.sort_unstable(); x })
         .prop_perturb(|x, mut rng| (x.clone(), rng.gen_range(0..x.len())))
     ) {
         let v: Vec<u32> = v;

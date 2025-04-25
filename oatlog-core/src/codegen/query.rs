@@ -384,7 +384,7 @@ impl CodegenRuleTrieCtx<'_> {
                             .iter()
                             .map(|x| ident::var_var(&self.variables[x]))
                             .collect_vec();
-                        let [inputs @ .., output] = &args[..] else {
+                        let [inputs @ .., output] = &*args else {
                             unreachable!()
                         };
                         let rel = ident::rel_get(relation);

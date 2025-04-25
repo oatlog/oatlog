@@ -80,7 +80,12 @@ pub(crate) fn emit_lir_theory(mut theory: hir::Theory) -> (hir::Theory, lir::The
             let uses = &mut table_uses[relation_id];
             // ImplicitRuleId(x) => IndexUsageId(x)
             assert_eq!(uses.len(), 0);
-            uses.extend(relation.implicit_rules.iter().map(|x| x.key_columns()))
+            uses.extend(
+                relation
+                    .implicit_rules
+                    .iter()
+                    .map(super::hir::ImplicitRule::key_columns),
+            );
         }
     }
 
@@ -113,7 +118,7 @@ pub(crate) fn emit_lir_theory(mut theory: hir::Theory) -> (hir::Theory, lir::The
         );
 
         lir_variables = variables;
-        tries = lir_tries.into_iter().copied().collect();
+        tries = lir_tries.to_vec();
     }
 
     // compute indexes for relations.
@@ -156,7 +161,7 @@ pub(crate) fn emit_lir_theory(mut theory: hir::Theory) -> (hir::Theory, lir::The
                 //    .collect();
                 let column_back_references: TVec<ColumnId, IndexUsageId> = TVec::new();
                 // Guarantee some column
-                let _ = uses.push(BTreeSet::from_iter(relation.columns.enumerate()));
+                let _ = uses.push(relation.columns.enumerate().collect::<BTreeSet<ColumnId>>());
 
                 let implicit_with_index = relation.implicit_rules.map(|x| {
                     let index_usage = uses.push(x.key_columns());
@@ -284,7 +289,7 @@ fn scc_group_size<'a>(
         for i in 0..n {
             dfs(i, adj, &mut order, &mut visited);
         }
-        let adj_inv = adj_reverse(&adj);
+        let adj_inv = adj_reverse(adj);
 
         visited.fill(false);
 
@@ -325,10 +330,10 @@ fn scc_group_size<'a>(
             }
         }
     }
-    adj.iter_mut().for_each(|x| {
-        x.sort();
-        x.dedup()
-    });
+    for x in &mut adj {
+        x.sort_unstable();
+        x.dedup();
+    }
 
     strongly_connected_components(&adj)
         .into_iter()
@@ -360,9 +365,8 @@ fn action_topo_resolve<'a>(
     let mut actions: BTreeSet<Atom> = x
         .into_iter()
         .cloned()
-        .map(|x| {
+        .inspect(|x| {
             assert_eq!(hir::IsPremise::Action, x.is_premise);
-            x
         })
         .collect();
 
@@ -405,7 +409,7 @@ fn action_topo_resolve<'a>(
                 }) || scc_sizes[x] > 1
             });
 
-            if problematic.len() == 0 {
+            if problematic.is_empty() {
                 break;
             }
 
@@ -440,7 +444,7 @@ fn action_topo_resolve<'a>(
                     assert_ne!(outputs.len(), 0);
 
                     let mut x2 = x.clone();
-                    outputs.iter().for_each(|c| {
+                    for c in &outputs {
                         let old_action_id = x2.columns[*c];
                         let meta = &action_variables[old_action_id];
                         let lir_meta = meta.into_lir(old_action_id);
@@ -453,7 +457,7 @@ fn action_topo_resolve<'a>(
                         to_unify.push((old_lir_id, new_lir_id));
 
                         x2.columns[*c] = new_action_id;
-                    });
+                    }
 
                     actions.remove(x);
                     actions.insert(x2);
@@ -462,17 +466,19 @@ fn action_topo_resolve<'a>(
                 }
             }
 
-            if !ok {
-                panic!("problematic array has something transformable to insert");
-            }
+            assert!(
+                ok,
+                "problematic array has something transformable to insert"
+            );
         }
 
         write_deg
     };
 
-    if !write_deg.inner().iter().all(|x| *x <= 1) {
-        panic!("TODO: resolve multiple assignment {dbg_rule_src:?} {write_deg:?} {actions:?}");
-    }
+    assert!(
+        write_deg.inner().iter().all(|x| *x <= 1),
+        "TODO: resolve multiple assignment {dbg_rule_src:?} {write_deg:?} {actions:?}"
+    );
 
     for i in from_premise.iter().copied() {
         if i.0 < write_deg.len() {

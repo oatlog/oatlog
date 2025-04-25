@@ -33,7 +33,7 @@ pub unsafe trait IndexRow: PreReqs {
             let slice: &'a [Self] = slice;
             let ptr: *const Self = slice.as_ptr();
             let len = slice.len();
-            let ptr: *const Self::Repr = ptr as _;
+            let ptr: *const Self::Repr = ptr.cast();
             let ret: &'a [Self::Repr] = std::slice::from_raw_parts(ptr, len);
             ret
         }
@@ -47,7 +47,7 @@ pub unsafe trait IndexRow: PreReqs {
             let slice: &'a [Self::Repr] = slice;
             let ptr: *const Self::Repr = slice.as_ptr();
             let len = slice.len();
-            let ptr: *const Self = ptr as _;
+            let ptr: *const Self = ptr.cast();
             let ret: &'a [Self] = std::slice::from_raw_parts(ptr, len);
             ret
         }
@@ -61,12 +61,12 @@ pub unsafe trait IndexRow: PreReqs {
             let slice: &'a mut [Self::Repr] = slice;
             let ptr: *mut Self::Repr = slice.as_mut_ptr();
             let len = slice.len();
-            let ptr: *mut Self = ptr as _;
+            let ptr: *mut Self = ptr.cast();
             let ret: &'a mut [Self] = std::slice::from_raw_parts_mut(ptr, len);
             ret
         }
     }
-    fn from_inner_vec<'a>(vec: &'a mut Vec<Self::Repr>) -> &'a mut Vec<Self> {
+    fn from_inner_vec(vec: &mut Vec<Self::Repr>) -> &mut Vec<Self> {
         use std::alloc::Layout;
         assert_eq!(Layout::new::<Self>(), Layout::new::<Self::Repr>());
 
@@ -79,7 +79,7 @@ pub unsafe trait IndexRow: PreReqs {
     fn inner_mut(&mut self) -> &mut Self::Repr;
     fn key(self) -> Self::Key;
     fn value(self) -> Self::Value;
-    fn value_mut<'a>(&'a mut self) -> Self::ValueMut<'a>;
+    fn value_mut(&mut self) -> Self::ValueMut<'_>;
 
     fn col_val_range(fc: Self::FirstColumn) -> std::ops::RangeInclusive<Self>;
     fn first_col(self) -> Self::FirstColumn;
@@ -108,7 +108,7 @@ impl<T> RadixSortable<T> {
             let slice: &'a mut [T] = slice;
             let ptr: *mut T = slice.as_mut_ptr();
             let len = slice.len();
-            let ptr: *mut Self = ptr as _;
+            let ptr: *mut Self = ptr.cast();
             let ret: &'a mut [Self] = std::slice::from_raw_parts_mut(ptr, len);
             ret
         }
@@ -127,9 +127,9 @@ macro_rules! radix_sortable_raw_row {
     }
 }
 radix_sortable_raw_row!(T1: u32; s => s.0.inner());
-radix_sortable_raw_row!(T1, T2: u64; s => ((s.0.inner() as u64) << 32) + (s.1.inner() as u64));
-radix_sortable_raw_row!(T1, T2, T3: u128; s => ((s.0.inner() as u128) << 64) + ((s.1.inner() as u128) << 32) + (s.2.inner() as u128));
-radix_sortable_raw_row!(T1, T2, T3, T4: u128; s => ((s.0.inner() as u128) << 96) + ((s.1.inner() as u128) << 64) + ((s.2.inner() as u128) << 32) + (s.3.inner() as u128));
+radix_sortable_raw_row!(T1, T2: u64; s => (u64::from(s.0.inner()) << 32) + u64::from(s.1.inner()));
+radix_sortable_raw_row!(T1, T2, T3: u128; s => (u128::from(s.0.inner()) << 64) + (u128::from(s.1.inner()) << 32) + u128::from(s.2.inner()));
+radix_sortable_raw_row!(T1, T2, T3, T4: u128; s => (u128::from(s.0.inner()) << 96) + (u128::from(s.1.inner()) << 64) + (u128::from(s.2.inner()) << 32) + u128::from(s.3.inner()));
 
 #[macro_export]
 macro_rules! decl_row {
@@ -161,7 +161,7 @@ macro_rules! decl_row {
                     // NOTE: i32 compare is identical to u32 compare for eclasses,
                     // assuming less than i32::MAX eclasses have been created.
                     let vectors = ($(
-                        _mm_loadu_si128(&block.$ii as *const _ as *const __m128i),
+                        _mm_loadu_si128(&raw const block.$ii as *const __m128i),
                     )*);
                     let key = ($(_mm_set1_epi32({
                         let k: u32 = key.inner.$col_i.inner();
@@ -234,7 +234,7 @@ macro_rules! decl_row {
             fn value(self) -> Self::Value {
                 ($(self.inner.$value_i,)*)
             }
-            fn value_mut<'a>(&'a mut self) -> Self::ValueMut<'a> {
+            fn value_mut(&mut self) -> Self::ValueMut<'_> {
                 ($(&mut self.inner.$value_i,)*)
             }
             #[allow(unused_variables, reason="false positive due to macros")]

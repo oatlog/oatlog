@@ -32,7 +32,7 @@ fn shrink_err(program: expect_test::Expect, expected_err: expect_test::Expect) {
     let mut state = crate::format_program(program.data().trim().to_string());
     let res = crate::try_compile(&state);
     let expected_err = match res {
-        Ok(_) => {
+        Ok(()) => {
             expected_err.assert_eq("DOES NOT ERROR?");
             return;
         }
@@ -79,19 +79,19 @@ fn shrink_cases() {
     // );
 
     shrink_err(
-        expect![[r#"
+        expect![[r"
              (datatype Math (Sub Math Math) (Const i64))
              (rewrite (Sub a a) (Const 0))
-             (rewrite (Sub f g) x)"#]],
+             (rewrite (Sub f g) x)"]],
         expect!["DOES NOT ERROR?"],
     );
 
     shrink_err(
-        expect![[r#"
+        expect![[r"
              (sort HerbieType)
              (datatype Math (Sub HerbieType Math Math))
              (rewrite (Sub ty x x) r-zero)
-             (rewrite (Sub ty a b) a)"#]],
+             (rewrite (Sub ty a b) a)"]],
         expect!["DOES NOT ERROR?"],
     );
 }
@@ -307,9 +307,9 @@ fn redundant_action_simplify() {
 #[test]
 fn weird_premise_equality() {
     Steps {
-        code: r#"
+        code: r"
             (rule ((= x 1) (= y x) (= z y)) ())
-        "#,
+        ",
         expected_hir: Some(expect![[r#"
             Theory {
                 types: {
@@ -356,12 +356,12 @@ fn weird_premise_equality() {
 #[test]
 fn hir_commutative() {
     Steps {
-        code: r#"
+        code: r"
             (datatype Math
                 (Add Math Math)
             )
             (rule ((= e (Add a b) )) ((union e (Add b a))))
-        "#,
+        ",
         expected_hir: Some(expect![[r#"
             Theory {
                 types: {
@@ -413,13 +413,13 @@ fn hir_commutative() {
 #[test]
 fn hir_distributive() {
     Steps {
-        code: r#"
+        code: r"
             (datatype Math
                 (Add Math Math)
                 (Mul Math Math)
             )
             (rewrite (Mul (Add a b) c) (Add (Mul a c) (Mul b c)))
-        "#,
+        ",
         expected_hir: Some(expect![[r#"
             Theory {
                 types: {
@@ -479,12 +479,12 @@ fn hir_distributive() {
 #[test]
 fn hir_userspace_implicit_functionality() {
     Steps {
-        code: r#"
+        code: r"
             (sort Math)
             (relation Add (Math Math Math))
 
             (rule ((Add a b c) (Add a b d)) ((union c d)))
-        "#,
+        ",
         expected_hir: Some(expect![[r#"
             Theory {
                 types: {
@@ -839,11 +839,11 @@ fn hir_global() {
 #[test]
 fn regression_tir2() {
     Steps {
-        code: r#"
+        code: r"
             (datatype Math (Mul Math Math) (Pow Math Math) (Const i64))
             (rewrite (Pow x (Const 2)) (Mul x x))
             (Pow (Const 5) (Const 3))
-        "#,
+        ",
         expected_hir: Some(expect![[r#"
             Theory {
                 types: {
@@ -1904,11 +1904,11 @@ fn regression_tir2() {
 #[test]
 fn regression_tir1() {
     Steps {
-        code: r#"
+        code: r"
             (datatype Math (Sub Math Math) (Const i64))
             (rewrite (Sub a a) (Const 0))
             (rewrite (Sub f g) g)
-        "#,
+        ",
         expected_hir: Some(expect![[r#"
             Theory {
                 types: {
@@ -2613,11 +2613,11 @@ fn regression_tir1() {
 #[test]
 fn regression_elim_problematic() {
     Steps {
-        code: r#"
+        code: r"
             (datatype Math (Mul Math Math) (Zero ))
             (let zero (Zero ))
             (rule ((= a (Mul zero c))) ((union a zero)))
-        "#,
+        ",
         expected_hir: Some(expect![[r#"
             Theory {
                 types: {
@@ -2673,11 +2673,11 @@ fn regression_elim_problematic() {
 #[test]
 fn codegen_template() {
     Steps {
-        code: r#"
-        "#,
-        expected_hir: Some(expect![[r#""#]]),
-        expected_lir: Some(expect![[r#""#]]),
-        expected_codegen: Some(expect![[r#""#]]),
+        code: r"
+        ",
+        expected_hir: Some(expect![[r""]]),
+        expected_lir: Some(expect![[r""]]),
+        expected_codegen: Some(expect![[r""]]),
     }
     .check();
 }
@@ -2685,7 +2685,7 @@ fn codegen_template() {
 #[test]
 fn codegen_constant_propagation() {
     Steps {
-        code: r#"
+        code: r"
             (datatype Math
                 (Add Math Math)
                 (Mul Math Math)
@@ -2693,7 +2693,7 @@ fn codegen_constant_propagation() {
             )
             (rule ((= e (Add (Const a) (Const b)))) ((union e (Const (+ a b)))))
             (rule ((= e (Mul (Const a) (Const b)))) ((union e (Const (* a b)))))
-        "#,
+        ",
         expected_hir: Some(expect![[r#"
             Theory {
                 types: {
@@ -3813,12 +3813,12 @@ fn codegen_constant_propagation() {
 #[test]
 fn codegen_commutative() {
     Steps {
-        code: r#"
+        code: r"
             (datatype Math
                 (Add Math Math)
             )
             (rule ((= e (Add a b) )) ((union e (Add b a))))
-        "#,
+        ",
         expected_hir: None,
         expected_lir: None,
         expected_codegen: Some(expect![[r#"
@@ -4147,10 +4147,10 @@ fn codegen_commutative() {
 #[test]
 fn regression_entry2() {
     Steps {
-        code: r#"
+        code: r"
             (datatype Math (Sub Math Math) (Const i64))
             (rewrite (Sub a b) (Const -1))
-        "#,
+        ",
         expected_hir: Some(expect![[r#"
             Theory {
                 types: {
@@ -4825,10 +4825,10 @@ fn regression_entry2() {
 #[test]
 fn regression_entry() {
     Steps {
-        code: r#"
+        code: r"
             (datatype Math (Integral Math Math) (Add Math Math))
             (rewrite (Add f g) (Add (Integral f f) g))
-        "#,
+        ",
         expected_hir: Some(expect![[r#"
             Theory {
                 types: {
@@ -5487,12 +5487,12 @@ fn regression_entry() {
 #[test]
 fn test_bind_variable_multiple_times() {
     Steps {
-        code: r#"
+        code: r"
             (datatype Foo
                 (Same Foo Foo)
             )
             (rewrite (Same x x) x)
-        "#,
+        ",
         expected_hir: Some(expect![[r#"
             Theory {
                 types: {
@@ -5974,7 +5974,7 @@ fn test_bind_variable_multiple_times() {
 #[test]
 fn test_negative_i64_tokens() {
     Steps {
-        code: r#"
+        code: r"
             (datatype Math
                 (Mul Math Math)
                 (Add Math Math)
@@ -5983,7 +5983,7 @@ fn test_negative_i64_tokens() {
             )
             (let neg_two (Const -2))
             (rewrite (Const -1) (Const -1))
-        "#,
+        ",
         expected_hir: Some(expect![[r#"
             Theory {
                 types: {
@@ -6040,12 +6040,12 @@ fn test_negative_i64_tokens() {
 #[test]
 fn codegen_variable_reuse_bug() {
     Steps {
-        code: r#"
+        code: r"
             (datatype Math (Add Math Math) (Zero))
             (let zero (Zero))
 
             (rule ((= zero (Add zero x))) ((union x (Zero))))
-        "#,
+        ",
         expected_hir: Some(expect![[r#"
             Theory {
                 types: {
@@ -6749,7 +6749,7 @@ fn codegen_variable_reuse_bug() {
             }
         "#]]),
     }
-    .check()
+    .check();
 }
 
 #[test]
@@ -6762,7 +6762,7 @@ fn initial_exprs() {
 
             (Mul (Var "x") (Var "y"))
         "#,
-        expected_hir: Some(expect![[r#"
+        expected_hir: Some(expect![[r"
             Theory {
                 types: {
                     [t0, ()]: std::primitive::unit,
@@ -6802,7 +6802,7 @@ fn initial_exprs() {
                     r27: g8 { columns: [Math], kind: Global(g8), implicit_rules: {n0: [!]} },
                     r28: g9 { columns: [Math], kind: Global(g9), implicit_rules: {n0: [!]} },
                 },
-            }"#]]),
+            }"]]),
         expected_lir: None,
         expected_codegen: Some(expect![[r#"
             use oatlog::runtime::{self, *};
@@ -7631,7 +7631,7 @@ fn initial_exprs() {
                 }
             }
         "#]]),
-    }.check()
+    }.check();
 }
 
 #[test]
@@ -7642,10 +7642,10 @@ fn codegen_panic_merge() {
         //
         // (function g () i64 :no-merge)
         // (fail (let y (g)))
-        code: r#"
+        code: r"
             (function f () i64 :no-merge)
             (set (f) 0)
-        "#,
+        ",
         expected_hir: Some(expect![[r#"
             Theory "":
 
@@ -7837,13 +7837,13 @@ fn codegen_panic_merge() {
 #[test]
 fn codegen_bug1() {
     Steps {
-        code: r#"
+        code: r"
             (sort T0)
             (sort T1)
             (sort T2)
             (relation Foo (T0 T1 T2))
-        "#,
-        expected_hir: Some(expect![[r#"
+        ",
+        expected_hir: Some(expect![[r"
             Theory {
                 types: {
                     [t0, ()]: std::primitive::unit,
@@ -7874,7 +7874,7 @@ fn codegen_bug1() {
                     r16: T2 { columns: [T2], kind: Forall(t5), implicit_rules: {} },
                     r17: Foo { columns: [T0, T1, T2], kind: Table, implicit_rules: {} },
                 },
-            }"#]]),
+            }"]]),
         expected_lir: None,
         expected_codegen: Some(expect![[r#"
             use oatlog::runtime::{self, *};
@@ -8197,13 +8197,13 @@ fn codegen_bug1() {
 #[test]
 fn initial() {
     Steps {
-        code: r#"
+        code: r"
             (datatype Math
                 (Const i64)
             )
             (run 42)
-        "#,
-        expected_hir: Some(expect![[r#"
+        ",
+        expected_hir: Some(expect![[r"
             Theory {
                 types: {
                     [t0, ()]: std::primitive::unit,
@@ -8230,7 +8230,7 @@ fn initial() {
                     r14: Math { columns: [Math], kind: Forall(t3), implicit_rules: {} },
                     r15: Const { columns: [i64, Math], kind: Table, implicit_rules: {n0: [_, U]} },
                 },
-            }"#]]),
+            }"]]),
         expected_lir: None,
         expected_codegen: Some(expect![[r#"
             use oatlog::runtime::{self, *};
@@ -9598,7 +9598,7 @@ fn test_primitives_simple() {
 #[test]
 fn triangle_join() {
     Steps {
-        code: r#"
+        code: r"
             (sort Math)
             (relation Foo (Math Math))
             (relation Bar (Math Math))
@@ -9607,7 +9607,7 @@ fn triangle_join() {
             (relation Triangle (Math Math Math))
 
             (rule ((Foo a b) (Bar b c) (Baz c a)) ((Triangle a b c)))
-        "#,
+        ",
         expected_hir: Some(expect![[r#"
             Theory {
                 types: {
@@ -10451,13 +10451,13 @@ fn triangle_join() {
 fn edgecase0() {
     // needed a "PremiseAny"
     Steps {
-        code: r#"
+        code: r"
             (datatype Math
                 (Mul Math Math)
                 (Add Math Math)
             )
             (rewrite (Add (Mul a b) (Mul a c)) (Mul a (Add b c)))
-        "#,
+        ",
         expected_hir :Some( expect![[r#"
             Theory {
                 types: {
@@ -11139,10 +11139,10 @@ fn edgecase0() {
 #[test]
 fn test_into_codegen() {
     Steps {
-        code: r#"
+        code: r"
             (datatype Math (Mul Math Math) (Add Math Math))
             (rewrite (Mul (Add a b) c) (Add (Mul a c) (Mul b c)))
-        "#,
+        ",
         expected_hir: Some(expect![[r#"
             Theory {
                 types: {
@@ -11740,11 +11740,11 @@ fn test_into_codegen() {
 #[ignore = "forall is not yet implemented (interacts badly with semi-naive)"]
 fn simple_forall() {
     Steps {
-        code: r#"
+        code: r"
             (sort Math)
             (relation Le (Math Math))
             (rule ((forall x)) ((define (Le x x))))
-        "#,
+        ",
         expected_hir: Some(expect![[r#"
             Theory "":
 

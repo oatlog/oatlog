@@ -17,12 +17,16 @@ pub trait Index {
 
     fn new() -> Self;
     fn len(&self) -> usize;
-    fn iter<'a>(&'a self) -> impl 'a + Iterator<Item = <Self::Row as IndexRow>::Repr>;
+    fn iter(&self) -> impl '_ + Iterator<Item = <Self::Row as IndexRow>::Repr>;
 
     fn range(
         &self,
         r: RangeInclusive<<Self::Row as IndexRow>::Repr>,
     ) -> impl Iterator<Item = <Self::Row as IndexRow>::Repr>;
+
+    fn is_empty(&self) -> bool {
+        self.len() == 0
+    }
 }
 pub trait IndexStatic: Index {
     fn as_slice(&self) -> &[<Self::Row as IndexRow>::Repr];
@@ -91,7 +95,7 @@ impl<
 {
     type Row = R;
     fn sort(slice: &mut [Self::Row]) {
-        use voracious_radix_sort::RadixSort;
+        use voracious_radix_sort::RadixSort as _;
         slice.voracious_sort();
     }
 
