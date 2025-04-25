@@ -4,6 +4,7 @@ version = "0.1.0"
 edition = "2024"
 
 [dependencies]
+blake3.workspace = true
 darling.workspace = true
 derive_more.workspace = true
 educe.workspace = true
@@ -16,8 +17,8 @@ rand.workspace = true
 regex.workspace = true
 smallvec.workspace = true
 syn.workspace = true
+tracing.workspace = true
 voracious_radix_sort.workspace = true
-rand_chacha.workspace = true
 
 [dev-dependencies]
 expect-test.workspace = true

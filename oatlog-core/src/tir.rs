@@ -142,6 +142,7 @@ pub(crate) fn schedule_rules(
 
         let mut best_trie = inner(ctx.clone(), &rules);
         let mut best_score = score_for_trie(&best_trie);
+        tracing::info!("trie score {best_score:?}");
 
         const TRIE_BUILDING_IMPROVEMENT_ITERATIONS: usize = 0;
         for _ in 0..TRIE_BUILDING_IMPROVEMENT_ITERATIONS {
@@ -149,7 +150,7 @@ pub(crate) fn schedule_rules(
             let score = score_for_trie(&trie);
 
             if score < best_score {
-                println!("trie improved to {:?}, previous {:?}", score, best_score);
+                tracing::info!("trie improved to {score:?}, previous {best_score:?}");
                 best_score = score;
                 best_trie = trie;
             }

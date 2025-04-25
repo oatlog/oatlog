@@ -19,7 +19,7 @@ mod expect_tests;
 
 use frontend::MResult;
 use itertools::Itertools;
-use std::{collections::BTreeMap, panic::UnwindSafe};
+use std::{collections::BTreeMap, panic::UnwindSafe, time::Instant};
 
 fn to_egglog_ast(program: &str) -> frontend::egglog_ast::Program {
     let program = program.to_string().leak();
@@ -143,6 +143,14 @@ impl Input {
             Input::String(x) => frontend::parse_str_to_sexps(x),
         }
     }
+    fn digest(&self) -> String {
+        match self {
+            Input::Tokens(x) => blake3::hash(x.to_string().as_bytes()),
+            Input::String(x) => blake3::hash(x.as_bytes()),
+        }
+        .to_string()[..5]
+            .to_string()
+    }
 }
 
 #[allow(dead_code)]
@@ -211,22 +219,28 @@ enum Output {
 /// This is intentionally not pub.
 /// This is the single entry point to the compiler
 fn universal(input: Input, config: Configuration) -> Result<Output, CompileError> {
-    let compile = || compile_impl(input.to_sexp()?, config);
-    let output = match config.panic_backtrace {
-        BackTraceAction::ForceBacktracePanic => match panic_to_err(compile) {
-            Ok(output) => output.map_err(CompileError::Err),
-            Err((msg, backtrace)) => {
-                panic!("{msg}\n{backtrace}");
-            }
-        },
-        BackTraceAction::ForceBacktraceErr => match panic_to_err(compile) {
-            Ok(output) => output.map_err(CompileError::Err),
-            Err((message, backtrace)) => Err(CompileError::Panic { message, backtrace }),
-        },
-        BackTraceAction::Passthrough => compile().map_err(CompileError::Err),
-    };
+    let epoch = Instant::now();
 
-    return output;
+    return tracing::info_span!("oatlog", digest = input.digest()).in_scope(|| {
+        let compile = || compile_impl(input.to_sexp()?, config);
+        let output = match config.panic_backtrace {
+            BackTraceAction::ForceBacktracePanic => match panic_to_err(compile) {
+                Ok(output) => output.map_err(CompileError::Err),
+                Err((msg, backtrace)) => {
+                    panic!("{msg}\n{backtrace}");
+                }
+            },
+            BackTraceAction::ForceBacktraceErr => match panic_to_err(compile) {
+                Ok(output) => output.map_err(CompileError::Err),
+                Err((message, backtrace)) => Err(CompileError::Panic { message, backtrace }),
+            },
+            BackTraceAction::Passthrough => compile().map_err(CompileError::Err),
+        };
+        let ms = epoch.elapsed().as_millis();
+        tracing::info!("oatlog compilation finished in {ms}ms");
+
+        output
+    });
 
     fn compile_impl(sexps: Vec<frontend::ParseInput>, config: Configuration) -> MResult<Output> {
         let hir = frontend::parse(sexps, config)?;

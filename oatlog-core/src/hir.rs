@@ -862,9 +862,9 @@ impl Theory {
 
         if config.egglog_compat.allow_column_invariant_permutations() {
             for rule in &this.symbolic_rules {
-                // TODO loke: proper optimization logging
-                // dbg!(premise_v, action_v, this.relations[action.relation].name);
                 rule.extract_invariant_permutations(|relation, perm| {
+                    tracing::debug!(?relation, perm = ?&perm[..]);
+
                     this.relations[relation]
                         .invariant_permutations
                         .add_invariant_permutations(perm)
