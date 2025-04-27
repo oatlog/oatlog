@@ -29,3 +29,4 @@
 // mod todo_scratch;
 // mod todo_seminaive;
 // mod todo_tir;
+// mod todo_vectorize;
