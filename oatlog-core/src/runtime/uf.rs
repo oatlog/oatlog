@@ -73,19 +73,15 @@ impl<T: Eclass> UnionFind<T> {
     /// Sugar
     #[inline]
     pub fn is_root(&mut self, t: T) -> bool {
-        // self.find(t) == t
-        T::new(self.repr[t.inner() as usize]) == t
-    }
-    // For tests?
-    #[inline]
-    pub fn is_root_mut(&mut self, t: &mut T) -> bool {
-        let r = self.find(*t);
-        let ret = r == *t;
-        *t = r;
-        ret
+        // NOTE: Using a bitset is not beneficial
+        self.repr[t.inner() as usize] == t.inner()
     }
     #[inline]
     fn find_inner(&mut self, mut i: u32) -> u32 {
+        // Curiously, it is not beneficial to
+        // 1. Unroll this loop
+        // 2. Unroll this loop with path compression
+        // 3. Perform recursive path compression (well how could it given (2))
         loop {
             let i_old = i;
             i = self.repr[i as usize];

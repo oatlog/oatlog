@@ -441,7 +441,7 @@ fn update(
                                 None
                             }
                         })
-                        .intersperse(quote! { && })
+                        .intersperse(quote! { & })
                         .collect();
                     if key_is_root.is_empty() {
                         quote! { true }
@@ -466,7 +466,7 @@ fn update(
                                 None
                             }
                         })
-                        .intersperse(quote! { && })
+                        .intersperse(quote! { & })
                         .collect();
                     if value_is_root.is_empty() {
                         quote! { true }
@@ -617,7 +617,7 @@ fn update(
                                 None
                             }
                         })
-                        .intersperse(quote! { && })
+                        .intersperse(quote! { & })
                         .collect();
                     if key_is_root.is_empty() {
                         quote! { true }

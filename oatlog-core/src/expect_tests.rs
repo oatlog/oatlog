@@ -1305,7 +1305,7 @@ fn regression_tir2() {
                             .push(());
                     }
                     self.hash_index_0_1_2.retain(|&(x0, x1, x2), v| {
-                        if uf.math_.is_root(x0) && uf.math_.is_root(x1) && uf.math_.is_root(x2) {
+                        if uf.math_.is_root(x0) & uf.math_.is_root(x1) & uf.math_.is_root(x2) {
                             v.retain(|&mut ()| true);
                             v.sort_unstable();
                             v.dedup();
@@ -1449,7 +1449,7 @@ fn regression_tir2() {
                     }
                     self.hash_index_1.retain(|&(x1,), v| {
                         if uf.math_.is_root(x1) {
-                            v.retain(|&mut (x0, x2)| uf.math_.is_root(x0) && uf.math_.is_root(x2));
+                            v.retain(|&mut (x0, x2)| uf.math_.is_root(x0) & uf.math_.is_root(x2));
                             v.sort_unstable();
                             v.dedup();
                             true
@@ -1464,7 +1464,7 @@ fn regression_tir2() {
                             .push(());
                     }
                     self.hash_index_1_0_2.retain(|&(x1, x0, x2), v| {
-                        if uf.math_.is_root(x1) && uf.math_.is_root(x0) && uf.math_.is_root(x2) {
+                        if uf.math_.is_root(x1) & uf.math_.is_root(x0) & uf.math_.is_root(x2) {
                             v.retain(|&mut ()| true);
                             v.sort_unstable();
                             v.dedup();
@@ -2257,7 +2257,7 @@ fn regression_tir1() {
                             .push(());
                     }
                     self.hash_index_0_1_2.retain(|&(x0, x1, x2), v| {
-                        if uf.math_.is_root(x0) && uf.math_.is_root(x1) && uf.math_.is_root(x2) {
+                        if uf.math_.is_root(x0) & uf.math_.is_root(x1) & uf.math_.is_root(x2) {
                             v.retain(|&mut ()| true);
                             v.sort_unstable();
                             v.dedup();
@@ -3150,7 +3150,7 @@ fn codegen_constant_propagation() {
                     }
                     self.hash_index_0.retain(|&(x0,), v| {
                         if uf.math_.is_root(x0) {
-                            v.retain(|&mut (x1, x2)| uf.math_.is_root(x1) && uf.math_.is_root(x2));
+                            v.retain(|&mut (x1, x2)| uf.math_.is_root(x1) & uf.math_.is_root(x2));
                             v.sort_unstable();
                             v.dedup();
                             true
@@ -3166,7 +3166,7 @@ fn codegen_constant_propagation() {
                     }
                     self.hash_index_1.retain(|&(x1,), v| {
                         if uf.math_.is_root(x1) {
-                            v.retain(|&mut (x0, x2)| uf.math_.is_root(x0) && uf.math_.is_root(x2));
+                            v.retain(|&mut (x0, x2)| uf.math_.is_root(x0) & uf.math_.is_root(x2));
                             v.sort_unstable();
                             v.dedup();
                             true
@@ -3181,7 +3181,7 @@ fn codegen_constant_propagation() {
                             .push(());
                     }
                     self.hash_index_0_1_2.retain(|&(x0, x1, x2), v| {
-                        if uf.math_.is_root(x0) && uf.math_.is_root(x1) && uf.math_.is_root(x2) {
+                        if uf.math_.is_root(x0) & uf.math_.is_root(x1) & uf.math_.is_root(x2) {
                             v.retain(|&mut ()| true);
                             v.sort_unstable();
                             v.dedup();
@@ -3338,7 +3338,7 @@ fn codegen_constant_propagation() {
                     }
                     self.hash_index_0.retain(|&(x0,), v| {
                         if uf.math_.is_root(x0) {
-                            v.retain(|&mut (x1, x2)| uf.math_.is_root(x1) && uf.math_.is_root(x2));
+                            v.retain(|&mut (x1, x2)| uf.math_.is_root(x1) & uf.math_.is_root(x2));
                             v.sort_unstable();
                             v.dedup();
                             true
@@ -3354,7 +3354,7 @@ fn codegen_constant_propagation() {
                     }
                     self.hash_index_1.retain(|&(x1,), v| {
                         if uf.math_.is_root(x1) {
-                            v.retain(|&mut (x0, x2)| uf.math_.is_root(x0) && uf.math_.is_root(x2));
+                            v.retain(|&mut (x0, x2)| uf.math_.is_root(x0) & uf.math_.is_root(x2));
                             v.sort_unstable();
                             v.dedup();
                             true
@@ -3369,7 +3369,7 @@ fn codegen_constant_propagation() {
                             .push(());
                     }
                     self.hash_index_0_1_2.retain(|&(x0, x1, x2), v| {
-                        if uf.math_.is_root(x0) && uf.math_.is_root(x1) && uf.math_.is_root(x2) {
+                        if uf.math_.is_root(x0) & uf.math_.is_root(x1) & uf.math_.is_root(x2) {
                             v.retain(|&mut ()| true);
                             v.sort_unstable();
                             v.dedup();
@@ -3958,7 +3958,7 @@ fn codegen_commutative() {
                             .push(());
                     }
                     self.hash_index_0_1_2.retain(|&(x0, x1, x2), v| {
-                        if uf.math_.is_root(x0) && uf.math_.is_root(x1) && uf.math_.is_root(x2) {
+                        if uf.math_.is_root(x0) & uf.math_.is_root(x1) & uf.math_.is_root(x2) {
                             v.retain(|&mut ()| true);
                             v.sort_unstable();
                             v.dedup();
@@ -4475,7 +4475,7 @@ fn regression_entry2() {
                             .push(());
                     }
                     self.hash_index_0_1_2.retain(|&(x0, x1, x2), v| {
-                        if uf.math_.is_root(x0) && uf.math_.is_root(x1) && uf.math_.is_root(x2) {
+                        if uf.math_.is_root(x0) & uf.math_.is_root(x1) & uf.math_.is_root(x2) {
                             v.retain(|&mut ()| true);
                             v.sort_unstable();
                             v.dedup();
@@ -5136,7 +5136,7 @@ fn regression_entry() {
                             .push(());
                     }
                     self.hash_index_0_1_2.retain(|&(x0, x1, x2), v| {
-                        if uf.math_.is_root(x0) && uf.math_.is_root(x1) && uf.math_.is_root(x2) {
+                        if uf.math_.is_root(x0) & uf.math_.is_root(x1) & uf.math_.is_root(x2) {
                             v.retain(|&mut ()| true);
                             v.sort_unstable();
                             v.dedup();
@@ -5278,7 +5278,7 @@ fn regression_entry() {
                             .push(());
                     }
                     self.hash_index_0_1_2.retain(|&(x0, x1, x2), v| {
-                        if uf.math_.is_root(x0) && uf.math_.is_root(x1) && uf.math_.is_root(x2) {
+                        if uf.math_.is_root(x0) & uf.math_.is_root(x1) & uf.math_.is_root(x2) {
                             v.retain(|&mut ()| true);
                             v.sort_unstable();
                             v.dedup();
@@ -5783,7 +5783,7 @@ fn test_bind_variable_multiple_times() {
                             .push(());
                     }
                     self.hash_index_0_1_2.retain(|&(x0, x1, x2), v| {
-                        if uf.foo_.is_root(x0) && uf.foo_.is_root(x1) && uf.foo_.is_root(x2) {
+                        if uf.foo_.is_root(x0) & uf.foo_.is_root(x1) & uf.foo_.is_root(x2) {
                             v.retain(|&mut ()| true);
                             v.sort_unstable();
                             v.dedup();
@@ -6383,7 +6383,7 @@ fn codegen_variable_reuse_bug() {
                             .push((uf.math_.find(x1),));
                     }
                     self.hash_index_0_2.retain(|&(x0, x2), v| {
-                        if uf.math_.is_root(x0) && uf.math_.is_root(x2) {
+                        if uf.math_.is_root(x0) & uf.math_.is_root(x2) {
                             v.retain(|&mut (x1,)| uf.math_.is_root(x1));
                             v.sort_unstable();
                             v.dedup();
@@ -6399,7 +6399,7 @@ fn codegen_variable_reuse_bug() {
                             .push(());
                     }
                     self.hash_index_0_1_2.retain(|&(x0, x1, x2), v| {
-                        if uf.math_.is_root(x0) && uf.math_.is_root(x1) && uf.math_.is_root(x2) {
+                        if uf.math_.is_root(x0) & uf.math_.is_root(x1) & uf.math_.is_root(x2) {
                             v.retain(|&mut ()| true);
                             v.sort_unstable();
                             v.dedup();
@@ -6941,7 +6941,7 @@ fn initial_exprs() {
                             .push(());
                     }
                     self.hash_index_0_1_2.retain(|&(x0, x1, x2), v| {
-                        if uf.math_.is_root(x0) && uf.math_.is_root(x1) && uf.math_.is_root(x2) {
+                        if uf.math_.is_root(x0) & uf.math_.is_root(x1) & uf.math_.is_root(x2) {
                             v.retain(|&mut ()| true);
                             v.sort_unstable();
                             v.dedup();
@@ -7083,7 +7083,7 @@ fn initial_exprs() {
                             .push(());
                     }
                     self.hash_index_0_1_2.retain(|&(x0, x1, x2), v| {
-                        if uf.math_.is_root(x0) && uf.math_.is_root(x1) && uf.math_.is_root(x2) {
+                        if uf.math_.is_root(x0) & uf.math_.is_root(x1) & uf.math_.is_root(x2) {
                             v.retain(|&mut ()| true);
                             v.sort_unstable();
                             v.dedup();
@@ -8001,7 +8001,7 @@ fn codegen_bug1() {
                             .push(());
                     }
                     self.hash_index_0_1_2.retain(|&(x0, x1, x2), v| {
-                        if uf.t0_.is_root(x0) && uf.t1_.is_root(x1) && uf.t2_.is_root(x2) {
+                        if uf.t0_.is_root(x0) & uf.t1_.is_root(x1) & uf.t2_.is_root(x2) {
                             v.retain(|&mut ()| true);
                             v.sort_unstable();
                             v.dedup();
@@ -8817,7 +8817,7 @@ fn test_primitives_simple() {
                     }
                     self.hash_index_1.retain(|&(x1,), v| {
                         if uf.math_.is_root(x1) {
-                            v.retain(|&mut (x0, x2)| uf.math_.is_root(x0) && uf.math_.is_root(x2));
+                            v.retain(|&mut (x0, x2)| uf.math_.is_root(x0) & uf.math_.is_root(x2));
                             v.sort_unstable();
                             v.dedup();
                             true
@@ -8832,7 +8832,7 @@ fn test_primitives_simple() {
                             .push(());
                     }
                     self.hash_index_1_0_2.retain(|&(x1, x0, x2), v| {
-                        if uf.math_.is_root(x1) && uf.math_.is_root(x0) && uf.math_.is_root(x2) {
+                        if uf.math_.is_root(x1) & uf.math_.is_root(x0) & uf.math_.is_root(x2) {
                             v.retain(|&mut ()| true);
                             v.sort_unstable();
                             v.dedup();
@@ -8980,7 +8980,7 @@ fn test_primitives_simple() {
                             .push(());
                     }
                     self.hash_index_0_1_2.retain(|&(x0, x1, x2), v| {
-                        if uf.math_.is_root(x0) && uf.math_.is_root(x1) && uf.math_.is_root(x2) {
+                        if uf.math_.is_root(x0) & uf.math_.is_root(x1) & uf.math_.is_root(x2) {
                             v.retain(|&mut ()| true);
                             v.sort_unstable();
                             v.dedup();
@@ -9789,7 +9789,7 @@ fn triangle_join() {
                             .push(());
                     }
                     self.hash_index_1_0.retain(|&(x1, x0), v| {
-                        if uf.math_.is_root(x1) && uf.math_.is_root(x0) {
+                        if uf.math_.is_root(x1) & uf.math_.is_root(x0) {
                             v.retain(|&mut ()| true);
                             v.sort_unstable();
                             v.dedup();
@@ -9933,7 +9933,7 @@ fn triangle_join() {
                             .push(());
                     }
                     self.hash_index_0_1.retain(|&(x0, x1), v| {
-                        if uf.math_.is_root(x0) && uf.math_.is_root(x1) {
+                        if uf.math_.is_root(x0) & uf.math_.is_root(x1) {
                             v.retain(|&mut ()| true);
                             v.sort_unstable();
                             v.dedup();
@@ -10093,7 +10093,7 @@ fn triangle_join() {
                             .push(());
                     }
                     self.hash_index_1_0.retain(|&(x1, x0), v| {
-                        if uf.math_.is_root(x1) && uf.math_.is_root(x0) {
+                        if uf.math_.is_root(x1) & uf.math_.is_root(x0) {
                             v.retain(|&mut ()| true);
                             v.sort_unstable();
                             v.dedup();
@@ -10204,7 +10204,7 @@ fn triangle_join() {
                             .push(());
                     }
                     self.hash_index_0_1_2.retain(|&(x0, x1, x2), v| {
-                        if uf.math_.is_root(x0) && uf.math_.is_root(x1) && uf.math_.is_root(x2) {
+                        if uf.math_.is_root(x0) & uf.math_.is_root(x1) & uf.math_.is_root(x2) {
                             v.retain(|&mut ()| true);
                             v.sort_unstable();
                             v.dedup();
@@ -10650,7 +10650,7 @@ fn edgecase0() {
                     }
                     self.hash_index_0.retain(|&(x0,), v| {
                         if uf.math_.is_root(x0) {
-                            v.retain(|&mut (x1, x2)| uf.math_.is_root(x1) && uf.math_.is_root(x2));
+                            v.retain(|&mut (x1, x2)| uf.math_.is_root(x1) & uf.math_.is_root(x2));
                             v.sort_unstable();
                             v.dedup();
                             true
@@ -10665,7 +10665,7 @@ fn edgecase0() {
                             .push((uf.math_.find(x1),));
                     }
                     self.hash_index_2_0.retain(|&(x2, x0), v| {
-                        if uf.math_.is_root(x2) && uf.math_.is_root(x0) {
+                        if uf.math_.is_root(x2) & uf.math_.is_root(x0) {
                             v.retain(|&mut (x1,)| uf.math_.is_root(x1));
                             v.sort_unstable();
                             v.dedup();
@@ -10682,7 +10682,7 @@ fn edgecase0() {
                     }
                     self.hash_index_2.retain(|&(x2,), v| {
                         if uf.math_.is_root(x2) {
-                            v.retain(|&mut (x0, x1)| uf.math_.is_root(x0) && uf.math_.is_root(x1));
+                            v.retain(|&mut (x0, x1)| uf.math_.is_root(x0) & uf.math_.is_root(x1));
                             v.sort_unstable();
                             v.dedup();
                             true
@@ -10697,7 +10697,7 @@ fn edgecase0() {
                             .push(());
                     }
                     self.hash_index_0_1_2.retain(|&(x0, x1, x2), v| {
-                        if uf.math_.is_root(x0) && uf.math_.is_root(x1) && uf.math_.is_root(x2) {
+                        if uf.math_.is_root(x0) & uf.math_.is_root(x1) & uf.math_.is_root(x2) {
                             v.retain(|&mut ()| true);
                             v.sort_unstable();
                             v.dedup();
@@ -10864,7 +10864,7 @@ fn edgecase0() {
                     }
                     self.hash_index_0.retain(|&(x0,), v| {
                         if uf.math_.is_root(x0) {
-                            v.retain(|&mut (x1, x2)| uf.math_.is_root(x1) && uf.math_.is_root(x2));
+                            v.retain(|&mut (x1, x2)| uf.math_.is_root(x1) & uf.math_.is_root(x2));
                             v.sort_unstable();
                             v.dedup();
                             true
@@ -10880,7 +10880,7 @@ fn edgecase0() {
                     }
                     self.hash_index_1.retain(|&(x1,), v| {
                         if uf.math_.is_root(x1) {
-                            v.retain(|&mut (x0, x2)| uf.math_.is_root(x0) && uf.math_.is_root(x2));
+                            v.retain(|&mut (x0, x2)| uf.math_.is_root(x0) & uf.math_.is_root(x2));
                             v.sort_unstable();
                             v.dedup();
                             true
@@ -10895,7 +10895,7 @@ fn edgecase0() {
                             .push(());
                     }
                     self.hash_index_0_1_2.retain(|&(x0, x1, x2), v| {
-                        if uf.math_.is_root(x0) && uf.math_.is_root(x1) && uf.math_.is_root(x2) {
+                        if uf.math_.is_root(x0) & uf.math_.is_root(x1) & uf.math_.is_root(x2) {
                             v.retain(|&mut ()| true);
                             v.sort_unstable();
                             v.dedup();
@@ -11333,7 +11333,7 @@ fn test_into_codegen() {
                     }
                     self.hash_index_0.retain(|&(x0,), v| {
                         if uf.math_.is_root(x0) {
-                            v.retain(|&mut (x1, x2)| uf.math_.is_root(x1) && uf.math_.is_root(x2));
+                            v.retain(|&mut (x1, x2)| uf.math_.is_root(x1) & uf.math_.is_root(x2));
                             v.sort_unstable();
                             v.dedup();
                             true
@@ -11348,7 +11348,7 @@ fn test_into_codegen() {
                             .push(());
                     }
                     self.hash_index_0_1_2.retain(|&(x0, x1, x2), v| {
-                        if uf.math_.is_root(x0) && uf.math_.is_root(x1) && uf.math_.is_root(x2) {
+                        if uf.math_.is_root(x0) & uf.math_.is_root(x1) & uf.math_.is_root(x2) {
                             v.retain(|&mut ()| true);
                             v.sort_unstable();
                             v.dedup();
@@ -11498,7 +11498,7 @@ fn test_into_codegen() {
                     }
                     self.hash_index_2.retain(|&(x2,), v| {
                         if uf.math_.is_root(x2) {
-                            v.retain(|&mut (x0, x1)| uf.math_.is_root(x0) && uf.math_.is_root(x1));
+                            v.retain(|&mut (x0, x1)| uf.math_.is_root(x0) & uf.math_.is_root(x1));
                             v.sort_unstable();
                             v.dedup();
                             true
@@ -11513,7 +11513,7 @@ fn test_into_codegen() {
                             .push(());
                     }
                     self.hash_index_0_1_2.retain(|&(x0, x1, x2), v| {
-                        if uf.math_.is_root(x0) && uf.math_.is_root(x1) && uf.math_.is_root(x2) {
+                        if uf.math_.is_root(x0) & uf.math_.is_root(x1) & uf.math_.is_root(x2) {
                             v.retain(|&mut ()| true);
                             v.sort_unstable();
                             v.dedup();
@@ -14169,7 +14169,7 @@ fn lir_math() {
                             .push(());
                     }
                     self.hash_index_0_1.retain(|&(x0, x1), v| {
-                        if uf.fuel_unit_.is_root(x0) && uf.fuel_unit_.is_root(x1) {
+                        if uf.fuel_unit_.is_root(x0) & uf.fuel_unit_.is_root(x1) {
                             v.retain(|&mut ()| true);
                             v.sort_unstable();
                             v.dedup();
@@ -14442,7 +14442,7 @@ fn lir_math() {
                     }
                     self.hash_index_1.retain(|&(x1,), v| {
                         if uf.math_.is_root(x1) {
-                            v.retain(|&mut (x0, x2)| uf.math_.is_root(x0) && uf.math_.is_root(x2));
+                            v.retain(|&mut (x0, x2)| uf.math_.is_root(x0) & uf.math_.is_root(x2));
                             v.sort_unstable();
                             v.dedup();
                             true
@@ -14457,7 +14457,7 @@ fn lir_math() {
                             .push(());
                     }
                     self.hash_index_1_0_2.retain(|&(x1, x0, x2), v| {
-                        if uf.math_.is_root(x1) && uf.math_.is_root(x0) && uf.math_.is_root(x2) {
+                        if uf.math_.is_root(x1) & uf.math_.is_root(x0) & uf.math_.is_root(x2) {
                             v.retain(|&mut ()| true);
                             v.sort_unstable();
                             v.dedup();
@@ -14627,7 +14627,7 @@ fn lir_math() {
                     self.hash_index_0.retain(|&(x0,), v| {
                         if uf.fuel_unit_.is_root(x0) {
                             v.retain(|&mut (x1, x2, x3)| {
-                                uf.math_.is_root(x1) && uf.math_.is_root(x2) && uf.math_.is_root(x3)
+                                uf.math_.is_root(x1) & uf.math_.is_root(x2) & uf.math_.is_root(x3)
                             });
                             v.sort_unstable();
                             v.dedup();
@@ -14645,7 +14645,7 @@ fn lir_math() {
                     self.hash_index_1.retain(|&(x1,), v| {
                         if uf.math_.is_root(x1) {
                             v.retain(|&mut (x2, x0, x3)| {
-                                uf.math_.is_root(x2) && uf.fuel_unit_.is_root(x0) && uf.math_.is_root(x3)
+                                uf.math_.is_root(x2) & uf.fuel_unit_.is_root(x0) & uf.math_.is_root(x3)
                             });
                             v.sort_unstable();
                             v.dedup();
@@ -14661,8 +14661,8 @@ fn lir_math() {
                             .push((uf.fuel_unit_.find(x0), uf.math_.find(x3)));
                     }
                     self.hash_index_1_2.retain(|&(x1, x2), v| {
-                        if uf.math_.is_root(x1) && uf.math_.is_root(x2) {
-                            v.retain(|&mut (x0, x3)| uf.fuel_unit_.is_root(x0) && uf.math_.is_root(x3));
+                        if uf.math_.is_root(x1) & uf.math_.is_root(x2) {
+                            v.retain(|&mut (x0, x3)| uf.fuel_unit_.is_root(x0) & uf.math_.is_root(x3));
                             v.sort_unstable();
                             v.dedup();
                             true
@@ -14683,9 +14683,9 @@ fn lir_math() {
                     }
                     self.hash_index_0_1_2_3.retain(|&(x0, x1, x2, x3), v| {
                         if uf.fuel_unit_.is_root(x0)
-                            && uf.math_.is_root(x1)
-                            && uf.math_.is_root(x2)
-                            && uf.math_.is_root(x3)
+                            & uf.math_.is_root(x1)
+                            & uf.math_.is_root(x2)
+                            & uf.math_.is_root(x3)
                         {
                             v.retain(|&mut ()| true);
                             v.sort_unstable();
@@ -14881,7 +14881,7 @@ fn lir_math() {
                     }
                     self.hash_index_2.retain(|&(x2,), v| {
                         if uf.math_.is_root(x2) {
-                            v.retain(|&mut (x0, x1)| uf.math_.is_root(x0) && uf.math_.is_root(x1));
+                            v.retain(|&mut (x0, x1)| uf.math_.is_root(x0) & uf.math_.is_root(x1));
                             v.sort_unstable();
                             v.dedup();
                             true
@@ -14897,7 +14897,7 @@ fn lir_math() {
                     }
                     self.hash_index_1.retain(|&(x1,), v| {
                         if uf.math_.is_root(x1) {
-                            v.retain(|&mut (x0, x2)| uf.math_.is_root(x0) && uf.math_.is_root(x2));
+                            v.retain(|&mut (x0, x2)| uf.math_.is_root(x0) & uf.math_.is_root(x2));
                             v.sort_unstable();
                             v.dedup();
                             true
@@ -14913,7 +14913,7 @@ fn lir_math() {
                     }
                     self.hash_index_0.retain(|&(x0,), v| {
                         if uf.math_.is_root(x0) {
-                            v.retain(|&mut (x1, x2)| uf.math_.is_root(x1) && uf.math_.is_root(x2));
+                            v.retain(|&mut (x1, x2)| uf.math_.is_root(x1) & uf.math_.is_root(x2));
                             v.sort_unstable();
                             v.dedup();
                             true
@@ -14928,7 +14928,7 @@ fn lir_math() {
                             .push(());
                     }
                     self.hash_index_1_0_2.retain(|&(x1, x0, x2), v| {
-                        if uf.math_.is_root(x1) && uf.math_.is_root(x0) && uf.math_.is_root(x2) {
+                        if uf.math_.is_root(x1) & uf.math_.is_root(x0) & uf.math_.is_root(x2) {
                             v.retain(|&mut ()| true);
                             v.sort_unstable();
                             v.dedup();
@@ -15090,7 +15090,7 @@ fn lir_math() {
                     }
                     self.hash_index_2.retain(|&(x2,), v| {
                         if uf.math_.is_root(x2) {
-                            v.retain(|&mut (x0, x1)| uf.math_.is_root(x0) && uf.math_.is_root(x1));
+                            v.retain(|&mut (x0, x1)| uf.math_.is_root(x0) & uf.math_.is_root(x1));
                             v.sort_unstable();
                             v.dedup();
                             true
@@ -15105,7 +15105,7 @@ fn lir_math() {
                             .push(());
                     }
                     self.hash_index_0_1_2.retain(|&(x0, x1, x2), v| {
-                        if uf.math_.is_root(x0) && uf.math_.is_root(x1) && uf.math_.is_root(x2) {
+                        if uf.math_.is_root(x0) & uf.math_.is_root(x1) & uf.math_.is_root(x2) {
                             v.retain(|&mut ()| true);
                             v.sort_unstable();
                             v.dedup();
@@ -15258,7 +15258,7 @@ fn lir_math() {
                     }
                     self.hash_index_2.retain(|&(x2,), v| {
                         if uf.math_.is_root(x2) {
-                            v.retain(|&mut (x0, x1)| uf.math_.is_root(x0) && uf.math_.is_root(x1));
+                            v.retain(|&mut (x0, x1)| uf.math_.is_root(x0) & uf.math_.is_root(x1));
                             v.sort_unstable();
                             v.dedup();
                             true
@@ -15274,7 +15274,7 @@ fn lir_math() {
                     }
                     self.hash_index_1.retain(|&(x1,), v| {
                         if uf.math_.is_root(x1) {
-                            v.retain(|&mut (x0, x2)| uf.math_.is_root(x0) && uf.math_.is_root(x2));
+                            v.retain(|&mut (x0, x2)| uf.math_.is_root(x0) & uf.math_.is_root(x2));
                             v.sort_unstable();
                             v.dedup();
                             true
@@ -15289,7 +15289,7 @@ fn lir_math() {
                             .push((uf.math_.find(x1),));
                     }
                     self.hash_index_2_0.retain(|&(x2, x0), v| {
-                        if uf.math_.is_root(x2) && uf.math_.is_root(x0) {
+                        if uf.math_.is_root(x2) & uf.math_.is_root(x0) {
                             v.retain(|&mut (x1,)| uf.math_.is_root(x1));
                             v.sort_unstable();
                             v.dedup();
@@ -15306,7 +15306,7 @@ fn lir_math() {
                     }
                     self.hash_index_0.retain(|&(x0,), v| {
                         if uf.math_.is_root(x0) {
-                            v.retain(|&mut (x1, x2)| uf.math_.is_root(x1) && uf.math_.is_root(x2));
+                            v.retain(|&mut (x1, x2)| uf.math_.is_root(x1) & uf.math_.is_root(x2));
                             v.sort_unstable();
                             v.dedup();
                             true
@@ -15321,7 +15321,7 @@ fn lir_math() {
                             .push(());
                     }
                     self.hash_index_1_0_2.retain(|&(x1, x0, x2), v| {
-                        if uf.math_.is_root(x1) && uf.math_.is_root(x0) && uf.math_.is_root(x2) {
+                        if uf.math_.is_root(x1) & uf.math_.is_root(x0) & uf.math_.is_root(x2) {
                             v.retain(|&mut ()| true);
                             v.sort_unstable();
                             v.dedup();
@@ -15491,7 +15491,7 @@ fn lir_math() {
                             .push(());
                     }
                     self.hash_index_0_1_2.retain(|&(x0, x1, x2), v| {
-                        if uf.math_.is_root(x0) && uf.math_.is_root(x1) && uf.math_.is_root(x2) {
+                        if uf.math_.is_root(x0) & uf.math_.is_root(x1) & uf.math_.is_root(x2) {
                             v.retain(|&mut ()| true);
                             v.sort_unstable();
                             v.dedup();
@@ -15638,7 +15638,7 @@ fn lir_math() {
                     }
                     self.hash_index_2.retain(|&(x2,), v| {
                         if uf.math_.is_root(x2) {
-                            v.retain(|&mut (x0, x1)| uf.math_.is_root(x0) && uf.math_.is_root(x1));
+                            v.retain(|&mut (x0, x1)| uf.math_.is_root(x0) & uf.math_.is_root(x1));
                             v.sort_unstable();
                             v.dedup();
                             true
@@ -15653,7 +15653,7 @@ fn lir_math() {
                             .push((uf.math_.find(x1),));
                     }
                     self.hash_index_2_0.retain(|&(x2, x0), v| {
-                        if uf.math_.is_root(x2) && uf.math_.is_root(x0) {
+                        if uf.math_.is_root(x2) & uf.math_.is_root(x0) {
                             v.retain(|&mut (x1,)| uf.math_.is_root(x1));
                             v.sort_unstable();
                             v.dedup();
@@ -15670,7 +15670,7 @@ fn lir_math() {
                     }
                     self.hash_index_0.retain(|&(x0,), v| {
                         if uf.math_.is_root(x0) {
-                            v.retain(|&mut (x1, x2)| uf.math_.is_root(x1) && uf.math_.is_root(x2));
+                            v.retain(|&mut (x1, x2)| uf.math_.is_root(x1) & uf.math_.is_root(x2));
                             v.sort_unstable();
                             v.dedup();
                             true
@@ -15686,7 +15686,7 @@ fn lir_math() {
                     }
                     self.hash_index_1.retain(|&(x1,), v| {
                         if uf.math_.is_root(x1) {
-                            v.retain(|&mut (x0, x2)| uf.math_.is_root(x0) && uf.math_.is_root(x2));
+                            v.retain(|&mut (x0, x2)| uf.math_.is_root(x0) & uf.math_.is_root(x2));
                             v.sort_unstable();
                             v.dedup();
                             true
@@ -15701,7 +15701,7 @@ fn lir_math() {
                             .push(());
                     }
                     self.hash_index_0_1_2.retain(|&(x0, x1, x2), v| {
-                        if uf.math_.is_root(x0) && uf.math_.is_root(x1) && uf.math_.is_root(x2) {
+                        if uf.math_.is_root(x0) & uf.math_.is_root(x1) & uf.math_.is_root(x2) {
                             v.retain(|&mut ()| true);
                             v.sort_unstable();
                             v.dedup();
@@ -15865,7 +15865,7 @@ fn lir_math() {
                             .push(());
                     }
                     self.hash_index_0_1.retain(|&(x0, x1), v| {
-                        if uf.math_.is_root(x0) && uf.math_.is_root(x1) {
+                        if uf.math_.is_root(x0) & uf.math_.is_root(x1) {
                             v.retain(|&mut ()| true);
                             v.sort_unstable();
                             v.dedup();
@@ -15994,7 +15994,7 @@ fn lir_math() {
                             .push(());
                     }
                     self.hash_index_0_1.retain(|&(x0, x1), v| {
-                        if uf.math_.is_root(x0) && uf.math_.is_root(x1) {
+                        if uf.math_.is_root(x0) & uf.math_.is_root(x1) {
                             v.retain(|&mut ()| true);
                             v.sort_unstable();
                             v.dedup();
@@ -16123,7 +16123,7 @@ fn lir_math() {
                             .push(());
                     }
                     self.hash_index_0_1.retain(|&(x0, x1), v| {
-                        if uf.math_.is_root(x0) && uf.math_.is_root(x1) {
+                        if uf.math_.is_root(x0) & uf.math_.is_root(x1) {
                             v.retain(|&mut ()| true);
                             v.sort_unstable();
                             v.dedup();
@@ -16252,7 +16252,7 @@ fn lir_math() {
                             .push(());
                     }
                     self.hash_index_0_1.retain(|&(x0, x1), v| {
-                        if uf.math_.is_root(x0) && uf.math_.is_root(x1) {
+                        if uf.math_.is_root(x0) & uf.math_.is_root(x1) {
                             v.retain(|&mut ()| true);
                             v.sort_unstable();
                             v.dedup();
