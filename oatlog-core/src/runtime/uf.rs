@@ -83,13 +83,13 @@ impl<T: Eclass> UnionFind<T> {
         ret
     }
     #[inline]
-    fn find_inner(&mut self, i: u32) -> u32 {
-        if self.repr[i as usize] == i {
-            i
-        } else {
-            let root = self.find_inner(self.repr[i as usize]);
-            self.repr[i as usize] = root;
-            root
+    fn find_inner(&mut self, mut i: u32) -> u32 {
+        loop {
+            let i_old = i;
+            i = self.repr[i as usize];
+            if i == i_old {
+                break i;
+            }
         }
     }
     #[inline]

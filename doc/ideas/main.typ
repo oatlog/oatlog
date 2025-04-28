@@ -2625,6 +2625,74 @@ If we want better plans, we can try to do greedy planning with all rules at the 
 
 Then based on the indexes we get, we can redo the plans greedily to get fewer indexes.
 
+
+= Vectorized query planning
+(practically, how to do it)
+
+Writing a vectorized query plan is non-trivial because we always want to run everything in
+batches and the batches must not be too big or too small.
+
+Figuring out how to schedule/design a vectorized join plan is somewhat similar to pipelined
+multithreading.
+
+```
+input --> t1 ---A--> t2 ---B--> t3 --> output
+```
+
+Here, the t1, t2, t3 threads perform some processing in a pipeline where all of them may produce
+a variable amount of output.
+The threads may perform tasks such as filtering or joins.
+
+But we are a single thread, and the work of t1, t2, t3 is just a function call, so we need to
+figure out the best schedule to "call" t1,t2,t3
+
+NOTE: We can push/pop from the Vecs, so we don't have to use a queue (needs consideration for
+trie though).
+```rust
+struct State {
+    a: Vec<A>,
+    b: Vec<B>,
+    /* ... */
+}
+impl State {
+    fn remainder(&mut self, /* ... */) { /* ... */ }
+
+    fn t1_single(&mut self, /* ... */) { /* ... */ }
+    fn t2_single(&mut self, /* ... */) { /* ... */ }
+    fn t3_single(&mut self, /* ... */) { /* ... */ }
+
+    // perform operation on 1000 elements
+    fn t1_batched(&mut self, /* ... */) { /* ... */ }
+    fn t2_batched(&mut self, /* ... */) { /* ... */ }
+    fn t3_batched(&mut self, /* ... */) { /* ... */ }
+}
+```
+
+```rust
+loop {
+    if B.len() >= 1000 { t3(1000); continue; }
+    if A.len() >= 1000 { t2(1000); continue; }
+    if input.len() >= 1000 { t1(1000); continue; }
+
+    if input.len() > 0 { t1(input.len()); continue; }
+    if A.len() > 0 { t2(A.len()); continue; }
+    if B.len() > 0 { t3(B.len()); continue; }
+
+    break;
+}
+```
+
+= Path compression is expensive
+
+Assuming we balance perfectly, we have logarithmic bounds on how many steps find will take.
+
+However, doing path compression is (somewhat) expensive, so skipping it can be fine.
+
+= SIMD union-find
+
+SIMD union-find with path compression is tricky because you essentially need a stack per-lane.
+By getting rid of path compression, SIMD-find is only a bunch of gathers, although union probably still has to be serial since we want to track outdated E-classes.
+
 = TODO READ
 Papers are just under the first author i looked at.
 I stopped adding authors after a while since this is just too many papers.
