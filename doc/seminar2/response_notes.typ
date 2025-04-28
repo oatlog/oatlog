@@ -56,7 +56,7 @@ What does Prog mean in this context? (both concrete datastructure and what the a
 
 You should swap the order, first present examples (`var arr :: Prog State [Int]`), and then the abstraction (`var :: (s -> a) -> Prog s a`).
 
-"and the program variables are constructed as follows:" These are just the type signatures, right? Or are we treating types as values.
+"and the program variables are constructed as follows:" These are just the type signatures, right? Or are we treating types as values?
 
 I think it's confusing to have two definitions of plength, maybe something like this?
 
@@ -114,6 +114,18 @@ If it's user editable, then the user can pick the semantics (eg array is a funct
 == Inequalites
 
 = Case studies
+
+== Partial functions
+
+What about it returning a "Nan" or None value that is semantically distinct from all other values?
+
+== Monotoni..
+
+Monotonically decreasing/increasing is more clear.
+
+== Combined predicates
+
+$2n -> 2^n$
 
 = Related work
 

@@ -2693,6 +2693,57 @@ However, doing path compression is (somewhat) expensive, so skipping it can be f
 SIMD union-find with path compression is tricky because you essentially need a stack per-lane.
 By getting rid of path compression, SIMD-find is only a bunch of gathers, although union probably still has to be serial since we want to track outdated E-classes.
 
+= Compression
+
+Easy: re-use old e-class ids.
+
+Need to use fewer indexes.
+
+
+= TODO: easy
+
+// (evals-to i64)
+// 
+// (evals-to a b1)
+// (evals-to c b2)
+// b1 = b2
+// 
+// (Add x x)
+// (Add x1 x2)
+// x1 = x2
+
+- GC ids.
+- faster UF
+  - ILP, multiple lookups
+- reserve allocations
+- ILP entry
+- faster is_root
+- better hash functions
+- prefetch hashmap lookup
+- if only value is non-root, do in-place thing
+
+= TODO: want to do
+
+- lattice?
+
+- (superhard) extraction
+- robust equality modulo permutation (more reasonable query planning).
+- re-evaluate "is_root" and switch to "is_root_mut"
+
+= TODO: hard
+
+- think about allocations.
+- think about avoiding accidentally quadratic behaviour on hashmaps.
+- vectorization
+- scheduling/rulesets/check
+
+= async gather??
+
+```
+is_root && is_root && is_root
+```
+want to send 3 memory requests and continue as soon as one matches.
+
 = TODO READ
 Papers are just under the first author i looked at.
 I stopped adding authors after a while since this is just too many papers.

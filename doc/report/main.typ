@@ -34,6 +34,8 @@
     // Here, you can say thank you to your supervisor(s), company advisors and other people that
     // supported you during your project.
     #TODO[Write acknowledgements]
+    // egraph community
+    // supervisor
   ],
 )
 
@@ -43,6 +45,10 @@
 #TODO[introduce relevant references]
 
 #TODO[Clearly present motivation for this work]
+
+#TODO[read feedback]
+
+#TODO[integrate from presentation, extended abstract]
 
 = Introduction
 
