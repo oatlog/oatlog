@@ -76,16 +76,14 @@ mod conceptual_idea {
     }
 }
 
-
-
 mod non_trivial_example {
     // NOTE: PROJECT is actually very important since it literally impacts our memory usage. We
     // don't care about x0, x1 for our final output.
-    #[derive(Copy, Clone, Eq, PartialEq, Ord, PartialOrd, Default, Debug, Hash)]
-    struct Math(u32);
+    use super::Relations;
+    use super::demo_relation::*;
 
     // (rewrite (Add (Mul a c) (Mul b c)) (Mul (Add a b) c))
-    // (rule 
+    // (rule
     //      (
     //          (Mul a c x0)
     //          (Mul b c x1)
@@ -97,37 +95,86 @@ mod non_trivial_example {
     //      )
     // )
 
-
     // q1:
     // (MulNew a c x0)
-    // (Mul b c x1)
+    // (Mul c b x1)
     // (Add x0 x1 x2)
     //
     // q2:
     // (MulNew a c x0)
-    // (Mul b c x1)
+    // (Mul c b x1)
     // (Add x1 x0 x2)
-
 
     // input---t1-->a_b_c_x0_x1---t2-->output
     //                        |
     //                        \---t3-->output
 
     struct State {
-        a_b_c_x0_x1: Vec<(Math, Math, Math, Math, Math)>
+        a_c_x0_offset: usize,
+        a_b_c_x0_x1: Vec<(Math, Math, Math, Math, Math)>,
     }
     impl State {
-        fn t1_batch(&mut self, a_c_x0: &[(Math, Math, Math)]) {
+        fn t1_batch(&mut self, steps: usize, relations: &Relations) {
+            // for &(a, c, x0) in [] {
+            // relations.mul_.iter1_1_0_2();
+            // }
         }
+        fn t2_batch(&mut self, steps: usize, relations: &Relations) {}
+        fn t3_batch(&mut self, steps: usize, relations: &Relations) {}
+        fn run(&mut self, relations: &Relations) {}
     }
 }
 
+mod simd_actions {
+    fn union_simd(a: [u32; 8], b: [u32; 8], repr: &mut [u32]) {
+        let a = find_simd(a, repr);
+        let b = find_simd(b, repr);
+
+        //
+        // 1 - 2
+        // 2 - 3
+        // 2 - 4
+        //
+        // => we need to check if there is any overlap between anything in a, b
+
+        for i in 0..8 {
+            // needs to be ordered for correctness.
+            let a = a[i];
+            let b = b[i];
+        }
+    }
+    fn conflict_detection(a: [u32; 8], b: [u32; 8]) -> bool {
+        todo!()
+    }
+    fn find_scalar(mut i: u32, repr: &mut [u32]) -> u32 {
+        loop {
+            let i_old = i;
+            i = repr[i as usize];
+            if i == i_old {
+                break i;
+            }
+        }
+    }
+    fn find_simd(mut a: [u32; 8], repr: &mut [u32]) -> [u32; 8] {
+        loop {
+            let a_new = a.map(|i| repr[i as usize]);
+            let a_new_new = a_new.map(|i| repr[i as usize]);
+            for i in 0..8 {
+                // simulate scatter
+                repr[a[i] as usize] = a_new_new[i];
+            }
+            if a == a_new_new {
+                break a;
+            }
+            a = a_new_new;
+        }
+    }
+}
 
 // (Mul (Add a b) c)
 //
 // (MulNew t0 c t1)
 // (Add a b t0)
-
 
 // join/filter/join+filter
 // A QueryElement owns it's OUTPUT
@@ -146,7 +193,6 @@ trait QueryElement {
     // should be #[inline(never)]
     fn process_remaining(&mut self, relations: &Relations, input: &Self::Input);
 }
-
 
 struct Relations {
     // add, mul etc...
@@ -239,5 +285,195 @@ mod as_an_interpreter {
             }
         }
         num_elements
+    }
+}
+
+mod demo_relation {
+    use crate::runtime::{self, *};
+    eclass_wrapper_ty!(Math);
+    #[derive(Debug, Default)]
+    struct MulRelation {
+        new: Vec<(Math, Math, Math)>,
+        hash_index_0_1: runtime::HashMap<(Math, Math), (Math,)>,
+        hash_index_0: runtime::HashMap<(Math,), runtime::SmallVec<[(Math, Math); 1]>>,
+        hash_index_2_0: runtime::HashMap<(Math, Math), runtime::SmallVec<[(Math,); 1]>>,
+        hash_index_2: runtime::HashMap<(Math,), runtime::SmallVec<[(Math, Math); 1]>>,
+        hash_index_0_1_2: runtime::HashMap<(Math, Math, Math), runtime::SmallVec<[(); 1]>>,
+        math_num_uprooted_at_latest_retain: usize,
+    }
+    impl MulRelation {
+        fn iter2_0_1_2(&self, x0: Math, x1: Math) -> impl Iterator<Item = (Math,)> + use<'_> {
+            self.hash_index_0_1.get(&(x0, x1)).into_iter().copied()
+        }
+        fn iter1_0_1_2(&self, x0: Math) -> impl Iterator<Item = (Math, Math)> + use<'_> {
+            self.hash_index_0.get(&(x0,)).into_iter().flatten().copied()
+        }
+        fn iter2_2_0_1(&self, x2: Math, x0: Math) -> impl Iterator<Item = (Math,)> + use<'_> {
+            self.hash_index_2_0
+                .get(&(x2, x0))
+                .into_iter()
+                .flatten()
+                .copied()
+        }
+        fn iter1_2_0_1(&self, x2: Math) -> impl Iterator<Item = (Math, Math)> + use<'_> {
+            self.hash_index_2.get(&(x2,)).into_iter().flatten().copied()
+        }
+        fn iter3_0_1_2(&self, x0: Math, x1: Math, x2: Math) -> impl Iterator<Item = ()> + use<'_> {
+            self.hash_index_0_1_2
+                .get(&(x0, x1, x2))
+                .into_iter()
+                .flatten()
+                .copied()
+        }
+        fn check2_0_1_2(&self, x0: Math, x1: Math) -> bool {
+            self.iter2_0_1_2(x0, x1).next().is_some()
+        }
+        fn check1_0_1_2(&self, x0: Math) -> bool {
+            self.iter1_0_1_2(x0).next().is_some()
+        }
+        fn check2_2_0_1(&self, x2: Math, x0: Math) -> bool {
+            self.iter2_2_0_1(x2, x0).next().is_some()
+        }
+        fn check1_2_0_1(&self, x2: Math) -> bool {
+            self.iter1_2_0_1(x2).next().is_some()
+        }
+        fn check3_0_1_2(&self, x0: Math, x1: Math, x2: Math) -> bool {
+            self.iter3_0_1_2(x0, x1, x2).next().is_some()
+        }
+        #[allow(unreachable_code)]
+        fn entry2_0_1_2(
+            &self,
+            x0: Math,
+            x1: Math,
+            delta: &mut Delta,
+            uf: &mut Unification,
+        ) -> (Math,) {
+            if let Some((x2,)) = self.iter2_0_1_2(x0, x1).next() {
+                return (x2,);
+            }
+            let x2 = uf.math_.add_eclass();
+            delta.mul_.push((x0, x1, x2));
+            (x2,)
+        }
+        #[allow(unreachable_code)]
+        fn entry3_0_1_2(
+            &self,
+            x0: Math,
+            x1: Math,
+            x2: Math,
+            delta: &mut Delta,
+            uf: &mut Unification,
+        ) -> () {
+            if let Some(()) = self.iter3_0_1_2(x0, x1, x2).next() {
+                return ();
+            }
+            delta.mul_.push((x0, x1, x2));
+            ()
+        }
+    }
+    #[derive(Debug, Default)]
+    struct AddRelation {
+        new: Vec<(Math, Math, Math)>,
+        hash_index_0_1: runtime::HashMap<(Math, Math), (Math,)>,
+        hash_index_0: runtime::HashMap<(Math,), runtime::SmallVec<[(Math, Math); 1]>>,
+        hash_index_1: runtime::HashMap<(Math,), runtime::SmallVec<[(Math, Math); 1]>>,
+        hash_index_0_1_2: runtime::HashMap<(Math, Math, Math), runtime::SmallVec<[(); 1]>>,
+        math_num_uprooted_at_latest_retain: usize,
+    }
+    impl AddRelation {
+        fn iter2_0_1_2(&self, x0: Math, x1: Math) -> impl Iterator<Item = (Math,)> + use<'_> {
+            self.hash_index_0_1.get(&(x0, x1)).into_iter().copied()
+        }
+        fn iter1_0_1_2(&self, x0: Math) -> impl Iterator<Item = (Math, Math)> + use<'_> {
+            self.hash_index_0.get(&(x0,)).into_iter().flatten().copied()
+        }
+        fn iter1_1_0_2(&self, x1: Math) -> impl Iterator<Item = (Math, Math)> + use<'_> {
+            self.hash_index_1.get(&(x1,)).into_iter().flatten().copied()
+        }
+        fn iter3_0_1_2(&self, x0: Math, x1: Math, x2: Math) -> impl Iterator<Item = ()> + use<'_> {
+            self.hash_index_0_1_2
+                .get(&(x0, x1, x2))
+                .into_iter()
+                .flatten()
+                .copied()
+        }
+        fn check2_0_1_2(&self, x0: Math, x1: Math) -> bool {
+            self.iter2_0_1_2(x0, x1).next().is_some()
+        }
+        fn check1_0_1_2(&self, x0: Math) -> bool {
+            self.iter1_0_1_2(x0).next().is_some()
+        }
+        fn check1_1_0_2(&self, x1: Math) -> bool {
+            self.iter1_1_0_2(x1).next().is_some()
+        }
+        fn check3_0_1_2(&self, x0: Math, x1: Math, x2: Math) -> bool {
+            self.iter3_0_1_2(x0, x1, x2).next().is_some()
+        }
+        #[allow(unreachable_code)]
+        fn entry2_0_1_2(
+            &self,
+            x0: Math,
+            x1: Math,
+            delta: &mut Delta,
+            uf: &mut Unification,
+        ) -> (Math,) {
+            if let Some((x2,)) = self.iter2_0_1_2(x0, x1).next() {
+                return (x2,);
+            }
+            let x2 = uf.math_.add_eclass();
+            delta.add_.push((x0, x1, x2));
+            (x2,)
+        }
+        #[allow(unreachable_code)]
+        fn entry3_0_1_2(
+            &self,
+            x0: Math,
+            x1: Math,
+            x2: Math,
+            delta: &mut Delta,
+            uf: &mut Unification,
+        ) -> () {
+            if let Some(()) = self.iter3_0_1_2(x0, x1, x2).next() {
+                return ();
+            }
+            delta.add_.push((x0, x1, x2));
+            ()
+        }
+    }
+    #[derive(Debug, Default)]
+    pub struct Delta {
+        mul_: Vec<(Math, Math, Math)>,
+        add_: Vec<(Math, Math, Math)>,
+    }
+    impl Delta {
+        fn new() -> Self {
+            Self::default()
+        }
+        fn has_new_inserts(&self) -> bool {
+            let mut has_new_inserts = false;
+            has_new_inserts |= !self.mul_.is_empty();
+            has_new_inserts |= !self.add_.is_empty();
+            has_new_inserts
+        }
+        pub fn insert_mul(&mut self, x: (Math, Math, Math)) {
+            self.mul_.push(x);
+        }
+        pub fn insert_add(&mut self, x: (Math, Math, Math)) {
+            self.add_.push(x);
+        }
+    }
+    #[derive(Debug, Default)]
+    struct Unification {
+        pub math_: UnionFind<Math>,
+    }
+    impl Unification {
+        fn num_uprooted(&mut self) -> usize {
+            let mut ret = 0;
+            ret += self.math_.num_uprooted();
+            ret
+        }
+        fn reset_num_uprooted(&mut self) {
+            self.math_.reset_num_uprooted();
+        }
     }
 }
