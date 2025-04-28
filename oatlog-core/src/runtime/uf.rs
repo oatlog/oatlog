@@ -73,8 +73,10 @@ impl<T: Eclass> UnionFind<T> {
     /// Sugar
     #[inline]
     pub fn is_root(&mut self, t: T) -> bool {
-        self.find(t) == t
+        // self.find(t) == t
+        T::new(self.repr[t.inner() as usize]) == t
     }
+    // For tests?
     #[inline]
     pub fn is_root_mut(&mut self, t: &mut T) -> bool {
         let r = self.find(*t);

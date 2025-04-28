@@ -365,7 +365,7 @@ fn update(
                                 None
                             }
                         })
-                        .intersperse(quote! { && })
+                        .intersperse(quote! { & })
                         .collect();
                     if cols_is_root.is_empty() {
                         quote! { true }

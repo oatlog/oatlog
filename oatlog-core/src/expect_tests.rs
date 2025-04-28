@@ -1275,7 +1275,7 @@ fn regression_tir2() {
                     self.math_num_uprooted_at_latest_retain = uf.math_.num_uprooted();
                     let offset = insertions.len();
                     self.hash_index_0_1.retain(|&(x0, x1), &mut (x2,)| {
-                        if uf.math_.is_root(x0) && uf.math_.is_root(x1) && uf.math_.is_root(x2) {
+                        if uf.math_.is_root(x0) & uf.math_.is_root(x1) & uf.math_.is_root(x2) {
                             true
                         } else {
                             insertions.push((x0, x1, x2));
@@ -1418,7 +1418,7 @@ fn regression_tir2() {
                     self.math_num_uprooted_at_latest_retain = uf.math_.num_uprooted();
                     let offset = insertions.len();
                     self.hash_index_1_0.retain(|&(x1, x0), &mut (x2,)| {
-                        if uf.math_.is_root(x0) && uf.math_.is_root(x1) && uf.math_.is_root(x2) {
+                        if uf.math_.is_root(x0) & uf.math_.is_root(x1) & uf.math_.is_root(x2) {
                             true
                         } else {
                             insertions.push((x0, x1, x2));
@@ -2227,7 +2227,7 @@ fn regression_tir1() {
                     self.math_num_uprooted_at_latest_retain = uf.math_.num_uprooted();
                     let offset = insertions.len();
                     self.hash_index_0_1.retain(|&(x0, x1), &mut (x2,)| {
-                        if uf.math_.is_root(x0) && uf.math_.is_root(x1) && uf.math_.is_root(x2) {
+                        if uf.math_.is_root(x0) & uf.math_.is_root(x1) & uf.math_.is_root(x2) {
                             true
                         } else {
                             insertions.push((x0, x1, x2));
@@ -3119,7 +3119,7 @@ fn codegen_constant_propagation() {
                     self.math_num_uprooted_at_latest_retain = uf.math_.num_uprooted();
                     let offset = insertions.len();
                     self.hash_index_0_1.retain(|&(x0, x1), &mut (x2,)| {
-                        if uf.math_.is_root(x0) && uf.math_.is_root(x1) && uf.math_.is_root(x2) {
+                        if uf.math_.is_root(x0) & uf.math_.is_root(x1) & uf.math_.is_root(x2) {
                             true
                         } else {
                             insertions.push((x0, x1, x2));
@@ -3307,7 +3307,7 @@ fn codegen_constant_propagation() {
                     self.math_num_uprooted_at_latest_retain = uf.math_.num_uprooted();
                     let offset = insertions.len();
                     self.hash_index_0_1.retain(|&(x0, x1), &mut (x2,)| {
-                        if uf.math_.is_root(x0) && uf.math_.is_root(x1) && uf.math_.is_root(x2) {
+                        if uf.math_.is_root(x0) & uf.math_.is_root(x1) & uf.math_.is_root(x2) {
                             true
                         } else {
                             insertions.push((x0, x1, x2));
@@ -3928,7 +3928,7 @@ fn codegen_commutative() {
                     self.math_num_uprooted_at_latest_retain = uf.math_.num_uprooted();
                     let offset = insertions.len();
                     self.hash_index_0_1.retain(|&(x0, x1), &mut (x2,)| {
-                        if uf.math_.is_root(x0) && uf.math_.is_root(x1) && uf.math_.is_root(x2) {
+                        if uf.math_.is_root(x0) & uf.math_.is_root(x1) & uf.math_.is_root(x2) {
                             true
                         } else {
                             insertions.push((x0, x1, x2));
@@ -4445,7 +4445,7 @@ fn regression_entry2() {
                     self.math_num_uprooted_at_latest_retain = uf.math_.num_uprooted();
                     let offset = insertions.len();
                     self.hash_index_0_1.retain(|&(x0, x1), &mut (x2,)| {
-                        if uf.math_.is_root(x0) && uf.math_.is_root(x1) && uf.math_.is_root(x2) {
+                        if uf.math_.is_root(x0) & uf.math_.is_root(x1) & uf.math_.is_root(x2) {
                             true
                         } else {
                             insertions.push((x0, x1, x2));
@@ -5106,7 +5106,7 @@ fn regression_entry() {
                     self.math_num_uprooted_at_latest_retain = uf.math_.num_uprooted();
                     let offset = insertions.len();
                     self.hash_index_0_1.retain(|&(x0, x1), &mut (x2,)| {
-                        if uf.math_.is_root(x0) && uf.math_.is_root(x1) && uf.math_.is_root(x2) {
+                        if uf.math_.is_root(x0) & uf.math_.is_root(x1) & uf.math_.is_root(x2) {
                             true
                         } else {
                             insertions.push((x0, x1, x2));
@@ -5248,7 +5248,7 @@ fn regression_entry() {
                     self.math_num_uprooted_at_latest_retain = uf.math_.num_uprooted();
                     let offset = insertions.len();
                     self.hash_index_0_1.retain(|&(x0, x1), &mut (x2,)| {
-                        if uf.math_.is_root(x0) && uf.math_.is_root(x1) && uf.math_.is_root(x2) {
+                        if uf.math_.is_root(x0) & uf.math_.is_root(x1) & uf.math_.is_root(x2) {
                             true
                         } else {
                             insertions.push((x0, x1, x2));
@@ -5755,7 +5755,7 @@ fn test_bind_variable_multiple_times() {
                     self.foo_num_uprooted_at_latest_retain = uf.foo_.num_uprooted();
                     let offset = insertions.len();
                     self.hash_index_0_1.retain(|&(x0, x1), &mut (x2,)| {
-                        if uf.foo_.is_root(x0) && uf.foo_.is_root(x1) && uf.foo_.is_root(x2) {
+                        if uf.foo_.is_root(x0) & uf.foo_.is_root(x1) & uf.foo_.is_root(x2) {
                             true
                         } else {
                             insertions.push((x0, x1, x2));
@@ -6353,7 +6353,7 @@ fn codegen_variable_reuse_bug() {
                     self.math_num_uprooted_at_latest_retain = uf.math_.num_uprooted();
                     let offset = insertions.len();
                     self.hash_index_0_1.retain(|&(x0, x1), &mut (x2,)| {
-                        if uf.math_.is_root(x0) && uf.math_.is_root(x1) && uf.math_.is_root(x2) {
+                        if uf.math_.is_root(x0) & uf.math_.is_root(x1) & uf.math_.is_root(x2) {
                             true
                         } else {
                             insertions.push((x0, x1, x2));
@@ -6911,7 +6911,7 @@ fn initial_exprs() {
                     self.math_num_uprooted_at_latest_retain = uf.math_.num_uprooted();
                     let offset = insertions.len();
                     self.hash_index_0_1.retain(|&(x0, x1), &mut (x2,)| {
-                        if uf.math_.is_root(x0) && uf.math_.is_root(x1) && uf.math_.is_root(x2) {
+                        if uf.math_.is_root(x0) & uf.math_.is_root(x1) & uf.math_.is_root(x2) {
                             true
                         } else {
                             insertions.push((x0, x1, x2));
@@ -7053,7 +7053,7 @@ fn initial_exprs() {
                     self.math_num_uprooted_at_latest_retain = uf.math_.num_uprooted();
                     let offset = insertions.len();
                     self.hash_index_0_1.retain(|&(x0, x1), &mut (x2,)| {
-                        if uf.math_.is_root(x0) && uf.math_.is_root(x1) && uf.math_.is_root(x2) {
+                        if uf.math_.is_root(x0) & uf.math_.is_root(x1) & uf.math_.is_root(x2) {
                             true
                         } else {
                             insertions.push((x0, x1, x2));
@@ -8786,7 +8786,7 @@ fn test_primitives_simple() {
                     self.math_num_uprooted_at_latest_retain = uf.math_.num_uprooted();
                     let offset = insertions.len();
                     self.hash_index_1_0.retain(|&(x1, x0), &mut (x2,)| {
-                        if uf.math_.is_root(x0) && uf.math_.is_root(x1) && uf.math_.is_root(x2) {
+                        if uf.math_.is_root(x0) & uf.math_.is_root(x1) & uf.math_.is_root(x2) {
                             true
                         } else {
                             insertions.push((x0, x1, x2));
@@ -8950,7 +8950,7 @@ fn test_primitives_simple() {
                     self.math_num_uprooted_at_latest_retain = uf.math_.num_uprooted();
                     let offset = insertions.len();
                     self.hash_index_0_1.retain(|&(x0, x1), &mut (x2,)| {
-                        if uf.math_.is_root(x0) && uf.math_.is_root(x1) && uf.math_.is_root(x2) {
+                        if uf.math_.is_root(x0) & uf.math_.is_root(x1) & uf.math_.is_root(x2) {
                             true
                         } else {
                             insertions.push((x0, x1, x2));
@@ -10619,7 +10619,7 @@ fn edgecase0() {
                     self.math_num_uprooted_at_latest_retain = uf.math_.num_uprooted();
                     let offset = insertions.len();
                     self.hash_index_0_1.retain(|&(x0, x1), &mut (x2,)| {
-                        if uf.math_.is_root(x0) && uf.math_.is_root(x1) && uf.math_.is_root(x2) {
+                        if uf.math_.is_root(x0) & uf.math_.is_root(x1) & uf.math_.is_root(x2) {
                             true
                         } else {
                             insertions.push((x0, x1, x2));
@@ -10833,7 +10833,7 @@ fn edgecase0() {
                     self.math_num_uprooted_at_latest_retain = uf.math_.num_uprooted();
                     let offset = insertions.len();
                     self.hash_index_0_1.retain(|&(x0, x1), &mut (x2,)| {
-                        if uf.math_.is_root(x0) && uf.math_.is_root(x1) && uf.math_.is_root(x2) {
+                        if uf.math_.is_root(x0) & uf.math_.is_root(x1) & uf.math_.is_root(x2) {
                             true
                         } else {
                             insertions.push((x0, x1, x2));
@@ -11302,7 +11302,7 @@ fn test_into_codegen() {
                     self.math_num_uprooted_at_latest_retain = uf.math_.num_uprooted();
                     let offset = insertions.len();
                     self.hash_index_0_1.retain(|&(x0, x1), &mut (x2,)| {
-                        if uf.math_.is_root(x0) && uf.math_.is_root(x1) && uf.math_.is_root(x2) {
+                        if uf.math_.is_root(x0) & uf.math_.is_root(x1) & uf.math_.is_root(x2) {
                             true
                         } else {
                             insertions.push((x0, x1, x2));
@@ -11467,7 +11467,7 @@ fn test_into_codegen() {
                     self.math_num_uprooted_at_latest_retain = uf.math_.num_uprooted();
                     let offset = insertions.len();
                     self.hash_index_0_1.retain(|&(x0, x1), &mut (x2,)| {
-                        if uf.math_.is_root(x0) && uf.math_.is_root(x1) && uf.math_.is_root(x2) {
+                        if uf.math_.is_root(x0) & uf.math_.is_root(x1) & uf.math_.is_root(x2) {
                             true
                         } else {
                             insertions.push((x0, x1, x2));
@@ -14125,7 +14125,7 @@ fn lir_math() {
                     self.fuel_unit_num_uprooted_at_latest_retain = uf.fuel_unit_.num_uprooted();
                     let offset = insertions.len();
                     self.hash_index_0.retain(|&(x0,), &mut (x1,)| {
-                        if uf.fuel_unit_.is_root(x0) && uf.fuel_unit_.is_root(x1) {
+                        if uf.fuel_unit_.is_root(x0) & uf.fuel_unit_.is_root(x1) {
                             true
                         } else {
                             insertions.push((x0, x1));
@@ -14411,7 +14411,7 @@ fn lir_math() {
                     self.math_num_uprooted_at_latest_retain = uf.math_.num_uprooted();
                     let offset = insertions.len();
                     self.hash_index_1_0.retain(|&(x1, x0), &mut (x2,)| {
-                        if uf.math_.is_root(x0) && uf.math_.is_root(x1) && uf.math_.is_root(x2) {
+                        if uf.math_.is_root(x0) & uf.math_.is_root(x1) & uf.math_.is_root(x2) {
                             true
                         } else {
                             insertions.push((x0, x1, x2));
@@ -14585,9 +14585,9 @@ fn lir_math() {
                     let offset = insertions.len();
                     self.hash_index_0_1_2.retain(|&(x0, x1, x2), &mut (x3,)| {
                         if uf.fuel_unit_.is_root(x0)
-                            && uf.math_.is_root(x1)
-                            && uf.math_.is_root(x2)
-                            && uf.math_.is_root(x3)
+                            & uf.math_.is_root(x1)
+                            & uf.math_.is_root(x2)
+                            & uf.math_.is_root(x3)
                         {
                             true
                         } else {
@@ -14850,7 +14850,7 @@ fn lir_math() {
                     self.math_num_uprooted_at_latest_retain = uf.math_.num_uprooted();
                     let offset = insertions.len();
                     self.hash_index_1_0.retain(|&(x1, x0), &mut (x2,)| {
-                        if uf.math_.is_root(x0) && uf.math_.is_root(x1) && uf.math_.is_root(x2) {
+                        if uf.math_.is_root(x0) & uf.math_.is_root(x1) & uf.math_.is_root(x2) {
                             true
                         } else {
                             insertions.push((x0, x1, x2));
@@ -15059,7 +15059,7 @@ fn lir_math() {
                     self.math_num_uprooted_at_latest_retain = uf.math_.num_uprooted();
                     let offset = insertions.len();
                     self.hash_index_0_1.retain(|&(x0, x1), &mut (x2,)| {
-                        if uf.math_.is_root(x0) && uf.math_.is_root(x1) && uf.math_.is_root(x2) {
+                        if uf.math_.is_root(x0) & uf.math_.is_root(x1) & uf.math_.is_root(x2) {
                             true
                         } else {
                             insertions.push((x0, x1, x2));
@@ -15227,7 +15227,7 @@ fn lir_math() {
                     self.math_num_uprooted_at_latest_retain = uf.math_.num_uprooted();
                     let offset = insertions.len();
                     self.hash_index_1_0.retain(|&(x1, x0), &mut (x2,)| {
-                        if uf.math_.is_root(x0) && uf.math_.is_root(x1) && uf.math_.is_root(x2) {
+                        if uf.math_.is_root(x0) & uf.math_.is_root(x1) & uf.math_.is_root(x2) {
                             true
                         } else {
                             insertions.push((x0, x1, x2));
@@ -15461,7 +15461,7 @@ fn lir_math() {
                     self.math_num_uprooted_at_latest_retain = uf.math_.num_uprooted();
                     let offset = insertions.len();
                     self.hash_index_0_1.retain(|&(x0, x1), &mut (x2,)| {
-                        if uf.math_.is_root(x0) && uf.math_.is_root(x1) && uf.math_.is_root(x2) {
+                        if uf.math_.is_root(x0) & uf.math_.is_root(x1) & uf.math_.is_root(x2) {
                             true
                         } else {
                             insertions.push((x0, x1, x2));
@@ -15607,7 +15607,7 @@ fn lir_math() {
                     self.math_num_uprooted_at_latest_retain = uf.math_.num_uprooted();
                     let offset = insertions.len();
                     self.hash_index_0_1.retain(|&(x0, x1), &mut (x2,)| {
-                        if uf.math_.is_root(x0) && uf.math_.is_root(x1) && uf.math_.is_root(x2) {
+                        if uf.math_.is_root(x0) & uf.math_.is_root(x1) & uf.math_.is_root(x2) {
                             true
                         } else {
                             insertions.push((x0, x1, x2));
@@ -15837,7 +15837,7 @@ fn lir_math() {
                     self.math_num_uprooted_at_latest_retain = uf.math_.num_uprooted();
                     let offset = insertions.len();
                     self.hash_index_0.retain(|&(x0,), &mut (x1,)| {
-                        if uf.math_.is_root(x0) && uf.math_.is_root(x1) {
+                        if uf.math_.is_root(x0) & uf.math_.is_root(x1) {
                             true
                         } else {
                             insertions.push((x0, x1));
@@ -15966,7 +15966,7 @@ fn lir_math() {
                     self.math_num_uprooted_at_latest_retain = uf.math_.num_uprooted();
                     let offset = insertions.len();
                     self.hash_index_0.retain(|&(x0,), &mut (x1,)| {
-                        if uf.math_.is_root(x0) && uf.math_.is_root(x1) {
+                        if uf.math_.is_root(x0) & uf.math_.is_root(x1) {
                             true
                         } else {
                             insertions.push((x0, x1));
@@ -16095,7 +16095,7 @@ fn lir_math() {
                     self.math_num_uprooted_at_latest_retain = uf.math_.num_uprooted();
                     let offset = insertions.len();
                     self.hash_index_0.retain(|&(x0,), &mut (x1,)| {
-                        if uf.math_.is_root(x0) && uf.math_.is_root(x1) {
+                        if uf.math_.is_root(x0) & uf.math_.is_root(x1) {
                             true
                         } else {
                             insertions.push((x0, x1));
@@ -16224,7 +16224,7 @@ fn lir_math() {
                     self.math_num_uprooted_at_latest_retain = uf.math_.num_uprooted();
                     let offset = insertions.len();
                     self.hash_index_0.retain(|&(x0,), &mut (x1,)| {
-                        if uf.math_.is_root(x0) && uf.math_.is_root(x1) {
+                        if uf.math_.is_root(x0) & uf.math_.is_root(x1) {
                             true
                         } else {
                             insertions.push((x0, x1));
