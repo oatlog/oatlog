@@ -149,11 +149,17 @@
 
 #TODO[integrate from presentation, extended abstract]
 
+#TODO[Elaborate on evaluation once that's possible.]
+
+#NOTE[The midpoint draft is too early for a conclusion.]
+
 = Introduction
 
 #TODO[what is ad-hoc passes and why relevant]
 
 #TODO[improve program = optimize program?]
+
+/*
 
 Modern software development depends on efficient and reliable compilers, which apply sophisticated
 optimizations to improve performance while enabling portability and abstraction. For example,
@@ -200,7 +206,10 @@ rewriting to make it nondestructive.
 
 == E-graphs and equality saturation
 
+*/
+
 #TODO[explain limitations of aegraphs]
+/*
 
 E-graphs @oldegraph are data structures for rewriting that allow multiple representations of a
 value, committing to one only after all rewrites have been searched. The representations are stored
@@ -244,7 +253,10 @@ e-graphs within compilers would require them to become faster.
 
 == Datalog and relational databases
 
+*/
+
 #TODO[e-graphs as relational databases is discovered "recently" provide year/citation]
+/*
 
 Recent developments in e-graphs and equality saturation @relationalematching @eqlog @egglog have
 shown that adding indexes to e-graph pattern-matching creates a structure that is very similar to
@@ -297,14 +309,29 @@ within oatlog.
 in addition to showing what oatlog can do and how it is used. @oatlog_evaluation follows by
 evaluating oatlog through its test suite and benchmarks.
 
-#TODO[Elaborate on evaluation once that's possible.]
+*/
 
-#NOTE[The midpoint draft is too early for a conclusion.]
++ Kompilatorer viktiga
++ peepholes är bra
++ Vad är en rewrite
+  - exempel?
++ Kompilatorer har phase ordering problem pga destructive rewrites
++ e-grafer löser phase ordering
++ e-grafer är långsamma
++ Finns lovande innovation inom e-graf-implementering
++ Vi har implementerat e-graf som är snabbare än egglog i många fall
+
+= Background <background>
+
+/*
 
 = Conceptual background <conceptual_background>
 
-#TODO[Asking Matti: Is the conceptual background sufficiently understandable?]
+*/
 
+// #TODO[Asking Matti: Is the conceptual background sufficiently understandable?]
+
+/*
 The conceptual background explains the core concepts necessary to understand our work. Its
 explanation goes into greater technical detail than in the introduction, while remaining more
 pedagogical (and less comprehensive) than the background in @background.
@@ -338,7 +365,9 @@ equality-preserving rewrites, it is more effective to introduce e-classes -- gro
 compactly represent an exponential number of equivalent expressions, parameterized by mappings from
 e-classes to e-nodes.
 
+*/
 #TODO[This paragraph is hard to understand before reading figure 1]
+/*
 
 E-graphs can be represented as graphs in multiple ways. In one formulation, hinted at by the
 terminology of e-nodes and e-classes, e-nodes are the nodes of the graph and e-classes are
@@ -406,8 +435,10 @@ modifications are then applied to the e-graph in the canonicalization step, with
 the bipartite formulation, corresponding to adding nodes and unification corresponding to a node
 contraction.
 
+*/
 #TODO[Formal e-graph representation (Union-find $U : "EClassId" -> "EClassId"$, map $M : "EClassId"
 -> {"ENode"}$, hashcons $H : "ENode" -> "EClass"$, etc) suitable for implementation]
+/*
 
 #figure(
   ```rust
@@ -428,12 +459,14 @@ contraction.
   caption: [Egg-like egraph representation],
 ) <listing_egglike_egraph>
 
+*/
 #TODO[Canonicalization on this representation]
 
 #TODO[Recursive e-matching]
 
 #TODO[Batching rewrites for EqSat. WHY is this incompatible with rollback and hence theorem
   proving?]
+/*
 
 A set of rewrite rules is called a theory, and these can be shown to converge to finite e-graphs
 under some conditions. In practice, many theories diverge and the EqSat rewriting phase is often
@@ -500,7 +533,9 @@ than iterating then filtering.
 The filters that appear in recursive e-matching are of the form
 + Require e-nodes to be of a certain variant (e.g. addition or multiplication).
 + Require e-nodes to belong to a certain parent e-class.
+*/
 #TODO[DAG patterns need to be explained with an example]
+/*
 + If supporting DAG patterns, require some bound e-classes from different subpatterns to be identical.
 
 The e-graph representation previously introduced in @listing_egglike_egraph already has indexes from
@@ -595,7 +630,9 @@ The e-node $"Add"(a,b)=c$ implies that $c$ is uniquely determined by $a$ and $b$
 $"Add"$ is a function, and we have a functional dependency from $(x,y)$ to $"res"$. In database
 terminology, we have a primary key on (x,y) for this relation.
 
+*/
 #TODO[Maybe we should have a figure showing the tables Add and Mul being joined for $(x+y) dot z$ here?]
+/*
 
 What about e-matching? The pattern $(x+y) dot z$ for which we sketched recursive e-matching in
 @listing_recursive_ematching would in this new relational representation correspond to the SQL query
@@ -609,7 +646,9 @@ JOIN add ON add.sum = mul.lhs
 i.e. a query on the form of iterating the root of the pattern and then adjoining tables for its
 subpatterns. The pattern can also be written as
 
+*/
 #TODO[what is join]
+/*
 $"Mul"(t_0, c, t_1) join "Add"(a, b, t_0)$
 
 where $join$ denotes a natural join, here on the column $t_0$. This is a conjunctive query, a
@@ -634,7 +673,9 @@ conjunctive queries.
 
 == Semi-naive evaluation <conceptual_background_seminaive>
 
+*/
 #TODO[hard to understand without database 101 (join operator)]
+/*
 
 Semi-naive evaluation is an algorithm for joining relations, each consisting of both old and new
 tuples, guaranteeing that each joined tuple contains some new information. In the context of
@@ -705,11 +746,15 @@ since the first relation in the query plan is iterated in its entirety. This mak
 evaluation and recursive e-matching essentially incompatible, since the latter will always begin
 query execution at the pattern root.
 
+*/
 #TODO[what does this mean in practice?]
+/*
 
 == Theory languages <conceptual_background_theory_languages>
 
+*/
 #TODO[Elaborate]
+/*
 
 @informal-theory-example shows an example EqSat theory specified in the egglog domain-specific
 language @egglog. `Math` is essentially a sum type, where `Add`, `Sub`, etc are constructors.
@@ -838,9 +883,11 @@ index data-structures based on exact queries.
 That said, it's entirely possible to create an e-graph engine that uses SQL internally and in fact a
 prototype of egglog, egglite, was originally implemented on top of sqlite @egglite @egraph_sqlite.
 
-= Background <background>
+*/
+// = Background <background>
 
 #TODO[Section overview]
+/*
 
 == Nomenclature
 
@@ -881,15 +928,21 @@ other.
 
 @rosettaexample shows how an egglog rule can be transformed to eqlog, Rust, and SQL.
 
+*/
 #TODO[]
+/*
 
 === Datalog
 
+*/
 #TODO[]
+/*
 
 === Egglog <language-egglog>
 
+*/
 #TODO[]
+/*
 
 == Rule preprocessing
 
@@ -969,7 +1022,9 @@ for _ in b_new(..) {
 }
 ```
 
+*/
 #TODO[what does egglog and eqlog do?]
+/*
 
 === Merging rules with identical premises
 
@@ -982,22 +1037,26 @@ the original rules.
 
 === Magic sets
 
+*/
 #TODO[Since oatlog/egglog is a superset of Datalog, this should be possible, right?]
 
 #TODO[we have not done this though, and it's unclear if it is useful, I guess rules can have a :magic annotation?]
+/*
 
 Magic sets are a way to get the performance of top-down evaluation using bottom-up evaluation.
 
 Top-down evaluation means starting from a goal and searching for facts until the starting facts are
-reached. Typically, Prolog uses Top-down evaluation #TODO[citation needed]. Bottom-up evaluation
-derives more facts from the starting facts until the goal facts are reached. Datalog engines, as
-well as egglog and oatlog use bottom-up evaluation.
+reached. Typically, Prolog uses Top-down evaluation */#TODO[citation needed]/*. Bottom-up evaluation
+                                                                            derives more facts from the starting facts until the goal facts are reached. Datalog engines, as
+                                                                            well as egglog and oatlog use bottom-up evaluation.
 
+                                                                            */
 #TODO[I guess this only makes sense if we want to prove two expressions equal?]
 
 #TODO[I think a fundamental problem to apply this to e-graphs is how to add "magic bits" to the equality relation.]
 
 #TODO[I don't know if the code is actually correct.]
+/*
 
 ```datalog
 path(x, z) :- edge(x, y), path(y, z).
@@ -1044,20 +1103,26 @@ only computed if they are potentially useful.
 
 == Rule scheduling and termination
 
+*/
 #TODO[section summary]
+/*
 
 === Surjectivity
 
+*/
 #TODO[Surjectivity and "syntactically new variables"]
 
 #TODO["no syntactically new variables" = epic <=> strong = deterministic]
+/*
 
 If a rule does not create any new e-classes it is called surjective @eqlog.
 A theory only containing surjective rules is guaranteed to terminate @eqlog.
 
 === Running unifying rules to closure before running rules that introduce e-classes.
 
+*/
 #TODO[]
+/*
 
 === Semi-naive without running all rules all the time.
 
@@ -1120,8 +1185,10 @@ for a visualization of this.
 
 == Canonicalization
 
+*/
 #TODO[When one actually inserts pending inserts and canonicalizes uprooted e-classes. Interaction
   with semi-naive, updating what `new` means.]
+/*
 
 === Union-find
 
@@ -1201,19 +1268,26 @@ row. However, in practice tracking this number brings additional maintenance ove
 therefore not performed in oatlog. Instead, one can merge larger-id to smaller-id as a heuristic,
 since earlier and hence smaller ids are likely to be present in more existing tuples.
 
+*/
+
 === #TODO[]
 
 #TODO[Additional aspects of canonicalization, pseudocode etc]
+/*
 
 == Query planning
 
+*/
 #TODO[Worst-case optimal join, generic join, free join]
+/*
 
 == Index selection and implementation
 
+*/
 #TODO[@factor_db]
 
 #TODO[curried indexes, Something something trie, logical physical indexes, flow.]
+/*
 
 === Curried indexes
 
@@ -1261,7 +1335,9 @@ See @index-datastructures.
   ),
 ) <index-datastructures>
 
+*/
 #TODO[elaborate]
+/*
 
 == Extraction
 
@@ -1273,9 +1349,23 @@ trivial, but selecting an optimal expression, even with simple cost functions is
 
 Many NP-hard graph algorithms can be done in polynomial time for a fixed treewidth, and this also applies to extraction, where it can be done linear time @fastextract @egraphcircuit.
 
-= Oatlog implementation <oatlog_implementation>
+*/
+
+- definition of e-graph
+  - math objects as python syntax?
+- canonicalization and union-find
+- recursive ematching
+- ematching as a join + what is a join
+- semi-naive evaluation
+- egglog/Datalog language explained using examples
+- nomenclature (+ pick what nomenclature we use for the report)
+- scheduling and termination
+- extraction
+
+= Implementation <oatlog_implementation>
 
 #TODO[Elaborate and forward reference]
+/*
 
 This section discusses oatlog in detail, including how its used, what it can do and how its
 implemented.
@@ -1467,7 +1557,9 @@ inserts and unifications. HIR is lowered into LIR and that process also performs
 #NOTE[The current implementation is a very ad-hoc generic join and will be replaced by something
   similar to free-join, except entirely static (only a single cover)]
 
+  */
 #TODO[We need to have explained query planning in the background and refer to that here.]
+/*
 
 Represents all the choices made to transform a conjunctive query to LIR, specifically the order of
 joins and how the joins are performed. Note that this IR only contains queries and other
@@ -1481,11 +1573,15 @@ LIR is a low-level description of the actual code that is to be generated.
 
 == Selected algorithms
 
+*/
 #TODO[]
+/*
 
 == Selected implementation details
 
+*/
 #TODO[]
+/*
 
 === Rustc spans across files
 
@@ -1557,11 +1653,18 @@ Overall, our comparative testing infrastructure (against egglog) can handle the 
 
 = Oatlog evaluation <oatlog_evaluation>
 
+*/
+
+= Evaluation <oatlog_evaluation>
+
 #TODO[Section summary]
+/*
 
 == Benchmarks
 
+*/
 #TODO[eventually replace with a log/log graph and add more benchmarks, include sizes]
+/*
 
 // generated using:
 // cargo bench --no-run && taskset -c 3 cargo bench
@@ -1602,9 +1705,29 @@ startup and oatlog extraction is better handled using the run-time API.
 
 For a list of currently passing tests, see @passingtests.
 
+*/
+
+- egglog compatible API interface
+
+- architecture and IRs
+  - should contain bulk of text
+  - explanations and optimizations interleaved
+  - query planning
+  - index selection + algorithms
+
+- exactly how is canonicalization implemented (cool optimizations)
+  - essentially everything from the runtime library
+
+- misc implementation details
+  - proc macro stuff
+  - spans
+  - testing infrastructure
+
 = Conclusion <conclusion>
 
 #TODO[Nothing here yet..]
+
+- we have shown that significantly faster e-graph engines are possible
 
 #bibliography("refs.bib")
 #show: appendices
