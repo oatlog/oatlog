@@ -1362,6 +1362,49 @@ Many NP-hard graph algorithms can be done in polynomial time for a fixed treewid
 - scheduling and termination
 - extraction
 
+#pagebreak(to: "even")
+== Union-find
+
+#raw(read("simple_union_find.py"), lang: "python")
+
+#pagebreak(to: "even")
+== E-graph
+
+#raw(read("simple_egraph.py"), lang: "python")
+
+#pagebreak(to: "even")
+== Rewriting
+
+#raw(read("simple_rewrite_rules.py"), lang: "python")
+
+#pagebreak()
+
+// #figure(
+//   columns(1, align(left, raw(read("simple_union_find.py"), lang: "python"))),
+//   caption: flex-caption(
+//     [Union-find implementation in Python.],
+//     [
+//       Note that this example is not pseudocode and can be run.
+//     ],
+//   ),
+// )
+// 
+// #figure(
+//   align(
+//     center,
+//     block(
+//       width: 125%,
+//       text(size: 10pt, columns(2, gutter: 0pt, align(left, raw(read("simple_egraph.py"), lang: "python")))),
+//     ),
+//   ),
+//   caption: flex-caption(
+//     [Union-find implementation in Python.],
+//     [
+//       Note that this example is not pseudocode and can be run.
+//     ],
+//   ),
+// )
+
 = Implementation <oatlog_implementation>
 
 #TODO[Elaborate and forward reference]
