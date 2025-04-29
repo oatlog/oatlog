@@ -534,6 +534,7 @@ addressed by semi-naive evaluation, an algorithm from Datalog that we now can us
 conjunctive queries.
 
 == Semi-naive evaluation <conceptual_background_seminaive>
+
 #TODO[hard to understand without database 101 (join operator)]
 
 Semi-naive evaluation is an algorithm for joining relations, each consisting of both old and new
@@ -1038,6 +1039,15 @@ optimization is applied individually, with an amortized time complexity of $O(al
 #footnote[$alpha$ is the inverse of the Ackermann function and grows slowly enough to be considered
 constant for all practical inputs.] if they are applied together @fastunionfind
 @unionfindvariantbounds. An example implementation is shown in @union-find-path-compression.
+
+#figure(
+  ```python
+  ```,
+  caption: flex-caption(
+    [Union-find with path compression. ],
+    [If `repr[i] == i` then `i` is a representative of the set. Initially `repr[i] = i`, so all elements belong to disjoint sets of size 1.],
+  ),
+) <union-find-path-compression>
 
 #figure(
   ```rust
