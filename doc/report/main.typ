@@ -52,6 +52,10 @@
 
 = Introduction
 
+#TODO[what is ad-hoc passes and why relevant]
+
+#TODO[improve program = optimize program?]
+
 Modern software development depends on efficient and reliable compilers, which apply sophisticated
 optimizations to improve performance while enabling portability and abstraction. For example,
 autovectorization allows code to take advantage of SIMD hardware without using architecture-specific
@@ -97,6 +101,8 @@ rewriting to make it nondestructive.
 
 == E-graphs and equality saturation
 
+#TODO[explain limitations of aegraphs]
+
 E-graphs @oldegraph are data structures for rewriting that allow multiple representations of a
 value, committing to one only after all rewrites have been searched. The representations are stored
 simultaneously and since there is no backtracking there is no duplicated post-branch work.
@@ -138,6 +144,8 @@ acyclic e-graphs (aegraphs), due to performance problems of full e-graphs. A pro
 e-graphs within compilers would require them to become faster.
 
 == Datalog and relational databases
+
+#TODO[e-graphs as relational databases is discovered "recently" provide year/citation]
 
 Recent developments in e-graphs and equality saturation @relationalematching @eqlog @egglog have
 shown that adding indexes to e-graph pattern-matching creates a structure that is very similar to
@@ -230,6 +238,8 @@ equality-preserving rewrites, it is more effective to introduce e-classes -- gro
 -- that e-nodes reference instead of pointing to other e-nodes directly. This enables an e-graph to
 compactly represent an exponential number of equivalent expressions, parameterized by mappings from
 e-classes to e-nodes.
+
+#TODO[This paragraph is hard to understand before reading figure 1]
 
 E-graphs can be represented as graphs in multiple ways. In one formulation, hinted at by the
 terminology of e-nodes and e-classes, e-nodes are the nodes of the graph and e-classes are
@@ -391,6 +401,7 @@ than iterating then filtering.
 The filters that appear in recursive e-matching are of the form
 + Require e-nodes to be of a certain variant (e.g. addition or multiplication).
 + Require e-nodes to belong to a certain parent e-class.
+#TODO[DAG patterns need to be explained with an example]
 + If supporting DAG patterns, require some bound e-classes from different subpatterns to be identical.
 
 The e-graph representation previously introduced in @listing_egglike_egraph already has indexes from
@@ -499,6 +510,7 @@ JOIN add ON add.sum = mul.lhs
 i.e. a query on the form of iterating the root of the pattern and then adjoining tables for its
 subpatterns. The pattern can also be written as
 
+#TODO[what is join]
 $"Mul"(t_0, c, t_1) join "Add"(a, b, t_0)$
 
 where $join$ denotes a natural join, here on the column $t_0$. This is a conjunctive query, a
@@ -522,6 +534,7 @@ addressed by semi-naive evaluation, an algorithm from Datalog that we now can us
 conjunctive queries.
 
 == Semi-naive evaluation <conceptual_background_seminaive>
+#TODO[hard to understand without database 101 (join operator)]
 
 Semi-naive evaluation is an algorithm for joining relations, each consisting of both old and new
 tuples, guaranteeing that each joined tuple contains some new information. In the context of
