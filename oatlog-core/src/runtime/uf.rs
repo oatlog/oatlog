@@ -8,6 +8,8 @@ use crate::runtime::Eclass;
 /// Per eclass state.
 #[derive(Default)]
 pub struct UnionFind<T> {
+    /// `repr[i] == 0` for roots.
+    /// Parent of `i` is `i-repr[i]` otherwise.
     repr: Vec<u32>,
     /// Newly created eclasses since last `take_new`
     new: Vec<T>,
@@ -19,7 +21,7 @@ impl<T> std::fmt::Debug for UnionFind<T> {
         writeln!(f)?;
         for i in 0..self.repr.len() {
             let repr = self.repr[i];
-            if repr as usize == i {
+            if repr == 0 {
                 writeln!(f, "{i}")?;
             } else {
                 writeln!(f, "{i}: {repr}")?;
@@ -72,19 +74,32 @@ impl<T: Eclass> UnionFind<T> {
     }
     /// Sugar
     #[inline]
+    #[allow(unsafe_code)]
     pub fn is_root(&mut self, t: T) -> bool {
         // NOTE: Using a bitset is not beneficial
-        self.repr[t.inner() as usize] == t.inner()
+
+        // SAFETY: The only way to construct `T` is using `add_eclass` below, which also push to `repr`.
+        unsafe {
+            debug_assert!((t.inner() as usize) < self.repr.len());
+            *self.repr.get_unchecked(t.inner() as usize) == 0
+        }
     }
     #[inline]
+    #[allow(unsafe_code)]
     fn find_inner(&mut self, mut i: u32) -> u32 {
         // Curiously, it is not beneficial to
         // 1. Unroll this loop
         // 2. Unroll this loop with path compression
         // 3. Perform recursive path compression (well how could it given (2))
+        assert!((i as usize) < self.repr.len());
         loop {
             let i_old = i;
-            i = self.repr[i as usize];
+            // SAFETY: `i` being in bounds initially is checked above, and UF parents will always
+            // be in bounds.
+            unsafe {
+                debug_assert!((i as usize) < self.repr.len());
+                i -= self.repr.get_unchecked(i as usize);
+            }
             if i == i_old {
                 break i;
             }
@@ -98,7 +113,7 @@ impl<T: Eclass> UnionFind<T> {
             return T::new(a);
         }
         let (root, uprooted) = (u32::min(a, b), u32::max(a, b));
-        self.repr[uprooted as usize] = self.repr[root as usize];
+        self.repr[uprooted as usize] = uprooted - root;
         self.num_uprooted += 1;
         self.num_roots -= 1;
         T::new(root)
@@ -106,7 +121,7 @@ impl<T: Eclass> UnionFind<T> {
     #[inline]
     pub fn add_eclass(&mut self) -> T {
         let id = u32::try_from(self.repr.len()).expect("out of u32 ids");
-        self.repr.push(id);
+        self.repr.push(0);
         self.new.push(T::new(id));
         self.num_roots += 1;
         T::new(id)
