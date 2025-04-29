@@ -161,7 +161,6 @@ function `Theory::apply_rules` that executes all queries and which alternates wi
 
 = Evaluation
 
-
 #figure(
   placement: top,
   scope: "parent",

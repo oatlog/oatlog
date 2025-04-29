@@ -8,6 +8,8 @@
 }
 
 #show "naive": "naïve"
+#show "e-graph": box[e-graph]
+#show "e-graphs": box[e-graphs]
 
 #set document(title: [Oatlog])
 
@@ -16,7 +18,8 @@
 
 #let department = "Department of Computer Science and Engineering"
 #show: template.with(
-  title: [Oatlog: Ahead-of-time compiled #box[e-graphs] with primitives],
+  // title: [Oatlog: Ahead-of-time compiled #box[e-graphs] with primitives],
+  title: [Oatlog: A performant ahead-of-time compiled #box[e-graph] engine],
   subtitle: [Implementing a high-performance relational #box[e-graph] engine],
   authors: ("Loke Gustafsson", "Erik Magnusson"),
   department: department,
@@ -26,7 +29,6 @@
   abstract: [
     // Abstract text about your project in Computer Science and Engineering
     #TODO[Write abstract]
-
     #TODO[We have made an egglog compatible e-graph engine]
   ],
   keywords: ("e-graphs", "equality saturation", "datalog", "program optimization", "rewrite rules"),
@@ -41,6 +43,103 @@
 
 // #TODO[conceptual background: how things developed historically.]
 // #TODO[background: frontend, mid-end, backend.]
+
+// old structure
+// = Introduction
+//
+// - compilers -> egraphs
+// - egraphs and equality saturation
+// - oatlog
+// - this thesis
+//
+// = Background
+//
+// - definition of e-graph
+// - recursive matching
+// - canonicalization
+// - semi-naive evaluation
+// - egglog example
+//
+// - nomenclature
+// - egglog vs Datalog vs database
+// - rule preprocessing
+//     - semi-naive evaluation
+//     - functional dependency
+//     - merging rules
+//     - magic sets
+// - scheduling and termination
+// - canonicalization and union-find
+// - query planning
+// - index selection and implementation
+// - extraction
+//
+// = Implementation
+//
+// - egglog compatible API interface
+// - architecture and IRs
+// - selected algorithms
+// - selected implementation details
+//     - spans
+//     - testing infrastructure
+//
+// = Evaluation
+//
+// - benchmarks
+// - egglog testsuite
+//
+// = Conclusion
+//
+//
+// // new structure
+// = Introduction
+//
+// + Kompilatorer viktiga
+// + peepholes är bra
+// + Vad är en rewrite
+//     - exempel?
+// + Kompilatorer har phase ordering problem pga destructive rewrites
+// + e-grafer löser phase ordering
+// + e-grafer är långsamma
+// + Finns lovande innovation inom e-graf-implementering
+// + Vi har implementerat e-graf som är snabbare än egglog i många fall
+//
+// = Background
+//
+// - definition of e-graph
+//     - math objects as python syntax?
+// - canonicalization and union-find
+// - recursive ematching
+// - ematching as a join + what is a join
+// - semi-naive evaluation
+// - egglog/Datalog language explained using examples
+// - nomenclature (+ pick what nomenclature we use for the report)
+// - scheduling and termination
+// - extraction
+//
+// = Implementation
+//
+// - egglog compatible API interface
+//
+// - architecture and IRs
+//     - should contain bulk of text
+//     - explanations and optimizations interleaved
+//     - query planning
+//     - index selection + algorithms
+//
+// - exactly how is canonicalization implemented (cool optimizations)
+//     - essentially everything from the runtime library
+//
+// - misc implementation details
+//     - proc macro stuff
+//     - spans
+//     - testing infrastructure
+//
+// = Evaluation
+//
+// - benchmarks
+// - egglog testsuite
+//
+// = Conclusion
 
 #TODO[introduce relevant references]
 
