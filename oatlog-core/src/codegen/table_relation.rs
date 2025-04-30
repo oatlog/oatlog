@@ -708,7 +708,7 @@ fn update(
             #sort_new
             self.new.dedup();
 
-            #(
+            #(  // Indexes like `HashMap<(T, T, T), SmallVec<[(); 1]>>` and `HashMap<(T, T), SmallVec<[(T,); 1]>>`
                 for &(#(#indexes_nofd_cols,)*) in &self.new {
                     self.#indexes_nofd
                         .entry(#indexes_nofd_find_keys)
@@ -726,7 +726,7 @@ fn update(
                     }
                 });
             )*
-            #(
+            #(  // Non-union functional dependency indexes, where merge is a panic or a primitive function.
                 for &(#(mut #indexes_othfd_cols,)*) in &self.new {
                     match self.#indexes_othfd.entry((#(#indexes_othfd_keys,)*)) {
                         runtime::HashMapEntry::Occupied(mut entry) => #indexes_othfd_merge,
