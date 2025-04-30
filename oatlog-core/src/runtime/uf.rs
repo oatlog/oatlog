@@ -81,7 +81,7 @@ impl<T: Eclass> UnionFind<T> {
         // SAFETY: The only way to construct `T` is using `add_eclass` below, which also push to `repr`.
         unsafe {
             debug_assert!((t.inner() as usize) < self.repr.len());
-            *self.repr.get_unchecked(t.inner() as usize) == 0
+            *self.repr.get_unchecked(t.inner() as usize) == t.inner()
         }
     }
     #[inline]
@@ -98,7 +98,7 @@ impl<T: Eclass> UnionFind<T> {
             // be in bounds.
             unsafe {
                 debug_assert!((i as usize) < self.repr.len());
-                i -= self.repr.get_unchecked(i as usize);
+                i = *self.repr.get_unchecked(i as usize);
             }
             if i == i_old {
                 break i;
@@ -113,7 +113,7 @@ impl<T: Eclass> UnionFind<T> {
             return T::new(a);
         }
         let (root, uprooted) = (u32::min(a, b), u32::max(a, b));
-        self.repr[uprooted as usize] = uprooted - root;
+        self.repr[uprooted as usize] = root;
         self.num_uprooted += 1;
         self.num_roots -= 1;
         T::new(root)
@@ -121,7 +121,7 @@ impl<T: Eclass> UnionFind<T> {
     #[inline]
     pub fn add_eclass(&mut self) -> T {
         let id = u32::try_from(self.repr.len()).expect("out of u32 ids");
-        self.repr.push(0);
+        self.repr.push(id);
         self.new.push(T::new(id));
         self.num_roots += 1;
         T::new(id)
