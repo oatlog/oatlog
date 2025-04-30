@@ -321,6 +321,19 @@ evaluating oatlog through its test suite and benchmarks.
 + Finns lovande innovation inom e-graf-implementering
 + Vi har implementerat e-graf som är snabbare än egglog i många fall
 
+#figure(
+  image("../figures/egraph_cluster.svg", width: 60%),
+  caption: flex-caption(
+    [Example of an equivalence-class-formulation e-graph that initially contains
+      $(a+2) dot c$.],
+    [
+      The sharp boxes are e-nodes and the rounded boxes are e-classes. E-classes
+      contain e-nodes evaluating to the same value and the input to an e-node can be computed from any
+      of the e-nodes in its input e-class.
+    ],
+  ),
+) <informal-egraph-figure-non-bipartite>
+
 = Background <background>
 
 /*
@@ -1270,7 +1283,7 @@ since earlier and hence smaller ids are likely to be present in more existing tu
 
 */
 
-=== #TODO[]
+// === #TODO[]
 
 #TODO[Additional aspects of canonicalization, pseudocode etc]
 /*
@@ -1351,59 +1364,160 @@ Many NP-hard graph algorithms can be done in polynomial time for a fixed treewid
 
 */
 
-- definition of e-graph
-  - math objects as python syntax?
-- canonicalization and union-find
-- recursive ematching
-- ematching as a join + what is a join
-- semi-naive evaluation
-- egglog/Datalog language explained using examples
-- nomenclature (+ pick what nomenclature we use for the report)
-- scheduling and termination
-- extraction
+This section introduces the union-find datastructure in @union-find-explain, which is used in e-graph implementations, which is shown in @e-graph-explain.
+How rewrites can be performed is shown in @rewriting-impl.
+Note that while the Python implementations are just example implementations, they are not pseudocode.
 
-#pagebreak(to: "even")
-== Union-find
+// - definition of e-graph
+//   - math objects as python syntax?
+// - canonicalization and union-find
+// - recursive ematching
+// - ematching as a join + what is a join
+// - semi-naive evaluation
+// - egglog/Datalog language explained using examples
+// - nomenclature (+ pick what nomenclature we use for the report)
+// - scheduling and termination
+// - extraction
+
+== Union-find <union-find-explain>
+
+#figure(
+  ```python
+  class UnionFindSimple:
+      def __init__(self, num_elements):
+          self.representative = [i for i in range(num_elements)]
+
+      # find the representative element
+      def find(self, i):
+          if self.representative[i] == i:
+              return i
+          else:
+              return self.find(i)
+
+      # merge the sets that i and j belong to
+      def union(self, i, j):
+          self.representative[self.find(i)] = self.find(j)
+
+  ```,
+  caption: [A simplified union-find implementation without path compression nor smaller-to-larger merging.],
+) <union-find-simplified-impl>
+
+Union-find is a datastructure that maintains disjoint sets, meaning that every element belongs to exactly one set.
+This is a very general-purpose datastructure, for example it can be used to implement Kruskal's algorithm for minimum spanning trees.
+
+Because of the property that each element belongs to exactly one set, we can refer to an arbitrary representative element in the set instead of referring to the entire set.
+
+The `find()` function takes an arbitrary element in some set and returns the unique representative of that set.
+To check if two elements, $a,b$ belong to the same set, we check if their representatives are the same, if `find(a) == find(b)`.
+
+The `union()` function takes two elements $a,b$ and ensures that their sets are unified.
+
+An example implementation is shown in @union-find-simplified-impl.
+
+=== Implementation
+
+To implement union-find, each element is an integer, so it maintains sets of integers, but this is equivalent to storing sets of any type since we can assign unique integer ids to each element.
+
+#TODO[picture of before/after merge that also shows what elements are representatives]
+
+Each element has a representative element stored in the `representative` array where each element initially claims that they are their own representative and that their set size is one.
+
+For elements $a,b$ where $a != b$ and `representative[a] = b`, the representative of $a$ is recursively the representative of $b$.
+For example if we had sets of persons and each person pointed to an arbitrary person who is taller than them, we could find the representative (tallest) person by following where people point until the representative is found.
+
+To unify the sets that $a$ and $b$ belong to, we make the representative of $a$, the representative of $b$, `representative[find(a)] = find(b)]`.
+In the previous metaphor, this would be finding the tallest person in the first set and telling them to point to the tallest person in the second set.
+This means that if you started in either sets you would now end up with the same representative and therefore the sets are merged.
+
+#TODO[limitations of union-find (can't iterate over sets)]
+
+#TODO[this is one of many ways to implement it]
+
+=== Efficient union-find
+
+To make union-find efficient, there are two optimizations that are applied, smaller-to-larger merging and path-compression. This is shown in @union-find-impl.
+
+In the worst-case for this implementation the `find()` operation may be $O(n)$ since the tree may be unbalanced.
+With smaller-to-larger merging we ensure that the trees are balanced and therefore get a $O(log n)$ complexity for `find()`.
+
+Path compression amortizes the cost of `find()` by modifying the representatives along the path to the root to just directly point to the root.
+
+#TODO[picture of path compression]
+
+With path compression and smaller-to-larger merging, it is extremely hard to find a worst-case and the amortized complexity of `find()` becomes $O($alpha$(n))$ @fastunionfind @unionfindvariantbounds
+where $alpha$ is the inverse of the Ackermann function.
+This grows extremely slowly (significantly slower than logarithmic) and in practice it has a good constant factor, so in practice it is typically treated as if it was $O(1)$.
+
+#pagebreak()
+== Union-find example implementation and usage <union-find-impl>
 
 #raw(read("simple_union_find.py"), lang: "python")
 
+#pagebreak()
+== E-graph <e-graph-explain>
+
+An e-graph is a data structure that maintains e-classes that contain e-nodes which refer to e-classes, see @informal-egraph-figure-non-bipartite.
+An example implementation can be found in @e-graph-impl.
+
+It contains a union-find and a map from e-node to e-class called the hashcons.
+It supports the same operations as union-find on its e-classes (`union`, `find`, `make`), and additionally has the functions `canonicalize` and `insert_enode`.
+`insert_enode` just inserts a new e-node and returns its e-class.
+
+`canonicalize` replaces all e-classes with their representatives, and merges e-classes when conflicts occur, $f(a) = b and f(a) = c => b = c$. 
+
+#TODO[explain `tuple(map(canonicalize_element, enode))`]
+
+#TODO[note that this formulation ignores the e-class map because it's actually not needed and is kinda just confusing]
+
 #pagebreak(to: "even")
-== E-graph
+== E-graph example implementation and usage <e-graph-impl>
 
 #raw(read("simple_egraph.py"), lang: "python")
 
-#pagebreak(to: "even")
+#pagebreak()
 == Rewriting
+
+#figure(
+  image("../figures/egraph_example.svg", width: 75%),
+  caption: flex-caption(
+    [The same e-graph as in @informal-egraph-figure-non-bipartite, but drawn as a bipartite graph.],
+    [
+      The oval shapes are e-classes, representing a set of equivalent expressions, with incoming edges
+      denoting e-node members.
+      The rectangle shapes are e-nodes, which have e-classes as arguments.
+      The orange-colored edges and shapes are those added due to the applied rules.
+    ],
+  ),
+) <informal-egraph-figure>
+
+#TODO[]
+
+#pagebreak(to: "even")
+== Rewriting example implementation and usage <rewriting-impl>
 
 #raw(read("simple_rewrite_rules.py"), lang: "python")
 
 #pagebreak()
 
-// #figure(
-//   columns(1, align(left, raw(read("simple_union_find.py"), lang: "python"))),
-//   caption: flex-caption(
-//     [Union-find implementation in Python.],
-//     [
-//       Note that this example is not pseudocode and can be run.
-//     ],
-//   ),
-// )
-// 
-// #figure(
-//   align(
-//     center,
-//     block(
-//       width: 125%,
-//       text(size: 10pt, columns(2, gutter: 0pt, align(left, raw(read("simple_egraph.py"), lang: "python")))),
-//     ),
-//   ),
-//   caption: flex-caption(
-//     [Union-find implementation in Python.],
-//     [
-//       Note that this example is not pseudocode and can be run.
-//     ],
-//   ),
-// )
+== #TODO[recursive vs relational e-matching, What is join]
+
+#TODO[]
+
+== #TODO[semi-naive evaluation]
+
+#TODO[]
+
+== #TODO[egglog/(Datalog?) language]
+
+#TODO[]
+
+== #TODO[egglog language]
+
+#TODO[]
+
+== #TODO[nomenclature]
+
+#TODO[]
 
 = Implementation <oatlog_implementation>
 
@@ -1698,6 +1812,55 @@ Overall, our comparative testing infrastructure (against egglog) can handle the 
 
 */
 
+#TODO[section summary]
+
+// - egglog compatible API interface
+//
+// - architecture and IRs
+//     - should contain bulk of text
+//     - explanations and optimizations interleaved
+//     - query planning
+//     - index selection + algorithms
+//
+// - exactly how is canonicalization implemented (cool optimizations)
+//     - essentially everything from the runtime library
+//
+// - misc implementation details
+//     - proc macro stuff
+//     - spans
+//     - testing infrastructure
+
+== API interface
+
+#TODO[example and link to appendix]
+
+== Architecture
+
+#figure(
+  image("../figures/architecture.svg"),
+  caption: [A coarse overview of the current oatlog architecture.],
+) <oatlog-architecture>
+
+=== Egglog AST
+
+#TODO[]
+
+=== HIR
+
+#TODO[]
+
+=== TIR
+
+#TODO[]
+
+=== LIR
+
+#TODO[]
+
+=== Runtime
+
+#TODO[]
+
 = Evaluation <oatlog_evaluation>
 
 #TODO[Section summary]
@@ -1750,27 +1913,97 @@ For a list of currently passing tests, see @passingtests.
 
 */
 
-- egglog compatible API interface
+== Testing
 
-- architecture and IRs
-  - should contain bulk of text
-  - explanations and optimizations interleaved
-  - query planning
-  - index selection + algorithms
+- egglog testsuite
 
-- exactly how is canonicalization implemented (cool optimizations)
-  - essentially everything from the runtime library
+== Benchmarks
 
-- misc implementation details
-  - proc macro stuff
-  - spans
-  - testing infrastructure
+#figure(
+  //placement: top,
+  //scope: "parent",
+  text(
+    size: 9pt,
+    table(
+      columns: (auto, auto, auto, auto, auto, auto),
+      inset: 4pt,
+      table.header(
+        [*benchmark*],
+        [*e-nodes*],
+        [*egglog 0.4 deterministic*],
+        [*egglog 0.4*],
+        [*oatlog*],
+        [*speedup*],
+      ),
+      [`fuel2-math`, 10 steps, saturated], [1516], [7.0778 ms], [5.8908 ms], [1.1579 ms], table.cell(
+        fill: green.lighten(40%),
+      )[5.09x],
+      [`fuel3-math`, 21 steps, saturated], [50021], [192.50 ms], [170.06 ms], [52.954 ms], table.cell(
+        fill: green.lighten(40%),
+      )[3.21x],
+
+      [`math`, 1 step], [69], [688.83 µs], [660.76 µs], [17.055 µs], table.cell(fill: green.lighten(20%))[38.75x],
+      [`math`, 2 steps], [118], [871.97 µs], [828.21 µs], [32.492 µs], table.cell(fill: green.lighten(20%))[25.49x],
+      [`math`, 3 steps], [208], [1.0845 ms], [1.0066 ms], [61.145 µs], table.cell(fill: green.lighten(20%))[16.47x],
+      [`math`, 4 steps], [389], [1.3692 ms], [1.2498 ms], [122.53 µs], table.cell(fill: green.lighten(20%))[10.20x],
+      [`math`, 5 steps], [784], [1.8410 ms], [1.6360 ms], [253.68 µs], table.cell(fill: green.lighten(40%))[6.45x],
+      [`math`, 6 steps], [1576], [2.6639 ms], [2.3093 ms], [539.74 µs], table.cell(fill: green.lighten(40%))[4.28x],
+      [`math`, 7 steps], [3160], [4.3486 ms], [3.6846 ms], [1.1199 ms], table.cell(fill: green.lighten(40%))[3.29x],
+      [`math`, 8 steps], [8113], [7.6845 ms], [6.4288 ms], [2.6543 ms], table.cell(fill: green.lighten(40%))[2.42x],
+      [`math`, 9 steps], [28303], [16.224 ms], [13.825 ms], [8.6804 ms], table.cell(fill: green.lighten(60%))[1.59x],
+      [`math`, 10 steps], [136446], [63.135 ms], [54.481 ms], [53.112 ms], table.cell(fill: green.lighten(80%))[1.03x],
+      [`math`, 11 steps], [1047896], [448.77 ms], [436.24 ms], [563.93 ms], table.cell(fill: red.lighten(60%))[0.77x],
+
+      [`boolean-adder`, 1 step], [106], [936.01 µs], [902.80 µs], [19.588 µs], table.cell(
+        fill: green.lighten(20%),
+      )[46.07x],
+      [`boolean-adder`, 2 steps], [241], [1.1303 ms], [1.0787 ms], [49.379 µs], table.cell(
+        fill: green.lighten(20%),
+      )[21.84x],
+      [`boolean-adder`, 3 steps], [511], [1.5437 ms], [1.4349 ms], [120.61 µs], table.cell(
+        fill: green.lighten(20%),
+      )[11.89x],
+      [`boolean-adder`, 4 steps], [727], [2.2988 ms], [2.0731 ms], [226.53 µs], table.cell(
+        fill: green.lighten(20%),
+      )[9.15x],
+      [`boolean-adder`, 5 steps], [906], [3.7199 ms], [3.2451 ms], [370.08 µs], table.cell(
+        fill: green.lighten(20%),
+      )[8.77x],
+      [`boolean-adder`, 6 steps], [1332], [5.1971 ms], [4.4394 ms], [530.71 µs], table.cell(
+        fill: green.lighten(20%),
+      )[8.36x],
+      [`boolean-adder`, 7 steps], [2374], [6.9556 ms], [5.9033 ms], [919.43 µs], table.cell(
+        fill: green.lighten(40%),
+      )[6.42x],
+      [`boolean-adder`, 8 steps], [5246], [10.596 ms], [8.9572 ms], [2.0239 ms], table.cell(
+        fill: green.lighten(40%),
+      )[4.43x],
+      [`boolean-adder`, 9 steps], [15778], [20.219 ms], [17.294 ms], [5.5787 ms], table.cell(
+        fill: green.lighten(40%),
+      )[3.10x],
+      [`boolean-adder`, 10 steps], [77091], [52.227 ms], [45.194 ms], [25.410 ms], table.cell(
+        fill: green.lighten(60%),
+      )[1.78x],
+      [`boolean-adder`, 11 steps], [854974], [406.15 ms], [395.05 ms], [478.83 ms], table.cell(
+        fill: red.lighten(60%),
+      )[0.82x],
+    ),
+  ),
+  caption: [
+    Microbenchmark results comparing egglog with oatlog. The reported timings are maximum likelihood
+    estimates over $100$ samples or $5$ seconds, whichever is greater, computed by Criterion.rs
+    @criterionrs on an AMD Ryzen 5900X CPU. Oatlog is compared with nondeterministic egglog since
+    it internally iterates `hashbrown::HashMap`s.
+  ],
+) <benchmark-results>
 
 = Conclusion <conclusion>
 
-#TODO[Nothing here yet..]
+We have shown that it is possible for an e-graph engine to be significantly faster than egglog, at
+least on small e-graphs, while still using fundamentally the same algorithms.
 
-- we have shown that significantly faster e-graph engines are possible
+There are still many ways in which oatlog could be improved, from merging relations and better
+scheduling to more standard database improvements in the form of better indexes and query planning.
 
 #bibliography("refs.bib")
 #show: appendices
