@@ -25,6 +25,19 @@ fn run(sink: &mut impl std::io::Write, iters: usize) {
         .collect::<Vec<String>>()
         .join("\n");
     writeln!(sink, "\n{relation_entry_count}").unwrap();
+    writeln!(
+        sink,
+        "\ntotal e-nodes: {}",
+        theory.get_total_relation_entry_count()
+    )
+    .unwrap();
+    let uf_count = theory
+        .get_uf_count()
+        .into_iter()
+        .map(|(name, (tot, roots))| format!("{name}: tot={tot} roots={roots}"))
+        .collect::<Vec<String>>()
+        .join("\n");
+    writeln!(sink, "\n{uf_count}").unwrap();
 }
 
 fn main() {
@@ -41,7 +54,7 @@ fn test() {
     let mut sink = Vec::new();
     run(&mut sink, 9);
     let sink = String::from_utf8(sink).unwrap();
-    expect_test::expect!([r"
+    expect_test::expect!([r#"
         running with iters=9
         i=0 size=69
         i=1 size=118
@@ -66,6 +79,10 @@ fn test() {
         Sqrt: 1
         Sub: 1311
         Var: 3
-    "])
+
+        total e-nodes: 28303
+
+        Math: tot=29055 roots=12445
+    "#])
     .assert_eq(&sink);
 }
