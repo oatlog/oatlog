@@ -10,7 +10,10 @@ impl Steps {
     fn check(self) {
         let sexps = crate::frontend::parse_str_to_sexps(self.code).unwrap();
         let config = crate::Configuration::default();
-        let hir = crate::frontend::parse(sexps, config).unwrap();
+
+        let mut parser = crate::frontend::Parser::new();
+        parser.ingest_all(sexps, config).unwrap();
+        let hir = parser.emit_hir().optimize(config);
         if let Some(exp) = self.expected_hir {
             exp.assert_eq(&hir.dbg_summary());
         }
@@ -803,31 +806,15 @@ fn hir_global() {
                 initial: [
                     ComputeGlobal {
                         global_id: g0,
-                        compute: Literal(
-                            I64(
-                                1,
-                            ),
-                        ),
+                        compute: Literal(I64(1)),
                     },
                     ComputeGlobal {
                         global_id: g1,
-                        compute: Literal(
-                            String(
-                                IString(
-                                    0,
-                                ),
-                            ),
-                        ),
+                        compute: Literal(String(IString(0))),
                     },
                     ComputeGlobal {
                         global_id: g2,
-                        compute: Literal(
-                            String(
-                                IString(
-                                    1,
-                                ),
-                            ),
-                        ),
+                        compute: Literal(String(IString(1))),
                     },
                 ],
             }"#]]),
@@ -1116,55 +1103,27 @@ fn regression_tir2() {
                 initial: [
                     ComputeGlobal {
                         global_id: g0,
-                        compute: Literal(
-                            I64(
-                                2,
-                            ),
-                        ),
+                        compute: Literal(I64(2)),
                     },
                     ComputeGlobal {
                         global_id: g1,
-                        compute: Literal(
-                            I64(
-                                5,
-                            ),
-                        ),
+                        compute: Literal(I64(5)),
                     },
                     ComputeGlobal {
                         global_id: g2,
-                        compute: Compute {
-                            relation: r17,
-                            args: [
-                                g1,
-                            ],
-                        },
+                        compute: Compute { relation: r17, args: [g1] },
                     },
                     ComputeGlobal {
                         global_id: g3,
-                        compute: Literal(
-                            I64(
-                                3,
-                            ),
-                        ),
+                        compute: Literal(I64(3)),
                     },
                     ComputeGlobal {
                         global_id: g4,
-                        compute: Compute {
-                            relation: r17,
-                            args: [
-                                g3,
-                            ],
-                        },
+                        compute: Compute { relation: r17, args: [g3] },
                     },
                     ComputeGlobal {
                         global_id: g5,
-                        compute: Compute {
-                            relation: r16,
-                            args: [
-                                g2,
-                                g4,
-                            ],
-                        },
+                        compute: Compute { relation: r16, args: [g2, g4] },
                     },
                 ],
             }"#]]),
@@ -2112,11 +2071,7 @@ fn regression_tir1() {
                 initial: [
                     ComputeGlobal {
                         global_id: g0,
-                        compute: Literal(
-                            I64(
-                                0,
-                            ),
-                        ),
+                        compute: Literal(I64(0)),
                     },
                 ],
             }"#]]),
@@ -4330,11 +4285,7 @@ fn regression_entry2() {
                 initial: [
                     ComputeGlobal {
                         global_id: g0,
-                        compute: Literal(
-                            I64(
-                                -1,
-                            ),
-                        ),
+                        compute: Literal(I64(-1)),
                     },
                 ],
             }"#]]),
@@ -6238,10 +6189,7 @@ fn codegen_variable_reuse_bug() {
                 initial: [
                     ComputeGlobal {
                         global_id: g0,
-                        compute: Compute {
-                            relation: r16,
-                            args: [],
-                        },
+                        compute: Compute { relation: r16, args: [] },
                     },
                 ],
             }"#]]),
@@ -12067,7 +12015,534 @@ fn lir_math() {
             (Add (Mul (Var "y") (Add (Var "x") (Var "y"))) (Sub (Add (Var "x") (Const 2)) (Add (Var "x") (Var "x"))))
             (Div (Const 1) (Sub (Div (Add (Const 1) (Sqrt (Var "z"))) (Const 2)) (Div (Sub (Const 1) (Sqrt (Var "z"))) (Const 2))))
         "#,
-        expected_hir: None,
+        expected_hir: Some(expect![[r#"
+            Theory {
+                types: {
+                    [t0, ()]: std::primitive::unit,
+                    [t1, i64]: std::primitive::i64,
+                    [t2, String]: runtime::IString,
+                    [t3, FuelUnit]: [symbolic],
+                    [t4, Math]: [symbolic],
+                },
+                symbolic_rules: [
+                    SymbolicRule {
+                        src: "( rewrite ( Integral fuel ( Sin x ) x ) ( Mul ( Const -1 ) ( Cos x ) ) )",
+                        atoms: [
+                            Premise { relation: Integral, columns: [fuel, v2, x, v3] },
+                            Premise { relation: Sin, columns: [x, v2] },
+                            Action { relation: Mul, columns: [v5, v6, v3], entry: [_, _, U] },
+                            Action { relation: Cos, columns: [x, v6], entry: [_, U] },
+                            Action { relation: Const, columns: [v4, v5], entry: [_, U] },
+                            Action { relation: g0, columns: [v4], entry: [!] },
+                        ],
+                        variables: {
+                            v0: VariableMeta { name: Some("fuel"), ty: t3 },
+                            v1: VariableMeta { name: Some("x"), ty: t4 },
+                            v2: VariableMeta { name: None, ty: t4 },
+                            v3: VariableMeta { name: None, ty: t4 },
+                            v4: VariableMeta { name: None, ty: t1 },
+                            v5: VariableMeta { name: None, ty: t4 },
+                            v6: VariableMeta { name: None, ty: t4 },
+                        },
+                        unify: [],
+                    },
+                    SymbolicRule {
+                        src: "( rewrite ( Sub a b ) ( Add a ( Mul ( Const -1 ) b ) ) )",
+                        atoms: [
+                            Premise { relation: Sub, columns: [a, b, v2] },
+                            Action { relation: Add, columns: [a, v5, v2], entry: [_, _, U] },
+                            Action { relation: Mul, columns: [v4, b, v5], entry: [_, _, U] },
+                            Action { relation: Const, columns: [v3, v4], entry: [_, U] },
+                            Action { relation: g0, columns: [v3], entry: [!] },
+                        ],
+                        variables: {
+                            v0: VariableMeta { name: Some("a"), ty: t4 },
+                            v1: VariableMeta { name: Some("b"), ty: t4 },
+                            v2: VariableMeta { name: None, ty: t4 },
+                            v3: VariableMeta { name: None, ty: t1 },
+                            v4: VariableMeta { name: None, ty: t4 },
+                            v5: VariableMeta { name: None, ty: t4 },
+                        },
+                        unify: [],
+                    },
+                    SymbolicRule {
+                        src: "( rewrite ( Diff x ( Cos x ) ) ( Mul ( Const -1 ) ( Sin x ) ) )",
+                        atoms: [
+                            Premise { relation: Diff, columns: [x, v1, v2] },
+                            Premise { relation: Cos, columns: [x, v1] },
+                            Action { relation: Mul, columns: [v4, v5, v2], entry: [_, _, U] },
+                            Action { relation: Sin, columns: [x, v5], entry: [_, U] },
+                            Action { relation: Const, columns: [v3, v4], entry: [_, U] },
+                            Action { relation: g0, columns: [v3], entry: [!] },
+                        ],
+                        variables: {
+                            v0: VariableMeta { name: Some("x"), ty: t4 },
+                            v1: VariableMeta { name: None, ty: t4 },
+                            v2: VariableMeta { name: None, ty: t4 },
+                            v3: VariableMeta { name: None, ty: t1 },
+                            v4: VariableMeta { name: None, ty: t4 },
+                            v5: VariableMeta { name: None, ty: t4 },
+                        },
+                        unify: [],
+                    },
+                    SymbolicRule {
+                        src: "( rewrite ( Add a b ) ( Add b a ) )",
+                        atoms: [
+                            Premise { relation: Add, columns: [a, b, v2] },
+                            Action { relation: Add, columns: [b, a, v2], entry: [_, _, U] },
+                        ],
+                        variables: {
+                            v0: VariableMeta { name: Some("a"), ty: t4 },
+                            v1: VariableMeta { name: Some("b"), ty: t4 },
+                            v2: VariableMeta { name: None, ty: t4 },
+                        },
+                        unify: [],
+                    },
+                    SymbolicRule {
+                        src: "( rewrite ( Mul a b ) ( Mul b a ) )",
+                        atoms: [
+                            Premise { relation: Mul, columns: [a, b, v2] },
+                            Action { relation: Mul, columns: [b, a, v2], entry: [_, _, U] },
+                        ],
+                        variables: {
+                            v0: VariableMeta { name: Some("a"), ty: t4 },
+                            v1: VariableMeta { name: Some("b"), ty: t4 },
+                            v2: VariableMeta { name: None, ty: t4 },
+                        },
+                        unify: [],
+                    },
+                    SymbolicRule {
+                        src: "( rewrite ( Add a ( Add b c ) ) ( Add ( Add a b ) c ) )",
+                        atoms: [
+                            Premise { relation: Add, columns: [a, v3, v4] },
+                            Premise { relation: Add, columns: [b, c, v3] },
+                            Action { relation: Add, columns: [a, b, v5], entry: [_, _, U] },
+                            Action { relation: Add, columns: [v5, c, v4], entry: [_, _, U] },
+                        ],
+                        variables: {
+                            v0: VariableMeta { name: Some("a"), ty: t4 },
+                            v1: VariableMeta { name: Some("b"), ty: t4 },
+                            v2: VariableMeta { name: Some("c"), ty: t4 },
+                            v3: VariableMeta { name: None, ty: t4 },
+                            v4: VariableMeta { name: None, ty: t4 },
+                            v5: VariableMeta { name: None, ty: t4 },
+                        },
+                        unify: [],
+                    },
+                    SymbolicRule {
+                        src: "( rewrite ( Mul a ( Mul b c ) ) ( Mul ( Mul a b ) c ) )",
+                        atoms: [
+                            Premise { relation: Mul, columns: [a, v3, v4] },
+                            Premise { relation: Mul, columns: [b, c, v3] },
+                            Action { relation: Mul, columns: [a, b, v5], entry: [_, _, U] },
+                            Action { relation: Mul, columns: [v5, c, v4], entry: [_, _, U] },
+                        ],
+                        variables: {
+                            v0: VariableMeta { name: Some("a"), ty: t4 },
+                            v1: VariableMeta { name: Some("b"), ty: t4 },
+                            v2: VariableMeta { name: Some("c"), ty: t4 },
+                            v3: VariableMeta { name: None, ty: t4 },
+                            v4: VariableMeta { name: None, ty: t4 },
+                            v5: VariableMeta { name: None, ty: t4 },
+                        },
+                        unify: [],
+                    },
+                    SymbolicRule {
+                        src: "( rewrite ( Add a ( Const 0 ) ) a )",
+                        atoms: [
+                            Premise { relation: Add, columns: [a, v2, v3] },
+                            Premise { relation: Const, columns: [v1, v2] },
+                            Premise { relation: g1, columns: [v1] },
+                        ],
+                        variables: {
+                            v0: VariableMeta { name: Some("a"), ty: t4 },
+                            v1: VariableMeta { name: None, ty: t1 },
+                            v2: VariableMeta { name: None, ty: t4 },
+                            v3: VariableMeta { name: None, ty: t4 },
+                        },
+                        unify: [
+                            [v3, a],
+                        ],
+                    },
+                    SymbolicRule {
+                        src: "( rewrite ( Mul a ( Const 0 ) ) ( Const 0 ) )",
+                        atoms: [
+                            Premise { relation: Mul, columns: [a, v1, v2] },
+                            Premise { relation: Const, columns: [v3, v1] },
+                            Premise { relation: g1, columns: [v3] },
+                            Action { relation: Const, columns: [v3, v2], entry: [_, U] },
+                        ],
+                        variables: {
+                            v0: VariableMeta { name: Some("a"), ty: t4 },
+                            v1: VariableMeta { name: None, ty: t4 },
+                            v2: VariableMeta { name: None, ty: t4 },
+                            v3: VariableMeta { name: None, ty: t1 },
+                        },
+                        unify: [],
+                    },
+                    SymbolicRule {
+                        src: "( rewrite ( Mul a ( Const 1 ) ) a )",
+                        atoms: [
+                            Premise { relation: Mul, columns: [a, v2, v3] },
+                            Premise { relation: Const, columns: [v1, v2] },
+                            Premise { relation: g2, columns: [v1] },
+                        ],
+                        variables: {
+                            v0: VariableMeta { name: Some("a"), ty: t4 },
+                            v1: VariableMeta { name: None, ty: t1 },
+                            v2: VariableMeta { name: None, ty: t4 },
+                            v3: VariableMeta { name: None, ty: t4 },
+                        },
+                        unify: [
+                            [v3, a],
+                        ],
+                    },
+                    SymbolicRule {
+                        src: "( rewrite ( Mul a ( Add b c ) ) ( Add ( Mul a b ) ( Mul a c ) ) )",
+                        atoms: [
+                            Premise { relation: Add, columns: [b, c, v3] },
+                            Premise { relation: Mul, columns: [a, v3, v4] },
+                            Action { relation: Add, columns: [v5, v6, v4], entry: [_, _, U] },
+                            Action { relation: Mul, columns: [a, b, v5], entry: [_, _, U] },
+                            Action { relation: Mul, columns: [a, c, v6], entry: [_, _, U] },
+                        ],
+                        variables: {
+                            v0: VariableMeta { name: Some("a"), ty: t4 },
+                            v1: VariableMeta { name: Some("b"), ty: t4 },
+                            v2: VariableMeta { name: Some("c"), ty: t4 },
+                            v3: VariableMeta { name: None, ty: t4 },
+                            v4: VariableMeta { name: None, ty: t4 },
+                            v5: VariableMeta { name: None, ty: t4 },
+                            v6: VariableMeta { name: None, ty: t4 },
+                        },
+                        unify: [],
+                    },
+                    SymbolicRule {
+                        src: "( rewrite ( Add ( Mul a b ) ( Mul a c ) ) ( Mul a ( Add b c ) ) )",
+                        atoms: [
+                            Premise { relation: Add, columns: [v2, v4, v5] },
+                            Premise { relation: Mul, columns: [a, b, v2] },
+                            Premise { relation: Mul, columns: [a, c, v4] },
+                            Action { relation: Add, columns: [b, c, v6], entry: [_, _, U] },
+                            Action { relation: Mul, columns: [a, v6, v5], entry: [_, _, U] },
+                        ],
+                        variables: {
+                            v0: VariableMeta { name: Some("a"), ty: t4 },
+                            v1: VariableMeta { name: Some("b"), ty: t4 },
+                            v2: VariableMeta { name: None, ty: t4 },
+                            v3: VariableMeta { name: Some("c"), ty: t4 },
+                            v4: VariableMeta { name: None, ty: t4 },
+                            v5: VariableMeta { name: None, ty: t4 },
+                            v6: VariableMeta { name: None, ty: t4 },
+                        },
+                        unify: [],
+                    },
+                    SymbolicRule {
+                        src: "( rewrite ( Mul ( Pow a b ) ( Pow a c ) ) ( Pow a ( Add b c ) ) )",
+                        atoms: [
+                            Premise { relation: Mul, columns: [v2, v4, v5] },
+                            Premise { relation: Pow, columns: [a, b, v2] },
+                            Premise { relation: Pow, columns: [a, c, v4] },
+                            Action { relation: Add, columns: [b, c, v6], entry: [_, _, U] },
+                            Action { relation: Pow, columns: [a, v6, v5], entry: [_, _, U] },
+                        ],
+                        variables: {
+                            v0: VariableMeta { name: Some("a"), ty: t4 },
+                            v1: VariableMeta { name: Some("b"), ty: t4 },
+                            v2: VariableMeta { name: None, ty: t4 },
+                            v3: VariableMeta { name: Some("c"), ty: t4 },
+                            v4: VariableMeta { name: None, ty: t4 },
+                            v5: VariableMeta { name: None, ty: t4 },
+                            v6: VariableMeta { name: None, ty: t4 },
+                        },
+                        unify: [],
+                    },
+                    SymbolicRule {
+                        src: "( rewrite ( Pow x ( Const 1 ) ) x )",
+                        atoms: [
+                            Premise { relation: Pow, columns: [x, v2, v3] },
+                            Premise { relation: Const, columns: [v1, v2] },
+                            Premise { relation: g2, columns: [v1] },
+                        ],
+                        variables: {
+                            v0: VariableMeta { name: Some("x"), ty: t4 },
+                            v1: VariableMeta { name: None, ty: t1 },
+                            v2: VariableMeta { name: None, ty: t4 },
+                            v3: VariableMeta { name: None, ty: t4 },
+                        },
+                        unify: [
+                            [v3, x],
+                        ],
+                    },
+                    SymbolicRule {
+                        src: "( rewrite ( Pow x ( Const 2 ) ) ( Mul x x ) )",
+                        atoms: [
+                            Premise { relation: Pow, columns: [x, v2, v3] },
+                            Premise { relation: Const, columns: [v1, v2] },
+                            Premise { relation: g3, columns: [v1] },
+                            Action { relation: Mul, columns: [x, x, v3], entry: [_, _, U] },
+                        ],
+                        variables: {
+                            v0: VariableMeta { name: Some("x"), ty: t4 },
+                            v1: VariableMeta { name: None, ty: t1 },
+                            v2: VariableMeta { name: None, ty: t4 },
+                            v3: VariableMeta { name: None, ty: t4 },
+                        },
+                        unify: [],
+                    },
+                    SymbolicRule {
+                        src: "( rewrite ( Diff x ( Add a b ) ) ( Add ( Diff x a ) ( Diff x b ) ) )",
+                        atoms: [
+                            Premise { relation: Diff, columns: [x, v3, v4] },
+                            Premise { relation: Add, columns: [a, b, v3] },
+                            Action { relation: Diff, columns: [x, a, v5], entry: [_, _, U] },
+                            Action { relation: Diff, columns: [x, b, v6], entry: [_, _, U] },
+                            Action { relation: Add, columns: [v5, v6, v4], entry: [_, _, U] },
+                        ],
+                        variables: {
+                            v0: VariableMeta { name: Some("x"), ty: t4 },
+                            v1: VariableMeta { name: Some("a"), ty: t4 },
+                            v2: VariableMeta { name: Some("b"), ty: t4 },
+                            v3: VariableMeta { name: None, ty: t4 },
+                            v4: VariableMeta { name: None, ty: t4 },
+                            v5: VariableMeta { name: None, ty: t4 },
+                            v6: VariableMeta { name: None, ty: t4 },
+                        },
+                        unify: [],
+                    },
+                    SymbolicRule {
+                        src: "( rewrite ( Diff x ( Mul a b ) ) ( Add ( Mul a ( Diff x b ) ) ( Mul b ( Diff x a ) ) ) )",
+                        atoms: [
+                            Premise { relation: Diff, columns: [x, v3, v4] },
+                            Premise { relation: Mul, columns: [a, b, v3] },
+                            Action { relation: Diff, columns: [x, a, v7], entry: [_, _, U] },
+                            Action { relation: Diff, columns: [x, b, v5], entry: [_, _, U] },
+                            Action { relation: Add, columns: [v6, v8, v4], entry: [_, _, U] },
+                            Action { relation: Mul, columns: [a, v5, v6], entry: [_, _, U] },
+                            Action { relation: Mul, columns: [b, v7, v8], entry: [_, _, U] },
+                        ],
+                        variables: {
+                            v0: VariableMeta { name: Some("x"), ty: t4 },
+                            v1: VariableMeta { name: Some("a"), ty: t4 },
+                            v2: VariableMeta { name: Some("b"), ty: t4 },
+                            v3: VariableMeta { name: None, ty: t4 },
+                            v4: VariableMeta { name: None, ty: t4 },
+                            v5: VariableMeta { name: None, ty: t4 },
+                            v6: VariableMeta { name: None, ty: t4 },
+                            v7: VariableMeta { name: None, ty: t4 },
+                            v8: VariableMeta { name: None, ty: t4 },
+                        },
+                        unify: [],
+                    },
+                    SymbolicRule {
+                        src: "( rewrite ( Diff x ( Sin x ) ) ( Cos x ) )",
+                        atoms: [
+                            Premise { relation: Diff, columns: [x, v1, v2] },
+                            Premise { relation: Sin, columns: [x, v1] },
+                            Action { relation: Cos, columns: [x, v2], entry: [_, U] },
+                        ],
+                        variables: {
+                            v0: VariableMeta { name: Some("x"), ty: t4 },
+                            v1: VariableMeta { name: None, ty: t4 },
+                            v2: VariableMeta { name: None, ty: t4 },
+                        },
+                        unify: [],
+                    },
+                    SymbolicRule {
+                        src: "( rewrite ( Integral ( Fuel fuel ) ( Const 1 ) x ) x )",
+                        atoms: [
+                            Premise { relation: Fuel, columns: [fuel, v1] },
+                            Premise { relation: Integral, columns: [v1, v3, x, v5] },
+                            Premise { relation: Const, columns: [v2, v3] },
+                            Premise { relation: g2, columns: [v2] },
+                        ],
+                        variables: {
+                            v0: VariableMeta { name: Some("fuel"), ty: t3 },
+                            v1: VariableMeta { name: None, ty: t3 },
+                            v2: VariableMeta { name: None, ty: t1 },
+                            v3: VariableMeta { name: None, ty: t4 },
+                            v4: VariableMeta { name: Some("x"), ty: t4 },
+                            v5: VariableMeta { name: None, ty: t4 },
+                        },
+                        unify: [
+                            [v5, x],
+                        ],
+                    },
+                    SymbolicRule {
+                        src: "( rewrite ( Integral ( Fuel fuel ) ( Cos x ) x ) ( Sin x ) )",
+                        atoms: [
+                            Premise { relation: Fuel, columns: [fuel, v1] },
+                            Premise { relation: Integral, columns: [v1, v3, x, v4] },
+                            Premise { relation: Cos, columns: [x, v3] },
+                            Action { relation: Sin, columns: [x, v4], entry: [_, U] },
+                        ],
+                        variables: {
+                            v0: VariableMeta { name: Some("fuel"), ty: t3 },
+                            v1: VariableMeta { name: None, ty: t3 },
+                            v2: VariableMeta { name: Some("x"), ty: t4 },
+                            v3: VariableMeta { name: None, ty: t4 },
+                            v4: VariableMeta { name: None, ty: t4 },
+                        },
+                        unify: [],
+                    },
+                    SymbolicRule {
+                        src: "( rewrite ( Integral ( Fuel fuel ) ( Add f g ) x ) ( Add ( Integral fuel f x ) ( Integral fuel g x ) ) )",
+                        atoms: [
+                            Premise { relation: Fuel, columns: [fuel, v1] },
+                            Premise { relation: Integral, columns: [v1, v4, x, v6] },
+                            Premise { relation: Add, columns: [f, g, v4] },
+                            Action { relation: Integral, columns: [fuel, f, x, v7], entry: [_, _, _, U] },
+                            Action { relation: Integral, columns: [fuel, g, x, v8], entry: [_, _, _, U] },
+                            Action { relation: Add, columns: [v7, v8, v6], entry: [_, _, U] },
+                        ],
+                        variables: {
+                            v0: VariableMeta { name: Some("fuel"), ty: t3 },
+                            v1: VariableMeta { name: None, ty: t3 },
+                            v2: VariableMeta { name: Some("f"), ty: t4 },
+                            v3: VariableMeta { name: Some("g"), ty: t4 },
+                            v4: VariableMeta { name: None, ty: t4 },
+                            v5: VariableMeta { name: Some("x"), ty: t4 },
+                            v6: VariableMeta { name: None, ty: t4 },
+                            v7: VariableMeta { name: None, ty: t4 },
+                            v8: VariableMeta { name: None, ty: t4 },
+                        },
+                        unify: [],
+                    },
+                    SymbolicRule {
+                        src: "( rewrite ( Integral ( Fuel fuel ) ( Sub f g ) x ) ( Sub ( Integral fuel f x ) ( Integral fuel g x ) ) )",
+                        atoms: [
+                            Premise { relation: Fuel, columns: [fuel, v1] },
+                            Premise { relation: Integral, columns: [v1, v4, x, v6] },
+                            Premise { relation: Sub, columns: [f, g, v4] },
+                            Action { relation: Integral, columns: [fuel, f, x, v7], entry: [_, _, _, U] },
+                            Action { relation: Integral, columns: [fuel, g, x, v8], entry: [_, _, _, U] },
+                            Action { relation: Sub, columns: [v7, v8, v6], entry: [_, _, U] },
+                        ],
+                        variables: {
+                            v0: VariableMeta { name: Some("fuel"), ty: t3 },
+                            v1: VariableMeta { name: None, ty: t3 },
+                            v2: VariableMeta { name: Some("f"), ty: t4 },
+                            v3: VariableMeta { name: Some("g"), ty: t4 },
+                            v4: VariableMeta { name: None, ty: t4 },
+                            v5: VariableMeta { name: Some("x"), ty: t4 },
+                            v6: VariableMeta { name: None, ty: t4 },
+                            v7: VariableMeta { name: None, ty: t4 },
+                            v8: VariableMeta { name: None, ty: t4 },
+                        },
+                        unify: [],
+                    },
+                    SymbolicRule {
+                        src: "( rewrite ( Integral ( Fuel fuel ) ( Mul a b ) x ) ( Sub ( Mul a ( Integral fuel b x ) ) ( Integral fuel ( Mul ( Diff x a ) ( Integral fuel b x ) ) x ) ) )",
+                        atoms: [
+                            Premise { relation: Fuel, columns: [fuel, v1] },
+                            Premise { relation: Integral, columns: [v1, v4, x, v6] },
+                            Premise { relation: Mul, columns: [a, b, v4] },
+                            Action { relation: Diff, columns: [x, a, v8], entry: [_, _, U] },
+                            Action { relation: Integral, columns: [fuel, b, x, v9], entry: [_, _, _, U] },
+                            Action { relation: Integral, columns: [fuel, v10, x, v11], entry: [_, _, _, U] },
+                            Action { relation: Sub, columns: [v7, v11, v6], entry: [_, _, U] },
+                            Action { relation: Mul, columns: [a, v9, v7], entry: [_, _, U] },
+                            Action { relation: Mul, columns: [v8, v9, v10], entry: [_, _, U] },
+                        ],
+                        variables: {
+                            v0: VariableMeta { name: Some("fuel"), ty: t3 },
+                            v1: VariableMeta { name: None, ty: t3 },
+                            v2: VariableMeta { name: Some("a"), ty: t4 },
+                            v3: VariableMeta { name: Some("b"), ty: t4 },
+                            v4: VariableMeta { name: None, ty: t4 },
+                            v5: VariableMeta { name: Some("x"), ty: t4 },
+                            v6: VariableMeta { name: None, ty: t4 },
+                            v7: VariableMeta { name: None, ty: t4 },
+                            v8: VariableMeta { name: None, ty: t4 },
+                            v9: VariableMeta { name: None, ty: t4 },
+                            v10: VariableMeta { name: None, ty: t4 },
+                            v11: VariableMeta { name: None, ty: t4 },
+                        },
+                        unify: [],
+                    },
+                ],
+                relations: {
+                    r0: + { columns: [i64, i64, i64], kind: Primitive(i64_add012), implicit_rules: {n0: [_, _, !]} },
+                    r1: & { columns: [i64, i64, i64], kind: Primitive(i64_bitand012), implicit_rules: {n0: [_, _, !]} },
+                    r2: not-i64 { columns: [i64, i64], kind: Primitive(i64_bitnot01), implicit_rules: {n0: [_, !]} },
+                    r3: | { columns: [i64, i64, i64], kind: Primitive(i64_bitor012), implicit_rules: {n0: [_, _, !]} },
+                    r4: << { columns: [i64, i64, i64], kind: Primitive(i64_bitshl012), implicit_rules: {n0: [_, _, !]} },
+                    r5: >> { columns: [i64, i64, i64], kind: Primitive(i64_bitshr012), implicit_rules: {n0: [_, _, !]} },
+                    r6: ^ { columns: [i64, i64, i64], kind: Primitive(i64_bitxor012), implicit_rules: {n0: [_, _, !]} },
+                    r7: / { columns: [i64, i64, i64], kind: Primitive(i64_div012), implicit_rules: {n0: [_, _, !]} },
+                    r8: log2 { columns: [i64, i64], kind: Primitive(i64_log01), implicit_rules: {n0: [_, !]} },
+                    r9: max { columns: [i64, i64, i64], kind: Primitive(i64_max012), implicit_rules: {n0: [_, _, !]} },
+                    r10: min { columns: [i64, i64, i64], kind: Primitive(i64_min012), implicit_rules: {n0: [_, _, !]} },
+                    r11: * { columns: [i64, i64, i64], kind: Primitive(i64_mul012), implicit_rules: {n0: [_, _, !]} },
+                    r12: % { columns: [i64, i64, i64], kind: Primitive(i64_rem012), implicit_rules: {n0: [_, _, !]} },
+                    r13: - { columns: [i64, i64, i64], kind: Primitive(i64_sub012), implicit_rules: {n0: [_, _, !]} },
+                    r14: FuelUnit { columns: [FuelUnit], kind: Forall(t3), implicit_rules: {} },
+                    r15: Fuel { columns: [FuelUnit, FuelUnit], kind: Table, implicit_rules: {n0: [_, U]} },
+                    r16: ZeroFuel { columns: [FuelUnit], kind: Table, implicit_rules: {n0: [U]} },
+                    r17: Math { columns: [Math], kind: Forall(t4), implicit_rules: {} },
+                    r18: Diff { columns: [Math, Math, Math], kind: Table, implicit_rules: {n0: [_, _, U]} },
+                    r19: Integral { columns: [FuelUnit, Math, Math, Math], kind: Table, implicit_rules: {n0: [_, _, _, U]} },
+                    r20: Add { columns: [Math, Math, Math], kind: Table, implicit_rules: {n0: [_, _, U]} },
+                    r21: Sub { columns: [Math, Math, Math], kind: Table, implicit_rules: {n0: [_, _, U]} },
+                    r22: Mul { columns: [Math, Math, Math], kind: Table, implicit_rules: {n0: [_, _, U]} },
+                    r23: Div { columns: [Math, Math, Math], kind: Table, implicit_rules: {n0: [_, _, U]} },
+                    r24: Pow { columns: [Math, Math, Math], kind: Table, implicit_rules: {n0: [_, _, U]} },
+                    r25: Ln { columns: [Math, Math], kind: Table, implicit_rules: {n0: [_, U]} },
+                    r26: Sqrt { columns: [Math, Math], kind: Table, implicit_rules: {n0: [_, U]} },
+                    r27: Sin { columns: [Math, Math], kind: Table, implicit_rules: {n0: [_, U]} },
+                    r28: Cos { columns: [Math, Math], kind: Table, implicit_rules: {n0: [_, U]} },
+                    r29: Const { columns: [i64, Math], kind: Table, implicit_rules: {n0: [_, U]} },
+                    r30: Var { columns: [String, Math], kind: Table, implicit_rules: {n0: [_, U]} },
+                    r31: g0 { columns: [i64], kind: Global(g0), implicit_rules: {n0: [!]} },
+                    r32: g1 { columns: [i64], kind: Global(g1), implicit_rules: {n0: [!]} },
+                    r33: g2 { columns: [i64], kind: Global(g2), implicit_rules: {n0: [!]} },
+                    r34: g3 { columns: [i64], kind: Global(g3), implicit_rules: {n0: [!]} },
+                    r35: g4 { columns: [FuelUnit], kind: Global(g4), implicit_rules: {n0: [!]} },
+                    r36: g5 { columns: [FuelUnit], kind: Global(g5), implicit_rules: {n0: [!]} },
+                    r37: g6 { columns: [FuelUnit], kind: Global(g6), implicit_rules: {n0: [!]} },
+                    r38: fuel3 { columns: [FuelUnit], kind: Global(g7), implicit_rules: {n0: [!]} },
+                    r39: g8 { columns: [String], kind: Global(g8), implicit_rules: {n0: [!]} },
+                    r40: g9 { columns: [Math], kind: Global(g9), implicit_rules: {n0: [!]} },
+                    r41: g10 { columns: [Math], kind: Global(g10), implicit_rules: {n0: [!]} },
+                    r42: g11 { columns: [Math], kind: Global(g11), implicit_rules: {n0: [!]} },
+                    r43: g12 { columns: [Math], kind: Global(g12), implicit_rules: {n0: [!]} },
+                    r44: g13 { columns: [Math], kind: Global(g13), implicit_rules: {n0: [!]} },
+                    r45: g14 { columns: [Math], kind: Global(g14), implicit_rules: {n0: [!]} },
+                    r46: g15 { columns: [Math], kind: Global(g15), implicit_rules: {n0: [!]} },
+                    r47: g16 { columns: [Math], kind: Global(g16), implicit_rules: {n0: [!]} },
+                    r48: g17 { columns: [Math], kind: Global(g17), implicit_rules: {n0: [!]} },
+                    r49: g18 { columns: [Math], kind: Global(g18), implicit_rules: {n0: [!]} },
+                    r50: g19 { columns: [Math], kind: Global(g19), implicit_rules: {n0: [!]} },
+                    r51: g20 { columns: [Math], kind: Global(g20), implicit_rules: {n0: [!]} },
+                    r52: g21 { columns: [Math], kind: Global(g21), implicit_rules: {n0: [!]} },
+                    r53: g22 { columns: [i64], kind: Global(g22), implicit_rules: {n0: [!]} },
+                    r54: g23 { columns: [Math], kind: Global(g23), implicit_rules: {n0: [!]} },
+                    r55: g24 { columns: [Math], kind: Global(g24), implicit_rules: {n0: [!]} },
+                    r56: g25 { columns: [i64], kind: Global(g25), implicit_rules: {n0: [!]} },
+                    r57: g26 { columns: [Math], kind: Global(g26), implicit_rules: {n0: [!]} },
+                    r58: g27 { columns: [Math], kind: Global(g27), implicit_rules: {n0: [!]} },
+                    r59: g28 { columns: [Math], kind: Global(g28), implicit_rules: {n0: [!]} },
+                    r60: g29 { columns: [Math], kind: Global(g29), implicit_rules: {n0: [!]} },
+                    r61: g30 { columns: [Math], kind: Global(g30), implicit_rules: {n0: [!]} },
+                    r62: g31 { columns: [String], kind: Global(g31), implicit_rules: {n0: [!]} },
+                    r63: g32 { columns: [Math], kind: Global(g32), implicit_rules: {n0: [!]} },
+                    r64: g33 { columns: [Math], kind: Global(g33), implicit_rules: {n0: [!]} },
+                    r65: g34 { columns: [Math], kind: Global(g34), implicit_rules: {n0: [!]} },
+                    r66: g35 { columns: [Math], kind: Global(g35), implicit_rules: {n0: [!]} },
+                    r67: g36 { columns: [Math], kind: Global(g36), implicit_rules: {n0: [!]} },
+                    r68: g37 { columns: [Math], kind: Global(g37), implicit_rules: {n0: [!]} },
+                    r69: g38 { columns: [Math], kind: Global(g38), implicit_rules: {n0: [!]} },
+                    r70: g39 { columns: [String], kind: Global(g39), implicit_rules: {n0: [!]} },
+                    r71: g40 { columns: [Math], kind: Global(g40), implicit_rules: {n0: [!]} },
+                    r72: g41 { columns: [Math], kind: Global(g41), implicit_rules: {n0: [!]} },
+                    r73: g42 { columns: [Math], kind: Global(g42), implicit_rules: {n0: [!]} },
+                    r74: g43 { columns: [Math], kind: Global(g43), implicit_rules: {n0: [!]} },
+                    r75: g44 { columns: [Math], kind: Global(g44), implicit_rules: {n0: [!]} },
+                    r76: g45 { columns: [Math], kind: Global(g45), implicit_rules: {n0: [!]} },
+                    r77: g46 { columns: [Math], kind: Global(g46), implicit_rules: {n0: [!]} },
+                    r78: g47 { columns: [Math], kind: Global(g47), implicit_rules: {n0: [!]} },
+                },
+            }"#]]),
         expected_lir: Some(expect![[r#"
             Theory {
                 name: None,
@@ -13565,458 +14040,195 @@ fn lir_math() {
                 initial: [
                     ComputeGlobal {
                         global_id: g0,
-                        compute: Literal(
-                            I64(
-                                -1,
-                            ),
-                        ),
+                        compute: Literal(I64(-1)),
                     },
                     ComputeGlobal {
                         global_id: g1,
-                        compute: Literal(
-                            I64(
-                                0,
-                            ),
-                        ),
+                        compute: Literal(I64(0)),
                     },
                     ComputeGlobal {
                         global_id: g2,
-                        compute: Literal(
-                            I64(
-                                1,
-                            ),
-                        ),
+                        compute: Literal(I64(1)),
                     },
                     ComputeGlobal {
                         global_id: g3,
-                        compute: Literal(
-                            I64(
-                                2,
-                            ),
-                        ),
+                        compute: Literal(I64(2)),
                     },
                     ComputeGlobal {
                         global_id: g4,
-                        compute: Compute {
-                            relation: r16,
-                            args: [],
-                        },
+                        compute: Compute { relation: r16, args: [] },
                     },
                     ComputeGlobal {
                         global_id: g5,
-                        compute: Compute {
-                            relation: r15,
-                            args: [
-                                g4,
-                            ],
-                        },
+                        compute: Compute { relation: r15, args: [g4] },
                     },
                     ComputeGlobal {
                         global_id: g6,
-                        compute: Compute {
-                            relation: r15,
-                            args: [
-                                g5,
-                            ],
-                        },
+                        compute: Compute { relation: r15, args: [g5] },
                     },
                     ComputeGlobal {
                         global_id: g7,
-                        compute: Compute {
-                            relation: r15,
-                            args: [
-                                g6,
-                            ],
-                        },
+                        compute: Compute { relation: r15, args: [g6] },
                     },
                     ComputeGlobal {
                         global_id: g8,
-                        compute: Literal(
-                            String(
-                                IString(
-                                    0,
-                                ),
-                            ),
-                        ),
+                        compute: Literal(String(IString(0))),
                     },
                     ComputeGlobal {
                         global_id: g9,
-                        compute: Compute {
-                            relation: r30,
-                            args: [
-                                g8,
-                            ],
-                        },
+                        compute: Compute { relation: r30, args: [g8] },
                     },
                     ComputeGlobal {
                         global_id: g10,
-                        compute: Compute {
-                            relation: r25,
-                            args: [
-                                g9,
-                            ],
-                        },
+                        compute: Compute { relation: r25, args: [g9] },
                     },
                     ComputeGlobal {
                         global_id: g11,
-                        compute: Compute {
-                            relation: r19,
-                            args: [
-                                g7,
-                                g10,
-                                g9,
-                            ],
-                        },
+                        compute: Compute { relation: r19, args: [g7, g10, g9] },
                     },
                     ComputeGlobal {
                         global_id: g12,
-                        compute: Compute {
-                            relation: r28,
-                            args: [
-                                g9,
-                            ],
-                        },
+                        compute: Compute { relation: r28, args: [g9] },
                     },
                     ComputeGlobal {
                         global_id: g13,
-                        compute: Compute {
-                            relation: r20,
-                            args: [
-                                g9,
-                                g12,
-                            ],
-                        },
+                        compute: Compute { relation: r20, args: [g9, g12] },
                     },
                     ComputeGlobal {
                         global_id: g14,
-                        compute: Compute {
-                            relation: r19,
-                            args: [
-                                g7,
-                                g13,
-                                g9,
-                            ],
-                        },
+                        compute: Compute { relation: r19, args: [g7, g13, g9] },
                     },
                     ComputeGlobal {
                         global_id: g15,
-                        compute: Compute {
-                            relation: r22,
-                            args: [
-                                g12,
-                                g9,
-                            ],
-                        },
+                        compute: Compute { relation: r22, args: [g12, g9] },
                     },
                     ComputeGlobal {
                         global_id: g16,
-                        compute: Compute {
-                            relation: r19,
-                            args: [
-                                g7,
-                                g15,
-                                g9,
-                            ],
-                        },
+                        compute: Compute { relation: r19, args: [g7, g15, g9] },
                     },
                     ComputeGlobal {
                         global_id: g17,
-                        compute: Compute {
-                            relation: r29,
-                            args: [
-                                g2,
-                            ],
-                        },
+                        compute: Compute { relation: r29, args: [g2] },
                     },
                     ComputeGlobal {
                         global_id: g18,
-                        compute: Compute {
-                            relation: r29,
-                            args: [
-                                g3,
-                            ],
-                        },
+                        compute: Compute { relation: r29, args: [g3] },
                     },
                     ComputeGlobal {
                         global_id: g19,
-                        compute: Compute {
-                            relation: r22,
-                            args: [
-                                g18,
-                                g9,
-                            ],
-                        },
+                        compute: Compute { relation: r22, args: [g18, g9] },
                     },
                     ComputeGlobal {
                         global_id: g20,
-                        compute: Compute {
-                            relation: r20,
-                            args: [
-                                g17,
-                                g19,
-                            ],
-                        },
+                        compute: Compute { relation: r20, args: [g17, g19] },
                     },
                     ComputeGlobal {
                         global_id: g21,
-                        compute: Compute {
-                            relation: r18,
-                            args: [
-                                g9,
-                                g20,
-                            ],
-                        },
+                        compute: Compute { relation: r18, args: [g9, g20] },
                     },
                     ComputeGlobal {
                         global_id: g22,
-                        compute: Literal(
-                            I64(
-                                3,
-                            ),
-                        ),
+                        compute: Literal(I64(3)),
                     },
                     ComputeGlobal {
                         global_id: g23,
-                        compute: Compute {
-                            relation: r29,
-                            args: [
-                                g22,
-                            ],
-                        },
+                        compute: Compute { relation: r29, args: [g22] },
                     },
                     ComputeGlobal {
                         global_id: g24,
-                        compute: Compute {
-                            relation: r24,
-                            args: [
-                                g9,
-                                g23,
-                            ],
-                        },
+                        compute: Compute { relation: r24, args: [g9, g23] },
                     },
                     ComputeGlobal {
                         global_id: g25,
-                        compute: Literal(
-                            I64(
-                                7,
-                            ),
-                        ),
+                        compute: Literal(I64(7)),
                     },
                     ComputeGlobal {
                         global_id: g26,
-                        compute: Compute {
-                            relation: r29,
-                            args: [
-                                g25,
-                            ],
-                        },
+                        compute: Compute { relation: r29, args: [g25] },
                     },
                     ComputeGlobal {
                         global_id: g27,
-                        compute: Compute {
-                            relation: r24,
-                            args: [
-                                g9,
-                                g18,
-                            ],
-                        },
+                        compute: Compute { relation: r24, args: [g9, g18] },
                     },
                     ComputeGlobal {
                         global_id: g28,
-                        compute: Compute {
-                            relation: r22,
-                            args: [
-                                g26,
-                                g27,
-                            ],
-                        },
+                        compute: Compute { relation: r22, args: [g26, g27] },
                     },
                     ComputeGlobal {
                         global_id: g29,
-                        compute: Compute {
-                            relation: r21,
-                            args: [
-                                g24,
-                                g28,
-                            ],
-                        },
+                        compute: Compute { relation: r21, args: [g24, g28] },
                     },
                     ComputeGlobal {
                         global_id: g30,
-                        compute: Compute {
-                            relation: r18,
-                            args: [
-                                g9,
-                                g29,
-                            ],
-                        },
+                        compute: Compute { relation: r18, args: [g9, g29] },
                     },
                     ComputeGlobal {
                         global_id: g31,
-                        compute: Literal(
-                            String(
-                                IString(
-                                    1,
-                                ),
-                            ),
-                        ),
+                        compute: Literal(String(IString(1))),
                     },
                     ComputeGlobal {
                         global_id: g32,
-                        compute: Compute {
-                            relation: r30,
-                            args: [
-                                g31,
-                            ],
-                        },
+                        compute: Compute { relation: r30, args: [g31] },
                     },
                     ComputeGlobal {
                         global_id: g33,
-                        compute: Compute {
-                            relation: r20,
-                            args: [
-                                g9,
-                                g32,
-                            ],
-                        },
+                        compute: Compute { relation: r20, args: [g9, g32] },
                     },
                     ComputeGlobal {
                         global_id: g34,
-                        compute: Compute {
-                            relation: r22,
-                            args: [
-                                g32,
-                                g33,
-                            ],
-                        },
+                        compute: Compute { relation: r22, args: [g32, g33] },
                     },
                     ComputeGlobal {
                         global_id: g35,
-                        compute: Compute {
-                            relation: r20,
-                            args: [
-                                g9,
-                                g18,
-                            ],
-                        },
+                        compute: Compute { relation: r20, args: [g9, g18] },
                     },
                     ComputeGlobal {
                         global_id: g36,
-                        compute: Compute {
-                            relation: r20,
-                            args: [
-                                g9,
-                                g9,
-                            ],
-                        },
+                        compute: Compute { relation: r20, args: [g9, g9] },
                     },
                     ComputeGlobal {
                         global_id: g37,
-                        compute: Compute {
-                            relation: r21,
-                            args: [
-                                g35,
-                                g36,
-                            ],
-                        },
+                        compute: Compute { relation: r21, args: [g35, g36] },
                     },
                     ComputeGlobal {
                         global_id: g38,
-                        compute: Compute {
-                            relation: r20,
-                            args: [
-                                g34,
-                                g37,
-                            ],
-                        },
+                        compute: Compute { relation: r20, args: [g34, g37] },
                     },
                     ComputeGlobal {
                         global_id: g39,
-                        compute: Literal(
-                            String(
-                                IString(
-                                    2,
-                                ),
-                            ),
-                        ),
+                        compute: Literal(String(IString(2))),
                     },
                     ComputeGlobal {
                         global_id: g40,
-                        compute: Compute {
-                            relation: r30,
-                            args: [
-                                g39,
-                            ],
-                        },
+                        compute: Compute { relation: r30, args: [g39] },
                     },
                     ComputeGlobal {
                         global_id: g41,
-                        compute: Compute {
-                            relation: r26,
-                            args: [
-                                g40,
-                            ],
-                        },
+                        compute: Compute { relation: r26, args: [g40] },
                     },
                     ComputeGlobal {
                         global_id: g42,
-                        compute: Compute {
-                            relation: r20,
-                            args: [
-                                g17,
-                                g41,
-                            ],
-                        },
+                        compute: Compute { relation: r20, args: [g17, g41] },
                     },
                     ComputeGlobal {
                         global_id: g43,
-                        compute: Compute {
-                            relation: r23,
-                            args: [
-                                g42,
-                                g18,
-                            ],
-                        },
+                        compute: Compute { relation: r23, args: [g42, g18] },
                     },
                     ComputeGlobal {
                         global_id: g44,
-                        compute: Compute {
-                            relation: r21,
-                            args: [
-                                g17,
-                                g41,
-                            ],
-                        },
+                        compute: Compute { relation: r21, args: [g17, g41] },
                     },
                     ComputeGlobal {
                         global_id: g45,
-                        compute: Compute {
-                            relation: r23,
-                            args: [
-                                g44,
-                                g18,
-                            ],
-                        },
+                        compute: Compute { relation: r23, args: [g44, g18] },
                     },
                     ComputeGlobal {
                         global_id: g46,
-                        compute: Compute {
-                            relation: r21,
-                            args: [
-                                g43,
-                                g45,
-                            ],
-                        },
+                        compute: Compute { relation: r21, args: [g43, g45] },
                     },
                     ComputeGlobal {
                         global_id: g47,
-                        compute: Compute {
-                            relation: r23,
-                            args: [
-                                g17,
-                                g46,
-                            ],
-                        },
+                        compute: Compute { relation: r23, args: [g17, g46] },
                     },
                 ],
             }"#]]),

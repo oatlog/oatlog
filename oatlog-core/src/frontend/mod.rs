@@ -67,20 +67,6 @@ impl<A: Clone, B, E> VecExtClone<A, B, E> for [A] {
     }
 }
 
-pub(crate) fn parse(sexps: Vec<ParseInput>, config: Configuration) -> MResult<hir::Theory> {
-    let mut parser = Parser::new();
-    for sexp in sexps {
-        match sexp {
-            ParseInput::Sexp(sexp) => {
-                parser.parse_egglog_sexp(sexp, config)?;
-            }
-            ParseInput::Rust(primitive_functions) => {
-                parser.parse_primitives(primitive_functions)?;
-            }
-        }
-    }
-    Ok(parser.emit_hir(config))
-}
 pub(crate) fn parse_str_to_sexps(s: &'static str) -> MResult<Vec<ParseInput>> {
     let span = QSpan::new(Span::call_site(), s.to_string());
     let sexp = SexpSpan::parse_string(Some(span), s)?;
@@ -345,7 +331,7 @@ impl<V: Clone> MapExt<&'static str, Spanned<V>> for BTreeMap<&'static str, Spann
 
 /// Global parsing state
 #[derive(Debug)]
-struct Parser {
+pub struct Parser {
     /// Not yet implemented, sets of rules executed together.
     rulesets: BTreeMap<Str, ()>,
 
@@ -388,7 +374,7 @@ struct Parser {
 }
 use egglog_ast::Expr;
 impl Parser {
-    fn new() -> Self {
+    pub(crate) fn new() -> Self {
         let mut parser = Parser {
             compute_to_global: BTreeMap::new(),
             function_possible_ids: BTreeMap::new(),
@@ -414,8 +400,25 @@ impl Parser {
         parser.parse_primitives(runtime_tokenstream).unwrap();
         parser
     }
+    pub(crate) fn ingest_all(
+        &mut self,
+        sexps: Vec<ParseInput>,
+        config: Configuration,
+    ) -> MResult<()> {
+        for sexp in sexps {
+            match sexp {
+                ParseInput::Sexp(sexp) => {
+                    self.parse_egglog_sexp(sexp, config)?;
+                }
+                ParseInput::Rust(primitive_functions) => {
+                    self.parse_primitives(primitive_functions)?;
+                }
+            }
+        }
+        Ok(())
+    }
 
-    pub(crate) fn emit_hir(&self, config: Configuration) -> hir::Theory {
+    pub(crate) fn emit_hir(&self) -> hir::Theory {
         let types: TVec<TypeId, hir::Type> = self
             .types
             .iter()
@@ -439,11 +442,14 @@ impl Parser {
             initial: self.initial.clone(),
             interner: self.interner.clone(),
         }
-        .optimize(config)
     }
 
     // TODO: parse to AST + forward declarations here
-    fn parse_egglog_sexp(&mut self, sexp: Vec<SexpSpan>, config: Configuration) -> MResult<()> {
+    pub(crate) fn parse_egglog_sexp(
+        &mut self,
+        sexp: Vec<SexpSpan>,
+        config: Configuration,
+    ) -> MResult<()> {
         let program = egglog_ast::parse_program(sexp.clone())?;
         self.parse_egglog_program(program, config)?;
         Ok(())
@@ -1106,7 +1112,7 @@ impl Parser {
     fn type_name(&self, ty: TypeId) -> Str {
         self.types[&ty].name
     }
-    fn parse_primitives(&mut self, prim_funcs: TokenStream) -> MResult<()> {
+    pub(crate) fn parse_primitives(&mut self, prim_funcs: TokenStream) -> MResult<()> {
         let primitive_functions =
             primitive::parse_prim_funcs(prim_funcs, |s| self.type_ids.lookup(s).unwrap());
 

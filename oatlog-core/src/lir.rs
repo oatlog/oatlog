@@ -405,7 +405,7 @@ impl Theory {
                         "rule_tries",
                         &rule_tries.iter().map(Dbg).collect::<Vec<_>>(),
                     )
-                    .field("initial", initial)
+                    .field("initial", &initial.iter().map(Dbg).collect::<Vec<_>>())
                     .finish()
             }
         }
@@ -594,6 +594,18 @@ impl Theory {
                     RuleAtom::IfEq(a, b) => {
                         write!(f, "{:?}", DbgStr(["IfEq".to_string(), format!("{a}={b}")]))
                     }
+                }
+            }
+        }
+        impl Debug for Dbg<'_, Initial> {
+            fn fmt(&self, f: &mut Formatter<'_>) -> Result<(), Error> {
+                match self.0 {
+                    Initial::Run { steps } => f.debug_struct("Run").field("steps", steps).finish(),
+                    Initial::ComputeGlobal { global_id, compute } => f
+                        .debug_struct("ComputeGlobal")
+                        .field("global_id", global_id)
+                        .field("compute", &DbgStr([format!("{compute:?}")]))
+                        .finish(),
                 }
             }
         }
