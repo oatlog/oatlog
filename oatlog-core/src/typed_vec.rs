@@ -50,6 +50,9 @@ impl<K: Id, V> TVec<K, V> {
         (0..self.len()).map(K::from)
     }
     /// `.iter().enumerate()` with typed indexes
+    pub(crate) fn into_iter_enumerate(self) -> impl Iterator<Item = (K, V)> {
+        (0..).map(K::from).zip(self.x.into_iter())
+    }
     pub(crate) fn iter_enumerate(&self) -> impl Iterator<Item = (K, &V)> {
         (0..).map(K::from).zip(self.x.iter())
     }
@@ -76,6 +79,14 @@ impl<K: Id, V> TVec<K, V> {
     }
     pub(crate) fn map<'a, V2>(&'a self, f: impl FnMut(&'a V) -> V2) -> TVec<K, V2> {
         self.iter().map(f).collect()
+    }
+    pub(crate) fn from_iter_ordered(iter: impl Iterator<Item = (K, V)>) -> Self {
+        iter.enumerate()
+            .map(|(expected_id, (id, value))| {
+                assert_eq!(id, K::from(expected_id));
+                value
+            })
+            .collect()
     }
     /// Collect values that arrive out-of-order
     /// asserts that the ids are contiguous.
@@ -125,6 +136,17 @@ impl<K: Id> TVec<K, K> {
             inverted[*e] = i;
         }
         inverted
+    }
+}
+impl<K: Id> TVec<K, bool> {
+    pub(crate) fn into_remap_table(self) -> TVec<K, Option<K>> {
+        let mut next = 0;
+        self.map(|keep| {
+            keep.then(|| {
+                next += 1;
+                K::from(next - 1)
+            })
+        })
     }
 }
 
@@ -201,5 +223,14 @@ impl<'a, K: Id, V> IntoIterator for &'a TVec<K, V> {
 
     fn into_iter(self) -> Self::IntoIter {
         self.x.iter()
+    }
+}
+impl<'a, K: Id, V> IntoIterator for &'a mut TVec<K, V> {
+    type Item = &'a mut V;
+
+    type IntoIter = <&'a mut Vec<V> as IntoIterator>::IntoIter;
+
+    fn into_iter(self) -> Self::IntoIter {
+        self.x.iter_mut()
     }
 }

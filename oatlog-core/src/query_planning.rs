@@ -150,6 +150,9 @@ pub(crate) fn emit_lir_theory(mut theory: hir::Theory) -> (hir::Theory, lir::The
             RelationTy::Forall { ty: _ } => {
                 // Forall relations are implicitly created as a feature of `runtime::UnionFind`
                 lir_relations.push_expected(relation_id, None);
+                unreachable!(
+                    "After hir-optimization removing unused Forall, it seems to never be emitted as LIR"
+                );
             }
             RelationTy::Table => {
                 let uses = &mut table_uses[relation_id];

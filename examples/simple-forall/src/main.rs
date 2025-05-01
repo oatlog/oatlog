@@ -8,14 +8,17 @@ oatlog::compile_egraph_relaxed!((
     // (rule ((forall x)) ((define (Le x x))))
 ));
 
+// Stuff is commented out, because in the absence of the rule (which does not yet successfully codegen),
+// 1. `iter1_0_1` is not generated.
+// 2. The relation `Le` itself is optimized out
 fn run() {
     let mut theory = Theory::new();
-    let x = theory.make();
+    //let x = theory.make();
     theory.step();
 
-    let _ = x;
+    //let _ = x;
 
-    let x = theory.make();
+    //let x = theory.make();
     dbg!(&theory);
     //assert!(theory.le_.iter1_0_1(x).find(|&(e,)| e == x).is_some());
 }

@@ -2,7 +2,6 @@ use itertools::Itertools as _;
 
 use std::{
     collections::{BTreeMap, BTreeSet},
-    hash::Hash,
     mem::replace,
 };
 
@@ -18,7 +17,7 @@ use crate::{
 struct SparseUf<T> {
     repr: BTreeMap<T, T>,
 }
-impl<T: Copy + Eq + Ord + Hash> SparseUf<T> {
+impl<T: Copy + Eq + Ord> SparseUf<T> {
     fn find(&self, t: T) -> T {
         if let Some(t2) = self.repr.get(&t) {
             if *t2 == t { *t2 } else { self.find(*t2) }
@@ -36,7 +35,11 @@ impl<T: Copy + Eq + Ord + Hash> SparseUf<T> {
         true
     }
     fn iter(&self) -> impl Iterator<Item = T> {
-        self.repr.iter().flat_map(|(&a, &b)| [a, b]).unique()
+        self.repr
+            .iter()
+            .flat_map(|(&a, &b)| [a, b])
+            .collect::<BTreeSet<_>>()
+            .into_iter()
     }
     fn new() -> Self {
         Self {
@@ -269,6 +272,7 @@ fn action_topo_resolve<'a>(
     let actions = {
         use crate::union_find::UFData;
         use hir::IsPremise::{Action, Premise};
+
         let mut to_merge: UFData<VariableId, IsPremise> =
             variables.iter().copied().map(|_| Action).collect();
 
@@ -347,14 +351,14 @@ fn action_topo_resolve<'a>(
             }
             panic!("{pre:?} {queue:?}");
         }
+        queue.sort();
+        queue.dedup();
         queue
     };
 
-    let actions: BTreeSet<Atom> = actions.into_iter().collect();
-
-    let mut schedule: Vec<Atom> = vec![];
-    let mut conflict_free: Vec<Atom> = vec![];
-    let mut problematic: Vec<_> = actions.into_iter().collect();
+    let mut schedule: Vec<Atom> = Vec::new();
+    let mut conflict_free: Vec<Atom> = Vec::new();
+    let mut problematic: Vec<Atom> = actions;
 
     while !problematic.is_empty() || !conflict_free.is_empty() {
         let mut write_deg: BTreeMap<VariableId, usize>;

@@ -399,7 +399,6 @@ impl IsPremise {
 pub(crate) struct Atom {
     pub(crate) is_premise: IsPremise,
     pub(crate) relation: RelationId,
-    // TODO loke: consider not TVec.
     pub(crate) columns: TVec<ColumnId, VariableId>,
     /// Entry refers to a specific index.
     /// It means slightly different things for premise and action:
@@ -873,6 +872,86 @@ impl Theory {
             for rule in &mut this.symbolic_rules {
                 *rule = rule.optimize(&this.relations);
             }
+        }
+
+        {
+            // Remove unused relations and types
+            let mut types_to_keep: TVec<TypeId, bool> = this.types.new_same_size();
+            let mut relations_to_keep: TVec<RelationId, bool> = this.relations.new_same_size();
+
+            for rule in &this.symbolic_rules {
+                rule.atoms
+                    .iter()
+                    .for_each(|Atom { relation, .. }| relations_to_keep[relation] = true);
+                rule.variables
+                    .iter()
+                    .for_each(|VariableMeta { ty, .. }| types_to_keep[ty] = true);
+            }
+            this.global_types
+                .iter()
+                .for_each(|ty| types_to_keep[ty] = true);
+            this.global_to_relation
+                .iter()
+                .for_each(|rel| relations_to_keep[rel] = true);
+            this.initial.iter().for_each(|initial| {
+                if let lir::Initial::ComputeGlobal {
+                    compute: lir::GlobalCompute::Compute { relation, .. },
+                    ..
+                } = initial
+                {
+                    relations_to_keep[relation] = true
+                }
+            });
+            for (rel, relation) in this.relations.iter_enumerate() {
+                if relations_to_keep[rel] {
+                    for col_ty in &relation.columns {
+                        types_to_keep[col_ty] = true;
+                    }
+                }
+            }
+
+            let remap_types = types_to_keep.into_remap_table();
+            let remap_relations = relations_to_keep.into_remap_table();
+
+            for rule in &mut this.symbolic_rules {
+                for atom in &mut rule.atoms {
+                    atom.relation = remap_relations[atom.relation].unwrap();
+                }
+                for variable in &mut rule.variables {
+                    variable.ty = remap_types[variable.ty].unwrap();
+                }
+            }
+            for ty in &mut this.global_types {
+                *ty = remap_types[*ty].unwrap();
+            }
+            for rel in &mut this.global_to_relation {
+                *rel = remap_relations[*rel].unwrap();
+            }
+            for initial in &mut this.initial {
+                if let lir::Initial::ComputeGlobal {
+                    compute: lir::GlobalCompute::Compute { relation, .. },
+                    ..
+                } = initial
+                {
+                    *relation = remap_relations[*relation].unwrap();
+                }
+            }
+            this.relations =
+                TVec::from_iter_ordered(this.relations.into_iter_enumerate().filter_map(
+                    |(relation_id, mut relation)| {
+                        remap_relations[relation_id].map(|new_relation_id| {
+                            for col_ty in &mut relation.columns {
+                                *col_ty = remap_types[*col_ty].unwrap();
+                            }
+                            (new_relation_id, relation)
+                        })
+                    },
+                ));
+            this.types = TVec::from_iter_ordered(this.types.into_iter_enumerate().filter_map(
+                |(type_id, type_)| {
+                    remap_types[type_id].map(|new_relation_id| (new_relation_id, type_))
+                },
+            ));
         }
         this
     }

@@ -136,10 +136,8 @@ fn redundant_premise_simplify() {
         expected_hir: Some(expect![[r#"
             Theory {
                 types: {
-                    [t0, ()]: std::primitive::unit,
-                    [t1, i64]: std::primitive::i64,
-                    [t2, String]: runtime::IString,
-                    [t3, Math]: [symbolic],
+                    [t0, i64]: std::primitive::i64,
+                    [t1, Math]: [symbolic],
                 },
                 symbolic_rules: [
                     SymbolicRule {
@@ -151,9 +149,9 @@ fn redundant_premise_simplify() {
                             Premise { relation: g0, columns: [v0] },
                         ],
                         variables: {
-                            v0: VariableMeta { name: None, ty: t1 },
-                            v1: VariableMeta { name: None, ty: t3 },
-                            v2: VariableMeta { name: None, ty: t3 },
+                            v0: VariableMeta { name: None, ty: t0 },
+                            v1: VariableMeta { name: None, ty: t1 },
+                            v2: VariableMeta { name: None, ty: t1 },
                         },
                         unify: [],
                     },
@@ -166,32 +164,17 @@ fn redundant_premise_simplify() {
                             Premise { relation: g0, columns: [v1] },
                         ],
                         variables: {
-                            v0: VariableMeta { name: Some("one"), ty: t3 },
-                            v1: VariableMeta { name: None, ty: t1 },
-                            v2: VariableMeta { name: Some("two"), ty: t3 },
+                            v0: VariableMeta { name: Some("one"), ty: t1 },
+                            v1: VariableMeta { name: None, ty: t0 },
+                            v2: VariableMeta { name: Some("two"), ty: t1 },
                         },
                         unify: [],
                     },
                 ],
                 relations: {
-                    r0: + { columns: [i64, i64, i64], kind: Primitive(i64_add012), implicit_rules: {n0: [_, _, !]} },
-                    r1: & { columns: [i64, i64, i64], kind: Primitive(i64_bitand012), implicit_rules: {n0: [_, _, !]} },
-                    r2: not-i64 { columns: [i64, i64], kind: Primitive(i64_bitnot01), implicit_rules: {n0: [_, !]} },
-                    r3: | { columns: [i64, i64, i64], kind: Primitive(i64_bitor012), implicit_rules: {n0: [_, _, !]} },
-                    r4: << { columns: [i64, i64, i64], kind: Primitive(i64_bitshl012), implicit_rules: {n0: [_, _, !]} },
-                    r5: >> { columns: [i64, i64, i64], kind: Primitive(i64_bitshr012), implicit_rules: {n0: [_, _, !]} },
-                    r6: ^ { columns: [i64, i64, i64], kind: Primitive(i64_bitxor012), implicit_rules: {n0: [_, _, !]} },
-                    r7: / { columns: [i64, i64, i64], kind: Primitive(i64_div012), implicit_rules: {n0: [_, _, !]} },
-                    r8: log2 { columns: [i64, i64], kind: Primitive(i64_log01), implicit_rules: {n0: [_, !]} },
-                    r9: max { columns: [i64, i64, i64], kind: Primitive(i64_max012), implicit_rules: {n0: [_, _, !]} },
-                    r10: min { columns: [i64, i64, i64], kind: Primitive(i64_min012), implicit_rules: {n0: [_, _, !]} },
-                    r11: * { columns: [i64, i64, i64], kind: Primitive(i64_mul012), implicit_rules: {n0: [_, _, !]} },
-                    r12: % { columns: [i64, i64, i64], kind: Primitive(i64_rem012), implicit_rules: {n0: [_, _, !]} },
-                    r13: - { columns: [i64, i64, i64], kind: Primitive(i64_sub012), implicit_rules: {n0: [_, _, !]} },
-                    r14: Math { columns: [Math], kind: Forall(t3), implicit_rules: {} },
-                    r15: Const { columns: [i64, Math], kind: Table, implicit_rules: {n0: [_, U]} },
-                    r16: Add { columns: [Math, Math, Math], kind: Table, implicit_rules: {n0: [_, _, U]} },
-                    r17: g0 { columns: [i64], kind: Global(g0), implicit_rules: {n0: [!]} },
+                    r0: Const { columns: [i64, Math], kind: Table, implicit_rules: {n0: [_, U]} },
+                    r1: Add { columns: [Math, Math, Math], kind: Table, implicit_rules: {n0: [_, _, U]} },
+                    r2: g0 { columns: [i64], kind: Global(g0), implicit_rules: {n0: [!]} },
                 },
             }"#]]),
         expected_lir: None,
@@ -234,10 +217,8 @@ fn redundant_action_simplify() {
         expected_hir: Some(expect![[r#"
             Theory {
                 types: {
-                    [t0, ()]: std::primitive::unit,
-                    [t1, i64]: std::primitive::i64,
-                    [t2, String]: runtime::IString,
-                    [t3, Math]: [symbolic],
+                    [t0, i64]: std::primitive::i64,
+                    [t1, Math]: [symbolic],
                 },
                 symbolic_rules: [
                     SymbolicRule {
@@ -251,11 +232,11 @@ fn redundant_action_simplify() {
                             Premise { relation: g1, columns: [v2] },
                         ],
                         variables: {
-                            v0: VariableMeta { name: None, ty: t1 },
-                            v1: VariableMeta { name: None, ty: t3 },
-                            v2: VariableMeta { name: None, ty: t1 },
-                            v3: VariableMeta { name: None, ty: t3 },
-                            v4: VariableMeta { name: None, ty: t3 },
+                            v0: VariableMeta { name: None, ty: t0 },
+                            v1: VariableMeta { name: None, ty: t1 },
+                            v2: VariableMeta { name: None, ty: t0 },
+                            v3: VariableMeta { name: None, ty: t1 },
+                            v4: VariableMeta { name: None, ty: t1 },
                         },
                         unify: [],
                     },
@@ -270,35 +251,20 @@ fn redundant_action_simplify() {
                             Premise { relation: g1, columns: [v3] },
                         ],
                         variables: {
-                            v0: VariableMeta { name: Some("one"), ty: t3 },
-                            v1: VariableMeta { name: None, ty: t1 },
-                            v2: VariableMeta { name: Some("two"), ty: t3 },
-                            v3: VariableMeta { name: None, ty: t1 },
-                            v4: VariableMeta { name: Some("three"), ty: t3 },
+                            v0: VariableMeta { name: Some("one"), ty: t1 },
+                            v1: VariableMeta { name: None, ty: t0 },
+                            v2: VariableMeta { name: Some("two"), ty: t1 },
+                            v3: VariableMeta { name: None, ty: t0 },
+                            v4: VariableMeta { name: Some("three"), ty: t1 },
                         },
                         unify: [],
                     },
                 ],
                 relations: {
-                    r0: + { columns: [i64, i64, i64], kind: Primitive(i64_add012), implicit_rules: {n0: [_, _, !]} },
-                    r1: & { columns: [i64, i64, i64], kind: Primitive(i64_bitand012), implicit_rules: {n0: [_, _, !]} },
-                    r2: not-i64 { columns: [i64, i64], kind: Primitive(i64_bitnot01), implicit_rules: {n0: [_, !]} },
-                    r3: | { columns: [i64, i64, i64], kind: Primitive(i64_bitor012), implicit_rules: {n0: [_, _, !]} },
-                    r4: << { columns: [i64, i64, i64], kind: Primitive(i64_bitshl012), implicit_rules: {n0: [_, _, !]} },
-                    r5: >> { columns: [i64, i64, i64], kind: Primitive(i64_bitshr012), implicit_rules: {n0: [_, _, !]} },
-                    r6: ^ { columns: [i64, i64, i64], kind: Primitive(i64_bitxor012), implicit_rules: {n0: [_, _, !]} },
-                    r7: / { columns: [i64, i64, i64], kind: Primitive(i64_div012), implicit_rules: {n0: [_, _, !]} },
-                    r8: log2 { columns: [i64, i64], kind: Primitive(i64_log01), implicit_rules: {n0: [_, !]} },
-                    r9: max { columns: [i64, i64, i64], kind: Primitive(i64_max012), implicit_rules: {n0: [_, _, !]} },
-                    r10: min { columns: [i64, i64, i64], kind: Primitive(i64_min012), implicit_rules: {n0: [_, _, !]} },
-                    r11: * { columns: [i64, i64, i64], kind: Primitive(i64_mul012), implicit_rules: {n0: [_, _, !]} },
-                    r12: % { columns: [i64, i64, i64], kind: Primitive(i64_rem012), implicit_rules: {n0: [_, _, !]} },
-                    r13: - { columns: [i64, i64, i64], kind: Primitive(i64_sub012), implicit_rules: {n0: [_, _, !]} },
-                    r14: Math { columns: [Math], kind: Forall(t3), implicit_rules: {} },
-                    r15: Const { columns: [i64, Math], kind: Table, implicit_rules: {n0: [_, U]} },
-                    r16: Add { columns: [Math, Math, Math], kind: Table, implicit_rules: {n0: [_, _, U]} },
-                    r17: g0 { columns: [i64], kind: Global(g0), implicit_rules: {n0: [!]} },
-                    r18: g1 { columns: [i64], kind: Global(g1), implicit_rules: {n0: [!]} },
+                    r0: Const { columns: [i64, Math], kind: Table, implicit_rules: {n0: [_, U]} },
+                    r1: Add { columns: [Math, Math, Math], kind: Table, implicit_rules: {n0: [_, _, U]} },
+                    r2: g0 { columns: [i64], kind: Global(g0), implicit_rules: {n0: [!]} },
+                    r3: g1 { columns: [i64], kind: Global(g1), implicit_rules: {n0: [!]} },
                 },
             }"#]]),
         expected_lir: None,
@@ -316,9 +282,7 @@ fn weird_premise_equality() {
         expected_hir: Some(expect![[r#"
             Theory {
                 types: {
-                    [t0, ()]: std::primitive::unit,
-                    [t1, i64]: std::primitive::i64,
-                    [t2, String]: runtime::IString,
+                    [t0, i64]: std::primitive::i64,
                 },
                 symbolic_rules: [
                     SymbolicRule {
@@ -327,27 +291,13 @@ fn weird_premise_equality() {
                             Premise { relation: g0, columns: [xyz] },
                         ],
                         variables: {
-                            v0: VariableMeta { name: Some("xyz"), ty: t1 },
+                            v0: VariableMeta { name: Some("xyz"), ty: t0 },
                         },
                         unify: [],
                     },
                 ],
                 relations: {
-                    r0: + { columns: [i64, i64, i64], kind: Primitive(i64_add012), implicit_rules: {n0: [_, _, !]} },
-                    r1: & { columns: [i64, i64, i64], kind: Primitive(i64_bitand012), implicit_rules: {n0: [_, _, !]} },
-                    r2: not-i64 { columns: [i64, i64], kind: Primitive(i64_bitnot01), implicit_rules: {n0: [_, !]} },
-                    r3: | { columns: [i64, i64, i64], kind: Primitive(i64_bitor012), implicit_rules: {n0: [_, _, !]} },
-                    r4: << { columns: [i64, i64, i64], kind: Primitive(i64_bitshl012), implicit_rules: {n0: [_, _, !]} },
-                    r5: >> { columns: [i64, i64, i64], kind: Primitive(i64_bitshr012), implicit_rules: {n0: [_, _, !]} },
-                    r6: ^ { columns: [i64, i64, i64], kind: Primitive(i64_bitxor012), implicit_rules: {n0: [_, _, !]} },
-                    r7: / { columns: [i64, i64, i64], kind: Primitive(i64_div012), implicit_rules: {n0: [_, _, !]} },
-                    r8: log2 { columns: [i64, i64], kind: Primitive(i64_log01), implicit_rules: {n0: [_, !]} },
-                    r9: max { columns: [i64, i64, i64], kind: Primitive(i64_max012), implicit_rules: {n0: [_, _, !]} },
-                    r10: min { columns: [i64, i64, i64], kind: Primitive(i64_min012), implicit_rules: {n0: [_, _, !]} },
-                    r11: * { columns: [i64, i64, i64], kind: Primitive(i64_mul012), implicit_rules: {n0: [_, _, !]} },
-                    r12: % { columns: [i64, i64, i64], kind: Primitive(i64_rem012), implicit_rules: {n0: [_, _, !]} },
-                    r13: - { columns: [i64, i64, i64], kind: Primitive(i64_sub012), implicit_rules: {n0: [_, _, !]} },
-                    r14: g0 { columns: [i64], kind: Global(g0), implicit_rules: {n0: [!]} },
+                    r0: g0 { columns: [i64], kind: Global(g0), implicit_rules: {n0: [!]} },
                 },
             }"#]]),
         expected_lir: None,
@@ -368,10 +318,7 @@ fn hir_commutative() {
         expected_hir: Some(expect![[r#"
             Theory {
                 types: {
-                    [t0, ()]: std::primitive::unit,
-                    [t1, i64]: std::primitive::i64,
-                    [t2, String]: runtime::IString,
-                    [t3, Math]: [symbolic],
+                    [t0, Math]: [symbolic],
                 },
                 symbolic_rules: [
                     SymbolicRule {
@@ -381,30 +328,15 @@ fn hir_commutative() {
                             Action { relation: Add, columns: [b, a, e], entry: [_, _, U] },
                         ],
                         variables: {
-                            v0: VariableMeta { name: Some("e"), ty: t3 },
-                            v1: VariableMeta { name: Some("a"), ty: t3 },
-                            v2: VariableMeta { name: Some("b"), ty: t3 },
+                            v0: VariableMeta { name: Some("e"), ty: t0 },
+                            v1: VariableMeta { name: Some("a"), ty: t0 },
+                            v2: VariableMeta { name: Some("b"), ty: t0 },
                         },
                         unify: [],
                     },
                 ],
                 relations: {
-                    r0: + { columns: [i64, i64, i64], kind: Primitive(i64_add012), implicit_rules: {n0: [_, _, !]} },
-                    r1: & { columns: [i64, i64, i64], kind: Primitive(i64_bitand012), implicit_rules: {n0: [_, _, !]} },
-                    r2: not-i64 { columns: [i64, i64], kind: Primitive(i64_bitnot01), implicit_rules: {n0: [_, !]} },
-                    r3: | { columns: [i64, i64, i64], kind: Primitive(i64_bitor012), implicit_rules: {n0: [_, _, !]} },
-                    r4: << { columns: [i64, i64, i64], kind: Primitive(i64_bitshl012), implicit_rules: {n0: [_, _, !]} },
-                    r5: >> { columns: [i64, i64, i64], kind: Primitive(i64_bitshr012), implicit_rules: {n0: [_, _, !]} },
-                    r6: ^ { columns: [i64, i64, i64], kind: Primitive(i64_bitxor012), implicit_rules: {n0: [_, _, !]} },
-                    r7: / { columns: [i64, i64, i64], kind: Primitive(i64_div012), implicit_rules: {n0: [_, _, !]} },
-                    r8: log2 { columns: [i64, i64], kind: Primitive(i64_log01), implicit_rules: {n0: [_, !]} },
-                    r9: max { columns: [i64, i64, i64], kind: Primitive(i64_max012), implicit_rules: {n0: [_, _, !]} },
-                    r10: min { columns: [i64, i64, i64], kind: Primitive(i64_min012), implicit_rules: {n0: [_, _, !]} },
-                    r11: * { columns: [i64, i64, i64], kind: Primitive(i64_mul012), implicit_rules: {n0: [_, _, !]} },
-                    r12: % { columns: [i64, i64, i64], kind: Primitive(i64_rem012), implicit_rules: {n0: [_, _, !]} },
-                    r13: - { columns: [i64, i64, i64], kind: Primitive(i64_sub012), implicit_rules: {n0: [_, _, !]} },
-                    r14: Math { columns: [Math], kind: Forall(t3), implicit_rules: {} },
-                    r15: Add { columns: [Math, Math, Math], kind: Table, implicit_rules: {n0: [_, _, U]} },
+                    r0: Add { columns: [Math, Math, Math], kind: Table, implicit_rules: {n0: [_, _, U]} },
                 },
             }"#]]),
         expected_lir: None,
@@ -426,10 +358,7 @@ fn hir_distributive() {
         expected_hir: Some(expect![[r#"
             Theory {
                 types: {
-                    [t0, ()]: std::primitive::unit,
-                    [t1, i64]: std::primitive::i64,
-                    [t2, String]: runtime::IString,
-                    [t3, Math]: [symbolic],
+                    [t0, Math]: [symbolic],
                 },
                 symbolic_rules: [
                     SymbolicRule {
@@ -442,35 +371,20 @@ fn hir_distributive() {
                             Action { relation: Mul, columns: [b, c, v6], entry: [_, _, U] },
                         ],
                         variables: {
-                            v0: VariableMeta { name: Some("a"), ty: t3 },
-                            v1: VariableMeta { name: Some("b"), ty: t3 },
-                            v2: VariableMeta { name: None, ty: t3 },
-                            v3: VariableMeta { name: Some("c"), ty: t3 },
-                            v4: VariableMeta { name: None, ty: t3 },
-                            v5: VariableMeta { name: None, ty: t3 },
-                            v6: VariableMeta { name: None, ty: t3 },
+                            v0: VariableMeta { name: Some("a"), ty: t0 },
+                            v1: VariableMeta { name: Some("b"), ty: t0 },
+                            v2: VariableMeta { name: None, ty: t0 },
+                            v3: VariableMeta { name: Some("c"), ty: t0 },
+                            v4: VariableMeta { name: None, ty: t0 },
+                            v5: VariableMeta { name: None, ty: t0 },
+                            v6: VariableMeta { name: None, ty: t0 },
                         },
                         unify: [],
                     },
                 ],
                 relations: {
-                    r0: + { columns: [i64, i64, i64], kind: Primitive(i64_add012), implicit_rules: {n0: [_, _, !]} },
-                    r1: & { columns: [i64, i64, i64], kind: Primitive(i64_bitand012), implicit_rules: {n0: [_, _, !]} },
-                    r2: not-i64 { columns: [i64, i64], kind: Primitive(i64_bitnot01), implicit_rules: {n0: [_, !]} },
-                    r3: | { columns: [i64, i64, i64], kind: Primitive(i64_bitor012), implicit_rules: {n0: [_, _, !]} },
-                    r4: << { columns: [i64, i64, i64], kind: Primitive(i64_bitshl012), implicit_rules: {n0: [_, _, !]} },
-                    r5: >> { columns: [i64, i64, i64], kind: Primitive(i64_bitshr012), implicit_rules: {n0: [_, _, !]} },
-                    r6: ^ { columns: [i64, i64, i64], kind: Primitive(i64_bitxor012), implicit_rules: {n0: [_, _, !]} },
-                    r7: / { columns: [i64, i64, i64], kind: Primitive(i64_div012), implicit_rules: {n0: [_, _, !]} },
-                    r8: log2 { columns: [i64, i64], kind: Primitive(i64_log01), implicit_rules: {n0: [_, !]} },
-                    r9: max { columns: [i64, i64, i64], kind: Primitive(i64_max012), implicit_rules: {n0: [_, _, !]} },
-                    r10: min { columns: [i64, i64, i64], kind: Primitive(i64_min012), implicit_rules: {n0: [_, _, !]} },
-                    r11: * { columns: [i64, i64, i64], kind: Primitive(i64_mul012), implicit_rules: {n0: [_, _, !]} },
-                    r12: % { columns: [i64, i64, i64], kind: Primitive(i64_rem012), implicit_rules: {n0: [_, _, !]} },
-                    r13: - { columns: [i64, i64, i64], kind: Primitive(i64_sub012), implicit_rules: {n0: [_, _, !]} },
-                    r14: Math { columns: [Math], kind: Forall(t3), implicit_rules: {} },
-                    r15: Add { columns: [Math, Math, Math], kind: Table, implicit_rules: {n0: [_, _, U]} },
-                    r16: Mul { columns: [Math, Math, Math], kind: Table, implicit_rules: {n0: [_, _, U]} },
+                    r0: Add { columns: [Math, Math, Math], kind: Table, implicit_rules: {n0: [_, _, U]} },
+                    r1: Mul { columns: [Math, Math, Math], kind: Table, implicit_rules: {n0: [_, _, U]} },
                 },
             }"#]]),
         expected_lir: None,
@@ -491,10 +405,7 @@ fn hir_userspace_implicit_functionality() {
         expected_hir: Some(expect![[r#"
             Theory {
                 types: {
-                    [t0, ()]: std::primitive::unit,
-                    [t1, i64]: std::primitive::i64,
-                    [t2, String]: runtime::IString,
-                    [t3, Math]: [symbolic],
+                    [t0, Math]: [symbolic],
                 },
                 symbolic_rules: [
                     SymbolicRule {
@@ -504,10 +415,10 @@ fn hir_userspace_implicit_functionality() {
                             Premise { relation: Add, columns: [a, b, d] },
                         ],
                         variables: {
-                            v0: VariableMeta { name: Some("a"), ty: t3 },
-                            v1: VariableMeta { name: Some("b"), ty: t3 },
-                            v2: VariableMeta { name: Some("c"), ty: t3 },
-                            v3: VariableMeta { name: Some("d"), ty: t3 },
+                            v0: VariableMeta { name: Some("a"), ty: t0 },
+                            v1: VariableMeta { name: Some("b"), ty: t0 },
+                            v2: VariableMeta { name: Some("c"), ty: t0 },
+                            v3: VariableMeta { name: Some("d"), ty: t0 },
                         },
                         unify: [
                             [c, d],
@@ -515,22 +426,7 @@ fn hir_userspace_implicit_functionality() {
                     },
                 ],
                 relations: {
-                    r0: + { columns: [i64, i64, i64], kind: Primitive(i64_add012), implicit_rules: {n0: [_, _, !]} },
-                    r1: & { columns: [i64, i64, i64], kind: Primitive(i64_bitand012), implicit_rules: {n0: [_, _, !]} },
-                    r2: not-i64 { columns: [i64, i64], kind: Primitive(i64_bitnot01), implicit_rules: {n0: [_, !]} },
-                    r3: | { columns: [i64, i64, i64], kind: Primitive(i64_bitor012), implicit_rules: {n0: [_, _, !]} },
-                    r4: << { columns: [i64, i64, i64], kind: Primitive(i64_bitshl012), implicit_rules: {n0: [_, _, !]} },
-                    r5: >> { columns: [i64, i64, i64], kind: Primitive(i64_bitshr012), implicit_rules: {n0: [_, _, !]} },
-                    r6: ^ { columns: [i64, i64, i64], kind: Primitive(i64_bitxor012), implicit_rules: {n0: [_, _, !]} },
-                    r7: / { columns: [i64, i64, i64], kind: Primitive(i64_div012), implicit_rules: {n0: [_, _, !]} },
-                    r8: log2 { columns: [i64, i64], kind: Primitive(i64_log01), implicit_rules: {n0: [_, !]} },
-                    r9: max { columns: [i64, i64, i64], kind: Primitive(i64_max012), implicit_rules: {n0: [_, _, !]} },
-                    r10: min { columns: [i64, i64, i64], kind: Primitive(i64_min012), implicit_rules: {n0: [_, _, !]} },
-                    r11: * { columns: [i64, i64, i64], kind: Primitive(i64_mul012), implicit_rules: {n0: [_, _, !]} },
-                    r12: % { columns: [i64, i64, i64], kind: Primitive(i64_rem012), implicit_rules: {n0: [_, _, !]} },
-                    r13: - { columns: [i64, i64, i64], kind: Primitive(i64_sub012), implicit_rules: {n0: [_, _, !]} },
-                    r14: Math { columns: [Math], kind: Forall(t3), implicit_rules: {} },
-                    r15: Add { columns: [Math, Math, Math], kind: Table, implicit_rules: {} },
+                    r0: Add { columns: [Math, Math, Math], kind: Table, implicit_rules: {} },
                 },
             }"#]]),
         expected_lir: None,
@@ -555,10 +451,9 @@ fn hir_global() {
         expected_hir: Some(expect![[r#"
             Theory {
                 types: {
-                    [t0, ()]: std::primitive::unit,
-                    [t1, i64]: std::primitive::i64,
-                    [t2, String]: runtime::IString,
-                    [t3, Math]: [symbolic],
+                    [t0, i64]: std::primitive::i64,
+                    [t1, String]: runtime::IString,
+                    [t2, Math]: [symbolic],
                 },
                 symbolic_rules: [
                     SymbolicRule {
@@ -573,151 +468,50 @@ fn hir_global() {
                             Action { relation: g2, columns: [v4], entry: [!] },
                         ],
                         variables: {
-                            v0: VariableMeta { name: Some("one"), ty: t1 },
-                            v1: VariableMeta { name: None, ty: t3 },
-                            v2: VariableMeta { name: None, ty: t2 },
-                            v3: VariableMeta { name: None, ty: t3 },
-                            v4: VariableMeta { name: None, ty: t2 },
-                            v5: VariableMeta { name: None, ty: t3 },
+                            v0: VariableMeta { name: Some("one"), ty: t0 },
+                            v1: VariableMeta { name: None, ty: t2 },
+                            v2: VariableMeta { name: None, ty: t1 },
+                            v3: VariableMeta { name: None, ty: t2 },
+                            v4: VariableMeta { name: None, ty: t1 },
+                            v5: VariableMeta { name: None, ty: t2 },
                         },
                         unify: [],
                     },
                 ],
                 relations: {
-                    r0: + { columns: [i64, i64, i64], kind: Primitive(i64_add012), implicit_rules: {n0: [_, _, !]} },
-                    r1: & { columns: [i64, i64, i64], kind: Primitive(i64_bitand012), implicit_rules: {n0: [_, _, !]} },
-                    r2: not-i64 { columns: [i64, i64], kind: Primitive(i64_bitnot01), implicit_rules: {n0: [_, !]} },
-                    r3: | { columns: [i64, i64, i64], kind: Primitive(i64_bitor012), implicit_rules: {n0: [_, _, !]} },
-                    r4: << { columns: [i64, i64, i64], kind: Primitive(i64_bitshl012), implicit_rules: {n0: [_, _, !]} },
-                    r5: >> { columns: [i64, i64, i64], kind: Primitive(i64_bitshr012), implicit_rules: {n0: [_, _, !]} },
-                    r6: ^ { columns: [i64, i64, i64], kind: Primitive(i64_bitxor012), implicit_rules: {n0: [_, _, !]} },
-                    r7: / { columns: [i64, i64, i64], kind: Primitive(i64_div012), implicit_rules: {n0: [_, _, !]} },
-                    r8: log2 { columns: [i64, i64], kind: Primitive(i64_log01), implicit_rules: {n0: [_, !]} },
-                    r9: max { columns: [i64, i64, i64], kind: Primitive(i64_max012), implicit_rules: {n0: [_, _, !]} },
-                    r10: min { columns: [i64, i64, i64], kind: Primitive(i64_min012), implicit_rules: {n0: [_, _, !]} },
-                    r11: * { columns: [i64, i64, i64], kind: Primitive(i64_mul012), implicit_rules: {n0: [_, _, !]} },
-                    r12: % { columns: [i64, i64, i64], kind: Primitive(i64_rem012), implicit_rules: {n0: [_, _, !]} },
-                    r13: - { columns: [i64, i64, i64], kind: Primitive(i64_sub012), implicit_rules: {n0: [_, _, !]} },
-                    r14: Math { columns: [Math], kind: Forall(t3), implicit_rules: {} },
-                    r15: Mul { columns: [Math, Math, Math], kind: Table, implicit_rules: {n0: [_, _, U]} },
-                    r16: Add { columns: [Math, Math, Math], kind: Table, implicit_rules: {n0: [_, _, U]} },
-                    r17: Const { columns: [i64, Math], kind: Table, implicit_rules: {n0: [_, U]} },
-                    r18: Var { columns: [String, Math], kind: Table, implicit_rules: {n0: [_, U]} },
-                    r19: one { columns: [i64], kind: Global(g0), implicit_rules: {n0: [!]} },
-                    r20: g1 { columns: [String], kind: Global(g1), implicit_rules: {n0: [!]} },
-                    r21: g2 { columns: [String], kind: Global(g2), implicit_rules: {n0: [!]} },
+                    r0: Add { columns: [Math, Math, Math], kind: Table, implicit_rules: {n0: [_, _, U]} },
+                    r1: Const { columns: [i64, Math], kind: Table, implicit_rules: {n0: [_, U]} },
+                    r2: Var { columns: [String, Math], kind: Table, implicit_rules: {n0: [_, U]} },
+                    r3: one { columns: [i64], kind: Global(g0), implicit_rules: {n0: [!]} },
+                    r4: g1 { columns: [String], kind: Global(g1), implicit_rules: {n0: [!]} },
+                    r5: g2 { columns: [String], kind: Global(g2), implicit_rules: {n0: [!]} },
                 },
             }"#]]),
         expected_lir: Some(expect![[r#"
             Theory {
                 name: None,
                 types: {
-                    [t0, unit]: THIS_STRING_SHOULD_NOT_APPEAR_IN_GENERATED_CODE,
-                    [t1, i64]: std::primitive::i64,
-                    [t2, String]: runtime::IString,
-                    [t3, Math]: [symbolic],
+                    [t0, i64]: std::primitive::i64,
+                    [t1, String]: runtime::IString,
+                    [t2, Math]: [symbolic],
                 },
                 relations: {
                     r0: RelationData {
-                        name: "i64_add012",
-                        param_types: {c0: t1, c1: t1, c2: t1},
-                        kind: Primitive,
+                        name: "Add",
+                        param_types: {c0: t2, c1: t2, c2: t2},
+                        kind: Table {
+                            index_to_info: {ir0: 0_1_2 conflict[..2] => [2:union]},
+                            usage_to_info: {
+                                iu0: ir0[..2],
+                                iu1: ir0[..3],
+                                iu2: ir0[..2],
+                            },
+                            column_back_reference: {},
+                        },
                     },
                     r1: RelationData {
-                        name: "i64_bitand012",
-                        param_types: {c0: t1, c1: t1, c2: t1},
-                        kind: Primitive,
-                    },
-                    r2: RelationData {
-                        name: "i64_bitnot01",
-                        param_types: {c0: t1, c1: t1},
-                        kind: Primitive,
-                    },
-                    r3: RelationData {
-                        name: "i64_bitor012",
-                        param_types: {c0: t1, c1: t1, c2: t1},
-                        kind: Primitive,
-                    },
-                    r4: RelationData {
-                        name: "i64_bitshl012",
-                        param_types: {c0: t1, c1: t1, c2: t1},
-                        kind: Primitive,
-                    },
-                    r5: RelationData {
-                        name: "i64_bitshr012",
-                        param_types: {c0: t1, c1: t1, c2: t1},
-                        kind: Primitive,
-                    },
-                    r6: RelationData {
-                        name: "i64_bitxor012",
-                        param_types: {c0: t1, c1: t1, c2: t1},
-                        kind: Primitive,
-                    },
-                    r7: RelationData {
-                        name: "i64_div012",
-                        param_types: {c0: t1, c1: t1, c2: t1},
-                        kind: Primitive,
-                    },
-                    r8: RelationData {
-                        name: "i64_log01",
-                        param_types: {c0: t1, c1: t1},
-                        kind: Primitive,
-                    },
-                    r9: RelationData {
-                        name: "i64_max012",
-                        param_types: {c0: t1, c1: t1, c2: t1},
-                        kind: Primitive,
-                    },
-                    r10: RelationData {
-                        name: "i64_min012",
-                        param_types: {c0: t1, c1: t1, c2: t1},
-                        kind: Primitive,
-                    },
-                    r11: RelationData {
-                        name: "i64_mul012",
-                        param_types: {c0: t1, c1: t1, c2: t1},
-                        kind: Primitive,
-                    },
-                    r12: RelationData {
-                        name: "i64_rem012",
-                        param_types: {c0: t1, c1: t1, c2: t1},
-                        kind: Primitive,
-                    },
-                    r13: RelationData {
-                        name: "i64_sub012",
-                        param_types: {c0: t1, c1: t1, c2: t1},
-                        kind: Primitive,
-                    },
-                    r14: (hir-only relation),
-                    r15: RelationData {
-                        name: "Mul",
-                        param_types: {c0: t3, c1: t3, c2: t3},
-                        kind: Table {
-                            index_to_info: {ir0: 0_1_2 conflict[..2] => [2:union]},
-                            usage_to_info: {
-                                iu0: ir0[..2],
-                                iu1: ir0[..3],
-                                iu2: ir0[..2],
-                            },
-                            column_back_reference: {},
-                        },
-                    },
-                    r16: RelationData {
-                        name: "Add",
-                        param_types: {c0: t3, c1: t3, c2: t3},
-                        kind: Table {
-                            index_to_info: {ir0: 0_1_2 conflict[..2] => [2:union]},
-                            usage_to_info: {
-                                iu0: ir0[..2],
-                                iu1: ir0[..3],
-                                iu2: ir0[..2],
-                            },
-                            column_back_reference: {},
-                        },
-                    },
-                    r17: RelationData {
                         name: "Const",
-                        param_types: {c0: t1, c1: t3},
+                        param_types: {c0: t0, c1: t2},
                         kind: Table {
                             index_to_info: {ir0: 0_1 conflict[..1] => [1:union]},
                             usage_to_info: {
@@ -729,9 +523,9 @@ fn hir_global() {
                             column_back_reference: {},
                         },
                     },
-                    r18: RelationData {
+                    r2: RelationData {
                         name: "Var",
-                        param_types: {c0: t2, c1: t3},
+                        param_types: {c0: t1, c1: t2},
                         kind: Table {
                             index_to_info: {ir0: 0_1 conflict[..1] => [1:union]},
                             usage_to_info: {
@@ -742,64 +536,64 @@ fn hir_global() {
                             column_back_reference: {},
                         },
                     },
-                    r19: RelationData {
+                    r3: RelationData {
                         name: "g0",
-                        param_types: {c0: t1},
+                        param_types: {c0: t0},
                         kind: [Global, g0],
                     },
-                    r20: RelationData {
+                    r4: RelationData {
                         name: "g1",
-                        param_types: {c0: t2},
+                        param_types: {c0: t1},
                         kind: [Global, g1],
                     },
-                    r21: RelationData {
+                    r5: RelationData {
                         name: "g2",
-                        param_types: {c0: t2},
+                        param_types: {c0: t1},
                         kind: [Global, g2],
                     },
                 },
                 rule_variables: {
-                    [v0, one]: t1,
-                    [v1, v1]: t3,
-                    [v10, v10]: t2,
-                    [v11, v11]: t3,
-                    [v2, v2]: t2,
-                    [v3, v3]: t3,
-                    [v4, v4]: t2,
-                    [v5, v5]: t3,
-                    [v6, one_2]: t1,
-                    [v7, v7]: t3,
-                    [v8, v8]: t2,
-                    [v9, v9]: t3,
+                    [v0, one]: t0,
+                    [v1, v1]: t2,
+                    [v10, v10]: t1,
+                    [v11, v11]: t2,
+                    [v2, v2]: t1,
+                    [v3, v3]: t2,
+                    [v4, v4]: t1,
+                    [v5, v5]: t2,
+                    [v6, one_2]: t0,
+                    [v7, v7]: t2,
+                    [v8, v8]: t1,
+                    [v9, v9]: t2,
                 },
                 global_variable_types: {
-                    g0: t1,
-                    g1: t2,
-                    g2: t2,
+                    g0: t0,
+                    g1: t1,
+                    g2: t1,
                 },
                 rule_tries: [
-                    atom: [PremiseNew, r17(v0, v1)]
+                    atom: [PremiseNew, r1(v0, v1)]
                     then: [
-                        atom: [PremiseAny, r19(v0), iu_bogus]
+                        atom: [PremiseAny, r3(v0), iu_bogus]
                         then: [
                             meta: "( rewrite ( Const one ) ( Add ( Var \"a\" ) ( Var \"b\" ) ) )"
-                            atom: [Action::Insert, r20(v2) on iu0],
-                            atom: [Action::Insert, r21(v4) on iu0],
-                            atom: [Action::Insert, r18(v2, v3) on iu0],
-                            atom: [Action::Insert, r18(v4, v5) on iu0],
-                            atom: [Action::Insert, r16(v3, v5, v1)],
+                            atom: [Action::Insert, r4(v2) on iu0],
+                            atom: [Action::Insert, r5(v4) on iu0],
+                            atom: [Action::Insert, r2(v2, v3) on iu0],
+                            atom: [Action::Insert, r2(v4, v5) on iu0],
+                            atom: [Action::Insert, r0(v3, v5, v1)],
                         ],
                     ],
-                    atom: [PremiseNew, r19(v6)]
+                    atom: [PremiseNew, r3(v6)]
                     then: [
-                        atom: [Premise, r17(v6, v7), iu1]
+                        atom: [Premise, r1(v6, v7), iu1]
                         then: [
                             meta: "( rewrite ( Const one ) ( Add ( Var \"a\" ) ( Var \"b\" ) ) )"
-                            atom: [Action::Insert, r20(v8) on iu0],
-                            atom: [Action::Insert, r21(v10) on iu0],
-                            atom: [Action::Insert, r18(v8, v9) on iu0],
-                            atom: [Action::Insert, r18(v10, v11) on iu0],
-                            atom: [Action::Insert, r16(v9, v11, v7)],
+                            atom: [Action::Insert, r4(v8) on iu0],
+                            atom: [Action::Insert, r5(v10) on iu0],
+                            atom: [Action::Insert, r2(v8, v9) on iu0],
+                            atom: [Action::Insert, r2(v10, v11) on iu0],
+                            atom: [Action::Insert, r0(v9, v11, v7)],
                         ],
                     ],
                 ],
@@ -834,10 +628,8 @@ fn regression_tir2() {
         expected_hir: Some(expect![[r#"
             Theory {
                 types: {
-                    [t0, ()]: std::primitive::unit,
-                    [t1, i64]: std::primitive::i64,
-                    [t2, String]: runtime::IString,
-                    [t3, Math]: [symbolic],
+                    [t0, i64]: std::primitive::i64,
+                    [t1, Math]: [symbolic],
                 },
                 symbolic_rules: [
                     SymbolicRule {
@@ -849,125 +641,37 @@ fn regression_tir2() {
                             Action { relation: Mul, columns: [x, x, v3], entry: [_, _, U] },
                         ],
                         variables: {
-                            v0: VariableMeta { name: Some("x"), ty: t3 },
-                            v1: VariableMeta { name: None, ty: t1 },
-                            v2: VariableMeta { name: None, ty: t3 },
-                            v3: VariableMeta { name: None, ty: t3 },
+                            v0: VariableMeta { name: Some("x"), ty: t1 },
+                            v1: VariableMeta { name: None, ty: t0 },
+                            v2: VariableMeta { name: None, ty: t1 },
+                            v3: VariableMeta { name: None, ty: t1 },
                         },
                         unify: [],
                     },
                 ],
                 relations: {
-                    r0: + { columns: [i64, i64, i64], kind: Primitive(i64_add012), implicit_rules: {n0: [_, _, !]} },
-                    r1: & { columns: [i64, i64, i64], kind: Primitive(i64_bitand012), implicit_rules: {n0: [_, _, !]} },
-                    r2: not-i64 { columns: [i64, i64], kind: Primitive(i64_bitnot01), implicit_rules: {n0: [_, !]} },
-                    r3: | { columns: [i64, i64, i64], kind: Primitive(i64_bitor012), implicit_rules: {n0: [_, _, !]} },
-                    r4: << { columns: [i64, i64, i64], kind: Primitive(i64_bitshl012), implicit_rules: {n0: [_, _, !]} },
-                    r5: >> { columns: [i64, i64, i64], kind: Primitive(i64_bitshr012), implicit_rules: {n0: [_, _, !]} },
-                    r6: ^ { columns: [i64, i64, i64], kind: Primitive(i64_bitxor012), implicit_rules: {n0: [_, _, !]} },
-                    r7: / { columns: [i64, i64, i64], kind: Primitive(i64_div012), implicit_rules: {n0: [_, _, !]} },
-                    r8: log2 { columns: [i64, i64], kind: Primitive(i64_log01), implicit_rules: {n0: [_, !]} },
-                    r9: max { columns: [i64, i64, i64], kind: Primitive(i64_max012), implicit_rules: {n0: [_, _, !]} },
-                    r10: min { columns: [i64, i64, i64], kind: Primitive(i64_min012), implicit_rules: {n0: [_, _, !]} },
-                    r11: * { columns: [i64, i64, i64], kind: Primitive(i64_mul012), implicit_rules: {n0: [_, _, !]} },
-                    r12: % { columns: [i64, i64, i64], kind: Primitive(i64_rem012), implicit_rules: {n0: [_, _, !]} },
-                    r13: - { columns: [i64, i64, i64], kind: Primitive(i64_sub012), implicit_rules: {n0: [_, _, !]} },
-                    r14: Math { columns: [Math], kind: Forall(t3), implicit_rules: {} },
-                    r15: Mul { columns: [Math, Math, Math], kind: Table, implicit_rules: {n0: [_, _, U]} },
-                    r16: Pow { columns: [Math, Math, Math], kind: Table, implicit_rules: {n0: [_, _, U]} },
-                    r17: Const { columns: [i64, Math], kind: Table, implicit_rules: {n0: [_, U]} },
-                    r18: g0 { columns: [i64], kind: Global(g0), implicit_rules: {n0: [!]} },
-                    r19: g1 { columns: [i64], kind: Global(g1), implicit_rules: {n0: [!]} },
-                    r20: g2 { columns: [Math], kind: Global(g2), implicit_rules: {n0: [!]} },
-                    r21: g3 { columns: [i64], kind: Global(g3), implicit_rules: {n0: [!]} },
-                    r22: g4 { columns: [Math], kind: Global(g4), implicit_rules: {n0: [!]} },
-                    r23: g5 { columns: [Math], kind: Global(g5), implicit_rules: {n0: [!]} },
+                    r0: Mul { columns: [Math, Math, Math], kind: Table, implicit_rules: {n0: [_, _, U]} },
+                    r1: Pow { columns: [Math, Math, Math], kind: Table, implicit_rules: {n0: [_, _, U]} },
+                    r2: Const { columns: [i64, Math], kind: Table, implicit_rules: {n0: [_, U]} },
+                    r3: g0 { columns: [i64], kind: Global(g0), implicit_rules: {n0: [!]} },
+                    r4: g1 { columns: [i64], kind: Global(g1), implicit_rules: {n0: [!]} },
+                    r5: g2 { columns: [Math], kind: Global(g2), implicit_rules: {n0: [!]} },
+                    r6: g3 { columns: [i64], kind: Global(g3), implicit_rules: {n0: [!]} },
+                    r7: g4 { columns: [Math], kind: Global(g4), implicit_rules: {n0: [!]} },
+                    r8: g5 { columns: [Math], kind: Global(g5), implicit_rules: {n0: [!]} },
                 },
             }"#]]),
         expected_lir: Some(expect![[r#"
             Theory {
                 name: None,
                 types: {
-                    [t0, unit]: THIS_STRING_SHOULD_NOT_APPEAR_IN_GENERATED_CODE,
-                    [t1, i64]: std::primitive::i64,
-                    [t2, String]: runtime::IString,
-                    [t3, Math]: [symbolic],
+                    [t0, i64]: std::primitive::i64,
+                    [t1, Math]: [symbolic],
                 },
                 relations: {
                     r0: RelationData {
-                        name: "i64_add012",
-                        param_types: {c0: t1, c1: t1, c2: t1},
-                        kind: Primitive,
-                    },
-                    r1: RelationData {
-                        name: "i64_bitand012",
-                        param_types: {c0: t1, c1: t1, c2: t1},
-                        kind: Primitive,
-                    },
-                    r2: RelationData {
-                        name: "i64_bitnot01",
-                        param_types: {c0: t1, c1: t1},
-                        kind: Primitive,
-                    },
-                    r3: RelationData {
-                        name: "i64_bitor012",
-                        param_types: {c0: t1, c1: t1, c2: t1},
-                        kind: Primitive,
-                    },
-                    r4: RelationData {
-                        name: "i64_bitshl012",
-                        param_types: {c0: t1, c1: t1, c2: t1},
-                        kind: Primitive,
-                    },
-                    r5: RelationData {
-                        name: "i64_bitshr012",
-                        param_types: {c0: t1, c1: t1, c2: t1},
-                        kind: Primitive,
-                    },
-                    r6: RelationData {
-                        name: "i64_bitxor012",
-                        param_types: {c0: t1, c1: t1, c2: t1},
-                        kind: Primitive,
-                    },
-                    r7: RelationData {
-                        name: "i64_div012",
-                        param_types: {c0: t1, c1: t1, c2: t1},
-                        kind: Primitive,
-                    },
-                    r8: RelationData {
-                        name: "i64_log01",
-                        param_types: {c0: t1, c1: t1},
-                        kind: Primitive,
-                    },
-                    r9: RelationData {
-                        name: "i64_max012",
-                        param_types: {c0: t1, c1: t1, c2: t1},
-                        kind: Primitive,
-                    },
-                    r10: RelationData {
-                        name: "i64_min012",
-                        param_types: {c0: t1, c1: t1, c2: t1},
-                        kind: Primitive,
-                    },
-                    r11: RelationData {
-                        name: "i64_mul012",
-                        param_types: {c0: t1, c1: t1, c2: t1},
-                        kind: Primitive,
-                    },
-                    r12: RelationData {
-                        name: "i64_rem012",
-                        param_types: {c0: t1, c1: t1, c2: t1},
-                        kind: Primitive,
-                    },
-                    r13: RelationData {
-                        name: "i64_sub012",
-                        param_types: {c0: t1, c1: t1, c2: t1},
-                        kind: Primitive,
-                    },
-                    r14: (hir-only relation),
-                    r15: RelationData {
                         name: "Mul",
-                        param_types: {c0: t3, c1: t3, c2: t3},
+                        param_types: {c0: t1, c1: t1, c2: t1},
                         kind: Table {
                             index_to_info: {ir0: 0_1_2 conflict[..2] => [2:union]},
                             usage_to_info: {
@@ -978,9 +682,9 @@ fn regression_tir2() {
                             column_back_reference: {},
                         },
                     },
-                    r16: RelationData {
+                    r1: RelationData {
                         name: "Pow",
-                        param_types: {c0: t3, c1: t3, c2: t3},
+                        param_types: {c0: t1, c1: t1, c2: t1},
                         kind: Table {
                             index_to_info: {ir0: 1_0_2 conflict[..2] => [2:union]},
                             usage_to_info: {
@@ -994,9 +698,9 @@ fn regression_tir2() {
                             column_back_reference: {},
                         },
                     },
-                    r17: RelationData {
+                    r2: RelationData {
                         name: "Const",
-                        param_types: {c0: t1, c1: t3},
+                        param_types: {c0: t0, c1: t1},
                         kind: Table {
                             index_to_info: {ir0: 0_1 conflict[..1] => [1:union], ir1: 1_0},
                             usage_to_info: {
@@ -1009,93 +713,93 @@ fn regression_tir2() {
                             column_back_reference: {},
                         },
                     },
-                    r18: RelationData {
+                    r3: RelationData {
                         name: "g0",
-                        param_types: {c0: t1},
+                        param_types: {c0: t0},
                         kind: [Global, g0],
                     },
-                    r19: RelationData {
+                    r4: RelationData {
                         name: "g1",
-                        param_types: {c0: t1},
+                        param_types: {c0: t0},
                         kind: [Global, g1],
                     },
-                    r20: RelationData {
+                    r5: RelationData {
                         name: "g2",
-                        param_types: {c0: t3},
+                        param_types: {c0: t1},
                         kind: [Global, g2],
                     },
-                    r21: RelationData {
+                    r6: RelationData {
                         name: "g3",
-                        param_types: {c0: t1},
+                        param_types: {c0: t0},
                         kind: [Global, g3],
                     },
-                    r22: RelationData {
+                    r7: RelationData {
                         name: "g4",
-                        param_types: {c0: t3},
+                        param_types: {c0: t1},
                         kind: [Global, g4],
                     },
-                    r23: RelationData {
+                    r8: RelationData {
                         name: "g5",
-                        param_types: {c0: t3},
+                        param_types: {c0: t1},
                         kind: [Global, g5],
                     },
                 },
                 rule_variables: {
-                    [v0, x]: t3,
-                    [v1, v1]: t1,
-                    [v10, v10]: t3,
-                    [v11, v11]: t3,
-                    [v2, v2]: t3,
-                    [v3, v3]: t3,
-                    [v4, x_2]: t3,
-                    [v5, v5]: t1,
-                    [v6, v6]: t3,
-                    [v7, v7]: t3,
-                    [v8, x_3]: t3,
-                    [v9, v9]: t1,
+                    [v0, x]: t1,
+                    [v1, v1]: t0,
+                    [v10, v10]: t1,
+                    [v11, v11]: t1,
+                    [v2, v2]: t1,
+                    [v3, v3]: t1,
+                    [v4, x_2]: t1,
+                    [v5, v5]: t0,
+                    [v6, v6]: t1,
+                    [v7, v7]: t1,
+                    [v8, x_3]: t1,
+                    [v9, v9]: t0,
                 },
                 global_variable_types: {
-                    g0: t1,
-                    g1: t1,
-                    g2: t3,
-                    g3: t1,
-                    g4: t3,
-                    g5: t3,
+                    g0: t0,
+                    g1: t0,
+                    g2: t1,
+                    g3: t0,
+                    g4: t1,
+                    g5: t1,
                 },
                 rule_tries: [
-                    atom: [PremiseNew, r16(v0, v2, v3)]
+                    atom: [PremiseNew, r1(v0, v2, v3)]
                     then: [
-                        atom: [Premise, r17(v1, v2), iu1]
+                        atom: [Premise, r2(v1, v2), iu1]
                         then: [
-                            atom: [PremiseAny, r18(v1), iu_bogus]
+                            atom: [PremiseAny, r3(v1), iu_bogus]
                             then: [
                                 meta: "( rewrite ( Pow x ( Const 2 ) ) ( Mul x x ) )"
-                                atom: [Action::Insert, r15(v0, v0, v3)],
+                                atom: [Action::Insert, r0(v0, v0, v3)],
                             ],
                         ],
                     ],
-                    atom: [PremiseNew, r17(v5, v6)]
+                    atom: [PremiseNew, r2(v5, v6)]
                     then: [
-                        atom: [PremiseAny, r16(v4, v6, v7), iu1]
+                        atom: [PremiseAny, r1(v4, v6, v7), iu1]
                         then: [
-                            atom: [PremiseAny, r18(v5), iu_bogus]
+                            atom: [PremiseAny, r3(v5), iu_bogus]
                             then: [
-                                atom: [Premise, r16(v4, v6, v7), iu2]
+                                atom: [Premise, r1(v4, v6, v7), iu2]
                                 then: [
                                     meta: "( rewrite ( Pow x ( Const 2 ) ) ( Mul x x ) )"
-                                    atom: [Action::Insert, r15(v4, v4, v7)],
+                                    atom: [Action::Insert, r0(v4, v4, v7)],
                                 ],
                             ],
                         ],
                     ],
-                    atom: [PremiseNew, r18(v9)]
+                    atom: [PremiseNew, r3(v9)]
                     then: [
-                        atom: [Premise, r17(v9, v10), iu2]
+                        atom: [Premise, r2(v9, v10), iu2]
                         then: [
-                            atom: [Premise, r16(v8, v10, v11), iu3]
+                            atom: [Premise, r1(v8, v10, v11), iu3]
                             then: [
                                 meta: "( rewrite ( Pow x ( Const 2 ) ) ( Mul x x ) )"
-                                atom: [Action::Insert, r15(v8, v8, v11)],
+                                atom: [Action::Insert, r0(v8, v8, v11)],
                             ],
                         ],
                     ],
@@ -1111,7 +815,7 @@ fn regression_tir2() {
                     },
                     ComputeGlobal {
                         global_id: g2,
-                        compute: Compute { relation: r17, args: [g1] },
+                        compute: Compute { relation: r2, args: [g1] },
                     },
                     ComputeGlobal {
                         global_id: g3,
@@ -1119,63 +823,17 @@ fn regression_tir2() {
                     },
                     ComputeGlobal {
                         global_id: g4,
-                        compute: Compute { relation: r17, args: [g3] },
+                        compute: Compute { relation: r2, args: [g3] },
                     },
                     ComputeGlobal {
                         global_id: g5,
-                        compute: Compute { relation: r16, args: [g2, g4] },
+                        compute: Compute { relation: r1, args: [g2, g4] },
                     },
                 ],
             }"#]]),
         expected_codegen: Some(expect![[r#"
             use oatlog::runtime::{self, *};
             eclass_wrapper_ty!(Math);
-            fn i64_add012(a: i64, b: i64) -> impl Iterator<Item = (i64,)> {
-                a.checked_add(b).map(|x| (x,)).into_iter()
-            }
-            fn i64_bitand012(a: i64, b: i64) -> impl Iterator<Item = (i64,)> {
-                std::iter::once((a & b,))
-            }
-            fn i64_bitnot01(a: i64) -> impl Iterator<Item = (i64,)> {
-                std::iter::once((!a,))
-            }
-            fn i64_bitor012(a: i64, b: i64) -> impl Iterator<Item = (i64,)> {
-                std::iter::once((a | b,))
-            }
-            fn i64_bitshl012(a: i64, b: i64) -> impl Iterator<Item = (i64,)> {
-                a.checked_shl(b.try_into().unwrap())
-                    .map(|x| (x,))
-                    .into_iter()
-            }
-            fn i64_bitshr012(a: i64, b: i64) -> impl Iterator<Item = (i64,)> {
-                a.checked_shr(b.try_into().unwrap())
-                    .map(|x| (x,))
-                    .into_iter()
-            }
-            fn i64_bitxor012(a: i64, b: i64) -> impl Iterator<Item = (i64,)> {
-                std::iter::once((a ^ b,))
-            }
-            fn i64_div012(a: i64, b: i64) -> impl Iterator<Item = (i64,)> {
-                a.checked_div(b).map(|x| (x,)).into_iter()
-            }
-            fn i64_log01(a: i64) -> impl Iterator<Item = (i64,)> {
-                std::iter::once((a.ilog2() as i64,))
-            }
-            fn i64_max012(a: i64, b: i64) -> impl Iterator<Item = (i64,)> {
-                std::iter::once((a.max(b),))
-            }
-            fn i64_min012(a: i64, b: i64) -> impl Iterator<Item = (i64,)> {
-                std::iter::once((a.min(b),))
-            }
-            fn i64_mul012(a: i64, b: i64) -> impl Iterator<Item = (i64,)> {
-                a.checked_mul(b).map(|x| (x,)).into_iter()
-            }
-            fn i64_rem012(a: i64, b: i64) -> impl Iterator<Item = (i64,)> {
-                a.checked_rem(b).map(|x| (x,)).into_iter()
-            }
-            fn i64_sub012(a: i64, b: i64) -> impl Iterator<Item = (i64,)> {
-                a.checked_sub(b).map(|x| (x,)).into_iter()
-            }
             #[derive(Debug, Default)]
             struct MulRelation {
                 new: Vec<<Self as Relation>::Row>,
@@ -1871,10 +1529,8 @@ fn regression_tir1() {
         expected_hir: Some(expect![[r#"
             Theory {
                 types: {
-                    [t0, ()]: std::primitive::unit,
-                    [t1, i64]: std::primitive::i64,
-                    [t2, String]: runtime::IString,
-                    [t3, Math]: [symbolic],
+                    [t0, i64]: std::primitive::i64,
+                    [t1, Math]: [symbolic],
                 },
                 symbolic_rules: [
                     SymbolicRule {
@@ -1885,9 +1541,9 @@ fn regression_tir1() {
                             Action { relation: g0, columns: [v2], entry: [!] },
                         ],
                         variables: {
-                            v0: VariableMeta { name: Some("a"), ty: t3 },
-                            v1: VariableMeta { name: None, ty: t3 },
-                            v2: VariableMeta { name: None, ty: t1 },
+                            v0: VariableMeta { name: Some("a"), ty: t1 },
+                            v1: VariableMeta { name: None, ty: t1 },
+                            v2: VariableMeta { name: None, ty: t0 },
                         },
                         unify: [],
                     },
@@ -1897,9 +1553,9 @@ fn regression_tir1() {
                             Premise { relation: Sub, columns: [f, g, v2] },
                         ],
                         variables: {
-                            v0: VariableMeta { name: Some("f"), ty: t3 },
-                            v1: VariableMeta { name: Some("g"), ty: t3 },
-                            v2: VariableMeta { name: None, ty: t3 },
+                            v0: VariableMeta { name: Some("f"), ty: t1 },
+                            v1: VariableMeta { name: Some("g"), ty: t1 },
+                            v2: VariableMeta { name: None, ty: t1 },
                         },
                         unify: [
                             [v2, g],
@@ -1907,110 +1563,22 @@ fn regression_tir1() {
                     },
                 ],
                 relations: {
-                    r0: + { columns: [i64, i64, i64], kind: Primitive(i64_add012), implicit_rules: {n0: [_, _, !]} },
-                    r1: & { columns: [i64, i64, i64], kind: Primitive(i64_bitand012), implicit_rules: {n0: [_, _, !]} },
-                    r2: not-i64 { columns: [i64, i64], kind: Primitive(i64_bitnot01), implicit_rules: {n0: [_, !]} },
-                    r3: | { columns: [i64, i64, i64], kind: Primitive(i64_bitor012), implicit_rules: {n0: [_, _, !]} },
-                    r4: << { columns: [i64, i64, i64], kind: Primitive(i64_bitshl012), implicit_rules: {n0: [_, _, !]} },
-                    r5: >> { columns: [i64, i64, i64], kind: Primitive(i64_bitshr012), implicit_rules: {n0: [_, _, !]} },
-                    r6: ^ { columns: [i64, i64, i64], kind: Primitive(i64_bitxor012), implicit_rules: {n0: [_, _, !]} },
-                    r7: / { columns: [i64, i64, i64], kind: Primitive(i64_div012), implicit_rules: {n0: [_, _, !]} },
-                    r8: log2 { columns: [i64, i64], kind: Primitive(i64_log01), implicit_rules: {n0: [_, !]} },
-                    r9: max { columns: [i64, i64, i64], kind: Primitive(i64_max012), implicit_rules: {n0: [_, _, !]} },
-                    r10: min { columns: [i64, i64, i64], kind: Primitive(i64_min012), implicit_rules: {n0: [_, _, !]} },
-                    r11: * { columns: [i64, i64, i64], kind: Primitive(i64_mul012), implicit_rules: {n0: [_, _, !]} },
-                    r12: % { columns: [i64, i64, i64], kind: Primitive(i64_rem012), implicit_rules: {n0: [_, _, !]} },
-                    r13: - { columns: [i64, i64, i64], kind: Primitive(i64_sub012), implicit_rules: {n0: [_, _, !]} },
-                    r14: Math { columns: [Math], kind: Forall(t3), implicit_rules: {} },
-                    r15: Sub { columns: [Math, Math, Math], kind: Table, implicit_rules: {n0: [_, _, U]} },
-                    r16: Const { columns: [i64, Math], kind: Table, implicit_rules: {n0: [_, U]} },
-                    r17: g0 { columns: [i64], kind: Global(g0), implicit_rules: {n0: [!]} },
+                    r0: Sub { columns: [Math, Math, Math], kind: Table, implicit_rules: {n0: [_, _, U]} },
+                    r1: Const { columns: [i64, Math], kind: Table, implicit_rules: {n0: [_, U]} },
+                    r2: g0 { columns: [i64], kind: Global(g0), implicit_rules: {n0: [!]} },
                 },
             }"#]]),
         expected_lir: Some(expect![[r#"
             Theory {
                 name: None,
                 types: {
-                    [t0, unit]: THIS_STRING_SHOULD_NOT_APPEAR_IN_GENERATED_CODE,
-                    [t1, i64]: std::primitive::i64,
-                    [t2, String]: runtime::IString,
-                    [t3, Math]: [symbolic],
+                    [t0, i64]: std::primitive::i64,
+                    [t1, Math]: [symbolic],
                 },
                 relations: {
                     r0: RelationData {
-                        name: "i64_add012",
-                        param_types: {c0: t1, c1: t1, c2: t1},
-                        kind: Primitive,
-                    },
-                    r1: RelationData {
-                        name: "i64_bitand012",
-                        param_types: {c0: t1, c1: t1, c2: t1},
-                        kind: Primitive,
-                    },
-                    r2: RelationData {
-                        name: "i64_bitnot01",
-                        param_types: {c0: t1, c1: t1},
-                        kind: Primitive,
-                    },
-                    r3: RelationData {
-                        name: "i64_bitor012",
-                        param_types: {c0: t1, c1: t1, c2: t1},
-                        kind: Primitive,
-                    },
-                    r4: RelationData {
-                        name: "i64_bitshl012",
-                        param_types: {c0: t1, c1: t1, c2: t1},
-                        kind: Primitive,
-                    },
-                    r5: RelationData {
-                        name: "i64_bitshr012",
-                        param_types: {c0: t1, c1: t1, c2: t1},
-                        kind: Primitive,
-                    },
-                    r6: RelationData {
-                        name: "i64_bitxor012",
-                        param_types: {c0: t1, c1: t1, c2: t1},
-                        kind: Primitive,
-                    },
-                    r7: RelationData {
-                        name: "i64_div012",
-                        param_types: {c0: t1, c1: t1, c2: t1},
-                        kind: Primitive,
-                    },
-                    r8: RelationData {
-                        name: "i64_log01",
-                        param_types: {c0: t1, c1: t1},
-                        kind: Primitive,
-                    },
-                    r9: RelationData {
-                        name: "i64_max012",
-                        param_types: {c0: t1, c1: t1, c2: t1},
-                        kind: Primitive,
-                    },
-                    r10: RelationData {
-                        name: "i64_min012",
-                        param_types: {c0: t1, c1: t1, c2: t1},
-                        kind: Primitive,
-                    },
-                    r11: RelationData {
-                        name: "i64_mul012",
-                        param_types: {c0: t1, c1: t1, c2: t1},
-                        kind: Primitive,
-                    },
-                    r12: RelationData {
-                        name: "i64_rem012",
-                        param_types: {c0: t1, c1: t1, c2: t1},
-                        kind: Primitive,
-                    },
-                    r13: RelationData {
-                        name: "i64_sub012",
-                        param_types: {c0: t1, c1: t1, c2: t1},
-                        kind: Primitive,
-                    },
-                    r14: (hir-only relation),
-                    r15: RelationData {
                         name: "Sub",
-                        param_types: {c0: t3, c1: t3, c2: t3},
+                        param_types: {c0: t1, c1: t1, c2: t1},
                         kind: Table {
                             index_to_info: {ir0: 0_1_2 conflict[..2] => [2:union]},
                             usage_to_info: {
@@ -2021,9 +1589,9 @@ fn regression_tir1() {
                             column_back_reference: {},
                         },
                     },
-                    r16: RelationData {
+                    r1: RelationData {
                         name: "Const",
-                        param_types: {c0: t1, c1: t3},
+                        param_types: {c0: t0, c1: t1},
                         kind: Table {
                             index_to_info: {ir0: 0_1 conflict[..1] => [1:union]},
                             usage_to_info: {
@@ -2034,35 +1602,35 @@ fn regression_tir1() {
                             column_back_reference: {},
                         },
                     },
-                    r17: RelationData {
+                    r2: RelationData {
                         name: "g0",
-                        param_types: {c0: t1},
+                        param_types: {c0: t0},
                         kind: [Global, g0],
                     },
                 },
                 rule_variables: {
-                    [v0, a]: t3,
-                    [v1, v1]: t3,
-                    [v2, v2]: t1,
-                    [v3, f]: t3,
-                    [v4, g]: t3,
-                    [v5, v5]: t3,
-                    [v6, a_2]: t3,
+                    [v0, a]: t1,
+                    [v1, v1]: t1,
+                    [v2, v2]: t0,
+                    [v3, f]: t1,
+                    [v4, g]: t1,
+                    [v5, v5]: t1,
+                    [v6, a_2]: t1,
                 },
                 global_variable_types: {
-                    g0: t1,
+                    g0: t0,
                 },
                 rule_tries: [
-                    atom: [PremiseNew, r15(v0, v6, v1)]
+                    atom: [PremiseNew, r0(v0, v6, v1)]
                     then: [
                         atom: [IfEq, v0=v6]
                         then: [
                             meta: "( rewrite ( Sub a a ) ( Const 0 ) )"
-                            atom: [Action::Insert, r17(v2) on iu0],
-                            atom: [Action::Insert, r16(v2, v1)],
+                            atom: [Action::Insert, r2(v2) on iu0],
+                            atom: [Action::Insert, r1(v2, v1)],
                         ],
                     ],
-                    atom: [PremiseNew, r15(v3, v4, v5)]
+                    atom: [PremiseNew, r0(v3, v4, v5)]
                     then: [
                         meta: "( rewrite ( Sub f g ) g )"
                         atom: [Action::Equate, v4=v5],
@@ -2078,52 +1646,6 @@ fn regression_tir1() {
         expected_codegen: Some(expect![[r#"
             use oatlog::runtime::{self, *};
             eclass_wrapper_ty!(Math);
-            fn i64_add012(a: i64, b: i64) -> impl Iterator<Item = (i64,)> {
-                a.checked_add(b).map(|x| (x,)).into_iter()
-            }
-            fn i64_bitand012(a: i64, b: i64) -> impl Iterator<Item = (i64,)> {
-                std::iter::once((a & b,))
-            }
-            fn i64_bitnot01(a: i64) -> impl Iterator<Item = (i64,)> {
-                std::iter::once((!a,))
-            }
-            fn i64_bitor012(a: i64, b: i64) -> impl Iterator<Item = (i64,)> {
-                std::iter::once((a | b,))
-            }
-            fn i64_bitshl012(a: i64, b: i64) -> impl Iterator<Item = (i64,)> {
-                a.checked_shl(b.try_into().unwrap())
-                    .map(|x| (x,))
-                    .into_iter()
-            }
-            fn i64_bitshr012(a: i64, b: i64) -> impl Iterator<Item = (i64,)> {
-                a.checked_shr(b.try_into().unwrap())
-                    .map(|x| (x,))
-                    .into_iter()
-            }
-            fn i64_bitxor012(a: i64, b: i64) -> impl Iterator<Item = (i64,)> {
-                std::iter::once((a ^ b,))
-            }
-            fn i64_div012(a: i64, b: i64) -> impl Iterator<Item = (i64,)> {
-                a.checked_div(b).map(|x| (x,)).into_iter()
-            }
-            fn i64_log01(a: i64) -> impl Iterator<Item = (i64,)> {
-                std::iter::once((a.ilog2() as i64,))
-            }
-            fn i64_max012(a: i64, b: i64) -> impl Iterator<Item = (i64,)> {
-                std::iter::once((a.max(b),))
-            }
-            fn i64_min012(a: i64, b: i64) -> impl Iterator<Item = (i64,)> {
-                std::iter::once((a.min(b),))
-            }
-            fn i64_mul012(a: i64, b: i64) -> impl Iterator<Item = (i64,)> {
-                a.checked_mul(b).map(|x| (x,)).into_iter()
-            }
-            fn i64_rem012(a: i64, b: i64) -> impl Iterator<Item = (i64,)> {
-                a.checked_rem(b).map(|x| (x,)).into_iter()
-            }
-            fn i64_sub012(a: i64, b: i64) -> impl Iterator<Item = (i64,)> {
-                a.checked_sub(b).map(|x| (x,)).into_iter()
-            }
             #[derive(Debug, Default)]
             struct SubRelation {
                 new: Vec<<Self as Relation>::Row>,
@@ -2576,10 +2098,7 @@ fn regression_elim_problematic() {
         expected_hir: Some(expect![[r#"
             Theory {
                 types: {
-                    [t0, ()]: std::primitive::unit,
-                    [t1, i64]: std::primitive::i64,
-                    [t2, String]: runtime::IString,
-                    [t3, Math]: [symbolic],
+                    [t0, Math]: [symbolic],
                 },
                 symbolic_rules: [
                     SymbolicRule {
@@ -2590,32 +2109,17 @@ fn regression_elim_problematic() {
                             Action { relation: zero, columns: [azero], entry: [!] },
                         ],
                         variables: {
-                            v0: VariableMeta { name: Some("azero"), ty: t3 },
-                            v1: VariableMeta { name: Some("zero"), ty: t3 },
-                            v2: VariableMeta { name: Some("c"), ty: t3 },
+                            v0: VariableMeta { name: Some("azero"), ty: t0 },
+                            v1: VariableMeta { name: Some("zero"), ty: t0 },
+                            v2: VariableMeta { name: Some("c"), ty: t0 },
                         },
                         unify: [],
                     },
                 ],
                 relations: {
-                    r0: + { columns: [i64, i64, i64], kind: Primitive(i64_add012), implicit_rules: {n0: [_, _, !]} },
-                    r1: & { columns: [i64, i64, i64], kind: Primitive(i64_bitand012), implicit_rules: {n0: [_, _, !]} },
-                    r2: not-i64 { columns: [i64, i64], kind: Primitive(i64_bitnot01), implicit_rules: {n0: [_, !]} },
-                    r3: | { columns: [i64, i64, i64], kind: Primitive(i64_bitor012), implicit_rules: {n0: [_, _, !]} },
-                    r4: << { columns: [i64, i64, i64], kind: Primitive(i64_bitshl012), implicit_rules: {n0: [_, _, !]} },
-                    r5: >> { columns: [i64, i64, i64], kind: Primitive(i64_bitshr012), implicit_rules: {n0: [_, _, !]} },
-                    r6: ^ { columns: [i64, i64, i64], kind: Primitive(i64_bitxor012), implicit_rules: {n0: [_, _, !]} },
-                    r7: / { columns: [i64, i64, i64], kind: Primitive(i64_div012), implicit_rules: {n0: [_, _, !]} },
-                    r8: log2 { columns: [i64, i64], kind: Primitive(i64_log01), implicit_rules: {n0: [_, !]} },
-                    r9: max { columns: [i64, i64, i64], kind: Primitive(i64_max012), implicit_rules: {n0: [_, _, !]} },
-                    r10: min { columns: [i64, i64, i64], kind: Primitive(i64_min012), implicit_rules: {n0: [_, _, !]} },
-                    r11: * { columns: [i64, i64, i64], kind: Primitive(i64_mul012), implicit_rules: {n0: [_, _, !]} },
-                    r12: % { columns: [i64, i64, i64], kind: Primitive(i64_rem012), implicit_rules: {n0: [_, _, !]} },
-                    r13: - { columns: [i64, i64, i64], kind: Primitive(i64_sub012), implicit_rules: {n0: [_, _, !]} },
-                    r14: Math { columns: [Math], kind: Forall(t3), implicit_rules: {} },
-                    r15: Mul { columns: [Math, Math, Math], kind: Table, implicit_rules: {n0: [_, _, U]} },
-                    r16: Zero { columns: [Math], kind: Table, implicit_rules: {n0: [U]} },
-                    r17: zero { columns: [Math], kind: Global(g0), implicit_rules: {n0: [!]} },
+                    r0: Mul { columns: [Math, Math, Math], kind: Table, implicit_rules: {n0: [_, _, U]} },
+                    r1: Zero { columns: [Math], kind: Table, implicit_rules: {n0: [U]} },
+                    r2: zero { columns: [Math], kind: Global(g0), implicit_rules: {n0: [!]} },
                 },
             }"#]]),
         expected_lir: None,
@@ -2652,10 +2156,8 @@ fn codegen_constant_propagation() {
         expected_hir: Some(expect![[r#"
             Theory {
                 types: {
-                    [t0, ()]: std::primitive::unit,
-                    [t1, i64]: std::primitive::i64,
-                    [t2, String]: runtime::IString,
-                    [t3, Math]: [symbolic],
+                    [t0, i64]: std::primitive::i64,
+                    [t1, Math]: [symbolic],
                 },
                 symbolic_rules: [
                     SymbolicRule {
@@ -2668,12 +2170,12 @@ fn codegen_constant_propagation() {
                             Action { relation: Const, columns: [v5, e], entry: [_, U] },
                         ],
                         variables: {
-                            v0: VariableMeta { name: Some("e"), ty: t3 },
-                            v1: VariableMeta { name: Some("a"), ty: t1 },
-                            v2: VariableMeta { name: None, ty: t3 },
-                            v3: VariableMeta { name: Some("b"), ty: t1 },
-                            v4: VariableMeta { name: None, ty: t3 },
-                            v5: VariableMeta { name: None, ty: t1 },
+                            v0: VariableMeta { name: Some("e"), ty: t1 },
+                            v1: VariableMeta { name: Some("a"), ty: t0 },
+                            v2: VariableMeta { name: None, ty: t1 },
+                            v3: VariableMeta { name: Some("b"), ty: t0 },
+                            v4: VariableMeta { name: None, ty: t1 },
+                            v5: VariableMeta { name: None, ty: t0 },
                         },
                         unify: [],
                     },
@@ -2687,151 +2189,75 @@ fn codegen_constant_propagation() {
                             Action { relation: Const, columns: [v5, e], entry: [_, U] },
                         ],
                         variables: {
-                            v0: VariableMeta { name: Some("e"), ty: t3 },
-                            v1: VariableMeta { name: Some("a"), ty: t1 },
-                            v2: VariableMeta { name: None, ty: t3 },
-                            v3: VariableMeta { name: Some("b"), ty: t1 },
-                            v4: VariableMeta { name: None, ty: t3 },
-                            v5: VariableMeta { name: None, ty: t1 },
+                            v0: VariableMeta { name: Some("e"), ty: t1 },
+                            v1: VariableMeta { name: Some("a"), ty: t0 },
+                            v2: VariableMeta { name: None, ty: t1 },
+                            v3: VariableMeta { name: Some("b"), ty: t0 },
+                            v4: VariableMeta { name: None, ty: t1 },
+                            v5: VariableMeta { name: None, ty: t0 },
                         },
                         unify: [],
                     },
                 ],
                 relations: {
                     r0: + { columns: [i64, i64, i64], kind: Primitive(i64_add012), implicit_rules: {n0: [_, _, !]} },
-                    r1: & { columns: [i64, i64, i64], kind: Primitive(i64_bitand012), implicit_rules: {n0: [_, _, !]} },
-                    r2: not-i64 { columns: [i64, i64], kind: Primitive(i64_bitnot01), implicit_rules: {n0: [_, !]} },
-                    r3: | { columns: [i64, i64, i64], kind: Primitive(i64_bitor012), implicit_rules: {n0: [_, _, !]} },
-                    r4: << { columns: [i64, i64, i64], kind: Primitive(i64_bitshl012), implicit_rules: {n0: [_, _, !]} },
-                    r5: >> { columns: [i64, i64, i64], kind: Primitive(i64_bitshr012), implicit_rules: {n0: [_, _, !]} },
-                    r6: ^ { columns: [i64, i64, i64], kind: Primitive(i64_bitxor012), implicit_rules: {n0: [_, _, !]} },
-                    r7: / { columns: [i64, i64, i64], kind: Primitive(i64_div012), implicit_rules: {n0: [_, _, !]} },
-                    r8: log2 { columns: [i64, i64], kind: Primitive(i64_log01), implicit_rules: {n0: [_, !]} },
-                    r9: max { columns: [i64, i64, i64], kind: Primitive(i64_max012), implicit_rules: {n0: [_, _, !]} },
-                    r10: min { columns: [i64, i64, i64], kind: Primitive(i64_min012), implicit_rules: {n0: [_, _, !]} },
-                    r11: * { columns: [i64, i64, i64], kind: Primitive(i64_mul012), implicit_rules: {n0: [_, _, !]} },
-                    r12: % { columns: [i64, i64, i64], kind: Primitive(i64_rem012), implicit_rules: {n0: [_, _, !]} },
-                    r13: - { columns: [i64, i64, i64], kind: Primitive(i64_sub012), implicit_rules: {n0: [_, _, !]} },
-                    r14: Math { columns: [Math], kind: Forall(t3), implicit_rules: {} },
-                    r15: Add { columns: [Math, Math, Math], kind: Table, implicit_rules: {n0: [_, _, U]} },
-                    r16: Mul { columns: [Math, Math, Math], kind: Table, implicit_rules: {n0: [_, _, U]} },
-                    r17: Const { columns: [i64, Math], kind: Table, implicit_rules: {n0: [_, U]} },
+                    r1: * { columns: [i64, i64, i64], kind: Primitive(i64_mul012), implicit_rules: {n0: [_, _, !]} },
+                    r2: Add { columns: [Math, Math, Math], kind: Table, implicit_rules: {n0: [_, _, U]} },
+                    r3: Mul { columns: [Math, Math, Math], kind: Table, implicit_rules: {n0: [_, _, U]} },
+                    r4: Const { columns: [i64, Math], kind: Table, implicit_rules: {n0: [_, U]} },
                 },
             }"#]]),
         expected_lir: Some(expect![[r#"
             Theory {
                 name: None,
                 types: {
-                    [t0, unit]: THIS_STRING_SHOULD_NOT_APPEAR_IN_GENERATED_CODE,
-                    [t1, i64]: std::primitive::i64,
-                    [t2, String]: runtime::IString,
-                    [t3, Math]: [symbolic],
+                    [t0, i64]: std::primitive::i64,
+                    [t1, Math]: [symbolic],
                 },
                 relations: {
                     r0: RelationData {
                         name: "i64_add012",
-                        param_types: {c0: t1, c1: t1, c2: t1},
+                        param_types: {c0: t0, c1: t0, c2: t0},
                         kind: Primitive,
                     },
                     r1: RelationData {
-                        name: "i64_bitand012",
-                        param_types: {c0: t1, c1: t1, c2: t1},
+                        name: "i64_mul012",
+                        param_types: {c0: t0, c1: t0, c2: t0},
                         kind: Primitive,
                     },
                     r2: RelationData {
-                        name: "i64_bitnot01",
-                        param_types: {c0: t1, c1: t1},
-                        kind: Primitive,
+                        name: "Add",
+                        param_types: {c0: t1, c1: t1, c2: t1},
+                        kind: Table {
+                            index_to_info: {ir0: 0_1_2 conflict[..2] => [2:union], ir1: 1_0_2},
+                            usage_to_info: {
+                                iu0: ir0[..2],
+                                iu1: ir0[..1],
+                                iu2: ir1[..1],
+                                iu3: ir0[..3],
+                                iu4: ir0[..2],
+                            },
+                            column_back_reference: {},
+                        },
                     },
                     r3: RelationData {
-                        name: "i64_bitor012",
+                        name: "Mul",
                         param_types: {c0: t1, c1: t1, c2: t1},
-                        kind: Primitive,
+                        kind: Table {
+                            index_to_info: {ir0: 0_1_2 conflict[..2] => [2:union], ir1: 1_0_2},
+                            usage_to_info: {
+                                iu0: ir0[..2],
+                                iu1: ir0[..1],
+                                iu2: ir1[..1],
+                                iu3: ir0[..3],
+                                iu4: ir0[..2],
+                            },
+                            column_back_reference: {},
+                        },
                     },
                     r4: RelationData {
-                        name: "i64_bitshl012",
-                        param_types: {c0: t1, c1: t1, c2: t1},
-                        kind: Primitive,
-                    },
-                    r5: RelationData {
-                        name: "i64_bitshr012",
-                        param_types: {c0: t1, c1: t1, c2: t1},
-                        kind: Primitive,
-                    },
-                    r6: RelationData {
-                        name: "i64_bitxor012",
-                        param_types: {c0: t1, c1: t1, c2: t1},
-                        kind: Primitive,
-                    },
-                    r7: RelationData {
-                        name: "i64_div012",
-                        param_types: {c0: t1, c1: t1, c2: t1},
-                        kind: Primitive,
-                    },
-                    r8: RelationData {
-                        name: "i64_log01",
-                        param_types: {c0: t1, c1: t1},
-                        kind: Primitive,
-                    },
-                    r9: RelationData {
-                        name: "i64_max012",
-                        param_types: {c0: t1, c1: t1, c2: t1},
-                        kind: Primitive,
-                    },
-                    r10: RelationData {
-                        name: "i64_min012",
-                        param_types: {c0: t1, c1: t1, c2: t1},
-                        kind: Primitive,
-                    },
-                    r11: RelationData {
-                        name: "i64_mul012",
-                        param_types: {c0: t1, c1: t1, c2: t1},
-                        kind: Primitive,
-                    },
-                    r12: RelationData {
-                        name: "i64_rem012",
-                        param_types: {c0: t1, c1: t1, c2: t1},
-                        kind: Primitive,
-                    },
-                    r13: RelationData {
-                        name: "i64_sub012",
-                        param_types: {c0: t1, c1: t1, c2: t1},
-                        kind: Primitive,
-                    },
-                    r14: (hir-only relation),
-                    r15: RelationData {
-                        name: "Add",
-                        param_types: {c0: t3, c1: t3, c2: t3},
-                        kind: Table {
-                            index_to_info: {ir0: 0_1_2 conflict[..2] => [2:union], ir1: 1_0_2},
-                            usage_to_info: {
-                                iu0: ir0[..2],
-                                iu1: ir0[..1],
-                                iu2: ir1[..1],
-                                iu3: ir0[..3],
-                                iu4: ir0[..2],
-                            },
-                            column_back_reference: {},
-                        },
-                    },
-                    r16: RelationData {
-                        name: "Mul",
-                        param_types: {c0: t3, c1: t3, c2: t3},
-                        kind: Table {
-                            index_to_info: {ir0: 0_1_2 conflict[..2] => [2:union], ir1: 1_0_2},
-                            usage_to_info: {
-                                iu0: ir0[..2],
-                                iu1: ir0[..1],
-                                iu2: ir1[..1],
-                                iu3: ir0[..3],
-                                iu4: ir0[..2],
-                            },
-                            column_back_reference: {},
-                        },
-                    },
-                    r17: RelationData {
                         name: "Const",
-                        param_types: {c0: t1, c1: t3},
+                        param_types: {c0: t0, c1: t1},
                         kind: Table {
                             index_to_info: {ir0: 0_1 conflict[..1] => [1:union], ir1: 1_0},
                             usage_to_info: {
@@ -2854,111 +2280,111 @@ fn codegen_constant_propagation() {
                     },
                 },
                 rule_variables: {
-                    [v0, e]: t3,
-                    [v1, a]: t1,
-                    [v10, v10]: t3,
-                    [v11, v11]: t1,
-                    [v12, e_3]: t3,
-                    [v13, a_3]: t1,
-                    [v14, v14]: t3,
-                    [v15, b_3]: t1,
-                    [v16, v16]: t3,
-                    [v17, v17]: t1,
-                    [v18, e_4]: t3,
-                    [v19, a_4]: t1,
-                    [v2, v2]: t3,
-                    [v20, v20]: t3,
-                    [v21, b_4]: t1,
-                    [v22, v22]: t3,
-                    [v23, v23]: t1,
-                    [v24, e_5]: t3,
-                    [v25, a_5]: t1,
-                    [v26, v26]: t3,
-                    [v27, b_5]: t1,
-                    [v28, v28]: t3,
-                    [v29, v29]: t1,
-                    [v3, b]: t1,
-                    [v30, e_6]: t3,
-                    [v31, a_6]: t1,
-                    [v32, v32]: t3,
-                    [v33, b_6]: t1,
-                    [v34, v34]: t3,
-                    [v35, v35]: t1,
-                    [v4, v4]: t3,
-                    [v5, v5]: t1,
-                    [v6, e_2]: t3,
-                    [v7, a_2]: t1,
-                    [v8, v8]: t3,
-                    [v9, b_2]: t1,
+                    [v0, e]: t1,
+                    [v1, a]: t0,
+                    [v10, v10]: t1,
+                    [v11, v11]: t0,
+                    [v12, e_3]: t1,
+                    [v13, a_3]: t0,
+                    [v14, v14]: t1,
+                    [v15, b_3]: t0,
+                    [v16, v16]: t1,
+                    [v17, v17]: t0,
+                    [v18, e_4]: t1,
+                    [v19, a_4]: t0,
+                    [v2, v2]: t1,
+                    [v20, v20]: t1,
+                    [v21, b_4]: t0,
+                    [v22, v22]: t1,
+                    [v23, v23]: t0,
+                    [v24, e_5]: t1,
+                    [v25, a_5]: t0,
+                    [v26, v26]: t1,
+                    [v27, b_5]: t0,
+                    [v28, v28]: t1,
+                    [v29, v29]: t0,
+                    [v3, b]: t0,
+                    [v30, e_6]: t1,
+                    [v31, a_6]: t0,
+                    [v32, v32]: t1,
+                    [v33, b_6]: t0,
+                    [v34, v34]: t1,
+                    [v35, v35]: t0,
+                    [v4, v4]: t1,
+                    [v5, v5]: t0,
+                    [v6, e_2]: t1,
+                    [v7, a_2]: t0,
+                    [v8, v8]: t1,
+                    [v9, b_2]: t0,
                 },
                 global_variable_types: {},
                 rule_tries: [
-                    atom: [PremiseNew, r15(v2, v4, v0)]
+                    atom: [PremiseNew, r2(v2, v4, v0)]
                     then: [
-                        atom: [PremiseAny, r17(v1, v2), iu1]
+                        atom: [PremiseAny, r4(v1, v2), iu1]
                         then: [
-                            atom: [Premise, r17(v3, v4), iu3]
+                            atom: [Premise, r4(v3, v4), iu3]
                             then: [
-                                atom: [Premise, r17(v1, v2), iu2]
+                                atom: [Premise, r4(v1, v2), iu2]
                                 then: [
                                     meta: "( rule ( ( = e ( Add ( Const a ) ( Const b ) ) ) ) ( ( union e ( Const ( + a b ) ) ) ) )"
                                     atom: [Action::Insert, r0(v1, v3, v5) on iu0],
-                                    atom: [Action::Insert, r17(v5, v0)],
+                                    atom: [Action::Insert, r4(v5, v0)],
                                 ],
                             ],
                         ],
                     ],
-                    atom: [PremiseNew, r16(v20, v22, v18)]
+                    atom: [PremiseNew, r3(v20, v22, v18)]
                     then: [
-                        atom: [PremiseAny, r17(v19, v20), iu4]
+                        atom: [PremiseAny, r4(v19, v20), iu4]
                         then: [
-                            atom: [Premise, r17(v21, v22), iu6]
+                            atom: [Premise, r4(v21, v22), iu6]
                             then: [
-                                atom: [Premise, r17(v19, v20), iu5]
+                                atom: [Premise, r4(v19, v20), iu5]
                                 then: [
                                     meta: "( rule ( ( = e ( Mul ( Const a ) ( Const b ) ) ) ) ( ( union e ( Const ( * a b ) ) ) ) )"
-                                    atom: [Action::Insert, r11(v19, v21, v23) on iu0],
-                                    atom: [Action::Insert, r17(v23, v18)],
+                                    atom: [Action::Insert, r1(v19, v21, v23) on iu0],
+                                    atom: [Action::Insert, r4(v23, v18)],
                                 ],
                             ],
                         ],
                     ],
-                    atom: [PremiseNew, r17(v7, v8)]
+                    atom: [PremiseNew, r4(v7, v8)]
                     then: [
-                        atom: [Premise, r15(v8, v10, v6), iu1]
+                        atom: [Premise, r2(v8, v10, v6), iu1]
                         then: [
-                            atom: [Premise, r17(v9, v10), iu7]
+                            atom: [Premise, r4(v9, v10), iu7]
                             then: [
                                 meta: "( rule ( ( = e ( Add ( Const a ) ( Const b ) ) ) ) ( ( union e ( Const ( + a b ) ) ) ) )"
                                 atom: [Action::Insert, r0(v7, v9, v11) on iu0],
-                                atom: [Action::Insert, r17(v11, v6)],
+                                atom: [Action::Insert, r4(v11, v6)],
                             ],
                         ],
-                        atom: [Premise, r15(v14, v8, v12), iu2]
+                        atom: [Premise, r2(v14, v8, v12), iu2]
                         then: [
-                            atom: [Premise, r17(v13, v14), iu8]
+                            atom: [Premise, r4(v13, v14), iu8]
                             then: [
                                 meta: "( rule ( ( = e ( Add ( Const a ) ( Const b ) ) ) ) ( ( union e ( Const ( + a b ) ) ) ) )"
                                 atom: [Action::Insert, r0(v13, v7, v17) on iu0],
-                                atom: [Action::Insert, r17(v17, v12)],
+                                atom: [Action::Insert, r4(v17, v12)],
                             ],
                         ],
-                        atom: [Premise, r16(v8, v28, v24), iu1]
+                        atom: [Premise, r3(v8, v28, v24), iu1]
                         then: [
-                            atom: [Premise, r17(v27, v28), iu9]
+                            atom: [Premise, r4(v27, v28), iu9]
                             then: [
                                 meta: "( rule ( ( = e ( Mul ( Const a ) ( Const b ) ) ) ) ( ( union e ( Const ( * a b ) ) ) ) )"
-                                atom: [Action::Insert, r11(v7, v27, v29) on iu0],
-                                atom: [Action::Insert, r17(v29, v24)],
+                                atom: [Action::Insert, r1(v7, v27, v29) on iu0],
+                                atom: [Action::Insert, r4(v29, v24)],
                             ],
                         ],
-                        atom: [Premise, r16(v32, v8, v30), iu2]
+                        atom: [Premise, r3(v32, v8, v30), iu2]
                         then: [
-                            atom: [Premise, r17(v31, v32), iu10]
+                            atom: [Premise, r4(v31, v32), iu10]
                             then: [
                                 meta: "( rule ( ( = e ( Mul ( Const a ) ( Const b ) ) ) ) ( ( union e ( Const ( * a b ) ) ) ) )"
-                                atom: [Action::Insert, r11(v31, v7, v35) on iu0],
-                                atom: [Action::Insert, r17(v35, v30)],
+                                atom: [Action::Insert, r1(v31, v7, v35) on iu0],
+                                atom: [Action::Insert, r4(v35, v30)],
                             ],
                         ],
                     ],
@@ -2971,48 +2397,8 @@ fn codegen_constant_propagation() {
             fn i64_add012(a: i64, b: i64) -> impl Iterator<Item = (i64,)> {
                 a.checked_add(b).map(|x| (x,)).into_iter()
             }
-            fn i64_bitand012(a: i64, b: i64) -> impl Iterator<Item = (i64,)> {
-                std::iter::once((a & b,))
-            }
-            fn i64_bitnot01(a: i64) -> impl Iterator<Item = (i64,)> {
-                std::iter::once((!a,))
-            }
-            fn i64_bitor012(a: i64, b: i64) -> impl Iterator<Item = (i64,)> {
-                std::iter::once((a | b,))
-            }
-            fn i64_bitshl012(a: i64, b: i64) -> impl Iterator<Item = (i64,)> {
-                a.checked_shl(b.try_into().unwrap())
-                    .map(|x| (x,))
-                    .into_iter()
-            }
-            fn i64_bitshr012(a: i64, b: i64) -> impl Iterator<Item = (i64,)> {
-                a.checked_shr(b.try_into().unwrap())
-                    .map(|x| (x,))
-                    .into_iter()
-            }
-            fn i64_bitxor012(a: i64, b: i64) -> impl Iterator<Item = (i64,)> {
-                std::iter::once((a ^ b,))
-            }
-            fn i64_div012(a: i64, b: i64) -> impl Iterator<Item = (i64,)> {
-                a.checked_div(b).map(|x| (x,)).into_iter()
-            }
-            fn i64_log01(a: i64) -> impl Iterator<Item = (i64,)> {
-                std::iter::once((a.ilog2() as i64,))
-            }
-            fn i64_max012(a: i64, b: i64) -> impl Iterator<Item = (i64,)> {
-                std::iter::once((a.max(b),))
-            }
-            fn i64_min012(a: i64, b: i64) -> impl Iterator<Item = (i64,)> {
-                std::iter::once((a.min(b),))
-            }
             fn i64_mul012(a: i64, b: i64) -> impl Iterator<Item = (i64,)> {
                 a.checked_mul(b).map(|x| (x,)).into_iter()
-            }
-            fn i64_rem012(a: i64, b: i64) -> impl Iterator<Item = (i64,)> {
-                a.checked_rem(b).map(|x| (x,)).into_iter()
-            }
-            fn i64_sub012(a: i64, b: i64) -> impl Iterator<Item = (i64,)> {
-                a.checked_sub(b).map(|x| (x,)).into_iter()
             }
             #[derive(Debug, Default)]
             struct AddRelation {
@@ -3779,52 +3165,6 @@ fn codegen_commutative() {
         expected_codegen: Some(expect![[r#"
             use oatlog::runtime::{self, *};
             eclass_wrapper_ty!(Math);
-            fn i64_add012(a: i64, b: i64) -> impl Iterator<Item = (i64,)> {
-                a.checked_add(b).map(|x| (x,)).into_iter()
-            }
-            fn i64_bitand012(a: i64, b: i64) -> impl Iterator<Item = (i64,)> {
-                std::iter::once((a & b,))
-            }
-            fn i64_bitnot01(a: i64) -> impl Iterator<Item = (i64,)> {
-                std::iter::once((!a,))
-            }
-            fn i64_bitor012(a: i64, b: i64) -> impl Iterator<Item = (i64,)> {
-                std::iter::once((a | b,))
-            }
-            fn i64_bitshl012(a: i64, b: i64) -> impl Iterator<Item = (i64,)> {
-                a.checked_shl(b.try_into().unwrap())
-                    .map(|x| (x,))
-                    .into_iter()
-            }
-            fn i64_bitshr012(a: i64, b: i64) -> impl Iterator<Item = (i64,)> {
-                a.checked_shr(b.try_into().unwrap())
-                    .map(|x| (x,))
-                    .into_iter()
-            }
-            fn i64_bitxor012(a: i64, b: i64) -> impl Iterator<Item = (i64,)> {
-                std::iter::once((a ^ b,))
-            }
-            fn i64_div012(a: i64, b: i64) -> impl Iterator<Item = (i64,)> {
-                a.checked_div(b).map(|x| (x,)).into_iter()
-            }
-            fn i64_log01(a: i64) -> impl Iterator<Item = (i64,)> {
-                std::iter::once((a.ilog2() as i64,))
-            }
-            fn i64_max012(a: i64, b: i64) -> impl Iterator<Item = (i64,)> {
-                std::iter::once((a.max(b),))
-            }
-            fn i64_min012(a: i64, b: i64) -> impl Iterator<Item = (i64,)> {
-                std::iter::once((a.min(b),))
-            }
-            fn i64_mul012(a: i64, b: i64) -> impl Iterator<Item = (i64,)> {
-                a.checked_mul(b).map(|x| (x,)).into_iter()
-            }
-            fn i64_rem012(a: i64, b: i64) -> impl Iterator<Item = (i64,)> {
-                a.checked_rem(b).map(|x| (x,)).into_iter()
-            }
-            fn i64_sub012(a: i64, b: i64) -> impl Iterator<Item = (i64,)> {
-                a.checked_sub(b).map(|x| (x,)).into_iter()
-            }
             #[derive(Debug, Default)]
             struct AddRelation {
                 new: Vec<<Self as Relation>::Row>,
@@ -4109,10 +3449,8 @@ fn regression_entry2() {
         expected_hir: Some(expect![[r#"
             Theory {
                 types: {
-                    [t0, ()]: std::primitive::unit,
-                    [t1, i64]: std::primitive::i64,
-                    [t2, String]: runtime::IString,
-                    [t3, Math]: [symbolic],
+                    [t0, i64]: std::primitive::i64,
+                    [t1, Math]: [symbolic],
                 },
                 symbolic_rules: [
                     SymbolicRule {
@@ -4123,119 +3461,31 @@ fn regression_entry2() {
                             Action { relation: g0, columns: [v3], entry: [!] },
                         ],
                         variables: {
-                            v0: VariableMeta { name: Some("a"), ty: t3 },
-                            v1: VariableMeta { name: Some("b"), ty: t3 },
-                            v2: VariableMeta { name: None, ty: t3 },
-                            v3: VariableMeta { name: None, ty: t1 },
+                            v0: VariableMeta { name: Some("a"), ty: t1 },
+                            v1: VariableMeta { name: Some("b"), ty: t1 },
+                            v2: VariableMeta { name: None, ty: t1 },
+                            v3: VariableMeta { name: None, ty: t0 },
                         },
                         unify: [],
                     },
                 ],
                 relations: {
-                    r0: + { columns: [i64, i64, i64], kind: Primitive(i64_add012), implicit_rules: {n0: [_, _, !]} },
-                    r1: & { columns: [i64, i64, i64], kind: Primitive(i64_bitand012), implicit_rules: {n0: [_, _, !]} },
-                    r2: not-i64 { columns: [i64, i64], kind: Primitive(i64_bitnot01), implicit_rules: {n0: [_, !]} },
-                    r3: | { columns: [i64, i64, i64], kind: Primitive(i64_bitor012), implicit_rules: {n0: [_, _, !]} },
-                    r4: << { columns: [i64, i64, i64], kind: Primitive(i64_bitshl012), implicit_rules: {n0: [_, _, !]} },
-                    r5: >> { columns: [i64, i64, i64], kind: Primitive(i64_bitshr012), implicit_rules: {n0: [_, _, !]} },
-                    r6: ^ { columns: [i64, i64, i64], kind: Primitive(i64_bitxor012), implicit_rules: {n0: [_, _, !]} },
-                    r7: / { columns: [i64, i64, i64], kind: Primitive(i64_div012), implicit_rules: {n0: [_, _, !]} },
-                    r8: log2 { columns: [i64, i64], kind: Primitive(i64_log01), implicit_rules: {n0: [_, !]} },
-                    r9: max { columns: [i64, i64, i64], kind: Primitive(i64_max012), implicit_rules: {n0: [_, _, !]} },
-                    r10: min { columns: [i64, i64, i64], kind: Primitive(i64_min012), implicit_rules: {n0: [_, _, !]} },
-                    r11: * { columns: [i64, i64, i64], kind: Primitive(i64_mul012), implicit_rules: {n0: [_, _, !]} },
-                    r12: % { columns: [i64, i64, i64], kind: Primitive(i64_rem012), implicit_rules: {n0: [_, _, !]} },
-                    r13: - { columns: [i64, i64, i64], kind: Primitive(i64_sub012), implicit_rules: {n0: [_, _, !]} },
-                    r14: Math { columns: [Math], kind: Forall(t3), implicit_rules: {} },
-                    r15: Sub { columns: [Math, Math, Math], kind: Table, implicit_rules: {n0: [_, _, U]} },
-                    r16: Const { columns: [i64, Math], kind: Table, implicit_rules: {n0: [_, U]} },
-                    r17: g0 { columns: [i64], kind: Global(g0), implicit_rules: {n0: [!]} },
+                    r0: Sub { columns: [Math, Math, Math], kind: Table, implicit_rules: {n0: [_, _, U]} },
+                    r1: Const { columns: [i64, Math], kind: Table, implicit_rules: {n0: [_, U]} },
+                    r2: g0 { columns: [i64], kind: Global(g0), implicit_rules: {n0: [!]} },
                 },
             }"#]]),
         expected_lir: Some(expect![[r#"
             Theory {
                 name: None,
                 types: {
-                    [t0, unit]: THIS_STRING_SHOULD_NOT_APPEAR_IN_GENERATED_CODE,
-                    [t1, i64]: std::primitive::i64,
-                    [t2, String]: runtime::IString,
-                    [t3, Math]: [symbolic],
+                    [t0, i64]: std::primitive::i64,
+                    [t1, Math]: [symbolic],
                 },
                 relations: {
                     r0: RelationData {
-                        name: "i64_add012",
-                        param_types: {c0: t1, c1: t1, c2: t1},
-                        kind: Primitive,
-                    },
-                    r1: RelationData {
-                        name: "i64_bitand012",
-                        param_types: {c0: t1, c1: t1, c2: t1},
-                        kind: Primitive,
-                    },
-                    r2: RelationData {
-                        name: "i64_bitnot01",
-                        param_types: {c0: t1, c1: t1},
-                        kind: Primitive,
-                    },
-                    r3: RelationData {
-                        name: "i64_bitor012",
-                        param_types: {c0: t1, c1: t1, c2: t1},
-                        kind: Primitive,
-                    },
-                    r4: RelationData {
-                        name: "i64_bitshl012",
-                        param_types: {c0: t1, c1: t1, c2: t1},
-                        kind: Primitive,
-                    },
-                    r5: RelationData {
-                        name: "i64_bitshr012",
-                        param_types: {c0: t1, c1: t1, c2: t1},
-                        kind: Primitive,
-                    },
-                    r6: RelationData {
-                        name: "i64_bitxor012",
-                        param_types: {c0: t1, c1: t1, c2: t1},
-                        kind: Primitive,
-                    },
-                    r7: RelationData {
-                        name: "i64_div012",
-                        param_types: {c0: t1, c1: t1, c2: t1},
-                        kind: Primitive,
-                    },
-                    r8: RelationData {
-                        name: "i64_log01",
-                        param_types: {c0: t1, c1: t1},
-                        kind: Primitive,
-                    },
-                    r9: RelationData {
-                        name: "i64_max012",
-                        param_types: {c0: t1, c1: t1, c2: t1},
-                        kind: Primitive,
-                    },
-                    r10: RelationData {
-                        name: "i64_min012",
-                        param_types: {c0: t1, c1: t1, c2: t1},
-                        kind: Primitive,
-                    },
-                    r11: RelationData {
-                        name: "i64_mul012",
-                        param_types: {c0: t1, c1: t1, c2: t1},
-                        kind: Primitive,
-                    },
-                    r12: RelationData {
-                        name: "i64_rem012",
-                        param_types: {c0: t1, c1: t1, c2: t1},
-                        kind: Primitive,
-                    },
-                    r13: RelationData {
-                        name: "i64_sub012",
-                        param_types: {c0: t1, c1: t1, c2: t1},
-                        kind: Primitive,
-                    },
-                    r14: (hir-only relation),
-                    r15: RelationData {
                         name: "Sub",
-                        param_types: {c0: t3, c1: t3, c2: t3},
+                        param_types: {c0: t1, c1: t1, c2: t1},
                         kind: Table {
                             index_to_info: {ir0: 0_1_2 conflict[..2] => [2:union]},
                             usage_to_info: {
@@ -4246,9 +3496,9 @@ fn regression_entry2() {
                             column_back_reference: {},
                         },
                     },
-                    r16: RelationData {
+                    r1: RelationData {
                         name: "Const",
-                        param_types: {c0: t1, c1: t3},
+                        param_types: {c0: t0, c1: t1},
                         kind: Table {
                             index_to_info: {ir0: 0_1 conflict[..1] => [1:union]},
                             usage_to_info: {
@@ -4259,27 +3509,27 @@ fn regression_entry2() {
                             column_back_reference: {},
                         },
                     },
-                    r17: RelationData {
+                    r2: RelationData {
                         name: "g0",
-                        param_types: {c0: t1},
+                        param_types: {c0: t0},
                         kind: [Global, g0],
                     },
                 },
                 rule_variables: {
-                    [v0, a]: t3,
-                    [v1, b]: t3,
-                    [v2, v2]: t3,
-                    [v3, v3]: t1,
+                    [v0, a]: t1,
+                    [v1, b]: t1,
+                    [v2, v2]: t1,
+                    [v3, v3]: t0,
                 },
                 global_variable_types: {
-                    g0: t1,
+                    g0: t0,
                 },
                 rule_tries: [
-                    atom: [PremiseNew, r15(v0, v1, v2)]
+                    atom: [PremiseNew, r0(v0, v1, v2)]
                     then: [
                         meta: "( rewrite ( Sub a b ) ( Const -1 ) )"
-                        atom: [Action::Insert, r17(v3) on iu0],
-                        atom: [Action::Insert, r16(v3, v2)],
+                        atom: [Action::Insert, r2(v3) on iu0],
+                        atom: [Action::Insert, r1(v3, v2)],
                     ],
                 ],
                 initial: [
@@ -4292,52 +3542,6 @@ fn regression_entry2() {
         expected_codegen: Some(expect![[r#"
             use oatlog::runtime::{self, *};
             eclass_wrapper_ty!(Math);
-            fn i64_add012(a: i64, b: i64) -> impl Iterator<Item = (i64,)> {
-                a.checked_add(b).map(|x| (x,)).into_iter()
-            }
-            fn i64_bitand012(a: i64, b: i64) -> impl Iterator<Item = (i64,)> {
-                std::iter::once((a & b,))
-            }
-            fn i64_bitnot01(a: i64) -> impl Iterator<Item = (i64,)> {
-                std::iter::once((!a,))
-            }
-            fn i64_bitor012(a: i64, b: i64) -> impl Iterator<Item = (i64,)> {
-                std::iter::once((a | b,))
-            }
-            fn i64_bitshl012(a: i64, b: i64) -> impl Iterator<Item = (i64,)> {
-                a.checked_shl(b.try_into().unwrap())
-                    .map(|x| (x,))
-                    .into_iter()
-            }
-            fn i64_bitshr012(a: i64, b: i64) -> impl Iterator<Item = (i64,)> {
-                a.checked_shr(b.try_into().unwrap())
-                    .map(|x| (x,))
-                    .into_iter()
-            }
-            fn i64_bitxor012(a: i64, b: i64) -> impl Iterator<Item = (i64,)> {
-                std::iter::once((a ^ b,))
-            }
-            fn i64_div012(a: i64, b: i64) -> impl Iterator<Item = (i64,)> {
-                a.checked_div(b).map(|x| (x,)).into_iter()
-            }
-            fn i64_log01(a: i64) -> impl Iterator<Item = (i64,)> {
-                std::iter::once((a.ilog2() as i64,))
-            }
-            fn i64_max012(a: i64, b: i64) -> impl Iterator<Item = (i64,)> {
-                std::iter::once((a.max(b),))
-            }
-            fn i64_min012(a: i64, b: i64) -> impl Iterator<Item = (i64,)> {
-                std::iter::once((a.min(b),))
-            }
-            fn i64_mul012(a: i64, b: i64) -> impl Iterator<Item = (i64,)> {
-                a.checked_mul(b).map(|x| (x,)).into_iter()
-            }
-            fn i64_rem012(a: i64, b: i64) -> impl Iterator<Item = (i64,)> {
-                a.checked_rem(b).map(|x| (x,)).into_iter()
-            }
-            fn i64_sub012(a: i64, b: i64) -> impl Iterator<Item = (i64,)> {
-                a.checked_sub(b).map(|x| (x,)).into_iter()
-            }
             #[derive(Debug, Default)]
             struct SubRelation {
                 new: Vec<<Self as Relation>::Row>,
@@ -4783,10 +3987,7 @@ fn regression_entry() {
         expected_hir: Some(expect![[r#"
             Theory {
                 types: {
-                    [t0, ()]: std::primitive::unit,
-                    [t1, i64]: std::primitive::i64,
-                    [t2, String]: runtime::IString,
-                    [t3, Math]: [symbolic],
+                    [t0, Math]: [symbolic],
                 },
                 symbolic_rules: [
                     SymbolicRule {
@@ -4797,118 +3998,29 @@ fn regression_entry() {
                             Action { relation: Add, columns: [v3, g, v2], entry: [_, _, U] },
                         ],
                         variables: {
-                            v0: VariableMeta { name: Some("f"), ty: t3 },
-                            v1: VariableMeta { name: Some("g"), ty: t3 },
-                            v2: VariableMeta { name: None, ty: t3 },
-                            v3: VariableMeta { name: None, ty: t3 },
+                            v0: VariableMeta { name: Some("f"), ty: t0 },
+                            v1: VariableMeta { name: Some("g"), ty: t0 },
+                            v2: VariableMeta { name: None, ty: t0 },
+                            v3: VariableMeta { name: None, ty: t0 },
                         },
                         unify: [],
                     },
                 ],
                 relations: {
-                    r0: + { columns: [i64, i64, i64], kind: Primitive(i64_add012), implicit_rules: {n0: [_, _, !]} },
-                    r1: & { columns: [i64, i64, i64], kind: Primitive(i64_bitand012), implicit_rules: {n0: [_, _, !]} },
-                    r2: not-i64 { columns: [i64, i64], kind: Primitive(i64_bitnot01), implicit_rules: {n0: [_, !]} },
-                    r3: | { columns: [i64, i64, i64], kind: Primitive(i64_bitor012), implicit_rules: {n0: [_, _, !]} },
-                    r4: << { columns: [i64, i64, i64], kind: Primitive(i64_bitshl012), implicit_rules: {n0: [_, _, !]} },
-                    r5: >> { columns: [i64, i64, i64], kind: Primitive(i64_bitshr012), implicit_rules: {n0: [_, _, !]} },
-                    r6: ^ { columns: [i64, i64, i64], kind: Primitive(i64_bitxor012), implicit_rules: {n0: [_, _, !]} },
-                    r7: / { columns: [i64, i64, i64], kind: Primitive(i64_div012), implicit_rules: {n0: [_, _, !]} },
-                    r8: log2 { columns: [i64, i64], kind: Primitive(i64_log01), implicit_rules: {n0: [_, !]} },
-                    r9: max { columns: [i64, i64, i64], kind: Primitive(i64_max012), implicit_rules: {n0: [_, _, !]} },
-                    r10: min { columns: [i64, i64, i64], kind: Primitive(i64_min012), implicit_rules: {n0: [_, _, !]} },
-                    r11: * { columns: [i64, i64, i64], kind: Primitive(i64_mul012), implicit_rules: {n0: [_, _, !]} },
-                    r12: % { columns: [i64, i64, i64], kind: Primitive(i64_rem012), implicit_rules: {n0: [_, _, !]} },
-                    r13: - { columns: [i64, i64, i64], kind: Primitive(i64_sub012), implicit_rules: {n0: [_, _, !]} },
-                    r14: Math { columns: [Math], kind: Forall(t3), implicit_rules: {} },
-                    r15: Integral { columns: [Math, Math, Math], kind: Table, implicit_rules: {n0: [_, _, U]} },
-                    r16: Add { columns: [Math, Math, Math], kind: Table, implicit_rules: {n0: [_, _, U]} },
+                    r0: Integral { columns: [Math, Math, Math], kind: Table, implicit_rules: {n0: [_, _, U]} },
+                    r1: Add { columns: [Math, Math, Math], kind: Table, implicit_rules: {n0: [_, _, U]} },
                 },
             }"#]]),
         expected_lir: Some(expect![[r#"
             Theory {
                 name: None,
                 types: {
-                    [t0, unit]: THIS_STRING_SHOULD_NOT_APPEAR_IN_GENERATED_CODE,
-                    [t1, i64]: std::primitive::i64,
-                    [t2, String]: runtime::IString,
-                    [t3, Math]: [symbolic],
+                    [t0, Math]: [symbolic],
                 },
                 relations: {
                     r0: RelationData {
-                        name: "i64_add012",
-                        param_types: {c0: t1, c1: t1, c2: t1},
-                        kind: Primitive,
-                    },
-                    r1: RelationData {
-                        name: "i64_bitand012",
-                        param_types: {c0: t1, c1: t1, c2: t1},
-                        kind: Primitive,
-                    },
-                    r2: RelationData {
-                        name: "i64_bitnot01",
-                        param_types: {c0: t1, c1: t1},
-                        kind: Primitive,
-                    },
-                    r3: RelationData {
-                        name: "i64_bitor012",
-                        param_types: {c0: t1, c1: t1, c2: t1},
-                        kind: Primitive,
-                    },
-                    r4: RelationData {
-                        name: "i64_bitshl012",
-                        param_types: {c0: t1, c1: t1, c2: t1},
-                        kind: Primitive,
-                    },
-                    r5: RelationData {
-                        name: "i64_bitshr012",
-                        param_types: {c0: t1, c1: t1, c2: t1},
-                        kind: Primitive,
-                    },
-                    r6: RelationData {
-                        name: "i64_bitxor012",
-                        param_types: {c0: t1, c1: t1, c2: t1},
-                        kind: Primitive,
-                    },
-                    r7: RelationData {
-                        name: "i64_div012",
-                        param_types: {c0: t1, c1: t1, c2: t1},
-                        kind: Primitive,
-                    },
-                    r8: RelationData {
-                        name: "i64_log01",
-                        param_types: {c0: t1, c1: t1},
-                        kind: Primitive,
-                    },
-                    r9: RelationData {
-                        name: "i64_max012",
-                        param_types: {c0: t1, c1: t1, c2: t1},
-                        kind: Primitive,
-                    },
-                    r10: RelationData {
-                        name: "i64_min012",
-                        param_types: {c0: t1, c1: t1, c2: t1},
-                        kind: Primitive,
-                    },
-                    r11: RelationData {
-                        name: "i64_mul012",
-                        param_types: {c0: t1, c1: t1, c2: t1},
-                        kind: Primitive,
-                    },
-                    r12: RelationData {
-                        name: "i64_rem012",
-                        param_types: {c0: t1, c1: t1, c2: t1},
-                        kind: Primitive,
-                    },
-                    r13: RelationData {
-                        name: "i64_sub012",
-                        param_types: {c0: t1, c1: t1, c2: t1},
-                        kind: Primitive,
-                    },
-                    r14: (hir-only relation),
-                    r15: RelationData {
                         name: "Integral",
-                        param_types: {c0: t3, c1: t3, c2: t3},
+                        param_types: {c0: t0, c1: t0, c2: t0},
                         kind: Table {
                             index_to_info: {ir0: 0_1_2 conflict[..2] => [2:union]},
                             usage_to_info: {
@@ -4919,9 +4031,9 @@ fn regression_entry() {
                             column_back_reference: {},
                         },
                     },
-                    r16: RelationData {
+                    r1: RelationData {
                         name: "Add",
-                        param_types: {c0: t3, c1: t3, c2: t3},
+                        param_types: {c0: t0, c1: t0, c2: t0},
                         kind: Table {
                             index_to_info: {ir0: 0_1_2 conflict[..2] => [2:union]},
                             usage_to_info: {
@@ -4934,18 +4046,18 @@ fn regression_entry() {
                     },
                 },
                 rule_variables: {
-                    [v0, f]: t3,
-                    [v1, g]: t3,
-                    [v2, v2]: t3,
-                    [v3, v3]: t3,
+                    [v0, f]: t0,
+                    [v1, g]: t0,
+                    [v2, v2]: t0,
+                    [v3, v3]: t0,
                 },
                 global_variable_types: {},
                 rule_tries: [
-                    atom: [PremiseNew, r16(v0, v1, v2)]
+                    atom: [PremiseNew, r1(v0, v1, v2)]
                     then: [
                         meta: "( rewrite ( Add f g ) ( Add ( Integral f f ) g ) )"
-                        atom: [Action::Insert, r15(v0, v0, v3) on iu0],
-                        atom: [Action::Insert, r16(v3, v1, v2)],
+                        atom: [Action::Insert, r0(v0, v0, v3) on iu0],
+                        atom: [Action::Insert, r1(v3, v1, v2)],
                     ],
                 ],
                 initial: [],
@@ -4953,52 +4065,6 @@ fn regression_entry() {
         expected_codegen: Some(expect![[r#"
             use oatlog::runtime::{self, *};
             eclass_wrapper_ty!(Math);
-            fn i64_add012(a: i64, b: i64) -> impl Iterator<Item = (i64,)> {
-                a.checked_add(b).map(|x| (x,)).into_iter()
-            }
-            fn i64_bitand012(a: i64, b: i64) -> impl Iterator<Item = (i64,)> {
-                std::iter::once((a & b,))
-            }
-            fn i64_bitnot01(a: i64) -> impl Iterator<Item = (i64,)> {
-                std::iter::once((!a,))
-            }
-            fn i64_bitor012(a: i64, b: i64) -> impl Iterator<Item = (i64,)> {
-                std::iter::once((a | b,))
-            }
-            fn i64_bitshl012(a: i64, b: i64) -> impl Iterator<Item = (i64,)> {
-                a.checked_shl(b.try_into().unwrap())
-                    .map(|x| (x,))
-                    .into_iter()
-            }
-            fn i64_bitshr012(a: i64, b: i64) -> impl Iterator<Item = (i64,)> {
-                a.checked_shr(b.try_into().unwrap())
-                    .map(|x| (x,))
-                    .into_iter()
-            }
-            fn i64_bitxor012(a: i64, b: i64) -> impl Iterator<Item = (i64,)> {
-                std::iter::once((a ^ b,))
-            }
-            fn i64_div012(a: i64, b: i64) -> impl Iterator<Item = (i64,)> {
-                a.checked_div(b).map(|x| (x,)).into_iter()
-            }
-            fn i64_log01(a: i64) -> impl Iterator<Item = (i64,)> {
-                std::iter::once((a.ilog2() as i64,))
-            }
-            fn i64_max012(a: i64, b: i64) -> impl Iterator<Item = (i64,)> {
-                std::iter::once((a.max(b),))
-            }
-            fn i64_min012(a: i64, b: i64) -> impl Iterator<Item = (i64,)> {
-                std::iter::once((a.min(b),))
-            }
-            fn i64_mul012(a: i64, b: i64) -> impl Iterator<Item = (i64,)> {
-                a.checked_mul(b).map(|x| (x,)).into_iter()
-            }
-            fn i64_rem012(a: i64, b: i64) -> impl Iterator<Item = (i64,)> {
-                a.checked_rem(b).map(|x| (x,)).into_iter()
-            }
-            fn i64_sub012(a: i64, b: i64) -> impl Iterator<Item = (i64,)> {
-                a.checked_sub(b).map(|x| (x,)).into_iter()
-            }
             #[derive(Debug, Default)]
             struct IntegralRelation {
                 new: Vec<<Self as Relation>::Row>,
@@ -5447,10 +4513,7 @@ fn test_bind_variable_multiple_times() {
         expected_hir: Some(expect![[r#"
             Theory {
                 types: {
-                    [t0, ()]: std::primitive::unit,
-                    [t1, i64]: std::primitive::i64,
-                    [t2, String]: runtime::IString,
-                    [t3, Foo]: [symbolic],
+                    [t0, Foo]: [symbolic],
                 },
                 symbolic_rules: [
                     SymbolicRule {
@@ -5459,8 +4522,8 @@ fn test_bind_variable_multiple_times() {
                             Premise { relation: Same, columns: [x, x, v1] },
                         ],
                         variables: {
-                            v0: VariableMeta { name: Some("x"), ty: t3 },
-                            v1: VariableMeta { name: None, ty: t3 },
+                            v0: VariableMeta { name: Some("x"), ty: t0 },
+                            v1: VariableMeta { name: None, ty: t0 },
                         },
                         unify: [
                             [v1, x],
@@ -5468,108 +4531,19 @@ fn test_bind_variable_multiple_times() {
                     },
                 ],
                 relations: {
-                    r0: + { columns: [i64, i64, i64], kind: Primitive(i64_add012), implicit_rules: {n0: [_, _, !]} },
-                    r1: & { columns: [i64, i64, i64], kind: Primitive(i64_bitand012), implicit_rules: {n0: [_, _, !]} },
-                    r2: not-i64 { columns: [i64, i64], kind: Primitive(i64_bitnot01), implicit_rules: {n0: [_, !]} },
-                    r3: | { columns: [i64, i64, i64], kind: Primitive(i64_bitor012), implicit_rules: {n0: [_, _, !]} },
-                    r4: << { columns: [i64, i64, i64], kind: Primitive(i64_bitshl012), implicit_rules: {n0: [_, _, !]} },
-                    r5: >> { columns: [i64, i64, i64], kind: Primitive(i64_bitshr012), implicit_rules: {n0: [_, _, !]} },
-                    r6: ^ { columns: [i64, i64, i64], kind: Primitive(i64_bitxor012), implicit_rules: {n0: [_, _, !]} },
-                    r7: / { columns: [i64, i64, i64], kind: Primitive(i64_div012), implicit_rules: {n0: [_, _, !]} },
-                    r8: log2 { columns: [i64, i64], kind: Primitive(i64_log01), implicit_rules: {n0: [_, !]} },
-                    r9: max { columns: [i64, i64, i64], kind: Primitive(i64_max012), implicit_rules: {n0: [_, _, !]} },
-                    r10: min { columns: [i64, i64, i64], kind: Primitive(i64_min012), implicit_rules: {n0: [_, _, !]} },
-                    r11: * { columns: [i64, i64, i64], kind: Primitive(i64_mul012), implicit_rules: {n0: [_, _, !]} },
-                    r12: % { columns: [i64, i64, i64], kind: Primitive(i64_rem012), implicit_rules: {n0: [_, _, !]} },
-                    r13: - { columns: [i64, i64, i64], kind: Primitive(i64_sub012), implicit_rules: {n0: [_, _, !]} },
-                    r14: Foo { columns: [Foo], kind: Forall(t3), implicit_rules: {} },
-                    r15: Same { columns: [Foo, Foo, Foo], kind: Table, implicit_rules: {n0: [_, _, U]} },
+                    r0: Same { columns: [Foo, Foo, Foo], kind: Table, implicit_rules: {n0: [_, _, U]} },
                 },
             }"#]]),
         expected_lir: Some(expect![[r#"
             Theory {
                 name: None,
                 types: {
-                    [t0, unit]: THIS_STRING_SHOULD_NOT_APPEAR_IN_GENERATED_CODE,
-                    [t1, i64]: std::primitive::i64,
-                    [t2, String]: runtime::IString,
-                    [t3, Foo]: [symbolic],
+                    [t0, Foo]: [symbolic],
                 },
                 relations: {
                     r0: RelationData {
-                        name: "i64_add012",
-                        param_types: {c0: t1, c1: t1, c2: t1},
-                        kind: Primitive,
-                    },
-                    r1: RelationData {
-                        name: "i64_bitand012",
-                        param_types: {c0: t1, c1: t1, c2: t1},
-                        kind: Primitive,
-                    },
-                    r2: RelationData {
-                        name: "i64_bitnot01",
-                        param_types: {c0: t1, c1: t1},
-                        kind: Primitive,
-                    },
-                    r3: RelationData {
-                        name: "i64_bitor012",
-                        param_types: {c0: t1, c1: t1, c2: t1},
-                        kind: Primitive,
-                    },
-                    r4: RelationData {
-                        name: "i64_bitshl012",
-                        param_types: {c0: t1, c1: t1, c2: t1},
-                        kind: Primitive,
-                    },
-                    r5: RelationData {
-                        name: "i64_bitshr012",
-                        param_types: {c0: t1, c1: t1, c2: t1},
-                        kind: Primitive,
-                    },
-                    r6: RelationData {
-                        name: "i64_bitxor012",
-                        param_types: {c0: t1, c1: t1, c2: t1},
-                        kind: Primitive,
-                    },
-                    r7: RelationData {
-                        name: "i64_div012",
-                        param_types: {c0: t1, c1: t1, c2: t1},
-                        kind: Primitive,
-                    },
-                    r8: RelationData {
-                        name: "i64_log01",
-                        param_types: {c0: t1, c1: t1},
-                        kind: Primitive,
-                    },
-                    r9: RelationData {
-                        name: "i64_max012",
-                        param_types: {c0: t1, c1: t1, c2: t1},
-                        kind: Primitive,
-                    },
-                    r10: RelationData {
-                        name: "i64_min012",
-                        param_types: {c0: t1, c1: t1, c2: t1},
-                        kind: Primitive,
-                    },
-                    r11: RelationData {
-                        name: "i64_mul012",
-                        param_types: {c0: t1, c1: t1, c2: t1},
-                        kind: Primitive,
-                    },
-                    r12: RelationData {
-                        name: "i64_rem012",
-                        param_types: {c0: t1, c1: t1, c2: t1},
-                        kind: Primitive,
-                    },
-                    r13: RelationData {
-                        name: "i64_sub012",
-                        param_types: {c0: t1, c1: t1, c2: t1},
-                        kind: Primitive,
-                    },
-                    r14: (hir-only relation),
-                    r15: RelationData {
                         name: "Same",
-                        param_types: {c0: t3, c1: t3, c2: t3},
+                        param_types: {c0: t0, c1: t0, c2: t0},
                         kind: Table {
                             index_to_info: {ir0: 0_1_2 conflict[..2] => [2:union]},
                             usage_to_info: {
@@ -5582,13 +4556,13 @@ fn test_bind_variable_multiple_times() {
                     },
                 },
                 rule_variables: {
-                    [v0, x]: t3,
-                    [v1, v1]: t3,
-                    [v2, x_2]: t3,
+                    [v0, x]: t0,
+                    [v1, v1]: t0,
+                    [v2, x_2]: t0,
                 },
                 global_variable_types: {},
                 rule_tries: [
-                    atom: [PremiseNew, r15(v0, v2, v1)]
+                    atom: [PremiseNew, r0(v0, v2, v1)]
                     then: [
                         atom: [IfEq, v0=v2]
                         then: [
@@ -5602,52 +4576,6 @@ fn test_bind_variable_multiple_times() {
         expected_codegen: Some(expect![[r#"
             use oatlog::runtime::{self, *};
             eclass_wrapper_ty!(Foo);
-            fn i64_add012(a: i64, b: i64) -> impl Iterator<Item = (i64,)> {
-                a.checked_add(b).map(|x| (x,)).into_iter()
-            }
-            fn i64_bitand012(a: i64, b: i64) -> impl Iterator<Item = (i64,)> {
-                std::iter::once((a & b,))
-            }
-            fn i64_bitnot01(a: i64) -> impl Iterator<Item = (i64,)> {
-                std::iter::once((!a,))
-            }
-            fn i64_bitor012(a: i64, b: i64) -> impl Iterator<Item = (i64,)> {
-                std::iter::once((a | b,))
-            }
-            fn i64_bitshl012(a: i64, b: i64) -> impl Iterator<Item = (i64,)> {
-                a.checked_shl(b.try_into().unwrap())
-                    .map(|x| (x,))
-                    .into_iter()
-            }
-            fn i64_bitshr012(a: i64, b: i64) -> impl Iterator<Item = (i64,)> {
-                a.checked_shr(b.try_into().unwrap())
-                    .map(|x| (x,))
-                    .into_iter()
-            }
-            fn i64_bitxor012(a: i64, b: i64) -> impl Iterator<Item = (i64,)> {
-                std::iter::once((a ^ b,))
-            }
-            fn i64_div012(a: i64, b: i64) -> impl Iterator<Item = (i64,)> {
-                a.checked_div(b).map(|x| (x,)).into_iter()
-            }
-            fn i64_log01(a: i64) -> impl Iterator<Item = (i64,)> {
-                std::iter::once((a.ilog2() as i64,))
-            }
-            fn i64_max012(a: i64, b: i64) -> impl Iterator<Item = (i64,)> {
-                std::iter::once((a.max(b),))
-            }
-            fn i64_min012(a: i64, b: i64) -> impl Iterator<Item = (i64,)> {
-                std::iter::once((a.min(b),))
-            }
-            fn i64_mul012(a: i64, b: i64) -> impl Iterator<Item = (i64,)> {
-                a.checked_mul(b).map(|x| (x,)).into_iter()
-            }
-            fn i64_rem012(a: i64, b: i64) -> impl Iterator<Item = (i64,)> {
-                a.checked_rem(b).map(|x| (x,)).into_iter()
-            }
-            fn i64_sub012(a: i64, b: i64) -> impl Iterator<Item = (i64,)> {
-                a.checked_sub(b).map(|x| (x,)).into_iter()
-            }
             #[derive(Debug, Default)]
             struct SameRelation {
                 new: Vec<<Self as Relation>::Row>,
@@ -5938,10 +4866,8 @@ fn test_negative_i64_tokens() {
         expected_hir: Some(expect![[r#"
             Theory {
                 types: {
-                    [t0, ()]: std::primitive::unit,
-                    [t1, i64]: std::primitive::i64,
-                    [t2, String]: runtime::IString,
-                    [t3, Math]: [symbolic],
+                    [t0, i64]: std::primitive::i64,
+                    [t1, Math]: [symbolic],
                 },
                 symbolic_rules: [
                     SymbolicRule {
@@ -5951,35 +4877,17 @@ fn test_negative_i64_tokens() {
                             Premise { relation: g2, columns: [v1] },
                         ],
                         variables: {
-                            v0: VariableMeta { name: None, ty: t3 },
-                            v1: VariableMeta { name: None, ty: t1 },
+                            v0: VariableMeta { name: None, ty: t1 },
+                            v1: VariableMeta { name: None, ty: t0 },
                         },
                         unify: [],
                     },
                 ],
                 relations: {
-                    r0: + { columns: [i64, i64, i64], kind: Primitive(i64_add012), implicit_rules: {n0: [_, _, !]} },
-                    r1: & { columns: [i64, i64, i64], kind: Primitive(i64_bitand012), implicit_rules: {n0: [_, _, !]} },
-                    r2: not-i64 { columns: [i64, i64], kind: Primitive(i64_bitnot01), implicit_rules: {n0: [_, !]} },
-                    r3: | { columns: [i64, i64, i64], kind: Primitive(i64_bitor012), implicit_rules: {n0: [_, _, !]} },
-                    r4: << { columns: [i64, i64, i64], kind: Primitive(i64_bitshl012), implicit_rules: {n0: [_, _, !]} },
-                    r5: >> { columns: [i64, i64, i64], kind: Primitive(i64_bitshr012), implicit_rules: {n0: [_, _, !]} },
-                    r6: ^ { columns: [i64, i64, i64], kind: Primitive(i64_bitxor012), implicit_rules: {n0: [_, _, !]} },
-                    r7: / { columns: [i64, i64, i64], kind: Primitive(i64_div012), implicit_rules: {n0: [_, _, !]} },
-                    r8: log2 { columns: [i64, i64], kind: Primitive(i64_log01), implicit_rules: {n0: [_, !]} },
-                    r9: max { columns: [i64, i64, i64], kind: Primitive(i64_max012), implicit_rules: {n0: [_, _, !]} },
-                    r10: min { columns: [i64, i64, i64], kind: Primitive(i64_min012), implicit_rules: {n0: [_, _, !]} },
-                    r11: * { columns: [i64, i64, i64], kind: Primitive(i64_mul012), implicit_rules: {n0: [_, _, !]} },
-                    r12: % { columns: [i64, i64, i64], kind: Primitive(i64_rem012), implicit_rules: {n0: [_, _, !]} },
-                    r13: - { columns: [i64, i64, i64], kind: Primitive(i64_sub012), implicit_rules: {n0: [_, _, !]} },
-                    r14: Math { columns: [Math], kind: Forall(t3), implicit_rules: {} },
-                    r15: Mul { columns: [Math, Math, Math], kind: Table, implicit_rules: {n0: [_, _, U]} },
-                    r16: Add { columns: [Math, Math, Math], kind: Table, implicit_rules: {n0: [_, _, U]} },
-                    r17: Sub { columns: [Math, Math, Math], kind: Table, implicit_rules: {n0: [_, _, U]} },
-                    r18: Const { columns: [i64, Math], kind: Table, implicit_rules: {n0: [_, U]} },
-                    r19: g0 { columns: [i64], kind: Global(g0), implicit_rules: {n0: [!]} },
-                    r20: neg_two { columns: [Math], kind: Global(g1), implicit_rules: {n0: [!]} },
-                    r21: g2 { columns: [i64], kind: Global(g2), implicit_rules: {n0: [!]} },
+                    r0: Const { columns: [i64, Math], kind: Table, implicit_rules: {n0: [_, U]} },
+                    r1: g0 { columns: [i64], kind: Global(g0), implicit_rules: {n0: [!]} },
+                    r2: neg_two { columns: [Math], kind: Global(g1), implicit_rules: {n0: [!]} },
+                    r3: g2 { columns: [i64], kind: Global(g2), implicit_rules: {n0: [!]} },
                 },
             }"#]]),
         expected_lir: None,
@@ -6000,10 +4908,7 @@ fn codegen_variable_reuse_bug() {
         expected_hir: Some(expect![[r#"
             Theory {
                 types: {
-                    [t0, ()]: std::primitive::unit,
-                    [t1, i64]: std::primitive::i64,
-                    [t2, String]: runtime::IString,
-                    [t3, Math]: [symbolic],
+                    [t0, Math]: [symbolic],
                 },
                 symbolic_rules: [
                     SymbolicRule {
@@ -6014,117 +4919,28 @@ fn codegen_variable_reuse_bug() {
                             Action { relation: Zero, columns: [x], entry: [U] },
                         ],
                         variables: {
-                            v0: VariableMeta { name: Some("zerozero"), ty: t3 },
-                            v1: VariableMeta { name: Some("x"), ty: t3 },
+                            v0: VariableMeta { name: Some("zerozero"), ty: t0 },
+                            v1: VariableMeta { name: Some("x"), ty: t0 },
                         },
                         unify: [],
                     },
                 ],
                 relations: {
-                    r0: + { columns: [i64, i64, i64], kind: Primitive(i64_add012), implicit_rules: {n0: [_, _, !]} },
-                    r1: & { columns: [i64, i64, i64], kind: Primitive(i64_bitand012), implicit_rules: {n0: [_, _, !]} },
-                    r2: not-i64 { columns: [i64, i64], kind: Primitive(i64_bitnot01), implicit_rules: {n0: [_, !]} },
-                    r3: | { columns: [i64, i64, i64], kind: Primitive(i64_bitor012), implicit_rules: {n0: [_, _, !]} },
-                    r4: << { columns: [i64, i64, i64], kind: Primitive(i64_bitshl012), implicit_rules: {n0: [_, _, !]} },
-                    r5: >> { columns: [i64, i64, i64], kind: Primitive(i64_bitshr012), implicit_rules: {n0: [_, _, !]} },
-                    r6: ^ { columns: [i64, i64, i64], kind: Primitive(i64_bitxor012), implicit_rules: {n0: [_, _, !]} },
-                    r7: / { columns: [i64, i64, i64], kind: Primitive(i64_div012), implicit_rules: {n0: [_, _, !]} },
-                    r8: log2 { columns: [i64, i64], kind: Primitive(i64_log01), implicit_rules: {n0: [_, !]} },
-                    r9: max { columns: [i64, i64, i64], kind: Primitive(i64_max012), implicit_rules: {n0: [_, _, !]} },
-                    r10: min { columns: [i64, i64, i64], kind: Primitive(i64_min012), implicit_rules: {n0: [_, _, !]} },
-                    r11: * { columns: [i64, i64, i64], kind: Primitive(i64_mul012), implicit_rules: {n0: [_, _, !]} },
-                    r12: % { columns: [i64, i64, i64], kind: Primitive(i64_rem012), implicit_rules: {n0: [_, _, !]} },
-                    r13: - { columns: [i64, i64, i64], kind: Primitive(i64_sub012), implicit_rules: {n0: [_, _, !]} },
-                    r14: Math { columns: [Math], kind: Forall(t3), implicit_rules: {} },
-                    r15: Add { columns: [Math, Math, Math], kind: Table, implicit_rules: {n0: [_, _, U]} },
-                    r16: Zero { columns: [Math], kind: Table, implicit_rules: {n0: [U]} },
-                    r17: zero { columns: [Math], kind: Global(g0), implicit_rules: {n0: [!]} },
+                    r0: Add { columns: [Math, Math, Math], kind: Table, implicit_rules: {n0: [_, _, U]} },
+                    r1: Zero { columns: [Math], kind: Table, implicit_rules: {n0: [U]} },
+                    r2: zero { columns: [Math], kind: Global(g0), implicit_rules: {n0: [!]} },
                 },
             }"#]]),
         expected_lir: Some(expect![[r#"
             Theory {
                 name: None,
                 types: {
-                    [t0, unit]: THIS_STRING_SHOULD_NOT_APPEAR_IN_GENERATED_CODE,
-                    [t1, i64]: std::primitive::i64,
-                    [t2, String]: runtime::IString,
-                    [t3, Math]: [symbolic],
+                    [t0, Math]: [symbolic],
                 },
                 relations: {
                     r0: RelationData {
-                        name: "i64_add012",
-                        param_types: {c0: t1, c1: t1, c2: t1},
-                        kind: Primitive,
-                    },
-                    r1: RelationData {
-                        name: "i64_bitand012",
-                        param_types: {c0: t1, c1: t1, c2: t1},
-                        kind: Primitive,
-                    },
-                    r2: RelationData {
-                        name: "i64_bitnot01",
-                        param_types: {c0: t1, c1: t1},
-                        kind: Primitive,
-                    },
-                    r3: RelationData {
-                        name: "i64_bitor012",
-                        param_types: {c0: t1, c1: t1, c2: t1},
-                        kind: Primitive,
-                    },
-                    r4: RelationData {
-                        name: "i64_bitshl012",
-                        param_types: {c0: t1, c1: t1, c2: t1},
-                        kind: Primitive,
-                    },
-                    r5: RelationData {
-                        name: "i64_bitshr012",
-                        param_types: {c0: t1, c1: t1, c2: t1},
-                        kind: Primitive,
-                    },
-                    r6: RelationData {
-                        name: "i64_bitxor012",
-                        param_types: {c0: t1, c1: t1, c2: t1},
-                        kind: Primitive,
-                    },
-                    r7: RelationData {
-                        name: "i64_div012",
-                        param_types: {c0: t1, c1: t1, c2: t1},
-                        kind: Primitive,
-                    },
-                    r8: RelationData {
-                        name: "i64_log01",
-                        param_types: {c0: t1, c1: t1},
-                        kind: Primitive,
-                    },
-                    r9: RelationData {
-                        name: "i64_max012",
-                        param_types: {c0: t1, c1: t1, c2: t1},
-                        kind: Primitive,
-                    },
-                    r10: RelationData {
-                        name: "i64_min012",
-                        param_types: {c0: t1, c1: t1, c2: t1},
-                        kind: Primitive,
-                    },
-                    r11: RelationData {
-                        name: "i64_mul012",
-                        param_types: {c0: t1, c1: t1, c2: t1},
-                        kind: Primitive,
-                    },
-                    r12: RelationData {
-                        name: "i64_rem012",
-                        param_types: {c0: t1, c1: t1, c2: t1},
-                        kind: Primitive,
-                    },
-                    r13: RelationData {
-                        name: "i64_sub012",
-                        param_types: {c0: t1, c1: t1, c2: t1},
-                        kind: Primitive,
-                    },
-                    r14: (hir-only relation),
-                    r15: RelationData {
                         name: "Add",
-                        param_types: {c0: t3, c1: t3, c2: t3},
+                        param_types: {c0: t0, c1: t0, c2: t0},
                         kind: Table {
                             index_to_info: {ir0: 0_1_2 conflict[..2] => [2:union], ir1: 0_2_1},
                             usage_to_info: {
@@ -6136,9 +4952,9 @@ fn codegen_variable_reuse_bug() {
                             column_back_reference: {},
                         },
                     },
-                    r16: RelationData {
+                    r1: RelationData {
                         name: "Zero",
-                        param_types: {c0: t3},
+                        param_types: {c0: t0},
                         kind: Table {
                             index_to_info: {ir0: 0 conflict[..0] => [0:union]},
                             usage_to_info: {
@@ -6149,99 +4965,53 @@ fn codegen_variable_reuse_bug() {
                             column_back_reference: {},
                         },
                     },
-                    r17: RelationData {
+                    r2: RelationData {
                         name: "g0",
-                        param_types: {c0: t3},
+                        param_types: {c0: t0},
                         kind: [Global, g0],
                     },
                 },
                 rule_variables: {
-                    [v0, zerozero]: t3,
-                    [v1, x]: t3,
-                    [v2, zerozero_2]: t3,
-                    [v3, x_2]: t3,
-                    [v4, zerozero_3]: t3,
+                    [v0, zerozero]: t0,
+                    [v1, x]: t0,
+                    [v2, zerozero_2]: t0,
+                    [v3, x_2]: t0,
+                    [v4, zerozero_3]: t0,
                 },
                 global_variable_types: {
-                    g0: t3,
+                    g0: t0,
                 },
                 rule_tries: [
-                    atom: [PremiseNew, r15(v0, v1, v4)]
+                    atom: [PremiseNew, r0(v0, v1, v4)]
                     then: [
                         atom: [IfEq, v0=v4]
                         then: [
-                            atom: [PremiseAny, r17(v0), iu_bogus]
+                            atom: [PremiseAny, r2(v0), iu_bogus]
                             then: [
                                 meta: "( rule ( ( = zero ( Add zero x ) ) ) ( ( union x ( Zero ) ) ) )"
-                                atom: [Action::Insert, r16(v1)],
+                                atom: [Action::Insert, r1(v1)],
                             ],
                         ],
                     ],
-                    atom: [PremiseNew, r17(v2)]
+                    atom: [PremiseNew, r2(v2)]
                     then: [
-                        atom: [Premise, r15(v2, v3, v2), iu1]
+                        atom: [Premise, r0(v2, v3, v2), iu1]
                         then: [
                             meta: "( rule ( ( = zero ( Add zero x ) ) ) ( ( union x ( Zero ) ) ) )"
-                            atom: [Action::Insert, r16(v3)],
+                            atom: [Action::Insert, r1(v3)],
                         ],
                     ],
                 ],
                 initial: [
                     ComputeGlobal {
                         global_id: g0,
-                        compute: Compute { relation: r16, args: [] },
+                        compute: Compute { relation: r1, args: [] },
                     },
                 ],
             }"#]]),
         expected_codegen: Some(expect![[r#"
             use oatlog::runtime::{self, *};
             eclass_wrapper_ty!(Math);
-            fn i64_add012(a: i64, b: i64) -> impl Iterator<Item = (i64,)> {
-                a.checked_add(b).map(|x| (x,)).into_iter()
-            }
-            fn i64_bitand012(a: i64, b: i64) -> impl Iterator<Item = (i64,)> {
-                std::iter::once((a & b,))
-            }
-            fn i64_bitnot01(a: i64) -> impl Iterator<Item = (i64,)> {
-                std::iter::once((!a,))
-            }
-            fn i64_bitor012(a: i64, b: i64) -> impl Iterator<Item = (i64,)> {
-                std::iter::once((a | b,))
-            }
-            fn i64_bitshl012(a: i64, b: i64) -> impl Iterator<Item = (i64,)> {
-                a.checked_shl(b.try_into().unwrap())
-                    .map(|x| (x,))
-                    .into_iter()
-            }
-            fn i64_bitshr012(a: i64, b: i64) -> impl Iterator<Item = (i64,)> {
-                a.checked_shr(b.try_into().unwrap())
-                    .map(|x| (x,))
-                    .into_iter()
-            }
-            fn i64_bitxor012(a: i64, b: i64) -> impl Iterator<Item = (i64,)> {
-                std::iter::once((a ^ b,))
-            }
-            fn i64_div012(a: i64, b: i64) -> impl Iterator<Item = (i64,)> {
-                a.checked_div(b).map(|x| (x,)).into_iter()
-            }
-            fn i64_log01(a: i64) -> impl Iterator<Item = (i64,)> {
-                std::iter::once((a.ilog2() as i64,))
-            }
-            fn i64_max012(a: i64, b: i64) -> impl Iterator<Item = (i64,)> {
-                std::iter::once((a.max(b),))
-            }
-            fn i64_min012(a: i64, b: i64) -> impl Iterator<Item = (i64,)> {
-                std::iter::once((a.min(b),))
-            }
-            fn i64_mul012(a: i64, b: i64) -> impl Iterator<Item = (i64,)> {
-                a.checked_mul(b).map(|x| (x,)).into_iter()
-            }
-            fn i64_rem012(a: i64, b: i64) -> impl Iterator<Item = (i64,)> {
-                a.checked_rem(b).map(|x| (x,)).into_iter()
-            }
-            fn i64_sub012(a: i64, b: i64) -> impl Iterator<Item = (i64,)> {
-                a.checked_sub(b).map(|x| (x,)).into_iter()
-            }
             #[derive(Debug, Default)]
             struct AddRelation {
                 new: Vec<<Self as Relation>::Row>,
@@ -6710,97 +5480,35 @@ fn initial_exprs() {
 
             (Mul (Var "x") (Var "y"))
         "#,
-        expected_hir: Some(expect![[r"
+        expected_hir: Some(expect![[r#"
             Theory {
                 types: {
-                    [t0, ()]: std::primitive::unit,
-                    [t1, i64]: std::primitive::i64,
-                    [t2, String]: runtime::IString,
-                    [t3, Math]: [symbolic],
+                    [t0, i64]: std::primitive::i64,
+                    [t1, String]: runtime::IString,
+                    [t2, Math]: [symbolic],
                 },
                 symbolic_rules: [],
                 relations: {
-                    r0: + { columns: [i64, i64, i64], kind: Primitive(i64_add012), implicit_rules: {n0: [_, _, !]} },
-                    r1: & { columns: [i64, i64, i64], kind: Primitive(i64_bitand012), implicit_rules: {n0: [_, _, !]} },
-                    r2: not-i64 { columns: [i64, i64], kind: Primitive(i64_bitnot01), implicit_rules: {n0: [_, !]} },
-                    r3: | { columns: [i64, i64, i64], kind: Primitive(i64_bitor012), implicit_rules: {n0: [_, _, !]} },
-                    r4: << { columns: [i64, i64, i64], kind: Primitive(i64_bitshl012), implicit_rules: {n0: [_, _, !]} },
-                    r5: >> { columns: [i64, i64, i64], kind: Primitive(i64_bitshr012), implicit_rules: {n0: [_, _, !]} },
-                    r6: ^ { columns: [i64, i64, i64], kind: Primitive(i64_bitxor012), implicit_rules: {n0: [_, _, !]} },
-                    r7: / { columns: [i64, i64, i64], kind: Primitive(i64_div012), implicit_rules: {n0: [_, _, !]} },
-                    r8: log2 { columns: [i64, i64], kind: Primitive(i64_log01), implicit_rules: {n0: [_, !]} },
-                    r9: max { columns: [i64, i64, i64], kind: Primitive(i64_max012), implicit_rules: {n0: [_, _, !]} },
-                    r10: min { columns: [i64, i64, i64], kind: Primitive(i64_min012), implicit_rules: {n0: [_, _, !]} },
-                    r11: * { columns: [i64, i64, i64], kind: Primitive(i64_mul012), implicit_rules: {n0: [_, _, !]} },
-                    r12: % { columns: [i64, i64, i64], kind: Primitive(i64_rem012), implicit_rules: {n0: [_, _, !]} },
-                    r13: - { columns: [i64, i64, i64], kind: Primitive(i64_sub012), implicit_rules: {n0: [_, _, !]} },
-                    r14: Math { columns: [Math], kind: Forall(t3), implicit_rules: {} },
-                    r15: Add { columns: [Math, Math, Math], kind: Table, implicit_rules: {n0: [_, _, U]} },
-                    r16: Mul { columns: [Math, Math, Math], kind: Table, implicit_rules: {n0: [_, _, U]} },
-                    r17: Const { columns: [i64, Math], kind: Table, implicit_rules: {n0: [_, U]} },
-                    r18: Var { columns: [String, Math], kind: Table, implicit_rules: {n0: [_, U]} },
-                    r19: g0 { columns: [i64], kind: Global(g0), implicit_rules: {n0: [!]} },
-                    r20: g1 { columns: [Math], kind: Global(g1), implicit_rules: {n0: [!]} },
-                    r21: g2 { columns: [i64], kind: Global(g2), implicit_rules: {n0: [!]} },
-                    r22: g3 { columns: [Math], kind: Global(g3), implicit_rules: {n0: [!]} },
-                    r23: g4 { columns: [Math], kind: Global(g4), implicit_rules: {n0: [!]} },
-                    r24: g5 { columns: [String], kind: Global(g5), implicit_rules: {n0: [!]} },
-                    r25: g6 { columns: [Math], kind: Global(g6), implicit_rules: {n0: [!]} },
-                    r26: g7 { columns: [String], kind: Global(g7), implicit_rules: {n0: [!]} },
-                    r27: g8 { columns: [Math], kind: Global(g8), implicit_rules: {n0: [!]} },
-                    r28: g9 { columns: [Math], kind: Global(g9), implicit_rules: {n0: [!]} },
+                    r0: Add { columns: [Math, Math, Math], kind: Table, implicit_rules: {n0: [_, _, U]} },
+                    r1: Mul { columns: [Math, Math, Math], kind: Table, implicit_rules: {n0: [_, _, U]} },
+                    r2: Const { columns: [i64, Math], kind: Table, implicit_rules: {n0: [_, U]} },
+                    r3: Var { columns: [String, Math], kind: Table, implicit_rules: {n0: [_, U]} },
+                    r4: g0 { columns: [i64], kind: Global(g0), implicit_rules: {n0: [!]} },
+                    r5: g1 { columns: [Math], kind: Global(g1), implicit_rules: {n0: [!]} },
+                    r6: g2 { columns: [i64], kind: Global(g2), implicit_rules: {n0: [!]} },
+                    r7: g3 { columns: [Math], kind: Global(g3), implicit_rules: {n0: [!]} },
+                    r8: g4 { columns: [Math], kind: Global(g4), implicit_rules: {n0: [!]} },
+                    r9: g5 { columns: [String], kind: Global(g5), implicit_rules: {n0: [!]} },
+                    r10: g6 { columns: [Math], kind: Global(g6), implicit_rules: {n0: [!]} },
+                    r11: g7 { columns: [String], kind: Global(g7), implicit_rules: {n0: [!]} },
+                    r12: g8 { columns: [Math], kind: Global(g8), implicit_rules: {n0: [!]} },
+                    r13: g9 { columns: [Math], kind: Global(g9), implicit_rules: {n0: [!]} },
                 },
-            }"]]),
+            }"#]]),
         expected_lir: None,
         expected_codegen: Some(expect![[r#"
             use oatlog::runtime::{self, *};
             eclass_wrapper_ty!(Math);
-            fn i64_add012(a: i64, b: i64) -> impl Iterator<Item = (i64,)> {
-                a.checked_add(b).map(|x| (x,)).into_iter()
-            }
-            fn i64_bitand012(a: i64, b: i64) -> impl Iterator<Item = (i64,)> {
-                std::iter::once((a & b,))
-            }
-            fn i64_bitnot01(a: i64) -> impl Iterator<Item = (i64,)> {
-                std::iter::once((!a,))
-            }
-            fn i64_bitor012(a: i64, b: i64) -> impl Iterator<Item = (i64,)> {
-                std::iter::once((a | b,))
-            }
-            fn i64_bitshl012(a: i64, b: i64) -> impl Iterator<Item = (i64,)> {
-                a.checked_shl(b.try_into().unwrap())
-                    .map(|x| (x,))
-                    .into_iter()
-            }
-            fn i64_bitshr012(a: i64, b: i64) -> impl Iterator<Item = (i64,)> {
-                a.checked_shr(b.try_into().unwrap())
-                    .map(|x| (x,))
-                    .into_iter()
-            }
-            fn i64_bitxor012(a: i64, b: i64) -> impl Iterator<Item = (i64,)> {
-                std::iter::once((a ^ b,))
-            }
-            fn i64_div012(a: i64, b: i64) -> impl Iterator<Item = (i64,)> {
-                a.checked_div(b).map(|x| (x,)).into_iter()
-            }
-            fn i64_log01(a: i64) -> impl Iterator<Item = (i64,)> {
-                std::iter::once((a.ilog2() as i64,))
-            }
-            fn i64_max012(a: i64, b: i64) -> impl Iterator<Item = (i64,)> {
-                std::iter::once((a.max(b),))
-            }
-            fn i64_min012(a: i64, b: i64) -> impl Iterator<Item = (i64,)> {
-                std::iter::once((a.min(b),))
-            }
-            fn i64_mul012(a: i64, b: i64) -> impl Iterator<Item = (i64,)> {
-                a.checked_mul(b).map(|x| (x,)).into_iter()
-            }
-            fn i64_rem012(a: i64, b: i64) -> impl Iterator<Item = (i64,)> {
-                a.checked_rem(b).map(|x| (x,)).into_iter()
-            }
-            fn i64_sub012(a: i64, b: i64) -> impl Iterator<Item = (i64,)> {
-                a.checked_sub(b).map(|x| (x,)).into_iter()
-            }
             #[derive(Debug, Default)]
             struct AddRelation {
                 new: Vec<<Self as Relation>::Row>,
@@ -7791,240 +6499,39 @@ fn codegen_bug1() {
             (sort T2)
             (relation Foo (T0 T1 T2))
         ",
-        expected_hir: Some(expect![[r"
+        expected_hir: Some(expect![[r#"
             Theory {
-                types: {
-                    [t0, ()]: std::primitive::unit,
-                    [t1, i64]: std::primitive::i64,
-                    [t2, String]: runtime::IString,
-                    [t3, T0]: [symbolic],
-                    [t4, T1]: [symbolic],
-                    [t5, T2]: [symbolic],
-                },
+                types: {},
                 symbolic_rules: [],
-                relations: {
-                    r0: + { columns: [i64, i64, i64], kind: Primitive(i64_add012), implicit_rules: {n0: [_, _, !]} },
-                    r1: & { columns: [i64, i64, i64], kind: Primitive(i64_bitand012), implicit_rules: {n0: [_, _, !]} },
-                    r2: not-i64 { columns: [i64, i64], kind: Primitive(i64_bitnot01), implicit_rules: {n0: [_, !]} },
-                    r3: | { columns: [i64, i64, i64], kind: Primitive(i64_bitor012), implicit_rules: {n0: [_, _, !]} },
-                    r4: << { columns: [i64, i64, i64], kind: Primitive(i64_bitshl012), implicit_rules: {n0: [_, _, !]} },
-                    r5: >> { columns: [i64, i64, i64], kind: Primitive(i64_bitshr012), implicit_rules: {n0: [_, _, !]} },
-                    r6: ^ { columns: [i64, i64, i64], kind: Primitive(i64_bitxor012), implicit_rules: {n0: [_, _, !]} },
-                    r7: / { columns: [i64, i64, i64], kind: Primitive(i64_div012), implicit_rules: {n0: [_, _, !]} },
-                    r8: log2 { columns: [i64, i64], kind: Primitive(i64_log01), implicit_rules: {n0: [_, !]} },
-                    r9: max { columns: [i64, i64, i64], kind: Primitive(i64_max012), implicit_rules: {n0: [_, _, !]} },
-                    r10: min { columns: [i64, i64, i64], kind: Primitive(i64_min012), implicit_rules: {n0: [_, _, !]} },
-                    r11: * { columns: [i64, i64, i64], kind: Primitive(i64_mul012), implicit_rules: {n0: [_, _, !]} },
-                    r12: % { columns: [i64, i64, i64], kind: Primitive(i64_rem012), implicit_rules: {n0: [_, _, !]} },
-                    r13: - { columns: [i64, i64, i64], kind: Primitive(i64_sub012), implicit_rules: {n0: [_, _, !]} },
-                    r14: T0 { columns: [T0], kind: Forall(t3), implicit_rules: {} },
-                    r15: T1 { columns: [T1], kind: Forall(t4), implicit_rules: {} },
-                    r16: T2 { columns: [T2], kind: Forall(t5), implicit_rules: {} },
-                    r17: Foo { columns: [T0, T1, T2], kind: Table, implicit_rules: {} },
-                },
-            }"]]),
+                relations: {},
+            }"#]]),
         expected_lir: None,
         expected_codegen: Some(expect![[r#"
             use oatlog::runtime::{self, *};
-            eclass_wrapper_ty!(T0);
-            eclass_wrapper_ty!(T1);
-            eclass_wrapper_ty!(T2);
-            fn i64_add012(a: i64, b: i64) -> impl Iterator<Item = (i64,)> {
-                a.checked_add(b).map(|x| (x,)).into_iter()
-            }
-            fn i64_bitand012(a: i64, b: i64) -> impl Iterator<Item = (i64,)> {
-                std::iter::once((a & b,))
-            }
-            fn i64_bitnot01(a: i64) -> impl Iterator<Item = (i64,)> {
-                std::iter::once((!a,))
-            }
-            fn i64_bitor012(a: i64, b: i64) -> impl Iterator<Item = (i64,)> {
-                std::iter::once((a | b,))
-            }
-            fn i64_bitshl012(a: i64, b: i64) -> impl Iterator<Item = (i64,)> {
-                a.checked_shl(b.try_into().unwrap())
-                    .map(|x| (x,))
-                    .into_iter()
-            }
-            fn i64_bitshr012(a: i64, b: i64) -> impl Iterator<Item = (i64,)> {
-                a.checked_shr(b.try_into().unwrap())
-                    .map(|x| (x,))
-                    .into_iter()
-            }
-            fn i64_bitxor012(a: i64, b: i64) -> impl Iterator<Item = (i64,)> {
-                std::iter::once((a ^ b,))
-            }
-            fn i64_div012(a: i64, b: i64) -> impl Iterator<Item = (i64,)> {
-                a.checked_div(b).map(|x| (x,)).into_iter()
-            }
-            fn i64_log01(a: i64) -> impl Iterator<Item = (i64,)> {
-                std::iter::once((a.ilog2() as i64,))
-            }
-            fn i64_max012(a: i64, b: i64) -> impl Iterator<Item = (i64,)> {
-                std::iter::once((a.max(b),))
-            }
-            fn i64_min012(a: i64, b: i64) -> impl Iterator<Item = (i64,)> {
-                std::iter::once((a.min(b),))
-            }
-            fn i64_mul012(a: i64, b: i64) -> impl Iterator<Item = (i64,)> {
-                a.checked_mul(b).map(|x| (x,)).into_iter()
-            }
-            fn i64_rem012(a: i64, b: i64) -> impl Iterator<Item = (i64,)> {
-                a.checked_rem(b).map(|x| (x,)).into_iter()
-            }
-            fn i64_sub012(a: i64, b: i64) -> impl Iterator<Item = (i64,)> {
-                a.checked_sub(b).map(|x| (x,)).into_iter()
-            }
             #[derive(Debug, Default)]
-            struct FooRelation {
-                new: Vec<<Self as Relation>::Row>,
-                hash_index_0_1_2: runtime::HashMap<(T0, T1, T2), runtime::SmallVec<[(); 1]>>,
-                t0_num_uprooted_at_latest_retain: usize,
-                t1_num_uprooted_at_latest_retain: usize,
-                t2_num_uprooted_at_latest_retain: usize,
-            }
-            impl Relation for FooRelation {
-                type Row = (T0, T1, T2);
-                type Unification = Unification;
-                const COST: u32 = 3u32;
-                fn new() -> Self {
-                    Self::default()
-                }
-                fn has_new(&self) -> bool {
-                    !self.new.is_empty()
-                }
-                fn clear_new(&mut self) {
-                    self.new.clear();
-                }
-                fn iter_new(&self) -> impl '_ + Iterator<Item = Self::Row> {
-                    self.new.iter().copied()
-                }
-                fn len(&self) -> usize {
-                    self.hash_index_0_1_2.values().map(|v| v.len()).sum()
-                }
-                fn emit_graphviz(&self, buf: &mut String) {
-                    use std::fmt::Write;
-                    for (i, ((x0, x1, x2), ())) in self
-                        .hash_index_0_1_2
-                        .iter()
-                        .flat_map(|(k, v)| v.iter().map(move |v| (k, v)))
-                        .enumerate()
-                    {
-                        writeln!(buf, "{}_{i} -> {}_{};", "foo", "t0", x0).unwrap();
-                        writeln!(buf, "{}_{i} -> {}_{};", "foo", "t1", x1).unwrap();
-                        writeln!(buf, "{}_{i} -> {}_{};", "foo", "t2", x2).unwrap();
-                        writeln!(buf, "{}_{i} [shape = box];", "foo").unwrap();
-                    }
-                }
-                fn update_begin(&mut self, insertions: &[Self::Row], uf: &mut Unification) {}
-                fn update(&mut self, insertions: &mut Vec<Self::Row>, uf: &mut Unification) -> bool {
-                    if self.t0_num_uprooted_at_latest_retain == uf.t0_.num_uprooted()
-                        && self.t1_num_uprooted_at_latest_retain == uf.t1_.num_uprooted()
-                        && self.t2_num_uprooted_at_latest_retain == uf.t2_.num_uprooted()
-                    {
-                        return false;
-                    }
-                    self.t0_num_uprooted_at_latest_retain = uf.t0_.num_uprooted();
-                    self.t1_num_uprooted_at_latest_retain = uf.t1_.num_uprooted();
-                    self.t2_num_uprooted_at_latest_retain = uf.t2_.num_uprooted();
-                    let offset = insertions.len();
-                    self.update_begin(&insertions[offset..], uf);
-                    true
-                }
-                fn update_finalize(&mut self, insertions: &mut Vec<Self::Row>, uf: &mut Unification) {
-                    assert!(self.new.is_empty());
-                    self.new.extend(
-                        insertions
-                            .iter()
-                            .map(|&(x0, x1, x2)| (uf.t0_.find(x0), uf.t1_.find(x1), uf.t2_.find(x2)))
-                            .filter(|&(x0, x1, x2)| !self.hash_index_0_1_2.contains_key(&(x0, x1, x2))),
-                    );
-                    insertions.clear();
-                    RadixSortable::wrap(&mut self.new).voracious_sort();
-                    self.new.dedup();
-                    for &(x0, x1, x2) in &self.new {
-                        self.hash_index_0_1_2
-                            .entry((uf.t0_.find(x0), uf.t1_.find(x1), uf.t2_.find(x2)))
-                            .or_default()
-                            .push(());
-                    }
-                    self.hash_index_0_1_2.retain(|&(x0, x1, x2), v| {
-                        if uf.t0_.is_root(x0) & uf.t1_.is_root(x1) & uf.t2_.is_root(x2) {
-                            v.retain(|&mut ()| true);
-                            v.sort_unstable();
-                            v.dedup();
-                            true
-                        } else {
-                            false
-                        }
-                    });
-                    self.t0_num_uprooted_at_latest_retain = 0;
-                    self.t1_num_uprooted_at_latest_retain = 0;
-                    self.t2_num_uprooted_at_latest_retain = 0;
-                }
-            }
-            impl FooRelation {
-                fn iter3_0_1_2(&self, x0: T0, x1: T1, x2: T2) -> impl Iterator<Item = ()> + use<'_> {
-                    self.hash_index_0_1_2
-                        .get(&(x0, x1, x2))
-                        .into_iter()
-                        .flatten()
-                        .copied()
-                }
-                fn check3_0_1_2(&self, x0: T0, x1: T1, x2: T2) -> bool {
-                    self.iter3_0_1_2(x0, x1, x2).next().is_some()
-                }
-                #[allow(unreachable_code)]
-                fn entry3_0_1_2(&self, x0: T0, x1: T1, x2: T2, delta: &mut Delta, uf: &mut Unification) -> () {
-                    if let Some(()) = self.iter3_0_1_2(x0, x1, x2).next() {
-                        return ();
-                    }
-                    delta.foo_.push((x0, x1, x2));
-                    ()
-                }
-            }
-            #[derive(Debug, Default)]
-            pub struct Delta {
-                foo_: Vec<<FooRelation as Relation>::Row>,
-            }
+            pub struct Delta {}
             impl Delta {
                 fn new() -> Self {
                     Self::default()
                 }
                 fn has_new_inserts(&self) -> bool {
                     let mut has_new_inserts = false;
-                    has_new_inserts |= !self.foo_.is_empty();
                     has_new_inserts
-                }
-                pub fn insert_foo(&mut self, x: <FooRelation as Relation>::Row) {
-                    self.foo_.push(x);
                 }
             }
             #[derive(Debug, Default)]
-            struct Unification {
-                pub t0_: UnionFind<T0>,
-                pub t1_: UnionFind<T1>,
-                pub t2_: UnionFind<T2>,
-            }
+            struct Unification {}
             impl Unification {
                 fn num_uprooted(&mut self) -> usize {
                     let mut ret = 0;
-                    ret += self.t0_.num_uprooted();
-                    ret += self.t1_.num_uprooted();
-                    ret += self.t2_.num_uprooted();
                     ret
                 }
-                fn reset_num_uprooted(&mut self) {
-                    self.t0_.reset_num_uprooted();
-                    self.t1_.reset_num_uprooted();
-                    self.t2_.reset_num_uprooted();
-                }
+                fn reset_num_uprooted(&mut self) {}
             }
             #[derive(Debug, Default)]
             pub struct Theory {
                 pub delta: Delta,
                 pub uf: Unification,
-                pub foo_: FooRelation,
             }
             impl Theory {
                 pub fn new() -> Self {
@@ -8050,7 +6557,6 @@ fn codegen_bug1() {
                 fn emit_graphviz(&self) -> String {
                     let mut buf = String::new();
                     buf.push_str("digraph G {\n");
-                    self.foo_.emit_graphviz(&mut buf);
                     buf.push_str("}\n");
                     buf
                 }
@@ -8058,7 +6564,7 @@ fn codegen_bug1() {
                     self.get_relation_entry_count().values().sum()
                 }
                 pub fn get_relation_entry_count(&self) -> std::collections::BTreeMap<&'static str, usize> {
-                    [("Foo", self.foo_.len())].into_iter().collect()
+                    [].into_iter().collect()
                 }
                 pub fn get_total_uf_count(&self) -> (usize, usize) {
                     self.get_uf_count()
@@ -8066,64 +6572,20 @@ fn codegen_bug1() {
                         .fold((0, 0), |(at, ar), (t, r)| (at + t, ar + r))
                 }
                 pub fn get_uf_count(&self) -> std::collections::BTreeMap<&'static str, (usize, usize)> {
-                    [
-                        ("T0", (self.uf.t0_.len(), self.uf.t0_.num_roots())),
-                        ("T1", (self.uf.t1_.len(), self.uf.t1_.num_roots())),
-                        ("T2", (self.uf.t2_.len(), self.uf.t2_.num_roots())),
-                    ]
-                    .into_iter()
-                    .collect()
+                    [].into_iter().collect()
                 }
                 #[inline(never)]
                 pub fn canonicalize(&mut self) {
-                    self.foo_.clear_new();
                     if !self.delta.has_new_inserts() && self.uf.num_uprooted() == 0 {
                         return;
                     }
-                    self.foo_.update_begin(&mut self.delta.foo_, &mut self.uf);
                     loop {
                         let mut progress = false;
-                        progress |= self.foo_.update(&mut self.delta.foo_, &mut self.uf);
                         if !progress {
                             break;
                         }
                     }
-                    self.foo_
-                        .update_finalize(&mut self.delta.foo_, &mut self.uf);
                     self.uf.reset_num_uprooted();
-                }
-            }
-            impl EclassProvider<T0> for Theory {
-                fn make(&mut self) -> T0 {
-                    self.uf.t0_.add_eclass()
-                }
-                fn find(&mut self, t: T0) -> T0 {
-                    self.uf.t0_.find(t)
-                }
-                fn union(&mut self, a: T0, b: T0) {
-                    self.uf.t0_.union(a, b);
-                }
-            }
-            impl EclassProvider<T1> for Theory {
-                fn make(&mut self) -> T1 {
-                    self.uf.t1_.add_eclass()
-                }
-                fn find(&mut self, t: T1) -> T1 {
-                    self.uf.t1_.find(t)
-                }
-                fn union(&mut self, a: T1, b: T1) {
-                    self.uf.t1_.union(a, b);
-                }
-            }
-            impl EclassProvider<T2> for Theory {
-                fn make(&mut self) -> T2 {
-                    self.uf.t2_.add_eclass()
-                }
-                fn find(&mut self, t: T2) -> T2 {
-                    self.uf.t2_.find(t)
-                }
-                fn union(&mut self, a: T2, b: T2) {
-                    self.uf.t2_.union(a, b);
                 }
             }
             impl std::ops::Deref for Theory {
@@ -8151,261 +6613,39 @@ fn initial() {
             )
             (run 42)
         ",
-        expected_hir: Some(expect![[r"
+        expected_hir: Some(expect![[r#"
             Theory {
-                types: {
-                    [t0, ()]: std::primitive::unit,
-                    [t1, i64]: std::primitive::i64,
-                    [t2, String]: runtime::IString,
-                    [t3, Math]: [symbolic],
-                },
+                types: {},
                 symbolic_rules: [],
-                relations: {
-                    r0: + { columns: [i64, i64, i64], kind: Primitive(i64_add012), implicit_rules: {n0: [_, _, !]} },
-                    r1: & { columns: [i64, i64, i64], kind: Primitive(i64_bitand012), implicit_rules: {n0: [_, _, !]} },
-                    r2: not-i64 { columns: [i64, i64], kind: Primitive(i64_bitnot01), implicit_rules: {n0: [_, !]} },
-                    r3: | { columns: [i64, i64, i64], kind: Primitive(i64_bitor012), implicit_rules: {n0: [_, _, !]} },
-                    r4: << { columns: [i64, i64, i64], kind: Primitive(i64_bitshl012), implicit_rules: {n0: [_, _, !]} },
-                    r5: >> { columns: [i64, i64, i64], kind: Primitive(i64_bitshr012), implicit_rules: {n0: [_, _, !]} },
-                    r6: ^ { columns: [i64, i64, i64], kind: Primitive(i64_bitxor012), implicit_rules: {n0: [_, _, !]} },
-                    r7: / { columns: [i64, i64, i64], kind: Primitive(i64_div012), implicit_rules: {n0: [_, _, !]} },
-                    r8: log2 { columns: [i64, i64], kind: Primitive(i64_log01), implicit_rules: {n0: [_, !]} },
-                    r9: max { columns: [i64, i64, i64], kind: Primitive(i64_max012), implicit_rules: {n0: [_, _, !]} },
-                    r10: min { columns: [i64, i64, i64], kind: Primitive(i64_min012), implicit_rules: {n0: [_, _, !]} },
-                    r11: * { columns: [i64, i64, i64], kind: Primitive(i64_mul012), implicit_rules: {n0: [_, _, !]} },
-                    r12: % { columns: [i64, i64, i64], kind: Primitive(i64_rem012), implicit_rules: {n0: [_, _, !]} },
-                    r13: - { columns: [i64, i64, i64], kind: Primitive(i64_sub012), implicit_rules: {n0: [_, _, !]} },
-                    r14: Math { columns: [Math], kind: Forall(t3), implicit_rules: {} },
-                    r15: Const { columns: [i64, Math], kind: Table, implicit_rules: {n0: [_, U]} },
-                },
-            }"]]),
+                relations: {},
+            }"#]]),
         expected_lir: None,
         expected_codegen: Some(expect![[r#"
             use oatlog::runtime::{self, *};
-            eclass_wrapper_ty!(Math);
-            fn i64_add012(a: i64, b: i64) -> impl Iterator<Item = (i64,)> {
-                a.checked_add(b).map(|x| (x,)).into_iter()
-            }
-            fn i64_bitand012(a: i64, b: i64) -> impl Iterator<Item = (i64,)> {
-                std::iter::once((a & b,))
-            }
-            fn i64_bitnot01(a: i64) -> impl Iterator<Item = (i64,)> {
-                std::iter::once((!a,))
-            }
-            fn i64_bitor012(a: i64, b: i64) -> impl Iterator<Item = (i64,)> {
-                std::iter::once((a | b,))
-            }
-            fn i64_bitshl012(a: i64, b: i64) -> impl Iterator<Item = (i64,)> {
-                a.checked_shl(b.try_into().unwrap())
-                    .map(|x| (x,))
-                    .into_iter()
-            }
-            fn i64_bitshr012(a: i64, b: i64) -> impl Iterator<Item = (i64,)> {
-                a.checked_shr(b.try_into().unwrap())
-                    .map(|x| (x,))
-                    .into_iter()
-            }
-            fn i64_bitxor012(a: i64, b: i64) -> impl Iterator<Item = (i64,)> {
-                std::iter::once((a ^ b,))
-            }
-            fn i64_div012(a: i64, b: i64) -> impl Iterator<Item = (i64,)> {
-                a.checked_div(b).map(|x| (x,)).into_iter()
-            }
-            fn i64_log01(a: i64) -> impl Iterator<Item = (i64,)> {
-                std::iter::once((a.ilog2() as i64,))
-            }
-            fn i64_max012(a: i64, b: i64) -> impl Iterator<Item = (i64,)> {
-                std::iter::once((a.max(b),))
-            }
-            fn i64_min012(a: i64, b: i64) -> impl Iterator<Item = (i64,)> {
-                std::iter::once((a.min(b),))
-            }
-            fn i64_mul012(a: i64, b: i64) -> impl Iterator<Item = (i64,)> {
-                a.checked_mul(b).map(|x| (x,)).into_iter()
-            }
-            fn i64_rem012(a: i64, b: i64) -> impl Iterator<Item = (i64,)> {
-                a.checked_rem(b).map(|x| (x,)).into_iter()
-            }
-            fn i64_sub012(a: i64, b: i64) -> impl Iterator<Item = (i64,)> {
-                a.checked_sub(b).map(|x| (x,)).into_iter()
-            }
             #[derive(Debug, Default)]
-            struct ConstRelation {
-                new: Vec<<Self as Relation>::Row>,
-                hash_index_0: runtime::HashMap<(std::primitive::i64,), (Math,)>,
-                hash_index_0_1: runtime::HashMap<(std::primitive::i64, Math), runtime::SmallVec<[(); 1]>>,
-                i64_num_uprooted_at_latest_retain: usize,
-                math_num_uprooted_at_latest_retain: usize,
-            }
-            impl Relation for ConstRelation {
-                type Row = (std::primitive::i64, Math);
-                type Unification = Unification;
-                const COST: u32 = 2u32;
-                fn new() -> Self {
-                    Self::default()
-                }
-                fn has_new(&self) -> bool {
-                    !self.new.is_empty()
-                }
-                fn clear_new(&mut self) {
-                    self.new.clear();
-                }
-                fn iter_new(&self) -> impl '_ + Iterator<Item = Self::Row> {
-                    self.new.iter().copied()
-                }
-                fn len(&self) -> usize {
-                    self.hash_index_0.len()
-                }
-                fn emit_graphviz(&self, buf: &mut String) {
-                    use std::fmt::Write;
-                    for (i, ((x0,), (x1,))) in self.hash_index_0.iter().enumerate() {
-                        writeln!(buf, "{}_{i} -> {}_{};", "const", "i64", x0).unwrap();
-                        writeln!(buf, "{}_{i} -> {}_{};", "const", "math", x1).unwrap();
-                        writeln!(buf, "{}_{i} [shape = box];", "const").unwrap();
-                    }
-                }
-                fn update_begin(&mut self, insertions: &[Self::Row], uf: &mut Unification) {
-                    for &(mut x0, mut x1) in insertions {
-                        match self.hash_index_0.entry((x0,)) {
-                            runtime::HashMapEntry::Occupied(mut entry) => {
-                                let (y1,) = entry.get_mut();
-                                uf.math_.union_mut(&mut x1, y1);
-                            }
-                            runtime::HashMapEntry::Vacant(entry) => {
-                                entry.insert((uf.math_.find(x1),));
-                            }
-                        }
-                    }
-                }
-                fn update(&mut self, insertions: &mut Vec<Self::Row>, uf: &mut Unification) -> bool {
-                    if self.math_num_uprooted_at_latest_retain == uf.math_.num_uprooted() {
-                        return false;
-                    }
-                    self.math_num_uprooted_at_latest_retain = uf.math_.num_uprooted();
-                    let offset = insertions.len();
-                    self.hash_index_0.retain(|&(x0,), &mut (x1,)| {
-                        if uf.math_.is_root(x1) {
-                            true
-                        } else {
-                            insertions.push((x0, x1));
-                            false
-                        }
-                    });
-                    self.update_begin(&insertions[offset..], uf);
-                    true
-                }
-                fn update_finalize(&mut self, insertions: &mut Vec<Self::Row>, uf: &mut Unification) {
-                    assert!(self.new.is_empty());
-                    self.new.extend(
-                        self.hash_index_0
-                            .iter()
-                            .map(|(&(x0,), &(x1,))| (x0, uf.math_.find(x1)))
-                            .filter(|&(x0, x1)| !self.hash_index_0_1.contains_key(&(x0, x1))),
-                    );
-                    insertions.clear();
-                    self.new.sort_unstable();
-                    self.new.dedup();
-                    for &(x0, x1) in &self.new {
-                        self.hash_index_0_1
-                            .entry((x0, uf.math_.find(x1)))
-                            .or_default()
-                            .push(());
-                    }
-                    self.hash_index_0_1.retain(|&(x0, x1), v| {
-                        if uf.math_.is_root(x1) {
-                            v.retain(|&mut ()| true);
-                            v.sort_unstable();
-                            v.dedup();
-                            true
-                        } else {
-                            false
-                        }
-                    });
-                    self.math_num_uprooted_at_latest_retain = 0;
-                }
-            }
-            impl ConstRelation {
-                fn iter1_0_1(&self, x0: std::primitive::i64) -> impl Iterator<Item = (Math,)> + use<'_> {
-                    self.hash_index_0.get(&(x0,)).into_iter().copied()
-                }
-                fn iter2_0_1(&self, x0: std::primitive::i64, x1: Math) -> impl Iterator<Item = ()> + use<'_> {
-                    self.hash_index_0_1
-                        .get(&(x0, x1))
-                        .into_iter()
-                        .flatten()
-                        .copied()
-                }
-                fn check1_0_1(&self, x0: std::primitive::i64) -> bool {
-                    self.iter1_0_1(x0).next().is_some()
-                }
-                fn check2_0_1(&self, x0: std::primitive::i64, x1: Math) -> bool {
-                    self.iter2_0_1(x0, x1).next().is_some()
-                }
-                #[allow(unreachable_code)]
-                fn entry1_0_1(
-                    &self,
-                    x0: std::primitive::i64,
-                    delta: &mut Delta,
-                    uf: &mut Unification,
-                ) -> (Math,) {
-                    if let Some((x1,)) = self.iter1_0_1(x0).next() {
-                        return (x1,);
-                    }
-                    let x1 = uf.math_.add_eclass();
-                    delta.const_.push((x0, x1));
-                    (x1,)
-                }
-                #[allow(unreachable_code)]
-                fn entry2_0_1(
-                    &self,
-                    x0: std::primitive::i64,
-                    x1: Math,
-                    delta: &mut Delta,
-                    uf: &mut Unification,
-                ) -> () {
-                    if let Some(()) = self.iter2_0_1(x0, x1).next() {
-                        return ();
-                    }
-                    delta.const_.push((x0, x1));
-                    ()
-                }
-            }
-            #[derive(Debug, Default)]
-            pub struct Delta {
-                const_: Vec<<ConstRelation as Relation>::Row>,
-            }
+            pub struct Delta {}
             impl Delta {
                 fn new() -> Self {
                     Self::default()
                 }
                 fn has_new_inserts(&self) -> bool {
                     let mut has_new_inserts = false;
-                    has_new_inserts |= !self.const_.is_empty();
                     has_new_inserts
-                }
-                pub fn insert_const(&mut self, x: <ConstRelation as Relation>::Row) {
-                    self.const_.push(x);
                 }
             }
             #[derive(Debug, Default)]
-            struct Unification {
-                pub math_: UnionFind<Math>,
-            }
+            struct Unification {}
             impl Unification {
                 fn num_uprooted(&mut self) -> usize {
                     let mut ret = 0;
-                    ret += self.math_.num_uprooted();
                     ret
                 }
-                fn reset_num_uprooted(&mut self) {
-                    self.math_.reset_num_uprooted();
-                }
+                fn reset_num_uprooted(&mut self) {}
             }
             #[derive(Debug, Default)]
             pub struct Theory {
                 pub delta: Delta,
                 pub uf: Unification,
-                pub const_: ConstRelation,
             }
             impl Theory {
                 pub fn new() -> Self {
@@ -8434,7 +6674,6 @@ fn initial() {
                 fn emit_graphviz(&self) -> String {
                     let mut buf = String::new();
                     buf.push_str("digraph G {\n");
-                    self.const_.emit_graphviz(&mut buf);
                     buf.push_str("}\n");
                     buf
                 }
@@ -8442,7 +6681,7 @@ fn initial() {
                     self.get_relation_entry_count().values().sum()
                 }
                 pub fn get_relation_entry_count(&self) -> std::collections::BTreeMap<&'static str, usize> {
-                    [("Const", self.const_.len())].into_iter().collect()
+                    [].into_iter().collect()
                 }
                 pub fn get_total_uf_count(&self) -> (usize, usize) {
                     self.get_uf_count()
@@ -8450,39 +6689,20 @@ fn initial() {
                         .fold((0, 0), |(at, ar), (t, r)| (at + t, ar + r))
                 }
                 pub fn get_uf_count(&self) -> std::collections::BTreeMap<&'static str, (usize, usize)> {
-                    [("Math", (self.uf.math_.len(), self.uf.math_.num_roots()))]
-                        .into_iter()
-                        .collect()
+                    [].into_iter().collect()
                 }
                 #[inline(never)]
                 pub fn canonicalize(&mut self) {
-                    self.const_.clear_new();
                     if !self.delta.has_new_inserts() && self.uf.num_uprooted() == 0 {
                         return;
                     }
-                    self.const_
-                        .update_begin(&mut self.delta.const_, &mut self.uf);
                     loop {
                         let mut progress = false;
-                        progress |= self.const_.update(&mut self.delta.const_, &mut self.uf);
                         if !progress {
                             break;
                         }
                     }
-                    self.const_
-                        .update_finalize(&mut self.delta.const_, &mut self.uf);
                     self.uf.reset_num_uprooted();
-                }
-            }
-            impl EclassProvider<Math> for Theory {
-                fn make(&mut self) -> Math {
-                    self.uf.math_.add_eclass()
-                }
-                fn find(&mut self, t: Math) -> Math {
-                    self.uf.math_.find(t)
-                }
-                fn union(&mut self, a: Math, b: Math) {
-                    self.uf.math_.union(a, b);
                 }
             }
             impl std::ops::Deref for Theory {
@@ -8523,10 +6743,9 @@ fn test_primitives_simple() {
         expected_hir :Some( expect![[r#"
             Theory {
                 types: {
-                    [t0, ()]: std::primitive::unit,
-                    [t1, i64]: std::primitive::i64,
-                    [t2, String]: runtime::IString,
-                    [t3, Math]: [symbolic],
+                    [t0, i64]: std::primitive::i64,
+                    [t1, String]: runtime::IString,
+                    [t2, Math]: [symbolic],
                 },
                 symbolic_rules: [
                     SymbolicRule {
@@ -8539,10 +6758,10 @@ fn test_primitives_simple() {
                             Action { relation: g3, columns: [v2], entry: [!] },
                         ],
                         variables: {
-                            v0: VariableMeta { name: Some("one"), ty: t1 },
-                            v1: VariableMeta { name: None, ty: t3 },
-                            v2: VariableMeta { name: None, ty: t2 },
-                            v3: VariableMeta { name: None, ty: t3 },
+                            v0: VariableMeta { name: Some("one"), ty: t0 },
+                            v1: VariableMeta { name: None, ty: t2 },
+                            v2: VariableMeta { name: None, ty: t1 },
+                            v3: VariableMeta { name: None, ty: t2 },
                         },
                         unify: [],
                     },
@@ -8556,10 +6775,10 @@ fn test_primitives_simple() {
                             Action { relation: g4, columns: [v2], entry: [!] },
                         ],
                         variables: {
-                            v0: VariableMeta { name: None, ty: t1 },
-                            v1: VariableMeta { name: None, ty: t3 },
-                            v2: VariableMeta { name: None, ty: t2 },
-                            v3: VariableMeta { name: None, ty: t3 },
+                            v0: VariableMeta { name: None, ty: t0 },
+                            v1: VariableMeta { name: None, ty: t2 },
+                            v2: VariableMeta { name: None, ty: t1 },
+                            v3: VariableMeta { name: None, ty: t2 },
                         },
                         unify: [],
                     },
@@ -8572,9 +6791,9 @@ fn test_primitives_simple() {
                             Action { relation: g6, columns: [v2], entry: [!] },
                         ],
                         variables: {
-                            v0: VariableMeta { name: None, ty: t2 },
-                            v1: VariableMeta { name: None, ty: t3 },
-                            v2: VariableMeta { name: None, ty: t2 },
+                            v0: VariableMeta { name: None, ty: t1 },
+                            v1: VariableMeta { name: None, ty: t2 },
+                            v2: VariableMeta { name: None, ty: t1 },
                         },
                         unify: [],
                     },
@@ -8587,94 +6806,33 @@ fn test_primitives_simple() {
                             Action { relation: Const, columns: [v3, v2], entry: [_, U] },
                         ],
                         variables: {
-                            v0: VariableMeta { name: Some("a"), ty: t3 },
-                            v1: VariableMeta { name: None, ty: t3 },
-                            v2: VariableMeta { name: None, ty: t3 },
-                            v3: VariableMeta { name: None, ty: t1 },
+                            v0: VariableMeta { name: Some("a"), ty: t2 },
+                            v1: VariableMeta { name: None, ty: t2 },
+                            v2: VariableMeta { name: None, ty: t2 },
+                            v3: VariableMeta { name: None, ty: t0 },
                         },
                         unify: [],
                     },
                 ],
                 relations: {
-                    r0: + { columns: [i64, i64, i64], kind: Primitive(i64_add012), implicit_rules: {n0: [_, _, !]} },
-                    r1: & { columns: [i64, i64, i64], kind: Primitive(i64_bitand012), implicit_rules: {n0: [_, _, !]} },
-                    r2: not-i64 { columns: [i64, i64], kind: Primitive(i64_bitnot01), implicit_rules: {n0: [_, !]} },
-                    r3: | { columns: [i64, i64, i64], kind: Primitive(i64_bitor012), implicit_rules: {n0: [_, _, !]} },
-                    r4: << { columns: [i64, i64, i64], kind: Primitive(i64_bitshl012), implicit_rules: {n0: [_, _, !]} },
-                    r5: >> { columns: [i64, i64, i64], kind: Primitive(i64_bitshr012), implicit_rules: {n0: [_, _, !]} },
-                    r6: ^ { columns: [i64, i64, i64], kind: Primitive(i64_bitxor012), implicit_rules: {n0: [_, _, !]} },
-                    r7: / { columns: [i64, i64, i64], kind: Primitive(i64_div012), implicit_rules: {n0: [_, _, !]} },
-                    r8: log2 { columns: [i64, i64], kind: Primitive(i64_log01), implicit_rules: {n0: [_, !]} },
-                    r9: max { columns: [i64, i64, i64], kind: Primitive(i64_max012), implicit_rules: {n0: [_, _, !]} },
-                    r10: min { columns: [i64, i64, i64], kind: Primitive(i64_min012), implicit_rules: {n0: [_, _, !]} },
-                    r11: * { columns: [i64, i64, i64], kind: Primitive(i64_mul012), implicit_rules: {n0: [_, _, !]} },
-                    r12: % { columns: [i64, i64, i64], kind: Primitive(i64_rem012), implicit_rules: {n0: [_, _, !]} },
-                    r13: - { columns: [i64, i64, i64], kind: Primitive(i64_sub012), implicit_rules: {n0: [_, _, !]} },
-                    r14: Math { columns: [Math], kind: Forall(t3), implicit_rules: {} },
-                    r15: Mul { columns: [Math, Math, Math], kind: Table, implicit_rules: {n0: [_, _, U]} },
-                    r16: Add { columns: [Math, Math, Math], kind: Table, implicit_rules: {n0: [_, _, U]} },
-                    r17: Const { columns: [i64, Math], kind: Table, implicit_rules: {n0: [_, U]} },
-                    r18: Var { columns: [String, Math], kind: Table, implicit_rules: {n0: [_, U]} },
-                    r19: g0 { columns: [i64], kind: Global(g0), implicit_rules: {n0: [!]} },
-                    r20: two { columns: [Math], kind: Global(g1), implicit_rules: {n0: [!]} },
-                    r21: one { columns: [i64], kind: Global(g2), implicit_rules: {n0: [!]} },
-                    r22: g3 { columns: [String], kind: Global(g3), implicit_rules: {n0: [!]} },
-                    r23: g4 { columns: [String], kind: Global(g4), implicit_rules: {n0: [!]} },
-                    r24: g5 { columns: [String], kind: Global(g5), implicit_rules: {n0: [!]} },
-                    r25: g6 { columns: [String], kind: Global(g6), implicit_rules: {n0: [!]} },
-                    r26: g7 { columns: [i64], kind: Global(g7), implicit_rules: {n0: [!]} },
+                    r0: Mul { columns: [Math, Math, Math], kind: Table, implicit_rules: {n0: [_, _, U]} },
+                    r1: Add { columns: [Math, Math, Math], kind: Table, implicit_rules: {n0: [_, _, U]} },
+                    r2: Const { columns: [i64, Math], kind: Table, implicit_rules: {n0: [_, U]} },
+                    r3: Var { columns: [String, Math], kind: Table, implicit_rules: {n0: [_, U]} },
+                    r4: g0 { columns: [i64], kind: Global(g0), implicit_rules: {n0: [!]} },
+                    r5: two { columns: [Math], kind: Global(g1), implicit_rules: {n0: [!]} },
+                    r6: one { columns: [i64], kind: Global(g2), implicit_rules: {n0: [!]} },
+                    r7: g3 { columns: [String], kind: Global(g3), implicit_rules: {n0: [!]} },
+                    r8: g4 { columns: [String], kind: Global(g4), implicit_rules: {n0: [!]} },
+                    r9: g5 { columns: [String], kind: Global(g5), implicit_rules: {n0: [!]} },
+                    r10: g6 { columns: [String], kind: Global(g6), implicit_rules: {n0: [!]} },
+                    r11: g7 { columns: [i64], kind: Global(g7), implicit_rules: {n0: [!]} },
                 },
             }"#]]),
         expected_lir: None,
         expected_codegen : Some(expect![[r#"
             use oatlog::runtime::{self, *};
             eclass_wrapper_ty!(Math);
-            fn i64_add012(a: i64, b: i64) -> impl Iterator<Item = (i64,)> {
-                a.checked_add(b).map(|x| (x,)).into_iter()
-            }
-            fn i64_bitand012(a: i64, b: i64) -> impl Iterator<Item = (i64,)> {
-                std::iter::once((a & b,))
-            }
-            fn i64_bitnot01(a: i64) -> impl Iterator<Item = (i64,)> {
-                std::iter::once((!a,))
-            }
-            fn i64_bitor012(a: i64, b: i64) -> impl Iterator<Item = (i64,)> {
-                std::iter::once((a | b,))
-            }
-            fn i64_bitshl012(a: i64, b: i64) -> impl Iterator<Item = (i64,)> {
-                a.checked_shl(b.try_into().unwrap())
-                    .map(|x| (x,))
-                    .into_iter()
-            }
-            fn i64_bitshr012(a: i64, b: i64) -> impl Iterator<Item = (i64,)> {
-                a.checked_shr(b.try_into().unwrap())
-                    .map(|x| (x,))
-                    .into_iter()
-            }
-            fn i64_bitxor012(a: i64, b: i64) -> impl Iterator<Item = (i64,)> {
-                std::iter::once((a ^ b,))
-            }
-            fn i64_div012(a: i64, b: i64) -> impl Iterator<Item = (i64,)> {
-                a.checked_div(b).map(|x| (x,)).into_iter()
-            }
-            fn i64_log01(a: i64) -> impl Iterator<Item = (i64,)> {
-                std::iter::once((a.ilog2() as i64,))
-            }
-            fn i64_max012(a: i64, b: i64) -> impl Iterator<Item = (i64,)> {
-                std::iter::once((a.max(b),))
-            }
-            fn i64_min012(a: i64, b: i64) -> impl Iterator<Item = (i64,)> {
-                std::iter::once((a.min(b),))
-            }
-            fn i64_mul012(a: i64, b: i64) -> impl Iterator<Item = (i64,)> {
-                a.checked_mul(b).map(|x| (x,)).into_iter()
-            }
-            fn i64_rem012(a: i64, b: i64) -> impl Iterator<Item = (i64,)> {
-                a.checked_rem(b).map(|x| (x,)).into_iter()
-            }
-            fn i64_sub012(a: i64, b: i64) -> impl Iterator<Item = (i64,)> {
-                a.checked_sub(b).map(|x| (x,)).into_iter()
-            }
             #[derive(Debug, Default)]
             struct MulRelation {
                 new: Vec<<Self as Relation>::Row>,
@@ -9559,10 +7717,7 @@ fn triangle_join() {
         expected_hir: Some(expect![[r#"
             Theory {
                 types: {
-                    [t0, ()]: std::primitive::unit,
-                    [t1, i64]: std::primitive::i64,
-                    [t2, String]: runtime::IString,
-                    [t3, Math]: [symbolic],
+                    [t0, Math]: [symbolic],
                 },
                 symbolic_rules: [
                     SymbolicRule {
@@ -9574,85 +7729,24 @@ fn triangle_join() {
                             Action { relation: Triangle, columns: [a, b, c] },
                         ],
                         variables: {
-                            v0: VariableMeta { name: Some("a"), ty: t3 },
-                            v1: VariableMeta { name: Some("b"), ty: t3 },
-                            v2: VariableMeta { name: Some("c"), ty: t3 },
+                            v0: VariableMeta { name: Some("a"), ty: t0 },
+                            v1: VariableMeta { name: Some("b"), ty: t0 },
+                            v2: VariableMeta { name: Some("c"), ty: t0 },
                         },
                         unify: [],
                     },
                 ],
                 relations: {
-                    r0: + { columns: [i64, i64, i64], kind: Primitive(i64_add012), implicit_rules: {n0: [_, _, !]} },
-                    r1: & { columns: [i64, i64, i64], kind: Primitive(i64_bitand012), implicit_rules: {n0: [_, _, !]} },
-                    r2: not-i64 { columns: [i64, i64], kind: Primitive(i64_bitnot01), implicit_rules: {n0: [_, !]} },
-                    r3: | { columns: [i64, i64, i64], kind: Primitive(i64_bitor012), implicit_rules: {n0: [_, _, !]} },
-                    r4: << { columns: [i64, i64, i64], kind: Primitive(i64_bitshl012), implicit_rules: {n0: [_, _, !]} },
-                    r5: >> { columns: [i64, i64, i64], kind: Primitive(i64_bitshr012), implicit_rules: {n0: [_, _, !]} },
-                    r6: ^ { columns: [i64, i64, i64], kind: Primitive(i64_bitxor012), implicit_rules: {n0: [_, _, !]} },
-                    r7: / { columns: [i64, i64, i64], kind: Primitive(i64_div012), implicit_rules: {n0: [_, _, !]} },
-                    r8: log2 { columns: [i64, i64], kind: Primitive(i64_log01), implicit_rules: {n0: [_, !]} },
-                    r9: max { columns: [i64, i64, i64], kind: Primitive(i64_max012), implicit_rules: {n0: [_, _, !]} },
-                    r10: min { columns: [i64, i64, i64], kind: Primitive(i64_min012), implicit_rules: {n0: [_, _, !]} },
-                    r11: * { columns: [i64, i64, i64], kind: Primitive(i64_mul012), implicit_rules: {n0: [_, _, !]} },
-                    r12: % { columns: [i64, i64, i64], kind: Primitive(i64_rem012), implicit_rules: {n0: [_, _, !]} },
-                    r13: - { columns: [i64, i64, i64], kind: Primitive(i64_sub012), implicit_rules: {n0: [_, _, !]} },
-                    r14: Math { columns: [Math], kind: Forall(t3), implicit_rules: {} },
-                    r15: Foo { columns: [Math, Math], kind: Table, implicit_rules: {} },
-                    r16: Bar { columns: [Math, Math], kind: Table, implicit_rules: {} },
-                    r17: Baz { columns: [Math, Math], kind: Table, implicit_rules: {} },
-                    r18: Triangle { columns: [Math, Math, Math], kind: Table, implicit_rules: {} },
+                    r0: Foo { columns: [Math, Math], kind: Table, implicit_rules: {} },
+                    r1: Bar { columns: [Math, Math], kind: Table, implicit_rules: {} },
+                    r2: Baz { columns: [Math, Math], kind: Table, implicit_rules: {} },
+                    r3: Triangle { columns: [Math, Math, Math], kind: Table, implicit_rules: {} },
                 },
             }"#]]),
         expected_lir: None,
         expected_codegen: Some(expect![[r#"
             use oatlog::runtime::{self, *};
             eclass_wrapper_ty!(Math);
-            fn i64_add012(a: i64, b: i64) -> impl Iterator<Item = (i64,)> {
-                a.checked_add(b).map(|x| (x,)).into_iter()
-            }
-            fn i64_bitand012(a: i64, b: i64) -> impl Iterator<Item = (i64,)> {
-                std::iter::once((a & b,))
-            }
-            fn i64_bitnot01(a: i64) -> impl Iterator<Item = (i64,)> {
-                std::iter::once((!a,))
-            }
-            fn i64_bitor012(a: i64, b: i64) -> impl Iterator<Item = (i64,)> {
-                std::iter::once((a | b,))
-            }
-            fn i64_bitshl012(a: i64, b: i64) -> impl Iterator<Item = (i64,)> {
-                a.checked_shl(b.try_into().unwrap())
-                    .map(|x| (x,))
-                    .into_iter()
-            }
-            fn i64_bitshr012(a: i64, b: i64) -> impl Iterator<Item = (i64,)> {
-                a.checked_shr(b.try_into().unwrap())
-                    .map(|x| (x,))
-                    .into_iter()
-            }
-            fn i64_bitxor012(a: i64, b: i64) -> impl Iterator<Item = (i64,)> {
-                std::iter::once((a ^ b,))
-            }
-            fn i64_div012(a: i64, b: i64) -> impl Iterator<Item = (i64,)> {
-                a.checked_div(b).map(|x| (x,)).into_iter()
-            }
-            fn i64_log01(a: i64) -> impl Iterator<Item = (i64,)> {
-                std::iter::once((a.ilog2() as i64,))
-            }
-            fn i64_max012(a: i64, b: i64) -> impl Iterator<Item = (i64,)> {
-                std::iter::once((a.max(b),))
-            }
-            fn i64_min012(a: i64, b: i64) -> impl Iterator<Item = (i64,)> {
-                std::iter::once((a.min(b),))
-            }
-            fn i64_mul012(a: i64, b: i64) -> impl Iterator<Item = (i64,)> {
-                a.checked_mul(b).map(|x| (x,)).into_iter()
-            }
-            fn i64_rem012(a: i64, b: i64) -> impl Iterator<Item = (i64,)> {
-                a.checked_rem(b).map(|x| (x,)).into_iter()
-            }
-            fn i64_sub012(a: i64, b: i64) -> impl Iterator<Item = (i64,)> {
-                a.checked_sub(b).map(|x| (x,)).into_iter()
-            }
             #[derive(Debug, Default)]
             struct FooRelation {
                 new: Vec<<Self as Relation>::Row>,
@@ -10409,10 +8503,7 @@ fn edgecase0() {
         expected_hir :Some( expect![[r#"
             Theory {
                 types: {
-                    [t0, ()]: std::primitive::unit,
-                    [t1, i64]: std::primitive::i64,
-                    [t2, String]: runtime::IString,
-                    [t3, Math]: [symbolic],
+                    [t0, Math]: [symbolic],
                 },
                 symbolic_rules: [
                     SymbolicRule {
@@ -10425,87 +8516,26 @@ fn edgecase0() {
                             Action { relation: Add, columns: [b, c, v6], entry: [_, _, U] },
                         ],
                         variables: {
-                            v0: VariableMeta { name: Some("a"), ty: t3 },
-                            v1: VariableMeta { name: Some("b"), ty: t3 },
-                            v2: VariableMeta { name: None, ty: t3 },
-                            v3: VariableMeta { name: Some("c"), ty: t3 },
-                            v4: VariableMeta { name: None, ty: t3 },
-                            v5: VariableMeta { name: None, ty: t3 },
-                            v6: VariableMeta { name: None, ty: t3 },
+                            v0: VariableMeta { name: Some("a"), ty: t0 },
+                            v1: VariableMeta { name: Some("b"), ty: t0 },
+                            v2: VariableMeta { name: None, ty: t0 },
+                            v3: VariableMeta { name: Some("c"), ty: t0 },
+                            v4: VariableMeta { name: None, ty: t0 },
+                            v5: VariableMeta { name: None, ty: t0 },
+                            v6: VariableMeta { name: None, ty: t0 },
                         },
                         unify: [],
                     },
                 ],
                 relations: {
-                    r0: + { columns: [i64, i64, i64], kind: Primitive(i64_add012), implicit_rules: {n0: [_, _, !]} },
-                    r1: & { columns: [i64, i64, i64], kind: Primitive(i64_bitand012), implicit_rules: {n0: [_, _, !]} },
-                    r2: not-i64 { columns: [i64, i64], kind: Primitive(i64_bitnot01), implicit_rules: {n0: [_, !]} },
-                    r3: | { columns: [i64, i64, i64], kind: Primitive(i64_bitor012), implicit_rules: {n0: [_, _, !]} },
-                    r4: << { columns: [i64, i64, i64], kind: Primitive(i64_bitshl012), implicit_rules: {n0: [_, _, !]} },
-                    r5: >> { columns: [i64, i64, i64], kind: Primitive(i64_bitshr012), implicit_rules: {n0: [_, _, !]} },
-                    r6: ^ { columns: [i64, i64, i64], kind: Primitive(i64_bitxor012), implicit_rules: {n0: [_, _, !]} },
-                    r7: / { columns: [i64, i64, i64], kind: Primitive(i64_div012), implicit_rules: {n0: [_, _, !]} },
-                    r8: log2 { columns: [i64, i64], kind: Primitive(i64_log01), implicit_rules: {n0: [_, !]} },
-                    r9: max { columns: [i64, i64, i64], kind: Primitive(i64_max012), implicit_rules: {n0: [_, _, !]} },
-                    r10: min { columns: [i64, i64, i64], kind: Primitive(i64_min012), implicit_rules: {n0: [_, _, !]} },
-                    r11: * { columns: [i64, i64, i64], kind: Primitive(i64_mul012), implicit_rules: {n0: [_, _, !]} },
-                    r12: % { columns: [i64, i64, i64], kind: Primitive(i64_rem012), implicit_rules: {n0: [_, _, !]} },
-                    r13: - { columns: [i64, i64, i64], kind: Primitive(i64_sub012), implicit_rules: {n0: [_, _, !]} },
-                    r14: Math { columns: [Math], kind: Forall(t3), implicit_rules: {} },
-                    r15: Mul { columns: [Math, Math, Math], kind: Table, implicit_rules: {n0: [_, _, U]} },
-                    r16: Add { columns: [Math, Math, Math], kind: Table, implicit_rules: {n0: [_, _, U]} },
+                    r0: Mul { columns: [Math, Math, Math], kind: Table, implicit_rules: {n0: [_, _, U]} },
+                    r1: Add { columns: [Math, Math, Math], kind: Table, implicit_rules: {n0: [_, _, U]} },
                 },
             }"#]]),
         expected_lir: None,
         expected_codegen : Some(expect![[r#"
             use oatlog::runtime::{self, *};
             eclass_wrapper_ty!(Math);
-            fn i64_add012(a: i64, b: i64) -> impl Iterator<Item = (i64,)> {
-                a.checked_add(b).map(|x| (x,)).into_iter()
-            }
-            fn i64_bitand012(a: i64, b: i64) -> impl Iterator<Item = (i64,)> {
-                std::iter::once((a & b,))
-            }
-            fn i64_bitnot01(a: i64) -> impl Iterator<Item = (i64,)> {
-                std::iter::once((!a,))
-            }
-            fn i64_bitor012(a: i64, b: i64) -> impl Iterator<Item = (i64,)> {
-                std::iter::once((a | b,))
-            }
-            fn i64_bitshl012(a: i64, b: i64) -> impl Iterator<Item = (i64,)> {
-                a.checked_shl(b.try_into().unwrap())
-                    .map(|x| (x,))
-                    .into_iter()
-            }
-            fn i64_bitshr012(a: i64, b: i64) -> impl Iterator<Item = (i64,)> {
-                a.checked_shr(b.try_into().unwrap())
-                    .map(|x| (x,))
-                    .into_iter()
-            }
-            fn i64_bitxor012(a: i64, b: i64) -> impl Iterator<Item = (i64,)> {
-                std::iter::once((a ^ b,))
-            }
-            fn i64_div012(a: i64, b: i64) -> impl Iterator<Item = (i64,)> {
-                a.checked_div(b).map(|x| (x,)).into_iter()
-            }
-            fn i64_log01(a: i64) -> impl Iterator<Item = (i64,)> {
-                std::iter::once((a.ilog2() as i64,))
-            }
-            fn i64_max012(a: i64, b: i64) -> impl Iterator<Item = (i64,)> {
-                std::iter::once((a.max(b),))
-            }
-            fn i64_min012(a: i64, b: i64) -> impl Iterator<Item = (i64,)> {
-                std::iter::once((a.min(b),))
-            }
-            fn i64_mul012(a: i64, b: i64) -> impl Iterator<Item = (i64,)> {
-                a.checked_mul(b).map(|x| (x,)).into_iter()
-            }
-            fn i64_rem012(a: i64, b: i64) -> impl Iterator<Item = (i64,)> {
-                a.checked_rem(b).map(|x| (x,)).into_iter()
-            }
-            fn i64_sub012(a: i64, b: i64) -> impl Iterator<Item = (i64,)> {
-                a.checked_sub(b).map(|x| (x,)).into_iter()
-            }
             #[derive(Debug, Default)]
             struct MulRelation {
                 new: Vec<<Self as Relation>::Row>,
@@ -11094,10 +9124,7 @@ fn test_into_codegen() {
         expected_hir: Some(expect![[r#"
             Theory {
                 types: {
-                    [t0, ()]: std::primitive::unit,
-                    [t1, i64]: std::primitive::i64,
-                    [t2, String]: runtime::IString,
-                    [t3, Math]: [symbolic],
+                    [t0, Math]: [symbolic],
                 },
                 symbolic_rules: [
                     SymbolicRule {
@@ -11110,87 +9137,26 @@ fn test_into_codegen() {
                             Action { relation: Add, columns: [v5, v6, v4], entry: [_, _, U] },
                         ],
                         variables: {
-                            v0: VariableMeta { name: Some("a"), ty: t3 },
-                            v1: VariableMeta { name: Some("b"), ty: t3 },
-                            v2: VariableMeta { name: None, ty: t3 },
-                            v3: VariableMeta { name: Some("c"), ty: t3 },
-                            v4: VariableMeta { name: None, ty: t3 },
-                            v5: VariableMeta { name: None, ty: t3 },
-                            v6: VariableMeta { name: None, ty: t3 },
+                            v0: VariableMeta { name: Some("a"), ty: t0 },
+                            v1: VariableMeta { name: Some("b"), ty: t0 },
+                            v2: VariableMeta { name: None, ty: t0 },
+                            v3: VariableMeta { name: Some("c"), ty: t0 },
+                            v4: VariableMeta { name: None, ty: t0 },
+                            v5: VariableMeta { name: None, ty: t0 },
+                            v6: VariableMeta { name: None, ty: t0 },
                         },
                         unify: [],
                     },
                 ],
                 relations: {
-                    r0: + { columns: [i64, i64, i64], kind: Primitive(i64_add012), implicit_rules: {n0: [_, _, !]} },
-                    r1: & { columns: [i64, i64, i64], kind: Primitive(i64_bitand012), implicit_rules: {n0: [_, _, !]} },
-                    r2: not-i64 { columns: [i64, i64], kind: Primitive(i64_bitnot01), implicit_rules: {n0: [_, !]} },
-                    r3: | { columns: [i64, i64, i64], kind: Primitive(i64_bitor012), implicit_rules: {n0: [_, _, !]} },
-                    r4: << { columns: [i64, i64, i64], kind: Primitive(i64_bitshl012), implicit_rules: {n0: [_, _, !]} },
-                    r5: >> { columns: [i64, i64, i64], kind: Primitive(i64_bitshr012), implicit_rules: {n0: [_, _, !]} },
-                    r6: ^ { columns: [i64, i64, i64], kind: Primitive(i64_bitxor012), implicit_rules: {n0: [_, _, !]} },
-                    r7: / { columns: [i64, i64, i64], kind: Primitive(i64_div012), implicit_rules: {n0: [_, _, !]} },
-                    r8: log2 { columns: [i64, i64], kind: Primitive(i64_log01), implicit_rules: {n0: [_, !]} },
-                    r9: max { columns: [i64, i64, i64], kind: Primitive(i64_max012), implicit_rules: {n0: [_, _, !]} },
-                    r10: min { columns: [i64, i64, i64], kind: Primitive(i64_min012), implicit_rules: {n0: [_, _, !]} },
-                    r11: * { columns: [i64, i64, i64], kind: Primitive(i64_mul012), implicit_rules: {n0: [_, _, !]} },
-                    r12: % { columns: [i64, i64, i64], kind: Primitive(i64_rem012), implicit_rules: {n0: [_, _, !]} },
-                    r13: - { columns: [i64, i64, i64], kind: Primitive(i64_sub012), implicit_rules: {n0: [_, _, !]} },
-                    r14: Math { columns: [Math], kind: Forall(t3), implicit_rules: {} },
-                    r15: Mul { columns: [Math, Math, Math], kind: Table, implicit_rules: {n0: [_, _, U]} },
-                    r16: Add { columns: [Math, Math, Math], kind: Table, implicit_rules: {n0: [_, _, U]} },
+                    r0: Mul { columns: [Math, Math, Math], kind: Table, implicit_rules: {n0: [_, _, U]} },
+                    r1: Add { columns: [Math, Math, Math], kind: Table, implicit_rules: {n0: [_, _, U]} },
                 },
             }"#]]),
         expected_lir: None,
         expected_codegen: Some(expect![[r#"
             use oatlog::runtime::{self, *};
             eclass_wrapper_ty!(Math);
-            fn i64_add012(a: i64, b: i64) -> impl Iterator<Item = (i64,)> {
-                a.checked_add(b).map(|x| (x,)).into_iter()
-            }
-            fn i64_bitand012(a: i64, b: i64) -> impl Iterator<Item = (i64,)> {
-                std::iter::once((a & b,))
-            }
-            fn i64_bitnot01(a: i64) -> impl Iterator<Item = (i64,)> {
-                std::iter::once((!a,))
-            }
-            fn i64_bitor012(a: i64, b: i64) -> impl Iterator<Item = (i64,)> {
-                std::iter::once((a | b,))
-            }
-            fn i64_bitshl012(a: i64, b: i64) -> impl Iterator<Item = (i64,)> {
-                a.checked_shl(b.try_into().unwrap())
-                    .map(|x| (x,))
-                    .into_iter()
-            }
-            fn i64_bitshr012(a: i64, b: i64) -> impl Iterator<Item = (i64,)> {
-                a.checked_shr(b.try_into().unwrap())
-                    .map(|x| (x,))
-                    .into_iter()
-            }
-            fn i64_bitxor012(a: i64, b: i64) -> impl Iterator<Item = (i64,)> {
-                std::iter::once((a ^ b,))
-            }
-            fn i64_div012(a: i64, b: i64) -> impl Iterator<Item = (i64,)> {
-                a.checked_div(b).map(|x| (x,)).into_iter()
-            }
-            fn i64_log01(a: i64) -> impl Iterator<Item = (i64,)> {
-                std::iter::once((a.ilog2() as i64,))
-            }
-            fn i64_max012(a: i64, b: i64) -> impl Iterator<Item = (i64,)> {
-                std::iter::once((a.max(b),))
-            }
-            fn i64_min012(a: i64, b: i64) -> impl Iterator<Item = (i64,)> {
-                std::iter::once((a.min(b),))
-            }
-            fn i64_mul012(a: i64, b: i64) -> impl Iterator<Item = (i64,)> {
-                a.checked_mul(b).map(|x| (x,)).into_iter()
-            }
-            fn i64_rem012(a: i64, b: i64) -> impl Iterator<Item = (i64,)> {
-                a.checked_rem(b).map(|x| (x,)).into_iter()
-            }
-            fn i64_sub012(a: i64, b: i64) -> impl Iterator<Item = (i64,)> {
-                a.checked_sub(b).map(|x| (x,)).into_iter()
-            }
             #[derive(Debug, Default)]
             struct MulRelation {
                 new: Vec<<Self as Relation>::Row>,
@@ -12018,11 +9984,10 @@ fn lir_math() {
         expected_hir: Some(expect![[r#"
             Theory {
                 types: {
-                    [t0, ()]: std::primitive::unit,
-                    [t1, i64]: std::primitive::i64,
-                    [t2, String]: runtime::IString,
-                    [t3, FuelUnit]: [symbolic],
-                    [t4, Math]: [symbolic],
+                    [t0, i64]: std::primitive::i64,
+                    [t1, String]: runtime::IString,
+                    [t2, FuelUnit]: [symbolic],
+                    [t3, Math]: [symbolic],
                 },
                 symbolic_rules: [
                     SymbolicRule {
@@ -12036,13 +10001,13 @@ fn lir_math() {
                             Action { relation: g0, columns: [v4], entry: [!] },
                         ],
                         variables: {
-                            v0: VariableMeta { name: Some("fuel"), ty: t3 },
-                            v1: VariableMeta { name: Some("x"), ty: t4 },
-                            v2: VariableMeta { name: None, ty: t4 },
-                            v3: VariableMeta { name: None, ty: t4 },
-                            v4: VariableMeta { name: None, ty: t1 },
-                            v5: VariableMeta { name: None, ty: t4 },
-                            v6: VariableMeta { name: None, ty: t4 },
+                            v0: VariableMeta { name: Some("fuel"), ty: t2 },
+                            v1: VariableMeta { name: Some("x"), ty: t3 },
+                            v2: VariableMeta { name: None, ty: t3 },
+                            v3: VariableMeta { name: None, ty: t3 },
+                            v4: VariableMeta { name: None, ty: t0 },
+                            v5: VariableMeta { name: None, ty: t3 },
+                            v6: VariableMeta { name: None, ty: t3 },
                         },
                         unify: [],
                     },
@@ -12056,12 +10021,12 @@ fn lir_math() {
                             Action { relation: g0, columns: [v3], entry: [!] },
                         ],
                         variables: {
-                            v0: VariableMeta { name: Some("a"), ty: t4 },
-                            v1: VariableMeta { name: Some("b"), ty: t4 },
-                            v2: VariableMeta { name: None, ty: t4 },
-                            v3: VariableMeta { name: None, ty: t1 },
-                            v4: VariableMeta { name: None, ty: t4 },
-                            v5: VariableMeta { name: None, ty: t4 },
+                            v0: VariableMeta { name: Some("a"), ty: t3 },
+                            v1: VariableMeta { name: Some("b"), ty: t3 },
+                            v2: VariableMeta { name: None, ty: t3 },
+                            v3: VariableMeta { name: None, ty: t0 },
+                            v4: VariableMeta { name: None, ty: t3 },
+                            v5: VariableMeta { name: None, ty: t3 },
                         },
                         unify: [],
                     },
@@ -12076,12 +10041,12 @@ fn lir_math() {
                             Action { relation: g0, columns: [v3], entry: [!] },
                         ],
                         variables: {
-                            v0: VariableMeta { name: Some("x"), ty: t4 },
-                            v1: VariableMeta { name: None, ty: t4 },
-                            v2: VariableMeta { name: None, ty: t4 },
-                            v3: VariableMeta { name: None, ty: t1 },
-                            v4: VariableMeta { name: None, ty: t4 },
-                            v5: VariableMeta { name: None, ty: t4 },
+                            v0: VariableMeta { name: Some("x"), ty: t3 },
+                            v1: VariableMeta { name: None, ty: t3 },
+                            v2: VariableMeta { name: None, ty: t3 },
+                            v3: VariableMeta { name: None, ty: t0 },
+                            v4: VariableMeta { name: None, ty: t3 },
+                            v5: VariableMeta { name: None, ty: t3 },
                         },
                         unify: [],
                     },
@@ -12092,9 +10057,9 @@ fn lir_math() {
                             Action { relation: Add, columns: [b, a, v2], entry: [_, _, U] },
                         ],
                         variables: {
-                            v0: VariableMeta { name: Some("a"), ty: t4 },
-                            v1: VariableMeta { name: Some("b"), ty: t4 },
-                            v2: VariableMeta { name: None, ty: t4 },
+                            v0: VariableMeta { name: Some("a"), ty: t3 },
+                            v1: VariableMeta { name: Some("b"), ty: t3 },
+                            v2: VariableMeta { name: None, ty: t3 },
                         },
                         unify: [],
                     },
@@ -12105,9 +10070,9 @@ fn lir_math() {
                             Action { relation: Mul, columns: [b, a, v2], entry: [_, _, U] },
                         ],
                         variables: {
-                            v0: VariableMeta { name: Some("a"), ty: t4 },
-                            v1: VariableMeta { name: Some("b"), ty: t4 },
-                            v2: VariableMeta { name: None, ty: t4 },
+                            v0: VariableMeta { name: Some("a"), ty: t3 },
+                            v1: VariableMeta { name: Some("b"), ty: t3 },
+                            v2: VariableMeta { name: None, ty: t3 },
                         },
                         unify: [],
                     },
@@ -12120,12 +10085,12 @@ fn lir_math() {
                             Action { relation: Add, columns: [v5, c, v4], entry: [_, _, U] },
                         ],
                         variables: {
-                            v0: VariableMeta { name: Some("a"), ty: t4 },
-                            v1: VariableMeta { name: Some("b"), ty: t4 },
-                            v2: VariableMeta { name: Some("c"), ty: t4 },
-                            v3: VariableMeta { name: None, ty: t4 },
-                            v4: VariableMeta { name: None, ty: t4 },
-                            v5: VariableMeta { name: None, ty: t4 },
+                            v0: VariableMeta { name: Some("a"), ty: t3 },
+                            v1: VariableMeta { name: Some("b"), ty: t3 },
+                            v2: VariableMeta { name: Some("c"), ty: t3 },
+                            v3: VariableMeta { name: None, ty: t3 },
+                            v4: VariableMeta { name: None, ty: t3 },
+                            v5: VariableMeta { name: None, ty: t3 },
                         },
                         unify: [],
                     },
@@ -12138,12 +10103,12 @@ fn lir_math() {
                             Action { relation: Mul, columns: [v5, c, v4], entry: [_, _, U] },
                         ],
                         variables: {
-                            v0: VariableMeta { name: Some("a"), ty: t4 },
-                            v1: VariableMeta { name: Some("b"), ty: t4 },
-                            v2: VariableMeta { name: Some("c"), ty: t4 },
-                            v3: VariableMeta { name: None, ty: t4 },
-                            v4: VariableMeta { name: None, ty: t4 },
-                            v5: VariableMeta { name: None, ty: t4 },
+                            v0: VariableMeta { name: Some("a"), ty: t3 },
+                            v1: VariableMeta { name: Some("b"), ty: t3 },
+                            v2: VariableMeta { name: Some("c"), ty: t3 },
+                            v3: VariableMeta { name: None, ty: t3 },
+                            v4: VariableMeta { name: None, ty: t3 },
+                            v5: VariableMeta { name: None, ty: t3 },
                         },
                         unify: [],
                     },
@@ -12155,10 +10120,10 @@ fn lir_math() {
                             Premise { relation: g1, columns: [v1] },
                         ],
                         variables: {
-                            v0: VariableMeta { name: Some("a"), ty: t4 },
-                            v1: VariableMeta { name: None, ty: t1 },
-                            v2: VariableMeta { name: None, ty: t4 },
-                            v3: VariableMeta { name: None, ty: t4 },
+                            v0: VariableMeta { name: Some("a"), ty: t3 },
+                            v1: VariableMeta { name: None, ty: t0 },
+                            v2: VariableMeta { name: None, ty: t3 },
+                            v3: VariableMeta { name: None, ty: t3 },
                         },
                         unify: [
                             [v3, a],
@@ -12173,10 +10138,10 @@ fn lir_math() {
                             Action { relation: Const, columns: [v3, v2], entry: [_, U] },
                         ],
                         variables: {
-                            v0: VariableMeta { name: Some("a"), ty: t4 },
-                            v1: VariableMeta { name: None, ty: t4 },
-                            v2: VariableMeta { name: None, ty: t4 },
-                            v3: VariableMeta { name: None, ty: t1 },
+                            v0: VariableMeta { name: Some("a"), ty: t3 },
+                            v1: VariableMeta { name: None, ty: t3 },
+                            v2: VariableMeta { name: None, ty: t3 },
+                            v3: VariableMeta { name: None, ty: t0 },
                         },
                         unify: [],
                     },
@@ -12188,10 +10153,10 @@ fn lir_math() {
                             Premise { relation: g2, columns: [v1] },
                         ],
                         variables: {
-                            v0: VariableMeta { name: Some("a"), ty: t4 },
-                            v1: VariableMeta { name: None, ty: t1 },
-                            v2: VariableMeta { name: None, ty: t4 },
-                            v3: VariableMeta { name: None, ty: t4 },
+                            v0: VariableMeta { name: Some("a"), ty: t3 },
+                            v1: VariableMeta { name: None, ty: t0 },
+                            v2: VariableMeta { name: None, ty: t3 },
+                            v3: VariableMeta { name: None, ty: t3 },
                         },
                         unify: [
                             [v3, a],
@@ -12207,13 +10172,13 @@ fn lir_math() {
                             Action { relation: Mul, columns: [a, c, v6], entry: [_, _, U] },
                         ],
                         variables: {
-                            v0: VariableMeta { name: Some("a"), ty: t4 },
-                            v1: VariableMeta { name: Some("b"), ty: t4 },
-                            v2: VariableMeta { name: Some("c"), ty: t4 },
-                            v3: VariableMeta { name: None, ty: t4 },
-                            v4: VariableMeta { name: None, ty: t4 },
-                            v5: VariableMeta { name: None, ty: t4 },
-                            v6: VariableMeta { name: None, ty: t4 },
+                            v0: VariableMeta { name: Some("a"), ty: t3 },
+                            v1: VariableMeta { name: Some("b"), ty: t3 },
+                            v2: VariableMeta { name: Some("c"), ty: t3 },
+                            v3: VariableMeta { name: None, ty: t3 },
+                            v4: VariableMeta { name: None, ty: t3 },
+                            v5: VariableMeta { name: None, ty: t3 },
+                            v6: VariableMeta { name: None, ty: t3 },
                         },
                         unify: [],
                     },
@@ -12227,13 +10192,13 @@ fn lir_math() {
                             Action { relation: Mul, columns: [a, v6, v5], entry: [_, _, U] },
                         ],
                         variables: {
-                            v0: VariableMeta { name: Some("a"), ty: t4 },
-                            v1: VariableMeta { name: Some("b"), ty: t4 },
-                            v2: VariableMeta { name: None, ty: t4 },
-                            v3: VariableMeta { name: Some("c"), ty: t4 },
-                            v4: VariableMeta { name: None, ty: t4 },
-                            v5: VariableMeta { name: None, ty: t4 },
-                            v6: VariableMeta { name: None, ty: t4 },
+                            v0: VariableMeta { name: Some("a"), ty: t3 },
+                            v1: VariableMeta { name: Some("b"), ty: t3 },
+                            v2: VariableMeta { name: None, ty: t3 },
+                            v3: VariableMeta { name: Some("c"), ty: t3 },
+                            v4: VariableMeta { name: None, ty: t3 },
+                            v5: VariableMeta { name: None, ty: t3 },
+                            v6: VariableMeta { name: None, ty: t3 },
                         },
                         unify: [],
                     },
@@ -12247,13 +10212,13 @@ fn lir_math() {
                             Action { relation: Pow, columns: [a, v6, v5], entry: [_, _, U] },
                         ],
                         variables: {
-                            v0: VariableMeta { name: Some("a"), ty: t4 },
-                            v1: VariableMeta { name: Some("b"), ty: t4 },
-                            v2: VariableMeta { name: None, ty: t4 },
-                            v3: VariableMeta { name: Some("c"), ty: t4 },
-                            v4: VariableMeta { name: None, ty: t4 },
-                            v5: VariableMeta { name: None, ty: t4 },
-                            v6: VariableMeta { name: None, ty: t4 },
+                            v0: VariableMeta { name: Some("a"), ty: t3 },
+                            v1: VariableMeta { name: Some("b"), ty: t3 },
+                            v2: VariableMeta { name: None, ty: t3 },
+                            v3: VariableMeta { name: Some("c"), ty: t3 },
+                            v4: VariableMeta { name: None, ty: t3 },
+                            v5: VariableMeta { name: None, ty: t3 },
+                            v6: VariableMeta { name: None, ty: t3 },
                         },
                         unify: [],
                     },
@@ -12265,10 +10230,10 @@ fn lir_math() {
                             Premise { relation: g2, columns: [v1] },
                         ],
                         variables: {
-                            v0: VariableMeta { name: Some("x"), ty: t4 },
-                            v1: VariableMeta { name: None, ty: t1 },
-                            v2: VariableMeta { name: None, ty: t4 },
-                            v3: VariableMeta { name: None, ty: t4 },
+                            v0: VariableMeta { name: Some("x"), ty: t3 },
+                            v1: VariableMeta { name: None, ty: t0 },
+                            v2: VariableMeta { name: None, ty: t3 },
+                            v3: VariableMeta { name: None, ty: t3 },
                         },
                         unify: [
                             [v3, x],
@@ -12283,10 +10248,10 @@ fn lir_math() {
                             Action { relation: Mul, columns: [x, x, v3], entry: [_, _, U] },
                         ],
                         variables: {
-                            v0: VariableMeta { name: Some("x"), ty: t4 },
-                            v1: VariableMeta { name: None, ty: t1 },
-                            v2: VariableMeta { name: None, ty: t4 },
-                            v3: VariableMeta { name: None, ty: t4 },
+                            v0: VariableMeta { name: Some("x"), ty: t3 },
+                            v1: VariableMeta { name: None, ty: t0 },
+                            v2: VariableMeta { name: None, ty: t3 },
+                            v3: VariableMeta { name: None, ty: t3 },
                         },
                         unify: [],
                     },
@@ -12300,13 +10265,13 @@ fn lir_math() {
                             Action { relation: Add, columns: [v5, v6, v4], entry: [_, _, U] },
                         ],
                         variables: {
-                            v0: VariableMeta { name: Some("x"), ty: t4 },
-                            v1: VariableMeta { name: Some("a"), ty: t4 },
-                            v2: VariableMeta { name: Some("b"), ty: t4 },
-                            v3: VariableMeta { name: None, ty: t4 },
-                            v4: VariableMeta { name: None, ty: t4 },
-                            v5: VariableMeta { name: None, ty: t4 },
-                            v6: VariableMeta { name: None, ty: t4 },
+                            v0: VariableMeta { name: Some("x"), ty: t3 },
+                            v1: VariableMeta { name: Some("a"), ty: t3 },
+                            v2: VariableMeta { name: Some("b"), ty: t3 },
+                            v3: VariableMeta { name: None, ty: t3 },
+                            v4: VariableMeta { name: None, ty: t3 },
+                            v5: VariableMeta { name: None, ty: t3 },
+                            v6: VariableMeta { name: None, ty: t3 },
                         },
                         unify: [],
                     },
@@ -12322,15 +10287,15 @@ fn lir_math() {
                             Action { relation: Mul, columns: [b, v7, v8], entry: [_, _, U] },
                         ],
                         variables: {
-                            v0: VariableMeta { name: Some("x"), ty: t4 },
-                            v1: VariableMeta { name: Some("a"), ty: t4 },
-                            v2: VariableMeta { name: Some("b"), ty: t4 },
-                            v3: VariableMeta { name: None, ty: t4 },
-                            v4: VariableMeta { name: None, ty: t4 },
-                            v5: VariableMeta { name: None, ty: t4 },
-                            v6: VariableMeta { name: None, ty: t4 },
-                            v7: VariableMeta { name: None, ty: t4 },
-                            v8: VariableMeta { name: None, ty: t4 },
+                            v0: VariableMeta { name: Some("x"), ty: t3 },
+                            v1: VariableMeta { name: Some("a"), ty: t3 },
+                            v2: VariableMeta { name: Some("b"), ty: t3 },
+                            v3: VariableMeta { name: None, ty: t3 },
+                            v4: VariableMeta { name: None, ty: t3 },
+                            v5: VariableMeta { name: None, ty: t3 },
+                            v6: VariableMeta { name: None, ty: t3 },
+                            v7: VariableMeta { name: None, ty: t3 },
+                            v8: VariableMeta { name: None, ty: t3 },
                         },
                         unify: [],
                     },
@@ -12342,9 +10307,9 @@ fn lir_math() {
                             Action { relation: Cos, columns: [x, v2], entry: [_, U] },
                         ],
                         variables: {
-                            v0: VariableMeta { name: Some("x"), ty: t4 },
-                            v1: VariableMeta { name: None, ty: t4 },
-                            v2: VariableMeta { name: None, ty: t4 },
+                            v0: VariableMeta { name: Some("x"), ty: t3 },
+                            v1: VariableMeta { name: None, ty: t3 },
+                            v2: VariableMeta { name: None, ty: t3 },
                         },
                         unify: [],
                     },
@@ -12357,12 +10322,12 @@ fn lir_math() {
                             Premise { relation: g2, columns: [v2] },
                         ],
                         variables: {
-                            v0: VariableMeta { name: Some("fuel"), ty: t3 },
-                            v1: VariableMeta { name: None, ty: t3 },
-                            v2: VariableMeta { name: None, ty: t1 },
-                            v3: VariableMeta { name: None, ty: t4 },
-                            v4: VariableMeta { name: Some("x"), ty: t4 },
-                            v5: VariableMeta { name: None, ty: t4 },
+                            v0: VariableMeta { name: Some("fuel"), ty: t2 },
+                            v1: VariableMeta { name: None, ty: t2 },
+                            v2: VariableMeta { name: None, ty: t0 },
+                            v3: VariableMeta { name: None, ty: t3 },
+                            v4: VariableMeta { name: Some("x"), ty: t3 },
+                            v5: VariableMeta { name: None, ty: t3 },
                         },
                         unify: [
                             [v5, x],
@@ -12377,11 +10342,11 @@ fn lir_math() {
                             Action { relation: Sin, columns: [x, v4], entry: [_, U] },
                         ],
                         variables: {
-                            v0: VariableMeta { name: Some("fuel"), ty: t3 },
-                            v1: VariableMeta { name: None, ty: t3 },
-                            v2: VariableMeta { name: Some("x"), ty: t4 },
-                            v3: VariableMeta { name: None, ty: t4 },
-                            v4: VariableMeta { name: None, ty: t4 },
+                            v0: VariableMeta { name: Some("fuel"), ty: t2 },
+                            v1: VariableMeta { name: None, ty: t2 },
+                            v2: VariableMeta { name: Some("x"), ty: t3 },
+                            v3: VariableMeta { name: None, ty: t3 },
+                            v4: VariableMeta { name: None, ty: t3 },
                         },
                         unify: [],
                     },
@@ -12396,15 +10361,15 @@ fn lir_math() {
                             Action { relation: Add, columns: [v7, v8, v6], entry: [_, _, U] },
                         ],
                         variables: {
-                            v0: VariableMeta { name: Some("fuel"), ty: t3 },
-                            v1: VariableMeta { name: None, ty: t3 },
-                            v2: VariableMeta { name: Some("f"), ty: t4 },
-                            v3: VariableMeta { name: Some("g"), ty: t4 },
-                            v4: VariableMeta { name: None, ty: t4 },
-                            v5: VariableMeta { name: Some("x"), ty: t4 },
-                            v6: VariableMeta { name: None, ty: t4 },
-                            v7: VariableMeta { name: None, ty: t4 },
-                            v8: VariableMeta { name: None, ty: t4 },
+                            v0: VariableMeta { name: Some("fuel"), ty: t2 },
+                            v1: VariableMeta { name: None, ty: t2 },
+                            v2: VariableMeta { name: Some("f"), ty: t3 },
+                            v3: VariableMeta { name: Some("g"), ty: t3 },
+                            v4: VariableMeta { name: None, ty: t3 },
+                            v5: VariableMeta { name: Some("x"), ty: t3 },
+                            v6: VariableMeta { name: None, ty: t3 },
+                            v7: VariableMeta { name: None, ty: t3 },
+                            v8: VariableMeta { name: None, ty: t3 },
                         },
                         unify: [],
                     },
@@ -12419,15 +10384,15 @@ fn lir_math() {
                             Action { relation: Sub, columns: [v7, v8, v6], entry: [_, _, U] },
                         ],
                         variables: {
-                            v0: VariableMeta { name: Some("fuel"), ty: t3 },
-                            v1: VariableMeta { name: None, ty: t3 },
-                            v2: VariableMeta { name: Some("f"), ty: t4 },
-                            v3: VariableMeta { name: Some("g"), ty: t4 },
-                            v4: VariableMeta { name: None, ty: t4 },
-                            v5: VariableMeta { name: Some("x"), ty: t4 },
-                            v6: VariableMeta { name: None, ty: t4 },
-                            v7: VariableMeta { name: None, ty: t4 },
-                            v8: VariableMeta { name: None, ty: t4 },
+                            v0: VariableMeta { name: Some("fuel"), ty: t2 },
+                            v1: VariableMeta { name: None, ty: t2 },
+                            v2: VariableMeta { name: Some("f"), ty: t3 },
+                            v3: VariableMeta { name: Some("g"), ty: t3 },
+                            v4: VariableMeta { name: None, ty: t3 },
+                            v5: VariableMeta { name: Some("x"), ty: t3 },
+                            v6: VariableMeta { name: None, ty: t3 },
+                            v7: VariableMeta { name: None, ty: t3 },
+                            v8: VariableMeta { name: None, ty: t3 },
                         },
                         unify: [],
                     },
@@ -12445,189 +10410,101 @@ fn lir_math() {
                             Action { relation: Mul, columns: [v8, v9, v10], entry: [_, _, U] },
                         ],
                         variables: {
-                            v0: VariableMeta { name: Some("fuel"), ty: t3 },
-                            v1: VariableMeta { name: None, ty: t3 },
-                            v2: VariableMeta { name: Some("a"), ty: t4 },
-                            v3: VariableMeta { name: Some("b"), ty: t4 },
-                            v4: VariableMeta { name: None, ty: t4 },
-                            v5: VariableMeta { name: Some("x"), ty: t4 },
-                            v6: VariableMeta { name: None, ty: t4 },
-                            v7: VariableMeta { name: None, ty: t4 },
-                            v8: VariableMeta { name: None, ty: t4 },
-                            v9: VariableMeta { name: None, ty: t4 },
-                            v10: VariableMeta { name: None, ty: t4 },
-                            v11: VariableMeta { name: None, ty: t4 },
+                            v0: VariableMeta { name: Some("fuel"), ty: t2 },
+                            v1: VariableMeta { name: None, ty: t2 },
+                            v2: VariableMeta { name: Some("a"), ty: t3 },
+                            v3: VariableMeta { name: Some("b"), ty: t3 },
+                            v4: VariableMeta { name: None, ty: t3 },
+                            v5: VariableMeta { name: Some("x"), ty: t3 },
+                            v6: VariableMeta { name: None, ty: t3 },
+                            v7: VariableMeta { name: None, ty: t3 },
+                            v8: VariableMeta { name: None, ty: t3 },
+                            v9: VariableMeta { name: None, ty: t3 },
+                            v10: VariableMeta { name: None, ty: t3 },
+                            v11: VariableMeta { name: None, ty: t3 },
                         },
                         unify: [],
                     },
                 ],
                 relations: {
-                    r0: + { columns: [i64, i64, i64], kind: Primitive(i64_add012), implicit_rules: {n0: [_, _, !]} },
-                    r1: & { columns: [i64, i64, i64], kind: Primitive(i64_bitand012), implicit_rules: {n0: [_, _, !]} },
-                    r2: not-i64 { columns: [i64, i64], kind: Primitive(i64_bitnot01), implicit_rules: {n0: [_, !]} },
-                    r3: | { columns: [i64, i64, i64], kind: Primitive(i64_bitor012), implicit_rules: {n0: [_, _, !]} },
-                    r4: << { columns: [i64, i64, i64], kind: Primitive(i64_bitshl012), implicit_rules: {n0: [_, _, !]} },
-                    r5: >> { columns: [i64, i64, i64], kind: Primitive(i64_bitshr012), implicit_rules: {n0: [_, _, !]} },
-                    r6: ^ { columns: [i64, i64, i64], kind: Primitive(i64_bitxor012), implicit_rules: {n0: [_, _, !]} },
-                    r7: / { columns: [i64, i64, i64], kind: Primitive(i64_div012), implicit_rules: {n0: [_, _, !]} },
-                    r8: log2 { columns: [i64, i64], kind: Primitive(i64_log01), implicit_rules: {n0: [_, !]} },
-                    r9: max { columns: [i64, i64, i64], kind: Primitive(i64_max012), implicit_rules: {n0: [_, _, !]} },
-                    r10: min { columns: [i64, i64, i64], kind: Primitive(i64_min012), implicit_rules: {n0: [_, _, !]} },
-                    r11: * { columns: [i64, i64, i64], kind: Primitive(i64_mul012), implicit_rules: {n0: [_, _, !]} },
-                    r12: % { columns: [i64, i64, i64], kind: Primitive(i64_rem012), implicit_rules: {n0: [_, _, !]} },
-                    r13: - { columns: [i64, i64, i64], kind: Primitive(i64_sub012), implicit_rules: {n0: [_, _, !]} },
-                    r14: FuelUnit { columns: [FuelUnit], kind: Forall(t3), implicit_rules: {} },
-                    r15: Fuel { columns: [FuelUnit, FuelUnit], kind: Table, implicit_rules: {n0: [_, U]} },
-                    r16: ZeroFuel { columns: [FuelUnit], kind: Table, implicit_rules: {n0: [U]} },
-                    r17: Math { columns: [Math], kind: Forall(t4), implicit_rules: {} },
-                    r18: Diff { columns: [Math, Math, Math], kind: Table, implicit_rules: {n0: [_, _, U]} },
-                    r19: Integral { columns: [FuelUnit, Math, Math, Math], kind: Table, implicit_rules: {n0: [_, _, _, U]} },
-                    r20: Add { columns: [Math, Math, Math], kind: Table, implicit_rules: {n0: [_, _, U]} },
-                    r21: Sub { columns: [Math, Math, Math], kind: Table, implicit_rules: {n0: [_, _, U]} },
-                    r22: Mul { columns: [Math, Math, Math], kind: Table, implicit_rules: {n0: [_, _, U]} },
-                    r23: Div { columns: [Math, Math, Math], kind: Table, implicit_rules: {n0: [_, _, U]} },
-                    r24: Pow { columns: [Math, Math, Math], kind: Table, implicit_rules: {n0: [_, _, U]} },
-                    r25: Ln { columns: [Math, Math], kind: Table, implicit_rules: {n0: [_, U]} },
-                    r26: Sqrt { columns: [Math, Math], kind: Table, implicit_rules: {n0: [_, U]} },
-                    r27: Sin { columns: [Math, Math], kind: Table, implicit_rules: {n0: [_, U]} },
-                    r28: Cos { columns: [Math, Math], kind: Table, implicit_rules: {n0: [_, U]} },
-                    r29: Const { columns: [i64, Math], kind: Table, implicit_rules: {n0: [_, U]} },
-                    r30: Var { columns: [String, Math], kind: Table, implicit_rules: {n0: [_, U]} },
-                    r31: g0 { columns: [i64], kind: Global(g0), implicit_rules: {n0: [!]} },
-                    r32: g1 { columns: [i64], kind: Global(g1), implicit_rules: {n0: [!]} },
-                    r33: g2 { columns: [i64], kind: Global(g2), implicit_rules: {n0: [!]} },
-                    r34: g3 { columns: [i64], kind: Global(g3), implicit_rules: {n0: [!]} },
-                    r35: g4 { columns: [FuelUnit], kind: Global(g4), implicit_rules: {n0: [!]} },
-                    r36: g5 { columns: [FuelUnit], kind: Global(g5), implicit_rules: {n0: [!]} },
-                    r37: g6 { columns: [FuelUnit], kind: Global(g6), implicit_rules: {n0: [!]} },
-                    r38: fuel3 { columns: [FuelUnit], kind: Global(g7), implicit_rules: {n0: [!]} },
-                    r39: g8 { columns: [String], kind: Global(g8), implicit_rules: {n0: [!]} },
-                    r40: g9 { columns: [Math], kind: Global(g9), implicit_rules: {n0: [!]} },
-                    r41: g10 { columns: [Math], kind: Global(g10), implicit_rules: {n0: [!]} },
-                    r42: g11 { columns: [Math], kind: Global(g11), implicit_rules: {n0: [!]} },
-                    r43: g12 { columns: [Math], kind: Global(g12), implicit_rules: {n0: [!]} },
-                    r44: g13 { columns: [Math], kind: Global(g13), implicit_rules: {n0: [!]} },
-                    r45: g14 { columns: [Math], kind: Global(g14), implicit_rules: {n0: [!]} },
-                    r46: g15 { columns: [Math], kind: Global(g15), implicit_rules: {n0: [!]} },
-                    r47: g16 { columns: [Math], kind: Global(g16), implicit_rules: {n0: [!]} },
-                    r48: g17 { columns: [Math], kind: Global(g17), implicit_rules: {n0: [!]} },
-                    r49: g18 { columns: [Math], kind: Global(g18), implicit_rules: {n0: [!]} },
-                    r50: g19 { columns: [Math], kind: Global(g19), implicit_rules: {n0: [!]} },
-                    r51: g20 { columns: [Math], kind: Global(g20), implicit_rules: {n0: [!]} },
-                    r52: g21 { columns: [Math], kind: Global(g21), implicit_rules: {n0: [!]} },
-                    r53: g22 { columns: [i64], kind: Global(g22), implicit_rules: {n0: [!]} },
-                    r54: g23 { columns: [Math], kind: Global(g23), implicit_rules: {n0: [!]} },
-                    r55: g24 { columns: [Math], kind: Global(g24), implicit_rules: {n0: [!]} },
-                    r56: g25 { columns: [i64], kind: Global(g25), implicit_rules: {n0: [!]} },
-                    r57: g26 { columns: [Math], kind: Global(g26), implicit_rules: {n0: [!]} },
-                    r58: g27 { columns: [Math], kind: Global(g27), implicit_rules: {n0: [!]} },
-                    r59: g28 { columns: [Math], kind: Global(g28), implicit_rules: {n0: [!]} },
-                    r60: g29 { columns: [Math], kind: Global(g29), implicit_rules: {n0: [!]} },
-                    r61: g30 { columns: [Math], kind: Global(g30), implicit_rules: {n0: [!]} },
-                    r62: g31 { columns: [String], kind: Global(g31), implicit_rules: {n0: [!]} },
-                    r63: g32 { columns: [Math], kind: Global(g32), implicit_rules: {n0: [!]} },
-                    r64: g33 { columns: [Math], kind: Global(g33), implicit_rules: {n0: [!]} },
-                    r65: g34 { columns: [Math], kind: Global(g34), implicit_rules: {n0: [!]} },
-                    r66: g35 { columns: [Math], kind: Global(g35), implicit_rules: {n0: [!]} },
-                    r67: g36 { columns: [Math], kind: Global(g36), implicit_rules: {n0: [!]} },
-                    r68: g37 { columns: [Math], kind: Global(g37), implicit_rules: {n0: [!]} },
-                    r69: g38 { columns: [Math], kind: Global(g38), implicit_rules: {n0: [!]} },
-                    r70: g39 { columns: [String], kind: Global(g39), implicit_rules: {n0: [!]} },
-                    r71: g40 { columns: [Math], kind: Global(g40), implicit_rules: {n0: [!]} },
-                    r72: g41 { columns: [Math], kind: Global(g41), implicit_rules: {n0: [!]} },
-                    r73: g42 { columns: [Math], kind: Global(g42), implicit_rules: {n0: [!]} },
-                    r74: g43 { columns: [Math], kind: Global(g43), implicit_rules: {n0: [!]} },
-                    r75: g44 { columns: [Math], kind: Global(g44), implicit_rules: {n0: [!]} },
-                    r76: g45 { columns: [Math], kind: Global(g45), implicit_rules: {n0: [!]} },
-                    r77: g46 { columns: [Math], kind: Global(g46), implicit_rules: {n0: [!]} },
-                    r78: g47 { columns: [Math], kind: Global(g47), implicit_rules: {n0: [!]} },
+                    r0: Fuel { columns: [FuelUnit, FuelUnit], kind: Table, implicit_rules: {n0: [_, U]} },
+                    r1: ZeroFuel { columns: [FuelUnit], kind: Table, implicit_rules: {n0: [U]} },
+                    r2: Diff { columns: [Math, Math, Math], kind: Table, implicit_rules: {n0: [_, _, U]} },
+                    r3: Integral { columns: [FuelUnit, Math, Math, Math], kind: Table, implicit_rules: {n0: [_, _, _, U]} },
+                    r4: Add { columns: [Math, Math, Math], kind: Table, implicit_rules: {n0: [_, _, U]} },
+                    r5: Sub { columns: [Math, Math, Math], kind: Table, implicit_rules: {n0: [_, _, U]} },
+                    r6: Mul { columns: [Math, Math, Math], kind: Table, implicit_rules: {n0: [_, _, U]} },
+                    r7: Div { columns: [Math, Math, Math], kind: Table, implicit_rules: {n0: [_, _, U]} },
+                    r8: Pow { columns: [Math, Math, Math], kind: Table, implicit_rules: {n0: [_, _, U]} },
+                    r9: Ln { columns: [Math, Math], kind: Table, implicit_rules: {n0: [_, U]} },
+                    r10: Sqrt { columns: [Math, Math], kind: Table, implicit_rules: {n0: [_, U]} },
+                    r11: Sin { columns: [Math, Math], kind: Table, implicit_rules: {n0: [_, U]} },
+                    r12: Cos { columns: [Math, Math], kind: Table, implicit_rules: {n0: [_, U]} },
+                    r13: Const { columns: [i64, Math], kind: Table, implicit_rules: {n0: [_, U]} },
+                    r14: Var { columns: [String, Math], kind: Table, implicit_rules: {n0: [_, U]} },
+                    r15: g0 { columns: [i64], kind: Global(g0), implicit_rules: {n0: [!]} },
+                    r16: g1 { columns: [i64], kind: Global(g1), implicit_rules: {n0: [!]} },
+                    r17: g2 { columns: [i64], kind: Global(g2), implicit_rules: {n0: [!]} },
+                    r18: g3 { columns: [i64], kind: Global(g3), implicit_rules: {n0: [!]} },
+                    r19: g4 { columns: [FuelUnit], kind: Global(g4), implicit_rules: {n0: [!]} },
+                    r20: g5 { columns: [FuelUnit], kind: Global(g5), implicit_rules: {n0: [!]} },
+                    r21: g6 { columns: [FuelUnit], kind: Global(g6), implicit_rules: {n0: [!]} },
+                    r22: fuel3 { columns: [FuelUnit], kind: Global(g7), implicit_rules: {n0: [!]} },
+                    r23: g8 { columns: [String], kind: Global(g8), implicit_rules: {n0: [!]} },
+                    r24: g9 { columns: [Math], kind: Global(g9), implicit_rules: {n0: [!]} },
+                    r25: g10 { columns: [Math], kind: Global(g10), implicit_rules: {n0: [!]} },
+                    r26: g11 { columns: [Math], kind: Global(g11), implicit_rules: {n0: [!]} },
+                    r27: g12 { columns: [Math], kind: Global(g12), implicit_rules: {n0: [!]} },
+                    r28: g13 { columns: [Math], kind: Global(g13), implicit_rules: {n0: [!]} },
+                    r29: g14 { columns: [Math], kind: Global(g14), implicit_rules: {n0: [!]} },
+                    r30: g15 { columns: [Math], kind: Global(g15), implicit_rules: {n0: [!]} },
+                    r31: g16 { columns: [Math], kind: Global(g16), implicit_rules: {n0: [!]} },
+                    r32: g17 { columns: [Math], kind: Global(g17), implicit_rules: {n0: [!]} },
+                    r33: g18 { columns: [Math], kind: Global(g18), implicit_rules: {n0: [!]} },
+                    r34: g19 { columns: [Math], kind: Global(g19), implicit_rules: {n0: [!]} },
+                    r35: g20 { columns: [Math], kind: Global(g20), implicit_rules: {n0: [!]} },
+                    r36: g21 { columns: [Math], kind: Global(g21), implicit_rules: {n0: [!]} },
+                    r37: g22 { columns: [i64], kind: Global(g22), implicit_rules: {n0: [!]} },
+                    r38: g23 { columns: [Math], kind: Global(g23), implicit_rules: {n0: [!]} },
+                    r39: g24 { columns: [Math], kind: Global(g24), implicit_rules: {n0: [!]} },
+                    r40: g25 { columns: [i64], kind: Global(g25), implicit_rules: {n0: [!]} },
+                    r41: g26 { columns: [Math], kind: Global(g26), implicit_rules: {n0: [!]} },
+                    r42: g27 { columns: [Math], kind: Global(g27), implicit_rules: {n0: [!]} },
+                    r43: g28 { columns: [Math], kind: Global(g28), implicit_rules: {n0: [!]} },
+                    r44: g29 { columns: [Math], kind: Global(g29), implicit_rules: {n0: [!]} },
+                    r45: g30 { columns: [Math], kind: Global(g30), implicit_rules: {n0: [!]} },
+                    r46: g31 { columns: [String], kind: Global(g31), implicit_rules: {n0: [!]} },
+                    r47: g32 { columns: [Math], kind: Global(g32), implicit_rules: {n0: [!]} },
+                    r48: g33 { columns: [Math], kind: Global(g33), implicit_rules: {n0: [!]} },
+                    r49: g34 { columns: [Math], kind: Global(g34), implicit_rules: {n0: [!]} },
+                    r50: g35 { columns: [Math], kind: Global(g35), implicit_rules: {n0: [!]} },
+                    r51: g36 { columns: [Math], kind: Global(g36), implicit_rules: {n0: [!]} },
+                    r52: g37 { columns: [Math], kind: Global(g37), implicit_rules: {n0: [!]} },
+                    r53: g38 { columns: [Math], kind: Global(g38), implicit_rules: {n0: [!]} },
+                    r54: g39 { columns: [String], kind: Global(g39), implicit_rules: {n0: [!]} },
+                    r55: g40 { columns: [Math], kind: Global(g40), implicit_rules: {n0: [!]} },
+                    r56: g41 { columns: [Math], kind: Global(g41), implicit_rules: {n0: [!]} },
+                    r57: g42 { columns: [Math], kind: Global(g42), implicit_rules: {n0: [!]} },
+                    r58: g43 { columns: [Math], kind: Global(g43), implicit_rules: {n0: [!]} },
+                    r59: g44 { columns: [Math], kind: Global(g44), implicit_rules: {n0: [!]} },
+                    r60: g45 { columns: [Math], kind: Global(g45), implicit_rules: {n0: [!]} },
+                    r61: g46 { columns: [Math], kind: Global(g46), implicit_rules: {n0: [!]} },
+                    r62: g47 { columns: [Math], kind: Global(g47), implicit_rules: {n0: [!]} },
                 },
             }"#]]),
         expected_lir: Some(expect![[r#"
             Theory {
                 name: None,
                 types: {
-                    [t0, unit]: THIS_STRING_SHOULD_NOT_APPEAR_IN_GENERATED_CODE,
-                    [t1, i64]: std::primitive::i64,
-                    [t2, String]: runtime::IString,
-                    [t3, FuelUnit]: [symbolic],
-                    [t4, Math]: [symbolic],
+                    [t0, i64]: std::primitive::i64,
+                    [t1, String]: runtime::IString,
+                    [t2, FuelUnit]: [symbolic],
+                    [t3, Math]: [symbolic],
                 },
                 relations: {
                     r0: RelationData {
-                        name: "i64_add012",
-                        param_types: {c0: t1, c1: t1, c2: t1},
-                        kind: Primitive,
-                    },
-                    r1: RelationData {
-                        name: "i64_bitand012",
-                        param_types: {c0: t1, c1: t1, c2: t1},
-                        kind: Primitive,
-                    },
-                    r2: RelationData {
-                        name: "i64_bitnot01",
-                        param_types: {c0: t1, c1: t1},
-                        kind: Primitive,
-                    },
-                    r3: RelationData {
-                        name: "i64_bitor012",
-                        param_types: {c0: t1, c1: t1, c2: t1},
-                        kind: Primitive,
-                    },
-                    r4: RelationData {
-                        name: "i64_bitshl012",
-                        param_types: {c0: t1, c1: t1, c2: t1},
-                        kind: Primitive,
-                    },
-                    r5: RelationData {
-                        name: "i64_bitshr012",
-                        param_types: {c0: t1, c1: t1, c2: t1},
-                        kind: Primitive,
-                    },
-                    r6: RelationData {
-                        name: "i64_bitxor012",
-                        param_types: {c0: t1, c1: t1, c2: t1},
-                        kind: Primitive,
-                    },
-                    r7: RelationData {
-                        name: "i64_div012",
-                        param_types: {c0: t1, c1: t1, c2: t1},
-                        kind: Primitive,
-                    },
-                    r8: RelationData {
-                        name: "i64_log01",
-                        param_types: {c0: t1, c1: t1},
-                        kind: Primitive,
-                    },
-                    r9: RelationData {
-                        name: "i64_max012",
-                        param_types: {c0: t1, c1: t1, c2: t1},
-                        kind: Primitive,
-                    },
-                    r10: RelationData {
-                        name: "i64_min012",
-                        param_types: {c0: t1, c1: t1, c2: t1},
-                        kind: Primitive,
-                    },
-                    r11: RelationData {
-                        name: "i64_mul012",
-                        param_types: {c0: t1, c1: t1, c2: t1},
-                        kind: Primitive,
-                    },
-                    r12: RelationData {
-                        name: "i64_rem012",
-                        param_types: {c0: t1, c1: t1, c2: t1},
-                        kind: Primitive,
-                    },
-                    r13: RelationData {
-                        name: "i64_sub012",
-                        param_types: {c0: t1, c1: t1, c2: t1},
-                        kind: Primitive,
-                    },
-                    r14: (hir-only relation),
-                    r15: RelationData {
                         name: "Fuel",
-                        param_types: {c0: t3, c1: t3},
+                        param_types: {c0: t2, c1: t2},
                         kind: Table {
                             index_to_info: {ir0: 0_1 conflict[..1] => [1:union], ir1: 1_0},
                             usage_to_info: {
@@ -12650,9 +10527,9 @@ fn lir_math() {
                             column_back_reference: {},
                         },
                     },
-                    r16: RelationData {
+                    r1: RelationData {
                         name: "ZeroFuel",
-                        param_types: {c0: t3},
+                        param_types: {c0: t2},
                         kind: Table {
                             index_to_info: {ir0: 0 conflict[..0] => [0:union]},
                             usage_to_info: {
@@ -12663,10 +10540,9 @@ fn lir_math() {
                             column_back_reference: {},
                         },
                     },
-                    r17: (hir-only relation),
-                    r18: RelationData {
+                    r2: RelationData {
                         name: "Diff",
-                        param_types: {c0: t4, c1: t4, c2: t4},
+                        param_types: {c0: t3, c1: t3, c2: t3},
                         kind: Table {
                             index_to_info: {ir0: 1_0_2 conflict[..2] => [2:union]},
                             usage_to_info: {
@@ -12681,9 +10557,9 @@ fn lir_math() {
                             column_back_reference: {},
                         },
                     },
-                    r19: RelationData {
+                    r3: RelationData {
                         name: "Integral",
-                        param_types: {c0: t3, c1: t4, c2: t4, c3: t4},
+                        param_types: {c0: t2, c1: t3, c2: t3, c3: t3},
                         kind: Table {
                             index_to_info: {ir0: 0_1_2_3 conflict[..3] => [3:union], ir1: 1_2_0_3},
                             usage_to_info: {
@@ -12702,9 +10578,9 @@ fn lir_math() {
                             column_back_reference: {},
                         },
                     },
-                    r20: RelationData {
+                    r4: RelationData {
                         name: "Add",
-                        param_types: {c0: t4, c1: t4, c2: t4},
+                        param_types: {c0: t3, c1: t3, c2: t3},
                         kind: Table {
                             index_to_info: {ir0: 0_1_2, ir1: 1_0_2 conflict[..2] => [2:union], ir2: 2_0_1},
                             usage_to_info: {
@@ -12725,9 +10601,9 @@ fn lir_math() {
                             column_back_reference: {},
                         },
                     },
-                    r21: RelationData {
+                    r5: RelationData {
                         name: "Sub",
-                        param_types: {c0: t4, c1: t4, c2: t4},
+                        param_types: {c0: t3, c1: t3, c2: t3},
                         kind: Table {
                             index_to_info: {ir0: 0_1_2 conflict[..2] => [2:union], ir1: 2_0_1},
                             usage_to_info: {
@@ -12740,9 +10616,9 @@ fn lir_math() {
                             column_back_reference: {},
                         },
                     },
-                    r22: RelationData {
+                    r6: RelationData {
                         name: "Mul",
-                        param_types: {c0: t4, c1: t4, c2: t4},
+                        param_types: {c0: t3, c1: t3, c2: t3},
                         kind: Table {
                             index_to_info: {ir0: 0_1_2, ir1: 1_0_2 conflict[..2] => [2:union], ir2: 2_0_1},
                             usage_to_info: {
@@ -12771,9 +10647,9 @@ fn lir_math() {
                             column_back_reference: {},
                         },
                     },
-                    r23: RelationData {
+                    r7: RelationData {
                         name: "Div",
-                        param_types: {c0: t4, c1: t4, c2: t4},
+                        param_types: {c0: t3, c1: t3, c2: t3},
                         kind: Table {
                             index_to_info: {ir0: 0_1_2 conflict[..2] => [2:union]},
                             usage_to_info: {
@@ -12784,9 +10660,9 @@ fn lir_math() {
                             column_back_reference: {},
                         },
                     },
-                    r24: RelationData {
+                    r8: RelationData {
                         name: "Pow",
-                        param_types: {c0: t4, c1: t4, c2: t4},
+                        param_types: {c0: t3, c1: t3, c2: t3},
                         kind: Table {
                             index_to_info: {ir0: 0_1_2 conflict[..2] => [2:union], ir1: 1_0_2, ir2: 2_0_1},
                             usage_to_info: {
@@ -12808,9 +10684,9 @@ fn lir_math() {
                             column_back_reference: {},
                         },
                     },
-                    r25: RelationData {
+                    r9: RelationData {
                         name: "Ln",
-                        param_types: {c0: t4, c1: t4},
+                        param_types: {c0: t3, c1: t3},
                         kind: Table {
                             index_to_info: {ir0: 0_1 conflict[..1] => [1:union]},
                             usage_to_info: {
@@ -12821,9 +10697,9 @@ fn lir_math() {
                             column_back_reference: {},
                         },
                     },
-                    r26: RelationData {
+                    r10: RelationData {
                         name: "Sqrt",
-                        param_types: {c0: t4, c1: t4},
+                        param_types: {c0: t3, c1: t3},
                         kind: Table {
                             index_to_info: {ir0: 0_1 conflict[..1] => [1:union]},
                             usage_to_info: {
@@ -12834,9 +10710,9 @@ fn lir_math() {
                             column_back_reference: {},
                         },
                     },
-                    r27: RelationData {
+                    r11: RelationData {
                         name: "Sin",
-                        param_types: {c0: t4, c1: t4},
+                        param_types: {c0: t3, c1: t3},
                         kind: Table {
                             index_to_info: {ir0: 0_1 conflict[..1] => [1:union]},
                             usage_to_info: {
@@ -12849,9 +10725,9 @@ fn lir_math() {
                             column_back_reference: {},
                         },
                     },
-                    r28: RelationData {
+                    r12: RelationData {
                         name: "Cos",
-                        param_types: {c0: t4, c1: t4},
+                        param_types: {c0: t3, c1: t3},
                         kind: Table {
                             index_to_info: {ir0: 0_1 conflict[..1] => [1:union]},
                             usage_to_info: {
@@ -12865,9 +10741,9 @@ fn lir_math() {
                             column_back_reference: {},
                         },
                     },
-                    r29: RelationData {
+                    r13: RelationData {
                         name: "Const",
-                        param_types: {c0: t1, c1: t4},
+                        param_types: {c0: t0, c1: t3},
                         kind: Table {
                             index_to_info: {ir0: 0_1 conflict[..1] => [1:union], ir1: 1_0},
                             usage_to_info: {
@@ -12886,9 +10762,9 @@ fn lir_math() {
                             column_back_reference: {},
                         },
                     },
-                    r30: RelationData {
+                    r14: RelationData {
                         name: "Var",
-                        param_types: {c0: t2, c1: t4},
+                        param_types: {c0: t1, c1: t3},
                         kind: Table {
                             index_to_info: {ir0: 0_1 conflict[..1] => [1:union]},
                             usage_to_info: {
@@ -12899,681 +10775,681 @@ fn lir_math() {
                             column_back_reference: {},
                         },
                     },
-                    r31: RelationData {
+                    r15: RelationData {
                         name: "g0",
-                        param_types: {c0: t1},
+                        param_types: {c0: t0},
                         kind: [Global, g0],
                     },
-                    r32: RelationData {
+                    r16: RelationData {
                         name: "g1",
-                        param_types: {c0: t1},
+                        param_types: {c0: t0},
                         kind: [Global, g1],
                     },
-                    r33: RelationData {
+                    r17: RelationData {
                         name: "g2",
-                        param_types: {c0: t1},
+                        param_types: {c0: t0},
                         kind: [Global, g2],
                     },
-                    r34: RelationData {
+                    r18: RelationData {
                         name: "g3",
-                        param_types: {c0: t1},
+                        param_types: {c0: t0},
                         kind: [Global, g3],
                     },
-                    r35: RelationData {
+                    r19: RelationData {
                         name: "g4",
-                        param_types: {c0: t3},
+                        param_types: {c0: t2},
                         kind: [Global, g4],
                     },
-                    r36: RelationData {
+                    r20: RelationData {
                         name: "g5",
-                        param_types: {c0: t3},
+                        param_types: {c0: t2},
                         kind: [Global, g5],
                     },
-                    r37: RelationData {
+                    r21: RelationData {
                         name: "g6",
-                        param_types: {c0: t3},
+                        param_types: {c0: t2},
                         kind: [Global, g6],
                     },
-                    r38: RelationData {
+                    r22: RelationData {
                         name: "g7",
-                        param_types: {c0: t3},
+                        param_types: {c0: t2},
                         kind: [Global, g7],
                     },
-                    r39: RelationData {
+                    r23: RelationData {
                         name: "g8",
-                        param_types: {c0: t2},
+                        param_types: {c0: t1},
                         kind: [Global, g8],
                     },
-                    r40: RelationData {
+                    r24: RelationData {
                         name: "g9",
-                        param_types: {c0: t4},
+                        param_types: {c0: t3},
                         kind: [Global, g9],
                     },
-                    r41: RelationData {
+                    r25: RelationData {
                         name: "g10",
-                        param_types: {c0: t4},
+                        param_types: {c0: t3},
                         kind: [Global, g10],
                     },
-                    r42: RelationData {
+                    r26: RelationData {
                         name: "g11",
-                        param_types: {c0: t4},
+                        param_types: {c0: t3},
                         kind: [Global, g11],
                     },
-                    r43: RelationData {
+                    r27: RelationData {
                         name: "g12",
-                        param_types: {c0: t4},
+                        param_types: {c0: t3},
                         kind: [Global, g12],
                     },
-                    r44: RelationData {
+                    r28: RelationData {
                         name: "g13",
-                        param_types: {c0: t4},
+                        param_types: {c0: t3},
                         kind: [Global, g13],
                     },
-                    r45: RelationData {
+                    r29: RelationData {
                         name: "g14",
-                        param_types: {c0: t4},
+                        param_types: {c0: t3},
                         kind: [Global, g14],
                     },
-                    r46: RelationData {
+                    r30: RelationData {
                         name: "g15",
-                        param_types: {c0: t4},
+                        param_types: {c0: t3},
                         kind: [Global, g15],
                     },
-                    r47: RelationData {
+                    r31: RelationData {
                         name: "g16",
-                        param_types: {c0: t4},
+                        param_types: {c0: t3},
                         kind: [Global, g16],
                     },
-                    r48: RelationData {
+                    r32: RelationData {
                         name: "g17",
-                        param_types: {c0: t4},
+                        param_types: {c0: t3},
                         kind: [Global, g17],
                     },
-                    r49: RelationData {
+                    r33: RelationData {
                         name: "g18",
-                        param_types: {c0: t4},
+                        param_types: {c0: t3},
                         kind: [Global, g18],
                     },
-                    r50: RelationData {
+                    r34: RelationData {
                         name: "g19",
-                        param_types: {c0: t4},
+                        param_types: {c0: t3},
                         kind: [Global, g19],
                     },
-                    r51: RelationData {
+                    r35: RelationData {
                         name: "g20",
-                        param_types: {c0: t4},
+                        param_types: {c0: t3},
                         kind: [Global, g20],
                     },
-                    r52: RelationData {
+                    r36: RelationData {
                         name: "g21",
-                        param_types: {c0: t4},
+                        param_types: {c0: t3},
                         kind: [Global, g21],
                     },
-                    r53: RelationData {
+                    r37: RelationData {
                         name: "g22",
-                        param_types: {c0: t1},
+                        param_types: {c0: t0},
                         kind: [Global, g22],
                     },
-                    r54: RelationData {
+                    r38: RelationData {
                         name: "g23",
-                        param_types: {c0: t4},
+                        param_types: {c0: t3},
                         kind: [Global, g23],
                     },
-                    r55: RelationData {
+                    r39: RelationData {
                         name: "g24",
-                        param_types: {c0: t4},
+                        param_types: {c0: t3},
                         kind: [Global, g24],
                     },
-                    r56: RelationData {
+                    r40: RelationData {
                         name: "g25",
-                        param_types: {c0: t1},
+                        param_types: {c0: t0},
                         kind: [Global, g25],
                     },
-                    r57: RelationData {
+                    r41: RelationData {
                         name: "g26",
-                        param_types: {c0: t4},
+                        param_types: {c0: t3},
                         kind: [Global, g26],
                     },
-                    r58: RelationData {
+                    r42: RelationData {
                         name: "g27",
-                        param_types: {c0: t4},
+                        param_types: {c0: t3},
                         kind: [Global, g27],
                     },
-                    r59: RelationData {
+                    r43: RelationData {
                         name: "g28",
-                        param_types: {c0: t4},
+                        param_types: {c0: t3},
                         kind: [Global, g28],
                     },
-                    r60: RelationData {
+                    r44: RelationData {
                         name: "g29",
-                        param_types: {c0: t4},
+                        param_types: {c0: t3},
                         kind: [Global, g29],
                     },
-                    r61: RelationData {
+                    r45: RelationData {
                         name: "g30",
-                        param_types: {c0: t4},
+                        param_types: {c0: t3},
                         kind: [Global, g30],
                     },
-                    r62: RelationData {
+                    r46: RelationData {
                         name: "g31",
-                        param_types: {c0: t2},
+                        param_types: {c0: t1},
                         kind: [Global, g31],
                     },
-                    r63: RelationData {
+                    r47: RelationData {
                         name: "g32",
-                        param_types: {c0: t4},
+                        param_types: {c0: t3},
                         kind: [Global, g32],
                     },
-                    r64: RelationData {
+                    r48: RelationData {
                         name: "g33",
-                        param_types: {c0: t4},
+                        param_types: {c0: t3},
                         kind: [Global, g33],
                     },
-                    r65: RelationData {
+                    r49: RelationData {
                         name: "g34",
-                        param_types: {c0: t4},
+                        param_types: {c0: t3},
                         kind: [Global, g34],
                     },
-                    r66: RelationData {
+                    r50: RelationData {
                         name: "g35",
-                        param_types: {c0: t4},
+                        param_types: {c0: t3},
                         kind: [Global, g35],
                     },
-                    r67: RelationData {
+                    r51: RelationData {
                         name: "g36",
-                        param_types: {c0: t4},
+                        param_types: {c0: t3},
                         kind: [Global, g36],
                     },
-                    r68: RelationData {
+                    r52: RelationData {
                         name: "g37",
-                        param_types: {c0: t4},
+                        param_types: {c0: t3},
                         kind: [Global, g37],
                     },
-                    r69: RelationData {
+                    r53: RelationData {
                         name: "g38",
-                        param_types: {c0: t4},
+                        param_types: {c0: t3},
                         kind: [Global, g38],
                     },
-                    r70: RelationData {
+                    r54: RelationData {
                         name: "g39",
-                        param_types: {c0: t2},
+                        param_types: {c0: t1},
                         kind: [Global, g39],
                     },
-                    r71: RelationData {
+                    r55: RelationData {
                         name: "g40",
-                        param_types: {c0: t4},
+                        param_types: {c0: t3},
                         kind: [Global, g40],
                     },
-                    r72: RelationData {
+                    r56: RelationData {
                         name: "g41",
-                        param_types: {c0: t4},
+                        param_types: {c0: t3},
                         kind: [Global, g41],
                     },
-                    r73: RelationData {
+                    r57: RelationData {
                         name: "g42",
-                        param_types: {c0: t4},
+                        param_types: {c0: t3},
                         kind: [Global, g42],
                     },
-                    r74: RelationData {
+                    r58: RelationData {
                         name: "g43",
-                        param_types: {c0: t4},
+                        param_types: {c0: t3},
                         kind: [Global, g43],
                     },
-                    r75: RelationData {
+                    r59: RelationData {
                         name: "g44",
-                        param_types: {c0: t4},
+                        param_types: {c0: t3},
                         kind: [Global, g44],
                     },
-                    r76: RelationData {
+                    r60: RelationData {
                         name: "g45",
-                        param_types: {c0: t4},
+                        param_types: {c0: t3},
                         kind: [Global, g45],
                     },
-                    r77: RelationData {
+                    r61: RelationData {
                         name: "g46",
-                        param_types: {c0: t4},
+                        param_types: {c0: t3},
                         kind: [Global, g46],
                     },
-                    r78: RelationData {
+                    r62: RelationData {
                         name: "g47",
-                        param_types: {c0: t4},
+                        param_types: {c0: t3},
                         kind: [Global, g47],
                     },
                 },
                 rule_variables: {
-                    [v0, fuel]: t3,
-                    [v1, x]: t4,
-                    [v10, v10]: t4,
-                    [v100, c_5]: t4,
-                    [v101, v101]: t4,
-                    [v102, v102]: t4,
-                    [v103, v103]: t4,
-                    [v104, v104]: t4,
-                    [v105, a_18]: t4,
-                    [v106, b_9]: t4,
-                    [v107, c_6]: t4,
-                    [v108, v108]: t4,
-                    [v109, v109]: t4,
-                    [v11, v11]: t1,
-                    [v110, v110]: t4,
-                    [v111, v111]: t4,
-                    [v112, a_19]: t4,
-                    [v113, b_10]: t4,
-                    [v114, v114]: t4,
-                    [v115, c_7]: t4,
-                    [v116, v116]: t4,
-                    [v117, v117]: t4,
-                    [v118, v118]: t4,
-                    [v119, a_20]: t4,
-                    [v12, v12]: t4,
-                    [v120, b_11]: t4,
-                    [v121, v121]: t4,
-                    [v122, c_8]: t4,
-                    [v123, v123]: t4,
-                    [v124, v124]: t4,
-                    [v125, v125]: t4,
-                    [v126, a_21]: t4,
-                    [v127, b_12]: t4,
-                    [v128, v128]: t4,
-                    [v129, c_9]: t4,
-                    [v13, v13]: t4,
-                    [v130, v130]: t4,
-                    [v131, v131]: t4,
-                    [v132, v132]: t4,
-                    [v133, a_22]: t4,
-                    [v134, b_13]: t4,
-                    [v135, v135]: t4,
-                    [v136, c_10]: t4,
-                    [v137, v137]: t4,
-                    [v138, v138]: t4,
-                    [v139, v139]: t4,
-                    [v14, a]: t4,
-                    [v140, a_23]: t4,
-                    [v141, b_14]: t4,
-                    [v142, v142]: t4,
-                    [v143, c_11]: t4,
-                    [v144, v144]: t4,
-                    [v145, v145]: t4,
-                    [v146, v146]: t4,
-                    [v147, a_24]: t4,
-                    [v148, b_15]: t4,
-                    [v149, v149]: t4,
-                    [v15, b]: t4,
-                    [v150, c_12]: t4,
-                    [v151, v151]: t4,
-                    [v152, v152]: t4,
-                    [v153, v153]: t4,
-                    [v154, x_5]: t4,
-                    [v155, v155]: t1,
-                    [v156, v156]: t4,
-                    [v157, v157]: t4,
-                    [v158, x_6]: t4,
-                    [v159, v159]: t1,
-                    [v16, v16]: t4,
-                    [v160, v160]: t4,
-                    [v161, v161]: t4,
-                    [v162, x_7]: t4,
-                    [v163, v163]: t1,
-                    [v164, v164]: t4,
-                    [v165, v165]: t4,
-                    [v166, x_8]: t4,
-                    [v167, v167]: t1,
-                    [v168, v168]: t4,
-                    [v169, v169]: t4,
-                    [v17, v17]: t1,
-                    [v170, x_9]: t4,
-                    [v171, v171]: t1,
-                    [v172, v172]: t4,
-                    [v173, v173]: t4,
-                    [v174, x_10]: t4,
-                    [v175, v175]: t1,
-                    [v176, v176]: t4,
-                    [v177, v177]: t4,
-                    [v178, x_11]: t4,
-                    [v179, a_25]: t4,
-                    [v18, v18]: t4,
-                    [v180, b_16]: t4,
-                    [v181, v181]: t4,
-                    [v182, v182]: t4,
-                    [v183, v183]: t4,
-                    [v184, v184]: t4,
-                    [v185, x_12]: t4,
-                    [v186, a_26]: t4,
-                    [v187, b_17]: t4,
-                    [v188, v188]: t4,
-                    [v189, v189]: t4,
-                    [v19, v19]: t4,
-                    [v190, v190]: t4,
-                    [v191, v191]: t4,
-                    [v192, x_13]: t4,
-                    [v193, a_27]: t4,
-                    [v194, b_18]: t4,
-                    [v195, v195]: t4,
-                    [v196, v196]: t4,
-                    [v197, v197]: t4,
-                    [v198, v198]: t4,
-                    [v199, v199]: t4,
-                    [v2, v2]: t4,
-                    [v20, x_3]: t4,
-                    [v200, v200]: t4,
-                    [v201, x_14]: t4,
-                    [v202, a_28]: t4,
-                    [v203, b_19]: t4,
-                    [v204, v204]: t4,
-                    [v205, v205]: t4,
-                    [v206, v206]: t4,
-                    [v207, v207]: t4,
-                    [v208, v208]: t4,
-                    [v209, v209]: t4,
-                    [v21, v21]: t4,
-                    [v210, x_15]: t4,
-                    [v211, v211]: t4,
-                    [v212, v212]: t4,
-                    [v213, x_16]: t4,
-                    [v214, v214]: t4,
-                    [v215, v215]: t4,
-                    [v216, fuel_3]: t3,
-                    [v217, v217]: t3,
-                    [v218, v218]: t1,
-                    [v219, v219]: t4,
-                    [v22, v22]: t4,
-                    [v220, x_17]: t4,
-                    [v221, v221]: t4,
-                    [v222, fuel_4]: t3,
-                    [v223, v223]: t3,
-                    [v224, v224]: t1,
-                    [v225, v225]: t4,
-                    [v226, x_18]: t4,
-                    [v227, v227]: t4,
-                    [v228, fuel_5]: t3,
-                    [v229, v229]: t3,
-                    [v23, v23]: t1,
-                    [v230, v230]: t1,
-                    [v231, v231]: t4,
-                    [v232, x_19]: t4,
-                    [v233, v233]: t4,
-                    [v234, fuel_6]: t3,
-                    [v235, v235]: t3,
-                    [v236, v236]: t1,
-                    [v237, v237]: t4,
-                    [v238, x_20]: t4,
-                    [v239, v239]: t4,
-                    [v24, v24]: t4,
-                    [v240, fuel_7]: t3,
-                    [v241, v241]: t3,
-                    [v242, x_21]: t4,
-                    [v243, v243]: t4,
-                    [v244, v244]: t4,
-                    [v245, fuel_8]: t3,
-                    [v246, v246]: t3,
-                    [v247, x_22]: t4,
-                    [v248, v248]: t4,
-                    [v249, v249]: t4,
-                    [v25, v25]: t4,
-                    [v250, fuel_9]: t3,
-                    [v251, v251]: t3,
-                    [v252, x_23]: t4,
-                    [v253, v253]: t4,
-                    [v254, v254]: t4,
-                    [v255, fuel_10]: t3,
-                    [v256, v256]: t3,
-                    [v257, f]: t4,
-                    [v258, g]: t4,
-                    [v259, v259]: t4,
-                    [v26, x_4]: t4,
-                    [v260, x_24]: t4,
-                    [v261, v261]: t4,
-                    [v262, v262]: t4,
-                    [v263, v263]: t4,
-                    [v264, fuel_11]: t3,
-                    [v265, v265]: t3,
-                    [v266, f_2]: t4,
-                    [v267, g_2]: t4,
-                    [v268, v268]: t4,
-                    [v269, x_25]: t4,
-                    [v27, v27]: t4,
-                    [v270, v270]: t4,
-                    [v271, v271]: t4,
-                    [v272, v272]: t4,
-                    [v273, fuel_12]: t3,
-                    [v274, v274]: t3,
-                    [v275, f_3]: t4,
-                    [v276, g_3]: t4,
-                    [v277, v277]: t4,
-                    [v278, x_26]: t4,
-                    [v279, v279]: t4,
-                    [v28, v28]: t4,
-                    [v280, v280]: t4,
-                    [v281, v281]: t4,
-                    [v282, fuel_13]: t3,
-                    [v283, v283]: t3,
-                    [v284, f_4]: t4,
-                    [v285, g_4]: t4,
-                    [v286, v286]: t4,
-                    [v287, x_27]: t4,
-                    [v288, v288]: t4,
-                    [v289, v289]: t4,
-                    [v29, v29]: t1,
-                    [v290, v290]: t4,
-                    [v291, fuel_14]: t3,
-                    [v292, v292]: t3,
-                    [v293, f_5]: t4,
-                    [v294, g_5]: t4,
-                    [v295, v295]: t4,
-                    [v296, x_28]: t4,
-                    [v297, v297]: t4,
-                    [v298, v298]: t4,
-                    [v299, v299]: t4,
-                    [v3, v3]: t4,
-                    [v30, v30]: t4,
-                    [v300, fuel_15]: t3,
-                    [v301, v301]: t3,
-                    [v302, f_6]: t4,
-                    [v303, g_6]: t4,
-                    [v304, v304]: t4,
-                    [v305, x_29]: t4,
-                    [v306, v306]: t4,
-                    [v307, v307]: t4,
-                    [v308, v308]: t4,
-                    [v309, fuel_16]: t3,
-                    [v31, v31]: t4,
-                    [v310, v310]: t3,
-                    [v311, a_29]: t4,
-                    [v312, b_20]: t4,
-                    [v313, v313]: t4,
-                    [v314, x_30]: t4,
-                    [v315, v315]: t4,
-                    [v316, v316]: t4,
-                    [v317, v317]: t4,
-                    [v318, v318]: t4,
-                    [v319, v319]: t4,
-                    [v32, a_2]: t4,
-                    [v320, v320]: t4,
-                    [v321, fuel_17]: t3,
-                    [v322, v322]: t3,
-                    [v323, a_30]: t4,
-                    [v324, b_21]: t4,
-                    [v325, v325]: t4,
-                    [v326, x_31]: t4,
-                    [v327, v327]: t4,
-                    [v328, v328]: t4,
-                    [v329, v329]: t4,
-                    [v33, b_2]: t4,
-                    [v330, v330]: t4,
-                    [v331, v331]: t4,
-                    [v332, v332]: t4,
-                    [v333, fuel_18]: t3,
-                    [v334, v334]: t3,
-                    [v335, a_31]: t4,
-                    [v336, b_22]: t4,
-                    [v337, v337]: t4,
-                    [v338, x_32]: t4,
-                    [v339, v339]: t4,
-                    [v34, v34]: t4,
-                    [v340, v340]: t4,
-                    [v341, v341]: t4,
-                    [v342, v342]: t4,
-                    [v343, v343]: t4,
-                    [v344, v344]: t4,
-                    [v35, a_3]: t4,
-                    [v36, b_3]: t4,
-                    [v37, v37]: t4,
-                    [v38, a_4]: t4,
-                    [v39, b_4]: t4,
-                    [v4, v4]: t1,
-                    [v40, c]: t4,
-                    [v41, v41]: t4,
-                    [v42, v42]: t4,
-                    [v43, v43]: t4,
-                    [v44, a_5]: t4,
-                    [v45, b_5]: t4,
-                    [v46, c_2]: t4,
-                    [v47, v47]: t4,
-                    [v48, v48]: t4,
-                    [v49, v49]: t4,
-                    [v5, v5]: t4,
-                    [v50, a_6]: t4,
-                    [v51, b_6]: t4,
-                    [v52, c_3]: t4,
-                    [v53, v53]: t4,
-                    [v54, v54]: t4,
-                    [v55, v55]: t4,
-                    [v56, a_7]: t4,
-                    [v57, b_7]: t4,
-                    [v58, c_4]: t4,
-                    [v59, v59]: t4,
-                    [v6, v6]: t4,
-                    [v60, v60]: t4,
-                    [v61, v61]: t4,
-                    [v62, a_8]: t4,
-                    [v63, v63]: t1,
-                    [v64, v64]: t4,
-                    [v65, v65]: t4,
-                    [v66, a_9]: t4,
-                    [v67, v67]: t1,
-                    [v68, v68]: t4,
-                    [v69, v69]: t4,
-                    [v7, fuel_2]: t3,
-                    [v70, a_10]: t4,
-                    [v71, v71]: t1,
-                    [v72, v72]: t4,
-                    [v73, v73]: t4,
-                    [v74, a_11]: t4,
-                    [v75, v75]: t4,
-                    [v76, v76]: t4,
-                    [v77, v77]: t1,
-                    [v78, a_12]: t4,
-                    [v79, v79]: t4,
-                    [v8, x_2]: t4,
-                    [v80, v80]: t4,
-                    [v81, v81]: t1,
-                    [v82, a_13]: t4,
-                    [v83, v83]: t4,
-                    [v84, v84]: t4,
-                    [v85, v85]: t1,
-                    [v86, a_14]: t4,
-                    [v87, v87]: t1,
-                    [v88, v88]: t4,
-                    [v89, v89]: t4,
-                    [v9, v9]: t4,
-                    [v90, a_15]: t4,
-                    [v91, v91]: t1,
-                    [v92, v92]: t4,
-                    [v93, v93]: t4,
-                    [v94, a_16]: t4,
-                    [v95, v95]: t1,
-                    [v96, v96]: t4,
-                    [v97, v97]: t4,
-                    [v98, a_17]: t4,
-                    [v99, b_8]: t4,
+                    [v0, fuel]: t2,
+                    [v1, x]: t3,
+                    [v10, v10]: t3,
+                    [v100, c_5]: t3,
+                    [v101, v101]: t3,
+                    [v102, v102]: t3,
+                    [v103, v103]: t3,
+                    [v104, v104]: t3,
+                    [v105, a_18]: t3,
+                    [v106, b_9]: t3,
+                    [v107, c_6]: t3,
+                    [v108, v108]: t3,
+                    [v109, v109]: t3,
+                    [v11, v11]: t0,
+                    [v110, v110]: t3,
+                    [v111, v111]: t3,
+                    [v112, a_19]: t3,
+                    [v113, b_10]: t3,
+                    [v114, v114]: t3,
+                    [v115, c_7]: t3,
+                    [v116, v116]: t3,
+                    [v117, v117]: t3,
+                    [v118, v118]: t3,
+                    [v119, a_20]: t3,
+                    [v12, v12]: t3,
+                    [v120, b_11]: t3,
+                    [v121, v121]: t3,
+                    [v122, c_8]: t3,
+                    [v123, v123]: t3,
+                    [v124, v124]: t3,
+                    [v125, v125]: t3,
+                    [v126, a_21]: t3,
+                    [v127, b_12]: t3,
+                    [v128, v128]: t3,
+                    [v129, c_9]: t3,
+                    [v13, v13]: t3,
+                    [v130, v130]: t3,
+                    [v131, v131]: t3,
+                    [v132, v132]: t3,
+                    [v133, a_22]: t3,
+                    [v134, b_13]: t3,
+                    [v135, v135]: t3,
+                    [v136, c_10]: t3,
+                    [v137, v137]: t3,
+                    [v138, v138]: t3,
+                    [v139, v139]: t3,
+                    [v14, a]: t3,
+                    [v140, a_23]: t3,
+                    [v141, b_14]: t3,
+                    [v142, v142]: t3,
+                    [v143, c_11]: t3,
+                    [v144, v144]: t3,
+                    [v145, v145]: t3,
+                    [v146, v146]: t3,
+                    [v147, a_24]: t3,
+                    [v148, b_15]: t3,
+                    [v149, v149]: t3,
+                    [v15, b]: t3,
+                    [v150, c_12]: t3,
+                    [v151, v151]: t3,
+                    [v152, v152]: t3,
+                    [v153, v153]: t3,
+                    [v154, x_5]: t3,
+                    [v155, v155]: t0,
+                    [v156, v156]: t3,
+                    [v157, v157]: t3,
+                    [v158, x_6]: t3,
+                    [v159, v159]: t0,
+                    [v16, v16]: t3,
+                    [v160, v160]: t3,
+                    [v161, v161]: t3,
+                    [v162, x_7]: t3,
+                    [v163, v163]: t0,
+                    [v164, v164]: t3,
+                    [v165, v165]: t3,
+                    [v166, x_8]: t3,
+                    [v167, v167]: t0,
+                    [v168, v168]: t3,
+                    [v169, v169]: t3,
+                    [v17, v17]: t0,
+                    [v170, x_9]: t3,
+                    [v171, v171]: t0,
+                    [v172, v172]: t3,
+                    [v173, v173]: t3,
+                    [v174, x_10]: t3,
+                    [v175, v175]: t0,
+                    [v176, v176]: t3,
+                    [v177, v177]: t3,
+                    [v178, x_11]: t3,
+                    [v179, a_25]: t3,
+                    [v18, v18]: t3,
+                    [v180, b_16]: t3,
+                    [v181, v181]: t3,
+                    [v182, v182]: t3,
+                    [v183, v183]: t3,
+                    [v184, v184]: t3,
+                    [v185, x_12]: t3,
+                    [v186, a_26]: t3,
+                    [v187, b_17]: t3,
+                    [v188, v188]: t3,
+                    [v189, v189]: t3,
+                    [v19, v19]: t3,
+                    [v190, v190]: t3,
+                    [v191, v191]: t3,
+                    [v192, x_13]: t3,
+                    [v193, a_27]: t3,
+                    [v194, b_18]: t3,
+                    [v195, v195]: t3,
+                    [v196, v196]: t3,
+                    [v197, v197]: t3,
+                    [v198, v198]: t3,
+                    [v199, v199]: t3,
+                    [v2, v2]: t3,
+                    [v20, x_3]: t3,
+                    [v200, v200]: t3,
+                    [v201, x_14]: t3,
+                    [v202, a_28]: t3,
+                    [v203, b_19]: t3,
+                    [v204, v204]: t3,
+                    [v205, v205]: t3,
+                    [v206, v206]: t3,
+                    [v207, v207]: t3,
+                    [v208, v208]: t3,
+                    [v209, v209]: t3,
+                    [v21, v21]: t3,
+                    [v210, x_15]: t3,
+                    [v211, v211]: t3,
+                    [v212, v212]: t3,
+                    [v213, x_16]: t3,
+                    [v214, v214]: t3,
+                    [v215, v215]: t3,
+                    [v216, fuel_3]: t2,
+                    [v217, v217]: t2,
+                    [v218, v218]: t0,
+                    [v219, v219]: t3,
+                    [v22, v22]: t3,
+                    [v220, x_17]: t3,
+                    [v221, v221]: t3,
+                    [v222, fuel_4]: t2,
+                    [v223, v223]: t2,
+                    [v224, v224]: t0,
+                    [v225, v225]: t3,
+                    [v226, x_18]: t3,
+                    [v227, v227]: t3,
+                    [v228, fuel_5]: t2,
+                    [v229, v229]: t2,
+                    [v23, v23]: t0,
+                    [v230, v230]: t0,
+                    [v231, v231]: t3,
+                    [v232, x_19]: t3,
+                    [v233, v233]: t3,
+                    [v234, fuel_6]: t2,
+                    [v235, v235]: t2,
+                    [v236, v236]: t0,
+                    [v237, v237]: t3,
+                    [v238, x_20]: t3,
+                    [v239, v239]: t3,
+                    [v24, v24]: t3,
+                    [v240, fuel_7]: t2,
+                    [v241, v241]: t2,
+                    [v242, x_21]: t3,
+                    [v243, v243]: t3,
+                    [v244, v244]: t3,
+                    [v245, fuel_8]: t2,
+                    [v246, v246]: t2,
+                    [v247, x_22]: t3,
+                    [v248, v248]: t3,
+                    [v249, v249]: t3,
+                    [v25, v25]: t3,
+                    [v250, fuel_9]: t2,
+                    [v251, v251]: t2,
+                    [v252, x_23]: t3,
+                    [v253, v253]: t3,
+                    [v254, v254]: t3,
+                    [v255, fuel_10]: t2,
+                    [v256, v256]: t2,
+                    [v257, f]: t3,
+                    [v258, g]: t3,
+                    [v259, v259]: t3,
+                    [v26, x_4]: t3,
+                    [v260, x_24]: t3,
+                    [v261, v261]: t3,
+                    [v262, v262]: t3,
+                    [v263, v263]: t3,
+                    [v264, fuel_11]: t2,
+                    [v265, v265]: t2,
+                    [v266, f_2]: t3,
+                    [v267, g_2]: t3,
+                    [v268, v268]: t3,
+                    [v269, x_25]: t3,
+                    [v27, v27]: t3,
+                    [v270, v270]: t3,
+                    [v271, v271]: t3,
+                    [v272, v272]: t3,
+                    [v273, fuel_12]: t2,
+                    [v274, v274]: t2,
+                    [v275, f_3]: t3,
+                    [v276, g_3]: t3,
+                    [v277, v277]: t3,
+                    [v278, x_26]: t3,
+                    [v279, v279]: t3,
+                    [v28, v28]: t3,
+                    [v280, v280]: t3,
+                    [v281, v281]: t3,
+                    [v282, fuel_13]: t2,
+                    [v283, v283]: t2,
+                    [v284, f_4]: t3,
+                    [v285, g_4]: t3,
+                    [v286, v286]: t3,
+                    [v287, x_27]: t3,
+                    [v288, v288]: t3,
+                    [v289, v289]: t3,
+                    [v29, v29]: t0,
+                    [v290, v290]: t3,
+                    [v291, fuel_14]: t2,
+                    [v292, v292]: t2,
+                    [v293, f_5]: t3,
+                    [v294, g_5]: t3,
+                    [v295, v295]: t3,
+                    [v296, x_28]: t3,
+                    [v297, v297]: t3,
+                    [v298, v298]: t3,
+                    [v299, v299]: t3,
+                    [v3, v3]: t3,
+                    [v30, v30]: t3,
+                    [v300, fuel_15]: t2,
+                    [v301, v301]: t2,
+                    [v302, f_6]: t3,
+                    [v303, g_6]: t3,
+                    [v304, v304]: t3,
+                    [v305, x_29]: t3,
+                    [v306, v306]: t3,
+                    [v307, v307]: t3,
+                    [v308, v308]: t3,
+                    [v309, fuel_16]: t2,
+                    [v31, v31]: t3,
+                    [v310, v310]: t2,
+                    [v311, a_29]: t3,
+                    [v312, b_20]: t3,
+                    [v313, v313]: t3,
+                    [v314, x_30]: t3,
+                    [v315, v315]: t3,
+                    [v316, v316]: t3,
+                    [v317, v317]: t3,
+                    [v318, v318]: t3,
+                    [v319, v319]: t3,
+                    [v32, a_2]: t3,
+                    [v320, v320]: t3,
+                    [v321, fuel_17]: t2,
+                    [v322, v322]: t2,
+                    [v323, a_30]: t3,
+                    [v324, b_21]: t3,
+                    [v325, v325]: t3,
+                    [v326, x_31]: t3,
+                    [v327, v327]: t3,
+                    [v328, v328]: t3,
+                    [v329, v329]: t3,
+                    [v33, b_2]: t3,
+                    [v330, v330]: t3,
+                    [v331, v331]: t3,
+                    [v332, v332]: t3,
+                    [v333, fuel_18]: t2,
+                    [v334, v334]: t2,
+                    [v335, a_31]: t3,
+                    [v336, b_22]: t3,
+                    [v337, v337]: t3,
+                    [v338, x_32]: t3,
+                    [v339, v339]: t3,
+                    [v34, v34]: t3,
+                    [v340, v340]: t3,
+                    [v341, v341]: t3,
+                    [v342, v342]: t3,
+                    [v343, v343]: t3,
+                    [v344, v344]: t3,
+                    [v35, a_3]: t3,
+                    [v36, b_3]: t3,
+                    [v37, v37]: t3,
+                    [v38, a_4]: t3,
+                    [v39, b_4]: t3,
+                    [v4, v4]: t0,
+                    [v40, c]: t3,
+                    [v41, v41]: t3,
+                    [v42, v42]: t3,
+                    [v43, v43]: t3,
+                    [v44, a_5]: t3,
+                    [v45, b_5]: t3,
+                    [v46, c_2]: t3,
+                    [v47, v47]: t3,
+                    [v48, v48]: t3,
+                    [v49, v49]: t3,
+                    [v5, v5]: t3,
+                    [v50, a_6]: t3,
+                    [v51, b_6]: t3,
+                    [v52, c_3]: t3,
+                    [v53, v53]: t3,
+                    [v54, v54]: t3,
+                    [v55, v55]: t3,
+                    [v56, a_7]: t3,
+                    [v57, b_7]: t3,
+                    [v58, c_4]: t3,
+                    [v59, v59]: t3,
+                    [v6, v6]: t3,
+                    [v60, v60]: t3,
+                    [v61, v61]: t3,
+                    [v62, a_8]: t3,
+                    [v63, v63]: t0,
+                    [v64, v64]: t3,
+                    [v65, v65]: t3,
+                    [v66, a_9]: t3,
+                    [v67, v67]: t0,
+                    [v68, v68]: t3,
+                    [v69, v69]: t3,
+                    [v7, fuel_2]: t2,
+                    [v70, a_10]: t3,
+                    [v71, v71]: t0,
+                    [v72, v72]: t3,
+                    [v73, v73]: t3,
+                    [v74, a_11]: t3,
+                    [v75, v75]: t3,
+                    [v76, v76]: t3,
+                    [v77, v77]: t0,
+                    [v78, a_12]: t3,
+                    [v79, v79]: t3,
+                    [v8, x_2]: t3,
+                    [v80, v80]: t3,
+                    [v81, v81]: t0,
+                    [v82, a_13]: t3,
+                    [v83, v83]: t3,
+                    [v84, v84]: t3,
+                    [v85, v85]: t0,
+                    [v86, a_14]: t3,
+                    [v87, v87]: t0,
+                    [v88, v88]: t3,
+                    [v89, v89]: t3,
+                    [v9, v9]: t3,
+                    [v90, a_15]: t3,
+                    [v91, v91]: t0,
+                    [v92, v92]: t3,
+                    [v93, v93]: t3,
+                    [v94, a_16]: t3,
+                    [v95, v95]: t0,
+                    [v96, v96]: t3,
+                    [v97, v97]: t3,
+                    [v98, a_17]: t3,
+                    [v99, b_8]: t3,
                 },
                 global_variable_types: {
-                    g0: t1,
-                    g1: t1,
-                    g2: t1,
-                    g3: t1,
-                    g4: t3,
-                    g5: t3,
-                    g6: t3,
-                    g7: t3,
-                    g8: t2,
-                    g9: t4,
-                    g10: t4,
-                    g11: t4,
-                    g12: t4,
-                    g13: t4,
-                    g14: t4,
-                    g15: t4,
-                    g16: t4,
-                    g17: t4,
-                    g18: t4,
-                    g19: t4,
-                    g20: t4,
-                    g21: t4,
-                    g22: t1,
-                    g23: t4,
-                    g24: t4,
-                    g25: t1,
-                    g26: t4,
-                    g27: t4,
-                    g28: t4,
-                    g29: t4,
-                    g30: t4,
-                    g31: t2,
-                    g32: t4,
-                    g33: t4,
-                    g34: t4,
-                    g35: t4,
-                    g36: t4,
-                    g37: t4,
-                    g38: t4,
-                    g39: t2,
-                    g40: t4,
-                    g41: t4,
-                    g42: t4,
-                    g43: t4,
-                    g44: t4,
-                    g45: t4,
-                    g46: t4,
-                    g47: t4,
+                    g0: t0,
+                    g1: t0,
+                    g2: t0,
+                    g3: t0,
+                    g4: t2,
+                    g5: t2,
+                    g6: t2,
+                    g7: t2,
+                    g8: t1,
+                    g9: t3,
+                    g10: t3,
+                    g11: t3,
+                    g12: t3,
+                    g13: t3,
+                    g14: t3,
+                    g15: t3,
+                    g16: t3,
+                    g17: t3,
+                    g18: t3,
+                    g19: t3,
+                    g20: t3,
+                    g21: t3,
+                    g22: t0,
+                    g23: t3,
+                    g24: t3,
+                    g25: t0,
+                    g26: t3,
+                    g27: t3,
+                    g28: t3,
+                    g29: t3,
+                    g30: t3,
+                    g31: t1,
+                    g32: t3,
+                    g33: t3,
+                    g34: t3,
+                    g35: t3,
+                    g36: t3,
+                    g37: t3,
+                    g38: t3,
+                    g39: t1,
+                    g40: t3,
+                    g41: t3,
+                    g42: t3,
+                    g43: t3,
+                    g44: t3,
+                    g45: t3,
+                    g46: t3,
+                    g47: t3,
                 },
                 rule_tries: [
-                    atom: [PremiseNew, r15(v216, v217)]
+                    atom: [PremiseNew, r0(v216, v217)]
                     then: [
-                        atom: [Premise, r19(v217, v219, v220, v221), iu1]
+                        atom: [Premise, r3(v217, v219, v220, v221), iu1]
                         then: [
-                            atom: [Premise, r20(v257, v258, v219), iu1]
+                            atom: [Premise, r4(v257, v258, v219), iu1]
                             then: [
                                 meta: "( rewrite ( Integral ( Fuel fuel ) ( Add f g ) x ) ( Add ( Integral fuel f x ) ( Integral fuel g x ) ) )"
-                                atom: [Action::Insert, r19(v216, v257, v220, v262) on iu0],
-                                atom: [Action::Insert, r19(v216, v258, v220, v263) on iu0],
-                                atom: [Action::Insert, r20(v262, v263, v221)],
+                                atom: [Action::Insert, r3(v216, v257, v220, v262) on iu0],
+                                atom: [Action::Insert, r3(v216, v258, v220, v263) on iu0],
+                                atom: [Action::Insert, r4(v262, v263, v221)],
                             ],
-                            atom: [Premise, r21(v284, v285, v219), iu1]
+                            atom: [Premise, r5(v284, v285, v219), iu1]
                             then: [
                                 meta: "( rewrite ( Integral ( Fuel fuel ) ( Sub f g ) x ) ( Sub ( Integral fuel f x ) ( Integral fuel g x ) ) )"
-                                atom: [Action::Insert, r19(v216, v284, v220, v289) on iu0],
-                                atom: [Action::Insert, r19(v216, v285, v220, v290) on iu0],
-                                atom: [Action::Insert, r21(v289, v290, v221)],
+                                atom: [Action::Insert, r3(v216, v284, v220, v289) on iu0],
+                                atom: [Action::Insert, r3(v216, v285, v220, v290) on iu0],
+                                atom: [Action::Insert, r5(v289, v290, v221)],
                             ],
-                            atom: [Premise, r22(v311, v312, v219), iu1]
+                            atom: [Premise, r6(v311, v312, v219), iu1]
                             then: [
                                 meta: "( rewrite ( Integral ( Fuel fuel ) ( Mul a b ) x ) ( Sub ( Mul a ( Integral fuel b x ) ) ( Integral fuel ( Mul ( Diff x a ) ( Integral fuel b x ) ) x ) ) )"
-                                atom: [Action::Insert, r18(v220, v311, v317) on iu0],
-                                atom: [Action::Insert, r19(v216, v312, v220, v318) on iu0],
-                                atom: [Action::Insert, r22(v311, v318, v316) on iu0],
-                                atom: [Action::Insert, r22(v317, v318, v319) on iu0],
-                                atom: [Action::Insert, r19(v216, v319, v220, v320) on iu0],
-                                atom: [Action::Insert, r21(v316, v320, v221)],
+                                atom: [Action::Insert, r2(v220, v311, v317) on iu0],
+                                atom: [Action::Insert, r3(v216, v312, v220, v318) on iu0],
+                                atom: [Action::Insert, r6(v311, v318, v316) on iu0],
+                                atom: [Action::Insert, r6(v317, v318, v319) on iu0],
+                                atom: [Action::Insert, r3(v216, v319, v220, v320) on iu0],
+                                atom: [Action::Insert, r5(v316, v320, v221)],
                             ],
-                            atom: [Premise, r28(v220, v219), iu1]
+                            atom: [Premise, r12(v220, v219), iu1]
                             then: [
                                 meta: "( rewrite ( Integral ( Fuel fuel ) ( Cos x ) x ) ( Sin x ) )"
-                                atom: [Action::Insert, r27(v220, v221)],
+                                atom: [Action::Insert, r11(v220, v221)],
                             ],
-                            atom: [Premise, r29(v218, v219), iu1]
+                            atom: [Premise, r13(v218, v219), iu1]
                             then: [
-                                atom: [PremiseAny, r33(v218), iu_bogus]
+                                atom: [PremiseAny, r17(v218), iu_bogus]
                                 then: [
                                     meta: "( rewrite ( Integral ( Fuel fuel ) ( Const 1 ) x ) x )"
                                     atom: [Action::Equate, v220=v221],
@@ -13581,96 +11457,96 @@ fn lir_math() {
                             ],
                         ],
                     ],
-                    atom: [PremiseNew, r18(v20, v21, v22)]
+                    atom: [PremiseNew, r2(v20, v21, v22)]
                     then: [
-                        atom: [Premise, r20(v179, v180, v21), iu2]
+                        atom: [Premise, r4(v179, v180, v21), iu2]
                         then: [
                             meta: "( rewrite ( Diff x ( Add a b ) ) ( Add ( Diff x a ) ( Diff x b ) ) )"
-                            atom: [Action::Insert, r18(v20, v179, v183) on iu0],
-                            atom: [Action::Insert, r18(v20, v180, v184) on iu0],
-                            atom: [Action::Insert, r20(v183, v184, v22)],
+                            atom: [Action::Insert, r2(v20, v179, v183) on iu0],
+                            atom: [Action::Insert, r2(v20, v180, v184) on iu0],
+                            atom: [Action::Insert, r4(v183, v184, v22)],
                         ],
-                        atom: [Premise, r22(v193, v194, v21), iu2]
+                        atom: [Premise, r6(v193, v194, v21), iu2]
                         then: [
                             meta: "( rewrite ( Diff x ( Mul a b ) ) ( Add ( Mul a ( Diff x b ) ) ( Mul b ( Diff x a ) ) ) )"
-                            atom: [Action::Insert, r18(v20, v193, v199) on iu0],
-                            atom: [Action::Insert, r18(v20, v194, v197) on iu0],
-                            atom: [Action::Insert, r22(v193, v197, v198) on iu0],
-                            atom: [Action::Insert, r22(v194, v199, v200) on iu0],
-                            atom: [Action::Insert, r20(v198, v200, v22)],
+                            atom: [Action::Insert, r2(v20, v193, v199) on iu0],
+                            atom: [Action::Insert, r2(v20, v194, v197) on iu0],
+                            atom: [Action::Insert, r6(v193, v197, v198) on iu0],
+                            atom: [Action::Insert, r6(v194, v199, v200) on iu0],
+                            atom: [Action::Insert, r4(v198, v200, v22)],
                         ],
-                        atom: [Premise, r27(v20, v21), iu1]
+                        atom: [Premise, r11(v20, v21), iu1]
                         then: [
                             meta: "( rewrite ( Diff x ( Sin x ) ) ( Cos x ) )"
-                            atom: [Action::Insert, r28(v20, v22)],
+                            atom: [Action::Insert, r12(v20, v22)],
                         ],
-                        atom: [Premise, r28(v20, v21), iu2]
+                        atom: [Premise, r12(v20, v21), iu2]
                         then: [
                             meta: "( rewrite ( Diff x ( Cos x ) ) ( Mul ( Const -1 ) ( Sin x ) ) )"
-                            atom: [Action::Insert, r27(v20, v25) on iu0],
-                            atom: [Action::Insert, r31(v23) on iu0],
-                            atom: [Action::Insert, r29(v23, v24) on iu0],
-                            atom: [Action::Insert, r22(v24, v25, v22)],
+                            atom: [Action::Insert, r11(v20, v25) on iu0],
+                            atom: [Action::Insert, r15(v23) on iu0],
+                            atom: [Action::Insert, r13(v23, v24) on iu0],
+                            atom: [Action::Insert, r6(v24, v25, v22)],
                         ],
                     ],
-                    atom: [PremiseNew, r19(v0, v2, v1, v3)]
+                    atom: [PremiseNew, r3(v0, v2, v1, v3)]
                     then: [
-                        atom: [Premise, r27(v1, v2), iu2]
+                        atom: [Premise, r11(v1, v2), iu2]
                         then: [
                             meta: "( rewrite ( Integral fuel ( Sin x ) x ) ( Mul ( Const -1 ) ( Cos x ) ) )"
-                            atom: [Action::Insert, r28(v1, v6) on iu0],
-                            atom: [Action::Insert, r31(v4) on iu0],
-                            atom: [Action::Insert, r29(v4, v5) on iu0],
-                            atom: [Action::Insert, r22(v5, v6, v3)],
+                            atom: [Action::Insert, r12(v1, v6) on iu0],
+                            atom: [Action::Insert, r15(v4) on iu0],
+                            atom: [Action::Insert, r13(v4, v5) on iu0],
+                            atom: [Action::Insert, r6(v5, v6, v3)],
                         ],
-                        atom: [PremiseAny, r15(v222, v0), iu1]
+                        atom: [PremiseAny, r0(v222, v0), iu1]
                         then: [
-                            atom: [Premise, r20(v266, v267, v2), iu3]
+                            atom: [Premise, r4(v266, v267, v2), iu3]
                             then: [
-                                atom: [Premise, r15(v264, v0), iu2]
+                                atom: [Premise, r0(v264, v0), iu2]
                                 then: [
                                     meta: "( rewrite ( Integral ( Fuel fuel ) ( Add f g ) x ) ( Add ( Integral fuel f x ) ( Integral fuel g x ) ) )"
-                                    atom: [Action::Insert, r19(v264, v266, v1, v271) on iu0],
-                                    atom: [Action::Insert, r19(v264, v267, v1, v272) on iu0],
-                                    atom: [Action::Insert, r20(v271, v272, v3)],
+                                    atom: [Action::Insert, r3(v264, v266, v1, v271) on iu0],
+                                    atom: [Action::Insert, r3(v264, v267, v1, v272) on iu0],
+                                    atom: [Action::Insert, r4(v271, v272, v3)],
                                 ],
                             ],
-                            atom: [Premise, r21(v293, v294, v2), iu2]
+                            atom: [Premise, r5(v293, v294, v2), iu2]
                             then: [
-                                atom: [Premise, r15(v291, v0), iu3]
+                                atom: [Premise, r0(v291, v0), iu3]
                                 then: [
                                     meta: "( rewrite ( Integral ( Fuel fuel ) ( Sub f g ) x ) ( Sub ( Integral fuel f x ) ( Integral fuel g x ) ) )"
-                                    atom: [Action::Insert, r19(v291, v293, v1, v298) on iu0],
-                                    atom: [Action::Insert, r19(v291, v294, v1, v299) on iu0],
-                                    atom: [Action::Insert, r21(v298, v299, v3)],
+                                    atom: [Action::Insert, r3(v291, v293, v1, v298) on iu0],
+                                    atom: [Action::Insert, r3(v291, v294, v1, v299) on iu0],
+                                    atom: [Action::Insert, r5(v298, v299, v3)],
                                 ],
                             ],
-                            atom: [Premise, r22(v323, v324, v2), iu3]
+                            atom: [Premise, r6(v323, v324, v2), iu3]
                             then: [
-                                atom: [Premise, r15(v321, v0), iu4]
+                                atom: [Premise, r0(v321, v0), iu4]
                                 then: [
                                     meta: "( rewrite ( Integral ( Fuel fuel ) ( Mul a b ) x ) ( Sub ( Mul a ( Integral fuel b x ) ) ( Integral fuel ( Mul ( Diff x a ) ( Integral fuel b x ) ) x ) ) )"
-                                    atom: [Action::Insert, r18(v1, v323, v329) on iu0],
-                                    atom: [Action::Insert, r19(v321, v324, v1, v330) on iu0],
-                                    atom: [Action::Insert, r22(v323, v330, v328) on iu0],
-                                    atom: [Action::Insert, r22(v329, v330, v331) on iu0],
-                                    atom: [Action::Insert, r19(v321, v331, v1, v332) on iu0],
-                                    atom: [Action::Insert, r21(v328, v332, v3)],
+                                    atom: [Action::Insert, r2(v1, v323, v329) on iu0],
+                                    atom: [Action::Insert, r3(v321, v324, v1, v330) on iu0],
+                                    atom: [Action::Insert, r6(v323, v330, v328) on iu0],
+                                    atom: [Action::Insert, r6(v329, v330, v331) on iu0],
+                                    atom: [Action::Insert, r3(v321, v331, v1, v332) on iu0],
+                                    atom: [Action::Insert, r5(v328, v332, v3)],
                                 ],
                             ],
-                            atom: [Premise, r28(v1, v2), iu3]
+                            atom: [Premise, r12(v1, v2), iu3]
                             then: [
-                                atom: [Premise, r15(v245, v0), iu5]
+                                atom: [Premise, r0(v245, v0), iu5]
                                 then: [
                                     meta: "( rewrite ( Integral ( Fuel fuel ) ( Cos x ) x ) ( Sin x ) )"
-                                    atom: [Action::Insert, r27(v1, v3)],
+                                    atom: [Action::Insert, r11(v1, v3)],
                                 ],
                             ],
-                            atom: [Premise, r29(v224, v2), iu2]
+                            atom: [Premise, r13(v224, v2), iu2]
                             then: [
-                                atom: [PremiseAny, r33(v224), iu_bogus]
+                                atom: [PremiseAny, r17(v224), iu_bogus]
                                 then: [
-                                    atom: [Premise, r15(v222, v0), iu6]
+                                    atom: [Premise, r0(v222, v0), iu6]
                                     then: [
                                         meta: "( rewrite ( Integral ( Fuel fuel ) ( Const 1 ) x ) x )"
                                         atom: [Action::Equate, v1=v3],
@@ -13679,305 +11555,305 @@ fn lir_math() {
                             ],
                         ],
                     ],
-                    atom: [PremiseNew, r20(v32, v33, v34)]
+                    atom: [PremiseNew, r4(v32, v33, v34)]
                     then: [
                         meta: "( rewrite ( Add a b ) ( Add b a ) )"
-                        atom: [Action::Insert, r20(v33, v32, v34)],
-                        atom: [Premise, r18(v185, v34, v189), iu1]
+                        atom: [Action::Insert, r4(v33, v32, v34)],
+                        atom: [Premise, r2(v185, v34, v189), iu1]
                         then: [
                             meta: "( rewrite ( Diff x ( Add a b ) ) ( Add ( Diff x a ) ( Diff x b ) ) )"
-                            atom: [Action::Insert, r18(v185, v32, v190) on iu0],
-                            atom: [Action::Insert, r18(v185, v33, v191) on iu0],
-                            atom: [Action::Insert, r20(v190, v191, v189)],
+                            atom: [Action::Insert, r2(v185, v32, v190) on iu0],
+                            atom: [Action::Insert, r2(v185, v33, v191) on iu0],
+                            atom: [Action::Insert, r4(v190, v191, v189)],
                         ],
-                        atom: [Premise, r19(v274, v34, v278, v279), iu2]
+                        atom: [Premise, r3(v274, v34, v278, v279), iu2]
                         then: [
-                            atom: [Premise, r15(v273, v274), iu7]
+                            atom: [Premise, r0(v273, v274), iu7]
                             then: [
                                 meta: "( rewrite ( Integral ( Fuel fuel ) ( Add f g ) x ) ( Add ( Integral fuel f x ) ( Integral fuel g x ) ) )"
-                                atom: [Action::Insert, r19(v273, v32, v278, v280) on iu0],
-                                atom: [Action::Insert, r19(v273, v33, v278, v281) on iu0],
-                                atom: [Action::Insert, r20(v280, v281, v279)],
+                                atom: [Action::Insert, r3(v273, v32, v278, v280) on iu0],
+                                atom: [Action::Insert, r3(v273, v33, v278, v281) on iu0],
+                                atom: [Action::Insert, r4(v280, v281, v279)],
                             ],
                         ],
-                        atom: [Premise, r20(v39, v40, v33), iu4]
+                        atom: [Premise, r4(v39, v40, v33), iu4]
                         then: [
                             meta: "( rewrite ( Add a ( Add b c ) ) ( Add ( Add a b ) c ) )"
-                            atom: [Action::Insert, r20(v32, v39, v43) on iu0],
-                            atom: [Action::Insert, r20(v43, v40, v34)],
+                            atom: [Action::Insert, r4(v32, v39, v43) on iu0],
+                            atom: [Action::Insert, r4(v43, v40, v34)],
                         ],
-                        atom: [Premise, r20(v44, v34, v48), iu5]
+                        atom: [Premise, r4(v44, v34, v48), iu5]
                         then: [
                             meta: "( rewrite ( Add a ( Add b c ) ) ( Add ( Add a b ) c ) )"
-                            atom: [Action::Insert, r20(v44, v32, v49) on iu0],
-                            atom: [Action::Insert, r20(v49, v33, v48)],
+                            atom: [Action::Insert, r4(v44, v32, v49) on iu0],
+                            atom: [Action::Insert, r4(v49, v33, v48)],
                         ],
-                        atom: [Premise, r22(v98, v34, v102), iu4]
+                        atom: [Premise, r6(v98, v34, v102), iu4]
                         then: [
                             meta: "( rewrite ( Mul a ( Add b c ) ) ( Add ( Mul a b ) ( Mul a c ) ) )"
-                            atom: [Action::Insert, r22(v98, v32, v103) on iu0],
-                            atom: [Action::Insert, r22(v98, v33, v104) on iu0],
-                            atom: [Action::Insert, r20(v103, v104, v102)],
+                            atom: [Action::Insert, r6(v98, v32, v103) on iu0],
+                            atom: [Action::Insert, r6(v98, v33, v104) on iu0],
+                            atom: [Action::Insert, r4(v103, v104, v102)],
                         ],
-                        atom: [Premise, r29(v63, v33), iu3]
+                        atom: [Premise, r13(v63, v33), iu3]
                         then: [
-                            atom: [PremiseAny, r32(v63), iu_bogus]
+                            atom: [PremiseAny, r16(v63), iu_bogus]
                             then: [
                                 meta: "( rewrite ( Add a ( Const 0 ) ) a )"
                                 atom: [Action::Equate, v32=v34],
                             ],
                         ],
-                        atom: [PremiseAny, r22(v112, v113, v32), iu5]
+                        atom: [PremiseAny, r6(v112, v113, v32), iu5]
                         then: [
-                            atom: [Premise, r22(v112, v115, v33), iu7]
+                            atom: [Premise, r6(v112, v115, v33), iu7]
                             then: [
-                                atom: [Premise, r22(v112, v113, v32), iu6]
+                                atom: [Premise, r6(v112, v113, v32), iu6]
                                 then: [
                                     meta: "( rewrite ( Add ( Mul a b ) ( Mul a c ) ) ( Mul a ( Add b c ) ) )"
-                                    atom: [Action::Insert, r20(v113, v115, v118) on iu0],
-                                    atom: [Action::Insert, r22(v112, v118, v34)],
+                                    atom: [Action::Insert, r4(v113, v115, v118) on iu0],
+                                    atom: [Action::Insert, r6(v112, v118, v34)],
                                 ],
                             ],
                         ],
                     ],
-                    atom: [PremiseNew, r21(v14, v15, v16)]
+                    atom: [PremiseNew, r5(v14, v15, v16)]
                     then: [
                         meta: "( rewrite ( Sub a b ) ( Add a ( Mul ( Const -1 ) b ) ) )"
-                        atom: [Action::Insert, r31(v17) on iu0],
-                        atom: [Action::Insert, r29(v17, v18) on iu0],
-                        atom: [Action::Insert, r22(v18, v15, v19) on iu0],
-                        atom: [Action::Insert, r20(v14, v19, v16)],
-                        atom: [Premise, r19(v301, v16, v305, v306), iu3]
+                        atom: [Action::Insert, r15(v17) on iu0],
+                        atom: [Action::Insert, r13(v17, v18) on iu0],
+                        atom: [Action::Insert, r6(v18, v15, v19) on iu0],
+                        atom: [Action::Insert, r4(v14, v19, v16)],
+                        atom: [Premise, r3(v301, v16, v305, v306), iu3]
                         then: [
-                            atom: [Premise, r15(v300, v301), iu8]
+                            atom: [Premise, r0(v300, v301), iu8]
                             then: [
                                 meta: "( rewrite ( Integral ( Fuel fuel ) ( Sub f g ) x ) ( Sub ( Integral fuel f x ) ( Integral fuel g x ) ) )"
-                                atom: [Action::Insert, r19(v300, v14, v305, v307) on iu0],
-                                atom: [Action::Insert, r19(v300, v15, v305, v308) on iu0],
-                                atom: [Action::Insert, r21(v307, v308, v306)],
+                                atom: [Action::Insert, r3(v300, v14, v305, v307) on iu0],
+                                atom: [Action::Insert, r3(v300, v15, v305, v308) on iu0],
+                                atom: [Action::Insert, r5(v307, v308, v306)],
                             ],
                         ],
                     ],
-                    atom: [PremiseNew, r22(v35, v36, v37)]
+                    atom: [PremiseNew, r6(v35, v36, v37)]
                     then: [
                         meta: "( rewrite ( Mul a b ) ( Mul b a ) )"
-                        atom: [Action::Insert, r22(v36, v35, v37)],
-                        atom: [Premise, r18(v201, v37, v205), iu2]
+                        atom: [Action::Insert, r6(v36, v35, v37)],
+                        atom: [Premise, r2(v201, v37, v205), iu2]
                         then: [
                             meta: "( rewrite ( Diff x ( Mul a b ) ) ( Add ( Mul a ( Diff x b ) ) ( Mul b ( Diff x a ) ) ) )"
-                            atom: [Action::Insert, r18(v201, v35, v208) on iu0],
-                            atom: [Action::Insert, r18(v201, v36, v206) on iu0],
-                            atom: [Action::Insert, r22(v35, v206, v207) on iu0],
-                            atom: [Action::Insert, r22(v36, v208, v209) on iu0],
-                            atom: [Action::Insert, r20(v207, v209, v205)],
+                            atom: [Action::Insert, r2(v201, v35, v208) on iu0],
+                            atom: [Action::Insert, r2(v201, v36, v206) on iu0],
+                            atom: [Action::Insert, r6(v35, v206, v207) on iu0],
+                            atom: [Action::Insert, r6(v36, v208, v209) on iu0],
+                            atom: [Action::Insert, r4(v207, v209, v205)],
                         ],
-                        atom: [Premise, r19(v334, v37, v338, v339), iu4]
+                        atom: [Premise, r3(v334, v37, v338, v339), iu4]
                         then: [
-                            atom: [Premise, r15(v333, v334), iu9]
+                            atom: [Premise, r0(v333, v334), iu9]
                             then: [
                                 meta: "( rewrite ( Integral ( Fuel fuel ) ( Mul a b ) x ) ( Sub ( Mul a ( Integral fuel b x ) ) ( Integral fuel ( Mul ( Diff x a ) ( Integral fuel b x ) ) x ) ) )"
-                                atom: [Action::Insert, r18(v338, v35, v341) on iu0],
-                                atom: [Action::Insert, r19(v333, v36, v338, v342) on iu0],
-                                atom: [Action::Insert, r22(v35, v342, v340) on iu0],
-                                atom: [Action::Insert, r22(v341, v342, v343) on iu0],
-                                atom: [Action::Insert, r19(v333, v343, v338, v344) on iu0],
-                                atom: [Action::Insert, r21(v340, v344, v339)],
+                                atom: [Action::Insert, r2(v338, v35, v341) on iu0],
+                                atom: [Action::Insert, r3(v333, v36, v338, v342) on iu0],
+                                atom: [Action::Insert, r6(v35, v342, v340) on iu0],
+                                atom: [Action::Insert, r6(v341, v342, v343) on iu0],
+                                atom: [Action::Insert, r3(v333, v343, v338, v344) on iu0],
+                                atom: [Action::Insert, r5(v340, v344, v339)],
                             ],
                         ],
-                        atom: [Premise, r20(v106, v107, v36), iu6]
+                        atom: [Premise, r4(v106, v107, v36), iu6]
                         then: [
                             meta: "( rewrite ( Mul a ( Add b c ) ) ( Add ( Mul a b ) ( Mul a c ) ) )"
-                            atom: [Action::Insert, r22(v35, v106, v110) on iu0],
-                            atom: [Action::Insert, r22(v35, v107, v111) on iu0],
-                            atom: [Action::Insert, r20(v110, v111, v37)],
+                            atom: [Action::Insert, r6(v35, v106, v110) on iu0],
+                            atom: [Action::Insert, r6(v35, v107, v111) on iu0],
+                            atom: [Action::Insert, r4(v110, v111, v37)],
                         ],
-                        atom: [Premise, r22(v51, v52, v36), iu8]
+                        atom: [Premise, r6(v51, v52, v36), iu8]
                         then: [
                             meta: "( rewrite ( Mul a ( Mul b c ) ) ( Mul ( Mul a b ) c ) )"
-                            atom: [Action::Insert, r22(v35, v51, v55) on iu0],
-                            atom: [Action::Insert, r22(v55, v52, v37)],
+                            atom: [Action::Insert, r6(v35, v51, v55) on iu0],
+                            atom: [Action::Insert, r6(v55, v52, v37)],
                         ],
-                        atom: [Premise, r22(v56, v37, v60), iu9]
+                        atom: [Premise, r6(v56, v37, v60), iu9]
                         then: [
                             meta: "( rewrite ( Mul a ( Mul b c ) ) ( Mul ( Mul a b ) c ) )"
-                            atom: [Action::Insert, r22(v56, v35, v61) on iu0],
-                            atom: [Action::Insert, r22(v61, v36, v60)],
+                            atom: [Action::Insert, r6(v56, v35, v61) on iu0],
+                            atom: [Action::Insert, r6(v61, v36, v60)],
                         ],
-                        atom: [Premise, r29(v77, v36), iu4]
+                        atom: [Premise, r13(v77, v36), iu4]
                         then: [
-                            atom: [PremiseAny, r32(v77), iu_bogus]
+                            atom: [PremiseAny, r16(v77), iu_bogus]
                             then: [
                                 meta: "( rewrite ( Mul a ( Const 0 ) ) ( Const 0 ) )"
-                                atom: [Action::Insert, r29(v77, v37)],
+                                atom: [Action::Insert, r13(v77, v37)],
                             ],
-                            atom: [PremiseAny, r33(v77), iu_bogus]
+                            atom: [PremiseAny, r17(v77), iu_bogus]
                             then: [
                                 meta: "( rewrite ( Mul a ( Const 1 ) ) a )"
                                 atom: [Action::Equate, v35=v37],
                             ],
                         ],
-                        atom: [PremiseAny, r22(v35, v122, v123), iu10]
+                        atom: [PremiseAny, r6(v35, v122, v123), iu10]
                         then: [
-                            atom: [Premise, r20(v37, v123, v124), iu7]
+                            atom: [Premise, r4(v37, v123, v124), iu7]
                             then: [
-                                atom: [Premise, r22(v35, v122, v123), iu11]
+                                atom: [Premise, r6(v35, v122, v123), iu11]
                                 then: [
                                     meta: "( rewrite ( Add ( Mul a b ) ( Mul a c ) ) ( Mul a ( Add b c ) ) )"
-                                    atom: [Action::Insert, r20(v36, v122, v125) on iu0],
-                                    atom: [Action::Insert, r22(v35, v125, v124)],
+                                    atom: [Action::Insert, r4(v36, v122, v125) on iu0],
+                                    atom: [Action::Insert, r6(v35, v125, v124)],
                                 ],
                             ],
-                            atom: [Premise, r20(v128, v37, v131), iu8]
+                            atom: [Premise, r4(v128, v37, v131), iu8]
                             then: [
-                                atom: [Premise, r22(v35, v127, v128), iu12]
+                                atom: [Premise, r6(v35, v127, v128), iu12]
                                 then: [
                                     meta: "( rewrite ( Add ( Mul a b ) ( Mul a c ) ) ( Mul a ( Add b c ) ) )"
-                                    atom: [Action::Insert, r20(v127, v36, v132) on iu0],
-                                    atom: [Action::Insert, r22(v35, v132, v131)],
+                                    atom: [Action::Insert, r4(v127, v36, v132) on iu0],
+                                    atom: [Action::Insert, r6(v35, v132, v131)],
                                 ],
                             ],
                         ],
-                        atom: [PremiseAny, r24(v133, v134, v35), iu1]
+                        atom: [PremiseAny, r8(v133, v134, v35), iu1]
                         then: [
-                            atom: [Premise, r24(v133, v136, v36), iu3]
+                            atom: [Premise, r8(v133, v136, v36), iu3]
                             then: [
-                                atom: [Premise, r24(v133, v134, v35), iu2]
+                                atom: [Premise, r8(v133, v134, v35), iu2]
                                 then: [
                                     meta: "( rewrite ( Mul ( Pow a b ) ( Pow a c ) ) ( Pow a ( Add b c ) ) )"
-                                    atom: [Action::Insert, r20(v134, v136, v139) on iu0],
-                                    atom: [Action::Insert, r24(v133, v139, v37)],
+                                    atom: [Action::Insert, r4(v134, v136, v139) on iu0],
+                                    atom: [Action::Insert, r8(v133, v139, v37)],
                                 ],
                             ],
                         ],
                     ],
-                    atom: [PremiseNew, r24(v140, v141, v142)]
+                    atom: [PremiseNew, r8(v140, v141, v142)]
                     then: [
-                        atom: [Premise, r29(v155, v141), iu5]
+                        atom: [Premise, r13(v155, v141), iu5]
                         then: [
-                            atom: [PremiseAny, r33(v155), iu_bogus]
+                            atom: [PremiseAny, r17(v155), iu_bogus]
                             then: [
                                 meta: "( rewrite ( Pow x ( Const 1 ) ) x )"
                                 atom: [Action::Equate, v140=v142],
                             ],
-                            atom: [PremiseAny, r34(v155), iu_bogus]
+                            atom: [PremiseAny, r18(v155), iu_bogus]
                             then: [
                                 meta: "( rewrite ( Pow x ( Const 2 ) ) ( Mul x x ) )"
-                                atom: [Action::Insert, r22(v140, v140, v142)],
+                                atom: [Action::Insert, r6(v140, v140, v142)],
                             ],
                         ],
-                        atom: [PremiseAny, r24(v140, v143, v144), iu4]
+                        atom: [PremiseAny, r8(v140, v143, v144), iu4]
                         then: [
-                            atom: [Premise, r22(v142, v144, v145), iu13]
+                            atom: [Premise, r6(v142, v144, v145), iu13]
                             then: [
-                                atom: [Premise, r24(v140, v143, v144), iu5]
+                                atom: [Premise, r8(v140, v143, v144), iu5]
                                 then: [
                                     meta: "( rewrite ( Mul ( Pow a b ) ( Pow a c ) ) ( Pow a ( Add b c ) ) )"
-                                    atom: [Action::Insert, r20(v141, v143, v146) on iu0],
-                                    atom: [Action::Insert, r24(v140, v146, v145)],
+                                    atom: [Action::Insert, r4(v141, v143, v146) on iu0],
+                                    atom: [Action::Insert, r8(v140, v146, v145)],
                                 ],
                             ],
-                            atom: [Premise, r22(v149, v142, v152), iu14]
+                            atom: [Premise, r6(v149, v142, v152), iu14]
                             then: [
-                                atom: [Premise, r24(v140, v148, v149), iu6]
+                                atom: [Premise, r8(v140, v148, v149), iu6]
                                 then: [
                                     meta: "( rewrite ( Mul ( Pow a b ) ( Pow a c ) ) ( Pow a ( Add b c ) ) )"
-                                    atom: [Action::Insert, r20(v148, v141, v153) on iu0],
-                                    atom: [Action::Insert, r24(v140, v153, v152)],
+                                    atom: [Action::Insert, r4(v148, v141, v153) on iu0],
+                                    atom: [Action::Insert, r8(v140, v153, v152)],
                                 ],
                             ],
                         ],
                     ],
-                    atom: [PremiseNew, r27(v8, v9)]
+                    atom: [PremiseNew, r11(v8, v9)]
                     then: [
-                        atom: [Premise, r18(v8, v9, v215), iu3]
+                        atom: [Premise, r2(v8, v9, v215), iu3]
                         then: [
                             meta: "( rewrite ( Diff x ( Sin x ) ) ( Cos x ) )"
-                            atom: [Action::Insert, r28(v8, v215)],
+                            atom: [Action::Insert, r12(v8, v215)],
                         ],
-                        atom: [Premise, r19(v7, v9, v8, v10), iu5]
+                        atom: [Premise, r3(v7, v9, v8, v10), iu5]
                         then: [
                             meta: "( rewrite ( Integral fuel ( Sin x ) x ) ( Mul ( Const -1 ) ( Cos x ) ) )"
-                            atom: [Action::Insert, r28(v8, v13) on iu0],
-                            atom: [Action::Insert, r31(v11) on iu0],
-                            atom: [Action::Insert, r29(v11, v12) on iu0],
-                            atom: [Action::Insert, r22(v12, v13, v10)],
+                            atom: [Action::Insert, r12(v8, v13) on iu0],
+                            atom: [Action::Insert, r15(v11) on iu0],
+                            atom: [Action::Insert, r13(v11, v12) on iu0],
+                            atom: [Action::Insert, r6(v12, v13, v10)],
                         ],
                     ],
-                    atom: [PremiseNew, r28(v26, v27)]
+                    atom: [PremiseNew, r12(v26, v27)]
                     then: [
-                        atom: [Premise, r18(v26, v27, v28), iu4]
+                        atom: [Premise, r2(v26, v27, v28), iu4]
                         then: [
                             meta: "( rewrite ( Diff x ( Cos x ) ) ( Mul ( Const -1 ) ( Sin x ) ) )"
-                            atom: [Action::Insert, r27(v26, v31) on iu0],
-                            atom: [Action::Insert, r31(v29) on iu0],
-                            atom: [Action::Insert, r29(v29, v30) on iu0],
-                            atom: [Action::Insert, r22(v30, v31, v28)],
+                            atom: [Action::Insert, r11(v26, v31) on iu0],
+                            atom: [Action::Insert, r15(v29) on iu0],
+                            atom: [Action::Insert, r13(v29, v30) on iu0],
+                            atom: [Action::Insert, r6(v30, v31, v28)],
                         ],
-                        atom: [Premise, r19(v251, v27, v26, v254), iu6]
+                        atom: [Premise, r3(v251, v27, v26, v254), iu6]
                         then: [
-                            atom: [Premise, r15(v250, v251), iu10]
+                            atom: [Premise, r0(v250, v251), iu10]
                             then: [
                                 meta: "( rewrite ( Integral ( Fuel fuel ) ( Cos x ) x ) ( Sin x ) )"
-                                atom: [Action::Insert, r27(v26, v254)],
+                                atom: [Action::Insert, r11(v26, v254)],
                             ],
                         ],
                     ],
-                    atom: [PremiseNew, r29(v67, v68)]
+                    atom: [PremiseNew, r13(v67, v68)]
                     then: [
-                        atom: [PremiseAny, r24(v158, v68, v161), iu7]
+                        atom: [PremiseAny, r8(v158, v68, v161), iu7]
                         then: [
-                            atom: [PremiseAny, r34(v67), iu_bogus]
+                            atom: [PremiseAny, r18(v67), iu_bogus]
                             then: [
-                                atom: [Premise, r24(v170, v68, v173), iu8]
+                                atom: [Premise, r8(v170, v68, v173), iu8]
                                 then: [
                                     meta: "( rewrite ( Pow x ( Const 2 ) ) ( Mul x x ) )"
-                                    atom: [Action::Insert, r22(v170, v170, v173)],
+                                    atom: [Action::Insert, r6(v170, v170, v173)],
                                 ],
                             ],
                         ],
-                        atom: [PremiseAny, r32(v67), iu_bogus]
+                        atom: [PremiseAny, r16(v67), iu_bogus]
                         then: [
-                            atom: [Premise, r20(v66, v68, v69), iu9]
+                            atom: [Premise, r4(v66, v68, v69), iu9]
                             then: [
-                                atom: [PremiseAny, r32(v67), iu_bogus]
+                                atom: [PremiseAny, r16(v67), iu_bogus]
                                 then: [
                                     meta: "( rewrite ( Add a ( Const 0 ) ) a )"
                                     atom: [Action::Equate, v66=v69],
                                 ],
                             ],
-                            atom: [Premise, r22(v78, v68, v80), iu15]
+                            atom: [Premise, r6(v78, v68, v80), iu15]
                             then: [
-                                atom: [PremiseAny, r32(v67), iu_bogus]
+                                atom: [PremiseAny, r16(v67), iu_bogus]
                                 then: [
                                     meta: "( rewrite ( Mul a ( Const 0 ) ) ( Const 0 ) )"
-                                    atom: [Action::Insert, r29(v67, v80)],
+                                    atom: [Action::Insert, r13(v67, v80)],
                                 ],
                             ],
                         ],
-                        atom: [PremiseAny, r33(v67), iu_bogus]
+                        atom: [PremiseAny, r17(v67), iu_bogus]
                         then: [
-                            atom: [Premise, r19(v229, v68, v232, v233), iu7]
+                            atom: [Premise, r3(v229, v68, v232, v233), iu7]
                             then: [
-                                atom: [Premise, r15(v228, v229), iu11]
+                                atom: [Premise, r0(v228, v229), iu11]
                                 then: [
-                                    atom: [PremiseAny, r33(v67), iu_bogus]
+                                    atom: [PremiseAny, r17(v67), iu_bogus]
                                     then: [
                                         meta: "( rewrite ( Integral ( Fuel fuel ) ( Const 1 ) x ) x )"
                                         atom: [Action::Equate, v232=v233],
                                     ],
                                 ],
                             ],
-                            atom: [Premise, r22(v90, v68, v93), iu16]
+                            atom: [Premise, r6(v90, v68, v93), iu16]
                             then: [
-                                atom: [PremiseAny, r33(v67), iu_bogus]
+                                atom: [PremiseAny, r17(v67), iu_bogus]
                                 then: [
                                     meta: "( rewrite ( Mul a ( Const 1 ) ) a )"
                                     atom: [Action::Equate, v90=v93],
                                 ],
                             ],
-                            atom: [Premise, r24(v158, v68, v161), iu9]
+                            atom: [Premise, r8(v158, v68, v161), iu9]
                             then: [
-                                atom: [PremiseAny, r33(v67), iu_bogus]
+                                atom: [PremiseAny, r17(v67), iu_bogus]
                                 then: [
                                     meta: "( rewrite ( Pow x ( Const 1 ) ) x )"
                                     atom: [Action::Equate, v158=v161],
@@ -13985,54 +11861,54 @@ fn lir_math() {
                             ],
                         ],
                     ],
-                    atom: [PremiseNew, r32(v71)]
+                    atom: [PremiseNew, r16(v71)]
                     then: [
-                        atom: [Premise, r29(v71, v72), iu6]
+                        atom: [Premise, r13(v71, v72), iu6]
                         then: [
-                            atom: [Premise, r20(v70, v72, v73), iu10]
+                            atom: [Premise, r4(v70, v72, v73), iu10]
                             then: [
                                 meta: "( rewrite ( Add a ( Const 0 ) ) a )"
                                 atom: [Action::Equate, v70=v73],
                             ],
-                            atom: [Premise, r22(v82, v72, v84), iu17]
+                            atom: [Premise, r6(v82, v72, v84), iu17]
                             then: [
                                 meta: "( rewrite ( Mul a ( Const 0 ) ) ( Const 0 ) )"
-                                atom: [Action::Insert, r29(v71, v84)],
+                                atom: [Action::Insert, r13(v71, v84)],
                             ],
                         ],
                     ],
-                    atom: [PremiseNew, r33(v95)]
+                    atom: [PremiseNew, r17(v95)]
                     then: [
-                        atom: [Premise, r29(v95, v96), iu7]
+                        atom: [Premise, r13(v95, v96), iu7]
                         then: [
-                            atom: [Premise, r19(v235, v96, v238, v239), iu8]
+                            atom: [Premise, r3(v235, v96, v238, v239), iu8]
                             then: [
-                                atom: [Premise, r15(v234, v235), iu12]
+                                atom: [Premise, r0(v234, v235), iu12]
                                 then: [
                                     meta: "( rewrite ( Integral ( Fuel fuel ) ( Const 1 ) x ) x )"
                                     atom: [Action::Equate, v238=v239],
                                 ],
                             ],
-                            atom: [Premise, r22(v94, v96, v97), iu18]
+                            atom: [Premise, r6(v94, v96, v97), iu18]
                             then: [
                                 meta: "( rewrite ( Mul a ( Const 1 ) ) a )"
                                 atom: [Action::Equate, v94=v97],
                             ],
-                            atom: [Premise, r24(v162, v96, v165), iu10]
+                            atom: [Premise, r8(v162, v96, v165), iu10]
                             then: [
                                 meta: "( rewrite ( Pow x ( Const 1 ) ) x )"
                                 atom: [Action::Equate, v162=v165],
                             ],
                         ],
                     ],
-                    atom: [PremiseNew, r34(v175)]
+                    atom: [PremiseNew, r18(v175)]
                     then: [
-                        atom: [Premise, r29(v175, v176), iu8]
+                        atom: [Premise, r13(v175, v176), iu8]
                         then: [
-                            atom: [Premise, r24(v174, v176, v177), iu11]
+                            atom: [Premise, r8(v174, v176, v177), iu11]
                             then: [
                                 meta: "( rewrite ( Pow x ( Const 2 ) ) ( Mul x x ) )"
-                                atom: [Action::Insert, r22(v174, v174, v177)],
+                                atom: [Action::Insert, r6(v174, v174, v177)],
                             ],
                         ],
                     ],
@@ -14056,19 +11932,19 @@ fn lir_math() {
                     },
                     ComputeGlobal {
                         global_id: g4,
-                        compute: Compute { relation: r16, args: [] },
+                        compute: Compute { relation: r1, args: [] },
                     },
                     ComputeGlobal {
                         global_id: g5,
-                        compute: Compute { relation: r15, args: [g4] },
+                        compute: Compute { relation: r0, args: [g4] },
                     },
                     ComputeGlobal {
                         global_id: g6,
-                        compute: Compute { relation: r15, args: [g5] },
+                        compute: Compute { relation: r0, args: [g5] },
                     },
                     ComputeGlobal {
                         global_id: g7,
-                        compute: Compute { relation: r15, args: [g6] },
+                        compute: Compute { relation: r0, args: [g6] },
                     },
                     ComputeGlobal {
                         global_id: g8,
@@ -14076,55 +11952,55 @@ fn lir_math() {
                     },
                     ComputeGlobal {
                         global_id: g9,
-                        compute: Compute { relation: r30, args: [g8] },
+                        compute: Compute { relation: r14, args: [g8] },
                     },
                     ComputeGlobal {
                         global_id: g10,
-                        compute: Compute { relation: r25, args: [g9] },
+                        compute: Compute { relation: r9, args: [g9] },
                     },
                     ComputeGlobal {
                         global_id: g11,
-                        compute: Compute { relation: r19, args: [g7, g10, g9] },
+                        compute: Compute { relation: r3, args: [g7, g10, g9] },
                     },
                     ComputeGlobal {
                         global_id: g12,
-                        compute: Compute { relation: r28, args: [g9] },
+                        compute: Compute { relation: r12, args: [g9] },
                     },
                     ComputeGlobal {
                         global_id: g13,
-                        compute: Compute { relation: r20, args: [g9, g12] },
+                        compute: Compute { relation: r4, args: [g9, g12] },
                     },
                     ComputeGlobal {
                         global_id: g14,
-                        compute: Compute { relation: r19, args: [g7, g13, g9] },
+                        compute: Compute { relation: r3, args: [g7, g13, g9] },
                     },
                     ComputeGlobal {
                         global_id: g15,
-                        compute: Compute { relation: r22, args: [g12, g9] },
+                        compute: Compute { relation: r6, args: [g12, g9] },
                     },
                     ComputeGlobal {
                         global_id: g16,
-                        compute: Compute { relation: r19, args: [g7, g15, g9] },
+                        compute: Compute { relation: r3, args: [g7, g15, g9] },
                     },
                     ComputeGlobal {
                         global_id: g17,
-                        compute: Compute { relation: r29, args: [g2] },
+                        compute: Compute { relation: r13, args: [g2] },
                     },
                     ComputeGlobal {
                         global_id: g18,
-                        compute: Compute { relation: r29, args: [g3] },
+                        compute: Compute { relation: r13, args: [g3] },
                     },
                     ComputeGlobal {
                         global_id: g19,
-                        compute: Compute { relation: r22, args: [g18, g9] },
+                        compute: Compute { relation: r6, args: [g18, g9] },
                     },
                     ComputeGlobal {
                         global_id: g20,
-                        compute: Compute { relation: r20, args: [g17, g19] },
+                        compute: Compute { relation: r4, args: [g17, g19] },
                     },
                     ComputeGlobal {
                         global_id: g21,
-                        compute: Compute { relation: r18, args: [g9, g20] },
+                        compute: Compute { relation: r2, args: [g9, g20] },
                     },
                     ComputeGlobal {
                         global_id: g22,
@@ -14132,11 +12008,11 @@ fn lir_math() {
                     },
                     ComputeGlobal {
                         global_id: g23,
-                        compute: Compute { relation: r29, args: [g22] },
+                        compute: Compute { relation: r13, args: [g22] },
                     },
                     ComputeGlobal {
                         global_id: g24,
-                        compute: Compute { relation: r24, args: [g9, g23] },
+                        compute: Compute { relation: r8, args: [g9, g23] },
                     },
                     ComputeGlobal {
                         global_id: g25,
@@ -14144,23 +12020,23 @@ fn lir_math() {
                     },
                     ComputeGlobal {
                         global_id: g26,
-                        compute: Compute { relation: r29, args: [g25] },
+                        compute: Compute { relation: r13, args: [g25] },
                     },
                     ComputeGlobal {
                         global_id: g27,
-                        compute: Compute { relation: r24, args: [g9, g18] },
+                        compute: Compute { relation: r8, args: [g9, g18] },
                     },
                     ComputeGlobal {
                         global_id: g28,
-                        compute: Compute { relation: r22, args: [g26, g27] },
+                        compute: Compute { relation: r6, args: [g26, g27] },
                     },
                     ComputeGlobal {
                         global_id: g29,
-                        compute: Compute { relation: r21, args: [g24, g28] },
+                        compute: Compute { relation: r5, args: [g24, g28] },
                     },
                     ComputeGlobal {
                         global_id: g30,
-                        compute: Compute { relation: r18, args: [g9, g29] },
+                        compute: Compute { relation: r2, args: [g9, g29] },
                     },
                     ComputeGlobal {
                         global_id: g31,
@@ -14168,31 +12044,31 @@ fn lir_math() {
                     },
                     ComputeGlobal {
                         global_id: g32,
-                        compute: Compute { relation: r30, args: [g31] },
+                        compute: Compute { relation: r14, args: [g31] },
                     },
                     ComputeGlobal {
                         global_id: g33,
-                        compute: Compute { relation: r20, args: [g9, g32] },
+                        compute: Compute { relation: r4, args: [g9, g32] },
                     },
                     ComputeGlobal {
                         global_id: g34,
-                        compute: Compute { relation: r22, args: [g32, g33] },
+                        compute: Compute { relation: r6, args: [g32, g33] },
                     },
                     ComputeGlobal {
                         global_id: g35,
-                        compute: Compute { relation: r20, args: [g9, g18] },
+                        compute: Compute { relation: r4, args: [g9, g18] },
                     },
                     ComputeGlobal {
                         global_id: g36,
-                        compute: Compute { relation: r20, args: [g9, g9] },
+                        compute: Compute { relation: r4, args: [g9, g9] },
                     },
                     ComputeGlobal {
                         global_id: g37,
-                        compute: Compute { relation: r21, args: [g35, g36] },
+                        compute: Compute { relation: r5, args: [g35, g36] },
                     },
                     ComputeGlobal {
                         global_id: g38,
-                        compute: Compute { relation: r20, args: [g34, g37] },
+                        compute: Compute { relation: r4, args: [g34, g37] },
                     },
                     ComputeGlobal {
                         global_id: g39,
@@ -14200,35 +12076,35 @@ fn lir_math() {
                     },
                     ComputeGlobal {
                         global_id: g40,
-                        compute: Compute { relation: r30, args: [g39] },
+                        compute: Compute { relation: r14, args: [g39] },
                     },
                     ComputeGlobal {
                         global_id: g41,
-                        compute: Compute { relation: r26, args: [g40] },
+                        compute: Compute { relation: r10, args: [g40] },
                     },
                     ComputeGlobal {
                         global_id: g42,
-                        compute: Compute { relation: r20, args: [g17, g41] },
+                        compute: Compute { relation: r4, args: [g17, g41] },
                     },
                     ComputeGlobal {
                         global_id: g43,
-                        compute: Compute { relation: r23, args: [g42, g18] },
+                        compute: Compute { relation: r7, args: [g42, g18] },
                     },
                     ComputeGlobal {
                         global_id: g44,
-                        compute: Compute { relation: r21, args: [g17, g41] },
+                        compute: Compute { relation: r5, args: [g17, g41] },
                     },
                     ComputeGlobal {
                         global_id: g45,
-                        compute: Compute { relation: r23, args: [g44, g18] },
+                        compute: Compute { relation: r7, args: [g44, g18] },
                     },
                     ComputeGlobal {
                         global_id: g46,
-                        compute: Compute { relation: r21, args: [g43, g45] },
+                        compute: Compute { relation: r5, args: [g43, g45] },
                     },
                     ComputeGlobal {
                         global_id: g47,
-                        compute: Compute { relation: r23, args: [g17, g46] },
+                        compute: Compute { relation: r7, args: [g17, g46] },
                     },
                 ],
             }"#]]),
@@ -14236,52 +12112,6 @@ fn lir_math() {
             use oatlog::runtime::{self, *};
             eclass_wrapper_ty!(FuelUnit);
             eclass_wrapper_ty!(Math);
-            fn i64_add012(a: i64, b: i64) -> impl Iterator<Item = (i64,)> {
-                a.checked_add(b).map(|x| (x,)).into_iter()
-            }
-            fn i64_bitand012(a: i64, b: i64) -> impl Iterator<Item = (i64,)> {
-                std::iter::once((a & b,))
-            }
-            fn i64_bitnot01(a: i64) -> impl Iterator<Item = (i64,)> {
-                std::iter::once((!a,))
-            }
-            fn i64_bitor012(a: i64, b: i64) -> impl Iterator<Item = (i64,)> {
-                std::iter::once((a | b,))
-            }
-            fn i64_bitshl012(a: i64, b: i64) -> impl Iterator<Item = (i64,)> {
-                a.checked_shl(b.try_into().unwrap())
-                    .map(|x| (x,))
-                    .into_iter()
-            }
-            fn i64_bitshr012(a: i64, b: i64) -> impl Iterator<Item = (i64,)> {
-                a.checked_shr(b.try_into().unwrap())
-                    .map(|x| (x,))
-                    .into_iter()
-            }
-            fn i64_bitxor012(a: i64, b: i64) -> impl Iterator<Item = (i64,)> {
-                std::iter::once((a ^ b,))
-            }
-            fn i64_div012(a: i64, b: i64) -> impl Iterator<Item = (i64,)> {
-                a.checked_div(b).map(|x| (x,)).into_iter()
-            }
-            fn i64_log01(a: i64) -> impl Iterator<Item = (i64,)> {
-                std::iter::once((a.ilog2() as i64,))
-            }
-            fn i64_max012(a: i64, b: i64) -> impl Iterator<Item = (i64,)> {
-                std::iter::once((a.max(b),))
-            }
-            fn i64_min012(a: i64, b: i64) -> impl Iterator<Item = (i64,)> {
-                std::iter::once((a.min(b),))
-            }
-            fn i64_mul012(a: i64, b: i64) -> impl Iterator<Item = (i64,)> {
-                a.checked_mul(b).map(|x| (x,)).into_iter()
-            }
-            fn i64_rem012(a: i64, b: i64) -> impl Iterator<Item = (i64,)> {
-                a.checked_rem(b).map(|x| (x,)).into_iter()
-            }
-            fn i64_sub012(a: i64, b: i64) -> impl Iterator<Item = (i64,)> {
-                a.checked_sub(b).map(|x| (x,)).into_iter()
-            }
             #[derive(Debug, Default)]
             struct FuelRelation {
                 new: Vec<<Self as Relation>::Row>,
