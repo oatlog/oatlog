@@ -1,6 +1,7 @@
 use expect_test::expect;
 
 struct Steps {
+    strict_egglog_compat: bool,
     code: &'static str,
     expected_hir: Option<expect_test::Expect>,
     expected_lir: Option<expect_test::Expect>,
@@ -9,7 +10,14 @@ struct Steps {
 impl Steps {
     fn check(self) {
         let sexps = crate::frontend::parse_str_to_sexps(self.code).unwrap();
-        let config = crate::Configuration::default();
+        let config = crate::Configuration {
+            egglog_compat: if self.strict_egglog_compat {
+                crate::EgglogCompatibility::PostStep
+            } else {
+                crate::EgglogCompatibility::PostSaturation
+            },
+            ..Default::default()
+        };
 
         let mut parser = crate::frontend::Parser::new();
         parser.ingest_all(sexps, config).unwrap();
@@ -110,6 +118,7 @@ fn shrink_cases() {
 #[test]
 fn redundant_premise_simplify() {
     Steps {
+        strict_egglog_compat: true,
         code: r#"
             (datatype Math (Const i64) (Add Math Math))
             (rule
@@ -186,6 +195,7 @@ fn redundant_premise_simplify() {
 #[test]
 fn redundant_action_simplify() {
     Steps {
+        strict_egglog_compat: true,
         code: r#"
             (datatype Math (Const i64) (Add Math Math))
             (rule
@@ -276,6 +286,7 @@ fn redundant_action_simplify() {
 #[test]
 fn weird_premise_equality() {
     Steps {
+        strict_egglog_compat: true,
         code: r"
             (rule ((= x 1) (= y x) (= z y)) ())
         ",
@@ -309,6 +320,7 @@ fn weird_premise_equality() {
 #[test]
 fn hir_commutative() {
     Steps {
+        strict_egglog_compat: true,
         code: r"
             (datatype Math
                 (Add Math Math)
@@ -348,6 +360,7 @@ fn hir_commutative() {
 #[test]
 fn hir_distributive() {
     Steps {
+        strict_egglog_compat: true,
         code: r"
             (datatype Math
                 (Add Math Math)
@@ -396,6 +409,7 @@ fn hir_distributive() {
 #[test]
 fn hir_userspace_implicit_functionality() {
     Steps {
+        strict_egglog_compat: true,
         code: r"
             (sort Math)
             (relation Add (Math Math Math))
@@ -438,6 +452,7 @@ fn hir_userspace_implicit_functionality() {
 #[test]
 fn hir_global() {
     Steps {
+        strict_egglog_compat: true,
         code: r#"
             (datatype Math
                 (Mul Math Math)
@@ -620,6 +635,7 @@ fn hir_global() {
 #[test]
 fn regression_tir2() {
     Steps {
+        strict_egglog_compat: true,
         code: r"
             (datatype Math (Mul Math Math) (Pow Math Math) (Const i64))
             (rewrite (Pow x (Const 2)) (Mul x x))
@@ -1521,6 +1537,7 @@ fn regression_tir2() {
 #[test]
 fn regression_tir1() {
     Steps {
+        strict_egglog_compat: true,
         code: r"
             (datatype Math (Sub Math Math) (Const i64))
             (rewrite (Sub a a) (Const 0))
@@ -2090,6 +2107,7 @@ fn regression_tir1() {
 #[test]
 fn regression_elim_problematic() {
     Steps {
+        strict_egglog_compat: true,
         code: r"
             (datatype Math (Mul Math Math) (Zero ))
             (let zero (Zero ))
@@ -2132,6 +2150,7 @@ fn regression_elim_problematic() {
 #[test]
 fn codegen_template() {
     Steps {
+        strict_egglog_compat: true,
         code: r"
         ",
         expected_hir: Some(expect![[r""]]),
@@ -2144,6 +2163,7 @@ fn codegen_template() {
 #[test]
 fn codegen_constant_propagation() {
     Steps {
+        strict_egglog_compat: true,
         code: r"
             (datatype Math
                 (Add Math Math)
@@ -3154,6 +3174,7 @@ fn codegen_constant_propagation() {
 #[test]
 fn codegen_commutative() {
     Steps {
+        strict_egglog_compat: true,
         code: r"
             (datatype Math
                 (Add Math Math)
@@ -3442,6 +3463,7 @@ fn codegen_commutative() {
 #[test]
 fn regression_entry2() {
     Steps {
+        strict_egglog_compat: true,
         code: r"
             (datatype Math (Sub Math Math) (Const i64))
             (rewrite (Sub a b) (Const -1))
@@ -3980,6 +4002,7 @@ fn regression_entry2() {
 #[test]
 fn regression_entry() {
     Steps {
+        strict_egglog_compat: true,
         code: r"
             (datatype Math (Integral Math Math) (Add Math Math))
             (rewrite (Add f g) (Add (Integral f f) g))
@@ -4504,6 +4527,7 @@ fn regression_entry() {
 #[test]
 fn test_bind_variable_multiple_times() {
     Steps {
+        strict_egglog_compat: true,
         code: r"
             (datatype Foo
                 (Same Foo Foo)
@@ -4853,6 +4877,7 @@ fn test_bind_variable_multiple_times() {
 #[test]
 fn test_negative_i64_tokens() {
     Steps {
+        strict_egglog_compat: true,
         code: r"
             (datatype Math
                 (Mul Math Math)
@@ -4899,6 +4924,7 @@ fn test_negative_i64_tokens() {
 #[test]
 fn codegen_variable_reuse_bug() {
     Steps {
+        strict_egglog_compat: true,
         code: r"
             (datatype Math (Add Math Math) (Zero))
             (let zero (Zero))
@@ -5473,6 +5499,7 @@ fn codegen_variable_reuse_bug() {
 #[test]
 fn initial_exprs() {
     Steps {
+        strict_egglog_compat: true,
         code: r#"
             (datatype Math (Add Math Math) (Mul Math Math) (Const i64) (Var String))
 
@@ -6294,6 +6321,7 @@ fn initial_exprs() {
 #[ignore = "set not implemented yet"]
 fn codegen_panic_merge() {
     Steps {
+        strict_egglog_compat: true,
         // (let x (f))
         //
         // (function g () i64 :no-merge)
@@ -6493,6 +6521,7 @@ fn codegen_panic_merge() {
 #[test]
 fn codegen_bug1() {
     Steps {
+        strict_egglog_compat: true,
         code: r"
             (sort T0)
             (sort T1)
@@ -6607,6 +6636,7 @@ fn codegen_bug1() {
 #[test]
 fn initial() {
     Steps {
+        strict_egglog_compat: true,
         code: r"
             (datatype Math
                 (Const i64)
@@ -6724,6 +6754,7 @@ fn initial() {
 #[test]
 fn test_primitives_simple() {
     Steps {
+        strict_egglog_compat: true,
         code: r#"
             (datatype Math
                 (Mul Math Math)
@@ -7704,6 +7735,7 @@ fn test_primitives_simple() {
 #[test]
 fn triangle_join() {
     Steps {
+        strict_egglog_compat: true,
         code: r"
             (sort Math)
             (relation Foo (Math Math))
@@ -8493,6 +8525,7 @@ fn triangle_join() {
 fn edgecase0() {
     // needed a "PremiseAny"
     Steps {
+        strict_egglog_compat: true,
         code: r"
             (datatype Math
                 (Mul Math Math)
@@ -9117,6 +9150,7 @@ fn edgecase0() {
 #[test]
 fn test_into_codegen() {
     Steps {
+        strict_egglog_compat: true,
         code: r"
             (datatype Math (Mul Math Math) (Add Math Math))
             (rewrite (Mul (Add a b) c) (Add (Mul a c) (Mul b c)))
@@ -9654,6 +9688,7 @@ fn test_into_codegen() {
 #[ignore = "forall is not yet implemented (interacts badly with semi-naive)"]
 fn simple_forall() {
     Steps {
+        strict_egglog_compat: true,
         code: r"
             (sort Math)
             (relation Le (Math Math))
@@ -9919,6 +9954,7 @@ fn simple_forall() {
 #[test]
 fn lir_math() {
     Steps {
+        strict_egglog_compat: false,
         code: r#"
             (datatype FuelUnit
                 (Fuel FuelUnit)

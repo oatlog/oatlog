@@ -21,6 +21,10 @@ enum Commands {
         /// Output file (.rs), if not stdout.
         #[arg(short, long, value_name = "FILE")]
         output: Option<PathBuf>,
+
+        /// Relaxed egglog compat
+        #[arg(short, long)]
+        relaxed_compat: bool,
     },
     Shrink {
         /// Take an egglog program that does not match egglog and shrink it.
@@ -98,8 +102,11 @@ fn main() {
     };
 
     match cli.command {
-        Commands::Compile { output } => {
-            ret.push_str(&oatlog::compile_str(&input, true));
+        Commands::Compile {
+            output,
+            relaxed_compat,
+        } => {
+            ret.push_str(&oatlog::compile_str(&input, !relaxed_compat));
             use std::io::Write as _;
             match output {
                 Some(path) => fs::write(path, ret).unwrap(),

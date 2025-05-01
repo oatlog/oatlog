@@ -1152,7 +1152,7 @@ mod debug_print {
                     columns,
                     kind,
                     implicit_rules,
-                    invariant_permutations: _,
+                    invariant_permutations,
                 },
             ) = self;
 
@@ -1164,7 +1164,8 @@ mod debug_print {
                 RelationTy::Primitive { syn: _, ident } => format!("Primitive({ident})"),
                 RelationTy::Forall { ty } => format!("Forall({ty})"),
             };
-            f.debug_struct(name)
+            let mut dbg_struct = f.debug_struct(name);
+            dbg_struct
                 .field(
                     "columns",
                     &columns
@@ -1179,8 +1180,14 @@ mod debug_print {
                         "{:?}",
                         implicit_rules.iter_enumerate().collect::<BTreeMap<_, _>>()
                     )),
-                )
-                .finish()
+                );
+            if invariant_permutations.inner.len() > 1 {
+                dbg_struct.field(
+                    "invariant_permutations",
+                    &Dbg(format!("{:?}", invariant_permutations.inner)),
+                );
+            }
+            dbg_struct.finish()
         }
     }
 
