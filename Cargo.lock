@@ -577,6 +577,17 @@ dependencies = [
 ]
 
 [[package]]
+name = "experiments"
+version = "0.1.0"
+dependencies = [
+ "criterion",
+ "hashbrown",
+ "oorandom",
+ "proptest",
+ "voracious_radix_sort",
+]
+
+[[package]]
 name = "fastrand"
 version = "2.3.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"

@@ -6,7 +6,8 @@ members = [
     "examples/partial-integration-fueled",
     "examples/quadratic-formula",
     "examples/simple-forall",
-    "examples/test-api",
+    "examples/test-api", "experiments",
+    "experiments",
     "oatlog",
     "oatlog-bench",
     "oatlog-core",
@@ -24,6 +25,7 @@ oatlog-macro.path = "oatlog-macro"
 # oatlog-bench.path = "oatlog-bench"
 # comparative-test.path = "comparative-test"
 
+#hashbrown = { version = "0.14", features = ["raw"] }
 blake3 = "1"
 clap = { version = "4", features = ["derive"]}
 criterion = "0.5"
@@ -36,6 +38,7 @@ expect-test = "1"
 hashbrown = "0.15"
 heck = "0.5"
 itertools = "0.14"
+oorandom = "11"
 paste = "1"
 proc-macro2 = { version = "1", features = ["span-locations"], default-features = false }
 proptest = "1"
