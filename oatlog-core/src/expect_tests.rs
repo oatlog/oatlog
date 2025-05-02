@@ -928,9 +928,7 @@ fn regression_tir2() {
                         self.new.extend(
                             self.hash_index_0_1
                                 .iter()
-                                .map(|(&(x0, x1), &(x2,))| {
-                                    (uf.math_.find(x0), uf.math_.find(x1), uf.math_.find(x2))
-                                })
+                                .map(|(&(x0, x1), &(x2,))| (x0, x1, x2))
                                 .filter(|&(x0, x1, x2)| !self.hash_index_0_1_2.contains_key(&(x0, x1, x2))),
                         );
                         insertions.clear();
@@ -938,7 +936,7 @@ fn regression_tir2() {
                         self.new.dedup();
                         for &(x0, x1, x2) in &self.new {
                             self.hash_index_0_1_2
-                                .entry((uf.math_.find(x0), uf.math_.find(x1), uf.math_.find(x2)))
+                                .entry((x0, x1, x2))
                                 .or_default()
                                 .push(());
                         }
@@ -1077,19 +1075,14 @@ fn regression_tir2() {
                         self.new.extend(
                             self.hash_index_1_0
                                 .iter()
-                                .map(|(&(x1, x0), &(x2,))| {
-                                    (uf.math_.find(x0), uf.math_.find(x1), uf.math_.find(x2))
-                                })
+                                .map(|(&(x1, x0), &(x2,))| (x0, x1, x2))
                                 .filter(|&(x0, x1, x2)| !self.hash_index_1_0_2.contains_key(&(x1, x0, x2))),
                         );
                         insertions.clear();
                         RadixSortable::wrap(&mut self.new).voracious_sort();
                         self.new.dedup();
                         for &(x0, x1, x2) in &self.new {
-                            self.hash_index_1
-                                .entry((uf.math_.find(x1),))
-                                .or_default()
-                                .push((uf.math_.find(x0), uf.math_.find(x2)));
+                            self.hash_index_1.entry((x1,)).or_default().push((x0, x2));
                         }
                         self.hash_index_1.retain(|&(x1,), v| {
                             if uf.math_.is_root(x1) {
@@ -1103,7 +1096,7 @@ fn regression_tir2() {
                         });
                         for &(x0, x1, x2) in &self.new {
                             self.hash_index_1_0_2
-                                .entry((uf.math_.find(x1), uf.math_.find(x0), uf.math_.find(x2)))
+                                .entry((x1, x0, x2))
                                 .or_default()
                                 .push(());
                         }
@@ -1245,17 +1238,14 @@ fn regression_tir2() {
                         self.new.extend(
                             self.hash_index_0
                                 .iter()
-                                .map(|(&(x0,), &(x1,))| (x0, uf.math_.find(x1)))
+                                .map(|(&(x0,), &(x1,))| (x0, x1))
                                 .filter(|&(x0, x1)| !self.hash_index_0_1.contains_key(&(x0, x1))),
                         );
                         insertions.clear();
                         self.new.sort_unstable();
                         self.new.dedup();
                         for &(x0, x1) in &self.new {
-                            self.hash_index_1
-                                .entry((uf.math_.find(x1),))
-                                .or_default()
-                                .push((x0,));
+                            self.hash_index_1.entry((x1,)).or_default().push((x0,));
                         }
                         self.hash_index_1.retain(|&(x1,), v| {
                             if uf.math_.is_root(x1) {
@@ -1268,10 +1258,7 @@ fn regression_tir2() {
                             }
                         });
                         for &(x0, x1) in &self.new {
-                            self.hash_index_0_1
-                                .entry((x0, uf.math_.find(x1)))
-                                .or_default()
-                                .push(());
+                            self.hash_index_0_1.entry((x0, x1)).or_default().push(());
                         }
                         self.hash_index_0_1.retain(|&(x0, x1), v| {
                             if uf.math_.is_root(x1) {
@@ -1771,9 +1758,7 @@ fn regression_tir1() {
                         self.new.extend(
                             self.hash_index_0_1
                                 .iter()
-                                .map(|(&(x0, x1), &(x2,))| {
-                                    (uf.math_.find(x0), uf.math_.find(x1), uf.math_.find(x2))
-                                })
+                                .map(|(&(x0, x1), &(x2,))| (x0, x1, x2))
                                 .filter(|&(x0, x1, x2)| !self.hash_index_0_1_2.contains_key(&(x0, x1, x2))),
                         );
                         insertions.clear();
@@ -1781,7 +1766,7 @@ fn regression_tir1() {
                         self.new.dedup();
                         for &(x0, x1, x2) in &self.new {
                             self.hash_index_0_1_2
-                                .entry((uf.math_.find(x0), uf.math_.find(x1), uf.math_.find(x2)))
+                                .entry((x0, x1, x2))
                                 .or_default()
                                 .push(());
                         }
@@ -1916,17 +1901,14 @@ fn regression_tir1() {
                         self.new.extend(
                             self.hash_index_0
                                 .iter()
-                                .map(|(&(x0,), &(x1,))| (x0, uf.math_.find(x1)))
+                                .map(|(&(x0,), &(x1,))| (x0, x1))
                                 .filter(|&(x0, x1)| !self.hash_index_0_1.contains_key(&(x0, x1))),
                         );
                         insertions.clear();
                         self.new.sort_unstable();
                         self.new.dedup();
                         for &(x0, x1) in &self.new {
-                            self.hash_index_0_1
-                                .entry((x0, uf.math_.find(x1)))
-                                .or_default()
-                                .push(());
+                            self.hash_index_0_1.entry((x0, x1)).or_default().push(());
                         }
                         self.hash_index_0_1.retain(|&(x0, x1), v| {
                             if uf.math_.is_root(x1) {
@@ -2554,19 +2536,14 @@ fn codegen_constant_propagation() {
                         self.new.extend(
                             self.hash_index_0_1
                                 .iter()
-                                .map(|(&(x0, x1), &(x2,))| {
-                                    (uf.math_.find(x0), uf.math_.find(x1), uf.math_.find(x2))
-                                })
+                                .map(|(&(x0, x1), &(x2,))| (x0, x1, x2))
                                 .filter(|&(x0, x1, x2)| !self.hash_index_0_1_2.contains_key(&(x0, x1, x2))),
                         );
                         insertions.clear();
                         RadixSortable::wrap(&mut self.new).voracious_sort();
                         self.new.dedup();
                         for &(x0, x1, x2) in &self.new {
-                            self.hash_index_0
-                                .entry((uf.math_.find(x0),))
-                                .or_default()
-                                .push((uf.math_.find(x1), uf.math_.find(x2)));
+                            self.hash_index_0.entry((x0,)).or_default().push((x1, x2));
                         }
                         self.hash_index_0.retain(|&(x0,), v| {
                             if uf.math_.is_root(x0) {
@@ -2579,10 +2556,7 @@ fn codegen_constant_propagation() {
                             }
                         });
                         for &(x0, x1, x2) in &self.new {
-                            self.hash_index_1
-                                .entry((uf.math_.find(x1),))
-                                .or_default()
-                                .push((uf.math_.find(x0), uf.math_.find(x2)));
+                            self.hash_index_1.entry((x1,)).or_default().push((x0, x2));
                         }
                         self.hash_index_1.retain(|&(x1,), v| {
                             if uf.math_.is_root(x1) {
@@ -2596,7 +2570,7 @@ fn codegen_constant_propagation() {
                         });
                         for &(x0, x1, x2) in &self.new {
                             self.hash_index_0_1_2
-                                .entry((uf.math_.find(x0), uf.math_.find(x1), uf.math_.find(x2)))
+                                .entry((x0, x1, x2))
                                 .or_default()
                                 .push(());
                         }
@@ -2748,19 +2722,14 @@ fn codegen_constant_propagation() {
                         self.new.extend(
                             self.hash_index_0_1
                                 .iter()
-                                .map(|(&(x0, x1), &(x2,))| {
-                                    (uf.math_.find(x0), uf.math_.find(x1), uf.math_.find(x2))
-                                })
+                                .map(|(&(x0, x1), &(x2,))| (x0, x1, x2))
                                 .filter(|&(x0, x1, x2)| !self.hash_index_0_1_2.contains_key(&(x0, x1, x2))),
                         );
                         insertions.clear();
                         RadixSortable::wrap(&mut self.new).voracious_sort();
                         self.new.dedup();
                         for &(x0, x1, x2) in &self.new {
-                            self.hash_index_0
-                                .entry((uf.math_.find(x0),))
-                                .or_default()
-                                .push((uf.math_.find(x1), uf.math_.find(x2)));
+                            self.hash_index_0.entry((x0,)).or_default().push((x1, x2));
                         }
                         self.hash_index_0.retain(|&(x0,), v| {
                             if uf.math_.is_root(x0) {
@@ -2773,10 +2742,7 @@ fn codegen_constant_propagation() {
                             }
                         });
                         for &(x0, x1, x2) in &self.new {
-                            self.hash_index_1
-                                .entry((uf.math_.find(x1),))
-                                .or_default()
-                                .push((uf.math_.find(x0), uf.math_.find(x2)));
+                            self.hash_index_1.entry((x1,)).or_default().push((x0, x2));
                         }
                         self.hash_index_1.retain(|&(x1,), v| {
                             if uf.math_.is_root(x1) {
@@ -2790,7 +2756,7 @@ fn codegen_constant_propagation() {
                         });
                         for &(x0, x1, x2) in &self.new {
                             self.hash_index_0_1_2
-                                .entry((uf.math_.find(x0), uf.math_.find(x1), uf.math_.find(x2)))
+                                .entry((x0, x1, x2))
                                 .or_default()
                                 .push(());
                         }
@@ -2938,17 +2904,14 @@ fn codegen_constant_propagation() {
                         self.new.extend(
                             self.hash_index_0
                                 .iter()
-                                .map(|(&(x0,), &(x1,))| (x0, uf.math_.find(x1)))
+                                .map(|(&(x0,), &(x1,))| (x0, x1))
                                 .filter(|&(x0, x1)| !self.hash_index_0_1.contains_key(&(x0, x1))),
                         );
                         insertions.clear();
                         self.new.sort_unstable();
                         self.new.dedup();
                         for &(x0, x1) in &self.new {
-                            self.hash_index_1
-                                .entry((uf.math_.find(x1),))
-                                .or_default()
-                                .push((x0,));
+                            self.hash_index_1.entry((x1,)).or_default().push((x0,));
                         }
                         self.hash_index_1.retain(|&(x1,), v| {
                             if uf.math_.is_root(x1) {
@@ -2961,10 +2924,7 @@ fn codegen_constant_propagation() {
                             }
                         });
                         for &(x0, x1) in &self.new {
-                            self.hash_index_0_1
-                                .entry((x0, uf.math_.find(x1)))
-                                .or_default()
-                                .push(());
+                            self.hash_index_0_1.entry((x0, x1)).or_default().push(());
                         }
                         self.hash_index_0_1.retain(|&(x0, x1), v| {
                             if uf.math_.is_root(x1) {
@@ -3348,9 +3308,7 @@ fn codegen_commutative() {
                         self.new.extend(
                             self.hash_index_0_1
                                 .iter()
-                                .map(|(&(x0, x1), &(x2,))| {
-                                    (uf.math_.find(x0), uf.math_.find(x1), uf.math_.find(x2))
-                                })
+                                .map(|(&(x0, x1), &(x2,))| (x0, x1, x2))
                                 .filter(|&(x0, x1, x2)| !self.hash_index_0_1_2.contains_key(&(x0, x1, x2))),
                         );
                         insertions.clear();
@@ -3358,7 +3316,7 @@ fn codegen_commutative() {
                         self.new.dedup();
                         for &(x0, x1, x2) in &self.new {
                             self.hash_index_0_1_2
-                                .entry((uf.math_.find(x0), uf.math_.find(x1), uf.math_.find(x2)))
+                                .entry((x0, x1, x2))
                                 .or_default()
                                 .push(());
                         }
@@ -3744,9 +3702,7 @@ fn regression_entry2() {
                         self.new.extend(
                             self.hash_index_0_1
                                 .iter()
-                                .map(|(&(x0, x1), &(x2,))| {
-                                    (uf.math_.find(x0), uf.math_.find(x1), uf.math_.find(x2))
-                                })
+                                .map(|(&(x0, x1), &(x2,))| (x0, x1, x2))
                                 .filter(|&(x0, x1, x2)| !self.hash_index_0_1_2.contains_key(&(x0, x1, x2))),
                         );
                         insertions.clear();
@@ -3754,7 +3710,7 @@ fn regression_entry2() {
                         self.new.dedup();
                         for &(x0, x1, x2) in &self.new {
                             self.hash_index_0_1_2
-                                .entry((uf.math_.find(x0), uf.math_.find(x1), uf.math_.find(x2)))
+                                .entry((x0, x1, x2))
                                 .or_default()
                                 .push(());
                         }
@@ -3889,17 +3845,14 @@ fn regression_entry2() {
                         self.new.extend(
                             self.hash_index_0
                                 .iter()
-                                .map(|(&(x0,), &(x1,))| (x0, uf.math_.find(x1)))
+                                .map(|(&(x0,), &(x1,))| (x0, x1))
                                 .filter(|&(x0, x1)| !self.hash_index_0_1.contains_key(&(x0, x1))),
                         );
                         insertions.clear();
                         self.new.sort_unstable();
                         self.new.dedup();
                         for &(x0, x1) in &self.new {
-                            self.hash_index_0_1
-                                .entry((x0, uf.math_.find(x1)))
-                                .or_default()
-                                .push(());
+                            self.hash_index_0_1.entry((x0, x1)).or_default().push(());
                         }
                         self.hash_index_0_1.retain(|&(x0, x1), v| {
                             if uf.math_.is_root(x1) {
@@ -4292,9 +4245,7 @@ fn regression_entry() {
                         self.new.extend(
                             self.hash_index_0_1
                                 .iter()
-                                .map(|(&(x0, x1), &(x2,))| {
-                                    (uf.math_.find(x0), uf.math_.find(x1), uf.math_.find(x2))
-                                })
+                                .map(|(&(x0, x1), &(x2,))| (x0, x1, x2))
                                 .filter(|&(x0, x1, x2)| !self.hash_index_0_1_2.contains_key(&(x0, x1, x2))),
                         );
                         insertions.clear();
@@ -4302,7 +4253,7 @@ fn regression_entry() {
                         self.new.dedup();
                         for &(x0, x1, x2) in &self.new {
                             self.hash_index_0_1_2
-                                .entry((uf.math_.find(x0), uf.math_.find(x1), uf.math_.find(x2)))
+                                .entry((x0, x1, x2))
                                 .or_default()
                                 .push(());
                         }
@@ -4440,9 +4391,7 @@ fn regression_entry() {
                         self.new.extend(
                             self.hash_index_0_1
                                 .iter()
-                                .map(|(&(x0, x1), &(x2,))| {
-                                    (uf.math_.find(x0), uf.math_.find(x1), uf.math_.find(x2))
-                                })
+                                .map(|(&(x0, x1), &(x2,))| (x0, x1, x2))
                                 .filter(|&(x0, x1, x2)| !self.hash_index_0_1_2.contains_key(&(x0, x1, x2))),
                         );
                         insertions.clear();
@@ -4450,7 +4399,7 @@ fn regression_entry() {
                         self.new.dedup();
                         for &(x0, x1, x2) in &self.new {
                             self.hash_index_0_1_2
-                                .entry((uf.math_.find(x0), uf.math_.find(x1), uf.math_.find(x2)))
+                                .entry((x0, x1, x2))
                                 .or_default()
                                 .push(());
                         }
@@ -4828,9 +4777,7 @@ fn test_bind_variable_multiple_times() {
                         self.new.extend(
                             self.hash_index_0_1
                                 .iter()
-                                .map(|(&(x0, x1), &(x2,))| {
-                                    (uf.foo_.find(x0), uf.foo_.find(x1), uf.foo_.find(x2))
-                                })
+                                .map(|(&(x0, x1), &(x2,))| (x0, x1, x2))
                                 .filter(|&(x0, x1, x2)| !self.hash_index_0_1_2.contains_key(&(x0, x1, x2))),
                         );
                         insertions.clear();
@@ -4838,7 +4785,7 @@ fn test_bind_variable_multiple_times() {
                         self.new.dedup();
                         for &(x0, x1, x2) in &self.new {
                             self.hash_index_0_1_2
-                                .entry((uf.foo_.find(x0), uf.foo_.find(x1), uf.foo_.find(x2)))
+                                .entry((x0, x1, x2))
                                 .or_default()
                                 .push(());
                         }
@@ -5287,19 +5234,14 @@ fn codegen_variable_reuse_bug() {
                         self.new.extend(
                             self.hash_index_0_1
                                 .iter()
-                                .map(|(&(x0, x1), &(x2,))| {
-                                    (uf.math_.find(x0), uf.math_.find(x1), uf.math_.find(x2))
-                                })
+                                .map(|(&(x0, x1), &(x2,))| (x0, x1, x2))
                                 .filter(|&(x0, x1, x2)| !self.hash_index_0_1_2.contains_key(&(x0, x1, x2))),
                         );
                         insertions.clear();
                         RadixSortable::wrap(&mut self.new).voracious_sort();
                         self.new.dedup();
                         for &(x0, x1, x2) in &self.new {
-                            self.hash_index_0_2
-                                .entry((uf.math_.find(x0), uf.math_.find(x2)))
-                                .or_default()
-                                .push((uf.math_.find(x1),));
+                            self.hash_index_0_2.entry((x0, x2)).or_default().push((x1,));
                         }
                         self.hash_index_0_2.retain(|&(x0, x2), v| {
                             if uf.math_.is_root(x0) & uf.math_.is_root(x2) {
@@ -5313,7 +5255,7 @@ fn codegen_variable_reuse_bug() {
                         });
                         for &(x0, x1, x2) in &self.new {
                             self.hash_index_0_1_2
-                                .entry((uf.math_.find(x0), uf.math_.find(x1), uf.math_.find(x2)))
+                                .entry((x0, x1, x2))
                                 .or_default()
                                 .push(());
                         }
@@ -5456,17 +5398,14 @@ fn codegen_variable_reuse_bug() {
                         self.new.extend(
                             self.hash_index_
                                 .iter()
-                                .map(|(&(), &(x0,))| (uf.math_.find(x0),))
+                                .map(|(&(), &(x0,))| (x0,))
                                 .filter(|&(x0,)| !self.hash_index_0.contains_key(&(x0,))),
                         );
                         insertions.clear();
                         RadixSortable::wrap(&mut self.new).voracious_sort();
                         self.new.dedup();
                         for &(x0,) in &self.new {
-                            self.hash_index_0
-                                .entry((uf.math_.find(x0),))
-                                .or_default()
-                                .push(());
+                            self.hash_index_0.entry((x0,)).or_default().push(());
                         }
                         self.hash_index_0.retain(|&(x0,), v| {
                             if uf.math_.is_root(x0) {
@@ -5808,9 +5747,7 @@ fn initial_exprs() {
                         self.new.extend(
                             self.hash_index_0_1
                                 .iter()
-                                .map(|(&(x0, x1), &(x2,))| {
-                                    (uf.math_.find(x0), uf.math_.find(x1), uf.math_.find(x2))
-                                })
+                                .map(|(&(x0, x1), &(x2,))| (x0, x1, x2))
                                 .filter(|&(x0, x1, x2)| !self.hash_index_0_1_2.contains_key(&(x0, x1, x2))),
                         );
                         insertions.clear();
@@ -5818,7 +5755,7 @@ fn initial_exprs() {
                         self.new.dedup();
                         for &(x0, x1, x2) in &self.new {
                             self.hash_index_0_1_2
-                                .entry((uf.math_.find(x0), uf.math_.find(x1), uf.math_.find(x2)))
+                                .entry((x0, x1, x2))
                                 .or_default()
                                 .push(());
                         }
@@ -5956,9 +5893,7 @@ fn initial_exprs() {
                         self.new.extend(
                             self.hash_index_0_1
                                 .iter()
-                                .map(|(&(x0, x1), &(x2,))| {
-                                    (uf.math_.find(x0), uf.math_.find(x1), uf.math_.find(x2))
-                                })
+                                .map(|(&(x0, x1), &(x2,))| (x0, x1, x2))
                                 .filter(|&(x0, x1, x2)| !self.hash_index_0_1_2.contains_key(&(x0, x1, x2))),
                         );
                         insertions.clear();
@@ -5966,7 +5901,7 @@ fn initial_exprs() {
                         self.new.dedup();
                         for &(x0, x1, x2) in &self.new {
                             self.hash_index_0_1_2
-                                .entry((uf.math_.find(x0), uf.math_.find(x1), uf.math_.find(x2)))
+                                .entry((x0, x1, x2))
                                 .or_default()
                                 .push(());
                         }
@@ -6101,17 +6036,14 @@ fn initial_exprs() {
                         self.new.extend(
                             self.hash_index_0
                                 .iter()
-                                .map(|(&(x0,), &(x1,))| (x0, uf.math_.find(x1)))
+                                .map(|(&(x0,), &(x1,))| (x0, x1))
                                 .filter(|&(x0, x1)| !self.hash_index_0_1.contains_key(&(x0, x1))),
                         );
                         insertions.clear();
                         self.new.sort_unstable();
                         self.new.dedup();
                         for &(x0, x1) in &self.new {
-                            self.hash_index_0_1
-                                .entry((x0, uf.math_.find(x1)))
-                                .or_default()
-                                .push(());
+                            self.hash_index_0_1.entry((x0, x1)).or_default().push(());
                         }
                         self.hash_index_0_1.retain(|&(x0, x1), v| {
                             if uf.math_.is_root(x1) {
@@ -6248,17 +6180,14 @@ fn initial_exprs() {
                         self.new.extend(
                             self.hash_index_0
                                 .iter()
-                                .map(|(&(x0,), &(x1,))| (x0, uf.math_.find(x1)))
+                                .map(|(&(x0,), &(x1,))| (x0, x1))
                                 .filter(|&(x0, x1)| !self.hash_index_0_1.contains_key(&(x0, x1))),
                         );
                         insertions.clear();
                         self.new.sort_unstable();
                         self.new.dedup();
                         for &(x0, x1) in &self.new {
-                            self.hash_index_0_1
-                                .entry((x0, uf.math_.find(x1)))
-                                .or_default()
-                                .push(());
+                            self.hash_index_0_1.entry((x0, x1)).or_default().push(());
                         }
                         self.hash_index_0_1.retain(|&(x0, x1), v| {
                             if uf.math_.is_root(x1) {
@@ -7195,19 +7124,14 @@ fn test_primitives_simple() {
                         self.new.extend(
                             self.hash_index_1_0
                                 .iter()
-                                .map(|(&(x1, x0), &(x2,))| {
-                                    (uf.math_.find(x0), uf.math_.find(x1), uf.math_.find(x2))
-                                })
+                                .map(|(&(x1, x0), &(x2,))| (x0, x1, x2))
                                 .filter(|&(x0, x1, x2)| !self.hash_index_1_0_2.contains_key(&(x1, x0, x2))),
                         );
                         insertions.clear();
                         RadixSortable::wrap(&mut self.new).voracious_sort();
                         self.new.dedup();
                         for &(x0, x1, x2) in &self.new {
-                            self.hash_index_1
-                                .entry((uf.math_.find(x1),))
-                                .or_default()
-                                .push((uf.math_.find(x0), uf.math_.find(x2)));
+                            self.hash_index_1.entry((x1,)).or_default().push((x0, x2));
                         }
                         self.hash_index_1.retain(|&(x1,), v| {
                             if uf.math_.is_root(x1) {
@@ -7221,7 +7145,7 @@ fn test_primitives_simple() {
                         });
                         for &(x0, x1, x2) in &self.new {
                             self.hash_index_1_0_2
-                                .entry((uf.math_.find(x1), uf.math_.find(x0), uf.math_.find(x2)))
+                                .entry((x1, x0, x2))
                                 .or_default()
                                 .push(());
                         }
@@ -7365,9 +7289,7 @@ fn test_primitives_simple() {
                         self.new.extend(
                             self.hash_index_0_1
                                 .iter()
-                                .map(|(&(x0, x1), &(x2,))| {
-                                    (uf.math_.find(x0), uf.math_.find(x1), uf.math_.find(x2))
-                                })
+                                .map(|(&(x0, x1), &(x2,))| (x0, x1, x2))
                                 .filter(|&(x0, x1, x2)| !self.hash_index_0_1_2.contains_key(&(x0, x1, x2))),
                         );
                         insertions.clear();
@@ -7375,7 +7297,7 @@ fn test_primitives_simple() {
                         self.new.dedup();
                         for &(x0, x1, x2) in &self.new {
                             self.hash_index_0_1_2
-                                .entry((uf.math_.find(x0), uf.math_.find(x1), uf.math_.find(x2)))
+                                .entry((x0, x1, x2))
                                 .or_default()
                                 .push(());
                         }
@@ -7511,17 +7433,14 @@ fn test_primitives_simple() {
                         self.new.extend(
                             self.hash_index_0
                                 .iter()
-                                .map(|(&(x0,), &(x1,))| (x0, uf.math_.find(x1)))
+                                .map(|(&(x0,), &(x1,))| (x0, x1))
                                 .filter(|&(x0, x1)| !self.hash_index_0_1.contains_key(&(x0, x1))),
                         );
                         insertions.clear();
                         self.new.sort_unstable();
                         self.new.dedup();
                         for &(x0, x1) in &self.new {
-                            self.hash_index_1
-                                .entry((uf.math_.find(x1),))
-                                .or_default()
-                                .push((x0,));
+                            self.hash_index_1.entry((x1,)).or_default().push((x0,));
                         }
                         self.hash_index_1.retain(|&(x1,), v| {
                             if uf.math_.is_root(x1) {
@@ -7534,10 +7453,7 @@ fn test_primitives_simple() {
                             }
                         });
                         for &(x0, x1) in &self.new {
-                            self.hash_index_0_1
-                                .entry((x0, uf.math_.find(x1)))
-                                .or_default()
-                                .push(());
+                            self.hash_index_0_1.entry((x0, x1)).or_default().push(());
                         }
                         self.hash_index_0_1.retain(|&(x0, x1), v| {
                             if uf.math_.is_root(x1) {
@@ -7680,17 +7596,14 @@ fn test_primitives_simple() {
                         self.new.extend(
                             self.hash_index_0
                                 .iter()
-                                .map(|(&(x0,), &(x1,))| (x0, uf.math_.find(x1)))
+                                .map(|(&(x0,), &(x1,))| (x0, x1))
                                 .filter(|&(x0, x1)| !self.hash_index_0_1.contains_key(&(x0, x1))),
                         );
                         insertions.clear();
                         self.new.sort_unstable();
                         self.new.dedup();
                         for &(x0, x1) in &self.new {
-                            self.hash_index_0_1
-                                .entry((x0, uf.math_.find(x1)))
-                                .or_default()
-                                .push(());
+                            self.hash_index_0_1.entry((x0, x1)).or_default().push(());
                         }
                         self.hash_index_0_1.retain(|&(x0, x1), v| {
                             if uf.math_.is_root(x1) {
@@ -8127,17 +8040,14 @@ fn triangle_join() {
                         self.new.extend(
                             insertions
                                 .iter()
-                                .map(|&(x0, x1)| (uf.math_.find(x0), uf.math_.find(x1)))
+                                .map(|&(x0, x1)| (x0, x1))
                                 .filter(|&(x0, x1)| !self.hash_index_1_0.contains_key(&(x1, x0))),
                         );
                         insertions.clear();
                         RadixSortable::wrap(&mut self.new).voracious_sort();
                         self.new.dedup();
                         for &(x0, x1) in &self.new {
-                            self.hash_index_1
-                                .entry((uf.math_.find(x1),))
-                                .or_default()
-                                .push((uf.math_.find(x0),));
+                            self.hash_index_1.entry((x1,)).or_default().push((x0,));
                         }
                         self.hash_index_1.retain(|&(x1,), v| {
                             if uf.math_.is_root(x1) {
@@ -8150,10 +8060,7 @@ fn triangle_join() {
                             }
                         });
                         for &(x0, x1) in &self.new {
-                            self.hash_index_1_0
-                                .entry((uf.math_.find(x1), uf.math_.find(x0)))
-                                .or_default()
-                                .push(());
+                            self.hash_index_1_0.entry((x1, x0)).or_default().push(());
                         }
                         self.hash_index_1_0.retain(|&(x1, x0), v| {
                             if uf.math_.is_root(x1) & uf.math_.is_root(x0) {
@@ -8166,10 +8073,7 @@ fn triangle_join() {
                             }
                         });
                         for &(x0, x1) in &self.new {
-                            self.hash_index_0
-                                .entry((uf.math_.find(x0),))
-                                .or_default()
-                                .push((uf.math_.find(x1),));
+                            self.hash_index_0.entry((x0,)).or_default().push((x1,));
                         }
                         self.hash_index_0.retain(|&(x0,), v| {
                             if uf.math_.is_root(x0) {
@@ -8277,17 +8181,14 @@ fn triangle_join() {
                         self.new.extend(
                             insertions
                                 .iter()
-                                .map(|&(x0, x1)| (uf.math_.find(x0), uf.math_.find(x1)))
+                                .map(|&(x0, x1)| (x0, x1))
                                 .filter(|&(x0, x1)| !self.hash_index_0_1.contains_key(&(x0, x1))),
                         );
                         insertions.clear();
                         RadixSortable::wrap(&mut self.new).voracious_sort();
                         self.new.dedup();
                         for &(x0, x1) in &self.new {
-                            self.hash_index_0
-                                .entry((uf.math_.find(x0),))
-                                .or_default()
-                                .push((uf.math_.find(x1),));
+                            self.hash_index_0.entry((x0,)).or_default().push((x1,));
                         }
                         self.hash_index_0.retain(|&(x0,), v| {
                             if uf.math_.is_root(x0) {
@@ -8300,10 +8201,7 @@ fn triangle_join() {
                             }
                         });
                         for &(x0, x1) in &self.new {
-                            self.hash_index_0_1
-                                .entry((uf.math_.find(x0), uf.math_.find(x1)))
-                                .or_default()
-                                .push(());
+                            self.hash_index_0_1.entry((x0, x1)).or_default().push(());
                         }
                         self.hash_index_0_1.retain(|&(x0, x1), v| {
                             if uf.math_.is_root(x0) & uf.math_.is_root(x1) {
@@ -8316,10 +8214,7 @@ fn triangle_join() {
                             }
                         });
                         for &(x0, x1) in &self.new {
-                            self.hash_index_1
-                                .entry((uf.math_.find(x1),))
-                                .or_default()
-                                .push((uf.math_.find(x0),));
+                            self.hash_index_1.entry((x1,)).or_default().push((x0,));
                         }
                         self.hash_index_1.retain(|&(x1,), v| {
                             if uf.math_.is_root(x1) {
@@ -8427,17 +8322,14 @@ fn triangle_join() {
                         self.new.extend(
                             insertions
                                 .iter()
-                                .map(|&(x0, x1)| (uf.math_.find(x0), uf.math_.find(x1)))
+                                .map(|&(x0, x1)| (x0, x1))
                                 .filter(|&(x0, x1)| !self.hash_index_1_0.contains_key(&(x1, x0))),
                         );
                         insertions.clear();
                         RadixSortable::wrap(&mut self.new).voracious_sort();
                         self.new.dedup();
                         for &(x0, x1) in &self.new {
-                            self.hash_index_1
-                                .entry((uf.math_.find(x1),))
-                                .or_default()
-                                .push((uf.math_.find(x0),));
+                            self.hash_index_1.entry((x1,)).or_default().push((x0,));
                         }
                         self.hash_index_1.retain(|&(x1,), v| {
                             if uf.math_.is_root(x1) {
@@ -8450,10 +8342,7 @@ fn triangle_join() {
                             }
                         });
                         for &(x0, x1) in &self.new {
-                            self.hash_index_0
-                                .entry((uf.math_.find(x0),))
-                                .or_default()
-                                .push((uf.math_.find(x1),));
+                            self.hash_index_0.entry((x0,)).or_default().push((x1,));
                         }
                         self.hash_index_0.retain(|&(x0,), v| {
                             if uf.math_.is_root(x0) {
@@ -8466,10 +8355,7 @@ fn triangle_join() {
                             }
                         });
                         for &(x0, x1) in &self.new {
-                            self.hash_index_1_0
-                                .entry((uf.math_.find(x1), uf.math_.find(x0)))
-                                .or_default()
-                                .push(());
+                            self.hash_index_1_0.entry((x1, x0)).or_default().push(());
                         }
                         self.hash_index_1_0.retain(|&(x1, x0), v| {
                             if uf.math_.is_root(x1) & uf.math_.is_root(x0) {
@@ -8576,7 +8462,7 @@ fn triangle_join() {
                         self.new.extend(
                             insertions
                                 .iter()
-                                .map(|&(x0, x1, x2)| (uf.math_.find(x0), uf.math_.find(x1), uf.math_.find(x2)))
+                                .map(|&(x0, x1, x2)| (x0, x1, x2))
                                 .filter(|&(x0, x1, x2)| !self.hash_index_0_1_2.contains_key(&(x0, x1, x2))),
                         );
                         insertions.clear();
@@ -8584,7 +8470,7 @@ fn triangle_join() {
                         self.new.dedup();
                         for &(x0, x1, x2) in &self.new {
                             self.hash_index_0_1_2
-                                .entry((uf.math_.find(x0), uf.math_.find(x1), uf.math_.find(x2)))
+                                .entry((x0, x1, x2))
                                 .or_default()
                                 .push(());
                         }
@@ -8974,19 +8860,14 @@ fn edgecase0() {
                         self.new.extend(
                             self.hash_index_0_1
                                 .iter()
-                                .map(|(&(x0, x1), &(x2,))| {
-                                    (uf.math_.find(x0), uf.math_.find(x1), uf.math_.find(x2))
-                                })
+                                .map(|(&(x0, x1), &(x2,))| (x0, x1, x2))
                                 .filter(|&(x0, x1, x2)| !self.hash_index_0_1_2.contains_key(&(x0, x1, x2))),
                         );
                         insertions.clear();
                         RadixSortable::wrap(&mut self.new).voracious_sort();
                         self.new.dedup();
                         for &(x0, x1, x2) in &self.new {
-                            self.hash_index_0
-                                .entry((uf.math_.find(x0),))
-                                .or_default()
-                                .push((uf.math_.find(x1), uf.math_.find(x2)));
+                            self.hash_index_0.entry((x0,)).or_default().push((x1, x2));
                         }
                         self.hash_index_0.retain(|&(x0,), v| {
                             if uf.math_.is_root(x0) {
@@ -8999,10 +8880,7 @@ fn edgecase0() {
                             }
                         });
                         for &(x0, x1, x2) in &self.new {
-                            self.hash_index_2_0
-                                .entry((uf.math_.find(x2), uf.math_.find(x0)))
-                                .or_default()
-                                .push((uf.math_.find(x1),));
+                            self.hash_index_2_0.entry((x2, x0)).or_default().push((x1,));
                         }
                         self.hash_index_2_0.retain(|&(x2, x0), v| {
                             if uf.math_.is_root(x2) & uf.math_.is_root(x0) {
@@ -9015,10 +8893,7 @@ fn edgecase0() {
                             }
                         });
                         for &(x0, x1, x2) in &self.new {
-                            self.hash_index_2
-                                .entry((uf.math_.find(x2),))
-                                .or_default()
-                                .push((uf.math_.find(x0), uf.math_.find(x1)));
+                            self.hash_index_2.entry((x2,)).or_default().push((x0, x1));
                         }
                         self.hash_index_2.retain(|&(x2,), v| {
                             if uf.math_.is_root(x2) {
@@ -9032,7 +8907,7 @@ fn edgecase0() {
                         });
                         for &(x0, x1, x2) in &self.new {
                             self.hash_index_0_1_2
-                                .entry((uf.math_.find(x0), uf.math_.find(x1), uf.math_.find(x2)))
+                                .entry((x0, x1, x2))
                                 .or_default()
                                 .push(());
                         }
@@ -9194,19 +9069,14 @@ fn edgecase0() {
                         self.new.extend(
                             self.hash_index_0_1
                                 .iter()
-                                .map(|(&(x0, x1), &(x2,))| {
-                                    (uf.math_.find(x0), uf.math_.find(x1), uf.math_.find(x2))
-                                })
+                                .map(|(&(x0, x1), &(x2,))| (x0, x1, x2))
                                 .filter(|&(x0, x1, x2)| !self.hash_index_0_1_2.contains_key(&(x0, x1, x2))),
                         );
                         insertions.clear();
                         RadixSortable::wrap(&mut self.new).voracious_sort();
                         self.new.dedup();
                         for &(x0, x1, x2) in &self.new {
-                            self.hash_index_0
-                                .entry((uf.math_.find(x0),))
-                                .or_default()
-                                .push((uf.math_.find(x1), uf.math_.find(x2)));
+                            self.hash_index_0.entry((x0,)).or_default().push((x1, x2));
                         }
                         self.hash_index_0.retain(|&(x0,), v| {
                             if uf.math_.is_root(x0) {
@@ -9219,10 +9089,7 @@ fn edgecase0() {
                             }
                         });
                         for &(x0, x1, x2) in &self.new {
-                            self.hash_index_1
-                                .entry((uf.math_.find(x1),))
-                                .or_default()
-                                .push((uf.math_.find(x0), uf.math_.find(x2)));
+                            self.hash_index_1.entry((x1,)).or_default().push((x0, x2));
                         }
                         self.hash_index_1.retain(|&(x1,), v| {
                             if uf.math_.is_root(x1) {
@@ -9236,7 +9103,7 @@ fn edgecase0() {
                         });
                         for &(x0, x1, x2) in &self.new {
                             self.hash_index_0_1_2
-                                .entry((uf.math_.find(x0), uf.math_.find(x1), uf.math_.find(x2)))
+                                .entry((x0, x1, x2))
                                 .or_default()
                                 .push(());
                         }
@@ -9618,19 +9485,14 @@ fn test_into_codegen() {
                         self.new.extend(
                             self.hash_index_0_1
                                 .iter()
-                                .map(|(&(x0, x1), &(x2,))| {
-                                    (uf.math_.find(x0), uf.math_.find(x1), uf.math_.find(x2))
-                                })
+                                .map(|(&(x0, x1), &(x2,))| (x0, x1, x2))
                                 .filter(|&(x0, x1, x2)| !self.hash_index_0_1_2.contains_key(&(x0, x1, x2))),
                         );
                         insertions.clear();
                         RadixSortable::wrap(&mut self.new).voracious_sort();
                         self.new.dedup();
                         for &(x0, x1, x2) in &self.new {
-                            self.hash_index_0
-                                .entry((uf.math_.find(x0),))
-                                .or_default()
-                                .push((uf.math_.find(x1), uf.math_.find(x2)));
+                            self.hash_index_0.entry((x0,)).or_default().push((x1, x2));
                         }
                         self.hash_index_0.retain(|&(x0,), v| {
                             if uf.math_.is_root(x0) {
@@ -9644,7 +9506,7 @@ fn test_into_codegen() {
                         });
                         for &(x0, x1, x2) in &self.new {
                             self.hash_index_0_1_2
-                                .entry((uf.math_.find(x0), uf.math_.find(x1), uf.math_.find(x2)))
+                                .entry((x0, x1, x2))
                                 .or_default()
                                 .push(());
                         }
@@ -9789,19 +9651,14 @@ fn test_into_codegen() {
                         self.new.extend(
                             self.hash_index_0_1
                                 .iter()
-                                .map(|(&(x0, x1), &(x2,))| {
-                                    (uf.math_.find(x0), uf.math_.find(x1), uf.math_.find(x2))
-                                })
+                                .map(|(&(x0, x1), &(x2,))| (x0, x1, x2))
                                 .filter(|&(x0, x1, x2)| !self.hash_index_0_1_2.contains_key(&(x0, x1, x2))),
                         );
                         insertions.clear();
                         RadixSortable::wrap(&mut self.new).voracious_sort();
                         self.new.dedup();
                         for &(x0, x1, x2) in &self.new {
-                            self.hash_index_2
-                                .entry((uf.math_.find(x2),))
-                                .or_default()
-                                .push((uf.math_.find(x0), uf.math_.find(x1)));
+                            self.hash_index_2.entry((x2,)).or_default().push((x0, x1));
                         }
                         self.hash_index_2.retain(|&(x2,), v| {
                             if uf.math_.is_root(x2) {
@@ -9815,7 +9672,7 @@ fn test_into_codegen() {
                         });
                         for &(x0, x1, x2) in &self.new {
                             self.hash_index_0_1_2
-                                .entry((uf.math_.find(x0), uf.math_.find(x1), uf.math_.find(x2)))
+                                .entry((x0, x1, x2))
                                 .or_default()
                                 .push(());
                         }
@@ -12595,17 +12452,14 @@ fn lir_math() {
                         self.new.extend(
                             self.hash_index_0
                                 .iter()
-                                .map(|(&(x0,), &(x1,))| (uf.fuel_unit_.find(x0), uf.fuel_unit_.find(x1)))
+                                .map(|(&(x0,), &(x1,))| (x0, x1))
                                 .filter(|&(x0, x1)| !self.hash_index_0_1.contains_key(&(x0, x1))),
                         );
                         insertions.clear();
                         RadixSortable::wrap(&mut self.new).voracious_sort();
                         self.new.dedup();
                         for &(x0, x1) in &self.new {
-                            self.hash_index_1
-                                .entry((uf.fuel_unit_.find(x1),))
-                                .or_default()
-                                .push((uf.fuel_unit_.find(x0),));
+                            self.hash_index_1.entry((x1,)).or_default().push((x0,));
                         }
                         self.hash_index_1.retain(|&(x1,), v| {
                             if uf.fuel_unit_.is_root(x1) {
@@ -12618,10 +12472,7 @@ fn lir_math() {
                             }
                         });
                         for &(x0, x1) in &self.new {
-                            self.hash_index_0_1
-                                .entry((uf.fuel_unit_.find(x0), uf.fuel_unit_.find(x1)))
-                                .or_default()
-                                .push(());
+                            self.hash_index_0_1.entry((x0, x1)).or_default().push(());
                         }
                         self.hash_index_0_1.retain(|&(x0, x1), v| {
                             if uf.fuel_unit_.is_root(x0) & uf.fuel_unit_.is_root(x1) {
@@ -12757,17 +12608,14 @@ fn lir_math() {
                         self.new.extend(
                             self.hash_index_
                                 .iter()
-                                .map(|(&(), &(x0,))| (uf.fuel_unit_.find(x0),))
+                                .map(|(&(), &(x0,))| (x0,))
                                 .filter(|&(x0,)| !self.hash_index_0.contains_key(&(x0,))),
                         );
                         insertions.clear();
                         RadixSortable::wrap(&mut self.new).voracious_sort();
                         self.new.dedup();
                         for &(x0,) in &self.new {
-                            self.hash_index_0
-                                .entry((uf.fuel_unit_.find(x0),))
-                                .or_default()
-                                .push(());
+                            self.hash_index_0.entry((x0,)).or_default().push(());
                         }
                         self.hash_index_0.retain(|&(x0,), v| {
                             if uf.fuel_unit_.is_root(x0) {
@@ -12893,19 +12741,14 @@ fn lir_math() {
                         self.new.extend(
                             self.hash_index_1_0
                                 .iter()
-                                .map(|(&(x1, x0), &(x2,))| {
-                                    (uf.math_.find(x0), uf.math_.find(x1), uf.math_.find(x2))
-                                })
+                                .map(|(&(x1, x0), &(x2,))| (x0, x1, x2))
                                 .filter(|&(x0, x1, x2)| !self.hash_index_1_0_2.contains_key(&(x1, x0, x2))),
                         );
                         insertions.clear();
                         RadixSortable::wrap(&mut self.new).voracious_sort();
                         self.new.dedup();
                         for &(x0, x1, x2) in &self.new {
-                            self.hash_index_1
-                                .entry((uf.math_.find(x1),))
-                                .or_default()
-                                .push((uf.math_.find(x0), uf.math_.find(x2)));
+                            self.hash_index_1.entry((x1,)).or_default().push((x0, x2));
                         }
                         self.hash_index_1.retain(|&(x1,), v| {
                             if uf.math_.is_root(x1) {
@@ -12919,7 +12762,7 @@ fn lir_math() {
                         });
                         for &(x0, x1, x2) in &self.new {
                             self.hash_index_1_0_2
-                                .entry((uf.math_.find(x1), uf.math_.find(x0), uf.math_.find(x2)))
+                                .entry((x1, x0, x2))
                                 .or_default()
                                 .push(());
                         }
@@ -13076,14 +12919,7 @@ fn lir_math() {
                         self.new.extend(
                             self.hash_index_0_1_2
                                 .iter()
-                                .map(|(&(x0, x1, x2), &(x3,))| {
-                                    (
-                                        uf.fuel_unit_.find(x0),
-                                        uf.math_.find(x1),
-                                        uf.math_.find(x2),
-                                        uf.math_.find(x3),
-                                    )
-                                })
+                                .map(|(&(x0, x1, x2), &(x3,))| (x0, x1, x2, x3))
                                 .filter(|&(x0, x1, x2, x3)| {
                                     !self.hash_index_0_1_2_3.contains_key(&(x0, x1, x2, x3))
                                 }),
@@ -13093,9 +12929,9 @@ fn lir_math() {
                         self.new.dedup();
                         for &(x0, x1, x2, x3) in &self.new {
                             self.hash_index_0
-                                .entry((uf.fuel_unit_.find(x0),))
+                                .entry((x0,))
                                 .or_default()
-                                .push((uf.math_.find(x1), uf.math_.find(x2), uf.math_.find(x3)));
+                                .push((x1, x2, x3));
                         }
                         self.hash_index_0.retain(|&(x0,), v| {
                             if uf.fuel_unit_.is_root(x0) {
@@ -13111,9 +12947,9 @@ fn lir_math() {
                         });
                         for &(x0, x1, x2, x3) in &self.new {
                             self.hash_index_1
-                                .entry((uf.math_.find(x1),))
+                                .entry((x1,))
                                 .or_default()
-                                .push((uf.math_.find(x2), uf.fuel_unit_.find(x0), uf.math_.find(x3)));
+                                .push((x2, x0, x3));
                         }
                         self.hash_index_1.retain(|&(x1,), v| {
                             if uf.math_.is_root(x1) {
@@ -13129,9 +12965,9 @@ fn lir_math() {
                         });
                         for &(x0, x1, x2, x3) in &self.new {
                             self.hash_index_1_2
-                                .entry((uf.math_.find(x1), uf.math_.find(x2)))
+                                .entry((x1, x2))
                                 .or_default()
-                                .push((uf.fuel_unit_.find(x0), uf.math_.find(x3)));
+                                .push((x0, x3));
                         }
                         self.hash_index_1_2.retain(|&(x1, x2), v| {
                             if uf.math_.is_root(x1) & uf.math_.is_root(x2) {
@@ -13145,12 +12981,7 @@ fn lir_math() {
                         });
                         for &(x0, x1, x2, x3) in &self.new {
                             self.hash_index_0_1_2_3
-                                .entry((
-                                    uf.fuel_unit_.find(x0),
-                                    uf.math_.find(x1),
-                                    uf.math_.find(x2),
-                                    uf.math_.find(x3),
-                                ))
+                                .entry((x0, x1, x2, x3))
                                 .or_default()
                                 .push(());
                         }
@@ -13344,19 +13175,14 @@ fn lir_math() {
                         self.new.extend(
                             self.hash_index_1_0
                                 .iter()
-                                .map(|(&(x1, x0), &(x2,))| {
-                                    (uf.math_.find(x0), uf.math_.find(x1), uf.math_.find(x2))
-                                })
+                                .map(|(&(x1, x0), &(x2,))| (x0, x1, x2))
                                 .filter(|&(x0, x1, x2)| !self.hash_index_1_0_2.contains_key(&(x1, x0, x2))),
                         );
                         insertions.clear();
                         RadixSortable::wrap(&mut self.new).voracious_sort();
                         self.new.dedup();
                         for &(x0, x1, x2) in &self.new {
-                            self.hash_index_2
-                                .entry((uf.math_.find(x2),))
-                                .or_default()
-                                .push((uf.math_.find(x0), uf.math_.find(x1)));
+                            self.hash_index_2.entry((x2,)).or_default().push((x0, x1));
                         }
                         self.hash_index_2.retain(|&(x2,), v| {
                             if uf.math_.is_root(x2) {
@@ -13369,10 +13195,7 @@ fn lir_math() {
                             }
                         });
                         for &(x0, x1, x2) in &self.new {
-                            self.hash_index_1
-                                .entry((uf.math_.find(x1),))
-                                .or_default()
-                                .push((uf.math_.find(x0), uf.math_.find(x2)));
+                            self.hash_index_1.entry((x1,)).or_default().push((x0, x2));
                         }
                         self.hash_index_1.retain(|&(x1,), v| {
                             if uf.math_.is_root(x1) {
@@ -13385,10 +13208,7 @@ fn lir_math() {
                             }
                         });
                         for &(x0, x1, x2) in &self.new {
-                            self.hash_index_0
-                                .entry((uf.math_.find(x0),))
-                                .or_default()
-                                .push((uf.math_.find(x1), uf.math_.find(x2)));
+                            self.hash_index_0.entry((x0,)).or_default().push((x1, x2));
                         }
                         self.hash_index_0.retain(|&(x0,), v| {
                             if uf.math_.is_root(x0) {
@@ -13402,7 +13222,7 @@ fn lir_math() {
                         });
                         for &(x0, x1, x2) in &self.new {
                             self.hash_index_1_0_2
-                                .entry((uf.math_.find(x1), uf.math_.find(x0), uf.math_.find(x2)))
+                                .entry((x1, x0, x2))
                                 .or_default()
                                 .push(());
                         }
@@ -13559,19 +13379,14 @@ fn lir_math() {
                         self.new.extend(
                             self.hash_index_0_1
                                 .iter()
-                                .map(|(&(x0, x1), &(x2,))| {
-                                    (uf.math_.find(x0), uf.math_.find(x1), uf.math_.find(x2))
-                                })
+                                .map(|(&(x0, x1), &(x2,))| (x0, x1, x2))
                                 .filter(|&(x0, x1, x2)| !self.hash_index_0_1_2.contains_key(&(x0, x1, x2))),
                         );
                         insertions.clear();
                         RadixSortable::wrap(&mut self.new).voracious_sort();
                         self.new.dedup();
                         for &(x0, x1, x2) in &self.new {
-                            self.hash_index_2
-                                .entry((uf.math_.find(x2),))
-                                .or_default()
-                                .push((uf.math_.find(x0), uf.math_.find(x1)));
+                            self.hash_index_2.entry((x2,)).or_default().push((x0, x1));
                         }
                         self.hash_index_2.retain(|&(x2,), v| {
                             if uf.math_.is_root(x2) {
@@ -13585,7 +13400,7 @@ fn lir_math() {
                         });
                         for &(x0, x1, x2) in &self.new {
                             self.hash_index_0_1_2
-                                .entry((uf.math_.find(x0), uf.math_.find(x1), uf.math_.find(x2)))
+                                .entry((x0, x1, x2))
                                 .or_default()
                                 .push(());
                         }
@@ -13733,19 +13548,14 @@ fn lir_math() {
                         self.new.extend(
                             self.hash_index_1_0
                                 .iter()
-                                .map(|(&(x1, x0), &(x2,))| {
-                                    (uf.math_.find(x0), uf.math_.find(x1), uf.math_.find(x2))
-                                })
+                                .map(|(&(x1, x0), &(x2,))| (x0, x1, x2))
                                 .filter(|&(x0, x1, x2)| !self.hash_index_1_0_2.contains_key(&(x1, x0, x2))),
                         );
                         insertions.clear();
                         RadixSortable::wrap(&mut self.new).voracious_sort();
                         self.new.dedup();
                         for &(x0, x1, x2) in &self.new {
-                            self.hash_index_2
-                                .entry((uf.math_.find(x2),))
-                                .or_default()
-                                .push((uf.math_.find(x0), uf.math_.find(x1)));
+                            self.hash_index_2.entry((x2,)).or_default().push((x0, x1));
                         }
                         self.hash_index_2.retain(|&(x2,), v| {
                             if uf.math_.is_root(x2) {
@@ -13758,10 +13568,7 @@ fn lir_math() {
                             }
                         });
                         for &(x0, x1, x2) in &self.new {
-                            self.hash_index_1
-                                .entry((uf.math_.find(x1),))
-                                .or_default()
-                                .push((uf.math_.find(x0), uf.math_.find(x2)));
+                            self.hash_index_1.entry((x1,)).or_default().push((x0, x2));
                         }
                         self.hash_index_1.retain(|&(x1,), v| {
                             if uf.math_.is_root(x1) {
@@ -13774,10 +13581,7 @@ fn lir_math() {
                             }
                         });
                         for &(x0, x1, x2) in &self.new {
-                            self.hash_index_2_0
-                                .entry((uf.math_.find(x2), uf.math_.find(x0)))
-                                .or_default()
-                                .push((uf.math_.find(x1),));
+                            self.hash_index_2_0.entry((x2, x0)).or_default().push((x1,));
                         }
                         self.hash_index_2_0.retain(|&(x2, x0), v| {
                             if uf.math_.is_root(x2) & uf.math_.is_root(x0) {
@@ -13790,10 +13594,7 @@ fn lir_math() {
                             }
                         });
                         for &(x0, x1, x2) in &self.new {
-                            self.hash_index_0
-                                .entry((uf.math_.find(x0),))
-                                .or_default()
-                                .push((uf.math_.find(x1), uf.math_.find(x2)));
+                            self.hash_index_0.entry((x0,)).or_default().push((x1, x2));
                         }
                         self.hash_index_0.retain(|&(x0,), v| {
                             if uf.math_.is_root(x0) {
@@ -13807,7 +13608,7 @@ fn lir_math() {
                         });
                         for &(x0, x1, x2) in &self.new {
                             self.hash_index_1_0_2
-                                .entry((uf.math_.find(x1), uf.math_.find(x0), uf.math_.find(x2)))
+                                .entry((x1, x0, x2))
                                 .or_default()
                                 .push(());
                         }
@@ -13973,9 +13774,7 @@ fn lir_math() {
                         self.new.extend(
                             self.hash_index_0_1
                                 .iter()
-                                .map(|(&(x0, x1), &(x2,))| {
-                                    (uf.math_.find(x0), uf.math_.find(x1), uf.math_.find(x2))
-                                })
+                                .map(|(&(x0, x1), &(x2,))| (x0, x1, x2))
                                 .filter(|&(x0, x1, x2)| !self.hash_index_0_1_2.contains_key(&(x0, x1, x2))),
                         );
                         insertions.clear();
@@ -13983,7 +13782,7 @@ fn lir_math() {
                         self.new.dedup();
                         for &(x0, x1, x2) in &self.new {
                             self.hash_index_0_1_2
-                                .entry((uf.math_.find(x0), uf.math_.find(x1), uf.math_.find(x2)))
+                                .entry((x0, x1, x2))
                                 .or_default()
                                 .push(());
                         }
@@ -14125,19 +13924,14 @@ fn lir_math() {
                         self.new.extend(
                             self.hash_index_0_1
                                 .iter()
-                                .map(|(&(x0, x1), &(x2,))| {
-                                    (uf.math_.find(x0), uf.math_.find(x1), uf.math_.find(x2))
-                                })
+                                .map(|(&(x0, x1), &(x2,))| (x0, x1, x2))
                                 .filter(|&(x0, x1, x2)| !self.hash_index_0_1_2.contains_key(&(x0, x1, x2))),
                         );
                         insertions.clear();
                         RadixSortable::wrap(&mut self.new).voracious_sort();
                         self.new.dedup();
                         for &(x0, x1, x2) in &self.new {
-                            self.hash_index_2
-                                .entry((uf.math_.find(x2),))
-                                .or_default()
-                                .push((uf.math_.find(x0), uf.math_.find(x1)));
+                            self.hash_index_2.entry((x2,)).or_default().push((x0, x1));
                         }
                         self.hash_index_2.retain(|&(x2,), v| {
                             if uf.math_.is_root(x2) {
@@ -14150,10 +13944,7 @@ fn lir_math() {
                             }
                         });
                         for &(x0, x1, x2) in &self.new {
-                            self.hash_index_2_0
-                                .entry((uf.math_.find(x2), uf.math_.find(x0)))
-                                .or_default()
-                                .push((uf.math_.find(x1),));
+                            self.hash_index_2_0.entry((x2, x0)).or_default().push((x1,));
                         }
                         self.hash_index_2_0.retain(|&(x2, x0), v| {
                             if uf.math_.is_root(x2) & uf.math_.is_root(x0) {
@@ -14166,10 +13957,7 @@ fn lir_math() {
                             }
                         });
                         for &(x0, x1, x2) in &self.new {
-                            self.hash_index_0
-                                .entry((uf.math_.find(x0),))
-                                .or_default()
-                                .push((uf.math_.find(x1), uf.math_.find(x2)));
+                            self.hash_index_0.entry((x0,)).or_default().push((x1, x2));
                         }
                         self.hash_index_0.retain(|&(x0,), v| {
                             if uf.math_.is_root(x0) {
@@ -14182,10 +13970,7 @@ fn lir_math() {
                             }
                         });
                         for &(x0, x1, x2) in &self.new {
-                            self.hash_index_1
-                                .entry((uf.math_.find(x1),))
-                                .or_default()
-                                .push((uf.math_.find(x0), uf.math_.find(x2)));
+                            self.hash_index_1.entry((x1,)).or_default().push((x0, x2));
                         }
                         self.hash_index_1.retain(|&(x1,), v| {
                             if uf.math_.is_root(x1) {
@@ -14199,7 +13984,7 @@ fn lir_math() {
                         });
                         for &(x0, x1, x2) in &self.new {
                             self.hash_index_0_1_2
-                                .entry((uf.math_.find(x0), uf.math_.find(x1), uf.math_.find(x2)))
+                                .entry((x0, x1, x2))
                                 .or_default()
                                 .push(());
                         }
@@ -14361,17 +14146,14 @@ fn lir_math() {
                         self.new.extend(
                             self.hash_index_0
                                 .iter()
-                                .map(|(&(x0,), &(x1,))| (uf.math_.find(x0), uf.math_.find(x1)))
+                                .map(|(&(x0,), &(x1,))| (x0, x1))
                                 .filter(|&(x0, x1)| !self.hash_index_0_1.contains_key(&(x0, x1))),
                         );
                         insertions.clear();
                         RadixSortable::wrap(&mut self.new).voracious_sort();
                         self.new.dedup();
                         for &(x0, x1) in &self.new {
-                            self.hash_index_0_1
-                                .entry((uf.math_.find(x0), uf.math_.find(x1)))
-                                .or_default()
-                                .push(());
+                            self.hash_index_0_1.entry((x0, x1)).or_default().push(());
                         }
                         self.hash_index_0_1.retain(|&(x0, x1), v| {
                             if uf.math_.is_root(x0) & uf.math_.is_root(x1) {
@@ -14496,17 +14278,14 @@ fn lir_math() {
                         self.new.extend(
                             self.hash_index_0
                                 .iter()
-                                .map(|(&(x0,), &(x1,))| (uf.math_.find(x0), uf.math_.find(x1)))
+                                .map(|(&(x0,), &(x1,))| (x0, x1))
                                 .filter(|&(x0, x1)| !self.hash_index_0_1.contains_key(&(x0, x1))),
                         );
                         insertions.clear();
                         RadixSortable::wrap(&mut self.new).voracious_sort();
                         self.new.dedup();
                         for &(x0, x1) in &self.new {
-                            self.hash_index_0_1
-                                .entry((uf.math_.find(x0), uf.math_.find(x1)))
-                                .or_default()
-                                .push(());
+                            self.hash_index_0_1.entry((x0, x1)).or_default().push(());
                         }
                         self.hash_index_0_1.retain(|&(x0, x1), v| {
                             if uf.math_.is_root(x0) & uf.math_.is_root(x1) {
@@ -14631,17 +14410,14 @@ fn lir_math() {
                         self.new.extend(
                             self.hash_index_0
                                 .iter()
-                                .map(|(&(x0,), &(x1,))| (uf.math_.find(x0), uf.math_.find(x1)))
+                                .map(|(&(x0,), &(x1,))| (x0, x1))
                                 .filter(|&(x0, x1)| !self.hash_index_0_1.contains_key(&(x0, x1))),
                         );
                         insertions.clear();
                         RadixSortable::wrap(&mut self.new).voracious_sort();
                         self.new.dedup();
                         for &(x0, x1) in &self.new {
-                            self.hash_index_0_1
-                                .entry((uf.math_.find(x0), uf.math_.find(x1)))
-                                .or_default()
-                                .push(());
+                            self.hash_index_0_1.entry((x0, x1)).or_default().push(());
                         }
                         self.hash_index_0_1.retain(|&(x0, x1), v| {
                             if uf.math_.is_root(x0) & uf.math_.is_root(x1) {
@@ -14766,17 +14542,14 @@ fn lir_math() {
                         self.new.extend(
                             self.hash_index_0
                                 .iter()
-                                .map(|(&(x0,), &(x1,))| (uf.math_.find(x0), uf.math_.find(x1)))
+                                .map(|(&(x0,), &(x1,))| (x0, x1))
                                 .filter(|&(x0, x1)| !self.hash_index_0_1.contains_key(&(x0, x1))),
                         );
                         insertions.clear();
                         RadixSortable::wrap(&mut self.new).voracious_sort();
                         self.new.dedup();
                         for &(x0, x1) in &self.new {
-                            self.hash_index_0_1
-                                .entry((uf.math_.find(x0), uf.math_.find(x1)))
-                                .or_default()
-                                .push(());
+                            self.hash_index_0_1.entry((x0, x1)).or_default().push(());
                         }
                         self.hash_index_0_1.retain(|&(x0, x1), v| {
                             if uf.math_.is_root(x0) & uf.math_.is_root(x1) {
@@ -14903,17 +14676,14 @@ fn lir_math() {
                         self.new.extend(
                             self.hash_index_0
                                 .iter()
-                                .map(|(&(x0,), &(x1,))| (x0, uf.math_.find(x1)))
+                                .map(|(&(x0,), &(x1,))| (x0, x1))
                                 .filter(|&(x0, x1)| !self.hash_index_0_1.contains_key(&(x0, x1))),
                         );
                         insertions.clear();
                         self.new.sort_unstable();
                         self.new.dedup();
                         for &(x0, x1) in &self.new {
-                            self.hash_index_1
-                                .entry((uf.math_.find(x1),))
-                                .or_default()
-                                .push((x0,));
+                            self.hash_index_1.entry((x1,)).or_default().push((x0,));
                         }
                         self.hash_index_1.retain(|&(x1,), v| {
                             if uf.math_.is_root(x1) {
@@ -14926,10 +14696,7 @@ fn lir_math() {
                             }
                         });
                         for &(x0, x1) in &self.new {
-                            self.hash_index_0_1
-                                .entry((x0, uf.math_.find(x1)))
-                                .or_default()
-                                .push(());
+                            self.hash_index_0_1.entry((x0, x1)).or_default().push(());
                         }
                         self.hash_index_0_1.retain(|&(x0, x1), v| {
                             if uf.math_.is_root(x1) {
@@ -15072,17 +14839,14 @@ fn lir_math() {
                         self.new.extend(
                             self.hash_index_0
                                 .iter()
-                                .map(|(&(x0,), &(x1,))| (x0, uf.math_.find(x1)))
+                                .map(|(&(x0,), &(x1,))| (x0, x1))
                                 .filter(|&(x0, x1)| !self.hash_index_0_1.contains_key(&(x0, x1))),
                         );
                         insertions.clear();
                         self.new.sort_unstable();
                         self.new.dedup();
                         for &(x0, x1) in &self.new {
-                            self.hash_index_0_1
-                                .entry((x0, uf.math_.find(x1)))
-                                .or_default()
-                                .push(());
+                            self.hash_index_0_1.entry((x0, x1)).or_default().push(());
                         }
                         self.hash_index_0_1.retain(|&(x0, x1), v| {
                             if uf.math_.is_root(x1) {

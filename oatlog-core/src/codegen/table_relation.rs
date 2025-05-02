@@ -656,11 +656,11 @@ fn update(
         indexes_fd_vals.first(),
     ) {
         quote! {
-            self.#index.iter().map(|(&(#(#keys,)*), &(#(#vals,)*))| (#(#cols_find,)*))
+            self.#index.iter().map(|(&(#(#keys,)*), &(#(#vals,)*))| (#(#cols,)*))
         }
     } else {
         quote! {
-            insertions.iter().map(|&(#(#cols,)*)| (#(#cols_find,)*))
+            insertions.iter().map(|&(#(#cols,)*)| (#(#cols,)*))
         }
     };
 
@@ -718,9 +718,9 @@ fn update(
                 #(  // Indexes like `HashMap<(T, T, T), SmallVec<[(); 1]>>` and `HashMap<(T, T), SmallVec<[(T,); 1]>>`
                     for &(#(#indexes_nofd_cols,)*) in &self.new {
                         self.#indexes_nofd
-                            .entry(#indexes_nofd_find_keys)
+                            .entry((#(#indexes_nofd_keys,)*))
                             .or_default()
-                            .push(#indexes_nofd_find_vals);
+                            .push((#(#indexes_nofd_vals,)*));
                     }
                     self.#indexes_nofd.retain(|&(#(#indexes_nofd_keys,)*), v| {
                         if #indexes_nofd_key_is_root {
