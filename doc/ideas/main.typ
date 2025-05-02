@@ -2736,6 +2736,9 @@ Need to use fewer indexes.
 - think about avoiding accidentally quadratic behaviour on hashmaps.
 - vectorization
 - scheduling/rulesets/check
+- check if we are doing semi-naive correctly and fix it
+    - check our performance with semi-naive disabled.
+- try to isolate other optimizations from just being AOT vs interpreter.
 
 = async gather??
 
