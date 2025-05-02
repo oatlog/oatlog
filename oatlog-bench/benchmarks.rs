@@ -1,3 +1,11 @@
+/*
+benchmarks! {
+    bench!(math8, r#"(include "oatlog-bench/input/math.egg") (run 8)"#);
+    bench!(math9, r#"(include "oatlog-bench/input/math.egg") (run 9)"#);
+    bench!(math10, samples=60, r#"(include "oatlog-bench/input/math.egg") (run 10)"#);
+    bench!(math11, samples=20, r#"(include "oatlog-bench/input/math.egg") (run 11)"#);
+}
+*/
 
 benchmarks! {
     bench!(fuel1_math, :saturation, r#"(include "oatlog-bench/input/fuel1_math.egg") (run 100)"#);

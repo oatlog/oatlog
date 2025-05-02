@@ -886,66 +886,72 @@ fn regression_tir2() {
                     }
                 }
                 fn update_begin(&mut self, insertions: &[Self::Row], uf: &mut Unification) {
-                    for &(mut x0, mut x1, mut x2) in insertions {
-                        match self
-                            .hash_index_0_1
-                            .entry((uf.math_.find(x0), uf.math_.find(x1)))
-                        {
-                            runtime::HashMapEntry::Occupied(mut entry) => {
-                                let (y2,) = entry.get_mut();
-                                uf.math_.union_mut(&mut x2, y2);
-                            }
-                            runtime::HashMapEntry::Vacant(entry) => {
-                                entry.insert((uf.math_.find(x2),));
+                    log_duration!("update_begin {}: {}", "mul", {
+                        for &(mut x0, mut x1, mut x2) in insertions {
+                            match self
+                                .hash_index_0_1
+                                .entry((uf.math_.find(x0), uf.math_.find(x1)))
+                            {
+                                runtime::HashMapEntry::Occupied(mut entry) => {
+                                    let (y2,) = entry.get_mut();
+                                    uf.math_.union_mut(&mut x2, y2);
+                                }
+                                runtime::HashMapEntry::Vacant(entry) => {
+                                    entry.insert((uf.math_.find(x2),));
+                                }
                             }
                         }
-                    }
+                    });
                 }
                 fn update(&mut self, insertions: &mut Vec<Self::Row>, uf: &mut Unification) -> bool {
                     if self.math_num_uprooted_at_latest_retain == uf.math_.num_uprooted() {
                         return false;
                     }
-                    self.math_num_uprooted_at_latest_retain = uf.math_.num_uprooted();
                     let offset = insertions.len();
-                    self.hash_index_0_1.retain(|&(x0, x1), &mut (x2,)| {
-                        if uf.math_.is_root(x0) & uf.math_.is_root(x1) & uf.math_.is_root(x2) {
-                            true
-                        } else {
-                            insertions.push((x0, x1, x2));
-                            false
-                        }
+                    log_duration!("update {}: {}", "mul", {
+                        self.math_num_uprooted_at_latest_retain = uf.math_.num_uprooted();
+                        self.hash_index_0_1.retain(|&(x0, x1), &mut (x2,)| {
+                            if uf.math_.is_root(x0) & uf.math_.is_root(x1) & uf.math_.is_root(x2) {
+                                true
+                            } else {
+                                insertions.push((x0, x1, x2));
+                                false
+                            }
+                        });
                     });
                     self.update_begin(&insertions[offset..], uf);
                     true
                 }
                 fn update_finalize(&mut self, insertions: &mut Vec<Self::Row>, uf: &mut Unification) {
-                    assert!(self.new.is_empty());
-                    self.new.extend(
-                        self.hash_index_0_1
-                            .iter()
-                            .map(|(&(x0, x1), &(x2,))| {
-                                (uf.math_.find(x0), uf.math_.find(x1), uf.math_.find(x2))
-                            })
-                            .filter(|&(x0, x1, x2)| !self.hash_index_0_1_2.contains_key(&(x0, x1, x2))),
-                    );
-                    insertions.clear();
-                    RadixSortable::wrap(&mut self.new).voracious_sort();
-                    self.new.dedup();
-                    for &(x0, x1, x2) in &self.new {
-                        self.hash_index_0_1_2
-                            .entry((uf.math_.find(x0), uf.math_.find(x1), uf.math_.find(x2)))
-                            .or_default()
-                            .push(());
-                    }
-                    self.hash_index_0_1_2.retain(|&(x0, x1, x2), v| {
-                        if uf.math_.is_root(x0) & uf.math_.is_root(x1) & uf.math_.is_root(x2) {
-                            v.retain(|&mut ()| true);
-                            v.sort_unstable();
-                            v.dedup();
-                            true
-                        } else {
-                            false
+                    log_duration!("update_finalize {}: {}", "mul", {
+                        assert!(self.new.is_empty());
+                        self.new.extend(
+                            self.hash_index_0_1
+                                .iter()
+                                .map(|(&(x0, x1), &(x2,))| {
+                                    (uf.math_.find(x0), uf.math_.find(x1), uf.math_.find(x2))
+                                })
+                                .filter(|&(x0, x1, x2)| !self.hash_index_0_1_2.contains_key(&(x0, x1, x2))),
+                        );
+                        insertions.clear();
+                        RadixSortable::wrap(&mut self.new).voracious_sort();
+                        self.new.dedup();
+                        for &(x0, x1, x2) in &self.new {
+                            self.hash_index_0_1_2
+                                .entry((uf.math_.find(x0), uf.math_.find(x1), uf.math_.find(x2)))
+                                .or_default()
+                                .push(());
                         }
+                        self.hash_index_0_1_2.retain(|&(x0, x1, x2), v| {
+                            if uf.math_.is_root(x0) & uf.math_.is_root(x1) & uf.math_.is_root(x2) {
+                                v.retain(|&mut ()| true);
+                                v.sort_unstable();
+                                v.dedup();
+                                true
+                            } else {
+                                false
+                            }
+                        });
                     });
                     self.math_num_uprooted_at_latest_retain = 0;
                 }
@@ -1029,82 +1035,88 @@ fn regression_tir2() {
                     }
                 }
                 fn update_begin(&mut self, insertions: &[Self::Row], uf: &mut Unification) {
-                    for &(mut x0, mut x1, mut x2) in insertions {
-                        match self
-                            .hash_index_1_0
-                            .entry((uf.math_.find(x1), uf.math_.find(x0)))
-                        {
-                            runtime::HashMapEntry::Occupied(mut entry) => {
-                                let (y2,) = entry.get_mut();
-                                uf.math_.union_mut(&mut x2, y2);
-                            }
-                            runtime::HashMapEntry::Vacant(entry) => {
-                                entry.insert((uf.math_.find(x2),));
+                    log_duration!("update_begin {}: {}", "pow", {
+                        for &(mut x0, mut x1, mut x2) in insertions {
+                            match self
+                                .hash_index_1_0
+                                .entry((uf.math_.find(x1), uf.math_.find(x0)))
+                            {
+                                runtime::HashMapEntry::Occupied(mut entry) => {
+                                    let (y2,) = entry.get_mut();
+                                    uf.math_.union_mut(&mut x2, y2);
+                                }
+                                runtime::HashMapEntry::Vacant(entry) => {
+                                    entry.insert((uf.math_.find(x2),));
+                                }
                             }
                         }
-                    }
+                    });
                 }
                 fn update(&mut self, insertions: &mut Vec<Self::Row>, uf: &mut Unification) -> bool {
                     if self.math_num_uprooted_at_latest_retain == uf.math_.num_uprooted() {
                         return false;
                     }
-                    self.math_num_uprooted_at_latest_retain = uf.math_.num_uprooted();
                     let offset = insertions.len();
-                    self.hash_index_1_0.retain(|&(x1, x0), &mut (x2,)| {
-                        if uf.math_.is_root(x0) & uf.math_.is_root(x1) & uf.math_.is_root(x2) {
-                            true
-                        } else {
-                            insertions.push((x0, x1, x2));
-                            false
-                        }
+                    log_duration!("update {}: {}", "pow", {
+                        self.math_num_uprooted_at_latest_retain = uf.math_.num_uprooted();
+                        self.hash_index_1_0.retain(|&(x1, x0), &mut (x2,)| {
+                            if uf.math_.is_root(x0) & uf.math_.is_root(x1) & uf.math_.is_root(x2) {
+                                true
+                            } else {
+                                insertions.push((x0, x1, x2));
+                                false
+                            }
+                        });
                     });
                     self.update_begin(&insertions[offset..], uf);
                     true
                 }
                 fn update_finalize(&mut self, insertions: &mut Vec<Self::Row>, uf: &mut Unification) {
-                    assert!(self.new.is_empty());
-                    self.new.extend(
-                        self.hash_index_1_0
-                            .iter()
-                            .map(|(&(x1, x0), &(x2,))| {
-                                (uf.math_.find(x0), uf.math_.find(x1), uf.math_.find(x2))
-                            })
-                            .filter(|&(x0, x1, x2)| !self.hash_index_1_0_2.contains_key(&(x1, x0, x2))),
-                    );
-                    insertions.clear();
-                    RadixSortable::wrap(&mut self.new).voracious_sort();
-                    self.new.dedup();
-                    for &(x0, x1, x2) in &self.new {
-                        self.hash_index_1
-                            .entry((uf.math_.find(x1),))
-                            .or_default()
-                            .push((uf.math_.find(x0), uf.math_.find(x2)));
-                    }
-                    self.hash_index_1.retain(|&(x1,), v| {
-                        if uf.math_.is_root(x1) {
-                            v.retain(|&mut (x0, x2)| uf.math_.is_root(x0) & uf.math_.is_root(x2));
-                            v.sort_unstable();
-                            v.dedup();
-                            true
-                        } else {
-                            false
+                    log_duration!("update_finalize {}: {}", "pow", {
+                        assert!(self.new.is_empty());
+                        self.new.extend(
+                            self.hash_index_1_0
+                                .iter()
+                                .map(|(&(x1, x0), &(x2,))| {
+                                    (uf.math_.find(x0), uf.math_.find(x1), uf.math_.find(x2))
+                                })
+                                .filter(|&(x0, x1, x2)| !self.hash_index_1_0_2.contains_key(&(x1, x0, x2))),
+                        );
+                        insertions.clear();
+                        RadixSortable::wrap(&mut self.new).voracious_sort();
+                        self.new.dedup();
+                        for &(x0, x1, x2) in &self.new {
+                            self.hash_index_1
+                                .entry((uf.math_.find(x1),))
+                                .or_default()
+                                .push((uf.math_.find(x0), uf.math_.find(x2)));
                         }
-                    });
-                    for &(x0, x1, x2) in &self.new {
-                        self.hash_index_1_0_2
-                            .entry((uf.math_.find(x1), uf.math_.find(x0), uf.math_.find(x2)))
-                            .or_default()
-                            .push(());
-                    }
-                    self.hash_index_1_0_2.retain(|&(x1, x0, x2), v| {
-                        if uf.math_.is_root(x1) & uf.math_.is_root(x0) & uf.math_.is_root(x2) {
-                            v.retain(|&mut ()| true);
-                            v.sort_unstable();
-                            v.dedup();
-                            true
-                        } else {
-                            false
+                        self.hash_index_1.retain(|&(x1,), v| {
+                            if uf.math_.is_root(x1) {
+                                v.retain(|&mut (x0, x2)| uf.math_.is_root(x0) & uf.math_.is_root(x2));
+                                v.sort_unstable();
+                                v.dedup();
+                                true
+                            } else {
+                                false
+                            }
+                        });
+                        for &(x0, x1, x2) in &self.new {
+                            self.hash_index_1_0_2
+                                .entry((uf.math_.find(x1), uf.math_.find(x0), uf.math_.find(x2)))
+                                .or_default()
+                                .push(());
                         }
+                        self.hash_index_1_0_2.retain(|&(x1, x0, x2), v| {
+                            if uf.math_.is_root(x1) & uf.math_.is_root(x0) & uf.math_.is_root(x2) {
+                                v.retain(|&mut ()| true);
+                                v.sort_unstable();
+                                v.dedup();
+                                true
+                            } else {
+                                false
+                            }
+                        });
                     });
                     self.math_num_uprooted_at_latest_retain = 0;
                 }
@@ -1194,77 +1206,83 @@ fn regression_tir2() {
                     }
                 }
                 fn update_begin(&mut self, insertions: &[Self::Row], uf: &mut Unification) {
-                    for &(mut x0, mut x1) in insertions {
-                        match self.hash_index_0.entry((x0,)) {
-                            runtime::HashMapEntry::Occupied(mut entry) => {
-                                let (y1,) = entry.get_mut();
-                                uf.math_.union_mut(&mut x1, y1);
-                            }
-                            runtime::HashMapEntry::Vacant(entry) => {
-                                entry.insert((uf.math_.find(x1),));
+                    log_duration!("update_begin {}: {}", "const", {
+                        for &(mut x0, mut x1) in insertions {
+                            match self.hash_index_0.entry((x0,)) {
+                                runtime::HashMapEntry::Occupied(mut entry) => {
+                                    let (y1,) = entry.get_mut();
+                                    uf.math_.union_mut(&mut x1, y1);
+                                }
+                                runtime::HashMapEntry::Vacant(entry) => {
+                                    entry.insert((uf.math_.find(x1),));
+                                }
                             }
                         }
-                    }
+                    });
                 }
                 fn update(&mut self, insertions: &mut Vec<Self::Row>, uf: &mut Unification) -> bool {
                     if self.math_num_uprooted_at_latest_retain == uf.math_.num_uprooted() {
                         return false;
                     }
-                    self.math_num_uprooted_at_latest_retain = uf.math_.num_uprooted();
                     let offset = insertions.len();
-                    self.hash_index_0.retain(|&(x0,), &mut (x1,)| {
-                        if uf.math_.is_root(x1) {
-                            true
-                        } else {
-                            insertions.push((x0, x1));
-                            false
-                        }
+                    log_duration!("update {}: {}", "const", {
+                        self.math_num_uprooted_at_latest_retain = uf.math_.num_uprooted();
+                        self.hash_index_0.retain(|&(x0,), &mut (x1,)| {
+                            if uf.math_.is_root(x1) {
+                                true
+                            } else {
+                                insertions.push((x0, x1));
+                                false
+                            }
+                        });
                     });
                     self.update_begin(&insertions[offset..], uf);
                     true
                 }
                 fn update_finalize(&mut self, insertions: &mut Vec<Self::Row>, uf: &mut Unification) {
-                    assert!(self.new.is_empty());
-                    self.new.extend(
-                        self.hash_index_0
-                            .iter()
-                            .map(|(&(x0,), &(x1,))| (x0, uf.math_.find(x1)))
-                            .filter(|&(x0, x1)| !self.hash_index_0_1.contains_key(&(x0, x1))),
-                    );
-                    insertions.clear();
-                    self.new.sort_unstable();
-                    self.new.dedup();
-                    for &(x0, x1) in &self.new {
-                        self.hash_index_1
-                            .entry((uf.math_.find(x1),))
-                            .or_default()
-                            .push((x0,));
-                    }
-                    self.hash_index_1.retain(|&(x1,), v| {
-                        if uf.math_.is_root(x1) {
-                            v.retain(|&mut (x0,)| true);
-                            v.sort_unstable();
-                            v.dedup();
-                            true
-                        } else {
-                            false
+                    log_duration!("update_finalize {}: {}", "const", {
+                        assert!(self.new.is_empty());
+                        self.new.extend(
+                            self.hash_index_0
+                                .iter()
+                                .map(|(&(x0,), &(x1,))| (x0, uf.math_.find(x1)))
+                                .filter(|&(x0, x1)| !self.hash_index_0_1.contains_key(&(x0, x1))),
+                        );
+                        insertions.clear();
+                        self.new.sort_unstable();
+                        self.new.dedup();
+                        for &(x0, x1) in &self.new {
+                            self.hash_index_1
+                                .entry((uf.math_.find(x1),))
+                                .or_default()
+                                .push((x0,));
                         }
-                    });
-                    for &(x0, x1) in &self.new {
-                        self.hash_index_0_1
-                            .entry((x0, uf.math_.find(x1)))
-                            .or_default()
-                            .push(());
-                    }
-                    self.hash_index_0_1.retain(|&(x0, x1), v| {
-                        if uf.math_.is_root(x1) {
-                            v.retain(|&mut ()| true);
-                            v.sort_unstable();
-                            v.dedup();
-                            true
-                        } else {
-                            false
+                        self.hash_index_1.retain(|&(x1,), v| {
+                            if uf.math_.is_root(x1) {
+                                v.retain(|&mut (x0,)| true);
+                                v.sort_unstable();
+                                v.dedup();
+                                true
+                            } else {
+                                false
+                            }
+                        });
+                        for &(x0, x1) in &self.new {
+                            self.hash_index_0_1
+                                .entry((x0, uf.math_.find(x1)))
+                                .or_default()
+                                .push(());
                         }
+                        self.hash_index_0_1.retain(|&(x0, x1), v| {
+                            if uf.math_.is_root(x1) {
+                                v.retain(|&mut ()| true);
+                                v.sort_unstable();
+                                v.dedup();
+                                true
+                            } else {
+                                false
+                            }
+                        });
                     });
                     self.math_num_uprooted_at_latest_retain = 0;
                 }
@@ -1401,18 +1419,22 @@ fn regression_tir2() {
                     theory
                 }
                 pub fn step(&mut self) -> [std::time::Duration; 2] {
-                    [
-                        {
-                            let start = std::time::Instant::now();
-                            self.apply_rules();
-                            start.elapsed()
-                        },
-                        {
-                            let start = std::time::Instant::now();
-                            self.canonicalize();
-                            start.elapsed()
-                        },
-                    ]
+                    log_duration!("======== STEP took {} ==========", {
+                        [
+                            {
+                                let start = std::time::Instant::now();
+                                log_duration!("apply_rules: {}", {
+                                    self.apply_rules();
+                                });
+                                start.elapsed()
+                            },
+                            {
+                                let start = std::time::Instant::now();
+                                self.canonicalize();
+                                start.elapsed()
+                            },
+                        ]
+                    })
                 }
                 #[inline(never)]
                 pub fn apply_rules(&mut self) {
@@ -1476,35 +1498,43 @@ fn regression_tir2() {
                 }
                 #[inline(never)]
                 pub fn canonicalize(&mut self) {
-                    self.mul_.clear_new();
-                    self.pow_.clear_new();
-                    self.const_.clear_new();
-                    if !self.delta.has_new_inserts() && self.uf.num_uprooted() == 0 {
-                        return;
-                    }
-                    self.mul_.update_begin(&mut self.delta.mul_, &mut self.uf);
-                    self.pow_.update_begin(&mut self.delta.pow_, &mut self.uf);
-                    self.const_
-                        .update_begin(&mut self.delta.const_, &mut self.uf);
-                    loop {
-                        let mut progress = false;
-                        progress |= self.mul_.update(&mut self.delta.mul_, &mut self.uf);
-                        progress |= self.pow_.update(&mut self.delta.pow_, &mut self.uf);
-                        progress |= self.const_.update(&mut self.delta.const_, &mut self.uf);
-                        if !progress {
-                            break;
+                    log_duration!("canonicalize (total): {}", {
+                        self.mul_.clear_new();
+                        self.pow_.clear_new();
+                        self.const_.clear_new();
+                        if !self.delta.has_new_inserts() && self.uf.num_uprooted() == 0 {
+                            return;
                         }
-                    }
-                    self.mul_
-                        .update_finalize(&mut self.delta.mul_, &mut self.uf);
-                    self.pow_
-                        .update_finalize(&mut self.delta.pow_, &mut self.uf);
-                    self.const_
-                        .update_finalize(&mut self.delta.const_, &mut self.uf);
-                    self.global_math.update(&mut self.uf.math_);
-                    self.global_i64.update_finalize();
-                    self.global_math.update_finalize();
-                    self.uf.reset_num_uprooted();
+                        log_duration!("update_begin (total): {}", {
+                            self.mul_.update_begin(&mut self.delta.mul_, &mut self.uf);
+                            self.pow_.update_begin(&mut self.delta.pow_, &mut self.uf);
+                            self.const_
+                                .update_begin(&mut self.delta.const_, &mut self.uf);
+                        });
+                        log_duration!("update_loop (total): {}", {
+                            loop {
+                                let mut progress = false;
+                                progress |= self.mul_.update(&mut self.delta.mul_, &mut self.uf);
+                                progress |= self.pow_.update(&mut self.delta.pow_, &mut self.uf);
+                                progress |= self.const_.update(&mut self.delta.const_, &mut self.uf);
+                                if !progress {
+                                    break;
+                                }
+                            }
+                        });
+                        log_duration!("update_finalize (total): {}", {
+                            self.mul_
+                                .update_finalize(&mut self.delta.mul_, &mut self.uf);
+                            self.pow_
+                                .update_finalize(&mut self.delta.pow_, &mut self.uf);
+                            self.const_
+                                .update_finalize(&mut self.delta.const_, &mut self.uf);
+                            self.global_math.update(&mut self.uf.math_);
+                            self.global_i64.update_finalize();
+                            self.global_math.update_finalize();
+                            self.uf.reset_num_uprooted();
+                        });
+                    });
                 }
             }
             impl EclassProvider<Math> for Theory {
@@ -1699,66 +1729,72 @@ fn regression_tir1() {
                     }
                 }
                 fn update_begin(&mut self, insertions: &[Self::Row], uf: &mut Unification) {
-                    for &(mut x0, mut x1, mut x2) in insertions {
-                        match self
-                            .hash_index_0_1
-                            .entry((uf.math_.find(x0), uf.math_.find(x1)))
-                        {
-                            runtime::HashMapEntry::Occupied(mut entry) => {
-                                let (y2,) = entry.get_mut();
-                                uf.math_.union_mut(&mut x2, y2);
-                            }
-                            runtime::HashMapEntry::Vacant(entry) => {
-                                entry.insert((uf.math_.find(x2),));
+                    log_duration!("update_begin {}: {}", "sub", {
+                        for &(mut x0, mut x1, mut x2) in insertions {
+                            match self
+                                .hash_index_0_1
+                                .entry((uf.math_.find(x0), uf.math_.find(x1)))
+                            {
+                                runtime::HashMapEntry::Occupied(mut entry) => {
+                                    let (y2,) = entry.get_mut();
+                                    uf.math_.union_mut(&mut x2, y2);
+                                }
+                                runtime::HashMapEntry::Vacant(entry) => {
+                                    entry.insert((uf.math_.find(x2),));
+                                }
                             }
                         }
-                    }
+                    });
                 }
                 fn update(&mut self, insertions: &mut Vec<Self::Row>, uf: &mut Unification) -> bool {
                     if self.math_num_uprooted_at_latest_retain == uf.math_.num_uprooted() {
                         return false;
                     }
-                    self.math_num_uprooted_at_latest_retain = uf.math_.num_uprooted();
                     let offset = insertions.len();
-                    self.hash_index_0_1.retain(|&(x0, x1), &mut (x2,)| {
-                        if uf.math_.is_root(x0) & uf.math_.is_root(x1) & uf.math_.is_root(x2) {
-                            true
-                        } else {
-                            insertions.push((x0, x1, x2));
-                            false
-                        }
+                    log_duration!("update {}: {}", "sub", {
+                        self.math_num_uprooted_at_latest_retain = uf.math_.num_uprooted();
+                        self.hash_index_0_1.retain(|&(x0, x1), &mut (x2,)| {
+                            if uf.math_.is_root(x0) & uf.math_.is_root(x1) & uf.math_.is_root(x2) {
+                                true
+                            } else {
+                                insertions.push((x0, x1, x2));
+                                false
+                            }
+                        });
                     });
                     self.update_begin(&insertions[offset..], uf);
                     true
                 }
                 fn update_finalize(&mut self, insertions: &mut Vec<Self::Row>, uf: &mut Unification) {
-                    assert!(self.new.is_empty());
-                    self.new.extend(
-                        self.hash_index_0_1
-                            .iter()
-                            .map(|(&(x0, x1), &(x2,))| {
-                                (uf.math_.find(x0), uf.math_.find(x1), uf.math_.find(x2))
-                            })
-                            .filter(|&(x0, x1, x2)| !self.hash_index_0_1_2.contains_key(&(x0, x1, x2))),
-                    );
-                    insertions.clear();
-                    RadixSortable::wrap(&mut self.new).voracious_sort();
-                    self.new.dedup();
-                    for &(x0, x1, x2) in &self.new {
-                        self.hash_index_0_1_2
-                            .entry((uf.math_.find(x0), uf.math_.find(x1), uf.math_.find(x2)))
-                            .or_default()
-                            .push(());
-                    }
-                    self.hash_index_0_1_2.retain(|&(x0, x1, x2), v| {
-                        if uf.math_.is_root(x0) & uf.math_.is_root(x1) & uf.math_.is_root(x2) {
-                            v.retain(|&mut ()| true);
-                            v.sort_unstable();
-                            v.dedup();
-                            true
-                        } else {
-                            false
+                    log_duration!("update_finalize {}: {}", "sub", {
+                        assert!(self.new.is_empty());
+                        self.new.extend(
+                            self.hash_index_0_1
+                                .iter()
+                                .map(|(&(x0, x1), &(x2,))| {
+                                    (uf.math_.find(x0), uf.math_.find(x1), uf.math_.find(x2))
+                                })
+                                .filter(|&(x0, x1, x2)| !self.hash_index_0_1_2.contains_key(&(x0, x1, x2))),
+                        );
+                        insertions.clear();
+                        RadixSortable::wrap(&mut self.new).voracious_sort();
+                        self.new.dedup();
+                        for &(x0, x1, x2) in &self.new {
+                            self.hash_index_0_1_2
+                                .entry((uf.math_.find(x0), uf.math_.find(x1), uf.math_.find(x2)))
+                                .or_default()
+                                .push(());
                         }
+                        self.hash_index_0_1_2.retain(|&(x0, x1, x2), v| {
+                            if uf.math_.is_root(x0) & uf.math_.is_root(x1) & uf.math_.is_root(x2) {
+                                v.retain(|&mut ()| true);
+                                v.sort_unstable();
+                                v.dedup();
+                                true
+                            } else {
+                                false
+                            }
+                        });
                     });
                     self.math_num_uprooted_at_latest_retain = 0;
                 }
@@ -1841,61 +1877,67 @@ fn regression_tir1() {
                     }
                 }
                 fn update_begin(&mut self, insertions: &[Self::Row], uf: &mut Unification) {
-                    for &(mut x0, mut x1) in insertions {
-                        match self.hash_index_0.entry((x0,)) {
-                            runtime::HashMapEntry::Occupied(mut entry) => {
-                                let (y1,) = entry.get_mut();
-                                uf.math_.union_mut(&mut x1, y1);
-                            }
-                            runtime::HashMapEntry::Vacant(entry) => {
-                                entry.insert((uf.math_.find(x1),));
+                    log_duration!("update_begin {}: {}", "const", {
+                        for &(mut x0, mut x1) in insertions {
+                            match self.hash_index_0.entry((x0,)) {
+                                runtime::HashMapEntry::Occupied(mut entry) => {
+                                    let (y1,) = entry.get_mut();
+                                    uf.math_.union_mut(&mut x1, y1);
+                                }
+                                runtime::HashMapEntry::Vacant(entry) => {
+                                    entry.insert((uf.math_.find(x1),));
+                                }
                             }
                         }
-                    }
+                    });
                 }
                 fn update(&mut self, insertions: &mut Vec<Self::Row>, uf: &mut Unification) -> bool {
                     if self.math_num_uprooted_at_latest_retain == uf.math_.num_uprooted() {
                         return false;
                     }
-                    self.math_num_uprooted_at_latest_retain = uf.math_.num_uprooted();
                     let offset = insertions.len();
-                    self.hash_index_0.retain(|&(x0,), &mut (x1,)| {
-                        if uf.math_.is_root(x1) {
-                            true
-                        } else {
-                            insertions.push((x0, x1));
-                            false
-                        }
+                    log_duration!("update {}: {}", "const", {
+                        self.math_num_uprooted_at_latest_retain = uf.math_.num_uprooted();
+                        self.hash_index_0.retain(|&(x0,), &mut (x1,)| {
+                            if uf.math_.is_root(x1) {
+                                true
+                            } else {
+                                insertions.push((x0, x1));
+                                false
+                            }
+                        });
                     });
                     self.update_begin(&insertions[offset..], uf);
                     true
                 }
                 fn update_finalize(&mut self, insertions: &mut Vec<Self::Row>, uf: &mut Unification) {
-                    assert!(self.new.is_empty());
-                    self.new.extend(
-                        self.hash_index_0
-                            .iter()
-                            .map(|(&(x0,), &(x1,))| (x0, uf.math_.find(x1)))
-                            .filter(|&(x0, x1)| !self.hash_index_0_1.contains_key(&(x0, x1))),
-                    );
-                    insertions.clear();
-                    self.new.sort_unstable();
-                    self.new.dedup();
-                    for &(x0, x1) in &self.new {
-                        self.hash_index_0_1
-                            .entry((x0, uf.math_.find(x1)))
-                            .or_default()
-                            .push(());
-                    }
-                    self.hash_index_0_1.retain(|&(x0, x1), v| {
-                        if uf.math_.is_root(x1) {
-                            v.retain(|&mut ()| true);
-                            v.sort_unstable();
-                            v.dedup();
-                            true
-                        } else {
-                            false
+                    log_duration!("update_finalize {}: {}", "const", {
+                        assert!(self.new.is_empty());
+                        self.new.extend(
+                            self.hash_index_0
+                                .iter()
+                                .map(|(&(x0,), &(x1,))| (x0, uf.math_.find(x1)))
+                                .filter(|&(x0, x1)| !self.hash_index_0_1.contains_key(&(x0, x1))),
+                        );
+                        insertions.clear();
+                        self.new.sort_unstable();
+                        self.new.dedup();
+                        for &(x0, x1) in &self.new {
+                            self.hash_index_0_1
+                                .entry((x0, uf.math_.find(x1)))
+                                .or_default()
+                                .push(());
                         }
+                        self.hash_index_0_1.retain(|&(x0, x1), v| {
+                            if uf.math_.is_root(x1) {
+                                v.retain(|&mut ()| true);
+                                v.sort_unstable();
+                                v.dedup();
+                                true
+                            } else {
+                                false
+                            }
+                        });
                     });
                     self.math_num_uprooted_at_latest_retain = 0;
                 }
@@ -1998,18 +2040,22 @@ fn regression_tir1() {
                     theory
                 }
                 pub fn step(&mut self) -> [std::time::Duration; 2] {
-                    [
-                        {
-                            let start = std::time::Instant::now();
-                            self.apply_rules();
-                            start.elapsed()
-                        },
-                        {
-                            let start = std::time::Instant::now();
-                            self.canonicalize();
-                            start.elapsed()
-                        },
-                    ]
+                    log_duration!("======== STEP took {} ==========", {
+                        [
+                            {
+                                let start = std::time::Instant::now();
+                                log_duration!("apply_rules: {}", {
+                                    self.apply_rules();
+                                });
+                                start.elapsed()
+                            },
+                            {
+                                let start = std::time::Instant::now();
+                                self.canonicalize();
+                                start.elapsed()
+                            },
+                        ]
+                    })
                 }
                 #[inline(never)]
                 pub fn apply_rules(&mut self) {
@@ -2053,28 +2099,36 @@ fn regression_tir1() {
                 }
                 #[inline(never)]
                 pub fn canonicalize(&mut self) {
-                    self.sub_.clear_new();
-                    self.const_.clear_new();
-                    if !self.delta.has_new_inserts() && self.uf.num_uprooted() == 0 {
-                        return;
-                    }
-                    self.sub_.update_begin(&mut self.delta.sub_, &mut self.uf);
-                    self.const_
-                        .update_begin(&mut self.delta.const_, &mut self.uf);
-                    loop {
-                        let mut progress = false;
-                        progress |= self.sub_.update(&mut self.delta.sub_, &mut self.uf);
-                        progress |= self.const_.update(&mut self.delta.const_, &mut self.uf);
-                        if !progress {
-                            break;
+                    log_duration!("canonicalize (total): {}", {
+                        self.sub_.clear_new();
+                        self.const_.clear_new();
+                        if !self.delta.has_new_inserts() && self.uf.num_uprooted() == 0 {
+                            return;
                         }
-                    }
-                    self.sub_
-                        .update_finalize(&mut self.delta.sub_, &mut self.uf);
-                    self.const_
-                        .update_finalize(&mut self.delta.const_, &mut self.uf);
-                    self.global_i64.update_finalize();
-                    self.uf.reset_num_uprooted();
+                        log_duration!("update_begin (total): {}", {
+                            self.sub_.update_begin(&mut self.delta.sub_, &mut self.uf);
+                            self.const_
+                                .update_begin(&mut self.delta.const_, &mut self.uf);
+                        });
+                        log_duration!("update_loop (total): {}", {
+                            loop {
+                                let mut progress = false;
+                                progress |= self.sub_.update(&mut self.delta.sub_, &mut self.uf);
+                                progress |= self.const_.update(&mut self.delta.const_, &mut self.uf);
+                                if !progress {
+                                    break;
+                                }
+                            }
+                        });
+                        log_duration!("update_finalize (total): {}", {
+                            self.sub_
+                                .update_finalize(&mut self.delta.sub_, &mut self.uf);
+                            self.const_
+                                .update_finalize(&mut self.delta.const_, &mut self.uf);
+                            self.global_i64.update_finalize();
+                            self.uf.reset_num_uprooted();
+                        });
+                    });
                 }
             }
             impl EclassProvider<Math> for Theory {
@@ -2458,98 +2512,104 @@ fn codegen_constant_propagation() {
                     }
                 }
                 fn update_begin(&mut self, insertions: &[Self::Row], uf: &mut Unification) {
-                    for &(mut x0, mut x1, mut x2) in insertions {
-                        match self
-                            .hash_index_0_1
-                            .entry((uf.math_.find(x0), uf.math_.find(x1)))
-                        {
-                            runtime::HashMapEntry::Occupied(mut entry) => {
-                                let (y2,) = entry.get_mut();
-                                uf.math_.union_mut(&mut x2, y2);
-                            }
-                            runtime::HashMapEntry::Vacant(entry) => {
-                                entry.insert((uf.math_.find(x2),));
+                    log_duration!("update_begin {}: {}", "add", {
+                        for &(mut x0, mut x1, mut x2) in insertions {
+                            match self
+                                .hash_index_0_1
+                                .entry((uf.math_.find(x0), uf.math_.find(x1)))
+                            {
+                                runtime::HashMapEntry::Occupied(mut entry) => {
+                                    let (y2,) = entry.get_mut();
+                                    uf.math_.union_mut(&mut x2, y2);
+                                }
+                                runtime::HashMapEntry::Vacant(entry) => {
+                                    entry.insert((uf.math_.find(x2),));
+                                }
                             }
                         }
-                    }
+                    });
                 }
                 fn update(&mut self, insertions: &mut Vec<Self::Row>, uf: &mut Unification) -> bool {
                     if self.math_num_uprooted_at_latest_retain == uf.math_.num_uprooted() {
                         return false;
                     }
-                    self.math_num_uprooted_at_latest_retain = uf.math_.num_uprooted();
                     let offset = insertions.len();
-                    self.hash_index_0_1.retain(|&(x0, x1), &mut (x2,)| {
-                        if uf.math_.is_root(x0) & uf.math_.is_root(x1) & uf.math_.is_root(x2) {
-                            true
-                        } else {
-                            insertions.push((x0, x1, x2));
-                            false
-                        }
+                    log_duration!("update {}: {}", "add", {
+                        self.math_num_uprooted_at_latest_retain = uf.math_.num_uprooted();
+                        self.hash_index_0_1.retain(|&(x0, x1), &mut (x2,)| {
+                            if uf.math_.is_root(x0) & uf.math_.is_root(x1) & uf.math_.is_root(x2) {
+                                true
+                            } else {
+                                insertions.push((x0, x1, x2));
+                                false
+                            }
+                        });
                     });
                     self.update_begin(&insertions[offset..], uf);
                     true
                 }
                 fn update_finalize(&mut self, insertions: &mut Vec<Self::Row>, uf: &mut Unification) {
-                    assert!(self.new.is_empty());
-                    self.new.extend(
-                        self.hash_index_0_1
-                            .iter()
-                            .map(|(&(x0, x1), &(x2,))| {
-                                (uf.math_.find(x0), uf.math_.find(x1), uf.math_.find(x2))
-                            })
-                            .filter(|&(x0, x1, x2)| !self.hash_index_0_1_2.contains_key(&(x0, x1, x2))),
-                    );
-                    insertions.clear();
-                    RadixSortable::wrap(&mut self.new).voracious_sort();
-                    self.new.dedup();
-                    for &(x0, x1, x2) in &self.new {
-                        self.hash_index_0
-                            .entry((uf.math_.find(x0),))
-                            .or_default()
-                            .push((uf.math_.find(x1), uf.math_.find(x2)));
-                    }
-                    self.hash_index_0.retain(|&(x0,), v| {
-                        if uf.math_.is_root(x0) {
-                            v.retain(|&mut (x1, x2)| uf.math_.is_root(x1) & uf.math_.is_root(x2));
-                            v.sort_unstable();
-                            v.dedup();
-                            true
-                        } else {
-                            false
+                    log_duration!("update_finalize {}: {}", "add", {
+                        assert!(self.new.is_empty());
+                        self.new.extend(
+                            self.hash_index_0_1
+                                .iter()
+                                .map(|(&(x0, x1), &(x2,))| {
+                                    (uf.math_.find(x0), uf.math_.find(x1), uf.math_.find(x2))
+                                })
+                                .filter(|&(x0, x1, x2)| !self.hash_index_0_1_2.contains_key(&(x0, x1, x2))),
+                        );
+                        insertions.clear();
+                        RadixSortable::wrap(&mut self.new).voracious_sort();
+                        self.new.dedup();
+                        for &(x0, x1, x2) in &self.new {
+                            self.hash_index_0
+                                .entry((uf.math_.find(x0),))
+                                .or_default()
+                                .push((uf.math_.find(x1), uf.math_.find(x2)));
                         }
-                    });
-                    for &(x0, x1, x2) in &self.new {
-                        self.hash_index_1
-                            .entry((uf.math_.find(x1),))
-                            .or_default()
-                            .push((uf.math_.find(x0), uf.math_.find(x2)));
-                    }
-                    self.hash_index_1.retain(|&(x1,), v| {
-                        if uf.math_.is_root(x1) {
-                            v.retain(|&mut (x0, x2)| uf.math_.is_root(x0) & uf.math_.is_root(x2));
-                            v.sort_unstable();
-                            v.dedup();
-                            true
-                        } else {
-                            false
+                        self.hash_index_0.retain(|&(x0,), v| {
+                            if uf.math_.is_root(x0) {
+                                v.retain(|&mut (x1, x2)| uf.math_.is_root(x1) & uf.math_.is_root(x2));
+                                v.sort_unstable();
+                                v.dedup();
+                                true
+                            } else {
+                                false
+                            }
+                        });
+                        for &(x0, x1, x2) in &self.new {
+                            self.hash_index_1
+                                .entry((uf.math_.find(x1),))
+                                .or_default()
+                                .push((uf.math_.find(x0), uf.math_.find(x2)));
                         }
-                    });
-                    for &(x0, x1, x2) in &self.new {
-                        self.hash_index_0_1_2
-                            .entry((uf.math_.find(x0), uf.math_.find(x1), uf.math_.find(x2)))
-                            .or_default()
-                            .push(());
-                    }
-                    self.hash_index_0_1_2.retain(|&(x0, x1, x2), v| {
-                        if uf.math_.is_root(x0) & uf.math_.is_root(x1) & uf.math_.is_root(x2) {
-                            v.retain(|&mut ()| true);
-                            v.sort_unstable();
-                            v.dedup();
-                            true
-                        } else {
-                            false
+                        self.hash_index_1.retain(|&(x1,), v| {
+                            if uf.math_.is_root(x1) {
+                                v.retain(|&mut (x0, x2)| uf.math_.is_root(x0) & uf.math_.is_root(x2));
+                                v.sort_unstable();
+                                v.dedup();
+                                true
+                            } else {
+                                false
+                            }
+                        });
+                        for &(x0, x1, x2) in &self.new {
+                            self.hash_index_0_1_2
+                                .entry((uf.math_.find(x0), uf.math_.find(x1), uf.math_.find(x2)))
+                                .or_default()
+                                .push(());
                         }
+                        self.hash_index_0_1_2.retain(|&(x0, x1, x2), v| {
+                            if uf.math_.is_root(x0) & uf.math_.is_root(x1) & uf.math_.is_root(x2) {
+                                v.retain(|&mut ()| true);
+                                v.sort_unstable();
+                                v.dedup();
+                                true
+                            } else {
+                                false
+                            }
+                        });
                     });
                     self.math_num_uprooted_at_latest_retain = 0;
                 }
@@ -2646,98 +2706,104 @@ fn codegen_constant_propagation() {
                     }
                 }
                 fn update_begin(&mut self, insertions: &[Self::Row], uf: &mut Unification) {
-                    for &(mut x0, mut x1, mut x2) in insertions {
-                        match self
-                            .hash_index_0_1
-                            .entry((uf.math_.find(x0), uf.math_.find(x1)))
-                        {
-                            runtime::HashMapEntry::Occupied(mut entry) => {
-                                let (y2,) = entry.get_mut();
-                                uf.math_.union_mut(&mut x2, y2);
-                            }
-                            runtime::HashMapEntry::Vacant(entry) => {
-                                entry.insert((uf.math_.find(x2),));
+                    log_duration!("update_begin {}: {}", "mul", {
+                        for &(mut x0, mut x1, mut x2) in insertions {
+                            match self
+                                .hash_index_0_1
+                                .entry((uf.math_.find(x0), uf.math_.find(x1)))
+                            {
+                                runtime::HashMapEntry::Occupied(mut entry) => {
+                                    let (y2,) = entry.get_mut();
+                                    uf.math_.union_mut(&mut x2, y2);
+                                }
+                                runtime::HashMapEntry::Vacant(entry) => {
+                                    entry.insert((uf.math_.find(x2),));
+                                }
                             }
                         }
-                    }
+                    });
                 }
                 fn update(&mut self, insertions: &mut Vec<Self::Row>, uf: &mut Unification) -> bool {
                     if self.math_num_uprooted_at_latest_retain == uf.math_.num_uprooted() {
                         return false;
                     }
-                    self.math_num_uprooted_at_latest_retain = uf.math_.num_uprooted();
                     let offset = insertions.len();
-                    self.hash_index_0_1.retain(|&(x0, x1), &mut (x2,)| {
-                        if uf.math_.is_root(x0) & uf.math_.is_root(x1) & uf.math_.is_root(x2) {
-                            true
-                        } else {
-                            insertions.push((x0, x1, x2));
-                            false
-                        }
+                    log_duration!("update {}: {}", "mul", {
+                        self.math_num_uprooted_at_latest_retain = uf.math_.num_uprooted();
+                        self.hash_index_0_1.retain(|&(x0, x1), &mut (x2,)| {
+                            if uf.math_.is_root(x0) & uf.math_.is_root(x1) & uf.math_.is_root(x2) {
+                                true
+                            } else {
+                                insertions.push((x0, x1, x2));
+                                false
+                            }
+                        });
                     });
                     self.update_begin(&insertions[offset..], uf);
                     true
                 }
                 fn update_finalize(&mut self, insertions: &mut Vec<Self::Row>, uf: &mut Unification) {
-                    assert!(self.new.is_empty());
-                    self.new.extend(
-                        self.hash_index_0_1
-                            .iter()
-                            .map(|(&(x0, x1), &(x2,))| {
-                                (uf.math_.find(x0), uf.math_.find(x1), uf.math_.find(x2))
-                            })
-                            .filter(|&(x0, x1, x2)| !self.hash_index_0_1_2.contains_key(&(x0, x1, x2))),
-                    );
-                    insertions.clear();
-                    RadixSortable::wrap(&mut self.new).voracious_sort();
-                    self.new.dedup();
-                    for &(x0, x1, x2) in &self.new {
-                        self.hash_index_0
-                            .entry((uf.math_.find(x0),))
-                            .or_default()
-                            .push((uf.math_.find(x1), uf.math_.find(x2)));
-                    }
-                    self.hash_index_0.retain(|&(x0,), v| {
-                        if uf.math_.is_root(x0) {
-                            v.retain(|&mut (x1, x2)| uf.math_.is_root(x1) & uf.math_.is_root(x2));
-                            v.sort_unstable();
-                            v.dedup();
-                            true
-                        } else {
-                            false
+                    log_duration!("update_finalize {}: {}", "mul", {
+                        assert!(self.new.is_empty());
+                        self.new.extend(
+                            self.hash_index_0_1
+                                .iter()
+                                .map(|(&(x0, x1), &(x2,))| {
+                                    (uf.math_.find(x0), uf.math_.find(x1), uf.math_.find(x2))
+                                })
+                                .filter(|&(x0, x1, x2)| !self.hash_index_0_1_2.contains_key(&(x0, x1, x2))),
+                        );
+                        insertions.clear();
+                        RadixSortable::wrap(&mut self.new).voracious_sort();
+                        self.new.dedup();
+                        for &(x0, x1, x2) in &self.new {
+                            self.hash_index_0
+                                .entry((uf.math_.find(x0),))
+                                .or_default()
+                                .push((uf.math_.find(x1), uf.math_.find(x2)));
                         }
-                    });
-                    for &(x0, x1, x2) in &self.new {
-                        self.hash_index_1
-                            .entry((uf.math_.find(x1),))
-                            .or_default()
-                            .push((uf.math_.find(x0), uf.math_.find(x2)));
-                    }
-                    self.hash_index_1.retain(|&(x1,), v| {
-                        if uf.math_.is_root(x1) {
-                            v.retain(|&mut (x0, x2)| uf.math_.is_root(x0) & uf.math_.is_root(x2));
-                            v.sort_unstable();
-                            v.dedup();
-                            true
-                        } else {
-                            false
+                        self.hash_index_0.retain(|&(x0,), v| {
+                            if uf.math_.is_root(x0) {
+                                v.retain(|&mut (x1, x2)| uf.math_.is_root(x1) & uf.math_.is_root(x2));
+                                v.sort_unstable();
+                                v.dedup();
+                                true
+                            } else {
+                                false
+                            }
+                        });
+                        for &(x0, x1, x2) in &self.new {
+                            self.hash_index_1
+                                .entry((uf.math_.find(x1),))
+                                .or_default()
+                                .push((uf.math_.find(x0), uf.math_.find(x2)));
                         }
-                    });
-                    for &(x0, x1, x2) in &self.new {
-                        self.hash_index_0_1_2
-                            .entry((uf.math_.find(x0), uf.math_.find(x1), uf.math_.find(x2)))
-                            .or_default()
-                            .push(());
-                    }
-                    self.hash_index_0_1_2.retain(|&(x0, x1, x2), v| {
-                        if uf.math_.is_root(x0) & uf.math_.is_root(x1) & uf.math_.is_root(x2) {
-                            v.retain(|&mut ()| true);
-                            v.sort_unstable();
-                            v.dedup();
-                            true
-                        } else {
-                            false
+                        self.hash_index_1.retain(|&(x1,), v| {
+                            if uf.math_.is_root(x1) {
+                                v.retain(|&mut (x0, x2)| uf.math_.is_root(x0) & uf.math_.is_root(x2));
+                                v.sort_unstable();
+                                v.dedup();
+                                true
+                            } else {
+                                false
+                            }
+                        });
+                        for &(x0, x1, x2) in &self.new {
+                            self.hash_index_0_1_2
+                                .entry((uf.math_.find(x0), uf.math_.find(x1), uf.math_.find(x2)))
+                                .or_default()
+                                .push(());
                         }
+                        self.hash_index_0_1_2.retain(|&(x0, x1, x2), v| {
+                            if uf.math_.is_root(x0) & uf.math_.is_root(x1) & uf.math_.is_root(x2) {
+                                v.retain(|&mut ()| true);
+                                v.sort_unstable();
+                                v.dedup();
+                                true
+                            } else {
+                                false
+                            }
+                        });
                     });
                     self.math_num_uprooted_at_latest_retain = 0;
                 }
@@ -2833,77 +2899,83 @@ fn codegen_constant_propagation() {
                     }
                 }
                 fn update_begin(&mut self, insertions: &[Self::Row], uf: &mut Unification) {
-                    for &(mut x0, mut x1) in insertions {
-                        match self.hash_index_0.entry((x0,)) {
-                            runtime::HashMapEntry::Occupied(mut entry) => {
-                                let (y1,) = entry.get_mut();
-                                uf.math_.union_mut(&mut x1, y1);
-                            }
-                            runtime::HashMapEntry::Vacant(entry) => {
-                                entry.insert((uf.math_.find(x1),));
+                    log_duration!("update_begin {}: {}", "const", {
+                        for &(mut x0, mut x1) in insertions {
+                            match self.hash_index_0.entry((x0,)) {
+                                runtime::HashMapEntry::Occupied(mut entry) => {
+                                    let (y1,) = entry.get_mut();
+                                    uf.math_.union_mut(&mut x1, y1);
+                                }
+                                runtime::HashMapEntry::Vacant(entry) => {
+                                    entry.insert((uf.math_.find(x1),));
+                                }
                             }
                         }
-                    }
+                    });
                 }
                 fn update(&mut self, insertions: &mut Vec<Self::Row>, uf: &mut Unification) -> bool {
                     if self.math_num_uprooted_at_latest_retain == uf.math_.num_uprooted() {
                         return false;
                     }
-                    self.math_num_uprooted_at_latest_retain = uf.math_.num_uprooted();
                     let offset = insertions.len();
-                    self.hash_index_0.retain(|&(x0,), &mut (x1,)| {
-                        if uf.math_.is_root(x1) {
-                            true
-                        } else {
-                            insertions.push((x0, x1));
-                            false
-                        }
+                    log_duration!("update {}: {}", "const", {
+                        self.math_num_uprooted_at_latest_retain = uf.math_.num_uprooted();
+                        self.hash_index_0.retain(|&(x0,), &mut (x1,)| {
+                            if uf.math_.is_root(x1) {
+                                true
+                            } else {
+                                insertions.push((x0, x1));
+                                false
+                            }
+                        });
                     });
                     self.update_begin(&insertions[offset..], uf);
                     true
                 }
                 fn update_finalize(&mut self, insertions: &mut Vec<Self::Row>, uf: &mut Unification) {
-                    assert!(self.new.is_empty());
-                    self.new.extend(
-                        self.hash_index_0
-                            .iter()
-                            .map(|(&(x0,), &(x1,))| (x0, uf.math_.find(x1)))
-                            .filter(|&(x0, x1)| !self.hash_index_0_1.contains_key(&(x0, x1))),
-                    );
-                    insertions.clear();
-                    self.new.sort_unstable();
-                    self.new.dedup();
-                    for &(x0, x1) in &self.new {
-                        self.hash_index_1
-                            .entry((uf.math_.find(x1),))
-                            .or_default()
-                            .push((x0,));
-                    }
-                    self.hash_index_1.retain(|&(x1,), v| {
-                        if uf.math_.is_root(x1) {
-                            v.retain(|&mut (x0,)| true);
-                            v.sort_unstable();
-                            v.dedup();
-                            true
-                        } else {
-                            false
+                    log_duration!("update_finalize {}: {}", "const", {
+                        assert!(self.new.is_empty());
+                        self.new.extend(
+                            self.hash_index_0
+                                .iter()
+                                .map(|(&(x0,), &(x1,))| (x0, uf.math_.find(x1)))
+                                .filter(|&(x0, x1)| !self.hash_index_0_1.contains_key(&(x0, x1))),
+                        );
+                        insertions.clear();
+                        self.new.sort_unstable();
+                        self.new.dedup();
+                        for &(x0, x1) in &self.new {
+                            self.hash_index_1
+                                .entry((uf.math_.find(x1),))
+                                .or_default()
+                                .push((x0,));
                         }
-                    });
-                    for &(x0, x1) in &self.new {
-                        self.hash_index_0_1
-                            .entry((x0, uf.math_.find(x1)))
-                            .or_default()
-                            .push(());
-                    }
-                    self.hash_index_0_1.retain(|&(x0, x1), v| {
-                        if uf.math_.is_root(x1) {
-                            v.retain(|&mut ()| true);
-                            v.sort_unstable();
-                            v.dedup();
-                            true
-                        } else {
-                            false
+                        self.hash_index_1.retain(|&(x1,), v| {
+                            if uf.math_.is_root(x1) {
+                                v.retain(|&mut (x0,)| true);
+                                v.sort_unstable();
+                                v.dedup();
+                                true
+                            } else {
+                                false
+                            }
+                        });
+                        for &(x0, x1) in &self.new {
+                            self.hash_index_0_1
+                                .entry((x0, uf.math_.find(x1)))
+                                .or_default()
+                                .push(());
                         }
+                        self.hash_index_0_1.retain(|&(x0, x1), v| {
+                            if uf.math_.is_root(x1) {
+                                v.retain(|&mut ()| true);
+                                v.sort_unstable();
+                                v.dedup();
+                                true
+                            } else {
+                                false
+                            }
+                        });
                     });
                     self.math_num_uprooted_at_latest_retain = 0;
                 }
@@ -3015,18 +3087,22 @@ fn codegen_constant_propagation() {
                     theory
                 }
                 pub fn step(&mut self) -> [std::time::Duration; 2] {
-                    [
-                        {
-                            let start = std::time::Instant::now();
-                            self.apply_rules();
-                            start.elapsed()
-                        },
-                        {
-                            let start = std::time::Instant::now();
-                            self.canonicalize();
-                            start.elapsed()
-                        },
-                    ]
+                    log_duration!("======== STEP took {} ==========", {
+                        [
+                            {
+                                let start = std::time::Instant::now();
+                                log_duration!("apply_rules: {}", {
+                                    self.apply_rules();
+                                });
+                                start.elapsed()
+                            },
+                            {
+                                let start = std::time::Instant::now();
+                                self.canonicalize();
+                                start.elapsed()
+                            },
+                        ]
+                    })
                 }
                 #[inline(never)]
                 pub fn apply_rules(&mut self) {
@@ -3116,32 +3192,40 @@ fn codegen_constant_propagation() {
                 }
                 #[inline(never)]
                 pub fn canonicalize(&mut self) {
-                    self.add_.clear_new();
-                    self.mul_.clear_new();
-                    self.const_.clear_new();
-                    if !self.delta.has_new_inserts() && self.uf.num_uprooted() == 0 {
-                        return;
-                    }
-                    self.add_.update_begin(&mut self.delta.add_, &mut self.uf);
-                    self.mul_.update_begin(&mut self.delta.mul_, &mut self.uf);
-                    self.const_
-                        .update_begin(&mut self.delta.const_, &mut self.uf);
-                    loop {
-                        let mut progress = false;
-                        progress |= self.add_.update(&mut self.delta.add_, &mut self.uf);
-                        progress |= self.mul_.update(&mut self.delta.mul_, &mut self.uf);
-                        progress |= self.const_.update(&mut self.delta.const_, &mut self.uf);
-                        if !progress {
-                            break;
+                    log_duration!("canonicalize (total): {}", {
+                        self.add_.clear_new();
+                        self.mul_.clear_new();
+                        self.const_.clear_new();
+                        if !self.delta.has_new_inserts() && self.uf.num_uprooted() == 0 {
+                            return;
                         }
-                    }
-                    self.add_
-                        .update_finalize(&mut self.delta.add_, &mut self.uf);
-                    self.mul_
-                        .update_finalize(&mut self.delta.mul_, &mut self.uf);
-                    self.const_
-                        .update_finalize(&mut self.delta.const_, &mut self.uf);
-                    self.uf.reset_num_uprooted();
+                        log_duration!("update_begin (total): {}", {
+                            self.add_.update_begin(&mut self.delta.add_, &mut self.uf);
+                            self.mul_.update_begin(&mut self.delta.mul_, &mut self.uf);
+                            self.const_
+                                .update_begin(&mut self.delta.const_, &mut self.uf);
+                        });
+                        log_duration!("update_loop (total): {}", {
+                            loop {
+                                let mut progress = false;
+                                progress |= self.add_.update(&mut self.delta.add_, &mut self.uf);
+                                progress |= self.mul_.update(&mut self.delta.mul_, &mut self.uf);
+                                progress |= self.const_.update(&mut self.delta.const_, &mut self.uf);
+                                if !progress {
+                                    break;
+                                }
+                            }
+                        });
+                        log_duration!("update_finalize (total): {}", {
+                            self.add_
+                                .update_finalize(&mut self.delta.add_, &mut self.uf);
+                            self.mul_
+                                .update_finalize(&mut self.delta.mul_, &mut self.uf);
+                            self.const_
+                                .update_finalize(&mut self.delta.const_, &mut self.uf);
+                            self.uf.reset_num_uprooted();
+                        });
+                    });
                 }
             }
             impl EclassProvider<Math> for Theory {
@@ -3222,66 +3306,72 @@ fn codegen_commutative() {
                     }
                 }
                 fn update_begin(&mut self, insertions: &[Self::Row], uf: &mut Unification) {
-                    for &(mut x0, mut x1, mut x2) in insertions {
-                        match self
-                            .hash_index_0_1
-                            .entry((uf.math_.find(x0), uf.math_.find(x1)))
-                        {
-                            runtime::HashMapEntry::Occupied(mut entry) => {
-                                let (y2,) = entry.get_mut();
-                                uf.math_.union_mut(&mut x2, y2);
-                            }
-                            runtime::HashMapEntry::Vacant(entry) => {
-                                entry.insert((uf.math_.find(x2),));
+                    log_duration!("update_begin {}: {}", "add", {
+                        for &(mut x0, mut x1, mut x2) in insertions {
+                            match self
+                                .hash_index_0_1
+                                .entry((uf.math_.find(x0), uf.math_.find(x1)))
+                            {
+                                runtime::HashMapEntry::Occupied(mut entry) => {
+                                    let (y2,) = entry.get_mut();
+                                    uf.math_.union_mut(&mut x2, y2);
+                                }
+                                runtime::HashMapEntry::Vacant(entry) => {
+                                    entry.insert((uf.math_.find(x2),));
+                                }
                             }
                         }
-                    }
+                    });
                 }
                 fn update(&mut self, insertions: &mut Vec<Self::Row>, uf: &mut Unification) -> bool {
                     if self.math_num_uprooted_at_latest_retain == uf.math_.num_uprooted() {
                         return false;
                     }
-                    self.math_num_uprooted_at_latest_retain = uf.math_.num_uprooted();
                     let offset = insertions.len();
-                    self.hash_index_0_1.retain(|&(x0, x1), &mut (x2,)| {
-                        if uf.math_.is_root(x0) & uf.math_.is_root(x1) & uf.math_.is_root(x2) {
-                            true
-                        } else {
-                            insertions.push((x0, x1, x2));
-                            false
-                        }
+                    log_duration!("update {}: {}", "add", {
+                        self.math_num_uprooted_at_latest_retain = uf.math_.num_uprooted();
+                        self.hash_index_0_1.retain(|&(x0, x1), &mut (x2,)| {
+                            if uf.math_.is_root(x0) & uf.math_.is_root(x1) & uf.math_.is_root(x2) {
+                                true
+                            } else {
+                                insertions.push((x0, x1, x2));
+                                false
+                            }
+                        });
                     });
                     self.update_begin(&insertions[offset..], uf);
                     true
                 }
                 fn update_finalize(&mut self, insertions: &mut Vec<Self::Row>, uf: &mut Unification) {
-                    assert!(self.new.is_empty());
-                    self.new.extend(
-                        self.hash_index_0_1
-                            .iter()
-                            .map(|(&(x0, x1), &(x2,))| {
-                                (uf.math_.find(x0), uf.math_.find(x1), uf.math_.find(x2))
-                            })
-                            .filter(|&(x0, x1, x2)| !self.hash_index_0_1_2.contains_key(&(x0, x1, x2))),
-                    );
-                    insertions.clear();
-                    RadixSortable::wrap(&mut self.new).voracious_sort();
-                    self.new.dedup();
-                    for &(x0, x1, x2) in &self.new {
-                        self.hash_index_0_1_2
-                            .entry((uf.math_.find(x0), uf.math_.find(x1), uf.math_.find(x2)))
-                            .or_default()
-                            .push(());
-                    }
-                    self.hash_index_0_1_2.retain(|&(x0, x1, x2), v| {
-                        if uf.math_.is_root(x0) & uf.math_.is_root(x1) & uf.math_.is_root(x2) {
-                            v.retain(|&mut ()| true);
-                            v.sort_unstable();
-                            v.dedup();
-                            true
-                        } else {
-                            false
+                    log_duration!("update_finalize {}: {}", "add", {
+                        assert!(self.new.is_empty());
+                        self.new.extend(
+                            self.hash_index_0_1
+                                .iter()
+                                .map(|(&(x0, x1), &(x2,))| {
+                                    (uf.math_.find(x0), uf.math_.find(x1), uf.math_.find(x2))
+                                })
+                                .filter(|&(x0, x1, x2)| !self.hash_index_0_1_2.contains_key(&(x0, x1, x2))),
+                        );
+                        insertions.clear();
+                        RadixSortable::wrap(&mut self.new).voracious_sort();
+                        self.new.dedup();
+                        for &(x0, x1, x2) in &self.new {
+                            self.hash_index_0_1_2
+                                .entry((uf.math_.find(x0), uf.math_.find(x1), uf.math_.find(x2)))
+                                .or_default()
+                                .push(());
                         }
+                        self.hash_index_0_1_2.retain(|&(x0, x1, x2), v| {
+                            if uf.math_.is_root(x0) & uf.math_.is_root(x1) & uf.math_.is_root(x2) {
+                                v.retain(|&mut ()| true);
+                                v.sort_unstable();
+                                v.dedup();
+                                true
+                            } else {
+                                false
+                            }
+                        });
                     });
                     self.math_num_uprooted_at_latest_retain = 0;
                 }
@@ -3371,18 +3461,22 @@ fn codegen_commutative() {
                     theory
                 }
                 pub fn step(&mut self) -> [std::time::Duration; 2] {
-                    [
-                        {
-                            let start = std::time::Instant::now();
-                            self.apply_rules();
-                            start.elapsed()
-                        },
-                        {
-                            let start = std::time::Instant::now();
-                            self.canonicalize();
-                            start.elapsed()
-                        },
-                    ]
+                    log_duration!("======== STEP took {} ==========", {
+                        [
+                            {
+                                let start = std::time::Instant::now();
+                                log_duration!("apply_rules: {}", {
+                                    self.apply_rules();
+                                });
+                                start.elapsed()
+                            },
+                            {
+                                let start = std::time::Instant::now();
+                                self.canonicalize();
+                                start.elapsed()
+                            },
+                        ]
+                    })
                 }
                 #[inline(never)]
                 pub fn apply_rules(&mut self) {
@@ -3416,21 +3510,29 @@ fn codegen_commutative() {
                 }
                 #[inline(never)]
                 pub fn canonicalize(&mut self) {
-                    self.add_.clear_new();
-                    if !self.delta.has_new_inserts() && self.uf.num_uprooted() == 0 {
-                        return;
-                    }
-                    self.add_.update_begin(&mut self.delta.add_, &mut self.uf);
-                    loop {
-                        let mut progress = false;
-                        progress |= self.add_.update(&mut self.delta.add_, &mut self.uf);
-                        if !progress {
-                            break;
+                    log_duration!("canonicalize (total): {}", {
+                        self.add_.clear_new();
+                        if !self.delta.has_new_inserts() && self.uf.num_uprooted() == 0 {
+                            return;
                         }
-                    }
-                    self.add_
-                        .update_finalize(&mut self.delta.add_, &mut self.uf);
-                    self.uf.reset_num_uprooted();
+                        log_duration!("update_begin (total): {}", {
+                            self.add_.update_begin(&mut self.delta.add_, &mut self.uf);
+                        });
+                        log_duration!("update_loop (total): {}", {
+                            loop {
+                                let mut progress = false;
+                                progress |= self.add_.update(&mut self.delta.add_, &mut self.uf);
+                                if !progress {
+                                    break;
+                                }
+                            }
+                        });
+                        log_duration!("update_finalize (total): {}", {
+                            self.add_
+                                .update_finalize(&mut self.delta.add_, &mut self.uf);
+                            self.uf.reset_num_uprooted();
+                        });
+                    });
                 }
             }
             impl EclassProvider<Math> for Theory {
@@ -3600,66 +3702,72 @@ fn regression_entry2() {
                     }
                 }
                 fn update_begin(&mut self, insertions: &[Self::Row], uf: &mut Unification) {
-                    for &(mut x0, mut x1, mut x2) in insertions {
-                        match self
-                            .hash_index_0_1
-                            .entry((uf.math_.find(x0), uf.math_.find(x1)))
-                        {
-                            runtime::HashMapEntry::Occupied(mut entry) => {
-                                let (y2,) = entry.get_mut();
-                                uf.math_.union_mut(&mut x2, y2);
-                            }
-                            runtime::HashMapEntry::Vacant(entry) => {
-                                entry.insert((uf.math_.find(x2),));
+                    log_duration!("update_begin {}: {}", "sub", {
+                        for &(mut x0, mut x1, mut x2) in insertions {
+                            match self
+                                .hash_index_0_1
+                                .entry((uf.math_.find(x0), uf.math_.find(x1)))
+                            {
+                                runtime::HashMapEntry::Occupied(mut entry) => {
+                                    let (y2,) = entry.get_mut();
+                                    uf.math_.union_mut(&mut x2, y2);
+                                }
+                                runtime::HashMapEntry::Vacant(entry) => {
+                                    entry.insert((uf.math_.find(x2),));
+                                }
                             }
                         }
-                    }
+                    });
                 }
                 fn update(&mut self, insertions: &mut Vec<Self::Row>, uf: &mut Unification) -> bool {
                     if self.math_num_uprooted_at_latest_retain == uf.math_.num_uprooted() {
                         return false;
                     }
-                    self.math_num_uprooted_at_latest_retain = uf.math_.num_uprooted();
                     let offset = insertions.len();
-                    self.hash_index_0_1.retain(|&(x0, x1), &mut (x2,)| {
-                        if uf.math_.is_root(x0) & uf.math_.is_root(x1) & uf.math_.is_root(x2) {
-                            true
-                        } else {
-                            insertions.push((x0, x1, x2));
-                            false
-                        }
+                    log_duration!("update {}: {}", "sub", {
+                        self.math_num_uprooted_at_latest_retain = uf.math_.num_uprooted();
+                        self.hash_index_0_1.retain(|&(x0, x1), &mut (x2,)| {
+                            if uf.math_.is_root(x0) & uf.math_.is_root(x1) & uf.math_.is_root(x2) {
+                                true
+                            } else {
+                                insertions.push((x0, x1, x2));
+                                false
+                            }
+                        });
                     });
                     self.update_begin(&insertions[offset..], uf);
                     true
                 }
                 fn update_finalize(&mut self, insertions: &mut Vec<Self::Row>, uf: &mut Unification) {
-                    assert!(self.new.is_empty());
-                    self.new.extend(
-                        self.hash_index_0_1
-                            .iter()
-                            .map(|(&(x0, x1), &(x2,))| {
-                                (uf.math_.find(x0), uf.math_.find(x1), uf.math_.find(x2))
-                            })
-                            .filter(|&(x0, x1, x2)| !self.hash_index_0_1_2.contains_key(&(x0, x1, x2))),
-                    );
-                    insertions.clear();
-                    RadixSortable::wrap(&mut self.new).voracious_sort();
-                    self.new.dedup();
-                    for &(x0, x1, x2) in &self.new {
-                        self.hash_index_0_1_2
-                            .entry((uf.math_.find(x0), uf.math_.find(x1), uf.math_.find(x2)))
-                            .or_default()
-                            .push(());
-                    }
-                    self.hash_index_0_1_2.retain(|&(x0, x1, x2), v| {
-                        if uf.math_.is_root(x0) & uf.math_.is_root(x1) & uf.math_.is_root(x2) {
-                            v.retain(|&mut ()| true);
-                            v.sort_unstable();
-                            v.dedup();
-                            true
-                        } else {
-                            false
+                    log_duration!("update_finalize {}: {}", "sub", {
+                        assert!(self.new.is_empty());
+                        self.new.extend(
+                            self.hash_index_0_1
+                                .iter()
+                                .map(|(&(x0, x1), &(x2,))| {
+                                    (uf.math_.find(x0), uf.math_.find(x1), uf.math_.find(x2))
+                                })
+                                .filter(|&(x0, x1, x2)| !self.hash_index_0_1_2.contains_key(&(x0, x1, x2))),
+                        );
+                        insertions.clear();
+                        RadixSortable::wrap(&mut self.new).voracious_sort();
+                        self.new.dedup();
+                        for &(x0, x1, x2) in &self.new {
+                            self.hash_index_0_1_2
+                                .entry((uf.math_.find(x0), uf.math_.find(x1), uf.math_.find(x2)))
+                                .or_default()
+                                .push(());
                         }
+                        self.hash_index_0_1_2.retain(|&(x0, x1, x2), v| {
+                            if uf.math_.is_root(x0) & uf.math_.is_root(x1) & uf.math_.is_root(x2) {
+                                v.retain(|&mut ()| true);
+                                v.sort_unstable();
+                                v.dedup();
+                                true
+                            } else {
+                                false
+                            }
+                        });
                     });
                     self.math_num_uprooted_at_latest_retain = 0;
                 }
@@ -3742,61 +3850,67 @@ fn regression_entry2() {
                     }
                 }
                 fn update_begin(&mut self, insertions: &[Self::Row], uf: &mut Unification) {
-                    for &(mut x0, mut x1) in insertions {
-                        match self.hash_index_0.entry((x0,)) {
-                            runtime::HashMapEntry::Occupied(mut entry) => {
-                                let (y1,) = entry.get_mut();
-                                uf.math_.union_mut(&mut x1, y1);
-                            }
-                            runtime::HashMapEntry::Vacant(entry) => {
-                                entry.insert((uf.math_.find(x1),));
+                    log_duration!("update_begin {}: {}", "const", {
+                        for &(mut x0, mut x1) in insertions {
+                            match self.hash_index_0.entry((x0,)) {
+                                runtime::HashMapEntry::Occupied(mut entry) => {
+                                    let (y1,) = entry.get_mut();
+                                    uf.math_.union_mut(&mut x1, y1);
+                                }
+                                runtime::HashMapEntry::Vacant(entry) => {
+                                    entry.insert((uf.math_.find(x1),));
+                                }
                             }
                         }
-                    }
+                    });
                 }
                 fn update(&mut self, insertions: &mut Vec<Self::Row>, uf: &mut Unification) -> bool {
                     if self.math_num_uprooted_at_latest_retain == uf.math_.num_uprooted() {
                         return false;
                     }
-                    self.math_num_uprooted_at_latest_retain = uf.math_.num_uprooted();
                     let offset = insertions.len();
-                    self.hash_index_0.retain(|&(x0,), &mut (x1,)| {
-                        if uf.math_.is_root(x1) {
-                            true
-                        } else {
-                            insertions.push((x0, x1));
-                            false
-                        }
+                    log_duration!("update {}: {}", "const", {
+                        self.math_num_uprooted_at_latest_retain = uf.math_.num_uprooted();
+                        self.hash_index_0.retain(|&(x0,), &mut (x1,)| {
+                            if uf.math_.is_root(x1) {
+                                true
+                            } else {
+                                insertions.push((x0, x1));
+                                false
+                            }
+                        });
                     });
                     self.update_begin(&insertions[offset..], uf);
                     true
                 }
                 fn update_finalize(&mut self, insertions: &mut Vec<Self::Row>, uf: &mut Unification) {
-                    assert!(self.new.is_empty());
-                    self.new.extend(
-                        self.hash_index_0
-                            .iter()
-                            .map(|(&(x0,), &(x1,))| (x0, uf.math_.find(x1)))
-                            .filter(|&(x0, x1)| !self.hash_index_0_1.contains_key(&(x0, x1))),
-                    );
-                    insertions.clear();
-                    self.new.sort_unstable();
-                    self.new.dedup();
-                    for &(x0, x1) in &self.new {
-                        self.hash_index_0_1
-                            .entry((x0, uf.math_.find(x1)))
-                            .or_default()
-                            .push(());
-                    }
-                    self.hash_index_0_1.retain(|&(x0, x1), v| {
-                        if uf.math_.is_root(x1) {
-                            v.retain(|&mut ()| true);
-                            v.sort_unstable();
-                            v.dedup();
-                            true
-                        } else {
-                            false
+                    log_duration!("update_finalize {}: {}", "const", {
+                        assert!(self.new.is_empty());
+                        self.new.extend(
+                            self.hash_index_0
+                                .iter()
+                                .map(|(&(x0,), &(x1,))| (x0, uf.math_.find(x1)))
+                                .filter(|&(x0, x1)| !self.hash_index_0_1.contains_key(&(x0, x1))),
+                        );
+                        insertions.clear();
+                        self.new.sort_unstable();
+                        self.new.dedup();
+                        for &(x0, x1) in &self.new {
+                            self.hash_index_0_1
+                                .entry((x0, uf.math_.find(x1)))
+                                .or_default()
+                                .push(());
                         }
+                        self.hash_index_0_1.retain(|&(x0, x1), v| {
+                            if uf.math_.is_root(x1) {
+                                v.retain(|&mut ()| true);
+                                v.sort_unstable();
+                                v.dedup();
+                                true
+                            } else {
+                                false
+                            }
+                        });
                     });
                     self.math_num_uprooted_at_latest_retain = 0;
                 }
@@ -3899,18 +4013,22 @@ fn regression_entry2() {
                     theory
                 }
                 pub fn step(&mut self) -> [std::time::Duration; 2] {
-                    [
-                        {
-                            let start = std::time::Instant::now();
-                            self.apply_rules();
-                            start.elapsed()
-                        },
-                        {
-                            let start = std::time::Instant::now();
-                            self.canonicalize();
-                            start.elapsed()
-                        },
-                    ]
+                    log_duration!("======== STEP took {} ==========", {
+                        [
+                            {
+                                let start = std::time::Instant::now();
+                                log_duration!("apply_rules: {}", {
+                                    self.apply_rules();
+                                });
+                                start.elapsed()
+                            },
+                            {
+                                let start = std::time::Instant::now();
+                                self.canonicalize();
+                                start.elapsed()
+                            },
+                        ]
+                    })
                 }
                 #[inline(never)]
                 pub fn apply_rules(&mut self) {
@@ -3948,28 +4066,36 @@ fn regression_entry2() {
                 }
                 #[inline(never)]
                 pub fn canonicalize(&mut self) {
-                    self.sub_.clear_new();
-                    self.const_.clear_new();
-                    if !self.delta.has_new_inserts() && self.uf.num_uprooted() == 0 {
-                        return;
-                    }
-                    self.sub_.update_begin(&mut self.delta.sub_, &mut self.uf);
-                    self.const_
-                        .update_begin(&mut self.delta.const_, &mut self.uf);
-                    loop {
-                        let mut progress = false;
-                        progress |= self.sub_.update(&mut self.delta.sub_, &mut self.uf);
-                        progress |= self.const_.update(&mut self.delta.const_, &mut self.uf);
-                        if !progress {
-                            break;
+                    log_duration!("canonicalize (total): {}", {
+                        self.sub_.clear_new();
+                        self.const_.clear_new();
+                        if !self.delta.has_new_inserts() && self.uf.num_uprooted() == 0 {
+                            return;
                         }
-                    }
-                    self.sub_
-                        .update_finalize(&mut self.delta.sub_, &mut self.uf);
-                    self.const_
-                        .update_finalize(&mut self.delta.const_, &mut self.uf);
-                    self.global_i64.update_finalize();
-                    self.uf.reset_num_uprooted();
+                        log_duration!("update_begin (total): {}", {
+                            self.sub_.update_begin(&mut self.delta.sub_, &mut self.uf);
+                            self.const_
+                                .update_begin(&mut self.delta.const_, &mut self.uf);
+                        });
+                        log_duration!("update_loop (total): {}", {
+                            loop {
+                                let mut progress = false;
+                                progress |= self.sub_.update(&mut self.delta.sub_, &mut self.uf);
+                                progress |= self.const_.update(&mut self.delta.const_, &mut self.uf);
+                                if !progress {
+                                    break;
+                                }
+                            }
+                        });
+                        log_duration!("update_finalize (total): {}", {
+                            self.sub_
+                                .update_finalize(&mut self.delta.sub_, &mut self.uf);
+                            self.const_
+                                .update_finalize(&mut self.delta.const_, &mut self.uf);
+                            self.global_i64.update_finalize();
+                            self.uf.reset_num_uprooted();
+                        });
+                    });
                 }
             }
             impl EclassProvider<Math> for Theory {
@@ -4124,66 +4250,72 @@ fn regression_entry() {
                     }
                 }
                 fn update_begin(&mut self, insertions: &[Self::Row], uf: &mut Unification) {
-                    for &(mut x0, mut x1, mut x2) in insertions {
-                        match self
-                            .hash_index_0_1
-                            .entry((uf.math_.find(x0), uf.math_.find(x1)))
-                        {
-                            runtime::HashMapEntry::Occupied(mut entry) => {
-                                let (y2,) = entry.get_mut();
-                                uf.math_.union_mut(&mut x2, y2);
-                            }
-                            runtime::HashMapEntry::Vacant(entry) => {
-                                entry.insert((uf.math_.find(x2),));
+                    log_duration!("update_begin {}: {}", "integral", {
+                        for &(mut x0, mut x1, mut x2) in insertions {
+                            match self
+                                .hash_index_0_1
+                                .entry((uf.math_.find(x0), uf.math_.find(x1)))
+                            {
+                                runtime::HashMapEntry::Occupied(mut entry) => {
+                                    let (y2,) = entry.get_mut();
+                                    uf.math_.union_mut(&mut x2, y2);
+                                }
+                                runtime::HashMapEntry::Vacant(entry) => {
+                                    entry.insert((uf.math_.find(x2),));
+                                }
                             }
                         }
-                    }
+                    });
                 }
                 fn update(&mut self, insertions: &mut Vec<Self::Row>, uf: &mut Unification) -> bool {
                     if self.math_num_uprooted_at_latest_retain == uf.math_.num_uprooted() {
                         return false;
                     }
-                    self.math_num_uprooted_at_latest_retain = uf.math_.num_uprooted();
                     let offset = insertions.len();
-                    self.hash_index_0_1.retain(|&(x0, x1), &mut (x2,)| {
-                        if uf.math_.is_root(x0) & uf.math_.is_root(x1) & uf.math_.is_root(x2) {
-                            true
-                        } else {
-                            insertions.push((x0, x1, x2));
-                            false
-                        }
+                    log_duration!("update {}: {}", "integral", {
+                        self.math_num_uprooted_at_latest_retain = uf.math_.num_uprooted();
+                        self.hash_index_0_1.retain(|&(x0, x1), &mut (x2,)| {
+                            if uf.math_.is_root(x0) & uf.math_.is_root(x1) & uf.math_.is_root(x2) {
+                                true
+                            } else {
+                                insertions.push((x0, x1, x2));
+                                false
+                            }
+                        });
                     });
                     self.update_begin(&insertions[offset..], uf);
                     true
                 }
                 fn update_finalize(&mut self, insertions: &mut Vec<Self::Row>, uf: &mut Unification) {
-                    assert!(self.new.is_empty());
-                    self.new.extend(
-                        self.hash_index_0_1
-                            .iter()
-                            .map(|(&(x0, x1), &(x2,))| {
-                                (uf.math_.find(x0), uf.math_.find(x1), uf.math_.find(x2))
-                            })
-                            .filter(|&(x0, x1, x2)| !self.hash_index_0_1_2.contains_key(&(x0, x1, x2))),
-                    );
-                    insertions.clear();
-                    RadixSortable::wrap(&mut self.new).voracious_sort();
-                    self.new.dedup();
-                    for &(x0, x1, x2) in &self.new {
-                        self.hash_index_0_1_2
-                            .entry((uf.math_.find(x0), uf.math_.find(x1), uf.math_.find(x2)))
-                            .or_default()
-                            .push(());
-                    }
-                    self.hash_index_0_1_2.retain(|&(x0, x1, x2), v| {
-                        if uf.math_.is_root(x0) & uf.math_.is_root(x1) & uf.math_.is_root(x2) {
-                            v.retain(|&mut ()| true);
-                            v.sort_unstable();
-                            v.dedup();
-                            true
-                        } else {
-                            false
+                    log_duration!("update_finalize {}: {}", "integral", {
+                        assert!(self.new.is_empty());
+                        self.new.extend(
+                            self.hash_index_0_1
+                                .iter()
+                                .map(|(&(x0, x1), &(x2,))| {
+                                    (uf.math_.find(x0), uf.math_.find(x1), uf.math_.find(x2))
+                                })
+                                .filter(|&(x0, x1, x2)| !self.hash_index_0_1_2.contains_key(&(x0, x1, x2))),
+                        );
+                        insertions.clear();
+                        RadixSortable::wrap(&mut self.new).voracious_sort();
+                        self.new.dedup();
+                        for &(x0, x1, x2) in &self.new {
+                            self.hash_index_0_1_2
+                                .entry((uf.math_.find(x0), uf.math_.find(x1), uf.math_.find(x2)))
+                                .or_default()
+                                .push(());
                         }
+                        self.hash_index_0_1_2.retain(|&(x0, x1, x2), v| {
+                            if uf.math_.is_root(x0) & uf.math_.is_root(x1) & uf.math_.is_root(x2) {
+                                v.retain(|&mut ()| true);
+                                v.sort_unstable();
+                                v.dedup();
+                                true
+                            } else {
+                                false
+                            }
+                        });
                     });
                     self.math_num_uprooted_at_latest_retain = 0;
                 }
@@ -4266,66 +4398,72 @@ fn regression_entry() {
                     }
                 }
                 fn update_begin(&mut self, insertions: &[Self::Row], uf: &mut Unification) {
-                    for &(mut x0, mut x1, mut x2) in insertions {
-                        match self
-                            .hash_index_0_1
-                            .entry((uf.math_.find(x0), uf.math_.find(x1)))
-                        {
-                            runtime::HashMapEntry::Occupied(mut entry) => {
-                                let (y2,) = entry.get_mut();
-                                uf.math_.union_mut(&mut x2, y2);
-                            }
-                            runtime::HashMapEntry::Vacant(entry) => {
-                                entry.insert((uf.math_.find(x2),));
+                    log_duration!("update_begin {}: {}", "add", {
+                        for &(mut x0, mut x1, mut x2) in insertions {
+                            match self
+                                .hash_index_0_1
+                                .entry((uf.math_.find(x0), uf.math_.find(x1)))
+                            {
+                                runtime::HashMapEntry::Occupied(mut entry) => {
+                                    let (y2,) = entry.get_mut();
+                                    uf.math_.union_mut(&mut x2, y2);
+                                }
+                                runtime::HashMapEntry::Vacant(entry) => {
+                                    entry.insert((uf.math_.find(x2),));
+                                }
                             }
                         }
-                    }
+                    });
                 }
                 fn update(&mut self, insertions: &mut Vec<Self::Row>, uf: &mut Unification) -> bool {
                     if self.math_num_uprooted_at_latest_retain == uf.math_.num_uprooted() {
                         return false;
                     }
-                    self.math_num_uprooted_at_latest_retain = uf.math_.num_uprooted();
                     let offset = insertions.len();
-                    self.hash_index_0_1.retain(|&(x0, x1), &mut (x2,)| {
-                        if uf.math_.is_root(x0) & uf.math_.is_root(x1) & uf.math_.is_root(x2) {
-                            true
-                        } else {
-                            insertions.push((x0, x1, x2));
-                            false
-                        }
+                    log_duration!("update {}: {}", "add", {
+                        self.math_num_uprooted_at_latest_retain = uf.math_.num_uprooted();
+                        self.hash_index_0_1.retain(|&(x0, x1), &mut (x2,)| {
+                            if uf.math_.is_root(x0) & uf.math_.is_root(x1) & uf.math_.is_root(x2) {
+                                true
+                            } else {
+                                insertions.push((x0, x1, x2));
+                                false
+                            }
+                        });
                     });
                     self.update_begin(&insertions[offset..], uf);
                     true
                 }
                 fn update_finalize(&mut self, insertions: &mut Vec<Self::Row>, uf: &mut Unification) {
-                    assert!(self.new.is_empty());
-                    self.new.extend(
-                        self.hash_index_0_1
-                            .iter()
-                            .map(|(&(x0, x1), &(x2,))| {
-                                (uf.math_.find(x0), uf.math_.find(x1), uf.math_.find(x2))
-                            })
-                            .filter(|&(x0, x1, x2)| !self.hash_index_0_1_2.contains_key(&(x0, x1, x2))),
-                    );
-                    insertions.clear();
-                    RadixSortable::wrap(&mut self.new).voracious_sort();
-                    self.new.dedup();
-                    for &(x0, x1, x2) in &self.new {
-                        self.hash_index_0_1_2
-                            .entry((uf.math_.find(x0), uf.math_.find(x1), uf.math_.find(x2)))
-                            .or_default()
-                            .push(());
-                    }
-                    self.hash_index_0_1_2.retain(|&(x0, x1, x2), v| {
-                        if uf.math_.is_root(x0) & uf.math_.is_root(x1) & uf.math_.is_root(x2) {
-                            v.retain(|&mut ()| true);
-                            v.sort_unstable();
-                            v.dedup();
-                            true
-                        } else {
-                            false
+                    log_duration!("update_finalize {}: {}", "add", {
+                        assert!(self.new.is_empty());
+                        self.new.extend(
+                            self.hash_index_0_1
+                                .iter()
+                                .map(|(&(x0, x1), &(x2,))| {
+                                    (uf.math_.find(x0), uf.math_.find(x1), uf.math_.find(x2))
+                                })
+                                .filter(|&(x0, x1, x2)| !self.hash_index_0_1_2.contains_key(&(x0, x1, x2))),
+                        );
+                        insertions.clear();
+                        RadixSortable::wrap(&mut self.new).voracious_sort();
+                        self.new.dedup();
+                        for &(x0, x1, x2) in &self.new {
+                            self.hash_index_0_1_2
+                                .entry((uf.math_.find(x0), uf.math_.find(x1), uf.math_.find(x2)))
+                                .or_default()
+                                .push(());
                         }
+                        self.hash_index_0_1_2.retain(|&(x0, x1, x2), v| {
+                            if uf.math_.is_root(x0) & uf.math_.is_root(x1) & uf.math_.is_root(x2) {
+                                v.retain(|&mut ()| true);
+                                v.sort_unstable();
+                                v.dedup();
+                                true
+                            } else {
+                                false
+                            }
+                        });
                     });
                     self.math_num_uprooted_at_latest_retain = 0;
                 }
@@ -4421,18 +4559,22 @@ fn regression_entry() {
                     theory
                 }
                 pub fn step(&mut self) -> [std::time::Duration; 2] {
-                    [
-                        {
-                            let start = std::time::Instant::now();
-                            self.apply_rules();
-                            start.elapsed()
-                        },
-                        {
-                            let start = std::time::Instant::now();
-                            self.canonicalize();
-                            start.elapsed()
-                        },
-                    ]
+                    log_duration!("======== STEP took {} ==========", {
+                        [
+                            {
+                                let start = std::time::Instant::now();
+                                log_duration!("apply_rules: {}", {
+                                    self.apply_rules();
+                                });
+                                start.elapsed()
+                            },
+                            {
+                                let start = std::time::Instant::now();
+                                self.canonicalize();
+                                start.elapsed()
+                            },
+                        ]
+                    })
                 }
                 #[inline(never)]
                 pub fn apply_rules(&mut self) {
@@ -4472,29 +4614,37 @@ fn regression_entry() {
                 }
                 #[inline(never)]
                 pub fn canonicalize(&mut self) {
-                    self.integral_.clear_new();
-                    self.add_.clear_new();
-                    if !self.delta.has_new_inserts() && self.uf.num_uprooted() == 0 {
-                        return;
-                    }
-                    self.integral_
-                        .update_begin(&mut self.delta.integral_, &mut self.uf);
-                    self.add_.update_begin(&mut self.delta.add_, &mut self.uf);
-                    loop {
-                        let mut progress = false;
-                        progress |= self
-                            .integral_
-                            .update(&mut self.delta.integral_, &mut self.uf);
-                        progress |= self.add_.update(&mut self.delta.add_, &mut self.uf);
-                        if !progress {
-                            break;
+                    log_duration!("canonicalize (total): {}", {
+                        self.integral_.clear_new();
+                        self.add_.clear_new();
+                        if !self.delta.has_new_inserts() && self.uf.num_uprooted() == 0 {
+                            return;
                         }
-                    }
-                    self.integral_
-                        .update_finalize(&mut self.delta.integral_, &mut self.uf);
-                    self.add_
-                        .update_finalize(&mut self.delta.add_, &mut self.uf);
-                    self.uf.reset_num_uprooted();
+                        log_duration!("update_begin (total): {}", {
+                            self.integral_
+                                .update_begin(&mut self.delta.integral_, &mut self.uf);
+                            self.add_.update_begin(&mut self.delta.add_, &mut self.uf);
+                        });
+                        log_duration!("update_loop (total): {}", {
+                            loop {
+                                let mut progress = false;
+                                progress |= self
+                                    .integral_
+                                    .update(&mut self.delta.integral_, &mut self.uf);
+                                progress |= self.add_.update(&mut self.delta.add_, &mut self.uf);
+                                if !progress {
+                                    break;
+                                }
+                            }
+                        });
+                        log_duration!("update_finalize (total): {}", {
+                            self.integral_
+                                .update_finalize(&mut self.delta.integral_, &mut self.uf);
+                            self.add_
+                                .update_finalize(&mut self.delta.add_, &mut self.uf);
+                            self.uf.reset_num_uprooted();
+                        });
+                    });
                 }
             }
             impl EclassProvider<Math> for Theory {
@@ -4636,64 +4786,72 @@ fn test_bind_variable_multiple_times() {
                     }
                 }
                 fn update_begin(&mut self, insertions: &[Self::Row], uf: &mut Unification) {
-                    for &(mut x0, mut x1, mut x2) in insertions {
-                        match self
-                            .hash_index_0_1
-                            .entry((uf.foo_.find(x0), uf.foo_.find(x1)))
-                        {
-                            runtime::HashMapEntry::Occupied(mut entry) => {
-                                let (y2,) = entry.get_mut();
-                                uf.foo_.union_mut(&mut x2, y2);
-                            }
-                            runtime::HashMapEntry::Vacant(entry) => {
-                                entry.insert((uf.foo_.find(x2),));
+                    log_duration!("update_begin {}: {}", "same", {
+                        for &(mut x0, mut x1, mut x2) in insertions {
+                            match self
+                                .hash_index_0_1
+                                .entry((uf.foo_.find(x0), uf.foo_.find(x1)))
+                            {
+                                runtime::HashMapEntry::Occupied(mut entry) => {
+                                    let (y2,) = entry.get_mut();
+                                    uf.foo_.union_mut(&mut x2, y2);
+                                }
+                                runtime::HashMapEntry::Vacant(entry) => {
+                                    entry.insert((uf.foo_.find(x2),));
+                                }
                             }
                         }
-                    }
+                    });
                 }
                 fn update(&mut self, insertions: &mut Vec<Self::Row>, uf: &mut Unification) -> bool {
                     if self.foo_num_uprooted_at_latest_retain == uf.foo_.num_uprooted() {
                         return false;
                     }
-                    self.foo_num_uprooted_at_latest_retain = uf.foo_.num_uprooted();
                     let offset = insertions.len();
-                    self.hash_index_0_1.retain(|&(x0, x1), &mut (x2,)| {
-                        if uf.foo_.is_root(x0) & uf.foo_.is_root(x1) & uf.foo_.is_root(x2) {
-                            true
-                        } else {
-                            insertions.push((x0, x1, x2));
-                            false
-                        }
+                    log_duration!("update {}: {}", "same", {
+                        self.foo_num_uprooted_at_latest_retain = uf.foo_.num_uprooted();
+                        self.hash_index_0_1.retain(|&(x0, x1), &mut (x2,)| {
+                            if uf.foo_.is_root(x0) & uf.foo_.is_root(x1) & uf.foo_.is_root(x2) {
+                                true
+                            } else {
+                                insertions.push((x0, x1, x2));
+                                false
+                            }
+                        });
                     });
                     self.update_begin(&insertions[offset..], uf);
                     true
                 }
                 fn update_finalize(&mut self, insertions: &mut Vec<Self::Row>, uf: &mut Unification) {
-                    assert!(self.new.is_empty());
-                    self.new.extend(
-                        self.hash_index_0_1
-                            .iter()
-                            .map(|(&(x0, x1), &(x2,))| (uf.foo_.find(x0), uf.foo_.find(x1), uf.foo_.find(x2)))
-                            .filter(|&(x0, x1, x2)| !self.hash_index_0_1_2.contains_key(&(x0, x1, x2))),
-                    );
-                    insertions.clear();
-                    RadixSortable::wrap(&mut self.new).voracious_sort();
-                    self.new.dedup();
-                    for &(x0, x1, x2) in &self.new {
-                        self.hash_index_0_1_2
-                            .entry((uf.foo_.find(x0), uf.foo_.find(x1), uf.foo_.find(x2)))
-                            .or_default()
-                            .push(());
-                    }
-                    self.hash_index_0_1_2.retain(|&(x0, x1, x2), v| {
-                        if uf.foo_.is_root(x0) & uf.foo_.is_root(x1) & uf.foo_.is_root(x2) {
-                            v.retain(|&mut ()| true);
-                            v.sort_unstable();
-                            v.dedup();
-                            true
-                        } else {
-                            false
+                    log_duration!("update_finalize {}: {}", "same", {
+                        assert!(self.new.is_empty());
+                        self.new.extend(
+                            self.hash_index_0_1
+                                .iter()
+                                .map(|(&(x0, x1), &(x2,))| {
+                                    (uf.foo_.find(x0), uf.foo_.find(x1), uf.foo_.find(x2))
+                                })
+                                .filter(|&(x0, x1, x2)| !self.hash_index_0_1_2.contains_key(&(x0, x1, x2))),
+                        );
+                        insertions.clear();
+                        RadixSortable::wrap(&mut self.new).voracious_sort();
+                        self.new.dedup();
+                        for &(x0, x1, x2) in &self.new {
+                            self.hash_index_0_1_2
+                                .entry((uf.foo_.find(x0), uf.foo_.find(x1), uf.foo_.find(x2)))
+                                .or_default()
+                                .push(());
                         }
+                        self.hash_index_0_1_2.retain(|&(x0, x1, x2), v| {
+                            if uf.foo_.is_root(x0) & uf.foo_.is_root(x1) & uf.foo_.is_root(x2) {
+                                v.retain(|&mut ()| true);
+                                v.sort_unstable();
+                                v.dedup();
+                                true
+                            } else {
+                                false
+                            }
+                        });
                     });
                     self.foo_num_uprooted_at_latest_retain = 0;
                 }
@@ -4783,18 +4941,22 @@ fn test_bind_variable_multiple_times() {
                     theory
                 }
                 pub fn step(&mut self) -> [std::time::Duration; 2] {
-                    [
-                        {
-                            let start = std::time::Instant::now();
-                            self.apply_rules();
-                            start.elapsed()
-                        },
-                        {
-                            let start = std::time::Instant::now();
-                            self.canonicalize();
-                            start.elapsed()
-                        },
-                    ]
+                    log_duration!("======== STEP took {} ==========", {
+                        [
+                            {
+                                let start = std::time::Instant::now();
+                                log_duration!("apply_rules: {}", {
+                                    self.apply_rules();
+                                });
+                                start.elapsed()
+                            },
+                            {
+                                let start = std::time::Instant::now();
+                                self.canonicalize();
+                                start.elapsed()
+                            },
+                        ]
+                    })
                 }
                 #[inline(never)]
                 pub fn apply_rules(&mut self) {
@@ -4830,21 +4992,29 @@ fn test_bind_variable_multiple_times() {
                 }
                 #[inline(never)]
                 pub fn canonicalize(&mut self) {
-                    self.same_.clear_new();
-                    if !self.delta.has_new_inserts() && self.uf.num_uprooted() == 0 {
-                        return;
-                    }
-                    self.same_.update_begin(&mut self.delta.same_, &mut self.uf);
-                    loop {
-                        let mut progress = false;
-                        progress |= self.same_.update(&mut self.delta.same_, &mut self.uf);
-                        if !progress {
-                            break;
+                    log_duration!("canonicalize (total): {}", {
+                        self.same_.clear_new();
+                        if !self.delta.has_new_inserts() && self.uf.num_uprooted() == 0 {
+                            return;
                         }
-                    }
-                    self.same_
-                        .update_finalize(&mut self.delta.same_, &mut self.uf);
-                    self.uf.reset_num_uprooted();
+                        log_duration!("update_begin (total): {}", {
+                            self.same_.update_begin(&mut self.delta.same_, &mut self.uf);
+                        });
+                        log_duration!("update_loop (total): {}", {
+                            loop {
+                                let mut progress = false;
+                                progress |= self.same_.update(&mut self.delta.same_, &mut self.uf);
+                                if !progress {
+                                    break;
+                                }
+                            }
+                        });
+                        log_duration!("update_finalize (total): {}", {
+                            self.same_
+                                .update_finalize(&mut self.delta.same_, &mut self.uf);
+                            self.uf.reset_num_uprooted();
+                        });
+                    });
                 }
             }
             impl EclassProvider<Foo> for Theory {
@@ -5075,82 +5245,88 @@ fn codegen_variable_reuse_bug() {
                     }
                 }
                 fn update_begin(&mut self, insertions: &[Self::Row], uf: &mut Unification) {
-                    for &(mut x0, mut x1, mut x2) in insertions {
-                        match self
-                            .hash_index_0_1
-                            .entry((uf.math_.find(x0), uf.math_.find(x1)))
-                        {
-                            runtime::HashMapEntry::Occupied(mut entry) => {
-                                let (y2,) = entry.get_mut();
-                                uf.math_.union_mut(&mut x2, y2);
-                            }
-                            runtime::HashMapEntry::Vacant(entry) => {
-                                entry.insert((uf.math_.find(x2),));
+                    log_duration!("update_begin {}: {}", "add", {
+                        for &(mut x0, mut x1, mut x2) in insertions {
+                            match self
+                                .hash_index_0_1
+                                .entry((uf.math_.find(x0), uf.math_.find(x1)))
+                            {
+                                runtime::HashMapEntry::Occupied(mut entry) => {
+                                    let (y2,) = entry.get_mut();
+                                    uf.math_.union_mut(&mut x2, y2);
+                                }
+                                runtime::HashMapEntry::Vacant(entry) => {
+                                    entry.insert((uf.math_.find(x2),));
+                                }
                             }
                         }
-                    }
+                    });
                 }
                 fn update(&mut self, insertions: &mut Vec<Self::Row>, uf: &mut Unification) -> bool {
                     if self.math_num_uprooted_at_latest_retain == uf.math_.num_uprooted() {
                         return false;
                     }
-                    self.math_num_uprooted_at_latest_retain = uf.math_.num_uprooted();
                     let offset = insertions.len();
-                    self.hash_index_0_1.retain(|&(x0, x1), &mut (x2,)| {
-                        if uf.math_.is_root(x0) & uf.math_.is_root(x1) & uf.math_.is_root(x2) {
-                            true
-                        } else {
-                            insertions.push((x0, x1, x2));
-                            false
-                        }
+                    log_duration!("update {}: {}", "add", {
+                        self.math_num_uprooted_at_latest_retain = uf.math_.num_uprooted();
+                        self.hash_index_0_1.retain(|&(x0, x1), &mut (x2,)| {
+                            if uf.math_.is_root(x0) & uf.math_.is_root(x1) & uf.math_.is_root(x2) {
+                                true
+                            } else {
+                                insertions.push((x0, x1, x2));
+                                false
+                            }
+                        });
                     });
                     self.update_begin(&insertions[offset..], uf);
                     true
                 }
                 fn update_finalize(&mut self, insertions: &mut Vec<Self::Row>, uf: &mut Unification) {
-                    assert!(self.new.is_empty());
-                    self.new.extend(
-                        self.hash_index_0_1
-                            .iter()
-                            .map(|(&(x0, x1), &(x2,))| {
-                                (uf.math_.find(x0), uf.math_.find(x1), uf.math_.find(x2))
-                            })
-                            .filter(|&(x0, x1, x2)| !self.hash_index_0_1_2.contains_key(&(x0, x1, x2))),
-                    );
-                    insertions.clear();
-                    RadixSortable::wrap(&mut self.new).voracious_sort();
-                    self.new.dedup();
-                    for &(x0, x1, x2) in &self.new {
-                        self.hash_index_0_2
-                            .entry((uf.math_.find(x0), uf.math_.find(x2)))
-                            .or_default()
-                            .push((uf.math_.find(x1),));
-                    }
-                    self.hash_index_0_2.retain(|&(x0, x2), v| {
-                        if uf.math_.is_root(x0) & uf.math_.is_root(x2) {
-                            v.retain(|&mut (x1,)| uf.math_.is_root(x1));
-                            v.sort_unstable();
-                            v.dedup();
-                            true
-                        } else {
-                            false
+                    log_duration!("update_finalize {}: {}", "add", {
+                        assert!(self.new.is_empty());
+                        self.new.extend(
+                            self.hash_index_0_1
+                                .iter()
+                                .map(|(&(x0, x1), &(x2,))| {
+                                    (uf.math_.find(x0), uf.math_.find(x1), uf.math_.find(x2))
+                                })
+                                .filter(|&(x0, x1, x2)| !self.hash_index_0_1_2.contains_key(&(x0, x1, x2))),
+                        );
+                        insertions.clear();
+                        RadixSortable::wrap(&mut self.new).voracious_sort();
+                        self.new.dedup();
+                        for &(x0, x1, x2) in &self.new {
+                            self.hash_index_0_2
+                                .entry((uf.math_.find(x0), uf.math_.find(x2)))
+                                .or_default()
+                                .push((uf.math_.find(x1),));
                         }
-                    });
-                    for &(x0, x1, x2) in &self.new {
-                        self.hash_index_0_1_2
-                            .entry((uf.math_.find(x0), uf.math_.find(x1), uf.math_.find(x2)))
-                            .or_default()
-                            .push(());
-                    }
-                    self.hash_index_0_1_2.retain(|&(x0, x1, x2), v| {
-                        if uf.math_.is_root(x0) & uf.math_.is_root(x1) & uf.math_.is_root(x2) {
-                            v.retain(|&mut ()| true);
-                            v.sort_unstable();
-                            v.dedup();
-                            true
-                        } else {
-                            false
+                        self.hash_index_0_2.retain(|&(x0, x2), v| {
+                            if uf.math_.is_root(x0) & uf.math_.is_root(x2) {
+                                v.retain(|&mut (x1,)| uf.math_.is_root(x1));
+                                v.sort_unstable();
+                                v.dedup();
+                                true
+                            } else {
+                                false
+                            }
+                        });
+                        for &(x0, x1, x2) in &self.new {
+                            self.hash_index_0_1_2
+                                .entry((uf.math_.find(x0), uf.math_.find(x1), uf.math_.find(x2)))
+                                .or_default()
+                                .push(());
                         }
+                        self.hash_index_0_1_2.retain(|&(x0, x1, x2), v| {
+                            if uf.math_.is_root(x0) & uf.math_.is_root(x1) & uf.math_.is_root(x2) {
+                                v.retain(|&mut ()| true);
+                                v.sort_unstable();
+                                v.dedup();
+                                true
+                            } else {
+                                false
+                            }
+                        });
                     });
                     self.math_num_uprooted_at_latest_retain = 0;
                 }
@@ -5241,61 +5417,67 @@ fn codegen_variable_reuse_bug() {
                     }
                 }
                 fn update_begin(&mut self, insertions: &[Self::Row], uf: &mut Unification) {
-                    for &(mut x0,) in insertions {
-                        match self.hash_index_.entry(()) {
-                            runtime::HashMapEntry::Occupied(mut entry) => {
-                                let (y0,) = entry.get_mut();
-                                uf.math_.union_mut(&mut x0, y0);
-                            }
-                            runtime::HashMapEntry::Vacant(entry) => {
-                                entry.insert((uf.math_.find(x0),));
+                    log_duration!("update_begin {}: {}", "zero", {
+                        for &(mut x0,) in insertions {
+                            match self.hash_index_.entry(()) {
+                                runtime::HashMapEntry::Occupied(mut entry) => {
+                                    let (y0,) = entry.get_mut();
+                                    uf.math_.union_mut(&mut x0, y0);
+                                }
+                                runtime::HashMapEntry::Vacant(entry) => {
+                                    entry.insert((uf.math_.find(x0),));
+                                }
                             }
                         }
-                    }
+                    });
                 }
                 fn update(&mut self, insertions: &mut Vec<Self::Row>, uf: &mut Unification) -> bool {
                     if self.math_num_uprooted_at_latest_retain == uf.math_.num_uprooted() {
                         return false;
                     }
-                    self.math_num_uprooted_at_latest_retain = uf.math_.num_uprooted();
                     let offset = insertions.len();
-                    self.hash_index_.retain(|&(), &mut (x0,)| {
-                        if uf.math_.is_root(x0) {
-                            true
-                        } else {
-                            insertions.push((x0,));
-                            false
-                        }
+                    log_duration!("update {}: {}", "zero", {
+                        self.math_num_uprooted_at_latest_retain = uf.math_.num_uprooted();
+                        self.hash_index_.retain(|&(), &mut (x0,)| {
+                            if uf.math_.is_root(x0) {
+                                true
+                            } else {
+                                insertions.push((x0,));
+                                false
+                            }
+                        });
                     });
                     self.update_begin(&insertions[offset..], uf);
                     true
                 }
                 fn update_finalize(&mut self, insertions: &mut Vec<Self::Row>, uf: &mut Unification) {
-                    assert!(self.new.is_empty());
-                    self.new.extend(
-                        self.hash_index_
-                            .iter()
-                            .map(|(&(), &(x0,))| (uf.math_.find(x0),))
-                            .filter(|&(x0,)| !self.hash_index_0.contains_key(&(x0,))),
-                    );
-                    insertions.clear();
-                    RadixSortable::wrap(&mut self.new).voracious_sort();
-                    self.new.dedup();
-                    for &(x0,) in &self.new {
-                        self.hash_index_0
-                            .entry((uf.math_.find(x0),))
-                            .or_default()
-                            .push(());
-                    }
-                    self.hash_index_0.retain(|&(x0,), v| {
-                        if uf.math_.is_root(x0) {
-                            v.retain(|&mut ()| true);
-                            v.sort_unstable();
-                            v.dedup();
-                            true
-                        } else {
-                            false
+                    log_duration!("update_finalize {}: {}", "zero", {
+                        assert!(self.new.is_empty());
+                        self.new.extend(
+                            self.hash_index_
+                                .iter()
+                                .map(|(&(), &(x0,))| (uf.math_.find(x0),))
+                                .filter(|&(x0,)| !self.hash_index_0.contains_key(&(x0,))),
+                        );
+                        insertions.clear();
+                        RadixSortable::wrap(&mut self.new).voracious_sort();
+                        self.new.dedup();
+                        for &(x0,) in &self.new {
+                            self.hash_index_0
+                                .entry((uf.math_.find(x0),))
+                                .or_default()
+                                .push(());
                         }
+                        self.hash_index_0.retain(|&(x0,), v| {
+                            if uf.math_.is_root(x0) {
+                                v.retain(|&mut ()| true);
+                                v.sort_unstable();
+                                v.dedup();
+                                true
+                            } else {
+                                false
+                            }
+                        });
                     });
                     self.math_num_uprooted_at_latest_retain = 0;
                 }
@@ -5387,18 +5569,22 @@ fn codegen_variable_reuse_bug() {
                     theory
                 }
                 pub fn step(&mut self) -> [std::time::Duration; 2] {
-                    [
-                        {
-                            let start = std::time::Instant::now();
-                            self.apply_rules();
-                            start.elapsed()
-                        },
-                        {
-                            let start = std::time::Instant::now();
-                            self.canonicalize();
-                            start.elapsed()
-                        },
-                    ]
+                    log_duration!("======== STEP took {} ==========", {
+                        [
+                            {
+                                let start = std::time::Instant::now();
+                                log_duration!("apply_rules: {}", {
+                                    self.apply_rules();
+                                });
+                                start.elapsed()
+                            },
+                            {
+                                let start = std::time::Instant::now();
+                                self.canonicalize();
+                                start.elapsed()
+                            },
+                        ]
+                    })
                 }
                 #[inline(never)]
                 pub fn apply_rules(&mut self) {
@@ -5445,28 +5631,36 @@ fn codegen_variable_reuse_bug() {
                 }
                 #[inline(never)]
                 pub fn canonicalize(&mut self) {
-                    self.add_.clear_new();
-                    self.zero_.clear_new();
-                    if !self.delta.has_new_inserts() && self.uf.num_uprooted() == 0 {
-                        return;
-                    }
-                    self.add_.update_begin(&mut self.delta.add_, &mut self.uf);
-                    self.zero_.update_begin(&mut self.delta.zero_, &mut self.uf);
-                    loop {
-                        let mut progress = false;
-                        progress |= self.add_.update(&mut self.delta.add_, &mut self.uf);
-                        progress |= self.zero_.update(&mut self.delta.zero_, &mut self.uf);
-                        if !progress {
-                            break;
+                    log_duration!("canonicalize (total): {}", {
+                        self.add_.clear_new();
+                        self.zero_.clear_new();
+                        if !self.delta.has_new_inserts() && self.uf.num_uprooted() == 0 {
+                            return;
                         }
-                    }
-                    self.add_
-                        .update_finalize(&mut self.delta.add_, &mut self.uf);
-                    self.zero_
-                        .update_finalize(&mut self.delta.zero_, &mut self.uf);
-                    self.global_math.update(&mut self.uf.math_);
-                    self.global_math.update_finalize();
-                    self.uf.reset_num_uprooted();
+                        log_duration!("update_begin (total): {}", {
+                            self.add_.update_begin(&mut self.delta.add_, &mut self.uf);
+                            self.zero_.update_begin(&mut self.delta.zero_, &mut self.uf);
+                        });
+                        log_duration!("update_loop (total): {}", {
+                            loop {
+                                let mut progress = false;
+                                progress |= self.add_.update(&mut self.delta.add_, &mut self.uf);
+                                progress |= self.zero_.update(&mut self.delta.zero_, &mut self.uf);
+                                if !progress {
+                                    break;
+                                }
+                            }
+                        });
+                        log_duration!("update_finalize (total): {}", {
+                            self.add_
+                                .update_finalize(&mut self.delta.add_, &mut self.uf);
+                            self.zero_
+                                .update_finalize(&mut self.delta.zero_, &mut self.uf);
+                            self.global_math.update(&mut self.uf.math_);
+                            self.global_math.update_finalize();
+                            self.uf.reset_num_uprooted();
+                        });
+                    });
                 }
             }
             impl EclassProvider<Math> for Theory {
@@ -5572,66 +5766,72 @@ fn initial_exprs() {
                     }
                 }
                 fn update_begin(&mut self, insertions: &[Self::Row], uf: &mut Unification) {
-                    for &(mut x0, mut x1, mut x2) in insertions {
-                        match self
-                            .hash_index_0_1
-                            .entry((uf.math_.find(x0), uf.math_.find(x1)))
-                        {
-                            runtime::HashMapEntry::Occupied(mut entry) => {
-                                let (y2,) = entry.get_mut();
-                                uf.math_.union_mut(&mut x2, y2);
-                            }
-                            runtime::HashMapEntry::Vacant(entry) => {
-                                entry.insert((uf.math_.find(x2),));
+                    log_duration!("update_begin {}: {}", "add", {
+                        for &(mut x0, mut x1, mut x2) in insertions {
+                            match self
+                                .hash_index_0_1
+                                .entry((uf.math_.find(x0), uf.math_.find(x1)))
+                            {
+                                runtime::HashMapEntry::Occupied(mut entry) => {
+                                    let (y2,) = entry.get_mut();
+                                    uf.math_.union_mut(&mut x2, y2);
+                                }
+                                runtime::HashMapEntry::Vacant(entry) => {
+                                    entry.insert((uf.math_.find(x2),));
+                                }
                             }
                         }
-                    }
+                    });
                 }
                 fn update(&mut self, insertions: &mut Vec<Self::Row>, uf: &mut Unification) -> bool {
                     if self.math_num_uprooted_at_latest_retain == uf.math_.num_uprooted() {
                         return false;
                     }
-                    self.math_num_uprooted_at_latest_retain = uf.math_.num_uprooted();
                     let offset = insertions.len();
-                    self.hash_index_0_1.retain(|&(x0, x1), &mut (x2,)| {
-                        if uf.math_.is_root(x0) & uf.math_.is_root(x1) & uf.math_.is_root(x2) {
-                            true
-                        } else {
-                            insertions.push((x0, x1, x2));
-                            false
-                        }
+                    log_duration!("update {}: {}", "add", {
+                        self.math_num_uprooted_at_latest_retain = uf.math_.num_uprooted();
+                        self.hash_index_0_1.retain(|&(x0, x1), &mut (x2,)| {
+                            if uf.math_.is_root(x0) & uf.math_.is_root(x1) & uf.math_.is_root(x2) {
+                                true
+                            } else {
+                                insertions.push((x0, x1, x2));
+                                false
+                            }
+                        });
                     });
                     self.update_begin(&insertions[offset..], uf);
                     true
                 }
                 fn update_finalize(&mut self, insertions: &mut Vec<Self::Row>, uf: &mut Unification) {
-                    assert!(self.new.is_empty());
-                    self.new.extend(
-                        self.hash_index_0_1
-                            .iter()
-                            .map(|(&(x0, x1), &(x2,))| {
-                                (uf.math_.find(x0), uf.math_.find(x1), uf.math_.find(x2))
-                            })
-                            .filter(|&(x0, x1, x2)| !self.hash_index_0_1_2.contains_key(&(x0, x1, x2))),
-                    );
-                    insertions.clear();
-                    RadixSortable::wrap(&mut self.new).voracious_sort();
-                    self.new.dedup();
-                    for &(x0, x1, x2) in &self.new {
-                        self.hash_index_0_1_2
-                            .entry((uf.math_.find(x0), uf.math_.find(x1), uf.math_.find(x2)))
-                            .or_default()
-                            .push(());
-                    }
-                    self.hash_index_0_1_2.retain(|&(x0, x1, x2), v| {
-                        if uf.math_.is_root(x0) & uf.math_.is_root(x1) & uf.math_.is_root(x2) {
-                            v.retain(|&mut ()| true);
-                            v.sort_unstable();
-                            v.dedup();
-                            true
-                        } else {
-                            false
+                    log_duration!("update_finalize {}: {}", "add", {
+                        assert!(self.new.is_empty());
+                        self.new.extend(
+                            self.hash_index_0_1
+                                .iter()
+                                .map(|(&(x0, x1), &(x2,))| {
+                                    (uf.math_.find(x0), uf.math_.find(x1), uf.math_.find(x2))
+                                })
+                                .filter(|&(x0, x1, x2)| !self.hash_index_0_1_2.contains_key(&(x0, x1, x2))),
+                        );
+                        insertions.clear();
+                        RadixSortable::wrap(&mut self.new).voracious_sort();
+                        self.new.dedup();
+                        for &(x0, x1, x2) in &self.new {
+                            self.hash_index_0_1_2
+                                .entry((uf.math_.find(x0), uf.math_.find(x1), uf.math_.find(x2)))
+                                .or_default()
+                                .push(());
                         }
+                        self.hash_index_0_1_2.retain(|&(x0, x1, x2), v| {
+                            if uf.math_.is_root(x0) & uf.math_.is_root(x1) & uf.math_.is_root(x2) {
+                                v.retain(|&mut ()| true);
+                                v.sort_unstable();
+                                v.dedup();
+                                true
+                            } else {
+                                false
+                            }
+                        });
                     });
                     self.math_num_uprooted_at_latest_retain = 0;
                 }
@@ -5714,66 +5914,72 @@ fn initial_exprs() {
                     }
                 }
                 fn update_begin(&mut self, insertions: &[Self::Row], uf: &mut Unification) {
-                    for &(mut x0, mut x1, mut x2) in insertions {
-                        match self
-                            .hash_index_0_1
-                            .entry((uf.math_.find(x0), uf.math_.find(x1)))
-                        {
-                            runtime::HashMapEntry::Occupied(mut entry) => {
-                                let (y2,) = entry.get_mut();
-                                uf.math_.union_mut(&mut x2, y2);
-                            }
-                            runtime::HashMapEntry::Vacant(entry) => {
-                                entry.insert((uf.math_.find(x2),));
+                    log_duration!("update_begin {}: {}", "mul", {
+                        for &(mut x0, mut x1, mut x2) in insertions {
+                            match self
+                                .hash_index_0_1
+                                .entry((uf.math_.find(x0), uf.math_.find(x1)))
+                            {
+                                runtime::HashMapEntry::Occupied(mut entry) => {
+                                    let (y2,) = entry.get_mut();
+                                    uf.math_.union_mut(&mut x2, y2);
+                                }
+                                runtime::HashMapEntry::Vacant(entry) => {
+                                    entry.insert((uf.math_.find(x2),));
+                                }
                             }
                         }
-                    }
+                    });
                 }
                 fn update(&mut self, insertions: &mut Vec<Self::Row>, uf: &mut Unification) -> bool {
                     if self.math_num_uprooted_at_latest_retain == uf.math_.num_uprooted() {
                         return false;
                     }
-                    self.math_num_uprooted_at_latest_retain = uf.math_.num_uprooted();
                     let offset = insertions.len();
-                    self.hash_index_0_1.retain(|&(x0, x1), &mut (x2,)| {
-                        if uf.math_.is_root(x0) & uf.math_.is_root(x1) & uf.math_.is_root(x2) {
-                            true
-                        } else {
-                            insertions.push((x0, x1, x2));
-                            false
-                        }
+                    log_duration!("update {}: {}", "mul", {
+                        self.math_num_uprooted_at_latest_retain = uf.math_.num_uprooted();
+                        self.hash_index_0_1.retain(|&(x0, x1), &mut (x2,)| {
+                            if uf.math_.is_root(x0) & uf.math_.is_root(x1) & uf.math_.is_root(x2) {
+                                true
+                            } else {
+                                insertions.push((x0, x1, x2));
+                                false
+                            }
+                        });
                     });
                     self.update_begin(&insertions[offset..], uf);
                     true
                 }
                 fn update_finalize(&mut self, insertions: &mut Vec<Self::Row>, uf: &mut Unification) {
-                    assert!(self.new.is_empty());
-                    self.new.extend(
-                        self.hash_index_0_1
-                            .iter()
-                            .map(|(&(x0, x1), &(x2,))| {
-                                (uf.math_.find(x0), uf.math_.find(x1), uf.math_.find(x2))
-                            })
-                            .filter(|&(x0, x1, x2)| !self.hash_index_0_1_2.contains_key(&(x0, x1, x2))),
-                    );
-                    insertions.clear();
-                    RadixSortable::wrap(&mut self.new).voracious_sort();
-                    self.new.dedup();
-                    for &(x0, x1, x2) in &self.new {
-                        self.hash_index_0_1_2
-                            .entry((uf.math_.find(x0), uf.math_.find(x1), uf.math_.find(x2)))
-                            .or_default()
-                            .push(());
-                    }
-                    self.hash_index_0_1_2.retain(|&(x0, x1, x2), v| {
-                        if uf.math_.is_root(x0) & uf.math_.is_root(x1) & uf.math_.is_root(x2) {
-                            v.retain(|&mut ()| true);
-                            v.sort_unstable();
-                            v.dedup();
-                            true
-                        } else {
-                            false
+                    log_duration!("update_finalize {}: {}", "mul", {
+                        assert!(self.new.is_empty());
+                        self.new.extend(
+                            self.hash_index_0_1
+                                .iter()
+                                .map(|(&(x0, x1), &(x2,))| {
+                                    (uf.math_.find(x0), uf.math_.find(x1), uf.math_.find(x2))
+                                })
+                                .filter(|&(x0, x1, x2)| !self.hash_index_0_1_2.contains_key(&(x0, x1, x2))),
+                        );
+                        insertions.clear();
+                        RadixSortable::wrap(&mut self.new).voracious_sort();
+                        self.new.dedup();
+                        for &(x0, x1, x2) in &self.new {
+                            self.hash_index_0_1_2
+                                .entry((uf.math_.find(x0), uf.math_.find(x1), uf.math_.find(x2)))
+                                .or_default()
+                                .push(());
                         }
+                        self.hash_index_0_1_2.retain(|&(x0, x1, x2), v| {
+                            if uf.math_.is_root(x0) & uf.math_.is_root(x1) & uf.math_.is_root(x2) {
+                                v.retain(|&mut ()| true);
+                                v.sort_unstable();
+                                v.dedup();
+                                true
+                            } else {
+                                false
+                            }
+                        });
                     });
                     self.math_num_uprooted_at_latest_retain = 0;
                 }
@@ -5856,61 +6062,67 @@ fn initial_exprs() {
                     }
                 }
                 fn update_begin(&mut self, insertions: &[Self::Row], uf: &mut Unification) {
-                    for &(mut x0, mut x1) in insertions {
-                        match self.hash_index_0.entry((x0,)) {
-                            runtime::HashMapEntry::Occupied(mut entry) => {
-                                let (y1,) = entry.get_mut();
-                                uf.math_.union_mut(&mut x1, y1);
-                            }
-                            runtime::HashMapEntry::Vacant(entry) => {
-                                entry.insert((uf.math_.find(x1),));
+                    log_duration!("update_begin {}: {}", "const", {
+                        for &(mut x0, mut x1) in insertions {
+                            match self.hash_index_0.entry((x0,)) {
+                                runtime::HashMapEntry::Occupied(mut entry) => {
+                                    let (y1,) = entry.get_mut();
+                                    uf.math_.union_mut(&mut x1, y1);
+                                }
+                                runtime::HashMapEntry::Vacant(entry) => {
+                                    entry.insert((uf.math_.find(x1),));
+                                }
                             }
                         }
-                    }
+                    });
                 }
                 fn update(&mut self, insertions: &mut Vec<Self::Row>, uf: &mut Unification) -> bool {
                     if self.math_num_uprooted_at_latest_retain == uf.math_.num_uprooted() {
                         return false;
                     }
-                    self.math_num_uprooted_at_latest_retain = uf.math_.num_uprooted();
                     let offset = insertions.len();
-                    self.hash_index_0.retain(|&(x0,), &mut (x1,)| {
-                        if uf.math_.is_root(x1) {
-                            true
-                        } else {
-                            insertions.push((x0, x1));
-                            false
-                        }
+                    log_duration!("update {}: {}", "const", {
+                        self.math_num_uprooted_at_latest_retain = uf.math_.num_uprooted();
+                        self.hash_index_0.retain(|&(x0,), &mut (x1,)| {
+                            if uf.math_.is_root(x1) {
+                                true
+                            } else {
+                                insertions.push((x0, x1));
+                                false
+                            }
+                        });
                     });
                     self.update_begin(&insertions[offset..], uf);
                     true
                 }
                 fn update_finalize(&mut self, insertions: &mut Vec<Self::Row>, uf: &mut Unification) {
-                    assert!(self.new.is_empty());
-                    self.new.extend(
-                        self.hash_index_0
-                            .iter()
-                            .map(|(&(x0,), &(x1,))| (x0, uf.math_.find(x1)))
-                            .filter(|&(x0, x1)| !self.hash_index_0_1.contains_key(&(x0, x1))),
-                    );
-                    insertions.clear();
-                    self.new.sort_unstable();
-                    self.new.dedup();
-                    for &(x0, x1) in &self.new {
-                        self.hash_index_0_1
-                            .entry((x0, uf.math_.find(x1)))
-                            .or_default()
-                            .push(());
-                    }
-                    self.hash_index_0_1.retain(|&(x0, x1), v| {
-                        if uf.math_.is_root(x1) {
-                            v.retain(|&mut ()| true);
-                            v.sort_unstable();
-                            v.dedup();
-                            true
-                        } else {
-                            false
+                    log_duration!("update_finalize {}: {}", "const", {
+                        assert!(self.new.is_empty());
+                        self.new.extend(
+                            self.hash_index_0
+                                .iter()
+                                .map(|(&(x0,), &(x1,))| (x0, uf.math_.find(x1)))
+                                .filter(|&(x0, x1)| !self.hash_index_0_1.contains_key(&(x0, x1))),
+                        );
+                        insertions.clear();
+                        self.new.sort_unstable();
+                        self.new.dedup();
+                        for &(x0, x1) in &self.new {
+                            self.hash_index_0_1
+                                .entry((x0, uf.math_.find(x1)))
+                                .or_default()
+                                .push(());
                         }
+                        self.hash_index_0_1.retain(|&(x0, x1), v| {
+                            if uf.math_.is_root(x1) {
+                                v.retain(|&mut ()| true);
+                                v.sort_unstable();
+                                v.dedup();
+                                true
+                            } else {
+                                false
+                            }
+                        });
                     });
                     self.math_num_uprooted_at_latest_retain = 0;
                 }
@@ -5997,61 +6209,67 @@ fn initial_exprs() {
                     }
                 }
                 fn update_begin(&mut self, insertions: &[Self::Row], uf: &mut Unification) {
-                    for &(mut x0, mut x1) in insertions {
-                        match self.hash_index_0.entry((x0,)) {
-                            runtime::HashMapEntry::Occupied(mut entry) => {
-                                let (y1,) = entry.get_mut();
-                                uf.math_.union_mut(&mut x1, y1);
-                            }
-                            runtime::HashMapEntry::Vacant(entry) => {
-                                entry.insert((uf.math_.find(x1),));
+                    log_duration!("update_begin {}: {}", "var", {
+                        for &(mut x0, mut x1) in insertions {
+                            match self.hash_index_0.entry((x0,)) {
+                                runtime::HashMapEntry::Occupied(mut entry) => {
+                                    let (y1,) = entry.get_mut();
+                                    uf.math_.union_mut(&mut x1, y1);
+                                }
+                                runtime::HashMapEntry::Vacant(entry) => {
+                                    entry.insert((uf.math_.find(x1),));
+                                }
                             }
                         }
-                    }
+                    });
                 }
                 fn update(&mut self, insertions: &mut Vec<Self::Row>, uf: &mut Unification) -> bool {
                     if self.math_num_uprooted_at_latest_retain == uf.math_.num_uprooted() {
                         return false;
                     }
-                    self.math_num_uprooted_at_latest_retain = uf.math_.num_uprooted();
                     let offset = insertions.len();
-                    self.hash_index_0.retain(|&(x0,), &mut (x1,)| {
-                        if uf.math_.is_root(x1) {
-                            true
-                        } else {
-                            insertions.push((x0, x1));
-                            false
-                        }
+                    log_duration!("update {}: {}", "var", {
+                        self.math_num_uprooted_at_latest_retain = uf.math_.num_uprooted();
+                        self.hash_index_0.retain(|&(x0,), &mut (x1,)| {
+                            if uf.math_.is_root(x1) {
+                                true
+                            } else {
+                                insertions.push((x0, x1));
+                                false
+                            }
+                        });
                     });
                     self.update_begin(&insertions[offset..], uf);
                     true
                 }
                 fn update_finalize(&mut self, insertions: &mut Vec<Self::Row>, uf: &mut Unification) {
-                    assert!(self.new.is_empty());
-                    self.new.extend(
-                        self.hash_index_0
-                            .iter()
-                            .map(|(&(x0,), &(x1,))| (x0, uf.math_.find(x1)))
-                            .filter(|&(x0, x1)| !self.hash_index_0_1.contains_key(&(x0, x1))),
-                    );
-                    insertions.clear();
-                    self.new.sort_unstable();
-                    self.new.dedup();
-                    for &(x0, x1) in &self.new {
-                        self.hash_index_0_1
-                            .entry((x0, uf.math_.find(x1)))
-                            .or_default()
-                            .push(());
-                    }
-                    self.hash_index_0_1.retain(|&(x0, x1), v| {
-                        if uf.math_.is_root(x1) {
-                            v.retain(|&mut ()| true);
-                            v.sort_unstable();
-                            v.dedup();
-                            true
-                        } else {
-                            false
+                    log_duration!("update_finalize {}: {}", "var", {
+                        assert!(self.new.is_empty());
+                        self.new.extend(
+                            self.hash_index_0
+                                .iter()
+                                .map(|(&(x0,), &(x1,))| (x0, uf.math_.find(x1)))
+                                .filter(|&(x0, x1)| !self.hash_index_0_1.contains_key(&(x0, x1))),
+                        );
+                        insertions.clear();
+                        self.new.sort_unstable();
+                        self.new.dedup();
+                        for &(x0, x1) in &self.new {
+                            self.hash_index_0_1
+                                .entry((x0, uf.math_.find(x1)))
+                                .or_default()
+                                .push(());
                         }
+                        self.hash_index_0_1.retain(|&(x0, x1), v| {
+                            if uf.math_.is_root(x1) {
+                                v.retain(|&mut ()| true);
+                                v.sort_unstable();
+                                v.dedup();
+                                true
+                            } else {
+                                false
+                            }
+                        });
                     });
                     self.math_num_uprooted_at_latest_retain = 0;
                 }
@@ -6204,18 +6422,22 @@ fn initial_exprs() {
                     theory
                 }
                 pub fn step(&mut self) -> [std::time::Duration; 2] {
-                    [
-                        {
-                            let start = std::time::Instant::now();
-                            self.apply_rules();
-                            start.elapsed()
-                        },
-                        {
-                            let start = std::time::Instant::now();
-                            self.canonicalize();
-                            start.elapsed()
-                        },
-                    ]
+                    log_duration!("======== STEP took {} ==========", {
+                        [
+                            {
+                                let start = std::time::Instant::now();
+                                log_duration!("apply_rules: {}", {
+                                    self.apply_rules();
+                                });
+                                start.elapsed()
+                            },
+                            {
+                                let start = std::time::Instant::now();
+                                self.canonicalize();
+                                start.elapsed()
+                            },
+                        ]
+                    })
                 }
                 #[inline(never)]
                 pub fn apply_rules(&mut self) {}
@@ -6254,41 +6476,49 @@ fn initial_exprs() {
                 }
                 #[inline(never)]
                 pub fn canonicalize(&mut self) {
-                    self.add_.clear_new();
-                    self.mul_.clear_new();
-                    self.const_.clear_new();
-                    self.var_.clear_new();
-                    if !self.delta.has_new_inserts() && self.uf.num_uprooted() == 0 {
-                        return;
-                    }
-                    self.add_.update_begin(&mut self.delta.add_, &mut self.uf);
-                    self.mul_.update_begin(&mut self.delta.mul_, &mut self.uf);
-                    self.const_
-                        .update_begin(&mut self.delta.const_, &mut self.uf);
-                    self.var_.update_begin(&mut self.delta.var_, &mut self.uf);
-                    loop {
-                        let mut progress = false;
-                        progress |= self.add_.update(&mut self.delta.add_, &mut self.uf);
-                        progress |= self.mul_.update(&mut self.delta.mul_, &mut self.uf);
-                        progress |= self.const_.update(&mut self.delta.const_, &mut self.uf);
-                        progress |= self.var_.update(&mut self.delta.var_, &mut self.uf);
-                        if !progress {
-                            break;
+                    log_duration!("canonicalize (total): {}", {
+                        self.add_.clear_new();
+                        self.mul_.clear_new();
+                        self.const_.clear_new();
+                        self.var_.clear_new();
+                        if !self.delta.has_new_inserts() && self.uf.num_uprooted() == 0 {
+                            return;
                         }
-                    }
-                    self.add_
-                        .update_finalize(&mut self.delta.add_, &mut self.uf);
-                    self.mul_
-                        .update_finalize(&mut self.delta.mul_, &mut self.uf);
-                    self.const_
-                        .update_finalize(&mut self.delta.const_, &mut self.uf);
-                    self.var_
-                        .update_finalize(&mut self.delta.var_, &mut self.uf);
-                    self.global_math.update(&mut self.uf.math_);
-                    self.global_i64.update_finalize();
-                    self.global_string.update_finalize();
-                    self.global_math.update_finalize();
-                    self.uf.reset_num_uprooted();
+                        log_duration!("update_begin (total): {}", {
+                            self.add_.update_begin(&mut self.delta.add_, &mut self.uf);
+                            self.mul_.update_begin(&mut self.delta.mul_, &mut self.uf);
+                            self.const_
+                                .update_begin(&mut self.delta.const_, &mut self.uf);
+                            self.var_.update_begin(&mut self.delta.var_, &mut self.uf);
+                        });
+                        log_duration!("update_loop (total): {}", {
+                            loop {
+                                let mut progress = false;
+                                progress |= self.add_.update(&mut self.delta.add_, &mut self.uf);
+                                progress |= self.mul_.update(&mut self.delta.mul_, &mut self.uf);
+                                progress |= self.const_.update(&mut self.delta.const_, &mut self.uf);
+                                progress |= self.var_.update(&mut self.delta.var_, &mut self.uf);
+                                if !progress {
+                                    break;
+                                }
+                            }
+                        });
+                        log_duration!("update_finalize (total): {}", {
+                            self.add_
+                                .update_finalize(&mut self.delta.add_, &mut self.uf);
+                            self.mul_
+                                .update_finalize(&mut self.delta.mul_, &mut self.uf);
+                            self.const_
+                                .update_finalize(&mut self.delta.const_, &mut self.uf);
+                            self.var_
+                                .update_finalize(&mut self.delta.var_, &mut self.uf);
+                            self.global_math.update(&mut self.uf.math_);
+                            self.global_i64.update_finalize();
+                            self.global_string.update_finalize();
+                            self.global_math.update_finalize();
+                            self.uf.reset_num_uprooted();
+                        });
+                    });
                 }
             }
             impl EclassProvider<Math> for Theory {
@@ -6568,18 +6798,22 @@ fn codegen_bug1() {
                     theory
                 }
                 pub fn step(&mut self) -> [std::time::Duration; 2] {
-                    [
-                        {
-                            let start = std::time::Instant::now();
-                            self.apply_rules();
-                            start.elapsed()
-                        },
-                        {
-                            let start = std::time::Instant::now();
-                            self.canonicalize();
-                            start.elapsed()
-                        },
-                    ]
+                    log_duration!("======== STEP took {} ==========", {
+                        [
+                            {
+                                let start = std::time::Instant::now();
+                                log_duration!("apply_rules: {}", {
+                                    self.apply_rules();
+                                });
+                                start.elapsed()
+                            },
+                            {
+                                let start = std::time::Instant::now();
+                                self.canonicalize();
+                                start.elapsed()
+                            },
+                        ]
+                    })
                 }
                 #[inline(never)]
                 pub fn apply_rules(&mut self) {}
@@ -6605,16 +6839,23 @@ fn codegen_bug1() {
                 }
                 #[inline(never)]
                 pub fn canonicalize(&mut self) {
-                    if !self.delta.has_new_inserts() && self.uf.num_uprooted() == 0 {
-                        return;
-                    }
-                    loop {
-                        let mut progress = false;
-                        if !progress {
-                            break;
+                    log_duration!("canonicalize (total): {}", {
+                        if !self.delta.has_new_inserts() && self.uf.num_uprooted() == 0 {
+                            return;
                         }
-                    }
-                    self.uf.reset_num_uprooted();
+                        log_duration!("update_begin (total): {}", {});
+                        log_duration!("update_loop (total): {}", {
+                            loop {
+                                let mut progress = false;
+                                if !progress {
+                                    break;
+                                }
+                            }
+                        });
+                        log_duration!("update_finalize (total): {}", {
+                            self.uf.reset_num_uprooted();
+                        });
+                    });
                 }
             }
             impl std::ops::Deref for Theory {
@@ -6686,18 +6927,22 @@ fn initial() {
                     theory
                 }
                 pub fn step(&mut self) -> [std::time::Duration; 2] {
-                    [
-                        {
-                            let start = std::time::Instant::now();
-                            self.apply_rules();
-                            start.elapsed()
-                        },
-                        {
-                            let start = std::time::Instant::now();
-                            self.canonicalize();
-                            start.elapsed()
-                        },
-                    ]
+                    log_duration!("======== STEP took {} ==========", {
+                        [
+                            {
+                                let start = std::time::Instant::now();
+                                log_duration!("apply_rules: {}", {
+                                    self.apply_rules();
+                                });
+                                start.elapsed()
+                            },
+                            {
+                                let start = std::time::Instant::now();
+                                self.canonicalize();
+                                start.elapsed()
+                            },
+                        ]
+                    })
                 }
                 #[inline(never)]
                 pub fn apply_rules(&mut self) {}
@@ -6723,16 +6968,23 @@ fn initial() {
                 }
                 #[inline(never)]
                 pub fn canonicalize(&mut self) {
-                    if !self.delta.has_new_inserts() && self.uf.num_uprooted() == 0 {
-                        return;
-                    }
-                    loop {
-                        let mut progress = false;
-                        if !progress {
-                            break;
+                    log_duration!("canonicalize (total): {}", {
+                        if !self.delta.has_new_inserts() && self.uf.num_uprooted() == 0 {
+                            return;
                         }
-                    }
-                    self.uf.reset_num_uprooted();
+                        log_duration!("update_begin (total): {}", {});
+                        log_duration!("update_loop (total): {}", {
+                            loop {
+                                let mut progress = false;
+                                if !progress {
+                                    break;
+                                }
+                            }
+                        });
+                        log_duration!("update_finalize (total): {}", {
+                            self.uf.reset_num_uprooted();
+                        });
+                    });
                 }
             }
             impl std::ops::Deref for Theory {
@@ -6901,82 +7153,88 @@ fn test_primitives_simple() {
                     }
                 }
                 fn update_begin(&mut self, insertions: &[Self::Row], uf: &mut Unification) {
-                    for &(mut x0, mut x1, mut x2) in insertions {
-                        match self
-                            .hash_index_1_0
-                            .entry((uf.math_.find(x1), uf.math_.find(x0)))
-                        {
-                            runtime::HashMapEntry::Occupied(mut entry) => {
-                                let (y2,) = entry.get_mut();
-                                uf.math_.union_mut(&mut x2, y2);
-                            }
-                            runtime::HashMapEntry::Vacant(entry) => {
-                                entry.insert((uf.math_.find(x2),));
+                    log_duration!("update_begin {}: {}", "mul", {
+                        for &(mut x0, mut x1, mut x2) in insertions {
+                            match self
+                                .hash_index_1_0
+                                .entry((uf.math_.find(x1), uf.math_.find(x0)))
+                            {
+                                runtime::HashMapEntry::Occupied(mut entry) => {
+                                    let (y2,) = entry.get_mut();
+                                    uf.math_.union_mut(&mut x2, y2);
+                                }
+                                runtime::HashMapEntry::Vacant(entry) => {
+                                    entry.insert((uf.math_.find(x2),));
+                                }
                             }
                         }
-                    }
+                    });
                 }
                 fn update(&mut self, insertions: &mut Vec<Self::Row>, uf: &mut Unification) -> bool {
                     if self.math_num_uprooted_at_latest_retain == uf.math_.num_uprooted() {
                         return false;
                     }
-                    self.math_num_uprooted_at_latest_retain = uf.math_.num_uprooted();
                     let offset = insertions.len();
-                    self.hash_index_1_0.retain(|&(x1, x0), &mut (x2,)| {
-                        if uf.math_.is_root(x0) & uf.math_.is_root(x1) & uf.math_.is_root(x2) {
-                            true
-                        } else {
-                            insertions.push((x0, x1, x2));
-                            false
-                        }
+                    log_duration!("update {}: {}", "mul", {
+                        self.math_num_uprooted_at_latest_retain = uf.math_.num_uprooted();
+                        self.hash_index_1_0.retain(|&(x1, x0), &mut (x2,)| {
+                            if uf.math_.is_root(x0) & uf.math_.is_root(x1) & uf.math_.is_root(x2) {
+                                true
+                            } else {
+                                insertions.push((x0, x1, x2));
+                                false
+                            }
+                        });
                     });
                     self.update_begin(&insertions[offset..], uf);
                     true
                 }
                 fn update_finalize(&mut self, insertions: &mut Vec<Self::Row>, uf: &mut Unification) {
-                    assert!(self.new.is_empty());
-                    self.new.extend(
-                        self.hash_index_1_0
-                            .iter()
-                            .map(|(&(x1, x0), &(x2,))| {
-                                (uf.math_.find(x0), uf.math_.find(x1), uf.math_.find(x2))
-                            })
-                            .filter(|&(x0, x1, x2)| !self.hash_index_1_0_2.contains_key(&(x1, x0, x2))),
-                    );
-                    insertions.clear();
-                    RadixSortable::wrap(&mut self.new).voracious_sort();
-                    self.new.dedup();
-                    for &(x0, x1, x2) in &self.new {
-                        self.hash_index_1
-                            .entry((uf.math_.find(x1),))
-                            .or_default()
-                            .push((uf.math_.find(x0), uf.math_.find(x2)));
-                    }
-                    self.hash_index_1.retain(|&(x1,), v| {
-                        if uf.math_.is_root(x1) {
-                            v.retain(|&mut (x0, x2)| uf.math_.is_root(x0) & uf.math_.is_root(x2));
-                            v.sort_unstable();
-                            v.dedup();
-                            true
-                        } else {
-                            false
+                    log_duration!("update_finalize {}: {}", "mul", {
+                        assert!(self.new.is_empty());
+                        self.new.extend(
+                            self.hash_index_1_0
+                                .iter()
+                                .map(|(&(x1, x0), &(x2,))| {
+                                    (uf.math_.find(x0), uf.math_.find(x1), uf.math_.find(x2))
+                                })
+                                .filter(|&(x0, x1, x2)| !self.hash_index_1_0_2.contains_key(&(x1, x0, x2))),
+                        );
+                        insertions.clear();
+                        RadixSortable::wrap(&mut self.new).voracious_sort();
+                        self.new.dedup();
+                        for &(x0, x1, x2) in &self.new {
+                            self.hash_index_1
+                                .entry((uf.math_.find(x1),))
+                                .or_default()
+                                .push((uf.math_.find(x0), uf.math_.find(x2)));
                         }
-                    });
-                    for &(x0, x1, x2) in &self.new {
-                        self.hash_index_1_0_2
-                            .entry((uf.math_.find(x1), uf.math_.find(x0), uf.math_.find(x2)))
-                            .or_default()
-                            .push(());
-                    }
-                    self.hash_index_1_0_2.retain(|&(x1, x0, x2), v| {
-                        if uf.math_.is_root(x1) & uf.math_.is_root(x0) & uf.math_.is_root(x2) {
-                            v.retain(|&mut ()| true);
-                            v.sort_unstable();
-                            v.dedup();
-                            true
-                        } else {
-                            false
+                        self.hash_index_1.retain(|&(x1,), v| {
+                            if uf.math_.is_root(x1) {
+                                v.retain(|&mut (x0, x2)| uf.math_.is_root(x0) & uf.math_.is_root(x2));
+                                v.sort_unstable();
+                                v.dedup();
+                                true
+                            } else {
+                                false
+                            }
+                        });
+                        for &(x0, x1, x2) in &self.new {
+                            self.hash_index_1_0_2
+                                .entry((uf.math_.find(x1), uf.math_.find(x0), uf.math_.find(x2)))
+                                .or_default()
+                                .push(());
                         }
+                        self.hash_index_1_0_2.retain(|&(x1, x0, x2), v| {
+                            if uf.math_.is_root(x1) & uf.math_.is_root(x0) & uf.math_.is_root(x2) {
+                                v.retain(|&mut ()| true);
+                                v.sort_unstable();
+                                v.dedup();
+                                true
+                            } else {
+                                false
+                            }
+                        });
                     });
                     self.math_num_uprooted_at_latest_retain = 0;
                 }
@@ -7065,66 +7323,72 @@ fn test_primitives_simple() {
                     }
                 }
                 fn update_begin(&mut self, insertions: &[Self::Row], uf: &mut Unification) {
-                    for &(mut x0, mut x1, mut x2) in insertions {
-                        match self
-                            .hash_index_0_1
-                            .entry((uf.math_.find(x0), uf.math_.find(x1)))
-                        {
-                            runtime::HashMapEntry::Occupied(mut entry) => {
-                                let (y2,) = entry.get_mut();
-                                uf.math_.union_mut(&mut x2, y2);
-                            }
-                            runtime::HashMapEntry::Vacant(entry) => {
-                                entry.insert((uf.math_.find(x2),));
+                    log_duration!("update_begin {}: {}", "add", {
+                        for &(mut x0, mut x1, mut x2) in insertions {
+                            match self
+                                .hash_index_0_1
+                                .entry((uf.math_.find(x0), uf.math_.find(x1)))
+                            {
+                                runtime::HashMapEntry::Occupied(mut entry) => {
+                                    let (y2,) = entry.get_mut();
+                                    uf.math_.union_mut(&mut x2, y2);
+                                }
+                                runtime::HashMapEntry::Vacant(entry) => {
+                                    entry.insert((uf.math_.find(x2),));
+                                }
                             }
                         }
-                    }
+                    });
                 }
                 fn update(&mut self, insertions: &mut Vec<Self::Row>, uf: &mut Unification) -> bool {
                     if self.math_num_uprooted_at_latest_retain == uf.math_.num_uprooted() {
                         return false;
                     }
-                    self.math_num_uprooted_at_latest_retain = uf.math_.num_uprooted();
                     let offset = insertions.len();
-                    self.hash_index_0_1.retain(|&(x0, x1), &mut (x2,)| {
-                        if uf.math_.is_root(x0) & uf.math_.is_root(x1) & uf.math_.is_root(x2) {
-                            true
-                        } else {
-                            insertions.push((x0, x1, x2));
-                            false
-                        }
+                    log_duration!("update {}: {}", "add", {
+                        self.math_num_uprooted_at_latest_retain = uf.math_.num_uprooted();
+                        self.hash_index_0_1.retain(|&(x0, x1), &mut (x2,)| {
+                            if uf.math_.is_root(x0) & uf.math_.is_root(x1) & uf.math_.is_root(x2) {
+                                true
+                            } else {
+                                insertions.push((x0, x1, x2));
+                                false
+                            }
+                        });
                     });
                     self.update_begin(&insertions[offset..], uf);
                     true
                 }
                 fn update_finalize(&mut self, insertions: &mut Vec<Self::Row>, uf: &mut Unification) {
-                    assert!(self.new.is_empty());
-                    self.new.extend(
-                        self.hash_index_0_1
-                            .iter()
-                            .map(|(&(x0, x1), &(x2,))| {
-                                (uf.math_.find(x0), uf.math_.find(x1), uf.math_.find(x2))
-                            })
-                            .filter(|&(x0, x1, x2)| !self.hash_index_0_1_2.contains_key(&(x0, x1, x2))),
-                    );
-                    insertions.clear();
-                    RadixSortable::wrap(&mut self.new).voracious_sort();
-                    self.new.dedup();
-                    for &(x0, x1, x2) in &self.new {
-                        self.hash_index_0_1_2
-                            .entry((uf.math_.find(x0), uf.math_.find(x1), uf.math_.find(x2)))
-                            .or_default()
-                            .push(());
-                    }
-                    self.hash_index_0_1_2.retain(|&(x0, x1, x2), v| {
-                        if uf.math_.is_root(x0) & uf.math_.is_root(x1) & uf.math_.is_root(x2) {
-                            v.retain(|&mut ()| true);
-                            v.sort_unstable();
-                            v.dedup();
-                            true
-                        } else {
-                            false
+                    log_duration!("update_finalize {}: {}", "add", {
+                        assert!(self.new.is_empty());
+                        self.new.extend(
+                            self.hash_index_0_1
+                                .iter()
+                                .map(|(&(x0, x1), &(x2,))| {
+                                    (uf.math_.find(x0), uf.math_.find(x1), uf.math_.find(x2))
+                                })
+                                .filter(|&(x0, x1, x2)| !self.hash_index_0_1_2.contains_key(&(x0, x1, x2))),
+                        );
+                        insertions.clear();
+                        RadixSortable::wrap(&mut self.new).voracious_sort();
+                        self.new.dedup();
+                        for &(x0, x1, x2) in &self.new {
+                            self.hash_index_0_1_2
+                                .entry((uf.math_.find(x0), uf.math_.find(x1), uf.math_.find(x2)))
+                                .or_default()
+                                .push(());
                         }
+                        self.hash_index_0_1_2.retain(|&(x0, x1, x2), v| {
+                            if uf.math_.is_root(x0) & uf.math_.is_root(x1) & uf.math_.is_root(x2) {
+                                v.retain(|&mut ()| true);
+                                v.sort_unstable();
+                                v.dedup();
+                                true
+                            } else {
+                                false
+                            }
+                        });
                     });
                     self.math_num_uprooted_at_latest_retain = 0;
                 }
@@ -7208,77 +7472,83 @@ fn test_primitives_simple() {
                     }
                 }
                 fn update_begin(&mut self, insertions: &[Self::Row], uf: &mut Unification) {
-                    for &(mut x0, mut x1) in insertions {
-                        match self.hash_index_0.entry((x0,)) {
-                            runtime::HashMapEntry::Occupied(mut entry) => {
-                                let (y1,) = entry.get_mut();
-                                uf.math_.union_mut(&mut x1, y1);
-                            }
-                            runtime::HashMapEntry::Vacant(entry) => {
-                                entry.insert((uf.math_.find(x1),));
+                    log_duration!("update_begin {}: {}", "const", {
+                        for &(mut x0, mut x1) in insertions {
+                            match self.hash_index_0.entry((x0,)) {
+                                runtime::HashMapEntry::Occupied(mut entry) => {
+                                    let (y1,) = entry.get_mut();
+                                    uf.math_.union_mut(&mut x1, y1);
+                                }
+                                runtime::HashMapEntry::Vacant(entry) => {
+                                    entry.insert((uf.math_.find(x1),));
+                                }
                             }
                         }
-                    }
+                    });
                 }
                 fn update(&mut self, insertions: &mut Vec<Self::Row>, uf: &mut Unification) -> bool {
                     if self.math_num_uprooted_at_latest_retain == uf.math_.num_uprooted() {
                         return false;
                     }
-                    self.math_num_uprooted_at_latest_retain = uf.math_.num_uprooted();
                     let offset = insertions.len();
-                    self.hash_index_0.retain(|&(x0,), &mut (x1,)| {
-                        if uf.math_.is_root(x1) {
-                            true
-                        } else {
-                            insertions.push((x0, x1));
-                            false
-                        }
+                    log_duration!("update {}: {}", "const", {
+                        self.math_num_uprooted_at_latest_retain = uf.math_.num_uprooted();
+                        self.hash_index_0.retain(|&(x0,), &mut (x1,)| {
+                            if uf.math_.is_root(x1) {
+                                true
+                            } else {
+                                insertions.push((x0, x1));
+                                false
+                            }
+                        });
                     });
                     self.update_begin(&insertions[offset..], uf);
                     true
                 }
                 fn update_finalize(&mut self, insertions: &mut Vec<Self::Row>, uf: &mut Unification) {
-                    assert!(self.new.is_empty());
-                    self.new.extend(
-                        self.hash_index_0
-                            .iter()
-                            .map(|(&(x0,), &(x1,))| (x0, uf.math_.find(x1)))
-                            .filter(|&(x0, x1)| !self.hash_index_0_1.contains_key(&(x0, x1))),
-                    );
-                    insertions.clear();
-                    self.new.sort_unstable();
-                    self.new.dedup();
-                    for &(x0, x1) in &self.new {
-                        self.hash_index_1
-                            .entry((uf.math_.find(x1),))
-                            .or_default()
-                            .push((x0,));
-                    }
-                    self.hash_index_1.retain(|&(x1,), v| {
-                        if uf.math_.is_root(x1) {
-                            v.retain(|&mut (x0,)| true);
-                            v.sort_unstable();
-                            v.dedup();
-                            true
-                        } else {
-                            false
+                    log_duration!("update_finalize {}: {}", "const", {
+                        assert!(self.new.is_empty());
+                        self.new.extend(
+                            self.hash_index_0
+                                .iter()
+                                .map(|(&(x0,), &(x1,))| (x0, uf.math_.find(x1)))
+                                .filter(|&(x0, x1)| !self.hash_index_0_1.contains_key(&(x0, x1))),
+                        );
+                        insertions.clear();
+                        self.new.sort_unstable();
+                        self.new.dedup();
+                        for &(x0, x1) in &self.new {
+                            self.hash_index_1
+                                .entry((uf.math_.find(x1),))
+                                .or_default()
+                                .push((x0,));
                         }
-                    });
-                    for &(x0, x1) in &self.new {
-                        self.hash_index_0_1
-                            .entry((x0, uf.math_.find(x1)))
-                            .or_default()
-                            .push(());
-                    }
-                    self.hash_index_0_1.retain(|&(x0, x1), v| {
-                        if uf.math_.is_root(x1) {
-                            v.retain(|&mut ()| true);
-                            v.sort_unstable();
-                            v.dedup();
-                            true
-                        } else {
-                            false
+                        self.hash_index_1.retain(|&(x1,), v| {
+                            if uf.math_.is_root(x1) {
+                                v.retain(|&mut (x0,)| true);
+                                v.sort_unstable();
+                                v.dedup();
+                                true
+                            } else {
+                                false
+                            }
+                        });
+                        for &(x0, x1) in &self.new {
+                            self.hash_index_0_1
+                                .entry((x0, uf.math_.find(x1)))
+                                .or_default()
+                                .push(());
                         }
+                        self.hash_index_0_1.retain(|&(x0, x1), v| {
+                            if uf.math_.is_root(x1) {
+                                v.retain(|&mut ()| true);
+                                v.sort_unstable();
+                                v.dedup();
+                                true
+                            } else {
+                                false
+                            }
+                        });
                     });
                     self.math_num_uprooted_at_latest_retain = 0;
                 }
@@ -7371,61 +7641,67 @@ fn test_primitives_simple() {
                     }
                 }
                 fn update_begin(&mut self, insertions: &[Self::Row], uf: &mut Unification) {
-                    for &(mut x0, mut x1) in insertions {
-                        match self.hash_index_0.entry((x0,)) {
-                            runtime::HashMapEntry::Occupied(mut entry) => {
-                                let (y1,) = entry.get_mut();
-                                uf.math_.union_mut(&mut x1, y1);
-                            }
-                            runtime::HashMapEntry::Vacant(entry) => {
-                                entry.insert((uf.math_.find(x1),));
+                    log_duration!("update_begin {}: {}", "var", {
+                        for &(mut x0, mut x1) in insertions {
+                            match self.hash_index_0.entry((x0,)) {
+                                runtime::HashMapEntry::Occupied(mut entry) => {
+                                    let (y1,) = entry.get_mut();
+                                    uf.math_.union_mut(&mut x1, y1);
+                                }
+                                runtime::HashMapEntry::Vacant(entry) => {
+                                    entry.insert((uf.math_.find(x1),));
+                                }
                             }
                         }
-                    }
+                    });
                 }
                 fn update(&mut self, insertions: &mut Vec<Self::Row>, uf: &mut Unification) -> bool {
                     if self.math_num_uprooted_at_latest_retain == uf.math_.num_uprooted() {
                         return false;
                     }
-                    self.math_num_uprooted_at_latest_retain = uf.math_.num_uprooted();
                     let offset = insertions.len();
-                    self.hash_index_0.retain(|&(x0,), &mut (x1,)| {
-                        if uf.math_.is_root(x1) {
-                            true
-                        } else {
-                            insertions.push((x0, x1));
-                            false
-                        }
+                    log_duration!("update {}: {}", "var", {
+                        self.math_num_uprooted_at_latest_retain = uf.math_.num_uprooted();
+                        self.hash_index_0.retain(|&(x0,), &mut (x1,)| {
+                            if uf.math_.is_root(x1) {
+                                true
+                            } else {
+                                insertions.push((x0, x1));
+                                false
+                            }
+                        });
                     });
                     self.update_begin(&insertions[offset..], uf);
                     true
                 }
                 fn update_finalize(&mut self, insertions: &mut Vec<Self::Row>, uf: &mut Unification) {
-                    assert!(self.new.is_empty());
-                    self.new.extend(
-                        self.hash_index_0
-                            .iter()
-                            .map(|(&(x0,), &(x1,))| (x0, uf.math_.find(x1)))
-                            .filter(|&(x0, x1)| !self.hash_index_0_1.contains_key(&(x0, x1))),
-                    );
-                    insertions.clear();
-                    self.new.sort_unstable();
-                    self.new.dedup();
-                    for &(x0, x1) in &self.new {
-                        self.hash_index_0_1
-                            .entry((x0, uf.math_.find(x1)))
-                            .or_default()
-                            .push(());
-                    }
-                    self.hash_index_0_1.retain(|&(x0, x1), v| {
-                        if uf.math_.is_root(x1) {
-                            v.retain(|&mut ()| true);
-                            v.sort_unstable();
-                            v.dedup();
-                            true
-                        } else {
-                            false
+                    log_duration!("update_finalize {}: {}", "var", {
+                        assert!(self.new.is_empty());
+                        self.new.extend(
+                            self.hash_index_0
+                                .iter()
+                                .map(|(&(x0,), &(x1,))| (x0, uf.math_.find(x1)))
+                                .filter(|&(x0, x1)| !self.hash_index_0_1.contains_key(&(x0, x1))),
+                        );
+                        insertions.clear();
+                        self.new.sort_unstable();
+                        self.new.dedup();
+                        for &(x0, x1) in &self.new {
+                            self.hash_index_0_1
+                                .entry((x0, uf.math_.find(x1)))
+                                .or_default()
+                                .push(());
                         }
+                        self.hash_index_0_1.retain(|&(x0, x1), v| {
+                            if uf.math_.is_root(x1) {
+                                v.retain(|&mut ()| true);
+                                v.sort_unstable();
+                                v.dedup();
+                                true
+                            } else {
+                                false
+                            }
+                        });
                     });
                     self.math_num_uprooted_at_latest_retain = 0;
                 }
@@ -7549,18 +7825,22 @@ fn test_primitives_simple() {
                     theory
                 }
                 pub fn step(&mut self) -> [std::time::Duration; 2] {
-                    [
-                        {
-                            let start = std::time::Instant::now();
-                            self.apply_rules();
-                            start.elapsed()
-                        },
-                        {
-                            let start = std::time::Instant::now();
-                            self.canonicalize();
-                            start.elapsed()
-                        },
-                    ]
+                    log_duration!("======== STEP took {} ==========", {
+                        [
+                            {
+                                let start = std::time::Instant::now();
+                                log_duration!("apply_rules: {}", {
+                                    self.apply_rules();
+                                });
+                                start.elapsed()
+                            },
+                            {
+                                let start = std::time::Instant::now();
+                                self.canonicalize();
+                                start.elapsed()
+                            },
+                        ]
+                    })
                 }
                 #[inline(never)]
                 pub fn apply_rules(&mut self) {
@@ -7668,41 +7948,49 @@ fn test_primitives_simple() {
                 }
                 #[inline(never)]
                 pub fn canonicalize(&mut self) {
-                    self.mul_.clear_new();
-                    self.add_.clear_new();
-                    self.const_.clear_new();
-                    self.var_.clear_new();
-                    if !self.delta.has_new_inserts() && self.uf.num_uprooted() == 0 {
-                        return;
-                    }
-                    self.mul_.update_begin(&mut self.delta.mul_, &mut self.uf);
-                    self.add_.update_begin(&mut self.delta.add_, &mut self.uf);
-                    self.const_
-                        .update_begin(&mut self.delta.const_, &mut self.uf);
-                    self.var_.update_begin(&mut self.delta.var_, &mut self.uf);
-                    loop {
-                        let mut progress = false;
-                        progress |= self.mul_.update(&mut self.delta.mul_, &mut self.uf);
-                        progress |= self.add_.update(&mut self.delta.add_, &mut self.uf);
-                        progress |= self.const_.update(&mut self.delta.const_, &mut self.uf);
-                        progress |= self.var_.update(&mut self.delta.var_, &mut self.uf);
-                        if !progress {
-                            break;
+                    log_duration!("canonicalize (total): {}", {
+                        self.mul_.clear_new();
+                        self.add_.clear_new();
+                        self.const_.clear_new();
+                        self.var_.clear_new();
+                        if !self.delta.has_new_inserts() && self.uf.num_uprooted() == 0 {
+                            return;
                         }
-                    }
-                    self.mul_
-                        .update_finalize(&mut self.delta.mul_, &mut self.uf);
-                    self.add_
-                        .update_finalize(&mut self.delta.add_, &mut self.uf);
-                    self.const_
-                        .update_finalize(&mut self.delta.const_, &mut self.uf);
-                    self.var_
-                        .update_finalize(&mut self.delta.var_, &mut self.uf);
-                    self.global_math.update(&mut self.uf.math_);
-                    self.global_i64.update_finalize();
-                    self.global_string.update_finalize();
-                    self.global_math.update_finalize();
-                    self.uf.reset_num_uprooted();
+                        log_duration!("update_begin (total): {}", {
+                            self.mul_.update_begin(&mut self.delta.mul_, &mut self.uf);
+                            self.add_.update_begin(&mut self.delta.add_, &mut self.uf);
+                            self.const_
+                                .update_begin(&mut self.delta.const_, &mut self.uf);
+                            self.var_.update_begin(&mut self.delta.var_, &mut self.uf);
+                        });
+                        log_duration!("update_loop (total): {}", {
+                            loop {
+                                let mut progress = false;
+                                progress |= self.mul_.update(&mut self.delta.mul_, &mut self.uf);
+                                progress |= self.add_.update(&mut self.delta.add_, &mut self.uf);
+                                progress |= self.const_.update(&mut self.delta.const_, &mut self.uf);
+                                progress |= self.var_.update(&mut self.delta.var_, &mut self.uf);
+                                if !progress {
+                                    break;
+                                }
+                            }
+                        });
+                        log_duration!("update_finalize (total): {}", {
+                            self.mul_
+                                .update_finalize(&mut self.delta.mul_, &mut self.uf);
+                            self.add_
+                                .update_finalize(&mut self.delta.add_, &mut self.uf);
+                            self.const_
+                                .update_finalize(&mut self.delta.const_, &mut self.uf);
+                            self.var_
+                                .update_finalize(&mut self.delta.var_, &mut self.uf);
+                            self.global_math.update(&mut self.uf.math_);
+                            self.global_i64.update_finalize();
+                            self.global_string.update_finalize();
+                            self.global_math.update_finalize();
+                            self.uf.reset_num_uprooted();
+                        });
+                    });
                 }
             }
             impl EclassProvider<Math> for Theory {
@@ -7819,74 +8107,80 @@ fn triangle_join() {
                         writeln!(buf, "{}_{i} [shape = box];", "foo").unwrap();
                     }
                 }
-                fn update_begin(&mut self, insertions: &[Self::Row], uf: &mut Unification) {}
+                fn update_begin(&mut self, insertions: &[Self::Row], uf: &mut Unification) {
+                    log_duration!("update_begin {}: {}", "foo", {});
+                }
                 fn update(&mut self, insertions: &mut Vec<Self::Row>, uf: &mut Unification) -> bool {
                     if self.math_num_uprooted_at_latest_retain == uf.math_.num_uprooted() {
                         return false;
                     }
-                    self.math_num_uprooted_at_latest_retain = uf.math_.num_uprooted();
                     let offset = insertions.len();
+                    log_duration!("update {}: {}", "foo", {
+                        self.math_num_uprooted_at_latest_retain = uf.math_.num_uprooted();
+                    });
                     self.update_begin(&insertions[offset..], uf);
                     true
                 }
                 fn update_finalize(&mut self, insertions: &mut Vec<Self::Row>, uf: &mut Unification) {
-                    assert!(self.new.is_empty());
-                    self.new.extend(
-                        insertions
-                            .iter()
-                            .map(|&(x0, x1)| (uf.math_.find(x0), uf.math_.find(x1)))
-                            .filter(|&(x0, x1)| !self.hash_index_1_0.contains_key(&(x1, x0))),
-                    );
-                    insertions.clear();
-                    RadixSortable::wrap(&mut self.new).voracious_sort();
-                    self.new.dedup();
-                    for &(x0, x1) in &self.new {
-                        self.hash_index_1
-                            .entry((uf.math_.find(x1),))
-                            .or_default()
-                            .push((uf.math_.find(x0),));
-                    }
-                    self.hash_index_1.retain(|&(x1,), v| {
-                        if uf.math_.is_root(x1) {
-                            v.retain(|&mut (x0,)| uf.math_.is_root(x0));
-                            v.sort_unstable();
-                            v.dedup();
-                            true
-                        } else {
-                            false
+                    log_duration!("update_finalize {}: {}", "foo", {
+                        assert!(self.new.is_empty());
+                        self.new.extend(
+                            insertions
+                                .iter()
+                                .map(|&(x0, x1)| (uf.math_.find(x0), uf.math_.find(x1)))
+                                .filter(|&(x0, x1)| !self.hash_index_1_0.contains_key(&(x1, x0))),
+                        );
+                        insertions.clear();
+                        RadixSortable::wrap(&mut self.new).voracious_sort();
+                        self.new.dedup();
+                        for &(x0, x1) in &self.new {
+                            self.hash_index_1
+                                .entry((uf.math_.find(x1),))
+                                .or_default()
+                                .push((uf.math_.find(x0),));
                         }
-                    });
-                    for &(x0, x1) in &self.new {
-                        self.hash_index_1_0
-                            .entry((uf.math_.find(x1), uf.math_.find(x0)))
-                            .or_default()
-                            .push(());
-                    }
-                    self.hash_index_1_0.retain(|&(x1, x0), v| {
-                        if uf.math_.is_root(x1) & uf.math_.is_root(x0) {
-                            v.retain(|&mut ()| true);
-                            v.sort_unstable();
-                            v.dedup();
-                            true
-                        } else {
-                            false
+                        self.hash_index_1.retain(|&(x1,), v| {
+                            if uf.math_.is_root(x1) {
+                                v.retain(|&mut (x0,)| uf.math_.is_root(x0));
+                                v.sort_unstable();
+                                v.dedup();
+                                true
+                            } else {
+                                false
+                            }
+                        });
+                        for &(x0, x1) in &self.new {
+                            self.hash_index_1_0
+                                .entry((uf.math_.find(x1), uf.math_.find(x0)))
+                                .or_default()
+                                .push(());
                         }
-                    });
-                    for &(x0, x1) in &self.new {
-                        self.hash_index_0
-                            .entry((uf.math_.find(x0),))
-                            .or_default()
-                            .push((uf.math_.find(x1),));
-                    }
-                    self.hash_index_0.retain(|&(x0,), v| {
-                        if uf.math_.is_root(x0) {
-                            v.retain(|&mut (x1,)| uf.math_.is_root(x1));
-                            v.sort_unstable();
-                            v.dedup();
-                            true
-                        } else {
-                            false
+                        self.hash_index_1_0.retain(|&(x1, x0), v| {
+                            if uf.math_.is_root(x1) & uf.math_.is_root(x0) {
+                                v.retain(|&mut ()| true);
+                                v.sort_unstable();
+                                v.dedup();
+                                true
+                            } else {
+                                false
+                            }
+                        });
+                        for &(x0, x1) in &self.new {
+                            self.hash_index_0
+                                .entry((uf.math_.find(x0),))
+                                .or_default()
+                                .push((uf.math_.find(x1),));
                         }
+                        self.hash_index_0.retain(|&(x0,), v| {
+                            if uf.math_.is_root(x0) {
+                                v.retain(|&mut (x1,)| uf.math_.is_root(x1));
+                                v.sort_unstable();
+                                v.dedup();
+                                true
+                            } else {
+                                false
+                            }
+                        });
                     });
                     self.math_num_uprooted_at_latest_retain = 0;
                 }
@@ -7963,74 +8257,80 @@ fn triangle_join() {
                         writeln!(buf, "{}_{i} [shape = box];", "bar").unwrap();
                     }
                 }
-                fn update_begin(&mut self, insertions: &[Self::Row], uf: &mut Unification) {}
+                fn update_begin(&mut self, insertions: &[Self::Row], uf: &mut Unification) {
+                    log_duration!("update_begin {}: {}", "bar", {});
+                }
                 fn update(&mut self, insertions: &mut Vec<Self::Row>, uf: &mut Unification) -> bool {
                     if self.math_num_uprooted_at_latest_retain == uf.math_.num_uprooted() {
                         return false;
                     }
-                    self.math_num_uprooted_at_latest_retain = uf.math_.num_uprooted();
                     let offset = insertions.len();
+                    log_duration!("update {}: {}", "bar", {
+                        self.math_num_uprooted_at_latest_retain = uf.math_.num_uprooted();
+                    });
                     self.update_begin(&insertions[offset..], uf);
                     true
                 }
                 fn update_finalize(&mut self, insertions: &mut Vec<Self::Row>, uf: &mut Unification) {
-                    assert!(self.new.is_empty());
-                    self.new.extend(
-                        insertions
-                            .iter()
-                            .map(|&(x0, x1)| (uf.math_.find(x0), uf.math_.find(x1)))
-                            .filter(|&(x0, x1)| !self.hash_index_0_1.contains_key(&(x0, x1))),
-                    );
-                    insertions.clear();
-                    RadixSortable::wrap(&mut self.new).voracious_sort();
-                    self.new.dedup();
-                    for &(x0, x1) in &self.new {
-                        self.hash_index_0
-                            .entry((uf.math_.find(x0),))
-                            .or_default()
-                            .push((uf.math_.find(x1),));
-                    }
-                    self.hash_index_0.retain(|&(x0,), v| {
-                        if uf.math_.is_root(x0) {
-                            v.retain(|&mut (x1,)| uf.math_.is_root(x1));
-                            v.sort_unstable();
-                            v.dedup();
-                            true
-                        } else {
-                            false
+                    log_duration!("update_finalize {}: {}", "bar", {
+                        assert!(self.new.is_empty());
+                        self.new.extend(
+                            insertions
+                                .iter()
+                                .map(|&(x0, x1)| (uf.math_.find(x0), uf.math_.find(x1)))
+                                .filter(|&(x0, x1)| !self.hash_index_0_1.contains_key(&(x0, x1))),
+                        );
+                        insertions.clear();
+                        RadixSortable::wrap(&mut self.new).voracious_sort();
+                        self.new.dedup();
+                        for &(x0, x1) in &self.new {
+                            self.hash_index_0
+                                .entry((uf.math_.find(x0),))
+                                .or_default()
+                                .push((uf.math_.find(x1),));
                         }
-                    });
-                    for &(x0, x1) in &self.new {
-                        self.hash_index_0_1
-                            .entry((uf.math_.find(x0), uf.math_.find(x1)))
-                            .or_default()
-                            .push(());
-                    }
-                    self.hash_index_0_1.retain(|&(x0, x1), v| {
-                        if uf.math_.is_root(x0) & uf.math_.is_root(x1) {
-                            v.retain(|&mut ()| true);
-                            v.sort_unstable();
-                            v.dedup();
-                            true
-                        } else {
-                            false
+                        self.hash_index_0.retain(|&(x0,), v| {
+                            if uf.math_.is_root(x0) {
+                                v.retain(|&mut (x1,)| uf.math_.is_root(x1));
+                                v.sort_unstable();
+                                v.dedup();
+                                true
+                            } else {
+                                false
+                            }
+                        });
+                        for &(x0, x1) in &self.new {
+                            self.hash_index_0_1
+                                .entry((uf.math_.find(x0), uf.math_.find(x1)))
+                                .or_default()
+                                .push(());
                         }
-                    });
-                    for &(x0, x1) in &self.new {
-                        self.hash_index_1
-                            .entry((uf.math_.find(x1),))
-                            .or_default()
-                            .push((uf.math_.find(x0),));
-                    }
-                    self.hash_index_1.retain(|&(x1,), v| {
-                        if uf.math_.is_root(x1) {
-                            v.retain(|&mut (x0,)| uf.math_.is_root(x0));
-                            v.sort_unstable();
-                            v.dedup();
-                            true
-                        } else {
-                            false
+                        self.hash_index_0_1.retain(|&(x0, x1), v| {
+                            if uf.math_.is_root(x0) & uf.math_.is_root(x1) {
+                                v.retain(|&mut ()| true);
+                                v.sort_unstable();
+                                v.dedup();
+                                true
+                            } else {
+                                false
+                            }
+                        });
+                        for &(x0, x1) in &self.new {
+                            self.hash_index_1
+                                .entry((uf.math_.find(x1),))
+                                .or_default()
+                                .push((uf.math_.find(x0),));
                         }
+                        self.hash_index_1.retain(|&(x1,), v| {
+                            if uf.math_.is_root(x1) {
+                                v.retain(|&mut (x0,)| uf.math_.is_root(x0));
+                                v.sort_unstable();
+                                v.dedup();
+                                true
+                            } else {
+                                false
+                            }
+                        });
                     });
                     self.math_num_uprooted_at_latest_retain = 0;
                 }
@@ -8107,74 +8407,80 @@ fn triangle_join() {
                         writeln!(buf, "{}_{i} [shape = box];", "baz").unwrap();
                     }
                 }
-                fn update_begin(&mut self, insertions: &[Self::Row], uf: &mut Unification) {}
+                fn update_begin(&mut self, insertions: &[Self::Row], uf: &mut Unification) {
+                    log_duration!("update_begin {}: {}", "baz", {});
+                }
                 fn update(&mut self, insertions: &mut Vec<Self::Row>, uf: &mut Unification) -> bool {
                     if self.math_num_uprooted_at_latest_retain == uf.math_.num_uprooted() {
                         return false;
                     }
-                    self.math_num_uprooted_at_latest_retain = uf.math_.num_uprooted();
                     let offset = insertions.len();
+                    log_duration!("update {}: {}", "baz", {
+                        self.math_num_uprooted_at_latest_retain = uf.math_.num_uprooted();
+                    });
                     self.update_begin(&insertions[offset..], uf);
                     true
                 }
                 fn update_finalize(&mut self, insertions: &mut Vec<Self::Row>, uf: &mut Unification) {
-                    assert!(self.new.is_empty());
-                    self.new.extend(
-                        insertions
-                            .iter()
-                            .map(|&(x0, x1)| (uf.math_.find(x0), uf.math_.find(x1)))
-                            .filter(|&(x0, x1)| !self.hash_index_1_0.contains_key(&(x1, x0))),
-                    );
-                    insertions.clear();
-                    RadixSortable::wrap(&mut self.new).voracious_sort();
-                    self.new.dedup();
-                    for &(x0, x1) in &self.new {
-                        self.hash_index_1
-                            .entry((uf.math_.find(x1),))
-                            .or_default()
-                            .push((uf.math_.find(x0),));
-                    }
-                    self.hash_index_1.retain(|&(x1,), v| {
-                        if uf.math_.is_root(x1) {
-                            v.retain(|&mut (x0,)| uf.math_.is_root(x0));
-                            v.sort_unstable();
-                            v.dedup();
-                            true
-                        } else {
-                            false
+                    log_duration!("update_finalize {}: {}", "baz", {
+                        assert!(self.new.is_empty());
+                        self.new.extend(
+                            insertions
+                                .iter()
+                                .map(|&(x0, x1)| (uf.math_.find(x0), uf.math_.find(x1)))
+                                .filter(|&(x0, x1)| !self.hash_index_1_0.contains_key(&(x1, x0))),
+                        );
+                        insertions.clear();
+                        RadixSortable::wrap(&mut self.new).voracious_sort();
+                        self.new.dedup();
+                        for &(x0, x1) in &self.new {
+                            self.hash_index_1
+                                .entry((uf.math_.find(x1),))
+                                .or_default()
+                                .push((uf.math_.find(x0),));
                         }
-                    });
-                    for &(x0, x1) in &self.new {
-                        self.hash_index_0
-                            .entry((uf.math_.find(x0),))
-                            .or_default()
-                            .push((uf.math_.find(x1),));
-                    }
-                    self.hash_index_0.retain(|&(x0,), v| {
-                        if uf.math_.is_root(x0) {
-                            v.retain(|&mut (x1,)| uf.math_.is_root(x1));
-                            v.sort_unstable();
-                            v.dedup();
-                            true
-                        } else {
-                            false
+                        self.hash_index_1.retain(|&(x1,), v| {
+                            if uf.math_.is_root(x1) {
+                                v.retain(|&mut (x0,)| uf.math_.is_root(x0));
+                                v.sort_unstable();
+                                v.dedup();
+                                true
+                            } else {
+                                false
+                            }
+                        });
+                        for &(x0, x1) in &self.new {
+                            self.hash_index_0
+                                .entry((uf.math_.find(x0),))
+                                .or_default()
+                                .push((uf.math_.find(x1),));
                         }
-                    });
-                    for &(x0, x1) in &self.new {
-                        self.hash_index_1_0
-                            .entry((uf.math_.find(x1), uf.math_.find(x0)))
-                            .or_default()
-                            .push(());
-                    }
-                    self.hash_index_1_0.retain(|&(x1, x0), v| {
-                        if uf.math_.is_root(x1) & uf.math_.is_root(x0) {
-                            v.retain(|&mut ()| true);
-                            v.sort_unstable();
-                            v.dedup();
-                            true
-                        } else {
-                            false
+                        self.hash_index_0.retain(|&(x0,), v| {
+                            if uf.math_.is_root(x0) {
+                                v.retain(|&mut (x1,)| uf.math_.is_root(x1));
+                                v.sort_unstable();
+                                v.dedup();
+                                true
+                            } else {
+                                false
+                            }
+                        });
+                        for &(x0, x1) in &self.new {
+                            self.hash_index_1_0
+                                .entry((uf.math_.find(x1), uf.math_.find(x0)))
+                                .or_default()
+                                .push(());
                         }
+                        self.hash_index_1_0.retain(|&(x1, x0), v| {
+                            if uf.math_.is_root(x1) & uf.math_.is_root(x0) {
+                                v.retain(|&mut ()| true);
+                                v.sort_unstable();
+                                v.dedup();
+                                true
+                            } else {
+                                false
+                            }
+                        });
                     });
                     self.math_num_uprooted_at_latest_retain = 0;
                 }
@@ -8250,42 +8556,48 @@ fn triangle_join() {
                         writeln!(buf, "{}_{i} [shape = box];", "triangle").unwrap();
                     }
                 }
-                fn update_begin(&mut self, insertions: &[Self::Row], uf: &mut Unification) {}
+                fn update_begin(&mut self, insertions: &[Self::Row], uf: &mut Unification) {
+                    log_duration!("update_begin {}: {}", "triangle", {});
+                }
                 fn update(&mut self, insertions: &mut Vec<Self::Row>, uf: &mut Unification) -> bool {
                     if self.math_num_uprooted_at_latest_retain == uf.math_.num_uprooted() {
                         return false;
                     }
-                    self.math_num_uprooted_at_latest_retain = uf.math_.num_uprooted();
                     let offset = insertions.len();
+                    log_duration!("update {}: {}", "triangle", {
+                        self.math_num_uprooted_at_latest_retain = uf.math_.num_uprooted();
+                    });
                     self.update_begin(&insertions[offset..], uf);
                     true
                 }
                 fn update_finalize(&mut self, insertions: &mut Vec<Self::Row>, uf: &mut Unification) {
-                    assert!(self.new.is_empty());
-                    self.new.extend(
-                        insertions
-                            .iter()
-                            .map(|&(x0, x1, x2)| (uf.math_.find(x0), uf.math_.find(x1), uf.math_.find(x2)))
-                            .filter(|&(x0, x1, x2)| !self.hash_index_0_1_2.contains_key(&(x0, x1, x2))),
-                    );
-                    insertions.clear();
-                    RadixSortable::wrap(&mut self.new).voracious_sort();
-                    self.new.dedup();
-                    for &(x0, x1, x2) in &self.new {
-                        self.hash_index_0_1_2
-                            .entry((uf.math_.find(x0), uf.math_.find(x1), uf.math_.find(x2)))
-                            .or_default()
-                            .push(());
-                    }
-                    self.hash_index_0_1_2.retain(|&(x0, x1, x2), v| {
-                        if uf.math_.is_root(x0) & uf.math_.is_root(x1) & uf.math_.is_root(x2) {
-                            v.retain(|&mut ()| true);
-                            v.sort_unstable();
-                            v.dedup();
-                            true
-                        } else {
-                            false
+                    log_duration!("update_finalize {}: {}", "triangle", {
+                        assert!(self.new.is_empty());
+                        self.new.extend(
+                            insertions
+                                .iter()
+                                .map(|&(x0, x1, x2)| (uf.math_.find(x0), uf.math_.find(x1), uf.math_.find(x2)))
+                                .filter(|&(x0, x1, x2)| !self.hash_index_0_1_2.contains_key(&(x0, x1, x2))),
+                        );
+                        insertions.clear();
+                        RadixSortable::wrap(&mut self.new).voracious_sort();
+                        self.new.dedup();
+                        for &(x0, x1, x2) in &self.new {
+                            self.hash_index_0_1_2
+                                .entry((uf.math_.find(x0), uf.math_.find(x1), uf.math_.find(x2)))
+                                .or_default()
+                                .push(());
                         }
+                        self.hash_index_0_1_2.retain(|&(x0, x1, x2), v| {
+                            if uf.math_.is_root(x0) & uf.math_.is_root(x1) & uf.math_.is_root(x2) {
+                                v.retain(|&mut ()| true);
+                                v.sort_unstable();
+                                v.dedup();
+                                true
+                            } else {
+                                false
+                            }
+                        });
                     });
                     self.math_num_uprooted_at_latest_retain = 0;
                 }
@@ -8378,18 +8690,22 @@ fn triangle_join() {
                     theory
                 }
                 pub fn step(&mut self) -> [std::time::Duration; 2] {
-                    [
-                        {
-                            let start = std::time::Instant::now();
-                            self.apply_rules();
-                            start.elapsed()
-                        },
-                        {
-                            let start = std::time::Instant::now();
-                            self.canonicalize();
-                            start.elapsed()
-                        },
-                    ]
+                    log_duration!("======== STEP took {} ==========", {
+                        [
+                            {
+                                let start = std::time::Instant::now();
+                                log_duration!("apply_rules: {}", {
+                                    self.apply_rules();
+                                });
+                                start.elapsed()
+                            },
+                            {
+                                let start = std::time::Instant::now();
+                                self.canonicalize();
+                                start.elapsed()
+                            },
+                        ]
+                    })
                 }
                 #[inline(never)]
                 pub fn apply_rules(&mut self) {
@@ -8459,39 +8775,47 @@ fn triangle_join() {
                 }
                 #[inline(never)]
                 pub fn canonicalize(&mut self) {
-                    self.foo_.clear_new();
-                    self.bar_.clear_new();
-                    self.baz_.clear_new();
-                    self.triangle_.clear_new();
-                    if !self.delta.has_new_inserts() && self.uf.num_uprooted() == 0 {
-                        return;
-                    }
-                    self.foo_.update_begin(&mut self.delta.foo_, &mut self.uf);
-                    self.bar_.update_begin(&mut self.delta.bar_, &mut self.uf);
-                    self.baz_.update_begin(&mut self.delta.baz_, &mut self.uf);
-                    self.triangle_
-                        .update_begin(&mut self.delta.triangle_, &mut self.uf);
-                    loop {
-                        let mut progress = false;
-                        progress |= self.foo_.update(&mut self.delta.foo_, &mut self.uf);
-                        progress |= self.bar_.update(&mut self.delta.bar_, &mut self.uf);
-                        progress |= self.baz_.update(&mut self.delta.baz_, &mut self.uf);
-                        progress |= self
-                            .triangle_
-                            .update(&mut self.delta.triangle_, &mut self.uf);
-                        if !progress {
-                            break;
+                    log_duration!("canonicalize (total): {}", {
+                        self.foo_.clear_new();
+                        self.bar_.clear_new();
+                        self.baz_.clear_new();
+                        self.triangle_.clear_new();
+                        if !self.delta.has_new_inserts() && self.uf.num_uprooted() == 0 {
+                            return;
                         }
-                    }
-                    self.foo_
-                        .update_finalize(&mut self.delta.foo_, &mut self.uf);
-                    self.bar_
-                        .update_finalize(&mut self.delta.bar_, &mut self.uf);
-                    self.baz_
-                        .update_finalize(&mut self.delta.baz_, &mut self.uf);
-                    self.triangle_
-                        .update_finalize(&mut self.delta.triangle_, &mut self.uf);
-                    self.uf.reset_num_uprooted();
+                        log_duration!("update_begin (total): {}", {
+                            self.foo_.update_begin(&mut self.delta.foo_, &mut self.uf);
+                            self.bar_.update_begin(&mut self.delta.bar_, &mut self.uf);
+                            self.baz_.update_begin(&mut self.delta.baz_, &mut self.uf);
+                            self.triangle_
+                                .update_begin(&mut self.delta.triangle_, &mut self.uf);
+                        });
+                        log_duration!("update_loop (total): {}", {
+                            loop {
+                                let mut progress = false;
+                                progress |= self.foo_.update(&mut self.delta.foo_, &mut self.uf);
+                                progress |= self.bar_.update(&mut self.delta.bar_, &mut self.uf);
+                                progress |= self.baz_.update(&mut self.delta.baz_, &mut self.uf);
+                                progress |= self
+                                    .triangle_
+                                    .update(&mut self.delta.triangle_, &mut self.uf);
+                                if !progress {
+                                    break;
+                                }
+                            }
+                        });
+                        log_duration!("update_finalize (total): {}", {
+                            self.foo_
+                                .update_finalize(&mut self.delta.foo_, &mut self.uf);
+                            self.bar_
+                                .update_finalize(&mut self.delta.bar_, &mut self.uf);
+                            self.baz_
+                                .update_finalize(&mut self.delta.baz_, &mut self.uf);
+                            self.triangle_
+                                .update_finalize(&mut self.delta.triangle_, &mut self.uf);
+                            self.uf.reset_num_uprooted();
+                        });
+                    });
                 }
             }
             impl EclassProvider<Math> for Theory {
@@ -8608,114 +8932,120 @@ fn edgecase0() {
                     }
                 }
                 fn update_begin(&mut self, insertions: &[Self::Row], uf: &mut Unification) {
-                    for &(mut x0, mut x1, mut x2) in insertions {
-                        match self
-                            .hash_index_0_1
-                            .entry((uf.math_.find(x0), uf.math_.find(x1)))
-                        {
-                            runtime::HashMapEntry::Occupied(mut entry) => {
-                                let (y2,) = entry.get_mut();
-                                uf.math_.union_mut(&mut x2, y2);
-                            }
-                            runtime::HashMapEntry::Vacant(entry) => {
-                                entry.insert((uf.math_.find(x2),));
+                    log_duration!("update_begin {}: {}", "mul", {
+                        for &(mut x0, mut x1, mut x2) in insertions {
+                            match self
+                                .hash_index_0_1
+                                .entry((uf.math_.find(x0), uf.math_.find(x1)))
+                            {
+                                runtime::HashMapEntry::Occupied(mut entry) => {
+                                    let (y2,) = entry.get_mut();
+                                    uf.math_.union_mut(&mut x2, y2);
+                                }
+                                runtime::HashMapEntry::Vacant(entry) => {
+                                    entry.insert((uf.math_.find(x2),));
+                                }
                             }
                         }
-                    }
+                    });
                 }
                 fn update(&mut self, insertions: &mut Vec<Self::Row>, uf: &mut Unification) -> bool {
                     if self.math_num_uprooted_at_latest_retain == uf.math_.num_uprooted() {
                         return false;
                     }
-                    self.math_num_uprooted_at_latest_retain = uf.math_.num_uprooted();
                     let offset = insertions.len();
-                    self.hash_index_0_1.retain(|&(x0, x1), &mut (x2,)| {
-                        if uf.math_.is_root(x0) & uf.math_.is_root(x1) & uf.math_.is_root(x2) {
-                            true
-                        } else {
-                            insertions.push((x0, x1, x2));
-                            false
-                        }
+                    log_duration!("update {}: {}", "mul", {
+                        self.math_num_uprooted_at_latest_retain = uf.math_.num_uprooted();
+                        self.hash_index_0_1.retain(|&(x0, x1), &mut (x2,)| {
+                            if uf.math_.is_root(x0) & uf.math_.is_root(x1) & uf.math_.is_root(x2) {
+                                true
+                            } else {
+                                insertions.push((x0, x1, x2));
+                                false
+                            }
+                        });
                     });
                     self.update_begin(&insertions[offset..], uf);
                     true
                 }
                 fn update_finalize(&mut self, insertions: &mut Vec<Self::Row>, uf: &mut Unification) {
-                    assert!(self.new.is_empty());
-                    self.new.extend(
-                        self.hash_index_0_1
-                            .iter()
-                            .map(|(&(x0, x1), &(x2,))| {
-                                (uf.math_.find(x0), uf.math_.find(x1), uf.math_.find(x2))
-                            })
-                            .filter(|&(x0, x1, x2)| !self.hash_index_0_1_2.contains_key(&(x0, x1, x2))),
-                    );
-                    insertions.clear();
-                    RadixSortable::wrap(&mut self.new).voracious_sort();
-                    self.new.dedup();
-                    for &(x0, x1, x2) in &self.new {
-                        self.hash_index_0
-                            .entry((uf.math_.find(x0),))
-                            .or_default()
-                            .push((uf.math_.find(x1), uf.math_.find(x2)));
-                    }
-                    self.hash_index_0.retain(|&(x0,), v| {
-                        if uf.math_.is_root(x0) {
-                            v.retain(|&mut (x1, x2)| uf.math_.is_root(x1) & uf.math_.is_root(x2));
-                            v.sort_unstable();
-                            v.dedup();
-                            true
-                        } else {
-                            false
+                    log_duration!("update_finalize {}: {}", "mul", {
+                        assert!(self.new.is_empty());
+                        self.new.extend(
+                            self.hash_index_0_1
+                                .iter()
+                                .map(|(&(x0, x1), &(x2,))| {
+                                    (uf.math_.find(x0), uf.math_.find(x1), uf.math_.find(x2))
+                                })
+                                .filter(|&(x0, x1, x2)| !self.hash_index_0_1_2.contains_key(&(x0, x1, x2))),
+                        );
+                        insertions.clear();
+                        RadixSortable::wrap(&mut self.new).voracious_sort();
+                        self.new.dedup();
+                        for &(x0, x1, x2) in &self.new {
+                            self.hash_index_0
+                                .entry((uf.math_.find(x0),))
+                                .or_default()
+                                .push((uf.math_.find(x1), uf.math_.find(x2)));
                         }
-                    });
-                    for &(x0, x1, x2) in &self.new {
-                        self.hash_index_2_0
-                            .entry((uf.math_.find(x2), uf.math_.find(x0)))
-                            .or_default()
-                            .push((uf.math_.find(x1),));
-                    }
-                    self.hash_index_2_0.retain(|&(x2, x0), v| {
-                        if uf.math_.is_root(x2) & uf.math_.is_root(x0) {
-                            v.retain(|&mut (x1,)| uf.math_.is_root(x1));
-                            v.sort_unstable();
-                            v.dedup();
-                            true
-                        } else {
-                            false
+                        self.hash_index_0.retain(|&(x0,), v| {
+                            if uf.math_.is_root(x0) {
+                                v.retain(|&mut (x1, x2)| uf.math_.is_root(x1) & uf.math_.is_root(x2));
+                                v.sort_unstable();
+                                v.dedup();
+                                true
+                            } else {
+                                false
+                            }
+                        });
+                        for &(x0, x1, x2) in &self.new {
+                            self.hash_index_2_0
+                                .entry((uf.math_.find(x2), uf.math_.find(x0)))
+                                .or_default()
+                                .push((uf.math_.find(x1),));
                         }
-                    });
-                    for &(x0, x1, x2) in &self.new {
-                        self.hash_index_2
-                            .entry((uf.math_.find(x2),))
-                            .or_default()
-                            .push((uf.math_.find(x0), uf.math_.find(x1)));
-                    }
-                    self.hash_index_2.retain(|&(x2,), v| {
-                        if uf.math_.is_root(x2) {
-                            v.retain(|&mut (x0, x1)| uf.math_.is_root(x0) & uf.math_.is_root(x1));
-                            v.sort_unstable();
-                            v.dedup();
-                            true
-                        } else {
-                            false
+                        self.hash_index_2_0.retain(|&(x2, x0), v| {
+                            if uf.math_.is_root(x2) & uf.math_.is_root(x0) {
+                                v.retain(|&mut (x1,)| uf.math_.is_root(x1));
+                                v.sort_unstable();
+                                v.dedup();
+                                true
+                            } else {
+                                false
+                            }
+                        });
+                        for &(x0, x1, x2) in &self.new {
+                            self.hash_index_2
+                                .entry((uf.math_.find(x2),))
+                                .or_default()
+                                .push((uf.math_.find(x0), uf.math_.find(x1)));
                         }
-                    });
-                    for &(x0, x1, x2) in &self.new {
-                        self.hash_index_0_1_2
-                            .entry((uf.math_.find(x0), uf.math_.find(x1), uf.math_.find(x2)))
-                            .or_default()
-                            .push(());
-                    }
-                    self.hash_index_0_1_2.retain(|&(x0, x1, x2), v| {
-                        if uf.math_.is_root(x0) & uf.math_.is_root(x1) & uf.math_.is_root(x2) {
-                            v.retain(|&mut ()| true);
-                            v.sort_unstable();
-                            v.dedup();
-                            true
-                        } else {
-                            false
+                        self.hash_index_2.retain(|&(x2,), v| {
+                            if uf.math_.is_root(x2) {
+                                v.retain(|&mut (x0, x1)| uf.math_.is_root(x0) & uf.math_.is_root(x1));
+                                v.sort_unstable();
+                                v.dedup();
+                                true
+                            } else {
+                                false
+                            }
+                        });
+                        for &(x0, x1, x2) in &self.new {
+                            self.hash_index_0_1_2
+                                .entry((uf.math_.find(x0), uf.math_.find(x1), uf.math_.find(x2)))
+                                .or_default()
+                                .push(());
                         }
+                        self.hash_index_0_1_2.retain(|&(x0, x1, x2), v| {
+                            if uf.math_.is_root(x0) & uf.math_.is_root(x1) & uf.math_.is_root(x2) {
+                                v.retain(|&mut ()| true);
+                                v.sort_unstable();
+                                v.dedup();
+                                true
+                            } else {
+                                false
+                            }
+                        });
                     });
                     self.math_num_uprooted_at_latest_retain = 0;
                 }
@@ -8822,98 +9152,104 @@ fn edgecase0() {
                     }
                 }
                 fn update_begin(&mut self, insertions: &[Self::Row], uf: &mut Unification) {
-                    for &(mut x0, mut x1, mut x2) in insertions {
-                        match self
-                            .hash_index_0_1
-                            .entry((uf.math_.find(x0), uf.math_.find(x1)))
-                        {
-                            runtime::HashMapEntry::Occupied(mut entry) => {
-                                let (y2,) = entry.get_mut();
-                                uf.math_.union_mut(&mut x2, y2);
-                            }
-                            runtime::HashMapEntry::Vacant(entry) => {
-                                entry.insert((uf.math_.find(x2),));
+                    log_duration!("update_begin {}: {}", "add", {
+                        for &(mut x0, mut x1, mut x2) in insertions {
+                            match self
+                                .hash_index_0_1
+                                .entry((uf.math_.find(x0), uf.math_.find(x1)))
+                            {
+                                runtime::HashMapEntry::Occupied(mut entry) => {
+                                    let (y2,) = entry.get_mut();
+                                    uf.math_.union_mut(&mut x2, y2);
+                                }
+                                runtime::HashMapEntry::Vacant(entry) => {
+                                    entry.insert((uf.math_.find(x2),));
+                                }
                             }
                         }
-                    }
+                    });
                 }
                 fn update(&mut self, insertions: &mut Vec<Self::Row>, uf: &mut Unification) -> bool {
                     if self.math_num_uprooted_at_latest_retain == uf.math_.num_uprooted() {
                         return false;
                     }
-                    self.math_num_uprooted_at_latest_retain = uf.math_.num_uprooted();
                     let offset = insertions.len();
-                    self.hash_index_0_1.retain(|&(x0, x1), &mut (x2,)| {
-                        if uf.math_.is_root(x0) & uf.math_.is_root(x1) & uf.math_.is_root(x2) {
-                            true
-                        } else {
-                            insertions.push((x0, x1, x2));
-                            false
-                        }
+                    log_duration!("update {}: {}", "add", {
+                        self.math_num_uprooted_at_latest_retain = uf.math_.num_uprooted();
+                        self.hash_index_0_1.retain(|&(x0, x1), &mut (x2,)| {
+                            if uf.math_.is_root(x0) & uf.math_.is_root(x1) & uf.math_.is_root(x2) {
+                                true
+                            } else {
+                                insertions.push((x0, x1, x2));
+                                false
+                            }
+                        });
                     });
                     self.update_begin(&insertions[offset..], uf);
                     true
                 }
                 fn update_finalize(&mut self, insertions: &mut Vec<Self::Row>, uf: &mut Unification) {
-                    assert!(self.new.is_empty());
-                    self.new.extend(
-                        self.hash_index_0_1
-                            .iter()
-                            .map(|(&(x0, x1), &(x2,))| {
-                                (uf.math_.find(x0), uf.math_.find(x1), uf.math_.find(x2))
-                            })
-                            .filter(|&(x0, x1, x2)| !self.hash_index_0_1_2.contains_key(&(x0, x1, x2))),
-                    );
-                    insertions.clear();
-                    RadixSortable::wrap(&mut self.new).voracious_sort();
-                    self.new.dedup();
-                    for &(x0, x1, x2) in &self.new {
-                        self.hash_index_0
-                            .entry((uf.math_.find(x0),))
-                            .or_default()
-                            .push((uf.math_.find(x1), uf.math_.find(x2)));
-                    }
-                    self.hash_index_0.retain(|&(x0,), v| {
-                        if uf.math_.is_root(x0) {
-                            v.retain(|&mut (x1, x2)| uf.math_.is_root(x1) & uf.math_.is_root(x2));
-                            v.sort_unstable();
-                            v.dedup();
-                            true
-                        } else {
-                            false
+                    log_duration!("update_finalize {}: {}", "add", {
+                        assert!(self.new.is_empty());
+                        self.new.extend(
+                            self.hash_index_0_1
+                                .iter()
+                                .map(|(&(x0, x1), &(x2,))| {
+                                    (uf.math_.find(x0), uf.math_.find(x1), uf.math_.find(x2))
+                                })
+                                .filter(|&(x0, x1, x2)| !self.hash_index_0_1_2.contains_key(&(x0, x1, x2))),
+                        );
+                        insertions.clear();
+                        RadixSortable::wrap(&mut self.new).voracious_sort();
+                        self.new.dedup();
+                        for &(x0, x1, x2) in &self.new {
+                            self.hash_index_0
+                                .entry((uf.math_.find(x0),))
+                                .or_default()
+                                .push((uf.math_.find(x1), uf.math_.find(x2)));
                         }
-                    });
-                    for &(x0, x1, x2) in &self.new {
-                        self.hash_index_1
-                            .entry((uf.math_.find(x1),))
-                            .or_default()
-                            .push((uf.math_.find(x0), uf.math_.find(x2)));
-                    }
-                    self.hash_index_1.retain(|&(x1,), v| {
-                        if uf.math_.is_root(x1) {
-                            v.retain(|&mut (x0, x2)| uf.math_.is_root(x0) & uf.math_.is_root(x2));
-                            v.sort_unstable();
-                            v.dedup();
-                            true
-                        } else {
-                            false
+                        self.hash_index_0.retain(|&(x0,), v| {
+                            if uf.math_.is_root(x0) {
+                                v.retain(|&mut (x1, x2)| uf.math_.is_root(x1) & uf.math_.is_root(x2));
+                                v.sort_unstable();
+                                v.dedup();
+                                true
+                            } else {
+                                false
+                            }
+                        });
+                        for &(x0, x1, x2) in &self.new {
+                            self.hash_index_1
+                                .entry((uf.math_.find(x1),))
+                                .or_default()
+                                .push((uf.math_.find(x0), uf.math_.find(x2)));
                         }
-                    });
-                    for &(x0, x1, x2) in &self.new {
-                        self.hash_index_0_1_2
-                            .entry((uf.math_.find(x0), uf.math_.find(x1), uf.math_.find(x2)))
-                            .or_default()
-                            .push(());
-                    }
-                    self.hash_index_0_1_2.retain(|&(x0, x1, x2), v| {
-                        if uf.math_.is_root(x0) & uf.math_.is_root(x1) & uf.math_.is_root(x2) {
-                            v.retain(|&mut ()| true);
-                            v.sort_unstable();
-                            v.dedup();
-                            true
-                        } else {
-                            false
+                        self.hash_index_1.retain(|&(x1,), v| {
+                            if uf.math_.is_root(x1) {
+                                v.retain(|&mut (x0, x2)| uf.math_.is_root(x0) & uf.math_.is_root(x2));
+                                v.sort_unstable();
+                                v.dedup();
+                                true
+                            } else {
+                                false
+                            }
+                        });
+                        for &(x0, x1, x2) in &self.new {
+                            self.hash_index_0_1_2
+                                .entry((uf.math_.find(x0), uf.math_.find(x1), uf.math_.find(x2)))
+                                .or_default()
+                                .push(());
                         }
+                        self.hash_index_0_1_2.retain(|&(x0, x1, x2), v| {
+                            if uf.math_.is_root(x0) & uf.math_.is_root(x1) & uf.math_.is_root(x2) {
+                                v.retain(|&mut ()| true);
+                                v.sort_unstable();
+                                v.dedup();
+                                true
+                            } else {
+                                false
+                            }
+                        });
                     });
                     self.math_num_uprooted_at_latest_retain = 0;
                 }
@@ -9021,18 +9357,22 @@ fn edgecase0() {
                     theory
                 }
                 pub fn step(&mut self) -> [std::time::Duration; 2] {
-                    [
-                        {
-                            let start = std::time::Instant::now();
-                            self.apply_rules();
-                            start.elapsed()
-                        },
-                        {
-                            let start = std::time::Instant::now();
-                            self.canonicalize();
-                            start.elapsed()
-                        },
-                    ]
+                    log_duration!("======== STEP took {} ==========", {
+                        [
+                            {
+                                let start = std::time::Instant::now();
+                                log_duration!("apply_rules: {}", {
+                                    self.apply_rules();
+                                });
+                                start.elapsed()
+                            },
+                            {
+                                let start = std::time::Instant::now();
+                                self.canonicalize();
+                                start.elapsed()
+                            },
+                        ]
+                    })
                 }
                 #[inline(never)]
                 pub fn apply_rules(&mut self) {
@@ -9098,26 +9438,34 @@ fn edgecase0() {
                 }
                 #[inline(never)]
                 pub fn canonicalize(&mut self) {
-                    self.mul_.clear_new();
-                    self.add_.clear_new();
-                    if !self.delta.has_new_inserts() && self.uf.num_uprooted() == 0 {
-                        return;
-                    }
-                    self.mul_.update_begin(&mut self.delta.mul_, &mut self.uf);
-                    self.add_.update_begin(&mut self.delta.add_, &mut self.uf);
-                    loop {
-                        let mut progress = false;
-                        progress |= self.mul_.update(&mut self.delta.mul_, &mut self.uf);
-                        progress |= self.add_.update(&mut self.delta.add_, &mut self.uf);
-                        if !progress {
-                            break;
+                    log_duration!("canonicalize (total): {}", {
+                        self.mul_.clear_new();
+                        self.add_.clear_new();
+                        if !self.delta.has_new_inserts() && self.uf.num_uprooted() == 0 {
+                            return;
                         }
-                    }
-                    self.mul_
-                        .update_finalize(&mut self.delta.mul_, &mut self.uf);
-                    self.add_
-                        .update_finalize(&mut self.delta.add_, &mut self.uf);
-                    self.uf.reset_num_uprooted();
+                        log_duration!("update_begin (total): {}", {
+                            self.mul_.update_begin(&mut self.delta.mul_, &mut self.uf);
+                            self.add_.update_begin(&mut self.delta.add_, &mut self.uf);
+                        });
+                        log_duration!("update_loop (total): {}", {
+                            loop {
+                                let mut progress = false;
+                                progress |= self.mul_.update(&mut self.delta.mul_, &mut self.uf);
+                                progress |= self.add_.update(&mut self.delta.add_, &mut self.uf);
+                                if !progress {
+                                    break;
+                                }
+                            }
+                        });
+                        log_duration!("update_finalize (total): {}", {
+                            self.mul_
+                                .update_finalize(&mut self.delta.mul_, &mut self.uf);
+                            self.add_
+                                .update_finalize(&mut self.delta.add_, &mut self.uf);
+                            self.uf.reset_num_uprooted();
+                        });
+                    });
                 }
             }
             impl EclassProvider<Math> for Theory {
@@ -9228,82 +9576,88 @@ fn test_into_codegen() {
                     }
                 }
                 fn update_begin(&mut self, insertions: &[Self::Row], uf: &mut Unification) {
-                    for &(mut x0, mut x1, mut x2) in insertions {
-                        match self
-                            .hash_index_0_1
-                            .entry((uf.math_.find(x0), uf.math_.find(x1)))
-                        {
-                            runtime::HashMapEntry::Occupied(mut entry) => {
-                                let (y2,) = entry.get_mut();
-                                uf.math_.union_mut(&mut x2, y2);
-                            }
-                            runtime::HashMapEntry::Vacant(entry) => {
-                                entry.insert((uf.math_.find(x2),));
+                    log_duration!("update_begin {}: {}", "mul", {
+                        for &(mut x0, mut x1, mut x2) in insertions {
+                            match self
+                                .hash_index_0_1
+                                .entry((uf.math_.find(x0), uf.math_.find(x1)))
+                            {
+                                runtime::HashMapEntry::Occupied(mut entry) => {
+                                    let (y2,) = entry.get_mut();
+                                    uf.math_.union_mut(&mut x2, y2);
+                                }
+                                runtime::HashMapEntry::Vacant(entry) => {
+                                    entry.insert((uf.math_.find(x2),));
+                                }
                             }
                         }
-                    }
+                    });
                 }
                 fn update(&mut self, insertions: &mut Vec<Self::Row>, uf: &mut Unification) -> bool {
                     if self.math_num_uprooted_at_latest_retain == uf.math_.num_uprooted() {
                         return false;
                     }
-                    self.math_num_uprooted_at_latest_retain = uf.math_.num_uprooted();
                     let offset = insertions.len();
-                    self.hash_index_0_1.retain(|&(x0, x1), &mut (x2,)| {
-                        if uf.math_.is_root(x0) & uf.math_.is_root(x1) & uf.math_.is_root(x2) {
-                            true
-                        } else {
-                            insertions.push((x0, x1, x2));
-                            false
-                        }
+                    log_duration!("update {}: {}", "mul", {
+                        self.math_num_uprooted_at_latest_retain = uf.math_.num_uprooted();
+                        self.hash_index_0_1.retain(|&(x0, x1), &mut (x2,)| {
+                            if uf.math_.is_root(x0) & uf.math_.is_root(x1) & uf.math_.is_root(x2) {
+                                true
+                            } else {
+                                insertions.push((x0, x1, x2));
+                                false
+                            }
+                        });
                     });
                     self.update_begin(&insertions[offset..], uf);
                     true
                 }
                 fn update_finalize(&mut self, insertions: &mut Vec<Self::Row>, uf: &mut Unification) {
-                    assert!(self.new.is_empty());
-                    self.new.extend(
-                        self.hash_index_0_1
-                            .iter()
-                            .map(|(&(x0, x1), &(x2,))| {
-                                (uf.math_.find(x0), uf.math_.find(x1), uf.math_.find(x2))
-                            })
-                            .filter(|&(x0, x1, x2)| !self.hash_index_0_1_2.contains_key(&(x0, x1, x2))),
-                    );
-                    insertions.clear();
-                    RadixSortable::wrap(&mut self.new).voracious_sort();
-                    self.new.dedup();
-                    for &(x0, x1, x2) in &self.new {
-                        self.hash_index_0
-                            .entry((uf.math_.find(x0),))
-                            .or_default()
-                            .push((uf.math_.find(x1), uf.math_.find(x2)));
-                    }
-                    self.hash_index_0.retain(|&(x0,), v| {
-                        if uf.math_.is_root(x0) {
-                            v.retain(|&mut (x1, x2)| uf.math_.is_root(x1) & uf.math_.is_root(x2));
-                            v.sort_unstable();
-                            v.dedup();
-                            true
-                        } else {
-                            false
+                    log_duration!("update_finalize {}: {}", "mul", {
+                        assert!(self.new.is_empty());
+                        self.new.extend(
+                            self.hash_index_0_1
+                                .iter()
+                                .map(|(&(x0, x1), &(x2,))| {
+                                    (uf.math_.find(x0), uf.math_.find(x1), uf.math_.find(x2))
+                                })
+                                .filter(|&(x0, x1, x2)| !self.hash_index_0_1_2.contains_key(&(x0, x1, x2))),
+                        );
+                        insertions.clear();
+                        RadixSortable::wrap(&mut self.new).voracious_sort();
+                        self.new.dedup();
+                        for &(x0, x1, x2) in &self.new {
+                            self.hash_index_0
+                                .entry((uf.math_.find(x0),))
+                                .or_default()
+                                .push((uf.math_.find(x1), uf.math_.find(x2)));
                         }
-                    });
-                    for &(x0, x1, x2) in &self.new {
-                        self.hash_index_0_1_2
-                            .entry((uf.math_.find(x0), uf.math_.find(x1), uf.math_.find(x2)))
-                            .or_default()
-                            .push(());
-                    }
-                    self.hash_index_0_1_2.retain(|&(x0, x1, x2), v| {
-                        if uf.math_.is_root(x0) & uf.math_.is_root(x1) & uf.math_.is_root(x2) {
-                            v.retain(|&mut ()| true);
-                            v.sort_unstable();
-                            v.dedup();
-                            true
-                        } else {
-                            false
+                        self.hash_index_0.retain(|&(x0,), v| {
+                            if uf.math_.is_root(x0) {
+                                v.retain(|&mut (x1, x2)| uf.math_.is_root(x1) & uf.math_.is_root(x2));
+                                v.sort_unstable();
+                                v.dedup();
+                                true
+                            } else {
+                                false
+                            }
+                        });
+                        for &(x0, x1, x2) in &self.new {
+                            self.hash_index_0_1_2
+                                .entry((uf.math_.find(x0), uf.math_.find(x1), uf.math_.find(x2)))
+                                .or_default()
+                                .push(());
                         }
+                        self.hash_index_0_1_2.retain(|&(x0, x1, x2), v| {
+                            if uf.math_.is_root(x0) & uf.math_.is_root(x1) & uf.math_.is_root(x2) {
+                                v.retain(|&mut ()| true);
+                                v.sort_unstable();
+                                v.dedup();
+                                true
+                            } else {
+                                false
+                            }
+                        });
                     });
                     self.math_num_uprooted_at_latest_retain = 0;
                 }
@@ -9393,82 +9747,88 @@ fn test_into_codegen() {
                     }
                 }
                 fn update_begin(&mut self, insertions: &[Self::Row], uf: &mut Unification) {
-                    for &(mut x0, mut x1, mut x2) in insertions {
-                        match self
-                            .hash_index_0_1
-                            .entry((uf.math_.find(x0), uf.math_.find(x1)))
-                        {
-                            runtime::HashMapEntry::Occupied(mut entry) => {
-                                let (y2,) = entry.get_mut();
-                                uf.math_.union_mut(&mut x2, y2);
-                            }
-                            runtime::HashMapEntry::Vacant(entry) => {
-                                entry.insert((uf.math_.find(x2),));
+                    log_duration!("update_begin {}: {}", "add", {
+                        for &(mut x0, mut x1, mut x2) in insertions {
+                            match self
+                                .hash_index_0_1
+                                .entry((uf.math_.find(x0), uf.math_.find(x1)))
+                            {
+                                runtime::HashMapEntry::Occupied(mut entry) => {
+                                    let (y2,) = entry.get_mut();
+                                    uf.math_.union_mut(&mut x2, y2);
+                                }
+                                runtime::HashMapEntry::Vacant(entry) => {
+                                    entry.insert((uf.math_.find(x2),));
+                                }
                             }
                         }
-                    }
+                    });
                 }
                 fn update(&mut self, insertions: &mut Vec<Self::Row>, uf: &mut Unification) -> bool {
                     if self.math_num_uprooted_at_latest_retain == uf.math_.num_uprooted() {
                         return false;
                     }
-                    self.math_num_uprooted_at_latest_retain = uf.math_.num_uprooted();
                     let offset = insertions.len();
-                    self.hash_index_0_1.retain(|&(x0, x1), &mut (x2,)| {
-                        if uf.math_.is_root(x0) & uf.math_.is_root(x1) & uf.math_.is_root(x2) {
-                            true
-                        } else {
-                            insertions.push((x0, x1, x2));
-                            false
-                        }
+                    log_duration!("update {}: {}", "add", {
+                        self.math_num_uprooted_at_latest_retain = uf.math_.num_uprooted();
+                        self.hash_index_0_1.retain(|&(x0, x1), &mut (x2,)| {
+                            if uf.math_.is_root(x0) & uf.math_.is_root(x1) & uf.math_.is_root(x2) {
+                                true
+                            } else {
+                                insertions.push((x0, x1, x2));
+                                false
+                            }
+                        });
                     });
                     self.update_begin(&insertions[offset..], uf);
                     true
                 }
                 fn update_finalize(&mut self, insertions: &mut Vec<Self::Row>, uf: &mut Unification) {
-                    assert!(self.new.is_empty());
-                    self.new.extend(
-                        self.hash_index_0_1
-                            .iter()
-                            .map(|(&(x0, x1), &(x2,))| {
-                                (uf.math_.find(x0), uf.math_.find(x1), uf.math_.find(x2))
-                            })
-                            .filter(|&(x0, x1, x2)| !self.hash_index_0_1_2.contains_key(&(x0, x1, x2))),
-                    );
-                    insertions.clear();
-                    RadixSortable::wrap(&mut self.new).voracious_sort();
-                    self.new.dedup();
-                    for &(x0, x1, x2) in &self.new {
-                        self.hash_index_2
-                            .entry((uf.math_.find(x2),))
-                            .or_default()
-                            .push((uf.math_.find(x0), uf.math_.find(x1)));
-                    }
-                    self.hash_index_2.retain(|&(x2,), v| {
-                        if uf.math_.is_root(x2) {
-                            v.retain(|&mut (x0, x1)| uf.math_.is_root(x0) & uf.math_.is_root(x1));
-                            v.sort_unstable();
-                            v.dedup();
-                            true
-                        } else {
-                            false
+                    log_duration!("update_finalize {}: {}", "add", {
+                        assert!(self.new.is_empty());
+                        self.new.extend(
+                            self.hash_index_0_1
+                                .iter()
+                                .map(|(&(x0, x1), &(x2,))| {
+                                    (uf.math_.find(x0), uf.math_.find(x1), uf.math_.find(x2))
+                                })
+                                .filter(|&(x0, x1, x2)| !self.hash_index_0_1_2.contains_key(&(x0, x1, x2))),
+                        );
+                        insertions.clear();
+                        RadixSortable::wrap(&mut self.new).voracious_sort();
+                        self.new.dedup();
+                        for &(x0, x1, x2) in &self.new {
+                            self.hash_index_2
+                                .entry((uf.math_.find(x2),))
+                                .or_default()
+                                .push((uf.math_.find(x0), uf.math_.find(x1)));
                         }
-                    });
-                    for &(x0, x1, x2) in &self.new {
-                        self.hash_index_0_1_2
-                            .entry((uf.math_.find(x0), uf.math_.find(x1), uf.math_.find(x2)))
-                            .or_default()
-                            .push(());
-                    }
-                    self.hash_index_0_1_2.retain(|&(x0, x1, x2), v| {
-                        if uf.math_.is_root(x0) & uf.math_.is_root(x1) & uf.math_.is_root(x2) {
-                            v.retain(|&mut ()| true);
-                            v.sort_unstable();
-                            v.dedup();
-                            true
-                        } else {
-                            false
+                        self.hash_index_2.retain(|&(x2,), v| {
+                            if uf.math_.is_root(x2) {
+                                v.retain(|&mut (x0, x1)| uf.math_.is_root(x0) & uf.math_.is_root(x1));
+                                v.sort_unstable();
+                                v.dedup();
+                                true
+                            } else {
+                                false
+                            }
+                        });
+                        for &(x0, x1, x2) in &self.new {
+                            self.hash_index_0_1_2
+                                .entry((uf.math_.find(x0), uf.math_.find(x1), uf.math_.find(x2)))
+                                .or_default()
+                                .push(());
                         }
+                        self.hash_index_0_1_2.retain(|&(x0, x1, x2), v| {
+                            if uf.math_.is_root(x0) & uf.math_.is_root(x1) & uf.math_.is_root(x2) {
+                                v.retain(|&mut ()| true);
+                                v.sort_unstable();
+                                v.dedup();
+                                true
+                            } else {
+                                false
+                            }
+                        });
                     });
                     self.math_num_uprooted_at_latest_retain = 0;
                 }
@@ -9570,18 +9930,22 @@ fn test_into_codegen() {
                     theory
                 }
                 pub fn step(&mut self) -> [std::time::Duration; 2] {
-                    [
-                        {
-                            let start = std::time::Instant::now();
-                            self.apply_rules();
-                            start.elapsed()
-                        },
-                        {
-                            let start = std::time::Instant::now();
-                            self.canonicalize();
-                            start.elapsed()
-                        },
-                    ]
+                    log_duration!("======== STEP took {} ==========", {
+                        [
+                            {
+                                let start = std::time::Instant::now();
+                                log_duration!("apply_rules: {}", {
+                                    self.apply_rules();
+                                });
+                                start.elapsed()
+                            },
+                            {
+                                let start = std::time::Instant::now();
+                                self.canonicalize();
+                                start.elapsed()
+                            },
+                        ]
+                    })
                 }
                 #[inline(never)]
                 pub fn apply_rules(&mut self) {
@@ -9634,26 +9998,34 @@ fn test_into_codegen() {
                 }
                 #[inline(never)]
                 pub fn canonicalize(&mut self) {
-                    self.mul_.clear_new();
-                    self.add_.clear_new();
-                    if !self.delta.has_new_inserts() && self.uf.num_uprooted() == 0 {
-                        return;
-                    }
-                    self.mul_.update_begin(&mut self.delta.mul_, &mut self.uf);
-                    self.add_.update_begin(&mut self.delta.add_, &mut self.uf);
-                    loop {
-                        let mut progress = false;
-                        progress |= self.mul_.update(&mut self.delta.mul_, &mut self.uf);
-                        progress |= self.add_.update(&mut self.delta.add_, &mut self.uf);
-                        if !progress {
-                            break;
+                    log_duration!("canonicalize (total): {}", {
+                        self.mul_.clear_new();
+                        self.add_.clear_new();
+                        if !self.delta.has_new_inserts() && self.uf.num_uprooted() == 0 {
+                            return;
                         }
-                    }
-                    self.mul_
-                        .update_finalize(&mut self.delta.mul_, &mut self.uf);
-                    self.add_
-                        .update_finalize(&mut self.delta.add_, &mut self.uf);
-                    self.uf.reset_num_uprooted();
+                        log_duration!("update_begin (total): {}", {
+                            self.mul_.update_begin(&mut self.delta.mul_, &mut self.uf);
+                            self.add_.update_begin(&mut self.delta.add_, &mut self.uf);
+                        });
+                        log_duration!("update_loop (total): {}", {
+                            loop {
+                                let mut progress = false;
+                                progress |= self.mul_.update(&mut self.delta.mul_, &mut self.uf);
+                                progress |= self.add_.update(&mut self.delta.add_, &mut self.uf);
+                                if !progress {
+                                    break;
+                                }
+                            }
+                        });
+                        log_duration!("update_finalize (total): {}", {
+                            self.mul_
+                                .update_finalize(&mut self.delta.mul_, &mut self.uf);
+                            self.add_
+                                .update_finalize(&mut self.delta.add_, &mut self.uf);
+                            self.uf.reset_num_uprooted();
+                        });
+                    });
                 }
             }
             impl EclassProvider<Math> for Theory {
@@ -12184,77 +12556,83 @@ fn lir_math() {
                     }
                 }
                 fn update_begin(&mut self, insertions: &[Self::Row], uf: &mut Unification) {
-                    for &(mut x0, mut x1) in insertions {
-                        match self.hash_index_0.entry((uf.fuel_unit_.find(x0),)) {
-                            runtime::HashMapEntry::Occupied(mut entry) => {
-                                let (y1,) = entry.get_mut();
-                                uf.fuel_unit_.union_mut(&mut x1, y1);
-                            }
-                            runtime::HashMapEntry::Vacant(entry) => {
-                                entry.insert((uf.fuel_unit_.find(x1),));
+                    log_duration!("update_begin {}: {}", "fuel", {
+                        for &(mut x0, mut x1) in insertions {
+                            match self.hash_index_0.entry((uf.fuel_unit_.find(x0),)) {
+                                runtime::HashMapEntry::Occupied(mut entry) => {
+                                    let (y1,) = entry.get_mut();
+                                    uf.fuel_unit_.union_mut(&mut x1, y1);
+                                }
+                                runtime::HashMapEntry::Vacant(entry) => {
+                                    entry.insert((uf.fuel_unit_.find(x1),));
+                                }
                             }
                         }
-                    }
+                    });
                 }
                 fn update(&mut self, insertions: &mut Vec<Self::Row>, uf: &mut Unification) -> bool {
                     if self.fuel_unit_num_uprooted_at_latest_retain == uf.fuel_unit_.num_uprooted() {
                         return false;
                     }
-                    self.fuel_unit_num_uprooted_at_latest_retain = uf.fuel_unit_.num_uprooted();
                     let offset = insertions.len();
-                    self.hash_index_0.retain(|&(x0,), &mut (x1,)| {
-                        if uf.fuel_unit_.is_root(x0) & uf.fuel_unit_.is_root(x1) {
-                            true
-                        } else {
-                            insertions.push((x0, x1));
-                            false
-                        }
+                    log_duration!("update {}: {}", "fuel", {
+                        self.fuel_unit_num_uprooted_at_latest_retain = uf.fuel_unit_.num_uprooted();
+                        self.hash_index_0.retain(|&(x0,), &mut (x1,)| {
+                            if uf.fuel_unit_.is_root(x0) & uf.fuel_unit_.is_root(x1) {
+                                true
+                            } else {
+                                insertions.push((x0, x1));
+                                false
+                            }
+                        });
                     });
                     self.update_begin(&insertions[offset..], uf);
                     true
                 }
                 fn update_finalize(&mut self, insertions: &mut Vec<Self::Row>, uf: &mut Unification) {
-                    assert!(self.new.is_empty());
-                    self.new.extend(
-                        self.hash_index_0
-                            .iter()
-                            .map(|(&(x0,), &(x1,))| (uf.fuel_unit_.find(x0), uf.fuel_unit_.find(x1)))
-                            .filter(|&(x0, x1)| !self.hash_index_0_1.contains_key(&(x0, x1))),
-                    );
-                    insertions.clear();
-                    RadixSortable::wrap(&mut self.new).voracious_sort();
-                    self.new.dedup();
-                    for &(x0, x1) in &self.new {
-                        self.hash_index_1
-                            .entry((uf.fuel_unit_.find(x1),))
-                            .or_default()
-                            .push((uf.fuel_unit_.find(x0),));
-                    }
-                    self.hash_index_1.retain(|&(x1,), v| {
-                        if uf.fuel_unit_.is_root(x1) {
-                            v.retain(|&mut (x0,)| uf.fuel_unit_.is_root(x0));
-                            v.sort_unstable();
-                            v.dedup();
-                            true
-                        } else {
-                            false
+                    log_duration!("update_finalize {}: {}", "fuel", {
+                        assert!(self.new.is_empty());
+                        self.new.extend(
+                            self.hash_index_0
+                                .iter()
+                                .map(|(&(x0,), &(x1,))| (uf.fuel_unit_.find(x0), uf.fuel_unit_.find(x1)))
+                                .filter(|&(x0, x1)| !self.hash_index_0_1.contains_key(&(x0, x1))),
+                        );
+                        insertions.clear();
+                        RadixSortable::wrap(&mut self.new).voracious_sort();
+                        self.new.dedup();
+                        for &(x0, x1) in &self.new {
+                            self.hash_index_1
+                                .entry((uf.fuel_unit_.find(x1),))
+                                .or_default()
+                                .push((uf.fuel_unit_.find(x0),));
                         }
-                    });
-                    for &(x0, x1) in &self.new {
-                        self.hash_index_0_1
-                            .entry((uf.fuel_unit_.find(x0), uf.fuel_unit_.find(x1)))
-                            .or_default()
-                            .push(());
-                    }
-                    self.hash_index_0_1.retain(|&(x0, x1), v| {
-                        if uf.fuel_unit_.is_root(x0) & uf.fuel_unit_.is_root(x1) {
-                            v.retain(|&mut ()| true);
-                            v.sort_unstable();
-                            v.dedup();
-                            true
-                        } else {
-                            false
+                        self.hash_index_1.retain(|&(x1,), v| {
+                            if uf.fuel_unit_.is_root(x1) {
+                                v.retain(|&mut (x0,)| uf.fuel_unit_.is_root(x0));
+                                v.sort_unstable();
+                                v.dedup();
+                                true
+                            } else {
+                                false
+                            }
+                        });
+                        for &(x0, x1) in &self.new {
+                            self.hash_index_0_1
+                                .entry((uf.fuel_unit_.find(x0), uf.fuel_unit_.find(x1)))
+                                .or_default()
+                                .push(());
                         }
+                        self.hash_index_0_1.retain(|&(x0, x1), v| {
+                            if uf.fuel_unit_.is_root(x0) & uf.fuel_unit_.is_root(x1) {
+                                v.retain(|&mut ()| true);
+                                v.sort_unstable();
+                                v.dedup();
+                                true
+                            } else {
+                                false
+                            }
+                        });
                     });
                     self.fuel_unit_num_uprooted_at_latest_retain = 0;
                 }
@@ -12340,61 +12718,67 @@ fn lir_math() {
                     }
                 }
                 fn update_begin(&mut self, insertions: &[Self::Row], uf: &mut Unification) {
-                    for &(mut x0,) in insertions {
-                        match self.hash_index_.entry(()) {
-                            runtime::HashMapEntry::Occupied(mut entry) => {
-                                let (y0,) = entry.get_mut();
-                                uf.fuel_unit_.union_mut(&mut x0, y0);
-                            }
-                            runtime::HashMapEntry::Vacant(entry) => {
-                                entry.insert((uf.fuel_unit_.find(x0),));
+                    log_duration!("update_begin {}: {}", "zero_fuel", {
+                        for &(mut x0,) in insertions {
+                            match self.hash_index_.entry(()) {
+                                runtime::HashMapEntry::Occupied(mut entry) => {
+                                    let (y0,) = entry.get_mut();
+                                    uf.fuel_unit_.union_mut(&mut x0, y0);
+                                }
+                                runtime::HashMapEntry::Vacant(entry) => {
+                                    entry.insert((uf.fuel_unit_.find(x0),));
+                                }
                             }
                         }
-                    }
+                    });
                 }
                 fn update(&mut self, insertions: &mut Vec<Self::Row>, uf: &mut Unification) -> bool {
                     if self.fuel_unit_num_uprooted_at_latest_retain == uf.fuel_unit_.num_uprooted() {
                         return false;
                     }
-                    self.fuel_unit_num_uprooted_at_latest_retain = uf.fuel_unit_.num_uprooted();
                     let offset = insertions.len();
-                    self.hash_index_.retain(|&(), &mut (x0,)| {
-                        if uf.fuel_unit_.is_root(x0) {
-                            true
-                        } else {
-                            insertions.push((x0,));
-                            false
-                        }
+                    log_duration!("update {}: {}", "zero_fuel", {
+                        self.fuel_unit_num_uprooted_at_latest_retain = uf.fuel_unit_.num_uprooted();
+                        self.hash_index_.retain(|&(), &mut (x0,)| {
+                            if uf.fuel_unit_.is_root(x0) {
+                                true
+                            } else {
+                                insertions.push((x0,));
+                                false
+                            }
+                        });
                     });
                     self.update_begin(&insertions[offset..], uf);
                     true
                 }
                 fn update_finalize(&mut self, insertions: &mut Vec<Self::Row>, uf: &mut Unification) {
-                    assert!(self.new.is_empty());
-                    self.new.extend(
-                        self.hash_index_
-                            .iter()
-                            .map(|(&(), &(x0,))| (uf.fuel_unit_.find(x0),))
-                            .filter(|&(x0,)| !self.hash_index_0.contains_key(&(x0,))),
-                    );
-                    insertions.clear();
-                    RadixSortable::wrap(&mut self.new).voracious_sort();
-                    self.new.dedup();
-                    for &(x0,) in &self.new {
-                        self.hash_index_0
-                            .entry((uf.fuel_unit_.find(x0),))
-                            .or_default()
-                            .push(());
-                    }
-                    self.hash_index_0.retain(|&(x0,), v| {
-                        if uf.fuel_unit_.is_root(x0) {
-                            v.retain(|&mut ()| true);
-                            v.sort_unstable();
-                            v.dedup();
-                            true
-                        } else {
-                            false
+                    log_duration!("update_finalize {}: {}", "zero_fuel", {
+                        assert!(self.new.is_empty());
+                        self.new.extend(
+                            self.hash_index_
+                                .iter()
+                                .map(|(&(), &(x0,))| (uf.fuel_unit_.find(x0),))
+                                .filter(|&(x0,)| !self.hash_index_0.contains_key(&(x0,))),
+                        );
+                        insertions.clear();
+                        RadixSortable::wrap(&mut self.new).voracious_sort();
+                        self.new.dedup();
+                        for &(x0,) in &self.new {
+                            self.hash_index_0
+                                .entry((uf.fuel_unit_.find(x0),))
+                                .or_default()
+                                .push(());
                         }
+                        self.hash_index_0.retain(|&(x0,), v| {
+                            if uf.fuel_unit_.is_root(x0) {
+                                v.retain(|&mut ()| true);
+                                v.sort_unstable();
+                                v.dedup();
+                                true
+                            } else {
+                                false
+                            }
+                        });
                     });
                     self.fuel_unit_num_uprooted_at_latest_retain = 0;
                 }
@@ -12467,82 +12851,88 @@ fn lir_math() {
                     }
                 }
                 fn update_begin(&mut self, insertions: &[Self::Row], uf: &mut Unification) {
-                    for &(mut x0, mut x1, mut x2) in insertions {
-                        match self
-                            .hash_index_1_0
-                            .entry((uf.math_.find(x1), uf.math_.find(x0)))
-                        {
-                            runtime::HashMapEntry::Occupied(mut entry) => {
-                                let (y2,) = entry.get_mut();
-                                uf.math_.union_mut(&mut x2, y2);
-                            }
-                            runtime::HashMapEntry::Vacant(entry) => {
-                                entry.insert((uf.math_.find(x2),));
+                    log_duration!("update_begin {}: {}", "diff", {
+                        for &(mut x0, mut x1, mut x2) in insertions {
+                            match self
+                                .hash_index_1_0
+                                .entry((uf.math_.find(x1), uf.math_.find(x0)))
+                            {
+                                runtime::HashMapEntry::Occupied(mut entry) => {
+                                    let (y2,) = entry.get_mut();
+                                    uf.math_.union_mut(&mut x2, y2);
+                                }
+                                runtime::HashMapEntry::Vacant(entry) => {
+                                    entry.insert((uf.math_.find(x2),));
+                                }
                             }
                         }
-                    }
+                    });
                 }
                 fn update(&mut self, insertions: &mut Vec<Self::Row>, uf: &mut Unification) -> bool {
                     if self.math_num_uprooted_at_latest_retain == uf.math_.num_uprooted() {
                         return false;
                     }
-                    self.math_num_uprooted_at_latest_retain = uf.math_.num_uprooted();
                     let offset = insertions.len();
-                    self.hash_index_1_0.retain(|&(x1, x0), &mut (x2,)| {
-                        if uf.math_.is_root(x0) & uf.math_.is_root(x1) & uf.math_.is_root(x2) {
-                            true
-                        } else {
-                            insertions.push((x0, x1, x2));
-                            false
-                        }
+                    log_duration!("update {}: {}", "diff", {
+                        self.math_num_uprooted_at_latest_retain = uf.math_.num_uprooted();
+                        self.hash_index_1_0.retain(|&(x1, x0), &mut (x2,)| {
+                            if uf.math_.is_root(x0) & uf.math_.is_root(x1) & uf.math_.is_root(x2) {
+                                true
+                            } else {
+                                insertions.push((x0, x1, x2));
+                                false
+                            }
+                        });
                     });
                     self.update_begin(&insertions[offset..], uf);
                     true
                 }
                 fn update_finalize(&mut self, insertions: &mut Vec<Self::Row>, uf: &mut Unification) {
-                    assert!(self.new.is_empty());
-                    self.new.extend(
-                        self.hash_index_1_0
-                            .iter()
-                            .map(|(&(x1, x0), &(x2,))| {
-                                (uf.math_.find(x0), uf.math_.find(x1), uf.math_.find(x2))
-                            })
-                            .filter(|&(x0, x1, x2)| !self.hash_index_1_0_2.contains_key(&(x1, x0, x2))),
-                    );
-                    insertions.clear();
-                    RadixSortable::wrap(&mut self.new).voracious_sort();
-                    self.new.dedup();
-                    for &(x0, x1, x2) in &self.new {
-                        self.hash_index_1
-                            .entry((uf.math_.find(x1),))
-                            .or_default()
-                            .push((uf.math_.find(x0), uf.math_.find(x2)));
-                    }
-                    self.hash_index_1.retain(|&(x1,), v| {
-                        if uf.math_.is_root(x1) {
-                            v.retain(|&mut (x0, x2)| uf.math_.is_root(x0) & uf.math_.is_root(x2));
-                            v.sort_unstable();
-                            v.dedup();
-                            true
-                        } else {
-                            false
+                    log_duration!("update_finalize {}: {}", "diff", {
+                        assert!(self.new.is_empty());
+                        self.new.extend(
+                            self.hash_index_1_0
+                                .iter()
+                                .map(|(&(x1, x0), &(x2,))| {
+                                    (uf.math_.find(x0), uf.math_.find(x1), uf.math_.find(x2))
+                                })
+                                .filter(|&(x0, x1, x2)| !self.hash_index_1_0_2.contains_key(&(x1, x0, x2))),
+                        );
+                        insertions.clear();
+                        RadixSortable::wrap(&mut self.new).voracious_sort();
+                        self.new.dedup();
+                        for &(x0, x1, x2) in &self.new {
+                            self.hash_index_1
+                                .entry((uf.math_.find(x1),))
+                                .or_default()
+                                .push((uf.math_.find(x0), uf.math_.find(x2)));
                         }
-                    });
-                    for &(x0, x1, x2) in &self.new {
-                        self.hash_index_1_0_2
-                            .entry((uf.math_.find(x1), uf.math_.find(x0), uf.math_.find(x2)))
-                            .or_default()
-                            .push(());
-                    }
-                    self.hash_index_1_0_2.retain(|&(x1, x0, x2), v| {
-                        if uf.math_.is_root(x1) & uf.math_.is_root(x0) & uf.math_.is_root(x2) {
-                            v.retain(|&mut ()| true);
-                            v.sort_unstable();
-                            v.dedup();
-                            true
-                        } else {
-                            false
+                        self.hash_index_1.retain(|&(x1,), v| {
+                            if uf.math_.is_root(x1) {
+                                v.retain(|&mut (x0, x2)| uf.math_.is_root(x0) & uf.math_.is_root(x2));
+                                v.sort_unstable();
+                                v.dedup();
+                                true
+                            } else {
+                                false
+                            }
+                        });
+                        for &(x0, x1, x2) in &self.new {
+                            self.hash_index_1_0_2
+                                .entry((uf.math_.find(x1), uf.math_.find(x0), uf.math_.find(x2)))
+                                .or_default()
+                                .push(());
                         }
+                        self.hash_index_1_0_2.retain(|&(x1, x0, x2), v| {
+                            if uf.math_.is_root(x1) & uf.math_.is_root(x0) & uf.math_.is_root(x2) {
+                                v.retain(|&mut ()| true);
+                                v.sort_unstable();
+                                v.dedup();
+                                true
+                            } else {
+                                false
+                            }
+                        });
                     });
                     self.math_num_uprooted_at_latest_retain = 0;
                 }
@@ -12636,21 +13026,23 @@ fn lir_math() {
                     }
                 }
                 fn update_begin(&mut self, insertions: &[Self::Row], uf: &mut Unification) {
-                    for &(mut x0, mut x1, mut x2, mut x3) in insertions {
-                        match self.hash_index_0_1_2.entry((
-                            uf.fuel_unit_.find(x0),
-                            uf.math_.find(x1),
-                            uf.math_.find(x2),
-                        )) {
-                            runtime::HashMapEntry::Occupied(mut entry) => {
-                                let (y3,) = entry.get_mut();
-                                uf.math_.union_mut(&mut x3, y3);
-                            }
-                            runtime::HashMapEntry::Vacant(entry) => {
-                                entry.insert((uf.math_.find(x3),));
+                    log_duration!("update_begin {}: {}", "integral", {
+                        for &(mut x0, mut x1, mut x2, mut x3) in insertions {
+                            match self.hash_index_0_1_2.entry((
+                                uf.fuel_unit_.find(x0),
+                                uf.math_.find(x1),
+                                uf.math_.find(x2),
+                            )) {
+                                runtime::HashMapEntry::Occupied(mut entry) => {
+                                    let (y3,) = entry.get_mut();
+                                    uf.math_.union_mut(&mut x3, y3);
+                                }
+                                runtime::HashMapEntry::Vacant(entry) => {
+                                    entry.insert((uf.math_.find(x3),));
+                                }
                             }
                         }
-                    }
+                    });
                 }
                 fn update(&mut self, insertions: &mut Vec<Self::Row>, uf: &mut Unification) -> bool {
                     if self.fuel_unit_num_uprooted_at_latest_retain == uf.fuel_unit_.num_uprooted()
@@ -12658,120 +13050,124 @@ fn lir_math() {
                     {
                         return false;
                     }
-                    self.fuel_unit_num_uprooted_at_latest_retain = uf.fuel_unit_.num_uprooted();
-                    self.math_num_uprooted_at_latest_retain = uf.math_.num_uprooted();
                     let offset = insertions.len();
-                    self.hash_index_0_1_2.retain(|&(x0, x1, x2), &mut (x3,)| {
-                        if uf.fuel_unit_.is_root(x0)
-                            & uf.math_.is_root(x1)
-                            & uf.math_.is_root(x2)
-                            & uf.math_.is_root(x3)
-                        {
-                            true
-                        } else {
-                            insertions.push((x0, x1, x2, x3));
-                            false
-                        }
+                    log_duration!("update {}: {}", "integral", {
+                        self.fuel_unit_num_uprooted_at_latest_retain = uf.fuel_unit_.num_uprooted();
+                        self.math_num_uprooted_at_latest_retain = uf.math_.num_uprooted();
+                        self.hash_index_0_1_2.retain(|&(x0, x1, x2), &mut (x3,)| {
+                            if uf.fuel_unit_.is_root(x0)
+                                & uf.math_.is_root(x1)
+                                & uf.math_.is_root(x2)
+                                & uf.math_.is_root(x3)
+                            {
+                                true
+                            } else {
+                                insertions.push((x0, x1, x2, x3));
+                                false
+                            }
+                        });
                     });
                     self.update_begin(&insertions[offset..], uf);
                     true
                 }
                 fn update_finalize(&mut self, insertions: &mut Vec<Self::Row>, uf: &mut Unification) {
-                    assert!(self.new.is_empty());
-                    self.new.extend(
-                        self.hash_index_0_1_2
-                            .iter()
-                            .map(|(&(x0, x1, x2), &(x3,))| {
-                                (
+                    log_duration!("update_finalize {}: {}", "integral", {
+                        assert!(self.new.is_empty());
+                        self.new.extend(
+                            self.hash_index_0_1_2
+                                .iter()
+                                .map(|(&(x0, x1, x2), &(x3,))| {
+                                    (
+                                        uf.fuel_unit_.find(x0),
+                                        uf.math_.find(x1),
+                                        uf.math_.find(x2),
+                                        uf.math_.find(x3),
+                                    )
+                                })
+                                .filter(|&(x0, x1, x2, x3)| {
+                                    !self.hash_index_0_1_2_3.contains_key(&(x0, x1, x2, x3))
+                                }),
+                        );
+                        insertions.clear();
+                        RadixSortable::wrap(&mut self.new).voracious_sort();
+                        self.new.dedup();
+                        for &(x0, x1, x2, x3) in &self.new {
+                            self.hash_index_0
+                                .entry((uf.fuel_unit_.find(x0),))
+                                .or_default()
+                                .push((uf.math_.find(x1), uf.math_.find(x2), uf.math_.find(x3)));
+                        }
+                        self.hash_index_0.retain(|&(x0,), v| {
+                            if uf.fuel_unit_.is_root(x0) {
+                                v.retain(|&mut (x1, x2, x3)| {
+                                    uf.math_.is_root(x1) & uf.math_.is_root(x2) & uf.math_.is_root(x3)
+                                });
+                                v.sort_unstable();
+                                v.dedup();
+                                true
+                            } else {
+                                false
+                            }
+                        });
+                        for &(x0, x1, x2, x3) in &self.new {
+                            self.hash_index_1
+                                .entry((uf.math_.find(x1),))
+                                .or_default()
+                                .push((uf.math_.find(x2), uf.fuel_unit_.find(x0), uf.math_.find(x3)));
+                        }
+                        self.hash_index_1.retain(|&(x1,), v| {
+                            if uf.math_.is_root(x1) {
+                                v.retain(|&mut (x2, x0, x3)| {
+                                    uf.math_.is_root(x2) & uf.fuel_unit_.is_root(x0) & uf.math_.is_root(x3)
+                                });
+                                v.sort_unstable();
+                                v.dedup();
+                                true
+                            } else {
+                                false
+                            }
+                        });
+                        for &(x0, x1, x2, x3) in &self.new {
+                            self.hash_index_1_2
+                                .entry((uf.math_.find(x1), uf.math_.find(x2)))
+                                .or_default()
+                                .push((uf.fuel_unit_.find(x0), uf.math_.find(x3)));
+                        }
+                        self.hash_index_1_2.retain(|&(x1, x2), v| {
+                            if uf.math_.is_root(x1) & uf.math_.is_root(x2) {
+                                v.retain(|&mut (x0, x3)| uf.fuel_unit_.is_root(x0) & uf.math_.is_root(x3));
+                                v.sort_unstable();
+                                v.dedup();
+                                true
+                            } else {
+                                false
+                            }
+                        });
+                        for &(x0, x1, x2, x3) in &self.new {
+                            self.hash_index_0_1_2_3
+                                .entry((
                                     uf.fuel_unit_.find(x0),
                                     uf.math_.find(x1),
                                     uf.math_.find(x2),
                                     uf.math_.find(x3),
-                                )
-                            })
-                            .filter(|&(x0, x1, x2, x3)| {
-                                !self.hash_index_0_1_2_3.contains_key(&(x0, x1, x2, x3))
-                            }),
-                    );
-                    insertions.clear();
-                    RadixSortable::wrap(&mut self.new).voracious_sort();
-                    self.new.dedup();
-                    for &(x0, x1, x2, x3) in &self.new {
-                        self.hash_index_0
-                            .entry((uf.fuel_unit_.find(x0),))
-                            .or_default()
-                            .push((uf.math_.find(x1), uf.math_.find(x2), uf.math_.find(x3)));
-                    }
-                    self.hash_index_0.retain(|&(x0,), v| {
-                        if uf.fuel_unit_.is_root(x0) {
-                            v.retain(|&mut (x1, x2, x3)| {
-                                uf.math_.is_root(x1) & uf.math_.is_root(x2) & uf.math_.is_root(x3)
-                            });
-                            v.sort_unstable();
-                            v.dedup();
-                            true
-                        } else {
-                            false
+                                ))
+                                .or_default()
+                                .push(());
                         }
-                    });
-                    for &(x0, x1, x2, x3) in &self.new {
-                        self.hash_index_1
-                            .entry((uf.math_.find(x1),))
-                            .or_default()
-                            .push((uf.math_.find(x2), uf.fuel_unit_.find(x0), uf.math_.find(x3)));
-                    }
-                    self.hash_index_1.retain(|&(x1,), v| {
-                        if uf.math_.is_root(x1) {
-                            v.retain(|&mut (x2, x0, x3)| {
-                                uf.math_.is_root(x2) & uf.fuel_unit_.is_root(x0) & uf.math_.is_root(x3)
-                            });
-                            v.sort_unstable();
-                            v.dedup();
-                            true
-                        } else {
-                            false
-                        }
-                    });
-                    for &(x0, x1, x2, x3) in &self.new {
-                        self.hash_index_1_2
-                            .entry((uf.math_.find(x1), uf.math_.find(x2)))
-                            .or_default()
-                            .push((uf.fuel_unit_.find(x0), uf.math_.find(x3)));
-                    }
-                    self.hash_index_1_2.retain(|&(x1, x2), v| {
-                        if uf.math_.is_root(x1) & uf.math_.is_root(x2) {
-                            v.retain(|&mut (x0, x3)| uf.fuel_unit_.is_root(x0) & uf.math_.is_root(x3));
-                            v.sort_unstable();
-                            v.dedup();
-                            true
-                        } else {
-                            false
-                        }
-                    });
-                    for &(x0, x1, x2, x3) in &self.new {
-                        self.hash_index_0_1_2_3
-                            .entry((
-                                uf.fuel_unit_.find(x0),
-                                uf.math_.find(x1),
-                                uf.math_.find(x2),
-                                uf.math_.find(x3),
-                            ))
-                            .or_default()
-                            .push(());
-                    }
-                    self.hash_index_0_1_2_3.retain(|&(x0, x1, x2, x3), v| {
-                        if uf.fuel_unit_.is_root(x0)
-                            & uf.math_.is_root(x1)
-                            & uf.math_.is_root(x2)
-                            & uf.math_.is_root(x3)
-                        {
-                            v.retain(|&mut ()| true);
-                            v.sort_unstable();
-                            v.dedup();
-                            true
-                        } else {
-                            false
-                        }
+                        self.hash_index_0_1_2_3.retain(|&(x0, x1, x2, x3), v| {
+                            if uf.fuel_unit_.is_root(x0)
+                                & uf.math_.is_root(x1)
+                                & uf.math_.is_root(x2)
+                                & uf.math_.is_root(x3)
+                            {
+                                v.retain(|&mut ()| true);
+                                v.sort_unstable();
+                                v.dedup();
+                                true
+                            } else {
+                                false
+                            }
+                        });
                     });
                     self.fuel_unit_num_uprooted_at_latest_retain = 0;
                     self.math_num_uprooted_at_latest_retain = 0;
@@ -12906,114 +13302,120 @@ fn lir_math() {
                     }
                 }
                 fn update_begin(&mut self, insertions: &[Self::Row], uf: &mut Unification) {
-                    for &(mut x0, mut x1, mut x2) in insertions {
-                        match self
-                            .hash_index_1_0
-                            .entry((uf.math_.find(x1), uf.math_.find(x0)))
-                        {
-                            runtime::HashMapEntry::Occupied(mut entry) => {
-                                let (y2,) = entry.get_mut();
-                                uf.math_.union_mut(&mut x2, y2);
-                            }
-                            runtime::HashMapEntry::Vacant(entry) => {
-                                entry.insert((uf.math_.find(x2),));
+                    log_duration!("update_begin {}: {}", "add", {
+                        for &(mut x0, mut x1, mut x2) in insertions {
+                            match self
+                                .hash_index_1_0
+                                .entry((uf.math_.find(x1), uf.math_.find(x0)))
+                            {
+                                runtime::HashMapEntry::Occupied(mut entry) => {
+                                    let (y2,) = entry.get_mut();
+                                    uf.math_.union_mut(&mut x2, y2);
+                                }
+                                runtime::HashMapEntry::Vacant(entry) => {
+                                    entry.insert((uf.math_.find(x2),));
+                                }
                             }
                         }
-                    }
+                    });
                 }
                 fn update(&mut self, insertions: &mut Vec<Self::Row>, uf: &mut Unification) -> bool {
                     if self.math_num_uprooted_at_latest_retain == uf.math_.num_uprooted() {
                         return false;
                     }
-                    self.math_num_uprooted_at_latest_retain = uf.math_.num_uprooted();
                     let offset = insertions.len();
-                    self.hash_index_1_0.retain(|&(x1, x0), &mut (x2,)| {
-                        if uf.math_.is_root(x0) & uf.math_.is_root(x1) & uf.math_.is_root(x2) {
-                            true
-                        } else {
-                            insertions.push((x0, x1, x2));
-                            false
-                        }
+                    log_duration!("update {}: {}", "add", {
+                        self.math_num_uprooted_at_latest_retain = uf.math_.num_uprooted();
+                        self.hash_index_1_0.retain(|&(x1, x0), &mut (x2,)| {
+                            if uf.math_.is_root(x0) & uf.math_.is_root(x1) & uf.math_.is_root(x2) {
+                                true
+                            } else {
+                                insertions.push((x0, x1, x2));
+                                false
+                            }
+                        });
                     });
                     self.update_begin(&insertions[offset..], uf);
                     true
                 }
                 fn update_finalize(&mut self, insertions: &mut Vec<Self::Row>, uf: &mut Unification) {
-                    assert!(self.new.is_empty());
-                    self.new.extend(
-                        self.hash_index_1_0
-                            .iter()
-                            .map(|(&(x1, x0), &(x2,))| {
-                                (uf.math_.find(x0), uf.math_.find(x1), uf.math_.find(x2))
-                            })
-                            .filter(|&(x0, x1, x2)| !self.hash_index_1_0_2.contains_key(&(x1, x0, x2))),
-                    );
-                    insertions.clear();
-                    RadixSortable::wrap(&mut self.new).voracious_sort();
-                    self.new.dedup();
-                    for &(x0, x1, x2) in &self.new {
-                        self.hash_index_2
-                            .entry((uf.math_.find(x2),))
-                            .or_default()
-                            .push((uf.math_.find(x0), uf.math_.find(x1)));
-                    }
-                    self.hash_index_2.retain(|&(x2,), v| {
-                        if uf.math_.is_root(x2) {
-                            v.retain(|&mut (x0, x1)| uf.math_.is_root(x0) & uf.math_.is_root(x1));
-                            v.sort_unstable();
-                            v.dedup();
-                            true
-                        } else {
-                            false
+                    log_duration!("update_finalize {}: {}", "add", {
+                        assert!(self.new.is_empty());
+                        self.new.extend(
+                            self.hash_index_1_0
+                                .iter()
+                                .map(|(&(x1, x0), &(x2,))| {
+                                    (uf.math_.find(x0), uf.math_.find(x1), uf.math_.find(x2))
+                                })
+                                .filter(|&(x0, x1, x2)| !self.hash_index_1_0_2.contains_key(&(x1, x0, x2))),
+                        );
+                        insertions.clear();
+                        RadixSortable::wrap(&mut self.new).voracious_sort();
+                        self.new.dedup();
+                        for &(x0, x1, x2) in &self.new {
+                            self.hash_index_2
+                                .entry((uf.math_.find(x2),))
+                                .or_default()
+                                .push((uf.math_.find(x0), uf.math_.find(x1)));
                         }
-                    });
-                    for &(x0, x1, x2) in &self.new {
-                        self.hash_index_1
-                            .entry((uf.math_.find(x1),))
-                            .or_default()
-                            .push((uf.math_.find(x0), uf.math_.find(x2)));
-                    }
-                    self.hash_index_1.retain(|&(x1,), v| {
-                        if uf.math_.is_root(x1) {
-                            v.retain(|&mut (x0, x2)| uf.math_.is_root(x0) & uf.math_.is_root(x2));
-                            v.sort_unstable();
-                            v.dedup();
-                            true
-                        } else {
-                            false
+                        self.hash_index_2.retain(|&(x2,), v| {
+                            if uf.math_.is_root(x2) {
+                                v.retain(|&mut (x0, x1)| uf.math_.is_root(x0) & uf.math_.is_root(x1));
+                                v.sort_unstable();
+                                v.dedup();
+                                true
+                            } else {
+                                false
+                            }
+                        });
+                        for &(x0, x1, x2) in &self.new {
+                            self.hash_index_1
+                                .entry((uf.math_.find(x1),))
+                                .or_default()
+                                .push((uf.math_.find(x0), uf.math_.find(x2)));
                         }
-                    });
-                    for &(x0, x1, x2) in &self.new {
-                        self.hash_index_0
-                            .entry((uf.math_.find(x0),))
-                            .or_default()
-                            .push((uf.math_.find(x1), uf.math_.find(x2)));
-                    }
-                    self.hash_index_0.retain(|&(x0,), v| {
-                        if uf.math_.is_root(x0) {
-                            v.retain(|&mut (x1, x2)| uf.math_.is_root(x1) & uf.math_.is_root(x2));
-                            v.sort_unstable();
-                            v.dedup();
-                            true
-                        } else {
-                            false
+                        self.hash_index_1.retain(|&(x1,), v| {
+                            if uf.math_.is_root(x1) {
+                                v.retain(|&mut (x0, x2)| uf.math_.is_root(x0) & uf.math_.is_root(x2));
+                                v.sort_unstable();
+                                v.dedup();
+                                true
+                            } else {
+                                false
+                            }
+                        });
+                        for &(x0, x1, x2) in &self.new {
+                            self.hash_index_0
+                                .entry((uf.math_.find(x0),))
+                                .or_default()
+                                .push((uf.math_.find(x1), uf.math_.find(x2)));
                         }
-                    });
-                    for &(x0, x1, x2) in &self.new {
-                        self.hash_index_1_0_2
-                            .entry((uf.math_.find(x1), uf.math_.find(x0), uf.math_.find(x2)))
-                            .or_default()
-                            .push(());
-                    }
-                    self.hash_index_1_0_2.retain(|&(x1, x0, x2), v| {
-                        if uf.math_.is_root(x1) & uf.math_.is_root(x0) & uf.math_.is_root(x2) {
-                            v.retain(|&mut ()| true);
-                            v.sort_unstable();
-                            v.dedup();
-                            true
-                        } else {
-                            false
+                        self.hash_index_0.retain(|&(x0,), v| {
+                            if uf.math_.is_root(x0) {
+                                v.retain(|&mut (x1, x2)| uf.math_.is_root(x1) & uf.math_.is_root(x2));
+                                v.sort_unstable();
+                                v.dedup();
+                                true
+                            } else {
+                                false
+                            }
+                        });
+                        for &(x0, x1, x2) in &self.new {
+                            self.hash_index_1_0_2
+                                .entry((uf.math_.find(x1), uf.math_.find(x0), uf.math_.find(x2)))
+                                .or_default()
+                                .push(());
                         }
+                        self.hash_index_1_0_2.retain(|&(x1, x0, x2), v| {
+                            if uf.math_.is_root(x1) & uf.math_.is_root(x0) & uf.math_.is_root(x2) {
+                                v.retain(|&mut ()| true);
+                                v.sort_unstable();
+                                v.dedup();
+                                true
+                            } else {
+                                false
+                            }
+                        });
                     });
                     self.math_num_uprooted_at_latest_retain = 0;
                 }
@@ -13115,82 +13517,88 @@ fn lir_math() {
                     }
                 }
                 fn update_begin(&mut self, insertions: &[Self::Row], uf: &mut Unification) {
-                    for &(mut x0, mut x1, mut x2) in insertions {
-                        match self
-                            .hash_index_0_1
-                            .entry((uf.math_.find(x0), uf.math_.find(x1)))
-                        {
-                            runtime::HashMapEntry::Occupied(mut entry) => {
-                                let (y2,) = entry.get_mut();
-                                uf.math_.union_mut(&mut x2, y2);
-                            }
-                            runtime::HashMapEntry::Vacant(entry) => {
-                                entry.insert((uf.math_.find(x2),));
+                    log_duration!("update_begin {}: {}", "sub", {
+                        for &(mut x0, mut x1, mut x2) in insertions {
+                            match self
+                                .hash_index_0_1
+                                .entry((uf.math_.find(x0), uf.math_.find(x1)))
+                            {
+                                runtime::HashMapEntry::Occupied(mut entry) => {
+                                    let (y2,) = entry.get_mut();
+                                    uf.math_.union_mut(&mut x2, y2);
+                                }
+                                runtime::HashMapEntry::Vacant(entry) => {
+                                    entry.insert((uf.math_.find(x2),));
+                                }
                             }
                         }
-                    }
+                    });
                 }
                 fn update(&mut self, insertions: &mut Vec<Self::Row>, uf: &mut Unification) -> bool {
                     if self.math_num_uprooted_at_latest_retain == uf.math_.num_uprooted() {
                         return false;
                     }
-                    self.math_num_uprooted_at_latest_retain = uf.math_.num_uprooted();
                     let offset = insertions.len();
-                    self.hash_index_0_1.retain(|&(x0, x1), &mut (x2,)| {
-                        if uf.math_.is_root(x0) & uf.math_.is_root(x1) & uf.math_.is_root(x2) {
-                            true
-                        } else {
-                            insertions.push((x0, x1, x2));
-                            false
-                        }
+                    log_duration!("update {}: {}", "sub", {
+                        self.math_num_uprooted_at_latest_retain = uf.math_.num_uprooted();
+                        self.hash_index_0_1.retain(|&(x0, x1), &mut (x2,)| {
+                            if uf.math_.is_root(x0) & uf.math_.is_root(x1) & uf.math_.is_root(x2) {
+                                true
+                            } else {
+                                insertions.push((x0, x1, x2));
+                                false
+                            }
+                        });
                     });
                     self.update_begin(&insertions[offset..], uf);
                     true
                 }
                 fn update_finalize(&mut self, insertions: &mut Vec<Self::Row>, uf: &mut Unification) {
-                    assert!(self.new.is_empty());
-                    self.new.extend(
-                        self.hash_index_0_1
-                            .iter()
-                            .map(|(&(x0, x1), &(x2,))| {
-                                (uf.math_.find(x0), uf.math_.find(x1), uf.math_.find(x2))
-                            })
-                            .filter(|&(x0, x1, x2)| !self.hash_index_0_1_2.contains_key(&(x0, x1, x2))),
-                    );
-                    insertions.clear();
-                    RadixSortable::wrap(&mut self.new).voracious_sort();
-                    self.new.dedup();
-                    for &(x0, x1, x2) in &self.new {
-                        self.hash_index_2
-                            .entry((uf.math_.find(x2),))
-                            .or_default()
-                            .push((uf.math_.find(x0), uf.math_.find(x1)));
-                    }
-                    self.hash_index_2.retain(|&(x2,), v| {
-                        if uf.math_.is_root(x2) {
-                            v.retain(|&mut (x0, x1)| uf.math_.is_root(x0) & uf.math_.is_root(x1));
-                            v.sort_unstable();
-                            v.dedup();
-                            true
-                        } else {
-                            false
+                    log_duration!("update_finalize {}: {}", "sub", {
+                        assert!(self.new.is_empty());
+                        self.new.extend(
+                            self.hash_index_0_1
+                                .iter()
+                                .map(|(&(x0, x1), &(x2,))| {
+                                    (uf.math_.find(x0), uf.math_.find(x1), uf.math_.find(x2))
+                                })
+                                .filter(|&(x0, x1, x2)| !self.hash_index_0_1_2.contains_key(&(x0, x1, x2))),
+                        );
+                        insertions.clear();
+                        RadixSortable::wrap(&mut self.new).voracious_sort();
+                        self.new.dedup();
+                        for &(x0, x1, x2) in &self.new {
+                            self.hash_index_2
+                                .entry((uf.math_.find(x2),))
+                                .or_default()
+                                .push((uf.math_.find(x0), uf.math_.find(x1)));
                         }
-                    });
-                    for &(x0, x1, x2) in &self.new {
-                        self.hash_index_0_1_2
-                            .entry((uf.math_.find(x0), uf.math_.find(x1), uf.math_.find(x2)))
-                            .or_default()
-                            .push(());
-                    }
-                    self.hash_index_0_1_2.retain(|&(x0, x1, x2), v| {
-                        if uf.math_.is_root(x0) & uf.math_.is_root(x1) & uf.math_.is_root(x2) {
-                            v.retain(|&mut ()| true);
-                            v.sort_unstable();
-                            v.dedup();
-                            true
-                        } else {
-                            false
+                        self.hash_index_2.retain(|&(x2,), v| {
+                            if uf.math_.is_root(x2) {
+                                v.retain(|&mut (x0, x1)| uf.math_.is_root(x0) & uf.math_.is_root(x1));
+                                v.sort_unstable();
+                                v.dedup();
+                                true
+                            } else {
+                                false
+                            }
+                        });
+                        for &(x0, x1, x2) in &self.new {
+                            self.hash_index_0_1_2
+                                .entry((uf.math_.find(x0), uf.math_.find(x1), uf.math_.find(x2)))
+                                .or_default()
+                                .push(());
                         }
+                        self.hash_index_0_1_2.retain(|&(x0, x1, x2), v| {
+                            if uf.math_.is_root(x0) & uf.math_.is_root(x1) & uf.math_.is_root(x2) {
+                                v.retain(|&mut ()| true);
+                                v.sort_unstable();
+                                v.dedup();
+                                true
+                            } else {
+                                false
+                            }
+                        });
                     });
                     self.math_num_uprooted_at_latest_retain = 0;
                 }
@@ -13283,130 +13691,136 @@ fn lir_math() {
                     }
                 }
                 fn update_begin(&mut self, insertions: &[Self::Row], uf: &mut Unification) {
-                    for &(mut x0, mut x1, mut x2) in insertions {
-                        match self
-                            .hash_index_1_0
-                            .entry((uf.math_.find(x1), uf.math_.find(x0)))
-                        {
-                            runtime::HashMapEntry::Occupied(mut entry) => {
-                                let (y2,) = entry.get_mut();
-                                uf.math_.union_mut(&mut x2, y2);
-                            }
-                            runtime::HashMapEntry::Vacant(entry) => {
-                                entry.insert((uf.math_.find(x2),));
+                    log_duration!("update_begin {}: {}", "mul", {
+                        for &(mut x0, mut x1, mut x2) in insertions {
+                            match self
+                                .hash_index_1_0
+                                .entry((uf.math_.find(x1), uf.math_.find(x0)))
+                            {
+                                runtime::HashMapEntry::Occupied(mut entry) => {
+                                    let (y2,) = entry.get_mut();
+                                    uf.math_.union_mut(&mut x2, y2);
+                                }
+                                runtime::HashMapEntry::Vacant(entry) => {
+                                    entry.insert((uf.math_.find(x2),));
+                                }
                             }
                         }
-                    }
+                    });
                 }
                 fn update(&mut self, insertions: &mut Vec<Self::Row>, uf: &mut Unification) -> bool {
                     if self.math_num_uprooted_at_latest_retain == uf.math_.num_uprooted() {
                         return false;
                     }
-                    self.math_num_uprooted_at_latest_retain = uf.math_.num_uprooted();
                     let offset = insertions.len();
-                    self.hash_index_1_0.retain(|&(x1, x0), &mut (x2,)| {
-                        if uf.math_.is_root(x0) & uf.math_.is_root(x1) & uf.math_.is_root(x2) {
-                            true
-                        } else {
-                            insertions.push((x0, x1, x2));
-                            false
-                        }
+                    log_duration!("update {}: {}", "mul", {
+                        self.math_num_uprooted_at_latest_retain = uf.math_.num_uprooted();
+                        self.hash_index_1_0.retain(|&(x1, x0), &mut (x2,)| {
+                            if uf.math_.is_root(x0) & uf.math_.is_root(x1) & uf.math_.is_root(x2) {
+                                true
+                            } else {
+                                insertions.push((x0, x1, x2));
+                                false
+                            }
+                        });
                     });
                     self.update_begin(&insertions[offset..], uf);
                     true
                 }
                 fn update_finalize(&mut self, insertions: &mut Vec<Self::Row>, uf: &mut Unification) {
-                    assert!(self.new.is_empty());
-                    self.new.extend(
-                        self.hash_index_1_0
-                            .iter()
-                            .map(|(&(x1, x0), &(x2,))| {
-                                (uf.math_.find(x0), uf.math_.find(x1), uf.math_.find(x2))
-                            })
-                            .filter(|&(x0, x1, x2)| !self.hash_index_1_0_2.contains_key(&(x1, x0, x2))),
-                    );
-                    insertions.clear();
-                    RadixSortable::wrap(&mut self.new).voracious_sort();
-                    self.new.dedup();
-                    for &(x0, x1, x2) in &self.new {
-                        self.hash_index_2
-                            .entry((uf.math_.find(x2),))
-                            .or_default()
-                            .push((uf.math_.find(x0), uf.math_.find(x1)));
-                    }
-                    self.hash_index_2.retain(|&(x2,), v| {
-                        if uf.math_.is_root(x2) {
-                            v.retain(|&mut (x0, x1)| uf.math_.is_root(x0) & uf.math_.is_root(x1));
-                            v.sort_unstable();
-                            v.dedup();
-                            true
-                        } else {
-                            false
+                    log_duration!("update_finalize {}: {}", "mul", {
+                        assert!(self.new.is_empty());
+                        self.new.extend(
+                            self.hash_index_1_0
+                                .iter()
+                                .map(|(&(x1, x0), &(x2,))| {
+                                    (uf.math_.find(x0), uf.math_.find(x1), uf.math_.find(x2))
+                                })
+                                .filter(|&(x0, x1, x2)| !self.hash_index_1_0_2.contains_key(&(x1, x0, x2))),
+                        );
+                        insertions.clear();
+                        RadixSortable::wrap(&mut self.new).voracious_sort();
+                        self.new.dedup();
+                        for &(x0, x1, x2) in &self.new {
+                            self.hash_index_2
+                                .entry((uf.math_.find(x2),))
+                                .or_default()
+                                .push((uf.math_.find(x0), uf.math_.find(x1)));
                         }
-                    });
-                    for &(x0, x1, x2) in &self.new {
-                        self.hash_index_1
-                            .entry((uf.math_.find(x1),))
-                            .or_default()
-                            .push((uf.math_.find(x0), uf.math_.find(x2)));
-                    }
-                    self.hash_index_1.retain(|&(x1,), v| {
-                        if uf.math_.is_root(x1) {
-                            v.retain(|&mut (x0, x2)| uf.math_.is_root(x0) & uf.math_.is_root(x2));
-                            v.sort_unstable();
-                            v.dedup();
-                            true
-                        } else {
-                            false
+                        self.hash_index_2.retain(|&(x2,), v| {
+                            if uf.math_.is_root(x2) {
+                                v.retain(|&mut (x0, x1)| uf.math_.is_root(x0) & uf.math_.is_root(x1));
+                                v.sort_unstable();
+                                v.dedup();
+                                true
+                            } else {
+                                false
+                            }
+                        });
+                        for &(x0, x1, x2) in &self.new {
+                            self.hash_index_1
+                                .entry((uf.math_.find(x1),))
+                                .or_default()
+                                .push((uf.math_.find(x0), uf.math_.find(x2)));
                         }
-                    });
-                    for &(x0, x1, x2) in &self.new {
-                        self.hash_index_2_0
-                            .entry((uf.math_.find(x2), uf.math_.find(x0)))
-                            .or_default()
-                            .push((uf.math_.find(x1),));
-                    }
-                    self.hash_index_2_0.retain(|&(x2, x0), v| {
-                        if uf.math_.is_root(x2) & uf.math_.is_root(x0) {
-                            v.retain(|&mut (x1,)| uf.math_.is_root(x1));
-                            v.sort_unstable();
-                            v.dedup();
-                            true
-                        } else {
-                            false
+                        self.hash_index_1.retain(|&(x1,), v| {
+                            if uf.math_.is_root(x1) {
+                                v.retain(|&mut (x0, x2)| uf.math_.is_root(x0) & uf.math_.is_root(x2));
+                                v.sort_unstable();
+                                v.dedup();
+                                true
+                            } else {
+                                false
+                            }
+                        });
+                        for &(x0, x1, x2) in &self.new {
+                            self.hash_index_2_0
+                                .entry((uf.math_.find(x2), uf.math_.find(x0)))
+                                .or_default()
+                                .push((uf.math_.find(x1),));
                         }
-                    });
-                    for &(x0, x1, x2) in &self.new {
-                        self.hash_index_0
-                            .entry((uf.math_.find(x0),))
-                            .or_default()
-                            .push((uf.math_.find(x1), uf.math_.find(x2)));
-                    }
-                    self.hash_index_0.retain(|&(x0,), v| {
-                        if uf.math_.is_root(x0) {
-                            v.retain(|&mut (x1, x2)| uf.math_.is_root(x1) & uf.math_.is_root(x2));
-                            v.sort_unstable();
-                            v.dedup();
-                            true
-                        } else {
-                            false
+                        self.hash_index_2_0.retain(|&(x2, x0), v| {
+                            if uf.math_.is_root(x2) & uf.math_.is_root(x0) {
+                                v.retain(|&mut (x1,)| uf.math_.is_root(x1));
+                                v.sort_unstable();
+                                v.dedup();
+                                true
+                            } else {
+                                false
+                            }
+                        });
+                        for &(x0, x1, x2) in &self.new {
+                            self.hash_index_0
+                                .entry((uf.math_.find(x0),))
+                                .or_default()
+                                .push((uf.math_.find(x1), uf.math_.find(x2)));
                         }
-                    });
-                    for &(x0, x1, x2) in &self.new {
-                        self.hash_index_1_0_2
-                            .entry((uf.math_.find(x1), uf.math_.find(x0), uf.math_.find(x2)))
-                            .or_default()
-                            .push(());
-                    }
-                    self.hash_index_1_0_2.retain(|&(x1, x0, x2), v| {
-                        if uf.math_.is_root(x1) & uf.math_.is_root(x0) & uf.math_.is_root(x2) {
-                            v.retain(|&mut ()| true);
-                            v.sort_unstable();
-                            v.dedup();
-                            true
-                        } else {
-                            false
+                        self.hash_index_0.retain(|&(x0,), v| {
+                            if uf.math_.is_root(x0) {
+                                v.retain(|&mut (x1, x2)| uf.math_.is_root(x1) & uf.math_.is_root(x2));
+                                v.sort_unstable();
+                                v.dedup();
+                                true
+                            } else {
+                                false
+                            }
+                        });
+                        for &(x0, x1, x2) in &self.new {
+                            self.hash_index_1_0_2
+                                .entry((uf.math_.find(x1), uf.math_.find(x0), uf.math_.find(x2)))
+                                .or_default()
+                                .push(());
                         }
+                        self.hash_index_1_0_2.retain(|&(x1, x0, x2), v| {
+                            if uf.math_.is_root(x1) & uf.math_.is_root(x0) & uf.math_.is_root(x2) {
+                                v.retain(|&mut ()| true);
+                                v.sort_unstable();
+                                v.dedup();
+                                true
+                            } else {
+                                false
+                            }
+                        });
                     });
                     self.math_num_uprooted_at_latest_retain = 0;
                 }
@@ -13517,66 +13931,72 @@ fn lir_math() {
                     }
                 }
                 fn update_begin(&mut self, insertions: &[Self::Row], uf: &mut Unification) {
-                    for &(mut x0, mut x1, mut x2) in insertions {
-                        match self
-                            .hash_index_0_1
-                            .entry((uf.math_.find(x0), uf.math_.find(x1)))
-                        {
-                            runtime::HashMapEntry::Occupied(mut entry) => {
-                                let (y2,) = entry.get_mut();
-                                uf.math_.union_mut(&mut x2, y2);
-                            }
-                            runtime::HashMapEntry::Vacant(entry) => {
-                                entry.insert((uf.math_.find(x2),));
+                    log_duration!("update_begin {}: {}", "div", {
+                        for &(mut x0, mut x1, mut x2) in insertions {
+                            match self
+                                .hash_index_0_1
+                                .entry((uf.math_.find(x0), uf.math_.find(x1)))
+                            {
+                                runtime::HashMapEntry::Occupied(mut entry) => {
+                                    let (y2,) = entry.get_mut();
+                                    uf.math_.union_mut(&mut x2, y2);
+                                }
+                                runtime::HashMapEntry::Vacant(entry) => {
+                                    entry.insert((uf.math_.find(x2),));
+                                }
                             }
                         }
-                    }
+                    });
                 }
                 fn update(&mut self, insertions: &mut Vec<Self::Row>, uf: &mut Unification) -> bool {
                     if self.math_num_uprooted_at_latest_retain == uf.math_.num_uprooted() {
                         return false;
                     }
-                    self.math_num_uprooted_at_latest_retain = uf.math_.num_uprooted();
                     let offset = insertions.len();
-                    self.hash_index_0_1.retain(|&(x0, x1), &mut (x2,)| {
-                        if uf.math_.is_root(x0) & uf.math_.is_root(x1) & uf.math_.is_root(x2) {
-                            true
-                        } else {
-                            insertions.push((x0, x1, x2));
-                            false
-                        }
+                    log_duration!("update {}: {}", "div", {
+                        self.math_num_uprooted_at_latest_retain = uf.math_.num_uprooted();
+                        self.hash_index_0_1.retain(|&(x0, x1), &mut (x2,)| {
+                            if uf.math_.is_root(x0) & uf.math_.is_root(x1) & uf.math_.is_root(x2) {
+                                true
+                            } else {
+                                insertions.push((x0, x1, x2));
+                                false
+                            }
+                        });
                     });
                     self.update_begin(&insertions[offset..], uf);
                     true
                 }
                 fn update_finalize(&mut self, insertions: &mut Vec<Self::Row>, uf: &mut Unification) {
-                    assert!(self.new.is_empty());
-                    self.new.extend(
-                        self.hash_index_0_1
-                            .iter()
-                            .map(|(&(x0, x1), &(x2,))| {
-                                (uf.math_.find(x0), uf.math_.find(x1), uf.math_.find(x2))
-                            })
-                            .filter(|&(x0, x1, x2)| !self.hash_index_0_1_2.contains_key(&(x0, x1, x2))),
-                    );
-                    insertions.clear();
-                    RadixSortable::wrap(&mut self.new).voracious_sort();
-                    self.new.dedup();
-                    for &(x0, x1, x2) in &self.new {
-                        self.hash_index_0_1_2
-                            .entry((uf.math_.find(x0), uf.math_.find(x1), uf.math_.find(x2)))
-                            .or_default()
-                            .push(());
-                    }
-                    self.hash_index_0_1_2.retain(|&(x0, x1, x2), v| {
-                        if uf.math_.is_root(x0) & uf.math_.is_root(x1) & uf.math_.is_root(x2) {
-                            v.retain(|&mut ()| true);
-                            v.sort_unstable();
-                            v.dedup();
-                            true
-                        } else {
-                            false
+                    log_duration!("update_finalize {}: {}", "div", {
+                        assert!(self.new.is_empty());
+                        self.new.extend(
+                            self.hash_index_0_1
+                                .iter()
+                                .map(|(&(x0, x1), &(x2,))| {
+                                    (uf.math_.find(x0), uf.math_.find(x1), uf.math_.find(x2))
+                                })
+                                .filter(|&(x0, x1, x2)| !self.hash_index_0_1_2.contains_key(&(x0, x1, x2))),
+                        );
+                        insertions.clear();
+                        RadixSortable::wrap(&mut self.new).voracious_sort();
+                        self.new.dedup();
+                        for &(x0, x1, x2) in &self.new {
+                            self.hash_index_0_1_2
+                                .entry((uf.math_.find(x0), uf.math_.find(x1), uf.math_.find(x2)))
+                                .or_default()
+                                .push(());
                         }
+                        self.hash_index_0_1_2.retain(|&(x0, x1, x2), v| {
+                            if uf.math_.is_root(x0) & uf.math_.is_root(x1) & uf.math_.is_root(x2) {
+                                v.retain(|&mut ()| true);
+                                v.sort_unstable();
+                                v.dedup();
+                                true
+                            } else {
+                                false
+                            }
+                        });
                     });
                     self.math_num_uprooted_at_latest_retain = 0;
                 }
@@ -13663,130 +14083,136 @@ fn lir_math() {
                     }
                 }
                 fn update_begin(&mut self, insertions: &[Self::Row], uf: &mut Unification) {
-                    for &(mut x0, mut x1, mut x2) in insertions {
-                        match self
-                            .hash_index_0_1
-                            .entry((uf.math_.find(x0), uf.math_.find(x1)))
-                        {
-                            runtime::HashMapEntry::Occupied(mut entry) => {
-                                let (y2,) = entry.get_mut();
-                                uf.math_.union_mut(&mut x2, y2);
-                            }
-                            runtime::HashMapEntry::Vacant(entry) => {
-                                entry.insert((uf.math_.find(x2),));
+                    log_duration!("update_begin {}: {}", "pow", {
+                        for &(mut x0, mut x1, mut x2) in insertions {
+                            match self
+                                .hash_index_0_1
+                                .entry((uf.math_.find(x0), uf.math_.find(x1)))
+                            {
+                                runtime::HashMapEntry::Occupied(mut entry) => {
+                                    let (y2,) = entry.get_mut();
+                                    uf.math_.union_mut(&mut x2, y2);
+                                }
+                                runtime::HashMapEntry::Vacant(entry) => {
+                                    entry.insert((uf.math_.find(x2),));
+                                }
                             }
                         }
-                    }
+                    });
                 }
                 fn update(&mut self, insertions: &mut Vec<Self::Row>, uf: &mut Unification) -> bool {
                     if self.math_num_uprooted_at_latest_retain == uf.math_.num_uprooted() {
                         return false;
                     }
-                    self.math_num_uprooted_at_latest_retain = uf.math_.num_uprooted();
                     let offset = insertions.len();
-                    self.hash_index_0_1.retain(|&(x0, x1), &mut (x2,)| {
-                        if uf.math_.is_root(x0) & uf.math_.is_root(x1) & uf.math_.is_root(x2) {
-                            true
-                        } else {
-                            insertions.push((x0, x1, x2));
-                            false
-                        }
+                    log_duration!("update {}: {}", "pow", {
+                        self.math_num_uprooted_at_latest_retain = uf.math_.num_uprooted();
+                        self.hash_index_0_1.retain(|&(x0, x1), &mut (x2,)| {
+                            if uf.math_.is_root(x0) & uf.math_.is_root(x1) & uf.math_.is_root(x2) {
+                                true
+                            } else {
+                                insertions.push((x0, x1, x2));
+                                false
+                            }
+                        });
                     });
                     self.update_begin(&insertions[offset..], uf);
                     true
                 }
                 fn update_finalize(&mut self, insertions: &mut Vec<Self::Row>, uf: &mut Unification) {
-                    assert!(self.new.is_empty());
-                    self.new.extend(
-                        self.hash_index_0_1
-                            .iter()
-                            .map(|(&(x0, x1), &(x2,))| {
-                                (uf.math_.find(x0), uf.math_.find(x1), uf.math_.find(x2))
-                            })
-                            .filter(|&(x0, x1, x2)| !self.hash_index_0_1_2.contains_key(&(x0, x1, x2))),
-                    );
-                    insertions.clear();
-                    RadixSortable::wrap(&mut self.new).voracious_sort();
-                    self.new.dedup();
-                    for &(x0, x1, x2) in &self.new {
-                        self.hash_index_2
-                            .entry((uf.math_.find(x2),))
-                            .or_default()
-                            .push((uf.math_.find(x0), uf.math_.find(x1)));
-                    }
-                    self.hash_index_2.retain(|&(x2,), v| {
-                        if uf.math_.is_root(x2) {
-                            v.retain(|&mut (x0, x1)| uf.math_.is_root(x0) & uf.math_.is_root(x1));
-                            v.sort_unstable();
-                            v.dedup();
-                            true
-                        } else {
-                            false
+                    log_duration!("update_finalize {}: {}", "pow", {
+                        assert!(self.new.is_empty());
+                        self.new.extend(
+                            self.hash_index_0_1
+                                .iter()
+                                .map(|(&(x0, x1), &(x2,))| {
+                                    (uf.math_.find(x0), uf.math_.find(x1), uf.math_.find(x2))
+                                })
+                                .filter(|&(x0, x1, x2)| !self.hash_index_0_1_2.contains_key(&(x0, x1, x2))),
+                        );
+                        insertions.clear();
+                        RadixSortable::wrap(&mut self.new).voracious_sort();
+                        self.new.dedup();
+                        for &(x0, x1, x2) in &self.new {
+                            self.hash_index_2
+                                .entry((uf.math_.find(x2),))
+                                .or_default()
+                                .push((uf.math_.find(x0), uf.math_.find(x1)));
                         }
-                    });
-                    for &(x0, x1, x2) in &self.new {
-                        self.hash_index_2_0
-                            .entry((uf.math_.find(x2), uf.math_.find(x0)))
-                            .or_default()
-                            .push((uf.math_.find(x1),));
-                    }
-                    self.hash_index_2_0.retain(|&(x2, x0), v| {
-                        if uf.math_.is_root(x2) & uf.math_.is_root(x0) {
-                            v.retain(|&mut (x1,)| uf.math_.is_root(x1));
-                            v.sort_unstable();
-                            v.dedup();
-                            true
-                        } else {
-                            false
+                        self.hash_index_2.retain(|&(x2,), v| {
+                            if uf.math_.is_root(x2) {
+                                v.retain(|&mut (x0, x1)| uf.math_.is_root(x0) & uf.math_.is_root(x1));
+                                v.sort_unstable();
+                                v.dedup();
+                                true
+                            } else {
+                                false
+                            }
+                        });
+                        for &(x0, x1, x2) in &self.new {
+                            self.hash_index_2_0
+                                .entry((uf.math_.find(x2), uf.math_.find(x0)))
+                                .or_default()
+                                .push((uf.math_.find(x1),));
                         }
-                    });
-                    for &(x0, x1, x2) in &self.new {
-                        self.hash_index_0
-                            .entry((uf.math_.find(x0),))
-                            .or_default()
-                            .push((uf.math_.find(x1), uf.math_.find(x2)));
-                    }
-                    self.hash_index_0.retain(|&(x0,), v| {
-                        if uf.math_.is_root(x0) {
-                            v.retain(|&mut (x1, x2)| uf.math_.is_root(x1) & uf.math_.is_root(x2));
-                            v.sort_unstable();
-                            v.dedup();
-                            true
-                        } else {
-                            false
+                        self.hash_index_2_0.retain(|&(x2, x0), v| {
+                            if uf.math_.is_root(x2) & uf.math_.is_root(x0) {
+                                v.retain(|&mut (x1,)| uf.math_.is_root(x1));
+                                v.sort_unstable();
+                                v.dedup();
+                                true
+                            } else {
+                                false
+                            }
+                        });
+                        for &(x0, x1, x2) in &self.new {
+                            self.hash_index_0
+                                .entry((uf.math_.find(x0),))
+                                .or_default()
+                                .push((uf.math_.find(x1), uf.math_.find(x2)));
                         }
-                    });
-                    for &(x0, x1, x2) in &self.new {
-                        self.hash_index_1
-                            .entry((uf.math_.find(x1),))
-                            .or_default()
-                            .push((uf.math_.find(x0), uf.math_.find(x2)));
-                    }
-                    self.hash_index_1.retain(|&(x1,), v| {
-                        if uf.math_.is_root(x1) {
-                            v.retain(|&mut (x0, x2)| uf.math_.is_root(x0) & uf.math_.is_root(x2));
-                            v.sort_unstable();
-                            v.dedup();
-                            true
-                        } else {
-                            false
+                        self.hash_index_0.retain(|&(x0,), v| {
+                            if uf.math_.is_root(x0) {
+                                v.retain(|&mut (x1, x2)| uf.math_.is_root(x1) & uf.math_.is_root(x2));
+                                v.sort_unstable();
+                                v.dedup();
+                                true
+                            } else {
+                                false
+                            }
+                        });
+                        for &(x0, x1, x2) in &self.new {
+                            self.hash_index_1
+                                .entry((uf.math_.find(x1),))
+                                .or_default()
+                                .push((uf.math_.find(x0), uf.math_.find(x2)));
                         }
-                    });
-                    for &(x0, x1, x2) in &self.new {
-                        self.hash_index_0_1_2
-                            .entry((uf.math_.find(x0), uf.math_.find(x1), uf.math_.find(x2)))
-                            .or_default()
-                            .push(());
-                    }
-                    self.hash_index_0_1_2.retain(|&(x0, x1, x2), v| {
-                        if uf.math_.is_root(x0) & uf.math_.is_root(x1) & uf.math_.is_root(x2) {
-                            v.retain(|&mut ()| true);
-                            v.sort_unstable();
-                            v.dedup();
-                            true
-                        } else {
-                            false
+                        self.hash_index_1.retain(|&(x1,), v| {
+                            if uf.math_.is_root(x1) {
+                                v.retain(|&mut (x0, x2)| uf.math_.is_root(x0) & uf.math_.is_root(x2));
+                                v.sort_unstable();
+                                v.dedup();
+                                true
+                            } else {
+                                false
+                            }
+                        });
+                        for &(x0, x1, x2) in &self.new {
+                            self.hash_index_0_1_2
+                                .entry((uf.math_.find(x0), uf.math_.find(x1), uf.math_.find(x2)))
+                                .or_default()
+                                .push(());
                         }
+                        self.hash_index_0_1_2.retain(|&(x0, x1, x2), v| {
+                            if uf.math_.is_root(x0) & uf.math_.is_root(x1) & uf.math_.is_root(x2) {
+                                v.retain(|&mut ()| true);
+                                v.sort_unstable();
+                                v.dedup();
+                                true
+                            } else {
+                                false
+                            }
+                        });
                     });
                     self.math_num_uprooted_at_latest_retain = 0;
                 }
@@ -13896,61 +14322,67 @@ fn lir_math() {
                     }
                 }
                 fn update_begin(&mut self, insertions: &[Self::Row], uf: &mut Unification) {
-                    for &(mut x0, mut x1) in insertions {
-                        match self.hash_index_0.entry((uf.math_.find(x0),)) {
-                            runtime::HashMapEntry::Occupied(mut entry) => {
-                                let (y1,) = entry.get_mut();
-                                uf.math_.union_mut(&mut x1, y1);
-                            }
-                            runtime::HashMapEntry::Vacant(entry) => {
-                                entry.insert((uf.math_.find(x1),));
+                    log_duration!("update_begin {}: {}", "ln", {
+                        for &(mut x0, mut x1) in insertions {
+                            match self.hash_index_0.entry((uf.math_.find(x0),)) {
+                                runtime::HashMapEntry::Occupied(mut entry) => {
+                                    let (y1,) = entry.get_mut();
+                                    uf.math_.union_mut(&mut x1, y1);
+                                }
+                                runtime::HashMapEntry::Vacant(entry) => {
+                                    entry.insert((uf.math_.find(x1),));
+                                }
                             }
                         }
-                    }
+                    });
                 }
                 fn update(&mut self, insertions: &mut Vec<Self::Row>, uf: &mut Unification) -> bool {
                     if self.math_num_uprooted_at_latest_retain == uf.math_.num_uprooted() {
                         return false;
                     }
-                    self.math_num_uprooted_at_latest_retain = uf.math_.num_uprooted();
                     let offset = insertions.len();
-                    self.hash_index_0.retain(|&(x0,), &mut (x1,)| {
-                        if uf.math_.is_root(x0) & uf.math_.is_root(x1) {
-                            true
-                        } else {
-                            insertions.push((x0, x1));
-                            false
-                        }
+                    log_duration!("update {}: {}", "ln", {
+                        self.math_num_uprooted_at_latest_retain = uf.math_.num_uprooted();
+                        self.hash_index_0.retain(|&(x0,), &mut (x1,)| {
+                            if uf.math_.is_root(x0) & uf.math_.is_root(x1) {
+                                true
+                            } else {
+                                insertions.push((x0, x1));
+                                false
+                            }
+                        });
                     });
                     self.update_begin(&insertions[offset..], uf);
                     true
                 }
                 fn update_finalize(&mut self, insertions: &mut Vec<Self::Row>, uf: &mut Unification) {
-                    assert!(self.new.is_empty());
-                    self.new.extend(
-                        self.hash_index_0
-                            .iter()
-                            .map(|(&(x0,), &(x1,))| (uf.math_.find(x0), uf.math_.find(x1)))
-                            .filter(|&(x0, x1)| !self.hash_index_0_1.contains_key(&(x0, x1))),
-                    );
-                    insertions.clear();
-                    RadixSortable::wrap(&mut self.new).voracious_sort();
-                    self.new.dedup();
-                    for &(x0, x1) in &self.new {
-                        self.hash_index_0_1
-                            .entry((uf.math_.find(x0), uf.math_.find(x1)))
-                            .or_default()
-                            .push(());
-                    }
-                    self.hash_index_0_1.retain(|&(x0, x1), v| {
-                        if uf.math_.is_root(x0) & uf.math_.is_root(x1) {
-                            v.retain(|&mut ()| true);
-                            v.sort_unstable();
-                            v.dedup();
-                            true
-                        } else {
-                            false
+                    log_duration!("update_finalize {}: {}", "ln", {
+                        assert!(self.new.is_empty());
+                        self.new.extend(
+                            self.hash_index_0
+                                .iter()
+                                .map(|(&(x0,), &(x1,))| (uf.math_.find(x0), uf.math_.find(x1)))
+                                .filter(|&(x0, x1)| !self.hash_index_0_1.contains_key(&(x0, x1))),
+                        );
+                        insertions.clear();
+                        RadixSortable::wrap(&mut self.new).voracious_sort();
+                        self.new.dedup();
+                        for &(x0, x1) in &self.new {
+                            self.hash_index_0_1
+                                .entry((uf.math_.find(x0), uf.math_.find(x1)))
+                                .or_default()
+                                .push(());
                         }
+                        self.hash_index_0_1.retain(|&(x0, x1), v| {
+                            if uf.math_.is_root(x0) & uf.math_.is_root(x1) {
+                                v.retain(|&mut ()| true);
+                                v.sort_unstable();
+                                v.dedup();
+                                true
+                            } else {
+                                false
+                            }
+                        });
                     });
                     self.math_num_uprooted_at_latest_retain = 0;
                 }
@@ -14025,61 +14457,67 @@ fn lir_math() {
                     }
                 }
                 fn update_begin(&mut self, insertions: &[Self::Row], uf: &mut Unification) {
-                    for &(mut x0, mut x1) in insertions {
-                        match self.hash_index_0.entry((uf.math_.find(x0),)) {
-                            runtime::HashMapEntry::Occupied(mut entry) => {
-                                let (y1,) = entry.get_mut();
-                                uf.math_.union_mut(&mut x1, y1);
-                            }
-                            runtime::HashMapEntry::Vacant(entry) => {
-                                entry.insert((uf.math_.find(x1),));
+                    log_duration!("update_begin {}: {}", "sqrt", {
+                        for &(mut x0, mut x1) in insertions {
+                            match self.hash_index_0.entry((uf.math_.find(x0),)) {
+                                runtime::HashMapEntry::Occupied(mut entry) => {
+                                    let (y1,) = entry.get_mut();
+                                    uf.math_.union_mut(&mut x1, y1);
+                                }
+                                runtime::HashMapEntry::Vacant(entry) => {
+                                    entry.insert((uf.math_.find(x1),));
+                                }
                             }
                         }
-                    }
+                    });
                 }
                 fn update(&mut self, insertions: &mut Vec<Self::Row>, uf: &mut Unification) -> bool {
                     if self.math_num_uprooted_at_latest_retain == uf.math_.num_uprooted() {
                         return false;
                     }
-                    self.math_num_uprooted_at_latest_retain = uf.math_.num_uprooted();
                     let offset = insertions.len();
-                    self.hash_index_0.retain(|&(x0,), &mut (x1,)| {
-                        if uf.math_.is_root(x0) & uf.math_.is_root(x1) {
-                            true
-                        } else {
-                            insertions.push((x0, x1));
-                            false
-                        }
+                    log_duration!("update {}: {}", "sqrt", {
+                        self.math_num_uprooted_at_latest_retain = uf.math_.num_uprooted();
+                        self.hash_index_0.retain(|&(x0,), &mut (x1,)| {
+                            if uf.math_.is_root(x0) & uf.math_.is_root(x1) {
+                                true
+                            } else {
+                                insertions.push((x0, x1));
+                                false
+                            }
+                        });
                     });
                     self.update_begin(&insertions[offset..], uf);
                     true
                 }
                 fn update_finalize(&mut self, insertions: &mut Vec<Self::Row>, uf: &mut Unification) {
-                    assert!(self.new.is_empty());
-                    self.new.extend(
-                        self.hash_index_0
-                            .iter()
-                            .map(|(&(x0,), &(x1,))| (uf.math_.find(x0), uf.math_.find(x1)))
-                            .filter(|&(x0, x1)| !self.hash_index_0_1.contains_key(&(x0, x1))),
-                    );
-                    insertions.clear();
-                    RadixSortable::wrap(&mut self.new).voracious_sort();
-                    self.new.dedup();
-                    for &(x0, x1) in &self.new {
-                        self.hash_index_0_1
-                            .entry((uf.math_.find(x0), uf.math_.find(x1)))
-                            .or_default()
-                            .push(());
-                    }
-                    self.hash_index_0_1.retain(|&(x0, x1), v| {
-                        if uf.math_.is_root(x0) & uf.math_.is_root(x1) {
-                            v.retain(|&mut ()| true);
-                            v.sort_unstable();
-                            v.dedup();
-                            true
-                        } else {
-                            false
+                    log_duration!("update_finalize {}: {}", "sqrt", {
+                        assert!(self.new.is_empty());
+                        self.new.extend(
+                            self.hash_index_0
+                                .iter()
+                                .map(|(&(x0,), &(x1,))| (uf.math_.find(x0), uf.math_.find(x1)))
+                                .filter(|&(x0, x1)| !self.hash_index_0_1.contains_key(&(x0, x1))),
+                        );
+                        insertions.clear();
+                        RadixSortable::wrap(&mut self.new).voracious_sort();
+                        self.new.dedup();
+                        for &(x0, x1) in &self.new {
+                            self.hash_index_0_1
+                                .entry((uf.math_.find(x0), uf.math_.find(x1)))
+                                .or_default()
+                                .push(());
                         }
+                        self.hash_index_0_1.retain(|&(x0, x1), v| {
+                            if uf.math_.is_root(x0) & uf.math_.is_root(x1) {
+                                v.retain(|&mut ()| true);
+                                v.sort_unstable();
+                                v.dedup();
+                                true
+                            } else {
+                                false
+                            }
+                        });
                     });
                     self.math_num_uprooted_at_latest_retain = 0;
                 }
@@ -14154,61 +14592,67 @@ fn lir_math() {
                     }
                 }
                 fn update_begin(&mut self, insertions: &[Self::Row], uf: &mut Unification) {
-                    for &(mut x0, mut x1) in insertions {
-                        match self.hash_index_0.entry((uf.math_.find(x0),)) {
-                            runtime::HashMapEntry::Occupied(mut entry) => {
-                                let (y1,) = entry.get_mut();
-                                uf.math_.union_mut(&mut x1, y1);
-                            }
-                            runtime::HashMapEntry::Vacant(entry) => {
-                                entry.insert((uf.math_.find(x1),));
+                    log_duration!("update_begin {}: {}", "sin", {
+                        for &(mut x0, mut x1) in insertions {
+                            match self.hash_index_0.entry((uf.math_.find(x0),)) {
+                                runtime::HashMapEntry::Occupied(mut entry) => {
+                                    let (y1,) = entry.get_mut();
+                                    uf.math_.union_mut(&mut x1, y1);
+                                }
+                                runtime::HashMapEntry::Vacant(entry) => {
+                                    entry.insert((uf.math_.find(x1),));
+                                }
                             }
                         }
-                    }
+                    });
                 }
                 fn update(&mut self, insertions: &mut Vec<Self::Row>, uf: &mut Unification) -> bool {
                     if self.math_num_uprooted_at_latest_retain == uf.math_.num_uprooted() {
                         return false;
                     }
-                    self.math_num_uprooted_at_latest_retain = uf.math_.num_uprooted();
                     let offset = insertions.len();
-                    self.hash_index_0.retain(|&(x0,), &mut (x1,)| {
-                        if uf.math_.is_root(x0) & uf.math_.is_root(x1) {
-                            true
-                        } else {
-                            insertions.push((x0, x1));
-                            false
-                        }
+                    log_duration!("update {}: {}", "sin", {
+                        self.math_num_uprooted_at_latest_retain = uf.math_.num_uprooted();
+                        self.hash_index_0.retain(|&(x0,), &mut (x1,)| {
+                            if uf.math_.is_root(x0) & uf.math_.is_root(x1) {
+                                true
+                            } else {
+                                insertions.push((x0, x1));
+                                false
+                            }
+                        });
                     });
                     self.update_begin(&insertions[offset..], uf);
                     true
                 }
                 fn update_finalize(&mut self, insertions: &mut Vec<Self::Row>, uf: &mut Unification) {
-                    assert!(self.new.is_empty());
-                    self.new.extend(
-                        self.hash_index_0
-                            .iter()
-                            .map(|(&(x0,), &(x1,))| (uf.math_.find(x0), uf.math_.find(x1)))
-                            .filter(|&(x0, x1)| !self.hash_index_0_1.contains_key(&(x0, x1))),
-                    );
-                    insertions.clear();
-                    RadixSortable::wrap(&mut self.new).voracious_sort();
-                    self.new.dedup();
-                    for &(x0, x1) in &self.new {
-                        self.hash_index_0_1
-                            .entry((uf.math_.find(x0), uf.math_.find(x1)))
-                            .or_default()
-                            .push(());
-                    }
-                    self.hash_index_0_1.retain(|&(x0, x1), v| {
-                        if uf.math_.is_root(x0) & uf.math_.is_root(x1) {
-                            v.retain(|&mut ()| true);
-                            v.sort_unstable();
-                            v.dedup();
-                            true
-                        } else {
-                            false
+                    log_duration!("update_finalize {}: {}", "sin", {
+                        assert!(self.new.is_empty());
+                        self.new.extend(
+                            self.hash_index_0
+                                .iter()
+                                .map(|(&(x0,), &(x1,))| (uf.math_.find(x0), uf.math_.find(x1)))
+                                .filter(|&(x0, x1)| !self.hash_index_0_1.contains_key(&(x0, x1))),
+                        );
+                        insertions.clear();
+                        RadixSortable::wrap(&mut self.new).voracious_sort();
+                        self.new.dedup();
+                        for &(x0, x1) in &self.new {
+                            self.hash_index_0_1
+                                .entry((uf.math_.find(x0), uf.math_.find(x1)))
+                                .or_default()
+                                .push(());
                         }
+                        self.hash_index_0_1.retain(|&(x0, x1), v| {
+                            if uf.math_.is_root(x0) & uf.math_.is_root(x1) {
+                                v.retain(|&mut ()| true);
+                                v.sort_unstable();
+                                v.dedup();
+                                true
+                            } else {
+                                false
+                            }
+                        });
                     });
                     self.math_num_uprooted_at_latest_retain = 0;
                 }
@@ -14283,61 +14727,67 @@ fn lir_math() {
                     }
                 }
                 fn update_begin(&mut self, insertions: &[Self::Row], uf: &mut Unification) {
-                    for &(mut x0, mut x1) in insertions {
-                        match self.hash_index_0.entry((uf.math_.find(x0),)) {
-                            runtime::HashMapEntry::Occupied(mut entry) => {
-                                let (y1,) = entry.get_mut();
-                                uf.math_.union_mut(&mut x1, y1);
-                            }
-                            runtime::HashMapEntry::Vacant(entry) => {
-                                entry.insert((uf.math_.find(x1),));
+                    log_duration!("update_begin {}: {}", "cos", {
+                        for &(mut x0, mut x1) in insertions {
+                            match self.hash_index_0.entry((uf.math_.find(x0),)) {
+                                runtime::HashMapEntry::Occupied(mut entry) => {
+                                    let (y1,) = entry.get_mut();
+                                    uf.math_.union_mut(&mut x1, y1);
+                                }
+                                runtime::HashMapEntry::Vacant(entry) => {
+                                    entry.insert((uf.math_.find(x1),));
+                                }
                             }
                         }
-                    }
+                    });
                 }
                 fn update(&mut self, insertions: &mut Vec<Self::Row>, uf: &mut Unification) -> bool {
                     if self.math_num_uprooted_at_latest_retain == uf.math_.num_uprooted() {
                         return false;
                     }
-                    self.math_num_uprooted_at_latest_retain = uf.math_.num_uprooted();
                     let offset = insertions.len();
-                    self.hash_index_0.retain(|&(x0,), &mut (x1,)| {
-                        if uf.math_.is_root(x0) & uf.math_.is_root(x1) {
-                            true
-                        } else {
-                            insertions.push((x0, x1));
-                            false
-                        }
+                    log_duration!("update {}: {}", "cos", {
+                        self.math_num_uprooted_at_latest_retain = uf.math_.num_uprooted();
+                        self.hash_index_0.retain(|&(x0,), &mut (x1,)| {
+                            if uf.math_.is_root(x0) & uf.math_.is_root(x1) {
+                                true
+                            } else {
+                                insertions.push((x0, x1));
+                                false
+                            }
+                        });
                     });
                     self.update_begin(&insertions[offset..], uf);
                     true
                 }
                 fn update_finalize(&mut self, insertions: &mut Vec<Self::Row>, uf: &mut Unification) {
-                    assert!(self.new.is_empty());
-                    self.new.extend(
-                        self.hash_index_0
-                            .iter()
-                            .map(|(&(x0,), &(x1,))| (uf.math_.find(x0), uf.math_.find(x1)))
-                            .filter(|&(x0, x1)| !self.hash_index_0_1.contains_key(&(x0, x1))),
-                    );
-                    insertions.clear();
-                    RadixSortable::wrap(&mut self.new).voracious_sort();
-                    self.new.dedup();
-                    for &(x0, x1) in &self.new {
-                        self.hash_index_0_1
-                            .entry((uf.math_.find(x0), uf.math_.find(x1)))
-                            .or_default()
-                            .push(());
-                    }
-                    self.hash_index_0_1.retain(|&(x0, x1), v| {
-                        if uf.math_.is_root(x0) & uf.math_.is_root(x1) {
-                            v.retain(|&mut ()| true);
-                            v.sort_unstable();
-                            v.dedup();
-                            true
-                        } else {
-                            false
+                    log_duration!("update_finalize {}: {}", "cos", {
+                        assert!(self.new.is_empty());
+                        self.new.extend(
+                            self.hash_index_0
+                                .iter()
+                                .map(|(&(x0,), &(x1,))| (uf.math_.find(x0), uf.math_.find(x1)))
+                                .filter(|&(x0, x1)| !self.hash_index_0_1.contains_key(&(x0, x1))),
+                        );
+                        insertions.clear();
+                        RadixSortable::wrap(&mut self.new).voracious_sort();
+                        self.new.dedup();
+                        for &(x0, x1) in &self.new {
+                            self.hash_index_0_1
+                                .entry((uf.math_.find(x0), uf.math_.find(x1)))
+                                .or_default()
+                                .push(());
                         }
+                        self.hash_index_0_1.retain(|&(x0, x1), v| {
+                            if uf.math_.is_root(x0) & uf.math_.is_root(x1) {
+                                v.retain(|&mut ()| true);
+                                v.sort_unstable();
+                                v.dedup();
+                                true
+                            } else {
+                                false
+                            }
+                        });
                     });
                     self.math_num_uprooted_at_latest_retain = 0;
                 }
@@ -14414,77 +14864,83 @@ fn lir_math() {
                     }
                 }
                 fn update_begin(&mut self, insertions: &[Self::Row], uf: &mut Unification) {
-                    for &(mut x0, mut x1) in insertions {
-                        match self.hash_index_0.entry((x0,)) {
-                            runtime::HashMapEntry::Occupied(mut entry) => {
-                                let (y1,) = entry.get_mut();
-                                uf.math_.union_mut(&mut x1, y1);
-                            }
-                            runtime::HashMapEntry::Vacant(entry) => {
-                                entry.insert((uf.math_.find(x1),));
+                    log_duration!("update_begin {}: {}", "const", {
+                        for &(mut x0, mut x1) in insertions {
+                            match self.hash_index_0.entry((x0,)) {
+                                runtime::HashMapEntry::Occupied(mut entry) => {
+                                    let (y1,) = entry.get_mut();
+                                    uf.math_.union_mut(&mut x1, y1);
+                                }
+                                runtime::HashMapEntry::Vacant(entry) => {
+                                    entry.insert((uf.math_.find(x1),));
+                                }
                             }
                         }
-                    }
+                    });
                 }
                 fn update(&mut self, insertions: &mut Vec<Self::Row>, uf: &mut Unification) -> bool {
                     if self.math_num_uprooted_at_latest_retain == uf.math_.num_uprooted() {
                         return false;
                     }
-                    self.math_num_uprooted_at_latest_retain = uf.math_.num_uprooted();
                     let offset = insertions.len();
-                    self.hash_index_0.retain(|&(x0,), &mut (x1,)| {
-                        if uf.math_.is_root(x1) {
-                            true
-                        } else {
-                            insertions.push((x0, x1));
-                            false
-                        }
+                    log_duration!("update {}: {}", "const", {
+                        self.math_num_uprooted_at_latest_retain = uf.math_.num_uprooted();
+                        self.hash_index_0.retain(|&(x0,), &mut (x1,)| {
+                            if uf.math_.is_root(x1) {
+                                true
+                            } else {
+                                insertions.push((x0, x1));
+                                false
+                            }
+                        });
                     });
                     self.update_begin(&insertions[offset..], uf);
                     true
                 }
                 fn update_finalize(&mut self, insertions: &mut Vec<Self::Row>, uf: &mut Unification) {
-                    assert!(self.new.is_empty());
-                    self.new.extend(
-                        self.hash_index_0
-                            .iter()
-                            .map(|(&(x0,), &(x1,))| (x0, uf.math_.find(x1)))
-                            .filter(|&(x0, x1)| !self.hash_index_0_1.contains_key(&(x0, x1))),
-                    );
-                    insertions.clear();
-                    self.new.sort_unstable();
-                    self.new.dedup();
-                    for &(x0, x1) in &self.new {
-                        self.hash_index_1
-                            .entry((uf.math_.find(x1),))
-                            .or_default()
-                            .push((x0,));
-                    }
-                    self.hash_index_1.retain(|&(x1,), v| {
-                        if uf.math_.is_root(x1) {
-                            v.retain(|&mut (x0,)| true);
-                            v.sort_unstable();
-                            v.dedup();
-                            true
-                        } else {
-                            false
+                    log_duration!("update_finalize {}: {}", "const", {
+                        assert!(self.new.is_empty());
+                        self.new.extend(
+                            self.hash_index_0
+                                .iter()
+                                .map(|(&(x0,), &(x1,))| (x0, uf.math_.find(x1)))
+                                .filter(|&(x0, x1)| !self.hash_index_0_1.contains_key(&(x0, x1))),
+                        );
+                        insertions.clear();
+                        self.new.sort_unstable();
+                        self.new.dedup();
+                        for &(x0, x1) in &self.new {
+                            self.hash_index_1
+                                .entry((uf.math_.find(x1),))
+                                .or_default()
+                                .push((x0,));
                         }
-                    });
-                    for &(x0, x1) in &self.new {
-                        self.hash_index_0_1
-                            .entry((x0, uf.math_.find(x1)))
-                            .or_default()
-                            .push(());
-                    }
-                    self.hash_index_0_1.retain(|&(x0, x1), v| {
-                        if uf.math_.is_root(x1) {
-                            v.retain(|&mut ()| true);
-                            v.sort_unstable();
-                            v.dedup();
-                            true
-                        } else {
-                            false
+                        self.hash_index_1.retain(|&(x1,), v| {
+                            if uf.math_.is_root(x1) {
+                                v.retain(|&mut (x0,)| true);
+                                v.sort_unstable();
+                                v.dedup();
+                                true
+                            } else {
+                                false
+                            }
+                        });
+                        for &(x0, x1) in &self.new {
+                            self.hash_index_0_1
+                                .entry((x0, uf.math_.find(x1)))
+                                .or_default()
+                                .push(());
                         }
+                        self.hash_index_0_1.retain(|&(x0, x1), v| {
+                            if uf.math_.is_root(x1) {
+                                v.retain(|&mut ()| true);
+                                v.sort_unstable();
+                                v.dedup();
+                                true
+                            } else {
+                                false
+                            }
+                        });
                     });
                     self.math_num_uprooted_at_latest_retain = 0;
                 }
@@ -14577,61 +15033,67 @@ fn lir_math() {
                     }
                 }
                 fn update_begin(&mut self, insertions: &[Self::Row], uf: &mut Unification) {
-                    for &(mut x0, mut x1) in insertions {
-                        match self.hash_index_0.entry((x0,)) {
-                            runtime::HashMapEntry::Occupied(mut entry) => {
-                                let (y1,) = entry.get_mut();
-                                uf.math_.union_mut(&mut x1, y1);
-                            }
-                            runtime::HashMapEntry::Vacant(entry) => {
-                                entry.insert((uf.math_.find(x1),));
+                    log_duration!("update_begin {}: {}", "var", {
+                        for &(mut x0, mut x1) in insertions {
+                            match self.hash_index_0.entry((x0,)) {
+                                runtime::HashMapEntry::Occupied(mut entry) => {
+                                    let (y1,) = entry.get_mut();
+                                    uf.math_.union_mut(&mut x1, y1);
+                                }
+                                runtime::HashMapEntry::Vacant(entry) => {
+                                    entry.insert((uf.math_.find(x1),));
+                                }
                             }
                         }
-                    }
+                    });
                 }
                 fn update(&mut self, insertions: &mut Vec<Self::Row>, uf: &mut Unification) -> bool {
                     if self.math_num_uprooted_at_latest_retain == uf.math_.num_uprooted() {
                         return false;
                     }
-                    self.math_num_uprooted_at_latest_retain = uf.math_.num_uprooted();
                     let offset = insertions.len();
-                    self.hash_index_0.retain(|&(x0,), &mut (x1,)| {
-                        if uf.math_.is_root(x1) {
-                            true
-                        } else {
-                            insertions.push((x0, x1));
-                            false
-                        }
+                    log_duration!("update {}: {}", "var", {
+                        self.math_num_uprooted_at_latest_retain = uf.math_.num_uprooted();
+                        self.hash_index_0.retain(|&(x0,), &mut (x1,)| {
+                            if uf.math_.is_root(x1) {
+                                true
+                            } else {
+                                insertions.push((x0, x1));
+                                false
+                            }
+                        });
                     });
                     self.update_begin(&insertions[offset..], uf);
                     true
                 }
                 fn update_finalize(&mut self, insertions: &mut Vec<Self::Row>, uf: &mut Unification) {
-                    assert!(self.new.is_empty());
-                    self.new.extend(
-                        self.hash_index_0
-                            .iter()
-                            .map(|(&(x0,), &(x1,))| (x0, uf.math_.find(x1)))
-                            .filter(|&(x0, x1)| !self.hash_index_0_1.contains_key(&(x0, x1))),
-                    );
-                    insertions.clear();
-                    self.new.sort_unstable();
-                    self.new.dedup();
-                    for &(x0, x1) in &self.new {
-                        self.hash_index_0_1
-                            .entry((x0, uf.math_.find(x1)))
-                            .or_default()
-                            .push(());
-                    }
-                    self.hash_index_0_1.retain(|&(x0, x1), v| {
-                        if uf.math_.is_root(x1) {
-                            v.retain(|&mut ()| true);
-                            v.sort_unstable();
-                            v.dedup();
-                            true
-                        } else {
-                            false
+                    log_duration!("update_finalize {}: {}", "var", {
+                        assert!(self.new.is_empty());
+                        self.new.extend(
+                            self.hash_index_0
+                                .iter()
+                                .map(|(&(x0,), &(x1,))| (x0, uf.math_.find(x1)))
+                                .filter(|&(x0, x1)| !self.hash_index_0_1.contains_key(&(x0, x1))),
+                        );
+                        insertions.clear();
+                        self.new.sort_unstable();
+                        self.new.dedup();
+                        for &(x0, x1) in &self.new {
+                            self.hash_index_0_1
+                                .entry((x0, uf.math_.find(x1)))
+                                .or_default()
+                                .push(());
                         }
+                        self.hash_index_0_1.retain(|&(x0, x1), v| {
+                            if uf.math_.is_root(x1) {
+                                v.retain(|&mut ()| true);
+                                v.sort_unstable();
+                                v.dedup();
+                                true
+                            } else {
+                                false
+                            }
+                        });
                     });
                     self.math_num_uprooted_at_latest_retain = 0;
                 }
@@ -15082,18 +15544,22 @@ fn lir_math() {
                     theory
                 }
                 pub fn step(&mut self) -> [std::time::Duration; 2] {
-                    [
-                        {
-                            let start = std::time::Instant::now();
-                            self.apply_rules();
-                            start.elapsed()
-                        },
-                        {
-                            let start = std::time::Instant::now();
-                            self.canonicalize();
-                            start.elapsed()
-                        },
-                    ]
+                    log_duration!("======== STEP took {} ==========", {
+                        [
+                            {
+                                let start = std::time::Instant::now();
+                                log_duration!("apply_rules: {}", {
+                                    self.apply_rules();
+                                });
+                                start.elapsed()
+                            },
+                            {
+                                let start = std::time::Instant::now();
+                                self.canonicalize();
+                                start.elapsed()
+                            },
+                        ]
+                    })
                 }
                 #[inline(never)]
                 pub fn apply_rules(&mut self) {
@@ -15733,103 +16199,111 @@ fn lir_math() {
                 }
                 #[inline(never)]
                 pub fn canonicalize(&mut self) {
-                    self.fuel_.clear_new();
-                    self.zero_fuel_.clear_new();
-                    self.diff_.clear_new();
-                    self.integral_.clear_new();
-                    self.add_.clear_new();
-                    self.sub_.clear_new();
-                    self.mul_.clear_new();
-                    self.div_.clear_new();
-                    self.pow_.clear_new();
-                    self.ln_.clear_new();
-                    self.sqrt_.clear_new();
-                    self.sin_.clear_new();
-                    self.cos_.clear_new();
-                    self.const_.clear_new();
-                    self.var_.clear_new();
-                    if !self.delta.has_new_inserts() && self.uf.num_uprooted() == 0 {
-                        return;
-                    }
-                    self.fuel_.update_begin(&mut self.delta.fuel_, &mut self.uf);
-                    self.zero_fuel_
-                        .update_begin(&mut self.delta.zero_fuel_, &mut self.uf);
-                    self.diff_.update_begin(&mut self.delta.diff_, &mut self.uf);
-                    self.integral_
-                        .update_begin(&mut self.delta.integral_, &mut self.uf);
-                    self.add_.update_begin(&mut self.delta.add_, &mut self.uf);
-                    self.sub_.update_begin(&mut self.delta.sub_, &mut self.uf);
-                    self.mul_.update_begin(&mut self.delta.mul_, &mut self.uf);
-                    self.div_.update_begin(&mut self.delta.div_, &mut self.uf);
-                    self.pow_.update_begin(&mut self.delta.pow_, &mut self.uf);
-                    self.ln_.update_begin(&mut self.delta.ln_, &mut self.uf);
-                    self.sqrt_.update_begin(&mut self.delta.sqrt_, &mut self.uf);
-                    self.sin_.update_begin(&mut self.delta.sin_, &mut self.uf);
-                    self.cos_.update_begin(&mut self.delta.cos_, &mut self.uf);
-                    self.const_
-                        .update_begin(&mut self.delta.const_, &mut self.uf);
-                    self.var_.update_begin(&mut self.delta.var_, &mut self.uf);
-                    loop {
-                        let mut progress = false;
-                        progress |= self.fuel_.update(&mut self.delta.fuel_, &mut self.uf);
-                        progress |= self
-                            .zero_fuel_
-                            .update(&mut self.delta.zero_fuel_, &mut self.uf);
-                        progress |= self.diff_.update(&mut self.delta.diff_, &mut self.uf);
-                        progress |= self
-                            .integral_
-                            .update(&mut self.delta.integral_, &mut self.uf);
-                        progress |= self.add_.update(&mut self.delta.add_, &mut self.uf);
-                        progress |= self.sub_.update(&mut self.delta.sub_, &mut self.uf);
-                        progress |= self.mul_.update(&mut self.delta.mul_, &mut self.uf);
-                        progress |= self.div_.update(&mut self.delta.div_, &mut self.uf);
-                        progress |= self.pow_.update(&mut self.delta.pow_, &mut self.uf);
-                        progress |= self.ln_.update(&mut self.delta.ln_, &mut self.uf);
-                        progress |= self.sqrt_.update(&mut self.delta.sqrt_, &mut self.uf);
-                        progress |= self.sin_.update(&mut self.delta.sin_, &mut self.uf);
-                        progress |= self.cos_.update(&mut self.delta.cos_, &mut self.uf);
-                        progress |= self.const_.update(&mut self.delta.const_, &mut self.uf);
-                        progress |= self.var_.update(&mut self.delta.var_, &mut self.uf);
-                        if !progress {
-                            break;
+                    log_duration!("canonicalize (total): {}", {
+                        self.fuel_.clear_new();
+                        self.zero_fuel_.clear_new();
+                        self.diff_.clear_new();
+                        self.integral_.clear_new();
+                        self.add_.clear_new();
+                        self.sub_.clear_new();
+                        self.mul_.clear_new();
+                        self.div_.clear_new();
+                        self.pow_.clear_new();
+                        self.ln_.clear_new();
+                        self.sqrt_.clear_new();
+                        self.sin_.clear_new();
+                        self.cos_.clear_new();
+                        self.const_.clear_new();
+                        self.var_.clear_new();
+                        if !self.delta.has_new_inserts() && self.uf.num_uprooted() == 0 {
+                            return;
                         }
-                    }
-                    self.fuel_
-                        .update_finalize(&mut self.delta.fuel_, &mut self.uf);
-                    self.zero_fuel_
-                        .update_finalize(&mut self.delta.zero_fuel_, &mut self.uf);
-                    self.diff_
-                        .update_finalize(&mut self.delta.diff_, &mut self.uf);
-                    self.integral_
-                        .update_finalize(&mut self.delta.integral_, &mut self.uf);
-                    self.add_
-                        .update_finalize(&mut self.delta.add_, &mut self.uf);
-                    self.sub_
-                        .update_finalize(&mut self.delta.sub_, &mut self.uf);
-                    self.mul_
-                        .update_finalize(&mut self.delta.mul_, &mut self.uf);
-                    self.div_
-                        .update_finalize(&mut self.delta.div_, &mut self.uf);
-                    self.pow_
-                        .update_finalize(&mut self.delta.pow_, &mut self.uf);
-                    self.ln_.update_finalize(&mut self.delta.ln_, &mut self.uf);
-                    self.sqrt_
-                        .update_finalize(&mut self.delta.sqrt_, &mut self.uf);
-                    self.sin_
-                        .update_finalize(&mut self.delta.sin_, &mut self.uf);
-                    self.cos_
-                        .update_finalize(&mut self.delta.cos_, &mut self.uf);
-                    self.const_
-                        .update_finalize(&mut self.delta.const_, &mut self.uf);
-                    self.var_
-                        .update_finalize(&mut self.delta.var_, &mut self.uf);
-                    self.global_fuel_unit.update(&mut self.uf.fuel_unit_);
-                    self.global_math.update(&mut self.uf.math_);
-                    self.global_i64.update_finalize();
-                    self.global_string.update_finalize();
-                    self.global_fuel_unit.update_finalize();
-                    self.global_math.update_finalize();
-                    self.uf.reset_num_uprooted();
+                        log_duration!("update_begin (total): {}", {
+                            self.fuel_.update_begin(&mut self.delta.fuel_, &mut self.uf);
+                            self.zero_fuel_
+                                .update_begin(&mut self.delta.zero_fuel_, &mut self.uf);
+                            self.diff_.update_begin(&mut self.delta.diff_, &mut self.uf);
+                            self.integral_
+                                .update_begin(&mut self.delta.integral_, &mut self.uf);
+                            self.add_.update_begin(&mut self.delta.add_, &mut self.uf);
+                            self.sub_.update_begin(&mut self.delta.sub_, &mut self.uf);
+                            self.mul_.update_begin(&mut self.delta.mul_, &mut self.uf);
+                            self.div_.update_begin(&mut self.delta.div_, &mut self.uf);
+                            self.pow_.update_begin(&mut self.delta.pow_, &mut self.uf);
+                            self.ln_.update_begin(&mut self.delta.ln_, &mut self.uf);
+                            self.sqrt_.update_begin(&mut self.delta.sqrt_, &mut self.uf);
+                            self.sin_.update_begin(&mut self.delta.sin_, &mut self.uf);
+                            self.cos_.update_begin(&mut self.delta.cos_, &mut self.uf);
+                            self.const_
+                                .update_begin(&mut self.delta.const_, &mut self.uf);
+                            self.var_.update_begin(&mut self.delta.var_, &mut self.uf);
+                        });
+                        log_duration!("update_loop (total): {}", {
+                            loop {
+                                let mut progress = false;
+                                progress |= self.fuel_.update(&mut self.delta.fuel_, &mut self.uf);
+                                progress |= self
+                                    .zero_fuel_
+                                    .update(&mut self.delta.zero_fuel_, &mut self.uf);
+                                progress |= self.diff_.update(&mut self.delta.diff_, &mut self.uf);
+                                progress |= self
+                                    .integral_
+                                    .update(&mut self.delta.integral_, &mut self.uf);
+                                progress |= self.add_.update(&mut self.delta.add_, &mut self.uf);
+                                progress |= self.sub_.update(&mut self.delta.sub_, &mut self.uf);
+                                progress |= self.mul_.update(&mut self.delta.mul_, &mut self.uf);
+                                progress |= self.div_.update(&mut self.delta.div_, &mut self.uf);
+                                progress |= self.pow_.update(&mut self.delta.pow_, &mut self.uf);
+                                progress |= self.ln_.update(&mut self.delta.ln_, &mut self.uf);
+                                progress |= self.sqrt_.update(&mut self.delta.sqrt_, &mut self.uf);
+                                progress |= self.sin_.update(&mut self.delta.sin_, &mut self.uf);
+                                progress |= self.cos_.update(&mut self.delta.cos_, &mut self.uf);
+                                progress |= self.const_.update(&mut self.delta.const_, &mut self.uf);
+                                progress |= self.var_.update(&mut self.delta.var_, &mut self.uf);
+                                if !progress {
+                                    break;
+                                }
+                            }
+                        });
+                        log_duration!("update_finalize (total): {}", {
+                            self.fuel_
+                                .update_finalize(&mut self.delta.fuel_, &mut self.uf);
+                            self.zero_fuel_
+                                .update_finalize(&mut self.delta.zero_fuel_, &mut self.uf);
+                            self.diff_
+                                .update_finalize(&mut self.delta.diff_, &mut self.uf);
+                            self.integral_
+                                .update_finalize(&mut self.delta.integral_, &mut self.uf);
+                            self.add_
+                                .update_finalize(&mut self.delta.add_, &mut self.uf);
+                            self.sub_
+                                .update_finalize(&mut self.delta.sub_, &mut self.uf);
+                            self.mul_
+                                .update_finalize(&mut self.delta.mul_, &mut self.uf);
+                            self.div_
+                                .update_finalize(&mut self.delta.div_, &mut self.uf);
+                            self.pow_
+                                .update_finalize(&mut self.delta.pow_, &mut self.uf);
+                            self.ln_.update_finalize(&mut self.delta.ln_, &mut self.uf);
+                            self.sqrt_
+                                .update_finalize(&mut self.delta.sqrt_, &mut self.uf);
+                            self.sin_
+                                .update_finalize(&mut self.delta.sin_, &mut self.uf);
+                            self.cos_
+                                .update_finalize(&mut self.delta.cos_, &mut self.uf);
+                            self.const_
+                                .update_finalize(&mut self.delta.const_, &mut self.uf);
+                            self.var_
+                                .update_finalize(&mut self.delta.var_, &mut self.uf);
+                            self.global_fuel_unit.update(&mut self.uf.fuel_unit_);
+                            self.global_math.update(&mut self.uf.math_);
+                            self.global_i64.update_finalize();
+                            self.global_string.update_finalize();
+                            self.global_fuel_unit.update_finalize();
+                            self.global_math.update_finalize();
+                            self.uf.reset_num_uprooted();
+                        });
+                    });
                 }
             }
             impl EclassProvider<FuelUnit> for Theory {

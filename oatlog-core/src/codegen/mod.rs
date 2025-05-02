@@ -148,25 +148,37 @@ pub fn codegen(theory: &Theory) -> TokenStream {
         quote! {
             #[inline(never)]
             pub fn canonicalize(&mut self) {
-                #(self.#relation_ident.clear_new();)*
-                if !self.delta.has_new_inserts() && self.uf.num_uprooted() == 0 {
-                    return;
-                }
-                #(self.#relation_ident.update_begin(&mut self.delta.#delta_row, &mut self.uf);)*
-                loop {
-                    let mut progress = false;
-                    #(progress |= self.#relation_ident.update(&mut self.delta.#delta_row, &mut self.uf);)*
-                    if !progress {
-                        break;
+                log_duration!("canonicalize (total): {}", {
+                    #(self.#relation_ident.clear_new();)*
+                    if !self.delta.has_new_inserts() && self.uf.num_uprooted() == 0 {
+                        return;
                     }
-                }
-                #(self.#relation_ident.update_finalize(&mut self.delta.#delta_row, &mut self.uf);)*
 
-                #(
-                    self.#global_type_symbolic.update(&mut self.uf.#global_type_symbolic_uf);
-                )*
-                #( self.#global_type.update_finalize(); )*
-                self.uf.reset_num_uprooted();
+                    log_duration!("update_begin (total): {}", {
+                        #(self.#relation_ident.update_begin(&mut self.delta.#delta_row, &mut self.uf);)*
+                    });
+
+                    log_duration!("update_loop (total): {}", {
+                        loop {
+                            let mut progress = false;
+                            #(progress |= self.#relation_ident.update(&mut self.delta.#delta_row, &mut self.uf);)*
+                            if !progress {
+                                break;
+                            }
+                        }
+
+                    });
+
+                    log_duration!("update_finalize (total): {}", {
+                        #(self.#relation_ident.update_finalize(&mut self.delta.#delta_row, &mut self.uf);)*
+
+                        #(
+                            self.#global_type_symbolic.update(&mut self.uf.#global_type_symbolic_uf);
+                        )*
+                        #( self.#global_type.update_finalize(); )*
+                        self.uf.reset_num_uprooted();
+                    });
+                });
             }
         }
     };
@@ -224,18 +236,22 @@ pub fn codegen(theory: &Theory) -> TokenStream {
                 theory
             }
             pub fn step(&mut self) -> [std::time::Duration; 2] {
-                [
-                    {
-                        let start = std::time::Instant::now();
-                        self.apply_rules();
-                        start.elapsed()
-                    },
-                    {
-                        let start = std::time::Instant::now();
-                        self.canonicalize();
-                        start.elapsed()
-                    },
-                ]
+                log_duration!("======== STEP took {} ==========", {
+                    [
+                        {
+                            let start = std::time::Instant::now();
+                            log_duration!("apply_rules: {}", {
+                                self.apply_rules();
+                            });
+                            start.elapsed()
+                        },
+                        {
+                            let start = std::time::Instant::now();
+                            self.canonicalize();
+                            start.elapsed()
+                        },
+                    ]
+                })
             }
             #[inline(never)]
             pub fn apply_rules(&mut self) { #rule_contents }

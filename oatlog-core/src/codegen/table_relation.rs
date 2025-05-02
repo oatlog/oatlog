@@ -664,79 +664,88 @@ fn update(
         }
     };
 
+    let relation_name = ident::rel_get(rel).to_string();
+
     quote! {
         // Called once at beginning of canonicalization.
         fn update_begin(&mut self, insertions: &[Self::Row], uf: &mut Unification) {
-            #(
-                for &(#(mut #indexes_fd_cols,)*) in insertions {
-                    match self.#indexes_fd.entry(#indexes_fd_find_keys) {
-                        runtime::HashMapEntry::Occupied(mut entry) => #indexes_fd_merge,
-                        runtime::HashMapEntry::Vacant(entry) => { entry.insert(#indexes_fd_find_values); }
+            log_duration!("update_begin {}: {}", #relation_name, {
+                #(
+                    for &(#(mut #indexes_fd_cols,)*) in insertions {
+                        match self.#indexes_fd.entry(#indexes_fd_find_keys) {
+                            runtime::HashMapEntry::Occupied(mut entry) => #indexes_fd_merge,
+                            runtime::HashMapEntry::Vacant(entry) => { entry.insert(#indexes_fd_find_values); }
+                        }
                     }
-                }
-            )*
+                )*
+            });
         }
         // Called round robin on relations during canonicalization.
         fn update(&mut self, insertions: &mut Vec<Self::Row>, uf: &mut Unification) -> bool {
             if #no_fresh_uprooted {
                 return false;
             }
-            #(self.#ty_uf_latest = uf.#ty_uf.num_uprooted();)*
             let offset = insertions.len();
-            #(
-                self.#indexes_fd
-                    .retain(|&(#(#indexes_fd_keys,)*), &mut (#(#indexes_fd_vals,)*)| {
-                        if #indexes_fd_cols_is_root {
-                            true
-                        } else {
-                            insertions.push((#(#indexes_fd_cols,)*));
-                            false
-                        }
-                    });
-            )*
+            log_duration!("update {}: {}", #relation_name, {
+                #(self.#ty_uf_latest = uf.#ty_uf.num_uprooted();)*
+                #(
+                    self.#indexes_fd
+                        .retain(|&(#(#indexes_fd_keys,)*), &mut (#(#indexes_fd_vals,)*)| {
+                            if #indexes_fd_cols_is_root {
+                                true
+                            } else {
+                                insertions.push((#(#indexes_fd_cols,)*));
+                                false
+                            }
+                        });
+                )*
+            });
             self.update_begin(&insertions[offset..], uf);
             true
         }
         // Called once at end of canonicalization.
         fn update_finalize(&mut self, insertions: &mut Vec<Self::Row>, uf: &mut Unification) {
-            assert!(self.new.is_empty());
-            self.new.extend(#iter_cols_superset_new
-                .filter(|&(#(#cols,)*)| !self.#allset.contains_key(&(#(#allset_cols,)*)))
-            );
-            insertions.clear();
+            log_duration!("update_finalize {}: {}", #relation_name, {
+                assert!(self.new.is_empty());
+                self.new.extend(#iter_cols_superset_new
+                    .filter(|&(#(#cols,)*)| !self.#allset.contains_key(&(#(#allset_cols,)*)))
+                );
+                insertions.clear();
 
-            #sort_new
-            self.new.dedup();
+                #sort_new
+                self.new.dedup();
 
-            #(  // Indexes like `HashMap<(T, T, T), SmallVec<[(); 1]>>` and `HashMap<(T, T), SmallVec<[(T,); 1]>>`
-                for &(#(#indexes_nofd_cols,)*) in &self.new {
-                    self.#indexes_nofd
-                        .entry(#indexes_nofd_find_keys)
-                        .or_default()
-                        .push(#indexes_nofd_find_vals);
-                }
-                self.#indexes_nofd.retain(|&(#(#indexes_nofd_keys,)*), v| {
-                    if #indexes_nofd_key_is_root {
-                        v.retain(|&mut (#(#indexes_nofd_vals,)*)| #indexes_nofd_value_is_root);
-                        v.sort_unstable();
-                        v.dedup();
-                        true
-                    } else {
-                        false
+                #(  // Indexes like `HashMap<(T, T, T), SmallVec<[(); 1]>>` and `HashMap<(T, T), SmallVec<[(T,); 1]>>`
+                    for &(#(#indexes_nofd_cols,)*) in &self.new {
+                        self.#indexes_nofd
+                            .entry(#indexes_nofd_find_keys)
+                            .or_default()
+                            .push(#indexes_nofd_find_vals);
                     }
-                });
-            )*
-            #(  // Non-union functional dependency indexes, where merge is a panic or a primitive function.
-                for &(#(mut #indexes_othfd_cols,)*) in &self.new {
-                    match self.#indexes_othfd.entry((#(#indexes_othfd_keys,)*)) {
-                        runtime::HashMapEntry::Occupied(mut entry) => #indexes_othfd_merge,
-                        runtime::HashMapEntry::Vacant(entry) => { entry.insert(#indexes_othfd_find); }
+                    self.#indexes_nofd.retain(|&(#(#indexes_nofd_keys,)*), v| {
+                        if #indexes_nofd_key_is_root {
+                            v.retain(|&mut (#(#indexes_nofd_vals,)*)| #indexes_nofd_value_is_root);
+                            v.sort_unstable();
+                            v.dedup();
+                            true
+                        } else {
+                            false
+                        }
+                    });
+                )*
+                #(  // Non-union functional dependency indexes, where merge is a panic or a primitive function.
+                    for &(#(mut #indexes_othfd_cols,)*) in &self.new {
+                        match self.#indexes_othfd.entry((#(#indexes_othfd_keys,)*)) {
+                            runtime::HashMapEntry::Occupied(mut entry) => #indexes_othfd_merge,
+                            runtime::HashMapEntry::Vacant(entry) => { entry.insert(#indexes_othfd_find); }
+                        }
                     }
-                }
-                self.#indexes_othfd.retain(|&(#(#indexes_othfd_keys,)*), v| {
-                    #indexes_othfd_key_is_root
-                });
-            )*
+                    self.#indexes_othfd.retain(|&(#(#indexes_othfd_keys,)*), v| {
+                        #indexes_othfd_key_is_root
+                    });
+                )*
+            });
+
 
             #(self.#ty_uf_latest = 0;)*
         }

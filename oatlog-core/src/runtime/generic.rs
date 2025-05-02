@@ -82,3 +82,15 @@ macro_rules! eclass_wrapper_ty {
         )*
     };
 }
+
+#[macro_export]
+/// Log duration of a chunk of code.
+macro_rules! log_duration {
+    ($literal:literal, $($tt:literal,)* $block:block) => {{
+        // let start = std::time::Instant::now();
+        // let res = $block;
+        // eprintln!($literal, $($tt, )* format!("{} ms", start.elapsed().as_secs_f64() * 1000.0));
+        // res
+        $block
+    }};
+}

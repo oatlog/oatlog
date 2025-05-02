@@ -7,7 +7,7 @@ mod row;
 mod uf;
 
 pub use crate::{
-    decl_row, eclass_wrapper_ty, relation_element_wrapper_ty,
+    decl_row, eclass_wrapper_ty, log_duration, relation_element_wrapper_ty,
     runtime::{
         generic::{Eclass, EclassProvider, RelationElement},
         global_vars::GlobalVars,

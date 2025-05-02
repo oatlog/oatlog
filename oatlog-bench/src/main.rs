@@ -16,12 +16,12 @@ macro_rules! benchmarks {
         })*
         fn run_main(_steps: usize) {$({
             std::env::set_current_dir(concat!(env!("CARGO_MANIFEST_DIR"), "/..")).unwrap();
-            println!("\nrunning {}: egglog\n", stringify!($name));
-            let mut egglog = egglog::EGraph::default();
-            let program = format!("{}\n(print-size)", $program);
-            for msg in egglog.parse_and_run_program(None, &program).unwrap() {
-                println!("{msg}");
-            }
+            // println!("\nrunning {}: egglog\n", stringify!($name));
+            // let mut egglog = egglog::EGraph::default();
+            // let program = format!("{}\n(print-size)", $program);
+            // for msg in egglog.parse_and_run_program(None, &program).unwrap() {
+            //     println!("{msg}");
+            // }
             println!("\nrunning {}: oatlog\n", stringify!($name));
             let theory = $name::Theory::new();
             for (relation, count) in theory.get_relation_entry_count() {
