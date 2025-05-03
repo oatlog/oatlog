@@ -129,6 +129,7 @@ impl CodegenRuleTrieCtx<'_> {
                 relation,
                 args,
                 index,
+                inclusion,
             } => {
                 let relation = &self.relations[relation]
                     .as_ref()
@@ -204,10 +205,18 @@ impl CodegenRuleTrieCtx<'_> {
                             inner
                         };
 
-                        let iter_ident = ident::index_all_iter(usage_info, index_info);
+                        let (iter_ident, maybe_timestamp) = match inclusion {
+                            crate::lir::Inclusion::All => {
+                                (ident::index_all_iter(usage_info, index_info), vec![])
+                            }
+                            crate::lir::Inclusion::Old => (
+                                ident::index_old_iter(usage_info, index_info),
+                                vec![quote!(self.latest_timestamp,)],
+                            ),
+                        };
                         let relation_ident = ident::rel_var(relation);
                         quote! {
-                            for (#(#new_columns_,)*) in self.#relation_ident.#iter_ident(#(#bound_columns_,)*) {
+                            for (#(#new_columns_,)*) in self.#relation_ident.#iter_ident(#(#bound_columns_,)* #(#maybe_timestamp)*) {
                                 #inner
                             }
                         }

@@ -262,6 +262,14 @@ impl VariableData {
         Self { name, type_: ty }
     }
 }
+
+#[derive(Debug, Copy, Clone)]
+pub(crate) enum Inclusion {
+    All,
+    Old,
+    // New?
+}
+
 #[derive(Debug, Clone, Copy)]
 pub(crate) struct RuleTrie {
     pub(crate) meta: Option<&'static str>,
@@ -283,14 +291,17 @@ pub(crate) enum RuleAtom {
         args: &'static [VariableId],
     },
     /// Indexed join with relation, binding any previously unbound variables.
+    /// for (c) in relation.iter(a, b) { .. }
     Premise {
         relation: RelationId,
         args: &'static [VariableId],
         /// usage depends on relationty
         index: IndexUsageId,
+        inclusion: Inclusion,
     },
     /// Proceed only if at least one row matching the `args` pattern exists in `relation`.
     /// AKA semi-join.
+    /// if relation.check(a, b) { .. }
     PremiseAny {
         relation: RelationId,
         /// a bit cursed to not have Option<VariableId> here, but it works when generating.
@@ -524,12 +535,13 @@ impl Theory {
                         relation,
                         args,
                         index,
+                        inclusion,
                     } => {
                         write!(
                             f,
                             "{:?}",
                             DbgStr([
-                                "Premise".to_string(),
+                                format!("Premise{inclusion:?}"),
                                 format!("{relation}({})", args.iter().join(", ")),
                                 index.to_string()
                             ])

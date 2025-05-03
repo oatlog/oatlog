@@ -289,36 +289,9 @@ impl Relation {
             columns,
         }
     }
-    /// Returns Some(..) if relation has a "new".
-    pub(crate) fn as_new(&self, id: RelationId) -> Option<Self> {
-        match self.kind {
-            RelationTy::NewOf { .. } => unreachable!("new of new?"),
-            RelationTy::Alias { .. } => unreachable!("new of alias?"),
-            RelationTy::Primitive { .. } => {
-                // primitive has no new.
-                None
-            }
-            RelationTy::Table | RelationTy::Global { .. } | RelationTy::Forall { .. } => {
-                Some(Self {
-                    name: format!("New{}", self.name).leak(),
-                    columns: self.columns.clone(),
-                    kind: RelationTy::NewOf { id },
-                    // At the point of introducing semi-naive, there is no simplification
-                    // benefit to implicit rules, so it's just for entry, but it's not possible
-                    // to use entry on new.
-                    implicit_rules: tvec![],
-                    // We probably don't need this.
-                    invariant_permutations: InvariantPermutationSubgroup::new_identity(
-                        self.columns.len(),
-                    ),
-                })
-            }
-        }
-    }
     /// Whether it is sound to turn entry on this into an insert.
     pub(crate) fn can_become_insert(&self, _im: ImplicitRuleId) -> bool {
         match &self.kind {
-            RelationTy::NewOf { .. } => unreachable!(),
             RelationTy::Table => {
                 // TODO erik: think about requirements
                 true
@@ -332,6 +305,16 @@ impl Relation {
             RelationTy::Forall { .. } => unreachable!(),
         }
     }
+    pub(crate) fn has_new(&self) -> bool {
+        match self.kind {
+            RelationTy::Alias { .. } => unreachable!("new of alias?"),
+            RelationTy::Primitive { .. } => {
+                // primitive has no new.
+                false
+            }
+            RelationTy::Table | RelationTy::Global { .. } | RelationTy::Forall { .. } => true,
+        }
+    }
 }
 
 #[derive(Educe, Clone, Debug)]
@@ -340,9 +323,6 @@ pub(crate) struct WrapIgnore<T>(#[educe(Ord(ignore), Hash(ignore), Eq(ignore))] 
 
 #[derive(Clone, Eq, PartialEq, Ord, PartialOrd, Hash, Debug)]
 pub(crate) enum RelationTy {
-    /// Same as other relation but referring to the "new" part of it.
-    /// Only supports iteration
-    NewOf { id: RelationId },
     /// An actual table with arbitrarily many indexes.
     /// Supports inserts, iteration, lookup for arbitrary indexes
     /// The only type that might be extractable.
@@ -393,6 +373,34 @@ impl IsPremise {
     }
 }
 
+#[derive(Copy, Clone, Eq, PartialEq, Ord, PartialOrd, Debug, Hash)]
+pub(crate) enum Inclusion {
+    New,
+    Old,
+    All,
+}
+impl Inclusion {
+    fn compatible(&self, other: Self) -> bool {
+        use Inclusion::*;
+        match (self, other) {
+            (New, New) | (Old, Old) | (All, All) => true,
+            (New, Old) | (Old, New) => false,
+            (All, New) => false,
+            (All, Old) => false,
+            (New, All) =>
+            /* maybe fine if fast growing */
+            {
+                false
+            }
+            (Old, All) =>
+            /* this is what we did before */
+            {
+                true
+            }
+        }
+    }
+}
+
 /// Unifies action insert/entry and premise.
 #[must_use]
 #[derive(Clone, Eq, PartialEq, Ord, PartialOrd, Debug, Hash)]
@@ -405,6 +413,8 @@ pub(crate) struct Atom {
     /// * Action: get-or-default, if primitive it will panic if missing.
     /// * Premise: use a specific index, only for primitive functions.
     pub(crate) entry: Option<ImplicitRuleId>,
+    /// Only for premise
+    pub(crate) incl: Inclusion,
 }
 impl Atom {
     /// List all atoms we consider equivalent to this atom.
@@ -424,6 +434,7 @@ impl Atom {
                 relation: self.relation,
                 columns: columns.into(),
                 entry: self.entry,
+                incl: self.incl,
             })
             .unique()
             .collect()
@@ -444,6 +455,7 @@ impl Atom {
             relation: self.relation,
             columns: self.columns.iter().copied().map(f).collect(),
             entry: self.entry,
+            incl: self.incl,
         }
     }
 
@@ -471,34 +483,6 @@ impl Atom {
             vec![]
         }
     }
-    // /// Equality modulo implicit functionality
-    // /// Mapping is self -> other
-    // pub(crate) fn apply_modulo(
-    //     &self,
-    //     other: &Self,
-    //     relations: &TVec<RelationId, Relation>,
-    //     mut mapping: impl FnMut(VariableId, VariableId),
-    // ) -> bool {
-    //     if self.relation != other.relation {
-    //         return false;
-    //     }
-    //     if self.columns == other.columns {
-    //         return true;
-    //     }
-
-    //     let mut eq = false;
-    //     for im in relations[self.relation].implicit_rules.iter().filter(|im| {
-    //         im.key_columns()
-    //             .into_iter()
-    //             .all(|c| self.columns[c] == other.columns[c])
-    //     }) {
-    //         eq = true;
-    //         for c in im.value_columns() {
-    //             mapping(self.columns[c], other.columns[c]);
-    //         }
-    //     }
-    //     eq
-    // }
 }
 
 #[must_use]
@@ -819,12 +803,14 @@ impl RuleArgs {
                 relation,
                 columns: args.into_iter().collect(),
                 entry: None,
+                incl: Inclusion::All,
             })
             .chain(self.action.into_iter().map(|(relation, args, entry)| Atom {
                 is_premise: Action,
                 relation,
                 columns: args.into_iter().collect(),
                 entry: entry.then_some(ImplicitRuleId(0)),
+                incl: Inclusion::All,
             }))
             .map(|atom| atom.map_columns(|v| to_merge.find(v)))
             .collect();
@@ -1157,7 +1143,6 @@ mod debug_print {
             ) = self;
 
             let kind = match kind {
-                RelationTy::NewOf { id } => format!("NewOf({id:?})"),
                 RelationTy::Table => "Table".to_string(),
                 RelationTy::Alias {} => "Alias".to_string(),
                 RelationTy::Global { id } => format!("Global({id})"),
@@ -1200,15 +1185,21 @@ mod debug_print {
                     relation,
                     columns,
                     entry,
+                    incl,
                 },
             ) = self;
 
+            let incl = match incl {
+                Inclusion::New => "New",
+                Inclusion::Old => "Old",
+                Inclusion::All => "",
+            };
             let premise = match premise {
                 Premise => "Premise",
                 Action => "Action",
             };
 
-            let mut dbg = &mut f.debug_struct(premise);
+            let mut dbg = &mut f.debug_struct(&format!("{premise}{incl}"));
             dbg = dbg.field(
                 "relation",
                 &Dbg(theory.relations[*relation].name.to_owned()),

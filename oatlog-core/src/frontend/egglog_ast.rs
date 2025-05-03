@@ -1147,7 +1147,7 @@ impl Display for Schedule {
             Schedule::Run(run_config) => {
                 let RunConfig { ruleset, until } = run_config;
                 let ruleset = ruleset.map(|x| *x).unwrap_or("");
-                until.as_ref().unwrap();
+                let _ = until;
                 write!(f, "(run {ruleset})")
             }
             Schedule::Sequence(x) => match x.as_slice() {

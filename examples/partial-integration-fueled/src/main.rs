@@ -91,7 +91,7 @@ fn test() {
         total e-nodes: 50021
 
         FuelUnit: tot=4 roots=4
-        Math: tot=56324 roots=5127
+        Math: tot=43464 roots=5127
     "#])
     .assert_eq(&sink);
 }

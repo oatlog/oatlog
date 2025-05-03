@@ -55,9 +55,24 @@ pub trait Relation {
     fn iter_new(&self) -> impl '_ + Iterator<Item = Self::Row>;
     fn len(&self) -> usize;
     fn emit_graphviz(&self, buf: &mut String);
-    fn update_begin(&mut self, insertions: &[Self::Row], uf: &mut Self::Unification);
-    fn update(&mut self, insertions: &mut Vec<Self::Row>, uf: &mut Self::Unification) -> bool;
-    fn update_finalize(&mut self, insertions: &mut Vec<Self::Row>, uf: &mut Self::Unification);
+    fn update_begin(
+        &mut self,
+        insertions: &[Self::Row],
+        uf: &mut Self::Unification,
+        latest_timestamp: TimeStamp,
+    );
+    fn update(
+        &mut self,
+        insertions: &mut Vec<Self::Row>,
+        uf: &mut Self::Unification,
+        latest_timestamp: TimeStamp,
+    ) -> bool;
+    fn update_finalize(
+        &mut self,
+        insertions: &mut Vec<Self::Row>,
+        uf: &mut Self::Unification,
+        latest_timestamp: TimeStamp,
+    );
 
     fn is_empty(&self) -> bool {
         self.len() == 0
@@ -65,6 +80,7 @@ pub trait Relation {
 }
 
 relation_element_wrapper_ty!(IString);
+relation_element_wrapper_ty!(TimeStamp);
 
 /// Only to be used for initial inserts, so performance does not really matter.
 #[derive(Clone, Eq, PartialEq, Ord, PartialOrd, Hash, Debug, Default)]

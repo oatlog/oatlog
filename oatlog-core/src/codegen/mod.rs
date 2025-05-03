@@ -148,6 +148,7 @@ pub fn codegen(theory: &Theory) -> TokenStream {
         quote! {
             #[inline(never)]
             pub fn canonicalize(&mut self) {
+                self.latest_timestamp.0 += 1;
                 log_duration!("canonicalize (total): {}", {
                     #(self.#relation_ident.clear_new();)*
                     if !self.delta.has_new_inserts() && self.uf.num_uprooted() == 0 {
@@ -155,13 +156,13 @@ pub fn codegen(theory: &Theory) -> TokenStream {
                     }
 
                     log_duration!("update_begin (total): {}", {
-                        #(self.#relation_ident.update_begin(&mut self.delta.#delta_row, &mut self.uf);)*
+                        #(self.#relation_ident.update_begin(&mut self.delta.#delta_row, &mut self.uf, self.latest_timestamp);)*
                     });
 
                     log_duration!("update_loop (total): {}", {
                         loop {
                             let mut progress = false;
-                            #(progress |= self.#relation_ident.update(&mut self.delta.#delta_row, &mut self.uf);)*
+                            #(progress |= self.#relation_ident.update(&mut self.delta.#delta_row, &mut self.uf, self.latest_timestamp);)*
                             if !progress {
                                 break;
                             }
@@ -170,7 +171,7 @@ pub fn codegen(theory: &Theory) -> TokenStream {
                     });
 
                     log_duration!("update_finalize (total): {}", {
-                        #(self.#relation_ident.update_finalize(&mut self.delta.#delta_row, &mut self.uf);)*
+                        #(self.#relation_ident.update_finalize(&mut self.delta.#delta_row, &mut self.uf, self.latest_timestamp);)*
 
                         #(
                             self.#global_type_symbolic.update(&mut self.uf.#global_type_symbolic_uf);
@@ -224,6 +225,7 @@ pub fn codegen(theory: &Theory) -> TokenStream {
 
         #[derive(Debug, Default)]
         pub struct #theory_ty {
+            pub latest_timestamp: TimeStamp,
             pub delta: #theory_delta_ty,
             pub uf: Unification,
             #(#global_variable_fields)*
@@ -662,7 +664,17 @@ mod ident {
             .map(|ColumnId(x)| format!("{x}"))
             .join("_");
         let prefix = format!("{}", usage.prefix);
-        format_ident!("iter{prefix}_{index_perm}")
+        format_ident!("iter_all{prefix}_{index_perm}")
+    }
+    /// `iter_old2_2_0_1`
+    pub fn index_old_iter(usage: &IndexUsageInfo, index: &IndexInfo) -> Ident {
+        let index_perm = index
+            .permuted_columns
+            .iter()
+            .map(|ColumnId(x)| format!("{x}"))
+            .join("_");
+        let prefix = format!("{}", usage.prefix);
+        format_ident!("iter_old{prefix}_{index_perm}")
     }
     /// `check2_2_0_1`
     pub fn index_all_check(usage: &IndexUsageInfo, index: &IndexInfo) -> Ident {
@@ -687,6 +699,10 @@ mod ident {
     /// `x2`
     pub fn column(c: ColumnId) -> Ident {
         format_ident!("x{}", c.0)
+    }
+    /// `x2_old`
+    pub fn column_old(c: ColumnId) -> Ident {
+        format_ident!("x{}_old", c.0)
     }
     /// `y2`
     pub fn column_alt(c: ColumnId) -> Ident {

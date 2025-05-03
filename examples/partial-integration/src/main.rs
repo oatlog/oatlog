@@ -82,7 +82,7 @@ fn test() {
 
         total e-nodes: 28303
 
-        Math: tot=29055 roots=12445
+        Math: tot=19319 roots=12445
     "#])
     .assert_eq(&sink);
 }

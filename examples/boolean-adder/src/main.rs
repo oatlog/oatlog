@@ -54,7 +54,7 @@ fn test() {
     let mut sink = Vec::new();
     run(&mut sink, 10);
     let sink = String::from_utf8(sink).unwrap();
-    expect_test::expect!([r"
+    expect_test::expect!([r#"
         running with iters=10
         i=0 size=106
         i=1 size=241
@@ -81,7 +81,7 @@ fn test() {
 
         total e-nodes: 77091
 
-        Math: tot=121458 roots=25899
-    "])
+        Math: tot=73462 roots=25899
+    "#])
     .assert_eq(&sink);
 }

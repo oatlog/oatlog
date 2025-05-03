@@ -516,6 +516,7 @@ pub(crate) fn lowering_rec(
                          relation,
                          columns,
                          entry,
+                         incl: _,
                      }| {
                         let args = columns.inner().clone().leak();
                         if first {
@@ -635,36 +636,47 @@ pub(crate) fn lowering_rec(
                     }
 
                     trie = {
-                        let atom = match &relations[atom.relation].kind {
-                            hir::RelationTy::Alias {} => panic!("primary join on alias"),
-                            hir::RelationTy::Forall { .. } => panic!("primary join on forall"),
-                            hir::RelationTy::Primitive { .. } => {
-                                todo!("primary join on primitive")
-                            }
-                            hir::RelationTy::NewOf { id } => lir::RuleAtom::PremiseNew {
-                                relation: *id,
-                                args,
-                            },
-                            hir::RelationTy::Table => lir::RuleAtom::Premise {
+                        let lir_inclusion = match atom.incl {
+                            hir::Inclusion::New => None,
+                            hir::Inclusion::Old => Some(lir::Inclusion::Old),
+                            hir::Inclusion::All => Some(lir::Inclusion::All),
+                        };
+                        let atom = match lir_inclusion {
+                            None => lir::RuleAtom::PremiseNew {
                                 relation: atom.relation,
                                 args,
-                                index: make_index_use(),
                             },
-                            hir::RelationTy::Global { .. } => {
-                                if bound_premise.contains(&args[0]) {
-                                    lir::RuleAtom::PremiseAny {
-                                        relation: atom.relation,
-                                        args,
-                                        index: IndexUsageId::bogus(),
-                                    }
-                                } else {
-                                    lir::RuleAtom::Premise {
-                                        relation: atom.relation,
-                                        args,
-                                        index: IndexUsageId::bogus(),
+                            Some(lir_inclusion) => match &relations[atom.relation].kind {
+                                hir::RelationTy::Alias {} => panic!("primary join on alias"),
+                                hir::RelationTy::Forall { .. } => {
+                                    panic!("primary join on forall")
+                                }
+                                hir::RelationTy::Primitive { .. } => {
+                                    todo!("primary join on primitive")
+                                }
+                                hir::RelationTy::Table => lir::RuleAtom::Premise {
+                                    relation: atom.relation,
+                                    args,
+                                    index: make_index_use(),
+                                    inclusion: lir_inclusion,
+                                },
+                                hir::RelationTy::Global { .. } => {
+                                    if bound_premise.contains(&args[0]) {
+                                        lir::RuleAtom::PremiseAny {
+                                            relation: atom.relation,
+                                            args,
+                                            index: IndexUsageId::bogus(),
+                                        }
+                                    } else {
+                                        lir::RuleAtom::Premise {
+                                            relation: atom.relation,
+                                            args,
+                                            index: IndexUsageId::bogus(),
+                                            inclusion: lir_inclusion,
+                                        }
                                     }
                                 }
-                            }
+                            },
                         };
 
                         vec![lir::RuleTrie {
@@ -689,8 +701,12 @@ pub(crate) fn lowering_rec(
                                 .collect(),
                         )
                     };
+                    assert_ne!(
+                        hir::Inclusion::New,
+                        atom.incl,
+                        "semi-join on new not supported, (yet?)"
+                    );
                     let atom = match &relations[atom.relation].kind {
-                        hir::RelationTy::NewOf { .. } => panic!("semi-join new"),
                         hir::RelationTy::Primitive { .. } => panic!("semi-join primitive"),
                         hir::RelationTy::Forall { .. } => panic!("semi-join forall"),
                         hir::RelationTy::Alias {} => panic!("semi-join alias"),
@@ -869,6 +885,7 @@ impl Rule {
 
         // NOTE: mapping should be a SparseUf actually
 
+        // which of MY atoms is supported right now?
         let supported = self
             .make_votes(ctx)
             .into_iter()
@@ -883,7 +900,8 @@ impl Rule {
                     .into_iter()
                     .map(move |atom| (salt.clone(), Semi(atom)))
                     .collect::<Vec<_>>(),
-            });
+            })
+            .collect_vec();
 
         match link {
             Primary(other) => {
@@ -897,7 +915,11 @@ impl Rule {
                     .flat_map(|x| x.equivalent_atoms(ctx.relations))
                 {
                     let this = &this;
-                    if !supported.contains(this) || this.relation != other.relation {
+                    // TODO erik: relax incl requirement.
+                    if !supported.contains(this)
+                        || this.relation != other.relation
+                        || this.incl != other.incl
+                    {
                         continue;
                     }
 
@@ -990,7 +1012,7 @@ impl Rule {
                                 return !matching;
                             }
 
-                            if this.relation != other.relation {
+                            if this.relation != other.relation && this.incl == other.incl {
                                 matching = false;
                                 return !matching;
                             }
@@ -1074,11 +1096,14 @@ impl Rule {
 
                         let mut score = NoQuery;
 
-                        let relation = &ctx.relations[atom.relation];
-                        match &relation.kind {
-                            hir::RelationTy::NewOf { id: _ } => {
+                        match atom.incl {
+                            hir::Inclusion::New => {
                                 score = score.max(New);
                             }
+                            hir::Inclusion::Old | hir::Inclusion::All => (),
+                        }
+                        let relation = &ctx.relations[atom.relation];
+                        match &relation.kind {
                             hir::RelationTy::Table => {
                                 score = score.max(Indexed);
                             }

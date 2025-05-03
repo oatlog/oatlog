@@ -62,10 +62,11 @@ impl<T: Eclass> UnionFind<T> {
     }
     /// Sugar
     #[inline]
-    pub fn union_mut(&mut self, a: &mut T, b: &mut T) {
+    pub fn union_mut(&mut self, a: &mut T, b: &mut T) -> T {
         let ret = self.union(*a, *b);
         *a = ret;
         *b = ret;
+        ret
     }
     /// Sugar
     #[inline]

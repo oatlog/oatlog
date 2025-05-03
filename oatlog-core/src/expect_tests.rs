@@ -601,7 +601,7 @@ fn hir_global() {
                     ],
                     atom: [PremiseNew, r3(v6)]
                     then: [
-                        atom: [Premise, r1(v6, v7), iu1]
+                        atom: [PremiseOld, r1(v6, v7), iu1]
                         then: [
                             meta: "( rewrite ( Const one ) ( Add ( Var \"a\" ) ( Var \"b\" ) ) )"
                             atom: [Action::Insert, r4(v8) on iu0],
@@ -785,7 +785,7 @@ fn regression_tir2() {
                 rule_tries: [
                     atom: [PremiseNew, r1(v0, v2, v3)]
                     then: [
-                        atom: [Premise, r2(v1, v2), iu1]
+                        atom: [PremiseAll, r2(v1, v2), iu1]
                         then: [
                             atom: [PremiseAny, r3(v1), iu_bogus]
                             then: [
@@ -800,7 +800,7 @@ fn regression_tir2() {
                         then: [
                             atom: [PremiseAny, r3(v5), iu_bogus]
                             then: [
-                                atom: [Premise, r1(v4, v6, v7), iu2]
+                                atom: [PremiseOld, r1(v4, v6, v7), iu2]
                                 then: [
                                     meta: "( rewrite ( Pow x ( Const 2 ) ) ( Mul x x ) )"
                                     atom: [Action::Insert, r0(v4, v4, v7)],
@@ -810,9 +810,9 @@ fn regression_tir2() {
                     ],
                     atom: [PremiseNew, r3(v9)]
                     then: [
-                        atom: [Premise, r2(v9, v10), iu2]
+                        atom: [PremiseOld, r2(v9, v10), iu2]
                         then: [
-                            atom: [Premise, r1(v8, v10, v11), iu3]
+                            atom: [PremiseOld, r1(v8, v10, v11), iu3]
                             then: [
                                 meta: "( rewrite ( Pow x ( Const 2 ) ) ( Mul x x ) )"
                                 atom: [Action::Insert, r0(v8, v8, v11)],
@@ -853,8 +853,8 @@ fn regression_tir2() {
             #[derive(Debug, Default)]
             struct MulRelation {
                 new: Vec<<Self as Relation>::Row>,
-                hash_index_0_1: runtime::HashMap<(Math, Math), (Math,)>,
-                hash_index_0_1_2: runtime::HashMap<(Math, Math, Math), runtime::SmallVec<[(); 1]>>,
+                hash_index_0_1: runtime::HashMap<(Math, Math), (Math, TimeStamp)>,
+                hash_index_0_1_2: runtime::HashMap<(Math, Math, Math), runtime::SmallVec<[(TimeStamp,); 1]>>,
                 math_num_uprooted_at_latest_retain: usize,
             }
             impl Relation for MulRelation {
@@ -878,14 +878,19 @@ fn regression_tir2() {
                 }
                 fn emit_graphviz(&self, buf: &mut String) {
                     use std::fmt::Write;
-                    for (i, ((x0, x1), (x2,))) in self.hash_index_0_1.iter().enumerate() {
+                    for (i, ((x0, x1), (x2, _timestamp))) in self.hash_index_0_1.iter().enumerate() {
                         writeln!(buf, "{}_{i} -> {}_{};", "mul", "math", x0).unwrap();
                         writeln!(buf, "{}_{i} -> {}_{};", "mul", "math", x1).unwrap();
                         writeln!(buf, "{}_{i} -> {}_{};", "mul", "math", x2).unwrap();
                         writeln!(buf, "{}_{i} [shape = box];", "mul").unwrap();
                     }
                 }
-                fn update_begin(&mut self, insertions: &[Self::Row], uf: &mut Unification) {
+                fn update_begin(
+                    &mut self,
+                    insertions: &[Self::Row],
+                    uf: &mut Unification,
+                    latest_timestamp: TimeStamp,
+                ) {
                     log_duration!("update_begin {}: {}", "mul", {
                         for &(mut x0, mut x1, mut x2) in insertions {
                             match self
@@ -893,43 +898,59 @@ fn regression_tir2() {
                                 .entry((uf.math_.find(x0), uf.math_.find(x1)))
                             {
                                 runtime::HashMapEntry::Occupied(mut entry) => {
-                                    let (y2,) = entry.get_mut();
-                                    uf.math_.union_mut(&mut x2, y2);
+                                    let (y2, timestamp) = entry.get_mut();
+                                    let changed = false;
+                                    let old_val = *y2;
+                                    let changed = changed | (old_val != uf.math_.union_mut(&mut x2, y2));
+                                    if changed {
+                                        *timestamp = latest_timestamp;
+                                    }
                                 }
                                 runtime::HashMapEntry::Vacant(entry) => {
-                                    entry.insert((uf.math_.find(x2),));
+                                    entry.insert((uf.math_.find(x2), latest_timestamp));
                                 }
                             }
                         }
                     });
                 }
-                fn update(&mut self, insertions: &mut Vec<Self::Row>, uf: &mut Unification) -> bool {
+                fn update(
+                    &mut self,
+                    insertions: &mut Vec<Self::Row>,
+                    uf: &mut Unification,
+                    latest_timestamp: TimeStamp,
+                ) -> bool {
                     if self.math_num_uprooted_at_latest_retain == uf.math_.num_uprooted() {
                         return false;
                     }
                     let offset = insertions.len();
                     log_duration!("update {}: {}", "mul", {
                         self.math_num_uprooted_at_latest_retain = uf.math_.num_uprooted();
-                        self.hash_index_0_1.retain(|&(x0, x1), &mut (x2,)| {
-                            if uf.math_.is_root(x0) & uf.math_.is_root(x1) & uf.math_.is_root(x2) {
-                                true
-                            } else {
-                                insertions.push((x0, x1, x2));
-                                false
-                            }
-                        });
+                        self.hash_index_0_1
+                            .retain(|&(x0, x1), &mut (x2, _timestamp)| {
+                                if uf.math_.is_root(x0) & uf.math_.is_root(x1) & uf.math_.is_root(x2) {
+                                    true
+                                } else {
+                                    insertions.push((x0, x1, x2));
+                                    false
+                                }
+                            });
                     });
-                    self.update_begin(&insertions[offset..], uf);
+                    self.update_begin(&insertions[offset..], uf, latest_timestamp);
                     true
                 }
-                fn update_finalize(&mut self, insertions: &mut Vec<Self::Row>, uf: &mut Unification) {
+                fn update_finalize(
+                    &mut self,
+                    insertions: &mut Vec<Self::Row>,
+                    uf: &mut Unification,
+                    latest_timestamp: TimeStamp,
+                ) {
                     log_duration!("update_finalize {}: {}", "mul", {
                         assert!(self.new.is_empty());
                         log_duration!("fill new: {}", {
                             self.new.extend(
                                 self.hash_index_0_1
                                     .iter()
-                                    .map(|(&(x0, x1), &(x2,))| (x0, x1, x2))
+                                    .map(|(&(x0, x1), &(x2, _timestamp))| (x0, x1, x2))
                                     .filter(|&(x0, x1, x2)| !self.hash_index_0_1_2.contains_key(&(x0, x1, x2))),
                             );
                             insertions.clear();
@@ -941,15 +962,15 @@ fn regression_tir2() {
                                 self.hash_index_0_1_2
                                     .entry((x0, x1, x2))
                                     .or_default()
-                                    .push(());
+                                    .push((latest_timestamp,));
                             }
                         });
                         log_duration!("retain index: {}", {
                             self.hash_index_0_1_2.retain(|&(x0, x1, x2), v| {
                                 if uf.math_.is_root(x0) & uf.math_.is_root(x1) & uf.math_.is_root(x2) {
-                                    v.retain(|&mut ()| true);
+                                    v.retain(|&mut (_timestamp)| true);
                                     v.sort_unstable();
-                                    v.dedup();
+                                    v.dedup_by(|(t1,), (t2,)| true);
                                     true
                                 } else {
                                     false
@@ -961,25 +982,56 @@ fn regression_tir2() {
                 }
             }
             impl MulRelation {
-                fn iter2_0_1_2(&self, x0: Math, x1: Math) -> impl Iterator<Item = (Math,)> + use<'_> {
-                    self.hash_index_0_1.get(&(x0, x1)).into_iter().copied()
+                fn iter_all2_0_1_2(&self, x0: Math, x1: Math) -> impl Iterator<Item = (Math,)> + use<'_> {
+                    self.hash_index_0_1
+                        .get(&(x0, x1))
+                        .into_iter()
+                        .copied()
+                        .map(|(x2, _timestamp)| (x2,))
                 }
-                fn iter3_0_1_2(&self, x0: Math, x1: Math, x2: Math) -> impl Iterator<Item = ()> + use<'_> {
+                fn iter_all3_0_1_2(&self, x0: Math, x1: Math, x2: Math) -> impl Iterator<Item = ()> + use<'_> {
                     self.hash_index_0_1_2
                         .get(&(x0, x1, x2))
                         .into_iter()
                         .flatten()
                         .copied()
+                        .map(|(_timestamp)| ())
+                }
+                fn iter_old2_0_1_2(
+                    &self,
+                    x0: Math,
+                    x1: Math,
+                    latest_timestamp: TimeStamp,
+                ) -> impl Iterator<Item = (Math,)> + use<'_> {
+                    self.hash_index_0_1
+                        .get(&(x0, x1))
+                        .into_iter()
+                        .copied()
+                        .filter_map(move |(x2, timestamp)| (timestamp < latest_timestamp).then_some((x2,)))
+                }
+                fn iter_old3_0_1_2(
+                    &self,
+                    x0: Math,
+                    x1: Math,
+                    x2: Math,
+                    latest_timestamp: TimeStamp,
+                ) -> impl Iterator<Item = ()> + use<'_> {
+                    self.hash_index_0_1_2
+                        .get(&(x0, x1, x2))
+                        .into_iter()
+                        .flatten()
+                        .copied()
+                        .filter_map(move |(timestamp,)| (timestamp < latest_timestamp).then_some(()))
                 }
                 fn check2_0_1_2(&self, x0: Math, x1: Math) -> bool {
-                    self.iter2_0_1_2(x0, x1).next().is_some()
+                    self.iter_all2_0_1_2(x0, x1).next().is_some()
                 }
                 fn check3_0_1_2(&self, x0: Math, x1: Math, x2: Math) -> bool {
-                    self.iter3_0_1_2(x0, x1, x2).next().is_some()
+                    self.iter_all3_0_1_2(x0, x1, x2).next().is_some()
                 }
                 #[allow(unreachable_code)]
                 fn entry2_0_1_2(&self, x0: Math, x1: Math, delta: &mut Delta, uf: &mut Unification) -> (Math,) {
-                    if let Some((x2,)) = self.iter2_0_1_2(x0, x1).next() {
+                    if let Some((x2,)) = self.iter_all2_0_1_2(x0, x1).next() {
                         return (x2,);
                     }
                     let x2 = uf.math_.add_eclass();
@@ -995,7 +1047,7 @@ fn regression_tir2() {
                     delta: &mut Delta,
                     uf: &mut Unification,
                 ) -> () {
-                    if let Some(()) = self.iter3_0_1_2(x0, x1, x2).next() {
+                    if let Some(()) = self.iter_all3_0_1_2(x0, x1, x2).next() {
                         return ();
                     }
                     delta.mul_.push((x0, x1, x2));
@@ -1005,9 +1057,9 @@ fn regression_tir2() {
             #[derive(Debug, Default)]
             struct PowRelation {
                 new: Vec<<Self as Relation>::Row>,
-                hash_index_1_0: runtime::HashMap<(Math, Math), (Math,)>,
-                hash_index_1: runtime::HashMap<(Math,), runtime::SmallVec<[(Math, Math); 1]>>,
-                hash_index_1_0_2: runtime::HashMap<(Math, Math, Math), runtime::SmallVec<[(); 1]>>,
+                hash_index_1_0: runtime::HashMap<(Math, Math), (Math, TimeStamp)>,
+                hash_index_1: runtime::HashMap<(Math,), runtime::SmallVec<[(Math, Math, TimeStamp); 1]>>,
+                hash_index_1_0_2: runtime::HashMap<(Math, Math, Math), runtime::SmallVec<[(TimeStamp,); 1]>>,
                 math_num_uprooted_at_latest_retain: usize,
             }
             impl Relation for PowRelation {
@@ -1031,14 +1083,19 @@ fn regression_tir2() {
                 }
                 fn emit_graphviz(&self, buf: &mut String) {
                     use std::fmt::Write;
-                    for (i, ((x1, x0), (x2,))) in self.hash_index_1_0.iter().enumerate() {
+                    for (i, ((x1, x0), (x2, _timestamp))) in self.hash_index_1_0.iter().enumerate() {
                         writeln!(buf, "{}_{i} -> {}_{};", "pow", "math", x1).unwrap();
                         writeln!(buf, "{}_{i} -> {}_{};", "pow", "math", x0).unwrap();
                         writeln!(buf, "{}_{i} -> {}_{};", "pow", "math", x2).unwrap();
                         writeln!(buf, "{}_{i} [shape = box];", "pow").unwrap();
                     }
                 }
-                fn update_begin(&mut self, insertions: &[Self::Row], uf: &mut Unification) {
+                fn update_begin(
+                    &mut self,
+                    insertions: &[Self::Row],
+                    uf: &mut Unification,
+                    latest_timestamp: TimeStamp,
+                ) {
                     log_duration!("update_begin {}: {}", "pow", {
                         for &(mut x0, mut x1, mut x2) in insertions {
                             match self
@@ -1046,43 +1103,59 @@ fn regression_tir2() {
                                 .entry((uf.math_.find(x1), uf.math_.find(x0)))
                             {
                                 runtime::HashMapEntry::Occupied(mut entry) => {
-                                    let (y2,) = entry.get_mut();
-                                    uf.math_.union_mut(&mut x2, y2);
+                                    let (y2, timestamp) = entry.get_mut();
+                                    let changed = false;
+                                    let old_val = *y2;
+                                    let changed = changed | (old_val != uf.math_.union_mut(&mut x2, y2));
+                                    if changed {
+                                        *timestamp = latest_timestamp;
+                                    }
                                 }
                                 runtime::HashMapEntry::Vacant(entry) => {
-                                    entry.insert((uf.math_.find(x2),));
+                                    entry.insert((uf.math_.find(x2), latest_timestamp));
                                 }
                             }
                         }
                     });
                 }
-                fn update(&mut self, insertions: &mut Vec<Self::Row>, uf: &mut Unification) -> bool {
+                fn update(
+                    &mut self,
+                    insertions: &mut Vec<Self::Row>,
+                    uf: &mut Unification,
+                    latest_timestamp: TimeStamp,
+                ) -> bool {
                     if self.math_num_uprooted_at_latest_retain == uf.math_.num_uprooted() {
                         return false;
                     }
                     let offset = insertions.len();
                     log_duration!("update {}: {}", "pow", {
                         self.math_num_uprooted_at_latest_retain = uf.math_.num_uprooted();
-                        self.hash_index_1_0.retain(|&(x1, x0), &mut (x2,)| {
-                            if uf.math_.is_root(x0) & uf.math_.is_root(x1) & uf.math_.is_root(x2) {
-                                true
-                            } else {
-                                insertions.push((x0, x1, x2));
-                                false
-                            }
-                        });
+                        self.hash_index_1_0
+                            .retain(|&(x1, x0), &mut (x2, _timestamp)| {
+                                if uf.math_.is_root(x0) & uf.math_.is_root(x1) & uf.math_.is_root(x2) {
+                                    true
+                                } else {
+                                    insertions.push((x0, x1, x2));
+                                    false
+                                }
+                            });
                     });
-                    self.update_begin(&insertions[offset..], uf);
+                    self.update_begin(&insertions[offset..], uf, latest_timestamp);
                     true
                 }
-                fn update_finalize(&mut self, insertions: &mut Vec<Self::Row>, uf: &mut Unification) {
+                fn update_finalize(
+                    &mut self,
+                    insertions: &mut Vec<Self::Row>,
+                    uf: &mut Unification,
+                    latest_timestamp: TimeStamp,
+                ) {
                     log_duration!("update_finalize {}: {}", "pow", {
                         assert!(self.new.is_empty());
                         log_duration!("fill new: {}", {
                             self.new.extend(
                                 self.hash_index_1_0
                                     .iter()
-                                    .map(|(&(x1, x0), &(x2,))| (x0, x1, x2))
+                                    .map(|(&(x1, x0), &(x2, _timestamp))| (x0, x1, x2))
                                     .filter(|&(x0, x1, x2)| !self.hash_index_1_0_2.contains_key(&(x1, x0, x2))),
                             );
                             insertions.clear();
@@ -1091,15 +1164,20 @@ fn regression_tir2() {
                         });
                         log_duration!("fill index: {}", {
                             for &(x0, x1, x2) in &self.new {
-                                self.hash_index_1.entry((x1,)).or_default().push((x0, x2));
+                                self.hash_index_1
+                                    .entry((x1,))
+                                    .or_default()
+                                    .push((x0, x2, latest_timestamp));
                             }
                         });
                         log_duration!("retain index: {}", {
                             self.hash_index_1.retain(|&(x1,), v| {
                                 if uf.math_.is_root(x1) {
-                                    v.retain(|&mut (x0, x2)| uf.math_.is_root(x0) & uf.math_.is_root(x2));
+                                    v.retain(|&mut (x0, x2, _timestamp)| {
+                                        uf.math_.is_root(x0) & uf.math_.is_root(x2)
+                                    });
                                     v.sort_unstable();
-                                    v.dedup();
+                                    v.dedup_by(|(x0, x2, t1), (y0, y2, t2)| true & (*x0 == *y0) & (*x2 == *y2));
                                     true
                                 } else {
                                     false
@@ -1111,15 +1189,15 @@ fn regression_tir2() {
                                 self.hash_index_1_0_2
                                     .entry((x1, x0, x2))
                                     .or_default()
-                                    .push(());
+                                    .push((latest_timestamp,));
                             }
                         });
                         log_duration!("retain index: {}", {
                             self.hash_index_1_0_2.retain(|&(x1, x0, x2), v| {
                                 if uf.math_.is_root(x1) & uf.math_.is_root(x0) & uf.math_.is_root(x2) {
-                                    v.retain(|&mut ()| true);
+                                    v.retain(|&mut (_timestamp)| true);
                                     v.sort_unstable();
-                                    v.dedup();
+                                    v.dedup_by(|(t1,), (t2,)| true);
                                     true
                                 } else {
                                     false
@@ -1131,31 +1209,81 @@ fn regression_tir2() {
                 }
             }
             impl PowRelation {
-                fn iter2_1_0_2(&self, x1: Math, x0: Math) -> impl Iterator<Item = (Math,)> + use<'_> {
-                    self.hash_index_1_0.get(&(x1, x0)).into_iter().copied()
+                fn iter_all2_1_0_2(&self, x1: Math, x0: Math) -> impl Iterator<Item = (Math,)> + use<'_> {
+                    self.hash_index_1_0
+                        .get(&(x1, x0))
+                        .into_iter()
+                        .copied()
+                        .map(|(x2, _timestamp)| (x2,))
                 }
-                fn iter1_1_0_2(&self, x1: Math) -> impl Iterator<Item = (Math, Math)> + use<'_> {
-                    self.hash_index_1.get(&(x1,)).into_iter().flatten().copied()
+                fn iter_all1_1_0_2(&self, x1: Math) -> impl Iterator<Item = (Math, Math)> + use<'_> {
+                    self.hash_index_1
+                        .get(&(x1,))
+                        .into_iter()
+                        .flatten()
+                        .copied()
+                        .map(|(x0, x2, _timestamp)| (x0, x2))
                 }
-                fn iter3_1_0_2(&self, x1: Math, x0: Math, x2: Math) -> impl Iterator<Item = ()> + use<'_> {
+                fn iter_all3_1_0_2(&self, x1: Math, x0: Math, x2: Math) -> impl Iterator<Item = ()> + use<'_> {
                     self.hash_index_1_0_2
                         .get(&(x1, x0, x2))
                         .into_iter()
                         .flatten()
                         .copied()
+                        .map(|(_timestamp)| ())
+                }
+                fn iter_old2_1_0_2(
+                    &self,
+                    x1: Math,
+                    x0: Math,
+                    latest_timestamp: TimeStamp,
+                ) -> impl Iterator<Item = (Math,)> + use<'_> {
+                    self.hash_index_1_0
+                        .get(&(x1, x0))
+                        .into_iter()
+                        .copied()
+                        .filter_map(move |(x2, timestamp)| (timestamp < latest_timestamp).then_some((x2,)))
+                }
+                fn iter_old1_1_0_2(
+                    &self,
+                    x1: Math,
+                    latest_timestamp: TimeStamp,
+                ) -> impl Iterator<Item = (Math, Math)> + use<'_> {
+                    self.hash_index_1
+                        .get(&(x1,))
+                        .into_iter()
+                        .flatten()
+                        .copied()
+                        .filter_map(move |(x0, x2, timestamp)| {
+                            (timestamp < latest_timestamp).then_some((x0, x2))
+                        })
+                }
+                fn iter_old3_1_0_2(
+                    &self,
+                    x1: Math,
+                    x0: Math,
+                    x2: Math,
+                    latest_timestamp: TimeStamp,
+                ) -> impl Iterator<Item = ()> + use<'_> {
+                    self.hash_index_1_0_2
+                        .get(&(x1, x0, x2))
+                        .into_iter()
+                        .flatten()
+                        .copied()
+                        .filter_map(move |(timestamp,)| (timestamp < latest_timestamp).then_some(()))
                 }
                 fn check2_1_0_2(&self, x1: Math, x0: Math) -> bool {
-                    self.iter2_1_0_2(x1, x0).next().is_some()
+                    self.iter_all2_1_0_2(x1, x0).next().is_some()
                 }
                 fn check1_1_0_2(&self, x1: Math) -> bool {
-                    self.iter1_1_0_2(x1).next().is_some()
+                    self.iter_all1_1_0_2(x1).next().is_some()
                 }
                 fn check3_1_0_2(&self, x1: Math, x0: Math, x2: Math) -> bool {
-                    self.iter3_1_0_2(x1, x0, x2).next().is_some()
+                    self.iter_all3_1_0_2(x1, x0, x2).next().is_some()
                 }
                 #[allow(unreachable_code)]
                 fn entry2_1_0_2(&self, x1: Math, x0: Math, delta: &mut Delta, uf: &mut Unification) -> (Math,) {
-                    if let Some((x2,)) = self.iter2_1_0_2(x1, x0).next() {
+                    if let Some((x2,)) = self.iter_all2_1_0_2(x1, x0).next() {
                         return (x2,);
                     }
                     let x2 = uf.math_.add_eclass();
@@ -1171,7 +1299,7 @@ fn regression_tir2() {
                     delta: &mut Delta,
                     uf: &mut Unification,
                 ) -> () {
-                    if let Some(()) = self.iter3_1_0_2(x1, x0, x2).next() {
+                    if let Some(()) = self.iter_all3_1_0_2(x1, x0, x2).next() {
                         return ();
                     }
                     delta.pow_.push((x0, x1, x2));
@@ -1181,9 +1309,11 @@ fn regression_tir2() {
             #[derive(Debug, Default)]
             struct ConstRelation {
                 new: Vec<<Self as Relation>::Row>,
-                hash_index_0: runtime::HashMap<(std::primitive::i64,), (Math,)>,
-                hash_index_1: runtime::HashMap<(Math,), runtime::SmallVec<[(std::primitive::i64,); 1]>>,
-                hash_index_0_1: runtime::HashMap<(std::primitive::i64, Math), runtime::SmallVec<[(); 1]>>,
+                hash_index_0: runtime::HashMap<(std::primitive::i64,), (Math, TimeStamp)>,
+                hash_index_1:
+                    runtime::HashMap<(Math,), runtime::SmallVec<[(std::primitive::i64, TimeStamp); 1]>>,
+                hash_index_0_1:
+                    runtime::HashMap<(std::primitive::i64, Math), runtime::SmallVec<[(TimeStamp,); 1]>>,
                 i64_num_uprooted_at_latest_retain: usize,
                 math_num_uprooted_at_latest_retain: usize,
             }
@@ -1208,35 +1338,50 @@ fn regression_tir2() {
                 }
                 fn emit_graphviz(&self, buf: &mut String) {
                     use std::fmt::Write;
-                    for (i, ((x0,), (x1,))) in self.hash_index_0.iter().enumerate() {
+                    for (i, ((x0,), (x1, _timestamp))) in self.hash_index_0.iter().enumerate() {
                         writeln!(buf, "{}_{i} -> {}_{};", "const", "i64", x0).unwrap();
                         writeln!(buf, "{}_{i} -> {}_{};", "const", "math", x1).unwrap();
                         writeln!(buf, "{}_{i} [shape = box];", "const").unwrap();
                     }
                 }
-                fn update_begin(&mut self, insertions: &[Self::Row], uf: &mut Unification) {
+                fn update_begin(
+                    &mut self,
+                    insertions: &[Self::Row],
+                    uf: &mut Unification,
+                    latest_timestamp: TimeStamp,
+                ) {
                     log_duration!("update_begin {}: {}", "const", {
                         for &(mut x0, mut x1) in insertions {
                             match self.hash_index_0.entry((x0,)) {
                                 runtime::HashMapEntry::Occupied(mut entry) => {
-                                    let (y1,) = entry.get_mut();
-                                    uf.math_.union_mut(&mut x1, y1);
+                                    let (y1, timestamp) = entry.get_mut();
+                                    let changed = false;
+                                    let old_val = *y1;
+                                    let changed = changed | (old_val != uf.math_.union_mut(&mut x1, y1));
+                                    if changed {
+                                        *timestamp = latest_timestamp;
+                                    }
                                 }
                                 runtime::HashMapEntry::Vacant(entry) => {
-                                    entry.insert((uf.math_.find(x1),));
+                                    entry.insert((uf.math_.find(x1), latest_timestamp));
                                 }
                             }
                         }
                     });
                 }
-                fn update(&mut self, insertions: &mut Vec<Self::Row>, uf: &mut Unification) -> bool {
+                fn update(
+                    &mut self,
+                    insertions: &mut Vec<Self::Row>,
+                    uf: &mut Unification,
+                    latest_timestamp: TimeStamp,
+                ) -> bool {
                     if self.math_num_uprooted_at_latest_retain == uf.math_.num_uprooted() {
                         return false;
                     }
                     let offset = insertions.len();
                     log_duration!("update {}: {}", "const", {
                         self.math_num_uprooted_at_latest_retain = uf.math_.num_uprooted();
-                        self.hash_index_0.retain(|&(x0,), &mut (x1,)| {
+                        self.hash_index_0.retain(|&(x0,), &mut (x1, _timestamp)| {
                             if uf.math_.is_root(x1) {
                                 true
                             } else {
@@ -1245,17 +1390,22 @@ fn regression_tir2() {
                             }
                         });
                     });
-                    self.update_begin(&insertions[offset..], uf);
+                    self.update_begin(&insertions[offset..], uf, latest_timestamp);
                     true
                 }
-                fn update_finalize(&mut self, insertions: &mut Vec<Self::Row>, uf: &mut Unification) {
+                fn update_finalize(
+                    &mut self,
+                    insertions: &mut Vec<Self::Row>,
+                    uf: &mut Unification,
+                    latest_timestamp: TimeStamp,
+                ) {
                     log_duration!("update_finalize {}: {}", "const", {
                         assert!(self.new.is_empty());
                         log_duration!("fill new: {}", {
                             self.new.extend(
                                 self.hash_index_0
                                     .iter()
-                                    .map(|(&(x0,), &(x1,))| (x0, x1))
+                                    .map(|(&(x0,), &(x1, _timestamp))| (x0, x1))
                                     .filter(|&(x0, x1)| !self.hash_index_0_1.contains_key(&(x0, x1))),
                             );
                             insertions.clear();
@@ -1264,15 +1414,18 @@ fn regression_tir2() {
                         });
                         log_duration!("fill index: {}", {
                             for &(x0, x1) in &self.new {
-                                self.hash_index_1.entry((x1,)).or_default().push((x0,));
+                                self.hash_index_1
+                                    .entry((x1,))
+                                    .or_default()
+                                    .push((x0, latest_timestamp));
                             }
                         });
                         log_duration!("retain index: {}", {
                             self.hash_index_1.retain(|&(x1,), v| {
                                 if uf.math_.is_root(x1) {
-                                    v.retain(|&mut (x0,)| true);
+                                    v.retain(|&mut (x0, _timestamp)| true);
                                     v.sort_unstable();
-                                    v.dedup();
+                                    v.dedup_by(|(x0, t1), (y0, t2)| true & (*x0 == *y0));
                                     true
                                 } else {
                                     false
@@ -1281,15 +1434,18 @@ fn regression_tir2() {
                         });
                         log_duration!("fill index: {}", {
                             for &(x0, x1) in &self.new {
-                                self.hash_index_0_1.entry((x0, x1)).or_default().push(());
+                                self.hash_index_0_1
+                                    .entry((x0, x1))
+                                    .or_default()
+                                    .push((latest_timestamp,));
                             }
                         });
                         log_duration!("retain index: {}", {
                             self.hash_index_0_1.retain(|&(x0, x1), v| {
                                 if uf.math_.is_root(x1) {
-                                    v.retain(|&mut ()| true);
+                                    v.retain(|&mut (_timestamp)| true);
                                     v.sort_unstable();
-                                    v.dedup();
+                                    v.dedup_by(|(t1,), (t2,)| true);
                                     true
                                 } else {
                                     false
@@ -1301,27 +1457,77 @@ fn regression_tir2() {
                 }
             }
             impl ConstRelation {
-                fn iter1_0_1(&self, x0: std::primitive::i64) -> impl Iterator<Item = (Math,)> + use<'_> {
-                    self.hash_index_0.get(&(x0,)).into_iter().copied()
+                fn iter_all1_0_1(&self, x0: std::primitive::i64) -> impl Iterator<Item = (Math,)> + use<'_> {
+                    self.hash_index_0
+                        .get(&(x0,))
+                        .into_iter()
+                        .copied()
+                        .map(|(x1, _timestamp)| (x1,))
                 }
-                fn iter1_1_0(&self, x1: Math) -> impl Iterator<Item = (std::primitive::i64,)> + use<'_> {
-                    self.hash_index_1.get(&(x1,)).into_iter().flatten().copied()
+                fn iter_all1_1_0(&self, x1: Math) -> impl Iterator<Item = (std::primitive::i64,)> + use<'_> {
+                    self.hash_index_1
+                        .get(&(x1,))
+                        .into_iter()
+                        .flatten()
+                        .copied()
+                        .map(|(x0, _timestamp)| (x0,))
                 }
-                fn iter2_0_1(&self, x0: std::primitive::i64, x1: Math) -> impl Iterator<Item = ()> + use<'_> {
+                fn iter_all2_0_1(
+                    &self,
+                    x0: std::primitive::i64,
+                    x1: Math,
+                ) -> impl Iterator<Item = ()> + use<'_> {
                     self.hash_index_0_1
                         .get(&(x0, x1))
                         .into_iter()
                         .flatten()
                         .copied()
+                        .map(|(_timestamp)| ())
+                }
+                fn iter_old1_0_1(
+                    &self,
+                    x0: std::primitive::i64,
+                    latest_timestamp: TimeStamp,
+                ) -> impl Iterator<Item = (Math,)> + use<'_> {
+                    self.hash_index_0
+                        .get(&(x0,))
+                        .into_iter()
+                        .copied()
+                        .filter_map(move |(x1, timestamp)| (timestamp < latest_timestamp).then_some((x1,)))
+                }
+                fn iter_old1_1_0(
+                    &self,
+                    x1: Math,
+                    latest_timestamp: TimeStamp,
+                ) -> impl Iterator<Item = (std::primitive::i64,)> + use<'_> {
+                    self.hash_index_1
+                        .get(&(x1,))
+                        .into_iter()
+                        .flatten()
+                        .copied()
+                        .filter_map(move |(x0, timestamp)| (timestamp < latest_timestamp).then_some((x0,)))
+                }
+                fn iter_old2_0_1(
+                    &self,
+                    x0: std::primitive::i64,
+                    x1: Math,
+                    latest_timestamp: TimeStamp,
+                ) -> impl Iterator<Item = ()> + use<'_> {
+                    self.hash_index_0_1
+                        .get(&(x0, x1))
+                        .into_iter()
+                        .flatten()
+                        .copied()
+                        .filter_map(move |(timestamp,)| (timestamp < latest_timestamp).then_some(()))
                 }
                 fn check1_0_1(&self, x0: std::primitive::i64) -> bool {
-                    self.iter1_0_1(x0).next().is_some()
+                    self.iter_all1_0_1(x0).next().is_some()
                 }
                 fn check1_1_0(&self, x1: Math) -> bool {
-                    self.iter1_1_0(x1).next().is_some()
+                    self.iter_all1_1_0(x1).next().is_some()
                 }
                 fn check2_0_1(&self, x0: std::primitive::i64, x1: Math) -> bool {
-                    self.iter2_0_1(x0, x1).next().is_some()
+                    self.iter_all2_0_1(x0, x1).next().is_some()
                 }
                 #[allow(unreachable_code)]
                 fn entry1_0_1(
@@ -1330,7 +1536,7 @@ fn regression_tir2() {
                     delta: &mut Delta,
                     uf: &mut Unification,
                 ) -> (Math,) {
-                    if let Some((x1,)) = self.iter1_0_1(x0).next() {
+                    if let Some((x1,)) = self.iter_all1_0_1(x0).next() {
                         return (x1,);
                     }
                     let x1 = uf.math_.add_eclass();
@@ -1345,7 +1551,7 @@ fn regression_tir2() {
                     delta: &mut Delta,
                     uf: &mut Unification,
                 ) -> () {
-                    if let Some(()) = self.iter2_0_1(x0, x1).next() {
+                    if let Some(()) = self.iter_all2_0_1(x0, x1).next() {
                         return ();
                     }
                     delta.const_.push((x0, x1));
@@ -1395,6 +1601,7 @@ fn regression_tir2() {
             }
             #[derive(Debug, Default)]
             pub struct Theory {
+                pub latest_timestamp: TimeStamp,
                 pub delta: Delta,
                 pub uf: Unification,
                 global_i64: GlobalVars<std::primitive::i64>,
@@ -1452,7 +1659,7 @@ fn regression_tir2() {
                 #[inline(never)]
                 pub fn apply_rules(&mut self) {
                     for (x, v2, v3) in self.pow_.iter_new() {
-                        for (v1,) in self.const_.iter1_1_0(v2) {
+                        for (v1,) in self.const_.iter_all1_1_0(v2) {
                             if v1 == self.global_i64.get(0usize) {
                                 #[doc = "( rewrite ( Pow x ( Const 2 ) ) ( Mul x x ) )"]
                                 self.delta.insert_mul((x, x, v3));
@@ -1462,7 +1669,7 @@ fn regression_tir2() {
                     for (v5, v6) in self.const_.iter_new() {
                         if self.pow_.check1_1_0_2(v6) {
                             if v5 == self.global_i64.get(0usize) {
-                                for (x_2, v7) in self.pow_.iter1_1_0_2(v6) {
+                                for (x_2, v7) in self.pow_.iter_old1_1_0_2(v6, self.latest_timestamp) {
                                     #[doc = "( rewrite ( Pow x ( Const 2 ) ) ( Mul x x ) )"]
                                     self.delta.insert_mul((x_2, x_2, v7));
                                 }
@@ -1470,8 +1677,8 @@ fn regression_tir2() {
                         }
                     }
                     if let Some(v9) = self.global_i64.get_new(0usize) {
-                        for (v10,) in self.const_.iter1_0_1(v9) {
-                            for (x_3, v11) in self.pow_.iter1_1_0_2(v10) {
+                        for (v10,) in self.const_.iter_old1_0_1(v9, self.latest_timestamp) {
+                            for (x_3, v11) in self.pow_.iter_old1_1_0_2(v10, self.latest_timestamp) {
                                 #[doc = "( rewrite ( Pow x ( Const 2 ) ) ( Mul x x ) )"]
                                 self.delta.insert_mul((x_3, x_3, v11));
                             }
@@ -1511,6 +1718,7 @@ fn regression_tir2() {
                 }
                 #[inline(never)]
                 pub fn canonicalize(&mut self) {
+                    self.latest_timestamp.0 += 1;
                     log_duration!("canonicalize (total): {}", {
                         self.mul_.clear_new();
                         self.pow_.clear_new();
@@ -1519,29 +1727,51 @@ fn regression_tir2() {
                             return;
                         }
                         log_duration!("update_begin (total): {}", {
-                            self.mul_.update_begin(&mut self.delta.mul_, &mut self.uf);
-                            self.pow_.update_begin(&mut self.delta.pow_, &mut self.uf);
-                            self.const_
-                                .update_begin(&mut self.delta.const_, &mut self.uf);
+                            self.mul_
+                                .update_begin(&mut self.delta.mul_, &mut self.uf, self.latest_timestamp);
+                            self.pow_
+                                .update_begin(&mut self.delta.pow_, &mut self.uf, self.latest_timestamp);
+                            self.const_.update_begin(
+                                &mut self.delta.const_,
+                                &mut self.uf,
+                                self.latest_timestamp,
+                            );
                         });
                         log_duration!("update_loop (total): {}", {
                             loop {
                                 let mut progress = false;
-                                progress |= self.mul_.update(&mut self.delta.mul_, &mut self.uf);
-                                progress |= self.pow_.update(&mut self.delta.pow_, &mut self.uf);
-                                progress |= self.const_.update(&mut self.delta.const_, &mut self.uf);
+                                progress |=
+                                    self.mul_
+                                        .update(&mut self.delta.mul_, &mut self.uf, self.latest_timestamp);
+                                progress |=
+                                    self.pow_
+                                        .update(&mut self.delta.pow_, &mut self.uf, self.latest_timestamp);
+                                progress |= self.const_.update(
+                                    &mut self.delta.const_,
+                                    &mut self.uf,
+                                    self.latest_timestamp,
+                                );
                                 if !progress {
                                     break;
                                 }
                             }
                         });
                         log_duration!("update_finalize (total): {}", {
-                            self.mul_
-                                .update_finalize(&mut self.delta.mul_, &mut self.uf);
-                            self.pow_
-                                .update_finalize(&mut self.delta.pow_, &mut self.uf);
-                            self.const_
-                                .update_finalize(&mut self.delta.const_, &mut self.uf);
+                            self.mul_.update_finalize(
+                                &mut self.delta.mul_,
+                                &mut self.uf,
+                                self.latest_timestamp,
+                            );
+                            self.pow_.update_finalize(
+                                &mut self.delta.pow_,
+                                &mut self.uf,
+                                self.latest_timestamp,
+                            );
+                            self.const_.update_finalize(
+                                &mut self.delta.const_,
+                                &mut self.uf,
+                                self.latest_timestamp,
+                            );
                             self.global_math.update(&mut self.uf.math_);
                             self.global_i64.update_finalize();
                             self.global_math.update_finalize();
@@ -1709,8 +1939,8 @@ fn regression_tir1() {
             #[derive(Debug, Default)]
             struct SubRelation {
                 new: Vec<<Self as Relation>::Row>,
-                hash_index_0_1: runtime::HashMap<(Math, Math), (Math,)>,
-                hash_index_0_1_2: runtime::HashMap<(Math, Math, Math), runtime::SmallVec<[(); 1]>>,
+                hash_index_0_1: runtime::HashMap<(Math, Math), (Math, TimeStamp)>,
+                hash_index_0_1_2: runtime::HashMap<(Math, Math, Math), runtime::SmallVec<[(TimeStamp,); 1]>>,
                 math_num_uprooted_at_latest_retain: usize,
             }
             impl Relation for SubRelation {
@@ -1734,14 +1964,19 @@ fn regression_tir1() {
                 }
                 fn emit_graphviz(&self, buf: &mut String) {
                     use std::fmt::Write;
-                    for (i, ((x0, x1), (x2,))) in self.hash_index_0_1.iter().enumerate() {
+                    for (i, ((x0, x1), (x2, _timestamp))) in self.hash_index_0_1.iter().enumerate() {
                         writeln!(buf, "{}_{i} -> {}_{};", "sub", "math", x0).unwrap();
                         writeln!(buf, "{}_{i} -> {}_{};", "sub", "math", x1).unwrap();
                         writeln!(buf, "{}_{i} -> {}_{};", "sub", "math", x2).unwrap();
                         writeln!(buf, "{}_{i} [shape = box];", "sub").unwrap();
                     }
                 }
-                fn update_begin(&mut self, insertions: &[Self::Row], uf: &mut Unification) {
+                fn update_begin(
+                    &mut self,
+                    insertions: &[Self::Row],
+                    uf: &mut Unification,
+                    latest_timestamp: TimeStamp,
+                ) {
                     log_duration!("update_begin {}: {}", "sub", {
                         for &(mut x0, mut x1, mut x2) in insertions {
                             match self
@@ -1749,43 +1984,59 @@ fn regression_tir1() {
                                 .entry((uf.math_.find(x0), uf.math_.find(x1)))
                             {
                                 runtime::HashMapEntry::Occupied(mut entry) => {
-                                    let (y2,) = entry.get_mut();
-                                    uf.math_.union_mut(&mut x2, y2);
+                                    let (y2, timestamp) = entry.get_mut();
+                                    let changed = false;
+                                    let old_val = *y2;
+                                    let changed = changed | (old_val != uf.math_.union_mut(&mut x2, y2));
+                                    if changed {
+                                        *timestamp = latest_timestamp;
+                                    }
                                 }
                                 runtime::HashMapEntry::Vacant(entry) => {
-                                    entry.insert((uf.math_.find(x2),));
+                                    entry.insert((uf.math_.find(x2), latest_timestamp));
                                 }
                             }
                         }
                     });
                 }
-                fn update(&mut self, insertions: &mut Vec<Self::Row>, uf: &mut Unification) -> bool {
+                fn update(
+                    &mut self,
+                    insertions: &mut Vec<Self::Row>,
+                    uf: &mut Unification,
+                    latest_timestamp: TimeStamp,
+                ) -> bool {
                     if self.math_num_uprooted_at_latest_retain == uf.math_.num_uprooted() {
                         return false;
                     }
                     let offset = insertions.len();
                     log_duration!("update {}: {}", "sub", {
                         self.math_num_uprooted_at_latest_retain = uf.math_.num_uprooted();
-                        self.hash_index_0_1.retain(|&(x0, x1), &mut (x2,)| {
-                            if uf.math_.is_root(x0) & uf.math_.is_root(x1) & uf.math_.is_root(x2) {
-                                true
-                            } else {
-                                insertions.push((x0, x1, x2));
-                                false
-                            }
-                        });
+                        self.hash_index_0_1
+                            .retain(|&(x0, x1), &mut (x2, _timestamp)| {
+                                if uf.math_.is_root(x0) & uf.math_.is_root(x1) & uf.math_.is_root(x2) {
+                                    true
+                                } else {
+                                    insertions.push((x0, x1, x2));
+                                    false
+                                }
+                            });
                     });
-                    self.update_begin(&insertions[offset..], uf);
+                    self.update_begin(&insertions[offset..], uf, latest_timestamp);
                     true
                 }
-                fn update_finalize(&mut self, insertions: &mut Vec<Self::Row>, uf: &mut Unification) {
+                fn update_finalize(
+                    &mut self,
+                    insertions: &mut Vec<Self::Row>,
+                    uf: &mut Unification,
+                    latest_timestamp: TimeStamp,
+                ) {
                     log_duration!("update_finalize {}: {}", "sub", {
                         assert!(self.new.is_empty());
                         log_duration!("fill new: {}", {
                             self.new.extend(
                                 self.hash_index_0_1
                                     .iter()
-                                    .map(|(&(x0, x1), &(x2,))| (x0, x1, x2))
+                                    .map(|(&(x0, x1), &(x2, _timestamp))| (x0, x1, x2))
                                     .filter(|&(x0, x1, x2)| !self.hash_index_0_1_2.contains_key(&(x0, x1, x2))),
                             );
                             insertions.clear();
@@ -1797,15 +2048,15 @@ fn regression_tir1() {
                                 self.hash_index_0_1_2
                                     .entry((x0, x1, x2))
                                     .or_default()
-                                    .push(());
+                                    .push((latest_timestamp,));
                             }
                         });
                         log_duration!("retain index: {}", {
                             self.hash_index_0_1_2.retain(|&(x0, x1, x2), v| {
                                 if uf.math_.is_root(x0) & uf.math_.is_root(x1) & uf.math_.is_root(x2) {
-                                    v.retain(|&mut ()| true);
+                                    v.retain(|&mut (_timestamp)| true);
                                     v.sort_unstable();
-                                    v.dedup();
+                                    v.dedup_by(|(t1,), (t2,)| true);
                                     true
                                 } else {
                                     false
@@ -1817,25 +2068,56 @@ fn regression_tir1() {
                 }
             }
             impl SubRelation {
-                fn iter2_0_1_2(&self, x0: Math, x1: Math) -> impl Iterator<Item = (Math,)> + use<'_> {
-                    self.hash_index_0_1.get(&(x0, x1)).into_iter().copied()
+                fn iter_all2_0_1_2(&self, x0: Math, x1: Math) -> impl Iterator<Item = (Math,)> + use<'_> {
+                    self.hash_index_0_1
+                        .get(&(x0, x1))
+                        .into_iter()
+                        .copied()
+                        .map(|(x2, _timestamp)| (x2,))
                 }
-                fn iter3_0_1_2(&self, x0: Math, x1: Math, x2: Math) -> impl Iterator<Item = ()> + use<'_> {
+                fn iter_all3_0_1_2(&self, x0: Math, x1: Math, x2: Math) -> impl Iterator<Item = ()> + use<'_> {
                     self.hash_index_0_1_2
                         .get(&(x0, x1, x2))
                         .into_iter()
                         .flatten()
                         .copied()
+                        .map(|(_timestamp)| ())
+                }
+                fn iter_old2_0_1_2(
+                    &self,
+                    x0: Math,
+                    x1: Math,
+                    latest_timestamp: TimeStamp,
+                ) -> impl Iterator<Item = (Math,)> + use<'_> {
+                    self.hash_index_0_1
+                        .get(&(x0, x1))
+                        .into_iter()
+                        .copied()
+                        .filter_map(move |(x2, timestamp)| (timestamp < latest_timestamp).then_some((x2,)))
+                }
+                fn iter_old3_0_1_2(
+                    &self,
+                    x0: Math,
+                    x1: Math,
+                    x2: Math,
+                    latest_timestamp: TimeStamp,
+                ) -> impl Iterator<Item = ()> + use<'_> {
+                    self.hash_index_0_1_2
+                        .get(&(x0, x1, x2))
+                        .into_iter()
+                        .flatten()
+                        .copied()
+                        .filter_map(move |(timestamp,)| (timestamp < latest_timestamp).then_some(()))
                 }
                 fn check2_0_1_2(&self, x0: Math, x1: Math) -> bool {
-                    self.iter2_0_1_2(x0, x1).next().is_some()
+                    self.iter_all2_0_1_2(x0, x1).next().is_some()
                 }
                 fn check3_0_1_2(&self, x0: Math, x1: Math, x2: Math) -> bool {
-                    self.iter3_0_1_2(x0, x1, x2).next().is_some()
+                    self.iter_all3_0_1_2(x0, x1, x2).next().is_some()
                 }
                 #[allow(unreachable_code)]
                 fn entry2_0_1_2(&self, x0: Math, x1: Math, delta: &mut Delta, uf: &mut Unification) -> (Math,) {
-                    if let Some((x2,)) = self.iter2_0_1_2(x0, x1).next() {
+                    if let Some((x2,)) = self.iter_all2_0_1_2(x0, x1).next() {
                         return (x2,);
                     }
                     let x2 = uf.math_.add_eclass();
@@ -1851,7 +2133,7 @@ fn regression_tir1() {
                     delta: &mut Delta,
                     uf: &mut Unification,
                 ) -> () {
-                    if let Some(()) = self.iter3_0_1_2(x0, x1, x2).next() {
+                    if let Some(()) = self.iter_all3_0_1_2(x0, x1, x2).next() {
                         return ();
                     }
                     delta.sub_.push((x0, x1, x2));
@@ -1861,8 +2143,9 @@ fn regression_tir1() {
             #[derive(Debug, Default)]
             struct ConstRelation {
                 new: Vec<<Self as Relation>::Row>,
-                hash_index_0: runtime::HashMap<(std::primitive::i64,), (Math,)>,
-                hash_index_0_1: runtime::HashMap<(std::primitive::i64, Math), runtime::SmallVec<[(); 1]>>,
+                hash_index_0: runtime::HashMap<(std::primitive::i64,), (Math, TimeStamp)>,
+                hash_index_0_1:
+                    runtime::HashMap<(std::primitive::i64, Math), runtime::SmallVec<[(TimeStamp,); 1]>>,
                 i64_num_uprooted_at_latest_retain: usize,
                 math_num_uprooted_at_latest_retain: usize,
             }
@@ -1887,35 +2170,50 @@ fn regression_tir1() {
                 }
                 fn emit_graphviz(&self, buf: &mut String) {
                     use std::fmt::Write;
-                    for (i, ((x0,), (x1,))) in self.hash_index_0.iter().enumerate() {
+                    for (i, ((x0,), (x1, _timestamp))) in self.hash_index_0.iter().enumerate() {
                         writeln!(buf, "{}_{i} -> {}_{};", "const", "i64", x0).unwrap();
                         writeln!(buf, "{}_{i} -> {}_{};", "const", "math", x1).unwrap();
                         writeln!(buf, "{}_{i} [shape = box];", "const").unwrap();
                     }
                 }
-                fn update_begin(&mut self, insertions: &[Self::Row], uf: &mut Unification) {
+                fn update_begin(
+                    &mut self,
+                    insertions: &[Self::Row],
+                    uf: &mut Unification,
+                    latest_timestamp: TimeStamp,
+                ) {
                     log_duration!("update_begin {}: {}", "const", {
                         for &(mut x0, mut x1) in insertions {
                             match self.hash_index_0.entry((x0,)) {
                                 runtime::HashMapEntry::Occupied(mut entry) => {
-                                    let (y1,) = entry.get_mut();
-                                    uf.math_.union_mut(&mut x1, y1);
+                                    let (y1, timestamp) = entry.get_mut();
+                                    let changed = false;
+                                    let old_val = *y1;
+                                    let changed = changed | (old_val != uf.math_.union_mut(&mut x1, y1));
+                                    if changed {
+                                        *timestamp = latest_timestamp;
+                                    }
                                 }
                                 runtime::HashMapEntry::Vacant(entry) => {
-                                    entry.insert((uf.math_.find(x1),));
+                                    entry.insert((uf.math_.find(x1), latest_timestamp));
                                 }
                             }
                         }
                     });
                 }
-                fn update(&mut self, insertions: &mut Vec<Self::Row>, uf: &mut Unification) -> bool {
+                fn update(
+                    &mut self,
+                    insertions: &mut Vec<Self::Row>,
+                    uf: &mut Unification,
+                    latest_timestamp: TimeStamp,
+                ) -> bool {
                     if self.math_num_uprooted_at_latest_retain == uf.math_.num_uprooted() {
                         return false;
                     }
                     let offset = insertions.len();
                     log_duration!("update {}: {}", "const", {
                         self.math_num_uprooted_at_latest_retain = uf.math_.num_uprooted();
-                        self.hash_index_0.retain(|&(x0,), &mut (x1,)| {
+                        self.hash_index_0.retain(|&(x0,), &mut (x1, _timestamp)| {
                             if uf.math_.is_root(x1) {
                                 true
                             } else {
@@ -1924,17 +2222,22 @@ fn regression_tir1() {
                             }
                         });
                     });
-                    self.update_begin(&insertions[offset..], uf);
+                    self.update_begin(&insertions[offset..], uf, latest_timestamp);
                     true
                 }
-                fn update_finalize(&mut self, insertions: &mut Vec<Self::Row>, uf: &mut Unification) {
+                fn update_finalize(
+                    &mut self,
+                    insertions: &mut Vec<Self::Row>,
+                    uf: &mut Unification,
+                    latest_timestamp: TimeStamp,
+                ) {
                     log_duration!("update_finalize {}: {}", "const", {
                         assert!(self.new.is_empty());
                         log_duration!("fill new: {}", {
                             self.new.extend(
                                 self.hash_index_0
                                     .iter()
-                                    .map(|(&(x0,), &(x1,))| (x0, x1))
+                                    .map(|(&(x0,), &(x1, _timestamp))| (x0, x1))
                                     .filter(|&(x0, x1)| !self.hash_index_0_1.contains_key(&(x0, x1))),
                             );
                             insertions.clear();
@@ -1943,15 +2246,18 @@ fn regression_tir1() {
                         });
                         log_duration!("fill index: {}", {
                             for &(x0, x1) in &self.new {
-                                self.hash_index_0_1.entry((x0, x1)).or_default().push(());
+                                self.hash_index_0_1
+                                    .entry((x0, x1))
+                                    .or_default()
+                                    .push((latest_timestamp,));
                             }
                         });
                         log_duration!("retain index: {}", {
                             self.hash_index_0_1.retain(|&(x0, x1), v| {
                                 if uf.math_.is_root(x1) {
-                                    v.retain(|&mut ()| true);
+                                    v.retain(|&mut (_timestamp)| true);
                                     v.sort_unstable();
-                                    v.dedup();
+                                    v.dedup_by(|(t1,), (t2,)| true);
                                     true
                                 } else {
                                     false
@@ -1963,21 +2269,54 @@ fn regression_tir1() {
                 }
             }
             impl ConstRelation {
-                fn iter1_0_1(&self, x0: std::primitive::i64) -> impl Iterator<Item = (Math,)> + use<'_> {
-                    self.hash_index_0.get(&(x0,)).into_iter().copied()
+                fn iter_all1_0_1(&self, x0: std::primitive::i64) -> impl Iterator<Item = (Math,)> + use<'_> {
+                    self.hash_index_0
+                        .get(&(x0,))
+                        .into_iter()
+                        .copied()
+                        .map(|(x1, _timestamp)| (x1,))
                 }
-                fn iter2_0_1(&self, x0: std::primitive::i64, x1: Math) -> impl Iterator<Item = ()> + use<'_> {
+                fn iter_all2_0_1(
+                    &self,
+                    x0: std::primitive::i64,
+                    x1: Math,
+                ) -> impl Iterator<Item = ()> + use<'_> {
                     self.hash_index_0_1
                         .get(&(x0, x1))
                         .into_iter()
                         .flatten()
                         .copied()
+                        .map(|(_timestamp)| ())
+                }
+                fn iter_old1_0_1(
+                    &self,
+                    x0: std::primitive::i64,
+                    latest_timestamp: TimeStamp,
+                ) -> impl Iterator<Item = (Math,)> + use<'_> {
+                    self.hash_index_0
+                        .get(&(x0,))
+                        .into_iter()
+                        .copied()
+                        .filter_map(move |(x1, timestamp)| (timestamp < latest_timestamp).then_some((x1,)))
+                }
+                fn iter_old2_0_1(
+                    &self,
+                    x0: std::primitive::i64,
+                    x1: Math,
+                    latest_timestamp: TimeStamp,
+                ) -> impl Iterator<Item = ()> + use<'_> {
+                    self.hash_index_0_1
+                        .get(&(x0, x1))
+                        .into_iter()
+                        .flatten()
+                        .copied()
+                        .filter_map(move |(timestamp,)| (timestamp < latest_timestamp).then_some(()))
                 }
                 fn check1_0_1(&self, x0: std::primitive::i64) -> bool {
-                    self.iter1_0_1(x0).next().is_some()
+                    self.iter_all1_0_1(x0).next().is_some()
                 }
                 fn check2_0_1(&self, x0: std::primitive::i64, x1: Math) -> bool {
-                    self.iter2_0_1(x0, x1).next().is_some()
+                    self.iter_all2_0_1(x0, x1).next().is_some()
                 }
                 #[allow(unreachable_code)]
                 fn entry1_0_1(
@@ -1986,7 +2325,7 @@ fn regression_tir1() {
                     delta: &mut Delta,
                     uf: &mut Unification,
                 ) -> (Math,) {
-                    if let Some((x1,)) = self.iter1_0_1(x0).next() {
+                    if let Some((x1,)) = self.iter_all1_0_1(x0).next() {
                         return (x1,);
                     }
                     let x1 = uf.math_.add_eclass();
@@ -2001,7 +2340,7 @@ fn regression_tir1() {
                     delta: &mut Delta,
                     uf: &mut Unification,
                 ) -> () {
-                    if let Some(()) = self.iter2_0_1(x0, x1).next() {
+                    if let Some(()) = self.iter_all2_0_1(x0, x1).next() {
                         return ();
                     }
                     delta.const_.push((x0, x1));
@@ -2046,6 +2385,7 @@ fn regression_tir1() {
             }
             #[derive(Debug, Default)]
             pub struct Theory {
+                pub latest_timestamp: TimeStamp,
                 pub delta: Delta,
                 pub uf: Unification,
                 global_i64: GlobalVars<std::primitive::i64>,
@@ -2119,6 +2459,7 @@ fn regression_tir1() {
                 }
                 #[inline(never)]
                 pub fn canonicalize(&mut self) {
+                    self.latest_timestamp.0 += 1;
                     log_duration!("canonicalize (total): {}", {
                         self.sub_.clear_new();
                         self.const_.clear_new();
@@ -2126,25 +2467,41 @@ fn regression_tir1() {
                             return;
                         }
                         log_duration!("update_begin (total): {}", {
-                            self.sub_.update_begin(&mut self.delta.sub_, &mut self.uf);
-                            self.const_
-                                .update_begin(&mut self.delta.const_, &mut self.uf);
+                            self.sub_
+                                .update_begin(&mut self.delta.sub_, &mut self.uf, self.latest_timestamp);
+                            self.const_.update_begin(
+                                &mut self.delta.const_,
+                                &mut self.uf,
+                                self.latest_timestamp,
+                            );
                         });
                         log_duration!("update_loop (total): {}", {
                             loop {
                                 let mut progress = false;
-                                progress |= self.sub_.update(&mut self.delta.sub_, &mut self.uf);
-                                progress |= self.const_.update(&mut self.delta.const_, &mut self.uf);
+                                progress |=
+                                    self.sub_
+                                        .update(&mut self.delta.sub_, &mut self.uf, self.latest_timestamp);
+                                progress |= self.const_.update(
+                                    &mut self.delta.const_,
+                                    &mut self.uf,
+                                    self.latest_timestamp,
+                                );
                                 if !progress {
                                     break;
                                 }
                             }
                         });
                         log_duration!("update_finalize (total): {}", {
-                            self.sub_
-                                .update_finalize(&mut self.delta.sub_, &mut self.uf);
-                            self.const_
-                                .update_finalize(&mut self.delta.const_, &mut self.uf);
+                            self.sub_.update_finalize(
+                                &mut self.delta.sub_,
+                                &mut self.uf,
+                                self.latest_timestamp,
+                            );
+                            self.const_.update_finalize(
+                                &mut self.delta.const_,
+                                &mut self.uf,
+                                self.latest_timestamp,
+                            );
                             self.global_i64.update_finalize();
                             self.uf.reset_num_uprooted();
                         });
@@ -2417,9 +2774,9 @@ fn codegen_constant_propagation() {
                     then: [
                         atom: [PremiseAny, r4(v1, v2), iu1]
                         then: [
-                            atom: [Premise, r4(v3, v4), iu3]
+                            atom: [PremiseAll, r4(v3, v4), iu3]
                             then: [
-                                atom: [Premise, r4(v1, v2), iu2]
+                                atom: [PremiseAll, r4(v1, v2), iu2]
                                 then: [
                                     meta: "( rule ( ( = e ( Add ( Const a ) ( Const b ) ) ) ) ( ( union e ( Const ( + a b ) ) ) ) )"
                                     atom: [Action::Insert, r0(v1, v3, v5) on iu0],
@@ -2432,9 +2789,9 @@ fn codegen_constant_propagation() {
                     then: [
                         atom: [PremiseAny, r4(v19, v20), iu4]
                         then: [
-                            atom: [Premise, r4(v21, v22), iu6]
+                            atom: [PremiseAll, r4(v21, v22), iu6]
                             then: [
-                                atom: [Premise, r4(v19, v20), iu5]
+                                atom: [PremiseAll, r4(v19, v20), iu5]
                                 then: [
                                     meta: "( rule ( ( = e ( Mul ( Const a ) ( Const b ) ) ) ) ( ( union e ( Const ( * a b ) ) ) ) )"
                                     atom: [Action::Insert, r1(v19, v21, v23) on iu0],
@@ -2445,36 +2802,36 @@ fn codegen_constant_propagation() {
                     ],
                     atom: [PremiseNew, r4(v7, v8)]
                     then: [
-                        atom: [Premise, r2(v8, v10, v6), iu1]
+                        atom: [PremiseOld, r2(v8, v10, v6), iu1]
                         then: [
-                            atom: [Premise, r4(v9, v10), iu7]
+                            atom: [PremiseAll, r4(v9, v10), iu7]
                             then: [
                                 meta: "( rule ( ( = e ( Add ( Const a ) ( Const b ) ) ) ) ( ( union e ( Const ( + a b ) ) ) ) )"
                                 atom: [Action::Insert, r0(v7, v9, v11) on iu0],
                                 atom: [Action::Insert, r4(v11, v6)],
                             ],
                         ],
-                        atom: [Premise, r2(v14, v8, v12), iu2]
+                        atom: [PremiseOld, r2(v14, v8, v12), iu2]
                         then: [
-                            atom: [Premise, r4(v13, v14), iu8]
+                            atom: [PremiseOld, r4(v13, v14), iu8]
                             then: [
                                 meta: "( rule ( ( = e ( Add ( Const a ) ( Const b ) ) ) ) ( ( union e ( Const ( + a b ) ) ) ) )"
                                 atom: [Action::Insert, r0(v13, v7, v17) on iu0],
                                 atom: [Action::Insert, r4(v17, v12)],
                             ],
                         ],
-                        atom: [Premise, r3(v8, v28, v24), iu1]
+                        atom: [PremiseOld, r3(v8, v28, v24), iu1]
                         then: [
-                            atom: [Premise, r4(v27, v28), iu9]
+                            atom: [PremiseAll, r4(v27, v28), iu9]
                             then: [
                                 meta: "( rule ( ( = e ( Mul ( Const a ) ( Const b ) ) ) ) ( ( union e ( Const ( * a b ) ) ) ) )"
                                 atom: [Action::Insert, r1(v7, v27, v29) on iu0],
                                 atom: [Action::Insert, r4(v29, v24)],
                             ],
                         ],
-                        atom: [Premise, r3(v32, v8, v30), iu2]
+                        atom: [PremiseOld, r3(v32, v8, v30), iu2]
                         then: [
-                            atom: [Premise, r4(v31, v32), iu10]
+                            atom: [PremiseOld, r4(v31, v32), iu10]
                             then: [
                                 meta: "( rule ( ( = e ( Mul ( Const a ) ( Const b ) ) ) ) ( ( union e ( Const ( * a b ) ) ) ) )"
                                 atom: [Action::Insert, r1(v31, v7, v35) on iu0],
@@ -2497,10 +2854,10 @@ fn codegen_constant_propagation() {
             #[derive(Debug, Default)]
             struct AddRelation {
                 new: Vec<<Self as Relation>::Row>,
-                hash_index_0_1: runtime::HashMap<(Math, Math), (Math,)>,
-                hash_index_0: runtime::HashMap<(Math,), runtime::SmallVec<[(Math, Math); 1]>>,
-                hash_index_1: runtime::HashMap<(Math,), runtime::SmallVec<[(Math, Math); 1]>>,
-                hash_index_0_1_2: runtime::HashMap<(Math, Math, Math), runtime::SmallVec<[(); 1]>>,
+                hash_index_0_1: runtime::HashMap<(Math, Math), (Math, TimeStamp)>,
+                hash_index_0: runtime::HashMap<(Math,), runtime::SmallVec<[(Math, Math, TimeStamp); 1]>>,
+                hash_index_1: runtime::HashMap<(Math,), runtime::SmallVec<[(Math, Math, TimeStamp); 1]>>,
+                hash_index_0_1_2: runtime::HashMap<(Math, Math, Math), runtime::SmallVec<[(TimeStamp,); 1]>>,
                 math_num_uprooted_at_latest_retain: usize,
             }
             impl Relation for AddRelation {
@@ -2524,14 +2881,19 @@ fn codegen_constant_propagation() {
                 }
                 fn emit_graphviz(&self, buf: &mut String) {
                     use std::fmt::Write;
-                    for (i, ((x0, x1), (x2,))) in self.hash_index_0_1.iter().enumerate() {
+                    for (i, ((x0, x1), (x2, _timestamp))) in self.hash_index_0_1.iter().enumerate() {
                         writeln!(buf, "{}_{i} -> {}_{};", "add", "math", x0).unwrap();
                         writeln!(buf, "{}_{i} -> {}_{};", "add", "math", x1).unwrap();
                         writeln!(buf, "{}_{i} -> {}_{};", "add", "math", x2).unwrap();
                         writeln!(buf, "{}_{i} [shape = box];", "add").unwrap();
                     }
                 }
-                fn update_begin(&mut self, insertions: &[Self::Row], uf: &mut Unification) {
+                fn update_begin(
+                    &mut self,
+                    insertions: &[Self::Row],
+                    uf: &mut Unification,
+                    latest_timestamp: TimeStamp,
+                ) {
                     log_duration!("update_begin {}: {}", "add", {
                         for &(mut x0, mut x1, mut x2) in insertions {
                             match self
@@ -2539,43 +2901,59 @@ fn codegen_constant_propagation() {
                                 .entry((uf.math_.find(x0), uf.math_.find(x1)))
                             {
                                 runtime::HashMapEntry::Occupied(mut entry) => {
-                                    let (y2,) = entry.get_mut();
-                                    uf.math_.union_mut(&mut x2, y2);
+                                    let (y2, timestamp) = entry.get_mut();
+                                    let changed = false;
+                                    let old_val = *y2;
+                                    let changed = changed | (old_val != uf.math_.union_mut(&mut x2, y2));
+                                    if changed {
+                                        *timestamp = latest_timestamp;
+                                    }
                                 }
                                 runtime::HashMapEntry::Vacant(entry) => {
-                                    entry.insert((uf.math_.find(x2),));
+                                    entry.insert((uf.math_.find(x2), latest_timestamp));
                                 }
                             }
                         }
                     });
                 }
-                fn update(&mut self, insertions: &mut Vec<Self::Row>, uf: &mut Unification) -> bool {
+                fn update(
+                    &mut self,
+                    insertions: &mut Vec<Self::Row>,
+                    uf: &mut Unification,
+                    latest_timestamp: TimeStamp,
+                ) -> bool {
                     if self.math_num_uprooted_at_latest_retain == uf.math_.num_uprooted() {
                         return false;
                     }
                     let offset = insertions.len();
                     log_duration!("update {}: {}", "add", {
                         self.math_num_uprooted_at_latest_retain = uf.math_.num_uprooted();
-                        self.hash_index_0_1.retain(|&(x0, x1), &mut (x2,)| {
-                            if uf.math_.is_root(x0) & uf.math_.is_root(x1) & uf.math_.is_root(x2) {
-                                true
-                            } else {
-                                insertions.push((x0, x1, x2));
-                                false
-                            }
-                        });
+                        self.hash_index_0_1
+                            .retain(|&(x0, x1), &mut (x2, _timestamp)| {
+                                if uf.math_.is_root(x0) & uf.math_.is_root(x1) & uf.math_.is_root(x2) {
+                                    true
+                                } else {
+                                    insertions.push((x0, x1, x2));
+                                    false
+                                }
+                            });
                     });
-                    self.update_begin(&insertions[offset..], uf);
+                    self.update_begin(&insertions[offset..], uf, latest_timestamp);
                     true
                 }
-                fn update_finalize(&mut self, insertions: &mut Vec<Self::Row>, uf: &mut Unification) {
+                fn update_finalize(
+                    &mut self,
+                    insertions: &mut Vec<Self::Row>,
+                    uf: &mut Unification,
+                    latest_timestamp: TimeStamp,
+                ) {
                     log_duration!("update_finalize {}: {}", "add", {
                         assert!(self.new.is_empty());
                         log_duration!("fill new: {}", {
                             self.new.extend(
                                 self.hash_index_0_1
                                     .iter()
-                                    .map(|(&(x0, x1), &(x2,))| (x0, x1, x2))
+                                    .map(|(&(x0, x1), &(x2, _timestamp))| (x0, x1, x2))
                                     .filter(|&(x0, x1, x2)| !self.hash_index_0_1_2.contains_key(&(x0, x1, x2))),
                             );
                             insertions.clear();
@@ -2584,15 +2962,20 @@ fn codegen_constant_propagation() {
                         });
                         log_duration!("fill index: {}", {
                             for &(x0, x1, x2) in &self.new {
-                                self.hash_index_0.entry((x0,)).or_default().push((x1, x2));
+                                self.hash_index_0
+                                    .entry((x0,))
+                                    .or_default()
+                                    .push((x1, x2, latest_timestamp));
                             }
                         });
                         log_duration!("retain index: {}", {
                             self.hash_index_0.retain(|&(x0,), v| {
                                 if uf.math_.is_root(x0) {
-                                    v.retain(|&mut (x1, x2)| uf.math_.is_root(x1) & uf.math_.is_root(x2));
+                                    v.retain(|&mut (x1, x2, _timestamp)| {
+                                        uf.math_.is_root(x1) & uf.math_.is_root(x2)
+                                    });
                                     v.sort_unstable();
-                                    v.dedup();
+                                    v.dedup_by(|(x1, x2, t1), (y1, y2, t2)| true & (*x1 == *y1) & (*x2 == *y2));
                                     true
                                 } else {
                                     false
@@ -2601,15 +2984,20 @@ fn codegen_constant_propagation() {
                         });
                         log_duration!("fill index: {}", {
                             for &(x0, x1, x2) in &self.new {
-                                self.hash_index_1.entry((x1,)).or_default().push((x0, x2));
+                                self.hash_index_1
+                                    .entry((x1,))
+                                    .or_default()
+                                    .push((x0, x2, latest_timestamp));
                             }
                         });
                         log_duration!("retain index: {}", {
                             self.hash_index_1.retain(|&(x1,), v| {
                                 if uf.math_.is_root(x1) {
-                                    v.retain(|&mut (x0, x2)| uf.math_.is_root(x0) & uf.math_.is_root(x2));
+                                    v.retain(|&mut (x0, x2, _timestamp)| {
+                                        uf.math_.is_root(x0) & uf.math_.is_root(x2)
+                                    });
                                     v.sort_unstable();
-                                    v.dedup();
+                                    v.dedup_by(|(x0, x2, t1), (y0, y2, t2)| true & (*x0 == *y0) & (*x2 == *y2));
                                     true
                                 } else {
                                     false
@@ -2621,15 +3009,15 @@ fn codegen_constant_propagation() {
                                 self.hash_index_0_1_2
                                     .entry((x0, x1, x2))
                                     .or_default()
-                                    .push(());
+                                    .push((latest_timestamp,));
                             }
                         });
                         log_duration!("retain index: {}", {
                             self.hash_index_0_1_2.retain(|&(x0, x1, x2), v| {
                                 if uf.math_.is_root(x0) & uf.math_.is_root(x1) & uf.math_.is_root(x2) {
-                                    v.retain(|&mut ()| true);
+                                    v.retain(|&mut (_timestamp)| true);
                                     v.sort_unstable();
-                                    v.dedup();
+                                    v.dedup_by(|(t1,), (t2,)| true);
                                     true
                                 } else {
                                     false
@@ -2641,37 +3029,106 @@ fn codegen_constant_propagation() {
                 }
             }
             impl AddRelation {
-                fn iter2_0_1_2(&self, x0: Math, x1: Math) -> impl Iterator<Item = (Math,)> + use<'_> {
-                    self.hash_index_0_1.get(&(x0, x1)).into_iter().copied()
+                fn iter_all2_0_1_2(&self, x0: Math, x1: Math) -> impl Iterator<Item = (Math,)> + use<'_> {
+                    self.hash_index_0_1
+                        .get(&(x0, x1))
+                        .into_iter()
+                        .copied()
+                        .map(|(x2, _timestamp)| (x2,))
                 }
-                fn iter1_0_1_2(&self, x0: Math) -> impl Iterator<Item = (Math, Math)> + use<'_> {
-                    self.hash_index_0.get(&(x0,)).into_iter().flatten().copied()
+                fn iter_all1_0_1_2(&self, x0: Math) -> impl Iterator<Item = (Math, Math)> + use<'_> {
+                    self.hash_index_0
+                        .get(&(x0,))
+                        .into_iter()
+                        .flatten()
+                        .copied()
+                        .map(|(x1, x2, _timestamp)| (x1, x2))
                 }
-                fn iter1_1_0_2(&self, x1: Math) -> impl Iterator<Item = (Math, Math)> + use<'_> {
-                    self.hash_index_1.get(&(x1,)).into_iter().flatten().copied()
+                fn iter_all1_1_0_2(&self, x1: Math) -> impl Iterator<Item = (Math, Math)> + use<'_> {
+                    self.hash_index_1
+                        .get(&(x1,))
+                        .into_iter()
+                        .flatten()
+                        .copied()
+                        .map(|(x0, x2, _timestamp)| (x0, x2))
                 }
-                fn iter3_0_1_2(&self, x0: Math, x1: Math, x2: Math) -> impl Iterator<Item = ()> + use<'_> {
+                fn iter_all3_0_1_2(&self, x0: Math, x1: Math, x2: Math) -> impl Iterator<Item = ()> + use<'_> {
                     self.hash_index_0_1_2
                         .get(&(x0, x1, x2))
                         .into_iter()
                         .flatten()
                         .copied()
+                        .map(|(_timestamp)| ())
+                }
+                fn iter_old2_0_1_2(
+                    &self,
+                    x0: Math,
+                    x1: Math,
+                    latest_timestamp: TimeStamp,
+                ) -> impl Iterator<Item = (Math,)> + use<'_> {
+                    self.hash_index_0_1
+                        .get(&(x0, x1))
+                        .into_iter()
+                        .copied()
+                        .filter_map(move |(x2, timestamp)| (timestamp < latest_timestamp).then_some((x2,)))
+                }
+                fn iter_old1_0_1_2(
+                    &self,
+                    x0: Math,
+                    latest_timestamp: TimeStamp,
+                ) -> impl Iterator<Item = (Math, Math)> + use<'_> {
+                    self.hash_index_0
+                        .get(&(x0,))
+                        .into_iter()
+                        .flatten()
+                        .copied()
+                        .filter_map(move |(x1, x2, timestamp)| {
+                            (timestamp < latest_timestamp).then_some((x1, x2))
+                        })
+                }
+                fn iter_old1_1_0_2(
+                    &self,
+                    x1: Math,
+                    latest_timestamp: TimeStamp,
+                ) -> impl Iterator<Item = (Math, Math)> + use<'_> {
+                    self.hash_index_1
+                        .get(&(x1,))
+                        .into_iter()
+                        .flatten()
+                        .copied()
+                        .filter_map(move |(x0, x2, timestamp)| {
+                            (timestamp < latest_timestamp).then_some((x0, x2))
+                        })
+                }
+                fn iter_old3_0_1_2(
+                    &self,
+                    x0: Math,
+                    x1: Math,
+                    x2: Math,
+                    latest_timestamp: TimeStamp,
+                ) -> impl Iterator<Item = ()> + use<'_> {
+                    self.hash_index_0_1_2
+                        .get(&(x0, x1, x2))
+                        .into_iter()
+                        .flatten()
+                        .copied()
+                        .filter_map(move |(timestamp,)| (timestamp < latest_timestamp).then_some(()))
                 }
                 fn check2_0_1_2(&self, x0: Math, x1: Math) -> bool {
-                    self.iter2_0_1_2(x0, x1).next().is_some()
+                    self.iter_all2_0_1_2(x0, x1).next().is_some()
                 }
                 fn check1_0_1_2(&self, x0: Math) -> bool {
-                    self.iter1_0_1_2(x0).next().is_some()
+                    self.iter_all1_0_1_2(x0).next().is_some()
                 }
                 fn check1_1_0_2(&self, x1: Math) -> bool {
-                    self.iter1_1_0_2(x1).next().is_some()
+                    self.iter_all1_1_0_2(x1).next().is_some()
                 }
                 fn check3_0_1_2(&self, x0: Math, x1: Math, x2: Math) -> bool {
-                    self.iter3_0_1_2(x0, x1, x2).next().is_some()
+                    self.iter_all3_0_1_2(x0, x1, x2).next().is_some()
                 }
                 #[allow(unreachable_code)]
                 fn entry2_0_1_2(&self, x0: Math, x1: Math, delta: &mut Delta, uf: &mut Unification) -> (Math,) {
-                    if let Some((x2,)) = self.iter2_0_1_2(x0, x1).next() {
+                    if let Some((x2,)) = self.iter_all2_0_1_2(x0, x1).next() {
                         return (x2,);
                     }
                     let x2 = uf.math_.add_eclass();
@@ -2687,7 +3144,7 @@ fn codegen_constant_propagation() {
                     delta: &mut Delta,
                     uf: &mut Unification,
                 ) -> () {
-                    if let Some(()) = self.iter3_0_1_2(x0, x1, x2).next() {
+                    if let Some(()) = self.iter_all3_0_1_2(x0, x1, x2).next() {
                         return ();
                     }
                     delta.add_.push((x0, x1, x2));
@@ -2697,10 +3154,10 @@ fn codegen_constant_propagation() {
             #[derive(Debug, Default)]
             struct MulRelation {
                 new: Vec<<Self as Relation>::Row>,
-                hash_index_0_1: runtime::HashMap<(Math, Math), (Math,)>,
-                hash_index_0: runtime::HashMap<(Math,), runtime::SmallVec<[(Math, Math); 1]>>,
-                hash_index_1: runtime::HashMap<(Math,), runtime::SmallVec<[(Math, Math); 1]>>,
-                hash_index_0_1_2: runtime::HashMap<(Math, Math, Math), runtime::SmallVec<[(); 1]>>,
+                hash_index_0_1: runtime::HashMap<(Math, Math), (Math, TimeStamp)>,
+                hash_index_0: runtime::HashMap<(Math,), runtime::SmallVec<[(Math, Math, TimeStamp); 1]>>,
+                hash_index_1: runtime::HashMap<(Math,), runtime::SmallVec<[(Math, Math, TimeStamp); 1]>>,
+                hash_index_0_1_2: runtime::HashMap<(Math, Math, Math), runtime::SmallVec<[(TimeStamp,); 1]>>,
                 math_num_uprooted_at_latest_retain: usize,
             }
             impl Relation for MulRelation {
@@ -2724,14 +3181,19 @@ fn codegen_constant_propagation() {
                 }
                 fn emit_graphviz(&self, buf: &mut String) {
                     use std::fmt::Write;
-                    for (i, ((x0, x1), (x2,))) in self.hash_index_0_1.iter().enumerate() {
+                    for (i, ((x0, x1), (x2, _timestamp))) in self.hash_index_0_1.iter().enumerate() {
                         writeln!(buf, "{}_{i} -> {}_{};", "mul", "math", x0).unwrap();
                         writeln!(buf, "{}_{i} -> {}_{};", "mul", "math", x1).unwrap();
                         writeln!(buf, "{}_{i} -> {}_{};", "mul", "math", x2).unwrap();
                         writeln!(buf, "{}_{i} [shape = box];", "mul").unwrap();
                     }
                 }
-                fn update_begin(&mut self, insertions: &[Self::Row], uf: &mut Unification) {
+                fn update_begin(
+                    &mut self,
+                    insertions: &[Self::Row],
+                    uf: &mut Unification,
+                    latest_timestamp: TimeStamp,
+                ) {
                     log_duration!("update_begin {}: {}", "mul", {
                         for &(mut x0, mut x1, mut x2) in insertions {
                             match self
@@ -2739,43 +3201,59 @@ fn codegen_constant_propagation() {
                                 .entry((uf.math_.find(x0), uf.math_.find(x1)))
                             {
                                 runtime::HashMapEntry::Occupied(mut entry) => {
-                                    let (y2,) = entry.get_mut();
-                                    uf.math_.union_mut(&mut x2, y2);
+                                    let (y2, timestamp) = entry.get_mut();
+                                    let changed = false;
+                                    let old_val = *y2;
+                                    let changed = changed | (old_val != uf.math_.union_mut(&mut x2, y2));
+                                    if changed {
+                                        *timestamp = latest_timestamp;
+                                    }
                                 }
                                 runtime::HashMapEntry::Vacant(entry) => {
-                                    entry.insert((uf.math_.find(x2),));
+                                    entry.insert((uf.math_.find(x2), latest_timestamp));
                                 }
                             }
                         }
                     });
                 }
-                fn update(&mut self, insertions: &mut Vec<Self::Row>, uf: &mut Unification) -> bool {
+                fn update(
+                    &mut self,
+                    insertions: &mut Vec<Self::Row>,
+                    uf: &mut Unification,
+                    latest_timestamp: TimeStamp,
+                ) -> bool {
                     if self.math_num_uprooted_at_latest_retain == uf.math_.num_uprooted() {
                         return false;
                     }
                     let offset = insertions.len();
                     log_duration!("update {}: {}", "mul", {
                         self.math_num_uprooted_at_latest_retain = uf.math_.num_uprooted();
-                        self.hash_index_0_1.retain(|&(x0, x1), &mut (x2,)| {
-                            if uf.math_.is_root(x0) & uf.math_.is_root(x1) & uf.math_.is_root(x2) {
-                                true
-                            } else {
-                                insertions.push((x0, x1, x2));
-                                false
-                            }
-                        });
+                        self.hash_index_0_1
+                            .retain(|&(x0, x1), &mut (x2, _timestamp)| {
+                                if uf.math_.is_root(x0) & uf.math_.is_root(x1) & uf.math_.is_root(x2) {
+                                    true
+                                } else {
+                                    insertions.push((x0, x1, x2));
+                                    false
+                                }
+                            });
                     });
-                    self.update_begin(&insertions[offset..], uf);
+                    self.update_begin(&insertions[offset..], uf, latest_timestamp);
                     true
                 }
-                fn update_finalize(&mut self, insertions: &mut Vec<Self::Row>, uf: &mut Unification) {
+                fn update_finalize(
+                    &mut self,
+                    insertions: &mut Vec<Self::Row>,
+                    uf: &mut Unification,
+                    latest_timestamp: TimeStamp,
+                ) {
                     log_duration!("update_finalize {}: {}", "mul", {
                         assert!(self.new.is_empty());
                         log_duration!("fill new: {}", {
                             self.new.extend(
                                 self.hash_index_0_1
                                     .iter()
-                                    .map(|(&(x0, x1), &(x2,))| (x0, x1, x2))
+                                    .map(|(&(x0, x1), &(x2, _timestamp))| (x0, x1, x2))
                                     .filter(|&(x0, x1, x2)| !self.hash_index_0_1_2.contains_key(&(x0, x1, x2))),
                             );
                             insertions.clear();
@@ -2784,15 +3262,20 @@ fn codegen_constant_propagation() {
                         });
                         log_duration!("fill index: {}", {
                             for &(x0, x1, x2) in &self.new {
-                                self.hash_index_0.entry((x0,)).or_default().push((x1, x2));
+                                self.hash_index_0
+                                    .entry((x0,))
+                                    .or_default()
+                                    .push((x1, x2, latest_timestamp));
                             }
                         });
                         log_duration!("retain index: {}", {
                             self.hash_index_0.retain(|&(x0,), v| {
                                 if uf.math_.is_root(x0) {
-                                    v.retain(|&mut (x1, x2)| uf.math_.is_root(x1) & uf.math_.is_root(x2));
+                                    v.retain(|&mut (x1, x2, _timestamp)| {
+                                        uf.math_.is_root(x1) & uf.math_.is_root(x2)
+                                    });
                                     v.sort_unstable();
-                                    v.dedup();
+                                    v.dedup_by(|(x1, x2, t1), (y1, y2, t2)| true & (*x1 == *y1) & (*x2 == *y2));
                                     true
                                 } else {
                                     false
@@ -2801,15 +3284,20 @@ fn codegen_constant_propagation() {
                         });
                         log_duration!("fill index: {}", {
                             for &(x0, x1, x2) in &self.new {
-                                self.hash_index_1.entry((x1,)).or_default().push((x0, x2));
+                                self.hash_index_1
+                                    .entry((x1,))
+                                    .or_default()
+                                    .push((x0, x2, latest_timestamp));
                             }
                         });
                         log_duration!("retain index: {}", {
                             self.hash_index_1.retain(|&(x1,), v| {
                                 if uf.math_.is_root(x1) {
-                                    v.retain(|&mut (x0, x2)| uf.math_.is_root(x0) & uf.math_.is_root(x2));
+                                    v.retain(|&mut (x0, x2, _timestamp)| {
+                                        uf.math_.is_root(x0) & uf.math_.is_root(x2)
+                                    });
                                     v.sort_unstable();
-                                    v.dedup();
+                                    v.dedup_by(|(x0, x2, t1), (y0, y2, t2)| true & (*x0 == *y0) & (*x2 == *y2));
                                     true
                                 } else {
                                     false
@@ -2821,15 +3309,15 @@ fn codegen_constant_propagation() {
                                 self.hash_index_0_1_2
                                     .entry((x0, x1, x2))
                                     .or_default()
-                                    .push(());
+                                    .push((latest_timestamp,));
                             }
                         });
                         log_duration!("retain index: {}", {
                             self.hash_index_0_1_2.retain(|&(x0, x1, x2), v| {
                                 if uf.math_.is_root(x0) & uf.math_.is_root(x1) & uf.math_.is_root(x2) {
-                                    v.retain(|&mut ()| true);
+                                    v.retain(|&mut (_timestamp)| true);
                                     v.sort_unstable();
-                                    v.dedup();
+                                    v.dedup_by(|(t1,), (t2,)| true);
                                     true
                                 } else {
                                     false
@@ -2841,37 +3329,106 @@ fn codegen_constant_propagation() {
                 }
             }
             impl MulRelation {
-                fn iter2_0_1_2(&self, x0: Math, x1: Math) -> impl Iterator<Item = (Math,)> + use<'_> {
-                    self.hash_index_0_1.get(&(x0, x1)).into_iter().copied()
+                fn iter_all2_0_1_2(&self, x0: Math, x1: Math) -> impl Iterator<Item = (Math,)> + use<'_> {
+                    self.hash_index_0_1
+                        .get(&(x0, x1))
+                        .into_iter()
+                        .copied()
+                        .map(|(x2, _timestamp)| (x2,))
                 }
-                fn iter1_0_1_2(&self, x0: Math) -> impl Iterator<Item = (Math, Math)> + use<'_> {
-                    self.hash_index_0.get(&(x0,)).into_iter().flatten().copied()
+                fn iter_all1_0_1_2(&self, x0: Math) -> impl Iterator<Item = (Math, Math)> + use<'_> {
+                    self.hash_index_0
+                        .get(&(x0,))
+                        .into_iter()
+                        .flatten()
+                        .copied()
+                        .map(|(x1, x2, _timestamp)| (x1, x2))
                 }
-                fn iter1_1_0_2(&self, x1: Math) -> impl Iterator<Item = (Math, Math)> + use<'_> {
-                    self.hash_index_1.get(&(x1,)).into_iter().flatten().copied()
+                fn iter_all1_1_0_2(&self, x1: Math) -> impl Iterator<Item = (Math, Math)> + use<'_> {
+                    self.hash_index_1
+                        .get(&(x1,))
+                        .into_iter()
+                        .flatten()
+                        .copied()
+                        .map(|(x0, x2, _timestamp)| (x0, x2))
                 }
-                fn iter3_0_1_2(&self, x0: Math, x1: Math, x2: Math) -> impl Iterator<Item = ()> + use<'_> {
+                fn iter_all3_0_1_2(&self, x0: Math, x1: Math, x2: Math) -> impl Iterator<Item = ()> + use<'_> {
                     self.hash_index_0_1_2
                         .get(&(x0, x1, x2))
                         .into_iter()
                         .flatten()
                         .copied()
+                        .map(|(_timestamp)| ())
+                }
+                fn iter_old2_0_1_2(
+                    &self,
+                    x0: Math,
+                    x1: Math,
+                    latest_timestamp: TimeStamp,
+                ) -> impl Iterator<Item = (Math,)> + use<'_> {
+                    self.hash_index_0_1
+                        .get(&(x0, x1))
+                        .into_iter()
+                        .copied()
+                        .filter_map(move |(x2, timestamp)| (timestamp < latest_timestamp).then_some((x2,)))
+                }
+                fn iter_old1_0_1_2(
+                    &self,
+                    x0: Math,
+                    latest_timestamp: TimeStamp,
+                ) -> impl Iterator<Item = (Math, Math)> + use<'_> {
+                    self.hash_index_0
+                        .get(&(x0,))
+                        .into_iter()
+                        .flatten()
+                        .copied()
+                        .filter_map(move |(x1, x2, timestamp)| {
+                            (timestamp < latest_timestamp).then_some((x1, x2))
+                        })
+                }
+                fn iter_old1_1_0_2(
+                    &self,
+                    x1: Math,
+                    latest_timestamp: TimeStamp,
+                ) -> impl Iterator<Item = (Math, Math)> + use<'_> {
+                    self.hash_index_1
+                        .get(&(x1,))
+                        .into_iter()
+                        .flatten()
+                        .copied()
+                        .filter_map(move |(x0, x2, timestamp)| {
+                            (timestamp < latest_timestamp).then_some((x0, x2))
+                        })
+                }
+                fn iter_old3_0_1_2(
+                    &self,
+                    x0: Math,
+                    x1: Math,
+                    x2: Math,
+                    latest_timestamp: TimeStamp,
+                ) -> impl Iterator<Item = ()> + use<'_> {
+                    self.hash_index_0_1_2
+                        .get(&(x0, x1, x2))
+                        .into_iter()
+                        .flatten()
+                        .copied()
+                        .filter_map(move |(timestamp,)| (timestamp < latest_timestamp).then_some(()))
                 }
                 fn check2_0_1_2(&self, x0: Math, x1: Math) -> bool {
-                    self.iter2_0_1_2(x0, x1).next().is_some()
+                    self.iter_all2_0_1_2(x0, x1).next().is_some()
                 }
                 fn check1_0_1_2(&self, x0: Math) -> bool {
-                    self.iter1_0_1_2(x0).next().is_some()
+                    self.iter_all1_0_1_2(x0).next().is_some()
                 }
                 fn check1_1_0_2(&self, x1: Math) -> bool {
-                    self.iter1_1_0_2(x1).next().is_some()
+                    self.iter_all1_1_0_2(x1).next().is_some()
                 }
                 fn check3_0_1_2(&self, x0: Math, x1: Math, x2: Math) -> bool {
-                    self.iter3_0_1_2(x0, x1, x2).next().is_some()
+                    self.iter_all3_0_1_2(x0, x1, x2).next().is_some()
                 }
                 #[allow(unreachable_code)]
                 fn entry2_0_1_2(&self, x0: Math, x1: Math, delta: &mut Delta, uf: &mut Unification) -> (Math,) {
-                    if let Some((x2,)) = self.iter2_0_1_2(x0, x1).next() {
+                    if let Some((x2,)) = self.iter_all2_0_1_2(x0, x1).next() {
                         return (x2,);
                     }
                     let x2 = uf.math_.add_eclass();
@@ -2887,7 +3444,7 @@ fn codegen_constant_propagation() {
                     delta: &mut Delta,
                     uf: &mut Unification,
                 ) -> () {
-                    if let Some(()) = self.iter3_0_1_2(x0, x1, x2).next() {
+                    if let Some(()) = self.iter_all3_0_1_2(x0, x1, x2).next() {
                         return ();
                     }
                     delta.mul_.push((x0, x1, x2));
@@ -2897,9 +3454,11 @@ fn codegen_constant_propagation() {
             #[derive(Debug, Default)]
             struct ConstRelation {
                 new: Vec<<Self as Relation>::Row>,
-                hash_index_0: runtime::HashMap<(std::primitive::i64,), (Math,)>,
-                hash_index_1: runtime::HashMap<(Math,), runtime::SmallVec<[(std::primitive::i64,); 1]>>,
-                hash_index_0_1: runtime::HashMap<(std::primitive::i64, Math), runtime::SmallVec<[(); 1]>>,
+                hash_index_0: runtime::HashMap<(std::primitive::i64,), (Math, TimeStamp)>,
+                hash_index_1:
+                    runtime::HashMap<(Math,), runtime::SmallVec<[(std::primitive::i64, TimeStamp); 1]>>,
+                hash_index_0_1:
+                    runtime::HashMap<(std::primitive::i64, Math), runtime::SmallVec<[(TimeStamp,); 1]>>,
                 i64_num_uprooted_at_latest_retain: usize,
                 math_num_uprooted_at_latest_retain: usize,
             }
@@ -2924,35 +3483,50 @@ fn codegen_constant_propagation() {
                 }
                 fn emit_graphviz(&self, buf: &mut String) {
                     use std::fmt::Write;
-                    for (i, ((x0,), (x1,))) in self.hash_index_0.iter().enumerate() {
+                    for (i, ((x0,), (x1, _timestamp))) in self.hash_index_0.iter().enumerate() {
                         writeln!(buf, "{}_{i} -> {}_{};", "const", "i64", x0).unwrap();
                         writeln!(buf, "{}_{i} -> {}_{};", "const", "math", x1).unwrap();
                         writeln!(buf, "{}_{i} [shape = box];", "const").unwrap();
                     }
                 }
-                fn update_begin(&mut self, insertions: &[Self::Row], uf: &mut Unification) {
+                fn update_begin(
+                    &mut self,
+                    insertions: &[Self::Row],
+                    uf: &mut Unification,
+                    latest_timestamp: TimeStamp,
+                ) {
                     log_duration!("update_begin {}: {}", "const", {
                         for &(mut x0, mut x1) in insertions {
                             match self.hash_index_0.entry((x0,)) {
                                 runtime::HashMapEntry::Occupied(mut entry) => {
-                                    let (y1,) = entry.get_mut();
-                                    uf.math_.union_mut(&mut x1, y1);
+                                    let (y1, timestamp) = entry.get_mut();
+                                    let changed = false;
+                                    let old_val = *y1;
+                                    let changed = changed | (old_val != uf.math_.union_mut(&mut x1, y1));
+                                    if changed {
+                                        *timestamp = latest_timestamp;
+                                    }
                                 }
                                 runtime::HashMapEntry::Vacant(entry) => {
-                                    entry.insert((uf.math_.find(x1),));
+                                    entry.insert((uf.math_.find(x1), latest_timestamp));
                                 }
                             }
                         }
                     });
                 }
-                fn update(&mut self, insertions: &mut Vec<Self::Row>, uf: &mut Unification) -> bool {
+                fn update(
+                    &mut self,
+                    insertions: &mut Vec<Self::Row>,
+                    uf: &mut Unification,
+                    latest_timestamp: TimeStamp,
+                ) -> bool {
                     if self.math_num_uprooted_at_latest_retain == uf.math_.num_uprooted() {
                         return false;
                     }
                     let offset = insertions.len();
                     log_duration!("update {}: {}", "const", {
                         self.math_num_uprooted_at_latest_retain = uf.math_.num_uprooted();
-                        self.hash_index_0.retain(|&(x0,), &mut (x1,)| {
+                        self.hash_index_0.retain(|&(x0,), &mut (x1, _timestamp)| {
                             if uf.math_.is_root(x1) {
                                 true
                             } else {
@@ -2961,17 +3535,22 @@ fn codegen_constant_propagation() {
                             }
                         });
                     });
-                    self.update_begin(&insertions[offset..], uf);
+                    self.update_begin(&insertions[offset..], uf, latest_timestamp);
                     true
                 }
-                fn update_finalize(&mut self, insertions: &mut Vec<Self::Row>, uf: &mut Unification) {
+                fn update_finalize(
+                    &mut self,
+                    insertions: &mut Vec<Self::Row>,
+                    uf: &mut Unification,
+                    latest_timestamp: TimeStamp,
+                ) {
                     log_duration!("update_finalize {}: {}", "const", {
                         assert!(self.new.is_empty());
                         log_duration!("fill new: {}", {
                             self.new.extend(
                                 self.hash_index_0
                                     .iter()
-                                    .map(|(&(x0,), &(x1,))| (x0, x1))
+                                    .map(|(&(x0,), &(x1, _timestamp))| (x0, x1))
                                     .filter(|&(x0, x1)| !self.hash_index_0_1.contains_key(&(x0, x1))),
                             );
                             insertions.clear();
@@ -2980,15 +3559,18 @@ fn codegen_constant_propagation() {
                         });
                         log_duration!("fill index: {}", {
                             for &(x0, x1) in &self.new {
-                                self.hash_index_1.entry((x1,)).or_default().push((x0,));
+                                self.hash_index_1
+                                    .entry((x1,))
+                                    .or_default()
+                                    .push((x0, latest_timestamp));
                             }
                         });
                         log_duration!("retain index: {}", {
                             self.hash_index_1.retain(|&(x1,), v| {
                                 if uf.math_.is_root(x1) {
-                                    v.retain(|&mut (x0,)| true);
+                                    v.retain(|&mut (x0, _timestamp)| true);
                                     v.sort_unstable();
-                                    v.dedup();
+                                    v.dedup_by(|(x0, t1), (y0, t2)| true & (*x0 == *y0));
                                     true
                                 } else {
                                     false
@@ -2997,15 +3579,18 @@ fn codegen_constant_propagation() {
                         });
                         log_duration!("fill index: {}", {
                             for &(x0, x1) in &self.new {
-                                self.hash_index_0_1.entry((x0, x1)).or_default().push(());
+                                self.hash_index_0_1
+                                    .entry((x0, x1))
+                                    .or_default()
+                                    .push((latest_timestamp,));
                             }
                         });
                         log_duration!("retain index: {}", {
                             self.hash_index_0_1.retain(|&(x0, x1), v| {
                                 if uf.math_.is_root(x1) {
-                                    v.retain(|&mut ()| true);
+                                    v.retain(|&mut (_timestamp)| true);
                                     v.sort_unstable();
-                                    v.dedup();
+                                    v.dedup_by(|(t1,), (t2,)| true);
                                     true
                                 } else {
                                     false
@@ -3017,27 +3602,77 @@ fn codegen_constant_propagation() {
                 }
             }
             impl ConstRelation {
-                fn iter1_0_1(&self, x0: std::primitive::i64) -> impl Iterator<Item = (Math,)> + use<'_> {
-                    self.hash_index_0.get(&(x0,)).into_iter().copied()
+                fn iter_all1_0_1(&self, x0: std::primitive::i64) -> impl Iterator<Item = (Math,)> + use<'_> {
+                    self.hash_index_0
+                        .get(&(x0,))
+                        .into_iter()
+                        .copied()
+                        .map(|(x1, _timestamp)| (x1,))
                 }
-                fn iter1_1_0(&self, x1: Math) -> impl Iterator<Item = (std::primitive::i64,)> + use<'_> {
-                    self.hash_index_1.get(&(x1,)).into_iter().flatten().copied()
+                fn iter_all1_1_0(&self, x1: Math) -> impl Iterator<Item = (std::primitive::i64,)> + use<'_> {
+                    self.hash_index_1
+                        .get(&(x1,))
+                        .into_iter()
+                        .flatten()
+                        .copied()
+                        .map(|(x0, _timestamp)| (x0,))
                 }
-                fn iter2_0_1(&self, x0: std::primitive::i64, x1: Math) -> impl Iterator<Item = ()> + use<'_> {
+                fn iter_all2_0_1(
+                    &self,
+                    x0: std::primitive::i64,
+                    x1: Math,
+                ) -> impl Iterator<Item = ()> + use<'_> {
                     self.hash_index_0_1
                         .get(&(x0, x1))
                         .into_iter()
                         .flatten()
                         .copied()
+                        .map(|(_timestamp)| ())
+                }
+                fn iter_old1_0_1(
+                    &self,
+                    x0: std::primitive::i64,
+                    latest_timestamp: TimeStamp,
+                ) -> impl Iterator<Item = (Math,)> + use<'_> {
+                    self.hash_index_0
+                        .get(&(x0,))
+                        .into_iter()
+                        .copied()
+                        .filter_map(move |(x1, timestamp)| (timestamp < latest_timestamp).then_some((x1,)))
+                }
+                fn iter_old1_1_0(
+                    &self,
+                    x1: Math,
+                    latest_timestamp: TimeStamp,
+                ) -> impl Iterator<Item = (std::primitive::i64,)> + use<'_> {
+                    self.hash_index_1
+                        .get(&(x1,))
+                        .into_iter()
+                        .flatten()
+                        .copied()
+                        .filter_map(move |(x0, timestamp)| (timestamp < latest_timestamp).then_some((x0,)))
+                }
+                fn iter_old2_0_1(
+                    &self,
+                    x0: std::primitive::i64,
+                    x1: Math,
+                    latest_timestamp: TimeStamp,
+                ) -> impl Iterator<Item = ()> + use<'_> {
+                    self.hash_index_0_1
+                        .get(&(x0, x1))
+                        .into_iter()
+                        .flatten()
+                        .copied()
+                        .filter_map(move |(timestamp,)| (timestamp < latest_timestamp).then_some(()))
                 }
                 fn check1_0_1(&self, x0: std::primitive::i64) -> bool {
-                    self.iter1_0_1(x0).next().is_some()
+                    self.iter_all1_0_1(x0).next().is_some()
                 }
                 fn check1_1_0(&self, x1: Math) -> bool {
-                    self.iter1_1_0(x1).next().is_some()
+                    self.iter_all1_1_0(x1).next().is_some()
                 }
                 fn check2_0_1(&self, x0: std::primitive::i64, x1: Math) -> bool {
-                    self.iter2_0_1(x0, x1).next().is_some()
+                    self.iter_all2_0_1(x0, x1).next().is_some()
                 }
                 #[allow(unreachable_code)]
                 fn entry1_0_1(
@@ -3046,7 +3681,7 @@ fn codegen_constant_propagation() {
                     delta: &mut Delta,
                     uf: &mut Unification,
                 ) -> (Math,) {
-                    if let Some((x1,)) = self.iter1_0_1(x0).next() {
+                    if let Some((x1,)) = self.iter_all1_0_1(x0).next() {
                         return (x1,);
                     }
                     let x1 = uf.math_.add_eclass();
@@ -3061,7 +3696,7 @@ fn codegen_constant_propagation() {
                     delta: &mut Delta,
                     uf: &mut Unification,
                 ) -> () {
-                    if let Some(()) = self.iter2_0_1(x0, x1).next() {
+                    if let Some(()) = self.iter_all2_0_1(x0, x1).next() {
                         return ();
                     }
                     delta.const_.push((x0, x1));
@@ -3111,6 +3746,7 @@ fn codegen_constant_propagation() {
             }
             #[derive(Debug, Default)]
             pub struct Theory {
+                pub latest_timestamp: TimeStamp,
                 pub delta: Delta,
                 pub uf: Unification,
                 pub add_: AddRelation,
@@ -3144,8 +3780,8 @@ fn codegen_constant_propagation() {
                 pub fn apply_rules(&mut self) {
                     for (v2, v4, e) in self.add_.iter_new() {
                         if self.const_.check1_1_0(v2) {
-                            for (b,) in self.const_.iter1_1_0(v4) {
-                                for (a,) in self.const_.iter1_1_0(v2) {
+                            for (b,) in self.const_.iter_all1_1_0(v4) {
+                                for (a,) in self.const_.iter_all1_1_0(v2) {
                                     #[doc = "( rule ( ( = e ( Add ( Const a ) ( Const b ) ) ) ) ( ( union e ( Const ( + a b ) ) ) ) )"]
                                     let (v5,) = i64_add012(a, b).next().unwrap();
                                     self.delta.insert_const((v5, e));
@@ -3155,8 +3791,8 @@ fn codegen_constant_propagation() {
                     }
                     for (v20, v22, e_4) in self.mul_.iter_new() {
                         if self.const_.check1_1_0(v20) {
-                            for (b_4,) in self.const_.iter1_1_0(v22) {
-                                for (a_4,) in self.const_.iter1_1_0(v20) {
+                            for (b_4,) in self.const_.iter_all1_1_0(v22) {
+                                for (a_4,) in self.const_.iter_all1_1_0(v20) {
                                     #[doc = "( rule ( ( = e ( Mul ( Const a ) ( Const b ) ) ) ) ( ( union e ( Const ( * a b ) ) ) ) )"]
                                     let (v23,) = i64_mul012(a_4, b_4).next().unwrap();
                                     self.delta.insert_const((v23, e_4));
@@ -3165,29 +3801,29 @@ fn codegen_constant_propagation() {
                         }
                     }
                     for (a_2, v8) in self.const_.iter_new() {
-                        for (v10, e_2) in self.add_.iter1_0_1_2(v8) {
-                            for (b_2,) in self.const_.iter1_1_0(v10) {
+                        for (v10, e_2) in self.add_.iter_old1_0_1_2(v8, self.latest_timestamp) {
+                            for (b_2,) in self.const_.iter_all1_1_0(v10) {
                                 #[doc = "( rule ( ( = e ( Add ( Const a ) ( Const b ) ) ) ) ( ( union e ( Const ( + a b ) ) ) ) )"]
                                 let (v11,) = i64_add012(a_2, b_2).next().unwrap();
                                 self.delta.insert_const((v11, e_2));
                             }
                         }
-                        for (v14, e_3) in self.add_.iter1_1_0_2(v8) {
-                            for (a_3,) in self.const_.iter1_1_0(v14) {
+                        for (v14, e_3) in self.add_.iter_old1_1_0_2(v8, self.latest_timestamp) {
+                            for (a_3,) in self.const_.iter_old1_1_0(v14, self.latest_timestamp) {
                                 #[doc = "( rule ( ( = e ( Add ( Const a ) ( Const b ) ) ) ) ( ( union e ( Const ( + a b ) ) ) ) )"]
                                 let (v17,) = i64_add012(a_3, a_2).next().unwrap();
                                 self.delta.insert_const((v17, e_3));
                             }
                         }
-                        for (v28, e_5) in self.mul_.iter1_0_1_2(v8) {
-                            for (b_5,) in self.const_.iter1_1_0(v28) {
+                        for (v28, e_5) in self.mul_.iter_old1_0_1_2(v8, self.latest_timestamp) {
+                            for (b_5,) in self.const_.iter_all1_1_0(v28) {
                                 #[doc = "( rule ( ( = e ( Mul ( Const a ) ( Const b ) ) ) ) ( ( union e ( Const ( * a b ) ) ) ) )"]
                                 let (v29,) = i64_mul012(a_2, b_5).next().unwrap();
                                 self.delta.insert_const((v29, e_5));
                             }
                         }
-                        for (v32, e_6) in self.mul_.iter1_1_0_2(v8) {
-                            for (a_6,) in self.const_.iter1_1_0(v32) {
+                        for (v32, e_6) in self.mul_.iter_old1_1_0_2(v8, self.latest_timestamp) {
+                            for (a_6,) in self.const_.iter_old1_1_0(v32, self.latest_timestamp) {
                                 #[doc = "( rule ( ( = e ( Mul ( Const a ) ( Const b ) ) ) ) ( ( union e ( Const ( * a b ) ) ) ) )"]
                                 let (v35,) = i64_mul012(a_6, a_2).next().unwrap();
                                 self.delta.insert_const((v35, e_6));
@@ -3228,6 +3864,7 @@ fn codegen_constant_propagation() {
                 }
                 #[inline(never)]
                 pub fn canonicalize(&mut self) {
+                    self.latest_timestamp.0 += 1;
                     log_duration!("canonicalize (total): {}", {
                         self.add_.clear_new();
                         self.mul_.clear_new();
@@ -3236,29 +3873,51 @@ fn codegen_constant_propagation() {
                             return;
                         }
                         log_duration!("update_begin (total): {}", {
-                            self.add_.update_begin(&mut self.delta.add_, &mut self.uf);
-                            self.mul_.update_begin(&mut self.delta.mul_, &mut self.uf);
-                            self.const_
-                                .update_begin(&mut self.delta.const_, &mut self.uf);
+                            self.add_
+                                .update_begin(&mut self.delta.add_, &mut self.uf, self.latest_timestamp);
+                            self.mul_
+                                .update_begin(&mut self.delta.mul_, &mut self.uf, self.latest_timestamp);
+                            self.const_.update_begin(
+                                &mut self.delta.const_,
+                                &mut self.uf,
+                                self.latest_timestamp,
+                            );
                         });
                         log_duration!("update_loop (total): {}", {
                             loop {
                                 let mut progress = false;
-                                progress |= self.add_.update(&mut self.delta.add_, &mut self.uf);
-                                progress |= self.mul_.update(&mut self.delta.mul_, &mut self.uf);
-                                progress |= self.const_.update(&mut self.delta.const_, &mut self.uf);
+                                progress |=
+                                    self.add_
+                                        .update(&mut self.delta.add_, &mut self.uf, self.latest_timestamp);
+                                progress |=
+                                    self.mul_
+                                        .update(&mut self.delta.mul_, &mut self.uf, self.latest_timestamp);
+                                progress |= self.const_.update(
+                                    &mut self.delta.const_,
+                                    &mut self.uf,
+                                    self.latest_timestamp,
+                                );
                                 if !progress {
                                     break;
                                 }
                             }
                         });
                         log_duration!("update_finalize (total): {}", {
-                            self.add_
-                                .update_finalize(&mut self.delta.add_, &mut self.uf);
-                            self.mul_
-                                .update_finalize(&mut self.delta.mul_, &mut self.uf);
-                            self.const_
-                                .update_finalize(&mut self.delta.const_, &mut self.uf);
+                            self.add_.update_finalize(
+                                &mut self.delta.add_,
+                                &mut self.uf,
+                                self.latest_timestamp,
+                            );
+                            self.mul_.update_finalize(
+                                &mut self.delta.mul_,
+                                &mut self.uf,
+                                self.latest_timestamp,
+                            );
+                            self.const_.update_finalize(
+                                &mut self.delta.const_,
+                                &mut self.uf,
+                                self.latest_timestamp,
+                            );
                             self.uf.reset_num_uprooted();
                         });
                     });
@@ -3309,8 +3968,8 @@ fn codegen_commutative() {
             #[derive(Debug, Default)]
             struct AddRelation {
                 new: Vec<<Self as Relation>::Row>,
-                hash_index_0_1: runtime::HashMap<(Math, Math), (Math,)>,
-                hash_index_0_1_2: runtime::HashMap<(Math, Math, Math), runtime::SmallVec<[(); 1]>>,
+                hash_index_0_1: runtime::HashMap<(Math, Math), (Math, TimeStamp)>,
+                hash_index_0_1_2: runtime::HashMap<(Math, Math, Math), runtime::SmallVec<[(TimeStamp,); 1]>>,
                 math_num_uprooted_at_latest_retain: usize,
             }
             impl Relation for AddRelation {
@@ -3334,14 +3993,19 @@ fn codegen_commutative() {
                 }
                 fn emit_graphviz(&self, buf: &mut String) {
                     use std::fmt::Write;
-                    for (i, ((x0, x1), (x2,))) in self.hash_index_0_1.iter().enumerate() {
+                    for (i, ((x0, x1), (x2, _timestamp))) in self.hash_index_0_1.iter().enumerate() {
                         writeln!(buf, "{}_{i} -> {}_{};", "add", "math", x0).unwrap();
                         writeln!(buf, "{}_{i} -> {}_{};", "add", "math", x1).unwrap();
                         writeln!(buf, "{}_{i} -> {}_{};", "add", "math", x2).unwrap();
                         writeln!(buf, "{}_{i} [shape = box];", "add").unwrap();
                     }
                 }
-                fn update_begin(&mut self, insertions: &[Self::Row], uf: &mut Unification) {
+                fn update_begin(
+                    &mut self,
+                    insertions: &[Self::Row],
+                    uf: &mut Unification,
+                    latest_timestamp: TimeStamp,
+                ) {
                     log_duration!("update_begin {}: {}", "add", {
                         for &(mut x0, mut x1, mut x2) in insertions {
                             match self
@@ -3349,43 +4013,59 @@ fn codegen_commutative() {
                                 .entry((uf.math_.find(x0), uf.math_.find(x1)))
                             {
                                 runtime::HashMapEntry::Occupied(mut entry) => {
-                                    let (y2,) = entry.get_mut();
-                                    uf.math_.union_mut(&mut x2, y2);
+                                    let (y2, timestamp) = entry.get_mut();
+                                    let changed = false;
+                                    let old_val = *y2;
+                                    let changed = changed | (old_val != uf.math_.union_mut(&mut x2, y2));
+                                    if changed {
+                                        *timestamp = latest_timestamp;
+                                    }
                                 }
                                 runtime::HashMapEntry::Vacant(entry) => {
-                                    entry.insert((uf.math_.find(x2),));
+                                    entry.insert((uf.math_.find(x2), latest_timestamp));
                                 }
                             }
                         }
                     });
                 }
-                fn update(&mut self, insertions: &mut Vec<Self::Row>, uf: &mut Unification) -> bool {
+                fn update(
+                    &mut self,
+                    insertions: &mut Vec<Self::Row>,
+                    uf: &mut Unification,
+                    latest_timestamp: TimeStamp,
+                ) -> bool {
                     if self.math_num_uprooted_at_latest_retain == uf.math_.num_uprooted() {
                         return false;
                     }
                     let offset = insertions.len();
                     log_duration!("update {}: {}", "add", {
                         self.math_num_uprooted_at_latest_retain = uf.math_.num_uprooted();
-                        self.hash_index_0_1.retain(|&(x0, x1), &mut (x2,)| {
-                            if uf.math_.is_root(x0) & uf.math_.is_root(x1) & uf.math_.is_root(x2) {
-                                true
-                            } else {
-                                insertions.push((x0, x1, x2));
-                                false
-                            }
-                        });
+                        self.hash_index_0_1
+                            .retain(|&(x0, x1), &mut (x2, _timestamp)| {
+                                if uf.math_.is_root(x0) & uf.math_.is_root(x1) & uf.math_.is_root(x2) {
+                                    true
+                                } else {
+                                    insertions.push((x0, x1, x2));
+                                    false
+                                }
+                            });
                     });
-                    self.update_begin(&insertions[offset..], uf);
+                    self.update_begin(&insertions[offset..], uf, latest_timestamp);
                     true
                 }
-                fn update_finalize(&mut self, insertions: &mut Vec<Self::Row>, uf: &mut Unification) {
+                fn update_finalize(
+                    &mut self,
+                    insertions: &mut Vec<Self::Row>,
+                    uf: &mut Unification,
+                    latest_timestamp: TimeStamp,
+                ) {
                     log_duration!("update_finalize {}: {}", "add", {
                         assert!(self.new.is_empty());
                         log_duration!("fill new: {}", {
                             self.new.extend(
                                 self.hash_index_0_1
                                     .iter()
-                                    .map(|(&(x0, x1), &(x2,))| (x0, x1, x2))
+                                    .map(|(&(x0, x1), &(x2, _timestamp))| (x0, x1, x2))
                                     .filter(|&(x0, x1, x2)| !self.hash_index_0_1_2.contains_key(&(x0, x1, x2))),
                             );
                             insertions.clear();
@@ -3397,15 +4077,15 @@ fn codegen_commutative() {
                                 self.hash_index_0_1_2
                                     .entry((x0, x1, x2))
                                     .or_default()
-                                    .push(());
+                                    .push((latest_timestamp,));
                             }
                         });
                         log_duration!("retain index: {}", {
                             self.hash_index_0_1_2.retain(|&(x0, x1, x2), v| {
                                 if uf.math_.is_root(x0) & uf.math_.is_root(x1) & uf.math_.is_root(x2) {
-                                    v.retain(|&mut ()| true);
+                                    v.retain(|&mut (_timestamp)| true);
                                     v.sort_unstable();
-                                    v.dedup();
+                                    v.dedup_by(|(t1,), (t2,)| true);
                                     true
                                 } else {
                                     false
@@ -3417,25 +4097,56 @@ fn codegen_commutative() {
                 }
             }
             impl AddRelation {
-                fn iter2_0_1_2(&self, x0: Math, x1: Math) -> impl Iterator<Item = (Math,)> + use<'_> {
-                    self.hash_index_0_1.get(&(x0, x1)).into_iter().copied()
+                fn iter_all2_0_1_2(&self, x0: Math, x1: Math) -> impl Iterator<Item = (Math,)> + use<'_> {
+                    self.hash_index_0_1
+                        .get(&(x0, x1))
+                        .into_iter()
+                        .copied()
+                        .map(|(x2, _timestamp)| (x2,))
                 }
-                fn iter3_0_1_2(&self, x0: Math, x1: Math, x2: Math) -> impl Iterator<Item = ()> + use<'_> {
+                fn iter_all3_0_1_2(&self, x0: Math, x1: Math, x2: Math) -> impl Iterator<Item = ()> + use<'_> {
                     self.hash_index_0_1_2
                         .get(&(x0, x1, x2))
                         .into_iter()
                         .flatten()
                         .copied()
+                        .map(|(_timestamp)| ())
+                }
+                fn iter_old2_0_1_2(
+                    &self,
+                    x0: Math,
+                    x1: Math,
+                    latest_timestamp: TimeStamp,
+                ) -> impl Iterator<Item = (Math,)> + use<'_> {
+                    self.hash_index_0_1
+                        .get(&(x0, x1))
+                        .into_iter()
+                        .copied()
+                        .filter_map(move |(x2, timestamp)| (timestamp < latest_timestamp).then_some((x2,)))
+                }
+                fn iter_old3_0_1_2(
+                    &self,
+                    x0: Math,
+                    x1: Math,
+                    x2: Math,
+                    latest_timestamp: TimeStamp,
+                ) -> impl Iterator<Item = ()> + use<'_> {
+                    self.hash_index_0_1_2
+                        .get(&(x0, x1, x2))
+                        .into_iter()
+                        .flatten()
+                        .copied()
+                        .filter_map(move |(timestamp,)| (timestamp < latest_timestamp).then_some(()))
                 }
                 fn check2_0_1_2(&self, x0: Math, x1: Math) -> bool {
-                    self.iter2_0_1_2(x0, x1).next().is_some()
+                    self.iter_all2_0_1_2(x0, x1).next().is_some()
                 }
                 fn check3_0_1_2(&self, x0: Math, x1: Math, x2: Math) -> bool {
-                    self.iter3_0_1_2(x0, x1, x2).next().is_some()
+                    self.iter_all3_0_1_2(x0, x1, x2).next().is_some()
                 }
                 #[allow(unreachable_code)]
                 fn entry2_0_1_2(&self, x0: Math, x1: Math, delta: &mut Delta, uf: &mut Unification) -> (Math,) {
-                    if let Some((x2,)) = self.iter2_0_1_2(x0, x1).next() {
+                    if let Some((x2,)) = self.iter_all2_0_1_2(x0, x1).next() {
                         return (x2,);
                     }
                     let x2 = uf.math_.add_eclass();
@@ -3451,7 +4162,7 @@ fn codegen_commutative() {
                     delta: &mut Delta,
                     uf: &mut Unification,
                 ) -> () {
-                    if let Some(()) = self.iter3_0_1_2(x0, x1, x2).next() {
+                    if let Some(()) = self.iter_all3_0_1_2(x0, x1, x2).next() {
                         return ();
                     }
                     delta.add_.push((x0, x1, x2));
@@ -3491,6 +4202,7 @@ fn codegen_commutative() {
             }
             #[derive(Debug, Default)]
             pub struct Theory {
+                pub latest_timestamp: TimeStamp,
                 pub delta: Delta,
                 pub uf: Unification,
                 pub add_: AddRelation,
@@ -3550,26 +4262,33 @@ fn codegen_commutative() {
                 }
                 #[inline(never)]
                 pub fn canonicalize(&mut self) {
+                    self.latest_timestamp.0 += 1;
                     log_duration!("canonicalize (total): {}", {
                         self.add_.clear_new();
                         if !self.delta.has_new_inserts() && self.uf.num_uprooted() == 0 {
                             return;
                         }
                         log_duration!("update_begin (total): {}", {
-                            self.add_.update_begin(&mut self.delta.add_, &mut self.uf);
+                            self.add_
+                                .update_begin(&mut self.delta.add_, &mut self.uf, self.latest_timestamp);
                         });
                         log_duration!("update_loop (total): {}", {
                             loop {
                                 let mut progress = false;
-                                progress |= self.add_.update(&mut self.delta.add_, &mut self.uf);
+                                progress |=
+                                    self.add_
+                                        .update(&mut self.delta.add_, &mut self.uf, self.latest_timestamp);
                                 if !progress {
                                     break;
                                 }
                             }
                         });
                         log_duration!("update_finalize (total): {}", {
-                            self.add_
-                                .update_finalize(&mut self.delta.add_, &mut self.uf);
+                            self.add_.update_finalize(
+                                &mut self.delta.add_,
+                                &mut self.uf,
+                                self.latest_timestamp,
+                            );
                             self.uf.reset_num_uprooted();
                         });
                     });
@@ -3709,8 +4428,8 @@ fn regression_entry2() {
             #[derive(Debug, Default)]
             struct SubRelation {
                 new: Vec<<Self as Relation>::Row>,
-                hash_index_0_1: runtime::HashMap<(Math, Math), (Math,)>,
-                hash_index_0_1_2: runtime::HashMap<(Math, Math, Math), runtime::SmallVec<[(); 1]>>,
+                hash_index_0_1: runtime::HashMap<(Math, Math), (Math, TimeStamp)>,
+                hash_index_0_1_2: runtime::HashMap<(Math, Math, Math), runtime::SmallVec<[(TimeStamp,); 1]>>,
                 math_num_uprooted_at_latest_retain: usize,
             }
             impl Relation for SubRelation {
@@ -3734,14 +4453,19 @@ fn regression_entry2() {
                 }
                 fn emit_graphviz(&self, buf: &mut String) {
                     use std::fmt::Write;
-                    for (i, ((x0, x1), (x2,))) in self.hash_index_0_1.iter().enumerate() {
+                    for (i, ((x0, x1), (x2, _timestamp))) in self.hash_index_0_1.iter().enumerate() {
                         writeln!(buf, "{}_{i} -> {}_{};", "sub", "math", x0).unwrap();
                         writeln!(buf, "{}_{i} -> {}_{};", "sub", "math", x1).unwrap();
                         writeln!(buf, "{}_{i} -> {}_{};", "sub", "math", x2).unwrap();
                         writeln!(buf, "{}_{i} [shape = box];", "sub").unwrap();
                     }
                 }
-                fn update_begin(&mut self, insertions: &[Self::Row], uf: &mut Unification) {
+                fn update_begin(
+                    &mut self,
+                    insertions: &[Self::Row],
+                    uf: &mut Unification,
+                    latest_timestamp: TimeStamp,
+                ) {
                     log_duration!("update_begin {}: {}", "sub", {
                         for &(mut x0, mut x1, mut x2) in insertions {
                             match self
@@ -3749,43 +4473,59 @@ fn regression_entry2() {
                                 .entry((uf.math_.find(x0), uf.math_.find(x1)))
                             {
                                 runtime::HashMapEntry::Occupied(mut entry) => {
-                                    let (y2,) = entry.get_mut();
-                                    uf.math_.union_mut(&mut x2, y2);
+                                    let (y2, timestamp) = entry.get_mut();
+                                    let changed = false;
+                                    let old_val = *y2;
+                                    let changed = changed | (old_val != uf.math_.union_mut(&mut x2, y2));
+                                    if changed {
+                                        *timestamp = latest_timestamp;
+                                    }
                                 }
                                 runtime::HashMapEntry::Vacant(entry) => {
-                                    entry.insert((uf.math_.find(x2),));
+                                    entry.insert((uf.math_.find(x2), latest_timestamp));
                                 }
                             }
                         }
                     });
                 }
-                fn update(&mut self, insertions: &mut Vec<Self::Row>, uf: &mut Unification) -> bool {
+                fn update(
+                    &mut self,
+                    insertions: &mut Vec<Self::Row>,
+                    uf: &mut Unification,
+                    latest_timestamp: TimeStamp,
+                ) -> bool {
                     if self.math_num_uprooted_at_latest_retain == uf.math_.num_uprooted() {
                         return false;
                     }
                     let offset = insertions.len();
                     log_duration!("update {}: {}", "sub", {
                         self.math_num_uprooted_at_latest_retain = uf.math_.num_uprooted();
-                        self.hash_index_0_1.retain(|&(x0, x1), &mut (x2,)| {
-                            if uf.math_.is_root(x0) & uf.math_.is_root(x1) & uf.math_.is_root(x2) {
-                                true
-                            } else {
-                                insertions.push((x0, x1, x2));
-                                false
-                            }
-                        });
+                        self.hash_index_0_1
+                            .retain(|&(x0, x1), &mut (x2, _timestamp)| {
+                                if uf.math_.is_root(x0) & uf.math_.is_root(x1) & uf.math_.is_root(x2) {
+                                    true
+                                } else {
+                                    insertions.push((x0, x1, x2));
+                                    false
+                                }
+                            });
                     });
-                    self.update_begin(&insertions[offset..], uf);
+                    self.update_begin(&insertions[offset..], uf, latest_timestamp);
                     true
                 }
-                fn update_finalize(&mut self, insertions: &mut Vec<Self::Row>, uf: &mut Unification) {
+                fn update_finalize(
+                    &mut self,
+                    insertions: &mut Vec<Self::Row>,
+                    uf: &mut Unification,
+                    latest_timestamp: TimeStamp,
+                ) {
                     log_duration!("update_finalize {}: {}", "sub", {
                         assert!(self.new.is_empty());
                         log_duration!("fill new: {}", {
                             self.new.extend(
                                 self.hash_index_0_1
                                     .iter()
-                                    .map(|(&(x0, x1), &(x2,))| (x0, x1, x2))
+                                    .map(|(&(x0, x1), &(x2, _timestamp))| (x0, x1, x2))
                                     .filter(|&(x0, x1, x2)| !self.hash_index_0_1_2.contains_key(&(x0, x1, x2))),
                             );
                             insertions.clear();
@@ -3797,15 +4537,15 @@ fn regression_entry2() {
                                 self.hash_index_0_1_2
                                     .entry((x0, x1, x2))
                                     .or_default()
-                                    .push(());
+                                    .push((latest_timestamp,));
                             }
                         });
                         log_duration!("retain index: {}", {
                             self.hash_index_0_1_2.retain(|&(x0, x1, x2), v| {
                                 if uf.math_.is_root(x0) & uf.math_.is_root(x1) & uf.math_.is_root(x2) {
-                                    v.retain(|&mut ()| true);
+                                    v.retain(|&mut (_timestamp)| true);
                                     v.sort_unstable();
-                                    v.dedup();
+                                    v.dedup_by(|(t1,), (t2,)| true);
                                     true
                                 } else {
                                     false
@@ -3817,25 +4557,56 @@ fn regression_entry2() {
                 }
             }
             impl SubRelation {
-                fn iter2_0_1_2(&self, x0: Math, x1: Math) -> impl Iterator<Item = (Math,)> + use<'_> {
-                    self.hash_index_0_1.get(&(x0, x1)).into_iter().copied()
+                fn iter_all2_0_1_2(&self, x0: Math, x1: Math) -> impl Iterator<Item = (Math,)> + use<'_> {
+                    self.hash_index_0_1
+                        .get(&(x0, x1))
+                        .into_iter()
+                        .copied()
+                        .map(|(x2, _timestamp)| (x2,))
                 }
-                fn iter3_0_1_2(&self, x0: Math, x1: Math, x2: Math) -> impl Iterator<Item = ()> + use<'_> {
+                fn iter_all3_0_1_2(&self, x0: Math, x1: Math, x2: Math) -> impl Iterator<Item = ()> + use<'_> {
                     self.hash_index_0_1_2
                         .get(&(x0, x1, x2))
                         .into_iter()
                         .flatten()
                         .copied()
+                        .map(|(_timestamp)| ())
+                }
+                fn iter_old2_0_1_2(
+                    &self,
+                    x0: Math,
+                    x1: Math,
+                    latest_timestamp: TimeStamp,
+                ) -> impl Iterator<Item = (Math,)> + use<'_> {
+                    self.hash_index_0_1
+                        .get(&(x0, x1))
+                        .into_iter()
+                        .copied()
+                        .filter_map(move |(x2, timestamp)| (timestamp < latest_timestamp).then_some((x2,)))
+                }
+                fn iter_old3_0_1_2(
+                    &self,
+                    x0: Math,
+                    x1: Math,
+                    x2: Math,
+                    latest_timestamp: TimeStamp,
+                ) -> impl Iterator<Item = ()> + use<'_> {
+                    self.hash_index_0_1_2
+                        .get(&(x0, x1, x2))
+                        .into_iter()
+                        .flatten()
+                        .copied()
+                        .filter_map(move |(timestamp,)| (timestamp < latest_timestamp).then_some(()))
                 }
                 fn check2_0_1_2(&self, x0: Math, x1: Math) -> bool {
-                    self.iter2_0_1_2(x0, x1).next().is_some()
+                    self.iter_all2_0_1_2(x0, x1).next().is_some()
                 }
                 fn check3_0_1_2(&self, x0: Math, x1: Math, x2: Math) -> bool {
-                    self.iter3_0_1_2(x0, x1, x2).next().is_some()
+                    self.iter_all3_0_1_2(x0, x1, x2).next().is_some()
                 }
                 #[allow(unreachable_code)]
                 fn entry2_0_1_2(&self, x0: Math, x1: Math, delta: &mut Delta, uf: &mut Unification) -> (Math,) {
-                    if let Some((x2,)) = self.iter2_0_1_2(x0, x1).next() {
+                    if let Some((x2,)) = self.iter_all2_0_1_2(x0, x1).next() {
                         return (x2,);
                     }
                     let x2 = uf.math_.add_eclass();
@@ -3851,7 +4622,7 @@ fn regression_entry2() {
                     delta: &mut Delta,
                     uf: &mut Unification,
                 ) -> () {
-                    if let Some(()) = self.iter3_0_1_2(x0, x1, x2).next() {
+                    if let Some(()) = self.iter_all3_0_1_2(x0, x1, x2).next() {
                         return ();
                     }
                     delta.sub_.push((x0, x1, x2));
@@ -3861,8 +4632,9 @@ fn regression_entry2() {
             #[derive(Debug, Default)]
             struct ConstRelation {
                 new: Vec<<Self as Relation>::Row>,
-                hash_index_0: runtime::HashMap<(std::primitive::i64,), (Math,)>,
-                hash_index_0_1: runtime::HashMap<(std::primitive::i64, Math), runtime::SmallVec<[(); 1]>>,
+                hash_index_0: runtime::HashMap<(std::primitive::i64,), (Math, TimeStamp)>,
+                hash_index_0_1:
+                    runtime::HashMap<(std::primitive::i64, Math), runtime::SmallVec<[(TimeStamp,); 1]>>,
                 i64_num_uprooted_at_latest_retain: usize,
                 math_num_uprooted_at_latest_retain: usize,
             }
@@ -3887,35 +4659,50 @@ fn regression_entry2() {
                 }
                 fn emit_graphviz(&self, buf: &mut String) {
                     use std::fmt::Write;
-                    for (i, ((x0,), (x1,))) in self.hash_index_0.iter().enumerate() {
+                    for (i, ((x0,), (x1, _timestamp))) in self.hash_index_0.iter().enumerate() {
                         writeln!(buf, "{}_{i} -> {}_{};", "const", "i64", x0).unwrap();
                         writeln!(buf, "{}_{i} -> {}_{};", "const", "math", x1).unwrap();
                         writeln!(buf, "{}_{i} [shape = box];", "const").unwrap();
                     }
                 }
-                fn update_begin(&mut self, insertions: &[Self::Row], uf: &mut Unification) {
+                fn update_begin(
+                    &mut self,
+                    insertions: &[Self::Row],
+                    uf: &mut Unification,
+                    latest_timestamp: TimeStamp,
+                ) {
                     log_duration!("update_begin {}: {}", "const", {
                         for &(mut x0, mut x1) in insertions {
                             match self.hash_index_0.entry((x0,)) {
                                 runtime::HashMapEntry::Occupied(mut entry) => {
-                                    let (y1,) = entry.get_mut();
-                                    uf.math_.union_mut(&mut x1, y1);
+                                    let (y1, timestamp) = entry.get_mut();
+                                    let changed = false;
+                                    let old_val = *y1;
+                                    let changed = changed | (old_val != uf.math_.union_mut(&mut x1, y1));
+                                    if changed {
+                                        *timestamp = latest_timestamp;
+                                    }
                                 }
                                 runtime::HashMapEntry::Vacant(entry) => {
-                                    entry.insert((uf.math_.find(x1),));
+                                    entry.insert((uf.math_.find(x1), latest_timestamp));
                                 }
                             }
                         }
                     });
                 }
-                fn update(&mut self, insertions: &mut Vec<Self::Row>, uf: &mut Unification) -> bool {
+                fn update(
+                    &mut self,
+                    insertions: &mut Vec<Self::Row>,
+                    uf: &mut Unification,
+                    latest_timestamp: TimeStamp,
+                ) -> bool {
                     if self.math_num_uprooted_at_latest_retain == uf.math_.num_uprooted() {
                         return false;
                     }
                     let offset = insertions.len();
                     log_duration!("update {}: {}", "const", {
                         self.math_num_uprooted_at_latest_retain = uf.math_.num_uprooted();
-                        self.hash_index_0.retain(|&(x0,), &mut (x1,)| {
+                        self.hash_index_0.retain(|&(x0,), &mut (x1, _timestamp)| {
                             if uf.math_.is_root(x1) {
                                 true
                             } else {
@@ -3924,17 +4711,22 @@ fn regression_entry2() {
                             }
                         });
                     });
-                    self.update_begin(&insertions[offset..], uf);
+                    self.update_begin(&insertions[offset..], uf, latest_timestamp);
                     true
                 }
-                fn update_finalize(&mut self, insertions: &mut Vec<Self::Row>, uf: &mut Unification) {
+                fn update_finalize(
+                    &mut self,
+                    insertions: &mut Vec<Self::Row>,
+                    uf: &mut Unification,
+                    latest_timestamp: TimeStamp,
+                ) {
                     log_duration!("update_finalize {}: {}", "const", {
                         assert!(self.new.is_empty());
                         log_duration!("fill new: {}", {
                             self.new.extend(
                                 self.hash_index_0
                                     .iter()
-                                    .map(|(&(x0,), &(x1,))| (x0, x1))
+                                    .map(|(&(x0,), &(x1, _timestamp))| (x0, x1))
                                     .filter(|&(x0, x1)| !self.hash_index_0_1.contains_key(&(x0, x1))),
                             );
                             insertions.clear();
@@ -3943,15 +4735,18 @@ fn regression_entry2() {
                         });
                         log_duration!("fill index: {}", {
                             for &(x0, x1) in &self.new {
-                                self.hash_index_0_1.entry((x0, x1)).or_default().push(());
+                                self.hash_index_0_1
+                                    .entry((x0, x1))
+                                    .or_default()
+                                    .push((latest_timestamp,));
                             }
                         });
                         log_duration!("retain index: {}", {
                             self.hash_index_0_1.retain(|&(x0, x1), v| {
                                 if uf.math_.is_root(x1) {
-                                    v.retain(|&mut ()| true);
+                                    v.retain(|&mut (_timestamp)| true);
                                     v.sort_unstable();
-                                    v.dedup();
+                                    v.dedup_by(|(t1,), (t2,)| true);
                                     true
                                 } else {
                                     false
@@ -3963,21 +4758,54 @@ fn regression_entry2() {
                 }
             }
             impl ConstRelation {
-                fn iter1_0_1(&self, x0: std::primitive::i64) -> impl Iterator<Item = (Math,)> + use<'_> {
-                    self.hash_index_0.get(&(x0,)).into_iter().copied()
+                fn iter_all1_0_1(&self, x0: std::primitive::i64) -> impl Iterator<Item = (Math,)> + use<'_> {
+                    self.hash_index_0
+                        .get(&(x0,))
+                        .into_iter()
+                        .copied()
+                        .map(|(x1, _timestamp)| (x1,))
                 }
-                fn iter2_0_1(&self, x0: std::primitive::i64, x1: Math) -> impl Iterator<Item = ()> + use<'_> {
+                fn iter_all2_0_1(
+                    &self,
+                    x0: std::primitive::i64,
+                    x1: Math,
+                ) -> impl Iterator<Item = ()> + use<'_> {
                     self.hash_index_0_1
                         .get(&(x0, x1))
                         .into_iter()
                         .flatten()
                         .copied()
+                        .map(|(_timestamp)| ())
+                }
+                fn iter_old1_0_1(
+                    &self,
+                    x0: std::primitive::i64,
+                    latest_timestamp: TimeStamp,
+                ) -> impl Iterator<Item = (Math,)> + use<'_> {
+                    self.hash_index_0
+                        .get(&(x0,))
+                        .into_iter()
+                        .copied()
+                        .filter_map(move |(x1, timestamp)| (timestamp < latest_timestamp).then_some((x1,)))
+                }
+                fn iter_old2_0_1(
+                    &self,
+                    x0: std::primitive::i64,
+                    x1: Math,
+                    latest_timestamp: TimeStamp,
+                ) -> impl Iterator<Item = ()> + use<'_> {
+                    self.hash_index_0_1
+                        .get(&(x0, x1))
+                        .into_iter()
+                        .flatten()
+                        .copied()
+                        .filter_map(move |(timestamp,)| (timestamp < latest_timestamp).then_some(()))
                 }
                 fn check1_0_1(&self, x0: std::primitive::i64) -> bool {
-                    self.iter1_0_1(x0).next().is_some()
+                    self.iter_all1_0_1(x0).next().is_some()
                 }
                 fn check2_0_1(&self, x0: std::primitive::i64, x1: Math) -> bool {
-                    self.iter2_0_1(x0, x1).next().is_some()
+                    self.iter_all2_0_1(x0, x1).next().is_some()
                 }
                 #[allow(unreachable_code)]
                 fn entry1_0_1(
@@ -3986,7 +4814,7 @@ fn regression_entry2() {
                     delta: &mut Delta,
                     uf: &mut Unification,
                 ) -> (Math,) {
-                    if let Some((x1,)) = self.iter1_0_1(x0).next() {
+                    if let Some((x1,)) = self.iter_all1_0_1(x0).next() {
                         return (x1,);
                     }
                     let x1 = uf.math_.add_eclass();
@@ -4001,7 +4829,7 @@ fn regression_entry2() {
                     delta: &mut Delta,
                     uf: &mut Unification,
                 ) -> () {
-                    if let Some(()) = self.iter2_0_1(x0, x1).next() {
+                    if let Some(()) = self.iter_all2_0_1(x0, x1).next() {
                         return ();
                     }
                     delta.const_.push((x0, x1));
@@ -4046,6 +4874,7 @@ fn regression_entry2() {
             }
             #[derive(Debug, Default)]
             pub struct Theory {
+                pub latest_timestamp: TimeStamp,
                 pub delta: Delta,
                 pub uf: Unification,
                 global_i64: GlobalVars<std::primitive::i64>,
@@ -4113,6 +4942,7 @@ fn regression_entry2() {
                 }
                 #[inline(never)]
                 pub fn canonicalize(&mut self) {
+                    self.latest_timestamp.0 += 1;
                     log_duration!("canonicalize (total): {}", {
                         self.sub_.clear_new();
                         self.const_.clear_new();
@@ -4120,25 +4950,41 @@ fn regression_entry2() {
                             return;
                         }
                         log_duration!("update_begin (total): {}", {
-                            self.sub_.update_begin(&mut self.delta.sub_, &mut self.uf);
-                            self.const_
-                                .update_begin(&mut self.delta.const_, &mut self.uf);
+                            self.sub_
+                                .update_begin(&mut self.delta.sub_, &mut self.uf, self.latest_timestamp);
+                            self.const_.update_begin(
+                                &mut self.delta.const_,
+                                &mut self.uf,
+                                self.latest_timestamp,
+                            );
                         });
                         log_duration!("update_loop (total): {}", {
                             loop {
                                 let mut progress = false;
-                                progress |= self.sub_.update(&mut self.delta.sub_, &mut self.uf);
-                                progress |= self.const_.update(&mut self.delta.const_, &mut self.uf);
+                                progress |=
+                                    self.sub_
+                                        .update(&mut self.delta.sub_, &mut self.uf, self.latest_timestamp);
+                                progress |= self.const_.update(
+                                    &mut self.delta.const_,
+                                    &mut self.uf,
+                                    self.latest_timestamp,
+                                );
                                 if !progress {
                                     break;
                                 }
                             }
                         });
                         log_duration!("update_finalize (total): {}", {
-                            self.sub_
-                                .update_finalize(&mut self.delta.sub_, &mut self.uf);
-                            self.const_
-                                .update_finalize(&mut self.delta.const_, &mut self.uf);
+                            self.sub_.update_finalize(
+                                &mut self.delta.sub_,
+                                &mut self.uf,
+                                self.latest_timestamp,
+                            );
+                            self.const_.update_finalize(
+                                &mut self.delta.const_,
+                                &mut self.uf,
+                                self.latest_timestamp,
+                            );
                             self.global_i64.update_finalize();
                             self.uf.reset_num_uprooted();
                         });
@@ -4264,8 +5110,8 @@ fn regression_entry() {
             #[derive(Debug, Default)]
             struct IntegralRelation {
                 new: Vec<<Self as Relation>::Row>,
-                hash_index_0_1: runtime::HashMap<(Math, Math), (Math,)>,
-                hash_index_0_1_2: runtime::HashMap<(Math, Math, Math), runtime::SmallVec<[(); 1]>>,
+                hash_index_0_1: runtime::HashMap<(Math, Math), (Math, TimeStamp)>,
+                hash_index_0_1_2: runtime::HashMap<(Math, Math, Math), runtime::SmallVec<[(TimeStamp,); 1]>>,
                 math_num_uprooted_at_latest_retain: usize,
             }
             impl Relation for IntegralRelation {
@@ -4289,14 +5135,19 @@ fn regression_entry() {
                 }
                 fn emit_graphviz(&self, buf: &mut String) {
                     use std::fmt::Write;
-                    for (i, ((x0, x1), (x2,))) in self.hash_index_0_1.iter().enumerate() {
+                    for (i, ((x0, x1), (x2, _timestamp))) in self.hash_index_0_1.iter().enumerate() {
                         writeln!(buf, "{}_{i} -> {}_{};", "integral", "math", x0).unwrap();
                         writeln!(buf, "{}_{i} -> {}_{};", "integral", "math", x1).unwrap();
                         writeln!(buf, "{}_{i} -> {}_{};", "integral", "math", x2).unwrap();
                         writeln!(buf, "{}_{i} [shape = box];", "integral").unwrap();
                     }
                 }
-                fn update_begin(&mut self, insertions: &[Self::Row], uf: &mut Unification) {
+                fn update_begin(
+                    &mut self,
+                    insertions: &[Self::Row],
+                    uf: &mut Unification,
+                    latest_timestamp: TimeStamp,
+                ) {
                     log_duration!("update_begin {}: {}", "integral", {
                         for &(mut x0, mut x1, mut x2) in insertions {
                             match self
@@ -4304,43 +5155,59 @@ fn regression_entry() {
                                 .entry((uf.math_.find(x0), uf.math_.find(x1)))
                             {
                                 runtime::HashMapEntry::Occupied(mut entry) => {
-                                    let (y2,) = entry.get_mut();
-                                    uf.math_.union_mut(&mut x2, y2);
+                                    let (y2, timestamp) = entry.get_mut();
+                                    let changed = false;
+                                    let old_val = *y2;
+                                    let changed = changed | (old_val != uf.math_.union_mut(&mut x2, y2));
+                                    if changed {
+                                        *timestamp = latest_timestamp;
+                                    }
                                 }
                                 runtime::HashMapEntry::Vacant(entry) => {
-                                    entry.insert((uf.math_.find(x2),));
+                                    entry.insert((uf.math_.find(x2), latest_timestamp));
                                 }
                             }
                         }
                     });
                 }
-                fn update(&mut self, insertions: &mut Vec<Self::Row>, uf: &mut Unification) -> bool {
+                fn update(
+                    &mut self,
+                    insertions: &mut Vec<Self::Row>,
+                    uf: &mut Unification,
+                    latest_timestamp: TimeStamp,
+                ) -> bool {
                     if self.math_num_uprooted_at_latest_retain == uf.math_.num_uprooted() {
                         return false;
                     }
                     let offset = insertions.len();
                     log_duration!("update {}: {}", "integral", {
                         self.math_num_uprooted_at_latest_retain = uf.math_.num_uprooted();
-                        self.hash_index_0_1.retain(|&(x0, x1), &mut (x2,)| {
-                            if uf.math_.is_root(x0) & uf.math_.is_root(x1) & uf.math_.is_root(x2) {
-                                true
-                            } else {
-                                insertions.push((x0, x1, x2));
-                                false
-                            }
-                        });
+                        self.hash_index_0_1
+                            .retain(|&(x0, x1), &mut (x2, _timestamp)| {
+                                if uf.math_.is_root(x0) & uf.math_.is_root(x1) & uf.math_.is_root(x2) {
+                                    true
+                                } else {
+                                    insertions.push((x0, x1, x2));
+                                    false
+                                }
+                            });
                     });
-                    self.update_begin(&insertions[offset..], uf);
+                    self.update_begin(&insertions[offset..], uf, latest_timestamp);
                     true
                 }
-                fn update_finalize(&mut self, insertions: &mut Vec<Self::Row>, uf: &mut Unification) {
+                fn update_finalize(
+                    &mut self,
+                    insertions: &mut Vec<Self::Row>,
+                    uf: &mut Unification,
+                    latest_timestamp: TimeStamp,
+                ) {
                     log_duration!("update_finalize {}: {}", "integral", {
                         assert!(self.new.is_empty());
                         log_duration!("fill new: {}", {
                             self.new.extend(
                                 self.hash_index_0_1
                                     .iter()
-                                    .map(|(&(x0, x1), &(x2,))| (x0, x1, x2))
+                                    .map(|(&(x0, x1), &(x2, _timestamp))| (x0, x1, x2))
                                     .filter(|&(x0, x1, x2)| !self.hash_index_0_1_2.contains_key(&(x0, x1, x2))),
                             );
                             insertions.clear();
@@ -4352,15 +5219,15 @@ fn regression_entry() {
                                 self.hash_index_0_1_2
                                     .entry((x0, x1, x2))
                                     .or_default()
-                                    .push(());
+                                    .push((latest_timestamp,));
                             }
                         });
                         log_duration!("retain index: {}", {
                             self.hash_index_0_1_2.retain(|&(x0, x1, x2), v| {
                                 if uf.math_.is_root(x0) & uf.math_.is_root(x1) & uf.math_.is_root(x2) {
-                                    v.retain(|&mut ()| true);
+                                    v.retain(|&mut (_timestamp)| true);
                                     v.sort_unstable();
-                                    v.dedup();
+                                    v.dedup_by(|(t1,), (t2,)| true);
                                     true
                                 } else {
                                     false
@@ -4372,25 +5239,56 @@ fn regression_entry() {
                 }
             }
             impl IntegralRelation {
-                fn iter2_0_1_2(&self, x0: Math, x1: Math) -> impl Iterator<Item = (Math,)> + use<'_> {
-                    self.hash_index_0_1.get(&(x0, x1)).into_iter().copied()
+                fn iter_all2_0_1_2(&self, x0: Math, x1: Math) -> impl Iterator<Item = (Math,)> + use<'_> {
+                    self.hash_index_0_1
+                        .get(&(x0, x1))
+                        .into_iter()
+                        .copied()
+                        .map(|(x2, _timestamp)| (x2,))
                 }
-                fn iter3_0_1_2(&self, x0: Math, x1: Math, x2: Math) -> impl Iterator<Item = ()> + use<'_> {
+                fn iter_all3_0_1_2(&self, x0: Math, x1: Math, x2: Math) -> impl Iterator<Item = ()> + use<'_> {
                     self.hash_index_0_1_2
                         .get(&(x0, x1, x2))
                         .into_iter()
                         .flatten()
                         .copied()
+                        .map(|(_timestamp)| ())
+                }
+                fn iter_old2_0_1_2(
+                    &self,
+                    x0: Math,
+                    x1: Math,
+                    latest_timestamp: TimeStamp,
+                ) -> impl Iterator<Item = (Math,)> + use<'_> {
+                    self.hash_index_0_1
+                        .get(&(x0, x1))
+                        .into_iter()
+                        .copied()
+                        .filter_map(move |(x2, timestamp)| (timestamp < latest_timestamp).then_some((x2,)))
+                }
+                fn iter_old3_0_1_2(
+                    &self,
+                    x0: Math,
+                    x1: Math,
+                    x2: Math,
+                    latest_timestamp: TimeStamp,
+                ) -> impl Iterator<Item = ()> + use<'_> {
+                    self.hash_index_0_1_2
+                        .get(&(x0, x1, x2))
+                        .into_iter()
+                        .flatten()
+                        .copied()
+                        .filter_map(move |(timestamp,)| (timestamp < latest_timestamp).then_some(()))
                 }
                 fn check2_0_1_2(&self, x0: Math, x1: Math) -> bool {
-                    self.iter2_0_1_2(x0, x1).next().is_some()
+                    self.iter_all2_0_1_2(x0, x1).next().is_some()
                 }
                 fn check3_0_1_2(&self, x0: Math, x1: Math, x2: Math) -> bool {
-                    self.iter3_0_1_2(x0, x1, x2).next().is_some()
+                    self.iter_all3_0_1_2(x0, x1, x2).next().is_some()
                 }
                 #[allow(unreachable_code)]
                 fn entry2_0_1_2(&self, x0: Math, x1: Math, delta: &mut Delta, uf: &mut Unification) -> (Math,) {
-                    if let Some((x2,)) = self.iter2_0_1_2(x0, x1).next() {
+                    if let Some((x2,)) = self.iter_all2_0_1_2(x0, x1).next() {
                         return (x2,);
                     }
                     let x2 = uf.math_.add_eclass();
@@ -4406,7 +5304,7 @@ fn regression_entry() {
                     delta: &mut Delta,
                     uf: &mut Unification,
                 ) -> () {
-                    if let Some(()) = self.iter3_0_1_2(x0, x1, x2).next() {
+                    if let Some(()) = self.iter_all3_0_1_2(x0, x1, x2).next() {
                         return ();
                     }
                     delta.integral_.push((x0, x1, x2));
@@ -4416,8 +5314,8 @@ fn regression_entry() {
             #[derive(Debug, Default)]
             struct AddRelation {
                 new: Vec<<Self as Relation>::Row>,
-                hash_index_0_1: runtime::HashMap<(Math, Math), (Math,)>,
-                hash_index_0_1_2: runtime::HashMap<(Math, Math, Math), runtime::SmallVec<[(); 1]>>,
+                hash_index_0_1: runtime::HashMap<(Math, Math), (Math, TimeStamp)>,
+                hash_index_0_1_2: runtime::HashMap<(Math, Math, Math), runtime::SmallVec<[(TimeStamp,); 1]>>,
                 math_num_uprooted_at_latest_retain: usize,
             }
             impl Relation for AddRelation {
@@ -4441,14 +5339,19 @@ fn regression_entry() {
                 }
                 fn emit_graphviz(&self, buf: &mut String) {
                     use std::fmt::Write;
-                    for (i, ((x0, x1), (x2,))) in self.hash_index_0_1.iter().enumerate() {
+                    for (i, ((x0, x1), (x2, _timestamp))) in self.hash_index_0_1.iter().enumerate() {
                         writeln!(buf, "{}_{i} -> {}_{};", "add", "math", x0).unwrap();
                         writeln!(buf, "{}_{i} -> {}_{};", "add", "math", x1).unwrap();
                         writeln!(buf, "{}_{i} -> {}_{};", "add", "math", x2).unwrap();
                         writeln!(buf, "{}_{i} [shape = box];", "add").unwrap();
                     }
                 }
-                fn update_begin(&mut self, insertions: &[Self::Row], uf: &mut Unification) {
+                fn update_begin(
+                    &mut self,
+                    insertions: &[Self::Row],
+                    uf: &mut Unification,
+                    latest_timestamp: TimeStamp,
+                ) {
                     log_duration!("update_begin {}: {}", "add", {
                         for &(mut x0, mut x1, mut x2) in insertions {
                             match self
@@ -4456,43 +5359,59 @@ fn regression_entry() {
                                 .entry((uf.math_.find(x0), uf.math_.find(x1)))
                             {
                                 runtime::HashMapEntry::Occupied(mut entry) => {
-                                    let (y2,) = entry.get_mut();
-                                    uf.math_.union_mut(&mut x2, y2);
+                                    let (y2, timestamp) = entry.get_mut();
+                                    let changed = false;
+                                    let old_val = *y2;
+                                    let changed = changed | (old_val != uf.math_.union_mut(&mut x2, y2));
+                                    if changed {
+                                        *timestamp = latest_timestamp;
+                                    }
                                 }
                                 runtime::HashMapEntry::Vacant(entry) => {
-                                    entry.insert((uf.math_.find(x2),));
+                                    entry.insert((uf.math_.find(x2), latest_timestamp));
                                 }
                             }
                         }
                     });
                 }
-                fn update(&mut self, insertions: &mut Vec<Self::Row>, uf: &mut Unification) -> bool {
+                fn update(
+                    &mut self,
+                    insertions: &mut Vec<Self::Row>,
+                    uf: &mut Unification,
+                    latest_timestamp: TimeStamp,
+                ) -> bool {
                     if self.math_num_uprooted_at_latest_retain == uf.math_.num_uprooted() {
                         return false;
                     }
                     let offset = insertions.len();
                     log_duration!("update {}: {}", "add", {
                         self.math_num_uprooted_at_latest_retain = uf.math_.num_uprooted();
-                        self.hash_index_0_1.retain(|&(x0, x1), &mut (x2,)| {
-                            if uf.math_.is_root(x0) & uf.math_.is_root(x1) & uf.math_.is_root(x2) {
-                                true
-                            } else {
-                                insertions.push((x0, x1, x2));
-                                false
-                            }
-                        });
+                        self.hash_index_0_1
+                            .retain(|&(x0, x1), &mut (x2, _timestamp)| {
+                                if uf.math_.is_root(x0) & uf.math_.is_root(x1) & uf.math_.is_root(x2) {
+                                    true
+                                } else {
+                                    insertions.push((x0, x1, x2));
+                                    false
+                                }
+                            });
                     });
-                    self.update_begin(&insertions[offset..], uf);
+                    self.update_begin(&insertions[offset..], uf, latest_timestamp);
                     true
                 }
-                fn update_finalize(&mut self, insertions: &mut Vec<Self::Row>, uf: &mut Unification) {
+                fn update_finalize(
+                    &mut self,
+                    insertions: &mut Vec<Self::Row>,
+                    uf: &mut Unification,
+                    latest_timestamp: TimeStamp,
+                ) {
                     log_duration!("update_finalize {}: {}", "add", {
                         assert!(self.new.is_empty());
                         log_duration!("fill new: {}", {
                             self.new.extend(
                                 self.hash_index_0_1
                                     .iter()
-                                    .map(|(&(x0, x1), &(x2,))| (x0, x1, x2))
+                                    .map(|(&(x0, x1), &(x2, _timestamp))| (x0, x1, x2))
                                     .filter(|&(x0, x1, x2)| !self.hash_index_0_1_2.contains_key(&(x0, x1, x2))),
                             );
                             insertions.clear();
@@ -4504,15 +5423,15 @@ fn regression_entry() {
                                 self.hash_index_0_1_2
                                     .entry((x0, x1, x2))
                                     .or_default()
-                                    .push(());
+                                    .push((latest_timestamp,));
                             }
                         });
                         log_duration!("retain index: {}", {
                             self.hash_index_0_1_2.retain(|&(x0, x1, x2), v| {
                                 if uf.math_.is_root(x0) & uf.math_.is_root(x1) & uf.math_.is_root(x2) {
-                                    v.retain(|&mut ()| true);
+                                    v.retain(|&mut (_timestamp)| true);
                                     v.sort_unstable();
-                                    v.dedup();
+                                    v.dedup_by(|(t1,), (t2,)| true);
                                     true
                                 } else {
                                     false
@@ -4524,25 +5443,56 @@ fn regression_entry() {
                 }
             }
             impl AddRelation {
-                fn iter2_0_1_2(&self, x0: Math, x1: Math) -> impl Iterator<Item = (Math,)> + use<'_> {
-                    self.hash_index_0_1.get(&(x0, x1)).into_iter().copied()
+                fn iter_all2_0_1_2(&self, x0: Math, x1: Math) -> impl Iterator<Item = (Math,)> + use<'_> {
+                    self.hash_index_0_1
+                        .get(&(x0, x1))
+                        .into_iter()
+                        .copied()
+                        .map(|(x2, _timestamp)| (x2,))
                 }
-                fn iter3_0_1_2(&self, x0: Math, x1: Math, x2: Math) -> impl Iterator<Item = ()> + use<'_> {
+                fn iter_all3_0_1_2(&self, x0: Math, x1: Math, x2: Math) -> impl Iterator<Item = ()> + use<'_> {
                     self.hash_index_0_1_2
                         .get(&(x0, x1, x2))
                         .into_iter()
                         .flatten()
                         .copied()
+                        .map(|(_timestamp)| ())
+                }
+                fn iter_old2_0_1_2(
+                    &self,
+                    x0: Math,
+                    x1: Math,
+                    latest_timestamp: TimeStamp,
+                ) -> impl Iterator<Item = (Math,)> + use<'_> {
+                    self.hash_index_0_1
+                        .get(&(x0, x1))
+                        .into_iter()
+                        .copied()
+                        .filter_map(move |(x2, timestamp)| (timestamp < latest_timestamp).then_some((x2,)))
+                }
+                fn iter_old3_0_1_2(
+                    &self,
+                    x0: Math,
+                    x1: Math,
+                    x2: Math,
+                    latest_timestamp: TimeStamp,
+                ) -> impl Iterator<Item = ()> + use<'_> {
+                    self.hash_index_0_1_2
+                        .get(&(x0, x1, x2))
+                        .into_iter()
+                        .flatten()
+                        .copied()
+                        .filter_map(move |(timestamp,)| (timestamp < latest_timestamp).then_some(()))
                 }
                 fn check2_0_1_2(&self, x0: Math, x1: Math) -> bool {
-                    self.iter2_0_1_2(x0, x1).next().is_some()
+                    self.iter_all2_0_1_2(x0, x1).next().is_some()
                 }
                 fn check3_0_1_2(&self, x0: Math, x1: Math, x2: Math) -> bool {
-                    self.iter3_0_1_2(x0, x1, x2).next().is_some()
+                    self.iter_all3_0_1_2(x0, x1, x2).next().is_some()
                 }
                 #[allow(unreachable_code)]
                 fn entry2_0_1_2(&self, x0: Math, x1: Math, delta: &mut Delta, uf: &mut Unification) -> (Math,) {
-                    if let Some((x2,)) = self.iter2_0_1_2(x0, x1).next() {
+                    if let Some((x2,)) = self.iter_all2_0_1_2(x0, x1).next() {
                         return (x2,);
                     }
                     let x2 = uf.math_.add_eclass();
@@ -4558,7 +5508,7 @@ fn regression_entry() {
                     delta: &mut Delta,
                     uf: &mut Unification,
                 ) -> () {
-                    if let Some(()) = self.iter3_0_1_2(x0, x1, x2).next() {
+                    if let Some(()) = self.iter_all3_0_1_2(x0, x1, x2).next() {
                         return ();
                     }
                     delta.add_.push((x0, x1, x2));
@@ -4603,6 +5553,7 @@ fn regression_entry() {
             }
             #[derive(Debug, Default)]
             pub struct Theory {
+                pub latest_timestamp: TimeStamp,
                 pub delta: Delta,
                 pub uf: Unification,
                 pub integral_: IntegralRelation,
@@ -4669,6 +5620,7 @@ fn regression_entry() {
                 }
                 #[inline(never)]
                 pub fn canonicalize(&mut self) {
+                    self.latest_timestamp.0 += 1;
                     log_duration!("canonicalize (total): {}", {
                         self.integral_.clear_new();
                         self.add_.clear_new();
@@ -4676,27 +5628,41 @@ fn regression_entry() {
                             return;
                         }
                         log_duration!("update_begin (total): {}", {
-                            self.integral_
-                                .update_begin(&mut self.delta.integral_, &mut self.uf);
-                            self.add_.update_begin(&mut self.delta.add_, &mut self.uf);
+                            self.integral_.update_begin(
+                                &mut self.delta.integral_,
+                                &mut self.uf,
+                                self.latest_timestamp,
+                            );
+                            self.add_
+                                .update_begin(&mut self.delta.add_, &mut self.uf, self.latest_timestamp);
                         });
                         log_duration!("update_loop (total): {}", {
                             loop {
                                 let mut progress = false;
-                                progress |= self
-                                    .integral_
-                                    .update(&mut self.delta.integral_, &mut self.uf);
-                                progress |= self.add_.update(&mut self.delta.add_, &mut self.uf);
+                                progress |= self.integral_.update(
+                                    &mut self.delta.integral_,
+                                    &mut self.uf,
+                                    self.latest_timestamp,
+                                );
+                                progress |=
+                                    self.add_
+                                        .update(&mut self.delta.add_, &mut self.uf, self.latest_timestamp);
                                 if !progress {
                                     break;
                                 }
                             }
                         });
                         log_duration!("update_finalize (total): {}", {
-                            self.integral_
-                                .update_finalize(&mut self.delta.integral_, &mut self.uf);
-                            self.add_
-                                .update_finalize(&mut self.delta.add_, &mut self.uf);
+                            self.integral_.update_finalize(
+                                &mut self.delta.integral_,
+                                &mut self.uf,
+                                self.latest_timestamp,
+                            );
+                            self.add_.update_finalize(
+                                &mut self.delta.add_,
+                                &mut self.uf,
+                                self.latest_timestamp,
+                            );
                             self.uf.reset_num_uprooted();
                         });
                     });
@@ -4808,8 +5774,8 @@ fn test_bind_variable_multiple_times() {
             #[derive(Debug, Default)]
             struct SameRelation {
                 new: Vec<<Self as Relation>::Row>,
-                hash_index_0_1: runtime::HashMap<(Foo, Foo), (Foo,)>,
-                hash_index_0_1_2: runtime::HashMap<(Foo, Foo, Foo), runtime::SmallVec<[(); 1]>>,
+                hash_index_0_1: runtime::HashMap<(Foo, Foo), (Foo, TimeStamp)>,
+                hash_index_0_1_2: runtime::HashMap<(Foo, Foo, Foo), runtime::SmallVec<[(TimeStamp,); 1]>>,
                 foo_num_uprooted_at_latest_retain: usize,
             }
             impl Relation for SameRelation {
@@ -4833,14 +5799,19 @@ fn test_bind_variable_multiple_times() {
                 }
                 fn emit_graphviz(&self, buf: &mut String) {
                     use std::fmt::Write;
-                    for (i, ((x0, x1), (x2,))) in self.hash_index_0_1.iter().enumerate() {
+                    for (i, ((x0, x1), (x2, _timestamp))) in self.hash_index_0_1.iter().enumerate() {
                         writeln!(buf, "{}_{i} -> {}_{};", "same", "foo", x0).unwrap();
                         writeln!(buf, "{}_{i} -> {}_{};", "same", "foo", x1).unwrap();
                         writeln!(buf, "{}_{i} -> {}_{};", "same", "foo", x2).unwrap();
                         writeln!(buf, "{}_{i} [shape = box];", "same").unwrap();
                     }
                 }
-                fn update_begin(&mut self, insertions: &[Self::Row], uf: &mut Unification) {
+                fn update_begin(
+                    &mut self,
+                    insertions: &[Self::Row],
+                    uf: &mut Unification,
+                    latest_timestamp: TimeStamp,
+                ) {
                     log_duration!("update_begin {}: {}", "same", {
                         for &(mut x0, mut x1, mut x2) in insertions {
                             match self
@@ -4848,43 +5819,59 @@ fn test_bind_variable_multiple_times() {
                                 .entry((uf.foo_.find(x0), uf.foo_.find(x1)))
                             {
                                 runtime::HashMapEntry::Occupied(mut entry) => {
-                                    let (y2,) = entry.get_mut();
-                                    uf.foo_.union_mut(&mut x2, y2);
+                                    let (y2, timestamp) = entry.get_mut();
+                                    let changed = false;
+                                    let old_val = *y2;
+                                    let changed = changed | (old_val != uf.foo_.union_mut(&mut x2, y2));
+                                    if changed {
+                                        *timestamp = latest_timestamp;
+                                    }
                                 }
                                 runtime::HashMapEntry::Vacant(entry) => {
-                                    entry.insert((uf.foo_.find(x2),));
+                                    entry.insert((uf.foo_.find(x2), latest_timestamp));
                                 }
                             }
                         }
                     });
                 }
-                fn update(&mut self, insertions: &mut Vec<Self::Row>, uf: &mut Unification) -> bool {
+                fn update(
+                    &mut self,
+                    insertions: &mut Vec<Self::Row>,
+                    uf: &mut Unification,
+                    latest_timestamp: TimeStamp,
+                ) -> bool {
                     if self.foo_num_uprooted_at_latest_retain == uf.foo_.num_uprooted() {
                         return false;
                     }
                     let offset = insertions.len();
                     log_duration!("update {}: {}", "same", {
                         self.foo_num_uprooted_at_latest_retain = uf.foo_.num_uprooted();
-                        self.hash_index_0_1.retain(|&(x0, x1), &mut (x2,)| {
-                            if uf.foo_.is_root(x0) & uf.foo_.is_root(x1) & uf.foo_.is_root(x2) {
-                                true
-                            } else {
-                                insertions.push((x0, x1, x2));
-                                false
-                            }
-                        });
+                        self.hash_index_0_1
+                            .retain(|&(x0, x1), &mut (x2, _timestamp)| {
+                                if uf.foo_.is_root(x0) & uf.foo_.is_root(x1) & uf.foo_.is_root(x2) {
+                                    true
+                                } else {
+                                    insertions.push((x0, x1, x2));
+                                    false
+                                }
+                            });
                     });
-                    self.update_begin(&insertions[offset..], uf);
+                    self.update_begin(&insertions[offset..], uf, latest_timestamp);
                     true
                 }
-                fn update_finalize(&mut self, insertions: &mut Vec<Self::Row>, uf: &mut Unification) {
+                fn update_finalize(
+                    &mut self,
+                    insertions: &mut Vec<Self::Row>,
+                    uf: &mut Unification,
+                    latest_timestamp: TimeStamp,
+                ) {
                     log_duration!("update_finalize {}: {}", "same", {
                         assert!(self.new.is_empty());
                         log_duration!("fill new: {}", {
                             self.new.extend(
                                 self.hash_index_0_1
                                     .iter()
-                                    .map(|(&(x0, x1), &(x2,))| (x0, x1, x2))
+                                    .map(|(&(x0, x1), &(x2, _timestamp))| (x0, x1, x2))
                                     .filter(|&(x0, x1, x2)| !self.hash_index_0_1_2.contains_key(&(x0, x1, x2))),
                             );
                             insertions.clear();
@@ -4896,15 +5883,15 @@ fn test_bind_variable_multiple_times() {
                                 self.hash_index_0_1_2
                                     .entry((x0, x1, x2))
                                     .or_default()
-                                    .push(());
+                                    .push((latest_timestamp,));
                             }
                         });
                         log_duration!("retain index: {}", {
                             self.hash_index_0_1_2.retain(|&(x0, x1, x2), v| {
                                 if uf.foo_.is_root(x0) & uf.foo_.is_root(x1) & uf.foo_.is_root(x2) {
-                                    v.retain(|&mut ()| true);
+                                    v.retain(|&mut (_timestamp)| true);
                                     v.sort_unstable();
-                                    v.dedup();
+                                    v.dedup_by(|(t1,), (t2,)| true);
                                     true
                                 } else {
                                     false
@@ -4916,25 +5903,56 @@ fn test_bind_variable_multiple_times() {
                 }
             }
             impl SameRelation {
-                fn iter2_0_1_2(&self, x0: Foo, x1: Foo) -> impl Iterator<Item = (Foo,)> + use<'_> {
-                    self.hash_index_0_1.get(&(x0, x1)).into_iter().copied()
+                fn iter_all2_0_1_2(&self, x0: Foo, x1: Foo) -> impl Iterator<Item = (Foo,)> + use<'_> {
+                    self.hash_index_0_1
+                        .get(&(x0, x1))
+                        .into_iter()
+                        .copied()
+                        .map(|(x2, _timestamp)| (x2,))
                 }
-                fn iter3_0_1_2(&self, x0: Foo, x1: Foo, x2: Foo) -> impl Iterator<Item = ()> + use<'_> {
+                fn iter_all3_0_1_2(&self, x0: Foo, x1: Foo, x2: Foo) -> impl Iterator<Item = ()> + use<'_> {
                     self.hash_index_0_1_2
                         .get(&(x0, x1, x2))
                         .into_iter()
                         .flatten()
                         .copied()
+                        .map(|(_timestamp)| ())
+                }
+                fn iter_old2_0_1_2(
+                    &self,
+                    x0: Foo,
+                    x1: Foo,
+                    latest_timestamp: TimeStamp,
+                ) -> impl Iterator<Item = (Foo,)> + use<'_> {
+                    self.hash_index_0_1
+                        .get(&(x0, x1))
+                        .into_iter()
+                        .copied()
+                        .filter_map(move |(x2, timestamp)| (timestamp < latest_timestamp).then_some((x2,)))
+                }
+                fn iter_old3_0_1_2(
+                    &self,
+                    x0: Foo,
+                    x1: Foo,
+                    x2: Foo,
+                    latest_timestamp: TimeStamp,
+                ) -> impl Iterator<Item = ()> + use<'_> {
+                    self.hash_index_0_1_2
+                        .get(&(x0, x1, x2))
+                        .into_iter()
+                        .flatten()
+                        .copied()
+                        .filter_map(move |(timestamp,)| (timestamp < latest_timestamp).then_some(()))
                 }
                 fn check2_0_1_2(&self, x0: Foo, x1: Foo) -> bool {
-                    self.iter2_0_1_2(x0, x1).next().is_some()
+                    self.iter_all2_0_1_2(x0, x1).next().is_some()
                 }
                 fn check3_0_1_2(&self, x0: Foo, x1: Foo, x2: Foo) -> bool {
-                    self.iter3_0_1_2(x0, x1, x2).next().is_some()
+                    self.iter_all3_0_1_2(x0, x1, x2).next().is_some()
                 }
                 #[allow(unreachable_code)]
                 fn entry2_0_1_2(&self, x0: Foo, x1: Foo, delta: &mut Delta, uf: &mut Unification) -> (Foo,) {
-                    if let Some((x2,)) = self.iter2_0_1_2(x0, x1).next() {
+                    if let Some((x2,)) = self.iter_all2_0_1_2(x0, x1).next() {
                         return (x2,);
                     }
                     let x2 = uf.foo_.add_eclass();
@@ -4950,7 +5968,7 @@ fn test_bind_variable_multiple_times() {
                     delta: &mut Delta,
                     uf: &mut Unification,
                 ) -> () {
-                    if let Some(()) = self.iter3_0_1_2(x0, x1, x2).next() {
+                    if let Some(()) = self.iter_all3_0_1_2(x0, x1, x2).next() {
                         return ();
                     }
                     delta.same_.push((x0, x1, x2));
@@ -4990,6 +6008,7 @@ fn test_bind_variable_multiple_times() {
             }
             #[derive(Debug, Default)]
             pub struct Theory {
+                pub latest_timestamp: TimeStamp,
                 pub delta: Delta,
                 pub uf: Unification,
                 pub same_: SameRelation,
@@ -5051,26 +6070,35 @@ fn test_bind_variable_multiple_times() {
                 }
                 #[inline(never)]
                 pub fn canonicalize(&mut self) {
+                    self.latest_timestamp.0 += 1;
                     log_duration!("canonicalize (total): {}", {
                         self.same_.clear_new();
                         if !self.delta.has_new_inserts() && self.uf.num_uprooted() == 0 {
                             return;
                         }
                         log_duration!("update_begin (total): {}", {
-                            self.same_.update_begin(&mut self.delta.same_, &mut self.uf);
+                            self.same_
+                                .update_begin(&mut self.delta.same_, &mut self.uf, self.latest_timestamp);
                         });
                         log_duration!("update_loop (total): {}", {
                             loop {
                                 let mut progress = false;
-                                progress |= self.same_.update(&mut self.delta.same_, &mut self.uf);
+                                progress |= self.same_.update(
+                                    &mut self.delta.same_,
+                                    &mut self.uf,
+                                    self.latest_timestamp,
+                                );
                                 if !progress {
                                     break;
                                 }
                             }
                         });
                         log_duration!("update_finalize (total): {}", {
-                            self.same_
-                                .update_finalize(&mut self.delta.same_, &mut self.uf);
+                            self.same_.update_finalize(
+                                &mut self.delta.same_,
+                                &mut self.uf,
+                                self.latest_timestamp,
+                            );
                             self.uf.reset_num_uprooted();
                         });
                     });
@@ -5250,7 +6278,7 @@ fn codegen_variable_reuse_bug() {
                     ],
                     atom: [PremiseNew, r2(v2)]
                     then: [
-                        atom: [Premise, r0(v2, v3, v2), iu1]
+                        atom: [PremiseOld, r0(v2, v3, v2), iu1]
                         then: [
                             meta: "( rule ( ( = zero ( Add zero x ) ) ) ( ( union x ( Zero ) ) ) )"
                             atom: [Action::Insert, r1(v3)],
@@ -5270,9 +6298,9 @@ fn codegen_variable_reuse_bug() {
             #[derive(Debug, Default)]
             struct AddRelation {
                 new: Vec<<Self as Relation>::Row>,
-                hash_index_0_1: runtime::HashMap<(Math, Math), (Math,)>,
-                hash_index_0_2: runtime::HashMap<(Math, Math), runtime::SmallVec<[(Math,); 1]>>,
-                hash_index_0_1_2: runtime::HashMap<(Math, Math, Math), runtime::SmallVec<[(); 1]>>,
+                hash_index_0_1: runtime::HashMap<(Math, Math), (Math, TimeStamp)>,
+                hash_index_0_2: runtime::HashMap<(Math, Math), runtime::SmallVec<[(Math, TimeStamp); 1]>>,
+                hash_index_0_1_2: runtime::HashMap<(Math, Math, Math), runtime::SmallVec<[(TimeStamp,); 1]>>,
                 math_num_uprooted_at_latest_retain: usize,
             }
             impl Relation for AddRelation {
@@ -5296,14 +6324,19 @@ fn codegen_variable_reuse_bug() {
                 }
                 fn emit_graphviz(&self, buf: &mut String) {
                     use std::fmt::Write;
-                    for (i, ((x0, x1), (x2,))) in self.hash_index_0_1.iter().enumerate() {
+                    for (i, ((x0, x1), (x2, _timestamp))) in self.hash_index_0_1.iter().enumerate() {
                         writeln!(buf, "{}_{i} -> {}_{};", "add", "math", x0).unwrap();
                         writeln!(buf, "{}_{i} -> {}_{};", "add", "math", x1).unwrap();
                         writeln!(buf, "{}_{i} -> {}_{};", "add", "math", x2).unwrap();
                         writeln!(buf, "{}_{i} [shape = box];", "add").unwrap();
                     }
                 }
-                fn update_begin(&mut self, insertions: &[Self::Row], uf: &mut Unification) {
+                fn update_begin(
+                    &mut self,
+                    insertions: &[Self::Row],
+                    uf: &mut Unification,
+                    latest_timestamp: TimeStamp,
+                ) {
                     log_duration!("update_begin {}: {}", "add", {
                         for &(mut x0, mut x1, mut x2) in insertions {
                             match self
@@ -5311,43 +6344,59 @@ fn codegen_variable_reuse_bug() {
                                 .entry((uf.math_.find(x0), uf.math_.find(x1)))
                             {
                                 runtime::HashMapEntry::Occupied(mut entry) => {
-                                    let (y2,) = entry.get_mut();
-                                    uf.math_.union_mut(&mut x2, y2);
+                                    let (y2, timestamp) = entry.get_mut();
+                                    let changed = false;
+                                    let old_val = *y2;
+                                    let changed = changed | (old_val != uf.math_.union_mut(&mut x2, y2));
+                                    if changed {
+                                        *timestamp = latest_timestamp;
+                                    }
                                 }
                                 runtime::HashMapEntry::Vacant(entry) => {
-                                    entry.insert((uf.math_.find(x2),));
+                                    entry.insert((uf.math_.find(x2), latest_timestamp));
                                 }
                             }
                         }
                     });
                 }
-                fn update(&mut self, insertions: &mut Vec<Self::Row>, uf: &mut Unification) -> bool {
+                fn update(
+                    &mut self,
+                    insertions: &mut Vec<Self::Row>,
+                    uf: &mut Unification,
+                    latest_timestamp: TimeStamp,
+                ) -> bool {
                     if self.math_num_uprooted_at_latest_retain == uf.math_.num_uprooted() {
                         return false;
                     }
                     let offset = insertions.len();
                     log_duration!("update {}: {}", "add", {
                         self.math_num_uprooted_at_latest_retain = uf.math_.num_uprooted();
-                        self.hash_index_0_1.retain(|&(x0, x1), &mut (x2,)| {
-                            if uf.math_.is_root(x0) & uf.math_.is_root(x1) & uf.math_.is_root(x2) {
-                                true
-                            } else {
-                                insertions.push((x0, x1, x2));
-                                false
-                            }
-                        });
+                        self.hash_index_0_1
+                            .retain(|&(x0, x1), &mut (x2, _timestamp)| {
+                                if uf.math_.is_root(x0) & uf.math_.is_root(x1) & uf.math_.is_root(x2) {
+                                    true
+                                } else {
+                                    insertions.push((x0, x1, x2));
+                                    false
+                                }
+                            });
                     });
-                    self.update_begin(&insertions[offset..], uf);
+                    self.update_begin(&insertions[offset..], uf, latest_timestamp);
                     true
                 }
-                fn update_finalize(&mut self, insertions: &mut Vec<Self::Row>, uf: &mut Unification) {
+                fn update_finalize(
+                    &mut self,
+                    insertions: &mut Vec<Self::Row>,
+                    uf: &mut Unification,
+                    latest_timestamp: TimeStamp,
+                ) {
                     log_duration!("update_finalize {}: {}", "add", {
                         assert!(self.new.is_empty());
                         log_duration!("fill new: {}", {
                             self.new.extend(
                                 self.hash_index_0_1
                                     .iter()
-                                    .map(|(&(x0, x1), &(x2,))| (x0, x1, x2))
+                                    .map(|(&(x0, x1), &(x2, _timestamp))| (x0, x1, x2))
                                     .filter(|&(x0, x1, x2)| !self.hash_index_0_1_2.contains_key(&(x0, x1, x2))),
                             );
                             insertions.clear();
@@ -5356,15 +6405,18 @@ fn codegen_variable_reuse_bug() {
                         });
                         log_duration!("fill index: {}", {
                             for &(x0, x1, x2) in &self.new {
-                                self.hash_index_0_2.entry((x0, x2)).or_default().push((x1,));
+                                self.hash_index_0_2
+                                    .entry((x0, x2))
+                                    .or_default()
+                                    .push((x1, latest_timestamp));
                             }
                         });
                         log_duration!("retain index: {}", {
                             self.hash_index_0_2.retain(|&(x0, x2), v| {
                                 if uf.math_.is_root(x0) & uf.math_.is_root(x2) {
-                                    v.retain(|&mut (x1,)| uf.math_.is_root(x1));
+                                    v.retain(|&mut (x1, _timestamp)| uf.math_.is_root(x1));
                                     v.sort_unstable();
-                                    v.dedup();
+                                    v.dedup_by(|(x1, t1), (y1, t2)| true & (*x1 == *y1));
                                     true
                                 } else {
                                     false
@@ -5376,15 +6428,15 @@ fn codegen_variable_reuse_bug() {
                                 self.hash_index_0_1_2
                                     .entry((x0, x1, x2))
                                     .or_default()
-                                    .push(());
+                                    .push((latest_timestamp,));
                             }
                         });
                         log_duration!("retain index: {}", {
                             self.hash_index_0_1_2.retain(|&(x0, x1, x2), v| {
                                 if uf.math_.is_root(x0) & uf.math_.is_root(x1) & uf.math_.is_root(x2) {
-                                    v.retain(|&mut ()| true);
+                                    v.retain(|&mut (_timestamp)| true);
                                     v.sort_unstable();
-                                    v.dedup();
+                                    v.dedup_by(|(t1,), (t2,)| true);
                                     true
                                 } else {
                                     false
@@ -5396,35 +6448,80 @@ fn codegen_variable_reuse_bug() {
                 }
             }
             impl AddRelation {
-                fn iter2_0_1_2(&self, x0: Math, x1: Math) -> impl Iterator<Item = (Math,)> + use<'_> {
-                    self.hash_index_0_1.get(&(x0, x1)).into_iter().copied()
+                fn iter_all2_0_1_2(&self, x0: Math, x1: Math) -> impl Iterator<Item = (Math,)> + use<'_> {
+                    self.hash_index_0_1
+                        .get(&(x0, x1))
+                        .into_iter()
+                        .copied()
+                        .map(|(x2, _timestamp)| (x2,))
                 }
-                fn iter2_0_2_1(&self, x0: Math, x2: Math) -> impl Iterator<Item = (Math,)> + use<'_> {
+                fn iter_all2_0_2_1(&self, x0: Math, x2: Math) -> impl Iterator<Item = (Math,)> + use<'_> {
                     self.hash_index_0_2
                         .get(&(x0, x2))
                         .into_iter()
                         .flatten()
                         .copied()
+                        .map(|(x1, _timestamp)| (x1,))
                 }
-                fn iter3_0_1_2(&self, x0: Math, x1: Math, x2: Math) -> impl Iterator<Item = ()> + use<'_> {
+                fn iter_all3_0_1_2(&self, x0: Math, x1: Math, x2: Math) -> impl Iterator<Item = ()> + use<'_> {
                     self.hash_index_0_1_2
                         .get(&(x0, x1, x2))
                         .into_iter()
                         .flatten()
                         .copied()
+                        .map(|(_timestamp)| ())
+                }
+                fn iter_old2_0_1_2(
+                    &self,
+                    x0: Math,
+                    x1: Math,
+                    latest_timestamp: TimeStamp,
+                ) -> impl Iterator<Item = (Math,)> + use<'_> {
+                    self.hash_index_0_1
+                        .get(&(x0, x1))
+                        .into_iter()
+                        .copied()
+                        .filter_map(move |(x2, timestamp)| (timestamp < latest_timestamp).then_some((x2,)))
+                }
+                fn iter_old2_0_2_1(
+                    &self,
+                    x0: Math,
+                    x2: Math,
+                    latest_timestamp: TimeStamp,
+                ) -> impl Iterator<Item = (Math,)> + use<'_> {
+                    self.hash_index_0_2
+                        .get(&(x0, x2))
+                        .into_iter()
+                        .flatten()
+                        .copied()
+                        .filter_map(move |(x1, timestamp)| (timestamp < latest_timestamp).then_some((x1,)))
+                }
+                fn iter_old3_0_1_2(
+                    &self,
+                    x0: Math,
+                    x1: Math,
+                    x2: Math,
+                    latest_timestamp: TimeStamp,
+                ) -> impl Iterator<Item = ()> + use<'_> {
+                    self.hash_index_0_1_2
+                        .get(&(x0, x1, x2))
+                        .into_iter()
+                        .flatten()
+                        .copied()
+                        .filter_map(move |(timestamp,)| (timestamp < latest_timestamp).then_some(()))
                 }
                 fn check2_0_1_2(&self, x0: Math, x1: Math) -> bool {
-                    self.iter2_0_1_2(x0, x1).next().is_some()
+                    self.iter_all2_0_1_2(x0, x1).next().is_some()
                 }
                 fn check2_0_2_1(&self, x0: Math, x2: Math) -> bool {
-                    self.iter2_0_2_1(x0, x2).next().is_some()
+                    self.iter_all2_0_2_1(x0, x2).next().is_some()
                 }
                 fn check3_0_1_2(&self, x0: Math, x1: Math, x2: Math) -> bool {
-                    self.iter3_0_1_2(x0, x1, x2).next().is_some()
+                    self.iter_all3_0_1_2(x0, x1, x2).next().is_some()
                 }
                 #[allow(unreachable_code)]
                 fn entry2_0_1_2(&self, x0: Math, x1: Math, delta: &mut Delta, uf: &mut Unification) -> (Math,) {
-                    if let Some((x2,)) = self.iter2_0_1_2(x0, x1).next() {
+                    if let Some((x2,)) = self.iter_all2_0_1_2(x0, x1).next() {
                         return (x2,);
                     }
                     let x2 = uf.math_.add_eclass();
@@ -5440,7 +6537,7 @@ fn codegen_variable_reuse_bug() {
                     delta: &mut Delta,
                     uf: &mut Unification,
                 ) -> () {
-                    if let Some(()) = self.iter3_0_1_2(x0, x1, x2).next() {
+                    if let Some(()) = self.iter_all3_0_1_2(x0, x1, x2).next() {
                         return ();
                     }
                     delta.add_.push((x0, x1, x2));
@@ -5450,8 +6547,8 @@ fn codegen_variable_reuse_bug() {
             #[derive(Debug, Default)]
             struct ZeroRelation {
                 new: Vec<<Self as Relation>::Row>,
-                hash_index_: runtime::HashMap<(), (Math,)>,
-                hash_index_0: runtime::HashMap<(Math,), runtime::SmallVec<[(); 1]>>,
+                hash_index_: runtime::HashMap<(), (Math, TimeStamp)>,
+                hash_index_0: runtime::HashMap<(Math,), runtime::SmallVec<[(TimeStamp,); 1]>>,
                 math_num_uprooted_at_latest_retain: usize,
             }
             impl Relation for ZeroRelation {
@@ -5475,34 +6572,49 @@ fn codegen_variable_reuse_bug() {
                 }
                 fn emit_graphviz(&self, buf: &mut String) {
                     use std::fmt::Write;
-                    for (i, ((), (x0,))) in self.hash_index_.iter().enumerate() {
+                    for (i, ((), (x0, _timestamp))) in self.hash_index_.iter().enumerate() {
                         writeln!(buf, "{}_{i} -> {}_{};", "zero", "math", x0).unwrap();
                         writeln!(buf, "{}_{i} [shape = box];", "zero").unwrap();
                     }
                 }
-                fn update_begin(&mut self, insertions: &[Self::Row], uf: &mut Unification) {
+                fn update_begin(
+                    &mut self,
+                    insertions: &[Self::Row],
+                    uf: &mut Unification,
+                    latest_timestamp: TimeStamp,
+                ) {
                     log_duration!("update_begin {}: {}", "zero", {
                         for &(mut x0,) in insertions {
                             match self.hash_index_.entry(()) {
                                 runtime::HashMapEntry::Occupied(mut entry) => {
-                                    let (y0,) = entry.get_mut();
-                                    uf.math_.union_mut(&mut x0, y0);
+                                    let (y0, timestamp) = entry.get_mut();
+                                    let changed = false;
+                                    let old_val = *y0;
+                                    let changed = changed | (old_val != uf.math_.union_mut(&mut x0, y0));
+                                    if changed {
+                                        *timestamp = latest_timestamp;
+                                    }
                                 }
                                 runtime::HashMapEntry::Vacant(entry) => {
-                                    entry.insert((uf.math_.find(x0),));
+                                    entry.insert((uf.math_.find(x0), latest_timestamp));
                                 }
                             }
                         }
                     });
                 }
-                fn update(&mut self, insertions: &mut Vec<Self::Row>, uf: &mut Unification) -> bool {
+                fn update(
+                    &mut self,
+                    insertions: &mut Vec<Self::Row>,
+                    uf: &mut Unification,
+                    latest_timestamp: TimeStamp,
+                ) -> bool {
                     if self.math_num_uprooted_at_latest_retain == uf.math_.num_uprooted() {
                         return false;
                     }
                     let offset = insertions.len();
                     log_duration!("update {}: {}", "zero", {
                         self.math_num_uprooted_at_latest_retain = uf.math_.num_uprooted();
-                        self.hash_index_.retain(|&(), &mut (x0,)| {
+                        self.hash_index_.retain(|&(), &mut (x0, _timestamp)| {
                             if uf.math_.is_root(x0) {
                                 true
                             } else {
@@ -5511,17 +6623,22 @@ fn codegen_variable_reuse_bug() {
                             }
                         });
                     });
-                    self.update_begin(&insertions[offset..], uf);
+                    self.update_begin(&insertions[offset..], uf, latest_timestamp);
                     true
                 }
-                fn update_finalize(&mut self, insertions: &mut Vec<Self::Row>, uf: &mut Unification) {
+                fn update_finalize(
+                    &mut self,
+                    insertions: &mut Vec<Self::Row>,
+                    uf: &mut Unification,
+                    latest_timestamp: TimeStamp,
+                ) {
                     log_duration!("update_finalize {}: {}", "zero", {
                         assert!(self.new.is_empty());
                         log_duration!("fill new: {}", {
                             self.new.extend(
                                 self.hash_index_
                                     .iter()
-                                    .map(|(&(), &(x0,))| (x0,))
+                                    .map(|(&(), &(x0, _timestamp))| (x0,))
                                     .filter(|&(x0,)| !self.hash_index_0.contains_key(&(x0,))),
                             );
                             insertions.clear();
@@ -5530,15 +6647,18 @@ fn codegen_variable_reuse_bug() {
                         });
                         log_duration!("fill index: {}", {
                             for &(x0,) in &self.new {
-                                self.hash_index_0.entry((x0,)).or_default().push(());
+                                self.hash_index_0
+                                    .entry((x0,))
+                                    .or_default()
+                                    .push((latest_timestamp,));
                             }
                         });
                         log_duration!("retain index: {}", {
                             self.hash_index_0.retain(|&(x0,), v| {
                                 if uf.math_.is_root(x0) {
-                                    v.retain(|&mut ()| true);
+                                    v.retain(|&mut (_timestamp)| true);
                                     v.sort_unstable();
-                                    v.dedup();
+                                    v.dedup_by(|(t1,), (t2,)| true);
                                     true
                                 } else {
                                     false
@@ -5550,21 +6670,49 @@ fn codegen_variable_reuse_bug() {
                 }
             }
             impl ZeroRelation {
-                fn iter0_0(&self) -> impl Iterator<Item = (Math,)> + use<'_> {
-                    self.hash_index_.get(&()).into_iter().copied()
+                fn iter_all0_0(&self) -> impl Iterator<Item = (Math,)> + use<'_> {
+                    self.hash_index_
+                        .get(&())
+                        .into_iter()
+                        .copied()
+                        .map(|(x0, _timestamp)| (x0,))
                 }
-                fn iter1_0(&self, x0: Math) -> impl Iterator<Item = ()> + use<'_> {
-                    self.hash_index_0.get(&(x0,)).into_iter().flatten().copied()
+                fn iter_all1_0(&self, x0: Math) -> impl Iterator<Item = ()> + use<'_> {
+                    self.hash_index_0
+                        .get(&(x0,))
+                        .into_iter()
+                        .flatten()
+                        .copied()
+                        .map(|(_timestamp)| ())
+                }
+                fn iter_old0_0(&self, latest_timestamp: TimeStamp) -> impl Iterator<Item = (Math,)> + use<'_> {
+                    self.hash_index_
+                        .get(&())
+                        .into_iter()
+                        .copied()
+                        .filter_map(move |(x0, timestamp)| (timestamp < latest_timestamp).then_some((x0,)))
+                }
+                fn iter_old1_0(
+                    &self,
+                    x0: Math,
+                    latest_timestamp: TimeStamp,
+                ) -> impl Iterator<Item = ()> + use<'_> {
+                    self.hash_index_0
+                        .get(&(x0,))
+                        .into_iter()
+                        .flatten()
+                        .copied()
+                        .filter_map(move |(timestamp,)| (timestamp < latest_timestamp).then_some(()))
                 }
                 fn check0_0(&self) -> bool {
-                    self.iter0_0().next().is_some()
+                    self.iter_all0_0().next().is_some()
                 }
                 fn check1_0(&self, x0: Math) -> bool {
-                    self.iter1_0(x0).next().is_some()
+                    self.iter_all1_0(x0).next().is_some()
                 }
                 #[allow(unreachable_code)]
                 fn entry0_0(&self, delta: &mut Delta, uf: &mut Unification) -> (Math,) {
-                    if let Some((x0,)) = self.iter0_0().next() {
+                    if let Some((x0,)) = self.iter_all0_0().next() {
                         return (x0,);
                     }
                     let x0 = uf.math_.add_eclass();
@@ -5573,7 +6721,7 @@ fn codegen_variable_reuse_bug() {
                 }
                 #[allow(unreachable_code)]
                 fn entry1_0(&self, x0: Math, delta: &mut Delta, uf: &mut Unification) -> () {
-                    if let Some(()) = self.iter1_0(x0).next() {
+                    if let Some(()) = self.iter_all1_0(x0).next() {
                         return ();
                     }
                     delta.zero_.push((x0,));
@@ -5618,6 +6766,7 @@ fn codegen_variable_reuse_bug() {
             }
             #[derive(Debug, Default)]
             pub struct Theory {
+                pub latest_timestamp: TimeStamp,
                 pub delta: Delta,
                 pub uf: Unification,
                 global_math: GlobalVars<Math>,
@@ -5664,7 +6813,10 @@ fn codegen_variable_reuse_bug() {
                         }
                     }
                     if let Some(zerozero_2) = self.global_math.get_new(0usize) {
-                        for (x_2,) in self.add_.iter2_0_2_1(zerozero_2, zerozero_2) {
+                        for (x_2,) in self
+                            .add_
+                            .iter_old2_0_2_1(zerozero_2, zerozero_2, self.latest_timestamp)
+                        {
                             #[doc = "( rule ( ( = zero ( Add zero x ) ) ) ( ( union x ( Zero ) ) ) )"]
                             self.delta.insert_zero((x_2,));
                         }
@@ -5698,6 +6850,7 @@ fn codegen_variable_reuse_bug() {
                 }
                 #[inline(never)]
                 pub fn canonicalize(&mut self) {
+                    self.latest_timestamp.0 += 1;
                     log_duration!("canonicalize (total): {}", {
                         self.add_.clear_new();
                         self.zero_.clear_new();
@@ -5705,24 +6858,38 @@ fn codegen_variable_reuse_bug() {
                             return;
                         }
                         log_duration!("update_begin (total): {}", {
-                            self.add_.update_begin(&mut self.delta.add_, &mut self.uf);
-                            self.zero_.update_begin(&mut self.delta.zero_, &mut self.uf);
+                            self.add_
+                                .update_begin(&mut self.delta.add_, &mut self.uf, self.latest_timestamp);
+                            self.zero_
+                                .update_begin(&mut self.delta.zero_, &mut self.uf, self.latest_timestamp);
                         });
                         log_duration!("update_loop (total): {}", {
                             loop {
                                 let mut progress = false;
-                                progress |= self.add_.update(&mut self.delta.add_, &mut self.uf);
-                                progress |= self.zero_.update(&mut self.delta.zero_, &mut self.uf);
+                                progress |=
+                                    self.add_
+                                        .update(&mut self.delta.add_, &mut self.uf, self.latest_timestamp);
+                                progress |= self.zero_.update(
+                                    &mut self.delta.zero_,
+                                    &mut self.uf,
+                                    self.latest_timestamp,
+                                );
                                 if !progress {
                                     break;
                                 }
                             }
                         });
                         log_duration!("update_finalize (total): {}", {
-                            self.add_
-                                .update_finalize(&mut self.delta.add_, &mut self.uf);
-                            self.zero_
-                                .update_finalize(&mut self.delta.zero_, &mut self.uf);
+                            self.add_.update_finalize(
+                                &mut self.delta.add_,
+                                &mut self.uf,
+                                self.latest_timestamp,
+                            );
+                            self.zero_.update_finalize(
+                                &mut self.delta.zero_,
+                                &mut self.uf,
+                                self.latest_timestamp,
+                            );
                             self.global_math.update(&mut self.uf.math_);
                             self.global_math.update_finalize();
                             self.uf.reset_num_uprooted();
@@ -5800,8 +6967,8 @@ fn initial_exprs() {
             #[derive(Debug, Default)]
             struct AddRelation {
                 new: Vec<<Self as Relation>::Row>,
-                hash_index_0_1: runtime::HashMap<(Math, Math), (Math,)>,
-                hash_index_0_1_2: runtime::HashMap<(Math, Math, Math), runtime::SmallVec<[(); 1]>>,
+                hash_index_0_1: runtime::HashMap<(Math, Math), (Math, TimeStamp)>,
+                hash_index_0_1_2: runtime::HashMap<(Math, Math, Math), runtime::SmallVec<[(TimeStamp,); 1]>>,
                 math_num_uprooted_at_latest_retain: usize,
             }
             impl Relation for AddRelation {
@@ -5825,14 +6992,19 @@ fn initial_exprs() {
                 }
                 fn emit_graphviz(&self, buf: &mut String) {
                     use std::fmt::Write;
-                    for (i, ((x0, x1), (x2,))) in self.hash_index_0_1.iter().enumerate() {
+                    for (i, ((x0, x1), (x2, _timestamp))) in self.hash_index_0_1.iter().enumerate() {
                         writeln!(buf, "{}_{i} -> {}_{};", "add", "math", x0).unwrap();
                         writeln!(buf, "{}_{i} -> {}_{};", "add", "math", x1).unwrap();
                         writeln!(buf, "{}_{i} -> {}_{};", "add", "math", x2).unwrap();
                         writeln!(buf, "{}_{i} [shape = box];", "add").unwrap();
                     }
                 }
-                fn update_begin(&mut self, insertions: &[Self::Row], uf: &mut Unification) {
+                fn update_begin(
+                    &mut self,
+                    insertions: &[Self::Row],
+                    uf: &mut Unification,
+                    latest_timestamp: TimeStamp,
+                ) {
                     log_duration!("update_begin {}: {}", "add", {
                         for &(mut x0, mut x1, mut x2) in insertions {
                             match self
@@ -5840,43 +7012,59 @@ fn initial_exprs() {
                                 .entry((uf.math_.find(x0), uf.math_.find(x1)))
                             {
                                 runtime::HashMapEntry::Occupied(mut entry) => {
-                                    let (y2,) = entry.get_mut();
-                                    uf.math_.union_mut(&mut x2, y2);
+                                    let (y2, timestamp) = entry.get_mut();
+                                    let changed = false;
+                                    let old_val = *y2;
+                                    let changed = changed | (old_val != uf.math_.union_mut(&mut x2, y2));
+                                    if changed {
+                                        *timestamp = latest_timestamp;
+                                    }
                                 }
                                 runtime::HashMapEntry::Vacant(entry) => {
-                                    entry.insert((uf.math_.find(x2),));
+                                    entry.insert((uf.math_.find(x2), latest_timestamp));
                                 }
                             }
                         }
                     });
                 }
-                fn update(&mut self, insertions: &mut Vec<Self::Row>, uf: &mut Unification) -> bool {
+                fn update(
+                    &mut self,
+                    insertions: &mut Vec<Self::Row>,
+                    uf: &mut Unification,
+                    latest_timestamp: TimeStamp,
+                ) -> bool {
                     if self.math_num_uprooted_at_latest_retain == uf.math_.num_uprooted() {
                         return false;
                     }
                     let offset = insertions.len();
                     log_duration!("update {}: {}", "add", {
                         self.math_num_uprooted_at_latest_retain = uf.math_.num_uprooted();
-                        self.hash_index_0_1.retain(|&(x0, x1), &mut (x2,)| {
-                            if uf.math_.is_root(x0) & uf.math_.is_root(x1) & uf.math_.is_root(x2) {
-                                true
-                            } else {
-                                insertions.push((x0, x1, x2));
-                                false
-                            }
-                        });
+                        self.hash_index_0_1
+                            .retain(|&(x0, x1), &mut (x2, _timestamp)| {
+                                if uf.math_.is_root(x0) & uf.math_.is_root(x1) & uf.math_.is_root(x2) {
+                                    true
+                                } else {
+                                    insertions.push((x0, x1, x2));
+                                    false
+                                }
+                            });
                     });
-                    self.update_begin(&insertions[offset..], uf);
+                    self.update_begin(&insertions[offset..], uf, latest_timestamp);
                     true
                 }
-                fn update_finalize(&mut self, insertions: &mut Vec<Self::Row>, uf: &mut Unification) {
+                fn update_finalize(
+                    &mut self,
+                    insertions: &mut Vec<Self::Row>,
+                    uf: &mut Unification,
+                    latest_timestamp: TimeStamp,
+                ) {
                     log_duration!("update_finalize {}: {}", "add", {
                         assert!(self.new.is_empty());
                         log_duration!("fill new: {}", {
                             self.new.extend(
                                 self.hash_index_0_1
                                     .iter()
-                                    .map(|(&(x0, x1), &(x2,))| (x0, x1, x2))
+                                    .map(|(&(x0, x1), &(x2, _timestamp))| (x0, x1, x2))
                                     .filter(|&(x0, x1, x2)| !self.hash_index_0_1_2.contains_key(&(x0, x1, x2))),
                             );
                             insertions.clear();
@@ -5888,15 +7076,15 @@ fn initial_exprs() {
                                 self.hash_index_0_1_2
                                     .entry((x0, x1, x2))
                                     .or_default()
-                                    .push(());
+                                    .push((latest_timestamp,));
                             }
                         });
                         log_duration!("retain index: {}", {
                             self.hash_index_0_1_2.retain(|&(x0, x1, x2), v| {
                                 if uf.math_.is_root(x0) & uf.math_.is_root(x1) & uf.math_.is_root(x2) {
-                                    v.retain(|&mut ()| true);
+                                    v.retain(|&mut (_timestamp)| true);
                                     v.sort_unstable();
-                                    v.dedup();
+                                    v.dedup_by(|(t1,), (t2,)| true);
                                     true
                                 } else {
                                     false
@@ -5908,25 +7096,56 @@ fn initial_exprs() {
                 }
             }
             impl AddRelation {
-                fn iter2_0_1_2(&self, x0: Math, x1: Math) -> impl Iterator<Item = (Math,)> + use<'_> {
-                    self.hash_index_0_1.get(&(x0, x1)).into_iter().copied()
+                fn iter_all2_0_1_2(&self, x0: Math, x1: Math) -> impl Iterator<Item = (Math,)> + use<'_> {
+                    self.hash_index_0_1
+                        .get(&(x0, x1))
+                        .into_iter()
+                        .copied()
+                        .map(|(x2, _timestamp)| (x2,))
                 }
-                fn iter3_0_1_2(&self, x0: Math, x1: Math, x2: Math) -> impl Iterator<Item = ()> + use<'_> {
+                fn iter_all3_0_1_2(&self, x0: Math, x1: Math, x2: Math) -> impl Iterator<Item = ()> + use<'_> {
                     self.hash_index_0_1_2
                         .get(&(x0, x1, x2))
                         .into_iter()
                         .flatten()
                         .copied()
+                        .map(|(_timestamp)| ())
+                }
+                fn iter_old2_0_1_2(
+                    &self,
+                    x0: Math,
+                    x1: Math,
+                    latest_timestamp: TimeStamp,
+                ) -> impl Iterator<Item = (Math,)> + use<'_> {
+                    self.hash_index_0_1
+                        .get(&(x0, x1))
+                        .into_iter()
+                        .copied()
+                        .filter_map(move |(x2, timestamp)| (timestamp < latest_timestamp).then_some((x2,)))
+                }
+                fn iter_old3_0_1_2(
+                    &self,
+                    x0: Math,
+                    x1: Math,
+                    x2: Math,
+                    latest_timestamp: TimeStamp,
+                ) -> impl Iterator<Item = ()> + use<'_> {
+                    self.hash_index_0_1_2
+                        .get(&(x0, x1, x2))
+                        .into_iter()
+                        .flatten()
+                        .copied()
+                        .filter_map(move |(timestamp,)| (timestamp < latest_timestamp).then_some(()))
                 }
                 fn check2_0_1_2(&self, x0: Math, x1: Math) -> bool {
-                    self.iter2_0_1_2(x0, x1).next().is_some()
+                    self.iter_all2_0_1_2(x0, x1).next().is_some()
                 }
                 fn check3_0_1_2(&self, x0: Math, x1: Math, x2: Math) -> bool {
-                    self.iter3_0_1_2(x0, x1, x2).next().is_some()
+                    self.iter_all3_0_1_2(x0, x1, x2).next().is_some()
                 }
                 #[allow(unreachable_code)]
                 fn entry2_0_1_2(&self, x0: Math, x1: Math, delta: &mut Delta, uf: &mut Unification) -> (Math,) {
-                    if let Some((x2,)) = self.iter2_0_1_2(x0, x1).next() {
+                    if let Some((x2,)) = self.iter_all2_0_1_2(x0, x1).next() {
                         return (x2,);
                     }
                     let x2 = uf.math_.add_eclass();
@@ -5942,7 +7161,7 @@ fn initial_exprs() {
                     delta: &mut Delta,
                     uf: &mut Unification,
                 ) -> () {
-                    if let Some(()) = self.iter3_0_1_2(x0, x1, x2).next() {
+                    if let Some(()) = self.iter_all3_0_1_2(x0, x1, x2).next() {
                         return ();
                     }
                     delta.add_.push((x0, x1, x2));
@@ -5952,8 +7171,8 @@ fn initial_exprs() {
             #[derive(Debug, Default)]
             struct MulRelation {
                 new: Vec<<Self as Relation>::Row>,
-                hash_index_0_1: runtime::HashMap<(Math, Math), (Math,)>,
-                hash_index_0_1_2: runtime::HashMap<(Math, Math, Math), runtime::SmallVec<[(); 1]>>,
+                hash_index_0_1: runtime::HashMap<(Math, Math), (Math, TimeStamp)>,
+                hash_index_0_1_2: runtime::HashMap<(Math, Math, Math), runtime::SmallVec<[(TimeStamp,); 1]>>,
                 math_num_uprooted_at_latest_retain: usize,
             }
             impl Relation for MulRelation {
@@ -5977,14 +7196,19 @@ fn initial_exprs() {
                 }
                 fn emit_graphviz(&self, buf: &mut String) {
                     use std::fmt::Write;
-                    for (i, ((x0, x1), (x2,))) in self.hash_index_0_1.iter().enumerate() {
+                    for (i, ((x0, x1), (x2, _timestamp))) in self.hash_index_0_1.iter().enumerate() {
                         writeln!(buf, "{}_{i} -> {}_{};", "mul", "math", x0).unwrap();
                         writeln!(buf, "{}_{i} -> {}_{};", "mul", "math", x1).unwrap();
                         writeln!(buf, "{}_{i} -> {}_{};", "mul", "math", x2).unwrap();
                         writeln!(buf, "{}_{i} [shape = box];", "mul").unwrap();
                     }
                 }
-                fn update_begin(&mut self, insertions: &[Self::Row], uf: &mut Unification) {
+                fn update_begin(
+                    &mut self,
+                    insertions: &[Self::Row],
+                    uf: &mut Unification,
+                    latest_timestamp: TimeStamp,
+                ) {
                     log_duration!("update_begin {}: {}", "mul", {
                         for &(mut x0, mut x1, mut x2) in insertions {
                             match self
@@ -5992,43 +7216,59 @@ fn initial_exprs() {
                                 .entry((uf.math_.find(x0), uf.math_.find(x1)))
                             {
                                 runtime::HashMapEntry::Occupied(mut entry) => {
-                                    let (y2,) = entry.get_mut();
-                                    uf.math_.union_mut(&mut x2, y2);
+                                    let (y2, timestamp) = entry.get_mut();
+                                    let changed = false;
+                                    let old_val = *y2;
+                                    let changed = changed | (old_val != uf.math_.union_mut(&mut x2, y2));
+                                    if changed {
+                                        *timestamp = latest_timestamp;
+                                    }
                                 }
                                 runtime::HashMapEntry::Vacant(entry) => {
-                                    entry.insert((uf.math_.find(x2),));
+                                    entry.insert((uf.math_.find(x2), latest_timestamp));
                                 }
                             }
                         }
                     });
                 }
-                fn update(&mut self, insertions: &mut Vec<Self::Row>, uf: &mut Unification) -> bool {
+                fn update(
+                    &mut self,
+                    insertions: &mut Vec<Self::Row>,
+                    uf: &mut Unification,
+                    latest_timestamp: TimeStamp,
+                ) -> bool {
                     if self.math_num_uprooted_at_latest_retain == uf.math_.num_uprooted() {
                         return false;
                     }
                     let offset = insertions.len();
                     log_duration!("update {}: {}", "mul", {
                         self.math_num_uprooted_at_latest_retain = uf.math_.num_uprooted();
-                        self.hash_index_0_1.retain(|&(x0, x1), &mut (x2,)| {
-                            if uf.math_.is_root(x0) & uf.math_.is_root(x1) & uf.math_.is_root(x2) {
-                                true
-                            } else {
-                                insertions.push((x0, x1, x2));
-                                false
-                            }
-                        });
+                        self.hash_index_0_1
+                            .retain(|&(x0, x1), &mut (x2, _timestamp)| {
+                                if uf.math_.is_root(x0) & uf.math_.is_root(x1) & uf.math_.is_root(x2) {
+                                    true
+                                } else {
+                                    insertions.push((x0, x1, x2));
+                                    false
+                                }
+                            });
                     });
-                    self.update_begin(&insertions[offset..], uf);
+                    self.update_begin(&insertions[offset..], uf, latest_timestamp);
                     true
                 }
-                fn update_finalize(&mut self, insertions: &mut Vec<Self::Row>, uf: &mut Unification) {
+                fn update_finalize(
+                    &mut self,
+                    insertions: &mut Vec<Self::Row>,
+                    uf: &mut Unification,
+                    latest_timestamp: TimeStamp,
+                ) {
                     log_duration!("update_finalize {}: {}", "mul", {
                         assert!(self.new.is_empty());
                         log_duration!("fill new: {}", {
                             self.new.extend(
                                 self.hash_index_0_1
                                     .iter()
-                                    .map(|(&(x0, x1), &(x2,))| (x0, x1, x2))
+                                    .map(|(&(x0, x1), &(x2, _timestamp))| (x0, x1, x2))
                                     .filter(|&(x0, x1, x2)| !self.hash_index_0_1_2.contains_key(&(x0, x1, x2))),
                             );
                             insertions.clear();
@@ -6040,15 +7280,15 @@ fn initial_exprs() {
                                 self.hash_index_0_1_2
                                     .entry((x0, x1, x2))
                                     .or_default()
-                                    .push(());
+                                    .push((latest_timestamp,));
                             }
                         });
                         log_duration!("retain index: {}", {
                             self.hash_index_0_1_2.retain(|&(x0, x1, x2), v| {
                                 if uf.math_.is_root(x0) & uf.math_.is_root(x1) & uf.math_.is_root(x2) {
-                                    v.retain(|&mut ()| true);
+                                    v.retain(|&mut (_timestamp)| true);
                                     v.sort_unstable();
-                                    v.dedup();
+                                    v.dedup_by(|(t1,), (t2,)| true);
                                     true
                                 } else {
                                     false
@@ -6060,25 +7300,56 @@ fn initial_exprs() {
                 }
             }
             impl MulRelation {
-                fn iter2_0_1_2(&self, x0: Math, x1: Math) -> impl Iterator<Item = (Math,)> + use<'_> {
-                    self.hash_index_0_1.get(&(x0, x1)).into_iter().copied()
+                fn iter_all2_0_1_2(&self, x0: Math, x1: Math) -> impl Iterator<Item = (Math,)> + use<'_> {
+                    self.hash_index_0_1
+                        .get(&(x0, x1))
+                        .into_iter()
+                        .copied()
+                        .map(|(x2, _timestamp)| (x2,))
                 }
-                fn iter3_0_1_2(&self, x0: Math, x1: Math, x2: Math) -> impl Iterator<Item = ()> + use<'_> {
+                fn iter_all3_0_1_2(&self, x0: Math, x1: Math, x2: Math) -> impl Iterator<Item = ()> + use<'_> {
                     self.hash_index_0_1_2
                         .get(&(x0, x1, x2))
                         .into_iter()
                         .flatten()
                         .copied()
+                        .map(|(_timestamp)| ())
+                }
+                fn iter_old2_0_1_2(
+                    &self,
+                    x0: Math,
+                    x1: Math,
+                    latest_timestamp: TimeStamp,
+                ) -> impl Iterator<Item = (Math,)> + use<'_> {
+                    self.hash_index_0_1
+                        .get(&(x0, x1))
+                        .into_iter()
+                        .copied()
+                        .filter_map(move |(x2, timestamp)| (timestamp < latest_timestamp).then_some((x2,)))
+                }
+                fn iter_old3_0_1_2(
+                    &self,
+                    x0: Math,
+                    x1: Math,
+                    x2: Math,
+                    latest_timestamp: TimeStamp,
+                ) -> impl Iterator<Item = ()> + use<'_> {
+                    self.hash_index_0_1_2
+                        .get(&(x0, x1, x2))
+                        .into_iter()
+                        .flatten()
+                        .copied()
+                        .filter_map(move |(timestamp,)| (timestamp < latest_timestamp).then_some(()))
                 }
                 fn check2_0_1_2(&self, x0: Math, x1: Math) -> bool {
-                    self.iter2_0_1_2(x0, x1).next().is_some()
+                    self.iter_all2_0_1_2(x0, x1).next().is_some()
                 }
                 fn check3_0_1_2(&self, x0: Math, x1: Math, x2: Math) -> bool {
-                    self.iter3_0_1_2(x0, x1, x2).next().is_some()
+                    self.iter_all3_0_1_2(x0, x1, x2).next().is_some()
                 }
                 #[allow(unreachable_code)]
                 fn entry2_0_1_2(&self, x0: Math, x1: Math, delta: &mut Delta, uf: &mut Unification) -> (Math,) {
-                    if let Some((x2,)) = self.iter2_0_1_2(x0, x1).next() {
+                    if let Some((x2,)) = self.iter_all2_0_1_2(x0, x1).next() {
                         return (x2,);
                     }
                     let x2 = uf.math_.add_eclass();
@@ -6094,7 +7365,7 @@ fn initial_exprs() {
                     delta: &mut Delta,
                     uf: &mut Unification,
                 ) -> () {
-                    if let Some(()) = self.iter3_0_1_2(x0, x1, x2).next() {
+                    if let Some(()) = self.iter_all3_0_1_2(x0, x1, x2).next() {
                         return ();
                     }
                     delta.mul_.push((x0, x1, x2));
@@ -6104,8 +7375,9 @@ fn initial_exprs() {
             #[derive(Debug, Default)]
             struct ConstRelation {
                 new: Vec<<Self as Relation>::Row>,
-                hash_index_0: runtime::HashMap<(std::primitive::i64,), (Math,)>,
-                hash_index_0_1: runtime::HashMap<(std::primitive::i64, Math), runtime::SmallVec<[(); 1]>>,
+                hash_index_0: runtime::HashMap<(std::primitive::i64,), (Math, TimeStamp)>,
+                hash_index_0_1:
+                    runtime::HashMap<(std::primitive::i64, Math), runtime::SmallVec<[(TimeStamp,); 1]>>,
                 i64_num_uprooted_at_latest_retain: usize,
                 math_num_uprooted_at_latest_retain: usize,
             }
@@ -6130,35 +7402,50 @@ fn initial_exprs() {
                 }
                 fn emit_graphviz(&self, buf: &mut String) {
                     use std::fmt::Write;
-                    for (i, ((x0,), (x1,))) in self.hash_index_0.iter().enumerate() {
+                    for (i, ((x0,), (x1, _timestamp))) in self.hash_index_0.iter().enumerate() {
                         writeln!(buf, "{}_{i} -> {}_{};", "const", "i64", x0).unwrap();
                         writeln!(buf, "{}_{i} -> {}_{};", "const", "math", x1).unwrap();
                         writeln!(buf, "{}_{i} [shape = box];", "const").unwrap();
                     }
                 }
-                fn update_begin(&mut self, insertions: &[Self::Row], uf: &mut Unification) {
+                fn update_begin(
+                    &mut self,
+                    insertions: &[Self::Row],
+                    uf: &mut Unification,
+                    latest_timestamp: TimeStamp,
+                ) {
                     log_duration!("update_begin {}: {}", "const", {
                         for &(mut x0, mut x1) in insertions {
                             match self.hash_index_0.entry((x0,)) {
                                 runtime::HashMapEntry::Occupied(mut entry) => {
-                                    let (y1,) = entry.get_mut();
-                                    uf.math_.union_mut(&mut x1, y1);
+                                    let (y1, timestamp) = entry.get_mut();
+                                    let changed = false;
+                                    let old_val = *y1;
+                                    let changed = changed | (old_val != uf.math_.union_mut(&mut x1, y1));
+                                    if changed {
+                                        *timestamp = latest_timestamp;
+                                    }
                                 }
                                 runtime::HashMapEntry::Vacant(entry) => {
-                                    entry.insert((uf.math_.find(x1),));
+                                    entry.insert((uf.math_.find(x1), latest_timestamp));
                                 }
                             }
                         }
                     });
                 }
-                fn update(&mut self, insertions: &mut Vec<Self::Row>, uf: &mut Unification) -> bool {
+                fn update(
+                    &mut self,
+                    insertions: &mut Vec<Self::Row>,
+                    uf: &mut Unification,
+                    latest_timestamp: TimeStamp,
+                ) -> bool {
                     if self.math_num_uprooted_at_latest_retain == uf.math_.num_uprooted() {
                         return false;
                     }
                     let offset = insertions.len();
                     log_duration!("update {}: {}", "const", {
                         self.math_num_uprooted_at_latest_retain = uf.math_.num_uprooted();
-                        self.hash_index_0.retain(|&(x0,), &mut (x1,)| {
+                        self.hash_index_0.retain(|&(x0,), &mut (x1, _timestamp)| {
                             if uf.math_.is_root(x1) {
                                 true
                             } else {
@@ -6167,17 +7454,22 @@ fn initial_exprs() {
                             }
                         });
                     });
-                    self.update_begin(&insertions[offset..], uf);
+                    self.update_begin(&insertions[offset..], uf, latest_timestamp);
                     true
                 }
-                fn update_finalize(&mut self, insertions: &mut Vec<Self::Row>, uf: &mut Unification) {
+                fn update_finalize(
+                    &mut self,
+                    insertions: &mut Vec<Self::Row>,
+                    uf: &mut Unification,
+                    latest_timestamp: TimeStamp,
+                ) {
                     log_duration!("update_finalize {}: {}", "const", {
                         assert!(self.new.is_empty());
                         log_duration!("fill new: {}", {
                             self.new.extend(
                                 self.hash_index_0
                                     .iter()
-                                    .map(|(&(x0,), &(x1,))| (x0, x1))
+                                    .map(|(&(x0,), &(x1, _timestamp))| (x0, x1))
                                     .filter(|&(x0, x1)| !self.hash_index_0_1.contains_key(&(x0, x1))),
                             );
                             insertions.clear();
@@ -6186,15 +7478,18 @@ fn initial_exprs() {
                         });
                         log_duration!("fill index: {}", {
                             for &(x0, x1) in &self.new {
-                                self.hash_index_0_1.entry((x0, x1)).or_default().push(());
+                                self.hash_index_0_1
+                                    .entry((x0, x1))
+                                    .or_default()
+                                    .push((latest_timestamp,));
                             }
                         });
                         log_duration!("retain index: {}", {
                             self.hash_index_0_1.retain(|&(x0, x1), v| {
                                 if uf.math_.is_root(x1) {
-                                    v.retain(|&mut ()| true);
+                                    v.retain(|&mut (_timestamp)| true);
                                     v.sort_unstable();
-                                    v.dedup();
+                                    v.dedup_by(|(t1,), (t2,)| true);
                                     true
                                 } else {
                                     false
@@ -6206,21 +7501,54 @@ fn initial_exprs() {
                 }
             }
             impl ConstRelation {
-                fn iter1_0_1(&self, x0: std::primitive::i64) -> impl Iterator<Item = (Math,)> + use<'_> {
-                    self.hash_index_0.get(&(x0,)).into_iter().copied()
+                fn iter_all1_0_1(&self, x0: std::primitive::i64) -> impl Iterator<Item = (Math,)> + use<'_> {
+                    self.hash_index_0
+                        .get(&(x0,))
+                        .into_iter()
+                        .copied()
+                        .map(|(x1, _timestamp)| (x1,))
                 }
-                fn iter2_0_1(&self, x0: std::primitive::i64, x1: Math) -> impl Iterator<Item = ()> + use<'_> {
+                fn iter_all2_0_1(
+                    &self,
+                    x0: std::primitive::i64,
+                    x1: Math,
+                ) -> impl Iterator<Item = ()> + use<'_> {
                     self.hash_index_0_1
                         .get(&(x0, x1))
                         .into_iter()
                         .flatten()
                         .copied()
+                        .map(|(_timestamp)| ())
+                }
+                fn iter_old1_0_1(
+                    &self,
+                    x0: std::primitive::i64,
+                    latest_timestamp: TimeStamp,
+                ) -> impl Iterator<Item = (Math,)> + use<'_> {
+                    self.hash_index_0
+                        .get(&(x0,))
+                        .into_iter()
+                        .copied()
+                        .filter_map(move |(x1, timestamp)| (timestamp < latest_timestamp).then_some((x1,)))
+                }
+                fn iter_old2_0_1(
+                    &self,
+                    x0: std::primitive::i64,
+                    x1: Math,
+                    latest_timestamp: TimeStamp,
+                ) -> impl Iterator<Item = ()> + use<'_> {
+                    self.hash_index_0_1
+                        .get(&(x0, x1))
+                        .into_iter()
+                        .flatten()
+                        .copied()
+                        .filter_map(move |(timestamp,)| (timestamp < latest_timestamp).then_some(()))
                 }
                 fn check1_0_1(&self, x0: std::primitive::i64) -> bool {
-                    self.iter1_0_1(x0).next().is_some()
+                    self.iter_all1_0_1(x0).next().is_some()
                 }
                 fn check2_0_1(&self, x0: std::primitive::i64, x1: Math) -> bool {
-                    self.iter2_0_1(x0, x1).next().is_some()
+                    self.iter_all2_0_1(x0, x1).next().is_some()
                 }
                 #[allow(unreachable_code)]
                 fn entry1_0_1(
@@ -6229,7 +7557,7 @@ fn initial_exprs() {
                     delta: &mut Delta,
                     uf: &mut Unification,
                 ) -> (Math,) {
-                    if let Some((x1,)) = self.iter1_0_1(x0).next() {
+                    if let Some((x1,)) = self.iter_all1_0_1(x0).next() {
                         return (x1,);
                     }
                     let x1 = uf.math_.add_eclass();
@@ -6244,7 +7572,7 @@ fn initial_exprs() {
                     delta: &mut Delta,
                     uf: &mut Unification,
                 ) -> () {
-                    if let Some(()) = self.iter2_0_1(x0, x1).next() {
+                    if let Some(()) = self.iter_all2_0_1(x0, x1).next() {
                         return ();
                     }
                     delta.const_.push((x0, x1));
@@ -6254,8 +7582,9 @@ fn initial_exprs() {
             #[derive(Debug, Default)]
             struct VarRelation {
                 new: Vec<<Self as Relation>::Row>,
-                hash_index_0: runtime::HashMap<(runtime::IString,), (Math,)>,
-                hash_index_0_1: runtime::HashMap<(runtime::IString, Math), runtime::SmallVec<[(); 1]>>,
+                hash_index_0: runtime::HashMap<(runtime::IString,), (Math, TimeStamp)>,
+                hash_index_0_1:
+                    runtime::HashMap<(runtime::IString, Math), runtime::SmallVec<[(TimeStamp,); 1]>>,
                 string_num_uprooted_at_latest_retain: usize,
                 math_num_uprooted_at_latest_retain: usize,
             }
@@ -6280,35 +7609,50 @@ fn initial_exprs() {
                 }
                 fn emit_graphviz(&self, buf: &mut String) {
                     use std::fmt::Write;
-                    for (i, ((x0,), (x1,))) in self.hash_index_0.iter().enumerate() {
+                    for (i, ((x0,), (x1, _timestamp))) in self.hash_index_0.iter().enumerate() {
                         writeln!(buf, "{}_{i} -> {}_{};", "var", "string", x0).unwrap();
                         writeln!(buf, "{}_{i} -> {}_{};", "var", "math", x1).unwrap();
                         writeln!(buf, "{}_{i} [shape = box];", "var").unwrap();
                     }
                 }
-                fn update_begin(&mut self, insertions: &[Self::Row], uf: &mut Unification) {
+                fn update_begin(
+                    &mut self,
+                    insertions: &[Self::Row],
+                    uf: &mut Unification,
+                    latest_timestamp: TimeStamp,
+                ) {
                     log_duration!("update_begin {}: {}", "var", {
                         for &(mut x0, mut x1) in insertions {
                             match self.hash_index_0.entry((x0,)) {
                                 runtime::HashMapEntry::Occupied(mut entry) => {
-                                    let (y1,) = entry.get_mut();
-                                    uf.math_.union_mut(&mut x1, y1);
+                                    let (y1, timestamp) = entry.get_mut();
+                                    let changed = false;
+                                    let old_val = *y1;
+                                    let changed = changed | (old_val != uf.math_.union_mut(&mut x1, y1));
+                                    if changed {
+                                        *timestamp = latest_timestamp;
+                                    }
                                 }
                                 runtime::HashMapEntry::Vacant(entry) => {
-                                    entry.insert((uf.math_.find(x1),));
+                                    entry.insert((uf.math_.find(x1), latest_timestamp));
                                 }
                             }
                         }
                     });
                 }
-                fn update(&mut self, insertions: &mut Vec<Self::Row>, uf: &mut Unification) -> bool {
+                fn update(
+                    &mut self,
+                    insertions: &mut Vec<Self::Row>,
+                    uf: &mut Unification,
+                    latest_timestamp: TimeStamp,
+                ) -> bool {
                     if self.math_num_uprooted_at_latest_retain == uf.math_.num_uprooted() {
                         return false;
                     }
                     let offset = insertions.len();
                     log_duration!("update {}: {}", "var", {
                         self.math_num_uprooted_at_latest_retain = uf.math_.num_uprooted();
-                        self.hash_index_0.retain(|&(x0,), &mut (x1,)| {
+                        self.hash_index_0.retain(|&(x0,), &mut (x1, _timestamp)| {
                             if uf.math_.is_root(x1) {
                                 true
                             } else {
@@ -6317,17 +7661,22 @@ fn initial_exprs() {
                             }
                         });
                     });
-                    self.update_begin(&insertions[offset..], uf);
+                    self.update_begin(&insertions[offset..], uf, latest_timestamp);
                     true
                 }
-                fn update_finalize(&mut self, insertions: &mut Vec<Self::Row>, uf: &mut Unification) {
+                fn update_finalize(
+                    &mut self,
+                    insertions: &mut Vec<Self::Row>,
+                    uf: &mut Unification,
+                    latest_timestamp: TimeStamp,
+                ) {
                     log_duration!("update_finalize {}: {}", "var", {
                         assert!(self.new.is_empty());
                         log_duration!("fill new: {}", {
                             self.new.extend(
                                 self.hash_index_0
                                     .iter()
-                                    .map(|(&(x0,), &(x1,))| (x0, x1))
+                                    .map(|(&(x0,), &(x1, _timestamp))| (x0, x1))
                                     .filter(|&(x0, x1)| !self.hash_index_0_1.contains_key(&(x0, x1))),
                             );
                             insertions.clear();
@@ -6336,15 +7685,18 @@ fn initial_exprs() {
                         });
                         log_duration!("fill index: {}", {
                             for &(x0, x1) in &self.new {
-                                self.hash_index_0_1.entry((x0, x1)).or_default().push(());
+                                self.hash_index_0_1
+                                    .entry((x0, x1))
+                                    .or_default()
+                                    .push((latest_timestamp,));
                             }
                         });
                         log_duration!("retain index: {}", {
                             self.hash_index_0_1.retain(|&(x0, x1), v| {
                                 if uf.math_.is_root(x1) {
-                                    v.retain(|&mut ()| true);
+                                    v.retain(|&mut (_timestamp)| true);
                                     v.sort_unstable();
-                                    v.dedup();
+                                    v.dedup_by(|(t1,), (t2,)| true);
                                     true
                                 } else {
                                     false
@@ -6356,25 +7708,54 @@ fn initial_exprs() {
                 }
             }
             impl VarRelation {
-                fn iter1_0_1(&self, x0: runtime::IString) -> impl Iterator<Item = (Math,)> + use<'_> {
-                    self.hash_index_0.get(&(x0,)).into_iter().copied()
+                fn iter_all1_0_1(&self, x0: runtime::IString) -> impl Iterator<Item = (Math,)> + use<'_> {
+                    self.hash_index_0
+                        .get(&(x0,))
+                        .into_iter()
+                        .copied()
+                        .map(|(x1, _timestamp)| (x1,))
                 }
-                fn iter2_0_1(&self, x0: runtime::IString, x1: Math) -> impl Iterator<Item = ()> + use<'_> {
+                fn iter_all2_0_1(&self, x0: runtime::IString, x1: Math) -> impl Iterator<Item = ()> + use<'_> {
                     self.hash_index_0_1
                         .get(&(x0, x1))
                         .into_iter()
                         .flatten()
                         .copied()
+                        .map(|(_timestamp)| ())
+                }
+                fn iter_old1_0_1(
+                    &self,
+                    x0: runtime::IString,
+                    latest_timestamp: TimeStamp,
+                ) -> impl Iterator<Item = (Math,)> + use<'_> {
+                    self.hash_index_0
+                        .get(&(x0,))
+                        .into_iter()
+                        .copied()
+                        .filter_map(move |(x1, timestamp)| (timestamp < latest_timestamp).then_some((x1,)))
+                }
+                fn iter_old2_0_1(
+                    &self,
+                    x0: runtime::IString,
+                    x1: Math,
+                    latest_timestamp: TimeStamp,
+                ) -> impl Iterator<Item = ()> + use<'_> {
+                    self.hash_index_0_1
+                        .get(&(x0, x1))
+                        .into_iter()
+                        .flatten()
+                        .copied()
+                        .filter_map(move |(timestamp,)| (timestamp < latest_timestamp).then_some(()))
                 }
                 fn check1_0_1(&self, x0: runtime::IString) -> bool {
-                    self.iter1_0_1(x0).next().is_some()
+                    self.iter_all1_0_1(x0).next().is_some()
                 }
                 fn check2_0_1(&self, x0: runtime::IString, x1: Math) -> bool {
-                    self.iter2_0_1(x0, x1).next().is_some()
+                    self.iter_all2_0_1(x0, x1).next().is_some()
                 }
                 #[allow(unreachable_code)]
                 fn entry1_0_1(&self, x0: runtime::IString, delta: &mut Delta, uf: &mut Unification) -> (Math,) {
-                    if let Some((x1,)) = self.iter1_0_1(x0).next() {
+                    if let Some((x1,)) = self.iter_all1_0_1(x0).next() {
                         return (x1,);
                     }
                     let x1 = uf.math_.add_eclass();
@@ -6389,7 +7770,7 @@ fn initial_exprs() {
                     delta: &mut Delta,
                     uf: &mut Unification,
                 ) -> () {
-                    if let Some(()) = self.iter2_0_1(x0, x1).next() {
+                    if let Some(()) = self.iter_all2_0_1(x0, x1).next() {
                         return ();
                     }
                     delta.var_.push((x0, x1));
@@ -6444,6 +7825,7 @@ fn initial_exprs() {
             }
             #[derive(Debug, Default)]
             pub struct Theory {
+                pub latest_timestamp: TimeStamp,
                 pub delta: Delta,
                 pub uf: Unification,
                 global_i64: GlobalVars<std::primitive::i64>,
@@ -6557,6 +7939,7 @@ fn initial_exprs() {
                 }
                 #[inline(never)]
                 pub fn canonicalize(&mut self) {
+                    self.latest_timestamp.0 += 1;
                     log_duration!("canonicalize (total): {}", {
                         self.add_.clear_new();
                         self.mul_.clear_new();
@@ -6566,33 +7949,61 @@ fn initial_exprs() {
                             return;
                         }
                         log_duration!("update_begin (total): {}", {
-                            self.add_.update_begin(&mut self.delta.add_, &mut self.uf);
-                            self.mul_.update_begin(&mut self.delta.mul_, &mut self.uf);
-                            self.const_
-                                .update_begin(&mut self.delta.const_, &mut self.uf);
-                            self.var_.update_begin(&mut self.delta.var_, &mut self.uf);
+                            self.add_
+                                .update_begin(&mut self.delta.add_, &mut self.uf, self.latest_timestamp);
+                            self.mul_
+                                .update_begin(&mut self.delta.mul_, &mut self.uf, self.latest_timestamp);
+                            self.const_.update_begin(
+                                &mut self.delta.const_,
+                                &mut self.uf,
+                                self.latest_timestamp,
+                            );
+                            self.var_
+                                .update_begin(&mut self.delta.var_, &mut self.uf, self.latest_timestamp);
                         });
                         log_duration!("update_loop (total): {}", {
                             loop {
                                 let mut progress = false;
-                                progress |= self.add_.update(&mut self.delta.add_, &mut self.uf);
-                                progress |= self.mul_.update(&mut self.delta.mul_, &mut self.uf);
-                                progress |= self.const_.update(&mut self.delta.const_, &mut self.uf);
-                                progress |= self.var_.update(&mut self.delta.var_, &mut self.uf);
+                                progress |=
+                                    self.add_
+                                        .update(&mut self.delta.add_, &mut self.uf, self.latest_timestamp);
+                                progress |=
+                                    self.mul_
+                                        .update(&mut self.delta.mul_, &mut self.uf, self.latest_timestamp);
+                                progress |= self.const_.update(
+                                    &mut self.delta.const_,
+                                    &mut self.uf,
+                                    self.latest_timestamp,
+                                );
+                                progress |=
+                                    self.var_
+                                        .update(&mut self.delta.var_, &mut self.uf, self.latest_timestamp);
                                 if !progress {
                                     break;
                                 }
                             }
                         });
                         log_duration!("update_finalize (total): {}", {
-                            self.add_
-                                .update_finalize(&mut self.delta.add_, &mut self.uf);
-                            self.mul_
-                                .update_finalize(&mut self.delta.mul_, &mut self.uf);
-                            self.const_
-                                .update_finalize(&mut self.delta.const_, &mut self.uf);
-                            self.var_
-                                .update_finalize(&mut self.delta.var_, &mut self.uf);
+                            self.add_.update_finalize(
+                                &mut self.delta.add_,
+                                &mut self.uf,
+                                self.latest_timestamp,
+                            );
+                            self.mul_.update_finalize(
+                                &mut self.delta.mul_,
+                                &mut self.uf,
+                                self.latest_timestamp,
+                            );
+                            self.const_.update_finalize(
+                                &mut self.delta.const_,
+                                &mut self.uf,
+                                self.latest_timestamp,
+                            );
+                            self.var_.update_finalize(
+                                &mut self.delta.var_,
+                                &mut self.uf,
+                                self.latest_timestamp,
+                            );
                             self.global_math.update(&mut self.uf.math_);
                             self.global_i64.update_finalize();
                             self.global_string.update_finalize();
@@ -6870,6 +8281,7 @@ fn codegen_bug1() {
             }
             #[derive(Debug, Default)]
             pub struct Theory {
+                pub latest_timestamp: TimeStamp,
                 pub delta: Delta,
                 pub uf: Unification,
             }
@@ -6920,6 +8332,7 @@ fn codegen_bug1() {
                 }
                 #[inline(never)]
                 pub fn canonicalize(&mut self) {
+                    self.latest_timestamp.0 += 1;
                     log_duration!("canonicalize (total): {}", {
                         if !self.delta.has_new_inserts() && self.uf.num_uprooted() == 0 {
                             return;
@@ -6996,6 +8409,7 @@ fn initial() {
             }
             #[derive(Debug, Default)]
             pub struct Theory {
+                pub latest_timestamp: TimeStamp,
                 pub delta: Delta,
                 pub uf: Unification,
             }
@@ -7049,6 +8463,7 @@ fn initial() {
                 }
                 #[inline(never)]
                 pub fn canonicalize(&mut self) {
+                    self.latest_timestamp.0 += 1;
                     log_duration!("canonicalize (total): {}", {
                         if !self.delta.has_new_inserts() && self.uf.num_uprooted() == 0 {
                             return;
@@ -7200,9 +8615,9 @@ fn test_primitives_simple() {
             #[derive(Debug, Default)]
             struct MulRelation {
                 new: Vec<<Self as Relation>::Row>,
-                hash_index_1_0: runtime::HashMap<(Math, Math), (Math,)>,
-                hash_index_1: runtime::HashMap<(Math,), runtime::SmallVec<[(Math, Math); 1]>>,
-                hash_index_1_0_2: runtime::HashMap<(Math, Math, Math), runtime::SmallVec<[(); 1]>>,
+                hash_index_1_0: runtime::HashMap<(Math, Math), (Math, TimeStamp)>,
+                hash_index_1: runtime::HashMap<(Math,), runtime::SmallVec<[(Math, Math, TimeStamp); 1]>>,
+                hash_index_1_0_2: runtime::HashMap<(Math, Math, Math), runtime::SmallVec<[(TimeStamp,); 1]>>,
                 math_num_uprooted_at_latest_retain: usize,
             }
             impl Relation for MulRelation {
@@ -7226,14 +8641,19 @@ fn test_primitives_simple() {
                 }
                 fn emit_graphviz(&self, buf: &mut String) {
                     use std::fmt::Write;
-                    for (i, ((x1, x0), (x2,))) in self.hash_index_1_0.iter().enumerate() {
+                    for (i, ((x1, x0), (x2, _timestamp))) in self.hash_index_1_0.iter().enumerate() {
                         writeln!(buf, "{}_{i} -> {}_{};", "mul", "math", x1).unwrap();
                         writeln!(buf, "{}_{i} -> {}_{};", "mul", "math", x0).unwrap();
                         writeln!(buf, "{}_{i} -> {}_{};", "mul", "math", x2).unwrap();
                         writeln!(buf, "{}_{i} [shape = box];", "mul").unwrap();
                     }
                 }
-                fn update_begin(&mut self, insertions: &[Self::Row], uf: &mut Unification) {
+                fn update_begin(
+                    &mut self,
+                    insertions: &[Self::Row],
+                    uf: &mut Unification,
+                    latest_timestamp: TimeStamp,
+                ) {
                     log_duration!("update_begin {}: {}", "mul", {
                         for &(mut x0, mut x1, mut x2) in insertions {
                             match self
@@ -7241,43 +8661,59 @@ fn test_primitives_simple() {
                                 .entry((uf.math_.find(x1), uf.math_.find(x0)))
                             {
                                 runtime::HashMapEntry::Occupied(mut entry) => {
-                                    let (y2,) = entry.get_mut();
-                                    uf.math_.union_mut(&mut x2, y2);
+                                    let (y2, timestamp) = entry.get_mut();
+                                    let changed = false;
+                                    let old_val = *y2;
+                                    let changed = changed | (old_val != uf.math_.union_mut(&mut x2, y2));
+                                    if changed {
+                                        *timestamp = latest_timestamp;
+                                    }
                                 }
                                 runtime::HashMapEntry::Vacant(entry) => {
-                                    entry.insert((uf.math_.find(x2),));
+                                    entry.insert((uf.math_.find(x2), latest_timestamp));
                                 }
                             }
                         }
                     });
                 }
-                fn update(&mut self, insertions: &mut Vec<Self::Row>, uf: &mut Unification) -> bool {
+                fn update(
+                    &mut self,
+                    insertions: &mut Vec<Self::Row>,
+                    uf: &mut Unification,
+                    latest_timestamp: TimeStamp,
+                ) -> bool {
                     if self.math_num_uprooted_at_latest_retain == uf.math_.num_uprooted() {
                         return false;
                     }
                     let offset = insertions.len();
                     log_duration!("update {}: {}", "mul", {
                         self.math_num_uprooted_at_latest_retain = uf.math_.num_uprooted();
-                        self.hash_index_1_0.retain(|&(x1, x0), &mut (x2,)| {
-                            if uf.math_.is_root(x0) & uf.math_.is_root(x1) & uf.math_.is_root(x2) {
-                                true
-                            } else {
-                                insertions.push((x0, x1, x2));
-                                false
-                            }
-                        });
+                        self.hash_index_1_0
+                            .retain(|&(x1, x0), &mut (x2, _timestamp)| {
+                                if uf.math_.is_root(x0) & uf.math_.is_root(x1) & uf.math_.is_root(x2) {
+                                    true
+                                } else {
+                                    insertions.push((x0, x1, x2));
+                                    false
+                                }
+                            });
                     });
-                    self.update_begin(&insertions[offset..], uf);
+                    self.update_begin(&insertions[offset..], uf, latest_timestamp);
                     true
                 }
-                fn update_finalize(&mut self, insertions: &mut Vec<Self::Row>, uf: &mut Unification) {
+                fn update_finalize(
+                    &mut self,
+                    insertions: &mut Vec<Self::Row>,
+                    uf: &mut Unification,
+                    latest_timestamp: TimeStamp,
+                ) {
                     log_duration!("update_finalize {}: {}", "mul", {
                         assert!(self.new.is_empty());
                         log_duration!("fill new: {}", {
                             self.new.extend(
                                 self.hash_index_1_0
                                     .iter()
-                                    .map(|(&(x1, x0), &(x2,))| (x0, x1, x2))
+                                    .map(|(&(x1, x0), &(x2, _timestamp))| (x0, x1, x2))
                                     .filter(|&(x0, x1, x2)| !self.hash_index_1_0_2.contains_key(&(x1, x0, x2))),
                             );
                             insertions.clear();
@@ -7286,15 +8722,20 @@ fn test_primitives_simple() {
                         });
                         log_duration!("fill index: {}", {
                             for &(x0, x1, x2) in &self.new {
-                                self.hash_index_1.entry((x1,)).or_default().push((x0, x2));
+                                self.hash_index_1
+                                    .entry((x1,))
+                                    .or_default()
+                                    .push((x0, x2, latest_timestamp));
                             }
                         });
                         log_duration!("retain index: {}", {
                             self.hash_index_1.retain(|&(x1,), v| {
                                 if uf.math_.is_root(x1) {
-                                    v.retain(|&mut (x0, x2)| uf.math_.is_root(x0) & uf.math_.is_root(x2));
+                                    v.retain(|&mut (x0, x2, _timestamp)| {
+                                        uf.math_.is_root(x0) & uf.math_.is_root(x2)
+                                    });
                                     v.sort_unstable();
-                                    v.dedup();
+                                    v.dedup_by(|(x0, x2, t1), (y0, y2, t2)| true & (*x0 == *y0) & (*x2 == *y2));
                                     true
                                 } else {
                                     false
@@ -7306,15 +8747,15 @@ fn test_primitives_simple() {
                                 self.hash_index_1_0_2
                                     .entry((x1, x0, x2))
                                     .or_default()
-                                    .push(());
+                                    .push((latest_timestamp,));
                             }
                         });
                         log_duration!("retain index: {}", {
                             self.hash_index_1_0_2.retain(|&(x1, x0, x2), v| {
                                 if uf.math_.is_root(x1) & uf.math_.is_root(x0) & uf.math_.is_root(x2) {
-                                    v.retain(|&mut ()| true);
+                                    v.retain(|&mut (_timestamp)| true);
                                     v.sort_unstable();
-                                    v.dedup();
+                                    v.dedup_by(|(t1,), (t2,)| true);
                                     true
                                 } else {
                                     false
@@ -7326,31 +8767,81 @@ fn test_primitives_simple() {
                 }
             }
             impl MulRelation {
-                fn iter2_1_0_2(&self, x1: Math, x0: Math) -> impl Iterator<Item = (Math,)> + use<'_> {
-                    self.hash_index_1_0.get(&(x1, x0)).into_iter().copied()
+                fn iter_all2_1_0_2(&self, x1: Math, x0: Math) -> impl Iterator<Item = (Math,)> + use<'_> {
+                    self.hash_index_1_0
+                        .get(&(x1, x0))
+                        .into_iter()
+                        .copied()
+                        .map(|(x2, _timestamp)| (x2,))
                 }
-                fn iter1_1_0_2(&self, x1: Math) -> impl Iterator<Item = (Math, Math)> + use<'_> {
-                    self.hash_index_1.get(&(x1,)).into_iter().flatten().copied()
+                fn iter_all1_1_0_2(&self, x1: Math) -> impl Iterator<Item = (Math, Math)> + use<'_> {
+                    self.hash_index_1
+                        .get(&(x1,))
+                        .into_iter()
+                        .flatten()
+                        .copied()
+                        .map(|(x0, x2, _timestamp)| (x0, x2))
                 }
-                fn iter3_1_0_2(&self, x1: Math, x0: Math, x2: Math) -> impl Iterator<Item = ()> + use<'_> {
+                fn iter_all3_1_0_2(&self, x1: Math, x0: Math, x2: Math) -> impl Iterator<Item = ()> + use<'_> {
                     self.hash_index_1_0_2
                         .get(&(x1, x0, x2))
                         .into_iter()
                         .flatten()
                         .copied()
+                        .map(|(_timestamp)| ())
+                }
+                fn iter_old2_1_0_2(
+                    &self,
+                    x1: Math,
+                    x0: Math,
+                    latest_timestamp: TimeStamp,
+                ) -> impl Iterator<Item = (Math,)> + use<'_> {
+                    self.hash_index_1_0
+                        .get(&(x1, x0))
+                        .into_iter()
+                        .copied()
+                        .filter_map(move |(x2, timestamp)| (timestamp < latest_timestamp).then_some((x2,)))
+                }
+                fn iter_old1_1_0_2(
+                    &self,
+                    x1: Math,
+                    latest_timestamp: TimeStamp,
+                ) -> impl Iterator<Item = (Math, Math)> + use<'_> {
+                    self.hash_index_1
+                        .get(&(x1,))
+                        .into_iter()
+                        .flatten()
+                        .copied()
+                        .filter_map(move |(x0, x2, timestamp)| {
+                            (timestamp < latest_timestamp).then_some((x0, x2))
+                        })
+                }
+                fn iter_old3_1_0_2(
+                    &self,
+                    x1: Math,
+                    x0: Math,
+                    x2: Math,
+                    latest_timestamp: TimeStamp,
+                ) -> impl Iterator<Item = ()> + use<'_> {
+                    self.hash_index_1_0_2
+                        .get(&(x1, x0, x2))
+                        .into_iter()
+                        .flatten()
+                        .copied()
+                        .filter_map(move |(timestamp,)| (timestamp < latest_timestamp).then_some(()))
                 }
                 fn check2_1_0_2(&self, x1: Math, x0: Math) -> bool {
-                    self.iter2_1_0_2(x1, x0).next().is_some()
+                    self.iter_all2_1_0_2(x1, x0).next().is_some()
                 }
                 fn check1_1_0_2(&self, x1: Math) -> bool {
-                    self.iter1_1_0_2(x1).next().is_some()
+                    self.iter_all1_1_0_2(x1).next().is_some()
                 }
                 fn check3_1_0_2(&self, x1: Math, x0: Math, x2: Math) -> bool {
-                    self.iter3_1_0_2(x1, x0, x2).next().is_some()
+                    self.iter_all3_1_0_2(x1, x0, x2).next().is_some()
                 }
                 #[allow(unreachable_code)]
                 fn entry2_1_0_2(&self, x1: Math, x0: Math, delta: &mut Delta, uf: &mut Unification) -> (Math,) {
-                    if let Some((x2,)) = self.iter2_1_0_2(x1, x0).next() {
+                    if let Some((x2,)) = self.iter_all2_1_0_2(x1, x0).next() {
                         return (x2,);
                     }
                     let x2 = uf.math_.add_eclass();
@@ -7366,7 +8857,7 @@ fn test_primitives_simple() {
                     delta: &mut Delta,
                     uf: &mut Unification,
                 ) -> () {
-                    if let Some(()) = self.iter3_1_0_2(x1, x0, x2).next() {
+                    if let Some(()) = self.iter_all3_1_0_2(x1, x0, x2).next() {
                         return ();
                     }
                     delta.mul_.push((x0, x1, x2));
@@ -7376,8 +8867,8 @@ fn test_primitives_simple() {
             #[derive(Debug, Default)]
             struct AddRelation {
                 new: Vec<<Self as Relation>::Row>,
-                hash_index_0_1: runtime::HashMap<(Math, Math), (Math,)>,
-                hash_index_0_1_2: runtime::HashMap<(Math, Math, Math), runtime::SmallVec<[(); 1]>>,
+                hash_index_0_1: runtime::HashMap<(Math, Math), (Math, TimeStamp)>,
+                hash_index_0_1_2: runtime::HashMap<(Math, Math, Math), runtime::SmallVec<[(TimeStamp,); 1]>>,
                 math_num_uprooted_at_latest_retain: usize,
             }
             impl Relation for AddRelation {
@@ -7401,14 +8892,19 @@ fn test_primitives_simple() {
                 }
                 fn emit_graphviz(&self, buf: &mut String) {
                     use std::fmt::Write;
-                    for (i, ((x0, x1), (x2,))) in self.hash_index_0_1.iter().enumerate() {
+                    for (i, ((x0, x1), (x2, _timestamp))) in self.hash_index_0_1.iter().enumerate() {
                         writeln!(buf, "{}_{i} -> {}_{};", "add", "math", x0).unwrap();
                         writeln!(buf, "{}_{i} -> {}_{};", "add", "math", x1).unwrap();
                         writeln!(buf, "{}_{i} -> {}_{};", "add", "math", x2).unwrap();
                         writeln!(buf, "{}_{i} [shape = box];", "add").unwrap();
                     }
                 }
-                fn update_begin(&mut self, insertions: &[Self::Row], uf: &mut Unification) {
+                fn update_begin(
+                    &mut self,
+                    insertions: &[Self::Row],
+                    uf: &mut Unification,
+                    latest_timestamp: TimeStamp,
+                ) {
                     log_duration!("update_begin {}: {}", "add", {
                         for &(mut x0, mut x1, mut x2) in insertions {
                             match self
@@ -7416,43 +8912,59 @@ fn test_primitives_simple() {
                                 .entry((uf.math_.find(x0), uf.math_.find(x1)))
                             {
                                 runtime::HashMapEntry::Occupied(mut entry) => {
-                                    let (y2,) = entry.get_mut();
-                                    uf.math_.union_mut(&mut x2, y2);
+                                    let (y2, timestamp) = entry.get_mut();
+                                    let changed = false;
+                                    let old_val = *y2;
+                                    let changed = changed | (old_val != uf.math_.union_mut(&mut x2, y2));
+                                    if changed {
+                                        *timestamp = latest_timestamp;
+                                    }
                                 }
                                 runtime::HashMapEntry::Vacant(entry) => {
-                                    entry.insert((uf.math_.find(x2),));
+                                    entry.insert((uf.math_.find(x2), latest_timestamp));
                                 }
                             }
                         }
                     });
                 }
-                fn update(&mut self, insertions: &mut Vec<Self::Row>, uf: &mut Unification) -> bool {
+                fn update(
+                    &mut self,
+                    insertions: &mut Vec<Self::Row>,
+                    uf: &mut Unification,
+                    latest_timestamp: TimeStamp,
+                ) -> bool {
                     if self.math_num_uprooted_at_latest_retain == uf.math_.num_uprooted() {
                         return false;
                     }
                     let offset = insertions.len();
                     log_duration!("update {}: {}", "add", {
                         self.math_num_uprooted_at_latest_retain = uf.math_.num_uprooted();
-                        self.hash_index_0_1.retain(|&(x0, x1), &mut (x2,)| {
-                            if uf.math_.is_root(x0) & uf.math_.is_root(x1) & uf.math_.is_root(x2) {
-                                true
-                            } else {
-                                insertions.push((x0, x1, x2));
-                                false
-                            }
-                        });
+                        self.hash_index_0_1
+                            .retain(|&(x0, x1), &mut (x2, _timestamp)| {
+                                if uf.math_.is_root(x0) & uf.math_.is_root(x1) & uf.math_.is_root(x2) {
+                                    true
+                                } else {
+                                    insertions.push((x0, x1, x2));
+                                    false
+                                }
+                            });
                     });
-                    self.update_begin(&insertions[offset..], uf);
+                    self.update_begin(&insertions[offset..], uf, latest_timestamp);
                     true
                 }
-                fn update_finalize(&mut self, insertions: &mut Vec<Self::Row>, uf: &mut Unification) {
+                fn update_finalize(
+                    &mut self,
+                    insertions: &mut Vec<Self::Row>,
+                    uf: &mut Unification,
+                    latest_timestamp: TimeStamp,
+                ) {
                     log_duration!("update_finalize {}: {}", "add", {
                         assert!(self.new.is_empty());
                         log_duration!("fill new: {}", {
                             self.new.extend(
                                 self.hash_index_0_1
                                     .iter()
-                                    .map(|(&(x0, x1), &(x2,))| (x0, x1, x2))
+                                    .map(|(&(x0, x1), &(x2, _timestamp))| (x0, x1, x2))
                                     .filter(|&(x0, x1, x2)| !self.hash_index_0_1_2.contains_key(&(x0, x1, x2))),
                             );
                             insertions.clear();
@@ -7464,15 +8976,15 @@ fn test_primitives_simple() {
                                 self.hash_index_0_1_2
                                     .entry((x0, x1, x2))
                                     .or_default()
-                                    .push(());
+                                    .push((latest_timestamp,));
                             }
                         });
                         log_duration!("retain index: {}", {
                             self.hash_index_0_1_2.retain(|&(x0, x1, x2), v| {
                                 if uf.math_.is_root(x0) & uf.math_.is_root(x1) & uf.math_.is_root(x2) {
-                                    v.retain(|&mut ()| true);
+                                    v.retain(|&mut (_timestamp)| true);
                                     v.sort_unstable();
-                                    v.dedup();
+                                    v.dedup_by(|(t1,), (t2,)| true);
                                     true
                                 } else {
                                     false
@@ -7484,25 +8996,56 @@ fn test_primitives_simple() {
                 }
             }
             impl AddRelation {
-                fn iter2_0_1_2(&self, x0: Math, x1: Math) -> impl Iterator<Item = (Math,)> + use<'_> {
-                    self.hash_index_0_1.get(&(x0, x1)).into_iter().copied()
+                fn iter_all2_0_1_2(&self, x0: Math, x1: Math) -> impl Iterator<Item = (Math,)> + use<'_> {
+                    self.hash_index_0_1
+                        .get(&(x0, x1))
+                        .into_iter()
+                        .copied()
+                        .map(|(x2, _timestamp)| (x2,))
                 }
-                fn iter3_0_1_2(&self, x0: Math, x1: Math, x2: Math) -> impl Iterator<Item = ()> + use<'_> {
+                fn iter_all3_0_1_2(&self, x0: Math, x1: Math, x2: Math) -> impl Iterator<Item = ()> + use<'_> {
                     self.hash_index_0_1_2
                         .get(&(x0, x1, x2))
                         .into_iter()
                         .flatten()
                         .copied()
+                        .map(|(_timestamp)| ())
+                }
+                fn iter_old2_0_1_2(
+                    &self,
+                    x0: Math,
+                    x1: Math,
+                    latest_timestamp: TimeStamp,
+                ) -> impl Iterator<Item = (Math,)> + use<'_> {
+                    self.hash_index_0_1
+                        .get(&(x0, x1))
+                        .into_iter()
+                        .copied()
+                        .filter_map(move |(x2, timestamp)| (timestamp < latest_timestamp).then_some((x2,)))
+                }
+                fn iter_old3_0_1_2(
+                    &self,
+                    x0: Math,
+                    x1: Math,
+                    x2: Math,
+                    latest_timestamp: TimeStamp,
+                ) -> impl Iterator<Item = ()> + use<'_> {
+                    self.hash_index_0_1_2
+                        .get(&(x0, x1, x2))
+                        .into_iter()
+                        .flatten()
+                        .copied()
+                        .filter_map(move |(timestamp,)| (timestamp < latest_timestamp).then_some(()))
                 }
                 fn check2_0_1_2(&self, x0: Math, x1: Math) -> bool {
-                    self.iter2_0_1_2(x0, x1).next().is_some()
+                    self.iter_all2_0_1_2(x0, x1).next().is_some()
                 }
                 fn check3_0_1_2(&self, x0: Math, x1: Math, x2: Math) -> bool {
-                    self.iter3_0_1_2(x0, x1, x2).next().is_some()
+                    self.iter_all3_0_1_2(x0, x1, x2).next().is_some()
                 }
                 #[allow(unreachable_code)]
                 fn entry2_0_1_2(&self, x0: Math, x1: Math, delta: &mut Delta, uf: &mut Unification) -> (Math,) {
-                    if let Some((x2,)) = self.iter2_0_1_2(x0, x1).next() {
+                    if let Some((x2,)) = self.iter_all2_0_1_2(x0, x1).next() {
                         return (x2,);
                     }
                     let x2 = uf.math_.add_eclass();
@@ -7518,7 +9061,7 @@ fn test_primitives_simple() {
                     delta: &mut Delta,
                     uf: &mut Unification,
                 ) -> () {
-                    if let Some(()) = self.iter3_0_1_2(x0, x1, x2).next() {
+                    if let Some(()) = self.iter_all3_0_1_2(x0, x1, x2).next() {
                         return ();
                     }
                     delta.add_.push((x0, x1, x2));
@@ -7528,9 +9071,11 @@ fn test_primitives_simple() {
             #[derive(Debug, Default)]
             struct ConstRelation {
                 new: Vec<<Self as Relation>::Row>,
-                hash_index_0: runtime::HashMap<(std::primitive::i64,), (Math,)>,
-                hash_index_1: runtime::HashMap<(Math,), runtime::SmallVec<[(std::primitive::i64,); 1]>>,
-                hash_index_0_1: runtime::HashMap<(std::primitive::i64, Math), runtime::SmallVec<[(); 1]>>,
+                hash_index_0: runtime::HashMap<(std::primitive::i64,), (Math, TimeStamp)>,
+                hash_index_1:
+                    runtime::HashMap<(Math,), runtime::SmallVec<[(std::primitive::i64, TimeStamp); 1]>>,
+                hash_index_0_1:
+                    runtime::HashMap<(std::primitive::i64, Math), runtime::SmallVec<[(TimeStamp,); 1]>>,
                 i64_num_uprooted_at_latest_retain: usize,
                 math_num_uprooted_at_latest_retain: usize,
             }
@@ -7555,35 +9100,50 @@ fn test_primitives_simple() {
                 }
                 fn emit_graphviz(&self, buf: &mut String) {
                     use std::fmt::Write;
-                    for (i, ((x0,), (x1,))) in self.hash_index_0.iter().enumerate() {
+                    for (i, ((x0,), (x1, _timestamp))) in self.hash_index_0.iter().enumerate() {
                         writeln!(buf, "{}_{i} -> {}_{};", "const", "i64", x0).unwrap();
                         writeln!(buf, "{}_{i} -> {}_{};", "const", "math", x1).unwrap();
                         writeln!(buf, "{}_{i} [shape = box];", "const").unwrap();
                     }
                 }
-                fn update_begin(&mut self, insertions: &[Self::Row], uf: &mut Unification) {
+                fn update_begin(
+                    &mut self,
+                    insertions: &[Self::Row],
+                    uf: &mut Unification,
+                    latest_timestamp: TimeStamp,
+                ) {
                     log_duration!("update_begin {}: {}", "const", {
                         for &(mut x0, mut x1) in insertions {
                             match self.hash_index_0.entry((x0,)) {
                                 runtime::HashMapEntry::Occupied(mut entry) => {
-                                    let (y1,) = entry.get_mut();
-                                    uf.math_.union_mut(&mut x1, y1);
+                                    let (y1, timestamp) = entry.get_mut();
+                                    let changed = false;
+                                    let old_val = *y1;
+                                    let changed = changed | (old_val != uf.math_.union_mut(&mut x1, y1));
+                                    if changed {
+                                        *timestamp = latest_timestamp;
+                                    }
                                 }
                                 runtime::HashMapEntry::Vacant(entry) => {
-                                    entry.insert((uf.math_.find(x1),));
+                                    entry.insert((uf.math_.find(x1), latest_timestamp));
                                 }
                             }
                         }
                     });
                 }
-                fn update(&mut self, insertions: &mut Vec<Self::Row>, uf: &mut Unification) -> bool {
+                fn update(
+                    &mut self,
+                    insertions: &mut Vec<Self::Row>,
+                    uf: &mut Unification,
+                    latest_timestamp: TimeStamp,
+                ) -> bool {
                     if self.math_num_uprooted_at_latest_retain == uf.math_.num_uprooted() {
                         return false;
                     }
                     let offset = insertions.len();
                     log_duration!("update {}: {}", "const", {
                         self.math_num_uprooted_at_latest_retain = uf.math_.num_uprooted();
-                        self.hash_index_0.retain(|&(x0,), &mut (x1,)| {
+                        self.hash_index_0.retain(|&(x0,), &mut (x1, _timestamp)| {
                             if uf.math_.is_root(x1) {
                                 true
                             } else {
@@ -7592,17 +9152,22 @@ fn test_primitives_simple() {
                             }
                         });
                     });
-                    self.update_begin(&insertions[offset..], uf);
+                    self.update_begin(&insertions[offset..], uf, latest_timestamp);
                     true
                 }
-                fn update_finalize(&mut self, insertions: &mut Vec<Self::Row>, uf: &mut Unification) {
+                fn update_finalize(
+                    &mut self,
+                    insertions: &mut Vec<Self::Row>,
+                    uf: &mut Unification,
+                    latest_timestamp: TimeStamp,
+                ) {
                     log_duration!("update_finalize {}: {}", "const", {
                         assert!(self.new.is_empty());
                         log_duration!("fill new: {}", {
                             self.new.extend(
                                 self.hash_index_0
                                     .iter()
-                                    .map(|(&(x0,), &(x1,))| (x0, x1))
+                                    .map(|(&(x0,), &(x1, _timestamp))| (x0, x1))
                                     .filter(|&(x0, x1)| !self.hash_index_0_1.contains_key(&(x0, x1))),
                             );
                             insertions.clear();
@@ -7611,15 +9176,18 @@ fn test_primitives_simple() {
                         });
                         log_duration!("fill index: {}", {
                             for &(x0, x1) in &self.new {
-                                self.hash_index_1.entry((x1,)).or_default().push((x0,));
+                                self.hash_index_1
+                                    .entry((x1,))
+                                    .or_default()
+                                    .push((x0, latest_timestamp));
                             }
                         });
                         log_duration!("retain index: {}", {
                             self.hash_index_1.retain(|&(x1,), v| {
                                 if uf.math_.is_root(x1) {
-                                    v.retain(|&mut (x0,)| true);
+                                    v.retain(|&mut (x0, _timestamp)| true);
                                     v.sort_unstable();
-                                    v.dedup();
+                                    v.dedup_by(|(x0, t1), (y0, t2)| true & (*x0 == *y0));
                                     true
                                 } else {
                                     false
@@ -7628,15 +9196,18 @@ fn test_primitives_simple() {
                         });
                         log_duration!("fill index: {}", {
                             for &(x0, x1) in &self.new {
-                                self.hash_index_0_1.entry((x0, x1)).or_default().push(());
+                                self.hash_index_0_1
+                                    .entry((x0, x1))
+                                    .or_default()
+                                    .push((latest_timestamp,));
                             }
                         });
                         log_duration!("retain index: {}", {
                             self.hash_index_0_1.retain(|&(x0, x1), v| {
                                 if uf.math_.is_root(x1) {
-                                    v.retain(|&mut ()| true);
+                                    v.retain(|&mut (_timestamp)| true);
                                     v.sort_unstable();
-                                    v.dedup();
+                                    v.dedup_by(|(t1,), (t2,)| true);
                                     true
                                 } else {
                                     false
@@ -7648,27 +9219,77 @@ fn test_primitives_simple() {
                 }
             }
             impl ConstRelation {
-                fn iter1_0_1(&self, x0: std::primitive::i64) -> impl Iterator<Item = (Math,)> + use<'_> {
-                    self.hash_index_0.get(&(x0,)).into_iter().copied()
+                fn iter_all1_0_1(&self, x0: std::primitive::i64) -> impl Iterator<Item = (Math,)> + use<'_> {
+                    self.hash_index_0
+                        .get(&(x0,))
+                        .into_iter()
+                        .copied()
+                        .map(|(x1, _timestamp)| (x1,))
                 }
-                fn iter1_1_0(&self, x1: Math) -> impl Iterator<Item = (std::primitive::i64,)> + use<'_> {
-                    self.hash_index_1.get(&(x1,)).into_iter().flatten().copied()
+                fn iter_all1_1_0(&self, x1: Math) -> impl Iterator<Item = (std::primitive::i64,)> + use<'_> {
+                    self.hash_index_1
+                        .get(&(x1,))
+                        .into_iter()
+                        .flatten()
+                        .copied()
+                        .map(|(x0, _timestamp)| (x0,))
                 }
-                fn iter2_0_1(&self, x0: std::primitive::i64, x1: Math) -> impl Iterator<Item = ()> + use<'_> {
+                fn iter_all2_0_1(
+                    &self,
+                    x0: std::primitive::i64,
+                    x1: Math,
+                ) -> impl Iterator<Item = ()> + use<'_> {
                     self.hash_index_0_1
                         .get(&(x0, x1))
                         .into_iter()
                         .flatten()
                         .copied()
+                        .map(|(_timestamp)| ())
+                }
+                fn iter_old1_0_1(
+                    &self,
+                    x0: std::primitive::i64,
+                    latest_timestamp: TimeStamp,
+                ) -> impl Iterator<Item = (Math,)> + use<'_> {
+                    self.hash_index_0
+                        .get(&(x0,))
+                        .into_iter()
+                        .copied()
+                        .filter_map(move |(x1, timestamp)| (timestamp < latest_timestamp).then_some((x1,)))
+                }
+                fn iter_old1_1_0(
+                    &self,
+                    x1: Math,
+                    latest_timestamp: TimeStamp,
+                ) -> impl Iterator<Item = (std::primitive::i64,)> + use<'_> {
+                    self.hash_index_1
+                        .get(&(x1,))
+                        .into_iter()
+                        .flatten()
+                        .copied()
+                        .filter_map(move |(x0, timestamp)| (timestamp < latest_timestamp).then_some((x0,)))
+                }
+                fn iter_old2_0_1(
+                    &self,
+                    x0: std::primitive::i64,
+                    x1: Math,
+                    latest_timestamp: TimeStamp,
+                ) -> impl Iterator<Item = ()> + use<'_> {
+                    self.hash_index_0_1
+                        .get(&(x0, x1))
+                        .into_iter()
+                        .flatten()
+                        .copied()
+                        .filter_map(move |(timestamp,)| (timestamp < latest_timestamp).then_some(()))
                 }
                 fn check1_0_1(&self, x0: std::primitive::i64) -> bool {
-                    self.iter1_0_1(x0).next().is_some()
+                    self.iter_all1_0_1(x0).next().is_some()
                 }
                 fn check1_1_0(&self, x1: Math) -> bool {
-                    self.iter1_1_0(x1).next().is_some()
+                    self.iter_all1_1_0(x1).next().is_some()
                 }
                 fn check2_0_1(&self, x0: std::primitive::i64, x1: Math) -> bool {
-                    self.iter2_0_1(x0, x1).next().is_some()
+                    self.iter_all2_0_1(x0, x1).next().is_some()
                 }
                 #[allow(unreachable_code)]
                 fn entry1_0_1(
@@ -7677,7 +9298,7 @@ fn test_primitives_simple() {
                     delta: &mut Delta,
                     uf: &mut Unification,
                 ) -> (Math,) {
-                    if let Some((x1,)) = self.iter1_0_1(x0).next() {
+                    if let Some((x1,)) = self.iter_all1_0_1(x0).next() {
                         return (x1,);
                     }
                     let x1 = uf.math_.add_eclass();
@@ -7692,7 +9313,7 @@ fn test_primitives_simple() {
                     delta: &mut Delta,
                     uf: &mut Unification,
                 ) -> () {
-                    if let Some(()) = self.iter2_0_1(x0, x1).next() {
+                    if let Some(()) = self.iter_all2_0_1(x0, x1).next() {
                         return ();
                     }
                     delta.const_.push((x0, x1));
@@ -7702,8 +9323,9 @@ fn test_primitives_simple() {
             #[derive(Debug, Default)]
             struct VarRelation {
                 new: Vec<<Self as Relation>::Row>,
-                hash_index_0: runtime::HashMap<(runtime::IString,), (Math,)>,
-                hash_index_0_1: runtime::HashMap<(runtime::IString, Math), runtime::SmallVec<[(); 1]>>,
+                hash_index_0: runtime::HashMap<(runtime::IString,), (Math, TimeStamp)>,
+                hash_index_0_1:
+                    runtime::HashMap<(runtime::IString, Math), runtime::SmallVec<[(TimeStamp,); 1]>>,
                 string_num_uprooted_at_latest_retain: usize,
                 math_num_uprooted_at_latest_retain: usize,
             }
@@ -7728,35 +9350,50 @@ fn test_primitives_simple() {
                 }
                 fn emit_graphviz(&self, buf: &mut String) {
                     use std::fmt::Write;
-                    for (i, ((x0,), (x1,))) in self.hash_index_0.iter().enumerate() {
+                    for (i, ((x0,), (x1, _timestamp))) in self.hash_index_0.iter().enumerate() {
                         writeln!(buf, "{}_{i} -> {}_{};", "var", "string", x0).unwrap();
                         writeln!(buf, "{}_{i} -> {}_{};", "var", "math", x1).unwrap();
                         writeln!(buf, "{}_{i} [shape = box];", "var").unwrap();
                     }
                 }
-                fn update_begin(&mut self, insertions: &[Self::Row], uf: &mut Unification) {
+                fn update_begin(
+                    &mut self,
+                    insertions: &[Self::Row],
+                    uf: &mut Unification,
+                    latest_timestamp: TimeStamp,
+                ) {
                     log_duration!("update_begin {}: {}", "var", {
                         for &(mut x0, mut x1) in insertions {
                             match self.hash_index_0.entry((x0,)) {
                                 runtime::HashMapEntry::Occupied(mut entry) => {
-                                    let (y1,) = entry.get_mut();
-                                    uf.math_.union_mut(&mut x1, y1);
+                                    let (y1, timestamp) = entry.get_mut();
+                                    let changed = false;
+                                    let old_val = *y1;
+                                    let changed = changed | (old_val != uf.math_.union_mut(&mut x1, y1));
+                                    if changed {
+                                        *timestamp = latest_timestamp;
+                                    }
                                 }
                                 runtime::HashMapEntry::Vacant(entry) => {
-                                    entry.insert((uf.math_.find(x1),));
+                                    entry.insert((uf.math_.find(x1), latest_timestamp));
                                 }
                             }
                         }
                     });
                 }
-                fn update(&mut self, insertions: &mut Vec<Self::Row>, uf: &mut Unification) -> bool {
+                fn update(
+                    &mut self,
+                    insertions: &mut Vec<Self::Row>,
+                    uf: &mut Unification,
+                    latest_timestamp: TimeStamp,
+                ) -> bool {
                     if self.math_num_uprooted_at_latest_retain == uf.math_.num_uprooted() {
                         return false;
                     }
                     let offset = insertions.len();
                     log_duration!("update {}: {}", "var", {
                         self.math_num_uprooted_at_latest_retain = uf.math_.num_uprooted();
-                        self.hash_index_0.retain(|&(x0,), &mut (x1,)| {
+                        self.hash_index_0.retain(|&(x0,), &mut (x1, _timestamp)| {
                             if uf.math_.is_root(x1) {
                                 true
                             } else {
@@ -7765,17 +9402,22 @@ fn test_primitives_simple() {
                             }
                         });
                     });
-                    self.update_begin(&insertions[offset..], uf);
+                    self.update_begin(&insertions[offset..], uf, latest_timestamp);
                     true
                 }
-                fn update_finalize(&mut self, insertions: &mut Vec<Self::Row>, uf: &mut Unification) {
+                fn update_finalize(
+                    &mut self,
+                    insertions: &mut Vec<Self::Row>,
+                    uf: &mut Unification,
+                    latest_timestamp: TimeStamp,
+                ) {
                     log_duration!("update_finalize {}: {}", "var", {
                         assert!(self.new.is_empty());
                         log_duration!("fill new: {}", {
                             self.new.extend(
                                 self.hash_index_0
                                     .iter()
-                                    .map(|(&(x0,), &(x1,))| (x0, x1))
+                                    .map(|(&(x0,), &(x1, _timestamp))| (x0, x1))
                                     .filter(|&(x0, x1)| !self.hash_index_0_1.contains_key(&(x0, x1))),
                             );
                             insertions.clear();
@@ -7784,15 +9426,18 @@ fn test_primitives_simple() {
                         });
                         log_duration!("fill index: {}", {
                             for &(x0, x1) in &self.new {
-                                self.hash_index_0_1.entry((x0, x1)).or_default().push(());
+                                self.hash_index_0_1
+                                    .entry((x0, x1))
+                                    .or_default()
+                                    .push((latest_timestamp,));
                             }
                         });
                         log_duration!("retain index: {}", {
                             self.hash_index_0_1.retain(|&(x0, x1), v| {
                                 if uf.math_.is_root(x1) {
-                                    v.retain(|&mut ()| true);
+                                    v.retain(|&mut (_timestamp)| true);
                                     v.sort_unstable();
-                                    v.dedup();
+                                    v.dedup_by(|(t1,), (t2,)| true);
                                     true
                                 } else {
                                     false
@@ -7804,25 +9449,54 @@ fn test_primitives_simple() {
                 }
             }
             impl VarRelation {
-                fn iter1_0_1(&self, x0: runtime::IString) -> impl Iterator<Item = (Math,)> + use<'_> {
-                    self.hash_index_0.get(&(x0,)).into_iter().copied()
+                fn iter_all1_0_1(&self, x0: runtime::IString) -> impl Iterator<Item = (Math,)> + use<'_> {
+                    self.hash_index_0
+                        .get(&(x0,))
+                        .into_iter()
+                        .copied()
+                        .map(|(x1, _timestamp)| (x1,))
                 }
-                fn iter2_0_1(&self, x0: runtime::IString, x1: Math) -> impl Iterator<Item = ()> + use<'_> {
+                fn iter_all2_0_1(&self, x0: runtime::IString, x1: Math) -> impl Iterator<Item = ()> + use<'_> {
                     self.hash_index_0_1
                         .get(&(x0, x1))
                         .into_iter()
                         .flatten()
                         .copied()
+                        .map(|(_timestamp)| ())
+                }
+                fn iter_old1_0_1(
+                    &self,
+                    x0: runtime::IString,
+                    latest_timestamp: TimeStamp,
+                ) -> impl Iterator<Item = (Math,)> + use<'_> {
+                    self.hash_index_0
+                        .get(&(x0,))
+                        .into_iter()
+                        .copied()
+                        .filter_map(move |(x1, timestamp)| (timestamp < latest_timestamp).then_some((x1,)))
+                }
+                fn iter_old2_0_1(
+                    &self,
+                    x0: runtime::IString,
+                    x1: Math,
+                    latest_timestamp: TimeStamp,
+                ) -> impl Iterator<Item = ()> + use<'_> {
+                    self.hash_index_0_1
+                        .get(&(x0, x1))
+                        .into_iter()
+                        .flatten()
+                        .copied()
+                        .filter_map(move |(timestamp,)| (timestamp < latest_timestamp).then_some(()))
                 }
                 fn check1_0_1(&self, x0: runtime::IString) -> bool {
-                    self.iter1_0_1(x0).next().is_some()
+                    self.iter_all1_0_1(x0).next().is_some()
                 }
                 fn check2_0_1(&self, x0: runtime::IString, x1: Math) -> bool {
-                    self.iter2_0_1(x0, x1).next().is_some()
+                    self.iter_all2_0_1(x0, x1).next().is_some()
                 }
                 #[allow(unreachable_code)]
                 fn entry1_0_1(&self, x0: runtime::IString, delta: &mut Delta, uf: &mut Unification) -> (Math,) {
-                    if let Some((x1,)) = self.iter1_0_1(x0).next() {
+                    if let Some((x1,)) = self.iter_all1_0_1(x0).next() {
                         return (x1,);
                     }
                     let x1 = uf.math_.add_eclass();
@@ -7837,7 +9511,7 @@ fn test_primitives_simple() {
                     delta: &mut Delta,
                     uf: &mut Unification,
                 ) -> () {
-                    if let Some(()) = self.iter2_0_1(x0, x1).next() {
+                    if let Some(()) = self.iter_all2_0_1(x0, x1).next() {
                         return ();
                     }
                     delta.var_.push((x0, x1));
@@ -7892,6 +9566,7 @@ fn test_primitives_simple() {
             }
             #[derive(Debug, Default)]
             pub struct Theory {
+                pub latest_timestamp: TimeStamp,
                 pub delta: Delta,
                 pub uf: Unification,
                 global_i64: GlobalVars<std::primitive::i64>,
@@ -7942,7 +9617,7 @@ fn test_primitives_simple() {
                 #[inline(never)]
                 pub fn apply_rules(&mut self) {
                     for (a, v23, v24) in self.mul_.iter_new() {
-                        for (v25,) in self.const_.iter1_1_0(v23) {
+                        for (v25,) in self.const_.iter_all1_1_0(v23) {
                             if v25 == self.global_i64.get(2usize) {
                                 #[doc = "( rewrite ( Mul a ( Const 0 ) ) ( Const 0 ) )"]
                                 self.delta.insert_const((v25, v24));
@@ -7964,7 +9639,7 @@ fn test_primitives_simple() {
                         }
                         if self.mul_.check1_1_0_2(v1) {
                             if one == self.global_i64.get(2usize) {
-                                for (a_2, v28) in self.mul_.iter1_1_0_2(v1) {
+                                for (a_2, v28) in self.mul_.iter_old1_1_0_2(v1, self.latest_timestamp) {
                                     #[doc = "( rewrite ( Mul a ( Const 0 ) ) ( Const 0 ) )"]
                                     self.delta.insert_const((one, v28));
                                 }
@@ -7979,7 +9654,7 @@ fn test_primitives_simple() {
                         }
                     }
                     if let Some(v12) = self.global_i64.get_new(0usize) {
-                        for (v13,) in self.const_.iter1_0_1(v12) {
+                        for (v13,) in self.const_.iter_old1_0_1(v12, self.latest_timestamp) {
                             #[doc = "( rewrite ( Const 2 ) ( Add ( Var \"z\" ) ( Var \"z\" ) ) )"]
                             let v14 = self.global_string.get(1usize);
                             let (v15,) = self.var_.entry1_0_1(v14, &mut self.delta, &mut self.uf);
@@ -7987,7 +9662,7 @@ fn test_primitives_simple() {
                         }
                     }
                     if let Some(one_2) = self.global_i64.get_new(1usize) {
-                        for (v5,) in self.const_.iter1_0_1(one_2) {
+                        for (v5,) in self.const_.iter_old1_0_1(one_2, self.latest_timestamp) {
                             #[doc = "( rewrite ( Const one ) ( Add ( Var \"q\" ) ( Var \"q\" ) ) )"]
                             let v6 = self.global_string.get(0usize);
                             let (v7,) = self.var_.entry1_0_1(v6, &mut self.delta, &mut self.uf);
@@ -7995,15 +9670,15 @@ fn test_primitives_simple() {
                         }
                     }
                     if let Some(v19) = self.global_string.get_new(2usize) {
-                        for (v20,) in self.var_.iter1_0_1(v19) {
+                        for (v20,) in self.var_.iter_old1_0_1(v19, self.latest_timestamp) {
                             #[doc = "( rewrite ( Var \"x\" ) ( Var \"y\" ) )"]
                             let v21 = self.global_string.get(3usize);
                             self.delta.insert_var((v21, v20));
                         }
                     }
                     if let Some(v33) = self.global_i64.get_new(2usize) {
-                        for (v31,) in self.const_.iter1_0_1(v33) {
-                            for (a_3, v32) in self.mul_.iter1_1_0_2(v31) {
+                        for (v31,) in self.const_.iter_old1_0_1(v33, self.latest_timestamp) {
+                            for (a_3, v32) in self.mul_.iter_old1_1_0_2(v31, self.latest_timestamp) {
                                 #[doc = "( rewrite ( Mul a ( Const 0 ) ) ( Const 0 ) )"]
                                 self.delta.insert_const((v33, v32));
                             }
@@ -8045,6 +9720,7 @@ fn test_primitives_simple() {
                 }
                 #[inline(never)]
                 pub fn canonicalize(&mut self) {
+                    self.latest_timestamp.0 += 1;
                     log_duration!("canonicalize (total): {}", {
                         self.mul_.clear_new();
                         self.add_.clear_new();
@@ -8054,33 +9730,61 @@ fn test_primitives_simple() {
                             return;
                         }
                         log_duration!("update_begin (total): {}", {
-                            self.mul_.update_begin(&mut self.delta.mul_, &mut self.uf);
-                            self.add_.update_begin(&mut self.delta.add_, &mut self.uf);
-                            self.const_
-                                .update_begin(&mut self.delta.const_, &mut self.uf);
-                            self.var_.update_begin(&mut self.delta.var_, &mut self.uf);
+                            self.mul_
+                                .update_begin(&mut self.delta.mul_, &mut self.uf, self.latest_timestamp);
+                            self.add_
+                                .update_begin(&mut self.delta.add_, &mut self.uf, self.latest_timestamp);
+                            self.const_.update_begin(
+                                &mut self.delta.const_,
+                                &mut self.uf,
+                                self.latest_timestamp,
+                            );
+                            self.var_
+                                .update_begin(&mut self.delta.var_, &mut self.uf, self.latest_timestamp);
                         });
                         log_duration!("update_loop (total): {}", {
                             loop {
                                 let mut progress = false;
-                                progress |= self.mul_.update(&mut self.delta.mul_, &mut self.uf);
-                                progress |= self.add_.update(&mut self.delta.add_, &mut self.uf);
-                                progress |= self.const_.update(&mut self.delta.const_, &mut self.uf);
-                                progress |= self.var_.update(&mut self.delta.var_, &mut self.uf);
+                                progress |=
+                                    self.mul_
+                                        .update(&mut self.delta.mul_, &mut self.uf, self.latest_timestamp);
+                                progress |=
+                                    self.add_
+                                        .update(&mut self.delta.add_, &mut self.uf, self.latest_timestamp);
+                                progress |= self.const_.update(
+                                    &mut self.delta.const_,
+                                    &mut self.uf,
+                                    self.latest_timestamp,
+                                );
+                                progress |=
+                                    self.var_
+                                        .update(&mut self.delta.var_, &mut self.uf, self.latest_timestamp);
                                 if !progress {
                                     break;
                                 }
                             }
                         });
                         log_duration!("update_finalize (total): {}", {
-                            self.mul_
-                                .update_finalize(&mut self.delta.mul_, &mut self.uf);
-                            self.add_
-                                .update_finalize(&mut self.delta.add_, &mut self.uf);
-                            self.const_
-                                .update_finalize(&mut self.delta.const_, &mut self.uf);
-                            self.var_
-                                .update_finalize(&mut self.delta.var_, &mut self.uf);
+                            self.mul_.update_finalize(
+                                &mut self.delta.mul_,
+                                &mut self.uf,
+                                self.latest_timestamp,
+                            );
+                            self.add_.update_finalize(
+                                &mut self.delta.add_,
+                                &mut self.uf,
+                                self.latest_timestamp,
+                            );
+                            self.const_.update_finalize(
+                                &mut self.delta.const_,
+                                &mut self.uf,
+                                self.latest_timestamp,
+                            );
+                            self.var_.update_finalize(
+                                &mut self.delta.var_,
+                                &mut self.uf,
+                                self.latest_timestamp,
+                            );
                             self.global_math.update(&mut self.uf.math_);
                             self.global_i64.update_finalize();
                             self.global_string.update_finalize();
@@ -8167,9 +9871,9 @@ fn triangle_join() {
             #[derive(Debug, Default)]
             struct FooRelation {
                 new: Vec<<Self as Relation>::Row>,
-                hash_index_1: runtime::HashMap<(Math,), runtime::SmallVec<[(Math,); 1]>>,
-                hash_index_1_0: runtime::HashMap<(Math, Math), runtime::SmallVec<[(); 1]>>,
-                hash_index_0: runtime::HashMap<(Math,), runtime::SmallVec<[(Math,); 1]>>,
+                hash_index_1: runtime::HashMap<(Math,), runtime::SmallVec<[(Math, TimeStamp); 1]>>,
+                hash_index_1_0: runtime::HashMap<(Math, Math), runtime::SmallVec<[(TimeStamp,); 1]>>,
+                hash_index_0: runtime::HashMap<(Math,), runtime::SmallVec<[(Math, TimeStamp); 1]>>,
                 math_num_uprooted_at_latest_retain: usize,
             }
             impl Relation for FooRelation {
@@ -8193,7 +9897,7 @@ fn triangle_join() {
                 }
                 fn emit_graphviz(&self, buf: &mut String) {
                     use std::fmt::Write;
-                    for (i, ((x1,), (x0,))) in self
+                    for (i, ((x1,), (x0, _timestamp))) in self
                         .hash_index_1
                         .iter()
                         .flat_map(|(k, v)| v.iter().map(move |v| (k, v)))
@@ -8204,10 +9908,20 @@ fn triangle_join() {
                         writeln!(buf, "{}_{i} [shape = box];", "foo").unwrap();
                     }
                 }
-                fn update_begin(&mut self, insertions: &[Self::Row], uf: &mut Unification) {
+                fn update_begin(
+                    &mut self,
+                    insertions: &[Self::Row],
+                    uf: &mut Unification,
+                    latest_timestamp: TimeStamp,
+                ) {
                     log_duration!("update_begin {}: {}", "foo", {});
                 }
-                fn update(&mut self, insertions: &mut Vec<Self::Row>, uf: &mut Unification) -> bool {
+                fn update(
+                    &mut self,
+                    insertions: &mut Vec<Self::Row>,
+                    uf: &mut Unification,
+                    latest_timestamp: TimeStamp,
+                ) -> bool {
                     if self.math_num_uprooted_at_latest_retain == uf.math_.num_uprooted() {
                         return false;
                     }
@@ -8215,10 +9929,15 @@ fn triangle_join() {
                     log_duration!("update {}: {}", "foo", {
                         self.math_num_uprooted_at_latest_retain = uf.math_.num_uprooted();
                     });
-                    self.update_begin(&insertions[offset..], uf);
+                    self.update_begin(&insertions[offset..], uf, latest_timestamp);
                     true
                 }
-                fn update_finalize(&mut self, insertions: &mut Vec<Self::Row>, uf: &mut Unification) {
+                fn update_finalize(
+                    &mut self,
+                    insertions: &mut Vec<Self::Row>,
+                    uf: &mut Unification,
+                    latest_timestamp: TimeStamp,
+                ) {
                     log_duration!("update_finalize {}: {}", "foo", {
                         assert!(self.new.is_empty());
                         log_duration!("fill new: {}", {
@@ -8234,15 +9953,18 @@ fn triangle_join() {
                         });
                         log_duration!("fill index: {}", {
                             for &(x0, x1) in &self.new {
-                                self.hash_index_1.entry((x1,)).or_default().push((x0,));
+                                self.hash_index_1
+                                    .entry((x1,))
+                                    .or_default()
+                                    .push((x0, latest_timestamp));
                             }
                         });
                         log_duration!("retain index: {}", {
                             self.hash_index_1.retain(|&(x1,), v| {
                                 if uf.math_.is_root(x1) {
-                                    v.retain(|&mut (x0,)| uf.math_.is_root(x0));
+                                    v.retain(|&mut (x0, _timestamp)| uf.math_.is_root(x0));
                                     v.sort_unstable();
-                                    v.dedup();
+                                    v.dedup_by(|(x0, t1), (y0, t2)| true & (*x0 == *y0));
                                     true
                                 } else {
                                     false
@@ -8251,15 +9973,18 @@ fn triangle_join() {
                         });
                         log_duration!("fill index: {}", {
                             for &(x0, x1) in &self.new {
-                                self.hash_index_1_0.entry((x1, x0)).or_default().push(());
+                                self.hash_index_1_0
+                                    .entry((x1, x0))
+                                    .or_default()
+                                    .push((latest_timestamp,));
                             }
                         });
                         log_duration!("retain index: {}", {
                             self.hash_index_1_0.retain(|&(x1, x0), v| {
                                 if uf.math_.is_root(x1) & uf.math_.is_root(x0) {
-                                    v.retain(|&mut ()| true);
+                                    v.retain(|&mut (_timestamp)| true);
                                     v.sort_unstable();
-                                    v.dedup();
+                                    v.dedup_by(|(t1,), (t2,)| true);
                                     true
                                 } else {
                                     false
@@ -8268,15 +9993,18 @@ fn triangle_join() {
                         });
                         log_duration!("fill index: {}", {
                             for &(x0, x1) in &self.new {
-                                self.hash_index_0.entry((x0,)).or_default().push((x1,));
+                                self.hash_index_0
+                                    .entry((x0,))
+                                    .or_default()
+                                    .push((x1, latest_timestamp));
                             }
                         });
                         log_duration!("retain index: {}", {
                             self.hash_index_0.retain(|&(x0,), v| {
                                 if uf.math_.is_root(x0) {
-                                    v.retain(|&mut (x1,)| uf.math_.is_root(x1));
+                                    v.retain(|&mut (x1, _timestamp)| uf.math_.is_root(x1));
                                     v.sort_unstable();
-                                    v.dedup();
+                                    v.dedup_by(|(x1, t1), (y1, t2)| true & (*x1 == *y1));
                                     true
                                 } else {
                                     false
@@ -8288,31 +10016,79 @@ fn triangle_join() {
                 }
             }
             impl FooRelation {
-                fn iter1_1_0(&self, x1: Math) -> impl Iterator<Item = (Math,)> + use<'_> {
-                    self.hash_index_1.get(&(x1,)).into_iter().flatten().copied()
+                fn iter_all1_1_0(&self, x1: Math) -> impl Iterator<Item = (Math,)> + use<'_> {
+                    self.hash_index_1
+                        .get(&(x1,))
+                        .into_iter()
+                        .flatten()
+                        .copied()
+                        .map(|(x0, _timestamp)| (x0,))
                 }
-                fn iter2_1_0(&self, x1: Math, x0: Math) -> impl Iterator<Item = ()> + use<'_> {
+                fn iter_all2_1_0(&self, x1: Math, x0: Math) -> impl Iterator<Item = ()> + use<'_> {
                     self.hash_index_1_0
                         .get(&(x1, x0))
                         .into_iter()
                         .flatten()
                         .copied()
+                        .map(|(_timestamp)| ())
                 }
-                fn iter1_0_1(&self, x0: Math) -> impl Iterator<Item = (Math,)> + use<'_> {
-                    self.hash_index_0.get(&(x0,)).into_iter().flatten().copied()
+                fn iter_all1_0_1(&self, x0: Math) -> impl Iterator<Item = (Math,)> + use<'_> {
+                    self.hash_index_0
+                        .get(&(x0,))
+                        .into_iter()
+                        .flatten()
+                        .copied()
+                        .map(|(x1, _timestamp)| (x1,))
+                }
+                fn iter_old1_1_0(
+                    &self,
+                    x1: Math,
+                    latest_timestamp: TimeStamp,
+                ) -> impl Iterator<Item = (Math,)> + use<'_> {
+                    self.hash_index_1
+                        .get(&(x1,))
+                        .into_iter()
+                        .flatten()
+                        .copied()
+                        .filter_map(move |(x0, timestamp)| (timestamp < latest_timestamp).then_some((x0,)))
+                }
+                fn iter_old2_1_0(
+                    &self,
+                    x1: Math,
+                    x0: Math,
+                    latest_timestamp: TimeStamp,
+                ) -> impl Iterator<Item = ()> + use<'_> {
+                    self.hash_index_1_0
+                        .get(&(x1, x0))
+                        .into_iter()
+                        .flatten()
+                        .copied()
+                        .filter_map(move |(timestamp,)| (timestamp < latest_timestamp).then_some(()))
+                }
+                fn iter_old1_0_1(
+                    &self,
+                    x0: Math,
+                    latest_timestamp: TimeStamp,
+                ) -> impl Iterator<Item = (Math,)> + use<'_> {
+                    self.hash_index_0
+                        .get(&(x0,))
+                        .into_iter()
+                        .flatten()
+                        .copied()
+                        .filter_map(move |(x1, timestamp)| (timestamp < latest_timestamp).then_some((x1,)))
                 }
                 fn check1_1_0(&self, x1: Math) -> bool {
-                    self.iter1_1_0(x1).next().is_some()
+                    self.iter_all1_1_0(x1).next().is_some()
                 }
                 fn check2_1_0(&self, x1: Math, x0: Math) -> bool {
-                    self.iter2_1_0(x1, x0).next().is_some()
+                    self.iter_all2_1_0(x1, x0).next().is_some()
                 }
                 fn check1_0_1(&self, x0: Math) -> bool {
-                    self.iter1_0_1(x0).next().is_some()
+                    self.iter_all1_0_1(x0).next().is_some()
                 }
                 #[allow(unreachable_code)]
                 fn entry2_1_0(&self, x1: Math, x0: Math, delta: &mut Delta, uf: &mut Unification) -> () {
-                    if let Some(()) = self.iter2_1_0(x1, x0).next() {
+                    if let Some(()) = self.iter_all2_1_0(x1, x0).next() {
                         return ();
                     }
                     delta.foo_.push((x0, x1));
@@ -8322,9 +10098,9 @@ fn triangle_join() {
             #[derive(Debug, Default)]
             struct BarRelation {
                 new: Vec<<Self as Relation>::Row>,
-                hash_index_0: runtime::HashMap<(Math,), runtime::SmallVec<[(Math,); 1]>>,
-                hash_index_0_1: runtime::HashMap<(Math, Math), runtime::SmallVec<[(); 1]>>,
-                hash_index_1: runtime::HashMap<(Math,), runtime::SmallVec<[(Math,); 1]>>,
+                hash_index_0: runtime::HashMap<(Math,), runtime::SmallVec<[(Math, TimeStamp); 1]>>,
+                hash_index_0_1: runtime::HashMap<(Math, Math), runtime::SmallVec<[(TimeStamp,); 1]>>,
+                hash_index_1: runtime::HashMap<(Math,), runtime::SmallVec<[(Math, TimeStamp); 1]>>,
                 math_num_uprooted_at_latest_retain: usize,
             }
             impl Relation for BarRelation {
@@ -8348,7 +10124,7 @@ fn triangle_join() {
                 }
                 fn emit_graphviz(&self, buf: &mut String) {
                     use std::fmt::Write;
-                    for (i, ((x0,), (x1,))) in self
+                    for (i, ((x0,), (x1, _timestamp))) in self
                         .hash_index_0
                         .iter()
                         .flat_map(|(k, v)| v.iter().map(move |v| (k, v)))
@@ -8359,10 +10135,20 @@ fn triangle_join() {
                         writeln!(buf, "{}_{i} [shape = box];", "bar").unwrap();
                     }
                 }
-                fn update_begin(&mut self, insertions: &[Self::Row], uf: &mut Unification) {
+                fn update_begin(
+                    &mut self,
+                    insertions: &[Self::Row],
+                    uf: &mut Unification,
+                    latest_timestamp: TimeStamp,
+                ) {
                     log_duration!("update_begin {}: {}", "bar", {});
                 }
-                fn update(&mut self, insertions: &mut Vec<Self::Row>, uf: &mut Unification) -> bool {
+                fn update(
+                    &mut self,
+                    insertions: &mut Vec<Self::Row>,
+                    uf: &mut Unification,
+                    latest_timestamp: TimeStamp,
+                ) -> bool {
                     if self.math_num_uprooted_at_latest_retain == uf.math_.num_uprooted() {
                         return false;
                     }
@@ -8370,10 +10156,15 @@ fn triangle_join() {
                     log_duration!("update {}: {}", "bar", {
                         self.math_num_uprooted_at_latest_retain = uf.math_.num_uprooted();
                     });
-                    self.update_begin(&insertions[offset..], uf);
+                    self.update_begin(&insertions[offset..], uf, latest_timestamp);
                     true
                 }
-                fn update_finalize(&mut self, insertions: &mut Vec<Self::Row>, uf: &mut Unification) {
+                fn update_finalize(
+                    &mut self,
+                    insertions: &mut Vec<Self::Row>,
+                    uf: &mut Unification,
+                    latest_timestamp: TimeStamp,
+                ) {
                     log_duration!("update_finalize {}: {}", "bar", {
                         assert!(self.new.is_empty());
                         log_duration!("fill new: {}", {
@@ -8389,15 +10180,18 @@ fn triangle_join() {
                         });
                         log_duration!("fill index: {}", {
                             for &(x0, x1) in &self.new {
-                                self.hash_index_0.entry((x0,)).or_default().push((x1,));
+                                self.hash_index_0
+                                    .entry((x0,))
+                                    .or_default()
+                                    .push((x1, latest_timestamp));
                             }
                         });
                         log_duration!("retain index: {}", {
                             self.hash_index_0.retain(|&(x0,), v| {
                                 if uf.math_.is_root(x0) {
-                                    v.retain(|&mut (x1,)| uf.math_.is_root(x1));
+                                    v.retain(|&mut (x1, _timestamp)| uf.math_.is_root(x1));
                                     v.sort_unstable();
-                                    v.dedup();
+                                    v.dedup_by(|(x1, t1), (y1, t2)| true & (*x1 == *y1));
                                     true
                                 } else {
                                     false
@@ -8406,15 +10200,18 @@ fn triangle_join() {
                         });
                         log_duration!("fill index: {}", {
                             for &(x0, x1) in &self.new {
-                                self.hash_index_0_1.entry((x0, x1)).or_default().push(());
+                                self.hash_index_0_1
+                                    .entry((x0, x1))
+                                    .or_default()
+                                    .push((latest_timestamp,));
                             }
                         });
                         log_duration!("retain index: {}", {
                             self.hash_index_0_1.retain(|&(x0, x1), v| {
                                 if uf.math_.is_root(x0) & uf.math_.is_root(x1) {
-                                    v.retain(|&mut ()| true);
+                                    v.retain(|&mut (_timestamp)| true);
                                     v.sort_unstable();
-                                    v.dedup();
+                                    v.dedup_by(|(t1,), (t2,)| true);
                                     true
                                 } else {
                                     false
@@ -8423,15 +10220,18 @@ fn triangle_join() {
                         });
                         log_duration!("fill index: {}", {
                             for &(x0, x1) in &self.new {
-                                self.hash_index_1.entry((x1,)).or_default().push((x0,));
+                                self.hash_index_1
+                                    .entry((x1,))
+                                    .or_default()
+                                    .push((x0, latest_timestamp));
                             }
                         });
                         log_duration!("retain index: {}", {
                             self.hash_index_1.retain(|&(x1,), v| {
                                 if uf.math_.is_root(x1) {
-                                    v.retain(|&mut (x0,)| uf.math_.is_root(x0));
+                                    v.retain(|&mut (x0, _timestamp)| uf.math_.is_root(x0));
                                     v.sort_unstable();
-                                    v.dedup();
+                                    v.dedup_by(|(x0, t1), (y0, t2)| true & (*x0 == *y0));
                                     true
                                 } else {
                                     false
@@ -8443,31 +10243,79 @@ fn triangle_join() {
                 }
             }
             impl BarRelation {
-                fn iter1_0_1(&self, x0: Math) -> impl Iterator<Item = (Math,)> + use<'_> {
-                    self.hash_index_0.get(&(x0,)).into_iter().flatten().copied()
+                fn iter_all1_0_1(&self, x0: Math) -> impl Iterator<Item = (Math,)> + use<'_> {
+                    self.hash_index_0
+                        .get(&(x0,))
+                        .into_iter()
+                        .flatten()
+                        .copied()
+                        .map(|(x1, _timestamp)| (x1,))
                 }
-                fn iter2_0_1(&self, x0: Math, x1: Math) -> impl Iterator<Item = ()> + use<'_> {
+                fn iter_all2_0_1(&self, x0: Math, x1: Math) -> impl Iterator<Item = ()> + use<'_> {
                     self.hash_index_0_1
                         .get(&(x0, x1))
                         .into_iter()
                         .flatten()
                         .copied()
+                        .map(|(_timestamp)| ())
                 }
-                fn iter1_1_0(&self, x1: Math) -> impl Iterator<Item = (Math,)> + use<'_> {
-                    self.hash_index_1.get(&(x1,)).into_iter().flatten().copied()
+                fn iter_all1_1_0(&self, x1: Math) -> impl Iterator<Item = (Math,)> + use<'_> {
+                    self.hash_index_1
+                        .get(&(x1,))
+                        .into_iter()
+                        .flatten()
+                        .copied()
+                        .map(|(x0, _timestamp)| (x0,))
+                }
+                fn iter_old1_0_1(
+                    &self,
+                    x0: Math,
+                    latest_timestamp: TimeStamp,
+                ) -> impl Iterator<Item = (Math,)> + use<'_> {
+                    self.hash_index_0
+                        .get(&(x0,))
+                        .into_iter()
+                        .flatten()
+                        .copied()
+                        .filter_map(move |(x1, timestamp)| (timestamp < latest_timestamp).then_some((x1,)))
+                }
+                fn iter_old2_0_1(
+                    &self,
+                    x0: Math,
+                    x1: Math,
+                    latest_timestamp: TimeStamp,
+                ) -> impl Iterator<Item = ()> + use<'_> {
+                    self.hash_index_0_1
+                        .get(&(x0, x1))
+                        .into_iter()
+                        .flatten()
+                        .copied()
+                        .filter_map(move |(timestamp,)| (timestamp < latest_timestamp).then_some(()))
+                }
+                fn iter_old1_1_0(
+                    &self,
+                    x1: Math,
+                    latest_timestamp: TimeStamp,
+                ) -> impl Iterator<Item = (Math,)> + use<'_> {
+                    self.hash_index_1
+                        .get(&(x1,))
+                        .into_iter()
+                        .flatten()
+                        .copied()
+                        .filter_map(move |(x0, timestamp)| (timestamp < latest_timestamp).then_some((x0,)))
                 }
                 fn check1_0_1(&self, x0: Math) -> bool {
-                    self.iter1_0_1(x0).next().is_some()
+                    self.iter_all1_0_1(x0).next().is_some()
                 }
                 fn check2_0_1(&self, x0: Math, x1: Math) -> bool {
-                    self.iter2_0_1(x0, x1).next().is_some()
+                    self.iter_all2_0_1(x0, x1).next().is_some()
                 }
                 fn check1_1_0(&self, x1: Math) -> bool {
-                    self.iter1_1_0(x1).next().is_some()
+                    self.iter_all1_1_0(x1).next().is_some()
                 }
                 #[allow(unreachable_code)]
                 fn entry2_0_1(&self, x0: Math, x1: Math, delta: &mut Delta, uf: &mut Unification) -> () {
-                    if let Some(()) = self.iter2_0_1(x0, x1).next() {
+                    if let Some(()) = self.iter_all2_0_1(x0, x1).next() {
                         return ();
                     }
                     delta.bar_.push((x0, x1));
@@ -8477,9 +10325,9 @@ fn triangle_join() {
             #[derive(Debug, Default)]
             struct BazRelation {
                 new: Vec<<Self as Relation>::Row>,
-                hash_index_1: runtime::HashMap<(Math,), runtime::SmallVec<[(Math,); 1]>>,
-                hash_index_0: runtime::HashMap<(Math,), runtime::SmallVec<[(Math,); 1]>>,
-                hash_index_1_0: runtime::HashMap<(Math, Math), runtime::SmallVec<[(); 1]>>,
+                hash_index_1: runtime::HashMap<(Math,), runtime::SmallVec<[(Math, TimeStamp); 1]>>,
+                hash_index_0: runtime::HashMap<(Math,), runtime::SmallVec<[(Math, TimeStamp); 1]>>,
+                hash_index_1_0: runtime::HashMap<(Math, Math), runtime::SmallVec<[(TimeStamp,); 1]>>,
                 math_num_uprooted_at_latest_retain: usize,
             }
             impl Relation for BazRelation {
@@ -8503,7 +10351,7 @@ fn triangle_join() {
                 }
                 fn emit_graphviz(&self, buf: &mut String) {
                     use std::fmt::Write;
-                    for (i, ((x1,), (x0,))) in self
+                    for (i, ((x1,), (x0, _timestamp))) in self
                         .hash_index_1
                         .iter()
                         .flat_map(|(k, v)| v.iter().map(move |v| (k, v)))
@@ -8514,10 +10362,20 @@ fn triangle_join() {
                         writeln!(buf, "{}_{i} [shape = box];", "baz").unwrap();
                     }
                 }
-                fn update_begin(&mut self, insertions: &[Self::Row], uf: &mut Unification) {
+                fn update_begin(
+                    &mut self,
+                    insertions: &[Self::Row],
+                    uf: &mut Unification,
+                    latest_timestamp: TimeStamp,
+                ) {
                     log_duration!("update_begin {}: {}", "baz", {});
                 }
-                fn update(&mut self, insertions: &mut Vec<Self::Row>, uf: &mut Unification) -> bool {
+                fn update(
+                    &mut self,
+                    insertions: &mut Vec<Self::Row>,
+                    uf: &mut Unification,
+                    latest_timestamp: TimeStamp,
+                ) -> bool {
                     if self.math_num_uprooted_at_latest_retain == uf.math_.num_uprooted() {
                         return false;
                     }
@@ -8525,10 +10383,15 @@ fn triangle_join() {
                     log_duration!("update {}: {}", "baz", {
                         self.math_num_uprooted_at_latest_retain = uf.math_.num_uprooted();
                     });
-                    self.update_begin(&insertions[offset..], uf);
+                    self.update_begin(&insertions[offset..], uf, latest_timestamp);
                     true
                 }
-                fn update_finalize(&mut self, insertions: &mut Vec<Self::Row>, uf: &mut Unification) {
+                fn update_finalize(
+                    &mut self,
+                    insertions: &mut Vec<Self::Row>,
+                    uf: &mut Unification,
+                    latest_timestamp: TimeStamp,
+                ) {
                     log_duration!("update_finalize {}: {}", "baz", {
                         assert!(self.new.is_empty());
                         log_duration!("fill new: {}", {
@@ -8544,15 +10407,18 @@ fn triangle_join() {
                         });
                         log_duration!("fill index: {}", {
                             for &(x0, x1) in &self.new {
-                                self.hash_index_1.entry((x1,)).or_default().push((x0,));
+                                self.hash_index_1
+                                    .entry((x1,))
+                                    .or_default()
+                                    .push((x0, latest_timestamp));
                             }
                         });
                         log_duration!("retain index: {}", {
                             self.hash_index_1.retain(|&(x1,), v| {
                                 if uf.math_.is_root(x1) {
-                                    v.retain(|&mut (x0,)| uf.math_.is_root(x0));
+                                    v.retain(|&mut (x0, _timestamp)| uf.math_.is_root(x0));
                                     v.sort_unstable();
-                                    v.dedup();
+                                    v.dedup_by(|(x0, t1), (y0, t2)| true & (*x0 == *y0));
                                     true
                                 } else {
                                     false
@@ -8561,15 +10427,18 @@ fn triangle_join() {
                         });
                         log_duration!("fill index: {}", {
                             for &(x0, x1) in &self.new {
-                                self.hash_index_0.entry((x0,)).or_default().push((x1,));
+                                self.hash_index_0
+                                    .entry((x0,))
+                                    .or_default()
+                                    .push((x1, latest_timestamp));
                             }
                         });
                         log_duration!("retain index: {}", {
                             self.hash_index_0.retain(|&(x0,), v| {
                                 if uf.math_.is_root(x0) {
-                                    v.retain(|&mut (x1,)| uf.math_.is_root(x1));
+                                    v.retain(|&mut (x1, _timestamp)| uf.math_.is_root(x1));
                                     v.sort_unstable();
-                                    v.dedup();
+                                    v.dedup_by(|(x1, t1), (y1, t2)| true & (*x1 == *y1));
                                     true
                                 } else {
                                     false
@@ -8578,15 +10447,18 @@ fn triangle_join() {
                         });
                         log_duration!("fill index: {}", {
                             for &(x0, x1) in &self.new {
-                                self.hash_index_1_0.entry((x1, x0)).or_default().push(());
+                                self.hash_index_1_0
+                                    .entry((x1, x0))
+                                    .or_default()
+                                    .push((latest_timestamp,));
                             }
                         });
                         log_duration!("retain index: {}", {
                             self.hash_index_1_0.retain(|&(x1, x0), v| {
                                 if uf.math_.is_root(x1) & uf.math_.is_root(x0) {
-                                    v.retain(|&mut ()| true);
+                                    v.retain(|&mut (_timestamp)| true);
                                     v.sort_unstable();
-                                    v.dedup();
+                                    v.dedup_by(|(t1,), (t2,)| true);
                                     true
                                 } else {
                                     false
@@ -8598,31 +10470,79 @@ fn triangle_join() {
                 }
             }
             impl BazRelation {
-                fn iter1_1_0(&self, x1: Math) -> impl Iterator<Item = (Math,)> + use<'_> {
-                    self.hash_index_1.get(&(x1,)).into_iter().flatten().copied()
+                fn iter_all1_1_0(&self, x1: Math) -> impl Iterator<Item = (Math,)> + use<'_> {
+                    self.hash_index_1
+                        .get(&(x1,))
+                        .into_iter()
+                        .flatten()
+                        .copied()
+                        .map(|(x0, _timestamp)| (x0,))
                 }
-                fn iter1_0_1(&self, x0: Math) -> impl Iterator<Item = (Math,)> + use<'_> {
-                    self.hash_index_0.get(&(x0,)).into_iter().flatten().copied()
+                fn iter_all1_0_1(&self, x0: Math) -> impl Iterator<Item = (Math,)> + use<'_> {
+                    self.hash_index_0
+                        .get(&(x0,))
+                        .into_iter()
+                        .flatten()
+                        .copied()
+                        .map(|(x1, _timestamp)| (x1,))
                 }
-                fn iter2_1_0(&self, x1: Math, x0: Math) -> impl Iterator<Item = ()> + use<'_> {
+                fn iter_all2_1_0(&self, x1: Math, x0: Math) -> impl Iterator<Item = ()> + use<'_> {
                     self.hash_index_1_0
                         .get(&(x1, x0))
                         .into_iter()
                         .flatten()
                         .copied()
+                        .map(|(_timestamp)| ())
+                }
+                fn iter_old1_1_0(
+                    &self,
+                    x1: Math,
+                    latest_timestamp: TimeStamp,
+                ) -> impl Iterator<Item = (Math,)> + use<'_> {
+                    self.hash_index_1
+                        .get(&(x1,))
+                        .into_iter()
+                        .flatten()
+                        .copied()
+                        .filter_map(move |(x0, timestamp)| (timestamp < latest_timestamp).then_some((x0,)))
+                }
+                fn iter_old1_0_1(
+                    &self,
+                    x0: Math,
+                    latest_timestamp: TimeStamp,
+                ) -> impl Iterator<Item = (Math,)> + use<'_> {
+                    self.hash_index_0
+                        .get(&(x0,))
+                        .into_iter()
+                        .flatten()
+                        .copied()
+                        .filter_map(move |(x1, timestamp)| (timestamp < latest_timestamp).then_some((x1,)))
+                }
+                fn iter_old2_1_0(
+                    &self,
+                    x1: Math,
+                    x0: Math,
+                    latest_timestamp: TimeStamp,
+                ) -> impl Iterator<Item = ()> + use<'_> {
+                    self.hash_index_1_0
+                        .get(&(x1, x0))
+                        .into_iter()
+                        .flatten()
+                        .copied()
+                        .filter_map(move |(timestamp,)| (timestamp < latest_timestamp).then_some(()))
                 }
                 fn check1_1_0(&self, x1: Math) -> bool {
-                    self.iter1_1_0(x1).next().is_some()
+                    self.iter_all1_1_0(x1).next().is_some()
                 }
                 fn check1_0_1(&self, x0: Math) -> bool {
-                    self.iter1_0_1(x0).next().is_some()
+                    self.iter_all1_0_1(x0).next().is_some()
                 }
                 fn check2_1_0(&self, x1: Math, x0: Math) -> bool {
-                    self.iter2_1_0(x1, x0).next().is_some()
+                    self.iter_all2_1_0(x1, x0).next().is_some()
                 }
                 #[allow(unreachable_code)]
                 fn entry2_1_0(&self, x1: Math, x0: Math, delta: &mut Delta, uf: &mut Unification) -> () {
-                    if let Some(()) = self.iter2_1_0(x1, x0).next() {
+                    if let Some(()) = self.iter_all2_1_0(x1, x0).next() {
                         return ();
                     }
                     delta.baz_.push((x0, x1));
@@ -8632,7 +10552,7 @@ fn triangle_join() {
             #[derive(Debug, Default)]
             struct TriangleRelation {
                 new: Vec<<Self as Relation>::Row>,
-                hash_index_0_1_2: runtime::HashMap<(Math, Math, Math), runtime::SmallVec<[(); 1]>>,
+                hash_index_0_1_2: runtime::HashMap<(Math, Math, Math), runtime::SmallVec<[(TimeStamp,); 1]>>,
                 math_num_uprooted_at_latest_retain: usize,
             }
             impl Relation for TriangleRelation {
@@ -8656,7 +10576,7 @@ fn triangle_join() {
                 }
                 fn emit_graphviz(&self, buf: &mut String) {
                     use std::fmt::Write;
-                    for (i, ((x0, x1, x2), ())) in self
+                    for (i, ((x0, x1, x2), (_timestamp,))) in self
                         .hash_index_0_1_2
                         .iter()
                         .flat_map(|(k, v)| v.iter().map(move |v| (k, v)))
@@ -8668,10 +10588,20 @@ fn triangle_join() {
                         writeln!(buf, "{}_{i} [shape = box];", "triangle").unwrap();
                     }
                 }
-                fn update_begin(&mut self, insertions: &[Self::Row], uf: &mut Unification) {
+                fn update_begin(
+                    &mut self,
+                    insertions: &[Self::Row],
+                    uf: &mut Unification,
+                    latest_timestamp: TimeStamp,
+                ) {
                     log_duration!("update_begin {}: {}", "triangle", {});
                 }
-                fn update(&mut self, insertions: &mut Vec<Self::Row>, uf: &mut Unification) -> bool {
+                fn update(
+                    &mut self,
+                    insertions: &mut Vec<Self::Row>,
+                    uf: &mut Unification,
+                    latest_timestamp: TimeStamp,
+                ) -> bool {
                     if self.math_num_uprooted_at_latest_retain == uf.math_.num_uprooted() {
                         return false;
                     }
@@ -8679,10 +10609,15 @@ fn triangle_join() {
                     log_duration!("update {}: {}", "triangle", {
                         self.math_num_uprooted_at_latest_retain = uf.math_.num_uprooted();
                     });
-                    self.update_begin(&insertions[offset..], uf);
+                    self.update_begin(&insertions[offset..], uf, latest_timestamp);
                     true
                 }
-                fn update_finalize(&mut self, insertions: &mut Vec<Self::Row>, uf: &mut Unification) {
+                fn update_finalize(
+                    &mut self,
+                    insertions: &mut Vec<Self::Row>,
+                    uf: &mut Unification,
+                    latest_timestamp: TimeStamp,
+                ) {
                     log_duration!("update_finalize {}: {}", "triangle", {
                         assert!(self.new.is_empty());
                         log_duration!("fill new: {}", {
@@ -8701,15 +10636,15 @@ fn triangle_join() {
                                 self.hash_index_0_1_2
                                     .entry((x0, x1, x2))
                                     .or_default()
-                                    .push(());
+                                    .push((latest_timestamp,));
                             }
                         });
                         log_duration!("retain index: {}", {
                             self.hash_index_0_1_2.retain(|&(x0, x1, x2), v| {
                                 if uf.math_.is_root(x0) & uf.math_.is_root(x1) & uf.math_.is_root(x2) {
-                                    v.retain(|&mut ()| true);
+                                    v.retain(|&mut (_timestamp)| true);
                                     v.sort_unstable();
-                                    v.dedup();
+                                    v.dedup_by(|(t1,), (t2,)| true);
                                     true
                                 } else {
                                     false
@@ -8721,15 +10656,30 @@ fn triangle_join() {
                 }
             }
             impl TriangleRelation {
-                fn iter3_0_1_2(&self, x0: Math, x1: Math, x2: Math) -> impl Iterator<Item = ()> + use<'_> {
+                fn iter_all3_0_1_2(&self, x0: Math, x1: Math, x2: Math) -> impl Iterator<Item = ()> + use<'_> {
                     self.hash_index_0_1_2
                         .get(&(x0, x1, x2))
                         .into_iter()
                         .flatten()
                         .copied()
+                        .map(|(_timestamp)| ())
+                }
+                fn iter_old3_0_1_2(
+                    &self,
+                    x0: Math,
+                    x1: Math,
+                    x2: Math,
+                    latest_timestamp: TimeStamp,
+                ) -> impl Iterator<Item = ()> + use<'_> {
+                    self.hash_index_0_1_2
+                        .get(&(x0, x1, x2))
+                        .into_iter()
+                        .flatten()
+                        .copied()
+                        .filter_map(move |(timestamp,)| (timestamp < latest_timestamp).then_some(()))
                 }
                 fn check3_0_1_2(&self, x0: Math, x1: Math, x2: Math) -> bool {
-                    self.iter3_0_1_2(x0, x1, x2).next().is_some()
+                    self.iter_all3_0_1_2(x0, x1, x2).next().is_some()
                 }
                 #[allow(unreachable_code)]
                 fn entry3_0_1_2(
@@ -8740,7 +10690,7 @@ fn triangle_join() {
                     delta: &mut Delta,
                     uf: &mut Unification,
                 ) -> () {
-                    if let Some(()) = self.iter3_0_1_2(x0, x1, x2).next() {
+                    if let Some(()) = self.iter_all3_0_1_2(x0, x1, x2).next() {
                         return ();
                     }
                     delta.triangle_.push((x0, x1, x2));
@@ -8795,6 +10745,7 @@ fn triangle_join() {
             }
             #[derive(Debug, Default)]
             pub struct Theory {
+                pub latest_timestamp: TimeStamp,
                 pub delta: Delta,
                 pub uf: Unification,
                 pub foo_: FooRelation,
@@ -8829,8 +10780,8 @@ fn triangle_join() {
                 pub fn apply_rules(&mut self) {
                     for (a, b) in self.foo_.iter_new() {
                         if self.bar_.check1_0_1(b) {
-                            for (c,) in self.baz_.iter1_1_0(a) {
-                                for () in self.bar_.iter2_0_1(b, c) {
+                            for (c,) in self.baz_.iter_all1_1_0(a) {
+                                for () in self.bar_.iter_all2_0_1(b, c) {
                                     #[doc = "( rule ( ( Foo a b ) ( Bar b c ) ( Baz c a ) ) ( ( Triangle a b c ) ) )"]
                                     self.delta.insert_triangle((a, b, c));
                                 }
@@ -8839,8 +10790,8 @@ fn triangle_join() {
                     }
                     for (b_2, c_2) in self.bar_.iter_new() {
                         if self.foo_.check1_1_0(b_2) {
-                            for (a_2,) in self.baz_.iter1_0_1(c_2) {
-                                for () in self.foo_.iter2_1_0(b_2, a_2) {
+                            for (a_2,) in self.baz_.iter_all1_0_1(c_2) {
+                                for () in self.foo_.iter_old2_1_0(b_2, a_2, self.latest_timestamp) {
                                     #[doc = "( rule ( ( Foo a b ) ( Bar b c ) ( Baz c a ) ) ( ( Triangle a b c ) ) )"]
                                     self.delta.insert_triangle((a_2, b_2, c_2));
                                 }
@@ -8849,8 +10800,8 @@ fn triangle_join() {
                     }
                     for (c_3, a_3) in self.baz_.iter_new() {
                         if self.foo_.check1_0_1(a_3) {
-                            for (b_3,) in self.bar_.iter1_1_0(c_3) {
-                                for () in self.foo_.iter2_1_0(b_3, a_3) {
+                            for (b_3,) in self.bar_.iter_old1_1_0(c_3, self.latest_timestamp) {
+                                for () in self.foo_.iter_old2_1_0(b_3, a_3, self.latest_timestamp) {
                                     #[doc = "( rule ( ( Foo a b ) ( Bar b c ) ( Baz c a ) ) ( ( Triangle a b c ) ) )"]
                                     self.delta.insert_triangle((a_3, b_3, c_3));
                                 }
@@ -8893,6 +10844,7 @@ fn triangle_join() {
                 }
                 #[inline(never)]
                 pub fn canonicalize(&mut self) {
+                    self.latest_timestamp.0 += 1;
                     log_duration!("canonicalize (total): {}", {
                         self.foo_.clear_new();
                         self.bar_.clear_new();
@@ -8902,35 +10854,61 @@ fn triangle_join() {
                             return;
                         }
                         log_duration!("update_begin (total): {}", {
-                            self.foo_.update_begin(&mut self.delta.foo_, &mut self.uf);
-                            self.bar_.update_begin(&mut self.delta.bar_, &mut self.uf);
-                            self.baz_.update_begin(&mut self.delta.baz_, &mut self.uf);
-                            self.triangle_
-                                .update_begin(&mut self.delta.triangle_, &mut self.uf);
+                            self.foo_
+                                .update_begin(&mut self.delta.foo_, &mut self.uf, self.latest_timestamp);
+                            self.bar_
+                                .update_begin(&mut self.delta.bar_, &mut self.uf, self.latest_timestamp);
+                            self.baz_
+                                .update_begin(&mut self.delta.baz_, &mut self.uf, self.latest_timestamp);
+                            self.triangle_.update_begin(
+                                &mut self.delta.triangle_,
+                                &mut self.uf,
+                                self.latest_timestamp,
+                            );
                         });
                         log_duration!("update_loop (total): {}", {
                             loop {
                                 let mut progress = false;
-                                progress |= self.foo_.update(&mut self.delta.foo_, &mut self.uf);
-                                progress |= self.bar_.update(&mut self.delta.bar_, &mut self.uf);
-                                progress |= self.baz_.update(&mut self.delta.baz_, &mut self.uf);
-                                progress |= self
-                                    .triangle_
-                                    .update(&mut self.delta.triangle_, &mut self.uf);
+                                progress |=
+                                    self.foo_
+                                        .update(&mut self.delta.foo_, &mut self.uf, self.latest_timestamp);
+                                progress |=
+                                    self.bar_
+                                        .update(&mut self.delta.bar_, &mut self.uf, self.latest_timestamp);
+                                progress |=
+                                    self.baz_
+                                        .update(&mut self.delta.baz_, &mut self.uf, self.latest_timestamp);
+                                progress |= self.triangle_.update(
+                                    &mut self.delta.triangle_,
+                                    &mut self.uf,
+                                    self.latest_timestamp,
+                                );
                                 if !progress {
                                     break;
                                 }
                             }
                         });
                         log_duration!("update_finalize (total): {}", {
-                            self.foo_
-                                .update_finalize(&mut self.delta.foo_, &mut self.uf);
-                            self.bar_
-                                .update_finalize(&mut self.delta.bar_, &mut self.uf);
-                            self.baz_
-                                .update_finalize(&mut self.delta.baz_, &mut self.uf);
-                            self.triangle_
-                                .update_finalize(&mut self.delta.triangle_, &mut self.uf);
+                            self.foo_.update_finalize(
+                                &mut self.delta.foo_,
+                                &mut self.uf,
+                                self.latest_timestamp,
+                            );
+                            self.bar_.update_finalize(
+                                &mut self.delta.bar_,
+                                &mut self.uf,
+                                self.latest_timestamp,
+                            );
+                            self.baz_.update_finalize(
+                                &mut self.delta.baz_,
+                                &mut self.uf,
+                                self.latest_timestamp,
+                            );
+                            self.triangle_.update_finalize(
+                                &mut self.delta.triangle_,
+                                &mut self.uf,
+                                self.latest_timestamp,
+                            );
                             self.uf.reset_num_uprooted();
                         });
                     });
@@ -9014,11 +10992,11 @@ fn edgecase0() {
             #[derive(Debug, Default)]
             struct MulRelation {
                 new: Vec<<Self as Relation>::Row>,
-                hash_index_0_1: runtime::HashMap<(Math, Math), (Math,)>,
-                hash_index_0: runtime::HashMap<(Math,), runtime::SmallVec<[(Math, Math); 1]>>,
-                hash_index_2_0: runtime::HashMap<(Math, Math), runtime::SmallVec<[(Math,); 1]>>,
-                hash_index_2: runtime::HashMap<(Math,), runtime::SmallVec<[(Math, Math); 1]>>,
-                hash_index_0_1_2: runtime::HashMap<(Math, Math, Math), runtime::SmallVec<[(); 1]>>,
+                hash_index_0_1: runtime::HashMap<(Math, Math), (Math, TimeStamp)>,
+                hash_index_0: runtime::HashMap<(Math,), runtime::SmallVec<[(Math, Math, TimeStamp); 1]>>,
+                hash_index_2_0: runtime::HashMap<(Math, Math), runtime::SmallVec<[(Math, TimeStamp); 1]>>,
+                hash_index_2: runtime::HashMap<(Math,), runtime::SmallVec<[(Math, Math, TimeStamp); 1]>>,
+                hash_index_0_1_2: runtime::HashMap<(Math, Math, Math), runtime::SmallVec<[(TimeStamp,); 1]>>,
                 math_num_uprooted_at_latest_retain: usize,
             }
             impl Relation for MulRelation {
@@ -9042,14 +11020,19 @@ fn edgecase0() {
                 }
                 fn emit_graphviz(&self, buf: &mut String) {
                     use std::fmt::Write;
-                    for (i, ((x0, x1), (x2,))) in self.hash_index_0_1.iter().enumerate() {
+                    for (i, ((x0, x1), (x2, _timestamp))) in self.hash_index_0_1.iter().enumerate() {
                         writeln!(buf, "{}_{i} -> {}_{};", "mul", "math", x0).unwrap();
                         writeln!(buf, "{}_{i} -> {}_{};", "mul", "math", x1).unwrap();
                         writeln!(buf, "{}_{i} -> {}_{};", "mul", "math", x2).unwrap();
                         writeln!(buf, "{}_{i} [shape = box];", "mul").unwrap();
                     }
                 }
-                fn update_begin(&mut self, insertions: &[Self::Row], uf: &mut Unification) {
+                fn update_begin(
+                    &mut self,
+                    insertions: &[Self::Row],
+                    uf: &mut Unification,
+                    latest_timestamp: TimeStamp,
+                ) {
                     log_duration!("update_begin {}: {}", "mul", {
                         for &(mut x0, mut x1, mut x2) in insertions {
                             match self
@@ -9057,43 +11040,59 @@ fn edgecase0() {
                                 .entry((uf.math_.find(x0), uf.math_.find(x1)))
                             {
                                 runtime::HashMapEntry::Occupied(mut entry) => {
-                                    let (y2,) = entry.get_mut();
-                                    uf.math_.union_mut(&mut x2, y2);
+                                    let (y2, timestamp) = entry.get_mut();
+                                    let changed = false;
+                                    let old_val = *y2;
+                                    let changed = changed | (old_val != uf.math_.union_mut(&mut x2, y2));
+                                    if changed {
+                                        *timestamp = latest_timestamp;
+                                    }
                                 }
                                 runtime::HashMapEntry::Vacant(entry) => {
-                                    entry.insert((uf.math_.find(x2),));
+                                    entry.insert((uf.math_.find(x2), latest_timestamp));
                                 }
                             }
                         }
                     });
                 }
-                fn update(&mut self, insertions: &mut Vec<Self::Row>, uf: &mut Unification) -> bool {
+                fn update(
+                    &mut self,
+                    insertions: &mut Vec<Self::Row>,
+                    uf: &mut Unification,
+                    latest_timestamp: TimeStamp,
+                ) -> bool {
                     if self.math_num_uprooted_at_latest_retain == uf.math_.num_uprooted() {
                         return false;
                     }
                     let offset = insertions.len();
                     log_duration!("update {}: {}", "mul", {
                         self.math_num_uprooted_at_latest_retain = uf.math_.num_uprooted();
-                        self.hash_index_0_1.retain(|&(x0, x1), &mut (x2,)| {
-                            if uf.math_.is_root(x0) & uf.math_.is_root(x1) & uf.math_.is_root(x2) {
-                                true
-                            } else {
-                                insertions.push((x0, x1, x2));
-                                false
-                            }
-                        });
+                        self.hash_index_0_1
+                            .retain(|&(x0, x1), &mut (x2, _timestamp)| {
+                                if uf.math_.is_root(x0) & uf.math_.is_root(x1) & uf.math_.is_root(x2) {
+                                    true
+                                } else {
+                                    insertions.push((x0, x1, x2));
+                                    false
+                                }
+                            });
                     });
-                    self.update_begin(&insertions[offset..], uf);
+                    self.update_begin(&insertions[offset..], uf, latest_timestamp);
                     true
                 }
-                fn update_finalize(&mut self, insertions: &mut Vec<Self::Row>, uf: &mut Unification) {
+                fn update_finalize(
+                    &mut self,
+                    insertions: &mut Vec<Self::Row>,
+                    uf: &mut Unification,
+                    latest_timestamp: TimeStamp,
+                ) {
                     log_duration!("update_finalize {}: {}", "mul", {
                         assert!(self.new.is_empty());
                         log_duration!("fill new: {}", {
                             self.new.extend(
                                 self.hash_index_0_1
                                     .iter()
-                                    .map(|(&(x0, x1), &(x2,))| (x0, x1, x2))
+                                    .map(|(&(x0, x1), &(x2, _timestamp))| (x0, x1, x2))
                                     .filter(|&(x0, x1, x2)| !self.hash_index_0_1_2.contains_key(&(x0, x1, x2))),
                             );
                             insertions.clear();
@@ -9102,15 +11101,20 @@ fn edgecase0() {
                         });
                         log_duration!("fill index: {}", {
                             for &(x0, x1, x2) in &self.new {
-                                self.hash_index_0.entry((x0,)).or_default().push((x1, x2));
+                                self.hash_index_0
+                                    .entry((x0,))
+                                    .or_default()
+                                    .push((x1, x2, latest_timestamp));
                             }
                         });
                         log_duration!("retain index: {}", {
                             self.hash_index_0.retain(|&(x0,), v| {
                                 if uf.math_.is_root(x0) {
-                                    v.retain(|&mut (x1, x2)| uf.math_.is_root(x1) & uf.math_.is_root(x2));
+                                    v.retain(|&mut (x1, x2, _timestamp)| {
+                                        uf.math_.is_root(x1) & uf.math_.is_root(x2)
+                                    });
                                     v.sort_unstable();
-                                    v.dedup();
+                                    v.dedup_by(|(x1, x2, t1), (y1, y2, t2)| true & (*x1 == *y1) & (*x2 == *y2));
                                     true
                                 } else {
                                     false
@@ -9119,15 +11123,18 @@ fn edgecase0() {
                         });
                         log_duration!("fill index: {}", {
                             for &(x0, x1, x2) in &self.new {
-                                self.hash_index_2_0.entry((x2, x0)).or_default().push((x1,));
+                                self.hash_index_2_0
+                                    .entry((x2, x0))
+                                    .or_default()
+                                    .push((x1, latest_timestamp));
                             }
                         });
                         log_duration!("retain index: {}", {
                             self.hash_index_2_0.retain(|&(x2, x0), v| {
                                 if uf.math_.is_root(x2) & uf.math_.is_root(x0) {
-                                    v.retain(|&mut (x1,)| uf.math_.is_root(x1));
+                                    v.retain(|&mut (x1, _timestamp)| uf.math_.is_root(x1));
                                     v.sort_unstable();
-                                    v.dedup();
+                                    v.dedup_by(|(x1, t1), (y1, t2)| true & (*x1 == *y1));
                                     true
                                 } else {
                                     false
@@ -9136,15 +11143,20 @@ fn edgecase0() {
                         });
                         log_duration!("fill index: {}", {
                             for &(x0, x1, x2) in &self.new {
-                                self.hash_index_2.entry((x2,)).or_default().push((x0, x1));
+                                self.hash_index_2
+                                    .entry((x2,))
+                                    .or_default()
+                                    .push((x0, x1, latest_timestamp));
                             }
                         });
                         log_duration!("retain index: {}", {
                             self.hash_index_2.retain(|&(x2,), v| {
                                 if uf.math_.is_root(x2) {
-                                    v.retain(|&mut (x0, x1)| uf.math_.is_root(x0) & uf.math_.is_root(x1));
+                                    v.retain(|&mut (x0, x1, _timestamp)| {
+                                        uf.math_.is_root(x0) & uf.math_.is_root(x1)
+                                    });
                                     v.sort_unstable();
-                                    v.dedup();
+                                    v.dedup_by(|(x0, x1, t1), (y0, y1, t2)| true & (*x0 == *y0) & (*x1 == *y1));
                                     true
                                 } else {
                                     false
@@ -9156,15 +11168,15 @@ fn edgecase0() {
                                 self.hash_index_0_1_2
                                     .entry((x0, x1, x2))
                                     .or_default()
-                                    .push(());
+                                    .push((latest_timestamp,));
                             }
                         });
                         log_duration!("retain index: {}", {
                             self.hash_index_0_1_2.retain(|&(x0, x1, x2), v| {
                                 if uf.math_.is_root(x0) & uf.math_.is_root(x1) & uf.math_.is_root(x2) {
-                                    v.retain(|&mut ()| true);
+                                    v.retain(|&mut (_timestamp)| true);
                                     v.sort_unstable();
-                                    v.dedup();
+                                    v.dedup_by(|(t1,), (t2,)| true);
                                     true
                                 } else {
                                     false
@@ -9176,47 +11188,130 @@ fn edgecase0() {
                 }
             }
             impl MulRelation {
-                fn iter2_0_1_2(&self, x0: Math, x1: Math) -> impl Iterator<Item = (Math,)> + use<'_> {
-                    self.hash_index_0_1.get(&(x0, x1)).into_iter().copied()
+                fn iter_all2_0_1_2(&self, x0: Math, x1: Math) -> impl Iterator<Item = (Math,)> + use<'_> {
+                    self.hash_index_0_1
+                        .get(&(x0, x1))
+                        .into_iter()
+                        .copied()
+                        .map(|(x2, _timestamp)| (x2,))
                 }
-                fn iter1_0_1_2(&self, x0: Math) -> impl Iterator<Item = (Math, Math)> + use<'_> {
-                    self.hash_index_0.get(&(x0,)).into_iter().flatten().copied()
+                fn iter_all1_0_1_2(&self, x0: Math) -> impl Iterator<Item = (Math, Math)> + use<'_> {
+                    self.hash_index_0
+                        .get(&(x0,))
+                        .into_iter()
+                        .flatten()
+                        .copied()
+                        .map(|(x1, x2, _timestamp)| (x1, x2))
                 }
-                fn iter2_2_0_1(&self, x2: Math, x0: Math) -> impl Iterator<Item = (Math,)> + use<'_> {
+                fn iter_all2_2_0_1(&self, x2: Math, x0: Math) -> impl Iterator<Item = (Math,)> + use<'_> {
                     self.hash_index_2_0
                         .get(&(x2, x0))
                         .into_iter()
                         .flatten()
                         .copied()
+                        .map(|(x1, _timestamp)| (x1,))
                 }
-                fn iter1_2_0_1(&self, x2: Math) -> impl Iterator<Item = (Math, Math)> + use<'_> {
-                    self.hash_index_2.get(&(x2,)).into_iter().flatten().copied()
+                fn iter_all1_2_0_1(&self, x2: Math) -> impl Iterator<Item = (Math, Math)> + use<'_> {
+                    self.hash_index_2
+                        .get(&(x2,))
+                        .into_iter()
+                        .flatten()
+                        .copied()
+                        .map(|(x0, x1, _timestamp)| (x0, x1))
                 }
-                fn iter3_0_1_2(&self, x0: Math, x1: Math, x2: Math) -> impl Iterator<Item = ()> + use<'_> {
+                fn iter_all3_0_1_2(&self, x0: Math, x1: Math, x2: Math) -> impl Iterator<Item = ()> + use<'_> {
                     self.hash_index_0_1_2
                         .get(&(x0, x1, x2))
                         .into_iter()
                         .flatten()
                         .copied()
+                        .map(|(_timestamp)| ())
+                }
+                fn iter_old2_0_1_2(
+                    &self,
+                    x0: Math,
+                    x1: Math,
+                    latest_timestamp: TimeStamp,
+                ) -> impl Iterator<Item = (Math,)> + use<'_> {
+                    self.hash_index_0_1
+                        .get(&(x0, x1))
+                        .into_iter()
+                        .copied()
+                        .filter_map(move |(x2, timestamp)| (timestamp < latest_timestamp).then_some((x2,)))
+                }
+                fn iter_old1_0_1_2(
+                    &self,
+                    x0: Math,
+                    latest_timestamp: TimeStamp,
+                ) -> impl Iterator<Item = (Math, Math)> + use<'_> {
+                    self.hash_index_0
+                        .get(&(x0,))
+                        .into_iter()
+                        .flatten()
+                        .copied()
+                        .filter_map(move |(x1, x2, timestamp)| {
+                            (timestamp < latest_timestamp).then_some((x1, x2))
+                        })
+                }
+                fn iter_old2_2_0_1(
+                    &self,
+                    x2: Math,
+                    x0: Math,
+                    latest_timestamp: TimeStamp,
+                ) -> impl Iterator<Item = (Math,)> + use<'_> {
+                    self.hash_index_2_0
+                        .get(&(x2, x0))
+                        .into_iter()
+                        .flatten()
+                        .copied()
+                        .filter_map(move |(x1, timestamp)| (timestamp < latest_timestamp).then_some((x1,)))
+                }
+                fn iter_old1_2_0_1(
+                    &self,
+                    x2: Math,
+                    latest_timestamp: TimeStamp,
+                ) -> impl Iterator<Item = (Math, Math)> + use<'_> {
+                    self.hash_index_2
+                        .get(&(x2,))
+                        .into_iter()
+                        .flatten()
+                        .copied()
+                        .filter_map(move |(x0, x1, timestamp)| {
+                            (timestamp < latest_timestamp).then_some((x0, x1))
+                        })
+                }
+                fn iter_old3_0_1_2(
+                    &self,
+                    x0: Math,
+                    x1: Math,
+                    x2: Math,
+                    latest_timestamp: TimeStamp,
+                ) -> impl Iterator<Item = ()> + use<'_> {
+                    self.hash_index_0_1_2
+                        .get(&(x0, x1, x2))
+                        .into_iter()
+                        .flatten()
+                        .copied()
+                        .filter_map(move |(timestamp,)| (timestamp < latest_timestamp).then_some(()))
                 }
                 fn check2_0_1_2(&self, x0: Math, x1: Math) -> bool {
-                    self.iter2_0_1_2(x0, x1).next().is_some()
+                    self.iter_all2_0_1_2(x0, x1).next().is_some()
                 }
                 fn check1_0_1_2(&self, x0: Math) -> bool {
-                    self.iter1_0_1_2(x0).next().is_some()
+                    self.iter_all1_0_1_2(x0).next().is_some()
                 }
                 fn check2_2_0_1(&self, x2: Math, x0: Math) -> bool {
-                    self.iter2_2_0_1(x2, x0).next().is_some()
+                    self.iter_all2_2_0_1(x2, x0).next().is_some()
                 }
                 fn check1_2_0_1(&self, x2: Math) -> bool {
-                    self.iter1_2_0_1(x2).next().is_some()
+                    self.iter_all1_2_0_1(x2).next().is_some()
                 }
                 fn check3_0_1_2(&self, x0: Math, x1: Math, x2: Math) -> bool {
-                    self.iter3_0_1_2(x0, x1, x2).next().is_some()
+                    self.iter_all3_0_1_2(x0, x1, x2).next().is_some()
                 }
                 #[allow(unreachable_code)]
                 fn entry2_0_1_2(&self, x0: Math, x1: Math, delta: &mut Delta, uf: &mut Unification) -> (Math,) {
-                    if let Some((x2,)) = self.iter2_0_1_2(x0, x1).next() {
+                    if let Some((x2,)) = self.iter_all2_0_1_2(x0, x1).next() {
                         return (x2,);
                     }
                     let x2 = uf.math_.add_eclass();
@@ -9232,7 +11327,7 @@ fn edgecase0() {
                     delta: &mut Delta,
                     uf: &mut Unification,
                 ) -> () {
-                    if let Some(()) = self.iter3_0_1_2(x0, x1, x2).next() {
+                    if let Some(()) = self.iter_all3_0_1_2(x0, x1, x2).next() {
                         return ();
                     }
                     delta.mul_.push((x0, x1, x2));
@@ -9242,10 +11337,10 @@ fn edgecase0() {
             #[derive(Debug, Default)]
             struct AddRelation {
                 new: Vec<<Self as Relation>::Row>,
-                hash_index_0_1: runtime::HashMap<(Math, Math), (Math,)>,
-                hash_index_0: runtime::HashMap<(Math,), runtime::SmallVec<[(Math, Math); 1]>>,
-                hash_index_1: runtime::HashMap<(Math,), runtime::SmallVec<[(Math, Math); 1]>>,
-                hash_index_0_1_2: runtime::HashMap<(Math, Math, Math), runtime::SmallVec<[(); 1]>>,
+                hash_index_0_1: runtime::HashMap<(Math, Math), (Math, TimeStamp)>,
+                hash_index_0: runtime::HashMap<(Math,), runtime::SmallVec<[(Math, Math, TimeStamp); 1]>>,
+                hash_index_1: runtime::HashMap<(Math,), runtime::SmallVec<[(Math, Math, TimeStamp); 1]>>,
+                hash_index_0_1_2: runtime::HashMap<(Math, Math, Math), runtime::SmallVec<[(TimeStamp,); 1]>>,
                 math_num_uprooted_at_latest_retain: usize,
             }
             impl Relation for AddRelation {
@@ -9269,14 +11364,19 @@ fn edgecase0() {
                 }
                 fn emit_graphviz(&self, buf: &mut String) {
                     use std::fmt::Write;
-                    for (i, ((x0, x1), (x2,))) in self.hash_index_0_1.iter().enumerate() {
+                    for (i, ((x0, x1), (x2, _timestamp))) in self.hash_index_0_1.iter().enumerate() {
                         writeln!(buf, "{}_{i} -> {}_{};", "add", "math", x0).unwrap();
                         writeln!(buf, "{}_{i} -> {}_{};", "add", "math", x1).unwrap();
                         writeln!(buf, "{}_{i} -> {}_{};", "add", "math", x2).unwrap();
                         writeln!(buf, "{}_{i} [shape = box];", "add").unwrap();
                     }
                 }
-                fn update_begin(&mut self, insertions: &[Self::Row], uf: &mut Unification) {
+                fn update_begin(
+                    &mut self,
+                    insertions: &[Self::Row],
+                    uf: &mut Unification,
+                    latest_timestamp: TimeStamp,
+                ) {
                     log_duration!("update_begin {}: {}", "add", {
                         for &(mut x0, mut x1, mut x2) in insertions {
                             match self
@@ -9284,43 +11384,59 @@ fn edgecase0() {
                                 .entry((uf.math_.find(x0), uf.math_.find(x1)))
                             {
                                 runtime::HashMapEntry::Occupied(mut entry) => {
-                                    let (y2,) = entry.get_mut();
-                                    uf.math_.union_mut(&mut x2, y2);
+                                    let (y2, timestamp) = entry.get_mut();
+                                    let changed = false;
+                                    let old_val = *y2;
+                                    let changed = changed | (old_val != uf.math_.union_mut(&mut x2, y2));
+                                    if changed {
+                                        *timestamp = latest_timestamp;
+                                    }
                                 }
                                 runtime::HashMapEntry::Vacant(entry) => {
-                                    entry.insert((uf.math_.find(x2),));
+                                    entry.insert((uf.math_.find(x2), latest_timestamp));
                                 }
                             }
                         }
                     });
                 }
-                fn update(&mut self, insertions: &mut Vec<Self::Row>, uf: &mut Unification) -> bool {
+                fn update(
+                    &mut self,
+                    insertions: &mut Vec<Self::Row>,
+                    uf: &mut Unification,
+                    latest_timestamp: TimeStamp,
+                ) -> bool {
                     if self.math_num_uprooted_at_latest_retain == uf.math_.num_uprooted() {
                         return false;
                     }
                     let offset = insertions.len();
                     log_duration!("update {}: {}", "add", {
                         self.math_num_uprooted_at_latest_retain = uf.math_.num_uprooted();
-                        self.hash_index_0_1.retain(|&(x0, x1), &mut (x2,)| {
-                            if uf.math_.is_root(x0) & uf.math_.is_root(x1) & uf.math_.is_root(x2) {
-                                true
-                            } else {
-                                insertions.push((x0, x1, x2));
-                                false
-                            }
-                        });
+                        self.hash_index_0_1
+                            .retain(|&(x0, x1), &mut (x2, _timestamp)| {
+                                if uf.math_.is_root(x0) & uf.math_.is_root(x1) & uf.math_.is_root(x2) {
+                                    true
+                                } else {
+                                    insertions.push((x0, x1, x2));
+                                    false
+                                }
+                            });
                     });
-                    self.update_begin(&insertions[offset..], uf);
+                    self.update_begin(&insertions[offset..], uf, latest_timestamp);
                     true
                 }
-                fn update_finalize(&mut self, insertions: &mut Vec<Self::Row>, uf: &mut Unification) {
+                fn update_finalize(
+                    &mut self,
+                    insertions: &mut Vec<Self::Row>,
+                    uf: &mut Unification,
+                    latest_timestamp: TimeStamp,
+                ) {
                     log_duration!("update_finalize {}: {}", "add", {
                         assert!(self.new.is_empty());
                         log_duration!("fill new: {}", {
                             self.new.extend(
                                 self.hash_index_0_1
                                     .iter()
-                                    .map(|(&(x0, x1), &(x2,))| (x0, x1, x2))
+                                    .map(|(&(x0, x1), &(x2, _timestamp))| (x0, x1, x2))
                                     .filter(|&(x0, x1, x2)| !self.hash_index_0_1_2.contains_key(&(x0, x1, x2))),
                             );
                             insertions.clear();
@@ -9329,15 +11445,20 @@ fn edgecase0() {
                         });
                         log_duration!("fill index: {}", {
                             for &(x0, x1, x2) in &self.new {
-                                self.hash_index_0.entry((x0,)).or_default().push((x1, x2));
+                                self.hash_index_0
+                                    .entry((x0,))
+                                    .or_default()
+                                    .push((x1, x2, latest_timestamp));
                             }
                         });
                         log_duration!("retain index: {}", {
                             self.hash_index_0.retain(|&(x0,), v| {
                                 if uf.math_.is_root(x0) {
-                                    v.retain(|&mut (x1, x2)| uf.math_.is_root(x1) & uf.math_.is_root(x2));
+                                    v.retain(|&mut (x1, x2, _timestamp)| {
+                                        uf.math_.is_root(x1) & uf.math_.is_root(x2)
+                                    });
                                     v.sort_unstable();
-                                    v.dedup();
+                                    v.dedup_by(|(x1, x2, t1), (y1, y2, t2)| true & (*x1 == *y1) & (*x2 == *y2));
                                     true
                                 } else {
                                     false
@@ -9346,15 +11467,20 @@ fn edgecase0() {
                         });
                         log_duration!("fill index: {}", {
                             for &(x0, x1, x2) in &self.new {
-                                self.hash_index_1.entry((x1,)).or_default().push((x0, x2));
+                                self.hash_index_1
+                                    .entry((x1,))
+                                    .or_default()
+                                    .push((x0, x2, latest_timestamp));
                             }
                         });
                         log_duration!("retain index: {}", {
                             self.hash_index_1.retain(|&(x1,), v| {
                                 if uf.math_.is_root(x1) {
-                                    v.retain(|&mut (x0, x2)| uf.math_.is_root(x0) & uf.math_.is_root(x2));
+                                    v.retain(|&mut (x0, x2, _timestamp)| {
+                                        uf.math_.is_root(x0) & uf.math_.is_root(x2)
+                                    });
                                     v.sort_unstable();
-                                    v.dedup();
+                                    v.dedup_by(|(x0, x2, t1), (y0, y2, t2)| true & (*x0 == *y0) & (*x2 == *y2));
                                     true
                                 } else {
                                     false
@@ -9366,15 +11492,15 @@ fn edgecase0() {
                                 self.hash_index_0_1_2
                                     .entry((x0, x1, x2))
                                     .or_default()
-                                    .push(());
+                                    .push((latest_timestamp,));
                             }
                         });
                         log_duration!("retain index: {}", {
                             self.hash_index_0_1_2.retain(|&(x0, x1, x2), v| {
                                 if uf.math_.is_root(x0) & uf.math_.is_root(x1) & uf.math_.is_root(x2) {
-                                    v.retain(|&mut ()| true);
+                                    v.retain(|&mut (_timestamp)| true);
                                     v.sort_unstable();
-                                    v.dedup();
+                                    v.dedup_by(|(t1,), (t2,)| true);
                                     true
                                 } else {
                                     false
@@ -9386,37 +11512,106 @@ fn edgecase0() {
                 }
             }
             impl AddRelation {
-                fn iter2_0_1_2(&self, x0: Math, x1: Math) -> impl Iterator<Item = (Math,)> + use<'_> {
-                    self.hash_index_0_1.get(&(x0, x1)).into_iter().copied()
+                fn iter_all2_0_1_2(&self, x0: Math, x1: Math) -> impl Iterator<Item = (Math,)> + use<'_> {
+                    self.hash_index_0_1
+                        .get(&(x0, x1))
+                        .into_iter()
+                        .copied()
+                        .map(|(x2, _timestamp)| (x2,))
                 }
-                fn iter1_0_1_2(&self, x0: Math) -> impl Iterator<Item = (Math, Math)> + use<'_> {
-                    self.hash_index_0.get(&(x0,)).into_iter().flatten().copied()
+                fn iter_all1_0_1_2(&self, x0: Math) -> impl Iterator<Item = (Math, Math)> + use<'_> {
+                    self.hash_index_0
+                        .get(&(x0,))
+                        .into_iter()
+                        .flatten()
+                        .copied()
+                        .map(|(x1, x2, _timestamp)| (x1, x2))
                 }
-                fn iter1_1_0_2(&self, x1: Math) -> impl Iterator<Item = (Math, Math)> + use<'_> {
-                    self.hash_index_1.get(&(x1,)).into_iter().flatten().copied()
+                fn iter_all1_1_0_2(&self, x1: Math) -> impl Iterator<Item = (Math, Math)> + use<'_> {
+                    self.hash_index_1
+                        .get(&(x1,))
+                        .into_iter()
+                        .flatten()
+                        .copied()
+                        .map(|(x0, x2, _timestamp)| (x0, x2))
                 }
-                fn iter3_0_1_2(&self, x0: Math, x1: Math, x2: Math) -> impl Iterator<Item = ()> + use<'_> {
+                fn iter_all3_0_1_2(&self, x0: Math, x1: Math, x2: Math) -> impl Iterator<Item = ()> + use<'_> {
                     self.hash_index_0_1_2
                         .get(&(x0, x1, x2))
                         .into_iter()
                         .flatten()
                         .copied()
+                        .map(|(_timestamp)| ())
+                }
+                fn iter_old2_0_1_2(
+                    &self,
+                    x0: Math,
+                    x1: Math,
+                    latest_timestamp: TimeStamp,
+                ) -> impl Iterator<Item = (Math,)> + use<'_> {
+                    self.hash_index_0_1
+                        .get(&(x0, x1))
+                        .into_iter()
+                        .copied()
+                        .filter_map(move |(x2, timestamp)| (timestamp < latest_timestamp).then_some((x2,)))
+                }
+                fn iter_old1_0_1_2(
+                    &self,
+                    x0: Math,
+                    latest_timestamp: TimeStamp,
+                ) -> impl Iterator<Item = (Math, Math)> + use<'_> {
+                    self.hash_index_0
+                        .get(&(x0,))
+                        .into_iter()
+                        .flatten()
+                        .copied()
+                        .filter_map(move |(x1, x2, timestamp)| {
+                            (timestamp < latest_timestamp).then_some((x1, x2))
+                        })
+                }
+                fn iter_old1_1_0_2(
+                    &self,
+                    x1: Math,
+                    latest_timestamp: TimeStamp,
+                ) -> impl Iterator<Item = (Math, Math)> + use<'_> {
+                    self.hash_index_1
+                        .get(&(x1,))
+                        .into_iter()
+                        .flatten()
+                        .copied()
+                        .filter_map(move |(x0, x2, timestamp)| {
+                            (timestamp < latest_timestamp).then_some((x0, x2))
+                        })
+                }
+                fn iter_old3_0_1_2(
+                    &self,
+                    x0: Math,
+                    x1: Math,
+                    x2: Math,
+                    latest_timestamp: TimeStamp,
+                ) -> impl Iterator<Item = ()> + use<'_> {
+                    self.hash_index_0_1_2
+                        .get(&(x0, x1, x2))
+                        .into_iter()
+                        .flatten()
+                        .copied()
+                        .filter_map(move |(timestamp,)| (timestamp < latest_timestamp).then_some(()))
                 }
                 fn check2_0_1_2(&self, x0: Math, x1: Math) -> bool {
-                    self.iter2_0_1_2(x0, x1).next().is_some()
+                    self.iter_all2_0_1_2(x0, x1).next().is_some()
                 }
                 fn check1_0_1_2(&self, x0: Math) -> bool {
-                    self.iter1_0_1_2(x0).next().is_some()
+                    self.iter_all1_0_1_2(x0).next().is_some()
                 }
                 fn check1_1_0_2(&self, x1: Math) -> bool {
-                    self.iter1_1_0_2(x1).next().is_some()
+                    self.iter_all1_1_0_2(x1).next().is_some()
                 }
                 fn check3_0_1_2(&self, x0: Math, x1: Math, x2: Math) -> bool {
-                    self.iter3_0_1_2(x0, x1, x2).next().is_some()
+                    self.iter_all3_0_1_2(x0, x1, x2).next().is_some()
                 }
                 #[allow(unreachable_code)]
                 fn entry2_0_1_2(&self, x0: Math, x1: Math, delta: &mut Delta, uf: &mut Unification) -> (Math,) {
-                    if let Some((x2,)) = self.iter2_0_1_2(x0, x1).next() {
+                    if let Some((x2,)) = self.iter_all2_0_1_2(x0, x1).next() {
                         return (x2,);
                     }
                     let x2 = uf.math_.add_eclass();
@@ -9432,7 +11627,7 @@ fn edgecase0() {
                     delta: &mut Delta,
                     uf: &mut Unification,
                 ) -> () {
-                    if let Some(()) = self.iter3_0_1_2(x0, x1, x2).next() {
+                    if let Some(()) = self.iter_all3_0_1_2(x0, x1, x2).next() {
                         return ();
                     }
                     delta.add_.push((x0, x1, x2));
@@ -9477,6 +11672,7 @@ fn edgecase0() {
             }
             #[derive(Debug, Default)]
             pub struct Theory {
+                pub latest_timestamp: TimeStamp,
                 pub delta: Delta,
                 pub uf: Unification,
                 pub mul_: MulRelation,
@@ -9509,15 +11705,15 @@ fn edgecase0() {
                 pub fn apply_rules(&mut self) {
                     for (a, b, v2) in self.mul_.iter_new() {
                         if self.mul_.check1_0_1_2(a) {
-                            for (v4, v5) in self.add_.iter1_0_1_2(v2) {
-                                for (c,) in self.mul_.iter2_2_0_1(v4, a) {
+                            for (v4, v5) in self.add_.iter_all1_0_1_2(v2) {
+                                for (c,) in self.mul_.iter_all2_2_0_1(v4, a) {
                                     #[doc = "( rewrite ( Add ( Mul a b ) ( Mul a c ) ) ( Mul a ( Add b c ) ) )"]
                                     let (v6,) = self.add_.entry2_0_1_2(b, c, &mut self.delta, &mut self.uf);
                                     self.delta.insert_mul((a, v6, v5));
                                 }
                             }
-                            for (v9, v12) in self.add_.iter1_1_0_2(v2) {
-                                for (b_2,) in self.mul_.iter2_2_0_1(v9, a) {
+                            for (v9, v12) in self.add_.iter_all1_1_0_2(v2) {
+                                for (b_2,) in self.mul_.iter_old2_2_0_1(v9, a, self.latest_timestamp) {
                                     #[doc = "( rewrite ( Add ( Mul a b ) ( Mul a c ) ) ( Mul a ( Add b c ) ) )"]
                                     let (v13,) = self
                                         .add_
@@ -9529,8 +11725,8 @@ fn edgecase0() {
                     }
                     for (v16, v18, v19) in self.add_.iter_new() {
                         if self.mul_.check1_2_0_1(v16) {
-                            for (a_3, c_3) in self.mul_.iter1_2_0_1(v18) {
-                                for (b_3,) in self.mul_.iter2_2_0_1(v16, a_3) {
+                            for (a_3, c_3) in self.mul_.iter_old1_2_0_1(v18, self.latest_timestamp) {
+                                for (b_3,) in self.mul_.iter_old2_2_0_1(v16, a_3, self.latest_timestamp) {
                                     #[doc = "( rewrite ( Add ( Mul a b ) ( Mul a c ) ) ( Mul a ( Add b c ) ) )"]
                                     let (v20,) =
                                         self.add_
@@ -9569,6 +11765,7 @@ fn edgecase0() {
                 }
                 #[inline(never)]
                 pub fn canonicalize(&mut self) {
+                    self.latest_timestamp.0 += 1;
                     log_duration!("canonicalize (total): {}", {
                         self.mul_.clear_new();
                         self.add_.clear_new();
@@ -9576,24 +11773,36 @@ fn edgecase0() {
                             return;
                         }
                         log_duration!("update_begin (total): {}", {
-                            self.mul_.update_begin(&mut self.delta.mul_, &mut self.uf);
-                            self.add_.update_begin(&mut self.delta.add_, &mut self.uf);
+                            self.mul_
+                                .update_begin(&mut self.delta.mul_, &mut self.uf, self.latest_timestamp);
+                            self.add_
+                                .update_begin(&mut self.delta.add_, &mut self.uf, self.latest_timestamp);
                         });
                         log_duration!("update_loop (total): {}", {
                             loop {
                                 let mut progress = false;
-                                progress |= self.mul_.update(&mut self.delta.mul_, &mut self.uf);
-                                progress |= self.add_.update(&mut self.delta.add_, &mut self.uf);
+                                progress |=
+                                    self.mul_
+                                        .update(&mut self.delta.mul_, &mut self.uf, self.latest_timestamp);
+                                progress |=
+                                    self.add_
+                                        .update(&mut self.delta.add_, &mut self.uf, self.latest_timestamp);
                                 if !progress {
                                     break;
                                 }
                             }
                         });
                         log_duration!("update_finalize (total): {}", {
-                            self.mul_
-                                .update_finalize(&mut self.delta.mul_, &mut self.uf);
-                            self.add_
-                                .update_finalize(&mut self.delta.add_, &mut self.uf);
+                            self.mul_.update_finalize(
+                                &mut self.delta.mul_,
+                                &mut self.uf,
+                                self.latest_timestamp,
+                            );
+                            self.add_.update_finalize(
+                                &mut self.delta.add_,
+                                &mut self.uf,
+                                self.latest_timestamp,
+                            );
                             self.uf.reset_num_uprooted();
                         });
                     });
@@ -9673,9 +11882,9 @@ fn test_into_codegen() {
             #[derive(Debug, Default)]
             struct MulRelation {
                 new: Vec<<Self as Relation>::Row>,
-                hash_index_0_1: runtime::HashMap<(Math, Math), (Math,)>,
-                hash_index_0: runtime::HashMap<(Math,), runtime::SmallVec<[(Math, Math); 1]>>,
-                hash_index_0_1_2: runtime::HashMap<(Math, Math, Math), runtime::SmallVec<[(); 1]>>,
+                hash_index_0_1: runtime::HashMap<(Math, Math), (Math, TimeStamp)>,
+                hash_index_0: runtime::HashMap<(Math,), runtime::SmallVec<[(Math, Math, TimeStamp); 1]>>,
+                hash_index_0_1_2: runtime::HashMap<(Math, Math, Math), runtime::SmallVec<[(TimeStamp,); 1]>>,
                 math_num_uprooted_at_latest_retain: usize,
             }
             impl Relation for MulRelation {
@@ -9699,14 +11908,19 @@ fn test_into_codegen() {
                 }
                 fn emit_graphviz(&self, buf: &mut String) {
                     use std::fmt::Write;
-                    for (i, ((x0, x1), (x2,))) in self.hash_index_0_1.iter().enumerate() {
+                    for (i, ((x0, x1), (x2, _timestamp))) in self.hash_index_0_1.iter().enumerate() {
                         writeln!(buf, "{}_{i} -> {}_{};", "mul", "math", x0).unwrap();
                         writeln!(buf, "{}_{i} -> {}_{};", "mul", "math", x1).unwrap();
                         writeln!(buf, "{}_{i} -> {}_{};", "mul", "math", x2).unwrap();
                         writeln!(buf, "{}_{i} [shape = box];", "mul").unwrap();
                     }
                 }
-                fn update_begin(&mut self, insertions: &[Self::Row], uf: &mut Unification) {
+                fn update_begin(
+                    &mut self,
+                    insertions: &[Self::Row],
+                    uf: &mut Unification,
+                    latest_timestamp: TimeStamp,
+                ) {
                     log_duration!("update_begin {}: {}", "mul", {
                         for &(mut x0, mut x1, mut x2) in insertions {
                             match self
@@ -9714,43 +11928,59 @@ fn test_into_codegen() {
                                 .entry((uf.math_.find(x0), uf.math_.find(x1)))
                             {
                                 runtime::HashMapEntry::Occupied(mut entry) => {
-                                    let (y2,) = entry.get_mut();
-                                    uf.math_.union_mut(&mut x2, y2);
+                                    let (y2, timestamp) = entry.get_mut();
+                                    let changed = false;
+                                    let old_val = *y2;
+                                    let changed = changed | (old_val != uf.math_.union_mut(&mut x2, y2));
+                                    if changed {
+                                        *timestamp = latest_timestamp;
+                                    }
                                 }
                                 runtime::HashMapEntry::Vacant(entry) => {
-                                    entry.insert((uf.math_.find(x2),));
+                                    entry.insert((uf.math_.find(x2), latest_timestamp));
                                 }
                             }
                         }
                     });
                 }
-                fn update(&mut self, insertions: &mut Vec<Self::Row>, uf: &mut Unification) -> bool {
+                fn update(
+                    &mut self,
+                    insertions: &mut Vec<Self::Row>,
+                    uf: &mut Unification,
+                    latest_timestamp: TimeStamp,
+                ) -> bool {
                     if self.math_num_uprooted_at_latest_retain == uf.math_.num_uprooted() {
                         return false;
                     }
                     let offset = insertions.len();
                     log_duration!("update {}: {}", "mul", {
                         self.math_num_uprooted_at_latest_retain = uf.math_.num_uprooted();
-                        self.hash_index_0_1.retain(|&(x0, x1), &mut (x2,)| {
-                            if uf.math_.is_root(x0) & uf.math_.is_root(x1) & uf.math_.is_root(x2) {
-                                true
-                            } else {
-                                insertions.push((x0, x1, x2));
-                                false
-                            }
-                        });
+                        self.hash_index_0_1
+                            .retain(|&(x0, x1), &mut (x2, _timestamp)| {
+                                if uf.math_.is_root(x0) & uf.math_.is_root(x1) & uf.math_.is_root(x2) {
+                                    true
+                                } else {
+                                    insertions.push((x0, x1, x2));
+                                    false
+                                }
+                            });
                     });
-                    self.update_begin(&insertions[offset..], uf);
+                    self.update_begin(&insertions[offset..], uf, latest_timestamp);
                     true
                 }
-                fn update_finalize(&mut self, insertions: &mut Vec<Self::Row>, uf: &mut Unification) {
+                fn update_finalize(
+                    &mut self,
+                    insertions: &mut Vec<Self::Row>,
+                    uf: &mut Unification,
+                    latest_timestamp: TimeStamp,
+                ) {
                     log_duration!("update_finalize {}: {}", "mul", {
                         assert!(self.new.is_empty());
                         log_duration!("fill new: {}", {
                             self.new.extend(
                                 self.hash_index_0_1
                                     .iter()
-                                    .map(|(&(x0, x1), &(x2,))| (x0, x1, x2))
+                                    .map(|(&(x0, x1), &(x2, _timestamp))| (x0, x1, x2))
                                     .filter(|&(x0, x1, x2)| !self.hash_index_0_1_2.contains_key(&(x0, x1, x2))),
                             );
                             insertions.clear();
@@ -9759,15 +11989,20 @@ fn test_into_codegen() {
                         });
                         log_duration!("fill index: {}", {
                             for &(x0, x1, x2) in &self.new {
-                                self.hash_index_0.entry((x0,)).or_default().push((x1, x2));
+                                self.hash_index_0
+                                    .entry((x0,))
+                                    .or_default()
+                                    .push((x1, x2, latest_timestamp));
                             }
                         });
                         log_duration!("retain index: {}", {
                             self.hash_index_0.retain(|&(x0,), v| {
                                 if uf.math_.is_root(x0) {
-                                    v.retain(|&mut (x1, x2)| uf.math_.is_root(x1) & uf.math_.is_root(x2));
+                                    v.retain(|&mut (x1, x2, _timestamp)| {
+                                        uf.math_.is_root(x1) & uf.math_.is_root(x2)
+                                    });
                                     v.sort_unstable();
-                                    v.dedup();
+                                    v.dedup_by(|(x1, x2, t1), (y1, y2, t2)| true & (*x1 == *y1) & (*x2 == *y2));
                                     true
                                 } else {
                                     false
@@ -9779,15 +12014,15 @@ fn test_into_codegen() {
                                 self.hash_index_0_1_2
                                     .entry((x0, x1, x2))
                                     .or_default()
-                                    .push(());
+                                    .push((latest_timestamp,));
                             }
                         });
                         log_duration!("retain index: {}", {
                             self.hash_index_0_1_2.retain(|&(x0, x1, x2), v| {
                                 if uf.math_.is_root(x0) & uf.math_.is_root(x1) & uf.math_.is_root(x2) {
-                                    v.retain(|&mut ()| true);
+                                    v.retain(|&mut (_timestamp)| true);
                                     v.sort_unstable();
-                                    v.dedup();
+                                    v.dedup_by(|(t1,), (t2,)| true);
                                     true
                                 } else {
                                     false
@@ -9799,31 +12034,81 @@ fn test_into_codegen() {
                 }
             }
             impl MulRelation {
-                fn iter2_0_1_2(&self, x0: Math, x1: Math) -> impl Iterator<Item = (Math,)> + use<'_> {
-                    self.hash_index_0_1.get(&(x0, x1)).into_iter().copied()
+                fn iter_all2_0_1_2(&self, x0: Math, x1: Math) -> impl Iterator<Item = (Math,)> + use<'_> {
+                    self.hash_index_0_1
+                        .get(&(x0, x1))
+                        .into_iter()
+                        .copied()
+                        .map(|(x2, _timestamp)| (x2,))
                 }
-                fn iter1_0_1_2(&self, x0: Math) -> impl Iterator<Item = (Math, Math)> + use<'_> {
-                    self.hash_index_0.get(&(x0,)).into_iter().flatten().copied()
+                fn iter_all1_0_1_2(&self, x0: Math) -> impl Iterator<Item = (Math, Math)> + use<'_> {
+                    self.hash_index_0
+                        .get(&(x0,))
+                        .into_iter()
+                        .flatten()
+                        .copied()
+                        .map(|(x1, x2, _timestamp)| (x1, x2))
                 }
-                fn iter3_0_1_2(&self, x0: Math, x1: Math, x2: Math) -> impl Iterator<Item = ()> + use<'_> {
+                fn iter_all3_0_1_2(&self, x0: Math, x1: Math, x2: Math) -> impl Iterator<Item = ()> + use<'_> {
                     self.hash_index_0_1_2
                         .get(&(x0, x1, x2))
                         .into_iter()
                         .flatten()
                         .copied()
+                        .map(|(_timestamp)| ())
+                }
+                fn iter_old2_0_1_2(
+                    &self,
+                    x0: Math,
+                    x1: Math,
+                    latest_timestamp: TimeStamp,
+                ) -> impl Iterator<Item = (Math,)> + use<'_> {
+                    self.hash_index_0_1
+                        .get(&(x0, x1))
+                        .into_iter()
+                        .copied()
+                        .filter_map(move |(x2, timestamp)| (timestamp < latest_timestamp).then_some((x2,)))
+                }
+                fn iter_old1_0_1_2(
+                    &self,
+                    x0: Math,
+                    latest_timestamp: TimeStamp,
+                ) -> impl Iterator<Item = (Math, Math)> + use<'_> {
+                    self.hash_index_0
+                        .get(&(x0,))
+                        .into_iter()
+                        .flatten()
+                        .copied()
+                        .filter_map(move |(x1, x2, timestamp)| {
+                            (timestamp < latest_timestamp).then_some((x1, x2))
+                        })
+                }
+                fn iter_old3_0_1_2(
+                    &self,
+                    x0: Math,
+                    x1: Math,
+                    x2: Math,
+                    latest_timestamp: TimeStamp,
+                ) -> impl Iterator<Item = ()> + use<'_> {
+                    self.hash_index_0_1_2
+                        .get(&(x0, x1, x2))
+                        .into_iter()
+                        .flatten()
+                        .copied()
+                        .filter_map(move |(timestamp,)| (timestamp < latest_timestamp).then_some(()))
                 }
                 fn check2_0_1_2(&self, x0: Math, x1: Math) -> bool {
-                    self.iter2_0_1_2(x0, x1).next().is_some()
+                    self.iter_all2_0_1_2(x0, x1).next().is_some()
                 }
                 fn check1_0_1_2(&self, x0: Math) -> bool {
-                    self.iter1_0_1_2(x0).next().is_some()
+                    self.iter_all1_0_1_2(x0).next().is_some()
                 }
                 fn check3_0_1_2(&self, x0: Math, x1: Math, x2: Math) -> bool {
-                    self.iter3_0_1_2(x0, x1, x2).next().is_some()
+                    self.iter_all3_0_1_2(x0, x1, x2).next().is_some()
                 }
                 #[allow(unreachable_code)]
                 fn entry2_0_1_2(&self, x0: Math, x1: Math, delta: &mut Delta, uf: &mut Unification) -> (Math,) {
-                    if let Some((x2,)) = self.iter2_0_1_2(x0, x1).next() {
+                    if let Some((x2,)) = self.iter_all2_0_1_2(x0, x1).next() {
                         return (x2,);
                     }
                     let x2 = uf.math_.add_eclass();
@@ -9839,7 +12124,7 @@ fn test_into_codegen() {
                     delta: &mut Delta,
                     uf: &mut Unification,
                 ) -> () {
-                    if let Some(()) = self.iter3_0_1_2(x0, x1, x2).next() {
+                    if let Some(()) = self.iter_all3_0_1_2(x0, x1, x2).next() {
                         return ();
                     }
                     delta.mul_.push((x0, x1, x2));
@@ -9849,9 +12134,9 @@ fn test_into_codegen() {
             #[derive(Debug, Default)]
             struct AddRelation {
                 new: Vec<<Self as Relation>::Row>,
-                hash_index_0_1: runtime::HashMap<(Math, Math), (Math,)>,
-                hash_index_2: runtime::HashMap<(Math,), runtime::SmallVec<[(Math, Math); 1]>>,
-                hash_index_0_1_2: runtime::HashMap<(Math, Math, Math), runtime::SmallVec<[(); 1]>>,
+                hash_index_0_1: runtime::HashMap<(Math, Math), (Math, TimeStamp)>,
+                hash_index_2: runtime::HashMap<(Math,), runtime::SmallVec<[(Math, Math, TimeStamp); 1]>>,
+                hash_index_0_1_2: runtime::HashMap<(Math, Math, Math), runtime::SmallVec<[(TimeStamp,); 1]>>,
                 math_num_uprooted_at_latest_retain: usize,
             }
             impl Relation for AddRelation {
@@ -9875,14 +12160,19 @@ fn test_into_codegen() {
                 }
                 fn emit_graphviz(&self, buf: &mut String) {
                     use std::fmt::Write;
-                    for (i, ((x0, x1), (x2,))) in self.hash_index_0_1.iter().enumerate() {
+                    for (i, ((x0, x1), (x2, _timestamp))) in self.hash_index_0_1.iter().enumerate() {
                         writeln!(buf, "{}_{i} -> {}_{};", "add", "math", x0).unwrap();
                         writeln!(buf, "{}_{i} -> {}_{};", "add", "math", x1).unwrap();
                         writeln!(buf, "{}_{i} -> {}_{};", "add", "math", x2).unwrap();
                         writeln!(buf, "{}_{i} [shape = box];", "add").unwrap();
                     }
                 }
-                fn update_begin(&mut self, insertions: &[Self::Row], uf: &mut Unification) {
+                fn update_begin(
+                    &mut self,
+                    insertions: &[Self::Row],
+                    uf: &mut Unification,
+                    latest_timestamp: TimeStamp,
+                ) {
                     log_duration!("update_begin {}: {}", "add", {
                         for &(mut x0, mut x1, mut x2) in insertions {
                             match self
@@ -9890,43 +12180,59 @@ fn test_into_codegen() {
                                 .entry((uf.math_.find(x0), uf.math_.find(x1)))
                             {
                                 runtime::HashMapEntry::Occupied(mut entry) => {
-                                    let (y2,) = entry.get_mut();
-                                    uf.math_.union_mut(&mut x2, y2);
+                                    let (y2, timestamp) = entry.get_mut();
+                                    let changed = false;
+                                    let old_val = *y2;
+                                    let changed = changed | (old_val != uf.math_.union_mut(&mut x2, y2));
+                                    if changed {
+                                        *timestamp = latest_timestamp;
+                                    }
                                 }
                                 runtime::HashMapEntry::Vacant(entry) => {
-                                    entry.insert((uf.math_.find(x2),));
+                                    entry.insert((uf.math_.find(x2), latest_timestamp));
                                 }
                             }
                         }
                     });
                 }
-                fn update(&mut self, insertions: &mut Vec<Self::Row>, uf: &mut Unification) -> bool {
+                fn update(
+                    &mut self,
+                    insertions: &mut Vec<Self::Row>,
+                    uf: &mut Unification,
+                    latest_timestamp: TimeStamp,
+                ) -> bool {
                     if self.math_num_uprooted_at_latest_retain == uf.math_.num_uprooted() {
                         return false;
                     }
                     let offset = insertions.len();
                     log_duration!("update {}: {}", "add", {
                         self.math_num_uprooted_at_latest_retain = uf.math_.num_uprooted();
-                        self.hash_index_0_1.retain(|&(x0, x1), &mut (x2,)| {
-                            if uf.math_.is_root(x0) & uf.math_.is_root(x1) & uf.math_.is_root(x2) {
-                                true
-                            } else {
-                                insertions.push((x0, x1, x2));
-                                false
-                            }
-                        });
+                        self.hash_index_0_1
+                            .retain(|&(x0, x1), &mut (x2, _timestamp)| {
+                                if uf.math_.is_root(x0) & uf.math_.is_root(x1) & uf.math_.is_root(x2) {
+                                    true
+                                } else {
+                                    insertions.push((x0, x1, x2));
+                                    false
+                                }
+                            });
                     });
-                    self.update_begin(&insertions[offset..], uf);
+                    self.update_begin(&insertions[offset..], uf, latest_timestamp);
                     true
                 }
-                fn update_finalize(&mut self, insertions: &mut Vec<Self::Row>, uf: &mut Unification) {
+                fn update_finalize(
+                    &mut self,
+                    insertions: &mut Vec<Self::Row>,
+                    uf: &mut Unification,
+                    latest_timestamp: TimeStamp,
+                ) {
                     log_duration!("update_finalize {}: {}", "add", {
                         assert!(self.new.is_empty());
                         log_duration!("fill new: {}", {
                             self.new.extend(
                                 self.hash_index_0_1
                                     .iter()
-                                    .map(|(&(x0, x1), &(x2,))| (x0, x1, x2))
+                                    .map(|(&(x0, x1), &(x2, _timestamp))| (x0, x1, x2))
                                     .filter(|&(x0, x1, x2)| !self.hash_index_0_1_2.contains_key(&(x0, x1, x2))),
                             );
                             insertions.clear();
@@ -9935,15 +12241,20 @@ fn test_into_codegen() {
                         });
                         log_duration!("fill index: {}", {
                             for &(x0, x1, x2) in &self.new {
-                                self.hash_index_2.entry((x2,)).or_default().push((x0, x1));
+                                self.hash_index_2
+                                    .entry((x2,))
+                                    .or_default()
+                                    .push((x0, x1, latest_timestamp));
                             }
                         });
                         log_duration!("retain index: {}", {
                             self.hash_index_2.retain(|&(x2,), v| {
                                 if uf.math_.is_root(x2) {
-                                    v.retain(|&mut (x0, x1)| uf.math_.is_root(x0) & uf.math_.is_root(x1));
+                                    v.retain(|&mut (x0, x1, _timestamp)| {
+                                        uf.math_.is_root(x0) & uf.math_.is_root(x1)
+                                    });
                                     v.sort_unstable();
-                                    v.dedup();
+                                    v.dedup_by(|(x0, x1, t1), (y0, y1, t2)| true & (*x0 == *y0) & (*x1 == *y1));
                                     true
                                 } else {
                                     false
@@ -9955,15 +12266,15 @@ fn test_into_codegen() {
                                 self.hash_index_0_1_2
                                     .entry((x0, x1, x2))
                                     .or_default()
-                                    .push(());
+                                    .push((latest_timestamp,));
                             }
                         });
                         log_duration!("retain index: {}", {
                             self.hash_index_0_1_2.retain(|&(x0, x1, x2), v| {
                                 if uf.math_.is_root(x0) & uf.math_.is_root(x1) & uf.math_.is_root(x2) {
-                                    v.retain(|&mut ()| true);
+                                    v.retain(|&mut (_timestamp)| true);
                                     v.sort_unstable();
-                                    v.dedup();
+                                    v.dedup_by(|(t1,), (t2,)| true);
                                     true
                                 } else {
                                     false
@@ -9975,31 +12286,81 @@ fn test_into_codegen() {
                 }
             }
             impl AddRelation {
-                fn iter2_0_1_2(&self, x0: Math, x1: Math) -> impl Iterator<Item = (Math,)> + use<'_> {
-                    self.hash_index_0_1.get(&(x0, x1)).into_iter().copied()
+                fn iter_all2_0_1_2(&self, x0: Math, x1: Math) -> impl Iterator<Item = (Math,)> + use<'_> {
+                    self.hash_index_0_1
+                        .get(&(x0, x1))
+                        .into_iter()
+                        .copied()
+                        .map(|(x2, _timestamp)| (x2,))
                 }
-                fn iter1_2_0_1(&self, x2: Math) -> impl Iterator<Item = (Math, Math)> + use<'_> {
-                    self.hash_index_2.get(&(x2,)).into_iter().flatten().copied()
+                fn iter_all1_2_0_1(&self, x2: Math) -> impl Iterator<Item = (Math, Math)> + use<'_> {
+                    self.hash_index_2
+                        .get(&(x2,))
+                        .into_iter()
+                        .flatten()
+                        .copied()
+                        .map(|(x0, x1, _timestamp)| (x0, x1))
                 }
-                fn iter3_0_1_2(&self, x0: Math, x1: Math, x2: Math) -> impl Iterator<Item = ()> + use<'_> {
+                fn iter_all3_0_1_2(&self, x0: Math, x1: Math, x2: Math) -> impl Iterator<Item = ()> + use<'_> {
                     self.hash_index_0_1_2
                         .get(&(x0, x1, x2))
                         .into_iter()
                         .flatten()
                         .copied()
+                        .map(|(_timestamp)| ())
+                }
+                fn iter_old2_0_1_2(
+                    &self,
+                    x0: Math,
+                    x1: Math,
+                    latest_timestamp: TimeStamp,
+                ) -> impl Iterator<Item = (Math,)> + use<'_> {
+                    self.hash_index_0_1
+                        .get(&(x0, x1))
+                        .into_iter()
+                        .copied()
+                        .filter_map(move |(x2, timestamp)| (timestamp < latest_timestamp).then_some((x2,)))
+                }
+                fn iter_old1_2_0_1(
+                    &self,
+                    x2: Math,
+                    latest_timestamp: TimeStamp,
+                ) -> impl Iterator<Item = (Math, Math)> + use<'_> {
+                    self.hash_index_2
+                        .get(&(x2,))
+                        .into_iter()
+                        .flatten()
+                        .copied()
+                        .filter_map(move |(x0, x1, timestamp)| {
+                            (timestamp < latest_timestamp).then_some((x0, x1))
+                        })
+                }
+                fn iter_old3_0_1_2(
+                    &self,
+                    x0: Math,
+                    x1: Math,
+                    x2: Math,
+                    latest_timestamp: TimeStamp,
+                ) -> impl Iterator<Item = ()> + use<'_> {
+                    self.hash_index_0_1_2
+                        .get(&(x0, x1, x2))
+                        .into_iter()
+                        .flatten()
+                        .copied()
+                        .filter_map(move |(timestamp,)| (timestamp < latest_timestamp).then_some(()))
                 }
                 fn check2_0_1_2(&self, x0: Math, x1: Math) -> bool {
-                    self.iter2_0_1_2(x0, x1).next().is_some()
+                    self.iter_all2_0_1_2(x0, x1).next().is_some()
                 }
                 fn check1_2_0_1(&self, x2: Math) -> bool {
-                    self.iter1_2_0_1(x2).next().is_some()
+                    self.iter_all1_2_0_1(x2).next().is_some()
                 }
                 fn check3_0_1_2(&self, x0: Math, x1: Math, x2: Math) -> bool {
-                    self.iter3_0_1_2(x0, x1, x2).next().is_some()
+                    self.iter_all3_0_1_2(x0, x1, x2).next().is_some()
                 }
                 #[allow(unreachable_code)]
                 fn entry2_0_1_2(&self, x0: Math, x1: Math, delta: &mut Delta, uf: &mut Unification) -> (Math,) {
-                    if let Some((x2,)) = self.iter2_0_1_2(x0, x1).next() {
+                    if let Some((x2,)) = self.iter_all2_0_1_2(x0, x1).next() {
                         return (x2,);
                     }
                     let x2 = uf.math_.add_eclass();
@@ -10015,7 +12376,7 @@ fn test_into_codegen() {
                     delta: &mut Delta,
                     uf: &mut Unification,
                 ) -> () {
-                    if let Some(()) = self.iter3_0_1_2(x0, x1, x2).next() {
+                    if let Some(()) = self.iter_all3_0_1_2(x0, x1, x2).next() {
                         return ();
                     }
                     delta.add_.push((x0, x1, x2));
@@ -10060,6 +12421,7 @@ fn test_into_codegen() {
             }
             #[derive(Debug, Default)]
             pub struct Theory {
+                pub latest_timestamp: TimeStamp,
                 pub delta: Delta,
                 pub uf: Unification,
                 pub mul_: MulRelation,
@@ -10091,7 +12453,7 @@ fn test_into_codegen() {
                 #[inline(never)]
                 pub fn apply_rules(&mut self) {
                     for (v2, c, v4) in self.mul_.iter_new() {
-                        for (a, b) in self.add_.iter1_2_0_1(v2) {
+                        for (a, b) in self.add_.iter_all1_2_0_1(v2) {
                             #[doc = "( rewrite ( Mul ( Add a b ) c ) ( Add ( Mul a c ) ( Mul b c ) ) )"]
                             let (v5,) = self.mul_.entry2_0_1_2(a, c, &mut self.delta, &mut self.uf);
                             let (v6,) = self.mul_.entry2_0_1_2(b, c, &mut self.delta, &mut self.uf);
@@ -10099,7 +12461,7 @@ fn test_into_codegen() {
                         }
                     }
                     for (a_2, b_2, v9) in self.add_.iter_new() {
-                        for (c_2, v11) in self.mul_.iter1_0_1_2(v9) {
+                        for (c_2, v11) in self.mul_.iter_old1_0_1_2(v9, self.latest_timestamp) {
                             #[doc = "( rewrite ( Mul ( Add a b ) c ) ( Add ( Mul a c ) ( Mul b c ) ) )"]
                             let (v12,) = self
                                 .mul_
@@ -10139,6 +12501,7 @@ fn test_into_codegen() {
                 }
                 #[inline(never)]
                 pub fn canonicalize(&mut self) {
+                    self.latest_timestamp.0 += 1;
                     log_duration!("canonicalize (total): {}", {
                         self.mul_.clear_new();
                         self.add_.clear_new();
@@ -10146,24 +12509,36 @@ fn test_into_codegen() {
                             return;
                         }
                         log_duration!("update_begin (total): {}", {
-                            self.mul_.update_begin(&mut self.delta.mul_, &mut self.uf);
-                            self.add_.update_begin(&mut self.delta.add_, &mut self.uf);
+                            self.mul_
+                                .update_begin(&mut self.delta.mul_, &mut self.uf, self.latest_timestamp);
+                            self.add_
+                                .update_begin(&mut self.delta.add_, &mut self.uf, self.latest_timestamp);
                         });
                         log_duration!("update_loop (total): {}", {
                             loop {
                                 let mut progress = false;
-                                progress |= self.mul_.update(&mut self.delta.mul_, &mut self.uf);
-                                progress |= self.add_.update(&mut self.delta.add_, &mut self.uf);
+                                progress |=
+                                    self.mul_
+                                        .update(&mut self.delta.mul_, &mut self.uf, self.latest_timestamp);
+                                progress |=
+                                    self.add_
+                                        .update(&mut self.delta.add_, &mut self.uf, self.latest_timestamp);
                                 if !progress {
                                     break;
                                 }
                             }
                         });
                         log_duration!("update_finalize (total): {}", {
-                            self.mul_
-                                .update_finalize(&mut self.delta.mul_, &mut self.uf);
-                            self.add_
-                                .update_finalize(&mut self.delta.add_, &mut self.uf);
+                            self.mul_.update_finalize(
+                                &mut self.delta.mul_,
+                                &mut self.uf,
+                                self.latest_timestamp,
+                            );
+                            self.add_.update_finalize(
+                                &mut self.delta.add_,
+                                &mut self.uf,
+                                self.latest_timestamp,
+                            );
                             self.uf.reset_num_uprooted();
                         });
                     });
@@ -11965,23 +14340,23 @@ fn lir_math() {
                 rule_tries: [
                     atom: [PremiseNew, r0(v216, v217)]
                     then: [
-                        atom: [Premise, r3(v217, v219, v220, v221), iu1]
+                        atom: [PremiseAll, r3(v217, v219, v220, v221), iu1]
                         then: [
-                            atom: [Premise, r4(v257, v258, v219), iu1]
+                            atom: [PremiseAll, r4(v257, v258, v219), iu1]
                             then: [
                                 meta: "( rewrite ( Integral ( Fuel fuel ) ( Add f g ) x ) ( Add ( Integral fuel f x ) ( Integral fuel g x ) ) )"
                                 atom: [Action::Insert, r3(v216, v257, v220, v262) on iu0],
                                 atom: [Action::Insert, r3(v216, v258, v220, v263) on iu0],
                                 atom: [Action::Insert, r4(v262, v263, v221)],
                             ],
-                            atom: [Premise, r5(v284, v285, v219), iu1]
+                            atom: [PremiseAll, r5(v284, v285, v219), iu1]
                             then: [
                                 meta: "( rewrite ( Integral ( Fuel fuel ) ( Sub f g ) x ) ( Sub ( Integral fuel f x ) ( Integral fuel g x ) ) )"
                                 atom: [Action::Insert, r3(v216, v284, v220, v289) on iu0],
                                 atom: [Action::Insert, r3(v216, v285, v220, v290) on iu0],
                                 atom: [Action::Insert, r5(v289, v290, v221)],
                             ],
-                            atom: [Premise, r6(v311, v312, v219), iu1]
+                            atom: [PremiseAll, r6(v311, v312, v219), iu1]
                             then: [
                                 meta: "( rewrite ( Integral ( Fuel fuel ) ( Mul a b ) x ) ( Sub ( Mul a ( Integral fuel b x ) ) ( Integral fuel ( Mul ( Diff x a ) ( Integral fuel b x ) ) x ) ) )"
                                 atom: [Action::Insert, r2(v220, v311, v317) on iu0],
@@ -11991,12 +14366,12 @@ fn lir_math() {
                                 atom: [Action::Insert, r3(v216, v319, v220, v320) on iu0],
                                 atom: [Action::Insert, r5(v316, v320, v221)],
                             ],
-                            atom: [Premise, r12(v220, v219), iu1]
+                            atom: [PremiseAll, r12(v220, v219), iu1]
                             then: [
                                 meta: "( rewrite ( Integral ( Fuel fuel ) ( Cos x ) x ) ( Sin x ) )"
                                 atom: [Action::Insert, r11(v220, v221)],
                             ],
-                            atom: [Premise, r13(v218, v219), iu1]
+                            atom: [PremiseAll, r13(v218, v219), iu1]
                             then: [
                                 atom: [PremiseAny, r17(v218), iu_bogus]
                                 then: [
@@ -12008,14 +14383,14 @@ fn lir_math() {
                     ],
                     atom: [PremiseNew, r2(v20, v21, v22)]
                     then: [
-                        atom: [Premise, r4(v179, v180, v21), iu2]
+                        atom: [PremiseAll, r4(v179, v180, v21), iu2]
                         then: [
                             meta: "( rewrite ( Diff x ( Add a b ) ) ( Add ( Diff x a ) ( Diff x b ) ) )"
                             atom: [Action::Insert, r2(v20, v179, v183) on iu0],
                             atom: [Action::Insert, r2(v20, v180, v184) on iu0],
                             atom: [Action::Insert, r4(v183, v184, v22)],
                         ],
-                        atom: [Premise, r6(v193, v194, v21), iu2]
+                        atom: [PremiseAll, r6(v193, v194, v21), iu2]
                         then: [
                             meta: "( rewrite ( Diff x ( Mul a b ) ) ( Add ( Mul a ( Diff x b ) ) ( Mul b ( Diff x a ) ) ) )"
                             atom: [Action::Insert, r2(v20, v193, v199) on iu0],
@@ -12024,12 +14399,12 @@ fn lir_math() {
                             atom: [Action::Insert, r6(v194, v199, v200) on iu0],
                             atom: [Action::Insert, r4(v198, v200, v22)],
                         ],
-                        atom: [Premise, r11(v20, v21), iu1]
+                        atom: [PremiseAll, r11(v20, v21), iu1]
                         then: [
                             meta: "( rewrite ( Diff x ( Sin x ) ) ( Cos x ) )"
                             atom: [Action::Insert, r12(v20, v22)],
                         ],
-                        atom: [Premise, r12(v20, v21), iu2]
+                        atom: [PremiseAll, r12(v20, v21), iu2]
                         then: [
                             meta: "( rewrite ( Diff x ( Cos x ) ) ( Mul ( Const -1 ) ( Sin x ) ) )"
                             atom: [Action::Insert, r11(v20, v25) on iu0],
@@ -12040,7 +14415,7 @@ fn lir_math() {
                     ],
                     atom: [PremiseNew, r3(v0, v2, v1, v3)]
                     then: [
-                        atom: [Premise, r11(v1, v2), iu2]
+                        atom: [PremiseAll, r11(v1, v2), iu2]
                         then: [
                             meta: "( rewrite ( Integral fuel ( Sin x ) x ) ( Mul ( Const -1 ) ( Cos x ) ) )"
                             atom: [Action::Insert, r12(v1, v6) on iu0],
@@ -12050,9 +14425,9 @@ fn lir_math() {
                         ],
                         atom: [PremiseAny, r0(v222, v0), iu1]
                         then: [
-                            atom: [Premise, r4(v266, v267, v2), iu3]
+                            atom: [PremiseAll, r4(v266, v267, v2), iu3]
                             then: [
-                                atom: [Premise, r0(v264, v0), iu2]
+                                atom: [PremiseOld, r0(v264, v0), iu2]
                                 then: [
                                     meta: "( rewrite ( Integral ( Fuel fuel ) ( Add f g ) x ) ( Add ( Integral fuel f x ) ( Integral fuel g x ) ) )"
                                     atom: [Action::Insert, r3(v264, v266, v1, v271) on iu0],
@@ -12060,9 +14435,9 @@ fn lir_math() {
                                     atom: [Action::Insert, r4(v271, v272, v3)],
                                 ],
                             ],
-                            atom: [Premise, r5(v293, v294, v2), iu2]
+                            atom: [PremiseAll, r5(v293, v294, v2), iu2]
                             then: [
-                                atom: [Premise, r0(v291, v0), iu3]
+                                atom: [PremiseOld, r0(v291, v0), iu3]
                                 then: [
                                     meta: "( rewrite ( Integral ( Fuel fuel ) ( Sub f g ) x ) ( Sub ( Integral fuel f x ) ( Integral fuel g x ) ) )"
                                     atom: [Action::Insert, r3(v291, v293, v1, v298) on iu0],
@@ -12070,9 +14445,9 @@ fn lir_math() {
                                     atom: [Action::Insert, r5(v298, v299, v3)],
                                 ],
                             ],
-                            atom: [Premise, r6(v323, v324, v2), iu3]
+                            atom: [PremiseAll, r6(v323, v324, v2), iu3]
                             then: [
-                                atom: [Premise, r0(v321, v0), iu4]
+                                atom: [PremiseOld, r0(v321, v0), iu4]
                                 then: [
                                     meta: "( rewrite ( Integral ( Fuel fuel ) ( Mul a b ) x ) ( Sub ( Mul a ( Integral fuel b x ) ) ( Integral fuel ( Mul ( Diff x a ) ( Integral fuel b x ) ) x ) ) )"
                                     atom: [Action::Insert, r2(v1, v323, v329) on iu0],
@@ -12083,19 +14458,19 @@ fn lir_math() {
                                     atom: [Action::Insert, r5(v328, v332, v3)],
                                 ],
                             ],
-                            atom: [Premise, r12(v1, v2), iu3]
+                            atom: [PremiseAll, r12(v1, v2), iu3]
                             then: [
-                                atom: [Premise, r0(v245, v0), iu5]
+                                atom: [PremiseOld, r0(v245, v0), iu5]
                                 then: [
                                     meta: "( rewrite ( Integral ( Fuel fuel ) ( Cos x ) x ) ( Sin x ) )"
                                     atom: [Action::Insert, r11(v1, v3)],
                                 ],
                             ],
-                            atom: [Premise, r13(v224, v2), iu2]
+                            atom: [PremiseAll, r13(v224, v2), iu2]
                             then: [
                                 atom: [PremiseAny, r17(v224), iu_bogus]
                                 then: [
-                                    atom: [Premise, r0(v222, v0), iu6]
+                                    atom: [PremiseOld, r0(v222, v0), iu6]
                                     then: [
                                         meta: "( rewrite ( Integral ( Fuel fuel ) ( Const 1 ) x ) x )"
                                         atom: [Action::Equate, v1=v3],
@@ -12108,16 +14483,16 @@ fn lir_math() {
                     then: [
                         meta: "( rewrite ( Add a b ) ( Add b a ) )"
                         atom: [Action::Insert, r4(v33, v32, v34)],
-                        atom: [Premise, r2(v185, v34, v189), iu1]
+                        atom: [PremiseOld, r2(v185, v34, v189), iu1]
                         then: [
                             meta: "( rewrite ( Diff x ( Add a b ) ) ( Add ( Diff x a ) ( Diff x b ) ) )"
                             atom: [Action::Insert, r2(v185, v32, v190) on iu0],
                             atom: [Action::Insert, r2(v185, v33, v191) on iu0],
                             atom: [Action::Insert, r4(v190, v191, v189)],
                         ],
-                        atom: [Premise, r3(v274, v34, v278, v279), iu2]
+                        atom: [PremiseOld, r3(v274, v34, v278, v279), iu2]
                         then: [
-                            atom: [Premise, r0(v273, v274), iu7]
+                            atom: [PremiseOld, r0(v273, v274), iu7]
                             then: [
                                 meta: "( rewrite ( Integral ( Fuel fuel ) ( Add f g ) x ) ( Add ( Integral fuel f x ) ( Integral fuel g x ) ) )"
                                 atom: [Action::Insert, r3(v273, v32, v278, v280) on iu0],
@@ -12125,26 +14500,26 @@ fn lir_math() {
                                 atom: [Action::Insert, r4(v280, v281, v279)],
                             ],
                         ],
-                        atom: [Premise, r4(v39, v40, v33), iu4]
+                        atom: [PremiseAll, r4(v39, v40, v33), iu4]
                         then: [
                             meta: "( rewrite ( Add a ( Add b c ) ) ( Add ( Add a b ) c ) )"
                             atom: [Action::Insert, r4(v32, v39, v43) on iu0],
                             atom: [Action::Insert, r4(v43, v40, v34)],
                         ],
-                        atom: [Premise, r4(v44, v34, v48), iu5]
+                        atom: [PremiseOld, r4(v44, v34, v48), iu5]
                         then: [
                             meta: "( rewrite ( Add a ( Add b c ) ) ( Add ( Add a b ) c ) )"
                             atom: [Action::Insert, r4(v44, v32, v49) on iu0],
                             atom: [Action::Insert, r4(v49, v33, v48)],
                         ],
-                        atom: [Premise, r6(v98, v34, v102), iu4]
+                        atom: [PremiseAll, r6(v98, v34, v102), iu4]
                         then: [
                             meta: "( rewrite ( Mul a ( Add b c ) ) ( Add ( Mul a b ) ( Mul a c ) ) )"
                             atom: [Action::Insert, r6(v98, v32, v103) on iu0],
                             atom: [Action::Insert, r6(v98, v33, v104) on iu0],
                             atom: [Action::Insert, r4(v103, v104, v102)],
                         ],
-                        atom: [Premise, r13(v63, v33), iu3]
+                        atom: [PremiseAll, r13(v63, v33), iu3]
                         then: [
                             atom: [PremiseAny, r16(v63), iu_bogus]
                             then: [
@@ -12154,9 +14529,9 @@ fn lir_math() {
                         ],
                         atom: [PremiseAny, r6(v112, v113, v32), iu5]
                         then: [
-                            atom: [Premise, r6(v112, v115, v33), iu7]
+                            atom: [PremiseAll, r6(v112, v115, v33), iu7]
                             then: [
-                                atom: [Premise, r6(v112, v113, v32), iu6]
+                                atom: [PremiseAll, r6(v112, v113, v32), iu6]
                                 then: [
                                     meta: "( rewrite ( Add ( Mul a b ) ( Mul a c ) ) ( Mul a ( Add b c ) ) )"
                                     atom: [Action::Insert, r4(v113, v115, v118) on iu0],
@@ -12172,9 +14547,9 @@ fn lir_math() {
                         atom: [Action::Insert, r13(v17, v18) on iu0],
                         atom: [Action::Insert, r6(v18, v15, v19) on iu0],
                         atom: [Action::Insert, r4(v14, v19, v16)],
-                        atom: [Premise, r3(v301, v16, v305, v306), iu3]
+                        atom: [PremiseOld, r3(v301, v16, v305, v306), iu3]
                         then: [
-                            atom: [Premise, r0(v300, v301), iu8]
+                            atom: [PremiseOld, r0(v300, v301), iu8]
                             then: [
                                 meta: "( rewrite ( Integral ( Fuel fuel ) ( Sub f g ) x ) ( Sub ( Integral fuel f x ) ( Integral fuel g x ) ) )"
                                 atom: [Action::Insert, r3(v300, v14, v305, v307) on iu0],
@@ -12187,7 +14562,7 @@ fn lir_math() {
                     then: [
                         meta: "( rewrite ( Mul a b ) ( Mul b a ) )"
                         atom: [Action::Insert, r6(v36, v35, v37)],
-                        atom: [Premise, r2(v201, v37, v205), iu2]
+                        atom: [PremiseOld, r2(v201, v37, v205), iu2]
                         then: [
                             meta: "( rewrite ( Diff x ( Mul a b ) ) ( Add ( Mul a ( Diff x b ) ) ( Mul b ( Diff x a ) ) ) )"
                             atom: [Action::Insert, r2(v201, v35, v208) on iu0],
@@ -12196,9 +14571,9 @@ fn lir_math() {
                             atom: [Action::Insert, r6(v36, v208, v209) on iu0],
                             atom: [Action::Insert, r4(v207, v209, v205)],
                         ],
-                        atom: [Premise, r3(v334, v37, v338, v339), iu4]
+                        atom: [PremiseOld, r3(v334, v37, v338, v339), iu4]
                         then: [
-                            atom: [Premise, r0(v333, v334), iu9]
+                            atom: [PremiseOld, r0(v333, v334), iu9]
                             then: [
                                 meta: "( rewrite ( Integral ( Fuel fuel ) ( Mul a b ) x ) ( Sub ( Mul a ( Integral fuel b x ) ) ( Integral fuel ( Mul ( Diff x a ) ( Integral fuel b x ) ) x ) ) )"
                                 atom: [Action::Insert, r2(v338, v35, v341) on iu0],
@@ -12209,26 +14584,26 @@ fn lir_math() {
                                 atom: [Action::Insert, r5(v340, v344, v339)],
                             ],
                         ],
-                        atom: [Premise, r4(v106, v107, v36), iu6]
+                        atom: [PremiseOld, r4(v106, v107, v36), iu6]
                         then: [
                             meta: "( rewrite ( Mul a ( Add b c ) ) ( Add ( Mul a b ) ( Mul a c ) ) )"
                             atom: [Action::Insert, r6(v35, v106, v110) on iu0],
                             atom: [Action::Insert, r6(v35, v107, v111) on iu0],
                             atom: [Action::Insert, r4(v110, v111, v37)],
                         ],
-                        atom: [Premise, r6(v51, v52, v36), iu8]
+                        atom: [PremiseAll, r6(v51, v52, v36), iu8]
                         then: [
                             meta: "( rewrite ( Mul a ( Mul b c ) ) ( Mul ( Mul a b ) c ) )"
                             atom: [Action::Insert, r6(v35, v51, v55) on iu0],
                             atom: [Action::Insert, r6(v55, v52, v37)],
                         ],
-                        atom: [Premise, r6(v56, v37, v60), iu9]
+                        atom: [PremiseOld, r6(v56, v37, v60), iu9]
                         then: [
                             meta: "( rewrite ( Mul a ( Mul b c ) ) ( Mul ( Mul a b ) c ) )"
                             atom: [Action::Insert, r6(v56, v35, v61) on iu0],
                             atom: [Action::Insert, r6(v61, v36, v60)],
                         ],
-                        atom: [Premise, r13(v77, v36), iu4]
+                        atom: [PremiseAll, r13(v77, v36), iu4]
                         then: [
                             atom: [PremiseAny, r16(v77), iu_bogus]
                             then: [
@@ -12243,18 +14618,18 @@ fn lir_math() {
                         ],
                         atom: [PremiseAny, r6(v35, v122, v123), iu10]
                         then: [
-                            atom: [Premise, r4(v37, v123, v124), iu7]
+                            atom: [PremiseOld, r4(v37, v123, v124), iu7]
                             then: [
-                                atom: [Premise, r6(v35, v122, v123), iu11]
+                                atom: [PremiseAll, r6(v35, v122, v123), iu11]
                                 then: [
                                     meta: "( rewrite ( Add ( Mul a b ) ( Mul a c ) ) ( Mul a ( Add b c ) ) )"
                                     atom: [Action::Insert, r4(v36, v122, v125) on iu0],
                                     atom: [Action::Insert, r6(v35, v125, v124)],
                                 ],
                             ],
-                            atom: [Premise, r4(v128, v37, v131), iu8]
+                            atom: [PremiseOld, r4(v128, v37, v131), iu8]
                             then: [
-                                atom: [Premise, r6(v35, v127, v128), iu12]
+                                atom: [PremiseOld, r6(v35, v127, v128), iu12]
                                 then: [
                                     meta: "( rewrite ( Add ( Mul a b ) ( Mul a c ) ) ( Mul a ( Add b c ) ) )"
                                     atom: [Action::Insert, r4(v127, v36, v132) on iu0],
@@ -12264,9 +14639,9 @@ fn lir_math() {
                         ],
                         atom: [PremiseAny, r8(v133, v134, v35), iu1]
                         then: [
-                            atom: [Premise, r8(v133, v136, v36), iu3]
+                            atom: [PremiseAll, r8(v133, v136, v36), iu3]
                             then: [
-                                atom: [Premise, r8(v133, v134, v35), iu2]
+                                atom: [PremiseAll, r8(v133, v134, v35), iu2]
                                 then: [
                                     meta: "( rewrite ( Mul ( Pow a b ) ( Pow a c ) ) ( Pow a ( Add b c ) ) )"
                                     atom: [Action::Insert, r4(v134, v136, v139) on iu0],
@@ -12277,7 +14652,7 @@ fn lir_math() {
                     ],
                     atom: [PremiseNew, r8(v140, v141, v142)]
                     then: [
-                        atom: [Premise, r13(v155, v141), iu5]
+                        atom: [PremiseAll, r13(v155, v141), iu5]
                         then: [
                             atom: [PremiseAny, r17(v155), iu_bogus]
                             then: [
@@ -12292,18 +14667,18 @@ fn lir_math() {
                         ],
                         atom: [PremiseAny, r8(v140, v143, v144), iu4]
                         then: [
-                            atom: [Premise, r6(v142, v144, v145), iu13]
+                            atom: [PremiseOld, r6(v142, v144, v145), iu13]
                             then: [
-                                atom: [Premise, r8(v140, v143, v144), iu5]
+                                atom: [PremiseAll, r8(v140, v143, v144), iu5]
                                 then: [
                                     meta: "( rewrite ( Mul ( Pow a b ) ( Pow a c ) ) ( Pow a ( Add b c ) ) )"
                                     atom: [Action::Insert, r4(v141, v143, v146) on iu0],
                                     atom: [Action::Insert, r8(v140, v146, v145)],
                                 ],
                             ],
-                            atom: [Premise, r6(v149, v142, v152), iu14]
+                            atom: [PremiseOld, r6(v149, v142, v152), iu14]
                             then: [
-                                atom: [Premise, r8(v140, v148, v149), iu6]
+                                atom: [PremiseOld, r8(v140, v148, v149), iu6]
                                 then: [
                                     meta: "( rewrite ( Mul ( Pow a b ) ( Pow a c ) ) ( Pow a ( Add b c ) ) )"
                                     atom: [Action::Insert, r4(v148, v141, v153) on iu0],
@@ -12314,12 +14689,12 @@ fn lir_math() {
                     ],
                     atom: [PremiseNew, r11(v8, v9)]
                     then: [
-                        atom: [Premise, r2(v8, v9, v215), iu3]
+                        atom: [PremiseOld, r2(v8, v9, v215), iu3]
                         then: [
                             meta: "( rewrite ( Diff x ( Sin x ) ) ( Cos x ) )"
                             atom: [Action::Insert, r12(v8, v215)],
                         ],
-                        atom: [Premise, r3(v7, v9, v8, v10), iu5]
+                        atom: [PremiseOld, r3(v7, v9, v8, v10), iu5]
                         then: [
                             meta: "( rewrite ( Integral fuel ( Sin x ) x ) ( Mul ( Const -1 ) ( Cos x ) ) )"
                             atom: [Action::Insert, r12(v8, v13) on iu0],
@@ -12330,7 +14705,7 @@ fn lir_math() {
                     ],
                     atom: [PremiseNew, r12(v26, v27)]
                     then: [
-                        atom: [Premise, r2(v26, v27, v28), iu4]
+                        atom: [PremiseOld, r2(v26, v27, v28), iu4]
                         then: [
                             meta: "( rewrite ( Diff x ( Cos x ) ) ( Mul ( Const -1 ) ( Sin x ) ) )"
                             atom: [Action::Insert, r11(v26, v31) on iu0],
@@ -12338,9 +14713,9 @@ fn lir_math() {
                             atom: [Action::Insert, r13(v29, v30) on iu0],
                             atom: [Action::Insert, r6(v30, v31, v28)],
                         ],
-                        atom: [Premise, r3(v251, v27, v26, v254), iu6]
+                        atom: [PremiseOld, r3(v251, v27, v26, v254), iu6]
                         then: [
-                            atom: [Premise, r0(v250, v251), iu10]
+                            atom: [PremiseOld, r0(v250, v251), iu10]
                             then: [
                                 meta: "( rewrite ( Integral ( Fuel fuel ) ( Cos x ) x ) ( Sin x ) )"
                                 atom: [Action::Insert, r11(v26, v254)],
@@ -12353,7 +14728,7 @@ fn lir_math() {
                         then: [
                             atom: [PremiseAny, r18(v67), iu_bogus]
                             then: [
-                                atom: [Premise, r8(v170, v68, v173), iu8]
+                                atom: [PremiseOld, r8(v170, v68, v173), iu8]
                                 then: [
                                     meta: "( rewrite ( Pow x ( Const 2 ) ) ( Mul x x ) )"
                                     atom: [Action::Insert, r6(v170, v170, v173)],
@@ -12362,7 +14737,7 @@ fn lir_math() {
                         ],
                         atom: [PremiseAny, r16(v67), iu_bogus]
                         then: [
-                            atom: [Premise, r4(v66, v68, v69), iu9]
+                            atom: [PremiseOld, r4(v66, v68, v69), iu9]
                             then: [
                                 atom: [PremiseAny, r16(v67), iu_bogus]
                                 then: [
@@ -12370,7 +14745,7 @@ fn lir_math() {
                                     atom: [Action::Equate, v66=v69],
                                 ],
                             ],
-                            atom: [Premise, r6(v78, v68, v80), iu15]
+                            atom: [PremiseOld, r6(v78, v68, v80), iu15]
                             then: [
                                 atom: [PremiseAny, r16(v67), iu_bogus]
                                 then: [
@@ -12381,9 +14756,9 @@ fn lir_math() {
                         ],
                         atom: [PremiseAny, r17(v67), iu_bogus]
                         then: [
-                            atom: [Premise, r3(v229, v68, v232, v233), iu7]
+                            atom: [PremiseOld, r3(v229, v68, v232, v233), iu7]
                             then: [
-                                atom: [Premise, r0(v228, v229), iu11]
+                                atom: [PremiseOld, r0(v228, v229), iu11]
                                 then: [
                                     atom: [PremiseAny, r17(v67), iu_bogus]
                                     then: [
@@ -12392,7 +14767,7 @@ fn lir_math() {
                                     ],
                                 ],
                             ],
-                            atom: [Premise, r6(v90, v68, v93), iu16]
+                            atom: [PremiseOld, r6(v90, v68, v93), iu16]
                             then: [
                                 atom: [PremiseAny, r17(v67), iu_bogus]
                                 then: [
@@ -12400,7 +14775,7 @@ fn lir_math() {
                                     atom: [Action::Equate, v90=v93],
                                 ],
                             ],
-                            atom: [Premise, r8(v158, v68, v161), iu9]
+                            atom: [PremiseOld, r8(v158, v68, v161), iu9]
                             then: [
                                 atom: [PremiseAny, r17(v67), iu_bogus]
                                 then: [
@@ -12412,14 +14787,14 @@ fn lir_math() {
                     ],
                     atom: [PremiseNew, r16(v71)]
                     then: [
-                        atom: [Premise, r13(v71, v72), iu6]
+                        atom: [PremiseOld, r13(v71, v72), iu6]
                         then: [
-                            atom: [Premise, r4(v70, v72, v73), iu10]
+                            atom: [PremiseOld, r4(v70, v72, v73), iu10]
                             then: [
                                 meta: "( rewrite ( Add a ( Const 0 ) ) a )"
                                 atom: [Action::Equate, v70=v73],
                             ],
-                            atom: [Premise, r6(v82, v72, v84), iu17]
+                            atom: [PremiseOld, r6(v82, v72, v84), iu17]
                             then: [
                                 meta: "( rewrite ( Mul a ( Const 0 ) ) ( Const 0 ) )"
                                 atom: [Action::Insert, r13(v71, v84)],
@@ -12428,22 +14803,22 @@ fn lir_math() {
                     ],
                     atom: [PremiseNew, r17(v95)]
                     then: [
-                        atom: [Premise, r13(v95, v96), iu7]
+                        atom: [PremiseOld, r13(v95, v96), iu7]
                         then: [
-                            atom: [Premise, r3(v235, v96, v238, v239), iu8]
+                            atom: [PremiseOld, r3(v235, v96, v238, v239), iu8]
                             then: [
-                                atom: [Premise, r0(v234, v235), iu12]
+                                atom: [PremiseOld, r0(v234, v235), iu12]
                                 then: [
                                     meta: "( rewrite ( Integral ( Fuel fuel ) ( Const 1 ) x ) x )"
                                     atom: [Action::Equate, v238=v239],
                                 ],
                             ],
-                            atom: [Premise, r6(v94, v96, v97), iu18]
+                            atom: [PremiseOld, r6(v94, v96, v97), iu18]
                             then: [
                                 meta: "( rewrite ( Mul a ( Const 1 ) ) a )"
                                 atom: [Action::Equate, v94=v97],
                             ],
-                            atom: [Premise, r8(v162, v96, v165), iu10]
+                            atom: [PremiseOld, r8(v162, v96, v165), iu10]
                             then: [
                                 meta: "( rewrite ( Pow x ( Const 1 ) ) x )"
                                 atom: [Action::Equate, v162=v165],
@@ -12452,9 +14827,9 @@ fn lir_math() {
                     ],
                     atom: [PremiseNew, r18(v175)]
                     then: [
-                        atom: [Premise, r13(v175, v176), iu8]
+                        atom: [PremiseOld, r13(v175, v176), iu8]
                         then: [
-                            atom: [Premise, r8(v174, v176, v177), iu11]
+                            atom: [PremiseOld, r8(v174, v176, v177), iu11]
                             then: [
                                 meta: "( rewrite ( Pow x ( Const 2 ) ) ( Mul x x ) )"
                                 atom: [Action::Insert, r6(v174, v174, v177)],
@@ -12664,9 +15039,9 @@ fn lir_math() {
             #[derive(Debug, Default)]
             struct FuelRelation {
                 new: Vec<<Self as Relation>::Row>,
-                hash_index_0: runtime::HashMap<(FuelUnit,), (FuelUnit,)>,
-                hash_index_1: runtime::HashMap<(FuelUnit,), runtime::SmallVec<[(FuelUnit,); 1]>>,
-                hash_index_0_1: runtime::HashMap<(FuelUnit, FuelUnit), runtime::SmallVec<[(); 1]>>,
+                hash_index_0: runtime::HashMap<(FuelUnit,), (FuelUnit, TimeStamp)>,
+                hash_index_1: runtime::HashMap<(FuelUnit,), runtime::SmallVec<[(FuelUnit, TimeStamp); 1]>>,
+                hash_index_0_1: runtime::HashMap<(FuelUnit, FuelUnit), runtime::SmallVec<[(TimeStamp,); 1]>>,
                 fuel_unit_num_uprooted_at_latest_retain: usize,
             }
             impl Relation for FuelRelation {
@@ -12690,35 +15065,50 @@ fn lir_math() {
                 }
                 fn emit_graphviz(&self, buf: &mut String) {
                     use std::fmt::Write;
-                    for (i, ((x0,), (x1,))) in self.hash_index_0.iter().enumerate() {
+                    for (i, ((x0,), (x1, _timestamp))) in self.hash_index_0.iter().enumerate() {
                         writeln!(buf, "{}_{i} -> {}_{};", "fuel", "fuel_unit", x0).unwrap();
                         writeln!(buf, "{}_{i} -> {}_{};", "fuel", "fuel_unit", x1).unwrap();
                         writeln!(buf, "{}_{i} [shape = box];", "fuel").unwrap();
                     }
                 }
-                fn update_begin(&mut self, insertions: &[Self::Row], uf: &mut Unification) {
+                fn update_begin(
+                    &mut self,
+                    insertions: &[Self::Row],
+                    uf: &mut Unification,
+                    latest_timestamp: TimeStamp,
+                ) {
                     log_duration!("update_begin {}: {}", "fuel", {
                         for &(mut x0, mut x1) in insertions {
                             match self.hash_index_0.entry((uf.fuel_unit_.find(x0),)) {
                                 runtime::HashMapEntry::Occupied(mut entry) => {
-                                    let (y1,) = entry.get_mut();
-                                    uf.fuel_unit_.union_mut(&mut x1, y1);
+                                    let (y1, timestamp) = entry.get_mut();
+                                    let changed = false;
+                                    let old_val = *y1;
+                                    let changed = changed | (old_val != uf.fuel_unit_.union_mut(&mut x1, y1));
+                                    if changed {
+                                        *timestamp = latest_timestamp;
+                                    }
                                 }
                                 runtime::HashMapEntry::Vacant(entry) => {
-                                    entry.insert((uf.fuel_unit_.find(x1),));
+                                    entry.insert((uf.fuel_unit_.find(x1), latest_timestamp));
                                 }
                             }
                         }
                     });
                 }
-                fn update(&mut self, insertions: &mut Vec<Self::Row>, uf: &mut Unification) -> bool {
+                fn update(
+                    &mut self,
+                    insertions: &mut Vec<Self::Row>,
+                    uf: &mut Unification,
+                    latest_timestamp: TimeStamp,
+                ) -> bool {
                     if self.fuel_unit_num_uprooted_at_latest_retain == uf.fuel_unit_.num_uprooted() {
                         return false;
                     }
                     let offset = insertions.len();
                     log_duration!("update {}: {}", "fuel", {
                         self.fuel_unit_num_uprooted_at_latest_retain = uf.fuel_unit_.num_uprooted();
-                        self.hash_index_0.retain(|&(x0,), &mut (x1,)| {
+                        self.hash_index_0.retain(|&(x0,), &mut (x1, _timestamp)| {
                             if uf.fuel_unit_.is_root(x0) & uf.fuel_unit_.is_root(x1) {
                                 true
                             } else {
@@ -12727,17 +15117,22 @@ fn lir_math() {
                             }
                         });
                     });
-                    self.update_begin(&insertions[offset..], uf);
+                    self.update_begin(&insertions[offset..], uf, latest_timestamp);
                     true
                 }
-                fn update_finalize(&mut self, insertions: &mut Vec<Self::Row>, uf: &mut Unification) {
+                fn update_finalize(
+                    &mut self,
+                    insertions: &mut Vec<Self::Row>,
+                    uf: &mut Unification,
+                    latest_timestamp: TimeStamp,
+                ) {
                     log_duration!("update_finalize {}: {}", "fuel", {
                         assert!(self.new.is_empty());
                         log_duration!("fill new: {}", {
                             self.new.extend(
                                 self.hash_index_0
                                     .iter()
-                                    .map(|(&(x0,), &(x1,))| (x0, x1))
+                                    .map(|(&(x0,), &(x1, _timestamp))| (x0, x1))
                                     .filter(|&(x0, x1)| !self.hash_index_0_1.contains_key(&(x0, x1))),
                             );
                             insertions.clear();
@@ -12746,15 +15141,18 @@ fn lir_math() {
                         });
                         log_duration!("fill index: {}", {
                             for &(x0, x1) in &self.new {
-                                self.hash_index_1.entry((x1,)).or_default().push((x0,));
+                                self.hash_index_1
+                                    .entry((x1,))
+                                    .or_default()
+                                    .push((x0, latest_timestamp));
                             }
                         });
                         log_duration!("retain index: {}", {
                             self.hash_index_1.retain(|&(x1,), v| {
                                 if uf.fuel_unit_.is_root(x1) {
-                                    v.retain(|&mut (x0,)| uf.fuel_unit_.is_root(x0));
+                                    v.retain(|&mut (x0, _timestamp)| uf.fuel_unit_.is_root(x0));
                                     v.sort_unstable();
-                                    v.dedup();
+                                    v.dedup_by(|(x0, t1), (y0, t2)| true & (*x0 == *y0));
                                     true
                                 } else {
                                     false
@@ -12763,15 +15161,18 @@ fn lir_math() {
                         });
                         log_duration!("fill index: {}", {
                             for &(x0, x1) in &self.new {
-                                self.hash_index_0_1.entry((x0, x1)).or_default().push(());
+                                self.hash_index_0_1
+                                    .entry((x0, x1))
+                                    .or_default()
+                                    .push((latest_timestamp,));
                             }
                         });
                         log_duration!("retain index: {}", {
                             self.hash_index_0_1.retain(|&(x0, x1), v| {
                                 if uf.fuel_unit_.is_root(x0) & uf.fuel_unit_.is_root(x1) {
-                                    v.retain(|&mut ()| true);
+                                    v.retain(|&mut (_timestamp)| true);
                                     v.sort_unstable();
-                                    v.dedup();
+                                    v.dedup_by(|(t1,), (t2,)| true);
                                     true
                                 } else {
                                     false
@@ -12783,31 +15184,77 @@ fn lir_math() {
                 }
             }
             impl FuelRelation {
-                fn iter1_0_1(&self, x0: FuelUnit) -> impl Iterator<Item = (FuelUnit,)> + use<'_> {
-                    self.hash_index_0.get(&(x0,)).into_iter().copied()
+                fn iter_all1_0_1(&self, x0: FuelUnit) -> impl Iterator<Item = (FuelUnit,)> + use<'_> {
+                    self.hash_index_0
+                        .get(&(x0,))
+                        .into_iter()
+                        .copied()
+                        .map(|(x1, _timestamp)| (x1,))
                 }
-                fn iter1_1_0(&self, x1: FuelUnit) -> impl Iterator<Item = (FuelUnit,)> + use<'_> {
-                    self.hash_index_1.get(&(x1,)).into_iter().flatten().copied()
+                fn iter_all1_1_0(&self, x1: FuelUnit) -> impl Iterator<Item = (FuelUnit,)> + use<'_> {
+                    self.hash_index_1
+                        .get(&(x1,))
+                        .into_iter()
+                        .flatten()
+                        .copied()
+                        .map(|(x0, _timestamp)| (x0,))
                 }
-                fn iter2_0_1(&self, x0: FuelUnit, x1: FuelUnit) -> impl Iterator<Item = ()> + use<'_> {
+                fn iter_all2_0_1(&self, x0: FuelUnit, x1: FuelUnit) -> impl Iterator<Item = ()> + use<'_> {
                     self.hash_index_0_1
                         .get(&(x0, x1))
                         .into_iter()
                         .flatten()
                         .copied()
+                        .map(|(_timestamp)| ())
+                }
+                fn iter_old1_0_1(
+                    &self,
+                    x0: FuelUnit,
+                    latest_timestamp: TimeStamp,
+                ) -> impl Iterator<Item = (FuelUnit,)> + use<'_> {
+                    self.hash_index_0
+                        .get(&(x0,))
+                        .into_iter()
+                        .copied()
+                        .filter_map(move |(x1, timestamp)| (timestamp < latest_timestamp).then_some((x1,)))
+                }
+                fn iter_old1_1_0(
+                    &self,
+                    x1: FuelUnit,
+                    latest_timestamp: TimeStamp,
+                ) -> impl Iterator<Item = (FuelUnit,)> + use<'_> {
+                    self.hash_index_1
+                        .get(&(x1,))
+                        .into_iter()
+                        .flatten()
+                        .copied()
+                        .filter_map(move |(x0, timestamp)| (timestamp < latest_timestamp).then_some((x0,)))
+                }
+                fn iter_old2_0_1(
+                    &self,
+                    x0: FuelUnit,
+                    x1: FuelUnit,
+                    latest_timestamp: TimeStamp,
+                ) -> impl Iterator<Item = ()> + use<'_> {
+                    self.hash_index_0_1
+                        .get(&(x0, x1))
+                        .into_iter()
+                        .flatten()
+                        .copied()
+                        .filter_map(move |(timestamp,)| (timestamp < latest_timestamp).then_some(()))
                 }
                 fn check1_0_1(&self, x0: FuelUnit) -> bool {
-                    self.iter1_0_1(x0).next().is_some()
+                    self.iter_all1_0_1(x0).next().is_some()
                 }
                 fn check1_1_0(&self, x1: FuelUnit) -> bool {
-                    self.iter1_1_0(x1).next().is_some()
+                    self.iter_all1_1_0(x1).next().is_some()
                 }
                 fn check2_0_1(&self, x0: FuelUnit, x1: FuelUnit) -> bool {
-                    self.iter2_0_1(x0, x1).next().is_some()
+                    self.iter_all2_0_1(x0, x1).next().is_some()
                 }
                 #[allow(unreachable_code)]
                 fn entry1_0_1(&self, x0: FuelUnit, delta: &mut Delta, uf: &mut Unification) -> (FuelUnit,) {
-                    if let Some((x1,)) = self.iter1_0_1(x0).next() {
+                    if let Some((x1,)) = self.iter_all1_0_1(x0).next() {
                         return (x1,);
                     }
                     let x1 = uf.fuel_unit_.add_eclass();
@@ -12822,7 +15269,7 @@ fn lir_math() {
                     delta: &mut Delta,
                     uf: &mut Unification,
                 ) -> () {
-                    if let Some(()) = self.iter2_0_1(x0, x1).next() {
+                    if let Some(()) = self.iter_all2_0_1(x0, x1).next() {
                         return ();
                     }
                     delta.fuel_.push((x0, x1));
@@ -12832,8 +15279,8 @@ fn lir_math() {
             #[derive(Debug, Default)]
             struct ZeroFuelRelation {
                 new: Vec<<Self as Relation>::Row>,
-                hash_index_: runtime::HashMap<(), (FuelUnit,)>,
-                hash_index_0: runtime::HashMap<(FuelUnit,), runtime::SmallVec<[(); 1]>>,
+                hash_index_: runtime::HashMap<(), (FuelUnit, TimeStamp)>,
+                hash_index_0: runtime::HashMap<(FuelUnit,), runtime::SmallVec<[(TimeStamp,); 1]>>,
                 fuel_unit_num_uprooted_at_latest_retain: usize,
             }
             impl Relation for ZeroFuelRelation {
@@ -12857,34 +15304,49 @@ fn lir_math() {
                 }
                 fn emit_graphviz(&self, buf: &mut String) {
                     use std::fmt::Write;
-                    for (i, ((), (x0,))) in self.hash_index_.iter().enumerate() {
+                    for (i, ((), (x0, _timestamp))) in self.hash_index_.iter().enumerate() {
                         writeln!(buf, "{}_{i} -> {}_{};", "zero_fuel", "fuel_unit", x0).unwrap();
                         writeln!(buf, "{}_{i} [shape = box];", "zero_fuel").unwrap();
                     }
                 }
-                fn update_begin(&mut self, insertions: &[Self::Row], uf: &mut Unification) {
+                fn update_begin(
+                    &mut self,
+                    insertions: &[Self::Row],
+                    uf: &mut Unification,
+                    latest_timestamp: TimeStamp,
+                ) {
                     log_duration!("update_begin {}: {}", "zero_fuel", {
                         for &(mut x0,) in insertions {
                             match self.hash_index_.entry(()) {
                                 runtime::HashMapEntry::Occupied(mut entry) => {
-                                    let (y0,) = entry.get_mut();
-                                    uf.fuel_unit_.union_mut(&mut x0, y0);
+                                    let (y0, timestamp) = entry.get_mut();
+                                    let changed = false;
+                                    let old_val = *y0;
+                                    let changed = changed | (old_val != uf.fuel_unit_.union_mut(&mut x0, y0));
+                                    if changed {
+                                        *timestamp = latest_timestamp;
+                                    }
                                 }
                                 runtime::HashMapEntry::Vacant(entry) => {
-                                    entry.insert((uf.fuel_unit_.find(x0),));
+                                    entry.insert((uf.fuel_unit_.find(x0), latest_timestamp));
                                 }
                             }
                         }
                     });
                 }
-                fn update(&mut self, insertions: &mut Vec<Self::Row>, uf: &mut Unification) -> bool {
+                fn update(
+                    &mut self,
+                    insertions: &mut Vec<Self::Row>,
+                    uf: &mut Unification,
+                    latest_timestamp: TimeStamp,
+                ) -> bool {
                     if self.fuel_unit_num_uprooted_at_latest_retain == uf.fuel_unit_.num_uprooted() {
                         return false;
                     }
                     let offset = insertions.len();
                     log_duration!("update {}: {}", "zero_fuel", {
                         self.fuel_unit_num_uprooted_at_latest_retain = uf.fuel_unit_.num_uprooted();
-                        self.hash_index_.retain(|&(), &mut (x0,)| {
+                        self.hash_index_.retain(|&(), &mut (x0, _timestamp)| {
                             if uf.fuel_unit_.is_root(x0) {
                                 true
                             } else {
@@ -12893,17 +15355,22 @@ fn lir_math() {
                             }
                         });
                     });
-                    self.update_begin(&insertions[offset..], uf);
+                    self.update_begin(&insertions[offset..], uf, latest_timestamp);
                     true
                 }
-                fn update_finalize(&mut self, insertions: &mut Vec<Self::Row>, uf: &mut Unification) {
+                fn update_finalize(
+                    &mut self,
+                    insertions: &mut Vec<Self::Row>,
+                    uf: &mut Unification,
+                    latest_timestamp: TimeStamp,
+                ) {
                     log_duration!("update_finalize {}: {}", "zero_fuel", {
                         assert!(self.new.is_empty());
                         log_duration!("fill new: {}", {
                             self.new.extend(
                                 self.hash_index_
                                     .iter()
-                                    .map(|(&(), &(x0,))| (x0,))
+                                    .map(|(&(), &(x0, _timestamp))| (x0,))
                                     .filter(|&(x0,)| !self.hash_index_0.contains_key(&(x0,))),
                             );
                             insertions.clear();
@@ -12912,15 +15379,18 @@ fn lir_math() {
                         });
                         log_duration!("fill index: {}", {
                             for &(x0,) in &self.new {
-                                self.hash_index_0.entry((x0,)).or_default().push(());
+                                self.hash_index_0
+                                    .entry((x0,))
+                                    .or_default()
+                                    .push((latest_timestamp,));
                             }
                         });
                         log_duration!("retain index: {}", {
                             self.hash_index_0.retain(|&(x0,), v| {
                                 if uf.fuel_unit_.is_root(x0) {
-                                    v.retain(|&mut ()| true);
+                                    v.retain(|&mut (_timestamp)| true);
                                     v.sort_unstable();
-                                    v.dedup();
+                                    v.dedup_by(|(t1,), (t2,)| true);
                                     true
                                 } else {
                                     false
@@ -12932,21 +15402,52 @@ fn lir_math() {
                 }
             }
             impl ZeroFuelRelation {
-                fn iter0_0(&self) -> impl Iterator<Item = (FuelUnit,)> + use<'_> {
-                    self.hash_index_.get(&()).into_iter().copied()
+                fn iter_all0_0(&self) -> impl Iterator<Item = (FuelUnit,)> + use<'_> {
+                    self.hash_index_
+                        .get(&())
+                        .into_iter()
+                        .copied()
+                        .map(|(x0, _timestamp)| (x0,))
                 }
-                fn iter1_0(&self, x0: FuelUnit) -> impl Iterator<Item = ()> + use<'_> {
-                    self.hash_index_0.get(&(x0,)).into_iter().flatten().copied()
+                fn iter_all1_0(&self, x0: FuelUnit) -> impl Iterator<Item = ()> + use<'_> {
+                    self.hash_index_0
+                        .get(&(x0,))
+                        .into_iter()
+                        .flatten()
+                        .copied()
+                        .map(|(_timestamp)| ())
+                }
+                fn iter_old0_0(
+                    &self,
+                    latest_timestamp: TimeStamp,
+                ) -> impl Iterator<Item = (FuelUnit,)> + use<'_> {
+                    self.hash_index_
+                        .get(&())
+                        .into_iter()
+                        .copied()
+                        .filter_map(move |(x0, timestamp)| (timestamp < latest_timestamp).then_some((x0,)))
+                }
+                fn iter_old1_0(
+                    &self,
+                    x0: FuelUnit,
+                    latest_timestamp: TimeStamp,
+                ) -> impl Iterator<Item = ()> + use<'_> {
+                    self.hash_index_0
+                        .get(&(x0,))
+                        .into_iter()
+                        .flatten()
+                        .copied()
+                        .filter_map(move |(timestamp,)| (timestamp < latest_timestamp).then_some(()))
                 }
                 fn check0_0(&self) -> bool {
-                    self.iter0_0().next().is_some()
+                    self.iter_all0_0().next().is_some()
                 }
                 fn check1_0(&self, x0: FuelUnit) -> bool {
-                    self.iter1_0(x0).next().is_some()
+                    self.iter_all1_0(x0).next().is_some()
                 }
                 #[allow(unreachable_code)]
                 fn entry0_0(&self, delta: &mut Delta, uf: &mut Unification) -> (FuelUnit,) {
-                    if let Some((x0,)) = self.iter0_0().next() {
+                    if let Some((x0,)) = self.iter_all0_0().next() {
                         return (x0,);
                     }
                     let x0 = uf.fuel_unit_.add_eclass();
@@ -12955,7 +15456,7 @@ fn lir_math() {
                 }
                 #[allow(unreachable_code)]
                 fn entry1_0(&self, x0: FuelUnit, delta: &mut Delta, uf: &mut Unification) -> () {
-                    if let Some(()) = self.iter1_0(x0).next() {
+                    if let Some(()) = self.iter_all1_0(x0).next() {
                         return ();
                     }
                     delta.zero_fuel_.push((x0,));
@@ -12965,9 +15466,9 @@ fn lir_math() {
             #[derive(Debug, Default)]
             struct DiffRelation {
                 new: Vec<<Self as Relation>::Row>,
-                hash_index_1_0: runtime::HashMap<(Math, Math), (Math,)>,
-                hash_index_1: runtime::HashMap<(Math,), runtime::SmallVec<[(Math, Math); 1]>>,
-                hash_index_1_0_2: runtime::HashMap<(Math, Math, Math), runtime::SmallVec<[(); 1]>>,
+                hash_index_1_0: runtime::HashMap<(Math, Math), (Math, TimeStamp)>,
+                hash_index_1: runtime::HashMap<(Math,), runtime::SmallVec<[(Math, Math, TimeStamp); 1]>>,
+                hash_index_1_0_2: runtime::HashMap<(Math, Math, Math), runtime::SmallVec<[(TimeStamp,); 1]>>,
                 math_num_uprooted_at_latest_retain: usize,
             }
             impl Relation for DiffRelation {
@@ -12991,14 +15492,19 @@ fn lir_math() {
                 }
                 fn emit_graphviz(&self, buf: &mut String) {
                     use std::fmt::Write;
-                    for (i, ((x1, x0), (x2,))) in self.hash_index_1_0.iter().enumerate() {
+                    for (i, ((x1, x0), (x2, _timestamp))) in self.hash_index_1_0.iter().enumerate() {
                         writeln!(buf, "{}_{i} -> {}_{};", "diff", "math", x1).unwrap();
                         writeln!(buf, "{}_{i} -> {}_{};", "diff", "math", x0).unwrap();
                         writeln!(buf, "{}_{i} -> {}_{};", "diff", "math", x2).unwrap();
                         writeln!(buf, "{}_{i} [shape = box];", "diff").unwrap();
                     }
                 }
-                fn update_begin(&mut self, insertions: &[Self::Row], uf: &mut Unification) {
+                fn update_begin(
+                    &mut self,
+                    insertions: &[Self::Row],
+                    uf: &mut Unification,
+                    latest_timestamp: TimeStamp,
+                ) {
                     log_duration!("update_begin {}: {}", "diff", {
                         for &(mut x0, mut x1, mut x2) in insertions {
                             match self
@@ -13006,43 +15512,59 @@ fn lir_math() {
                                 .entry((uf.math_.find(x1), uf.math_.find(x0)))
                             {
                                 runtime::HashMapEntry::Occupied(mut entry) => {
-                                    let (y2,) = entry.get_mut();
-                                    uf.math_.union_mut(&mut x2, y2);
+                                    let (y2, timestamp) = entry.get_mut();
+                                    let changed = false;
+                                    let old_val = *y2;
+                                    let changed = changed | (old_val != uf.math_.union_mut(&mut x2, y2));
+                                    if changed {
+                                        *timestamp = latest_timestamp;
+                                    }
                                 }
                                 runtime::HashMapEntry::Vacant(entry) => {
-                                    entry.insert((uf.math_.find(x2),));
+                                    entry.insert((uf.math_.find(x2), latest_timestamp));
                                 }
                             }
                         }
                     });
                 }
-                fn update(&mut self, insertions: &mut Vec<Self::Row>, uf: &mut Unification) -> bool {
+                fn update(
+                    &mut self,
+                    insertions: &mut Vec<Self::Row>,
+                    uf: &mut Unification,
+                    latest_timestamp: TimeStamp,
+                ) -> bool {
                     if self.math_num_uprooted_at_latest_retain == uf.math_.num_uprooted() {
                         return false;
                     }
                     let offset = insertions.len();
                     log_duration!("update {}: {}", "diff", {
                         self.math_num_uprooted_at_latest_retain = uf.math_.num_uprooted();
-                        self.hash_index_1_0.retain(|&(x1, x0), &mut (x2,)| {
-                            if uf.math_.is_root(x0) & uf.math_.is_root(x1) & uf.math_.is_root(x2) {
-                                true
-                            } else {
-                                insertions.push((x0, x1, x2));
-                                false
-                            }
-                        });
+                        self.hash_index_1_0
+                            .retain(|&(x1, x0), &mut (x2, _timestamp)| {
+                                if uf.math_.is_root(x0) & uf.math_.is_root(x1) & uf.math_.is_root(x2) {
+                                    true
+                                } else {
+                                    insertions.push((x0, x1, x2));
+                                    false
+                                }
+                            });
                     });
-                    self.update_begin(&insertions[offset..], uf);
+                    self.update_begin(&insertions[offset..], uf, latest_timestamp);
                     true
                 }
-                fn update_finalize(&mut self, insertions: &mut Vec<Self::Row>, uf: &mut Unification) {
+                fn update_finalize(
+                    &mut self,
+                    insertions: &mut Vec<Self::Row>,
+                    uf: &mut Unification,
+                    latest_timestamp: TimeStamp,
+                ) {
                     log_duration!("update_finalize {}: {}", "diff", {
                         assert!(self.new.is_empty());
                         log_duration!("fill new: {}", {
                             self.new.extend(
                                 self.hash_index_1_0
                                     .iter()
-                                    .map(|(&(x1, x0), &(x2,))| (x0, x1, x2))
+                                    .map(|(&(x1, x0), &(x2, _timestamp))| (x0, x1, x2))
                                     .filter(|&(x0, x1, x2)| !self.hash_index_1_0_2.contains_key(&(x1, x0, x2))),
                             );
                             insertions.clear();
@@ -13051,15 +15573,20 @@ fn lir_math() {
                         });
                         log_duration!("fill index: {}", {
                             for &(x0, x1, x2) in &self.new {
-                                self.hash_index_1.entry((x1,)).or_default().push((x0, x2));
+                                self.hash_index_1
+                                    .entry((x1,))
+                                    .or_default()
+                                    .push((x0, x2, latest_timestamp));
                             }
                         });
                         log_duration!("retain index: {}", {
                             self.hash_index_1.retain(|&(x1,), v| {
                                 if uf.math_.is_root(x1) {
-                                    v.retain(|&mut (x0, x2)| uf.math_.is_root(x0) & uf.math_.is_root(x2));
+                                    v.retain(|&mut (x0, x2, _timestamp)| {
+                                        uf.math_.is_root(x0) & uf.math_.is_root(x2)
+                                    });
                                     v.sort_unstable();
-                                    v.dedup();
+                                    v.dedup_by(|(x0, x2, t1), (y0, y2, t2)| true & (*x0 == *y0) & (*x2 == *y2));
                                     true
                                 } else {
                                     false
@@ -13071,15 +15598,15 @@ fn lir_math() {
                                 self.hash_index_1_0_2
                                     .entry((x1, x0, x2))
                                     .or_default()
-                                    .push(());
+                                    .push((latest_timestamp,));
                             }
                         });
                         log_duration!("retain index: {}", {
                             self.hash_index_1_0_2.retain(|&(x1, x0, x2), v| {
                                 if uf.math_.is_root(x1) & uf.math_.is_root(x0) & uf.math_.is_root(x2) {
-                                    v.retain(|&mut ()| true);
+                                    v.retain(|&mut (_timestamp)| true);
                                     v.sort_unstable();
-                                    v.dedup();
+                                    v.dedup_by(|(t1,), (t2,)| true);
                                     true
                                 } else {
                                     false
@@ -13091,31 +15618,81 @@ fn lir_math() {
                 }
             }
             impl DiffRelation {
-                fn iter2_1_0_2(&self, x1: Math, x0: Math) -> impl Iterator<Item = (Math,)> + use<'_> {
-                    self.hash_index_1_0.get(&(x1, x0)).into_iter().copied()
+                fn iter_all2_1_0_2(&self, x1: Math, x0: Math) -> impl Iterator<Item = (Math,)> + use<'_> {
+                    self.hash_index_1_0
+                        .get(&(x1, x0))
+                        .into_iter()
+                        .copied()
+                        .map(|(x2, _timestamp)| (x2,))
                 }
-                fn iter1_1_0_2(&self, x1: Math) -> impl Iterator<Item = (Math, Math)> + use<'_> {
-                    self.hash_index_1.get(&(x1,)).into_iter().flatten().copied()
+                fn iter_all1_1_0_2(&self, x1: Math) -> impl Iterator<Item = (Math, Math)> + use<'_> {
+                    self.hash_index_1
+                        .get(&(x1,))
+                        .into_iter()
+                        .flatten()
+                        .copied()
+                        .map(|(x0, x2, _timestamp)| (x0, x2))
                 }
-                fn iter3_1_0_2(&self, x1: Math, x0: Math, x2: Math) -> impl Iterator<Item = ()> + use<'_> {
+                fn iter_all3_1_0_2(&self, x1: Math, x0: Math, x2: Math) -> impl Iterator<Item = ()> + use<'_> {
                     self.hash_index_1_0_2
                         .get(&(x1, x0, x2))
                         .into_iter()
                         .flatten()
                         .copied()
+                        .map(|(_timestamp)| ())
+                }
+                fn iter_old2_1_0_2(
+                    &self,
+                    x1: Math,
+                    x0: Math,
+                    latest_timestamp: TimeStamp,
+                ) -> impl Iterator<Item = (Math,)> + use<'_> {
+                    self.hash_index_1_0
+                        .get(&(x1, x0))
+                        .into_iter()
+                        .copied()
+                        .filter_map(move |(x2, timestamp)| (timestamp < latest_timestamp).then_some((x2,)))
+                }
+                fn iter_old1_1_0_2(
+                    &self,
+                    x1: Math,
+                    latest_timestamp: TimeStamp,
+                ) -> impl Iterator<Item = (Math, Math)> + use<'_> {
+                    self.hash_index_1
+                        .get(&(x1,))
+                        .into_iter()
+                        .flatten()
+                        .copied()
+                        .filter_map(move |(x0, x2, timestamp)| {
+                            (timestamp < latest_timestamp).then_some((x0, x2))
+                        })
+                }
+                fn iter_old3_1_0_2(
+                    &self,
+                    x1: Math,
+                    x0: Math,
+                    x2: Math,
+                    latest_timestamp: TimeStamp,
+                ) -> impl Iterator<Item = ()> + use<'_> {
+                    self.hash_index_1_0_2
+                        .get(&(x1, x0, x2))
+                        .into_iter()
+                        .flatten()
+                        .copied()
+                        .filter_map(move |(timestamp,)| (timestamp < latest_timestamp).then_some(()))
                 }
                 fn check2_1_0_2(&self, x1: Math, x0: Math) -> bool {
-                    self.iter2_1_0_2(x1, x0).next().is_some()
+                    self.iter_all2_1_0_2(x1, x0).next().is_some()
                 }
                 fn check1_1_0_2(&self, x1: Math) -> bool {
-                    self.iter1_1_0_2(x1).next().is_some()
+                    self.iter_all1_1_0_2(x1).next().is_some()
                 }
                 fn check3_1_0_2(&self, x1: Math, x0: Math, x2: Math) -> bool {
-                    self.iter3_1_0_2(x1, x0, x2).next().is_some()
+                    self.iter_all3_1_0_2(x1, x0, x2).next().is_some()
                 }
                 #[allow(unreachable_code)]
                 fn entry2_1_0_2(&self, x1: Math, x0: Math, delta: &mut Delta, uf: &mut Unification) -> (Math,) {
-                    if let Some((x2,)) = self.iter2_1_0_2(x1, x0).next() {
+                    if let Some((x2,)) = self.iter_all2_1_0_2(x1, x0).next() {
                         return (x2,);
                     }
                     let x2 = uf.math_.add_eclass();
@@ -13131,7 +15708,7 @@ fn lir_math() {
                     delta: &mut Delta,
                     uf: &mut Unification,
                 ) -> () {
-                    if let Some(()) = self.iter3_1_0_2(x1, x0, x2).next() {
+                    if let Some(()) = self.iter_all3_1_0_2(x1, x0, x2).next() {
                         return ();
                     }
                     delta.diff_.push((x0, x1, x2));
@@ -13141,11 +15718,15 @@ fn lir_math() {
             #[derive(Debug, Default)]
             struct IntegralRelation {
                 new: Vec<<Self as Relation>::Row>,
-                hash_index_0_1_2: runtime::HashMap<(FuelUnit, Math, Math), (Math,)>,
-                hash_index_0: runtime::HashMap<(FuelUnit,), runtime::SmallVec<[(Math, Math, Math); 1]>>,
-                hash_index_1: runtime::HashMap<(Math,), runtime::SmallVec<[(Math, FuelUnit, Math); 1]>>,
-                hash_index_1_2: runtime::HashMap<(Math, Math), runtime::SmallVec<[(FuelUnit, Math); 1]>>,
-                hash_index_0_1_2_3: runtime::HashMap<(FuelUnit, Math, Math, Math), runtime::SmallVec<[(); 1]>>,
+                hash_index_0_1_2: runtime::HashMap<(FuelUnit, Math, Math), (Math, TimeStamp)>,
+                hash_index_0:
+                    runtime::HashMap<(FuelUnit,), runtime::SmallVec<[(Math, Math, Math, TimeStamp); 1]>>,
+                hash_index_1:
+                    runtime::HashMap<(Math,), runtime::SmallVec<[(Math, FuelUnit, Math, TimeStamp); 1]>>,
+                hash_index_1_2:
+                    runtime::HashMap<(Math, Math), runtime::SmallVec<[(FuelUnit, Math, TimeStamp); 1]>>,
+                hash_index_0_1_2_3:
+                    runtime::HashMap<(FuelUnit, Math, Math, Math), runtime::SmallVec<[(TimeStamp,); 1]>>,
                 fuel_unit_num_uprooted_at_latest_retain: usize,
                 math_num_uprooted_at_latest_retain: usize,
             }
@@ -13170,7 +15751,7 @@ fn lir_math() {
                 }
                 fn emit_graphviz(&self, buf: &mut String) {
                     use std::fmt::Write;
-                    for (i, ((x0, x1, x2), (x3,))) in self.hash_index_0_1_2.iter().enumerate() {
+                    for (i, ((x0, x1, x2), (x3, _timestamp))) in self.hash_index_0_1_2.iter().enumerate() {
                         writeln!(buf, "{}_{i} -> {}_{};", "integral", "fuel_unit", x0).unwrap();
                         writeln!(buf, "{}_{i} -> {}_{};", "integral", "math", x1).unwrap();
                         writeln!(buf, "{}_{i} -> {}_{};", "integral", "math", x2).unwrap();
@@ -13178,7 +15759,12 @@ fn lir_math() {
                         writeln!(buf, "{}_{i} [shape = box];", "integral").unwrap();
                     }
                 }
-                fn update_begin(&mut self, insertions: &[Self::Row], uf: &mut Unification) {
+                fn update_begin(
+                    &mut self,
+                    insertions: &[Self::Row],
+                    uf: &mut Unification,
+                    latest_timestamp: TimeStamp,
+                ) {
                     log_duration!("update_begin {}: {}", "integral", {
                         for &(mut x0, mut x1, mut x2, mut x3) in insertions {
                             match self.hash_index_0_1_2.entry((
@@ -13187,17 +15773,27 @@ fn lir_math() {
                                 uf.math_.find(x2),
                             )) {
                                 runtime::HashMapEntry::Occupied(mut entry) => {
-                                    let (y3,) = entry.get_mut();
-                                    uf.math_.union_mut(&mut x3, y3);
+                                    let (y3, timestamp) = entry.get_mut();
+                                    let changed = false;
+                                    let old_val = *y3;
+                                    let changed = changed | (old_val != uf.math_.union_mut(&mut x3, y3));
+                                    if changed {
+                                        *timestamp = latest_timestamp;
+                                    }
                                 }
                                 runtime::HashMapEntry::Vacant(entry) => {
-                                    entry.insert((uf.math_.find(x3),));
+                                    entry.insert((uf.math_.find(x3), latest_timestamp));
                                 }
                             }
                         }
                     });
                 }
-                fn update(&mut self, insertions: &mut Vec<Self::Row>, uf: &mut Unification) -> bool {
+                fn update(
+                    &mut self,
+                    insertions: &mut Vec<Self::Row>,
+                    uf: &mut Unification,
+                    latest_timestamp: TimeStamp,
+                ) -> bool {
                     if self.fuel_unit_num_uprooted_at_latest_retain == uf.fuel_unit_.num_uprooted()
                         && self.math_num_uprooted_at_latest_retain == uf.math_.num_uprooted()
                     {
@@ -13207,30 +15803,36 @@ fn lir_math() {
                     log_duration!("update {}: {}", "integral", {
                         self.fuel_unit_num_uprooted_at_latest_retain = uf.fuel_unit_.num_uprooted();
                         self.math_num_uprooted_at_latest_retain = uf.math_.num_uprooted();
-                        self.hash_index_0_1_2.retain(|&(x0, x1, x2), &mut (x3,)| {
-                            if uf.fuel_unit_.is_root(x0)
-                                & uf.math_.is_root(x1)
-                                & uf.math_.is_root(x2)
-                                & uf.math_.is_root(x3)
-                            {
-                                true
-                            } else {
-                                insertions.push((x0, x1, x2, x3));
-                                false
-                            }
-                        });
+                        self.hash_index_0_1_2
+                            .retain(|&(x0, x1, x2), &mut (x3, _timestamp)| {
+                                if uf.fuel_unit_.is_root(x0)
+                                    & uf.math_.is_root(x1)
+                                    & uf.math_.is_root(x2)
+                                    & uf.math_.is_root(x3)
+                                {
+                                    true
+                                } else {
+                                    insertions.push((x0, x1, x2, x3));
+                                    false
+                                }
+                            });
                     });
-                    self.update_begin(&insertions[offset..], uf);
+                    self.update_begin(&insertions[offset..], uf, latest_timestamp);
                     true
                 }
-                fn update_finalize(&mut self, insertions: &mut Vec<Self::Row>, uf: &mut Unification) {
+                fn update_finalize(
+                    &mut self,
+                    insertions: &mut Vec<Self::Row>,
+                    uf: &mut Unification,
+                    latest_timestamp: TimeStamp,
+                ) {
                     log_duration!("update_finalize {}: {}", "integral", {
                         assert!(self.new.is_empty());
                         log_duration!("fill new: {}", {
                             self.new.extend(
                                 self.hash_index_0_1_2
                                     .iter()
-                                    .map(|(&(x0, x1, x2), &(x3,))| (x0, x1, x2, x3))
+                                    .map(|(&(x0, x1, x2), &(x3, _timestamp))| (x0, x1, x2, x3))
                                     .filter(|&(x0, x1, x2, x3)| {
                                         !self.hash_index_0_1_2_3.contains_key(&(x0, x1, x2, x3))
                                     }),
@@ -13241,20 +15843,24 @@ fn lir_math() {
                         });
                         log_duration!("fill index: {}", {
                             for &(x0, x1, x2, x3) in &self.new {
-                                self.hash_index_0
-                                    .entry((x0,))
-                                    .or_default()
-                                    .push((x1, x2, x3));
+                                self.hash_index_0.entry((x0,)).or_default().push((
+                                    x1,
+                                    x2,
+                                    x3,
+                                    latest_timestamp,
+                                ));
                             }
                         });
                         log_duration!("retain index: {}", {
                             self.hash_index_0.retain(|&(x0,), v| {
                                 if uf.fuel_unit_.is_root(x0) {
-                                    v.retain(|&mut (x1, x2, x3)| {
+                                    v.retain(|&mut (x1, x2, x3, _timestamp)| {
                                         uf.math_.is_root(x1) & uf.math_.is_root(x2) & uf.math_.is_root(x3)
                                     });
                                     v.sort_unstable();
-                                    v.dedup();
+                                    v.dedup_by(|(x1, x2, x3, t1), (y1, y2, y3, t2)| {
+                                        true & (*x1 == *y1) & (*x2 == *y2) & (*x3 == *y3)
+                                    });
                                     true
                                 } else {
                                     false
@@ -13263,20 +15869,24 @@ fn lir_math() {
                         });
                         log_duration!("fill index: {}", {
                             for &(x0, x1, x2, x3) in &self.new {
-                                self.hash_index_1
-                                    .entry((x1,))
-                                    .or_default()
-                                    .push((x2, x0, x3));
+                                self.hash_index_1.entry((x1,)).or_default().push((
+                                    x2,
+                                    x0,
+                                    x3,
+                                    latest_timestamp,
+                                ));
                             }
                         });
                         log_duration!("retain index: {}", {
                             self.hash_index_1.retain(|&(x1,), v| {
                                 if uf.math_.is_root(x1) {
-                                    v.retain(|&mut (x2, x0, x3)| {
+                                    v.retain(|&mut (x2, x0, x3, _timestamp)| {
                                         uf.math_.is_root(x2) & uf.fuel_unit_.is_root(x0) & uf.math_.is_root(x3)
                                     });
                                     v.sort_unstable();
-                                    v.dedup();
+                                    v.dedup_by(|(x2, x0, x3, t1), (y2, y0, y3, t2)| {
+                                        true & (*x2 == *y2) & (*x0 == *y0) & (*x3 == *y3)
+                                    });
                                     true
                                 } else {
                                     false
@@ -13285,18 +15895,21 @@ fn lir_math() {
                         });
                         log_duration!("fill index: {}", {
                             for &(x0, x1, x2, x3) in &self.new {
-                                self.hash_index_1_2
-                                    .entry((x1, x2))
-                                    .or_default()
-                                    .push((x0, x3));
+                                self.hash_index_1_2.entry((x1, x2)).or_default().push((
+                                    x0,
+                                    x3,
+                                    latest_timestamp,
+                                ));
                             }
                         });
                         log_duration!("retain index: {}", {
                             self.hash_index_1_2.retain(|&(x1, x2), v| {
                                 if uf.math_.is_root(x1) & uf.math_.is_root(x2) {
-                                    v.retain(|&mut (x0, x3)| uf.fuel_unit_.is_root(x0) & uf.math_.is_root(x3));
+                                    v.retain(|&mut (x0, x3, _timestamp)| {
+                                        uf.fuel_unit_.is_root(x0) & uf.math_.is_root(x3)
+                                    });
                                     v.sort_unstable();
-                                    v.dedup();
+                                    v.dedup_by(|(x0, x3, t1), (y0, y3, t2)| true & (*x0 == *y0) & (*x3 == *y3));
                                     true
                                 } else {
                                     false
@@ -13308,7 +15921,7 @@ fn lir_math() {
                                 self.hash_index_0_1_2_3
                                     .entry((x0, x1, x2, x3))
                                     .or_default()
-                                    .push(());
+                                    .push((latest_timestamp,));
                             }
                         });
                         log_duration!("retain index: {}", {
@@ -13318,9 +15931,9 @@ fn lir_math() {
                                     & uf.math_.is_root(x2)
                                     & uf.math_.is_root(x3)
                                 {
-                                    v.retain(|&mut ()| true);
+                                    v.retain(|&mut (_timestamp)| true);
                                     v.sort_unstable();
-                                    v.dedup();
+                                    v.dedup_by(|(t1,), (t2,)| true);
                                     true
                                 } else {
                                     false
@@ -13333,7 +15946,7 @@ fn lir_math() {
                 }
             }
             impl IntegralRelation {
-                fn iter3_0_1_2_3(
+                fn iter_all3_0_1_2_3(
                     &self,
                     x0: FuelUnit,
                     x1: Math,
@@ -13343,14 +15956,31 @@ fn lir_math() {
                         .get(&(x0, x1, x2))
                         .into_iter()
                         .copied()
+                        .map(|(x3, _timestamp)| (x3,))
                 }
-                fn iter1_0_1_2_3(&self, x0: FuelUnit) -> impl Iterator<Item = (Math, Math, Math)> + use<'_> {
-                    self.hash_index_0.get(&(x0,)).into_iter().flatten().copied()
+                fn iter_all1_0_1_2_3(
+                    &self,
+                    x0: FuelUnit,
+                ) -> impl Iterator<Item = (Math, Math, Math)> + use<'_> {
+                    self.hash_index_0
+                        .get(&(x0,))
+                        .into_iter()
+                        .flatten()
+                        .copied()
+                        .map(|(x1, x2, x3, _timestamp)| (x1, x2, x3))
                 }
-                fn iter1_1_2_0_3(&self, x1: Math) -> impl Iterator<Item = (Math, FuelUnit, Math)> + use<'_> {
-                    self.hash_index_1.get(&(x1,)).into_iter().flatten().copied()
+                fn iter_all1_1_2_0_3(
+                    &self,
+                    x1: Math,
+                ) -> impl Iterator<Item = (Math, FuelUnit, Math)> + use<'_> {
+                    self.hash_index_1
+                        .get(&(x1,))
+                        .into_iter()
+                        .flatten()
+                        .copied()
+                        .map(|(x2, x0, x3, _timestamp)| (x2, x0, x3))
                 }
-                fn iter2_1_2_0_3(
+                fn iter_all2_1_2_0_3(
                     &self,
                     x1: Math,
                     x2: Math,
@@ -13360,8 +15990,9 @@ fn lir_math() {
                         .into_iter()
                         .flatten()
                         .copied()
+                        .map(|(x0, x3, _timestamp)| (x0, x3))
                 }
-                fn iter4_0_1_2_3(
+                fn iter_all4_0_1_2_3(
                     &self,
                     x0: FuelUnit,
                     x1: Math,
@@ -13373,21 +16004,93 @@ fn lir_math() {
                         .into_iter()
                         .flatten()
                         .copied()
+                        .map(|(_timestamp)| ())
+                }
+                fn iter_old3_0_1_2_3(
+                    &self,
+                    x0: FuelUnit,
+                    x1: Math,
+                    x2: Math,
+                    latest_timestamp: TimeStamp,
+                ) -> impl Iterator<Item = (Math,)> + use<'_> {
+                    self.hash_index_0_1_2
+                        .get(&(x0, x1, x2))
+                        .into_iter()
+                        .copied()
+                        .filter_map(move |(x3, timestamp)| (timestamp < latest_timestamp).then_some((x3,)))
+                }
+                fn iter_old1_0_1_2_3(
+                    &self,
+                    x0: FuelUnit,
+                    latest_timestamp: TimeStamp,
+                ) -> impl Iterator<Item = (Math, Math, Math)> + use<'_> {
+                    self.hash_index_0
+                        .get(&(x0,))
+                        .into_iter()
+                        .flatten()
+                        .copied()
+                        .filter_map(move |(x1, x2, x3, timestamp)| {
+                            (timestamp < latest_timestamp).then_some((x1, x2, x3))
+                        })
+                }
+                fn iter_old1_1_2_0_3(
+                    &self,
+                    x1: Math,
+                    latest_timestamp: TimeStamp,
+                ) -> impl Iterator<Item = (Math, FuelUnit, Math)> + use<'_> {
+                    self.hash_index_1
+                        .get(&(x1,))
+                        .into_iter()
+                        .flatten()
+                        .copied()
+                        .filter_map(move |(x2, x0, x3, timestamp)| {
+                            (timestamp < latest_timestamp).then_some((x2, x0, x3))
+                        })
+                }
+                fn iter_old2_1_2_0_3(
+                    &self,
+                    x1: Math,
+                    x2: Math,
+                    latest_timestamp: TimeStamp,
+                ) -> impl Iterator<Item = (FuelUnit, Math)> + use<'_> {
+                    self.hash_index_1_2
+                        .get(&(x1, x2))
+                        .into_iter()
+                        .flatten()
+                        .copied()
+                        .filter_map(move |(x0, x3, timestamp)| {
+                            (timestamp < latest_timestamp).then_some((x0, x3))
+                        })
+                }
+                fn iter_old4_0_1_2_3(
+                    &self,
+                    x0: FuelUnit,
+                    x1: Math,
+                    x2: Math,
+                    x3: Math,
+                    latest_timestamp: TimeStamp,
+                ) -> impl Iterator<Item = ()> + use<'_> {
+                    self.hash_index_0_1_2_3
+                        .get(&(x0, x1, x2, x3))
+                        .into_iter()
+                        .flatten()
+                        .copied()
+                        .filter_map(move |(timestamp,)| (timestamp < latest_timestamp).then_some(()))
                 }
                 fn check3_0_1_2_3(&self, x0: FuelUnit, x1: Math, x2: Math) -> bool {
-                    self.iter3_0_1_2_3(x0, x1, x2).next().is_some()
+                    self.iter_all3_0_1_2_3(x0, x1, x2).next().is_some()
                 }
                 fn check1_0_1_2_3(&self, x0: FuelUnit) -> bool {
-                    self.iter1_0_1_2_3(x0).next().is_some()
+                    self.iter_all1_0_1_2_3(x0).next().is_some()
                 }
                 fn check1_1_2_0_3(&self, x1: Math) -> bool {
-                    self.iter1_1_2_0_3(x1).next().is_some()
+                    self.iter_all1_1_2_0_3(x1).next().is_some()
                 }
                 fn check2_1_2_0_3(&self, x1: Math, x2: Math) -> bool {
-                    self.iter2_1_2_0_3(x1, x2).next().is_some()
+                    self.iter_all2_1_2_0_3(x1, x2).next().is_some()
                 }
                 fn check4_0_1_2_3(&self, x0: FuelUnit, x1: Math, x2: Math, x3: Math) -> bool {
-                    self.iter4_0_1_2_3(x0, x1, x2, x3).next().is_some()
+                    self.iter_all4_0_1_2_3(x0, x1, x2, x3).next().is_some()
                 }
                 #[allow(unreachable_code)]
                 fn entry3_0_1_2_3(
@@ -13398,7 +16101,7 @@ fn lir_math() {
                     delta: &mut Delta,
                     uf: &mut Unification,
                 ) -> (Math,) {
-                    if let Some((x3,)) = self.iter3_0_1_2_3(x0, x1, x2).next() {
+                    if let Some((x3,)) = self.iter_all3_0_1_2_3(x0, x1, x2).next() {
                         return (x3,);
                     }
                     let x3 = uf.math_.add_eclass();
@@ -13415,7 +16118,7 @@ fn lir_math() {
                     delta: &mut Delta,
                     uf: &mut Unification,
                 ) -> () {
-                    if let Some(()) = self.iter4_0_1_2_3(x0, x1, x2, x3).next() {
+                    if let Some(()) = self.iter_all4_0_1_2_3(x0, x1, x2, x3).next() {
                         return ();
                     }
                     delta.integral_.push((x0, x1, x2, x3));
@@ -13425,11 +16128,11 @@ fn lir_math() {
             #[derive(Debug, Default)]
             struct AddRelation {
                 new: Vec<<Self as Relation>::Row>,
-                hash_index_1_0: runtime::HashMap<(Math, Math), (Math,)>,
-                hash_index_2: runtime::HashMap<(Math,), runtime::SmallVec<[(Math, Math); 1]>>,
-                hash_index_1: runtime::HashMap<(Math,), runtime::SmallVec<[(Math, Math); 1]>>,
-                hash_index_0: runtime::HashMap<(Math,), runtime::SmallVec<[(Math, Math); 1]>>,
-                hash_index_1_0_2: runtime::HashMap<(Math, Math, Math), runtime::SmallVec<[(); 1]>>,
+                hash_index_1_0: runtime::HashMap<(Math, Math), (Math, TimeStamp)>,
+                hash_index_2: runtime::HashMap<(Math,), runtime::SmallVec<[(Math, Math, TimeStamp); 1]>>,
+                hash_index_1: runtime::HashMap<(Math,), runtime::SmallVec<[(Math, Math, TimeStamp); 1]>>,
+                hash_index_0: runtime::HashMap<(Math,), runtime::SmallVec<[(Math, Math, TimeStamp); 1]>>,
+                hash_index_1_0_2: runtime::HashMap<(Math, Math, Math), runtime::SmallVec<[(TimeStamp,); 1]>>,
                 math_num_uprooted_at_latest_retain: usize,
             }
             impl Relation for AddRelation {
@@ -13453,14 +16156,19 @@ fn lir_math() {
                 }
                 fn emit_graphviz(&self, buf: &mut String) {
                     use std::fmt::Write;
-                    for (i, ((x1, x0), (x2,))) in self.hash_index_1_0.iter().enumerate() {
+                    for (i, ((x1, x0), (x2, _timestamp))) in self.hash_index_1_0.iter().enumerate() {
                         writeln!(buf, "{}_{i} -> {}_{};", "add", "math", x1).unwrap();
                         writeln!(buf, "{}_{i} -> {}_{};", "add", "math", x0).unwrap();
                         writeln!(buf, "{}_{i} -> {}_{};", "add", "math", x2).unwrap();
                         writeln!(buf, "{}_{i} [shape = box];", "add").unwrap();
                     }
                 }
-                fn update_begin(&mut self, insertions: &[Self::Row], uf: &mut Unification) {
+                fn update_begin(
+                    &mut self,
+                    insertions: &[Self::Row],
+                    uf: &mut Unification,
+                    latest_timestamp: TimeStamp,
+                ) {
                     log_duration!("update_begin {}: {}", "add", {
                         for &(mut x0, mut x1, mut x2) in insertions {
                             match self
@@ -13468,43 +16176,59 @@ fn lir_math() {
                                 .entry((uf.math_.find(x1), uf.math_.find(x0)))
                             {
                                 runtime::HashMapEntry::Occupied(mut entry) => {
-                                    let (y2,) = entry.get_mut();
-                                    uf.math_.union_mut(&mut x2, y2);
+                                    let (y2, timestamp) = entry.get_mut();
+                                    let changed = false;
+                                    let old_val = *y2;
+                                    let changed = changed | (old_val != uf.math_.union_mut(&mut x2, y2));
+                                    if changed {
+                                        *timestamp = latest_timestamp;
+                                    }
                                 }
                                 runtime::HashMapEntry::Vacant(entry) => {
-                                    entry.insert((uf.math_.find(x2),));
+                                    entry.insert((uf.math_.find(x2), latest_timestamp));
                                 }
                             }
                         }
                     });
                 }
-                fn update(&mut self, insertions: &mut Vec<Self::Row>, uf: &mut Unification) -> bool {
+                fn update(
+                    &mut self,
+                    insertions: &mut Vec<Self::Row>,
+                    uf: &mut Unification,
+                    latest_timestamp: TimeStamp,
+                ) -> bool {
                     if self.math_num_uprooted_at_latest_retain == uf.math_.num_uprooted() {
                         return false;
                     }
                     let offset = insertions.len();
                     log_duration!("update {}: {}", "add", {
                         self.math_num_uprooted_at_latest_retain = uf.math_.num_uprooted();
-                        self.hash_index_1_0.retain(|&(x1, x0), &mut (x2,)| {
-                            if uf.math_.is_root(x0) & uf.math_.is_root(x1) & uf.math_.is_root(x2) {
-                                true
-                            } else {
-                                insertions.push((x0, x1, x2));
-                                false
-                            }
-                        });
+                        self.hash_index_1_0
+                            .retain(|&(x1, x0), &mut (x2, _timestamp)| {
+                                if uf.math_.is_root(x0) & uf.math_.is_root(x1) & uf.math_.is_root(x2) {
+                                    true
+                                } else {
+                                    insertions.push((x0, x1, x2));
+                                    false
+                                }
+                            });
                     });
-                    self.update_begin(&insertions[offset..], uf);
+                    self.update_begin(&insertions[offset..], uf, latest_timestamp);
                     true
                 }
-                fn update_finalize(&mut self, insertions: &mut Vec<Self::Row>, uf: &mut Unification) {
+                fn update_finalize(
+                    &mut self,
+                    insertions: &mut Vec<Self::Row>,
+                    uf: &mut Unification,
+                    latest_timestamp: TimeStamp,
+                ) {
                     log_duration!("update_finalize {}: {}", "add", {
                         assert!(self.new.is_empty());
                         log_duration!("fill new: {}", {
                             self.new.extend(
                                 self.hash_index_1_0
                                     .iter()
-                                    .map(|(&(x1, x0), &(x2,))| (x0, x1, x2))
+                                    .map(|(&(x1, x0), &(x2, _timestamp))| (x0, x1, x2))
                                     .filter(|&(x0, x1, x2)| !self.hash_index_1_0_2.contains_key(&(x1, x0, x2))),
                             );
                             insertions.clear();
@@ -13513,15 +16237,20 @@ fn lir_math() {
                         });
                         log_duration!("fill index: {}", {
                             for &(x0, x1, x2) in &self.new {
-                                self.hash_index_2.entry((x2,)).or_default().push((x0, x1));
+                                self.hash_index_2
+                                    .entry((x2,))
+                                    .or_default()
+                                    .push((x0, x1, latest_timestamp));
                             }
                         });
                         log_duration!("retain index: {}", {
                             self.hash_index_2.retain(|&(x2,), v| {
                                 if uf.math_.is_root(x2) {
-                                    v.retain(|&mut (x0, x1)| uf.math_.is_root(x0) & uf.math_.is_root(x1));
+                                    v.retain(|&mut (x0, x1, _timestamp)| {
+                                        uf.math_.is_root(x0) & uf.math_.is_root(x1)
+                                    });
                                     v.sort_unstable();
-                                    v.dedup();
+                                    v.dedup_by(|(x0, x1, t1), (y0, y1, t2)| true & (*x0 == *y0) & (*x1 == *y1));
                                     true
                                 } else {
                                     false
@@ -13530,15 +16259,20 @@ fn lir_math() {
                         });
                         log_duration!("fill index: {}", {
                             for &(x0, x1, x2) in &self.new {
-                                self.hash_index_1.entry((x1,)).or_default().push((x0, x2));
+                                self.hash_index_1
+                                    .entry((x1,))
+                                    .or_default()
+                                    .push((x0, x2, latest_timestamp));
                             }
                         });
                         log_duration!("retain index: {}", {
                             self.hash_index_1.retain(|&(x1,), v| {
                                 if uf.math_.is_root(x1) {
-                                    v.retain(|&mut (x0, x2)| uf.math_.is_root(x0) & uf.math_.is_root(x2));
+                                    v.retain(|&mut (x0, x2, _timestamp)| {
+                                        uf.math_.is_root(x0) & uf.math_.is_root(x2)
+                                    });
                                     v.sort_unstable();
-                                    v.dedup();
+                                    v.dedup_by(|(x0, x2, t1), (y0, y2, t2)| true & (*x0 == *y0) & (*x2 == *y2));
                                     true
                                 } else {
                                     false
@@ -13547,15 +16281,20 @@ fn lir_math() {
                         });
                         log_duration!("fill index: {}", {
                             for &(x0, x1, x2) in &self.new {
-                                self.hash_index_0.entry((x0,)).or_default().push((x1, x2));
+                                self.hash_index_0
+                                    .entry((x0,))
+                                    .or_default()
+                                    .push((x1, x2, latest_timestamp));
                             }
                         });
                         log_duration!("retain index: {}", {
                             self.hash_index_0.retain(|&(x0,), v| {
                                 if uf.math_.is_root(x0) {
-                                    v.retain(|&mut (x1, x2)| uf.math_.is_root(x1) & uf.math_.is_root(x2));
+                                    v.retain(|&mut (x1, x2, _timestamp)| {
+                                        uf.math_.is_root(x1) & uf.math_.is_root(x2)
+                                    });
                                     v.sort_unstable();
-                                    v.dedup();
+                                    v.dedup_by(|(x1, x2, t1), (y1, y2, t2)| true & (*x1 == *y1) & (*x2 == *y2));
                                     true
                                 } else {
                                     false
@@ -13567,15 +16306,15 @@ fn lir_math() {
                                 self.hash_index_1_0_2
                                     .entry((x1, x0, x2))
                                     .or_default()
-                                    .push(());
+                                    .push((latest_timestamp,));
                             }
                         });
                         log_duration!("retain index: {}", {
                             self.hash_index_1_0_2.retain(|&(x1, x0, x2), v| {
                                 if uf.math_.is_root(x1) & uf.math_.is_root(x0) & uf.math_.is_root(x2) {
-                                    v.retain(|&mut ()| true);
+                                    v.retain(|&mut (_timestamp)| true);
                                     v.sort_unstable();
-                                    v.dedup();
+                                    v.dedup_by(|(t1,), (t2,)| true);
                                     true
                                 } else {
                                     false
@@ -13587,43 +16326,131 @@ fn lir_math() {
                 }
             }
             impl AddRelation {
-                fn iter2_1_0_2(&self, x1: Math, x0: Math) -> impl Iterator<Item = (Math,)> + use<'_> {
-                    self.hash_index_1_0.get(&(x1, x0)).into_iter().copied()
+                fn iter_all2_1_0_2(&self, x1: Math, x0: Math) -> impl Iterator<Item = (Math,)> + use<'_> {
+                    self.hash_index_1_0
+                        .get(&(x1, x0))
+                        .into_iter()
+                        .copied()
+                        .map(|(x2, _timestamp)| (x2,))
                 }
-                fn iter1_2_0_1(&self, x2: Math) -> impl Iterator<Item = (Math, Math)> + use<'_> {
-                    self.hash_index_2.get(&(x2,)).into_iter().flatten().copied()
+                fn iter_all1_2_0_1(&self, x2: Math) -> impl Iterator<Item = (Math, Math)> + use<'_> {
+                    self.hash_index_2
+                        .get(&(x2,))
+                        .into_iter()
+                        .flatten()
+                        .copied()
+                        .map(|(x0, x1, _timestamp)| (x0, x1))
                 }
-                fn iter1_1_0_2(&self, x1: Math) -> impl Iterator<Item = (Math, Math)> + use<'_> {
-                    self.hash_index_1.get(&(x1,)).into_iter().flatten().copied()
+                fn iter_all1_1_0_2(&self, x1: Math) -> impl Iterator<Item = (Math, Math)> + use<'_> {
+                    self.hash_index_1
+                        .get(&(x1,))
+                        .into_iter()
+                        .flatten()
+                        .copied()
+                        .map(|(x0, x2, _timestamp)| (x0, x2))
                 }
-                fn iter1_0_1_2(&self, x0: Math) -> impl Iterator<Item = (Math, Math)> + use<'_> {
-                    self.hash_index_0.get(&(x0,)).into_iter().flatten().copied()
+                fn iter_all1_0_1_2(&self, x0: Math) -> impl Iterator<Item = (Math, Math)> + use<'_> {
+                    self.hash_index_0
+                        .get(&(x0,))
+                        .into_iter()
+                        .flatten()
+                        .copied()
+                        .map(|(x1, x2, _timestamp)| (x1, x2))
                 }
-                fn iter3_1_0_2(&self, x1: Math, x0: Math, x2: Math) -> impl Iterator<Item = ()> + use<'_> {
+                fn iter_all3_1_0_2(&self, x1: Math, x0: Math, x2: Math) -> impl Iterator<Item = ()> + use<'_> {
                     self.hash_index_1_0_2
                         .get(&(x1, x0, x2))
                         .into_iter()
                         .flatten()
                         .copied()
+                        .map(|(_timestamp)| ())
+                }
+                fn iter_old2_1_0_2(
+                    &self,
+                    x1: Math,
+                    x0: Math,
+                    latest_timestamp: TimeStamp,
+                ) -> impl Iterator<Item = (Math,)> + use<'_> {
+                    self.hash_index_1_0
+                        .get(&(x1, x0))
+                        .into_iter()
+                        .copied()
+                        .filter_map(move |(x2, timestamp)| (timestamp < latest_timestamp).then_some((x2,)))
+                }
+                fn iter_old1_2_0_1(
+                    &self,
+                    x2: Math,
+                    latest_timestamp: TimeStamp,
+                ) -> impl Iterator<Item = (Math, Math)> + use<'_> {
+                    self.hash_index_2
+                        .get(&(x2,))
+                        .into_iter()
+                        .flatten()
+                        .copied()
+                        .filter_map(move |(x0, x1, timestamp)| {
+                            (timestamp < latest_timestamp).then_some((x0, x1))
+                        })
+                }
+                fn iter_old1_1_0_2(
+                    &self,
+                    x1: Math,
+                    latest_timestamp: TimeStamp,
+                ) -> impl Iterator<Item = (Math, Math)> + use<'_> {
+                    self.hash_index_1
+                        .get(&(x1,))
+                        .into_iter()
+                        .flatten()
+                        .copied()
+                        .filter_map(move |(x0, x2, timestamp)| {
+                            (timestamp < latest_timestamp).then_some((x0, x2))
+                        })
+                }
+                fn iter_old1_0_1_2(
+                    &self,
+                    x0: Math,
+                    latest_timestamp: TimeStamp,
+                ) -> impl Iterator<Item = (Math, Math)> + use<'_> {
+                    self.hash_index_0
+                        .get(&(x0,))
+                        .into_iter()
+                        .flatten()
+                        .copied()
+                        .filter_map(move |(x1, x2, timestamp)| {
+                            (timestamp < latest_timestamp).then_some((x1, x2))
+                        })
+                }
+                fn iter_old3_1_0_2(
+                    &self,
+                    x1: Math,
+                    x0: Math,
+                    x2: Math,
+                    latest_timestamp: TimeStamp,
+                ) -> impl Iterator<Item = ()> + use<'_> {
+                    self.hash_index_1_0_2
+                        .get(&(x1, x0, x2))
+                        .into_iter()
+                        .flatten()
+                        .copied()
+                        .filter_map(move |(timestamp,)| (timestamp < latest_timestamp).then_some(()))
                 }
                 fn check2_1_0_2(&self, x1: Math, x0: Math) -> bool {
-                    self.iter2_1_0_2(x1, x0).next().is_some()
+                    self.iter_all2_1_0_2(x1, x0).next().is_some()
                 }
                 fn check1_2_0_1(&self, x2: Math) -> bool {
-                    self.iter1_2_0_1(x2).next().is_some()
+                    self.iter_all1_2_0_1(x2).next().is_some()
                 }
                 fn check1_1_0_2(&self, x1: Math) -> bool {
-                    self.iter1_1_0_2(x1).next().is_some()
+                    self.iter_all1_1_0_2(x1).next().is_some()
                 }
                 fn check1_0_1_2(&self, x0: Math) -> bool {
-                    self.iter1_0_1_2(x0).next().is_some()
+                    self.iter_all1_0_1_2(x0).next().is_some()
                 }
                 fn check3_1_0_2(&self, x1: Math, x0: Math, x2: Math) -> bool {
-                    self.iter3_1_0_2(x1, x0, x2).next().is_some()
+                    self.iter_all3_1_0_2(x1, x0, x2).next().is_some()
                 }
                 #[allow(unreachable_code)]
                 fn entry2_1_0_2(&self, x1: Math, x0: Math, delta: &mut Delta, uf: &mut Unification) -> (Math,) {
-                    if let Some((x2,)) = self.iter2_1_0_2(x1, x0).next() {
+                    if let Some((x2,)) = self.iter_all2_1_0_2(x1, x0).next() {
                         return (x2,);
                     }
                     let x2 = uf.math_.add_eclass();
@@ -13639,7 +16466,7 @@ fn lir_math() {
                     delta: &mut Delta,
                     uf: &mut Unification,
                 ) -> () {
-                    if let Some(()) = self.iter3_1_0_2(x1, x0, x2).next() {
+                    if let Some(()) = self.iter_all3_1_0_2(x1, x0, x2).next() {
                         return ();
                     }
                     delta.add_.push((x0, x1, x2));
@@ -13649,9 +16476,9 @@ fn lir_math() {
             #[derive(Debug, Default)]
             struct SubRelation {
                 new: Vec<<Self as Relation>::Row>,
-                hash_index_0_1: runtime::HashMap<(Math, Math), (Math,)>,
-                hash_index_2: runtime::HashMap<(Math,), runtime::SmallVec<[(Math, Math); 1]>>,
-                hash_index_0_1_2: runtime::HashMap<(Math, Math, Math), runtime::SmallVec<[(); 1]>>,
+                hash_index_0_1: runtime::HashMap<(Math, Math), (Math, TimeStamp)>,
+                hash_index_2: runtime::HashMap<(Math,), runtime::SmallVec<[(Math, Math, TimeStamp); 1]>>,
+                hash_index_0_1_2: runtime::HashMap<(Math, Math, Math), runtime::SmallVec<[(TimeStamp,); 1]>>,
                 math_num_uprooted_at_latest_retain: usize,
             }
             impl Relation for SubRelation {
@@ -13675,14 +16502,19 @@ fn lir_math() {
                 }
                 fn emit_graphviz(&self, buf: &mut String) {
                     use std::fmt::Write;
-                    for (i, ((x0, x1), (x2,))) in self.hash_index_0_1.iter().enumerate() {
+                    for (i, ((x0, x1), (x2, _timestamp))) in self.hash_index_0_1.iter().enumerate() {
                         writeln!(buf, "{}_{i} -> {}_{};", "sub", "math", x0).unwrap();
                         writeln!(buf, "{}_{i} -> {}_{};", "sub", "math", x1).unwrap();
                         writeln!(buf, "{}_{i} -> {}_{};", "sub", "math", x2).unwrap();
                         writeln!(buf, "{}_{i} [shape = box];", "sub").unwrap();
                     }
                 }
-                fn update_begin(&mut self, insertions: &[Self::Row], uf: &mut Unification) {
+                fn update_begin(
+                    &mut self,
+                    insertions: &[Self::Row],
+                    uf: &mut Unification,
+                    latest_timestamp: TimeStamp,
+                ) {
                     log_duration!("update_begin {}: {}", "sub", {
                         for &(mut x0, mut x1, mut x2) in insertions {
                             match self
@@ -13690,43 +16522,59 @@ fn lir_math() {
                                 .entry((uf.math_.find(x0), uf.math_.find(x1)))
                             {
                                 runtime::HashMapEntry::Occupied(mut entry) => {
-                                    let (y2,) = entry.get_mut();
-                                    uf.math_.union_mut(&mut x2, y2);
+                                    let (y2, timestamp) = entry.get_mut();
+                                    let changed = false;
+                                    let old_val = *y2;
+                                    let changed = changed | (old_val != uf.math_.union_mut(&mut x2, y2));
+                                    if changed {
+                                        *timestamp = latest_timestamp;
+                                    }
                                 }
                                 runtime::HashMapEntry::Vacant(entry) => {
-                                    entry.insert((uf.math_.find(x2),));
+                                    entry.insert((uf.math_.find(x2), latest_timestamp));
                                 }
                             }
                         }
                     });
                 }
-                fn update(&mut self, insertions: &mut Vec<Self::Row>, uf: &mut Unification) -> bool {
+                fn update(
+                    &mut self,
+                    insertions: &mut Vec<Self::Row>,
+                    uf: &mut Unification,
+                    latest_timestamp: TimeStamp,
+                ) -> bool {
                     if self.math_num_uprooted_at_latest_retain == uf.math_.num_uprooted() {
                         return false;
                     }
                     let offset = insertions.len();
                     log_duration!("update {}: {}", "sub", {
                         self.math_num_uprooted_at_latest_retain = uf.math_.num_uprooted();
-                        self.hash_index_0_1.retain(|&(x0, x1), &mut (x2,)| {
-                            if uf.math_.is_root(x0) & uf.math_.is_root(x1) & uf.math_.is_root(x2) {
-                                true
-                            } else {
-                                insertions.push((x0, x1, x2));
-                                false
-                            }
-                        });
+                        self.hash_index_0_1
+                            .retain(|&(x0, x1), &mut (x2, _timestamp)| {
+                                if uf.math_.is_root(x0) & uf.math_.is_root(x1) & uf.math_.is_root(x2) {
+                                    true
+                                } else {
+                                    insertions.push((x0, x1, x2));
+                                    false
+                                }
+                            });
                     });
-                    self.update_begin(&insertions[offset..], uf);
+                    self.update_begin(&insertions[offset..], uf, latest_timestamp);
                     true
                 }
-                fn update_finalize(&mut self, insertions: &mut Vec<Self::Row>, uf: &mut Unification) {
+                fn update_finalize(
+                    &mut self,
+                    insertions: &mut Vec<Self::Row>,
+                    uf: &mut Unification,
+                    latest_timestamp: TimeStamp,
+                ) {
                     log_duration!("update_finalize {}: {}", "sub", {
                         assert!(self.new.is_empty());
                         log_duration!("fill new: {}", {
                             self.new.extend(
                                 self.hash_index_0_1
                                     .iter()
-                                    .map(|(&(x0, x1), &(x2,))| (x0, x1, x2))
+                                    .map(|(&(x0, x1), &(x2, _timestamp))| (x0, x1, x2))
                                     .filter(|&(x0, x1, x2)| !self.hash_index_0_1_2.contains_key(&(x0, x1, x2))),
                             );
                             insertions.clear();
@@ -13735,15 +16583,20 @@ fn lir_math() {
                         });
                         log_duration!("fill index: {}", {
                             for &(x0, x1, x2) in &self.new {
-                                self.hash_index_2.entry((x2,)).or_default().push((x0, x1));
+                                self.hash_index_2
+                                    .entry((x2,))
+                                    .or_default()
+                                    .push((x0, x1, latest_timestamp));
                             }
                         });
                         log_duration!("retain index: {}", {
                             self.hash_index_2.retain(|&(x2,), v| {
                                 if uf.math_.is_root(x2) {
-                                    v.retain(|&mut (x0, x1)| uf.math_.is_root(x0) & uf.math_.is_root(x1));
+                                    v.retain(|&mut (x0, x1, _timestamp)| {
+                                        uf.math_.is_root(x0) & uf.math_.is_root(x1)
+                                    });
                                     v.sort_unstable();
-                                    v.dedup();
+                                    v.dedup_by(|(x0, x1, t1), (y0, y1, t2)| true & (*x0 == *y0) & (*x1 == *y1));
                                     true
                                 } else {
                                     false
@@ -13755,15 +16608,15 @@ fn lir_math() {
                                 self.hash_index_0_1_2
                                     .entry((x0, x1, x2))
                                     .or_default()
-                                    .push(());
+                                    .push((latest_timestamp,));
                             }
                         });
                         log_duration!("retain index: {}", {
                             self.hash_index_0_1_2.retain(|&(x0, x1, x2), v| {
                                 if uf.math_.is_root(x0) & uf.math_.is_root(x1) & uf.math_.is_root(x2) {
-                                    v.retain(|&mut ()| true);
+                                    v.retain(|&mut (_timestamp)| true);
                                     v.sort_unstable();
-                                    v.dedup();
+                                    v.dedup_by(|(t1,), (t2,)| true);
                                     true
                                 } else {
                                     false
@@ -13775,31 +16628,81 @@ fn lir_math() {
                 }
             }
             impl SubRelation {
-                fn iter2_0_1_2(&self, x0: Math, x1: Math) -> impl Iterator<Item = (Math,)> + use<'_> {
-                    self.hash_index_0_1.get(&(x0, x1)).into_iter().copied()
+                fn iter_all2_0_1_2(&self, x0: Math, x1: Math) -> impl Iterator<Item = (Math,)> + use<'_> {
+                    self.hash_index_0_1
+                        .get(&(x0, x1))
+                        .into_iter()
+                        .copied()
+                        .map(|(x2, _timestamp)| (x2,))
                 }
-                fn iter1_2_0_1(&self, x2: Math) -> impl Iterator<Item = (Math, Math)> + use<'_> {
-                    self.hash_index_2.get(&(x2,)).into_iter().flatten().copied()
+                fn iter_all1_2_0_1(&self, x2: Math) -> impl Iterator<Item = (Math, Math)> + use<'_> {
+                    self.hash_index_2
+                        .get(&(x2,))
+                        .into_iter()
+                        .flatten()
+                        .copied()
+                        .map(|(x0, x1, _timestamp)| (x0, x1))
                 }
-                fn iter3_0_1_2(&self, x0: Math, x1: Math, x2: Math) -> impl Iterator<Item = ()> + use<'_> {
+                fn iter_all3_0_1_2(&self, x0: Math, x1: Math, x2: Math) -> impl Iterator<Item = ()> + use<'_> {
                     self.hash_index_0_1_2
                         .get(&(x0, x1, x2))
                         .into_iter()
                         .flatten()
                         .copied()
+                        .map(|(_timestamp)| ())
+                }
+                fn iter_old2_0_1_2(
+                    &self,
+                    x0: Math,
+                    x1: Math,
+                    latest_timestamp: TimeStamp,
+                ) -> impl Iterator<Item = (Math,)> + use<'_> {
+                    self.hash_index_0_1
+                        .get(&(x0, x1))
+                        .into_iter()
+                        .copied()
+                        .filter_map(move |(x2, timestamp)| (timestamp < latest_timestamp).then_some((x2,)))
+                }
+                fn iter_old1_2_0_1(
+                    &self,
+                    x2: Math,
+                    latest_timestamp: TimeStamp,
+                ) -> impl Iterator<Item = (Math, Math)> + use<'_> {
+                    self.hash_index_2
+                        .get(&(x2,))
+                        .into_iter()
+                        .flatten()
+                        .copied()
+                        .filter_map(move |(x0, x1, timestamp)| {
+                            (timestamp < latest_timestamp).then_some((x0, x1))
+                        })
+                }
+                fn iter_old3_0_1_2(
+                    &self,
+                    x0: Math,
+                    x1: Math,
+                    x2: Math,
+                    latest_timestamp: TimeStamp,
+                ) -> impl Iterator<Item = ()> + use<'_> {
+                    self.hash_index_0_1_2
+                        .get(&(x0, x1, x2))
+                        .into_iter()
+                        .flatten()
+                        .copied()
+                        .filter_map(move |(timestamp,)| (timestamp < latest_timestamp).then_some(()))
                 }
                 fn check2_0_1_2(&self, x0: Math, x1: Math) -> bool {
-                    self.iter2_0_1_2(x0, x1).next().is_some()
+                    self.iter_all2_0_1_2(x0, x1).next().is_some()
                 }
                 fn check1_2_0_1(&self, x2: Math) -> bool {
-                    self.iter1_2_0_1(x2).next().is_some()
+                    self.iter_all1_2_0_1(x2).next().is_some()
                 }
                 fn check3_0_1_2(&self, x0: Math, x1: Math, x2: Math) -> bool {
-                    self.iter3_0_1_2(x0, x1, x2).next().is_some()
+                    self.iter_all3_0_1_2(x0, x1, x2).next().is_some()
                 }
                 #[allow(unreachable_code)]
                 fn entry2_0_1_2(&self, x0: Math, x1: Math, delta: &mut Delta, uf: &mut Unification) -> (Math,) {
-                    if let Some((x2,)) = self.iter2_0_1_2(x0, x1).next() {
+                    if let Some((x2,)) = self.iter_all2_0_1_2(x0, x1).next() {
                         return (x2,);
                     }
                     let x2 = uf.math_.add_eclass();
@@ -13815,7 +16718,7 @@ fn lir_math() {
                     delta: &mut Delta,
                     uf: &mut Unification,
                 ) -> () {
-                    if let Some(()) = self.iter3_0_1_2(x0, x1, x2).next() {
+                    if let Some(()) = self.iter_all3_0_1_2(x0, x1, x2).next() {
                         return ();
                     }
                     delta.sub_.push((x0, x1, x2));
@@ -13825,12 +16728,12 @@ fn lir_math() {
             #[derive(Debug, Default)]
             struct MulRelation {
                 new: Vec<<Self as Relation>::Row>,
-                hash_index_1_0: runtime::HashMap<(Math, Math), (Math,)>,
-                hash_index_2: runtime::HashMap<(Math,), runtime::SmallVec<[(Math, Math); 1]>>,
-                hash_index_1: runtime::HashMap<(Math,), runtime::SmallVec<[(Math, Math); 1]>>,
-                hash_index_2_0: runtime::HashMap<(Math, Math), runtime::SmallVec<[(Math,); 1]>>,
-                hash_index_0: runtime::HashMap<(Math,), runtime::SmallVec<[(Math, Math); 1]>>,
-                hash_index_1_0_2: runtime::HashMap<(Math, Math, Math), runtime::SmallVec<[(); 1]>>,
+                hash_index_1_0: runtime::HashMap<(Math, Math), (Math, TimeStamp)>,
+                hash_index_2: runtime::HashMap<(Math,), runtime::SmallVec<[(Math, Math, TimeStamp); 1]>>,
+                hash_index_1: runtime::HashMap<(Math,), runtime::SmallVec<[(Math, Math, TimeStamp); 1]>>,
+                hash_index_2_0: runtime::HashMap<(Math, Math), runtime::SmallVec<[(Math, TimeStamp); 1]>>,
+                hash_index_0: runtime::HashMap<(Math,), runtime::SmallVec<[(Math, Math, TimeStamp); 1]>>,
+                hash_index_1_0_2: runtime::HashMap<(Math, Math, Math), runtime::SmallVec<[(TimeStamp,); 1]>>,
                 math_num_uprooted_at_latest_retain: usize,
             }
             impl Relation for MulRelation {
@@ -13854,14 +16757,19 @@ fn lir_math() {
                 }
                 fn emit_graphviz(&self, buf: &mut String) {
                     use std::fmt::Write;
-                    for (i, ((x1, x0), (x2,))) in self.hash_index_1_0.iter().enumerate() {
+                    for (i, ((x1, x0), (x2, _timestamp))) in self.hash_index_1_0.iter().enumerate() {
                         writeln!(buf, "{}_{i} -> {}_{};", "mul", "math", x1).unwrap();
                         writeln!(buf, "{}_{i} -> {}_{};", "mul", "math", x0).unwrap();
                         writeln!(buf, "{}_{i} -> {}_{};", "mul", "math", x2).unwrap();
                         writeln!(buf, "{}_{i} [shape = box];", "mul").unwrap();
                     }
                 }
-                fn update_begin(&mut self, insertions: &[Self::Row], uf: &mut Unification) {
+                fn update_begin(
+                    &mut self,
+                    insertions: &[Self::Row],
+                    uf: &mut Unification,
+                    latest_timestamp: TimeStamp,
+                ) {
                     log_duration!("update_begin {}: {}", "mul", {
                         for &(mut x0, mut x1, mut x2) in insertions {
                             match self
@@ -13869,43 +16777,59 @@ fn lir_math() {
                                 .entry((uf.math_.find(x1), uf.math_.find(x0)))
                             {
                                 runtime::HashMapEntry::Occupied(mut entry) => {
-                                    let (y2,) = entry.get_mut();
-                                    uf.math_.union_mut(&mut x2, y2);
+                                    let (y2, timestamp) = entry.get_mut();
+                                    let changed = false;
+                                    let old_val = *y2;
+                                    let changed = changed | (old_val != uf.math_.union_mut(&mut x2, y2));
+                                    if changed {
+                                        *timestamp = latest_timestamp;
+                                    }
                                 }
                                 runtime::HashMapEntry::Vacant(entry) => {
-                                    entry.insert((uf.math_.find(x2),));
+                                    entry.insert((uf.math_.find(x2), latest_timestamp));
                                 }
                             }
                         }
                     });
                 }
-                fn update(&mut self, insertions: &mut Vec<Self::Row>, uf: &mut Unification) -> bool {
+                fn update(
+                    &mut self,
+                    insertions: &mut Vec<Self::Row>,
+                    uf: &mut Unification,
+                    latest_timestamp: TimeStamp,
+                ) -> bool {
                     if self.math_num_uprooted_at_latest_retain == uf.math_.num_uprooted() {
                         return false;
                     }
                     let offset = insertions.len();
                     log_duration!("update {}: {}", "mul", {
                         self.math_num_uprooted_at_latest_retain = uf.math_.num_uprooted();
-                        self.hash_index_1_0.retain(|&(x1, x0), &mut (x2,)| {
-                            if uf.math_.is_root(x0) & uf.math_.is_root(x1) & uf.math_.is_root(x2) {
-                                true
-                            } else {
-                                insertions.push((x0, x1, x2));
-                                false
-                            }
-                        });
+                        self.hash_index_1_0
+                            .retain(|&(x1, x0), &mut (x2, _timestamp)| {
+                                if uf.math_.is_root(x0) & uf.math_.is_root(x1) & uf.math_.is_root(x2) {
+                                    true
+                                } else {
+                                    insertions.push((x0, x1, x2));
+                                    false
+                                }
+                            });
                     });
-                    self.update_begin(&insertions[offset..], uf);
+                    self.update_begin(&insertions[offset..], uf, latest_timestamp);
                     true
                 }
-                fn update_finalize(&mut self, insertions: &mut Vec<Self::Row>, uf: &mut Unification) {
+                fn update_finalize(
+                    &mut self,
+                    insertions: &mut Vec<Self::Row>,
+                    uf: &mut Unification,
+                    latest_timestamp: TimeStamp,
+                ) {
                     log_duration!("update_finalize {}: {}", "mul", {
                         assert!(self.new.is_empty());
                         log_duration!("fill new: {}", {
                             self.new.extend(
                                 self.hash_index_1_0
                                     .iter()
-                                    .map(|(&(x1, x0), &(x2,))| (x0, x1, x2))
+                                    .map(|(&(x1, x0), &(x2, _timestamp))| (x0, x1, x2))
                                     .filter(|&(x0, x1, x2)| !self.hash_index_1_0_2.contains_key(&(x1, x0, x2))),
                             );
                             insertions.clear();
@@ -13914,15 +16838,20 @@ fn lir_math() {
                         });
                         log_duration!("fill index: {}", {
                             for &(x0, x1, x2) in &self.new {
-                                self.hash_index_2.entry((x2,)).or_default().push((x0, x1));
+                                self.hash_index_2
+                                    .entry((x2,))
+                                    .or_default()
+                                    .push((x0, x1, latest_timestamp));
                             }
                         });
                         log_duration!("retain index: {}", {
                             self.hash_index_2.retain(|&(x2,), v| {
                                 if uf.math_.is_root(x2) {
-                                    v.retain(|&mut (x0, x1)| uf.math_.is_root(x0) & uf.math_.is_root(x1));
+                                    v.retain(|&mut (x0, x1, _timestamp)| {
+                                        uf.math_.is_root(x0) & uf.math_.is_root(x1)
+                                    });
                                     v.sort_unstable();
-                                    v.dedup();
+                                    v.dedup_by(|(x0, x1, t1), (y0, y1, t2)| true & (*x0 == *y0) & (*x1 == *y1));
                                     true
                                 } else {
                                     false
@@ -13931,15 +16860,20 @@ fn lir_math() {
                         });
                         log_duration!("fill index: {}", {
                             for &(x0, x1, x2) in &self.new {
-                                self.hash_index_1.entry((x1,)).or_default().push((x0, x2));
+                                self.hash_index_1
+                                    .entry((x1,))
+                                    .or_default()
+                                    .push((x0, x2, latest_timestamp));
                             }
                         });
                         log_duration!("retain index: {}", {
                             self.hash_index_1.retain(|&(x1,), v| {
                                 if uf.math_.is_root(x1) {
-                                    v.retain(|&mut (x0, x2)| uf.math_.is_root(x0) & uf.math_.is_root(x2));
+                                    v.retain(|&mut (x0, x2, _timestamp)| {
+                                        uf.math_.is_root(x0) & uf.math_.is_root(x2)
+                                    });
                                     v.sort_unstable();
-                                    v.dedup();
+                                    v.dedup_by(|(x0, x2, t1), (y0, y2, t2)| true & (*x0 == *y0) & (*x2 == *y2));
                                     true
                                 } else {
                                     false
@@ -13948,15 +16882,18 @@ fn lir_math() {
                         });
                         log_duration!("fill index: {}", {
                             for &(x0, x1, x2) in &self.new {
-                                self.hash_index_2_0.entry((x2, x0)).or_default().push((x1,));
+                                self.hash_index_2_0
+                                    .entry((x2, x0))
+                                    .or_default()
+                                    .push((x1, latest_timestamp));
                             }
                         });
                         log_duration!("retain index: {}", {
                             self.hash_index_2_0.retain(|&(x2, x0), v| {
                                 if uf.math_.is_root(x2) & uf.math_.is_root(x0) {
-                                    v.retain(|&mut (x1,)| uf.math_.is_root(x1));
+                                    v.retain(|&mut (x1, _timestamp)| uf.math_.is_root(x1));
                                     v.sort_unstable();
-                                    v.dedup();
+                                    v.dedup_by(|(x1, t1), (y1, t2)| true & (*x1 == *y1));
                                     true
                                 } else {
                                     false
@@ -13965,15 +16902,20 @@ fn lir_math() {
                         });
                         log_duration!("fill index: {}", {
                             for &(x0, x1, x2) in &self.new {
-                                self.hash_index_0.entry((x0,)).or_default().push((x1, x2));
+                                self.hash_index_0
+                                    .entry((x0,))
+                                    .or_default()
+                                    .push((x1, x2, latest_timestamp));
                             }
                         });
                         log_duration!("retain index: {}", {
                             self.hash_index_0.retain(|&(x0,), v| {
                                 if uf.math_.is_root(x0) {
-                                    v.retain(|&mut (x1, x2)| uf.math_.is_root(x1) & uf.math_.is_root(x2));
+                                    v.retain(|&mut (x1, x2, _timestamp)| {
+                                        uf.math_.is_root(x1) & uf.math_.is_root(x2)
+                                    });
                                     v.sort_unstable();
-                                    v.dedup();
+                                    v.dedup_by(|(x1, x2, t1), (y1, y2, t2)| true & (*x1 == *y1) & (*x2 == *y2));
                                     true
                                 } else {
                                     false
@@ -13985,15 +16927,15 @@ fn lir_math() {
                                 self.hash_index_1_0_2
                                     .entry((x1, x0, x2))
                                     .or_default()
-                                    .push(());
+                                    .push((latest_timestamp,));
                             }
                         });
                         log_duration!("retain index: {}", {
                             self.hash_index_1_0_2.retain(|&(x1, x0, x2), v| {
                                 if uf.math_.is_root(x1) & uf.math_.is_root(x0) & uf.math_.is_root(x2) {
-                                    v.retain(|&mut ()| true);
+                                    v.retain(|&mut (_timestamp)| true);
                                     v.sort_unstable();
-                                    v.dedup();
+                                    v.dedup_by(|(t1,), (t2,)| true);
                                     true
                                 } else {
                                     false
@@ -14005,53 +16947,155 @@ fn lir_math() {
                 }
             }
             impl MulRelation {
-                fn iter2_1_0_2(&self, x1: Math, x0: Math) -> impl Iterator<Item = (Math,)> + use<'_> {
-                    self.hash_index_1_0.get(&(x1, x0)).into_iter().copied()
+                fn iter_all2_1_0_2(&self, x1: Math, x0: Math) -> impl Iterator<Item = (Math,)> + use<'_> {
+                    self.hash_index_1_0
+                        .get(&(x1, x0))
+                        .into_iter()
+                        .copied()
+                        .map(|(x2, _timestamp)| (x2,))
                 }
-                fn iter1_2_0_1(&self, x2: Math) -> impl Iterator<Item = (Math, Math)> + use<'_> {
-                    self.hash_index_2.get(&(x2,)).into_iter().flatten().copied()
+                fn iter_all1_2_0_1(&self, x2: Math) -> impl Iterator<Item = (Math, Math)> + use<'_> {
+                    self.hash_index_2
+                        .get(&(x2,))
+                        .into_iter()
+                        .flatten()
+                        .copied()
+                        .map(|(x0, x1, _timestamp)| (x0, x1))
                 }
-                fn iter1_1_0_2(&self, x1: Math) -> impl Iterator<Item = (Math, Math)> + use<'_> {
-                    self.hash_index_1.get(&(x1,)).into_iter().flatten().copied()
+                fn iter_all1_1_0_2(&self, x1: Math) -> impl Iterator<Item = (Math, Math)> + use<'_> {
+                    self.hash_index_1
+                        .get(&(x1,))
+                        .into_iter()
+                        .flatten()
+                        .copied()
+                        .map(|(x0, x2, _timestamp)| (x0, x2))
                 }
-                fn iter2_2_0_1(&self, x2: Math, x0: Math) -> impl Iterator<Item = (Math,)> + use<'_> {
+                fn iter_all2_2_0_1(&self, x2: Math, x0: Math) -> impl Iterator<Item = (Math,)> + use<'_> {
                     self.hash_index_2_0
                         .get(&(x2, x0))
                         .into_iter()
                         .flatten()
                         .copied()
+                        .map(|(x1, _timestamp)| (x1,))
                 }
-                fn iter1_0_1_2(&self, x0: Math) -> impl Iterator<Item = (Math, Math)> + use<'_> {
-                    self.hash_index_0.get(&(x0,)).into_iter().flatten().copied()
+                fn iter_all1_0_1_2(&self, x0: Math) -> impl Iterator<Item = (Math, Math)> + use<'_> {
+                    self.hash_index_0
+                        .get(&(x0,))
+                        .into_iter()
+                        .flatten()
+                        .copied()
+                        .map(|(x1, x2, _timestamp)| (x1, x2))
                 }
-                fn iter3_1_0_2(&self, x1: Math, x0: Math, x2: Math) -> impl Iterator<Item = ()> + use<'_> {
+                fn iter_all3_1_0_2(&self, x1: Math, x0: Math, x2: Math) -> impl Iterator<Item = ()> + use<'_> {
                     self.hash_index_1_0_2
                         .get(&(x1, x0, x2))
                         .into_iter()
                         .flatten()
                         .copied()
+                        .map(|(_timestamp)| ())
+                }
+                fn iter_old2_1_0_2(
+                    &self,
+                    x1: Math,
+                    x0: Math,
+                    latest_timestamp: TimeStamp,
+                ) -> impl Iterator<Item = (Math,)> + use<'_> {
+                    self.hash_index_1_0
+                        .get(&(x1, x0))
+                        .into_iter()
+                        .copied()
+                        .filter_map(move |(x2, timestamp)| (timestamp < latest_timestamp).then_some((x2,)))
+                }
+                fn iter_old1_2_0_1(
+                    &self,
+                    x2: Math,
+                    latest_timestamp: TimeStamp,
+                ) -> impl Iterator<Item = (Math, Math)> + use<'_> {
+                    self.hash_index_2
+                        .get(&(x2,))
+                        .into_iter()
+                        .flatten()
+                        .copied()
+                        .filter_map(move |(x0, x1, timestamp)| {
+                            (timestamp < latest_timestamp).then_some((x0, x1))
+                        })
+                }
+                fn iter_old1_1_0_2(
+                    &self,
+                    x1: Math,
+                    latest_timestamp: TimeStamp,
+                ) -> impl Iterator<Item = (Math, Math)> + use<'_> {
+                    self.hash_index_1
+                        .get(&(x1,))
+                        .into_iter()
+                        .flatten()
+                        .copied()
+                        .filter_map(move |(x0, x2, timestamp)| {
+                            (timestamp < latest_timestamp).then_some((x0, x2))
+                        })
+                }
+                fn iter_old2_2_0_1(
+                    &self,
+                    x2: Math,
+                    x0: Math,
+                    latest_timestamp: TimeStamp,
+                ) -> impl Iterator<Item = (Math,)> + use<'_> {
+                    self.hash_index_2_0
+                        .get(&(x2, x0))
+                        .into_iter()
+                        .flatten()
+                        .copied()
+                        .filter_map(move |(x1, timestamp)| (timestamp < latest_timestamp).then_some((x1,)))
+                }
+                fn iter_old1_0_1_2(
+                    &self,
+                    x0: Math,
+                    latest_timestamp: TimeStamp,
+                ) -> impl Iterator<Item = (Math, Math)> + use<'_> {
+                    self.hash_index_0
+                        .get(&(x0,))
+                        .into_iter()
+                        .flatten()
+                        .copied()
+                        .filter_map(move |(x1, x2, timestamp)| {
+                            (timestamp < latest_timestamp).then_some((x1, x2))
+                        })
+                }
+                fn iter_old3_1_0_2(
+                    &self,
+                    x1: Math,
+                    x0: Math,
+                    x2: Math,
+                    latest_timestamp: TimeStamp,
+                ) -> impl Iterator<Item = ()> + use<'_> {
+                    self.hash_index_1_0_2
+                        .get(&(x1, x0, x2))
+                        .into_iter()
+                        .flatten()
+                        .copied()
+                        .filter_map(move |(timestamp,)| (timestamp < latest_timestamp).then_some(()))
                 }
                 fn check2_1_0_2(&self, x1: Math, x0: Math) -> bool {
-                    self.iter2_1_0_2(x1, x0).next().is_some()
+                    self.iter_all2_1_0_2(x1, x0).next().is_some()
                 }
                 fn check1_2_0_1(&self, x2: Math) -> bool {
-                    self.iter1_2_0_1(x2).next().is_some()
+                    self.iter_all1_2_0_1(x2).next().is_some()
                 }
                 fn check1_1_0_2(&self, x1: Math) -> bool {
-                    self.iter1_1_0_2(x1).next().is_some()
+                    self.iter_all1_1_0_2(x1).next().is_some()
                 }
                 fn check2_2_0_1(&self, x2: Math, x0: Math) -> bool {
-                    self.iter2_2_0_1(x2, x0).next().is_some()
+                    self.iter_all2_2_0_1(x2, x0).next().is_some()
                 }
                 fn check1_0_1_2(&self, x0: Math) -> bool {
-                    self.iter1_0_1_2(x0).next().is_some()
+                    self.iter_all1_0_1_2(x0).next().is_some()
                 }
                 fn check3_1_0_2(&self, x1: Math, x0: Math, x2: Math) -> bool {
-                    self.iter3_1_0_2(x1, x0, x2).next().is_some()
+                    self.iter_all3_1_0_2(x1, x0, x2).next().is_some()
                 }
                 #[allow(unreachable_code)]
                 fn entry2_1_0_2(&self, x1: Math, x0: Math, delta: &mut Delta, uf: &mut Unification) -> (Math,) {
-                    if let Some((x2,)) = self.iter2_1_0_2(x1, x0).next() {
+                    if let Some((x2,)) = self.iter_all2_1_0_2(x1, x0).next() {
                         return (x2,);
                     }
                     let x2 = uf.math_.add_eclass();
@@ -14067,7 +17111,7 @@ fn lir_math() {
                     delta: &mut Delta,
                     uf: &mut Unification,
                 ) -> () {
-                    if let Some(()) = self.iter3_1_0_2(x1, x0, x2).next() {
+                    if let Some(()) = self.iter_all3_1_0_2(x1, x0, x2).next() {
                         return ();
                     }
                     delta.mul_.push((x0, x1, x2));
@@ -14077,8 +17121,8 @@ fn lir_math() {
             #[derive(Debug, Default)]
             struct DivRelation {
                 new: Vec<<Self as Relation>::Row>,
-                hash_index_0_1: runtime::HashMap<(Math, Math), (Math,)>,
-                hash_index_0_1_2: runtime::HashMap<(Math, Math, Math), runtime::SmallVec<[(); 1]>>,
+                hash_index_0_1: runtime::HashMap<(Math, Math), (Math, TimeStamp)>,
+                hash_index_0_1_2: runtime::HashMap<(Math, Math, Math), runtime::SmallVec<[(TimeStamp,); 1]>>,
                 math_num_uprooted_at_latest_retain: usize,
             }
             impl Relation for DivRelation {
@@ -14102,14 +17146,19 @@ fn lir_math() {
                 }
                 fn emit_graphviz(&self, buf: &mut String) {
                     use std::fmt::Write;
-                    for (i, ((x0, x1), (x2,))) in self.hash_index_0_1.iter().enumerate() {
+                    for (i, ((x0, x1), (x2, _timestamp))) in self.hash_index_0_1.iter().enumerate() {
                         writeln!(buf, "{}_{i} -> {}_{};", "div", "math", x0).unwrap();
                         writeln!(buf, "{}_{i} -> {}_{};", "div", "math", x1).unwrap();
                         writeln!(buf, "{}_{i} -> {}_{};", "div", "math", x2).unwrap();
                         writeln!(buf, "{}_{i} [shape = box];", "div").unwrap();
                     }
                 }
-                fn update_begin(&mut self, insertions: &[Self::Row], uf: &mut Unification) {
+                fn update_begin(
+                    &mut self,
+                    insertions: &[Self::Row],
+                    uf: &mut Unification,
+                    latest_timestamp: TimeStamp,
+                ) {
                     log_duration!("update_begin {}: {}", "div", {
                         for &(mut x0, mut x1, mut x2) in insertions {
                             match self
@@ -14117,43 +17166,59 @@ fn lir_math() {
                                 .entry((uf.math_.find(x0), uf.math_.find(x1)))
                             {
                                 runtime::HashMapEntry::Occupied(mut entry) => {
-                                    let (y2,) = entry.get_mut();
-                                    uf.math_.union_mut(&mut x2, y2);
+                                    let (y2, timestamp) = entry.get_mut();
+                                    let changed = false;
+                                    let old_val = *y2;
+                                    let changed = changed | (old_val != uf.math_.union_mut(&mut x2, y2));
+                                    if changed {
+                                        *timestamp = latest_timestamp;
+                                    }
                                 }
                                 runtime::HashMapEntry::Vacant(entry) => {
-                                    entry.insert((uf.math_.find(x2),));
+                                    entry.insert((uf.math_.find(x2), latest_timestamp));
                                 }
                             }
                         }
                     });
                 }
-                fn update(&mut self, insertions: &mut Vec<Self::Row>, uf: &mut Unification) -> bool {
+                fn update(
+                    &mut self,
+                    insertions: &mut Vec<Self::Row>,
+                    uf: &mut Unification,
+                    latest_timestamp: TimeStamp,
+                ) -> bool {
                     if self.math_num_uprooted_at_latest_retain == uf.math_.num_uprooted() {
                         return false;
                     }
                     let offset = insertions.len();
                     log_duration!("update {}: {}", "div", {
                         self.math_num_uprooted_at_latest_retain = uf.math_.num_uprooted();
-                        self.hash_index_0_1.retain(|&(x0, x1), &mut (x2,)| {
-                            if uf.math_.is_root(x0) & uf.math_.is_root(x1) & uf.math_.is_root(x2) {
-                                true
-                            } else {
-                                insertions.push((x0, x1, x2));
-                                false
-                            }
-                        });
+                        self.hash_index_0_1
+                            .retain(|&(x0, x1), &mut (x2, _timestamp)| {
+                                if uf.math_.is_root(x0) & uf.math_.is_root(x1) & uf.math_.is_root(x2) {
+                                    true
+                                } else {
+                                    insertions.push((x0, x1, x2));
+                                    false
+                                }
+                            });
                     });
-                    self.update_begin(&insertions[offset..], uf);
+                    self.update_begin(&insertions[offset..], uf, latest_timestamp);
                     true
                 }
-                fn update_finalize(&mut self, insertions: &mut Vec<Self::Row>, uf: &mut Unification) {
+                fn update_finalize(
+                    &mut self,
+                    insertions: &mut Vec<Self::Row>,
+                    uf: &mut Unification,
+                    latest_timestamp: TimeStamp,
+                ) {
                     log_duration!("update_finalize {}: {}", "div", {
                         assert!(self.new.is_empty());
                         log_duration!("fill new: {}", {
                             self.new.extend(
                                 self.hash_index_0_1
                                     .iter()
-                                    .map(|(&(x0, x1), &(x2,))| (x0, x1, x2))
+                                    .map(|(&(x0, x1), &(x2, _timestamp))| (x0, x1, x2))
                                     .filter(|&(x0, x1, x2)| !self.hash_index_0_1_2.contains_key(&(x0, x1, x2))),
                             );
                             insertions.clear();
@@ -14165,15 +17230,15 @@ fn lir_math() {
                                 self.hash_index_0_1_2
                                     .entry((x0, x1, x2))
                                     .or_default()
-                                    .push(());
+                                    .push((latest_timestamp,));
                             }
                         });
                         log_duration!("retain index: {}", {
                             self.hash_index_0_1_2.retain(|&(x0, x1, x2), v| {
                                 if uf.math_.is_root(x0) & uf.math_.is_root(x1) & uf.math_.is_root(x2) {
-                                    v.retain(|&mut ()| true);
+                                    v.retain(|&mut (_timestamp)| true);
                                     v.sort_unstable();
-                                    v.dedup();
+                                    v.dedup_by(|(t1,), (t2,)| true);
                                     true
                                 } else {
                                     false
@@ -14185,25 +17250,56 @@ fn lir_math() {
                 }
             }
             impl DivRelation {
-                fn iter2_0_1_2(&self, x0: Math, x1: Math) -> impl Iterator<Item = (Math,)> + use<'_> {
-                    self.hash_index_0_1.get(&(x0, x1)).into_iter().copied()
+                fn iter_all2_0_1_2(&self, x0: Math, x1: Math) -> impl Iterator<Item = (Math,)> + use<'_> {
+                    self.hash_index_0_1
+                        .get(&(x0, x1))
+                        .into_iter()
+                        .copied()
+                        .map(|(x2, _timestamp)| (x2,))
                 }
-                fn iter3_0_1_2(&self, x0: Math, x1: Math, x2: Math) -> impl Iterator<Item = ()> + use<'_> {
+                fn iter_all3_0_1_2(&self, x0: Math, x1: Math, x2: Math) -> impl Iterator<Item = ()> + use<'_> {
                     self.hash_index_0_1_2
                         .get(&(x0, x1, x2))
                         .into_iter()
                         .flatten()
                         .copied()
+                        .map(|(_timestamp)| ())
+                }
+                fn iter_old2_0_1_2(
+                    &self,
+                    x0: Math,
+                    x1: Math,
+                    latest_timestamp: TimeStamp,
+                ) -> impl Iterator<Item = (Math,)> + use<'_> {
+                    self.hash_index_0_1
+                        .get(&(x0, x1))
+                        .into_iter()
+                        .copied()
+                        .filter_map(move |(x2, timestamp)| (timestamp < latest_timestamp).then_some((x2,)))
+                }
+                fn iter_old3_0_1_2(
+                    &self,
+                    x0: Math,
+                    x1: Math,
+                    x2: Math,
+                    latest_timestamp: TimeStamp,
+                ) -> impl Iterator<Item = ()> + use<'_> {
+                    self.hash_index_0_1_2
+                        .get(&(x0, x1, x2))
+                        .into_iter()
+                        .flatten()
+                        .copied()
+                        .filter_map(move |(timestamp,)| (timestamp < latest_timestamp).then_some(()))
                 }
                 fn check2_0_1_2(&self, x0: Math, x1: Math) -> bool {
-                    self.iter2_0_1_2(x0, x1).next().is_some()
+                    self.iter_all2_0_1_2(x0, x1).next().is_some()
                 }
                 fn check3_0_1_2(&self, x0: Math, x1: Math, x2: Math) -> bool {
-                    self.iter3_0_1_2(x0, x1, x2).next().is_some()
+                    self.iter_all3_0_1_2(x0, x1, x2).next().is_some()
                 }
                 #[allow(unreachable_code)]
                 fn entry2_0_1_2(&self, x0: Math, x1: Math, delta: &mut Delta, uf: &mut Unification) -> (Math,) {
-                    if let Some((x2,)) = self.iter2_0_1_2(x0, x1).next() {
+                    if let Some((x2,)) = self.iter_all2_0_1_2(x0, x1).next() {
                         return (x2,);
                     }
                     let x2 = uf.math_.add_eclass();
@@ -14219,7 +17315,7 @@ fn lir_math() {
                     delta: &mut Delta,
                     uf: &mut Unification,
                 ) -> () {
-                    if let Some(()) = self.iter3_0_1_2(x0, x1, x2).next() {
+                    if let Some(()) = self.iter_all3_0_1_2(x0, x1, x2).next() {
                         return ();
                     }
                     delta.div_.push((x0, x1, x2));
@@ -14229,12 +17325,12 @@ fn lir_math() {
             #[derive(Debug, Default)]
             struct PowRelation {
                 new: Vec<<Self as Relation>::Row>,
-                hash_index_0_1: runtime::HashMap<(Math, Math), (Math,)>,
-                hash_index_2: runtime::HashMap<(Math,), runtime::SmallVec<[(Math, Math); 1]>>,
-                hash_index_2_0: runtime::HashMap<(Math, Math), runtime::SmallVec<[(Math,); 1]>>,
-                hash_index_0: runtime::HashMap<(Math,), runtime::SmallVec<[(Math, Math); 1]>>,
-                hash_index_1: runtime::HashMap<(Math,), runtime::SmallVec<[(Math, Math); 1]>>,
-                hash_index_0_1_2: runtime::HashMap<(Math, Math, Math), runtime::SmallVec<[(); 1]>>,
+                hash_index_0_1: runtime::HashMap<(Math, Math), (Math, TimeStamp)>,
+                hash_index_2: runtime::HashMap<(Math,), runtime::SmallVec<[(Math, Math, TimeStamp); 1]>>,
+                hash_index_2_0: runtime::HashMap<(Math, Math), runtime::SmallVec<[(Math, TimeStamp); 1]>>,
+                hash_index_0: runtime::HashMap<(Math,), runtime::SmallVec<[(Math, Math, TimeStamp); 1]>>,
+                hash_index_1: runtime::HashMap<(Math,), runtime::SmallVec<[(Math, Math, TimeStamp); 1]>>,
+                hash_index_0_1_2: runtime::HashMap<(Math, Math, Math), runtime::SmallVec<[(TimeStamp,); 1]>>,
                 math_num_uprooted_at_latest_retain: usize,
             }
             impl Relation for PowRelation {
@@ -14258,14 +17354,19 @@ fn lir_math() {
                 }
                 fn emit_graphviz(&self, buf: &mut String) {
                     use std::fmt::Write;
-                    for (i, ((x0, x1), (x2,))) in self.hash_index_0_1.iter().enumerate() {
+                    for (i, ((x0, x1), (x2, _timestamp))) in self.hash_index_0_1.iter().enumerate() {
                         writeln!(buf, "{}_{i} -> {}_{};", "pow", "math", x0).unwrap();
                         writeln!(buf, "{}_{i} -> {}_{};", "pow", "math", x1).unwrap();
                         writeln!(buf, "{}_{i} -> {}_{};", "pow", "math", x2).unwrap();
                         writeln!(buf, "{}_{i} [shape = box];", "pow").unwrap();
                     }
                 }
-                fn update_begin(&mut self, insertions: &[Self::Row], uf: &mut Unification) {
+                fn update_begin(
+                    &mut self,
+                    insertions: &[Self::Row],
+                    uf: &mut Unification,
+                    latest_timestamp: TimeStamp,
+                ) {
                     log_duration!("update_begin {}: {}", "pow", {
                         for &(mut x0, mut x1, mut x2) in insertions {
                             match self
@@ -14273,43 +17374,59 @@ fn lir_math() {
                                 .entry((uf.math_.find(x0), uf.math_.find(x1)))
                             {
                                 runtime::HashMapEntry::Occupied(mut entry) => {
-                                    let (y2,) = entry.get_mut();
-                                    uf.math_.union_mut(&mut x2, y2);
+                                    let (y2, timestamp) = entry.get_mut();
+                                    let changed = false;
+                                    let old_val = *y2;
+                                    let changed = changed | (old_val != uf.math_.union_mut(&mut x2, y2));
+                                    if changed {
+                                        *timestamp = latest_timestamp;
+                                    }
                                 }
                                 runtime::HashMapEntry::Vacant(entry) => {
-                                    entry.insert((uf.math_.find(x2),));
+                                    entry.insert((uf.math_.find(x2), latest_timestamp));
                                 }
                             }
                         }
                     });
                 }
-                fn update(&mut self, insertions: &mut Vec<Self::Row>, uf: &mut Unification) -> bool {
+                fn update(
+                    &mut self,
+                    insertions: &mut Vec<Self::Row>,
+                    uf: &mut Unification,
+                    latest_timestamp: TimeStamp,
+                ) -> bool {
                     if self.math_num_uprooted_at_latest_retain == uf.math_.num_uprooted() {
                         return false;
                     }
                     let offset = insertions.len();
                     log_duration!("update {}: {}", "pow", {
                         self.math_num_uprooted_at_latest_retain = uf.math_.num_uprooted();
-                        self.hash_index_0_1.retain(|&(x0, x1), &mut (x2,)| {
-                            if uf.math_.is_root(x0) & uf.math_.is_root(x1) & uf.math_.is_root(x2) {
-                                true
-                            } else {
-                                insertions.push((x0, x1, x2));
-                                false
-                            }
-                        });
+                        self.hash_index_0_1
+                            .retain(|&(x0, x1), &mut (x2, _timestamp)| {
+                                if uf.math_.is_root(x0) & uf.math_.is_root(x1) & uf.math_.is_root(x2) {
+                                    true
+                                } else {
+                                    insertions.push((x0, x1, x2));
+                                    false
+                                }
+                            });
                     });
-                    self.update_begin(&insertions[offset..], uf);
+                    self.update_begin(&insertions[offset..], uf, latest_timestamp);
                     true
                 }
-                fn update_finalize(&mut self, insertions: &mut Vec<Self::Row>, uf: &mut Unification) {
+                fn update_finalize(
+                    &mut self,
+                    insertions: &mut Vec<Self::Row>,
+                    uf: &mut Unification,
+                    latest_timestamp: TimeStamp,
+                ) {
                     log_duration!("update_finalize {}: {}", "pow", {
                         assert!(self.new.is_empty());
                         log_duration!("fill new: {}", {
                             self.new.extend(
                                 self.hash_index_0_1
                                     .iter()
-                                    .map(|(&(x0, x1), &(x2,))| (x0, x1, x2))
+                                    .map(|(&(x0, x1), &(x2, _timestamp))| (x0, x1, x2))
                                     .filter(|&(x0, x1, x2)| !self.hash_index_0_1_2.contains_key(&(x0, x1, x2))),
                             );
                             insertions.clear();
@@ -14318,15 +17435,20 @@ fn lir_math() {
                         });
                         log_duration!("fill index: {}", {
                             for &(x0, x1, x2) in &self.new {
-                                self.hash_index_2.entry((x2,)).or_default().push((x0, x1));
+                                self.hash_index_2
+                                    .entry((x2,))
+                                    .or_default()
+                                    .push((x0, x1, latest_timestamp));
                             }
                         });
                         log_duration!("retain index: {}", {
                             self.hash_index_2.retain(|&(x2,), v| {
                                 if uf.math_.is_root(x2) {
-                                    v.retain(|&mut (x0, x1)| uf.math_.is_root(x0) & uf.math_.is_root(x1));
+                                    v.retain(|&mut (x0, x1, _timestamp)| {
+                                        uf.math_.is_root(x0) & uf.math_.is_root(x1)
+                                    });
                                     v.sort_unstable();
-                                    v.dedup();
+                                    v.dedup_by(|(x0, x1, t1), (y0, y1, t2)| true & (*x0 == *y0) & (*x1 == *y1));
                                     true
                                 } else {
                                     false
@@ -14335,15 +17457,18 @@ fn lir_math() {
                         });
                         log_duration!("fill index: {}", {
                             for &(x0, x1, x2) in &self.new {
-                                self.hash_index_2_0.entry((x2, x0)).or_default().push((x1,));
+                                self.hash_index_2_0
+                                    .entry((x2, x0))
+                                    .or_default()
+                                    .push((x1, latest_timestamp));
                             }
                         });
                         log_duration!("retain index: {}", {
                             self.hash_index_2_0.retain(|&(x2, x0), v| {
                                 if uf.math_.is_root(x2) & uf.math_.is_root(x0) {
-                                    v.retain(|&mut (x1,)| uf.math_.is_root(x1));
+                                    v.retain(|&mut (x1, _timestamp)| uf.math_.is_root(x1));
                                     v.sort_unstable();
-                                    v.dedup();
+                                    v.dedup_by(|(x1, t1), (y1, t2)| true & (*x1 == *y1));
                                     true
                                 } else {
                                     false
@@ -14352,15 +17477,20 @@ fn lir_math() {
                         });
                         log_duration!("fill index: {}", {
                             for &(x0, x1, x2) in &self.new {
-                                self.hash_index_0.entry((x0,)).or_default().push((x1, x2));
+                                self.hash_index_0
+                                    .entry((x0,))
+                                    .or_default()
+                                    .push((x1, x2, latest_timestamp));
                             }
                         });
                         log_duration!("retain index: {}", {
                             self.hash_index_0.retain(|&(x0,), v| {
                                 if uf.math_.is_root(x0) {
-                                    v.retain(|&mut (x1, x2)| uf.math_.is_root(x1) & uf.math_.is_root(x2));
+                                    v.retain(|&mut (x1, x2, _timestamp)| {
+                                        uf.math_.is_root(x1) & uf.math_.is_root(x2)
+                                    });
                                     v.sort_unstable();
-                                    v.dedup();
+                                    v.dedup_by(|(x1, x2, t1), (y1, y2, t2)| true & (*x1 == *y1) & (*x2 == *y2));
                                     true
                                 } else {
                                     false
@@ -14369,15 +17499,20 @@ fn lir_math() {
                         });
                         log_duration!("fill index: {}", {
                             for &(x0, x1, x2) in &self.new {
-                                self.hash_index_1.entry((x1,)).or_default().push((x0, x2));
+                                self.hash_index_1
+                                    .entry((x1,))
+                                    .or_default()
+                                    .push((x0, x2, latest_timestamp));
                             }
                         });
                         log_duration!("retain index: {}", {
                             self.hash_index_1.retain(|&(x1,), v| {
                                 if uf.math_.is_root(x1) {
-                                    v.retain(|&mut (x0, x2)| uf.math_.is_root(x0) & uf.math_.is_root(x2));
+                                    v.retain(|&mut (x0, x2, _timestamp)| {
+                                        uf.math_.is_root(x0) & uf.math_.is_root(x2)
+                                    });
                                     v.sort_unstable();
-                                    v.dedup();
+                                    v.dedup_by(|(x0, x2, t1), (y0, y2, t2)| true & (*x0 == *y0) & (*x2 == *y2));
                                     true
                                 } else {
                                     false
@@ -14389,15 +17524,15 @@ fn lir_math() {
                                 self.hash_index_0_1_2
                                     .entry((x0, x1, x2))
                                     .or_default()
-                                    .push(());
+                                    .push((latest_timestamp,));
                             }
                         });
                         log_duration!("retain index: {}", {
                             self.hash_index_0_1_2.retain(|&(x0, x1, x2), v| {
                                 if uf.math_.is_root(x0) & uf.math_.is_root(x1) & uf.math_.is_root(x2) {
-                                    v.retain(|&mut ()| true);
+                                    v.retain(|&mut (_timestamp)| true);
                                     v.sort_unstable();
-                                    v.dedup();
+                                    v.dedup_by(|(t1,), (t2,)| true);
                                     true
                                 } else {
                                     false
@@ -14409,53 +17544,155 @@ fn lir_math() {
                 }
             }
             impl PowRelation {
-                fn iter2_0_1_2(&self, x0: Math, x1: Math) -> impl Iterator<Item = (Math,)> + use<'_> {
-                    self.hash_index_0_1.get(&(x0, x1)).into_iter().copied()
+                fn iter_all2_0_1_2(&self, x0: Math, x1: Math) -> impl Iterator<Item = (Math,)> + use<'_> {
+                    self.hash_index_0_1
+                        .get(&(x0, x1))
+                        .into_iter()
+                        .copied()
+                        .map(|(x2, _timestamp)| (x2,))
                 }
-                fn iter1_2_0_1(&self, x2: Math) -> impl Iterator<Item = (Math, Math)> + use<'_> {
-                    self.hash_index_2.get(&(x2,)).into_iter().flatten().copied()
+                fn iter_all1_2_0_1(&self, x2: Math) -> impl Iterator<Item = (Math, Math)> + use<'_> {
+                    self.hash_index_2
+                        .get(&(x2,))
+                        .into_iter()
+                        .flatten()
+                        .copied()
+                        .map(|(x0, x1, _timestamp)| (x0, x1))
                 }
-                fn iter2_2_0_1(&self, x2: Math, x0: Math) -> impl Iterator<Item = (Math,)> + use<'_> {
+                fn iter_all2_2_0_1(&self, x2: Math, x0: Math) -> impl Iterator<Item = (Math,)> + use<'_> {
                     self.hash_index_2_0
                         .get(&(x2, x0))
                         .into_iter()
                         .flatten()
                         .copied()
+                        .map(|(x1, _timestamp)| (x1,))
                 }
-                fn iter1_0_1_2(&self, x0: Math) -> impl Iterator<Item = (Math, Math)> + use<'_> {
-                    self.hash_index_0.get(&(x0,)).into_iter().flatten().copied()
+                fn iter_all1_0_1_2(&self, x0: Math) -> impl Iterator<Item = (Math, Math)> + use<'_> {
+                    self.hash_index_0
+                        .get(&(x0,))
+                        .into_iter()
+                        .flatten()
+                        .copied()
+                        .map(|(x1, x2, _timestamp)| (x1, x2))
                 }
-                fn iter1_1_0_2(&self, x1: Math) -> impl Iterator<Item = (Math, Math)> + use<'_> {
-                    self.hash_index_1.get(&(x1,)).into_iter().flatten().copied()
+                fn iter_all1_1_0_2(&self, x1: Math) -> impl Iterator<Item = (Math, Math)> + use<'_> {
+                    self.hash_index_1
+                        .get(&(x1,))
+                        .into_iter()
+                        .flatten()
+                        .copied()
+                        .map(|(x0, x2, _timestamp)| (x0, x2))
                 }
-                fn iter3_0_1_2(&self, x0: Math, x1: Math, x2: Math) -> impl Iterator<Item = ()> + use<'_> {
+                fn iter_all3_0_1_2(&self, x0: Math, x1: Math, x2: Math) -> impl Iterator<Item = ()> + use<'_> {
                     self.hash_index_0_1_2
                         .get(&(x0, x1, x2))
                         .into_iter()
                         .flatten()
                         .copied()
+                        .map(|(_timestamp)| ())
+                }
+                fn iter_old2_0_1_2(
+                    &self,
+                    x0: Math,
+                    x1: Math,
+                    latest_timestamp: TimeStamp,
+                ) -> impl Iterator<Item = (Math,)> + use<'_> {
+                    self.hash_index_0_1
+                        .get(&(x0, x1))
+                        .into_iter()
+                        .copied()
+                        .filter_map(move |(x2, timestamp)| (timestamp < latest_timestamp).then_some((x2,)))
+                }
+                fn iter_old1_2_0_1(
+                    &self,
+                    x2: Math,
+                    latest_timestamp: TimeStamp,
+                ) -> impl Iterator<Item = (Math, Math)> + use<'_> {
+                    self.hash_index_2
+                        .get(&(x2,))
+                        .into_iter()
+                        .flatten()
+                        .copied()
+                        .filter_map(move |(x0, x1, timestamp)| {
+                            (timestamp < latest_timestamp).then_some((x0, x1))
+                        })
+                }
+                fn iter_old2_2_0_1(
+                    &self,
+                    x2: Math,
+                    x0: Math,
+                    latest_timestamp: TimeStamp,
+                ) -> impl Iterator<Item = (Math,)> + use<'_> {
+                    self.hash_index_2_0
+                        .get(&(x2, x0))
+                        .into_iter()
+                        .flatten()
+                        .copied()
+                        .filter_map(move |(x1, timestamp)| (timestamp < latest_timestamp).then_some((x1,)))
+                }
+                fn iter_old1_0_1_2(
+                    &self,
+                    x0: Math,
+                    latest_timestamp: TimeStamp,
+                ) -> impl Iterator<Item = (Math, Math)> + use<'_> {
+                    self.hash_index_0
+                        .get(&(x0,))
+                        .into_iter()
+                        .flatten()
+                        .copied()
+                        .filter_map(move |(x1, x2, timestamp)| {
+                            (timestamp < latest_timestamp).then_some((x1, x2))
+                        })
+                }
+                fn iter_old1_1_0_2(
+                    &self,
+                    x1: Math,
+                    latest_timestamp: TimeStamp,
+                ) -> impl Iterator<Item = (Math, Math)> + use<'_> {
+                    self.hash_index_1
+                        .get(&(x1,))
+                        .into_iter()
+                        .flatten()
+                        .copied()
+                        .filter_map(move |(x0, x2, timestamp)| {
+                            (timestamp < latest_timestamp).then_some((x0, x2))
+                        })
+                }
+                fn iter_old3_0_1_2(
+                    &self,
+                    x0: Math,
+                    x1: Math,
+                    x2: Math,
+                    latest_timestamp: TimeStamp,
+                ) -> impl Iterator<Item = ()> + use<'_> {
+                    self.hash_index_0_1_2
+                        .get(&(x0, x1, x2))
+                        .into_iter()
+                        .flatten()
+                        .copied()
+                        .filter_map(move |(timestamp,)| (timestamp < latest_timestamp).then_some(()))
                 }
                 fn check2_0_1_2(&self, x0: Math, x1: Math) -> bool {
-                    self.iter2_0_1_2(x0, x1).next().is_some()
+                    self.iter_all2_0_1_2(x0, x1).next().is_some()
                 }
                 fn check1_2_0_1(&self, x2: Math) -> bool {
-                    self.iter1_2_0_1(x2).next().is_some()
+                    self.iter_all1_2_0_1(x2).next().is_some()
                 }
                 fn check2_2_0_1(&self, x2: Math, x0: Math) -> bool {
-                    self.iter2_2_0_1(x2, x0).next().is_some()
+                    self.iter_all2_2_0_1(x2, x0).next().is_some()
                 }
                 fn check1_0_1_2(&self, x0: Math) -> bool {
-                    self.iter1_0_1_2(x0).next().is_some()
+                    self.iter_all1_0_1_2(x0).next().is_some()
                 }
                 fn check1_1_0_2(&self, x1: Math) -> bool {
-                    self.iter1_1_0_2(x1).next().is_some()
+                    self.iter_all1_1_0_2(x1).next().is_some()
                 }
                 fn check3_0_1_2(&self, x0: Math, x1: Math, x2: Math) -> bool {
-                    self.iter3_0_1_2(x0, x1, x2).next().is_some()
+                    self.iter_all3_0_1_2(x0, x1, x2).next().is_some()
                 }
                 #[allow(unreachable_code)]
                 fn entry2_0_1_2(&self, x0: Math, x1: Math, delta: &mut Delta, uf: &mut Unification) -> (Math,) {
-                    if let Some((x2,)) = self.iter2_0_1_2(x0, x1).next() {
+                    if let Some((x2,)) = self.iter_all2_0_1_2(x0, x1).next() {
                         return (x2,);
                     }
                     let x2 = uf.math_.add_eclass();
@@ -14471,7 +17708,7 @@ fn lir_math() {
                     delta: &mut Delta,
                     uf: &mut Unification,
                 ) -> () {
-                    if let Some(()) = self.iter3_0_1_2(x0, x1, x2).next() {
+                    if let Some(()) = self.iter_all3_0_1_2(x0, x1, x2).next() {
                         return ();
                     }
                     delta.pow_.push((x0, x1, x2));
@@ -14481,8 +17718,8 @@ fn lir_math() {
             #[derive(Debug, Default)]
             struct LnRelation {
                 new: Vec<<Self as Relation>::Row>,
-                hash_index_0: runtime::HashMap<(Math,), (Math,)>,
-                hash_index_0_1: runtime::HashMap<(Math, Math), runtime::SmallVec<[(); 1]>>,
+                hash_index_0: runtime::HashMap<(Math,), (Math, TimeStamp)>,
+                hash_index_0_1: runtime::HashMap<(Math, Math), runtime::SmallVec<[(TimeStamp,); 1]>>,
                 math_num_uprooted_at_latest_retain: usize,
             }
             impl Relation for LnRelation {
@@ -14506,35 +17743,50 @@ fn lir_math() {
                 }
                 fn emit_graphviz(&self, buf: &mut String) {
                     use std::fmt::Write;
-                    for (i, ((x0,), (x1,))) in self.hash_index_0.iter().enumerate() {
+                    for (i, ((x0,), (x1, _timestamp))) in self.hash_index_0.iter().enumerate() {
                         writeln!(buf, "{}_{i} -> {}_{};", "ln", "math", x0).unwrap();
                         writeln!(buf, "{}_{i} -> {}_{};", "ln", "math", x1).unwrap();
                         writeln!(buf, "{}_{i} [shape = box];", "ln").unwrap();
                     }
                 }
-                fn update_begin(&mut self, insertions: &[Self::Row], uf: &mut Unification) {
+                fn update_begin(
+                    &mut self,
+                    insertions: &[Self::Row],
+                    uf: &mut Unification,
+                    latest_timestamp: TimeStamp,
+                ) {
                     log_duration!("update_begin {}: {}", "ln", {
                         for &(mut x0, mut x1) in insertions {
                             match self.hash_index_0.entry((uf.math_.find(x0),)) {
                                 runtime::HashMapEntry::Occupied(mut entry) => {
-                                    let (y1,) = entry.get_mut();
-                                    uf.math_.union_mut(&mut x1, y1);
+                                    let (y1, timestamp) = entry.get_mut();
+                                    let changed = false;
+                                    let old_val = *y1;
+                                    let changed = changed | (old_val != uf.math_.union_mut(&mut x1, y1));
+                                    if changed {
+                                        *timestamp = latest_timestamp;
+                                    }
                                 }
                                 runtime::HashMapEntry::Vacant(entry) => {
-                                    entry.insert((uf.math_.find(x1),));
+                                    entry.insert((uf.math_.find(x1), latest_timestamp));
                                 }
                             }
                         }
                     });
                 }
-                fn update(&mut self, insertions: &mut Vec<Self::Row>, uf: &mut Unification) -> bool {
+                fn update(
+                    &mut self,
+                    insertions: &mut Vec<Self::Row>,
+                    uf: &mut Unification,
+                    latest_timestamp: TimeStamp,
+                ) -> bool {
                     if self.math_num_uprooted_at_latest_retain == uf.math_.num_uprooted() {
                         return false;
                     }
                     let offset = insertions.len();
                     log_duration!("update {}: {}", "ln", {
                         self.math_num_uprooted_at_latest_retain = uf.math_.num_uprooted();
-                        self.hash_index_0.retain(|&(x0,), &mut (x1,)| {
+                        self.hash_index_0.retain(|&(x0,), &mut (x1, _timestamp)| {
                             if uf.math_.is_root(x0) & uf.math_.is_root(x1) {
                                 true
                             } else {
@@ -14543,17 +17795,22 @@ fn lir_math() {
                             }
                         });
                     });
-                    self.update_begin(&insertions[offset..], uf);
+                    self.update_begin(&insertions[offset..], uf, latest_timestamp);
                     true
                 }
-                fn update_finalize(&mut self, insertions: &mut Vec<Self::Row>, uf: &mut Unification) {
+                fn update_finalize(
+                    &mut self,
+                    insertions: &mut Vec<Self::Row>,
+                    uf: &mut Unification,
+                    latest_timestamp: TimeStamp,
+                ) {
                     log_duration!("update_finalize {}: {}", "ln", {
                         assert!(self.new.is_empty());
                         log_duration!("fill new: {}", {
                             self.new.extend(
                                 self.hash_index_0
                                     .iter()
-                                    .map(|(&(x0,), &(x1,))| (x0, x1))
+                                    .map(|(&(x0,), &(x1, _timestamp))| (x0, x1))
                                     .filter(|&(x0, x1)| !self.hash_index_0_1.contains_key(&(x0, x1))),
                             );
                             insertions.clear();
@@ -14562,15 +17819,18 @@ fn lir_math() {
                         });
                         log_duration!("fill index: {}", {
                             for &(x0, x1) in &self.new {
-                                self.hash_index_0_1.entry((x0, x1)).or_default().push(());
+                                self.hash_index_0_1
+                                    .entry((x0, x1))
+                                    .or_default()
+                                    .push((latest_timestamp,));
                             }
                         });
                         log_duration!("retain index: {}", {
                             self.hash_index_0_1.retain(|&(x0, x1), v| {
                                 if uf.math_.is_root(x0) & uf.math_.is_root(x1) {
-                                    v.retain(|&mut ()| true);
+                                    v.retain(|&mut (_timestamp)| true);
                                     v.sort_unstable();
-                                    v.dedup();
+                                    v.dedup_by(|(t1,), (t2,)| true);
                                     true
                                 } else {
                                     false
@@ -14582,25 +17842,54 @@ fn lir_math() {
                 }
             }
             impl LnRelation {
-                fn iter1_0_1(&self, x0: Math) -> impl Iterator<Item = (Math,)> + use<'_> {
-                    self.hash_index_0.get(&(x0,)).into_iter().copied()
+                fn iter_all1_0_1(&self, x0: Math) -> impl Iterator<Item = (Math,)> + use<'_> {
+                    self.hash_index_0
+                        .get(&(x0,))
+                        .into_iter()
+                        .copied()
+                        .map(|(x1, _timestamp)| (x1,))
                 }
-                fn iter2_0_1(&self, x0: Math, x1: Math) -> impl Iterator<Item = ()> + use<'_> {
+                fn iter_all2_0_1(&self, x0: Math, x1: Math) -> impl Iterator<Item = ()> + use<'_> {
                     self.hash_index_0_1
                         .get(&(x0, x1))
                         .into_iter()
                         .flatten()
                         .copied()
+                        .map(|(_timestamp)| ())
+                }
+                fn iter_old1_0_1(
+                    &self,
+                    x0: Math,
+                    latest_timestamp: TimeStamp,
+                ) -> impl Iterator<Item = (Math,)> + use<'_> {
+                    self.hash_index_0
+                        .get(&(x0,))
+                        .into_iter()
+                        .copied()
+                        .filter_map(move |(x1, timestamp)| (timestamp < latest_timestamp).then_some((x1,)))
+                }
+                fn iter_old2_0_1(
+                    &self,
+                    x0: Math,
+                    x1: Math,
+                    latest_timestamp: TimeStamp,
+                ) -> impl Iterator<Item = ()> + use<'_> {
+                    self.hash_index_0_1
+                        .get(&(x0, x1))
+                        .into_iter()
+                        .flatten()
+                        .copied()
+                        .filter_map(move |(timestamp,)| (timestamp < latest_timestamp).then_some(()))
                 }
                 fn check1_0_1(&self, x0: Math) -> bool {
-                    self.iter1_0_1(x0).next().is_some()
+                    self.iter_all1_0_1(x0).next().is_some()
                 }
                 fn check2_0_1(&self, x0: Math, x1: Math) -> bool {
-                    self.iter2_0_1(x0, x1).next().is_some()
+                    self.iter_all2_0_1(x0, x1).next().is_some()
                 }
                 #[allow(unreachable_code)]
                 fn entry1_0_1(&self, x0: Math, delta: &mut Delta, uf: &mut Unification) -> (Math,) {
-                    if let Some((x1,)) = self.iter1_0_1(x0).next() {
+                    if let Some((x1,)) = self.iter_all1_0_1(x0).next() {
                         return (x1,);
                     }
                     let x1 = uf.math_.add_eclass();
@@ -14609,7 +17898,7 @@ fn lir_math() {
                 }
                 #[allow(unreachable_code)]
                 fn entry2_0_1(&self, x0: Math, x1: Math, delta: &mut Delta, uf: &mut Unification) -> () {
-                    if let Some(()) = self.iter2_0_1(x0, x1).next() {
+                    if let Some(()) = self.iter_all2_0_1(x0, x1).next() {
                         return ();
                     }
                     delta.ln_.push((x0, x1));
@@ -14619,8 +17908,8 @@ fn lir_math() {
             #[derive(Debug, Default)]
             struct SqrtRelation {
                 new: Vec<<Self as Relation>::Row>,
-                hash_index_0: runtime::HashMap<(Math,), (Math,)>,
-                hash_index_0_1: runtime::HashMap<(Math, Math), runtime::SmallVec<[(); 1]>>,
+                hash_index_0: runtime::HashMap<(Math,), (Math, TimeStamp)>,
+                hash_index_0_1: runtime::HashMap<(Math, Math), runtime::SmallVec<[(TimeStamp,); 1]>>,
                 math_num_uprooted_at_latest_retain: usize,
             }
             impl Relation for SqrtRelation {
@@ -14644,35 +17933,50 @@ fn lir_math() {
                 }
                 fn emit_graphviz(&self, buf: &mut String) {
                     use std::fmt::Write;
-                    for (i, ((x0,), (x1,))) in self.hash_index_0.iter().enumerate() {
+                    for (i, ((x0,), (x1, _timestamp))) in self.hash_index_0.iter().enumerate() {
                         writeln!(buf, "{}_{i} -> {}_{};", "sqrt", "math", x0).unwrap();
                         writeln!(buf, "{}_{i} -> {}_{};", "sqrt", "math", x1).unwrap();
                         writeln!(buf, "{}_{i} [shape = box];", "sqrt").unwrap();
                     }
                 }
-                fn update_begin(&mut self, insertions: &[Self::Row], uf: &mut Unification) {
+                fn update_begin(
+                    &mut self,
+                    insertions: &[Self::Row],
+                    uf: &mut Unification,
+                    latest_timestamp: TimeStamp,
+                ) {
                     log_duration!("update_begin {}: {}", "sqrt", {
                         for &(mut x0, mut x1) in insertions {
                             match self.hash_index_0.entry((uf.math_.find(x0),)) {
                                 runtime::HashMapEntry::Occupied(mut entry) => {
-                                    let (y1,) = entry.get_mut();
-                                    uf.math_.union_mut(&mut x1, y1);
+                                    let (y1, timestamp) = entry.get_mut();
+                                    let changed = false;
+                                    let old_val = *y1;
+                                    let changed = changed | (old_val != uf.math_.union_mut(&mut x1, y1));
+                                    if changed {
+                                        *timestamp = latest_timestamp;
+                                    }
                                 }
                                 runtime::HashMapEntry::Vacant(entry) => {
-                                    entry.insert((uf.math_.find(x1),));
+                                    entry.insert((uf.math_.find(x1), latest_timestamp));
                                 }
                             }
                         }
                     });
                 }
-                fn update(&mut self, insertions: &mut Vec<Self::Row>, uf: &mut Unification) -> bool {
+                fn update(
+                    &mut self,
+                    insertions: &mut Vec<Self::Row>,
+                    uf: &mut Unification,
+                    latest_timestamp: TimeStamp,
+                ) -> bool {
                     if self.math_num_uprooted_at_latest_retain == uf.math_.num_uprooted() {
                         return false;
                     }
                     let offset = insertions.len();
                     log_duration!("update {}: {}", "sqrt", {
                         self.math_num_uprooted_at_latest_retain = uf.math_.num_uprooted();
-                        self.hash_index_0.retain(|&(x0,), &mut (x1,)| {
+                        self.hash_index_0.retain(|&(x0,), &mut (x1, _timestamp)| {
                             if uf.math_.is_root(x0) & uf.math_.is_root(x1) {
                                 true
                             } else {
@@ -14681,17 +17985,22 @@ fn lir_math() {
                             }
                         });
                     });
-                    self.update_begin(&insertions[offset..], uf);
+                    self.update_begin(&insertions[offset..], uf, latest_timestamp);
                     true
                 }
-                fn update_finalize(&mut self, insertions: &mut Vec<Self::Row>, uf: &mut Unification) {
+                fn update_finalize(
+                    &mut self,
+                    insertions: &mut Vec<Self::Row>,
+                    uf: &mut Unification,
+                    latest_timestamp: TimeStamp,
+                ) {
                     log_duration!("update_finalize {}: {}", "sqrt", {
                         assert!(self.new.is_empty());
                         log_duration!("fill new: {}", {
                             self.new.extend(
                                 self.hash_index_0
                                     .iter()
-                                    .map(|(&(x0,), &(x1,))| (x0, x1))
+                                    .map(|(&(x0,), &(x1, _timestamp))| (x0, x1))
                                     .filter(|&(x0, x1)| !self.hash_index_0_1.contains_key(&(x0, x1))),
                             );
                             insertions.clear();
@@ -14700,15 +18009,18 @@ fn lir_math() {
                         });
                         log_duration!("fill index: {}", {
                             for &(x0, x1) in &self.new {
-                                self.hash_index_0_1.entry((x0, x1)).or_default().push(());
+                                self.hash_index_0_1
+                                    .entry((x0, x1))
+                                    .or_default()
+                                    .push((latest_timestamp,));
                             }
                         });
                         log_duration!("retain index: {}", {
                             self.hash_index_0_1.retain(|&(x0, x1), v| {
                                 if uf.math_.is_root(x0) & uf.math_.is_root(x1) {
-                                    v.retain(|&mut ()| true);
+                                    v.retain(|&mut (_timestamp)| true);
                                     v.sort_unstable();
-                                    v.dedup();
+                                    v.dedup_by(|(t1,), (t2,)| true);
                                     true
                                 } else {
                                     false
@@ -14720,25 +18032,54 @@ fn lir_math() {
                 }
             }
             impl SqrtRelation {
-                fn iter1_0_1(&self, x0: Math) -> impl Iterator<Item = (Math,)> + use<'_> {
-                    self.hash_index_0.get(&(x0,)).into_iter().copied()
+                fn iter_all1_0_1(&self, x0: Math) -> impl Iterator<Item = (Math,)> + use<'_> {
+                    self.hash_index_0
+                        .get(&(x0,))
+                        .into_iter()
+                        .copied()
+                        .map(|(x1, _timestamp)| (x1,))
                 }
-                fn iter2_0_1(&self, x0: Math, x1: Math) -> impl Iterator<Item = ()> + use<'_> {
+                fn iter_all2_0_1(&self, x0: Math, x1: Math) -> impl Iterator<Item = ()> + use<'_> {
                     self.hash_index_0_1
                         .get(&(x0, x1))
                         .into_iter()
                         .flatten()
                         .copied()
+                        .map(|(_timestamp)| ())
+                }
+                fn iter_old1_0_1(
+                    &self,
+                    x0: Math,
+                    latest_timestamp: TimeStamp,
+                ) -> impl Iterator<Item = (Math,)> + use<'_> {
+                    self.hash_index_0
+                        .get(&(x0,))
+                        .into_iter()
+                        .copied()
+                        .filter_map(move |(x1, timestamp)| (timestamp < latest_timestamp).then_some((x1,)))
+                }
+                fn iter_old2_0_1(
+                    &self,
+                    x0: Math,
+                    x1: Math,
+                    latest_timestamp: TimeStamp,
+                ) -> impl Iterator<Item = ()> + use<'_> {
+                    self.hash_index_0_1
+                        .get(&(x0, x1))
+                        .into_iter()
+                        .flatten()
+                        .copied()
+                        .filter_map(move |(timestamp,)| (timestamp < latest_timestamp).then_some(()))
                 }
                 fn check1_0_1(&self, x0: Math) -> bool {
-                    self.iter1_0_1(x0).next().is_some()
+                    self.iter_all1_0_1(x0).next().is_some()
                 }
                 fn check2_0_1(&self, x0: Math, x1: Math) -> bool {
-                    self.iter2_0_1(x0, x1).next().is_some()
+                    self.iter_all2_0_1(x0, x1).next().is_some()
                 }
                 #[allow(unreachable_code)]
                 fn entry1_0_1(&self, x0: Math, delta: &mut Delta, uf: &mut Unification) -> (Math,) {
-                    if let Some((x1,)) = self.iter1_0_1(x0).next() {
+                    if let Some((x1,)) = self.iter_all1_0_1(x0).next() {
                         return (x1,);
                     }
                     let x1 = uf.math_.add_eclass();
@@ -14747,7 +18088,7 @@ fn lir_math() {
                 }
                 #[allow(unreachable_code)]
                 fn entry2_0_1(&self, x0: Math, x1: Math, delta: &mut Delta, uf: &mut Unification) -> () {
-                    if let Some(()) = self.iter2_0_1(x0, x1).next() {
+                    if let Some(()) = self.iter_all2_0_1(x0, x1).next() {
                         return ();
                     }
                     delta.sqrt_.push((x0, x1));
@@ -14757,8 +18098,8 @@ fn lir_math() {
             #[derive(Debug, Default)]
             struct SinRelation {
                 new: Vec<<Self as Relation>::Row>,
-                hash_index_0: runtime::HashMap<(Math,), (Math,)>,
-                hash_index_0_1: runtime::HashMap<(Math, Math), runtime::SmallVec<[(); 1]>>,
+                hash_index_0: runtime::HashMap<(Math,), (Math, TimeStamp)>,
+                hash_index_0_1: runtime::HashMap<(Math, Math), runtime::SmallVec<[(TimeStamp,); 1]>>,
                 math_num_uprooted_at_latest_retain: usize,
             }
             impl Relation for SinRelation {
@@ -14782,35 +18123,50 @@ fn lir_math() {
                 }
                 fn emit_graphviz(&self, buf: &mut String) {
                     use std::fmt::Write;
-                    for (i, ((x0,), (x1,))) in self.hash_index_0.iter().enumerate() {
+                    for (i, ((x0,), (x1, _timestamp))) in self.hash_index_0.iter().enumerate() {
                         writeln!(buf, "{}_{i} -> {}_{};", "sin", "math", x0).unwrap();
                         writeln!(buf, "{}_{i} -> {}_{};", "sin", "math", x1).unwrap();
                         writeln!(buf, "{}_{i} [shape = box];", "sin").unwrap();
                     }
                 }
-                fn update_begin(&mut self, insertions: &[Self::Row], uf: &mut Unification) {
+                fn update_begin(
+                    &mut self,
+                    insertions: &[Self::Row],
+                    uf: &mut Unification,
+                    latest_timestamp: TimeStamp,
+                ) {
                     log_duration!("update_begin {}: {}", "sin", {
                         for &(mut x0, mut x1) in insertions {
                             match self.hash_index_0.entry((uf.math_.find(x0),)) {
                                 runtime::HashMapEntry::Occupied(mut entry) => {
-                                    let (y1,) = entry.get_mut();
-                                    uf.math_.union_mut(&mut x1, y1);
+                                    let (y1, timestamp) = entry.get_mut();
+                                    let changed = false;
+                                    let old_val = *y1;
+                                    let changed = changed | (old_val != uf.math_.union_mut(&mut x1, y1));
+                                    if changed {
+                                        *timestamp = latest_timestamp;
+                                    }
                                 }
                                 runtime::HashMapEntry::Vacant(entry) => {
-                                    entry.insert((uf.math_.find(x1),));
+                                    entry.insert((uf.math_.find(x1), latest_timestamp));
                                 }
                             }
                         }
                     });
                 }
-                fn update(&mut self, insertions: &mut Vec<Self::Row>, uf: &mut Unification) -> bool {
+                fn update(
+                    &mut self,
+                    insertions: &mut Vec<Self::Row>,
+                    uf: &mut Unification,
+                    latest_timestamp: TimeStamp,
+                ) -> bool {
                     if self.math_num_uprooted_at_latest_retain == uf.math_.num_uprooted() {
                         return false;
                     }
                     let offset = insertions.len();
                     log_duration!("update {}: {}", "sin", {
                         self.math_num_uprooted_at_latest_retain = uf.math_.num_uprooted();
-                        self.hash_index_0.retain(|&(x0,), &mut (x1,)| {
+                        self.hash_index_0.retain(|&(x0,), &mut (x1, _timestamp)| {
                             if uf.math_.is_root(x0) & uf.math_.is_root(x1) {
                                 true
                             } else {
@@ -14819,17 +18175,22 @@ fn lir_math() {
                             }
                         });
                     });
-                    self.update_begin(&insertions[offset..], uf);
+                    self.update_begin(&insertions[offset..], uf, latest_timestamp);
                     true
                 }
-                fn update_finalize(&mut self, insertions: &mut Vec<Self::Row>, uf: &mut Unification) {
+                fn update_finalize(
+                    &mut self,
+                    insertions: &mut Vec<Self::Row>,
+                    uf: &mut Unification,
+                    latest_timestamp: TimeStamp,
+                ) {
                     log_duration!("update_finalize {}: {}", "sin", {
                         assert!(self.new.is_empty());
                         log_duration!("fill new: {}", {
                             self.new.extend(
                                 self.hash_index_0
                                     .iter()
-                                    .map(|(&(x0,), &(x1,))| (x0, x1))
+                                    .map(|(&(x0,), &(x1, _timestamp))| (x0, x1))
                                     .filter(|&(x0, x1)| !self.hash_index_0_1.contains_key(&(x0, x1))),
                             );
                             insertions.clear();
@@ -14838,15 +18199,18 @@ fn lir_math() {
                         });
                         log_duration!("fill index: {}", {
                             for &(x0, x1) in &self.new {
-                                self.hash_index_0_1.entry((x0, x1)).or_default().push(());
+                                self.hash_index_0_1
+                                    .entry((x0, x1))
+                                    .or_default()
+                                    .push((latest_timestamp,));
                             }
                         });
                         log_duration!("retain index: {}", {
                             self.hash_index_0_1.retain(|&(x0, x1), v| {
                                 if uf.math_.is_root(x0) & uf.math_.is_root(x1) {
-                                    v.retain(|&mut ()| true);
+                                    v.retain(|&mut (_timestamp)| true);
                                     v.sort_unstable();
-                                    v.dedup();
+                                    v.dedup_by(|(t1,), (t2,)| true);
                                     true
                                 } else {
                                     false
@@ -14858,25 +18222,54 @@ fn lir_math() {
                 }
             }
             impl SinRelation {
-                fn iter1_0_1(&self, x0: Math) -> impl Iterator<Item = (Math,)> + use<'_> {
-                    self.hash_index_0.get(&(x0,)).into_iter().copied()
+                fn iter_all1_0_1(&self, x0: Math) -> impl Iterator<Item = (Math,)> + use<'_> {
+                    self.hash_index_0
+                        .get(&(x0,))
+                        .into_iter()
+                        .copied()
+                        .map(|(x1, _timestamp)| (x1,))
                 }
-                fn iter2_0_1(&self, x0: Math, x1: Math) -> impl Iterator<Item = ()> + use<'_> {
+                fn iter_all2_0_1(&self, x0: Math, x1: Math) -> impl Iterator<Item = ()> + use<'_> {
                     self.hash_index_0_1
                         .get(&(x0, x1))
                         .into_iter()
                         .flatten()
                         .copied()
+                        .map(|(_timestamp)| ())
+                }
+                fn iter_old1_0_1(
+                    &self,
+                    x0: Math,
+                    latest_timestamp: TimeStamp,
+                ) -> impl Iterator<Item = (Math,)> + use<'_> {
+                    self.hash_index_0
+                        .get(&(x0,))
+                        .into_iter()
+                        .copied()
+                        .filter_map(move |(x1, timestamp)| (timestamp < latest_timestamp).then_some((x1,)))
+                }
+                fn iter_old2_0_1(
+                    &self,
+                    x0: Math,
+                    x1: Math,
+                    latest_timestamp: TimeStamp,
+                ) -> impl Iterator<Item = ()> + use<'_> {
+                    self.hash_index_0_1
+                        .get(&(x0, x1))
+                        .into_iter()
+                        .flatten()
+                        .copied()
+                        .filter_map(move |(timestamp,)| (timestamp < latest_timestamp).then_some(()))
                 }
                 fn check1_0_1(&self, x0: Math) -> bool {
-                    self.iter1_0_1(x0).next().is_some()
+                    self.iter_all1_0_1(x0).next().is_some()
                 }
                 fn check2_0_1(&self, x0: Math, x1: Math) -> bool {
-                    self.iter2_0_1(x0, x1).next().is_some()
+                    self.iter_all2_0_1(x0, x1).next().is_some()
                 }
                 #[allow(unreachable_code)]
                 fn entry1_0_1(&self, x0: Math, delta: &mut Delta, uf: &mut Unification) -> (Math,) {
-                    if let Some((x1,)) = self.iter1_0_1(x0).next() {
+                    if let Some((x1,)) = self.iter_all1_0_1(x0).next() {
                         return (x1,);
                     }
                     let x1 = uf.math_.add_eclass();
@@ -14885,7 +18278,7 @@ fn lir_math() {
                 }
                 #[allow(unreachable_code)]
                 fn entry2_0_1(&self, x0: Math, x1: Math, delta: &mut Delta, uf: &mut Unification) -> () {
-                    if let Some(()) = self.iter2_0_1(x0, x1).next() {
+                    if let Some(()) = self.iter_all2_0_1(x0, x1).next() {
                         return ();
                     }
                     delta.sin_.push((x0, x1));
@@ -14895,8 +18288,8 @@ fn lir_math() {
             #[derive(Debug, Default)]
             struct CosRelation {
                 new: Vec<<Self as Relation>::Row>,
-                hash_index_0: runtime::HashMap<(Math,), (Math,)>,
-                hash_index_0_1: runtime::HashMap<(Math, Math), runtime::SmallVec<[(); 1]>>,
+                hash_index_0: runtime::HashMap<(Math,), (Math, TimeStamp)>,
+                hash_index_0_1: runtime::HashMap<(Math, Math), runtime::SmallVec<[(TimeStamp,); 1]>>,
                 math_num_uprooted_at_latest_retain: usize,
             }
             impl Relation for CosRelation {
@@ -14920,35 +18313,50 @@ fn lir_math() {
                 }
                 fn emit_graphviz(&self, buf: &mut String) {
                     use std::fmt::Write;
-                    for (i, ((x0,), (x1,))) in self.hash_index_0.iter().enumerate() {
+                    for (i, ((x0,), (x1, _timestamp))) in self.hash_index_0.iter().enumerate() {
                         writeln!(buf, "{}_{i} -> {}_{};", "cos", "math", x0).unwrap();
                         writeln!(buf, "{}_{i} -> {}_{};", "cos", "math", x1).unwrap();
                         writeln!(buf, "{}_{i} [shape = box];", "cos").unwrap();
                     }
                 }
-                fn update_begin(&mut self, insertions: &[Self::Row], uf: &mut Unification) {
+                fn update_begin(
+                    &mut self,
+                    insertions: &[Self::Row],
+                    uf: &mut Unification,
+                    latest_timestamp: TimeStamp,
+                ) {
                     log_duration!("update_begin {}: {}", "cos", {
                         for &(mut x0, mut x1) in insertions {
                             match self.hash_index_0.entry((uf.math_.find(x0),)) {
                                 runtime::HashMapEntry::Occupied(mut entry) => {
-                                    let (y1,) = entry.get_mut();
-                                    uf.math_.union_mut(&mut x1, y1);
+                                    let (y1, timestamp) = entry.get_mut();
+                                    let changed = false;
+                                    let old_val = *y1;
+                                    let changed = changed | (old_val != uf.math_.union_mut(&mut x1, y1));
+                                    if changed {
+                                        *timestamp = latest_timestamp;
+                                    }
                                 }
                                 runtime::HashMapEntry::Vacant(entry) => {
-                                    entry.insert((uf.math_.find(x1),));
+                                    entry.insert((uf.math_.find(x1), latest_timestamp));
                                 }
                             }
                         }
                     });
                 }
-                fn update(&mut self, insertions: &mut Vec<Self::Row>, uf: &mut Unification) -> bool {
+                fn update(
+                    &mut self,
+                    insertions: &mut Vec<Self::Row>,
+                    uf: &mut Unification,
+                    latest_timestamp: TimeStamp,
+                ) -> bool {
                     if self.math_num_uprooted_at_latest_retain == uf.math_.num_uprooted() {
                         return false;
                     }
                     let offset = insertions.len();
                     log_duration!("update {}: {}", "cos", {
                         self.math_num_uprooted_at_latest_retain = uf.math_.num_uprooted();
-                        self.hash_index_0.retain(|&(x0,), &mut (x1,)| {
+                        self.hash_index_0.retain(|&(x0,), &mut (x1, _timestamp)| {
                             if uf.math_.is_root(x0) & uf.math_.is_root(x1) {
                                 true
                             } else {
@@ -14957,17 +18365,22 @@ fn lir_math() {
                             }
                         });
                     });
-                    self.update_begin(&insertions[offset..], uf);
+                    self.update_begin(&insertions[offset..], uf, latest_timestamp);
                     true
                 }
-                fn update_finalize(&mut self, insertions: &mut Vec<Self::Row>, uf: &mut Unification) {
+                fn update_finalize(
+                    &mut self,
+                    insertions: &mut Vec<Self::Row>,
+                    uf: &mut Unification,
+                    latest_timestamp: TimeStamp,
+                ) {
                     log_duration!("update_finalize {}: {}", "cos", {
                         assert!(self.new.is_empty());
                         log_duration!("fill new: {}", {
                             self.new.extend(
                                 self.hash_index_0
                                     .iter()
-                                    .map(|(&(x0,), &(x1,))| (x0, x1))
+                                    .map(|(&(x0,), &(x1, _timestamp))| (x0, x1))
                                     .filter(|&(x0, x1)| !self.hash_index_0_1.contains_key(&(x0, x1))),
                             );
                             insertions.clear();
@@ -14976,15 +18389,18 @@ fn lir_math() {
                         });
                         log_duration!("fill index: {}", {
                             for &(x0, x1) in &self.new {
-                                self.hash_index_0_1.entry((x0, x1)).or_default().push(());
+                                self.hash_index_0_1
+                                    .entry((x0, x1))
+                                    .or_default()
+                                    .push((latest_timestamp,));
                             }
                         });
                         log_duration!("retain index: {}", {
                             self.hash_index_0_1.retain(|&(x0, x1), v| {
                                 if uf.math_.is_root(x0) & uf.math_.is_root(x1) {
-                                    v.retain(|&mut ()| true);
+                                    v.retain(|&mut (_timestamp)| true);
                                     v.sort_unstable();
-                                    v.dedup();
+                                    v.dedup_by(|(t1,), (t2,)| true);
                                     true
                                 } else {
                                     false
@@ -14996,25 +18412,54 @@ fn lir_math() {
                 }
             }
             impl CosRelation {
-                fn iter1_0_1(&self, x0: Math) -> impl Iterator<Item = (Math,)> + use<'_> {
-                    self.hash_index_0.get(&(x0,)).into_iter().copied()
+                fn iter_all1_0_1(&self, x0: Math) -> impl Iterator<Item = (Math,)> + use<'_> {
+                    self.hash_index_0
+                        .get(&(x0,))
+                        .into_iter()
+                        .copied()
+                        .map(|(x1, _timestamp)| (x1,))
                 }
-                fn iter2_0_1(&self, x0: Math, x1: Math) -> impl Iterator<Item = ()> + use<'_> {
+                fn iter_all2_0_1(&self, x0: Math, x1: Math) -> impl Iterator<Item = ()> + use<'_> {
                     self.hash_index_0_1
                         .get(&(x0, x1))
                         .into_iter()
                         .flatten()
                         .copied()
+                        .map(|(_timestamp)| ())
+                }
+                fn iter_old1_0_1(
+                    &self,
+                    x0: Math,
+                    latest_timestamp: TimeStamp,
+                ) -> impl Iterator<Item = (Math,)> + use<'_> {
+                    self.hash_index_0
+                        .get(&(x0,))
+                        .into_iter()
+                        .copied()
+                        .filter_map(move |(x1, timestamp)| (timestamp < latest_timestamp).then_some((x1,)))
+                }
+                fn iter_old2_0_1(
+                    &self,
+                    x0: Math,
+                    x1: Math,
+                    latest_timestamp: TimeStamp,
+                ) -> impl Iterator<Item = ()> + use<'_> {
+                    self.hash_index_0_1
+                        .get(&(x0, x1))
+                        .into_iter()
+                        .flatten()
+                        .copied()
+                        .filter_map(move |(timestamp,)| (timestamp < latest_timestamp).then_some(()))
                 }
                 fn check1_0_1(&self, x0: Math) -> bool {
-                    self.iter1_0_1(x0).next().is_some()
+                    self.iter_all1_0_1(x0).next().is_some()
                 }
                 fn check2_0_1(&self, x0: Math, x1: Math) -> bool {
-                    self.iter2_0_1(x0, x1).next().is_some()
+                    self.iter_all2_0_1(x0, x1).next().is_some()
                 }
                 #[allow(unreachable_code)]
                 fn entry1_0_1(&self, x0: Math, delta: &mut Delta, uf: &mut Unification) -> (Math,) {
-                    if let Some((x1,)) = self.iter1_0_1(x0).next() {
+                    if let Some((x1,)) = self.iter_all1_0_1(x0).next() {
                         return (x1,);
                     }
                     let x1 = uf.math_.add_eclass();
@@ -15023,7 +18468,7 @@ fn lir_math() {
                 }
                 #[allow(unreachable_code)]
                 fn entry2_0_1(&self, x0: Math, x1: Math, delta: &mut Delta, uf: &mut Unification) -> () {
-                    if let Some(()) = self.iter2_0_1(x0, x1).next() {
+                    if let Some(()) = self.iter_all2_0_1(x0, x1).next() {
                         return ();
                     }
                     delta.cos_.push((x0, x1));
@@ -15033,9 +18478,11 @@ fn lir_math() {
             #[derive(Debug, Default)]
             struct ConstRelation {
                 new: Vec<<Self as Relation>::Row>,
-                hash_index_0: runtime::HashMap<(std::primitive::i64,), (Math,)>,
-                hash_index_1: runtime::HashMap<(Math,), runtime::SmallVec<[(std::primitive::i64,); 1]>>,
-                hash_index_0_1: runtime::HashMap<(std::primitive::i64, Math), runtime::SmallVec<[(); 1]>>,
+                hash_index_0: runtime::HashMap<(std::primitive::i64,), (Math, TimeStamp)>,
+                hash_index_1:
+                    runtime::HashMap<(Math,), runtime::SmallVec<[(std::primitive::i64, TimeStamp); 1]>>,
+                hash_index_0_1:
+                    runtime::HashMap<(std::primitive::i64, Math), runtime::SmallVec<[(TimeStamp,); 1]>>,
                 i64_num_uprooted_at_latest_retain: usize,
                 math_num_uprooted_at_latest_retain: usize,
             }
@@ -15060,35 +18507,50 @@ fn lir_math() {
                 }
                 fn emit_graphviz(&self, buf: &mut String) {
                     use std::fmt::Write;
-                    for (i, ((x0,), (x1,))) in self.hash_index_0.iter().enumerate() {
+                    for (i, ((x0,), (x1, _timestamp))) in self.hash_index_0.iter().enumerate() {
                         writeln!(buf, "{}_{i} -> {}_{};", "const", "i64", x0).unwrap();
                         writeln!(buf, "{}_{i} -> {}_{};", "const", "math", x1).unwrap();
                         writeln!(buf, "{}_{i} [shape = box];", "const").unwrap();
                     }
                 }
-                fn update_begin(&mut self, insertions: &[Self::Row], uf: &mut Unification) {
+                fn update_begin(
+                    &mut self,
+                    insertions: &[Self::Row],
+                    uf: &mut Unification,
+                    latest_timestamp: TimeStamp,
+                ) {
                     log_duration!("update_begin {}: {}", "const", {
                         for &(mut x0, mut x1) in insertions {
                             match self.hash_index_0.entry((x0,)) {
                                 runtime::HashMapEntry::Occupied(mut entry) => {
-                                    let (y1,) = entry.get_mut();
-                                    uf.math_.union_mut(&mut x1, y1);
+                                    let (y1, timestamp) = entry.get_mut();
+                                    let changed = false;
+                                    let old_val = *y1;
+                                    let changed = changed | (old_val != uf.math_.union_mut(&mut x1, y1));
+                                    if changed {
+                                        *timestamp = latest_timestamp;
+                                    }
                                 }
                                 runtime::HashMapEntry::Vacant(entry) => {
-                                    entry.insert((uf.math_.find(x1),));
+                                    entry.insert((uf.math_.find(x1), latest_timestamp));
                                 }
                             }
                         }
                     });
                 }
-                fn update(&mut self, insertions: &mut Vec<Self::Row>, uf: &mut Unification) -> bool {
+                fn update(
+                    &mut self,
+                    insertions: &mut Vec<Self::Row>,
+                    uf: &mut Unification,
+                    latest_timestamp: TimeStamp,
+                ) -> bool {
                     if self.math_num_uprooted_at_latest_retain == uf.math_.num_uprooted() {
                         return false;
                     }
                     let offset = insertions.len();
                     log_duration!("update {}: {}", "const", {
                         self.math_num_uprooted_at_latest_retain = uf.math_.num_uprooted();
-                        self.hash_index_0.retain(|&(x0,), &mut (x1,)| {
+                        self.hash_index_0.retain(|&(x0,), &mut (x1, _timestamp)| {
                             if uf.math_.is_root(x1) {
                                 true
                             } else {
@@ -15097,17 +18559,22 @@ fn lir_math() {
                             }
                         });
                     });
-                    self.update_begin(&insertions[offset..], uf);
+                    self.update_begin(&insertions[offset..], uf, latest_timestamp);
                     true
                 }
-                fn update_finalize(&mut self, insertions: &mut Vec<Self::Row>, uf: &mut Unification) {
+                fn update_finalize(
+                    &mut self,
+                    insertions: &mut Vec<Self::Row>,
+                    uf: &mut Unification,
+                    latest_timestamp: TimeStamp,
+                ) {
                     log_duration!("update_finalize {}: {}", "const", {
                         assert!(self.new.is_empty());
                         log_duration!("fill new: {}", {
                             self.new.extend(
                                 self.hash_index_0
                                     .iter()
-                                    .map(|(&(x0,), &(x1,))| (x0, x1))
+                                    .map(|(&(x0,), &(x1, _timestamp))| (x0, x1))
                                     .filter(|&(x0, x1)| !self.hash_index_0_1.contains_key(&(x0, x1))),
                             );
                             insertions.clear();
@@ -15116,15 +18583,18 @@ fn lir_math() {
                         });
                         log_duration!("fill index: {}", {
                             for &(x0, x1) in &self.new {
-                                self.hash_index_1.entry((x1,)).or_default().push((x0,));
+                                self.hash_index_1
+                                    .entry((x1,))
+                                    .or_default()
+                                    .push((x0, latest_timestamp));
                             }
                         });
                         log_duration!("retain index: {}", {
                             self.hash_index_1.retain(|&(x1,), v| {
                                 if uf.math_.is_root(x1) {
-                                    v.retain(|&mut (x0,)| true);
+                                    v.retain(|&mut (x0, _timestamp)| true);
                                     v.sort_unstable();
-                                    v.dedup();
+                                    v.dedup_by(|(x0, t1), (y0, t2)| true & (*x0 == *y0));
                                     true
                                 } else {
                                     false
@@ -15133,15 +18603,18 @@ fn lir_math() {
                         });
                         log_duration!("fill index: {}", {
                             for &(x0, x1) in &self.new {
-                                self.hash_index_0_1.entry((x0, x1)).or_default().push(());
+                                self.hash_index_0_1
+                                    .entry((x0, x1))
+                                    .or_default()
+                                    .push((latest_timestamp,));
                             }
                         });
                         log_duration!("retain index: {}", {
                             self.hash_index_0_1.retain(|&(x0, x1), v| {
                                 if uf.math_.is_root(x1) {
-                                    v.retain(|&mut ()| true);
+                                    v.retain(|&mut (_timestamp)| true);
                                     v.sort_unstable();
-                                    v.dedup();
+                                    v.dedup_by(|(t1,), (t2,)| true);
                                     true
                                 } else {
                                     false
@@ -15153,27 +18626,77 @@ fn lir_math() {
                 }
             }
             impl ConstRelation {
-                fn iter1_0_1(&self, x0: std::primitive::i64) -> impl Iterator<Item = (Math,)> + use<'_> {
-                    self.hash_index_0.get(&(x0,)).into_iter().copied()
+                fn iter_all1_0_1(&self, x0: std::primitive::i64) -> impl Iterator<Item = (Math,)> + use<'_> {
+                    self.hash_index_0
+                        .get(&(x0,))
+                        .into_iter()
+                        .copied()
+                        .map(|(x1, _timestamp)| (x1,))
                 }
-                fn iter1_1_0(&self, x1: Math) -> impl Iterator<Item = (std::primitive::i64,)> + use<'_> {
-                    self.hash_index_1.get(&(x1,)).into_iter().flatten().copied()
+                fn iter_all1_1_0(&self, x1: Math) -> impl Iterator<Item = (std::primitive::i64,)> + use<'_> {
+                    self.hash_index_1
+                        .get(&(x1,))
+                        .into_iter()
+                        .flatten()
+                        .copied()
+                        .map(|(x0, _timestamp)| (x0,))
                 }
-                fn iter2_0_1(&self, x0: std::primitive::i64, x1: Math) -> impl Iterator<Item = ()> + use<'_> {
+                fn iter_all2_0_1(
+                    &self,
+                    x0: std::primitive::i64,
+                    x1: Math,
+                ) -> impl Iterator<Item = ()> + use<'_> {
                     self.hash_index_0_1
                         .get(&(x0, x1))
                         .into_iter()
                         .flatten()
                         .copied()
+                        .map(|(_timestamp)| ())
+                }
+                fn iter_old1_0_1(
+                    &self,
+                    x0: std::primitive::i64,
+                    latest_timestamp: TimeStamp,
+                ) -> impl Iterator<Item = (Math,)> + use<'_> {
+                    self.hash_index_0
+                        .get(&(x0,))
+                        .into_iter()
+                        .copied()
+                        .filter_map(move |(x1, timestamp)| (timestamp < latest_timestamp).then_some((x1,)))
+                }
+                fn iter_old1_1_0(
+                    &self,
+                    x1: Math,
+                    latest_timestamp: TimeStamp,
+                ) -> impl Iterator<Item = (std::primitive::i64,)> + use<'_> {
+                    self.hash_index_1
+                        .get(&(x1,))
+                        .into_iter()
+                        .flatten()
+                        .copied()
+                        .filter_map(move |(x0, timestamp)| (timestamp < latest_timestamp).then_some((x0,)))
+                }
+                fn iter_old2_0_1(
+                    &self,
+                    x0: std::primitive::i64,
+                    x1: Math,
+                    latest_timestamp: TimeStamp,
+                ) -> impl Iterator<Item = ()> + use<'_> {
+                    self.hash_index_0_1
+                        .get(&(x0, x1))
+                        .into_iter()
+                        .flatten()
+                        .copied()
+                        .filter_map(move |(timestamp,)| (timestamp < latest_timestamp).then_some(()))
                 }
                 fn check1_0_1(&self, x0: std::primitive::i64) -> bool {
-                    self.iter1_0_1(x0).next().is_some()
+                    self.iter_all1_0_1(x0).next().is_some()
                 }
                 fn check1_1_0(&self, x1: Math) -> bool {
-                    self.iter1_1_0(x1).next().is_some()
+                    self.iter_all1_1_0(x1).next().is_some()
                 }
                 fn check2_0_1(&self, x0: std::primitive::i64, x1: Math) -> bool {
-                    self.iter2_0_1(x0, x1).next().is_some()
+                    self.iter_all2_0_1(x0, x1).next().is_some()
                 }
                 #[allow(unreachable_code)]
                 fn entry1_0_1(
@@ -15182,7 +18705,7 @@ fn lir_math() {
                     delta: &mut Delta,
                     uf: &mut Unification,
                 ) -> (Math,) {
-                    if let Some((x1,)) = self.iter1_0_1(x0).next() {
+                    if let Some((x1,)) = self.iter_all1_0_1(x0).next() {
                         return (x1,);
                     }
                     let x1 = uf.math_.add_eclass();
@@ -15197,7 +18720,7 @@ fn lir_math() {
                     delta: &mut Delta,
                     uf: &mut Unification,
                 ) -> () {
-                    if let Some(()) = self.iter2_0_1(x0, x1).next() {
+                    if let Some(()) = self.iter_all2_0_1(x0, x1).next() {
                         return ();
                     }
                     delta.const_.push((x0, x1));
@@ -15207,8 +18730,9 @@ fn lir_math() {
             #[derive(Debug, Default)]
             struct VarRelation {
                 new: Vec<<Self as Relation>::Row>,
-                hash_index_0: runtime::HashMap<(runtime::IString,), (Math,)>,
-                hash_index_0_1: runtime::HashMap<(runtime::IString, Math), runtime::SmallVec<[(); 1]>>,
+                hash_index_0: runtime::HashMap<(runtime::IString,), (Math, TimeStamp)>,
+                hash_index_0_1:
+                    runtime::HashMap<(runtime::IString, Math), runtime::SmallVec<[(TimeStamp,); 1]>>,
                 string_num_uprooted_at_latest_retain: usize,
                 math_num_uprooted_at_latest_retain: usize,
             }
@@ -15233,35 +18757,50 @@ fn lir_math() {
                 }
                 fn emit_graphviz(&self, buf: &mut String) {
                     use std::fmt::Write;
-                    for (i, ((x0,), (x1,))) in self.hash_index_0.iter().enumerate() {
+                    for (i, ((x0,), (x1, _timestamp))) in self.hash_index_0.iter().enumerate() {
                         writeln!(buf, "{}_{i} -> {}_{};", "var", "string", x0).unwrap();
                         writeln!(buf, "{}_{i} -> {}_{};", "var", "math", x1).unwrap();
                         writeln!(buf, "{}_{i} [shape = box];", "var").unwrap();
                     }
                 }
-                fn update_begin(&mut self, insertions: &[Self::Row], uf: &mut Unification) {
+                fn update_begin(
+                    &mut self,
+                    insertions: &[Self::Row],
+                    uf: &mut Unification,
+                    latest_timestamp: TimeStamp,
+                ) {
                     log_duration!("update_begin {}: {}", "var", {
                         for &(mut x0, mut x1) in insertions {
                             match self.hash_index_0.entry((x0,)) {
                                 runtime::HashMapEntry::Occupied(mut entry) => {
-                                    let (y1,) = entry.get_mut();
-                                    uf.math_.union_mut(&mut x1, y1);
+                                    let (y1, timestamp) = entry.get_mut();
+                                    let changed = false;
+                                    let old_val = *y1;
+                                    let changed = changed | (old_val != uf.math_.union_mut(&mut x1, y1));
+                                    if changed {
+                                        *timestamp = latest_timestamp;
+                                    }
                                 }
                                 runtime::HashMapEntry::Vacant(entry) => {
-                                    entry.insert((uf.math_.find(x1),));
+                                    entry.insert((uf.math_.find(x1), latest_timestamp));
                                 }
                             }
                         }
                     });
                 }
-                fn update(&mut self, insertions: &mut Vec<Self::Row>, uf: &mut Unification) -> bool {
+                fn update(
+                    &mut self,
+                    insertions: &mut Vec<Self::Row>,
+                    uf: &mut Unification,
+                    latest_timestamp: TimeStamp,
+                ) -> bool {
                     if self.math_num_uprooted_at_latest_retain == uf.math_.num_uprooted() {
                         return false;
                     }
                     let offset = insertions.len();
                     log_duration!("update {}: {}", "var", {
                         self.math_num_uprooted_at_latest_retain = uf.math_.num_uprooted();
-                        self.hash_index_0.retain(|&(x0,), &mut (x1,)| {
+                        self.hash_index_0.retain(|&(x0,), &mut (x1, _timestamp)| {
                             if uf.math_.is_root(x1) {
                                 true
                             } else {
@@ -15270,17 +18809,22 @@ fn lir_math() {
                             }
                         });
                     });
-                    self.update_begin(&insertions[offset..], uf);
+                    self.update_begin(&insertions[offset..], uf, latest_timestamp);
                     true
                 }
-                fn update_finalize(&mut self, insertions: &mut Vec<Self::Row>, uf: &mut Unification) {
+                fn update_finalize(
+                    &mut self,
+                    insertions: &mut Vec<Self::Row>,
+                    uf: &mut Unification,
+                    latest_timestamp: TimeStamp,
+                ) {
                     log_duration!("update_finalize {}: {}", "var", {
                         assert!(self.new.is_empty());
                         log_duration!("fill new: {}", {
                             self.new.extend(
                                 self.hash_index_0
                                     .iter()
-                                    .map(|(&(x0,), &(x1,))| (x0, x1))
+                                    .map(|(&(x0,), &(x1, _timestamp))| (x0, x1))
                                     .filter(|&(x0, x1)| !self.hash_index_0_1.contains_key(&(x0, x1))),
                             );
                             insertions.clear();
@@ -15289,15 +18833,18 @@ fn lir_math() {
                         });
                         log_duration!("fill index: {}", {
                             for &(x0, x1) in &self.new {
-                                self.hash_index_0_1.entry((x0, x1)).or_default().push(());
+                                self.hash_index_0_1
+                                    .entry((x0, x1))
+                                    .or_default()
+                                    .push((latest_timestamp,));
                             }
                         });
                         log_duration!("retain index: {}", {
                             self.hash_index_0_1.retain(|&(x0, x1), v| {
                                 if uf.math_.is_root(x1) {
-                                    v.retain(|&mut ()| true);
+                                    v.retain(|&mut (_timestamp)| true);
                                     v.sort_unstable();
-                                    v.dedup();
+                                    v.dedup_by(|(t1,), (t2,)| true);
                                     true
                                 } else {
                                     false
@@ -15309,25 +18856,54 @@ fn lir_math() {
                 }
             }
             impl VarRelation {
-                fn iter1_0_1(&self, x0: runtime::IString) -> impl Iterator<Item = (Math,)> + use<'_> {
-                    self.hash_index_0.get(&(x0,)).into_iter().copied()
+                fn iter_all1_0_1(&self, x0: runtime::IString) -> impl Iterator<Item = (Math,)> + use<'_> {
+                    self.hash_index_0
+                        .get(&(x0,))
+                        .into_iter()
+                        .copied()
+                        .map(|(x1, _timestamp)| (x1,))
                 }
-                fn iter2_0_1(&self, x0: runtime::IString, x1: Math) -> impl Iterator<Item = ()> + use<'_> {
+                fn iter_all2_0_1(&self, x0: runtime::IString, x1: Math) -> impl Iterator<Item = ()> + use<'_> {
                     self.hash_index_0_1
                         .get(&(x0, x1))
                         .into_iter()
                         .flatten()
                         .copied()
+                        .map(|(_timestamp)| ())
+                }
+                fn iter_old1_0_1(
+                    &self,
+                    x0: runtime::IString,
+                    latest_timestamp: TimeStamp,
+                ) -> impl Iterator<Item = (Math,)> + use<'_> {
+                    self.hash_index_0
+                        .get(&(x0,))
+                        .into_iter()
+                        .copied()
+                        .filter_map(move |(x1, timestamp)| (timestamp < latest_timestamp).then_some((x1,)))
+                }
+                fn iter_old2_0_1(
+                    &self,
+                    x0: runtime::IString,
+                    x1: Math,
+                    latest_timestamp: TimeStamp,
+                ) -> impl Iterator<Item = ()> + use<'_> {
+                    self.hash_index_0_1
+                        .get(&(x0, x1))
+                        .into_iter()
+                        .flatten()
+                        .copied()
+                        .filter_map(move |(timestamp,)| (timestamp < latest_timestamp).then_some(()))
                 }
                 fn check1_0_1(&self, x0: runtime::IString) -> bool {
-                    self.iter1_0_1(x0).next().is_some()
+                    self.iter_all1_0_1(x0).next().is_some()
                 }
                 fn check2_0_1(&self, x0: runtime::IString, x1: Math) -> bool {
-                    self.iter2_0_1(x0, x1).next().is_some()
+                    self.iter_all2_0_1(x0, x1).next().is_some()
                 }
                 #[allow(unreachable_code)]
                 fn entry1_0_1(&self, x0: runtime::IString, delta: &mut Delta, uf: &mut Unification) -> (Math,) {
-                    if let Some((x1,)) = self.iter1_0_1(x0).next() {
+                    if let Some((x1,)) = self.iter_all1_0_1(x0).next() {
                         return (x1,);
                     }
                     let x1 = uf.math_.add_eclass();
@@ -15342,7 +18918,7 @@ fn lir_math() {
                     delta: &mut Delta,
                     uf: &mut Unification,
                 ) -> () {
-                    if let Some(()) = self.iter2_0_1(x0, x1).next() {
+                    if let Some(()) = self.iter_all2_0_1(x0, x1).next() {
                         return ();
                     }
                     delta.var_.push((x0, x1));
@@ -15455,6 +19031,7 @@ fn lir_math() {
             }
             #[derive(Debug, Default)]
             pub struct Theory {
+                pub latest_timestamp: TimeStamp,
                 pub delta: Delta,
                 pub uf: Unification,
                 global_i64: GlobalVars<std::primitive::i64>,
@@ -15774,8 +19351,8 @@ fn lir_math() {
                 #[inline(never)]
                 pub fn apply_rules(&mut self) {
                     for (fuel_3, v217) in self.fuel_.iter_new() {
-                        for (v219, x_17, v221) in self.integral_.iter1_0_1_2_3(v217) {
-                            for (f, g) in self.add_.iter1_2_0_1(v219) {
+                        for (v219, x_17, v221) in self.integral_.iter_all1_0_1_2_3(v217) {
+                            for (f, g) in self.add_.iter_all1_2_0_1(v219) {
                                 #[doc = "( rewrite ( Integral ( Fuel fuel ) ( Add f g ) x ) ( Add ( Integral fuel f x ) ( Integral fuel g x ) ) )"]
                                 let (v262,) = self.integral_.entry3_0_1_2_3(
                                     fuel_3,
@@ -15793,7 +19370,7 @@ fn lir_math() {
                                 );
                                 self.delta.insert_add((v262, v263, v221));
                             }
-                            for (f_4, g_4) in self.sub_.iter1_2_0_1(v219) {
+                            for (f_4, g_4) in self.sub_.iter_all1_2_0_1(v219) {
                                 #[doc = "( rewrite ( Integral ( Fuel fuel ) ( Sub f g ) x ) ( Sub ( Integral fuel f x ) ( Integral fuel g x ) ) )"]
                                 let (v289,) = self.integral_.entry3_0_1_2_3(
                                     fuel_3,
@@ -15811,7 +19388,7 @@ fn lir_math() {
                                 );
                                 self.delta.insert_sub((v289, v290, v221));
                             }
-                            for (a_29, b_20) in self.mul_.iter1_2_0_1(v219) {
+                            for (a_29, b_20) in self.mul_.iter_all1_2_0_1(v219) {
                                 #[doc = "( rewrite ( Integral ( Fuel fuel ) ( Mul a b ) x ) ( Sub ( Mul a ( Integral fuel b x ) ) ( Integral fuel ( Mul ( Diff x a ) ( Integral fuel b x ) ) x ) ) )"]
                                 let (v317,) =
                                     self.diff_
@@ -15838,11 +19415,11 @@ fn lir_math() {
                                 );
                                 self.delta.insert_sub((v316, v320, v221));
                             }
-                            for () in self.cos_.iter2_0_1(x_17, v219) {
+                            for () in self.cos_.iter_all2_0_1(x_17, v219) {
                                 #[doc = "( rewrite ( Integral ( Fuel fuel ) ( Cos x ) x ) ( Sin x ) )"]
                                 self.delta.insert_sin((x_17, v221));
                             }
-                            for (v218,) in self.const_.iter1_1_0(v219) {
+                            for (v218,) in self.const_.iter_all1_1_0(v219) {
                                 if v218 == self.global_i64.get(2usize) {
                                     #[doc = "( rewrite ( Integral ( Fuel fuel ) ( Const 1 ) x ) x )"]
                                     self.uf.math_.union(x_17, v221);
@@ -15851,7 +19428,7 @@ fn lir_math() {
                         }
                     }
                     for (x_3, v21, v22) in self.diff_.iter_new() {
-                        for (a_25, b_16) in self.add_.iter1_2_0_1(v21) {
+                        for (a_25, b_16) in self.add_.iter_all1_2_0_1(v21) {
                             #[doc = "( rewrite ( Diff x ( Add a b ) ) ( Add ( Diff x a ) ( Diff x b ) ) )"]
                             let (v183,) = self
                                 .diff_
@@ -15861,7 +19438,7 @@ fn lir_math() {
                                 .entry2_1_0_2(b_16, x_3, &mut self.delta, &mut self.uf);
                             self.delta.insert_add((v183, v184, v22));
                         }
-                        for (a_27, b_18) in self.mul_.iter1_2_0_1(v21) {
+                        for (a_27, b_18) in self.mul_.iter_all1_2_0_1(v21) {
                             #[doc = "( rewrite ( Diff x ( Mul a b ) ) ( Add ( Mul a ( Diff x b ) ) ( Mul b ( Diff x a ) ) ) )"]
                             let (v199,) = self
                                 .diff_
@@ -15877,11 +19454,11 @@ fn lir_math() {
                                 .entry2_1_0_2(v199, b_18, &mut self.delta, &mut self.uf);
                             self.delta.insert_add((v198, v200, v22));
                         }
-                        for () in self.sin_.iter2_0_1(x_3, v21) {
+                        for () in self.sin_.iter_all2_0_1(x_3, v21) {
                             #[doc = "( rewrite ( Diff x ( Sin x ) ) ( Cos x ) )"]
                             self.delta.insert_cos((x_3, v22));
                         }
-                        for () in self.cos_.iter2_0_1(x_3, v21) {
+                        for () in self.cos_.iter_all2_0_1(x_3, v21) {
                             #[doc = "( rewrite ( Diff x ( Cos x ) ) ( Mul ( Const -1 ) ( Sin x ) ) )"]
                             let (v25,) = self.sin_.entry1_0_1(x_3, &mut self.delta, &mut self.uf);
                             let v23 = self.global_i64.get(0usize);
@@ -15890,7 +19467,7 @@ fn lir_math() {
                         }
                     }
                     for (fuel, v2, x, v3) in self.integral_.iter_new() {
-                        for () in self.sin_.iter2_0_1(x, v2) {
+                        for () in self.sin_.iter_all2_0_1(x, v2) {
                             #[doc = "( rewrite ( Integral fuel ( Sin x ) x ) ( Mul ( Const -1 ) ( Cos x ) ) )"]
                             let (v6,) = self.cos_.entry1_0_1(x, &mut self.delta, &mut self.uf);
                             let v4 = self.global_i64.get(0usize);
@@ -15898,8 +19475,8 @@ fn lir_math() {
                             self.delta.insert_mul((v5, v6, v3));
                         }
                         if self.fuel_.check1_1_0(fuel) {
-                            for (f_2, g_2) in self.add_.iter1_2_0_1(v2) {
-                                for (fuel_11,) in self.fuel_.iter1_1_0(fuel) {
+                            for (f_2, g_2) in self.add_.iter_all1_2_0_1(v2) {
+                                for (fuel_11,) in self.fuel_.iter_old1_1_0(fuel, self.latest_timestamp) {
                                     #[doc = "( rewrite ( Integral ( Fuel fuel ) ( Add f g ) x ) ( Add ( Integral fuel f x ) ( Integral fuel g x ) ) )"]
                                     let (v271,) = self.integral_.entry3_0_1_2_3(
                                         fuel_11,
@@ -15918,8 +19495,8 @@ fn lir_math() {
                                     self.delta.insert_add((v271, v272, v3));
                                 }
                             }
-                            for (f_5, g_5) in self.sub_.iter1_2_0_1(v2) {
-                                for (fuel_14,) in self.fuel_.iter1_1_0(fuel) {
+                            for (f_5, g_5) in self.sub_.iter_all1_2_0_1(v2) {
+                                for (fuel_14,) in self.fuel_.iter_old1_1_0(fuel, self.latest_timestamp) {
                                     #[doc = "( rewrite ( Integral ( Fuel fuel ) ( Sub f g ) x ) ( Sub ( Integral fuel f x ) ( Integral fuel g x ) ) )"]
                                     let (v298,) = self.integral_.entry3_0_1_2_3(
                                         fuel_14,
@@ -15938,8 +19515,8 @@ fn lir_math() {
                                     self.delta.insert_sub((v298, v299, v3));
                                 }
                             }
-                            for (a_30, b_21) in self.mul_.iter1_2_0_1(v2) {
-                                for (fuel_17,) in self.fuel_.iter1_1_0(fuel) {
+                            for (a_30, b_21) in self.mul_.iter_all1_2_0_1(v2) {
+                                for (fuel_17,) in self.fuel_.iter_old1_1_0(fuel, self.latest_timestamp) {
                                     #[doc = "( rewrite ( Integral ( Fuel fuel ) ( Mul a b ) x ) ( Sub ( Mul a ( Integral fuel b x ) ) ( Integral fuel ( Mul ( Diff x a ) ( Integral fuel b x ) ) x ) ) )"]
                                     let (v329,) =
                                         self.diff_
@@ -15967,15 +19544,15 @@ fn lir_math() {
                                     self.delta.insert_sub((v328, v332, v3));
                                 }
                             }
-                            for () in self.cos_.iter2_0_1(x, v2) {
-                                for (fuel_8,) in self.fuel_.iter1_1_0(fuel) {
+                            for () in self.cos_.iter_all2_0_1(x, v2) {
+                                for (fuel_8,) in self.fuel_.iter_old1_1_0(fuel, self.latest_timestamp) {
                                     #[doc = "( rewrite ( Integral ( Fuel fuel ) ( Cos x ) x ) ( Sin x ) )"]
                                     self.delta.insert_sin((x, v3));
                                 }
                             }
-                            for (v224,) in self.const_.iter1_1_0(v2) {
+                            for (v224,) in self.const_.iter_all1_1_0(v2) {
                                 if v224 == self.global_i64.get(2usize) {
-                                    for (fuel_4,) in self.fuel_.iter1_1_0(fuel) {
+                                    for (fuel_4,) in self.fuel_.iter_old1_1_0(fuel, self.latest_timestamp) {
                                         #[doc = "( rewrite ( Integral ( Fuel fuel ) ( Const 1 ) x ) x )"]
                                         self.uf.math_.union(x, v3);
                                     }
@@ -15986,7 +19563,7 @@ fn lir_math() {
                     for (a_2, b_2, v34) in self.add_.iter_new() {
                         #[doc = "( rewrite ( Add a b ) ( Add b a ) )"]
                         self.delta.insert_add((b_2, a_2, v34));
-                        for (x_12, v189) in self.diff_.iter1_1_0_2(v34) {
+                        for (x_12, v189) in self.diff_.iter_old1_1_0_2(v34, self.latest_timestamp) {
                             #[doc = "( rewrite ( Diff x ( Add a b ) ) ( Add ( Diff x a ) ( Diff x b ) ) )"]
                             let (v190,) = self
                                 .diff_
@@ -15996,8 +19573,8 @@ fn lir_math() {
                                 .entry2_1_0_2(b_2, x_12, &mut self.delta, &mut self.uf);
                             self.delta.insert_add((v190, v191, v189));
                         }
-                        for (x_26, v274, v279) in self.integral_.iter1_1_2_0_3(v34) {
-                            for (fuel_12,) in self.fuel_.iter1_1_0(v274) {
+                        for (x_26, v274, v279) in self.integral_.iter_old1_1_2_0_3(v34, self.latest_timestamp) {
+                            for (fuel_12,) in self.fuel_.iter_old1_1_0(v274, self.latest_timestamp) {
                                 #[doc = "( rewrite ( Integral ( Fuel fuel ) ( Add f g ) x ) ( Add ( Integral fuel f x ) ( Integral fuel g x ) ) )"]
                                 let (v280,) = self.integral_.entry3_0_1_2_3(
                                     fuel_12,
@@ -16016,21 +19593,21 @@ fn lir_math() {
                                 self.delta.insert_add((v280, v281, v279));
                             }
                         }
-                        for (b_4, c) in self.add_.iter1_2_0_1(b_2) {
+                        for (b_4, c) in self.add_.iter_all1_2_0_1(b_2) {
                             #[doc = "( rewrite ( Add a ( Add b c ) ) ( Add ( Add a b ) c ) )"]
                             let (v43,) = self
                                 .add_
                                 .entry2_1_0_2(b_4, a_2, &mut self.delta, &mut self.uf);
                             self.delta.insert_add((v43, c, v34));
                         }
-                        for (a_5, v48) in self.add_.iter1_1_0_2(v34) {
+                        for (a_5, v48) in self.add_.iter_old1_1_0_2(v34, self.latest_timestamp) {
                             #[doc = "( rewrite ( Add a ( Add b c ) ) ( Add ( Add a b ) c ) )"]
                             let (v49,) = self
                                 .add_
                                 .entry2_1_0_2(a_2, a_5, &mut self.delta, &mut self.uf);
                             self.delta.insert_add((v49, b_2, v48));
                         }
-                        for (a_17, v102) in self.mul_.iter1_1_0_2(v34) {
+                        for (a_17, v102) in self.mul_.iter_all1_1_0_2(v34) {
                             #[doc = "( rewrite ( Mul a ( Add b c ) ) ( Add ( Mul a b ) ( Mul a c ) ) )"]
                             let (v103,) = self
                                 .mul_
@@ -16040,15 +19617,15 @@ fn lir_math() {
                                 .entry2_1_0_2(b_2, a_17, &mut self.delta, &mut self.uf);
                             self.delta.insert_add((v103, v104, v102));
                         }
-                        for (v63,) in self.const_.iter1_1_0(b_2) {
+                        for (v63,) in self.const_.iter_all1_1_0(b_2) {
                             if v63 == self.global_i64.get(1usize) {
                                 #[doc = "( rewrite ( Add a ( Const 0 ) ) a )"]
                                 self.uf.math_.union(a_2, v34);
                             }
                         }
                         if self.mul_.check1_2_0_1(a_2) {
-                            for (a_19, c_7) in self.mul_.iter1_2_0_1(b_2) {
-                                for (b_10,) in self.mul_.iter2_2_0_1(a_2, a_19) {
+                            for (a_19, c_7) in self.mul_.iter_all1_2_0_1(b_2) {
+                                for (b_10,) in self.mul_.iter_all2_2_0_1(a_2, a_19) {
                                     #[doc = "( rewrite ( Add ( Mul a b ) ( Mul a c ) ) ( Mul a ( Add b c ) ) )"]
                                     let (v118,) =
                                         self.add_
@@ -16066,8 +19643,8 @@ fn lir_math() {
                             .mul_
                             .entry2_1_0_2(b, v18, &mut self.delta, &mut self.uf);
                         self.delta.insert_add((a, v19, v16));
-                        for (x_29, v301, v306) in self.integral_.iter1_1_2_0_3(v16) {
-                            for (fuel_15,) in self.fuel_.iter1_1_0(v301) {
+                        for (x_29, v301, v306) in self.integral_.iter_old1_1_2_0_3(v16, self.latest_timestamp) {
+                            for (fuel_15,) in self.fuel_.iter_old1_1_0(v301, self.latest_timestamp) {
                                 #[doc = "( rewrite ( Integral ( Fuel fuel ) ( Sub f g ) x ) ( Sub ( Integral fuel f x ) ( Integral fuel g x ) ) )"]
                                 let (v307,) = self.integral_.entry3_0_1_2_3(
                                     fuel_15,
@@ -16090,7 +19667,7 @@ fn lir_math() {
                     for (a_3, b_3, v37) in self.mul_.iter_new() {
                         #[doc = "( rewrite ( Mul a b ) ( Mul b a ) )"]
                         self.delta.insert_mul((b_3, a_3, v37));
-                        for (x_14, v205) in self.diff_.iter1_1_0_2(v37) {
+                        for (x_14, v205) in self.diff_.iter_old1_1_0_2(v37, self.latest_timestamp) {
                             #[doc = "( rewrite ( Diff x ( Mul a b ) ) ( Add ( Mul a ( Diff x b ) ) ( Mul b ( Diff x a ) ) ) )"]
                             let (v208,) = self
                                 .diff_
@@ -16106,8 +19683,8 @@ fn lir_math() {
                                 .entry2_1_0_2(v208, b_3, &mut self.delta, &mut self.uf);
                             self.delta.insert_add((v207, v209, v205));
                         }
-                        for (x_32, v334, v339) in self.integral_.iter1_1_2_0_3(v37) {
-                            for (fuel_18,) in self.fuel_.iter1_1_0(v334) {
+                        for (x_32, v334, v339) in self.integral_.iter_old1_1_2_0_3(v37, self.latest_timestamp) {
+                            for (fuel_18,) in self.fuel_.iter_old1_1_0(v334, self.latest_timestamp) {
                                 #[doc = "( rewrite ( Integral ( Fuel fuel ) ( Mul a b ) x ) ( Sub ( Mul a ( Integral fuel b x ) ) ( Integral fuel ( Mul ( Diff x a ) ( Integral fuel b x ) ) x ) ) )"]
                                 let (v341,) = self
                                     .diff_
@@ -16135,7 +19712,7 @@ fn lir_math() {
                                 self.delta.insert_sub((v340, v344, v339));
                             }
                         }
-                        for (b_9, c_6) in self.add_.iter1_2_0_1(b_3) {
+                        for (b_9, c_6) in self.add_.iter_old1_2_0_1(b_3, self.latest_timestamp) {
                             #[doc = "( rewrite ( Mul a ( Add b c ) ) ( Add ( Mul a b ) ( Mul a c ) ) )"]
                             let (v110,) = self
                                 .mul_
@@ -16145,21 +19722,21 @@ fn lir_math() {
                                 .entry2_1_0_2(c_6, a_3, &mut self.delta, &mut self.uf);
                             self.delta.insert_add((v110, v111, v37));
                         }
-                        for (b_6, c_3) in self.mul_.iter1_2_0_1(b_3) {
+                        for (b_6, c_3) in self.mul_.iter_all1_2_0_1(b_3) {
                             #[doc = "( rewrite ( Mul a ( Mul b c ) ) ( Mul ( Mul a b ) c ) )"]
                             let (v55,) = self
                                 .mul_
                                 .entry2_1_0_2(b_6, a_3, &mut self.delta, &mut self.uf);
                             self.delta.insert_mul((v55, c_3, v37));
                         }
-                        for (a_7, v60) in self.mul_.iter1_1_0_2(v37) {
+                        for (a_7, v60) in self.mul_.iter_old1_1_0_2(v37, self.latest_timestamp) {
                             #[doc = "( rewrite ( Mul a ( Mul b c ) ) ( Mul ( Mul a b ) c ) )"]
                             let (v61,) = self
                                 .mul_
                                 .entry2_1_0_2(a_3, a_7, &mut self.delta, &mut self.uf);
                             self.delta.insert_mul((v61, b_3, v60));
                         }
-                        for (v77,) in self.const_.iter1_1_0(b_3) {
+                        for (v77,) in self.const_.iter_all1_1_0(b_3) {
                             if v77 == self.global_i64.get(1usize) {
                                 #[doc = "( rewrite ( Mul a ( Const 0 ) ) ( Const 0 ) )"]
                                 self.delta.insert_const((v77, v37));
@@ -16170,8 +19747,8 @@ fn lir_math() {
                             }
                         }
                         if self.mul_.check1_0_1_2(a_3) {
-                            for (v123, v124) in self.add_.iter1_0_1_2(v37) {
-                                for (c_8,) in self.mul_.iter2_2_0_1(v123, a_3) {
+                            for (v123, v124) in self.add_.iter_old1_0_1_2(v37, self.latest_timestamp) {
+                                for (c_8,) in self.mul_.iter_all2_2_0_1(v123, a_3) {
                                     #[doc = "( rewrite ( Add ( Mul a b ) ( Mul a c ) ) ( Mul a ( Add b c ) ) )"]
                                     let (v125,) =
                                         self.add_
@@ -16179,8 +19756,8 @@ fn lir_math() {
                                     self.delta.insert_mul((a_3, v125, v124));
                                 }
                             }
-                            for (v128, v131) in self.add_.iter1_1_0_2(v37) {
-                                for (b_12,) in self.mul_.iter2_2_0_1(v128, a_3) {
+                            for (v128, v131) in self.add_.iter_old1_1_0_2(v37, self.latest_timestamp) {
+                                for (b_12,) in self.mul_.iter_old2_2_0_1(v128, a_3, self.latest_timestamp) {
                                     #[doc = "( rewrite ( Add ( Mul a b ) ( Mul a c ) ) ( Mul a ( Add b c ) ) )"]
                                     let (v132,) =
                                         self.add_
@@ -16190,8 +19767,8 @@ fn lir_math() {
                             }
                         }
                         if self.pow_.check1_2_0_1(a_3) {
-                            for (a_22, c_10) in self.pow_.iter1_2_0_1(b_3) {
-                                for (b_13,) in self.pow_.iter2_2_0_1(a_3, a_22) {
+                            for (a_22, c_10) in self.pow_.iter_all1_2_0_1(b_3) {
+                                for (b_13,) in self.pow_.iter_all2_2_0_1(a_3, a_22) {
                                     #[doc = "( rewrite ( Mul ( Pow a b ) ( Pow a c ) ) ( Pow a ( Add b c ) ) )"]
                                     let (v139,) =
                                         self.add_
@@ -16202,7 +19779,7 @@ fn lir_math() {
                         }
                     }
                     for (a_23, b_14, v142) in self.pow_.iter_new() {
-                        for (v155,) in self.const_.iter1_1_0(b_14) {
+                        for (v155,) in self.const_.iter_all1_1_0(b_14) {
                             if v155 == self.global_i64.get(2usize) {
                                 #[doc = "( rewrite ( Pow x ( Const 1 ) ) x )"]
                                 self.uf.math_.union(a_23, v142);
@@ -16213,8 +19790,8 @@ fn lir_math() {
                             }
                         }
                         if self.pow_.check1_0_1_2(a_23) {
-                            for (v144, v145) in self.mul_.iter1_0_1_2(v142) {
-                                for (c_11,) in self.pow_.iter2_2_0_1(v144, a_23) {
+                            for (v144, v145) in self.mul_.iter_old1_0_1_2(v142, self.latest_timestamp) {
+                                for (c_11,) in self.pow_.iter_all2_2_0_1(v144, a_23) {
                                     #[doc = "( rewrite ( Mul ( Pow a b ) ( Pow a c ) ) ( Pow a ( Add b c ) ) )"]
                                     let (v146,) =
                                         self.add_
@@ -16222,8 +19799,8 @@ fn lir_math() {
                                     self.delta.insert_pow((a_23, v146, v145));
                                 }
                             }
-                            for (v149, v152) in self.mul_.iter1_1_0_2(v142) {
-                                for (b_15,) in self.pow_.iter2_2_0_1(v149, a_23) {
+                            for (v149, v152) in self.mul_.iter_old1_1_0_2(v142, self.latest_timestamp) {
+                                for (b_15,) in self.pow_.iter_old2_2_0_1(v149, a_23, self.latest_timestamp) {
                                     #[doc = "( rewrite ( Mul ( Pow a b ) ( Pow a c ) ) ( Pow a ( Add b c ) ) )"]
                                     let (v153,) =
                                         self.add_
@@ -16234,11 +19811,14 @@ fn lir_math() {
                         }
                     }
                     for (x_2, v9) in self.sin_.iter_new() {
-                        for (v215,) in self.diff_.iter2_1_0_2(v9, x_2) {
+                        for (v215,) in self.diff_.iter_old2_1_0_2(v9, x_2, self.latest_timestamp) {
                             #[doc = "( rewrite ( Diff x ( Sin x ) ) ( Cos x ) )"]
                             self.delta.insert_cos((x_2, v215));
                         }
-                        for (fuel_2, v10) in self.integral_.iter2_1_2_0_3(v9, x_2) {
+                        for (fuel_2, v10) in self
+                            .integral_
+                            .iter_old2_1_2_0_3(v9, x_2, self.latest_timestamp)
+                        {
                             #[doc = "( rewrite ( Integral fuel ( Sin x ) x ) ( Mul ( Const -1 ) ( Cos x ) ) )"]
                             let (v13,) = self.cos_.entry1_0_1(x_2, &mut self.delta, &mut self.uf);
                             let v11 = self.global_i64.get(0usize);
@@ -16247,15 +19827,18 @@ fn lir_math() {
                         }
                     }
                     for (x_4, v27) in self.cos_.iter_new() {
-                        for (v28,) in self.diff_.iter2_1_0_2(v27, x_4) {
+                        for (v28,) in self.diff_.iter_old2_1_0_2(v27, x_4, self.latest_timestamp) {
                             #[doc = "( rewrite ( Diff x ( Cos x ) ) ( Mul ( Const -1 ) ( Sin x ) ) )"]
                             let (v31,) = self.sin_.entry1_0_1(x_4, &mut self.delta, &mut self.uf);
                             let v29 = self.global_i64.get(0usize);
                             let (v30,) = self.const_.entry1_0_1(v29, &mut self.delta, &mut self.uf);
                             self.delta.insert_mul((v30, v31, v28));
                         }
-                        for (v251, v254) in self.integral_.iter2_1_2_0_3(v27, x_4) {
-                            for (fuel_9,) in self.fuel_.iter1_1_0(v251) {
+                        for (v251, v254) in self
+                            .integral_
+                            .iter_old2_1_2_0_3(v27, x_4, self.latest_timestamp)
+                        {
+                            for (fuel_9,) in self.fuel_.iter_old1_1_0(v251, self.latest_timestamp) {
                                 #[doc = "( rewrite ( Integral ( Fuel fuel ) ( Cos x ) x ) ( Sin x ) )"]
                                 self.delta.insert_sin((x_4, v254));
                             }
@@ -16264,20 +19847,20 @@ fn lir_math() {
                     for (v67, v68) in self.const_.iter_new() {
                         if self.pow_.check1_1_0_2(v68) {
                             if v67 == self.global_i64.get(3usize) {
-                                for (x_9, v173) in self.pow_.iter1_1_0_2(v68) {
+                                for (x_9, v173) in self.pow_.iter_old1_1_0_2(v68, self.latest_timestamp) {
                                     #[doc = "( rewrite ( Pow x ( Const 2 ) ) ( Mul x x ) )"]
                                     self.delta.insert_mul((x_9, x_9, v173));
                                 }
                             }
                         }
                         if v67 == self.global_i64.get(1usize) {
-                            for (a_9, v69) in self.add_.iter1_1_0_2(v68) {
+                            for (a_9, v69) in self.add_.iter_old1_1_0_2(v68, self.latest_timestamp) {
                                 if v67 == self.global_i64.get(1usize) {
                                     #[doc = "( rewrite ( Add a ( Const 0 ) ) a )"]
                                     self.uf.math_.union(a_9, v69);
                                 }
                             }
-                            for (a_12, v80) in self.mul_.iter1_1_0_2(v68) {
+                            for (a_12, v80) in self.mul_.iter_old1_1_0_2(v68, self.latest_timestamp) {
                                 if v67 == self.global_i64.get(1usize) {
                                     #[doc = "( rewrite ( Mul a ( Const 0 ) ) ( Const 0 ) )"]
                                     self.delta.insert_const((v67, v80));
@@ -16285,21 +19868,23 @@ fn lir_math() {
                             }
                         }
                         if v67 == self.global_i64.get(2usize) {
-                            for (x_19, v229, v233) in self.integral_.iter1_1_2_0_3(v68) {
-                                for (fuel_5,) in self.fuel_.iter1_1_0(v229) {
+                            for (x_19, v229, v233) in
+                                self.integral_.iter_old1_1_2_0_3(v68, self.latest_timestamp)
+                            {
+                                for (fuel_5,) in self.fuel_.iter_old1_1_0(v229, self.latest_timestamp) {
                                     if v67 == self.global_i64.get(2usize) {
                                         #[doc = "( rewrite ( Integral ( Fuel fuel ) ( Const 1 ) x ) x )"]
                                         self.uf.math_.union(x_19, v233);
                                     }
                                 }
                             }
-                            for (a_15, v93) in self.mul_.iter1_1_0_2(v68) {
+                            for (a_15, v93) in self.mul_.iter_old1_1_0_2(v68, self.latest_timestamp) {
                                 if v67 == self.global_i64.get(2usize) {
                                     #[doc = "( rewrite ( Mul a ( Const 1 ) ) a )"]
                                     self.uf.math_.union(a_15, v93);
                                 }
                             }
-                            for (x_6, v161) in self.pow_.iter1_1_0_2(v68) {
+                            for (x_6, v161) in self.pow_.iter_old1_1_0_2(v68, self.latest_timestamp) {
                                 if v67 == self.global_i64.get(2usize) {
                                     #[doc = "( rewrite ( Pow x ( Const 1 ) ) x )"]
                                     self.uf.math_.union(x_6, v161);
@@ -16308,38 +19893,40 @@ fn lir_math() {
                         }
                     }
                     if let Some(v71) = self.global_i64.get_new(1usize) {
-                        for (v72,) in self.const_.iter1_0_1(v71) {
-                            for (a_10, v73) in self.add_.iter1_1_0_2(v72) {
+                        for (v72,) in self.const_.iter_old1_0_1(v71, self.latest_timestamp) {
+                            for (a_10, v73) in self.add_.iter_old1_1_0_2(v72, self.latest_timestamp) {
                                 #[doc = "( rewrite ( Add a ( Const 0 ) ) a )"]
                                 self.uf.math_.union(a_10, v73);
                             }
-                            for (a_13, v84) in self.mul_.iter1_1_0_2(v72) {
+                            for (a_13, v84) in self.mul_.iter_old1_1_0_2(v72, self.latest_timestamp) {
                                 #[doc = "( rewrite ( Mul a ( Const 0 ) ) ( Const 0 ) )"]
                                 self.delta.insert_const((v71, v84));
                             }
                         }
                     }
                     if let Some(v95) = self.global_i64.get_new(2usize) {
-                        for (v96,) in self.const_.iter1_0_1(v95) {
-                            for (x_20, v235, v239) in self.integral_.iter1_1_2_0_3(v96) {
-                                for (fuel_6,) in self.fuel_.iter1_1_0(v235) {
+                        for (v96,) in self.const_.iter_old1_0_1(v95, self.latest_timestamp) {
+                            for (x_20, v235, v239) in
+                                self.integral_.iter_old1_1_2_0_3(v96, self.latest_timestamp)
+                            {
+                                for (fuel_6,) in self.fuel_.iter_old1_1_0(v235, self.latest_timestamp) {
                                     #[doc = "( rewrite ( Integral ( Fuel fuel ) ( Const 1 ) x ) x )"]
                                     self.uf.math_.union(x_20, v239);
                                 }
                             }
-                            for (a_16, v97) in self.mul_.iter1_1_0_2(v96) {
+                            for (a_16, v97) in self.mul_.iter_old1_1_0_2(v96, self.latest_timestamp) {
                                 #[doc = "( rewrite ( Mul a ( Const 1 ) ) a )"]
                                 self.uf.math_.union(a_16, v97);
                             }
-                            for (x_7, v165) in self.pow_.iter1_1_0_2(v96) {
+                            for (x_7, v165) in self.pow_.iter_old1_1_0_2(v96, self.latest_timestamp) {
                                 #[doc = "( rewrite ( Pow x ( Const 1 ) ) x )"]
                                 self.uf.math_.union(x_7, v165);
                             }
                         }
                     }
                     if let Some(v175) = self.global_i64.get_new(3usize) {
-                        for (v176,) in self.const_.iter1_0_1(v175) {
-                            for (x_10, v177) in self.pow_.iter1_1_0_2(v176) {
+                        for (v176,) in self.const_.iter_old1_0_1(v175, self.latest_timestamp) {
+                            for (x_10, v177) in self.pow_.iter_old1_1_0_2(v176, self.latest_timestamp) {
                                 #[doc = "( rewrite ( Pow x ( Const 2 ) ) ( Mul x x ) )"]
                                 self.delta.insert_mul((x_10, x_10, v177));
                             }
@@ -16409,6 +19996,7 @@ fn lir_math() {
                 }
                 #[inline(never)]
                 pub fn canonicalize(&mut self) {
+                    self.latest_timestamp.0 += 1;
                     log_duration!("canonicalize (total): {}", {
                         self.fuel_.clear_new();
                         self.zero_fuel_.clear_new();
@@ -16429,82 +20017,184 @@ fn lir_math() {
                             return;
                         }
                         log_duration!("update_begin (total): {}", {
-                            self.fuel_.update_begin(&mut self.delta.fuel_, &mut self.uf);
-                            self.zero_fuel_
-                                .update_begin(&mut self.delta.zero_fuel_, &mut self.uf);
-                            self.diff_.update_begin(&mut self.delta.diff_, &mut self.uf);
-                            self.integral_
-                                .update_begin(&mut self.delta.integral_, &mut self.uf);
-                            self.add_.update_begin(&mut self.delta.add_, &mut self.uf);
-                            self.sub_.update_begin(&mut self.delta.sub_, &mut self.uf);
-                            self.mul_.update_begin(&mut self.delta.mul_, &mut self.uf);
-                            self.div_.update_begin(&mut self.delta.div_, &mut self.uf);
-                            self.pow_.update_begin(&mut self.delta.pow_, &mut self.uf);
-                            self.ln_.update_begin(&mut self.delta.ln_, &mut self.uf);
-                            self.sqrt_.update_begin(&mut self.delta.sqrt_, &mut self.uf);
-                            self.sin_.update_begin(&mut self.delta.sin_, &mut self.uf);
-                            self.cos_.update_begin(&mut self.delta.cos_, &mut self.uf);
-                            self.const_
-                                .update_begin(&mut self.delta.const_, &mut self.uf);
-                            self.var_.update_begin(&mut self.delta.var_, &mut self.uf);
+                            self.fuel_
+                                .update_begin(&mut self.delta.fuel_, &mut self.uf, self.latest_timestamp);
+                            self.zero_fuel_.update_begin(
+                                &mut self.delta.zero_fuel_,
+                                &mut self.uf,
+                                self.latest_timestamp,
+                            );
+                            self.diff_
+                                .update_begin(&mut self.delta.diff_, &mut self.uf, self.latest_timestamp);
+                            self.integral_.update_begin(
+                                &mut self.delta.integral_,
+                                &mut self.uf,
+                                self.latest_timestamp,
+                            );
+                            self.add_
+                                .update_begin(&mut self.delta.add_, &mut self.uf, self.latest_timestamp);
+                            self.sub_
+                                .update_begin(&mut self.delta.sub_, &mut self.uf, self.latest_timestamp);
+                            self.mul_
+                                .update_begin(&mut self.delta.mul_, &mut self.uf, self.latest_timestamp);
+                            self.div_
+                                .update_begin(&mut self.delta.div_, &mut self.uf, self.latest_timestamp);
+                            self.pow_
+                                .update_begin(&mut self.delta.pow_, &mut self.uf, self.latest_timestamp);
+                            self.ln_
+                                .update_begin(&mut self.delta.ln_, &mut self.uf, self.latest_timestamp);
+                            self.sqrt_
+                                .update_begin(&mut self.delta.sqrt_, &mut self.uf, self.latest_timestamp);
+                            self.sin_
+                                .update_begin(&mut self.delta.sin_, &mut self.uf, self.latest_timestamp);
+                            self.cos_
+                                .update_begin(&mut self.delta.cos_, &mut self.uf, self.latest_timestamp);
+                            self.const_.update_begin(
+                                &mut self.delta.const_,
+                                &mut self.uf,
+                                self.latest_timestamp,
+                            );
+                            self.var_
+                                .update_begin(&mut self.delta.var_, &mut self.uf, self.latest_timestamp);
                         });
                         log_duration!("update_loop (total): {}", {
                             loop {
                                 let mut progress = false;
-                                progress |= self.fuel_.update(&mut self.delta.fuel_, &mut self.uf);
-                                progress |= self
-                                    .zero_fuel_
-                                    .update(&mut self.delta.zero_fuel_, &mut self.uf);
-                                progress |= self.diff_.update(&mut self.delta.diff_, &mut self.uf);
-                                progress |= self
-                                    .integral_
-                                    .update(&mut self.delta.integral_, &mut self.uf);
-                                progress |= self.add_.update(&mut self.delta.add_, &mut self.uf);
-                                progress |= self.sub_.update(&mut self.delta.sub_, &mut self.uf);
-                                progress |= self.mul_.update(&mut self.delta.mul_, &mut self.uf);
-                                progress |= self.div_.update(&mut self.delta.div_, &mut self.uf);
-                                progress |= self.pow_.update(&mut self.delta.pow_, &mut self.uf);
-                                progress |= self.ln_.update(&mut self.delta.ln_, &mut self.uf);
-                                progress |= self.sqrt_.update(&mut self.delta.sqrt_, &mut self.uf);
-                                progress |= self.sin_.update(&mut self.delta.sin_, &mut self.uf);
-                                progress |= self.cos_.update(&mut self.delta.cos_, &mut self.uf);
-                                progress |= self.const_.update(&mut self.delta.const_, &mut self.uf);
-                                progress |= self.var_.update(&mut self.delta.var_, &mut self.uf);
+                                progress |= self.fuel_.update(
+                                    &mut self.delta.fuel_,
+                                    &mut self.uf,
+                                    self.latest_timestamp,
+                                );
+                                progress |= self.zero_fuel_.update(
+                                    &mut self.delta.zero_fuel_,
+                                    &mut self.uf,
+                                    self.latest_timestamp,
+                                );
+                                progress |= self.diff_.update(
+                                    &mut self.delta.diff_,
+                                    &mut self.uf,
+                                    self.latest_timestamp,
+                                );
+                                progress |= self.integral_.update(
+                                    &mut self.delta.integral_,
+                                    &mut self.uf,
+                                    self.latest_timestamp,
+                                );
+                                progress |=
+                                    self.add_
+                                        .update(&mut self.delta.add_, &mut self.uf, self.latest_timestamp);
+                                progress |=
+                                    self.sub_
+                                        .update(&mut self.delta.sub_, &mut self.uf, self.latest_timestamp);
+                                progress |=
+                                    self.mul_
+                                        .update(&mut self.delta.mul_, &mut self.uf, self.latest_timestamp);
+                                progress |=
+                                    self.div_
+                                        .update(&mut self.delta.div_, &mut self.uf, self.latest_timestamp);
+                                progress |=
+                                    self.pow_
+                                        .update(&mut self.delta.pow_, &mut self.uf, self.latest_timestamp);
+                                progress |=
+                                    self.ln_
+                                        .update(&mut self.delta.ln_, &mut self.uf, self.latest_timestamp);
+                                progress |= self.sqrt_.update(
+                                    &mut self.delta.sqrt_,
+                                    &mut self.uf,
+                                    self.latest_timestamp,
+                                );
+                                progress |=
+                                    self.sin_
+                                        .update(&mut self.delta.sin_, &mut self.uf, self.latest_timestamp);
+                                progress |=
+                                    self.cos_
+                                        .update(&mut self.delta.cos_, &mut self.uf, self.latest_timestamp);
+                                progress |= self.const_.update(
+                                    &mut self.delta.const_,
+                                    &mut self.uf,
+                                    self.latest_timestamp,
+                                );
+                                progress |=
+                                    self.var_
+                                        .update(&mut self.delta.var_, &mut self.uf, self.latest_timestamp);
                                 if !progress {
                                     break;
                                 }
                             }
                         });
                         log_duration!("update_finalize (total): {}", {
-                            self.fuel_
-                                .update_finalize(&mut self.delta.fuel_, &mut self.uf);
-                            self.zero_fuel_
-                                .update_finalize(&mut self.delta.zero_fuel_, &mut self.uf);
-                            self.diff_
-                                .update_finalize(&mut self.delta.diff_, &mut self.uf);
-                            self.integral_
-                                .update_finalize(&mut self.delta.integral_, &mut self.uf);
-                            self.add_
-                                .update_finalize(&mut self.delta.add_, &mut self.uf);
-                            self.sub_
-                                .update_finalize(&mut self.delta.sub_, &mut self.uf);
-                            self.mul_
-                                .update_finalize(&mut self.delta.mul_, &mut self.uf);
-                            self.div_
-                                .update_finalize(&mut self.delta.div_, &mut self.uf);
-                            self.pow_
-                                .update_finalize(&mut self.delta.pow_, &mut self.uf);
-                            self.ln_.update_finalize(&mut self.delta.ln_, &mut self.uf);
-                            self.sqrt_
-                                .update_finalize(&mut self.delta.sqrt_, &mut self.uf);
-                            self.sin_
-                                .update_finalize(&mut self.delta.sin_, &mut self.uf);
-                            self.cos_
-                                .update_finalize(&mut self.delta.cos_, &mut self.uf);
-                            self.const_
-                                .update_finalize(&mut self.delta.const_, &mut self.uf);
-                            self.var_
-                                .update_finalize(&mut self.delta.var_, &mut self.uf);
+                            self.fuel_.update_finalize(
+                                &mut self.delta.fuel_,
+                                &mut self.uf,
+                                self.latest_timestamp,
+                            );
+                            self.zero_fuel_.update_finalize(
+                                &mut self.delta.zero_fuel_,
+                                &mut self.uf,
+                                self.latest_timestamp,
+                            );
+                            self.diff_.update_finalize(
+                                &mut self.delta.diff_,
+                                &mut self.uf,
+                                self.latest_timestamp,
+                            );
+                            self.integral_.update_finalize(
+                                &mut self.delta.integral_,
+                                &mut self.uf,
+                                self.latest_timestamp,
+                            );
+                            self.add_.update_finalize(
+                                &mut self.delta.add_,
+                                &mut self.uf,
+                                self.latest_timestamp,
+                            );
+                            self.sub_.update_finalize(
+                                &mut self.delta.sub_,
+                                &mut self.uf,
+                                self.latest_timestamp,
+                            );
+                            self.mul_.update_finalize(
+                                &mut self.delta.mul_,
+                                &mut self.uf,
+                                self.latest_timestamp,
+                            );
+                            self.div_.update_finalize(
+                                &mut self.delta.div_,
+                                &mut self.uf,
+                                self.latest_timestamp,
+                            );
+                            self.pow_.update_finalize(
+                                &mut self.delta.pow_,
+                                &mut self.uf,
+                                self.latest_timestamp,
+                            );
+                            self.ln_
+                                .update_finalize(&mut self.delta.ln_, &mut self.uf, self.latest_timestamp);
+                            self.sqrt_.update_finalize(
+                                &mut self.delta.sqrt_,
+                                &mut self.uf,
+                                self.latest_timestamp,
+                            );
+                            self.sin_.update_finalize(
+                                &mut self.delta.sin_,
+                                &mut self.uf,
+                                self.latest_timestamp,
+                            );
+                            self.cos_.update_finalize(
+                                &mut self.delta.cos_,
+                                &mut self.uf,
+                                self.latest_timestamp,
+                            );
+                            self.const_.update_finalize(
+                                &mut self.delta.const_,
+                                &mut self.uf,
+                                self.latest_timestamp,
+                            );
+                            self.var_.update_finalize(
+                                &mut self.delta.var_,
+                                &mut self.uf,
+                                self.latest_timestamp,
+                            );
                             self.global_fuel_unit.update(&mut self.uf.fuel_unit_);
                             self.global_math.update(&mut self.uf.math_);
                             self.global_i64.update_finalize();

@@ -2712,14 +2712,14 @@ Need to use fewer indexes.
 // (Add x1 x2)
 // x1 = x2
 
-- GC ids.
+- GC ids. - unviable
 - faster UF
   - ILP, multiple lookups
 - reserve allocations
 - ILP entry
-- faster is_root
+- faster is_root - done
 - better hash functions
-- prefetch hashmap lookup
+- prefetch hashmap lookup - partial not promising
 - if only value is non-root, do in-place thing
 
 = TODO: want to do
@@ -2746,6 +2746,14 @@ Need to use fewer indexes.
 is_root && is_root && is_root
 ```
 want to send 3 memory requests and continue as soon as one matches.
+
+= TODO: erik
+
+retain/dedup not needed during index reconstruction if no overlap between old and new.
+
+sorting new means touching vecs exactly once, so whatever can be done eagerly.
+
+kill dead code
 
 = TODO READ
 Papers are just under the first author i looked at.
