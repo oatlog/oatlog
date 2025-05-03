@@ -217,15 +217,26 @@ fn get_verdict(program: String, file: &mut File, wd: &Path) -> Verdict {
     }
     let contents = test_contents(&program);
     set_file_contents(file, &contents);
-    let compile_ok = Command::new("cargo")
+
+    let mut child = Command::new("cargo")
         .arg("build")
         .current_dir(wd)
-        .stderr(Stdio::null())
+        .stderr(Stdio::piped())
         .stdout(Stdio::null())
-        .status()
+        .spawn()
+        .unwrap();
+
+    let compile_ok = child.wait().unwrap().success();
+
+    let mut compile_output = String::new();
+    child
+        .stderr
         .unwrap()
-        .success();
+        .read_to_string(&mut compile_output)
+        .unwrap();
+
     if !compile_ok {
+        eprintln!("{}", compile_output);
         return NoCompile;
     }
     let test_ok = Command::new("cargo")
@@ -273,7 +284,7 @@ const INPUT: &str = r#\"
 {program}
 \"#;
 
-oatlog::compile_egraph!(r#\"
+oatlog::compile_egraph_strict!(r#\"
 {program}
 \"#);
 
