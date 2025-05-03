@@ -707,33 +707,42 @@ fn update(
         fn update_finalize(&mut self, insertions: &mut Vec<Self::Row>, uf: &mut Unification) {
             log_duration!("update_finalize {}: {}", #relation_name, {
                 assert!(self.new.is_empty());
-                self.new.extend(#iter_cols_superset_new
-                    .filter(|&(#(#cols,)*)| !self.#allset.contains_key(&(#(#allset_cols,)*)))
-                );
-                insertions.clear();
 
-                #sort_new
-                self.new.dedup();
+                log_duration!("fill new: {}", {
+                    self.new.extend(#iter_cols_superset_new
+                        .filter(|&(#(#cols,)*)| !self.#allset.contains_key(&(#(#allset_cols,)*)))
+                    );
+                    insertions.clear();
+
+                    #sort_new
+                    self.new.dedup();
+                });
+
 
                 #(  // Indexes like `HashMap<(T, T, T), SmallVec<[(); 1]>>` and `HashMap<(T, T), SmallVec<[(T,); 1]>>`
-                    for &(#(#indexes_nofd_cols,)*) in &self.new {
-                        self.#indexes_nofd
-                            .entry((#(#indexes_nofd_keys,)*))
-                            .or_default()
-                            .push((#(#indexes_nofd_vals,)*));
-                    }
-                    self.#indexes_nofd.retain(|&(#(#indexes_nofd_keys,)*), v| {
-                        if #indexes_nofd_key_is_root {
-                            v.retain(|&mut (#(#indexes_nofd_vals,)*)| #indexes_nofd_value_is_root);
-                            v.sort_unstable();
-                            v.dedup();
-                            true
-                        } else {
-                            false
+                    log_duration!("fill index: {}", {
+                        for &(#(#indexes_nofd_cols,)*) in &self.new {
+                            self.#indexes_nofd
+                                .entry((#(#indexes_nofd_keys,)*))
+                                .or_default()
+                                .push((#(#indexes_nofd_vals,)*));
                         }
+                    });
+                    log_duration!("retain index: {}", {
+                        self.#indexes_nofd.retain(|&(#(#indexes_nofd_keys,)*), v| {
+                            if #indexes_nofd_key_is_root {
+                                v.retain(|&mut (#(#indexes_nofd_vals,)*)| #indexes_nofd_value_is_root);
+                                v.sort_unstable();
+                                v.dedup();
+                                true
+                            } else {
+                                false
+                            }
+                        });
                     });
                 )*
                 #(  // Non-union functional dependency indexes, where merge is a panic or a primitive function.
+
                     for &(#(mut #indexes_othfd_cols,)*) in &self.new {
                         match self.#indexes_othfd.entry((#(#indexes_othfd_keys,)*)) {
                             runtime::HashMapEntry::Occupied(mut entry) => #indexes_othfd_merge,

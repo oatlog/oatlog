@@ -925,30 +925,36 @@ fn regression_tir2() {
                 fn update_finalize(&mut self, insertions: &mut Vec<Self::Row>, uf: &mut Unification) {
                     log_duration!("update_finalize {}: {}", "mul", {
                         assert!(self.new.is_empty());
-                        self.new.extend(
-                            self.hash_index_0_1
-                                .iter()
-                                .map(|(&(x0, x1), &(x2,))| (x0, x1, x2))
-                                .filter(|&(x0, x1, x2)| !self.hash_index_0_1_2.contains_key(&(x0, x1, x2))),
-                        );
-                        insertions.clear();
-                        RadixSortable::wrap(&mut self.new).voracious_sort();
-                        self.new.dedup();
-                        for &(x0, x1, x2) in &self.new {
-                            self.hash_index_0_1_2
-                                .entry((x0, x1, x2))
-                                .or_default()
-                                .push(());
-                        }
-                        self.hash_index_0_1_2.retain(|&(x0, x1, x2), v| {
-                            if uf.math_.is_root(x0) & uf.math_.is_root(x1) & uf.math_.is_root(x2) {
-                                v.retain(|&mut ()| true);
-                                v.sort_unstable();
-                                v.dedup();
-                                true
-                            } else {
-                                false
+                        log_duration!("fill new: {}", {
+                            self.new.extend(
+                                self.hash_index_0_1
+                                    .iter()
+                                    .map(|(&(x0, x1), &(x2,))| (x0, x1, x2))
+                                    .filter(|&(x0, x1, x2)| !self.hash_index_0_1_2.contains_key(&(x0, x1, x2))),
+                            );
+                            insertions.clear();
+                            RadixSortable::wrap(&mut self.new).voracious_sort();
+                            self.new.dedup();
+                        });
+                        log_duration!("fill index: {}", {
+                            for &(x0, x1, x2) in &self.new {
+                                self.hash_index_0_1_2
+                                    .entry((x0, x1, x2))
+                                    .or_default()
+                                    .push(());
                             }
+                        });
+                        log_duration!("retain index: {}", {
+                            self.hash_index_0_1_2.retain(|&(x0, x1, x2), v| {
+                                if uf.math_.is_root(x0) & uf.math_.is_root(x1) & uf.math_.is_root(x2) {
+                                    v.retain(|&mut ()| true);
+                                    v.sort_unstable();
+                                    v.dedup();
+                                    true
+                                } else {
+                                    false
+                                }
+                            });
                         });
                     });
                     self.math_num_uprooted_at_latest_retain = 0;
@@ -1072,43 +1078,53 @@ fn regression_tir2() {
                 fn update_finalize(&mut self, insertions: &mut Vec<Self::Row>, uf: &mut Unification) {
                     log_duration!("update_finalize {}: {}", "pow", {
                         assert!(self.new.is_empty());
-                        self.new.extend(
-                            self.hash_index_1_0
-                                .iter()
-                                .map(|(&(x1, x0), &(x2,))| (x0, x1, x2))
-                                .filter(|&(x0, x1, x2)| !self.hash_index_1_0_2.contains_key(&(x1, x0, x2))),
-                        );
-                        insertions.clear();
-                        RadixSortable::wrap(&mut self.new).voracious_sort();
-                        self.new.dedup();
-                        for &(x0, x1, x2) in &self.new {
-                            self.hash_index_1.entry((x1,)).or_default().push((x0, x2));
-                        }
-                        self.hash_index_1.retain(|&(x1,), v| {
-                            if uf.math_.is_root(x1) {
-                                v.retain(|&mut (x0, x2)| uf.math_.is_root(x0) & uf.math_.is_root(x2));
-                                v.sort_unstable();
-                                v.dedup();
-                                true
-                            } else {
-                                false
+                        log_duration!("fill new: {}", {
+                            self.new.extend(
+                                self.hash_index_1_0
+                                    .iter()
+                                    .map(|(&(x1, x0), &(x2,))| (x0, x1, x2))
+                                    .filter(|&(x0, x1, x2)| !self.hash_index_1_0_2.contains_key(&(x1, x0, x2))),
+                            );
+                            insertions.clear();
+                            RadixSortable::wrap(&mut self.new).voracious_sort();
+                            self.new.dedup();
+                        });
+                        log_duration!("fill index: {}", {
+                            for &(x0, x1, x2) in &self.new {
+                                self.hash_index_1.entry((x1,)).or_default().push((x0, x2));
                             }
                         });
-                        for &(x0, x1, x2) in &self.new {
-                            self.hash_index_1_0_2
-                                .entry((x1, x0, x2))
-                                .or_default()
-                                .push(());
-                        }
-                        self.hash_index_1_0_2.retain(|&(x1, x0, x2), v| {
-                            if uf.math_.is_root(x1) & uf.math_.is_root(x0) & uf.math_.is_root(x2) {
-                                v.retain(|&mut ()| true);
-                                v.sort_unstable();
-                                v.dedup();
-                                true
-                            } else {
-                                false
+                        log_duration!("retain index: {}", {
+                            self.hash_index_1.retain(|&(x1,), v| {
+                                if uf.math_.is_root(x1) {
+                                    v.retain(|&mut (x0, x2)| uf.math_.is_root(x0) & uf.math_.is_root(x2));
+                                    v.sort_unstable();
+                                    v.dedup();
+                                    true
+                                } else {
+                                    false
+                                }
+                            });
+                        });
+                        log_duration!("fill index: {}", {
+                            for &(x0, x1, x2) in &self.new {
+                                self.hash_index_1_0_2
+                                    .entry((x1, x0, x2))
+                                    .or_default()
+                                    .push(());
                             }
+                        });
+                        log_duration!("retain index: {}", {
+                            self.hash_index_1_0_2.retain(|&(x1, x0, x2), v| {
+                                if uf.math_.is_root(x1) & uf.math_.is_root(x0) & uf.math_.is_root(x2) {
+                                    v.retain(|&mut ()| true);
+                                    v.sort_unstable();
+                                    v.dedup();
+                                    true
+                                } else {
+                                    false
+                                }
+                            });
                         });
                     });
                     self.math_num_uprooted_at_latest_retain = 0;
@@ -1235,40 +1251,50 @@ fn regression_tir2() {
                 fn update_finalize(&mut self, insertions: &mut Vec<Self::Row>, uf: &mut Unification) {
                     log_duration!("update_finalize {}: {}", "const", {
                         assert!(self.new.is_empty());
-                        self.new.extend(
-                            self.hash_index_0
-                                .iter()
-                                .map(|(&(x0,), &(x1,))| (x0, x1))
-                                .filter(|&(x0, x1)| !self.hash_index_0_1.contains_key(&(x0, x1))),
-                        );
-                        insertions.clear();
-                        self.new.sort_unstable();
-                        self.new.dedup();
-                        for &(x0, x1) in &self.new {
-                            self.hash_index_1.entry((x1,)).or_default().push((x0,));
-                        }
-                        self.hash_index_1.retain(|&(x1,), v| {
-                            if uf.math_.is_root(x1) {
-                                v.retain(|&mut (x0,)| true);
-                                v.sort_unstable();
-                                v.dedup();
-                                true
-                            } else {
-                                false
+                        log_duration!("fill new: {}", {
+                            self.new.extend(
+                                self.hash_index_0
+                                    .iter()
+                                    .map(|(&(x0,), &(x1,))| (x0, x1))
+                                    .filter(|&(x0, x1)| !self.hash_index_0_1.contains_key(&(x0, x1))),
+                            );
+                            insertions.clear();
+                            self.new.sort_unstable();
+                            self.new.dedup();
+                        });
+                        log_duration!("fill index: {}", {
+                            for &(x0, x1) in &self.new {
+                                self.hash_index_1.entry((x1,)).or_default().push((x0,));
                             }
                         });
-                        for &(x0, x1) in &self.new {
-                            self.hash_index_0_1.entry((x0, x1)).or_default().push(());
-                        }
-                        self.hash_index_0_1.retain(|&(x0, x1), v| {
-                            if uf.math_.is_root(x1) {
-                                v.retain(|&mut ()| true);
-                                v.sort_unstable();
-                                v.dedup();
-                                true
-                            } else {
-                                false
+                        log_duration!("retain index: {}", {
+                            self.hash_index_1.retain(|&(x1,), v| {
+                                if uf.math_.is_root(x1) {
+                                    v.retain(|&mut (x0,)| true);
+                                    v.sort_unstable();
+                                    v.dedup();
+                                    true
+                                } else {
+                                    false
+                                }
+                            });
+                        });
+                        log_duration!("fill index: {}", {
+                            for &(x0, x1) in &self.new {
+                                self.hash_index_0_1.entry((x0, x1)).or_default().push(());
                             }
+                        });
+                        log_duration!("retain index: {}", {
+                            self.hash_index_0_1.retain(|&(x0, x1), v| {
+                                if uf.math_.is_root(x1) {
+                                    v.retain(|&mut ()| true);
+                                    v.sort_unstable();
+                                    v.dedup();
+                                    true
+                                } else {
+                                    false
+                                }
+                            });
                         });
                     });
                     self.math_num_uprooted_at_latest_retain = 0;
@@ -1755,30 +1781,36 @@ fn regression_tir1() {
                 fn update_finalize(&mut self, insertions: &mut Vec<Self::Row>, uf: &mut Unification) {
                     log_duration!("update_finalize {}: {}", "sub", {
                         assert!(self.new.is_empty());
-                        self.new.extend(
-                            self.hash_index_0_1
-                                .iter()
-                                .map(|(&(x0, x1), &(x2,))| (x0, x1, x2))
-                                .filter(|&(x0, x1, x2)| !self.hash_index_0_1_2.contains_key(&(x0, x1, x2))),
-                        );
-                        insertions.clear();
-                        RadixSortable::wrap(&mut self.new).voracious_sort();
-                        self.new.dedup();
-                        for &(x0, x1, x2) in &self.new {
-                            self.hash_index_0_1_2
-                                .entry((x0, x1, x2))
-                                .or_default()
-                                .push(());
-                        }
-                        self.hash_index_0_1_2.retain(|&(x0, x1, x2), v| {
-                            if uf.math_.is_root(x0) & uf.math_.is_root(x1) & uf.math_.is_root(x2) {
-                                v.retain(|&mut ()| true);
-                                v.sort_unstable();
-                                v.dedup();
-                                true
-                            } else {
-                                false
+                        log_duration!("fill new: {}", {
+                            self.new.extend(
+                                self.hash_index_0_1
+                                    .iter()
+                                    .map(|(&(x0, x1), &(x2,))| (x0, x1, x2))
+                                    .filter(|&(x0, x1, x2)| !self.hash_index_0_1_2.contains_key(&(x0, x1, x2))),
+                            );
+                            insertions.clear();
+                            RadixSortable::wrap(&mut self.new).voracious_sort();
+                            self.new.dedup();
+                        });
+                        log_duration!("fill index: {}", {
+                            for &(x0, x1, x2) in &self.new {
+                                self.hash_index_0_1_2
+                                    .entry((x0, x1, x2))
+                                    .or_default()
+                                    .push(());
                             }
+                        });
+                        log_duration!("retain index: {}", {
+                            self.hash_index_0_1_2.retain(|&(x0, x1, x2), v| {
+                                if uf.math_.is_root(x0) & uf.math_.is_root(x1) & uf.math_.is_root(x2) {
+                                    v.retain(|&mut ()| true);
+                                    v.sort_unstable();
+                                    v.dedup();
+                                    true
+                                } else {
+                                    false
+                                }
+                            });
                         });
                     });
                     self.math_num_uprooted_at_latest_retain = 0;
@@ -1898,27 +1930,33 @@ fn regression_tir1() {
                 fn update_finalize(&mut self, insertions: &mut Vec<Self::Row>, uf: &mut Unification) {
                     log_duration!("update_finalize {}: {}", "const", {
                         assert!(self.new.is_empty());
-                        self.new.extend(
-                            self.hash_index_0
-                                .iter()
-                                .map(|(&(x0,), &(x1,))| (x0, x1))
-                                .filter(|&(x0, x1)| !self.hash_index_0_1.contains_key(&(x0, x1))),
-                        );
-                        insertions.clear();
-                        self.new.sort_unstable();
-                        self.new.dedup();
-                        for &(x0, x1) in &self.new {
-                            self.hash_index_0_1.entry((x0, x1)).or_default().push(());
-                        }
-                        self.hash_index_0_1.retain(|&(x0, x1), v| {
-                            if uf.math_.is_root(x1) {
-                                v.retain(|&mut ()| true);
-                                v.sort_unstable();
-                                v.dedup();
-                                true
-                            } else {
-                                false
+                        log_duration!("fill new: {}", {
+                            self.new.extend(
+                                self.hash_index_0
+                                    .iter()
+                                    .map(|(&(x0,), &(x1,))| (x0, x1))
+                                    .filter(|&(x0, x1)| !self.hash_index_0_1.contains_key(&(x0, x1))),
+                            );
+                            insertions.clear();
+                            self.new.sort_unstable();
+                            self.new.dedup();
+                        });
+                        log_duration!("fill index: {}", {
+                            for &(x0, x1) in &self.new {
+                                self.hash_index_0_1.entry((x0, x1)).or_default().push(());
                             }
+                        });
+                        log_duration!("retain index: {}", {
+                            self.hash_index_0_1.retain(|&(x0, x1), v| {
+                                if uf.math_.is_root(x1) {
+                                    v.retain(|&mut ()| true);
+                                    v.sort_unstable();
+                                    v.dedup();
+                                    true
+                                } else {
+                                    false
+                                }
+                            });
                         });
                     });
                     self.math_num_uprooted_at_latest_retain = 0;
@@ -2533,56 +2571,70 @@ fn codegen_constant_propagation() {
                 fn update_finalize(&mut self, insertions: &mut Vec<Self::Row>, uf: &mut Unification) {
                     log_duration!("update_finalize {}: {}", "add", {
                         assert!(self.new.is_empty());
-                        self.new.extend(
-                            self.hash_index_0_1
-                                .iter()
-                                .map(|(&(x0, x1), &(x2,))| (x0, x1, x2))
-                                .filter(|&(x0, x1, x2)| !self.hash_index_0_1_2.contains_key(&(x0, x1, x2))),
-                        );
-                        insertions.clear();
-                        RadixSortable::wrap(&mut self.new).voracious_sort();
-                        self.new.dedup();
-                        for &(x0, x1, x2) in &self.new {
-                            self.hash_index_0.entry((x0,)).or_default().push((x1, x2));
-                        }
-                        self.hash_index_0.retain(|&(x0,), v| {
-                            if uf.math_.is_root(x0) {
-                                v.retain(|&mut (x1, x2)| uf.math_.is_root(x1) & uf.math_.is_root(x2));
-                                v.sort_unstable();
-                                v.dedup();
-                                true
-                            } else {
-                                false
+                        log_duration!("fill new: {}", {
+                            self.new.extend(
+                                self.hash_index_0_1
+                                    .iter()
+                                    .map(|(&(x0, x1), &(x2,))| (x0, x1, x2))
+                                    .filter(|&(x0, x1, x2)| !self.hash_index_0_1_2.contains_key(&(x0, x1, x2))),
+                            );
+                            insertions.clear();
+                            RadixSortable::wrap(&mut self.new).voracious_sort();
+                            self.new.dedup();
+                        });
+                        log_duration!("fill index: {}", {
+                            for &(x0, x1, x2) in &self.new {
+                                self.hash_index_0.entry((x0,)).or_default().push((x1, x2));
                             }
                         });
-                        for &(x0, x1, x2) in &self.new {
-                            self.hash_index_1.entry((x1,)).or_default().push((x0, x2));
-                        }
-                        self.hash_index_1.retain(|&(x1,), v| {
-                            if uf.math_.is_root(x1) {
-                                v.retain(|&mut (x0, x2)| uf.math_.is_root(x0) & uf.math_.is_root(x2));
-                                v.sort_unstable();
-                                v.dedup();
-                                true
-                            } else {
-                                false
+                        log_duration!("retain index: {}", {
+                            self.hash_index_0.retain(|&(x0,), v| {
+                                if uf.math_.is_root(x0) {
+                                    v.retain(|&mut (x1, x2)| uf.math_.is_root(x1) & uf.math_.is_root(x2));
+                                    v.sort_unstable();
+                                    v.dedup();
+                                    true
+                                } else {
+                                    false
+                                }
+                            });
+                        });
+                        log_duration!("fill index: {}", {
+                            for &(x0, x1, x2) in &self.new {
+                                self.hash_index_1.entry((x1,)).or_default().push((x0, x2));
                             }
                         });
-                        for &(x0, x1, x2) in &self.new {
-                            self.hash_index_0_1_2
-                                .entry((x0, x1, x2))
-                                .or_default()
-                                .push(());
-                        }
-                        self.hash_index_0_1_2.retain(|&(x0, x1, x2), v| {
-                            if uf.math_.is_root(x0) & uf.math_.is_root(x1) & uf.math_.is_root(x2) {
-                                v.retain(|&mut ()| true);
-                                v.sort_unstable();
-                                v.dedup();
-                                true
-                            } else {
-                                false
+                        log_duration!("retain index: {}", {
+                            self.hash_index_1.retain(|&(x1,), v| {
+                                if uf.math_.is_root(x1) {
+                                    v.retain(|&mut (x0, x2)| uf.math_.is_root(x0) & uf.math_.is_root(x2));
+                                    v.sort_unstable();
+                                    v.dedup();
+                                    true
+                                } else {
+                                    false
+                                }
+                            });
+                        });
+                        log_duration!("fill index: {}", {
+                            for &(x0, x1, x2) in &self.new {
+                                self.hash_index_0_1_2
+                                    .entry((x0, x1, x2))
+                                    .or_default()
+                                    .push(());
                             }
+                        });
+                        log_duration!("retain index: {}", {
+                            self.hash_index_0_1_2.retain(|&(x0, x1, x2), v| {
+                                if uf.math_.is_root(x0) & uf.math_.is_root(x1) & uf.math_.is_root(x2) {
+                                    v.retain(|&mut ()| true);
+                                    v.sort_unstable();
+                                    v.dedup();
+                                    true
+                                } else {
+                                    false
+                                }
+                            });
                         });
                     });
                     self.math_num_uprooted_at_latest_retain = 0;
@@ -2719,56 +2771,70 @@ fn codegen_constant_propagation() {
                 fn update_finalize(&mut self, insertions: &mut Vec<Self::Row>, uf: &mut Unification) {
                     log_duration!("update_finalize {}: {}", "mul", {
                         assert!(self.new.is_empty());
-                        self.new.extend(
-                            self.hash_index_0_1
-                                .iter()
-                                .map(|(&(x0, x1), &(x2,))| (x0, x1, x2))
-                                .filter(|&(x0, x1, x2)| !self.hash_index_0_1_2.contains_key(&(x0, x1, x2))),
-                        );
-                        insertions.clear();
-                        RadixSortable::wrap(&mut self.new).voracious_sort();
-                        self.new.dedup();
-                        for &(x0, x1, x2) in &self.new {
-                            self.hash_index_0.entry((x0,)).or_default().push((x1, x2));
-                        }
-                        self.hash_index_0.retain(|&(x0,), v| {
-                            if uf.math_.is_root(x0) {
-                                v.retain(|&mut (x1, x2)| uf.math_.is_root(x1) & uf.math_.is_root(x2));
-                                v.sort_unstable();
-                                v.dedup();
-                                true
-                            } else {
-                                false
+                        log_duration!("fill new: {}", {
+                            self.new.extend(
+                                self.hash_index_0_1
+                                    .iter()
+                                    .map(|(&(x0, x1), &(x2,))| (x0, x1, x2))
+                                    .filter(|&(x0, x1, x2)| !self.hash_index_0_1_2.contains_key(&(x0, x1, x2))),
+                            );
+                            insertions.clear();
+                            RadixSortable::wrap(&mut self.new).voracious_sort();
+                            self.new.dedup();
+                        });
+                        log_duration!("fill index: {}", {
+                            for &(x0, x1, x2) in &self.new {
+                                self.hash_index_0.entry((x0,)).or_default().push((x1, x2));
                             }
                         });
-                        for &(x0, x1, x2) in &self.new {
-                            self.hash_index_1.entry((x1,)).or_default().push((x0, x2));
-                        }
-                        self.hash_index_1.retain(|&(x1,), v| {
-                            if uf.math_.is_root(x1) {
-                                v.retain(|&mut (x0, x2)| uf.math_.is_root(x0) & uf.math_.is_root(x2));
-                                v.sort_unstable();
-                                v.dedup();
-                                true
-                            } else {
-                                false
+                        log_duration!("retain index: {}", {
+                            self.hash_index_0.retain(|&(x0,), v| {
+                                if uf.math_.is_root(x0) {
+                                    v.retain(|&mut (x1, x2)| uf.math_.is_root(x1) & uf.math_.is_root(x2));
+                                    v.sort_unstable();
+                                    v.dedup();
+                                    true
+                                } else {
+                                    false
+                                }
+                            });
+                        });
+                        log_duration!("fill index: {}", {
+                            for &(x0, x1, x2) in &self.new {
+                                self.hash_index_1.entry((x1,)).or_default().push((x0, x2));
                             }
                         });
-                        for &(x0, x1, x2) in &self.new {
-                            self.hash_index_0_1_2
-                                .entry((x0, x1, x2))
-                                .or_default()
-                                .push(());
-                        }
-                        self.hash_index_0_1_2.retain(|&(x0, x1, x2), v| {
-                            if uf.math_.is_root(x0) & uf.math_.is_root(x1) & uf.math_.is_root(x2) {
-                                v.retain(|&mut ()| true);
-                                v.sort_unstable();
-                                v.dedup();
-                                true
-                            } else {
-                                false
+                        log_duration!("retain index: {}", {
+                            self.hash_index_1.retain(|&(x1,), v| {
+                                if uf.math_.is_root(x1) {
+                                    v.retain(|&mut (x0, x2)| uf.math_.is_root(x0) & uf.math_.is_root(x2));
+                                    v.sort_unstable();
+                                    v.dedup();
+                                    true
+                                } else {
+                                    false
+                                }
+                            });
+                        });
+                        log_duration!("fill index: {}", {
+                            for &(x0, x1, x2) in &self.new {
+                                self.hash_index_0_1_2
+                                    .entry((x0, x1, x2))
+                                    .or_default()
+                                    .push(());
                             }
+                        });
+                        log_duration!("retain index: {}", {
+                            self.hash_index_0_1_2.retain(|&(x0, x1, x2), v| {
+                                if uf.math_.is_root(x0) & uf.math_.is_root(x1) & uf.math_.is_root(x2) {
+                                    v.retain(|&mut ()| true);
+                                    v.sort_unstable();
+                                    v.dedup();
+                                    true
+                                } else {
+                                    false
+                                }
+                            });
                         });
                     });
                     self.math_num_uprooted_at_latest_retain = 0;
@@ -2901,40 +2967,50 @@ fn codegen_constant_propagation() {
                 fn update_finalize(&mut self, insertions: &mut Vec<Self::Row>, uf: &mut Unification) {
                     log_duration!("update_finalize {}: {}", "const", {
                         assert!(self.new.is_empty());
-                        self.new.extend(
-                            self.hash_index_0
-                                .iter()
-                                .map(|(&(x0,), &(x1,))| (x0, x1))
-                                .filter(|&(x0, x1)| !self.hash_index_0_1.contains_key(&(x0, x1))),
-                        );
-                        insertions.clear();
-                        self.new.sort_unstable();
-                        self.new.dedup();
-                        for &(x0, x1) in &self.new {
-                            self.hash_index_1.entry((x1,)).or_default().push((x0,));
-                        }
-                        self.hash_index_1.retain(|&(x1,), v| {
-                            if uf.math_.is_root(x1) {
-                                v.retain(|&mut (x0,)| true);
-                                v.sort_unstable();
-                                v.dedup();
-                                true
-                            } else {
-                                false
+                        log_duration!("fill new: {}", {
+                            self.new.extend(
+                                self.hash_index_0
+                                    .iter()
+                                    .map(|(&(x0,), &(x1,))| (x0, x1))
+                                    .filter(|&(x0, x1)| !self.hash_index_0_1.contains_key(&(x0, x1))),
+                            );
+                            insertions.clear();
+                            self.new.sort_unstable();
+                            self.new.dedup();
+                        });
+                        log_duration!("fill index: {}", {
+                            for &(x0, x1) in &self.new {
+                                self.hash_index_1.entry((x1,)).or_default().push((x0,));
                             }
                         });
-                        for &(x0, x1) in &self.new {
-                            self.hash_index_0_1.entry((x0, x1)).or_default().push(());
-                        }
-                        self.hash_index_0_1.retain(|&(x0, x1), v| {
-                            if uf.math_.is_root(x1) {
-                                v.retain(|&mut ()| true);
-                                v.sort_unstable();
-                                v.dedup();
-                                true
-                            } else {
-                                false
+                        log_duration!("retain index: {}", {
+                            self.hash_index_1.retain(|&(x1,), v| {
+                                if uf.math_.is_root(x1) {
+                                    v.retain(|&mut (x0,)| true);
+                                    v.sort_unstable();
+                                    v.dedup();
+                                    true
+                                } else {
+                                    false
+                                }
+                            });
+                        });
+                        log_duration!("fill index: {}", {
+                            for &(x0, x1) in &self.new {
+                                self.hash_index_0_1.entry((x0, x1)).or_default().push(());
                             }
+                        });
+                        log_duration!("retain index: {}", {
+                            self.hash_index_0_1.retain(|&(x0, x1), v| {
+                                if uf.math_.is_root(x1) {
+                                    v.retain(|&mut ()| true);
+                                    v.sort_unstable();
+                                    v.dedup();
+                                    true
+                                } else {
+                                    false
+                                }
+                            });
                         });
                     });
                     self.math_num_uprooted_at_latest_retain = 0;
@@ -3305,30 +3381,36 @@ fn codegen_commutative() {
                 fn update_finalize(&mut self, insertions: &mut Vec<Self::Row>, uf: &mut Unification) {
                     log_duration!("update_finalize {}: {}", "add", {
                         assert!(self.new.is_empty());
-                        self.new.extend(
-                            self.hash_index_0_1
-                                .iter()
-                                .map(|(&(x0, x1), &(x2,))| (x0, x1, x2))
-                                .filter(|&(x0, x1, x2)| !self.hash_index_0_1_2.contains_key(&(x0, x1, x2))),
-                        );
-                        insertions.clear();
-                        RadixSortable::wrap(&mut self.new).voracious_sort();
-                        self.new.dedup();
-                        for &(x0, x1, x2) in &self.new {
-                            self.hash_index_0_1_2
-                                .entry((x0, x1, x2))
-                                .or_default()
-                                .push(());
-                        }
-                        self.hash_index_0_1_2.retain(|&(x0, x1, x2), v| {
-                            if uf.math_.is_root(x0) & uf.math_.is_root(x1) & uf.math_.is_root(x2) {
-                                v.retain(|&mut ()| true);
-                                v.sort_unstable();
-                                v.dedup();
-                                true
-                            } else {
-                                false
+                        log_duration!("fill new: {}", {
+                            self.new.extend(
+                                self.hash_index_0_1
+                                    .iter()
+                                    .map(|(&(x0, x1), &(x2,))| (x0, x1, x2))
+                                    .filter(|&(x0, x1, x2)| !self.hash_index_0_1_2.contains_key(&(x0, x1, x2))),
+                            );
+                            insertions.clear();
+                            RadixSortable::wrap(&mut self.new).voracious_sort();
+                            self.new.dedup();
+                        });
+                        log_duration!("fill index: {}", {
+                            for &(x0, x1, x2) in &self.new {
+                                self.hash_index_0_1_2
+                                    .entry((x0, x1, x2))
+                                    .or_default()
+                                    .push(());
                             }
+                        });
+                        log_duration!("retain index: {}", {
+                            self.hash_index_0_1_2.retain(|&(x0, x1, x2), v| {
+                                if uf.math_.is_root(x0) & uf.math_.is_root(x1) & uf.math_.is_root(x2) {
+                                    v.retain(|&mut ()| true);
+                                    v.sort_unstable();
+                                    v.dedup();
+                                    true
+                                } else {
+                                    false
+                                }
+                            });
                         });
                     });
                     self.math_num_uprooted_at_latest_retain = 0;
@@ -3699,30 +3781,36 @@ fn regression_entry2() {
                 fn update_finalize(&mut self, insertions: &mut Vec<Self::Row>, uf: &mut Unification) {
                     log_duration!("update_finalize {}: {}", "sub", {
                         assert!(self.new.is_empty());
-                        self.new.extend(
-                            self.hash_index_0_1
-                                .iter()
-                                .map(|(&(x0, x1), &(x2,))| (x0, x1, x2))
-                                .filter(|&(x0, x1, x2)| !self.hash_index_0_1_2.contains_key(&(x0, x1, x2))),
-                        );
-                        insertions.clear();
-                        RadixSortable::wrap(&mut self.new).voracious_sort();
-                        self.new.dedup();
-                        for &(x0, x1, x2) in &self.new {
-                            self.hash_index_0_1_2
-                                .entry((x0, x1, x2))
-                                .or_default()
-                                .push(());
-                        }
-                        self.hash_index_0_1_2.retain(|&(x0, x1, x2), v| {
-                            if uf.math_.is_root(x0) & uf.math_.is_root(x1) & uf.math_.is_root(x2) {
-                                v.retain(|&mut ()| true);
-                                v.sort_unstable();
-                                v.dedup();
-                                true
-                            } else {
-                                false
+                        log_duration!("fill new: {}", {
+                            self.new.extend(
+                                self.hash_index_0_1
+                                    .iter()
+                                    .map(|(&(x0, x1), &(x2,))| (x0, x1, x2))
+                                    .filter(|&(x0, x1, x2)| !self.hash_index_0_1_2.contains_key(&(x0, x1, x2))),
+                            );
+                            insertions.clear();
+                            RadixSortable::wrap(&mut self.new).voracious_sort();
+                            self.new.dedup();
+                        });
+                        log_duration!("fill index: {}", {
+                            for &(x0, x1, x2) in &self.new {
+                                self.hash_index_0_1_2
+                                    .entry((x0, x1, x2))
+                                    .or_default()
+                                    .push(());
                             }
+                        });
+                        log_duration!("retain index: {}", {
+                            self.hash_index_0_1_2.retain(|&(x0, x1, x2), v| {
+                                if uf.math_.is_root(x0) & uf.math_.is_root(x1) & uf.math_.is_root(x2) {
+                                    v.retain(|&mut ()| true);
+                                    v.sort_unstable();
+                                    v.dedup();
+                                    true
+                                } else {
+                                    false
+                                }
+                            });
                         });
                     });
                     self.math_num_uprooted_at_latest_retain = 0;
@@ -3842,27 +3930,33 @@ fn regression_entry2() {
                 fn update_finalize(&mut self, insertions: &mut Vec<Self::Row>, uf: &mut Unification) {
                     log_duration!("update_finalize {}: {}", "const", {
                         assert!(self.new.is_empty());
-                        self.new.extend(
-                            self.hash_index_0
-                                .iter()
-                                .map(|(&(x0,), &(x1,))| (x0, x1))
-                                .filter(|&(x0, x1)| !self.hash_index_0_1.contains_key(&(x0, x1))),
-                        );
-                        insertions.clear();
-                        self.new.sort_unstable();
-                        self.new.dedup();
-                        for &(x0, x1) in &self.new {
-                            self.hash_index_0_1.entry((x0, x1)).or_default().push(());
-                        }
-                        self.hash_index_0_1.retain(|&(x0, x1), v| {
-                            if uf.math_.is_root(x1) {
-                                v.retain(|&mut ()| true);
-                                v.sort_unstable();
-                                v.dedup();
-                                true
-                            } else {
-                                false
+                        log_duration!("fill new: {}", {
+                            self.new.extend(
+                                self.hash_index_0
+                                    .iter()
+                                    .map(|(&(x0,), &(x1,))| (x0, x1))
+                                    .filter(|&(x0, x1)| !self.hash_index_0_1.contains_key(&(x0, x1))),
+                            );
+                            insertions.clear();
+                            self.new.sort_unstable();
+                            self.new.dedup();
+                        });
+                        log_duration!("fill index: {}", {
+                            for &(x0, x1) in &self.new {
+                                self.hash_index_0_1.entry((x0, x1)).or_default().push(());
                             }
+                        });
+                        log_duration!("retain index: {}", {
+                            self.hash_index_0_1.retain(|&(x0, x1), v| {
+                                if uf.math_.is_root(x1) {
+                                    v.retain(|&mut ()| true);
+                                    v.sort_unstable();
+                                    v.dedup();
+                                    true
+                                } else {
+                                    false
+                                }
+                            });
                         });
                     });
                     self.math_num_uprooted_at_latest_retain = 0;
@@ -4242,30 +4336,36 @@ fn regression_entry() {
                 fn update_finalize(&mut self, insertions: &mut Vec<Self::Row>, uf: &mut Unification) {
                     log_duration!("update_finalize {}: {}", "integral", {
                         assert!(self.new.is_empty());
-                        self.new.extend(
-                            self.hash_index_0_1
-                                .iter()
-                                .map(|(&(x0, x1), &(x2,))| (x0, x1, x2))
-                                .filter(|&(x0, x1, x2)| !self.hash_index_0_1_2.contains_key(&(x0, x1, x2))),
-                        );
-                        insertions.clear();
-                        RadixSortable::wrap(&mut self.new).voracious_sort();
-                        self.new.dedup();
-                        for &(x0, x1, x2) in &self.new {
-                            self.hash_index_0_1_2
-                                .entry((x0, x1, x2))
-                                .or_default()
-                                .push(());
-                        }
-                        self.hash_index_0_1_2.retain(|&(x0, x1, x2), v| {
-                            if uf.math_.is_root(x0) & uf.math_.is_root(x1) & uf.math_.is_root(x2) {
-                                v.retain(|&mut ()| true);
-                                v.sort_unstable();
-                                v.dedup();
-                                true
-                            } else {
-                                false
+                        log_duration!("fill new: {}", {
+                            self.new.extend(
+                                self.hash_index_0_1
+                                    .iter()
+                                    .map(|(&(x0, x1), &(x2,))| (x0, x1, x2))
+                                    .filter(|&(x0, x1, x2)| !self.hash_index_0_1_2.contains_key(&(x0, x1, x2))),
+                            );
+                            insertions.clear();
+                            RadixSortable::wrap(&mut self.new).voracious_sort();
+                            self.new.dedup();
+                        });
+                        log_duration!("fill index: {}", {
+                            for &(x0, x1, x2) in &self.new {
+                                self.hash_index_0_1_2
+                                    .entry((x0, x1, x2))
+                                    .or_default()
+                                    .push(());
                             }
+                        });
+                        log_duration!("retain index: {}", {
+                            self.hash_index_0_1_2.retain(|&(x0, x1, x2), v| {
+                                if uf.math_.is_root(x0) & uf.math_.is_root(x1) & uf.math_.is_root(x2) {
+                                    v.retain(|&mut ()| true);
+                                    v.sort_unstable();
+                                    v.dedup();
+                                    true
+                                } else {
+                                    false
+                                }
+                            });
                         });
                     });
                     self.math_num_uprooted_at_latest_retain = 0;
@@ -4388,30 +4488,36 @@ fn regression_entry() {
                 fn update_finalize(&mut self, insertions: &mut Vec<Self::Row>, uf: &mut Unification) {
                     log_duration!("update_finalize {}: {}", "add", {
                         assert!(self.new.is_empty());
-                        self.new.extend(
-                            self.hash_index_0_1
-                                .iter()
-                                .map(|(&(x0, x1), &(x2,))| (x0, x1, x2))
-                                .filter(|&(x0, x1, x2)| !self.hash_index_0_1_2.contains_key(&(x0, x1, x2))),
-                        );
-                        insertions.clear();
-                        RadixSortable::wrap(&mut self.new).voracious_sort();
-                        self.new.dedup();
-                        for &(x0, x1, x2) in &self.new {
-                            self.hash_index_0_1_2
-                                .entry((x0, x1, x2))
-                                .or_default()
-                                .push(());
-                        }
-                        self.hash_index_0_1_2.retain(|&(x0, x1, x2), v| {
-                            if uf.math_.is_root(x0) & uf.math_.is_root(x1) & uf.math_.is_root(x2) {
-                                v.retain(|&mut ()| true);
-                                v.sort_unstable();
-                                v.dedup();
-                                true
-                            } else {
-                                false
+                        log_duration!("fill new: {}", {
+                            self.new.extend(
+                                self.hash_index_0_1
+                                    .iter()
+                                    .map(|(&(x0, x1), &(x2,))| (x0, x1, x2))
+                                    .filter(|&(x0, x1, x2)| !self.hash_index_0_1_2.contains_key(&(x0, x1, x2))),
+                            );
+                            insertions.clear();
+                            RadixSortable::wrap(&mut self.new).voracious_sort();
+                            self.new.dedup();
+                        });
+                        log_duration!("fill index: {}", {
+                            for &(x0, x1, x2) in &self.new {
+                                self.hash_index_0_1_2
+                                    .entry((x0, x1, x2))
+                                    .or_default()
+                                    .push(());
                             }
+                        });
+                        log_duration!("retain index: {}", {
+                            self.hash_index_0_1_2.retain(|&(x0, x1, x2), v| {
+                                if uf.math_.is_root(x0) & uf.math_.is_root(x1) & uf.math_.is_root(x2) {
+                                    v.retain(|&mut ()| true);
+                                    v.sort_unstable();
+                                    v.dedup();
+                                    true
+                                } else {
+                                    false
+                                }
+                            });
                         });
                     });
                     self.math_num_uprooted_at_latest_retain = 0;
@@ -4774,30 +4880,36 @@ fn test_bind_variable_multiple_times() {
                 fn update_finalize(&mut self, insertions: &mut Vec<Self::Row>, uf: &mut Unification) {
                     log_duration!("update_finalize {}: {}", "same", {
                         assert!(self.new.is_empty());
-                        self.new.extend(
-                            self.hash_index_0_1
-                                .iter()
-                                .map(|(&(x0, x1), &(x2,))| (x0, x1, x2))
-                                .filter(|&(x0, x1, x2)| !self.hash_index_0_1_2.contains_key(&(x0, x1, x2))),
-                        );
-                        insertions.clear();
-                        RadixSortable::wrap(&mut self.new).voracious_sort();
-                        self.new.dedup();
-                        for &(x0, x1, x2) in &self.new {
-                            self.hash_index_0_1_2
-                                .entry((x0, x1, x2))
-                                .or_default()
-                                .push(());
-                        }
-                        self.hash_index_0_1_2.retain(|&(x0, x1, x2), v| {
-                            if uf.foo_.is_root(x0) & uf.foo_.is_root(x1) & uf.foo_.is_root(x2) {
-                                v.retain(|&mut ()| true);
-                                v.sort_unstable();
-                                v.dedup();
-                                true
-                            } else {
-                                false
+                        log_duration!("fill new: {}", {
+                            self.new.extend(
+                                self.hash_index_0_1
+                                    .iter()
+                                    .map(|(&(x0, x1), &(x2,))| (x0, x1, x2))
+                                    .filter(|&(x0, x1, x2)| !self.hash_index_0_1_2.contains_key(&(x0, x1, x2))),
+                            );
+                            insertions.clear();
+                            RadixSortable::wrap(&mut self.new).voracious_sort();
+                            self.new.dedup();
+                        });
+                        log_duration!("fill index: {}", {
+                            for &(x0, x1, x2) in &self.new {
+                                self.hash_index_0_1_2
+                                    .entry((x0, x1, x2))
+                                    .or_default()
+                                    .push(());
                             }
+                        });
+                        log_duration!("retain index: {}", {
+                            self.hash_index_0_1_2.retain(|&(x0, x1, x2), v| {
+                                if uf.foo_.is_root(x0) & uf.foo_.is_root(x1) & uf.foo_.is_root(x2) {
+                                    v.retain(|&mut ()| true);
+                                    v.sort_unstable();
+                                    v.dedup();
+                                    true
+                                } else {
+                                    false
+                                }
+                            });
                         });
                     });
                     self.foo_num_uprooted_at_latest_retain = 0;
@@ -5231,43 +5343,53 @@ fn codegen_variable_reuse_bug() {
                 fn update_finalize(&mut self, insertions: &mut Vec<Self::Row>, uf: &mut Unification) {
                     log_duration!("update_finalize {}: {}", "add", {
                         assert!(self.new.is_empty());
-                        self.new.extend(
-                            self.hash_index_0_1
-                                .iter()
-                                .map(|(&(x0, x1), &(x2,))| (x0, x1, x2))
-                                .filter(|&(x0, x1, x2)| !self.hash_index_0_1_2.contains_key(&(x0, x1, x2))),
-                        );
-                        insertions.clear();
-                        RadixSortable::wrap(&mut self.new).voracious_sort();
-                        self.new.dedup();
-                        for &(x0, x1, x2) in &self.new {
-                            self.hash_index_0_2.entry((x0, x2)).or_default().push((x1,));
-                        }
-                        self.hash_index_0_2.retain(|&(x0, x2), v| {
-                            if uf.math_.is_root(x0) & uf.math_.is_root(x2) {
-                                v.retain(|&mut (x1,)| uf.math_.is_root(x1));
-                                v.sort_unstable();
-                                v.dedup();
-                                true
-                            } else {
-                                false
+                        log_duration!("fill new: {}", {
+                            self.new.extend(
+                                self.hash_index_0_1
+                                    .iter()
+                                    .map(|(&(x0, x1), &(x2,))| (x0, x1, x2))
+                                    .filter(|&(x0, x1, x2)| !self.hash_index_0_1_2.contains_key(&(x0, x1, x2))),
+                            );
+                            insertions.clear();
+                            RadixSortable::wrap(&mut self.new).voracious_sort();
+                            self.new.dedup();
+                        });
+                        log_duration!("fill index: {}", {
+                            for &(x0, x1, x2) in &self.new {
+                                self.hash_index_0_2.entry((x0, x2)).or_default().push((x1,));
                             }
                         });
-                        for &(x0, x1, x2) in &self.new {
-                            self.hash_index_0_1_2
-                                .entry((x0, x1, x2))
-                                .or_default()
-                                .push(());
-                        }
-                        self.hash_index_0_1_2.retain(|&(x0, x1, x2), v| {
-                            if uf.math_.is_root(x0) & uf.math_.is_root(x1) & uf.math_.is_root(x2) {
-                                v.retain(|&mut ()| true);
-                                v.sort_unstable();
-                                v.dedup();
-                                true
-                            } else {
-                                false
+                        log_duration!("retain index: {}", {
+                            self.hash_index_0_2.retain(|&(x0, x2), v| {
+                                if uf.math_.is_root(x0) & uf.math_.is_root(x2) {
+                                    v.retain(|&mut (x1,)| uf.math_.is_root(x1));
+                                    v.sort_unstable();
+                                    v.dedup();
+                                    true
+                                } else {
+                                    false
+                                }
+                            });
+                        });
+                        log_duration!("fill index: {}", {
+                            for &(x0, x1, x2) in &self.new {
+                                self.hash_index_0_1_2
+                                    .entry((x0, x1, x2))
+                                    .or_default()
+                                    .push(());
                             }
+                        });
+                        log_duration!("retain index: {}", {
+                            self.hash_index_0_1_2.retain(|&(x0, x1, x2), v| {
+                                if uf.math_.is_root(x0) & uf.math_.is_root(x1) & uf.math_.is_root(x2) {
+                                    v.retain(|&mut ()| true);
+                                    v.sort_unstable();
+                                    v.dedup();
+                                    true
+                                } else {
+                                    false
+                                }
+                            });
                         });
                     });
                     self.math_num_uprooted_at_latest_retain = 0;
@@ -5395,27 +5517,33 @@ fn codegen_variable_reuse_bug() {
                 fn update_finalize(&mut self, insertions: &mut Vec<Self::Row>, uf: &mut Unification) {
                     log_duration!("update_finalize {}: {}", "zero", {
                         assert!(self.new.is_empty());
-                        self.new.extend(
-                            self.hash_index_
-                                .iter()
-                                .map(|(&(), &(x0,))| (x0,))
-                                .filter(|&(x0,)| !self.hash_index_0.contains_key(&(x0,))),
-                        );
-                        insertions.clear();
-                        RadixSortable::wrap(&mut self.new).voracious_sort();
-                        self.new.dedup();
-                        for &(x0,) in &self.new {
-                            self.hash_index_0.entry((x0,)).or_default().push(());
-                        }
-                        self.hash_index_0.retain(|&(x0,), v| {
-                            if uf.math_.is_root(x0) {
-                                v.retain(|&mut ()| true);
-                                v.sort_unstable();
-                                v.dedup();
-                                true
-                            } else {
-                                false
+                        log_duration!("fill new: {}", {
+                            self.new.extend(
+                                self.hash_index_
+                                    .iter()
+                                    .map(|(&(), &(x0,))| (x0,))
+                                    .filter(|&(x0,)| !self.hash_index_0.contains_key(&(x0,))),
+                            );
+                            insertions.clear();
+                            RadixSortable::wrap(&mut self.new).voracious_sort();
+                            self.new.dedup();
+                        });
+                        log_duration!("fill index: {}", {
+                            for &(x0,) in &self.new {
+                                self.hash_index_0.entry((x0,)).or_default().push(());
                             }
+                        });
+                        log_duration!("retain index: {}", {
+                            self.hash_index_0.retain(|&(x0,), v| {
+                                if uf.math_.is_root(x0) {
+                                    v.retain(|&mut ()| true);
+                                    v.sort_unstable();
+                                    v.dedup();
+                                    true
+                                } else {
+                                    false
+                                }
+                            });
                         });
                     });
                     self.math_num_uprooted_at_latest_retain = 0;
@@ -5744,30 +5872,36 @@ fn initial_exprs() {
                 fn update_finalize(&mut self, insertions: &mut Vec<Self::Row>, uf: &mut Unification) {
                     log_duration!("update_finalize {}: {}", "add", {
                         assert!(self.new.is_empty());
-                        self.new.extend(
-                            self.hash_index_0_1
-                                .iter()
-                                .map(|(&(x0, x1), &(x2,))| (x0, x1, x2))
-                                .filter(|&(x0, x1, x2)| !self.hash_index_0_1_2.contains_key(&(x0, x1, x2))),
-                        );
-                        insertions.clear();
-                        RadixSortable::wrap(&mut self.new).voracious_sort();
-                        self.new.dedup();
-                        for &(x0, x1, x2) in &self.new {
-                            self.hash_index_0_1_2
-                                .entry((x0, x1, x2))
-                                .or_default()
-                                .push(());
-                        }
-                        self.hash_index_0_1_2.retain(|&(x0, x1, x2), v| {
-                            if uf.math_.is_root(x0) & uf.math_.is_root(x1) & uf.math_.is_root(x2) {
-                                v.retain(|&mut ()| true);
-                                v.sort_unstable();
-                                v.dedup();
-                                true
-                            } else {
-                                false
+                        log_duration!("fill new: {}", {
+                            self.new.extend(
+                                self.hash_index_0_1
+                                    .iter()
+                                    .map(|(&(x0, x1), &(x2,))| (x0, x1, x2))
+                                    .filter(|&(x0, x1, x2)| !self.hash_index_0_1_2.contains_key(&(x0, x1, x2))),
+                            );
+                            insertions.clear();
+                            RadixSortable::wrap(&mut self.new).voracious_sort();
+                            self.new.dedup();
+                        });
+                        log_duration!("fill index: {}", {
+                            for &(x0, x1, x2) in &self.new {
+                                self.hash_index_0_1_2
+                                    .entry((x0, x1, x2))
+                                    .or_default()
+                                    .push(());
                             }
+                        });
+                        log_duration!("retain index: {}", {
+                            self.hash_index_0_1_2.retain(|&(x0, x1, x2), v| {
+                                if uf.math_.is_root(x0) & uf.math_.is_root(x1) & uf.math_.is_root(x2) {
+                                    v.retain(|&mut ()| true);
+                                    v.sort_unstable();
+                                    v.dedup();
+                                    true
+                                } else {
+                                    false
+                                }
+                            });
                         });
                     });
                     self.math_num_uprooted_at_latest_retain = 0;
@@ -5890,30 +6024,36 @@ fn initial_exprs() {
                 fn update_finalize(&mut self, insertions: &mut Vec<Self::Row>, uf: &mut Unification) {
                     log_duration!("update_finalize {}: {}", "mul", {
                         assert!(self.new.is_empty());
-                        self.new.extend(
-                            self.hash_index_0_1
-                                .iter()
-                                .map(|(&(x0, x1), &(x2,))| (x0, x1, x2))
-                                .filter(|&(x0, x1, x2)| !self.hash_index_0_1_2.contains_key(&(x0, x1, x2))),
-                        );
-                        insertions.clear();
-                        RadixSortable::wrap(&mut self.new).voracious_sort();
-                        self.new.dedup();
-                        for &(x0, x1, x2) in &self.new {
-                            self.hash_index_0_1_2
-                                .entry((x0, x1, x2))
-                                .or_default()
-                                .push(());
-                        }
-                        self.hash_index_0_1_2.retain(|&(x0, x1, x2), v| {
-                            if uf.math_.is_root(x0) & uf.math_.is_root(x1) & uf.math_.is_root(x2) {
-                                v.retain(|&mut ()| true);
-                                v.sort_unstable();
-                                v.dedup();
-                                true
-                            } else {
-                                false
+                        log_duration!("fill new: {}", {
+                            self.new.extend(
+                                self.hash_index_0_1
+                                    .iter()
+                                    .map(|(&(x0, x1), &(x2,))| (x0, x1, x2))
+                                    .filter(|&(x0, x1, x2)| !self.hash_index_0_1_2.contains_key(&(x0, x1, x2))),
+                            );
+                            insertions.clear();
+                            RadixSortable::wrap(&mut self.new).voracious_sort();
+                            self.new.dedup();
+                        });
+                        log_duration!("fill index: {}", {
+                            for &(x0, x1, x2) in &self.new {
+                                self.hash_index_0_1_2
+                                    .entry((x0, x1, x2))
+                                    .or_default()
+                                    .push(());
                             }
+                        });
+                        log_duration!("retain index: {}", {
+                            self.hash_index_0_1_2.retain(|&(x0, x1, x2), v| {
+                                if uf.math_.is_root(x0) & uf.math_.is_root(x1) & uf.math_.is_root(x2) {
+                                    v.retain(|&mut ()| true);
+                                    v.sort_unstable();
+                                    v.dedup();
+                                    true
+                                } else {
+                                    false
+                                }
+                            });
                         });
                     });
                     self.math_num_uprooted_at_latest_retain = 0;
@@ -6033,27 +6173,33 @@ fn initial_exprs() {
                 fn update_finalize(&mut self, insertions: &mut Vec<Self::Row>, uf: &mut Unification) {
                     log_duration!("update_finalize {}: {}", "const", {
                         assert!(self.new.is_empty());
-                        self.new.extend(
-                            self.hash_index_0
-                                .iter()
-                                .map(|(&(x0,), &(x1,))| (x0, x1))
-                                .filter(|&(x0, x1)| !self.hash_index_0_1.contains_key(&(x0, x1))),
-                        );
-                        insertions.clear();
-                        self.new.sort_unstable();
-                        self.new.dedup();
-                        for &(x0, x1) in &self.new {
-                            self.hash_index_0_1.entry((x0, x1)).or_default().push(());
-                        }
-                        self.hash_index_0_1.retain(|&(x0, x1), v| {
-                            if uf.math_.is_root(x1) {
-                                v.retain(|&mut ()| true);
-                                v.sort_unstable();
-                                v.dedup();
-                                true
-                            } else {
-                                false
+                        log_duration!("fill new: {}", {
+                            self.new.extend(
+                                self.hash_index_0
+                                    .iter()
+                                    .map(|(&(x0,), &(x1,))| (x0, x1))
+                                    .filter(|&(x0, x1)| !self.hash_index_0_1.contains_key(&(x0, x1))),
+                            );
+                            insertions.clear();
+                            self.new.sort_unstable();
+                            self.new.dedup();
+                        });
+                        log_duration!("fill index: {}", {
+                            for &(x0, x1) in &self.new {
+                                self.hash_index_0_1.entry((x0, x1)).or_default().push(());
                             }
+                        });
+                        log_duration!("retain index: {}", {
+                            self.hash_index_0_1.retain(|&(x0, x1), v| {
+                                if uf.math_.is_root(x1) {
+                                    v.retain(|&mut ()| true);
+                                    v.sort_unstable();
+                                    v.dedup();
+                                    true
+                                } else {
+                                    false
+                                }
+                            });
                         });
                     });
                     self.math_num_uprooted_at_latest_retain = 0;
@@ -6177,27 +6323,33 @@ fn initial_exprs() {
                 fn update_finalize(&mut self, insertions: &mut Vec<Self::Row>, uf: &mut Unification) {
                     log_duration!("update_finalize {}: {}", "var", {
                         assert!(self.new.is_empty());
-                        self.new.extend(
-                            self.hash_index_0
-                                .iter()
-                                .map(|(&(x0,), &(x1,))| (x0, x1))
-                                .filter(|&(x0, x1)| !self.hash_index_0_1.contains_key(&(x0, x1))),
-                        );
-                        insertions.clear();
-                        self.new.sort_unstable();
-                        self.new.dedup();
-                        for &(x0, x1) in &self.new {
-                            self.hash_index_0_1.entry((x0, x1)).or_default().push(());
-                        }
-                        self.hash_index_0_1.retain(|&(x0, x1), v| {
-                            if uf.math_.is_root(x1) {
-                                v.retain(|&mut ()| true);
-                                v.sort_unstable();
-                                v.dedup();
-                                true
-                            } else {
-                                false
+                        log_duration!("fill new: {}", {
+                            self.new.extend(
+                                self.hash_index_0
+                                    .iter()
+                                    .map(|(&(x0,), &(x1,))| (x0, x1))
+                                    .filter(|&(x0, x1)| !self.hash_index_0_1.contains_key(&(x0, x1))),
+                            );
+                            insertions.clear();
+                            self.new.sort_unstable();
+                            self.new.dedup();
+                        });
+                        log_duration!("fill index: {}", {
+                            for &(x0, x1) in &self.new {
+                                self.hash_index_0_1.entry((x0, x1)).or_default().push(());
                             }
+                        });
+                        log_duration!("retain index: {}", {
+                            self.hash_index_0_1.retain(|&(x0, x1), v| {
+                                if uf.math_.is_root(x1) {
+                                    v.retain(|&mut ()| true);
+                                    v.sort_unstable();
+                                    v.dedup();
+                                    true
+                                } else {
+                                    false
+                                }
+                            });
                         });
                     });
                     self.math_num_uprooted_at_latest_retain = 0;
@@ -7121,43 +7273,53 @@ fn test_primitives_simple() {
                 fn update_finalize(&mut self, insertions: &mut Vec<Self::Row>, uf: &mut Unification) {
                     log_duration!("update_finalize {}: {}", "mul", {
                         assert!(self.new.is_empty());
-                        self.new.extend(
-                            self.hash_index_1_0
-                                .iter()
-                                .map(|(&(x1, x0), &(x2,))| (x0, x1, x2))
-                                .filter(|&(x0, x1, x2)| !self.hash_index_1_0_2.contains_key(&(x1, x0, x2))),
-                        );
-                        insertions.clear();
-                        RadixSortable::wrap(&mut self.new).voracious_sort();
-                        self.new.dedup();
-                        for &(x0, x1, x2) in &self.new {
-                            self.hash_index_1.entry((x1,)).or_default().push((x0, x2));
-                        }
-                        self.hash_index_1.retain(|&(x1,), v| {
-                            if uf.math_.is_root(x1) {
-                                v.retain(|&mut (x0, x2)| uf.math_.is_root(x0) & uf.math_.is_root(x2));
-                                v.sort_unstable();
-                                v.dedup();
-                                true
-                            } else {
-                                false
+                        log_duration!("fill new: {}", {
+                            self.new.extend(
+                                self.hash_index_1_0
+                                    .iter()
+                                    .map(|(&(x1, x0), &(x2,))| (x0, x1, x2))
+                                    .filter(|&(x0, x1, x2)| !self.hash_index_1_0_2.contains_key(&(x1, x0, x2))),
+                            );
+                            insertions.clear();
+                            RadixSortable::wrap(&mut self.new).voracious_sort();
+                            self.new.dedup();
+                        });
+                        log_duration!("fill index: {}", {
+                            for &(x0, x1, x2) in &self.new {
+                                self.hash_index_1.entry((x1,)).or_default().push((x0, x2));
                             }
                         });
-                        for &(x0, x1, x2) in &self.new {
-                            self.hash_index_1_0_2
-                                .entry((x1, x0, x2))
-                                .or_default()
-                                .push(());
-                        }
-                        self.hash_index_1_0_2.retain(|&(x1, x0, x2), v| {
-                            if uf.math_.is_root(x1) & uf.math_.is_root(x0) & uf.math_.is_root(x2) {
-                                v.retain(|&mut ()| true);
-                                v.sort_unstable();
-                                v.dedup();
-                                true
-                            } else {
-                                false
+                        log_duration!("retain index: {}", {
+                            self.hash_index_1.retain(|&(x1,), v| {
+                                if uf.math_.is_root(x1) {
+                                    v.retain(|&mut (x0, x2)| uf.math_.is_root(x0) & uf.math_.is_root(x2));
+                                    v.sort_unstable();
+                                    v.dedup();
+                                    true
+                                } else {
+                                    false
+                                }
+                            });
+                        });
+                        log_duration!("fill index: {}", {
+                            for &(x0, x1, x2) in &self.new {
+                                self.hash_index_1_0_2
+                                    .entry((x1, x0, x2))
+                                    .or_default()
+                                    .push(());
                             }
+                        });
+                        log_duration!("retain index: {}", {
+                            self.hash_index_1_0_2.retain(|&(x1, x0, x2), v| {
+                                if uf.math_.is_root(x1) & uf.math_.is_root(x0) & uf.math_.is_root(x2) {
+                                    v.retain(|&mut ()| true);
+                                    v.sort_unstable();
+                                    v.dedup();
+                                    true
+                                } else {
+                                    false
+                                }
+                            });
                         });
                     });
                     self.math_num_uprooted_at_latest_retain = 0;
@@ -7286,30 +7448,36 @@ fn test_primitives_simple() {
                 fn update_finalize(&mut self, insertions: &mut Vec<Self::Row>, uf: &mut Unification) {
                     log_duration!("update_finalize {}: {}", "add", {
                         assert!(self.new.is_empty());
-                        self.new.extend(
-                            self.hash_index_0_1
-                                .iter()
-                                .map(|(&(x0, x1), &(x2,))| (x0, x1, x2))
-                                .filter(|&(x0, x1, x2)| !self.hash_index_0_1_2.contains_key(&(x0, x1, x2))),
-                        );
-                        insertions.clear();
-                        RadixSortable::wrap(&mut self.new).voracious_sort();
-                        self.new.dedup();
-                        for &(x0, x1, x2) in &self.new {
-                            self.hash_index_0_1_2
-                                .entry((x0, x1, x2))
-                                .or_default()
-                                .push(());
-                        }
-                        self.hash_index_0_1_2.retain(|&(x0, x1, x2), v| {
-                            if uf.math_.is_root(x0) & uf.math_.is_root(x1) & uf.math_.is_root(x2) {
-                                v.retain(|&mut ()| true);
-                                v.sort_unstable();
-                                v.dedup();
-                                true
-                            } else {
-                                false
+                        log_duration!("fill new: {}", {
+                            self.new.extend(
+                                self.hash_index_0_1
+                                    .iter()
+                                    .map(|(&(x0, x1), &(x2,))| (x0, x1, x2))
+                                    .filter(|&(x0, x1, x2)| !self.hash_index_0_1_2.contains_key(&(x0, x1, x2))),
+                            );
+                            insertions.clear();
+                            RadixSortable::wrap(&mut self.new).voracious_sort();
+                            self.new.dedup();
+                        });
+                        log_duration!("fill index: {}", {
+                            for &(x0, x1, x2) in &self.new {
+                                self.hash_index_0_1_2
+                                    .entry((x0, x1, x2))
+                                    .or_default()
+                                    .push(());
                             }
+                        });
+                        log_duration!("retain index: {}", {
+                            self.hash_index_0_1_2.retain(|&(x0, x1, x2), v| {
+                                if uf.math_.is_root(x0) & uf.math_.is_root(x1) & uf.math_.is_root(x2) {
+                                    v.retain(|&mut ()| true);
+                                    v.sort_unstable();
+                                    v.dedup();
+                                    true
+                                } else {
+                                    false
+                                }
+                            });
                         });
                     });
                     self.math_num_uprooted_at_latest_retain = 0;
@@ -7430,40 +7598,50 @@ fn test_primitives_simple() {
                 fn update_finalize(&mut self, insertions: &mut Vec<Self::Row>, uf: &mut Unification) {
                     log_duration!("update_finalize {}: {}", "const", {
                         assert!(self.new.is_empty());
-                        self.new.extend(
-                            self.hash_index_0
-                                .iter()
-                                .map(|(&(x0,), &(x1,))| (x0, x1))
-                                .filter(|&(x0, x1)| !self.hash_index_0_1.contains_key(&(x0, x1))),
-                        );
-                        insertions.clear();
-                        self.new.sort_unstable();
-                        self.new.dedup();
-                        for &(x0, x1) in &self.new {
-                            self.hash_index_1.entry((x1,)).or_default().push((x0,));
-                        }
-                        self.hash_index_1.retain(|&(x1,), v| {
-                            if uf.math_.is_root(x1) {
-                                v.retain(|&mut (x0,)| true);
-                                v.sort_unstable();
-                                v.dedup();
-                                true
-                            } else {
-                                false
+                        log_duration!("fill new: {}", {
+                            self.new.extend(
+                                self.hash_index_0
+                                    .iter()
+                                    .map(|(&(x0,), &(x1,))| (x0, x1))
+                                    .filter(|&(x0, x1)| !self.hash_index_0_1.contains_key(&(x0, x1))),
+                            );
+                            insertions.clear();
+                            self.new.sort_unstable();
+                            self.new.dedup();
+                        });
+                        log_duration!("fill index: {}", {
+                            for &(x0, x1) in &self.new {
+                                self.hash_index_1.entry((x1,)).or_default().push((x0,));
                             }
                         });
-                        for &(x0, x1) in &self.new {
-                            self.hash_index_0_1.entry((x0, x1)).or_default().push(());
-                        }
-                        self.hash_index_0_1.retain(|&(x0, x1), v| {
-                            if uf.math_.is_root(x1) {
-                                v.retain(|&mut ()| true);
-                                v.sort_unstable();
-                                v.dedup();
-                                true
-                            } else {
-                                false
+                        log_duration!("retain index: {}", {
+                            self.hash_index_1.retain(|&(x1,), v| {
+                                if uf.math_.is_root(x1) {
+                                    v.retain(|&mut (x0,)| true);
+                                    v.sort_unstable();
+                                    v.dedup();
+                                    true
+                                } else {
+                                    false
+                                }
+                            });
+                        });
+                        log_duration!("fill index: {}", {
+                            for &(x0, x1) in &self.new {
+                                self.hash_index_0_1.entry((x0, x1)).or_default().push(());
                             }
+                        });
+                        log_duration!("retain index: {}", {
+                            self.hash_index_0_1.retain(|&(x0, x1), v| {
+                                if uf.math_.is_root(x1) {
+                                    v.retain(|&mut ()| true);
+                                    v.sort_unstable();
+                                    v.dedup();
+                                    true
+                                } else {
+                                    false
+                                }
+                            });
                         });
                     });
                     self.math_num_uprooted_at_latest_retain = 0;
@@ -7593,27 +7771,33 @@ fn test_primitives_simple() {
                 fn update_finalize(&mut self, insertions: &mut Vec<Self::Row>, uf: &mut Unification) {
                     log_duration!("update_finalize {}: {}", "var", {
                         assert!(self.new.is_empty());
-                        self.new.extend(
-                            self.hash_index_0
-                                .iter()
-                                .map(|(&(x0,), &(x1,))| (x0, x1))
-                                .filter(|&(x0, x1)| !self.hash_index_0_1.contains_key(&(x0, x1))),
-                        );
-                        insertions.clear();
-                        self.new.sort_unstable();
-                        self.new.dedup();
-                        for &(x0, x1) in &self.new {
-                            self.hash_index_0_1.entry((x0, x1)).or_default().push(());
-                        }
-                        self.hash_index_0_1.retain(|&(x0, x1), v| {
-                            if uf.math_.is_root(x1) {
-                                v.retain(|&mut ()| true);
-                                v.sort_unstable();
-                                v.dedup();
-                                true
-                            } else {
-                                false
+                        log_duration!("fill new: {}", {
+                            self.new.extend(
+                                self.hash_index_0
+                                    .iter()
+                                    .map(|(&(x0,), &(x1,))| (x0, x1))
+                                    .filter(|&(x0, x1)| !self.hash_index_0_1.contains_key(&(x0, x1))),
+                            );
+                            insertions.clear();
+                            self.new.sort_unstable();
+                            self.new.dedup();
+                        });
+                        log_duration!("fill index: {}", {
+                            for &(x0, x1) in &self.new {
+                                self.hash_index_0_1.entry((x0, x1)).or_default().push(());
                             }
+                        });
+                        log_duration!("retain index: {}", {
+                            self.hash_index_0_1.retain(|&(x0, x1), v| {
+                                if uf.math_.is_root(x1) {
+                                    v.retain(|&mut ()| true);
+                                    v.sort_unstable();
+                                    v.dedup();
+                                    true
+                                } else {
+                                    false
+                                }
+                            });
                         });
                     });
                     self.math_num_uprooted_at_latest_retain = 0;
@@ -8037,53 +8221,67 @@ fn triangle_join() {
                 fn update_finalize(&mut self, insertions: &mut Vec<Self::Row>, uf: &mut Unification) {
                     log_duration!("update_finalize {}: {}", "foo", {
                         assert!(self.new.is_empty());
-                        self.new.extend(
-                            insertions
-                                .iter()
-                                .map(|&(x0, x1)| (x0, x1))
-                                .filter(|&(x0, x1)| !self.hash_index_1_0.contains_key(&(x1, x0))),
-                        );
-                        insertions.clear();
-                        RadixSortable::wrap(&mut self.new).voracious_sort();
-                        self.new.dedup();
-                        for &(x0, x1) in &self.new {
-                            self.hash_index_1.entry((x1,)).or_default().push((x0,));
-                        }
-                        self.hash_index_1.retain(|&(x1,), v| {
-                            if uf.math_.is_root(x1) {
-                                v.retain(|&mut (x0,)| uf.math_.is_root(x0));
-                                v.sort_unstable();
-                                v.dedup();
-                                true
-                            } else {
-                                false
+                        log_duration!("fill new: {}", {
+                            self.new.extend(
+                                insertions
+                                    .iter()
+                                    .map(|&(x0, x1)| (x0, x1))
+                                    .filter(|&(x0, x1)| !self.hash_index_1_0.contains_key(&(x1, x0))),
+                            );
+                            insertions.clear();
+                            RadixSortable::wrap(&mut self.new).voracious_sort();
+                            self.new.dedup();
+                        });
+                        log_duration!("fill index: {}", {
+                            for &(x0, x1) in &self.new {
+                                self.hash_index_1.entry((x1,)).or_default().push((x0,));
                             }
                         });
-                        for &(x0, x1) in &self.new {
-                            self.hash_index_1_0.entry((x1, x0)).or_default().push(());
-                        }
-                        self.hash_index_1_0.retain(|&(x1, x0), v| {
-                            if uf.math_.is_root(x1) & uf.math_.is_root(x0) {
-                                v.retain(|&mut ()| true);
-                                v.sort_unstable();
-                                v.dedup();
-                                true
-                            } else {
-                                false
+                        log_duration!("retain index: {}", {
+                            self.hash_index_1.retain(|&(x1,), v| {
+                                if uf.math_.is_root(x1) {
+                                    v.retain(|&mut (x0,)| uf.math_.is_root(x0));
+                                    v.sort_unstable();
+                                    v.dedup();
+                                    true
+                                } else {
+                                    false
+                                }
+                            });
+                        });
+                        log_duration!("fill index: {}", {
+                            for &(x0, x1) in &self.new {
+                                self.hash_index_1_0.entry((x1, x0)).or_default().push(());
                             }
                         });
-                        for &(x0, x1) in &self.new {
-                            self.hash_index_0.entry((x0,)).or_default().push((x1,));
-                        }
-                        self.hash_index_0.retain(|&(x0,), v| {
-                            if uf.math_.is_root(x0) {
-                                v.retain(|&mut (x1,)| uf.math_.is_root(x1));
-                                v.sort_unstable();
-                                v.dedup();
-                                true
-                            } else {
-                                false
+                        log_duration!("retain index: {}", {
+                            self.hash_index_1_0.retain(|&(x1, x0), v| {
+                                if uf.math_.is_root(x1) & uf.math_.is_root(x0) {
+                                    v.retain(|&mut ()| true);
+                                    v.sort_unstable();
+                                    v.dedup();
+                                    true
+                                } else {
+                                    false
+                                }
+                            });
+                        });
+                        log_duration!("fill index: {}", {
+                            for &(x0, x1) in &self.new {
+                                self.hash_index_0.entry((x0,)).or_default().push((x1,));
                             }
+                        });
+                        log_duration!("retain index: {}", {
+                            self.hash_index_0.retain(|&(x0,), v| {
+                                if uf.math_.is_root(x0) {
+                                    v.retain(|&mut (x1,)| uf.math_.is_root(x1));
+                                    v.sort_unstable();
+                                    v.dedup();
+                                    true
+                                } else {
+                                    false
+                                }
+                            });
                         });
                     });
                     self.math_num_uprooted_at_latest_retain = 0;
@@ -8178,53 +8376,67 @@ fn triangle_join() {
                 fn update_finalize(&mut self, insertions: &mut Vec<Self::Row>, uf: &mut Unification) {
                     log_duration!("update_finalize {}: {}", "bar", {
                         assert!(self.new.is_empty());
-                        self.new.extend(
-                            insertions
-                                .iter()
-                                .map(|&(x0, x1)| (x0, x1))
-                                .filter(|&(x0, x1)| !self.hash_index_0_1.contains_key(&(x0, x1))),
-                        );
-                        insertions.clear();
-                        RadixSortable::wrap(&mut self.new).voracious_sort();
-                        self.new.dedup();
-                        for &(x0, x1) in &self.new {
-                            self.hash_index_0.entry((x0,)).or_default().push((x1,));
-                        }
-                        self.hash_index_0.retain(|&(x0,), v| {
-                            if uf.math_.is_root(x0) {
-                                v.retain(|&mut (x1,)| uf.math_.is_root(x1));
-                                v.sort_unstable();
-                                v.dedup();
-                                true
-                            } else {
-                                false
+                        log_duration!("fill new: {}", {
+                            self.new.extend(
+                                insertions
+                                    .iter()
+                                    .map(|&(x0, x1)| (x0, x1))
+                                    .filter(|&(x0, x1)| !self.hash_index_0_1.contains_key(&(x0, x1))),
+                            );
+                            insertions.clear();
+                            RadixSortable::wrap(&mut self.new).voracious_sort();
+                            self.new.dedup();
+                        });
+                        log_duration!("fill index: {}", {
+                            for &(x0, x1) in &self.new {
+                                self.hash_index_0.entry((x0,)).or_default().push((x1,));
                             }
                         });
-                        for &(x0, x1) in &self.new {
-                            self.hash_index_0_1.entry((x0, x1)).or_default().push(());
-                        }
-                        self.hash_index_0_1.retain(|&(x0, x1), v| {
-                            if uf.math_.is_root(x0) & uf.math_.is_root(x1) {
-                                v.retain(|&mut ()| true);
-                                v.sort_unstable();
-                                v.dedup();
-                                true
-                            } else {
-                                false
+                        log_duration!("retain index: {}", {
+                            self.hash_index_0.retain(|&(x0,), v| {
+                                if uf.math_.is_root(x0) {
+                                    v.retain(|&mut (x1,)| uf.math_.is_root(x1));
+                                    v.sort_unstable();
+                                    v.dedup();
+                                    true
+                                } else {
+                                    false
+                                }
+                            });
+                        });
+                        log_duration!("fill index: {}", {
+                            for &(x0, x1) in &self.new {
+                                self.hash_index_0_1.entry((x0, x1)).or_default().push(());
                             }
                         });
-                        for &(x0, x1) in &self.new {
-                            self.hash_index_1.entry((x1,)).or_default().push((x0,));
-                        }
-                        self.hash_index_1.retain(|&(x1,), v| {
-                            if uf.math_.is_root(x1) {
-                                v.retain(|&mut (x0,)| uf.math_.is_root(x0));
-                                v.sort_unstable();
-                                v.dedup();
-                                true
-                            } else {
-                                false
+                        log_duration!("retain index: {}", {
+                            self.hash_index_0_1.retain(|&(x0, x1), v| {
+                                if uf.math_.is_root(x0) & uf.math_.is_root(x1) {
+                                    v.retain(|&mut ()| true);
+                                    v.sort_unstable();
+                                    v.dedup();
+                                    true
+                                } else {
+                                    false
+                                }
+                            });
+                        });
+                        log_duration!("fill index: {}", {
+                            for &(x0, x1) in &self.new {
+                                self.hash_index_1.entry((x1,)).or_default().push((x0,));
                             }
+                        });
+                        log_duration!("retain index: {}", {
+                            self.hash_index_1.retain(|&(x1,), v| {
+                                if uf.math_.is_root(x1) {
+                                    v.retain(|&mut (x0,)| uf.math_.is_root(x0));
+                                    v.sort_unstable();
+                                    v.dedup();
+                                    true
+                                } else {
+                                    false
+                                }
+                            });
                         });
                     });
                     self.math_num_uprooted_at_latest_retain = 0;
@@ -8319,53 +8531,67 @@ fn triangle_join() {
                 fn update_finalize(&mut self, insertions: &mut Vec<Self::Row>, uf: &mut Unification) {
                     log_duration!("update_finalize {}: {}", "baz", {
                         assert!(self.new.is_empty());
-                        self.new.extend(
-                            insertions
-                                .iter()
-                                .map(|&(x0, x1)| (x0, x1))
-                                .filter(|&(x0, x1)| !self.hash_index_1_0.contains_key(&(x1, x0))),
-                        );
-                        insertions.clear();
-                        RadixSortable::wrap(&mut self.new).voracious_sort();
-                        self.new.dedup();
-                        for &(x0, x1) in &self.new {
-                            self.hash_index_1.entry((x1,)).or_default().push((x0,));
-                        }
-                        self.hash_index_1.retain(|&(x1,), v| {
-                            if uf.math_.is_root(x1) {
-                                v.retain(|&mut (x0,)| uf.math_.is_root(x0));
-                                v.sort_unstable();
-                                v.dedup();
-                                true
-                            } else {
-                                false
+                        log_duration!("fill new: {}", {
+                            self.new.extend(
+                                insertions
+                                    .iter()
+                                    .map(|&(x0, x1)| (x0, x1))
+                                    .filter(|&(x0, x1)| !self.hash_index_1_0.contains_key(&(x1, x0))),
+                            );
+                            insertions.clear();
+                            RadixSortable::wrap(&mut self.new).voracious_sort();
+                            self.new.dedup();
+                        });
+                        log_duration!("fill index: {}", {
+                            for &(x0, x1) in &self.new {
+                                self.hash_index_1.entry((x1,)).or_default().push((x0,));
                             }
                         });
-                        for &(x0, x1) in &self.new {
-                            self.hash_index_0.entry((x0,)).or_default().push((x1,));
-                        }
-                        self.hash_index_0.retain(|&(x0,), v| {
-                            if uf.math_.is_root(x0) {
-                                v.retain(|&mut (x1,)| uf.math_.is_root(x1));
-                                v.sort_unstable();
-                                v.dedup();
-                                true
-                            } else {
-                                false
+                        log_duration!("retain index: {}", {
+                            self.hash_index_1.retain(|&(x1,), v| {
+                                if uf.math_.is_root(x1) {
+                                    v.retain(|&mut (x0,)| uf.math_.is_root(x0));
+                                    v.sort_unstable();
+                                    v.dedup();
+                                    true
+                                } else {
+                                    false
+                                }
+                            });
+                        });
+                        log_duration!("fill index: {}", {
+                            for &(x0, x1) in &self.new {
+                                self.hash_index_0.entry((x0,)).or_default().push((x1,));
                             }
                         });
-                        for &(x0, x1) in &self.new {
-                            self.hash_index_1_0.entry((x1, x0)).or_default().push(());
-                        }
-                        self.hash_index_1_0.retain(|&(x1, x0), v| {
-                            if uf.math_.is_root(x1) & uf.math_.is_root(x0) {
-                                v.retain(|&mut ()| true);
-                                v.sort_unstable();
-                                v.dedup();
-                                true
-                            } else {
-                                false
+                        log_duration!("retain index: {}", {
+                            self.hash_index_0.retain(|&(x0,), v| {
+                                if uf.math_.is_root(x0) {
+                                    v.retain(|&mut (x1,)| uf.math_.is_root(x1));
+                                    v.sort_unstable();
+                                    v.dedup();
+                                    true
+                                } else {
+                                    false
+                                }
+                            });
+                        });
+                        log_duration!("fill index: {}", {
+                            for &(x0, x1) in &self.new {
+                                self.hash_index_1_0.entry((x1, x0)).or_default().push(());
                             }
+                        });
+                        log_duration!("retain index: {}", {
+                            self.hash_index_1_0.retain(|&(x1, x0), v| {
+                                if uf.math_.is_root(x1) & uf.math_.is_root(x0) {
+                                    v.retain(|&mut ()| true);
+                                    v.sort_unstable();
+                                    v.dedup();
+                                    true
+                                } else {
+                                    false
+                                }
+                            });
                         });
                     });
                     self.math_num_uprooted_at_latest_retain = 0;
@@ -8459,30 +8685,36 @@ fn triangle_join() {
                 fn update_finalize(&mut self, insertions: &mut Vec<Self::Row>, uf: &mut Unification) {
                     log_duration!("update_finalize {}: {}", "triangle", {
                         assert!(self.new.is_empty());
-                        self.new.extend(
-                            insertions
-                                .iter()
-                                .map(|&(x0, x1, x2)| (x0, x1, x2))
-                                .filter(|&(x0, x1, x2)| !self.hash_index_0_1_2.contains_key(&(x0, x1, x2))),
-                        );
-                        insertions.clear();
-                        RadixSortable::wrap(&mut self.new).voracious_sort();
-                        self.new.dedup();
-                        for &(x0, x1, x2) in &self.new {
-                            self.hash_index_0_1_2
-                                .entry((x0, x1, x2))
-                                .or_default()
-                                .push(());
-                        }
-                        self.hash_index_0_1_2.retain(|&(x0, x1, x2), v| {
-                            if uf.math_.is_root(x0) & uf.math_.is_root(x1) & uf.math_.is_root(x2) {
-                                v.retain(|&mut ()| true);
-                                v.sort_unstable();
-                                v.dedup();
-                                true
-                            } else {
-                                false
+                        log_duration!("fill new: {}", {
+                            self.new.extend(
+                                insertions
+                                    .iter()
+                                    .map(|&(x0, x1, x2)| (x0, x1, x2))
+                                    .filter(|&(x0, x1, x2)| !self.hash_index_0_1_2.contains_key(&(x0, x1, x2))),
+                            );
+                            insertions.clear();
+                            RadixSortable::wrap(&mut self.new).voracious_sort();
+                            self.new.dedup();
+                        });
+                        log_duration!("fill index: {}", {
+                            for &(x0, x1, x2) in &self.new {
+                                self.hash_index_0_1_2
+                                    .entry((x0, x1, x2))
+                                    .or_default()
+                                    .push(());
                             }
+                        });
+                        log_duration!("retain index: {}", {
+                            self.hash_index_0_1_2.retain(|&(x0, x1, x2), v| {
+                                if uf.math_.is_root(x0) & uf.math_.is_root(x1) & uf.math_.is_root(x2) {
+                                    v.retain(|&mut ()| true);
+                                    v.sort_unstable();
+                                    v.dedup();
+                                    true
+                                } else {
+                                    false
+                                }
+                            });
                         });
                     });
                     self.math_num_uprooted_at_latest_retain = 0;
@@ -8857,69 +9089,87 @@ fn edgecase0() {
                 fn update_finalize(&mut self, insertions: &mut Vec<Self::Row>, uf: &mut Unification) {
                     log_duration!("update_finalize {}: {}", "mul", {
                         assert!(self.new.is_empty());
-                        self.new.extend(
-                            self.hash_index_0_1
-                                .iter()
-                                .map(|(&(x0, x1), &(x2,))| (x0, x1, x2))
-                                .filter(|&(x0, x1, x2)| !self.hash_index_0_1_2.contains_key(&(x0, x1, x2))),
-                        );
-                        insertions.clear();
-                        RadixSortable::wrap(&mut self.new).voracious_sort();
-                        self.new.dedup();
-                        for &(x0, x1, x2) in &self.new {
-                            self.hash_index_0.entry((x0,)).or_default().push((x1, x2));
-                        }
-                        self.hash_index_0.retain(|&(x0,), v| {
-                            if uf.math_.is_root(x0) {
-                                v.retain(|&mut (x1, x2)| uf.math_.is_root(x1) & uf.math_.is_root(x2));
-                                v.sort_unstable();
-                                v.dedup();
-                                true
-                            } else {
-                                false
+                        log_duration!("fill new: {}", {
+                            self.new.extend(
+                                self.hash_index_0_1
+                                    .iter()
+                                    .map(|(&(x0, x1), &(x2,))| (x0, x1, x2))
+                                    .filter(|&(x0, x1, x2)| !self.hash_index_0_1_2.contains_key(&(x0, x1, x2))),
+                            );
+                            insertions.clear();
+                            RadixSortable::wrap(&mut self.new).voracious_sort();
+                            self.new.dedup();
+                        });
+                        log_duration!("fill index: {}", {
+                            for &(x0, x1, x2) in &self.new {
+                                self.hash_index_0.entry((x0,)).or_default().push((x1, x2));
                             }
                         });
-                        for &(x0, x1, x2) in &self.new {
-                            self.hash_index_2_0.entry((x2, x0)).or_default().push((x1,));
-                        }
-                        self.hash_index_2_0.retain(|&(x2, x0), v| {
-                            if uf.math_.is_root(x2) & uf.math_.is_root(x0) {
-                                v.retain(|&mut (x1,)| uf.math_.is_root(x1));
-                                v.sort_unstable();
-                                v.dedup();
-                                true
-                            } else {
-                                false
+                        log_duration!("retain index: {}", {
+                            self.hash_index_0.retain(|&(x0,), v| {
+                                if uf.math_.is_root(x0) {
+                                    v.retain(|&mut (x1, x2)| uf.math_.is_root(x1) & uf.math_.is_root(x2));
+                                    v.sort_unstable();
+                                    v.dedup();
+                                    true
+                                } else {
+                                    false
+                                }
+                            });
+                        });
+                        log_duration!("fill index: {}", {
+                            for &(x0, x1, x2) in &self.new {
+                                self.hash_index_2_0.entry((x2, x0)).or_default().push((x1,));
                             }
                         });
-                        for &(x0, x1, x2) in &self.new {
-                            self.hash_index_2.entry((x2,)).or_default().push((x0, x1));
-                        }
-                        self.hash_index_2.retain(|&(x2,), v| {
-                            if uf.math_.is_root(x2) {
-                                v.retain(|&mut (x0, x1)| uf.math_.is_root(x0) & uf.math_.is_root(x1));
-                                v.sort_unstable();
-                                v.dedup();
-                                true
-                            } else {
-                                false
+                        log_duration!("retain index: {}", {
+                            self.hash_index_2_0.retain(|&(x2, x0), v| {
+                                if uf.math_.is_root(x2) & uf.math_.is_root(x0) {
+                                    v.retain(|&mut (x1,)| uf.math_.is_root(x1));
+                                    v.sort_unstable();
+                                    v.dedup();
+                                    true
+                                } else {
+                                    false
+                                }
+                            });
+                        });
+                        log_duration!("fill index: {}", {
+                            for &(x0, x1, x2) in &self.new {
+                                self.hash_index_2.entry((x2,)).or_default().push((x0, x1));
                             }
                         });
-                        for &(x0, x1, x2) in &self.new {
-                            self.hash_index_0_1_2
-                                .entry((x0, x1, x2))
-                                .or_default()
-                                .push(());
-                        }
-                        self.hash_index_0_1_2.retain(|&(x0, x1, x2), v| {
-                            if uf.math_.is_root(x0) & uf.math_.is_root(x1) & uf.math_.is_root(x2) {
-                                v.retain(|&mut ()| true);
-                                v.sort_unstable();
-                                v.dedup();
-                                true
-                            } else {
-                                false
+                        log_duration!("retain index: {}", {
+                            self.hash_index_2.retain(|&(x2,), v| {
+                                if uf.math_.is_root(x2) {
+                                    v.retain(|&mut (x0, x1)| uf.math_.is_root(x0) & uf.math_.is_root(x1));
+                                    v.sort_unstable();
+                                    v.dedup();
+                                    true
+                                } else {
+                                    false
+                                }
+                            });
+                        });
+                        log_duration!("fill index: {}", {
+                            for &(x0, x1, x2) in &self.new {
+                                self.hash_index_0_1_2
+                                    .entry((x0, x1, x2))
+                                    .or_default()
+                                    .push(());
                             }
+                        });
+                        log_duration!("retain index: {}", {
+                            self.hash_index_0_1_2.retain(|&(x0, x1, x2), v| {
+                                if uf.math_.is_root(x0) & uf.math_.is_root(x1) & uf.math_.is_root(x2) {
+                                    v.retain(|&mut ()| true);
+                                    v.sort_unstable();
+                                    v.dedup();
+                                    true
+                                } else {
+                                    false
+                                }
+                            });
                         });
                     });
                     self.math_num_uprooted_at_latest_retain = 0;
@@ -9066,56 +9316,70 @@ fn edgecase0() {
                 fn update_finalize(&mut self, insertions: &mut Vec<Self::Row>, uf: &mut Unification) {
                     log_duration!("update_finalize {}: {}", "add", {
                         assert!(self.new.is_empty());
-                        self.new.extend(
-                            self.hash_index_0_1
-                                .iter()
-                                .map(|(&(x0, x1), &(x2,))| (x0, x1, x2))
-                                .filter(|&(x0, x1, x2)| !self.hash_index_0_1_2.contains_key(&(x0, x1, x2))),
-                        );
-                        insertions.clear();
-                        RadixSortable::wrap(&mut self.new).voracious_sort();
-                        self.new.dedup();
-                        for &(x0, x1, x2) in &self.new {
-                            self.hash_index_0.entry((x0,)).or_default().push((x1, x2));
-                        }
-                        self.hash_index_0.retain(|&(x0,), v| {
-                            if uf.math_.is_root(x0) {
-                                v.retain(|&mut (x1, x2)| uf.math_.is_root(x1) & uf.math_.is_root(x2));
-                                v.sort_unstable();
-                                v.dedup();
-                                true
-                            } else {
-                                false
+                        log_duration!("fill new: {}", {
+                            self.new.extend(
+                                self.hash_index_0_1
+                                    .iter()
+                                    .map(|(&(x0, x1), &(x2,))| (x0, x1, x2))
+                                    .filter(|&(x0, x1, x2)| !self.hash_index_0_1_2.contains_key(&(x0, x1, x2))),
+                            );
+                            insertions.clear();
+                            RadixSortable::wrap(&mut self.new).voracious_sort();
+                            self.new.dedup();
+                        });
+                        log_duration!("fill index: {}", {
+                            for &(x0, x1, x2) in &self.new {
+                                self.hash_index_0.entry((x0,)).or_default().push((x1, x2));
                             }
                         });
-                        for &(x0, x1, x2) in &self.new {
-                            self.hash_index_1.entry((x1,)).or_default().push((x0, x2));
-                        }
-                        self.hash_index_1.retain(|&(x1,), v| {
-                            if uf.math_.is_root(x1) {
-                                v.retain(|&mut (x0, x2)| uf.math_.is_root(x0) & uf.math_.is_root(x2));
-                                v.sort_unstable();
-                                v.dedup();
-                                true
-                            } else {
-                                false
+                        log_duration!("retain index: {}", {
+                            self.hash_index_0.retain(|&(x0,), v| {
+                                if uf.math_.is_root(x0) {
+                                    v.retain(|&mut (x1, x2)| uf.math_.is_root(x1) & uf.math_.is_root(x2));
+                                    v.sort_unstable();
+                                    v.dedup();
+                                    true
+                                } else {
+                                    false
+                                }
+                            });
+                        });
+                        log_duration!("fill index: {}", {
+                            for &(x0, x1, x2) in &self.new {
+                                self.hash_index_1.entry((x1,)).or_default().push((x0, x2));
                             }
                         });
-                        for &(x0, x1, x2) in &self.new {
-                            self.hash_index_0_1_2
-                                .entry((x0, x1, x2))
-                                .or_default()
-                                .push(());
-                        }
-                        self.hash_index_0_1_2.retain(|&(x0, x1, x2), v| {
-                            if uf.math_.is_root(x0) & uf.math_.is_root(x1) & uf.math_.is_root(x2) {
-                                v.retain(|&mut ()| true);
-                                v.sort_unstable();
-                                v.dedup();
-                                true
-                            } else {
-                                false
+                        log_duration!("retain index: {}", {
+                            self.hash_index_1.retain(|&(x1,), v| {
+                                if uf.math_.is_root(x1) {
+                                    v.retain(|&mut (x0, x2)| uf.math_.is_root(x0) & uf.math_.is_root(x2));
+                                    v.sort_unstable();
+                                    v.dedup();
+                                    true
+                                } else {
+                                    false
+                                }
+                            });
+                        });
+                        log_duration!("fill index: {}", {
+                            for &(x0, x1, x2) in &self.new {
+                                self.hash_index_0_1_2
+                                    .entry((x0, x1, x2))
+                                    .or_default()
+                                    .push(());
                             }
+                        });
+                        log_duration!("retain index: {}", {
+                            self.hash_index_0_1_2.retain(|&(x0, x1, x2), v| {
+                                if uf.math_.is_root(x0) & uf.math_.is_root(x1) & uf.math_.is_root(x2) {
+                                    v.retain(|&mut ()| true);
+                                    v.sort_unstable();
+                                    v.dedup();
+                                    true
+                                } else {
+                                    false
+                                }
+                            });
                         });
                     });
                     self.math_num_uprooted_at_latest_retain = 0;
@@ -9482,43 +9746,53 @@ fn test_into_codegen() {
                 fn update_finalize(&mut self, insertions: &mut Vec<Self::Row>, uf: &mut Unification) {
                     log_duration!("update_finalize {}: {}", "mul", {
                         assert!(self.new.is_empty());
-                        self.new.extend(
-                            self.hash_index_0_1
-                                .iter()
-                                .map(|(&(x0, x1), &(x2,))| (x0, x1, x2))
-                                .filter(|&(x0, x1, x2)| !self.hash_index_0_1_2.contains_key(&(x0, x1, x2))),
-                        );
-                        insertions.clear();
-                        RadixSortable::wrap(&mut self.new).voracious_sort();
-                        self.new.dedup();
-                        for &(x0, x1, x2) in &self.new {
-                            self.hash_index_0.entry((x0,)).or_default().push((x1, x2));
-                        }
-                        self.hash_index_0.retain(|&(x0,), v| {
-                            if uf.math_.is_root(x0) {
-                                v.retain(|&mut (x1, x2)| uf.math_.is_root(x1) & uf.math_.is_root(x2));
-                                v.sort_unstable();
-                                v.dedup();
-                                true
-                            } else {
-                                false
+                        log_duration!("fill new: {}", {
+                            self.new.extend(
+                                self.hash_index_0_1
+                                    .iter()
+                                    .map(|(&(x0, x1), &(x2,))| (x0, x1, x2))
+                                    .filter(|&(x0, x1, x2)| !self.hash_index_0_1_2.contains_key(&(x0, x1, x2))),
+                            );
+                            insertions.clear();
+                            RadixSortable::wrap(&mut self.new).voracious_sort();
+                            self.new.dedup();
+                        });
+                        log_duration!("fill index: {}", {
+                            for &(x0, x1, x2) in &self.new {
+                                self.hash_index_0.entry((x0,)).or_default().push((x1, x2));
                             }
                         });
-                        for &(x0, x1, x2) in &self.new {
-                            self.hash_index_0_1_2
-                                .entry((x0, x1, x2))
-                                .or_default()
-                                .push(());
-                        }
-                        self.hash_index_0_1_2.retain(|&(x0, x1, x2), v| {
-                            if uf.math_.is_root(x0) & uf.math_.is_root(x1) & uf.math_.is_root(x2) {
-                                v.retain(|&mut ()| true);
-                                v.sort_unstable();
-                                v.dedup();
-                                true
-                            } else {
-                                false
+                        log_duration!("retain index: {}", {
+                            self.hash_index_0.retain(|&(x0,), v| {
+                                if uf.math_.is_root(x0) {
+                                    v.retain(|&mut (x1, x2)| uf.math_.is_root(x1) & uf.math_.is_root(x2));
+                                    v.sort_unstable();
+                                    v.dedup();
+                                    true
+                                } else {
+                                    false
+                                }
+                            });
+                        });
+                        log_duration!("fill index: {}", {
+                            for &(x0, x1, x2) in &self.new {
+                                self.hash_index_0_1_2
+                                    .entry((x0, x1, x2))
+                                    .or_default()
+                                    .push(());
                             }
+                        });
+                        log_duration!("retain index: {}", {
+                            self.hash_index_0_1_2.retain(|&(x0, x1, x2), v| {
+                                if uf.math_.is_root(x0) & uf.math_.is_root(x1) & uf.math_.is_root(x2) {
+                                    v.retain(|&mut ()| true);
+                                    v.sort_unstable();
+                                    v.dedup();
+                                    true
+                                } else {
+                                    false
+                                }
+                            });
                         });
                     });
                     self.math_num_uprooted_at_latest_retain = 0;
@@ -9648,43 +9922,53 @@ fn test_into_codegen() {
                 fn update_finalize(&mut self, insertions: &mut Vec<Self::Row>, uf: &mut Unification) {
                     log_duration!("update_finalize {}: {}", "add", {
                         assert!(self.new.is_empty());
-                        self.new.extend(
-                            self.hash_index_0_1
-                                .iter()
-                                .map(|(&(x0, x1), &(x2,))| (x0, x1, x2))
-                                .filter(|&(x0, x1, x2)| !self.hash_index_0_1_2.contains_key(&(x0, x1, x2))),
-                        );
-                        insertions.clear();
-                        RadixSortable::wrap(&mut self.new).voracious_sort();
-                        self.new.dedup();
-                        for &(x0, x1, x2) in &self.new {
-                            self.hash_index_2.entry((x2,)).or_default().push((x0, x1));
-                        }
-                        self.hash_index_2.retain(|&(x2,), v| {
-                            if uf.math_.is_root(x2) {
-                                v.retain(|&mut (x0, x1)| uf.math_.is_root(x0) & uf.math_.is_root(x1));
-                                v.sort_unstable();
-                                v.dedup();
-                                true
-                            } else {
-                                false
+                        log_duration!("fill new: {}", {
+                            self.new.extend(
+                                self.hash_index_0_1
+                                    .iter()
+                                    .map(|(&(x0, x1), &(x2,))| (x0, x1, x2))
+                                    .filter(|&(x0, x1, x2)| !self.hash_index_0_1_2.contains_key(&(x0, x1, x2))),
+                            );
+                            insertions.clear();
+                            RadixSortable::wrap(&mut self.new).voracious_sort();
+                            self.new.dedup();
+                        });
+                        log_duration!("fill index: {}", {
+                            for &(x0, x1, x2) in &self.new {
+                                self.hash_index_2.entry((x2,)).or_default().push((x0, x1));
                             }
                         });
-                        for &(x0, x1, x2) in &self.new {
-                            self.hash_index_0_1_2
-                                .entry((x0, x1, x2))
-                                .or_default()
-                                .push(());
-                        }
-                        self.hash_index_0_1_2.retain(|&(x0, x1, x2), v| {
-                            if uf.math_.is_root(x0) & uf.math_.is_root(x1) & uf.math_.is_root(x2) {
-                                v.retain(|&mut ()| true);
-                                v.sort_unstable();
-                                v.dedup();
-                                true
-                            } else {
-                                false
+                        log_duration!("retain index: {}", {
+                            self.hash_index_2.retain(|&(x2,), v| {
+                                if uf.math_.is_root(x2) {
+                                    v.retain(|&mut (x0, x1)| uf.math_.is_root(x0) & uf.math_.is_root(x1));
+                                    v.sort_unstable();
+                                    v.dedup();
+                                    true
+                                } else {
+                                    false
+                                }
+                            });
+                        });
+                        log_duration!("fill index: {}", {
+                            for &(x0, x1, x2) in &self.new {
+                                self.hash_index_0_1_2
+                                    .entry((x0, x1, x2))
+                                    .or_default()
+                                    .push(());
                             }
+                        });
+                        log_duration!("retain index: {}", {
+                            self.hash_index_0_1_2.retain(|&(x0, x1, x2), v| {
+                                if uf.math_.is_root(x0) & uf.math_.is_root(x1) & uf.math_.is_root(x2) {
+                                    v.retain(|&mut ()| true);
+                                    v.sort_unstable();
+                                    v.dedup();
+                                    true
+                                } else {
+                                    false
+                                }
+                            });
                         });
                     });
                     self.math_num_uprooted_at_latest_retain = 0;
@@ -12449,40 +12733,50 @@ fn lir_math() {
                 fn update_finalize(&mut self, insertions: &mut Vec<Self::Row>, uf: &mut Unification) {
                     log_duration!("update_finalize {}: {}", "fuel", {
                         assert!(self.new.is_empty());
-                        self.new.extend(
-                            self.hash_index_0
-                                .iter()
-                                .map(|(&(x0,), &(x1,))| (x0, x1))
-                                .filter(|&(x0, x1)| !self.hash_index_0_1.contains_key(&(x0, x1))),
-                        );
-                        insertions.clear();
-                        RadixSortable::wrap(&mut self.new).voracious_sort();
-                        self.new.dedup();
-                        for &(x0, x1) in &self.new {
-                            self.hash_index_1.entry((x1,)).or_default().push((x0,));
-                        }
-                        self.hash_index_1.retain(|&(x1,), v| {
-                            if uf.fuel_unit_.is_root(x1) {
-                                v.retain(|&mut (x0,)| uf.fuel_unit_.is_root(x0));
-                                v.sort_unstable();
-                                v.dedup();
-                                true
-                            } else {
-                                false
+                        log_duration!("fill new: {}", {
+                            self.new.extend(
+                                self.hash_index_0
+                                    .iter()
+                                    .map(|(&(x0,), &(x1,))| (x0, x1))
+                                    .filter(|&(x0, x1)| !self.hash_index_0_1.contains_key(&(x0, x1))),
+                            );
+                            insertions.clear();
+                            RadixSortable::wrap(&mut self.new).voracious_sort();
+                            self.new.dedup();
+                        });
+                        log_duration!("fill index: {}", {
+                            for &(x0, x1) in &self.new {
+                                self.hash_index_1.entry((x1,)).or_default().push((x0,));
                             }
                         });
-                        for &(x0, x1) in &self.new {
-                            self.hash_index_0_1.entry((x0, x1)).or_default().push(());
-                        }
-                        self.hash_index_0_1.retain(|&(x0, x1), v| {
-                            if uf.fuel_unit_.is_root(x0) & uf.fuel_unit_.is_root(x1) {
-                                v.retain(|&mut ()| true);
-                                v.sort_unstable();
-                                v.dedup();
-                                true
-                            } else {
-                                false
+                        log_duration!("retain index: {}", {
+                            self.hash_index_1.retain(|&(x1,), v| {
+                                if uf.fuel_unit_.is_root(x1) {
+                                    v.retain(|&mut (x0,)| uf.fuel_unit_.is_root(x0));
+                                    v.sort_unstable();
+                                    v.dedup();
+                                    true
+                                } else {
+                                    false
+                                }
+                            });
+                        });
+                        log_duration!("fill index: {}", {
+                            for &(x0, x1) in &self.new {
+                                self.hash_index_0_1.entry((x0, x1)).or_default().push(());
                             }
+                        });
+                        log_duration!("retain index: {}", {
+                            self.hash_index_0_1.retain(|&(x0, x1), v| {
+                                if uf.fuel_unit_.is_root(x0) & uf.fuel_unit_.is_root(x1) {
+                                    v.retain(|&mut ()| true);
+                                    v.sort_unstable();
+                                    v.dedup();
+                                    true
+                                } else {
+                                    false
+                                }
+                            });
                         });
                     });
                     self.fuel_unit_num_uprooted_at_latest_retain = 0;
@@ -12605,27 +12899,33 @@ fn lir_math() {
                 fn update_finalize(&mut self, insertions: &mut Vec<Self::Row>, uf: &mut Unification) {
                     log_duration!("update_finalize {}: {}", "zero_fuel", {
                         assert!(self.new.is_empty());
-                        self.new.extend(
-                            self.hash_index_
-                                .iter()
-                                .map(|(&(), &(x0,))| (x0,))
-                                .filter(|&(x0,)| !self.hash_index_0.contains_key(&(x0,))),
-                        );
-                        insertions.clear();
-                        RadixSortable::wrap(&mut self.new).voracious_sort();
-                        self.new.dedup();
-                        for &(x0,) in &self.new {
-                            self.hash_index_0.entry((x0,)).or_default().push(());
-                        }
-                        self.hash_index_0.retain(|&(x0,), v| {
-                            if uf.fuel_unit_.is_root(x0) {
-                                v.retain(|&mut ()| true);
-                                v.sort_unstable();
-                                v.dedup();
-                                true
-                            } else {
-                                false
+                        log_duration!("fill new: {}", {
+                            self.new.extend(
+                                self.hash_index_
+                                    .iter()
+                                    .map(|(&(), &(x0,))| (x0,))
+                                    .filter(|&(x0,)| !self.hash_index_0.contains_key(&(x0,))),
+                            );
+                            insertions.clear();
+                            RadixSortable::wrap(&mut self.new).voracious_sort();
+                            self.new.dedup();
+                        });
+                        log_duration!("fill index: {}", {
+                            for &(x0,) in &self.new {
+                                self.hash_index_0.entry((x0,)).or_default().push(());
                             }
+                        });
+                        log_duration!("retain index: {}", {
+                            self.hash_index_0.retain(|&(x0,), v| {
+                                if uf.fuel_unit_.is_root(x0) {
+                                    v.retain(|&mut ()| true);
+                                    v.sort_unstable();
+                                    v.dedup();
+                                    true
+                                } else {
+                                    false
+                                }
+                            });
                         });
                     });
                     self.fuel_unit_num_uprooted_at_latest_retain = 0;
@@ -12738,43 +13038,53 @@ fn lir_math() {
                 fn update_finalize(&mut self, insertions: &mut Vec<Self::Row>, uf: &mut Unification) {
                     log_duration!("update_finalize {}: {}", "diff", {
                         assert!(self.new.is_empty());
-                        self.new.extend(
-                            self.hash_index_1_0
-                                .iter()
-                                .map(|(&(x1, x0), &(x2,))| (x0, x1, x2))
-                                .filter(|&(x0, x1, x2)| !self.hash_index_1_0_2.contains_key(&(x1, x0, x2))),
-                        );
-                        insertions.clear();
-                        RadixSortable::wrap(&mut self.new).voracious_sort();
-                        self.new.dedup();
-                        for &(x0, x1, x2) in &self.new {
-                            self.hash_index_1.entry((x1,)).or_default().push((x0, x2));
-                        }
-                        self.hash_index_1.retain(|&(x1,), v| {
-                            if uf.math_.is_root(x1) {
-                                v.retain(|&mut (x0, x2)| uf.math_.is_root(x0) & uf.math_.is_root(x2));
-                                v.sort_unstable();
-                                v.dedup();
-                                true
-                            } else {
-                                false
+                        log_duration!("fill new: {}", {
+                            self.new.extend(
+                                self.hash_index_1_0
+                                    .iter()
+                                    .map(|(&(x1, x0), &(x2,))| (x0, x1, x2))
+                                    .filter(|&(x0, x1, x2)| !self.hash_index_1_0_2.contains_key(&(x1, x0, x2))),
+                            );
+                            insertions.clear();
+                            RadixSortable::wrap(&mut self.new).voracious_sort();
+                            self.new.dedup();
+                        });
+                        log_duration!("fill index: {}", {
+                            for &(x0, x1, x2) in &self.new {
+                                self.hash_index_1.entry((x1,)).or_default().push((x0, x2));
                             }
                         });
-                        for &(x0, x1, x2) in &self.new {
-                            self.hash_index_1_0_2
-                                .entry((x1, x0, x2))
-                                .or_default()
-                                .push(());
-                        }
-                        self.hash_index_1_0_2.retain(|&(x1, x0, x2), v| {
-                            if uf.math_.is_root(x1) & uf.math_.is_root(x0) & uf.math_.is_root(x2) {
-                                v.retain(|&mut ()| true);
-                                v.sort_unstable();
-                                v.dedup();
-                                true
-                            } else {
-                                false
+                        log_duration!("retain index: {}", {
+                            self.hash_index_1.retain(|&(x1,), v| {
+                                if uf.math_.is_root(x1) {
+                                    v.retain(|&mut (x0, x2)| uf.math_.is_root(x0) & uf.math_.is_root(x2));
+                                    v.sort_unstable();
+                                    v.dedup();
+                                    true
+                                } else {
+                                    false
+                                }
+                            });
+                        });
+                        log_duration!("fill index: {}", {
+                            for &(x0, x1, x2) in &self.new {
+                                self.hash_index_1_0_2
+                                    .entry((x1, x0, x2))
+                                    .or_default()
+                                    .push(());
                             }
+                        });
+                        log_duration!("retain index: {}", {
+                            self.hash_index_1_0_2.retain(|&(x1, x0, x2), v| {
+                                if uf.math_.is_root(x1) & uf.math_.is_root(x0) & uf.math_.is_root(x2) {
+                                    v.retain(|&mut ()| true);
+                                    v.sort_unstable();
+                                    v.dedup();
+                                    true
+                                } else {
+                                    false
+                                }
+                            });
                         });
                     });
                     self.math_num_uprooted_at_latest_retain = 0;
@@ -12916,88 +13226,106 @@ fn lir_math() {
                 fn update_finalize(&mut self, insertions: &mut Vec<Self::Row>, uf: &mut Unification) {
                     log_duration!("update_finalize {}: {}", "integral", {
                         assert!(self.new.is_empty());
-                        self.new.extend(
-                            self.hash_index_0_1_2
-                                .iter()
-                                .map(|(&(x0, x1, x2), &(x3,))| (x0, x1, x2, x3))
-                                .filter(|&(x0, x1, x2, x3)| {
-                                    !self.hash_index_0_1_2_3.contains_key(&(x0, x1, x2, x3))
-                                }),
-                        );
-                        insertions.clear();
-                        RadixSortable::wrap(&mut self.new).voracious_sort();
-                        self.new.dedup();
-                        for &(x0, x1, x2, x3) in &self.new {
-                            self.hash_index_0
-                                .entry((x0,))
-                                .or_default()
-                                .push((x1, x2, x3));
-                        }
-                        self.hash_index_0.retain(|&(x0,), v| {
-                            if uf.fuel_unit_.is_root(x0) {
-                                v.retain(|&mut (x1, x2, x3)| {
-                                    uf.math_.is_root(x1) & uf.math_.is_root(x2) & uf.math_.is_root(x3)
-                                });
-                                v.sort_unstable();
-                                v.dedup();
-                                true
-                            } else {
-                                false
+                        log_duration!("fill new: {}", {
+                            self.new.extend(
+                                self.hash_index_0_1_2
+                                    .iter()
+                                    .map(|(&(x0, x1, x2), &(x3,))| (x0, x1, x2, x3))
+                                    .filter(|&(x0, x1, x2, x3)| {
+                                        !self.hash_index_0_1_2_3.contains_key(&(x0, x1, x2, x3))
+                                    }),
+                            );
+                            insertions.clear();
+                            RadixSortable::wrap(&mut self.new).voracious_sort();
+                            self.new.dedup();
+                        });
+                        log_duration!("fill index: {}", {
+                            for &(x0, x1, x2, x3) in &self.new {
+                                self.hash_index_0
+                                    .entry((x0,))
+                                    .or_default()
+                                    .push((x1, x2, x3));
                             }
                         });
-                        for &(x0, x1, x2, x3) in &self.new {
-                            self.hash_index_1
-                                .entry((x1,))
-                                .or_default()
-                                .push((x2, x0, x3));
-                        }
-                        self.hash_index_1.retain(|&(x1,), v| {
-                            if uf.math_.is_root(x1) {
-                                v.retain(|&mut (x2, x0, x3)| {
-                                    uf.math_.is_root(x2) & uf.fuel_unit_.is_root(x0) & uf.math_.is_root(x3)
-                                });
-                                v.sort_unstable();
-                                v.dedup();
-                                true
-                            } else {
-                                false
+                        log_duration!("retain index: {}", {
+                            self.hash_index_0.retain(|&(x0,), v| {
+                                if uf.fuel_unit_.is_root(x0) {
+                                    v.retain(|&mut (x1, x2, x3)| {
+                                        uf.math_.is_root(x1) & uf.math_.is_root(x2) & uf.math_.is_root(x3)
+                                    });
+                                    v.sort_unstable();
+                                    v.dedup();
+                                    true
+                                } else {
+                                    false
+                                }
+                            });
+                        });
+                        log_duration!("fill index: {}", {
+                            for &(x0, x1, x2, x3) in &self.new {
+                                self.hash_index_1
+                                    .entry((x1,))
+                                    .or_default()
+                                    .push((x2, x0, x3));
                             }
                         });
-                        for &(x0, x1, x2, x3) in &self.new {
-                            self.hash_index_1_2
-                                .entry((x1, x2))
-                                .or_default()
-                                .push((x0, x3));
-                        }
-                        self.hash_index_1_2.retain(|&(x1, x2), v| {
-                            if uf.math_.is_root(x1) & uf.math_.is_root(x2) {
-                                v.retain(|&mut (x0, x3)| uf.fuel_unit_.is_root(x0) & uf.math_.is_root(x3));
-                                v.sort_unstable();
-                                v.dedup();
-                                true
-                            } else {
-                                false
+                        log_duration!("retain index: {}", {
+                            self.hash_index_1.retain(|&(x1,), v| {
+                                if uf.math_.is_root(x1) {
+                                    v.retain(|&mut (x2, x0, x3)| {
+                                        uf.math_.is_root(x2) & uf.fuel_unit_.is_root(x0) & uf.math_.is_root(x3)
+                                    });
+                                    v.sort_unstable();
+                                    v.dedup();
+                                    true
+                                } else {
+                                    false
+                                }
+                            });
+                        });
+                        log_duration!("fill index: {}", {
+                            for &(x0, x1, x2, x3) in &self.new {
+                                self.hash_index_1_2
+                                    .entry((x1, x2))
+                                    .or_default()
+                                    .push((x0, x3));
                             }
                         });
-                        for &(x0, x1, x2, x3) in &self.new {
-                            self.hash_index_0_1_2_3
-                                .entry((x0, x1, x2, x3))
-                                .or_default()
-                                .push(());
-                        }
-                        self.hash_index_0_1_2_3.retain(|&(x0, x1, x2, x3), v| {
-                            if uf.fuel_unit_.is_root(x0)
-                                & uf.math_.is_root(x1)
-                                & uf.math_.is_root(x2)
-                                & uf.math_.is_root(x3)
-                            {
-                                v.retain(|&mut ()| true);
-                                v.sort_unstable();
-                                v.dedup();
-                                true
-                            } else {
-                                false
+                        log_duration!("retain index: {}", {
+                            self.hash_index_1_2.retain(|&(x1, x2), v| {
+                                if uf.math_.is_root(x1) & uf.math_.is_root(x2) {
+                                    v.retain(|&mut (x0, x3)| uf.fuel_unit_.is_root(x0) & uf.math_.is_root(x3));
+                                    v.sort_unstable();
+                                    v.dedup();
+                                    true
+                                } else {
+                                    false
+                                }
+                            });
+                        });
+                        log_duration!("fill index: {}", {
+                            for &(x0, x1, x2, x3) in &self.new {
+                                self.hash_index_0_1_2_3
+                                    .entry((x0, x1, x2, x3))
+                                    .or_default()
+                                    .push(());
                             }
+                        });
+                        log_duration!("retain index: {}", {
+                            self.hash_index_0_1_2_3.retain(|&(x0, x1, x2, x3), v| {
+                                if uf.fuel_unit_.is_root(x0)
+                                    & uf.math_.is_root(x1)
+                                    & uf.math_.is_root(x2)
+                                    & uf.math_.is_root(x3)
+                                {
+                                    v.retain(|&mut ()| true);
+                                    v.sort_unstable();
+                                    v.dedup();
+                                    true
+                                } else {
+                                    false
+                                }
+                            });
                         });
                     });
                     self.fuel_unit_num_uprooted_at_latest_retain = 0;
@@ -13172,69 +13500,87 @@ fn lir_math() {
                 fn update_finalize(&mut self, insertions: &mut Vec<Self::Row>, uf: &mut Unification) {
                     log_duration!("update_finalize {}: {}", "add", {
                         assert!(self.new.is_empty());
-                        self.new.extend(
-                            self.hash_index_1_0
-                                .iter()
-                                .map(|(&(x1, x0), &(x2,))| (x0, x1, x2))
-                                .filter(|&(x0, x1, x2)| !self.hash_index_1_0_2.contains_key(&(x1, x0, x2))),
-                        );
-                        insertions.clear();
-                        RadixSortable::wrap(&mut self.new).voracious_sort();
-                        self.new.dedup();
-                        for &(x0, x1, x2) in &self.new {
-                            self.hash_index_2.entry((x2,)).or_default().push((x0, x1));
-                        }
-                        self.hash_index_2.retain(|&(x2,), v| {
-                            if uf.math_.is_root(x2) {
-                                v.retain(|&mut (x0, x1)| uf.math_.is_root(x0) & uf.math_.is_root(x1));
-                                v.sort_unstable();
-                                v.dedup();
-                                true
-                            } else {
-                                false
+                        log_duration!("fill new: {}", {
+                            self.new.extend(
+                                self.hash_index_1_0
+                                    .iter()
+                                    .map(|(&(x1, x0), &(x2,))| (x0, x1, x2))
+                                    .filter(|&(x0, x1, x2)| !self.hash_index_1_0_2.contains_key(&(x1, x0, x2))),
+                            );
+                            insertions.clear();
+                            RadixSortable::wrap(&mut self.new).voracious_sort();
+                            self.new.dedup();
+                        });
+                        log_duration!("fill index: {}", {
+                            for &(x0, x1, x2) in &self.new {
+                                self.hash_index_2.entry((x2,)).or_default().push((x0, x1));
                             }
                         });
-                        for &(x0, x1, x2) in &self.new {
-                            self.hash_index_1.entry((x1,)).or_default().push((x0, x2));
-                        }
-                        self.hash_index_1.retain(|&(x1,), v| {
-                            if uf.math_.is_root(x1) {
-                                v.retain(|&mut (x0, x2)| uf.math_.is_root(x0) & uf.math_.is_root(x2));
-                                v.sort_unstable();
-                                v.dedup();
-                                true
-                            } else {
-                                false
+                        log_duration!("retain index: {}", {
+                            self.hash_index_2.retain(|&(x2,), v| {
+                                if uf.math_.is_root(x2) {
+                                    v.retain(|&mut (x0, x1)| uf.math_.is_root(x0) & uf.math_.is_root(x1));
+                                    v.sort_unstable();
+                                    v.dedup();
+                                    true
+                                } else {
+                                    false
+                                }
+                            });
+                        });
+                        log_duration!("fill index: {}", {
+                            for &(x0, x1, x2) in &self.new {
+                                self.hash_index_1.entry((x1,)).or_default().push((x0, x2));
                             }
                         });
-                        for &(x0, x1, x2) in &self.new {
-                            self.hash_index_0.entry((x0,)).or_default().push((x1, x2));
-                        }
-                        self.hash_index_0.retain(|&(x0,), v| {
-                            if uf.math_.is_root(x0) {
-                                v.retain(|&mut (x1, x2)| uf.math_.is_root(x1) & uf.math_.is_root(x2));
-                                v.sort_unstable();
-                                v.dedup();
-                                true
-                            } else {
-                                false
+                        log_duration!("retain index: {}", {
+                            self.hash_index_1.retain(|&(x1,), v| {
+                                if uf.math_.is_root(x1) {
+                                    v.retain(|&mut (x0, x2)| uf.math_.is_root(x0) & uf.math_.is_root(x2));
+                                    v.sort_unstable();
+                                    v.dedup();
+                                    true
+                                } else {
+                                    false
+                                }
+                            });
+                        });
+                        log_duration!("fill index: {}", {
+                            for &(x0, x1, x2) in &self.new {
+                                self.hash_index_0.entry((x0,)).or_default().push((x1, x2));
                             }
                         });
-                        for &(x0, x1, x2) in &self.new {
-                            self.hash_index_1_0_2
-                                .entry((x1, x0, x2))
-                                .or_default()
-                                .push(());
-                        }
-                        self.hash_index_1_0_2.retain(|&(x1, x0, x2), v| {
-                            if uf.math_.is_root(x1) & uf.math_.is_root(x0) & uf.math_.is_root(x2) {
-                                v.retain(|&mut ()| true);
-                                v.sort_unstable();
-                                v.dedup();
-                                true
-                            } else {
-                                false
+                        log_duration!("retain index: {}", {
+                            self.hash_index_0.retain(|&(x0,), v| {
+                                if uf.math_.is_root(x0) {
+                                    v.retain(|&mut (x1, x2)| uf.math_.is_root(x1) & uf.math_.is_root(x2));
+                                    v.sort_unstable();
+                                    v.dedup();
+                                    true
+                                } else {
+                                    false
+                                }
+                            });
+                        });
+                        log_duration!("fill index: {}", {
+                            for &(x0, x1, x2) in &self.new {
+                                self.hash_index_1_0_2
+                                    .entry((x1, x0, x2))
+                                    .or_default()
+                                    .push(());
                             }
+                        });
+                        log_duration!("retain index: {}", {
+                            self.hash_index_1_0_2.retain(|&(x1, x0, x2), v| {
+                                if uf.math_.is_root(x1) & uf.math_.is_root(x0) & uf.math_.is_root(x2) {
+                                    v.retain(|&mut ()| true);
+                                    v.sort_unstable();
+                                    v.dedup();
+                                    true
+                                } else {
+                                    false
+                                }
+                            });
                         });
                     });
                     self.math_num_uprooted_at_latest_retain = 0;
@@ -13376,43 +13722,53 @@ fn lir_math() {
                 fn update_finalize(&mut self, insertions: &mut Vec<Self::Row>, uf: &mut Unification) {
                     log_duration!("update_finalize {}: {}", "sub", {
                         assert!(self.new.is_empty());
-                        self.new.extend(
-                            self.hash_index_0_1
-                                .iter()
-                                .map(|(&(x0, x1), &(x2,))| (x0, x1, x2))
-                                .filter(|&(x0, x1, x2)| !self.hash_index_0_1_2.contains_key(&(x0, x1, x2))),
-                        );
-                        insertions.clear();
-                        RadixSortable::wrap(&mut self.new).voracious_sort();
-                        self.new.dedup();
-                        for &(x0, x1, x2) in &self.new {
-                            self.hash_index_2.entry((x2,)).or_default().push((x0, x1));
-                        }
-                        self.hash_index_2.retain(|&(x2,), v| {
-                            if uf.math_.is_root(x2) {
-                                v.retain(|&mut (x0, x1)| uf.math_.is_root(x0) & uf.math_.is_root(x1));
-                                v.sort_unstable();
-                                v.dedup();
-                                true
-                            } else {
-                                false
+                        log_duration!("fill new: {}", {
+                            self.new.extend(
+                                self.hash_index_0_1
+                                    .iter()
+                                    .map(|(&(x0, x1), &(x2,))| (x0, x1, x2))
+                                    .filter(|&(x0, x1, x2)| !self.hash_index_0_1_2.contains_key(&(x0, x1, x2))),
+                            );
+                            insertions.clear();
+                            RadixSortable::wrap(&mut self.new).voracious_sort();
+                            self.new.dedup();
+                        });
+                        log_duration!("fill index: {}", {
+                            for &(x0, x1, x2) in &self.new {
+                                self.hash_index_2.entry((x2,)).or_default().push((x0, x1));
                             }
                         });
-                        for &(x0, x1, x2) in &self.new {
-                            self.hash_index_0_1_2
-                                .entry((x0, x1, x2))
-                                .or_default()
-                                .push(());
-                        }
-                        self.hash_index_0_1_2.retain(|&(x0, x1, x2), v| {
-                            if uf.math_.is_root(x0) & uf.math_.is_root(x1) & uf.math_.is_root(x2) {
-                                v.retain(|&mut ()| true);
-                                v.sort_unstable();
-                                v.dedup();
-                                true
-                            } else {
-                                false
+                        log_duration!("retain index: {}", {
+                            self.hash_index_2.retain(|&(x2,), v| {
+                                if uf.math_.is_root(x2) {
+                                    v.retain(|&mut (x0, x1)| uf.math_.is_root(x0) & uf.math_.is_root(x1));
+                                    v.sort_unstable();
+                                    v.dedup();
+                                    true
+                                } else {
+                                    false
+                                }
+                            });
+                        });
+                        log_duration!("fill index: {}", {
+                            for &(x0, x1, x2) in &self.new {
+                                self.hash_index_0_1_2
+                                    .entry((x0, x1, x2))
+                                    .or_default()
+                                    .push(());
                             }
+                        });
+                        log_duration!("retain index: {}", {
+                            self.hash_index_0_1_2.retain(|&(x0, x1, x2), v| {
+                                if uf.math_.is_root(x0) & uf.math_.is_root(x1) & uf.math_.is_root(x2) {
+                                    v.retain(|&mut ()| true);
+                                    v.sort_unstable();
+                                    v.dedup();
+                                    true
+                                } else {
+                                    false
+                                }
+                            });
                         });
                     });
                     self.math_num_uprooted_at_latest_retain = 0;
@@ -13545,82 +13901,104 @@ fn lir_math() {
                 fn update_finalize(&mut self, insertions: &mut Vec<Self::Row>, uf: &mut Unification) {
                     log_duration!("update_finalize {}: {}", "mul", {
                         assert!(self.new.is_empty());
-                        self.new.extend(
-                            self.hash_index_1_0
-                                .iter()
-                                .map(|(&(x1, x0), &(x2,))| (x0, x1, x2))
-                                .filter(|&(x0, x1, x2)| !self.hash_index_1_0_2.contains_key(&(x1, x0, x2))),
-                        );
-                        insertions.clear();
-                        RadixSortable::wrap(&mut self.new).voracious_sort();
-                        self.new.dedup();
-                        for &(x0, x1, x2) in &self.new {
-                            self.hash_index_2.entry((x2,)).or_default().push((x0, x1));
-                        }
-                        self.hash_index_2.retain(|&(x2,), v| {
-                            if uf.math_.is_root(x2) {
-                                v.retain(|&mut (x0, x1)| uf.math_.is_root(x0) & uf.math_.is_root(x1));
-                                v.sort_unstable();
-                                v.dedup();
-                                true
-                            } else {
-                                false
+                        log_duration!("fill new: {}", {
+                            self.new.extend(
+                                self.hash_index_1_0
+                                    .iter()
+                                    .map(|(&(x1, x0), &(x2,))| (x0, x1, x2))
+                                    .filter(|&(x0, x1, x2)| !self.hash_index_1_0_2.contains_key(&(x1, x0, x2))),
+                            );
+                            insertions.clear();
+                            RadixSortable::wrap(&mut self.new).voracious_sort();
+                            self.new.dedup();
+                        });
+                        log_duration!("fill index: {}", {
+                            for &(x0, x1, x2) in &self.new {
+                                self.hash_index_2.entry((x2,)).or_default().push((x0, x1));
                             }
                         });
-                        for &(x0, x1, x2) in &self.new {
-                            self.hash_index_1.entry((x1,)).or_default().push((x0, x2));
-                        }
-                        self.hash_index_1.retain(|&(x1,), v| {
-                            if uf.math_.is_root(x1) {
-                                v.retain(|&mut (x0, x2)| uf.math_.is_root(x0) & uf.math_.is_root(x2));
-                                v.sort_unstable();
-                                v.dedup();
-                                true
-                            } else {
-                                false
+                        log_duration!("retain index: {}", {
+                            self.hash_index_2.retain(|&(x2,), v| {
+                                if uf.math_.is_root(x2) {
+                                    v.retain(|&mut (x0, x1)| uf.math_.is_root(x0) & uf.math_.is_root(x1));
+                                    v.sort_unstable();
+                                    v.dedup();
+                                    true
+                                } else {
+                                    false
+                                }
+                            });
+                        });
+                        log_duration!("fill index: {}", {
+                            for &(x0, x1, x2) in &self.new {
+                                self.hash_index_1.entry((x1,)).or_default().push((x0, x2));
                             }
                         });
-                        for &(x0, x1, x2) in &self.new {
-                            self.hash_index_2_0.entry((x2, x0)).or_default().push((x1,));
-                        }
-                        self.hash_index_2_0.retain(|&(x2, x0), v| {
-                            if uf.math_.is_root(x2) & uf.math_.is_root(x0) {
-                                v.retain(|&mut (x1,)| uf.math_.is_root(x1));
-                                v.sort_unstable();
-                                v.dedup();
-                                true
-                            } else {
-                                false
+                        log_duration!("retain index: {}", {
+                            self.hash_index_1.retain(|&(x1,), v| {
+                                if uf.math_.is_root(x1) {
+                                    v.retain(|&mut (x0, x2)| uf.math_.is_root(x0) & uf.math_.is_root(x2));
+                                    v.sort_unstable();
+                                    v.dedup();
+                                    true
+                                } else {
+                                    false
+                                }
+                            });
+                        });
+                        log_duration!("fill index: {}", {
+                            for &(x0, x1, x2) in &self.new {
+                                self.hash_index_2_0.entry((x2, x0)).or_default().push((x1,));
                             }
                         });
-                        for &(x0, x1, x2) in &self.new {
-                            self.hash_index_0.entry((x0,)).or_default().push((x1, x2));
-                        }
-                        self.hash_index_0.retain(|&(x0,), v| {
-                            if uf.math_.is_root(x0) {
-                                v.retain(|&mut (x1, x2)| uf.math_.is_root(x1) & uf.math_.is_root(x2));
-                                v.sort_unstable();
-                                v.dedup();
-                                true
-                            } else {
-                                false
+                        log_duration!("retain index: {}", {
+                            self.hash_index_2_0.retain(|&(x2, x0), v| {
+                                if uf.math_.is_root(x2) & uf.math_.is_root(x0) {
+                                    v.retain(|&mut (x1,)| uf.math_.is_root(x1));
+                                    v.sort_unstable();
+                                    v.dedup();
+                                    true
+                                } else {
+                                    false
+                                }
+                            });
+                        });
+                        log_duration!("fill index: {}", {
+                            for &(x0, x1, x2) in &self.new {
+                                self.hash_index_0.entry((x0,)).or_default().push((x1, x2));
                             }
                         });
-                        for &(x0, x1, x2) in &self.new {
-                            self.hash_index_1_0_2
-                                .entry((x1, x0, x2))
-                                .or_default()
-                                .push(());
-                        }
-                        self.hash_index_1_0_2.retain(|&(x1, x0, x2), v| {
-                            if uf.math_.is_root(x1) & uf.math_.is_root(x0) & uf.math_.is_root(x2) {
-                                v.retain(|&mut ()| true);
-                                v.sort_unstable();
-                                v.dedup();
-                                true
-                            } else {
-                                false
+                        log_duration!("retain index: {}", {
+                            self.hash_index_0.retain(|&(x0,), v| {
+                                if uf.math_.is_root(x0) {
+                                    v.retain(|&mut (x1, x2)| uf.math_.is_root(x1) & uf.math_.is_root(x2));
+                                    v.sort_unstable();
+                                    v.dedup();
+                                    true
+                                } else {
+                                    false
+                                }
+                            });
+                        });
+                        log_duration!("fill index: {}", {
+                            for &(x0, x1, x2) in &self.new {
+                                self.hash_index_1_0_2
+                                    .entry((x1, x0, x2))
+                                    .or_default()
+                                    .push(());
                             }
+                        });
+                        log_duration!("retain index: {}", {
+                            self.hash_index_1_0_2.retain(|&(x1, x0, x2), v| {
+                                if uf.math_.is_root(x1) & uf.math_.is_root(x0) & uf.math_.is_root(x2) {
+                                    v.retain(|&mut ()| true);
+                                    v.sort_unstable();
+                                    v.dedup();
+                                    true
+                                } else {
+                                    false
+                                }
+                            });
                         });
                     });
                     self.math_num_uprooted_at_latest_retain = 0;
@@ -13771,30 +14149,36 @@ fn lir_math() {
                 fn update_finalize(&mut self, insertions: &mut Vec<Self::Row>, uf: &mut Unification) {
                     log_duration!("update_finalize {}: {}", "div", {
                         assert!(self.new.is_empty());
-                        self.new.extend(
-                            self.hash_index_0_1
-                                .iter()
-                                .map(|(&(x0, x1), &(x2,))| (x0, x1, x2))
-                                .filter(|&(x0, x1, x2)| !self.hash_index_0_1_2.contains_key(&(x0, x1, x2))),
-                        );
-                        insertions.clear();
-                        RadixSortable::wrap(&mut self.new).voracious_sort();
-                        self.new.dedup();
-                        for &(x0, x1, x2) in &self.new {
-                            self.hash_index_0_1_2
-                                .entry((x0, x1, x2))
-                                .or_default()
-                                .push(());
-                        }
-                        self.hash_index_0_1_2.retain(|&(x0, x1, x2), v| {
-                            if uf.math_.is_root(x0) & uf.math_.is_root(x1) & uf.math_.is_root(x2) {
-                                v.retain(|&mut ()| true);
-                                v.sort_unstable();
-                                v.dedup();
-                                true
-                            } else {
-                                false
+                        log_duration!("fill new: {}", {
+                            self.new.extend(
+                                self.hash_index_0_1
+                                    .iter()
+                                    .map(|(&(x0, x1), &(x2,))| (x0, x1, x2))
+                                    .filter(|&(x0, x1, x2)| !self.hash_index_0_1_2.contains_key(&(x0, x1, x2))),
+                            );
+                            insertions.clear();
+                            RadixSortable::wrap(&mut self.new).voracious_sort();
+                            self.new.dedup();
+                        });
+                        log_duration!("fill index: {}", {
+                            for &(x0, x1, x2) in &self.new {
+                                self.hash_index_0_1_2
+                                    .entry((x0, x1, x2))
+                                    .or_default()
+                                    .push(());
                             }
+                        });
+                        log_duration!("retain index: {}", {
+                            self.hash_index_0_1_2.retain(|&(x0, x1, x2), v| {
+                                if uf.math_.is_root(x0) & uf.math_.is_root(x1) & uf.math_.is_root(x2) {
+                                    v.retain(|&mut ()| true);
+                                    v.sort_unstable();
+                                    v.dedup();
+                                    true
+                                } else {
+                                    false
+                                }
+                            });
                         });
                     });
                     self.math_num_uprooted_at_latest_retain = 0;
@@ -13921,82 +14305,104 @@ fn lir_math() {
                 fn update_finalize(&mut self, insertions: &mut Vec<Self::Row>, uf: &mut Unification) {
                     log_duration!("update_finalize {}: {}", "pow", {
                         assert!(self.new.is_empty());
-                        self.new.extend(
-                            self.hash_index_0_1
-                                .iter()
-                                .map(|(&(x0, x1), &(x2,))| (x0, x1, x2))
-                                .filter(|&(x0, x1, x2)| !self.hash_index_0_1_2.contains_key(&(x0, x1, x2))),
-                        );
-                        insertions.clear();
-                        RadixSortable::wrap(&mut self.new).voracious_sort();
-                        self.new.dedup();
-                        for &(x0, x1, x2) in &self.new {
-                            self.hash_index_2.entry((x2,)).or_default().push((x0, x1));
-                        }
-                        self.hash_index_2.retain(|&(x2,), v| {
-                            if uf.math_.is_root(x2) {
-                                v.retain(|&mut (x0, x1)| uf.math_.is_root(x0) & uf.math_.is_root(x1));
-                                v.sort_unstable();
-                                v.dedup();
-                                true
-                            } else {
-                                false
+                        log_duration!("fill new: {}", {
+                            self.new.extend(
+                                self.hash_index_0_1
+                                    .iter()
+                                    .map(|(&(x0, x1), &(x2,))| (x0, x1, x2))
+                                    .filter(|&(x0, x1, x2)| !self.hash_index_0_1_2.contains_key(&(x0, x1, x2))),
+                            );
+                            insertions.clear();
+                            RadixSortable::wrap(&mut self.new).voracious_sort();
+                            self.new.dedup();
+                        });
+                        log_duration!("fill index: {}", {
+                            for &(x0, x1, x2) in &self.new {
+                                self.hash_index_2.entry((x2,)).or_default().push((x0, x1));
                             }
                         });
-                        for &(x0, x1, x2) in &self.new {
-                            self.hash_index_2_0.entry((x2, x0)).or_default().push((x1,));
-                        }
-                        self.hash_index_2_0.retain(|&(x2, x0), v| {
-                            if uf.math_.is_root(x2) & uf.math_.is_root(x0) {
-                                v.retain(|&mut (x1,)| uf.math_.is_root(x1));
-                                v.sort_unstable();
-                                v.dedup();
-                                true
-                            } else {
-                                false
+                        log_duration!("retain index: {}", {
+                            self.hash_index_2.retain(|&(x2,), v| {
+                                if uf.math_.is_root(x2) {
+                                    v.retain(|&mut (x0, x1)| uf.math_.is_root(x0) & uf.math_.is_root(x1));
+                                    v.sort_unstable();
+                                    v.dedup();
+                                    true
+                                } else {
+                                    false
+                                }
+                            });
+                        });
+                        log_duration!("fill index: {}", {
+                            for &(x0, x1, x2) in &self.new {
+                                self.hash_index_2_0.entry((x2, x0)).or_default().push((x1,));
                             }
                         });
-                        for &(x0, x1, x2) in &self.new {
-                            self.hash_index_0.entry((x0,)).or_default().push((x1, x2));
-                        }
-                        self.hash_index_0.retain(|&(x0,), v| {
-                            if uf.math_.is_root(x0) {
-                                v.retain(|&mut (x1, x2)| uf.math_.is_root(x1) & uf.math_.is_root(x2));
-                                v.sort_unstable();
-                                v.dedup();
-                                true
-                            } else {
-                                false
+                        log_duration!("retain index: {}", {
+                            self.hash_index_2_0.retain(|&(x2, x0), v| {
+                                if uf.math_.is_root(x2) & uf.math_.is_root(x0) {
+                                    v.retain(|&mut (x1,)| uf.math_.is_root(x1));
+                                    v.sort_unstable();
+                                    v.dedup();
+                                    true
+                                } else {
+                                    false
+                                }
+                            });
+                        });
+                        log_duration!("fill index: {}", {
+                            for &(x0, x1, x2) in &self.new {
+                                self.hash_index_0.entry((x0,)).or_default().push((x1, x2));
                             }
                         });
-                        for &(x0, x1, x2) in &self.new {
-                            self.hash_index_1.entry((x1,)).or_default().push((x0, x2));
-                        }
-                        self.hash_index_1.retain(|&(x1,), v| {
-                            if uf.math_.is_root(x1) {
-                                v.retain(|&mut (x0, x2)| uf.math_.is_root(x0) & uf.math_.is_root(x2));
-                                v.sort_unstable();
-                                v.dedup();
-                                true
-                            } else {
-                                false
+                        log_duration!("retain index: {}", {
+                            self.hash_index_0.retain(|&(x0,), v| {
+                                if uf.math_.is_root(x0) {
+                                    v.retain(|&mut (x1, x2)| uf.math_.is_root(x1) & uf.math_.is_root(x2));
+                                    v.sort_unstable();
+                                    v.dedup();
+                                    true
+                                } else {
+                                    false
+                                }
+                            });
+                        });
+                        log_duration!("fill index: {}", {
+                            for &(x0, x1, x2) in &self.new {
+                                self.hash_index_1.entry((x1,)).or_default().push((x0, x2));
                             }
                         });
-                        for &(x0, x1, x2) in &self.new {
-                            self.hash_index_0_1_2
-                                .entry((x0, x1, x2))
-                                .or_default()
-                                .push(());
-                        }
-                        self.hash_index_0_1_2.retain(|&(x0, x1, x2), v| {
-                            if uf.math_.is_root(x0) & uf.math_.is_root(x1) & uf.math_.is_root(x2) {
-                                v.retain(|&mut ()| true);
-                                v.sort_unstable();
-                                v.dedup();
-                                true
-                            } else {
-                                false
+                        log_duration!("retain index: {}", {
+                            self.hash_index_1.retain(|&(x1,), v| {
+                                if uf.math_.is_root(x1) {
+                                    v.retain(|&mut (x0, x2)| uf.math_.is_root(x0) & uf.math_.is_root(x2));
+                                    v.sort_unstable();
+                                    v.dedup();
+                                    true
+                                } else {
+                                    false
+                                }
+                            });
+                        });
+                        log_duration!("fill index: {}", {
+                            for &(x0, x1, x2) in &self.new {
+                                self.hash_index_0_1_2
+                                    .entry((x0, x1, x2))
+                                    .or_default()
+                                    .push(());
                             }
+                        });
+                        log_duration!("retain index: {}", {
+                            self.hash_index_0_1_2.retain(|&(x0, x1, x2), v| {
+                                if uf.math_.is_root(x0) & uf.math_.is_root(x1) & uf.math_.is_root(x2) {
+                                    v.retain(|&mut ()| true);
+                                    v.sort_unstable();
+                                    v.dedup();
+                                    true
+                                } else {
+                                    false
+                                }
+                            });
                         });
                     });
                     self.math_num_uprooted_at_latest_retain = 0;
@@ -14143,27 +14549,33 @@ fn lir_math() {
                 fn update_finalize(&mut self, insertions: &mut Vec<Self::Row>, uf: &mut Unification) {
                     log_duration!("update_finalize {}: {}", "ln", {
                         assert!(self.new.is_empty());
-                        self.new.extend(
-                            self.hash_index_0
-                                .iter()
-                                .map(|(&(x0,), &(x1,))| (x0, x1))
-                                .filter(|&(x0, x1)| !self.hash_index_0_1.contains_key(&(x0, x1))),
-                        );
-                        insertions.clear();
-                        RadixSortable::wrap(&mut self.new).voracious_sort();
-                        self.new.dedup();
-                        for &(x0, x1) in &self.new {
-                            self.hash_index_0_1.entry((x0, x1)).or_default().push(());
-                        }
-                        self.hash_index_0_1.retain(|&(x0, x1), v| {
-                            if uf.math_.is_root(x0) & uf.math_.is_root(x1) {
-                                v.retain(|&mut ()| true);
-                                v.sort_unstable();
-                                v.dedup();
-                                true
-                            } else {
-                                false
+                        log_duration!("fill new: {}", {
+                            self.new.extend(
+                                self.hash_index_0
+                                    .iter()
+                                    .map(|(&(x0,), &(x1,))| (x0, x1))
+                                    .filter(|&(x0, x1)| !self.hash_index_0_1.contains_key(&(x0, x1))),
+                            );
+                            insertions.clear();
+                            RadixSortable::wrap(&mut self.new).voracious_sort();
+                            self.new.dedup();
+                        });
+                        log_duration!("fill index: {}", {
+                            for &(x0, x1) in &self.new {
+                                self.hash_index_0_1.entry((x0, x1)).or_default().push(());
                             }
+                        });
+                        log_duration!("retain index: {}", {
+                            self.hash_index_0_1.retain(|&(x0, x1), v| {
+                                if uf.math_.is_root(x0) & uf.math_.is_root(x1) {
+                                    v.retain(|&mut ()| true);
+                                    v.sort_unstable();
+                                    v.dedup();
+                                    true
+                                } else {
+                                    false
+                                }
+                            });
                         });
                     });
                     self.math_num_uprooted_at_latest_retain = 0;
@@ -14275,27 +14687,33 @@ fn lir_math() {
                 fn update_finalize(&mut self, insertions: &mut Vec<Self::Row>, uf: &mut Unification) {
                     log_duration!("update_finalize {}: {}", "sqrt", {
                         assert!(self.new.is_empty());
-                        self.new.extend(
-                            self.hash_index_0
-                                .iter()
-                                .map(|(&(x0,), &(x1,))| (x0, x1))
-                                .filter(|&(x0, x1)| !self.hash_index_0_1.contains_key(&(x0, x1))),
-                        );
-                        insertions.clear();
-                        RadixSortable::wrap(&mut self.new).voracious_sort();
-                        self.new.dedup();
-                        for &(x0, x1) in &self.new {
-                            self.hash_index_0_1.entry((x0, x1)).or_default().push(());
-                        }
-                        self.hash_index_0_1.retain(|&(x0, x1), v| {
-                            if uf.math_.is_root(x0) & uf.math_.is_root(x1) {
-                                v.retain(|&mut ()| true);
-                                v.sort_unstable();
-                                v.dedup();
-                                true
-                            } else {
-                                false
+                        log_duration!("fill new: {}", {
+                            self.new.extend(
+                                self.hash_index_0
+                                    .iter()
+                                    .map(|(&(x0,), &(x1,))| (x0, x1))
+                                    .filter(|&(x0, x1)| !self.hash_index_0_1.contains_key(&(x0, x1))),
+                            );
+                            insertions.clear();
+                            RadixSortable::wrap(&mut self.new).voracious_sort();
+                            self.new.dedup();
+                        });
+                        log_duration!("fill index: {}", {
+                            for &(x0, x1) in &self.new {
+                                self.hash_index_0_1.entry((x0, x1)).or_default().push(());
                             }
+                        });
+                        log_duration!("retain index: {}", {
+                            self.hash_index_0_1.retain(|&(x0, x1), v| {
+                                if uf.math_.is_root(x0) & uf.math_.is_root(x1) {
+                                    v.retain(|&mut ()| true);
+                                    v.sort_unstable();
+                                    v.dedup();
+                                    true
+                                } else {
+                                    false
+                                }
+                            });
                         });
                     });
                     self.math_num_uprooted_at_latest_retain = 0;
@@ -14407,27 +14825,33 @@ fn lir_math() {
                 fn update_finalize(&mut self, insertions: &mut Vec<Self::Row>, uf: &mut Unification) {
                     log_duration!("update_finalize {}: {}", "sin", {
                         assert!(self.new.is_empty());
-                        self.new.extend(
-                            self.hash_index_0
-                                .iter()
-                                .map(|(&(x0,), &(x1,))| (x0, x1))
-                                .filter(|&(x0, x1)| !self.hash_index_0_1.contains_key(&(x0, x1))),
-                        );
-                        insertions.clear();
-                        RadixSortable::wrap(&mut self.new).voracious_sort();
-                        self.new.dedup();
-                        for &(x0, x1) in &self.new {
-                            self.hash_index_0_1.entry((x0, x1)).or_default().push(());
-                        }
-                        self.hash_index_0_1.retain(|&(x0, x1), v| {
-                            if uf.math_.is_root(x0) & uf.math_.is_root(x1) {
-                                v.retain(|&mut ()| true);
-                                v.sort_unstable();
-                                v.dedup();
-                                true
-                            } else {
-                                false
+                        log_duration!("fill new: {}", {
+                            self.new.extend(
+                                self.hash_index_0
+                                    .iter()
+                                    .map(|(&(x0,), &(x1,))| (x0, x1))
+                                    .filter(|&(x0, x1)| !self.hash_index_0_1.contains_key(&(x0, x1))),
+                            );
+                            insertions.clear();
+                            RadixSortable::wrap(&mut self.new).voracious_sort();
+                            self.new.dedup();
+                        });
+                        log_duration!("fill index: {}", {
+                            for &(x0, x1) in &self.new {
+                                self.hash_index_0_1.entry((x0, x1)).or_default().push(());
                             }
+                        });
+                        log_duration!("retain index: {}", {
+                            self.hash_index_0_1.retain(|&(x0, x1), v| {
+                                if uf.math_.is_root(x0) & uf.math_.is_root(x1) {
+                                    v.retain(|&mut ()| true);
+                                    v.sort_unstable();
+                                    v.dedup();
+                                    true
+                                } else {
+                                    false
+                                }
+                            });
                         });
                     });
                     self.math_num_uprooted_at_latest_retain = 0;
@@ -14539,27 +14963,33 @@ fn lir_math() {
                 fn update_finalize(&mut self, insertions: &mut Vec<Self::Row>, uf: &mut Unification) {
                     log_duration!("update_finalize {}: {}", "cos", {
                         assert!(self.new.is_empty());
-                        self.new.extend(
-                            self.hash_index_0
-                                .iter()
-                                .map(|(&(x0,), &(x1,))| (x0, x1))
-                                .filter(|&(x0, x1)| !self.hash_index_0_1.contains_key(&(x0, x1))),
-                        );
-                        insertions.clear();
-                        RadixSortable::wrap(&mut self.new).voracious_sort();
-                        self.new.dedup();
-                        for &(x0, x1) in &self.new {
-                            self.hash_index_0_1.entry((x0, x1)).or_default().push(());
-                        }
-                        self.hash_index_0_1.retain(|&(x0, x1), v| {
-                            if uf.math_.is_root(x0) & uf.math_.is_root(x1) {
-                                v.retain(|&mut ()| true);
-                                v.sort_unstable();
-                                v.dedup();
-                                true
-                            } else {
-                                false
+                        log_duration!("fill new: {}", {
+                            self.new.extend(
+                                self.hash_index_0
+                                    .iter()
+                                    .map(|(&(x0,), &(x1,))| (x0, x1))
+                                    .filter(|&(x0, x1)| !self.hash_index_0_1.contains_key(&(x0, x1))),
+                            );
+                            insertions.clear();
+                            RadixSortable::wrap(&mut self.new).voracious_sort();
+                            self.new.dedup();
+                        });
+                        log_duration!("fill index: {}", {
+                            for &(x0, x1) in &self.new {
+                                self.hash_index_0_1.entry((x0, x1)).or_default().push(());
                             }
+                        });
+                        log_duration!("retain index: {}", {
+                            self.hash_index_0_1.retain(|&(x0, x1), v| {
+                                if uf.math_.is_root(x0) & uf.math_.is_root(x1) {
+                                    v.retain(|&mut ()| true);
+                                    v.sort_unstable();
+                                    v.dedup();
+                                    true
+                                } else {
+                                    false
+                                }
+                            });
                         });
                     });
                     self.math_num_uprooted_at_latest_retain = 0;
@@ -14673,40 +15103,50 @@ fn lir_math() {
                 fn update_finalize(&mut self, insertions: &mut Vec<Self::Row>, uf: &mut Unification) {
                     log_duration!("update_finalize {}: {}", "const", {
                         assert!(self.new.is_empty());
-                        self.new.extend(
-                            self.hash_index_0
-                                .iter()
-                                .map(|(&(x0,), &(x1,))| (x0, x1))
-                                .filter(|&(x0, x1)| !self.hash_index_0_1.contains_key(&(x0, x1))),
-                        );
-                        insertions.clear();
-                        self.new.sort_unstable();
-                        self.new.dedup();
-                        for &(x0, x1) in &self.new {
-                            self.hash_index_1.entry((x1,)).or_default().push((x0,));
-                        }
-                        self.hash_index_1.retain(|&(x1,), v| {
-                            if uf.math_.is_root(x1) {
-                                v.retain(|&mut (x0,)| true);
-                                v.sort_unstable();
-                                v.dedup();
-                                true
-                            } else {
-                                false
+                        log_duration!("fill new: {}", {
+                            self.new.extend(
+                                self.hash_index_0
+                                    .iter()
+                                    .map(|(&(x0,), &(x1,))| (x0, x1))
+                                    .filter(|&(x0, x1)| !self.hash_index_0_1.contains_key(&(x0, x1))),
+                            );
+                            insertions.clear();
+                            self.new.sort_unstable();
+                            self.new.dedup();
+                        });
+                        log_duration!("fill index: {}", {
+                            for &(x0, x1) in &self.new {
+                                self.hash_index_1.entry((x1,)).or_default().push((x0,));
                             }
                         });
-                        for &(x0, x1) in &self.new {
-                            self.hash_index_0_1.entry((x0, x1)).or_default().push(());
-                        }
-                        self.hash_index_0_1.retain(|&(x0, x1), v| {
-                            if uf.math_.is_root(x1) {
-                                v.retain(|&mut ()| true);
-                                v.sort_unstable();
-                                v.dedup();
-                                true
-                            } else {
-                                false
+                        log_duration!("retain index: {}", {
+                            self.hash_index_1.retain(|&(x1,), v| {
+                                if uf.math_.is_root(x1) {
+                                    v.retain(|&mut (x0,)| true);
+                                    v.sort_unstable();
+                                    v.dedup();
+                                    true
+                                } else {
+                                    false
+                                }
+                            });
+                        });
+                        log_duration!("fill index: {}", {
+                            for &(x0, x1) in &self.new {
+                                self.hash_index_0_1.entry((x0, x1)).or_default().push(());
                             }
+                        });
+                        log_duration!("retain index: {}", {
+                            self.hash_index_0_1.retain(|&(x0, x1), v| {
+                                if uf.math_.is_root(x1) {
+                                    v.retain(|&mut ()| true);
+                                    v.sort_unstable();
+                                    v.dedup();
+                                    true
+                                } else {
+                                    false
+                                }
+                            });
                         });
                     });
                     self.math_num_uprooted_at_latest_retain = 0;
@@ -14836,27 +15276,33 @@ fn lir_math() {
                 fn update_finalize(&mut self, insertions: &mut Vec<Self::Row>, uf: &mut Unification) {
                     log_duration!("update_finalize {}: {}", "var", {
                         assert!(self.new.is_empty());
-                        self.new.extend(
-                            self.hash_index_0
-                                .iter()
-                                .map(|(&(x0,), &(x1,))| (x0, x1))
-                                .filter(|&(x0, x1)| !self.hash_index_0_1.contains_key(&(x0, x1))),
-                        );
-                        insertions.clear();
-                        self.new.sort_unstable();
-                        self.new.dedup();
-                        for &(x0, x1) in &self.new {
-                            self.hash_index_0_1.entry((x0, x1)).or_default().push(());
-                        }
-                        self.hash_index_0_1.retain(|&(x0, x1), v| {
-                            if uf.math_.is_root(x1) {
-                                v.retain(|&mut ()| true);
-                                v.sort_unstable();
-                                v.dedup();
-                                true
-                            } else {
-                                false
+                        log_duration!("fill new: {}", {
+                            self.new.extend(
+                                self.hash_index_0
+                                    .iter()
+                                    .map(|(&(x0,), &(x1,))| (x0, x1))
+                                    .filter(|&(x0, x1)| !self.hash_index_0_1.contains_key(&(x0, x1))),
+                            );
+                            insertions.clear();
+                            self.new.sort_unstable();
+                            self.new.dedup();
+                        });
+                        log_duration!("fill index: {}", {
+                            for &(x0, x1) in &self.new {
+                                self.hash_index_0_1.entry((x0, x1)).or_default().push(());
                             }
+                        });
+                        log_duration!("retain index: {}", {
+                            self.hash_index_0_1.retain(|&(x0, x1), v| {
+                                if uf.math_.is_root(x1) {
+                                    v.retain(|&mut ()| true);
+                                    v.sort_unstable();
+                                    v.dedup();
+                                    true
+                                } else {
+                                    false
+                                }
+                            });
                         });
                     });
                     self.math_num_uprooted_at_latest_retain = 0;
