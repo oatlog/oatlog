@@ -1463,7 +1463,7 @@ It contains a union-find and a map from e-node to e-class called the hashcons.
 It supports the same operations as union-find on its e-classes (`union`, `find`, `make`), and additionally has the functions `canonicalize` and `insert_enode`.
 `insert_enode` just inserts a new e-node and returns its e-class.
 
-`canonicalize` replaces all e-classes with their representatives, and merges e-classes when conflicts occur, $f(a) = b and f(a) = c => b = c$. 
+`canonicalize` replaces all e-classes with their representatives, and merges e-classes when conflicts occur, $f(a) = b and f(a) = c => b = c$.
 
 #TODO[explain `tuple(map(canonicalize_element, enode))`]
 
@@ -1490,7 +1490,11 @@ It supports the same operations as union-find on its e-classes (`union`, `find`,
   ),
 ) <informal-egraph-figure>
 
-#TODO[]
+#TODO[...]
+#TODO[show some egglog here]
+
+When e-matching we are performing essentially the same computation as a database join.
+This motivates relational e-matching @relationalematching where patterns are found using database joins instead which unlocks further optimizations.
 
 #pagebreak(to: "even")
 == Rewriting example implementation and usage <rewriting-impl>
@@ -1499,11 +1503,222 @@ It supports the same operations as union-find on its e-classes (`union`, `find`,
 
 #pagebreak()
 
-== #TODO[recursive vs relational e-matching, What is join]
+== Database joins
 
-#TODO[]
+#let c2 = table.cell(fill: red.lighten(20%))[c2]
+#let c5 = table.cell(fill: blue.lighten(20%))[c5]
+#let c8 = table.cell(fill: green.lighten(20%))[c8]
 
-== #TODO[semi-naive evaluation]
+#figure(
+  grid(
+    columns: (auto, auto, auto),
+    inset: 2pt,
+    table(
+      columns: (auto, auto, auto),
+      inset: 8pt,
+      table.header(
+        table.cell(colspan: 3, [*Orders*]),
+        [Ord],
+        [Cust],
+        [Amnt],
+      ),
+
+      [o1], c8, [2],
+      [o2], c2, [1],
+      [o3], c5, [2],
+      [o4], c8, [5],
+      [o5], c2, [100],
+    ),
+    table(
+      columns: (auto, auto),
+      inset: 8pt,
+      table.header(
+        table.cell(colspan: 2, [*Customers*]),
+        [Cust],
+        [Name],
+      ),
+
+      c2, [Foo],
+      c5, [Bar],
+      c8, [Baz],
+    ),
+    table(
+      columns: (auto, auto, auto, auto),
+      inset: 8pt,
+      table.header(
+        table.cell(colspan: 4, [*Orders* $join$ *Customers*]),
+        [Order],
+        [Cust],
+        [Amount],
+        [Name],
+      ),
+
+      [o1], c8, [2], [Baz],
+      [o2], c2, [1], [Foo],
+      [o3], c5, [2], [Bar],
+      [o4], c8, [5], [Baz],
+      [o5], c2, [100], [Foo],
+    ),
+  ),
+  caption: [tables of a fictional company that maintains a table of orders and customers. Orders $join$ Customers is a join between the Orders and Customers table on "Cust"],
+) <database-table-example>
+
+In a database all information is stored in tables, see @database-table-example.
+We could keep a single table that merges Orders and Customers, but then we would be storing customer names multiple times and corrections to a customers information would need to modify multiple rows.
+
+But it is often useful to be able to be able to view the merged table, which is why the join ($join$) operation exists.
+Semantically it compares all pairs of the two relations and keeps the pairs where the attribute that we join on matches.
+The result of a join is shown in @database-table-example and an example implementation of nested-loop join is shown in @nested-loop-join-impl.
+
+#figure(
+  ```python
+  # join orders and customers on `cust` attribute
+  def join_orders_customers(orders, customers):
+      out = []
+
+      # for all pairs of the two relations
+      for (customer2, name) in customers:
+          for (order, customer1, amount) in orders:
+
+              # filter to make sure that the attribute we join on matches.
+              if customer1 != customer2:
+                  continue
+              out.append((order, customer1, amount, name))
+      return out
+  ```,
+  caption: [Example implementation of a nested-loop join.],
+) <nested-loop-join-impl>
+
+However, nested loop join is quite inefficient, since two random rows from the two relations are unlikely to match on their attribute.
+This makes us always perform $O(n^2)$ operations.
+This motivates indexed joins where we have data-structures to efficiently get a specific row in the relation.
+A simple implementation could use a hashmap and is shown in @hash-join-impl.
+
+#figure(
+  ```python
+  # join orders and customers on `cust` attribute
+  def join_orders_customers(orders, customers):
+      out = []
+
+      # make cust -> order index.
+      order_index = dict()
+      for (order, customer, amount) in orders:
+          order_index.get(customer, []).append(order, amount)
+
+      for (customer, name) in customers:
+          # indexed lookup
+          for (order, amount) in order_index[customer]:
+
+              out.append((order, customer1, amount, name))
+      return out
+  ```,
+  caption: [Example implementation of a nested-loop join.],
+) <hash-join-impl>
+
+== Relational e-matching
+
+If we look at the implementation for finding the pattern $(a + b) dot c$, see @non-relational-e-matching, we notice that it looks very similar to a nested-loop database join.
+
+#figure(
+  ```python
+  # t1 = (a + b) * c
+  for enode, t1 in e_graph.hashcons.items():
+      if enode[0] != "*":
+          continue
+
+      # t0 = a + b
+      _, t0, c = enode
+      for enode, eclass in e_graph.hashcons.items():
+          if enode[0] != "+" or eclass != t0:
+              continue
+          # actions...
+  ```,
+  caption: [non-relational e-matching implementation to find $(a + b) dot c$],
+)<non-relational-e-matching>
+
+Similar to the previous database, we can treat an e-graph as a relational database and express e-matching as joins, see @database-egraph-table-example.
+We can, just like the indexed join example, add indexes when performing e-matching, as can be seen in the pseudocode in @indexed-e-matching.
+
+#figure(
+  ```python
+  # t1 = (a + b) * c
+  for enode, t1 in e_graph.iter_math():
+
+      # t0 = a + b
+      _, t0, c = enode
+      for enode, eclass in e_graph.iter_add_res(t0):
+          # actions...
+  ```,
+  caption: [pseudocode for indexed join of when implementing e-matching to find $(a + b) dot c$],
+)<indexed-e-matching>
+
+#figure(
+  grid(
+    columns: (auto, auto, auto),
+    inset: 2pt,
+    table(
+      columns: (auto, auto, auto),
+      inset: 8pt,
+      table.header(
+        table.cell(colspan: 3, [*Add*]),
+        [x],
+        [y],
+        [res],
+      ),
+
+      [e1], [e2], [e3],
+      [e2], [e1], [e3],
+      [e4], [e5], [e6],
+      [e5], [e4], [e6],
+      [e7], [e8], [e9],
+      [e8], [e7], [e9],
+      [..], [..], [..],
+    ),
+    table(
+      columns: (auto, auto, auto),
+      inset: 8pt,
+      table.header(
+        table.cell(colspan: 3, [*Mul*]),
+        [x],
+        [y],
+        [res],
+      ),
+
+      [e9], [e3], [e12],
+      [e3], [e9], [e12],
+      [e6], [e14], [e15],
+      [e14], [e6], [e15],
+      [e16], [e17], [e18],
+      [e17], [e16], [e18],
+      [..], [..], [..],
+    ),
+    table(
+      columns: (auto, auto, auto, auto, auto),
+      inset: 8pt,
+      table.header(
+        table.cell(colspan: 5, [*Add* $join_("Add"."res" = "Mul"."x")$ *Mul*]),
+        [Add.x],
+        [Add.y],
+        [Add.res or
+          Mul.x],
+        [Mul.y],
+        [Mul.res],
+      ),
+
+      [e1], [e2], [e3], [e9], [e12],
+      [e2], [e1], [e3], [e9], [e12],
+      [e4], [e5], [e6], [e14], [e15],
+      [e5], [e4], [e6], [e14], [e15],
+      [e7], [e8], [e9], [e3], [e12],
+      [e8], [e7], [e9], [e3], [e12],
+    ),
+  ),
+  caption: [Add and Mul as tables along with a join between them.],
+) <database-egraph-table-example>
+
+#TODO[bridge to semi-naive]
+
+== Semi-naive evaluation
 
 #TODO[]
 
