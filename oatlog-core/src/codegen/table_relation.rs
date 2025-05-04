@@ -245,7 +245,7 @@ fn update(
     };
 
     let cols = rel.columns.enumerate().map(ident::column).collect_vec();
-    /*
+
     let cols_find = rel
         .columns
         .iter_enumerate()
@@ -264,7 +264,6 @@ fn update(
             }
         })
         .collect_vec();
-    */
 
     let (
         indexes_fd,
@@ -670,17 +669,21 @@ fn update(
         )
     };
 
+    // NOTE: these have the invariant that each element must be root.
     let iter_cols_superset_new = if let (Some(index), Some(keys), Some(vals)) = (
         indexes_fd.first(),
         indexes_fd_keys.first(),
         indexes_fd_vals.first(),
     ) {
         quote! {
+            // find is not needed because this index is used for congruence closure
             self.#index.iter().map(|(&(#(#keys,)*), &(#(#vals,)* _timestamp,))| (#(#cols,)*))
         }
     } else {
         quote! {
-            insertions.iter().map(|&(#(#cols,)*)| (#(#cols,)*))
+            // find is needed if we don't have FD because then update and update_begin
+            // are empty.
+            insertions.iter().map(|&(#(#cols,)*)| (#(#cols_find,)*))
         }
     };
 
@@ -741,8 +744,29 @@ fn update(
                     self.new.dedup();
                 });
 
+                #[cfg(debug_assertions)]
+                {
+                    self.new.iter().for_each(|&(#(#cols,)*)| {
+                        assert_eq!((#(#cols,)*), (#(#cols_find,)*), "new is canonical");
+                    });
+                }
+
+                // At this point we know that there is no overlap between old and new because of
+                // filtering
+                //
+                // We also know that new only contains root e-classes.
 
                 #(  // Indexes like `HashMap<(T, T, T), SmallVec<[(); 1]>>` and `HashMap<(T, T), SmallVec<[(T,); 1]>>`
+                    log_duration!("retain index: {}", {
+                        self.#indexes_nofd.retain(|&(#(#indexes_nofd_keys,)*), v| {
+                            if #indexes_nofd_key_is_root {
+                                v.retain(|&mut (#(#indexes_nofd_vals,)* _timestamp)| #indexes_nofd_value_is_root);
+                                true
+                            } else {
+                                false
+                            }
+                        });
+                    });
                     log_duration!("fill index: {}", {
                         for &(#(#indexes_nofd_cols,)*) in &self.new {
                             self.#indexes_nofd
@@ -751,33 +775,28 @@ fn update(
                                 .push((#(#indexes_nofd_vals,)* latest_timestamp,));
                         }
                     });
-                    log_duration!("retain index: {}", {
-                        self.#indexes_nofd.retain(|&(#(#indexes_nofd_keys,)*), v| {
-                            if #indexes_nofd_key_is_root {
-                                // can we combine retain and dedup here?
-                                v.retain(|&mut (#(#indexes_nofd_vals,)* _timestamp)| #indexes_nofd_value_is_root);
-                                v.sort_unstable();
-                                v.dedup_by(|
-                                    (#(#indexes_nofd_vals,)* t1,),
-                                    (#(#indexes_nofd_vals_alt,)* t2,),
-                                |{
-                                    // dedup_by passes arguments backwards but essentially does
-                                    // slice.windows(2)
-                                    // because the array is sorted, t1 >= t2
-                                    // this removes the highest timestamp, which is what we want.
 
-                                    //   potentially removed
-                                    //            v
-                                    // [_, _, t2, t1, _, _]
-                                    //
-                                    true #(& (*#indexes_nofd_vals == *#indexes_nofd_vals_alt))*
-                                });
-                                true
-                            } else {
-                                false
-                            }
+                    #[cfg(debug_assertions)]
+                    {
+                        self.#indexes_nofd.iter().for_each(|(&(#(#indexes_nofd_keys,)*), v)| {
+                            let mut v = v.clone();
+                            let n = v.len();
+                            v.sort();
+                            v.dedup_by(|
+                                (#(#indexes_nofd_vals,)* t1,),
+                                (#(#indexes_nofd_vals_alt,)* t2,),
+                            |{
+                                true #(& (*#indexes_nofd_vals == *#indexes_nofd_vals_alt))*
+                            });
+                            assert_eq!(n, v.len(), "indexes do not have duplicates");
+
+                            assert!(#indexes_nofd_key_is_root, "key is root");
+
+                            v.iter().copied().for_each(|(#(#indexes_nofd_vals,)* _timestamp)| {
+                                assert!(#indexes_nofd_value_is_root, "value is root");
+                            });
                         });
-                    });
+                    }
                 )*
                 #(  // Non-union functional dependency indexes, where merge is a panic or a primitive function.
 

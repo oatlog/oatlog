@@ -957,6 +957,26 @@ fn regression_tir2() {
                             RadixSortable::wrap(&mut self.new).voracious_sort();
                             self.new.dedup();
                         });
+                        #[cfg(debug_assertions)]
+                        {
+                            self.new.iter().for_each(|&(x0, x1, x2)| {
+                                assert_eq!(
+                                    (x0, x1, x2,),
+                                    (uf.math_.find(x0), uf.math_.find(x1), uf.math_.find(x2),),
+                                    "new is canonical"
+                                );
+                            });
+                        }
+                        log_duration!("retain index: {}", {
+                            self.hash_index_0_1_2.retain(|&(x0, x1, x2), v| {
+                                if uf.math_.is_root(x0) & uf.math_.is_root(x1) & uf.math_.is_root(x2) {
+                                    v.retain(|&mut (_timestamp)| true);
+                                    true
+                                } else {
+                                    false
+                                }
+                            });
+                        });
                         log_duration!("fill index: {}", {
                             for &(x0, x1, x2) in &self.new {
                                 self.hash_index_0_1_2
@@ -965,18 +985,23 @@ fn regression_tir2() {
                                     .push((latest_timestamp,));
                             }
                         });
-                        log_duration!("retain index: {}", {
-                            self.hash_index_0_1_2.retain(|&(x0, x1, x2), v| {
-                                if uf.math_.is_root(x0) & uf.math_.is_root(x1) & uf.math_.is_root(x2) {
-                                    v.retain(|&mut (_timestamp)| true);
-                                    v.sort_unstable();
-                                    v.dedup_by(|(t1,), (t2,)| true);
-                                    true
-                                } else {
-                                    false
-                                }
+                        #[cfg(debug_assertions)]
+                        {
+                            self.hash_index_0_1_2.iter().for_each(|(&(x0, x1, x2), v)| {
+                                let mut v = v.clone();
+                                let n = v.len();
+                                v.sort();
+                                v.dedup_by(|(t1,), (t2,)| true);
+                                assert_eq!(n, v.len(), "indexes do not have duplicates");
+                                assert!(
+                                    uf.math_.is_root(x0) & uf.math_.is_root(x1) & uf.math_.is_root(x2),
+                                    "key is root"
+                                );
+                                v.iter().copied().for_each(|(_timestamp)| {
+                                    assert!(true, "value is root");
+                                });
                             });
-                        });
+                        }
                     });
                     self.math_num_uprooted_at_latest_retain = 0;
                 }
@@ -1162,6 +1187,28 @@ fn regression_tir2() {
                             RadixSortable::wrap(&mut self.new).voracious_sort();
                             self.new.dedup();
                         });
+                        #[cfg(debug_assertions)]
+                        {
+                            self.new.iter().for_each(|&(x0, x1, x2)| {
+                                assert_eq!(
+                                    (x0, x1, x2,),
+                                    (uf.math_.find(x0), uf.math_.find(x1), uf.math_.find(x2),),
+                                    "new is canonical"
+                                );
+                            });
+                        }
+                        log_duration!("retain index: {}", {
+                            self.hash_index_1.retain(|&(x1,), v| {
+                                if uf.math_.is_root(x1) {
+                                    v.retain(|&mut (x0, x2, _timestamp)| {
+                                        uf.math_.is_root(x0) & uf.math_.is_root(x2)
+                                    });
+                                    true
+                                } else {
+                                    false
+                                }
+                            });
+                        });
                         log_duration!("fill index: {}", {
                             for &(x0, x1, x2) in &self.new {
                                 self.hash_index_1
@@ -1170,14 +1217,24 @@ fn regression_tir2() {
                                     .push((x0, x2, latest_timestamp));
                             }
                         });
+                        #[cfg(debug_assertions)]
+                        {
+                            self.hash_index_1.iter().for_each(|(&(x1,), v)| {
+                                let mut v = v.clone();
+                                let n = v.len();
+                                v.sort();
+                                v.dedup_by(|(x0, x2, t1), (y0, y2, t2)| true & (*x0 == *y0) & (*x2 == *y2));
+                                assert_eq!(n, v.len(), "indexes do not have duplicates");
+                                assert!(uf.math_.is_root(x1), "key is root");
+                                v.iter().copied().for_each(|(x0, x2, _timestamp)| {
+                                    assert!(uf.math_.is_root(x0) & uf.math_.is_root(x2), "value is root");
+                                });
+                            });
+                        }
                         log_duration!("retain index: {}", {
-                            self.hash_index_1.retain(|&(x1,), v| {
-                                if uf.math_.is_root(x1) {
-                                    v.retain(|&mut (x0, x2, _timestamp)| {
-                                        uf.math_.is_root(x0) & uf.math_.is_root(x2)
-                                    });
-                                    v.sort_unstable();
-                                    v.dedup_by(|(x0, x2, t1), (y0, y2, t2)| true & (*x0 == *y0) & (*x2 == *y2));
+                            self.hash_index_1_0_2.retain(|&(x1, x0, x2), v| {
+                                if uf.math_.is_root(x1) & uf.math_.is_root(x0) & uf.math_.is_root(x2) {
+                                    v.retain(|&mut (_timestamp)| true);
                                     true
                                 } else {
                                     false
@@ -1192,18 +1249,23 @@ fn regression_tir2() {
                                     .push((latest_timestamp,));
                             }
                         });
-                        log_duration!("retain index: {}", {
-                            self.hash_index_1_0_2.retain(|&(x1, x0, x2), v| {
-                                if uf.math_.is_root(x1) & uf.math_.is_root(x0) & uf.math_.is_root(x2) {
-                                    v.retain(|&mut (_timestamp)| true);
-                                    v.sort_unstable();
-                                    v.dedup_by(|(t1,), (t2,)| true);
-                                    true
-                                } else {
-                                    false
-                                }
+                        #[cfg(debug_assertions)]
+                        {
+                            self.hash_index_1_0_2.iter().for_each(|(&(x1, x0, x2), v)| {
+                                let mut v = v.clone();
+                                let n = v.len();
+                                v.sort();
+                                v.dedup_by(|(t1,), (t2,)| true);
+                                assert_eq!(n, v.len(), "indexes do not have duplicates");
+                                assert!(
+                                    uf.math_.is_root(x1) & uf.math_.is_root(x0) & uf.math_.is_root(x2),
+                                    "key is root"
+                                );
+                                v.iter().copied().for_each(|(_timestamp)| {
+                                    assert!(true, "value is root");
+                                });
                             });
-                        });
+                        }
                     });
                     self.math_num_uprooted_at_latest_retain = 0;
                 }
@@ -1412,6 +1474,22 @@ fn regression_tir2() {
                             self.new.sort_unstable();
                             self.new.dedup();
                         });
+                        #[cfg(debug_assertions)]
+                        {
+                            self.new.iter().for_each(|&(x0, x1)| {
+                                assert_eq!((x0, x1,), (x0, uf.math_.find(x1),), "new is canonical");
+                            });
+                        }
+                        log_duration!("retain index: {}", {
+                            self.hash_index_1.retain(|&(x1,), v| {
+                                if uf.math_.is_root(x1) {
+                                    v.retain(|&mut (x0, _timestamp)| true);
+                                    true
+                                } else {
+                                    false
+                                }
+                            });
+                        });
                         log_duration!("fill index: {}", {
                             for &(x0, x1) in &self.new {
                                 self.hash_index_1
@@ -1420,12 +1498,24 @@ fn regression_tir2() {
                                     .push((x0, latest_timestamp));
                             }
                         });
+                        #[cfg(debug_assertions)]
+                        {
+                            self.hash_index_1.iter().for_each(|(&(x1,), v)| {
+                                let mut v = v.clone();
+                                let n = v.len();
+                                v.sort();
+                                v.dedup_by(|(x0, t1), (y0, t2)| true & (*x0 == *y0));
+                                assert_eq!(n, v.len(), "indexes do not have duplicates");
+                                assert!(uf.math_.is_root(x1), "key is root");
+                                v.iter().copied().for_each(|(x0, _timestamp)| {
+                                    assert!(true, "value is root");
+                                });
+                            });
+                        }
                         log_duration!("retain index: {}", {
-                            self.hash_index_1.retain(|&(x1,), v| {
+                            self.hash_index_0_1.retain(|&(x0, x1), v| {
                                 if uf.math_.is_root(x1) {
-                                    v.retain(|&mut (x0, _timestamp)| true);
-                                    v.sort_unstable();
-                                    v.dedup_by(|(x0, t1), (y0, t2)| true & (*x0 == *y0));
+                                    v.retain(|&mut (_timestamp)| true);
                                     true
                                 } else {
                                     false
@@ -1440,18 +1530,20 @@ fn regression_tir2() {
                                     .push((latest_timestamp,));
                             }
                         });
-                        log_duration!("retain index: {}", {
-                            self.hash_index_0_1.retain(|&(x0, x1), v| {
-                                if uf.math_.is_root(x1) {
-                                    v.retain(|&mut (_timestamp)| true);
-                                    v.sort_unstable();
-                                    v.dedup_by(|(t1,), (t2,)| true);
-                                    true
-                                } else {
-                                    false
-                                }
+                        #[cfg(debug_assertions)]
+                        {
+                            self.hash_index_0_1.iter().for_each(|(&(x0, x1), v)| {
+                                let mut v = v.clone();
+                                let n = v.len();
+                                v.sort();
+                                v.dedup_by(|(t1,), (t2,)| true);
+                                assert_eq!(n, v.len(), "indexes do not have duplicates");
+                                assert!(uf.math_.is_root(x1), "key is root");
+                                v.iter().copied().for_each(|(_timestamp)| {
+                                    assert!(true, "value is root");
+                                });
                             });
-                        });
+                        }
                     });
                     self.math_num_uprooted_at_latest_retain = 0;
                 }
@@ -2043,6 +2135,26 @@ fn regression_tir1() {
                             RadixSortable::wrap(&mut self.new).voracious_sort();
                             self.new.dedup();
                         });
+                        #[cfg(debug_assertions)]
+                        {
+                            self.new.iter().for_each(|&(x0, x1, x2)| {
+                                assert_eq!(
+                                    (x0, x1, x2,),
+                                    (uf.math_.find(x0), uf.math_.find(x1), uf.math_.find(x2),),
+                                    "new is canonical"
+                                );
+                            });
+                        }
+                        log_duration!("retain index: {}", {
+                            self.hash_index_0_1_2.retain(|&(x0, x1, x2), v| {
+                                if uf.math_.is_root(x0) & uf.math_.is_root(x1) & uf.math_.is_root(x2) {
+                                    v.retain(|&mut (_timestamp)| true);
+                                    true
+                                } else {
+                                    false
+                                }
+                            });
+                        });
                         log_duration!("fill index: {}", {
                             for &(x0, x1, x2) in &self.new {
                                 self.hash_index_0_1_2
@@ -2051,18 +2163,23 @@ fn regression_tir1() {
                                     .push((latest_timestamp,));
                             }
                         });
-                        log_duration!("retain index: {}", {
-                            self.hash_index_0_1_2.retain(|&(x0, x1, x2), v| {
-                                if uf.math_.is_root(x0) & uf.math_.is_root(x1) & uf.math_.is_root(x2) {
-                                    v.retain(|&mut (_timestamp)| true);
-                                    v.sort_unstable();
-                                    v.dedup_by(|(t1,), (t2,)| true);
-                                    true
-                                } else {
-                                    false
-                                }
+                        #[cfg(debug_assertions)]
+                        {
+                            self.hash_index_0_1_2.iter().for_each(|(&(x0, x1, x2), v)| {
+                                let mut v = v.clone();
+                                let n = v.len();
+                                v.sort();
+                                v.dedup_by(|(t1,), (t2,)| true);
+                                assert_eq!(n, v.len(), "indexes do not have duplicates");
+                                assert!(
+                                    uf.math_.is_root(x0) & uf.math_.is_root(x1) & uf.math_.is_root(x2),
+                                    "key is root"
+                                );
+                                v.iter().copied().for_each(|(_timestamp)| {
+                                    assert!(true, "value is root");
+                                });
                             });
-                        });
+                        }
                     });
                     self.math_num_uprooted_at_latest_retain = 0;
                 }
@@ -2244,6 +2361,22 @@ fn regression_tir1() {
                             self.new.sort_unstable();
                             self.new.dedup();
                         });
+                        #[cfg(debug_assertions)]
+                        {
+                            self.new.iter().for_each(|&(x0, x1)| {
+                                assert_eq!((x0, x1,), (x0, uf.math_.find(x1),), "new is canonical");
+                            });
+                        }
+                        log_duration!("retain index: {}", {
+                            self.hash_index_0_1.retain(|&(x0, x1), v| {
+                                if uf.math_.is_root(x1) {
+                                    v.retain(|&mut (_timestamp)| true);
+                                    true
+                                } else {
+                                    false
+                                }
+                            });
+                        });
                         log_duration!("fill index: {}", {
                             for &(x0, x1) in &self.new {
                                 self.hash_index_0_1
@@ -2252,18 +2385,20 @@ fn regression_tir1() {
                                     .push((latest_timestamp,));
                             }
                         });
-                        log_duration!("retain index: {}", {
-                            self.hash_index_0_1.retain(|&(x0, x1), v| {
-                                if uf.math_.is_root(x1) {
-                                    v.retain(|&mut (_timestamp)| true);
-                                    v.sort_unstable();
-                                    v.dedup_by(|(t1,), (t2,)| true);
-                                    true
-                                } else {
-                                    false
-                                }
+                        #[cfg(debug_assertions)]
+                        {
+                            self.hash_index_0_1.iter().for_each(|(&(x0, x1), v)| {
+                                let mut v = v.clone();
+                                let n = v.len();
+                                v.sort();
+                                v.dedup_by(|(t1,), (t2,)| true);
+                                assert_eq!(n, v.len(), "indexes do not have duplicates");
+                                assert!(uf.math_.is_root(x1), "key is root");
+                                v.iter().copied().for_each(|(_timestamp)| {
+                                    assert!(true, "value is root");
+                                });
                             });
-                        });
+                        }
                     });
                     self.math_num_uprooted_at_latest_retain = 0;
                 }
@@ -2960,6 +3095,28 @@ fn codegen_constant_propagation() {
                             RadixSortable::wrap(&mut self.new).voracious_sort();
                             self.new.dedup();
                         });
+                        #[cfg(debug_assertions)]
+                        {
+                            self.new.iter().for_each(|&(x0, x1, x2)| {
+                                assert_eq!(
+                                    (x0, x1, x2,),
+                                    (uf.math_.find(x0), uf.math_.find(x1), uf.math_.find(x2),),
+                                    "new is canonical"
+                                );
+                            });
+                        }
+                        log_duration!("retain index: {}", {
+                            self.hash_index_0.retain(|&(x0,), v| {
+                                if uf.math_.is_root(x0) {
+                                    v.retain(|&mut (x1, x2, _timestamp)| {
+                                        uf.math_.is_root(x1) & uf.math_.is_root(x2)
+                                    });
+                                    true
+                                } else {
+                                    false
+                                }
+                            });
+                        });
                         log_duration!("fill index: {}", {
                             for &(x0, x1, x2) in &self.new {
                                 self.hash_index_0
@@ -2968,14 +3125,26 @@ fn codegen_constant_propagation() {
                                     .push((x1, x2, latest_timestamp));
                             }
                         });
+                        #[cfg(debug_assertions)]
+                        {
+                            self.hash_index_0.iter().for_each(|(&(x0,), v)| {
+                                let mut v = v.clone();
+                                let n = v.len();
+                                v.sort();
+                                v.dedup_by(|(x1, x2, t1), (y1, y2, t2)| true & (*x1 == *y1) & (*x2 == *y2));
+                                assert_eq!(n, v.len(), "indexes do not have duplicates");
+                                assert!(uf.math_.is_root(x0), "key is root");
+                                v.iter().copied().for_each(|(x1, x2, _timestamp)| {
+                                    assert!(uf.math_.is_root(x1) & uf.math_.is_root(x2), "value is root");
+                                });
+                            });
+                        }
                         log_duration!("retain index: {}", {
-                            self.hash_index_0.retain(|&(x0,), v| {
-                                if uf.math_.is_root(x0) {
-                                    v.retain(|&mut (x1, x2, _timestamp)| {
-                                        uf.math_.is_root(x1) & uf.math_.is_root(x2)
+                            self.hash_index_1.retain(|&(x1,), v| {
+                                if uf.math_.is_root(x1) {
+                                    v.retain(|&mut (x0, x2, _timestamp)| {
+                                        uf.math_.is_root(x0) & uf.math_.is_root(x2)
                                     });
-                                    v.sort_unstable();
-                                    v.dedup_by(|(x1, x2, t1), (y1, y2, t2)| true & (*x1 == *y1) & (*x2 == *y2));
                                     true
                                 } else {
                                     false
@@ -2990,14 +3159,24 @@ fn codegen_constant_propagation() {
                                     .push((x0, x2, latest_timestamp));
                             }
                         });
+                        #[cfg(debug_assertions)]
+                        {
+                            self.hash_index_1.iter().for_each(|(&(x1,), v)| {
+                                let mut v = v.clone();
+                                let n = v.len();
+                                v.sort();
+                                v.dedup_by(|(x0, x2, t1), (y0, y2, t2)| true & (*x0 == *y0) & (*x2 == *y2));
+                                assert_eq!(n, v.len(), "indexes do not have duplicates");
+                                assert!(uf.math_.is_root(x1), "key is root");
+                                v.iter().copied().for_each(|(x0, x2, _timestamp)| {
+                                    assert!(uf.math_.is_root(x0) & uf.math_.is_root(x2), "value is root");
+                                });
+                            });
+                        }
                         log_duration!("retain index: {}", {
-                            self.hash_index_1.retain(|&(x1,), v| {
-                                if uf.math_.is_root(x1) {
-                                    v.retain(|&mut (x0, x2, _timestamp)| {
-                                        uf.math_.is_root(x0) & uf.math_.is_root(x2)
-                                    });
-                                    v.sort_unstable();
-                                    v.dedup_by(|(x0, x2, t1), (y0, y2, t2)| true & (*x0 == *y0) & (*x2 == *y2));
+                            self.hash_index_0_1_2.retain(|&(x0, x1, x2), v| {
+                                if uf.math_.is_root(x0) & uf.math_.is_root(x1) & uf.math_.is_root(x2) {
+                                    v.retain(|&mut (_timestamp)| true);
                                     true
                                 } else {
                                     false
@@ -3012,18 +3191,23 @@ fn codegen_constant_propagation() {
                                     .push((latest_timestamp,));
                             }
                         });
-                        log_duration!("retain index: {}", {
-                            self.hash_index_0_1_2.retain(|&(x0, x1, x2), v| {
-                                if uf.math_.is_root(x0) & uf.math_.is_root(x1) & uf.math_.is_root(x2) {
-                                    v.retain(|&mut (_timestamp)| true);
-                                    v.sort_unstable();
-                                    v.dedup_by(|(t1,), (t2,)| true);
-                                    true
-                                } else {
-                                    false
-                                }
+                        #[cfg(debug_assertions)]
+                        {
+                            self.hash_index_0_1_2.iter().for_each(|(&(x0, x1, x2), v)| {
+                                let mut v = v.clone();
+                                let n = v.len();
+                                v.sort();
+                                v.dedup_by(|(t1,), (t2,)| true);
+                                assert_eq!(n, v.len(), "indexes do not have duplicates");
+                                assert!(
+                                    uf.math_.is_root(x0) & uf.math_.is_root(x1) & uf.math_.is_root(x2),
+                                    "key is root"
+                                );
+                                v.iter().copied().for_each(|(_timestamp)| {
+                                    assert!(true, "value is root");
+                                });
                             });
-                        });
+                        }
                     });
                     self.math_num_uprooted_at_latest_retain = 0;
                 }
@@ -3260,6 +3444,28 @@ fn codegen_constant_propagation() {
                             RadixSortable::wrap(&mut self.new).voracious_sort();
                             self.new.dedup();
                         });
+                        #[cfg(debug_assertions)]
+                        {
+                            self.new.iter().for_each(|&(x0, x1, x2)| {
+                                assert_eq!(
+                                    (x0, x1, x2,),
+                                    (uf.math_.find(x0), uf.math_.find(x1), uf.math_.find(x2),),
+                                    "new is canonical"
+                                );
+                            });
+                        }
+                        log_duration!("retain index: {}", {
+                            self.hash_index_0.retain(|&(x0,), v| {
+                                if uf.math_.is_root(x0) {
+                                    v.retain(|&mut (x1, x2, _timestamp)| {
+                                        uf.math_.is_root(x1) & uf.math_.is_root(x2)
+                                    });
+                                    true
+                                } else {
+                                    false
+                                }
+                            });
+                        });
                         log_duration!("fill index: {}", {
                             for &(x0, x1, x2) in &self.new {
                                 self.hash_index_0
@@ -3268,14 +3474,26 @@ fn codegen_constant_propagation() {
                                     .push((x1, x2, latest_timestamp));
                             }
                         });
+                        #[cfg(debug_assertions)]
+                        {
+                            self.hash_index_0.iter().for_each(|(&(x0,), v)| {
+                                let mut v = v.clone();
+                                let n = v.len();
+                                v.sort();
+                                v.dedup_by(|(x1, x2, t1), (y1, y2, t2)| true & (*x1 == *y1) & (*x2 == *y2));
+                                assert_eq!(n, v.len(), "indexes do not have duplicates");
+                                assert!(uf.math_.is_root(x0), "key is root");
+                                v.iter().copied().for_each(|(x1, x2, _timestamp)| {
+                                    assert!(uf.math_.is_root(x1) & uf.math_.is_root(x2), "value is root");
+                                });
+                            });
+                        }
                         log_duration!("retain index: {}", {
-                            self.hash_index_0.retain(|&(x0,), v| {
-                                if uf.math_.is_root(x0) {
-                                    v.retain(|&mut (x1, x2, _timestamp)| {
-                                        uf.math_.is_root(x1) & uf.math_.is_root(x2)
+                            self.hash_index_1.retain(|&(x1,), v| {
+                                if uf.math_.is_root(x1) {
+                                    v.retain(|&mut (x0, x2, _timestamp)| {
+                                        uf.math_.is_root(x0) & uf.math_.is_root(x2)
                                     });
-                                    v.sort_unstable();
-                                    v.dedup_by(|(x1, x2, t1), (y1, y2, t2)| true & (*x1 == *y1) & (*x2 == *y2));
                                     true
                                 } else {
                                     false
@@ -3290,14 +3508,24 @@ fn codegen_constant_propagation() {
                                     .push((x0, x2, latest_timestamp));
                             }
                         });
+                        #[cfg(debug_assertions)]
+                        {
+                            self.hash_index_1.iter().for_each(|(&(x1,), v)| {
+                                let mut v = v.clone();
+                                let n = v.len();
+                                v.sort();
+                                v.dedup_by(|(x0, x2, t1), (y0, y2, t2)| true & (*x0 == *y0) & (*x2 == *y2));
+                                assert_eq!(n, v.len(), "indexes do not have duplicates");
+                                assert!(uf.math_.is_root(x1), "key is root");
+                                v.iter().copied().for_each(|(x0, x2, _timestamp)| {
+                                    assert!(uf.math_.is_root(x0) & uf.math_.is_root(x2), "value is root");
+                                });
+                            });
+                        }
                         log_duration!("retain index: {}", {
-                            self.hash_index_1.retain(|&(x1,), v| {
-                                if uf.math_.is_root(x1) {
-                                    v.retain(|&mut (x0, x2, _timestamp)| {
-                                        uf.math_.is_root(x0) & uf.math_.is_root(x2)
-                                    });
-                                    v.sort_unstable();
-                                    v.dedup_by(|(x0, x2, t1), (y0, y2, t2)| true & (*x0 == *y0) & (*x2 == *y2));
+                            self.hash_index_0_1_2.retain(|&(x0, x1, x2), v| {
+                                if uf.math_.is_root(x0) & uf.math_.is_root(x1) & uf.math_.is_root(x2) {
+                                    v.retain(|&mut (_timestamp)| true);
                                     true
                                 } else {
                                     false
@@ -3312,18 +3540,23 @@ fn codegen_constant_propagation() {
                                     .push((latest_timestamp,));
                             }
                         });
-                        log_duration!("retain index: {}", {
-                            self.hash_index_0_1_2.retain(|&(x0, x1, x2), v| {
-                                if uf.math_.is_root(x0) & uf.math_.is_root(x1) & uf.math_.is_root(x2) {
-                                    v.retain(|&mut (_timestamp)| true);
-                                    v.sort_unstable();
-                                    v.dedup_by(|(t1,), (t2,)| true);
-                                    true
-                                } else {
-                                    false
-                                }
+                        #[cfg(debug_assertions)]
+                        {
+                            self.hash_index_0_1_2.iter().for_each(|(&(x0, x1, x2), v)| {
+                                let mut v = v.clone();
+                                let n = v.len();
+                                v.sort();
+                                v.dedup_by(|(t1,), (t2,)| true);
+                                assert_eq!(n, v.len(), "indexes do not have duplicates");
+                                assert!(
+                                    uf.math_.is_root(x0) & uf.math_.is_root(x1) & uf.math_.is_root(x2),
+                                    "key is root"
+                                );
+                                v.iter().copied().for_each(|(_timestamp)| {
+                                    assert!(true, "value is root");
+                                });
                             });
-                        });
+                        }
                     });
                     self.math_num_uprooted_at_latest_retain = 0;
                 }
@@ -3557,6 +3790,22 @@ fn codegen_constant_propagation() {
                             self.new.sort_unstable();
                             self.new.dedup();
                         });
+                        #[cfg(debug_assertions)]
+                        {
+                            self.new.iter().for_each(|&(x0, x1)| {
+                                assert_eq!((x0, x1,), (x0, uf.math_.find(x1),), "new is canonical");
+                            });
+                        }
+                        log_duration!("retain index: {}", {
+                            self.hash_index_1.retain(|&(x1,), v| {
+                                if uf.math_.is_root(x1) {
+                                    v.retain(|&mut (x0, _timestamp)| true);
+                                    true
+                                } else {
+                                    false
+                                }
+                            });
+                        });
                         log_duration!("fill index: {}", {
                             for &(x0, x1) in &self.new {
                                 self.hash_index_1
@@ -3565,12 +3814,24 @@ fn codegen_constant_propagation() {
                                     .push((x0, latest_timestamp));
                             }
                         });
+                        #[cfg(debug_assertions)]
+                        {
+                            self.hash_index_1.iter().for_each(|(&(x1,), v)| {
+                                let mut v = v.clone();
+                                let n = v.len();
+                                v.sort();
+                                v.dedup_by(|(x0, t1), (y0, t2)| true & (*x0 == *y0));
+                                assert_eq!(n, v.len(), "indexes do not have duplicates");
+                                assert!(uf.math_.is_root(x1), "key is root");
+                                v.iter().copied().for_each(|(x0, _timestamp)| {
+                                    assert!(true, "value is root");
+                                });
+                            });
+                        }
                         log_duration!("retain index: {}", {
-                            self.hash_index_1.retain(|&(x1,), v| {
+                            self.hash_index_0_1.retain(|&(x0, x1), v| {
                                 if uf.math_.is_root(x1) {
-                                    v.retain(|&mut (x0, _timestamp)| true);
-                                    v.sort_unstable();
-                                    v.dedup_by(|(x0, t1), (y0, t2)| true & (*x0 == *y0));
+                                    v.retain(|&mut (_timestamp)| true);
                                     true
                                 } else {
                                     false
@@ -3585,18 +3846,20 @@ fn codegen_constant_propagation() {
                                     .push((latest_timestamp,));
                             }
                         });
-                        log_duration!("retain index: {}", {
-                            self.hash_index_0_1.retain(|&(x0, x1), v| {
-                                if uf.math_.is_root(x1) {
-                                    v.retain(|&mut (_timestamp)| true);
-                                    v.sort_unstable();
-                                    v.dedup_by(|(t1,), (t2,)| true);
-                                    true
-                                } else {
-                                    false
-                                }
+                        #[cfg(debug_assertions)]
+                        {
+                            self.hash_index_0_1.iter().for_each(|(&(x0, x1), v)| {
+                                let mut v = v.clone();
+                                let n = v.len();
+                                v.sort();
+                                v.dedup_by(|(t1,), (t2,)| true);
+                                assert_eq!(n, v.len(), "indexes do not have duplicates");
+                                assert!(uf.math_.is_root(x1), "key is root");
+                                v.iter().copied().for_each(|(_timestamp)| {
+                                    assert!(true, "value is root");
+                                });
                             });
-                        });
+                        }
                     });
                     self.math_num_uprooted_at_latest_retain = 0;
                 }
@@ -4072,6 +4335,26 @@ fn codegen_commutative() {
                             RadixSortable::wrap(&mut self.new).voracious_sort();
                             self.new.dedup();
                         });
+                        #[cfg(debug_assertions)]
+                        {
+                            self.new.iter().for_each(|&(x0, x1, x2)| {
+                                assert_eq!(
+                                    (x0, x1, x2,),
+                                    (uf.math_.find(x0), uf.math_.find(x1), uf.math_.find(x2),),
+                                    "new is canonical"
+                                );
+                            });
+                        }
+                        log_duration!("retain index: {}", {
+                            self.hash_index_0_1_2.retain(|&(x0, x1, x2), v| {
+                                if uf.math_.is_root(x0) & uf.math_.is_root(x1) & uf.math_.is_root(x2) {
+                                    v.retain(|&mut (_timestamp)| true);
+                                    true
+                                } else {
+                                    false
+                                }
+                            });
+                        });
                         log_duration!("fill index: {}", {
                             for &(x0, x1, x2) in &self.new {
                                 self.hash_index_0_1_2
@@ -4080,18 +4363,23 @@ fn codegen_commutative() {
                                     .push((latest_timestamp,));
                             }
                         });
-                        log_duration!("retain index: {}", {
-                            self.hash_index_0_1_2.retain(|&(x0, x1, x2), v| {
-                                if uf.math_.is_root(x0) & uf.math_.is_root(x1) & uf.math_.is_root(x2) {
-                                    v.retain(|&mut (_timestamp)| true);
-                                    v.sort_unstable();
-                                    v.dedup_by(|(t1,), (t2,)| true);
-                                    true
-                                } else {
-                                    false
-                                }
+                        #[cfg(debug_assertions)]
+                        {
+                            self.hash_index_0_1_2.iter().for_each(|(&(x0, x1, x2), v)| {
+                                let mut v = v.clone();
+                                let n = v.len();
+                                v.sort();
+                                v.dedup_by(|(t1,), (t2,)| true);
+                                assert_eq!(n, v.len(), "indexes do not have duplicates");
+                                assert!(
+                                    uf.math_.is_root(x0) & uf.math_.is_root(x1) & uf.math_.is_root(x2),
+                                    "key is root"
+                                );
+                                v.iter().copied().for_each(|(_timestamp)| {
+                                    assert!(true, "value is root");
+                                });
                             });
-                        });
+                        }
                     });
                     self.math_num_uprooted_at_latest_retain = 0;
                 }
@@ -4532,6 +4820,26 @@ fn regression_entry2() {
                             RadixSortable::wrap(&mut self.new).voracious_sort();
                             self.new.dedup();
                         });
+                        #[cfg(debug_assertions)]
+                        {
+                            self.new.iter().for_each(|&(x0, x1, x2)| {
+                                assert_eq!(
+                                    (x0, x1, x2,),
+                                    (uf.math_.find(x0), uf.math_.find(x1), uf.math_.find(x2),),
+                                    "new is canonical"
+                                );
+                            });
+                        }
+                        log_duration!("retain index: {}", {
+                            self.hash_index_0_1_2.retain(|&(x0, x1, x2), v| {
+                                if uf.math_.is_root(x0) & uf.math_.is_root(x1) & uf.math_.is_root(x2) {
+                                    v.retain(|&mut (_timestamp)| true);
+                                    true
+                                } else {
+                                    false
+                                }
+                            });
+                        });
                         log_duration!("fill index: {}", {
                             for &(x0, x1, x2) in &self.new {
                                 self.hash_index_0_1_2
@@ -4540,18 +4848,23 @@ fn regression_entry2() {
                                     .push((latest_timestamp,));
                             }
                         });
-                        log_duration!("retain index: {}", {
-                            self.hash_index_0_1_2.retain(|&(x0, x1, x2), v| {
-                                if uf.math_.is_root(x0) & uf.math_.is_root(x1) & uf.math_.is_root(x2) {
-                                    v.retain(|&mut (_timestamp)| true);
-                                    v.sort_unstable();
-                                    v.dedup_by(|(t1,), (t2,)| true);
-                                    true
-                                } else {
-                                    false
-                                }
+                        #[cfg(debug_assertions)]
+                        {
+                            self.hash_index_0_1_2.iter().for_each(|(&(x0, x1, x2), v)| {
+                                let mut v = v.clone();
+                                let n = v.len();
+                                v.sort();
+                                v.dedup_by(|(t1,), (t2,)| true);
+                                assert_eq!(n, v.len(), "indexes do not have duplicates");
+                                assert!(
+                                    uf.math_.is_root(x0) & uf.math_.is_root(x1) & uf.math_.is_root(x2),
+                                    "key is root"
+                                );
+                                v.iter().copied().for_each(|(_timestamp)| {
+                                    assert!(true, "value is root");
+                                });
                             });
-                        });
+                        }
                     });
                     self.math_num_uprooted_at_latest_retain = 0;
                 }
@@ -4733,6 +5046,22 @@ fn regression_entry2() {
                             self.new.sort_unstable();
                             self.new.dedup();
                         });
+                        #[cfg(debug_assertions)]
+                        {
+                            self.new.iter().for_each(|&(x0, x1)| {
+                                assert_eq!((x0, x1,), (x0, uf.math_.find(x1),), "new is canonical");
+                            });
+                        }
+                        log_duration!("retain index: {}", {
+                            self.hash_index_0_1.retain(|&(x0, x1), v| {
+                                if uf.math_.is_root(x1) {
+                                    v.retain(|&mut (_timestamp)| true);
+                                    true
+                                } else {
+                                    false
+                                }
+                            });
+                        });
                         log_duration!("fill index: {}", {
                             for &(x0, x1) in &self.new {
                                 self.hash_index_0_1
@@ -4741,18 +5070,20 @@ fn regression_entry2() {
                                     .push((latest_timestamp,));
                             }
                         });
-                        log_duration!("retain index: {}", {
-                            self.hash_index_0_1.retain(|&(x0, x1), v| {
-                                if uf.math_.is_root(x1) {
-                                    v.retain(|&mut (_timestamp)| true);
-                                    v.sort_unstable();
-                                    v.dedup_by(|(t1,), (t2,)| true);
-                                    true
-                                } else {
-                                    false
-                                }
+                        #[cfg(debug_assertions)]
+                        {
+                            self.hash_index_0_1.iter().for_each(|(&(x0, x1), v)| {
+                                let mut v = v.clone();
+                                let n = v.len();
+                                v.sort();
+                                v.dedup_by(|(t1,), (t2,)| true);
+                                assert_eq!(n, v.len(), "indexes do not have duplicates");
+                                assert!(uf.math_.is_root(x1), "key is root");
+                                v.iter().copied().for_each(|(_timestamp)| {
+                                    assert!(true, "value is root");
+                                });
                             });
-                        });
+                        }
                     });
                     self.math_num_uprooted_at_latest_retain = 0;
                 }
@@ -5214,6 +5545,26 @@ fn regression_entry() {
                             RadixSortable::wrap(&mut self.new).voracious_sort();
                             self.new.dedup();
                         });
+                        #[cfg(debug_assertions)]
+                        {
+                            self.new.iter().for_each(|&(x0, x1, x2)| {
+                                assert_eq!(
+                                    (x0, x1, x2,),
+                                    (uf.math_.find(x0), uf.math_.find(x1), uf.math_.find(x2),),
+                                    "new is canonical"
+                                );
+                            });
+                        }
+                        log_duration!("retain index: {}", {
+                            self.hash_index_0_1_2.retain(|&(x0, x1, x2), v| {
+                                if uf.math_.is_root(x0) & uf.math_.is_root(x1) & uf.math_.is_root(x2) {
+                                    v.retain(|&mut (_timestamp)| true);
+                                    true
+                                } else {
+                                    false
+                                }
+                            });
+                        });
                         log_duration!("fill index: {}", {
                             for &(x0, x1, x2) in &self.new {
                                 self.hash_index_0_1_2
@@ -5222,18 +5573,23 @@ fn regression_entry() {
                                     .push((latest_timestamp,));
                             }
                         });
-                        log_duration!("retain index: {}", {
-                            self.hash_index_0_1_2.retain(|&(x0, x1, x2), v| {
-                                if uf.math_.is_root(x0) & uf.math_.is_root(x1) & uf.math_.is_root(x2) {
-                                    v.retain(|&mut (_timestamp)| true);
-                                    v.sort_unstable();
-                                    v.dedup_by(|(t1,), (t2,)| true);
-                                    true
-                                } else {
-                                    false
-                                }
+                        #[cfg(debug_assertions)]
+                        {
+                            self.hash_index_0_1_2.iter().for_each(|(&(x0, x1, x2), v)| {
+                                let mut v = v.clone();
+                                let n = v.len();
+                                v.sort();
+                                v.dedup_by(|(t1,), (t2,)| true);
+                                assert_eq!(n, v.len(), "indexes do not have duplicates");
+                                assert!(
+                                    uf.math_.is_root(x0) & uf.math_.is_root(x1) & uf.math_.is_root(x2),
+                                    "key is root"
+                                );
+                                v.iter().copied().for_each(|(_timestamp)| {
+                                    assert!(true, "value is root");
+                                });
                             });
-                        });
+                        }
                     });
                     self.math_num_uprooted_at_latest_retain = 0;
                 }
@@ -5418,6 +5774,26 @@ fn regression_entry() {
                             RadixSortable::wrap(&mut self.new).voracious_sort();
                             self.new.dedup();
                         });
+                        #[cfg(debug_assertions)]
+                        {
+                            self.new.iter().for_each(|&(x0, x1, x2)| {
+                                assert_eq!(
+                                    (x0, x1, x2,),
+                                    (uf.math_.find(x0), uf.math_.find(x1), uf.math_.find(x2),),
+                                    "new is canonical"
+                                );
+                            });
+                        }
+                        log_duration!("retain index: {}", {
+                            self.hash_index_0_1_2.retain(|&(x0, x1, x2), v| {
+                                if uf.math_.is_root(x0) & uf.math_.is_root(x1) & uf.math_.is_root(x2) {
+                                    v.retain(|&mut (_timestamp)| true);
+                                    true
+                                } else {
+                                    false
+                                }
+                            });
+                        });
                         log_duration!("fill index: {}", {
                             for &(x0, x1, x2) in &self.new {
                                 self.hash_index_0_1_2
@@ -5426,18 +5802,23 @@ fn regression_entry() {
                                     .push((latest_timestamp,));
                             }
                         });
-                        log_duration!("retain index: {}", {
-                            self.hash_index_0_1_2.retain(|&(x0, x1, x2), v| {
-                                if uf.math_.is_root(x0) & uf.math_.is_root(x1) & uf.math_.is_root(x2) {
-                                    v.retain(|&mut (_timestamp)| true);
-                                    v.sort_unstable();
-                                    v.dedup_by(|(t1,), (t2,)| true);
-                                    true
-                                } else {
-                                    false
-                                }
+                        #[cfg(debug_assertions)]
+                        {
+                            self.hash_index_0_1_2.iter().for_each(|(&(x0, x1, x2), v)| {
+                                let mut v = v.clone();
+                                let n = v.len();
+                                v.sort();
+                                v.dedup_by(|(t1,), (t2,)| true);
+                                assert_eq!(n, v.len(), "indexes do not have duplicates");
+                                assert!(
+                                    uf.math_.is_root(x0) & uf.math_.is_root(x1) & uf.math_.is_root(x2),
+                                    "key is root"
+                                );
+                                v.iter().copied().for_each(|(_timestamp)| {
+                                    assert!(true, "value is root");
+                                });
                             });
-                        });
+                        }
                     });
                     self.math_num_uprooted_at_latest_retain = 0;
                 }
@@ -5878,6 +6259,26 @@ fn test_bind_variable_multiple_times() {
                             RadixSortable::wrap(&mut self.new).voracious_sort();
                             self.new.dedup();
                         });
+                        #[cfg(debug_assertions)]
+                        {
+                            self.new.iter().for_each(|&(x0, x1, x2)| {
+                                assert_eq!(
+                                    (x0, x1, x2,),
+                                    (uf.foo_.find(x0), uf.foo_.find(x1), uf.foo_.find(x2),),
+                                    "new is canonical"
+                                );
+                            });
+                        }
+                        log_duration!("retain index: {}", {
+                            self.hash_index_0_1_2.retain(|&(x0, x1, x2), v| {
+                                if uf.foo_.is_root(x0) & uf.foo_.is_root(x1) & uf.foo_.is_root(x2) {
+                                    v.retain(|&mut (_timestamp)| true);
+                                    true
+                                } else {
+                                    false
+                                }
+                            });
+                        });
                         log_duration!("fill index: {}", {
                             for &(x0, x1, x2) in &self.new {
                                 self.hash_index_0_1_2
@@ -5886,18 +6287,23 @@ fn test_bind_variable_multiple_times() {
                                     .push((latest_timestamp,));
                             }
                         });
-                        log_duration!("retain index: {}", {
-                            self.hash_index_0_1_2.retain(|&(x0, x1, x2), v| {
-                                if uf.foo_.is_root(x0) & uf.foo_.is_root(x1) & uf.foo_.is_root(x2) {
-                                    v.retain(|&mut (_timestamp)| true);
-                                    v.sort_unstable();
-                                    v.dedup_by(|(t1,), (t2,)| true);
-                                    true
-                                } else {
-                                    false
-                                }
+                        #[cfg(debug_assertions)]
+                        {
+                            self.hash_index_0_1_2.iter().for_each(|(&(x0, x1, x2), v)| {
+                                let mut v = v.clone();
+                                let n = v.len();
+                                v.sort();
+                                v.dedup_by(|(t1,), (t2,)| true);
+                                assert_eq!(n, v.len(), "indexes do not have duplicates");
+                                assert!(
+                                    uf.foo_.is_root(x0) & uf.foo_.is_root(x1) & uf.foo_.is_root(x2),
+                                    "key is root"
+                                );
+                                v.iter().copied().for_each(|(_timestamp)| {
+                                    assert!(true, "value is root");
+                                });
                             });
-                        });
+                        }
                     });
                     self.foo_num_uprooted_at_latest_retain = 0;
                 }
@@ -6403,6 +6809,26 @@ fn codegen_variable_reuse_bug() {
                             RadixSortable::wrap(&mut self.new).voracious_sort();
                             self.new.dedup();
                         });
+                        #[cfg(debug_assertions)]
+                        {
+                            self.new.iter().for_each(|&(x0, x1, x2)| {
+                                assert_eq!(
+                                    (x0, x1, x2,),
+                                    (uf.math_.find(x0), uf.math_.find(x1), uf.math_.find(x2),),
+                                    "new is canonical"
+                                );
+                            });
+                        }
+                        log_duration!("retain index: {}", {
+                            self.hash_index_0_2.retain(|&(x0, x2), v| {
+                                if uf.math_.is_root(x0) & uf.math_.is_root(x2) {
+                                    v.retain(|&mut (x1, _timestamp)| uf.math_.is_root(x1));
+                                    true
+                                } else {
+                                    false
+                                }
+                            });
+                        });
                         log_duration!("fill index: {}", {
                             for &(x0, x1, x2) in &self.new {
                                 self.hash_index_0_2
@@ -6411,12 +6837,24 @@ fn codegen_variable_reuse_bug() {
                                     .push((x1, latest_timestamp));
                             }
                         });
+                        #[cfg(debug_assertions)]
+                        {
+                            self.hash_index_0_2.iter().for_each(|(&(x0, x2), v)| {
+                                let mut v = v.clone();
+                                let n = v.len();
+                                v.sort();
+                                v.dedup_by(|(x1, t1), (y1, t2)| true & (*x1 == *y1));
+                                assert_eq!(n, v.len(), "indexes do not have duplicates");
+                                assert!(uf.math_.is_root(x0) & uf.math_.is_root(x2), "key is root");
+                                v.iter().copied().for_each(|(x1, _timestamp)| {
+                                    assert!(uf.math_.is_root(x1), "value is root");
+                                });
+                            });
+                        }
                         log_duration!("retain index: {}", {
-                            self.hash_index_0_2.retain(|&(x0, x2), v| {
-                                if uf.math_.is_root(x0) & uf.math_.is_root(x2) {
-                                    v.retain(|&mut (x1, _timestamp)| uf.math_.is_root(x1));
-                                    v.sort_unstable();
-                                    v.dedup_by(|(x1, t1), (y1, t2)| true & (*x1 == *y1));
+                            self.hash_index_0_1_2.retain(|&(x0, x1, x2), v| {
+                                if uf.math_.is_root(x0) & uf.math_.is_root(x1) & uf.math_.is_root(x2) {
+                                    v.retain(|&mut (_timestamp)| true);
                                     true
                                 } else {
                                     false
@@ -6431,18 +6869,23 @@ fn codegen_variable_reuse_bug() {
                                     .push((latest_timestamp,));
                             }
                         });
-                        log_duration!("retain index: {}", {
-                            self.hash_index_0_1_2.retain(|&(x0, x1, x2), v| {
-                                if uf.math_.is_root(x0) & uf.math_.is_root(x1) & uf.math_.is_root(x2) {
-                                    v.retain(|&mut (_timestamp)| true);
-                                    v.sort_unstable();
-                                    v.dedup_by(|(t1,), (t2,)| true);
-                                    true
-                                } else {
-                                    false
-                                }
+                        #[cfg(debug_assertions)]
+                        {
+                            self.hash_index_0_1_2.iter().for_each(|(&(x0, x1, x2), v)| {
+                                let mut v = v.clone();
+                                let n = v.len();
+                                v.sort();
+                                v.dedup_by(|(t1,), (t2,)| true);
+                                assert_eq!(n, v.len(), "indexes do not have duplicates");
+                                assert!(
+                                    uf.math_.is_root(x0) & uf.math_.is_root(x1) & uf.math_.is_root(x2),
+                                    "key is root"
+                                );
+                                v.iter().copied().for_each(|(_timestamp)| {
+                                    assert!(true, "value is root");
+                                });
                             });
-                        });
+                        }
                     });
                     self.math_num_uprooted_at_latest_retain = 0;
                 }
@@ -6645,6 +7088,22 @@ fn codegen_variable_reuse_bug() {
                             RadixSortable::wrap(&mut self.new).voracious_sort();
                             self.new.dedup();
                         });
+                        #[cfg(debug_assertions)]
+                        {
+                            self.new.iter().for_each(|&(x0,)| {
+                                assert_eq!((x0,), (uf.math_.find(x0),), "new is canonical");
+                            });
+                        }
+                        log_duration!("retain index: {}", {
+                            self.hash_index_0.retain(|&(x0,), v| {
+                                if uf.math_.is_root(x0) {
+                                    v.retain(|&mut (_timestamp)| true);
+                                    true
+                                } else {
+                                    false
+                                }
+                            });
+                        });
                         log_duration!("fill index: {}", {
                             for &(x0,) in &self.new {
                                 self.hash_index_0
@@ -6653,18 +7112,20 @@ fn codegen_variable_reuse_bug() {
                                     .push((latest_timestamp,));
                             }
                         });
-                        log_duration!("retain index: {}", {
-                            self.hash_index_0.retain(|&(x0,), v| {
-                                if uf.math_.is_root(x0) {
-                                    v.retain(|&mut (_timestamp)| true);
-                                    v.sort_unstable();
-                                    v.dedup_by(|(t1,), (t2,)| true);
-                                    true
-                                } else {
-                                    false
-                                }
+                        #[cfg(debug_assertions)]
+                        {
+                            self.hash_index_0.iter().for_each(|(&(x0,), v)| {
+                                let mut v = v.clone();
+                                let n = v.len();
+                                v.sort();
+                                v.dedup_by(|(t1,), (t2,)| true);
+                                assert_eq!(n, v.len(), "indexes do not have duplicates");
+                                assert!(uf.math_.is_root(x0), "key is root");
+                                v.iter().copied().for_each(|(_timestamp)| {
+                                    assert!(true, "value is root");
+                                });
                             });
-                        });
+                        }
                     });
                     self.math_num_uprooted_at_latest_retain = 0;
                 }
@@ -7071,6 +7532,26 @@ fn initial_exprs() {
                             RadixSortable::wrap(&mut self.new).voracious_sort();
                             self.new.dedup();
                         });
+                        #[cfg(debug_assertions)]
+                        {
+                            self.new.iter().for_each(|&(x0, x1, x2)| {
+                                assert_eq!(
+                                    (x0, x1, x2,),
+                                    (uf.math_.find(x0), uf.math_.find(x1), uf.math_.find(x2),),
+                                    "new is canonical"
+                                );
+                            });
+                        }
+                        log_duration!("retain index: {}", {
+                            self.hash_index_0_1_2.retain(|&(x0, x1, x2), v| {
+                                if uf.math_.is_root(x0) & uf.math_.is_root(x1) & uf.math_.is_root(x2) {
+                                    v.retain(|&mut (_timestamp)| true);
+                                    true
+                                } else {
+                                    false
+                                }
+                            });
+                        });
                         log_duration!("fill index: {}", {
                             for &(x0, x1, x2) in &self.new {
                                 self.hash_index_0_1_2
@@ -7079,18 +7560,23 @@ fn initial_exprs() {
                                     .push((latest_timestamp,));
                             }
                         });
-                        log_duration!("retain index: {}", {
-                            self.hash_index_0_1_2.retain(|&(x0, x1, x2), v| {
-                                if uf.math_.is_root(x0) & uf.math_.is_root(x1) & uf.math_.is_root(x2) {
-                                    v.retain(|&mut (_timestamp)| true);
-                                    v.sort_unstable();
-                                    v.dedup_by(|(t1,), (t2,)| true);
-                                    true
-                                } else {
-                                    false
-                                }
+                        #[cfg(debug_assertions)]
+                        {
+                            self.hash_index_0_1_2.iter().for_each(|(&(x0, x1, x2), v)| {
+                                let mut v = v.clone();
+                                let n = v.len();
+                                v.sort();
+                                v.dedup_by(|(t1,), (t2,)| true);
+                                assert_eq!(n, v.len(), "indexes do not have duplicates");
+                                assert!(
+                                    uf.math_.is_root(x0) & uf.math_.is_root(x1) & uf.math_.is_root(x2),
+                                    "key is root"
+                                );
+                                v.iter().copied().for_each(|(_timestamp)| {
+                                    assert!(true, "value is root");
+                                });
                             });
-                        });
+                        }
                     });
                     self.math_num_uprooted_at_latest_retain = 0;
                 }
@@ -7275,6 +7761,26 @@ fn initial_exprs() {
                             RadixSortable::wrap(&mut self.new).voracious_sort();
                             self.new.dedup();
                         });
+                        #[cfg(debug_assertions)]
+                        {
+                            self.new.iter().for_each(|&(x0, x1, x2)| {
+                                assert_eq!(
+                                    (x0, x1, x2,),
+                                    (uf.math_.find(x0), uf.math_.find(x1), uf.math_.find(x2),),
+                                    "new is canonical"
+                                );
+                            });
+                        }
+                        log_duration!("retain index: {}", {
+                            self.hash_index_0_1_2.retain(|&(x0, x1, x2), v| {
+                                if uf.math_.is_root(x0) & uf.math_.is_root(x1) & uf.math_.is_root(x2) {
+                                    v.retain(|&mut (_timestamp)| true);
+                                    true
+                                } else {
+                                    false
+                                }
+                            });
+                        });
                         log_duration!("fill index: {}", {
                             for &(x0, x1, x2) in &self.new {
                                 self.hash_index_0_1_2
@@ -7283,18 +7789,23 @@ fn initial_exprs() {
                                     .push((latest_timestamp,));
                             }
                         });
-                        log_duration!("retain index: {}", {
-                            self.hash_index_0_1_2.retain(|&(x0, x1, x2), v| {
-                                if uf.math_.is_root(x0) & uf.math_.is_root(x1) & uf.math_.is_root(x2) {
-                                    v.retain(|&mut (_timestamp)| true);
-                                    v.sort_unstable();
-                                    v.dedup_by(|(t1,), (t2,)| true);
-                                    true
-                                } else {
-                                    false
-                                }
+                        #[cfg(debug_assertions)]
+                        {
+                            self.hash_index_0_1_2.iter().for_each(|(&(x0, x1, x2), v)| {
+                                let mut v = v.clone();
+                                let n = v.len();
+                                v.sort();
+                                v.dedup_by(|(t1,), (t2,)| true);
+                                assert_eq!(n, v.len(), "indexes do not have duplicates");
+                                assert!(
+                                    uf.math_.is_root(x0) & uf.math_.is_root(x1) & uf.math_.is_root(x2),
+                                    "key is root"
+                                );
+                                v.iter().copied().for_each(|(_timestamp)| {
+                                    assert!(true, "value is root");
+                                });
                             });
-                        });
+                        }
                     });
                     self.math_num_uprooted_at_latest_retain = 0;
                 }
@@ -7476,6 +7987,22 @@ fn initial_exprs() {
                             self.new.sort_unstable();
                             self.new.dedup();
                         });
+                        #[cfg(debug_assertions)]
+                        {
+                            self.new.iter().for_each(|&(x0, x1)| {
+                                assert_eq!((x0, x1,), (x0, uf.math_.find(x1),), "new is canonical");
+                            });
+                        }
+                        log_duration!("retain index: {}", {
+                            self.hash_index_0_1.retain(|&(x0, x1), v| {
+                                if uf.math_.is_root(x1) {
+                                    v.retain(|&mut (_timestamp)| true);
+                                    true
+                                } else {
+                                    false
+                                }
+                            });
+                        });
                         log_duration!("fill index: {}", {
                             for &(x0, x1) in &self.new {
                                 self.hash_index_0_1
@@ -7484,18 +8011,20 @@ fn initial_exprs() {
                                     .push((latest_timestamp,));
                             }
                         });
-                        log_duration!("retain index: {}", {
-                            self.hash_index_0_1.retain(|&(x0, x1), v| {
-                                if uf.math_.is_root(x1) {
-                                    v.retain(|&mut (_timestamp)| true);
-                                    v.sort_unstable();
-                                    v.dedup_by(|(t1,), (t2,)| true);
-                                    true
-                                } else {
-                                    false
-                                }
+                        #[cfg(debug_assertions)]
+                        {
+                            self.hash_index_0_1.iter().for_each(|(&(x0, x1), v)| {
+                                let mut v = v.clone();
+                                let n = v.len();
+                                v.sort();
+                                v.dedup_by(|(t1,), (t2,)| true);
+                                assert_eq!(n, v.len(), "indexes do not have duplicates");
+                                assert!(uf.math_.is_root(x1), "key is root");
+                                v.iter().copied().for_each(|(_timestamp)| {
+                                    assert!(true, "value is root");
+                                });
                             });
-                        });
+                        }
                     });
                     self.math_num_uprooted_at_latest_retain = 0;
                 }
@@ -7683,6 +8212,22 @@ fn initial_exprs() {
                             self.new.sort_unstable();
                             self.new.dedup();
                         });
+                        #[cfg(debug_assertions)]
+                        {
+                            self.new.iter().for_each(|&(x0, x1)| {
+                                assert_eq!((x0, x1,), (x0, uf.math_.find(x1),), "new is canonical");
+                            });
+                        }
+                        log_duration!("retain index: {}", {
+                            self.hash_index_0_1.retain(|&(x0, x1), v| {
+                                if uf.math_.is_root(x1) {
+                                    v.retain(|&mut (_timestamp)| true);
+                                    true
+                                } else {
+                                    false
+                                }
+                            });
+                        });
                         log_duration!("fill index: {}", {
                             for &(x0, x1) in &self.new {
                                 self.hash_index_0_1
@@ -7691,18 +8236,20 @@ fn initial_exprs() {
                                     .push((latest_timestamp,));
                             }
                         });
-                        log_duration!("retain index: {}", {
-                            self.hash_index_0_1.retain(|&(x0, x1), v| {
-                                if uf.math_.is_root(x1) {
-                                    v.retain(|&mut (_timestamp)| true);
-                                    v.sort_unstable();
-                                    v.dedup_by(|(t1,), (t2,)| true);
-                                    true
-                                } else {
-                                    false
-                                }
+                        #[cfg(debug_assertions)]
+                        {
+                            self.hash_index_0_1.iter().for_each(|(&(x0, x1), v)| {
+                                let mut v = v.clone();
+                                let n = v.len();
+                                v.sort();
+                                v.dedup_by(|(t1,), (t2,)| true);
+                                assert_eq!(n, v.len(), "indexes do not have duplicates");
+                                assert!(uf.math_.is_root(x1), "key is root");
+                                v.iter().copied().for_each(|(_timestamp)| {
+                                    assert!(true, "value is root");
+                                });
                             });
-                        });
+                        }
                     });
                     self.math_num_uprooted_at_latest_retain = 0;
                 }
@@ -8720,6 +9267,28 @@ fn test_primitives_simple() {
                             RadixSortable::wrap(&mut self.new).voracious_sort();
                             self.new.dedup();
                         });
+                        #[cfg(debug_assertions)]
+                        {
+                            self.new.iter().for_each(|&(x0, x1, x2)| {
+                                assert_eq!(
+                                    (x0, x1, x2,),
+                                    (uf.math_.find(x0), uf.math_.find(x1), uf.math_.find(x2),),
+                                    "new is canonical"
+                                );
+                            });
+                        }
+                        log_duration!("retain index: {}", {
+                            self.hash_index_1.retain(|&(x1,), v| {
+                                if uf.math_.is_root(x1) {
+                                    v.retain(|&mut (x0, x2, _timestamp)| {
+                                        uf.math_.is_root(x0) & uf.math_.is_root(x2)
+                                    });
+                                    true
+                                } else {
+                                    false
+                                }
+                            });
+                        });
                         log_duration!("fill index: {}", {
                             for &(x0, x1, x2) in &self.new {
                                 self.hash_index_1
@@ -8728,14 +9297,24 @@ fn test_primitives_simple() {
                                     .push((x0, x2, latest_timestamp));
                             }
                         });
+                        #[cfg(debug_assertions)]
+                        {
+                            self.hash_index_1.iter().for_each(|(&(x1,), v)| {
+                                let mut v = v.clone();
+                                let n = v.len();
+                                v.sort();
+                                v.dedup_by(|(x0, x2, t1), (y0, y2, t2)| true & (*x0 == *y0) & (*x2 == *y2));
+                                assert_eq!(n, v.len(), "indexes do not have duplicates");
+                                assert!(uf.math_.is_root(x1), "key is root");
+                                v.iter().copied().for_each(|(x0, x2, _timestamp)| {
+                                    assert!(uf.math_.is_root(x0) & uf.math_.is_root(x2), "value is root");
+                                });
+                            });
+                        }
                         log_duration!("retain index: {}", {
-                            self.hash_index_1.retain(|&(x1,), v| {
-                                if uf.math_.is_root(x1) {
-                                    v.retain(|&mut (x0, x2, _timestamp)| {
-                                        uf.math_.is_root(x0) & uf.math_.is_root(x2)
-                                    });
-                                    v.sort_unstable();
-                                    v.dedup_by(|(x0, x2, t1), (y0, y2, t2)| true & (*x0 == *y0) & (*x2 == *y2));
+                            self.hash_index_1_0_2.retain(|&(x1, x0, x2), v| {
+                                if uf.math_.is_root(x1) & uf.math_.is_root(x0) & uf.math_.is_root(x2) {
+                                    v.retain(|&mut (_timestamp)| true);
                                     true
                                 } else {
                                     false
@@ -8750,18 +9329,23 @@ fn test_primitives_simple() {
                                     .push((latest_timestamp,));
                             }
                         });
-                        log_duration!("retain index: {}", {
-                            self.hash_index_1_0_2.retain(|&(x1, x0, x2), v| {
-                                if uf.math_.is_root(x1) & uf.math_.is_root(x0) & uf.math_.is_root(x2) {
-                                    v.retain(|&mut (_timestamp)| true);
-                                    v.sort_unstable();
-                                    v.dedup_by(|(t1,), (t2,)| true);
-                                    true
-                                } else {
-                                    false
-                                }
+                        #[cfg(debug_assertions)]
+                        {
+                            self.hash_index_1_0_2.iter().for_each(|(&(x1, x0, x2), v)| {
+                                let mut v = v.clone();
+                                let n = v.len();
+                                v.sort();
+                                v.dedup_by(|(t1,), (t2,)| true);
+                                assert_eq!(n, v.len(), "indexes do not have duplicates");
+                                assert!(
+                                    uf.math_.is_root(x1) & uf.math_.is_root(x0) & uf.math_.is_root(x2),
+                                    "key is root"
+                                );
+                                v.iter().copied().for_each(|(_timestamp)| {
+                                    assert!(true, "value is root");
+                                });
                             });
-                        });
+                        }
                     });
                     self.math_num_uprooted_at_latest_retain = 0;
                 }
@@ -8971,6 +9555,26 @@ fn test_primitives_simple() {
                             RadixSortable::wrap(&mut self.new).voracious_sort();
                             self.new.dedup();
                         });
+                        #[cfg(debug_assertions)]
+                        {
+                            self.new.iter().for_each(|&(x0, x1, x2)| {
+                                assert_eq!(
+                                    (x0, x1, x2,),
+                                    (uf.math_.find(x0), uf.math_.find(x1), uf.math_.find(x2),),
+                                    "new is canonical"
+                                );
+                            });
+                        }
+                        log_duration!("retain index: {}", {
+                            self.hash_index_0_1_2.retain(|&(x0, x1, x2), v| {
+                                if uf.math_.is_root(x0) & uf.math_.is_root(x1) & uf.math_.is_root(x2) {
+                                    v.retain(|&mut (_timestamp)| true);
+                                    true
+                                } else {
+                                    false
+                                }
+                            });
+                        });
                         log_duration!("fill index: {}", {
                             for &(x0, x1, x2) in &self.new {
                                 self.hash_index_0_1_2
@@ -8979,18 +9583,23 @@ fn test_primitives_simple() {
                                     .push((latest_timestamp,));
                             }
                         });
-                        log_duration!("retain index: {}", {
-                            self.hash_index_0_1_2.retain(|&(x0, x1, x2), v| {
-                                if uf.math_.is_root(x0) & uf.math_.is_root(x1) & uf.math_.is_root(x2) {
-                                    v.retain(|&mut (_timestamp)| true);
-                                    v.sort_unstable();
-                                    v.dedup_by(|(t1,), (t2,)| true);
-                                    true
-                                } else {
-                                    false
-                                }
+                        #[cfg(debug_assertions)]
+                        {
+                            self.hash_index_0_1_2.iter().for_each(|(&(x0, x1, x2), v)| {
+                                let mut v = v.clone();
+                                let n = v.len();
+                                v.sort();
+                                v.dedup_by(|(t1,), (t2,)| true);
+                                assert_eq!(n, v.len(), "indexes do not have duplicates");
+                                assert!(
+                                    uf.math_.is_root(x0) & uf.math_.is_root(x1) & uf.math_.is_root(x2),
+                                    "key is root"
+                                );
+                                v.iter().copied().for_each(|(_timestamp)| {
+                                    assert!(true, "value is root");
+                                });
                             });
-                        });
+                        }
                     });
                     self.math_num_uprooted_at_latest_retain = 0;
                 }
@@ -9174,6 +9783,22 @@ fn test_primitives_simple() {
                             self.new.sort_unstable();
                             self.new.dedup();
                         });
+                        #[cfg(debug_assertions)]
+                        {
+                            self.new.iter().for_each(|&(x0, x1)| {
+                                assert_eq!((x0, x1,), (x0, uf.math_.find(x1),), "new is canonical");
+                            });
+                        }
+                        log_duration!("retain index: {}", {
+                            self.hash_index_1.retain(|&(x1,), v| {
+                                if uf.math_.is_root(x1) {
+                                    v.retain(|&mut (x0, _timestamp)| true);
+                                    true
+                                } else {
+                                    false
+                                }
+                            });
+                        });
                         log_duration!("fill index: {}", {
                             for &(x0, x1) in &self.new {
                                 self.hash_index_1
@@ -9182,12 +9807,24 @@ fn test_primitives_simple() {
                                     .push((x0, latest_timestamp));
                             }
                         });
+                        #[cfg(debug_assertions)]
+                        {
+                            self.hash_index_1.iter().for_each(|(&(x1,), v)| {
+                                let mut v = v.clone();
+                                let n = v.len();
+                                v.sort();
+                                v.dedup_by(|(x0, t1), (y0, t2)| true & (*x0 == *y0));
+                                assert_eq!(n, v.len(), "indexes do not have duplicates");
+                                assert!(uf.math_.is_root(x1), "key is root");
+                                v.iter().copied().for_each(|(x0, _timestamp)| {
+                                    assert!(true, "value is root");
+                                });
+                            });
+                        }
                         log_duration!("retain index: {}", {
-                            self.hash_index_1.retain(|&(x1,), v| {
+                            self.hash_index_0_1.retain(|&(x0, x1), v| {
                                 if uf.math_.is_root(x1) {
-                                    v.retain(|&mut (x0, _timestamp)| true);
-                                    v.sort_unstable();
-                                    v.dedup_by(|(x0, t1), (y0, t2)| true & (*x0 == *y0));
+                                    v.retain(|&mut (_timestamp)| true);
                                     true
                                 } else {
                                     false
@@ -9202,18 +9839,20 @@ fn test_primitives_simple() {
                                     .push((latest_timestamp,));
                             }
                         });
-                        log_duration!("retain index: {}", {
-                            self.hash_index_0_1.retain(|&(x0, x1), v| {
-                                if uf.math_.is_root(x1) {
-                                    v.retain(|&mut (_timestamp)| true);
-                                    v.sort_unstable();
-                                    v.dedup_by(|(t1,), (t2,)| true);
-                                    true
-                                } else {
-                                    false
-                                }
+                        #[cfg(debug_assertions)]
+                        {
+                            self.hash_index_0_1.iter().for_each(|(&(x0, x1), v)| {
+                                let mut v = v.clone();
+                                let n = v.len();
+                                v.sort();
+                                v.dedup_by(|(t1,), (t2,)| true);
+                                assert_eq!(n, v.len(), "indexes do not have duplicates");
+                                assert!(uf.math_.is_root(x1), "key is root");
+                                v.iter().copied().for_each(|(_timestamp)| {
+                                    assert!(true, "value is root");
+                                });
                             });
-                        });
+                        }
                     });
                     self.math_num_uprooted_at_latest_retain = 0;
                 }
@@ -9424,6 +10063,22 @@ fn test_primitives_simple() {
                             self.new.sort_unstable();
                             self.new.dedup();
                         });
+                        #[cfg(debug_assertions)]
+                        {
+                            self.new.iter().for_each(|&(x0, x1)| {
+                                assert_eq!((x0, x1,), (x0, uf.math_.find(x1),), "new is canonical");
+                            });
+                        }
+                        log_duration!("retain index: {}", {
+                            self.hash_index_0_1.retain(|&(x0, x1), v| {
+                                if uf.math_.is_root(x1) {
+                                    v.retain(|&mut (_timestamp)| true);
+                                    true
+                                } else {
+                                    false
+                                }
+                            });
+                        });
                         log_duration!("fill index: {}", {
                             for &(x0, x1) in &self.new {
                                 self.hash_index_0_1
@@ -9432,18 +10087,20 @@ fn test_primitives_simple() {
                                     .push((latest_timestamp,));
                             }
                         });
-                        log_duration!("retain index: {}", {
-                            self.hash_index_0_1.retain(|&(x0, x1), v| {
-                                if uf.math_.is_root(x1) {
-                                    v.retain(|&mut (_timestamp)| true);
-                                    v.sort_unstable();
-                                    v.dedup_by(|(t1,), (t2,)| true);
-                                    true
-                                } else {
-                                    false
-                                }
+                        #[cfg(debug_assertions)]
+                        {
+                            self.hash_index_0_1.iter().for_each(|(&(x0, x1), v)| {
+                                let mut v = v.clone();
+                                let n = v.len();
+                                v.sort();
+                                v.dedup_by(|(t1,), (t2,)| true);
+                                assert_eq!(n, v.len(), "indexes do not have duplicates");
+                                assert!(uf.math_.is_root(x1), "key is root");
+                                v.iter().copied().for_each(|(_timestamp)| {
+                                    assert!(true, "value is root");
+                                });
                             });
-                        });
+                        }
                     });
                     self.math_num_uprooted_at_latest_retain = 0;
                 }
@@ -9944,12 +10601,32 @@ fn triangle_join() {
                             self.new.extend(
                                 insertions
                                     .iter()
-                                    .map(|&(x0, x1)| (x0, x1))
+                                    .map(|&(x0, x1)| (uf.math_.find(x0), uf.math_.find(x1)))
                                     .filter(|&(x0, x1)| !self.hash_index_1_0.contains_key(&(x1, x0))),
                             );
                             insertions.clear();
                             RadixSortable::wrap(&mut self.new).voracious_sort();
                             self.new.dedup();
+                        });
+                        #[cfg(debug_assertions)]
+                        {
+                            self.new.iter().for_each(|&(x0, x1)| {
+                                assert_eq!(
+                                    (x0, x1,),
+                                    (uf.math_.find(x0), uf.math_.find(x1),),
+                                    "new is canonical"
+                                );
+                            });
+                        }
+                        log_duration!("retain index: {}", {
+                            self.hash_index_1.retain(|&(x1,), v| {
+                                if uf.math_.is_root(x1) {
+                                    v.retain(|&mut (x0, _timestamp)| uf.math_.is_root(x0));
+                                    true
+                                } else {
+                                    false
+                                }
+                            });
                         });
                         log_duration!("fill index: {}", {
                             for &(x0, x1) in &self.new {
@@ -9959,12 +10636,24 @@ fn triangle_join() {
                                     .push((x0, latest_timestamp));
                             }
                         });
+                        #[cfg(debug_assertions)]
+                        {
+                            self.hash_index_1.iter().for_each(|(&(x1,), v)| {
+                                let mut v = v.clone();
+                                let n = v.len();
+                                v.sort();
+                                v.dedup_by(|(x0, t1), (y0, t2)| true & (*x0 == *y0));
+                                assert_eq!(n, v.len(), "indexes do not have duplicates");
+                                assert!(uf.math_.is_root(x1), "key is root");
+                                v.iter().copied().for_each(|(x0, _timestamp)| {
+                                    assert!(uf.math_.is_root(x0), "value is root");
+                                });
+                            });
+                        }
                         log_duration!("retain index: {}", {
-                            self.hash_index_1.retain(|&(x1,), v| {
-                                if uf.math_.is_root(x1) {
-                                    v.retain(|&mut (x0, _timestamp)| uf.math_.is_root(x0));
-                                    v.sort_unstable();
-                                    v.dedup_by(|(x0, t1), (y0, t2)| true & (*x0 == *y0));
+                            self.hash_index_1_0.retain(|&(x1, x0), v| {
+                                if uf.math_.is_root(x1) & uf.math_.is_root(x0) {
+                                    v.retain(|&mut (_timestamp)| true);
                                     true
                                 } else {
                                     false
@@ -9979,12 +10668,24 @@ fn triangle_join() {
                                     .push((latest_timestamp,));
                             }
                         });
+                        #[cfg(debug_assertions)]
+                        {
+                            self.hash_index_1_0.iter().for_each(|(&(x1, x0), v)| {
+                                let mut v = v.clone();
+                                let n = v.len();
+                                v.sort();
+                                v.dedup_by(|(t1,), (t2,)| true);
+                                assert_eq!(n, v.len(), "indexes do not have duplicates");
+                                assert!(uf.math_.is_root(x1) & uf.math_.is_root(x0), "key is root");
+                                v.iter().copied().for_each(|(_timestamp)| {
+                                    assert!(true, "value is root");
+                                });
+                            });
+                        }
                         log_duration!("retain index: {}", {
-                            self.hash_index_1_0.retain(|&(x1, x0), v| {
-                                if uf.math_.is_root(x1) & uf.math_.is_root(x0) {
-                                    v.retain(|&mut (_timestamp)| true);
-                                    v.sort_unstable();
-                                    v.dedup_by(|(t1,), (t2,)| true);
+                            self.hash_index_0.retain(|&(x0,), v| {
+                                if uf.math_.is_root(x0) {
+                                    v.retain(|&mut (x1, _timestamp)| uf.math_.is_root(x1));
                                     true
                                 } else {
                                     false
@@ -9999,18 +10700,20 @@ fn triangle_join() {
                                     .push((x1, latest_timestamp));
                             }
                         });
-                        log_duration!("retain index: {}", {
-                            self.hash_index_0.retain(|&(x0,), v| {
-                                if uf.math_.is_root(x0) {
-                                    v.retain(|&mut (x1, _timestamp)| uf.math_.is_root(x1));
-                                    v.sort_unstable();
-                                    v.dedup_by(|(x1, t1), (y1, t2)| true & (*x1 == *y1));
-                                    true
-                                } else {
-                                    false
-                                }
+                        #[cfg(debug_assertions)]
+                        {
+                            self.hash_index_0.iter().for_each(|(&(x0,), v)| {
+                                let mut v = v.clone();
+                                let n = v.len();
+                                v.sort();
+                                v.dedup_by(|(x1, t1), (y1, t2)| true & (*x1 == *y1));
+                                assert_eq!(n, v.len(), "indexes do not have duplicates");
+                                assert!(uf.math_.is_root(x0), "key is root");
+                                v.iter().copied().for_each(|(x1, _timestamp)| {
+                                    assert!(uf.math_.is_root(x1), "value is root");
+                                });
                             });
-                        });
+                        }
                     });
                     self.math_num_uprooted_at_latest_retain = 0;
                 }
@@ -10171,12 +10874,32 @@ fn triangle_join() {
                             self.new.extend(
                                 insertions
                                     .iter()
-                                    .map(|&(x0, x1)| (x0, x1))
+                                    .map(|&(x0, x1)| (uf.math_.find(x0), uf.math_.find(x1)))
                                     .filter(|&(x0, x1)| !self.hash_index_0_1.contains_key(&(x0, x1))),
                             );
                             insertions.clear();
                             RadixSortable::wrap(&mut self.new).voracious_sort();
                             self.new.dedup();
+                        });
+                        #[cfg(debug_assertions)]
+                        {
+                            self.new.iter().for_each(|&(x0, x1)| {
+                                assert_eq!(
+                                    (x0, x1,),
+                                    (uf.math_.find(x0), uf.math_.find(x1),),
+                                    "new is canonical"
+                                );
+                            });
+                        }
+                        log_duration!("retain index: {}", {
+                            self.hash_index_0.retain(|&(x0,), v| {
+                                if uf.math_.is_root(x0) {
+                                    v.retain(|&mut (x1, _timestamp)| uf.math_.is_root(x1));
+                                    true
+                                } else {
+                                    false
+                                }
+                            });
                         });
                         log_duration!("fill index: {}", {
                             for &(x0, x1) in &self.new {
@@ -10186,12 +10909,24 @@ fn triangle_join() {
                                     .push((x1, latest_timestamp));
                             }
                         });
+                        #[cfg(debug_assertions)]
+                        {
+                            self.hash_index_0.iter().for_each(|(&(x0,), v)| {
+                                let mut v = v.clone();
+                                let n = v.len();
+                                v.sort();
+                                v.dedup_by(|(x1, t1), (y1, t2)| true & (*x1 == *y1));
+                                assert_eq!(n, v.len(), "indexes do not have duplicates");
+                                assert!(uf.math_.is_root(x0), "key is root");
+                                v.iter().copied().for_each(|(x1, _timestamp)| {
+                                    assert!(uf.math_.is_root(x1), "value is root");
+                                });
+                            });
+                        }
                         log_duration!("retain index: {}", {
-                            self.hash_index_0.retain(|&(x0,), v| {
-                                if uf.math_.is_root(x0) {
-                                    v.retain(|&mut (x1, _timestamp)| uf.math_.is_root(x1));
-                                    v.sort_unstable();
-                                    v.dedup_by(|(x1, t1), (y1, t2)| true & (*x1 == *y1));
+                            self.hash_index_0_1.retain(|&(x0, x1), v| {
+                                if uf.math_.is_root(x0) & uf.math_.is_root(x1) {
+                                    v.retain(|&mut (_timestamp)| true);
                                     true
                                 } else {
                                     false
@@ -10206,12 +10941,24 @@ fn triangle_join() {
                                     .push((latest_timestamp,));
                             }
                         });
+                        #[cfg(debug_assertions)]
+                        {
+                            self.hash_index_0_1.iter().for_each(|(&(x0, x1), v)| {
+                                let mut v = v.clone();
+                                let n = v.len();
+                                v.sort();
+                                v.dedup_by(|(t1,), (t2,)| true);
+                                assert_eq!(n, v.len(), "indexes do not have duplicates");
+                                assert!(uf.math_.is_root(x0) & uf.math_.is_root(x1), "key is root");
+                                v.iter().copied().for_each(|(_timestamp)| {
+                                    assert!(true, "value is root");
+                                });
+                            });
+                        }
                         log_duration!("retain index: {}", {
-                            self.hash_index_0_1.retain(|&(x0, x1), v| {
-                                if uf.math_.is_root(x0) & uf.math_.is_root(x1) {
-                                    v.retain(|&mut (_timestamp)| true);
-                                    v.sort_unstable();
-                                    v.dedup_by(|(t1,), (t2,)| true);
+                            self.hash_index_1.retain(|&(x1,), v| {
+                                if uf.math_.is_root(x1) {
+                                    v.retain(|&mut (x0, _timestamp)| uf.math_.is_root(x0));
                                     true
                                 } else {
                                     false
@@ -10226,18 +10973,20 @@ fn triangle_join() {
                                     .push((x0, latest_timestamp));
                             }
                         });
-                        log_duration!("retain index: {}", {
-                            self.hash_index_1.retain(|&(x1,), v| {
-                                if uf.math_.is_root(x1) {
-                                    v.retain(|&mut (x0, _timestamp)| uf.math_.is_root(x0));
-                                    v.sort_unstable();
-                                    v.dedup_by(|(x0, t1), (y0, t2)| true & (*x0 == *y0));
-                                    true
-                                } else {
-                                    false
-                                }
+                        #[cfg(debug_assertions)]
+                        {
+                            self.hash_index_1.iter().for_each(|(&(x1,), v)| {
+                                let mut v = v.clone();
+                                let n = v.len();
+                                v.sort();
+                                v.dedup_by(|(x0, t1), (y0, t2)| true & (*x0 == *y0));
+                                assert_eq!(n, v.len(), "indexes do not have duplicates");
+                                assert!(uf.math_.is_root(x1), "key is root");
+                                v.iter().copied().for_each(|(x0, _timestamp)| {
+                                    assert!(uf.math_.is_root(x0), "value is root");
+                                });
                             });
-                        });
+                        }
                     });
                     self.math_num_uprooted_at_latest_retain = 0;
                 }
@@ -10398,12 +11147,32 @@ fn triangle_join() {
                             self.new.extend(
                                 insertions
                                     .iter()
-                                    .map(|&(x0, x1)| (x0, x1))
+                                    .map(|&(x0, x1)| (uf.math_.find(x0), uf.math_.find(x1)))
                                     .filter(|&(x0, x1)| !self.hash_index_1_0.contains_key(&(x1, x0))),
                             );
                             insertions.clear();
                             RadixSortable::wrap(&mut self.new).voracious_sort();
                             self.new.dedup();
+                        });
+                        #[cfg(debug_assertions)]
+                        {
+                            self.new.iter().for_each(|&(x0, x1)| {
+                                assert_eq!(
+                                    (x0, x1,),
+                                    (uf.math_.find(x0), uf.math_.find(x1),),
+                                    "new is canonical"
+                                );
+                            });
+                        }
+                        log_duration!("retain index: {}", {
+                            self.hash_index_1.retain(|&(x1,), v| {
+                                if uf.math_.is_root(x1) {
+                                    v.retain(|&mut (x0, _timestamp)| uf.math_.is_root(x0));
+                                    true
+                                } else {
+                                    false
+                                }
+                            });
                         });
                         log_duration!("fill index: {}", {
                             for &(x0, x1) in &self.new {
@@ -10413,12 +11182,24 @@ fn triangle_join() {
                                     .push((x0, latest_timestamp));
                             }
                         });
+                        #[cfg(debug_assertions)]
+                        {
+                            self.hash_index_1.iter().for_each(|(&(x1,), v)| {
+                                let mut v = v.clone();
+                                let n = v.len();
+                                v.sort();
+                                v.dedup_by(|(x0, t1), (y0, t2)| true & (*x0 == *y0));
+                                assert_eq!(n, v.len(), "indexes do not have duplicates");
+                                assert!(uf.math_.is_root(x1), "key is root");
+                                v.iter().copied().for_each(|(x0, _timestamp)| {
+                                    assert!(uf.math_.is_root(x0), "value is root");
+                                });
+                            });
+                        }
                         log_duration!("retain index: {}", {
-                            self.hash_index_1.retain(|&(x1,), v| {
-                                if uf.math_.is_root(x1) {
-                                    v.retain(|&mut (x0, _timestamp)| uf.math_.is_root(x0));
-                                    v.sort_unstable();
-                                    v.dedup_by(|(x0, t1), (y0, t2)| true & (*x0 == *y0));
+                            self.hash_index_0.retain(|&(x0,), v| {
+                                if uf.math_.is_root(x0) {
+                                    v.retain(|&mut (x1, _timestamp)| uf.math_.is_root(x1));
                                     true
                                 } else {
                                     false
@@ -10433,12 +11214,24 @@ fn triangle_join() {
                                     .push((x1, latest_timestamp));
                             }
                         });
+                        #[cfg(debug_assertions)]
+                        {
+                            self.hash_index_0.iter().for_each(|(&(x0,), v)| {
+                                let mut v = v.clone();
+                                let n = v.len();
+                                v.sort();
+                                v.dedup_by(|(x1, t1), (y1, t2)| true & (*x1 == *y1));
+                                assert_eq!(n, v.len(), "indexes do not have duplicates");
+                                assert!(uf.math_.is_root(x0), "key is root");
+                                v.iter().copied().for_each(|(x1, _timestamp)| {
+                                    assert!(uf.math_.is_root(x1), "value is root");
+                                });
+                            });
+                        }
                         log_duration!("retain index: {}", {
-                            self.hash_index_0.retain(|&(x0,), v| {
-                                if uf.math_.is_root(x0) {
-                                    v.retain(|&mut (x1, _timestamp)| uf.math_.is_root(x1));
-                                    v.sort_unstable();
-                                    v.dedup_by(|(x1, t1), (y1, t2)| true & (*x1 == *y1));
+                            self.hash_index_1_0.retain(|&(x1, x0), v| {
+                                if uf.math_.is_root(x1) & uf.math_.is_root(x0) {
+                                    v.retain(|&mut (_timestamp)| true);
                                     true
                                 } else {
                                     false
@@ -10453,18 +11246,20 @@ fn triangle_join() {
                                     .push((latest_timestamp,));
                             }
                         });
-                        log_duration!("retain index: {}", {
-                            self.hash_index_1_0.retain(|&(x1, x0), v| {
-                                if uf.math_.is_root(x1) & uf.math_.is_root(x0) {
-                                    v.retain(|&mut (_timestamp)| true);
-                                    v.sort_unstable();
-                                    v.dedup_by(|(t1,), (t2,)| true);
-                                    true
-                                } else {
-                                    false
-                                }
+                        #[cfg(debug_assertions)]
+                        {
+                            self.hash_index_1_0.iter().for_each(|(&(x1, x0), v)| {
+                                let mut v = v.clone();
+                                let n = v.len();
+                                v.sort();
+                                v.dedup_by(|(t1,), (t2,)| true);
+                                assert_eq!(n, v.len(), "indexes do not have duplicates");
+                                assert!(uf.math_.is_root(x1) & uf.math_.is_root(x0), "key is root");
+                                v.iter().copied().for_each(|(_timestamp)| {
+                                    assert!(true, "value is root");
+                                });
                             });
-                        });
+                        }
                     });
                     self.math_num_uprooted_at_latest_retain = 0;
                 }
@@ -10624,12 +11419,34 @@ fn triangle_join() {
                             self.new.extend(
                                 insertions
                                     .iter()
-                                    .map(|&(x0, x1, x2)| (x0, x1, x2))
+                                    .map(|&(x0, x1, x2)| {
+                                        (uf.math_.find(x0), uf.math_.find(x1), uf.math_.find(x2))
+                                    })
                                     .filter(|&(x0, x1, x2)| !self.hash_index_0_1_2.contains_key(&(x0, x1, x2))),
                             );
                             insertions.clear();
                             RadixSortable::wrap(&mut self.new).voracious_sort();
                             self.new.dedup();
+                        });
+                        #[cfg(debug_assertions)]
+                        {
+                            self.new.iter().for_each(|&(x0, x1, x2)| {
+                                assert_eq!(
+                                    (x0, x1, x2,),
+                                    (uf.math_.find(x0), uf.math_.find(x1), uf.math_.find(x2),),
+                                    "new is canonical"
+                                );
+                            });
+                        }
+                        log_duration!("retain index: {}", {
+                            self.hash_index_0_1_2.retain(|&(x0, x1, x2), v| {
+                                if uf.math_.is_root(x0) & uf.math_.is_root(x1) & uf.math_.is_root(x2) {
+                                    v.retain(|&mut (_timestamp)| true);
+                                    true
+                                } else {
+                                    false
+                                }
+                            });
                         });
                         log_duration!("fill index: {}", {
                             for &(x0, x1, x2) in &self.new {
@@ -10639,18 +11456,23 @@ fn triangle_join() {
                                     .push((latest_timestamp,));
                             }
                         });
-                        log_duration!("retain index: {}", {
-                            self.hash_index_0_1_2.retain(|&(x0, x1, x2), v| {
-                                if uf.math_.is_root(x0) & uf.math_.is_root(x1) & uf.math_.is_root(x2) {
-                                    v.retain(|&mut (_timestamp)| true);
-                                    v.sort_unstable();
-                                    v.dedup_by(|(t1,), (t2,)| true);
-                                    true
-                                } else {
-                                    false
-                                }
+                        #[cfg(debug_assertions)]
+                        {
+                            self.hash_index_0_1_2.iter().for_each(|(&(x0, x1, x2), v)| {
+                                let mut v = v.clone();
+                                let n = v.len();
+                                v.sort();
+                                v.dedup_by(|(t1,), (t2,)| true);
+                                assert_eq!(n, v.len(), "indexes do not have duplicates");
+                                assert!(
+                                    uf.math_.is_root(x0) & uf.math_.is_root(x1) & uf.math_.is_root(x2),
+                                    "key is root"
+                                );
+                                v.iter().copied().for_each(|(_timestamp)| {
+                                    assert!(true, "value is root");
+                                });
                             });
-                        });
+                        }
                     });
                     self.math_num_uprooted_at_latest_retain = 0;
                 }
@@ -11099,6 +11921,28 @@ fn edgecase0() {
                             RadixSortable::wrap(&mut self.new).voracious_sort();
                             self.new.dedup();
                         });
+                        #[cfg(debug_assertions)]
+                        {
+                            self.new.iter().for_each(|&(x0, x1, x2)| {
+                                assert_eq!(
+                                    (x0, x1, x2,),
+                                    (uf.math_.find(x0), uf.math_.find(x1), uf.math_.find(x2),),
+                                    "new is canonical"
+                                );
+                            });
+                        }
+                        log_duration!("retain index: {}", {
+                            self.hash_index_0.retain(|&(x0,), v| {
+                                if uf.math_.is_root(x0) {
+                                    v.retain(|&mut (x1, x2, _timestamp)| {
+                                        uf.math_.is_root(x1) & uf.math_.is_root(x2)
+                                    });
+                                    true
+                                } else {
+                                    false
+                                }
+                            });
+                        });
                         log_duration!("fill index: {}", {
                             for &(x0, x1, x2) in &self.new {
                                 self.hash_index_0
@@ -11107,14 +11951,24 @@ fn edgecase0() {
                                     .push((x1, x2, latest_timestamp));
                             }
                         });
+                        #[cfg(debug_assertions)]
+                        {
+                            self.hash_index_0.iter().for_each(|(&(x0,), v)| {
+                                let mut v = v.clone();
+                                let n = v.len();
+                                v.sort();
+                                v.dedup_by(|(x1, x2, t1), (y1, y2, t2)| true & (*x1 == *y1) & (*x2 == *y2));
+                                assert_eq!(n, v.len(), "indexes do not have duplicates");
+                                assert!(uf.math_.is_root(x0), "key is root");
+                                v.iter().copied().for_each(|(x1, x2, _timestamp)| {
+                                    assert!(uf.math_.is_root(x1) & uf.math_.is_root(x2), "value is root");
+                                });
+                            });
+                        }
                         log_duration!("retain index: {}", {
-                            self.hash_index_0.retain(|&(x0,), v| {
-                                if uf.math_.is_root(x0) {
-                                    v.retain(|&mut (x1, x2, _timestamp)| {
-                                        uf.math_.is_root(x1) & uf.math_.is_root(x2)
-                                    });
-                                    v.sort_unstable();
-                                    v.dedup_by(|(x1, x2, t1), (y1, y2, t2)| true & (*x1 == *y1) & (*x2 == *y2));
+                            self.hash_index_2_0.retain(|&(x2, x0), v| {
+                                if uf.math_.is_root(x2) & uf.math_.is_root(x0) {
+                                    v.retain(|&mut (x1, _timestamp)| uf.math_.is_root(x1));
                                     true
                                 } else {
                                     false
@@ -11129,12 +11983,26 @@ fn edgecase0() {
                                     .push((x1, latest_timestamp));
                             }
                         });
+                        #[cfg(debug_assertions)]
+                        {
+                            self.hash_index_2_0.iter().for_each(|(&(x2, x0), v)| {
+                                let mut v = v.clone();
+                                let n = v.len();
+                                v.sort();
+                                v.dedup_by(|(x1, t1), (y1, t2)| true & (*x1 == *y1));
+                                assert_eq!(n, v.len(), "indexes do not have duplicates");
+                                assert!(uf.math_.is_root(x2) & uf.math_.is_root(x0), "key is root");
+                                v.iter().copied().for_each(|(x1, _timestamp)| {
+                                    assert!(uf.math_.is_root(x1), "value is root");
+                                });
+                            });
+                        }
                         log_duration!("retain index: {}", {
-                            self.hash_index_2_0.retain(|&(x2, x0), v| {
-                                if uf.math_.is_root(x2) & uf.math_.is_root(x0) {
-                                    v.retain(|&mut (x1, _timestamp)| uf.math_.is_root(x1));
-                                    v.sort_unstable();
-                                    v.dedup_by(|(x1, t1), (y1, t2)| true & (*x1 == *y1));
+                            self.hash_index_2.retain(|&(x2,), v| {
+                                if uf.math_.is_root(x2) {
+                                    v.retain(|&mut (x0, x1, _timestamp)| {
+                                        uf.math_.is_root(x0) & uf.math_.is_root(x1)
+                                    });
                                     true
                                 } else {
                                     false
@@ -11149,14 +12017,24 @@ fn edgecase0() {
                                     .push((x0, x1, latest_timestamp));
                             }
                         });
+                        #[cfg(debug_assertions)]
+                        {
+                            self.hash_index_2.iter().for_each(|(&(x2,), v)| {
+                                let mut v = v.clone();
+                                let n = v.len();
+                                v.sort();
+                                v.dedup_by(|(x0, x1, t1), (y0, y1, t2)| true & (*x0 == *y0) & (*x1 == *y1));
+                                assert_eq!(n, v.len(), "indexes do not have duplicates");
+                                assert!(uf.math_.is_root(x2), "key is root");
+                                v.iter().copied().for_each(|(x0, x1, _timestamp)| {
+                                    assert!(uf.math_.is_root(x0) & uf.math_.is_root(x1), "value is root");
+                                });
+                            });
+                        }
                         log_duration!("retain index: {}", {
-                            self.hash_index_2.retain(|&(x2,), v| {
-                                if uf.math_.is_root(x2) {
-                                    v.retain(|&mut (x0, x1, _timestamp)| {
-                                        uf.math_.is_root(x0) & uf.math_.is_root(x1)
-                                    });
-                                    v.sort_unstable();
-                                    v.dedup_by(|(x0, x1, t1), (y0, y1, t2)| true & (*x0 == *y0) & (*x1 == *y1));
+                            self.hash_index_0_1_2.retain(|&(x0, x1, x2), v| {
+                                if uf.math_.is_root(x0) & uf.math_.is_root(x1) & uf.math_.is_root(x2) {
+                                    v.retain(|&mut (_timestamp)| true);
                                     true
                                 } else {
                                     false
@@ -11171,18 +12049,23 @@ fn edgecase0() {
                                     .push((latest_timestamp,));
                             }
                         });
-                        log_duration!("retain index: {}", {
-                            self.hash_index_0_1_2.retain(|&(x0, x1, x2), v| {
-                                if uf.math_.is_root(x0) & uf.math_.is_root(x1) & uf.math_.is_root(x2) {
-                                    v.retain(|&mut (_timestamp)| true);
-                                    v.sort_unstable();
-                                    v.dedup_by(|(t1,), (t2,)| true);
-                                    true
-                                } else {
-                                    false
-                                }
+                        #[cfg(debug_assertions)]
+                        {
+                            self.hash_index_0_1_2.iter().for_each(|(&(x0, x1, x2), v)| {
+                                let mut v = v.clone();
+                                let n = v.len();
+                                v.sort();
+                                v.dedup_by(|(t1,), (t2,)| true);
+                                assert_eq!(n, v.len(), "indexes do not have duplicates");
+                                assert!(
+                                    uf.math_.is_root(x0) & uf.math_.is_root(x1) & uf.math_.is_root(x2),
+                                    "key is root"
+                                );
+                                v.iter().copied().for_each(|(_timestamp)| {
+                                    assert!(true, "value is root");
+                                });
                             });
-                        });
+                        }
                     });
                     self.math_num_uprooted_at_latest_retain = 0;
                 }
@@ -11443,6 +12326,28 @@ fn edgecase0() {
                             RadixSortable::wrap(&mut self.new).voracious_sort();
                             self.new.dedup();
                         });
+                        #[cfg(debug_assertions)]
+                        {
+                            self.new.iter().for_each(|&(x0, x1, x2)| {
+                                assert_eq!(
+                                    (x0, x1, x2,),
+                                    (uf.math_.find(x0), uf.math_.find(x1), uf.math_.find(x2),),
+                                    "new is canonical"
+                                );
+                            });
+                        }
+                        log_duration!("retain index: {}", {
+                            self.hash_index_0.retain(|&(x0,), v| {
+                                if uf.math_.is_root(x0) {
+                                    v.retain(|&mut (x1, x2, _timestamp)| {
+                                        uf.math_.is_root(x1) & uf.math_.is_root(x2)
+                                    });
+                                    true
+                                } else {
+                                    false
+                                }
+                            });
+                        });
                         log_duration!("fill index: {}", {
                             for &(x0, x1, x2) in &self.new {
                                 self.hash_index_0
@@ -11451,14 +12356,26 @@ fn edgecase0() {
                                     .push((x1, x2, latest_timestamp));
                             }
                         });
+                        #[cfg(debug_assertions)]
+                        {
+                            self.hash_index_0.iter().for_each(|(&(x0,), v)| {
+                                let mut v = v.clone();
+                                let n = v.len();
+                                v.sort();
+                                v.dedup_by(|(x1, x2, t1), (y1, y2, t2)| true & (*x1 == *y1) & (*x2 == *y2));
+                                assert_eq!(n, v.len(), "indexes do not have duplicates");
+                                assert!(uf.math_.is_root(x0), "key is root");
+                                v.iter().copied().for_each(|(x1, x2, _timestamp)| {
+                                    assert!(uf.math_.is_root(x1) & uf.math_.is_root(x2), "value is root");
+                                });
+                            });
+                        }
                         log_duration!("retain index: {}", {
-                            self.hash_index_0.retain(|&(x0,), v| {
-                                if uf.math_.is_root(x0) {
-                                    v.retain(|&mut (x1, x2, _timestamp)| {
-                                        uf.math_.is_root(x1) & uf.math_.is_root(x2)
+                            self.hash_index_1.retain(|&(x1,), v| {
+                                if uf.math_.is_root(x1) {
+                                    v.retain(|&mut (x0, x2, _timestamp)| {
+                                        uf.math_.is_root(x0) & uf.math_.is_root(x2)
                                     });
-                                    v.sort_unstable();
-                                    v.dedup_by(|(x1, x2, t1), (y1, y2, t2)| true & (*x1 == *y1) & (*x2 == *y2));
                                     true
                                 } else {
                                     false
@@ -11473,14 +12390,24 @@ fn edgecase0() {
                                     .push((x0, x2, latest_timestamp));
                             }
                         });
+                        #[cfg(debug_assertions)]
+                        {
+                            self.hash_index_1.iter().for_each(|(&(x1,), v)| {
+                                let mut v = v.clone();
+                                let n = v.len();
+                                v.sort();
+                                v.dedup_by(|(x0, x2, t1), (y0, y2, t2)| true & (*x0 == *y0) & (*x2 == *y2));
+                                assert_eq!(n, v.len(), "indexes do not have duplicates");
+                                assert!(uf.math_.is_root(x1), "key is root");
+                                v.iter().copied().for_each(|(x0, x2, _timestamp)| {
+                                    assert!(uf.math_.is_root(x0) & uf.math_.is_root(x2), "value is root");
+                                });
+                            });
+                        }
                         log_duration!("retain index: {}", {
-                            self.hash_index_1.retain(|&(x1,), v| {
-                                if uf.math_.is_root(x1) {
-                                    v.retain(|&mut (x0, x2, _timestamp)| {
-                                        uf.math_.is_root(x0) & uf.math_.is_root(x2)
-                                    });
-                                    v.sort_unstable();
-                                    v.dedup_by(|(x0, x2, t1), (y0, y2, t2)| true & (*x0 == *y0) & (*x2 == *y2));
+                            self.hash_index_0_1_2.retain(|&(x0, x1, x2), v| {
+                                if uf.math_.is_root(x0) & uf.math_.is_root(x1) & uf.math_.is_root(x2) {
+                                    v.retain(|&mut (_timestamp)| true);
                                     true
                                 } else {
                                     false
@@ -11495,18 +12422,23 @@ fn edgecase0() {
                                     .push((latest_timestamp,));
                             }
                         });
-                        log_duration!("retain index: {}", {
-                            self.hash_index_0_1_2.retain(|&(x0, x1, x2), v| {
-                                if uf.math_.is_root(x0) & uf.math_.is_root(x1) & uf.math_.is_root(x2) {
-                                    v.retain(|&mut (_timestamp)| true);
-                                    v.sort_unstable();
-                                    v.dedup_by(|(t1,), (t2,)| true);
-                                    true
-                                } else {
-                                    false
-                                }
+                        #[cfg(debug_assertions)]
+                        {
+                            self.hash_index_0_1_2.iter().for_each(|(&(x0, x1, x2), v)| {
+                                let mut v = v.clone();
+                                let n = v.len();
+                                v.sort();
+                                v.dedup_by(|(t1,), (t2,)| true);
+                                assert_eq!(n, v.len(), "indexes do not have duplicates");
+                                assert!(
+                                    uf.math_.is_root(x0) & uf.math_.is_root(x1) & uf.math_.is_root(x2),
+                                    "key is root"
+                                );
+                                v.iter().copied().for_each(|(_timestamp)| {
+                                    assert!(true, "value is root");
+                                });
                             });
-                        });
+                        }
                     });
                     self.math_num_uprooted_at_latest_retain = 0;
                 }
@@ -11987,6 +12919,28 @@ fn test_into_codegen() {
                             RadixSortable::wrap(&mut self.new).voracious_sort();
                             self.new.dedup();
                         });
+                        #[cfg(debug_assertions)]
+                        {
+                            self.new.iter().for_each(|&(x0, x1, x2)| {
+                                assert_eq!(
+                                    (x0, x1, x2,),
+                                    (uf.math_.find(x0), uf.math_.find(x1), uf.math_.find(x2),),
+                                    "new is canonical"
+                                );
+                            });
+                        }
+                        log_duration!("retain index: {}", {
+                            self.hash_index_0.retain(|&(x0,), v| {
+                                if uf.math_.is_root(x0) {
+                                    v.retain(|&mut (x1, x2, _timestamp)| {
+                                        uf.math_.is_root(x1) & uf.math_.is_root(x2)
+                                    });
+                                    true
+                                } else {
+                                    false
+                                }
+                            });
+                        });
                         log_duration!("fill index: {}", {
                             for &(x0, x1, x2) in &self.new {
                                 self.hash_index_0
@@ -11995,14 +12949,24 @@ fn test_into_codegen() {
                                     .push((x1, x2, latest_timestamp));
                             }
                         });
+                        #[cfg(debug_assertions)]
+                        {
+                            self.hash_index_0.iter().for_each(|(&(x0,), v)| {
+                                let mut v = v.clone();
+                                let n = v.len();
+                                v.sort();
+                                v.dedup_by(|(x1, x2, t1), (y1, y2, t2)| true & (*x1 == *y1) & (*x2 == *y2));
+                                assert_eq!(n, v.len(), "indexes do not have duplicates");
+                                assert!(uf.math_.is_root(x0), "key is root");
+                                v.iter().copied().for_each(|(x1, x2, _timestamp)| {
+                                    assert!(uf.math_.is_root(x1) & uf.math_.is_root(x2), "value is root");
+                                });
+                            });
+                        }
                         log_duration!("retain index: {}", {
-                            self.hash_index_0.retain(|&(x0,), v| {
-                                if uf.math_.is_root(x0) {
-                                    v.retain(|&mut (x1, x2, _timestamp)| {
-                                        uf.math_.is_root(x1) & uf.math_.is_root(x2)
-                                    });
-                                    v.sort_unstable();
-                                    v.dedup_by(|(x1, x2, t1), (y1, y2, t2)| true & (*x1 == *y1) & (*x2 == *y2));
+                            self.hash_index_0_1_2.retain(|&(x0, x1, x2), v| {
+                                if uf.math_.is_root(x0) & uf.math_.is_root(x1) & uf.math_.is_root(x2) {
+                                    v.retain(|&mut (_timestamp)| true);
                                     true
                                 } else {
                                     false
@@ -12017,18 +12981,23 @@ fn test_into_codegen() {
                                     .push((latest_timestamp,));
                             }
                         });
-                        log_duration!("retain index: {}", {
-                            self.hash_index_0_1_2.retain(|&(x0, x1, x2), v| {
-                                if uf.math_.is_root(x0) & uf.math_.is_root(x1) & uf.math_.is_root(x2) {
-                                    v.retain(|&mut (_timestamp)| true);
-                                    v.sort_unstable();
-                                    v.dedup_by(|(t1,), (t2,)| true);
-                                    true
-                                } else {
-                                    false
-                                }
+                        #[cfg(debug_assertions)]
+                        {
+                            self.hash_index_0_1_2.iter().for_each(|(&(x0, x1, x2), v)| {
+                                let mut v = v.clone();
+                                let n = v.len();
+                                v.sort();
+                                v.dedup_by(|(t1,), (t2,)| true);
+                                assert_eq!(n, v.len(), "indexes do not have duplicates");
+                                assert!(
+                                    uf.math_.is_root(x0) & uf.math_.is_root(x1) & uf.math_.is_root(x2),
+                                    "key is root"
+                                );
+                                v.iter().copied().for_each(|(_timestamp)| {
+                                    assert!(true, "value is root");
+                                });
                             });
-                        });
+                        }
                     });
                     self.math_num_uprooted_at_latest_retain = 0;
                 }
@@ -12239,6 +13208,28 @@ fn test_into_codegen() {
                             RadixSortable::wrap(&mut self.new).voracious_sort();
                             self.new.dedup();
                         });
+                        #[cfg(debug_assertions)]
+                        {
+                            self.new.iter().for_each(|&(x0, x1, x2)| {
+                                assert_eq!(
+                                    (x0, x1, x2,),
+                                    (uf.math_.find(x0), uf.math_.find(x1), uf.math_.find(x2),),
+                                    "new is canonical"
+                                );
+                            });
+                        }
+                        log_duration!("retain index: {}", {
+                            self.hash_index_2.retain(|&(x2,), v| {
+                                if uf.math_.is_root(x2) {
+                                    v.retain(|&mut (x0, x1, _timestamp)| {
+                                        uf.math_.is_root(x0) & uf.math_.is_root(x1)
+                                    });
+                                    true
+                                } else {
+                                    false
+                                }
+                            });
+                        });
                         log_duration!("fill index: {}", {
                             for &(x0, x1, x2) in &self.new {
                                 self.hash_index_2
@@ -12247,14 +13238,24 @@ fn test_into_codegen() {
                                     .push((x0, x1, latest_timestamp));
                             }
                         });
+                        #[cfg(debug_assertions)]
+                        {
+                            self.hash_index_2.iter().for_each(|(&(x2,), v)| {
+                                let mut v = v.clone();
+                                let n = v.len();
+                                v.sort();
+                                v.dedup_by(|(x0, x1, t1), (y0, y1, t2)| true & (*x0 == *y0) & (*x1 == *y1));
+                                assert_eq!(n, v.len(), "indexes do not have duplicates");
+                                assert!(uf.math_.is_root(x2), "key is root");
+                                v.iter().copied().for_each(|(x0, x1, _timestamp)| {
+                                    assert!(uf.math_.is_root(x0) & uf.math_.is_root(x1), "value is root");
+                                });
+                            });
+                        }
                         log_duration!("retain index: {}", {
-                            self.hash_index_2.retain(|&(x2,), v| {
-                                if uf.math_.is_root(x2) {
-                                    v.retain(|&mut (x0, x1, _timestamp)| {
-                                        uf.math_.is_root(x0) & uf.math_.is_root(x1)
-                                    });
-                                    v.sort_unstable();
-                                    v.dedup_by(|(x0, x1, t1), (y0, y1, t2)| true & (*x0 == *y0) & (*x1 == *y1));
+                            self.hash_index_0_1_2.retain(|&(x0, x1, x2), v| {
+                                if uf.math_.is_root(x0) & uf.math_.is_root(x1) & uf.math_.is_root(x2) {
+                                    v.retain(|&mut (_timestamp)| true);
                                     true
                                 } else {
                                     false
@@ -12269,18 +13270,23 @@ fn test_into_codegen() {
                                     .push((latest_timestamp,));
                             }
                         });
-                        log_duration!("retain index: {}", {
-                            self.hash_index_0_1_2.retain(|&(x0, x1, x2), v| {
-                                if uf.math_.is_root(x0) & uf.math_.is_root(x1) & uf.math_.is_root(x2) {
-                                    v.retain(|&mut (_timestamp)| true);
-                                    v.sort_unstable();
-                                    v.dedup_by(|(t1,), (t2,)| true);
-                                    true
-                                } else {
-                                    false
-                                }
+                        #[cfg(debug_assertions)]
+                        {
+                            self.hash_index_0_1_2.iter().for_each(|(&(x0, x1, x2), v)| {
+                                let mut v = v.clone();
+                                let n = v.len();
+                                v.sort();
+                                v.dedup_by(|(t1,), (t2,)| true);
+                                assert_eq!(n, v.len(), "indexes do not have duplicates");
+                                assert!(
+                                    uf.math_.is_root(x0) & uf.math_.is_root(x1) & uf.math_.is_root(x2),
+                                    "key is root"
+                                );
+                                v.iter().copied().for_each(|(_timestamp)| {
+                                    assert!(true, "value is root");
+                                });
                             });
-                        });
+                        }
                     });
                     self.math_num_uprooted_at_latest_retain = 0;
                 }
@@ -15139,6 +16145,26 @@ fn lir_math() {
                             RadixSortable::wrap(&mut self.new).voracious_sort();
                             self.new.dedup();
                         });
+                        #[cfg(debug_assertions)]
+                        {
+                            self.new.iter().for_each(|&(x0, x1)| {
+                                assert_eq!(
+                                    (x0, x1,),
+                                    (uf.fuel_unit_.find(x0), uf.fuel_unit_.find(x1),),
+                                    "new is canonical"
+                                );
+                            });
+                        }
+                        log_duration!("retain index: {}", {
+                            self.hash_index_1.retain(|&(x1,), v| {
+                                if uf.fuel_unit_.is_root(x1) {
+                                    v.retain(|&mut (x0, _timestamp)| uf.fuel_unit_.is_root(x0));
+                                    true
+                                } else {
+                                    false
+                                }
+                            });
+                        });
                         log_duration!("fill index: {}", {
                             for &(x0, x1) in &self.new {
                                 self.hash_index_1
@@ -15147,12 +16173,24 @@ fn lir_math() {
                                     .push((x0, latest_timestamp));
                             }
                         });
+                        #[cfg(debug_assertions)]
+                        {
+                            self.hash_index_1.iter().for_each(|(&(x1,), v)| {
+                                let mut v = v.clone();
+                                let n = v.len();
+                                v.sort();
+                                v.dedup_by(|(x0, t1), (y0, t2)| true & (*x0 == *y0));
+                                assert_eq!(n, v.len(), "indexes do not have duplicates");
+                                assert!(uf.fuel_unit_.is_root(x1), "key is root");
+                                v.iter().copied().for_each(|(x0, _timestamp)| {
+                                    assert!(uf.fuel_unit_.is_root(x0), "value is root");
+                                });
+                            });
+                        }
                         log_duration!("retain index: {}", {
-                            self.hash_index_1.retain(|&(x1,), v| {
-                                if uf.fuel_unit_.is_root(x1) {
-                                    v.retain(|&mut (x0, _timestamp)| uf.fuel_unit_.is_root(x0));
-                                    v.sort_unstable();
-                                    v.dedup_by(|(x0, t1), (y0, t2)| true & (*x0 == *y0));
+                            self.hash_index_0_1.retain(|&(x0, x1), v| {
+                                if uf.fuel_unit_.is_root(x0) & uf.fuel_unit_.is_root(x1) {
+                                    v.retain(|&mut (_timestamp)| true);
                                     true
                                 } else {
                                     false
@@ -15167,18 +16205,23 @@ fn lir_math() {
                                     .push((latest_timestamp,));
                             }
                         });
-                        log_duration!("retain index: {}", {
-                            self.hash_index_0_1.retain(|&(x0, x1), v| {
-                                if uf.fuel_unit_.is_root(x0) & uf.fuel_unit_.is_root(x1) {
-                                    v.retain(|&mut (_timestamp)| true);
-                                    v.sort_unstable();
-                                    v.dedup_by(|(t1,), (t2,)| true);
-                                    true
-                                } else {
-                                    false
-                                }
+                        #[cfg(debug_assertions)]
+                        {
+                            self.hash_index_0_1.iter().for_each(|(&(x0, x1), v)| {
+                                let mut v = v.clone();
+                                let n = v.len();
+                                v.sort();
+                                v.dedup_by(|(t1,), (t2,)| true);
+                                assert_eq!(n, v.len(), "indexes do not have duplicates");
+                                assert!(
+                                    uf.fuel_unit_.is_root(x0) & uf.fuel_unit_.is_root(x1),
+                                    "key is root"
+                                );
+                                v.iter().copied().for_each(|(_timestamp)| {
+                                    assert!(true, "value is root");
+                                });
                             });
-                        });
+                        }
                     });
                     self.fuel_unit_num_uprooted_at_latest_retain = 0;
                 }
@@ -15377,6 +16420,22 @@ fn lir_math() {
                             RadixSortable::wrap(&mut self.new).voracious_sort();
                             self.new.dedup();
                         });
+                        #[cfg(debug_assertions)]
+                        {
+                            self.new.iter().for_each(|&(x0,)| {
+                                assert_eq!((x0,), (uf.fuel_unit_.find(x0),), "new is canonical");
+                            });
+                        }
+                        log_duration!("retain index: {}", {
+                            self.hash_index_0.retain(|&(x0,), v| {
+                                if uf.fuel_unit_.is_root(x0) {
+                                    v.retain(|&mut (_timestamp)| true);
+                                    true
+                                } else {
+                                    false
+                                }
+                            });
+                        });
                         log_duration!("fill index: {}", {
                             for &(x0,) in &self.new {
                                 self.hash_index_0
@@ -15385,18 +16444,20 @@ fn lir_math() {
                                     .push((latest_timestamp,));
                             }
                         });
-                        log_duration!("retain index: {}", {
-                            self.hash_index_0.retain(|&(x0,), v| {
-                                if uf.fuel_unit_.is_root(x0) {
-                                    v.retain(|&mut (_timestamp)| true);
-                                    v.sort_unstable();
-                                    v.dedup_by(|(t1,), (t2,)| true);
-                                    true
-                                } else {
-                                    false
-                                }
+                        #[cfg(debug_assertions)]
+                        {
+                            self.hash_index_0.iter().for_each(|(&(x0,), v)| {
+                                let mut v = v.clone();
+                                let n = v.len();
+                                v.sort();
+                                v.dedup_by(|(t1,), (t2,)| true);
+                                assert_eq!(n, v.len(), "indexes do not have duplicates");
+                                assert!(uf.fuel_unit_.is_root(x0), "key is root");
+                                v.iter().copied().for_each(|(_timestamp)| {
+                                    assert!(true, "value is root");
+                                });
                             });
-                        });
+                        }
                     });
                     self.fuel_unit_num_uprooted_at_latest_retain = 0;
                 }
@@ -15571,6 +16632,28 @@ fn lir_math() {
                             RadixSortable::wrap(&mut self.new).voracious_sort();
                             self.new.dedup();
                         });
+                        #[cfg(debug_assertions)]
+                        {
+                            self.new.iter().for_each(|&(x0, x1, x2)| {
+                                assert_eq!(
+                                    (x0, x1, x2,),
+                                    (uf.math_.find(x0), uf.math_.find(x1), uf.math_.find(x2),),
+                                    "new is canonical"
+                                );
+                            });
+                        }
+                        log_duration!("retain index: {}", {
+                            self.hash_index_1.retain(|&(x1,), v| {
+                                if uf.math_.is_root(x1) {
+                                    v.retain(|&mut (x0, x2, _timestamp)| {
+                                        uf.math_.is_root(x0) & uf.math_.is_root(x2)
+                                    });
+                                    true
+                                } else {
+                                    false
+                                }
+                            });
+                        });
                         log_duration!("fill index: {}", {
                             for &(x0, x1, x2) in &self.new {
                                 self.hash_index_1
@@ -15579,14 +16662,24 @@ fn lir_math() {
                                     .push((x0, x2, latest_timestamp));
                             }
                         });
+                        #[cfg(debug_assertions)]
+                        {
+                            self.hash_index_1.iter().for_each(|(&(x1,), v)| {
+                                let mut v = v.clone();
+                                let n = v.len();
+                                v.sort();
+                                v.dedup_by(|(x0, x2, t1), (y0, y2, t2)| true & (*x0 == *y0) & (*x2 == *y2));
+                                assert_eq!(n, v.len(), "indexes do not have duplicates");
+                                assert!(uf.math_.is_root(x1), "key is root");
+                                v.iter().copied().for_each(|(x0, x2, _timestamp)| {
+                                    assert!(uf.math_.is_root(x0) & uf.math_.is_root(x2), "value is root");
+                                });
+                            });
+                        }
                         log_duration!("retain index: {}", {
-                            self.hash_index_1.retain(|&(x1,), v| {
-                                if uf.math_.is_root(x1) {
-                                    v.retain(|&mut (x0, x2, _timestamp)| {
-                                        uf.math_.is_root(x0) & uf.math_.is_root(x2)
-                                    });
-                                    v.sort_unstable();
-                                    v.dedup_by(|(x0, x2, t1), (y0, y2, t2)| true & (*x0 == *y0) & (*x2 == *y2));
+                            self.hash_index_1_0_2.retain(|&(x1, x0, x2), v| {
+                                if uf.math_.is_root(x1) & uf.math_.is_root(x0) & uf.math_.is_root(x2) {
+                                    v.retain(|&mut (_timestamp)| true);
                                     true
                                 } else {
                                     false
@@ -15601,18 +16694,23 @@ fn lir_math() {
                                     .push((latest_timestamp,));
                             }
                         });
-                        log_duration!("retain index: {}", {
-                            self.hash_index_1_0_2.retain(|&(x1, x0, x2), v| {
-                                if uf.math_.is_root(x1) & uf.math_.is_root(x0) & uf.math_.is_root(x2) {
-                                    v.retain(|&mut (_timestamp)| true);
-                                    v.sort_unstable();
-                                    v.dedup_by(|(t1,), (t2,)| true);
-                                    true
-                                } else {
-                                    false
-                                }
+                        #[cfg(debug_assertions)]
+                        {
+                            self.hash_index_1_0_2.iter().for_each(|(&(x1, x0, x2), v)| {
+                                let mut v = v.clone();
+                                let n = v.len();
+                                v.sort();
+                                v.dedup_by(|(t1,), (t2,)| true);
+                                assert_eq!(n, v.len(), "indexes do not have duplicates");
+                                assert!(
+                                    uf.math_.is_root(x1) & uf.math_.is_root(x0) & uf.math_.is_root(x2),
+                                    "key is root"
+                                );
+                                v.iter().copied().for_each(|(_timestamp)| {
+                                    assert!(true, "value is root");
+                                });
                             });
-                        });
+                        }
                     });
                     self.math_num_uprooted_at_latest_retain = 0;
                 }
@@ -15841,6 +16939,33 @@ fn lir_math() {
                             RadixSortable::wrap(&mut self.new).voracious_sort();
                             self.new.dedup();
                         });
+                        #[cfg(debug_assertions)]
+                        {
+                            self.new.iter().for_each(|&(x0, x1, x2, x3)| {
+                                assert_eq!(
+                                    (x0, x1, x2, x3,),
+                                    (
+                                        uf.fuel_unit_.find(x0),
+                                        uf.math_.find(x1),
+                                        uf.math_.find(x2),
+                                        uf.math_.find(x3),
+                                    ),
+                                    "new is canonical"
+                                );
+                            });
+                        }
+                        log_duration!("retain index: {}", {
+                            self.hash_index_0.retain(|&(x0,), v| {
+                                if uf.fuel_unit_.is_root(x0) {
+                                    v.retain(|&mut (x1, x2, x3, _timestamp)| {
+                                        uf.math_.is_root(x1) & uf.math_.is_root(x2) & uf.math_.is_root(x3)
+                                    });
+                                    true
+                                } else {
+                                    false
+                                }
+                            });
+                        });
                         log_duration!("fill index: {}", {
                             for &(x0, x1, x2, x3) in &self.new {
                                 self.hash_index_0.entry((x0,)).or_default().push((
@@ -15851,15 +16976,30 @@ fn lir_math() {
                                 ));
                             }
                         });
+                        #[cfg(debug_assertions)]
+                        {
+                            self.hash_index_0.iter().for_each(|(&(x0,), v)| {
+                                let mut v = v.clone();
+                                let n = v.len();
+                                v.sort();
+                                v.dedup_by(|(x1, x2, x3, t1), (y1, y2, y3, t2)| {
+                                    true & (*x1 == *y1) & (*x2 == *y2) & (*x3 == *y3)
+                                });
+                                assert_eq!(n, v.len(), "indexes do not have duplicates");
+                                assert!(uf.fuel_unit_.is_root(x0), "key is root");
+                                v.iter().copied().for_each(|(x1, x2, x3, _timestamp)| {
+                                    assert!(
+                                        uf.math_.is_root(x1) & uf.math_.is_root(x2) & uf.math_.is_root(x3),
+                                        "value is root"
+                                    );
+                                });
+                            });
+                        }
                         log_duration!("retain index: {}", {
-                            self.hash_index_0.retain(|&(x0,), v| {
-                                if uf.fuel_unit_.is_root(x0) {
-                                    v.retain(|&mut (x1, x2, x3, _timestamp)| {
-                                        uf.math_.is_root(x1) & uf.math_.is_root(x2) & uf.math_.is_root(x3)
-                                    });
-                                    v.sort_unstable();
-                                    v.dedup_by(|(x1, x2, x3, t1), (y1, y2, y3, t2)| {
-                                        true & (*x1 == *y1) & (*x2 == *y2) & (*x3 == *y3)
+                            self.hash_index_1.retain(|&(x1,), v| {
+                                if uf.math_.is_root(x1) {
+                                    v.retain(|&mut (x2, x0, x3, _timestamp)| {
+                                        uf.math_.is_root(x2) & uf.fuel_unit_.is_root(x0) & uf.math_.is_root(x3)
                                     });
                                     true
                                 } else {
@@ -15877,15 +17017,30 @@ fn lir_math() {
                                 ));
                             }
                         });
+                        #[cfg(debug_assertions)]
+                        {
+                            self.hash_index_1.iter().for_each(|(&(x1,), v)| {
+                                let mut v = v.clone();
+                                let n = v.len();
+                                v.sort();
+                                v.dedup_by(|(x2, x0, x3, t1), (y2, y0, y3, t2)| {
+                                    true & (*x2 == *y2) & (*x0 == *y0) & (*x3 == *y3)
+                                });
+                                assert_eq!(n, v.len(), "indexes do not have duplicates");
+                                assert!(uf.math_.is_root(x1), "key is root");
+                                v.iter().copied().for_each(|(x2, x0, x3, _timestamp)| {
+                                    assert!(
+                                        uf.math_.is_root(x2) & uf.fuel_unit_.is_root(x0) & uf.math_.is_root(x3),
+                                        "value is root"
+                                    );
+                                });
+                            });
+                        }
                         log_duration!("retain index: {}", {
-                            self.hash_index_1.retain(|&(x1,), v| {
-                                if uf.math_.is_root(x1) {
-                                    v.retain(|&mut (x2, x0, x3, _timestamp)| {
-                                        uf.math_.is_root(x2) & uf.fuel_unit_.is_root(x0) & uf.math_.is_root(x3)
-                                    });
-                                    v.sort_unstable();
-                                    v.dedup_by(|(x2, x0, x3, t1), (y2, y0, y3, t2)| {
-                                        true & (*x2 == *y2) & (*x0 == *y0) & (*x3 == *y3)
+                            self.hash_index_1_2.retain(|&(x1, x2), v| {
+                                if uf.math_.is_root(x1) & uf.math_.is_root(x2) {
+                                    v.retain(|&mut (x0, x3, _timestamp)| {
+                                        uf.fuel_unit_.is_root(x0) & uf.math_.is_root(x3)
                                     });
                                     true
                                 } else {
@@ -15902,14 +17057,31 @@ fn lir_math() {
                                 ));
                             }
                         });
+                        #[cfg(debug_assertions)]
+                        {
+                            self.hash_index_1_2.iter().for_each(|(&(x1, x2), v)| {
+                                let mut v = v.clone();
+                                let n = v.len();
+                                v.sort();
+                                v.dedup_by(|(x0, x3, t1), (y0, y3, t2)| true & (*x0 == *y0) & (*x3 == *y3));
+                                assert_eq!(n, v.len(), "indexes do not have duplicates");
+                                assert!(uf.math_.is_root(x1) & uf.math_.is_root(x2), "key is root");
+                                v.iter().copied().for_each(|(x0, x3, _timestamp)| {
+                                    assert!(
+                                        uf.fuel_unit_.is_root(x0) & uf.math_.is_root(x3),
+                                        "value is root"
+                                    );
+                                });
+                            });
+                        }
                         log_duration!("retain index: {}", {
-                            self.hash_index_1_2.retain(|&(x1, x2), v| {
-                                if uf.math_.is_root(x1) & uf.math_.is_root(x2) {
-                                    v.retain(|&mut (x0, x3, _timestamp)| {
-                                        uf.fuel_unit_.is_root(x0) & uf.math_.is_root(x3)
-                                    });
-                                    v.sort_unstable();
-                                    v.dedup_by(|(x0, x3, t1), (y0, y3, t2)| true & (*x0 == *y0) & (*x3 == *y3));
+                            self.hash_index_0_1_2_3.retain(|&(x0, x1, x2, x3), v| {
+                                if uf.fuel_unit_.is_root(x0)
+                                    & uf.math_.is_root(x1)
+                                    & uf.math_.is_root(x2)
+                                    & uf.math_.is_root(x3)
+                                {
+                                    v.retain(|&mut (_timestamp)| true);
                                     true
                                 } else {
                                     false
@@ -15924,22 +17096,28 @@ fn lir_math() {
                                     .push((latest_timestamp,));
                             }
                         });
-                        log_duration!("retain index: {}", {
-                            self.hash_index_0_1_2_3.retain(|&(x0, x1, x2, x3), v| {
-                                if uf.fuel_unit_.is_root(x0)
-                                    & uf.math_.is_root(x1)
-                                    & uf.math_.is_root(x2)
-                                    & uf.math_.is_root(x3)
-                                {
-                                    v.retain(|&mut (_timestamp)| true);
-                                    v.sort_unstable();
+                        #[cfg(debug_assertions)]
+                        {
+                            self.hash_index_0_1_2_3
+                                .iter()
+                                .for_each(|(&(x0, x1, x2, x3), v)| {
+                                    let mut v = v.clone();
+                                    let n = v.len();
+                                    v.sort();
                                     v.dedup_by(|(t1,), (t2,)| true);
-                                    true
-                                } else {
-                                    false
-                                }
-                            });
-                        });
+                                    assert_eq!(n, v.len(), "indexes do not have duplicates");
+                                    assert!(
+                                        uf.fuel_unit_.is_root(x0)
+                                            & uf.math_.is_root(x1)
+                                            & uf.math_.is_root(x2)
+                                            & uf.math_.is_root(x3),
+                                        "key is root"
+                                    );
+                                    v.iter().copied().for_each(|(_timestamp)| {
+                                        assert!(true, "value is root");
+                                    });
+                                });
+                        }
                     });
                     self.fuel_unit_num_uprooted_at_latest_retain = 0;
                     self.math_num_uprooted_at_latest_retain = 0;
@@ -16235,6 +17413,28 @@ fn lir_math() {
                             RadixSortable::wrap(&mut self.new).voracious_sort();
                             self.new.dedup();
                         });
+                        #[cfg(debug_assertions)]
+                        {
+                            self.new.iter().for_each(|&(x0, x1, x2)| {
+                                assert_eq!(
+                                    (x0, x1, x2,),
+                                    (uf.math_.find(x0), uf.math_.find(x1), uf.math_.find(x2),),
+                                    "new is canonical"
+                                );
+                            });
+                        }
+                        log_duration!("retain index: {}", {
+                            self.hash_index_2.retain(|&(x2,), v| {
+                                if uf.math_.is_root(x2) {
+                                    v.retain(|&mut (x0, x1, _timestamp)| {
+                                        uf.math_.is_root(x0) & uf.math_.is_root(x1)
+                                    });
+                                    true
+                                } else {
+                                    false
+                                }
+                            });
+                        });
                         log_duration!("fill index: {}", {
                             for &(x0, x1, x2) in &self.new {
                                 self.hash_index_2
@@ -16243,14 +17443,26 @@ fn lir_math() {
                                     .push((x0, x1, latest_timestamp));
                             }
                         });
+                        #[cfg(debug_assertions)]
+                        {
+                            self.hash_index_2.iter().for_each(|(&(x2,), v)| {
+                                let mut v = v.clone();
+                                let n = v.len();
+                                v.sort();
+                                v.dedup_by(|(x0, x1, t1), (y0, y1, t2)| true & (*x0 == *y0) & (*x1 == *y1));
+                                assert_eq!(n, v.len(), "indexes do not have duplicates");
+                                assert!(uf.math_.is_root(x2), "key is root");
+                                v.iter().copied().for_each(|(x0, x1, _timestamp)| {
+                                    assert!(uf.math_.is_root(x0) & uf.math_.is_root(x1), "value is root");
+                                });
+                            });
+                        }
                         log_duration!("retain index: {}", {
-                            self.hash_index_2.retain(|&(x2,), v| {
-                                if uf.math_.is_root(x2) {
-                                    v.retain(|&mut (x0, x1, _timestamp)| {
-                                        uf.math_.is_root(x0) & uf.math_.is_root(x1)
+                            self.hash_index_1.retain(|&(x1,), v| {
+                                if uf.math_.is_root(x1) {
+                                    v.retain(|&mut (x0, x2, _timestamp)| {
+                                        uf.math_.is_root(x0) & uf.math_.is_root(x2)
                                     });
-                                    v.sort_unstable();
-                                    v.dedup_by(|(x0, x1, t1), (y0, y1, t2)| true & (*x0 == *y0) & (*x1 == *y1));
                                     true
                                 } else {
                                     false
@@ -16265,14 +17477,26 @@ fn lir_math() {
                                     .push((x0, x2, latest_timestamp));
                             }
                         });
+                        #[cfg(debug_assertions)]
+                        {
+                            self.hash_index_1.iter().for_each(|(&(x1,), v)| {
+                                let mut v = v.clone();
+                                let n = v.len();
+                                v.sort();
+                                v.dedup_by(|(x0, x2, t1), (y0, y2, t2)| true & (*x0 == *y0) & (*x2 == *y2));
+                                assert_eq!(n, v.len(), "indexes do not have duplicates");
+                                assert!(uf.math_.is_root(x1), "key is root");
+                                v.iter().copied().for_each(|(x0, x2, _timestamp)| {
+                                    assert!(uf.math_.is_root(x0) & uf.math_.is_root(x2), "value is root");
+                                });
+                            });
+                        }
                         log_duration!("retain index: {}", {
-                            self.hash_index_1.retain(|&(x1,), v| {
-                                if uf.math_.is_root(x1) {
-                                    v.retain(|&mut (x0, x2, _timestamp)| {
-                                        uf.math_.is_root(x0) & uf.math_.is_root(x2)
+                            self.hash_index_0.retain(|&(x0,), v| {
+                                if uf.math_.is_root(x0) {
+                                    v.retain(|&mut (x1, x2, _timestamp)| {
+                                        uf.math_.is_root(x1) & uf.math_.is_root(x2)
                                     });
-                                    v.sort_unstable();
-                                    v.dedup_by(|(x0, x2, t1), (y0, y2, t2)| true & (*x0 == *y0) & (*x2 == *y2));
                                     true
                                 } else {
                                     false
@@ -16287,14 +17511,24 @@ fn lir_math() {
                                     .push((x1, x2, latest_timestamp));
                             }
                         });
+                        #[cfg(debug_assertions)]
+                        {
+                            self.hash_index_0.iter().for_each(|(&(x0,), v)| {
+                                let mut v = v.clone();
+                                let n = v.len();
+                                v.sort();
+                                v.dedup_by(|(x1, x2, t1), (y1, y2, t2)| true & (*x1 == *y1) & (*x2 == *y2));
+                                assert_eq!(n, v.len(), "indexes do not have duplicates");
+                                assert!(uf.math_.is_root(x0), "key is root");
+                                v.iter().copied().for_each(|(x1, x2, _timestamp)| {
+                                    assert!(uf.math_.is_root(x1) & uf.math_.is_root(x2), "value is root");
+                                });
+                            });
+                        }
                         log_duration!("retain index: {}", {
-                            self.hash_index_0.retain(|&(x0,), v| {
-                                if uf.math_.is_root(x0) {
-                                    v.retain(|&mut (x1, x2, _timestamp)| {
-                                        uf.math_.is_root(x1) & uf.math_.is_root(x2)
-                                    });
-                                    v.sort_unstable();
-                                    v.dedup_by(|(x1, x2, t1), (y1, y2, t2)| true & (*x1 == *y1) & (*x2 == *y2));
+                            self.hash_index_1_0_2.retain(|&(x1, x0, x2), v| {
+                                if uf.math_.is_root(x1) & uf.math_.is_root(x0) & uf.math_.is_root(x2) {
+                                    v.retain(|&mut (_timestamp)| true);
                                     true
                                 } else {
                                     false
@@ -16309,18 +17543,23 @@ fn lir_math() {
                                     .push((latest_timestamp,));
                             }
                         });
-                        log_duration!("retain index: {}", {
-                            self.hash_index_1_0_2.retain(|&(x1, x0, x2), v| {
-                                if uf.math_.is_root(x1) & uf.math_.is_root(x0) & uf.math_.is_root(x2) {
-                                    v.retain(|&mut (_timestamp)| true);
-                                    v.sort_unstable();
-                                    v.dedup_by(|(t1,), (t2,)| true);
-                                    true
-                                } else {
-                                    false
-                                }
+                        #[cfg(debug_assertions)]
+                        {
+                            self.hash_index_1_0_2.iter().for_each(|(&(x1, x0, x2), v)| {
+                                let mut v = v.clone();
+                                let n = v.len();
+                                v.sort();
+                                v.dedup_by(|(t1,), (t2,)| true);
+                                assert_eq!(n, v.len(), "indexes do not have duplicates");
+                                assert!(
+                                    uf.math_.is_root(x1) & uf.math_.is_root(x0) & uf.math_.is_root(x2),
+                                    "key is root"
+                                );
+                                v.iter().copied().for_each(|(_timestamp)| {
+                                    assert!(true, "value is root");
+                                });
                             });
-                        });
+                        }
                     });
                     self.math_num_uprooted_at_latest_retain = 0;
                 }
@@ -16581,6 +17820,28 @@ fn lir_math() {
                             RadixSortable::wrap(&mut self.new).voracious_sort();
                             self.new.dedup();
                         });
+                        #[cfg(debug_assertions)]
+                        {
+                            self.new.iter().for_each(|&(x0, x1, x2)| {
+                                assert_eq!(
+                                    (x0, x1, x2,),
+                                    (uf.math_.find(x0), uf.math_.find(x1), uf.math_.find(x2),),
+                                    "new is canonical"
+                                );
+                            });
+                        }
+                        log_duration!("retain index: {}", {
+                            self.hash_index_2.retain(|&(x2,), v| {
+                                if uf.math_.is_root(x2) {
+                                    v.retain(|&mut (x0, x1, _timestamp)| {
+                                        uf.math_.is_root(x0) & uf.math_.is_root(x1)
+                                    });
+                                    true
+                                } else {
+                                    false
+                                }
+                            });
+                        });
                         log_duration!("fill index: {}", {
                             for &(x0, x1, x2) in &self.new {
                                 self.hash_index_2
@@ -16589,14 +17850,24 @@ fn lir_math() {
                                     .push((x0, x1, latest_timestamp));
                             }
                         });
+                        #[cfg(debug_assertions)]
+                        {
+                            self.hash_index_2.iter().for_each(|(&(x2,), v)| {
+                                let mut v = v.clone();
+                                let n = v.len();
+                                v.sort();
+                                v.dedup_by(|(x0, x1, t1), (y0, y1, t2)| true & (*x0 == *y0) & (*x1 == *y1));
+                                assert_eq!(n, v.len(), "indexes do not have duplicates");
+                                assert!(uf.math_.is_root(x2), "key is root");
+                                v.iter().copied().for_each(|(x0, x1, _timestamp)| {
+                                    assert!(uf.math_.is_root(x0) & uf.math_.is_root(x1), "value is root");
+                                });
+                            });
+                        }
                         log_duration!("retain index: {}", {
-                            self.hash_index_2.retain(|&(x2,), v| {
-                                if uf.math_.is_root(x2) {
-                                    v.retain(|&mut (x0, x1, _timestamp)| {
-                                        uf.math_.is_root(x0) & uf.math_.is_root(x1)
-                                    });
-                                    v.sort_unstable();
-                                    v.dedup_by(|(x0, x1, t1), (y0, y1, t2)| true & (*x0 == *y0) & (*x1 == *y1));
+                            self.hash_index_0_1_2.retain(|&(x0, x1, x2), v| {
+                                if uf.math_.is_root(x0) & uf.math_.is_root(x1) & uf.math_.is_root(x2) {
+                                    v.retain(|&mut (_timestamp)| true);
                                     true
                                 } else {
                                     false
@@ -16611,18 +17882,23 @@ fn lir_math() {
                                     .push((latest_timestamp,));
                             }
                         });
-                        log_duration!("retain index: {}", {
-                            self.hash_index_0_1_2.retain(|&(x0, x1, x2), v| {
-                                if uf.math_.is_root(x0) & uf.math_.is_root(x1) & uf.math_.is_root(x2) {
-                                    v.retain(|&mut (_timestamp)| true);
-                                    v.sort_unstable();
-                                    v.dedup_by(|(t1,), (t2,)| true);
-                                    true
-                                } else {
-                                    false
-                                }
+                        #[cfg(debug_assertions)]
+                        {
+                            self.hash_index_0_1_2.iter().for_each(|(&(x0, x1, x2), v)| {
+                                let mut v = v.clone();
+                                let n = v.len();
+                                v.sort();
+                                v.dedup_by(|(t1,), (t2,)| true);
+                                assert_eq!(n, v.len(), "indexes do not have duplicates");
+                                assert!(
+                                    uf.math_.is_root(x0) & uf.math_.is_root(x1) & uf.math_.is_root(x2),
+                                    "key is root"
+                                );
+                                v.iter().copied().for_each(|(_timestamp)| {
+                                    assert!(true, "value is root");
+                                });
                             });
-                        });
+                        }
                     });
                     self.math_num_uprooted_at_latest_retain = 0;
                 }
@@ -16836,6 +18112,28 @@ fn lir_math() {
                             RadixSortable::wrap(&mut self.new).voracious_sort();
                             self.new.dedup();
                         });
+                        #[cfg(debug_assertions)]
+                        {
+                            self.new.iter().for_each(|&(x0, x1, x2)| {
+                                assert_eq!(
+                                    (x0, x1, x2,),
+                                    (uf.math_.find(x0), uf.math_.find(x1), uf.math_.find(x2),),
+                                    "new is canonical"
+                                );
+                            });
+                        }
+                        log_duration!("retain index: {}", {
+                            self.hash_index_2.retain(|&(x2,), v| {
+                                if uf.math_.is_root(x2) {
+                                    v.retain(|&mut (x0, x1, _timestamp)| {
+                                        uf.math_.is_root(x0) & uf.math_.is_root(x1)
+                                    });
+                                    true
+                                } else {
+                                    false
+                                }
+                            });
+                        });
                         log_duration!("fill index: {}", {
                             for &(x0, x1, x2) in &self.new {
                                 self.hash_index_2
@@ -16844,14 +18142,26 @@ fn lir_math() {
                                     .push((x0, x1, latest_timestamp));
                             }
                         });
+                        #[cfg(debug_assertions)]
+                        {
+                            self.hash_index_2.iter().for_each(|(&(x2,), v)| {
+                                let mut v = v.clone();
+                                let n = v.len();
+                                v.sort();
+                                v.dedup_by(|(x0, x1, t1), (y0, y1, t2)| true & (*x0 == *y0) & (*x1 == *y1));
+                                assert_eq!(n, v.len(), "indexes do not have duplicates");
+                                assert!(uf.math_.is_root(x2), "key is root");
+                                v.iter().copied().for_each(|(x0, x1, _timestamp)| {
+                                    assert!(uf.math_.is_root(x0) & uf.math_.is_root(x1), "value is root");
+                                });
+                            });
+                        }
                         log_duration!("retain index: {}", {
-                            self.hash_index_2.retain(|&(x2,), v| {
-                                if uf.math_.is_root(x2) {
-                                    v.retain(|&mut (x0, x1, _timestamp)| {
-                                        uf.math_.is_root(x0) & uf.math_.is_root(x1)
+                            self.hash_index_1.retain(|&(x1,), v| {
+                                if uf.math_.is_root(x1) {
+                                    v.retain(|&mut (x0, x2, _timestamp)| {
+                                        uf.math_.is_root(x0) & uf.math_.is_root(x2)
                                     });
-                                    v.sort_unstable();
-                                    v.dedup_by(|(x0, x1, t1), (y0, y1, t2)| true & (*x0 == *y0) & (*x1 == *y1));
                                     true
                                 } else {
                                     false
@@ -16866,14 +18176,24 @@ fn lir_math() {
                                     .push((x0, x2, latest_timestamp));
                             }
                         });
+                        #[cfg(debug_assertions)]
+                        {
+                            self.hash_index_1.iter().for_each(|(&(x1,), v)| {
+                                let mut v = v.clone();
+                                let n = v.len();
+                                v.sort();
+                                v.dedup_by(|(x0, x2, t1), (y0, y2, t2)| true & (*x0 == *y0) & (*x2 == *y2));
+                                assert_eq!(n, v.len(), "indexes do not have duplicates");
+                                assert!(uf.math_.is_root(x1), "key is root");
+                                v.iter().copied().for_each(|(x0, x2, _timestamp)| {
+                                    assert!(uf.math_.is_root(x0) & uf.math_.is_root(x2), "value is root");
+                                });
+                            });
+                        }
                         log_duration!("retain index: {}", {
-                            self.hash_index_1.retain(|&(x1,), v| {
-                                if uf.math_.is_root(x1) {
-                                    v.retain(|&mut (x0, x2, _timestamp)| {
-                                        uf.math_.is_root(x0) & uf.math_.is_root(x2)
-                                    });
-                                    v.sort_unstable();
-                                    v.dedup_by(|(x0, x2, t1), (y0, y2, t2)| true & (*x0 == *y0) & (*x2 == *y2));
+                            self.hash_index_2_0.retain(|&(x2, x0), v| {
+                                if uf.math_.is_root(x2) & uf.math_.is_root(x0) {
+                                    v.retain(|&mut (x1, _timestamp)| uf.math_.is_root(x1));
                                     true
                                 } else {
                                     false
@@ -16888,12 +18208,26 @@ fn lir_math() {
                                     .push((x1, latest_timestamp));
                             }
                         });
+                        #[cfg(debug_assertions)]
+                        {
+                            self.hash_index_2_0.iter().for_each(|(&(x2, x0), v)| {
+                                let mut v = v.clone();
+                                let n = v.len();
+                                v.sort();
+                                v.dedup_by(|(x1, t1), (y1, t2)| true & (*x1 == *y1));
+                                assert_eq!(n, v.len(), "indexes do not have duplicates");
+                                assert!(uf.math_.is_root(x2) & uf.math_.is_root(x0), "key is root");
+                                v.iter().copied().for_each(|(x1, _timestamp)| {
+                                    assert!(uf.math_.is_root(x1), "value is root");
+                                });
+                            });
+                        }
                         log_duration!("retain index: {}", {
-                            self.hash_index_2_0.retain(|&(x2, x0), v| {
-                                if uf.math_.is_root(x2) & uf.math_.is_root(x0) {
-                                    v.retain(|&mut (x1, _timestamp)| uf.math_.is_root(x1));
-                                    v.sort_unstable();
-                                    v.dedup_by(|(x1, t1), (y1, t2)| true & (*x1 == *y1));
+                            self.hash_index_0.retain(|&(x0,), v| {
+                                if uf.math_.is_root(x0) {
+                                    v.retain(|&mut (x1, x2, _timestamp)| {
+                                        uf.math_.is_root(x1) & uf.math_.is_root(x2)
+                                    });
                                     true
                                 } else {
                                     false
@@ -16908,14 +18242,24 @@ fn lir_math() {
                                     .push((x1, x2, latest_timestamp));
                             }
                         });
+                        #[cfg(debug_assertions)]
+                        {
+                            self.hash_index_0.iter().for_each(|(&(x0,), v)| {
+                                let mut v = v.clone();
+                                let n = v.len();
+                                v.sort();
+                                v.dedup_by(|(x1, x2, t1), (y1, y2, t2)| true & (*x1 == *y1) & (*x2 == *y2));
+                                assert_eq!(n, v.len(), "indexes do not have duplicates");
+                                assert!(uf.math_.is_root(x0), "key is root");
+                                v.iter().copied().for_each(|(x1, x2, _timestamp)| {
+                                    assert!(uf.math_.is_root(x1) & uf.math_.is_root(x2), "value is root");
+                                });
+                            });
+                        }
                         log_duration!("retain index: {}", {
-                            self.hash_index_0.retain(|&(x0,), v| {
-                                if uf.math_.is_root(x0) {
-                                    v.retain(|&mut (x1, x2, _timestamp)| {
-                                        uf.math_.is_root(x1) & uf.math_.is_root(x2)
-                                    });
-                                    v.sort_unstable();
-                                    v.dedup_by(|(x1, x2, t1), (y1, y2, t2)| true & (*x1 == *y1) & (*x2 == *y2));
+                            self.hash_index_1_0_2.retain(|&(x1, x0, x2), v| {
+                                if uf.math_.is_root(x1) & uf.math_.is_root(x0) & uf.math_.is_root(x2) {
+                                    v.retain(|&mut (_timestamp)| true);
                                     true
                                 } else {
                                     false
@@ -16930,18 +18274,23 @@ fn lir_math() {
                                     .push((latest_timestamp,));
                             }
                         });
-                        log_duration!("retain index: {}", {
-                            self.hash_index_1_0_2.retain(|&(x1, x0, x2), v| {
-                                if uf.math_.is_root(x1) & uf.math_.is_root(x0) & uf.math_.is_root(x2) {
-                                    v.retain(|&mut (_timestamp)| true);
-                                    v.sort_unstable();
-                                    v.dedup_by(|(t1,), (t2,)| true);
-                                    true
-                                } else {
-                                    false
-                                }
+                        #[cfg(debug_assertions)]
+                        {
+                            self.hash_index_1_0_2.iter().for_each(|(&(x1, x0, x2), v)| {
+                                let mut v = v.clone();
+                                let n = v.len();
+                                v.sort();
+                                v.dedup_by(|(t1,), (t2,)| true);
+                                assert_eq!(n, v.len(), "indexes do not have duplicates");
+                                assert!(
+                                    uf.math_.is_root(x1) & uf.math_.is_root(x0) & uf.math_.is_root(x2),
+                                    "key is root"
+                                );
+                                v.iter().copied().for_each(|(_timestamp)| {
+                                    assert!(true, "value is root");
+                                });
                             });
-                        });
+                        }
                     });
                     self.math_num_uprooted_at_latest_retain = 0;
                 }
@@ -17225,6 +18574,26 @@ fn lir_math() {
                             RadixSortable::wrap(&mut self.new).voracious_sort();
                             self.new.dedup();
                         });
+                        #[cfg(debug_assertions)]
+                        {
+                            self.new.iter().for_each(|&(x0, x1, x2)| {
+                                assert_eq!(
+                                    (x0, x1, x2,),
+                                    (uf.math_.find(x0), uf.math_.find(x1), uf.math_.find(x2),),
+                                    "new is canonical"
+                                );
+                            });
+                        }
+                        log_duration!("retain index: {}", {
+                            self.hash_index_0_1_2.retain(|&(x0, x1, x2), v| {
+                                if uf.math_.is_root(x0) & uf.math_.is_root(x1) & uf.math_.is_root(x2) {
+                                    v.retain(|&mut (_timestamp)| true);
+                                    true
+                                } else {
+                                    false
+                                }
+                            });
+                        });
                         log_duration!("fill index: {}", {
                             for &(x0, x1, x2) in &self.new {
                                 self.hash_index_0_1_2
@@ -17233,18 +18602,23 @@ fn lir_math() {
                                     .push((latest_timestamp,));
                             }
                         });
-                        log_duration!("retain index: {}", {
-                            self.hash_index_0_1_2.retain(|&(x0, x1, x2), v| {
-                                if uf.math_.is_root(x0) & uf.math_.is_root(x1) & uf.math_.is_root(x2) {
-                                    v.retain(|&mut (_timestamp)| true);
-                                    v.sort_unstable();
-                                    v.dedup_by(|(t1,), (t2,)| true);
-                                    true
-                                } else {
-                                    false
-                                }
+                        #[cfg(debug_assertions)]
+                        {
+                            self.hash_index_0_1_2.iter().for_each(|(&(x0, x1, x2), v)| {
+                                let mut v = v.clone();
+                                let n = v.len();
+                                v.sort();
+                                v.dedup_by(|(t1,), (t2,)| true);
+                                assert_eq!(n, v.len(), "indexes do not have duplicates");
+                                assert!(
+                                    uf.math_.is_root(x0) & uf.math_.is_root(x1) & uf.math_.is_root(x2),
+                                    "key is root"
+                                );
+                                v.iter().copied().for_each(|(_timestamp)| {
+                                    assert!(true, "value is root");
+                                });
                             });
-                        });
+                        }
                     });
                     self.math_num_uprooted_at_latest_retain = 0;
                 }
@@ -17433,6 +18807,28 @@ fn lir_math() {
                             RadixSortable::wrap(&mut self.new).voracious_sort();
                             self.new.dedup();
                         });
+                        #[cfg(debug_assertions)]
+                        {
+                            self.new.iter().for_each(|&(x0, x1, x2)| {
+                                assert_eq!(
+                                    (x0, x1, x2,),
+                                    (uf.math_.find(x0), uf.math_.find(x1), uf.math_.find(x2),),
+                                    "new is canonical"
+                                );
+                            });
+                        }
+                        log_duration!("retain index: {}", {
+                            self.hash_index_2.retain(|&(x2,), v| {
+                                if uf.math_.is_root(x2) {
+                                    v.retain(|&mut (x0, x1, _timestamp)| {
+                                        uf.math_.is_root(x0) & uf.math_.is_root(x1)
+                                    });
+                                    true
+                                } else {
+                                    false
+                                }
+                            });
+                        });
                         log_duration!("fill index: {}", {
                             for &(x0, x1, x2) in &self.new {
                                 self.hash_index_2
@@ -17441,14 +18837,24 @@ fn lir_math() {
                                     .push((x0, x1, latest_timestamp));
                             }
                         });
+                        #[cfg(debug_assertions)]
+                        {
+                            self.hash_index_2.iter().for_each(|(&(x2,), v)| {
+                                let mut v = v.clone();
+                                let n = v.len();
+                                v.sort();
+                                v.dedup_by(|(x0, x1, t1), (y0, y1, t2)| true & (*x0 == *y0) & (*x1 == *y1));
+                                assert_eq!(n, v.len(), "indexes do not have duplicates");
+                                assert!(uf.math_.is_root(x2), "key is root");
+                                v.iter().copied().for_each(|(x0, x1, _timestamp)| {
+                                    assert!(uf.math_.is_root(x0) & uf.math_.is_root(x1), "value is root");
+                                });
+                            });
+                        }
                         log_duration!("retain index: {}", {
-                            self.hash_index_2.retain(|&(x2,), v| {
-                                if uf.math_.is_root(x2) {
-                                    v.retain(|&mut (x0, x1, _timestamp)| {
-                                        uf.math_.is_root(x0) & uf.math_.is_root(x1)
-                                    });
-                                    v.sort_unstable();
-                                    v.dedup_by(|(x0, x1, t1), (y0, y1, t2)| true & (*x0 == *y0) & (*x1 == *y1));
+                            self.hash_index_2_0.retain(|&(x2, x0), v| {
+                                if uf.math_.is_root(x2) & uf.math_.is_root(x0) {
+                                    v.retain(|&mut (x1, _timestamp)| uf.math_.is_root(x1));
                                     true
                                 } else {
                                     false
@@ -17463,12 +18869,26 @@ fn lir_math() {
                                     .push((x1, latest_timestamp));
                             }
                         });
+                        #[cfg(debug_assertions)]
+                        {
+                            self.hash_index_2_0.iter().for_each(|(&(x2, x0), v)| {
+                                let mut v = v.clone();
+                                let n = v.len();
+                                v.sort();
+                                v.dedup_by(|(x1, t1), (y1, t2)| true & (*x1 == *y1));
+                                assert_eq!(n, v.len(), "indexes do not have duplicates");
+                                assert!(uf.math_.is_root(x2) & uf.math_.is_root(x0), "key is root");
+                                v.iter().copied().for_each(|(x1, _timestamp)| {
+                                    assert!(uf.math_.is_root(x1), "value is root");
+                                });
+                            });
+                        }
                         log_duration!("retain index: {}", {
-                            self.hash_index_2_0.retain(|&(x2, x0), v| {
-                                if uf.math_.is_root(x2) & uf.math_.is_root(x0) {
-                                    v.retain(|&mut (x1, _timestamp)| uf.math_.is_root(x1));
-                                    v.sort_unstable();
-                                    v.dedup_by(|(x1, t1), (y1, t2)| true & (*x1 == *y1));
+                            self.hash_index_0.retain(|&(x0,), v| {
+                                if uf.math_.is_root(x0) {
+                                    v.retain(|&mut (x1, x2, _timestamp)| {
+                                        uf.math_.is_root(x1) & uf.math_.is_root(x2)
+                                    });
                                     true
                                 } else {
                                     false
@@ -17483,14 +18903,26 @@ fn lir_math() {
                                     .push((x1, x2, latest_timestamp));
                             }
                         });
+                        #[cfg(debug_assertions)]
+                        {
+                            self.hash_index_0.iter().for_each(|(&(x0,), v)| {
+                                let mut v = v.clone();
+                                let n = v.len();
+                                v.sort();
+                                v.dedup_by(|(x1, x2, t1), (y1, y2, t2)| true & (*x1 == *y1) & (*x2 == *y2));
+                                assert_eq!(n, v.len(), "indexes do not have duplicates");
+                                assert!(uf.math_.is_root(x0), "key is root");
+                                v.iter().copied().for_each(|(x1, x2, _timestamp)| {
+                                    assert!(uf.math_.is_root(x1) & uf.math_.is_root(x2), "value is root");
+                                });
+                            });
+                        }
                         log_duration!("retain index: {}", {
-                            self.hash_index_0.retain(|&(x0,), v| {
-                                if uf.math_.is_root(x0) {
-                                    v.retain(|&mut (x1, x2, _timestamp)| {
-                                        uf.math_.is_root(x1) & uf.math_.is_root(x2)
+                            self.hash_index_1.retain(|&(x1,), v| {
+                                if uf.math_.is_root(x1) {
+                                    v.retain(|&mut (x0, x2, _timestamp)| {
+                                        uf.math_.is_root(x0) & uf.math_.is_root(x2)
                                     });
-                                    v.sort_unstable();
-                                    v.dedup_by(|(x1, x2, t1), (y1, y2, t2)| true & (*x1 == *y1) & (*x2 == *y2));
                                     true
                                 } else {
                                     false
@@ -17505,14 +18937,24 @@ fn lir_math() {
                                     .push((x0, x2, latest_timestamp));
                             }
                         });
+                        #[cfg(debug_assertions)]
+                        {
+                            self.hash_index_1.iter().for_each(|(&(x1,), v)| {
+                                let mut v = v.clone();
+                                let n = v.len();
+                                v.sort();
+                                v.dedup_by(|(x0, x2, t1), (y0, y2, t2)| true & (*x0 == *y0) & (*x2 == *y2));
+                                assert_eq!(n, v.len(), "indexes do not have duplicates");
+                                assert!(uf.math_.is_root(x1), "key is root");
+                                v.iter().copied().for_each(|(x0, x2, _timestamp)| {
+                                    assert!(uf.math_.is_root(x0) & uf.math_.is_root(x2), "value is root");
+                                });
+                            });
+                        }
                         log_duration!("retain index: {}", {
-                            self.hash_index_1.retain(|&(x1,), v| {
-                                if uf.math_.is_root(x1) {
-                                    v.retain(|&mut (x0, x2, _timestamp)| {
-                                        uf.math_.is_root(x0) & uf.math_.is_root(x2)
-                                    });
-                                    v.sort_unstable();
-                                    v.dedup_by(|(x0, x2, t1), (y0, y2, t2)| true & (*x0 == *y0) & (*x2 == *y2));
+                            self.hash_index_0_1_2.retain(|&(x0, x1, x2), v| {
+                                if uf.math_.is_root(x0) & uf.math_.is_root(x1) & uf.math_.is_root(x2) {
+                                    v.retain(|&mut (_timestamp)| true);
                                     true
                                 } else {
                                     false
@@ -17527,18 +18969,23 @@ fn lir_math() {
                                     .push((latest_timestamp,));
                             }
                         });
-                        log_duration!("retain index: {}", {
-                            self.hash_index_0_1_2.retain(|&(x0, x1, x2), v| {
-                                if uf.math_.is_root(x0) & uf.math_.is_root(x1) & uf.math_.is_root(x2) {
-                                    v.retain(|&mut (_timestamp)| true);
-                                    v.sort_unstable();
-                                    v.dedup_by(|(t1,), (t2,)| true);
-                                    true
-                                } else {
-                                    false
-                                }
+                        #[cfg(debug_assertions)]
+                        {
+                            self.hash_index_0_1_2.iter().for_each(|(&(x0, x1, x2), v)| {
+                                let mut v = v.clone();
+                                let n = v.len();
+                                v.sort();
+                                v.dedup_by(|(t1,), (t2,)| true);
+                                assert_eq!(n, v.len(), "indexes do not have duplicates");
+                                assert!(
+                                    uf.math_.is_root(x0) & uf.math_.is_root(x1) & uf.math_.is_root(x2),
+                                    "key is root"
+                                );
+                                v.iter().copied().for_each(|(_timestamp)| {
+                                    assert!(true, "value is root");
+                                });
                             });
-                        });
+                        }
                     });
                     self.math_num_uprooted_at_latest_retain = 0;
                 }
@@ -17817,6 +19264,26 @@ fn lir_math() {
                             RadixSortable::wrap(&mut self.new).voracious_sort();
                             self.new.dedup();
                         });
+                        #[cfg(debug_assertions)]
+                        {
+                            self.new.iter().for_each(|&(x0, x1)| {
+                                assert_eq!(
+                                    (x0, x1,),
+                                    (uf.math_.find(x0), uf.math_.find(x1),),
+                                    "new is canonical"
+                                );
+                            });
+                        }
+                        log_duration!("retain index: {}", {
+                            self.hash_index_0_1.retain(|&(x0, x1), v| {
+                                if uf.math_.is_root(x0) & uf.math_.is_root(x1) {
+                                    v.retain(|&mut (_timestamp)| true);
+                                    true
+                                } else {
+                                    false
+                                }
+                            });
+                        });
                         log_duration!("fill index: {}", {
                             for &(x0, x1) in &self.new {
                                 self.hash_index_0_1
@@ -17825,18 +19292,20 @@ fn lir_math() {
                                     .push((latest_timestamp,));
                             }
                         });
-                        log_duration!("retain index: {}", {
-                            self.hash_index_0_1.retain(|&(x0, x1), v| {
-                                if uf.math_.is_root(x0) & uf.math_.is_root(x1) {
-                                    v.retain(|&mut (_timestamp)| true);
-                                    v.sort_unstable();
-                                    v.dedup_by(|(t1,), (t2,)| true);
-                                    true
-                                } else {
-                                    false
-                                }
+                        #[cfg(debug_assertions)]
+                        {
+                            self.hash_index_0_1.iter().for_each(|(&(x0, x1), v)| {
+                                let mut v = v.clone();
+                                let n = v.len();
+                                v.sort();
+                                v.dedup_by(|(t1,), (t2,)| true);
+                                assert_eq!(n, v.len(), "indexes do not have duplicates");
+                                assert!(uf.math_.is_root(x0) & uf.math_.is_root(x1), "key is root");
+                                v.iter().copied().for_each(|(_timestamp)| {
+                                    assert!(true, "value is root");
+                                });
                             });
-                        });
+                        }
                     });
                     self.math_num_uprooted_at_latest_retain = 0;
                 }
@@ -18007,6 +19476,26 @@ fn lir_math() {
                             RadixSortable::wrap(&mut self.new).voracious_sort();
                             self.new.dedup();
                         });
+                        #[cfg(debug_assertions)]
+                        {
+                            self.new.iter().for_each(|&(x0, x1)| {
+                                assert_eq!(
+                                    (x0, x1,),
+                                    (uf.math_.find(x0), uf.math_.find(x1),),
+                                    "new is canonical"
+                                );
+                            });
+                        }
+                        log_duration!("retain index: {}", {
+                            self.hash_index_0_1.retain(|&(x0, x1), v| {
+                                if uf.math_.is_root(x0) & uf.math_.is_root(x1) {
+                                    v.retain(|&mut (_timestamp)| true);
+                                    true
+                                } else {
+                                    false
+                                }
+                            });
+                        });
                         log_duration!("fill index: {}", {
                             for &(x0, x1) in &self.new {
                                 self.hash_index_0_1
@@ -18015,18 +19504,20 @@ fn lir_math() {
                                     .push((latest_timestamp,));
                             }
                         });
-                        log_duration!("retain index: {}", {
-                            self.hash_index_0_1.retain(|&(x0, x1), v| {
-                                if uf.math_.is_root(x0) & uf.math_.is_root(x1) {
-                                    v.retain(|&mut (_timestamp)| true);
-                                    v.sort_unstable();
-                                    v.dedup_by(|(t1,), (t2,)| true);
-                                    true
-                                } else {
-                                    false
-                                }
+                        #[cfg(debug_assertions)]
+                        {
+                            self.hash_index_0_1.iter().for_each(|(&(x0, x1), v)| {
+                                let mut v = v.clone();
+                                let n = v.len();
+                                v.sort();
+                                v.dedup_by(|(t1,), (t2,)| true);
+                                assert_eq!(n, v.len(), "indexes do not have duplicates");
+                                assert!(uf.math_.is_root(x0) & uf.math_.is_root(x1), "key is root");
+                                v.iter().copied().for_each(|(_timestamp)| {
+                                    assert!(true, "value is root");
+                                });
                             });
-                        });
+                        }
                     });
                     self.math_num_uprooted_at_latest_retain = 0;
                 }
@@ -18197,6 +19688,26 @@ fn lir_math() {
                             RadixSortable::wrap(&mut self.new).voracious_sort();
                             self.new.dedup();
                         });
+                        #[cfg(debug_assertions)]
+                        {
+                            self.new.iter().for_each(|&(x0, x1)| {
+                                assert_eq!(
+                                    (x0, x1,),
+                                    (uf.math_.find(x0), uf.math_.find(x1),),
+                                    "new is canonical"
+                                );
+                            });
+                        }
+                        log_duration!("retain index: {}", {
+                            self.hash_index_0_1.retain(|&(x0, x1), v| {
+                                if uf.math_.is_root(x0) & uf.math_.is_root(x1) {
+                                    v.retain(|&mut (_timestamp)| true);
+                                    true
+                                } else {
+                                    false
+                                }
+                            });
+                        });
                         log_duration!("fill index: {}", {
                             for &(x0, x1) in &self.new {
                                 self.hash_index_0_1
@@ -18205,18 +19716,20 @@ fn lir_math() {
                                     .push((latest_timestamp,));
                             }
                         });
-                        log_duration!("retain index: {}", {
-                            self.hash_index_0_1.retain(|&(x0, x1), v| {
-                                if uf.math_.is_root(x0) & uf.math_.is_root(x1) {
-                                    v.retain(|&mut (_timestamp)| true);
-                                    v.sort_unstable();
-                                    v.dedup_by(|(t1,), (t2,)| true);
-                                    true
-                                } else {
-                                    false
-                                }
+                        #[cfg(debug_assertions)]
+                        {
+                            self.hash_index_0_1.iter().for_each(|(&(x0, x1), v)| {
+                                let mut v = v.clone();
+                                let n = v.len();
+                                v.sort();
+                                v.dedup_by(|(t1,), (t2,)| true);
+                                assert_eq!(n, v.len(), "indexes do not have duplicates");
+                                assert!(uf.math_.is_root(x0) & uf.math_.is_root(x1), "key is root");
+                                v.iter().copied().for_each(|(_timestamp)| {
+                                    assert!(true, "value is root");
+                                });
                             });
-                        });
+                        }
                     });
                     self.math_num_uprooted_at_latest_retain = 0;
                 }
@@ -18387,6 +19900,26 @@ fn lir_math() {
                             RadixSortable::wrap(&mut self.new).voracious_sort();
                             self.new.dedup();
                         });
+                        #[cfg(debug_assertions)]
+                        {
+                            self.new.iter().for_each(|&(x0, x1)| {
+                                assert_eq!(
+                                    (x0, x1,),
+                                    (uf.math_.find(x0), uf.math_.find(x1),),
+                                    "new is canonical"
+                                );
+                            });
+                        }
+                        log_duration!("retain index: {}", {
+                            self.hash_index_0_1.retain(|&(x0, x1), v| {
+                                if uf.math_.is_root(x0) & uf.math_.is_root(x1) {
+                                    v.retain(|&mut (_timestamp)| true);
+                                    true
+                                } else {
+                                    false
+                                }
+                            });
+                        });
                         log_duration!("fill index: {}", {
                             for &(x0, x1) in &self.new {
                                 self.hash_index_0_1
@@ -18395,18 +19928,20 @@ fn lir_math() {
                                     .push((latest_timestamp,));
                             }
                         });
-                        log_duration!("retain index: {}", {
-                            self.hash_index_0_1.retain(|&(x0, x1), v| {
-                                if uf.math_.is_root(x0) & uf.math_.is_root(x1) {
-                                    v.retain(|&mut (_timestamp)| true);
-                                    v.sort_unstable();
-                                    v.dedup_by(|(t1,), (t2,)| true);
-                                    true
-                                } else {
-                                    false
-                                }
+                        #[cfg(debug_assertions)]
+                        {
+                            self.hash_index_0_1.iter().for_each(|(&(x0, x1), v)| {
+                                let mut v = v.clone();
+                                let n = v.len();
+                                v.sort();
+                                v.dedup_by(|(t1,), (t2,)| true);
+                                assert_eq!(n, v.len(), "indexes do not have duplicates");
+                                assert!(uf.math_.is_root(x0) & uf.math_.is_root(x1), "key is root");
+                                v.iter().copied().for_each(|(_timestamp)| {
+                                    assert!(true, "value is root");
+                                });
                             });
-                        });
+                        }
                     });
                     self.math_num_uprooted_at_latest_retain = 0;
                 }
@@ -18581,6 +20116,22 @@ fn lir_math() {
                             self.new.sort_unstable();
                             self.new.dedup();
                         });
+                        #[cfg(debug_assertions)]
+                        {
+                            self.new.iter().for_each(|&(x0, x1)| {
+                                assert_eq!((x0, x1,), (x0, uf.math_.find(x1),), "new is canonical");
+                            });
+                        }
+                        log_duration!("retain index: {}", {
+                            self.hash_index_1.retain(|&(x1,), v| {
+                                if uf.math_.is_root(x1) {
+                                    v.retain(|&mut (x0, _timestamp)| true);
+                                    true
+                                } else {
+                                    false
+                                }
+                            });
+                        });
                         log_duration!("fill index: {}", {
                             for &(x0, x1) in &self.new {
                                 self.hash_index_1
@@ -18589,12 +20140,24 @@ fn lir_math() {
                                     .push((x0, latest_timestamp));
                             }
                         });
+                        #[cfg(debug_assertions)]
+                        {
+                            self.hash_index_1.iter().for_each(|(&(x1,), v)| {
+                                let mut v = v.clone();
+                                let n = v.len();
+                                v.sort();
+                                v.dedup_by(|(x0, t1), (y0, t2)| true & (*x0 == *y0));
+                                assert_eq!(n, v.len(), "indexes do not have duplicates");
+                                assert!(uf.math_.is_root(x1), "key is root");
+                                v.iter().copied().for_each(|(x0, _timestamp)| {
+                                    assert!(true, "value is root");
+                                });
+                            });
+                        }
                         log_duration!("retain index: {}", {
-                            self.hash_index_1.retain(|&(x1,), v| {
+                            self.hash_index_0_1.retain(|&(x0, x1), v| {
                                 if uf.math_.is_root(x1) {
-                                    v.retain(|&mut (x0, _timestamp)| true);
-                                    v.sort_unstable();
-                                    v.dedup_by(|(x0, t1), (y0, t2)| true & (*x0 == *y0));
+                                    v.retain(|&mut (_timestamp)| true);
                                     true
                                 } else {
                                     false
@@ -18609,18 +20172,20 @@ fn lir_math() {
                                     .push((latest_timestamp,));
                             }
                         });
-                        log_duration!("retain index: {}", {
-                            self.hash_index_0_1.retain(|&(x0, x1), v| {
-                                if uf.math_.is_root(x1) {
-                                    v.retain(|&mut (_timestamp)| true);
-                                    v.sort_unstable();
-                                    v.dedup_by(|(t1,), (t2,)| true);
-                                    true
-                                } else {
-                                    false
-                                }
+                        #[cfg(debug_assertions)]
+                        {
+                            self.hash_index_0_1.iter().for_each(|(&(x0, x1), v)| {
+                                let mut v = v.clone();
+                                let n = v.len();
+                                v.sort();
+                                v.dedup_by(|(t1,), (t2,)| true);
+                                assert_eq!(n, v.len(), "indexes do not have duplicates");
+                                assert!(uf.math_.is_root(x1), "key is root");
+                                v.iter().copied().for_each(|(_timestamp)| {
+                                    assert!(true, "value is root");
+                                });
                             });
-                        });
+                        }
                     });
                     self.math_num_uprooted_at_latest_retain = 0;
                 }
@@ -18831,6 +20396,22 @@ fn lir_math() {
                             self.new.sort_unstable();
                             self.new.dedup();
                         });
+                        #[cfg(debug_assertions)]
+                        {
+                            self.new.iter().for_each(|&(x0, x1)| {
+                                assert_eq!((x0, x1,), (x0, uf.math_.find(x1),), "new is canonical");
+                            });
+                        }
+                        log_duration!("retain index: {}", {
+                            self.hash_index_0_1.retain(|&(x0, x1), v| {
+                                if uf.math_.is_root(x1) {
+                                    v.retain(|&mut (_timestamp)| true);
+                                    true
+                                } else {
+                                    false
+                                }
+                            });
+                        });
                         log_duration!("fill index: {}", {
                             for &(x0, x1) in &self.new {
                                 self.hash_index_0_1
@@ -18839,18 +20420,20 @@ fn lir_math() {
                                     .push((latest_timestamp,));
                             }
                         });
-                        log_duration!("retain index: {}", {
-                            self.hash_index_0_1.retain(|&(x0, x1), v| {
-                                if uf.math_.is_root(x1) {
-                                    v.retain(|&mut (_timestamp)| true);
-                                    v.sort_unstable();
-                                    v.dedup_by(|(t1,), (t2,)| true);
-                                    true
-                                } else {
-                                    false
-                                }
+                        #[cfg(debug_assertions)]
+                        {
+                            self.hash_index_0_1.iter().for_each(|(&(x0, x1), v)| {
+                                let mut v = v.clone();
+                                let n = v.len();
+                                v.sort();
+                                v.dedup_by(|(t1,), (t2,)| true);
+                                assert_eq!(n, v.len(), "indexes do not have duplicates");
+                                assert!(uf.math_.is_root(x1), "key is root");
+                                v.iter().copied().for_each(|(_timestamp)| {
+                                    assert!(true, "value is root");
+                                });
                             });
-                        });
+                        }
                     });
                     self.math_num_uprooted_at_latest_retain = 0;
                 }
