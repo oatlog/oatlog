@@ -381,6 +381,7 @@ pub(crate) enum Inclusion {
     All,
 }
 impl Inclusion {
+    /*
     fn compatible(&self, other: Self) -> bool {
         use Inclusion::*;
         match (self, other) {
@@ -400,6 +401,7 @@ impl Inclusion {
             }
         }
     }
+    */
 }
 
 /// Unifies action insert/entry and premise.
@@ -510,12 +512,14 @@ impl SymbolicRule {
             })
     }
 
+    /*
     /// Variables that are bound by the premise.
     pub(crate) fn premise_variables(&self) -> impl Iterator<Item = VariableId> {
         self.premise_atoms()
             .flat_map(|x| x.columns.iter().copied())
             .unique()
     }
+    */
 
     fn extract_invariant_permutations(&self, mut callback: impl FnMut(RelationId, Vec<usize>)) {
         let Ok(single_premise) = self.premise_atoms().exactly_one() else {

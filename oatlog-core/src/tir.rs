@@ -34,13 +34,6 @@ impl<T: Copy + Eq + Ord> SparseUf<T> {
         self.repr.insert(from, to);
         true
     }
-    fn iter(&self) -> impl Iterator<Item = T> {
-        self.repr
-            .iter()
-            .flat_map(|(&a, &b)| [a, b])
-            .collect::<BTreeSet<_>>()
-            .into_iter()
-    }
     fn new() -> Self {
         Self {
             repr: BTreeMap::new(),
@@ -1278,28 +1271,28 @@ fn election(ctx: &Ctx<'_>, rules: &[Rule]) -> (Vec<Rule>, BTreeMap<TrieLink, Vec
             //         )
             //     })
             //     .collect();
-            if _count > 1 && vote.len() > 1 {
-                let indexes = vote
-                    .iter()
-                    .copied()
-                    .map(|x| votes[x].1.clone().atom())
-                    .map(|atom| {
-                        (
-                            ctx.relations[atom.relation].name,
-                            atom.columns
-                                .iter_enumerate()
-                                .filter_map(|(i, v)| ctx.bound_premise.contains(v).then_some(i))
-                                .collect::<BTreeSet<_>>(),
-                        )
-                    })
-                    .collect::<BTreeSet<_>>();
-                // eprintln!("count: {_count} indexes: {indexes:?}");
+            // if _count > 1 && vote.len() > 1 {
+            //     let indexes = vote
+            //         .iter()
+            //         .copied()
+            //         .map(|x| votes[x].1.clone().atom())
+            //         .map(|atom| {
+            //             (
+            //                 ctx.relations[atom.relation].name,
+            //                 atom.columns
+            //                     .iter_enumerate()
+            //                     .filter_map(|(i, v)| ctx.bound_premise.contains(v).then_some(i))
+            //                     .collect::<BTreeSet<_>>(),
+            //             )
+            //         })
+            //         .collect::<BTreeSet<_>>();
+            //     // eprintln!("count: {_count} indexes: {indexes:?}");
 
-                //         x.implicit_rules
-                //             .iter()
-                //             .map(|x| x.out.keys().cloned().collect())
-                //             .collect()
-            }
+            //     //         x.implicit_rules
+            //     //             .iter()
+            //     //             .map(|x| x.out.keys().cloned().collect())
+            //     //             .collect()
+            // }
         }
         // NOTE: Possible randomize selection here in the future, currently avoided because it does
         // not seem to improve things.

@@ -2736,8 +2736,8 @@ Need to use fewer indexes.
 - think about avoiding accidentally quadratic behaviour on hashmaps.
 - vectorization
 - scheduling/rulesets/check
-- check if we are doing semi-naive correctly and fix it
-    - check our performance with semi-naive disabled.
+- check if we are doing semi-naive correctly and fix it - DONE?
+    - check our performance with semi-naive disabled. - unclear results but can be done now.
 - try to isolate other optimizations from just being AOT vs interpreter.
 
 = async gather??
@@ -2749,11 +2749,13 @@ want to send 3 memory requests and continue as soon as one matches.
 
 = TODO: erik
 
-retain/dedup not needed during index reconstruction if no overlap between old and new.
+retain/dedup not needed during index reconstruction if no overlap between old and new. - DONE
 
 sorting new means touching vecs exactly once, so whatever can be done eagerly.
 
-kill dead code
+kill mandatory "index-all" by iterating FD index and filtering for new.
+
+kill dead code - DONE
 
 = TODO READ
 Papers are just under the first author i looked at.
