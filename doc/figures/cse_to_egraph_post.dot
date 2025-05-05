@@ -1,0 +1,54 @@
+digraph G {
+    graph [compound=true];
+    rankdir = "TD";
+    fontsize="24"
+    node [ fontsize="24" ]
+
+
+    subgraph cluster_add_2 {
+        add_2 [label="+"];
+    }
+    subgraph cluster_shift_1 {
+        shift_1 [label=">>"];
+        mul_2 [label="*"];
+    }
+    subgraph cluster_a_b_add {
+        a_b_add [label="+"];
+    }
+    subgraph cluster_final_result {
+        final_result [label="*"];
+    }
+    subgraph cluster_a {
+        a [label="a"];
+    }
+    subgraph cluster_b {
+        b [label="b"];
+    }
+    subgraph cluster_t2 {
+        t2 [label="2"];
+    }
+    subgraph cluster_t1 {
+        t1 [label="1"];
+    }
+
+    a -> a_b_add [ltail=cluster_a]
+    b -> a_b_add [ltail=cluster_b]
+
+    t2 -> add_2 [ltail=cluster_t2]
+    a_b_add -> add_2 [ltail=cluster_a_b_add]
+
+    t2 -> mul_2 [ltail=cluster_t2]
+    a_b_add -> mul_2 [ltail=cluster_a_b_add]
+
+    t1 -> shift_1 [ltail=cluster_t1]
+    a_b_add -> shift_1 [ltail=cluster_a_b_add]
+
+    add_2 -> final_result [ltail=cluster_add_2]
+    mul_2 -> final_result [ltail=cluster_shift_1]
+
+
+}
+
+
+
+

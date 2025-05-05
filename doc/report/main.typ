@@ -1379,6 +1379,27 @@ Note that while the Python implementations are just example implementations, the
 // - scheduling and termination
 // - extraction
 
+== #TODO[Expression trees]
+
+#figure(
+  image("../figures/cse_pre.svg"),
+  caption: [TODO: before cse],
+) <todo1>
+#figure(
+  image("../figures/cse_post.svg"),
+  caption: [TODO: after cse],
+) <todo2>
+#figure(
+  image("../figures/cse_to_egraph.svg"),
+  caption: [TODO: before egraph],
+) <todo3>
+#figure(
+  image("../figures/cse_to_egraph_post.svg"),
+  caption: [TODO: after egraph],
+) <todo4>
+
+#TODO[@todo1 @todo2 @todo3 @todo4]
+
 == Union-find <union-find-explain>
 
 #figure(
@@ -1716,7 +1737,7 @@ We can, just like the indexed join example, add indexes when performing e-matchi
   caption: [Add and Mul as tables along with a join between them.],
 ) <database-egraph-table-example>
 
-#TODO[bridge to semi-naive]
+However, a problem with relational e-matching is that we constantly re-discover the same facts, which is what semi-naive evaluation solves.
 
 == Semi-naive evaluation
 

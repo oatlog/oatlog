@@ -1,0 +1,38 @@
+digraph G {
+    rankdir = "TD";
+    fontsize="24"
+    node [ fontsize="24" ]
+
+    add_2 [label="+"];
+    a_b_add2 [label="+"];
+    mul_2 [label="*"];
+    a_b_add1 [label="+"];
+
+    final_result [label="*"];
+
+    a_1 [label="a"];
+    a_2 [label="a"];
+
+    b_1 [label="b"];
+    b_2 [label="b"];
+
+    t2_1 [label="2"];
+    t2_2 [label="2"];
+
+    a_1 -> a_b_add1
+    b_1 -> a_b_add1
+
+    a_2 -> a_b_add2
+    b_2 -> a_b_add2
+
+    t2_1 -> add_2
+    a_b_add1 -> add_2
+
+    t2_2 -> mul_2
+    a_b_add2 -> mul_2
+
+    add_2 -> final_result
+    mul_2 -> final_result
+}
+
+
