@@ -209,13 +209,13 @@ impl InvariantPermutationSubgroup {
             }
         }
     }
-    fn apply<T: Copy>(&self, x: &[T]) -> impl Iterator<Item = Vec<T>> {
+    fn apply<T: Copy>(&self, x: &TVec<ColumnId, T>) -> impl Iterator<Item = TVec<ColumnId, T>> {
         // NOTE: `self` stores all permutations and their inverses, so whether we permute or
         // inverse permute here does not matter.
         let main = self
             .inner
             .iter()
-            .map(|perm| perm.iter().map(|&i| x[i]).collect());
+            .map(|perm| perm.iter().map(|&i| x[ColumnId(i)]).collect());
         let fallback = self.inner.is_empty().then(|| x.to_owned());
 
         main.chain(fallback)
@@ -238,6 +238,28 @@ pub(crate) struct Relation {
     pub(crate) columns: TVec<ColumnId, TypeId>,
 }
 impl Relation {
+    pub(crate) fn implied_variable_equalities(
+        &self,
+        cols1: &TVec<ColumnId, VariableId>,
+        cols2: &TVec<ColumnId, VariableId>,
+    ) -> BTreeSet<(VariableId, VariableId)> {
+        let mut ret = BTreeSet::new();
+        for implicit_rule in &self.implicit_rules {
+            let key_columns = implicit_rule.key_columns();
+            let value_columns = implicit_rule.value_columns();
+
+            for cols2_prime in self.invariant_permutations.apply(cols2) {
+                if key_columns.iter().all(|col| cols1[col] == cols2_prime[col]) {
+                    ret.extend(
+                        value_columns
+                            .iter()
+                            .map(|col| (cols1[col], cols2_prime[col])),
+                    )
+                }
+            }
+        }
+        ret
+    }
     pub(crate) fn table(
         name: &'static str,
         columns: TVec<ColumnId, TypeId>,
@@ -367,10 +389,16 @@ pub(crate) enum IsPremise {
 }
 use IsPremise::{Action, Premise};
 impl IsPremise {
-    pub(crate) fn merge(a: Self, b: Self) -> Self {
+    pub(crate) fn merge_prefer_premise(a: Self, b: Self) -> Self {
         match (a, b) {
             (Premise, _) | (_, Premise) => Premise,
             (Action, Action) => Action,
+        }
+    }
+    pub(crate) fn merge_prefer_action(a: Self, b: Self) -> Self {
+        match (a, b) {
+            (Action, _) | (_, Action) => Action,
+            (Premise, Premise) => Premise,
         }
     }
 }
@@ -432,7 +460,7 @@ impl Atom {
     pub(crate) fn equivalent_atoms(&self, relations: &TVec<RelationId, Relation>) -> Vec<Atom> {
         relations[self.relation]
             .invariant_permutations
-            .apply(self.columns.inner())
+            .apply(&self.columns)
             .map(|columns| Atom {
                 is_premise: self.is_premise,
                 relation: self.relation,
@@ -494,7 +522,7 @@ impl Atom {
 pub(crate) struct SymbolicRule {
     pub(crate) meta: RuleMeta,
     /// Unstructured list of atoms, with some being premises and some actions.
-    pub(crate) atoms: Vec<Atom>,
+    pub(crate) atoms: BTreeSet<Atom>,
     /// Unifications to apply in actions.
     pub(crate) unify: UF<VariableId>,
     pub(crate) variables: TVec<VariableId, VariableMeta>,
@@ -563,7 +591,7 @@ impl SymbolicRule {
         }
     }
 
-    fn optimize(self, relations: &TVec<RelationId, Relation>) -> Self {
+    fn optimize(mut self, relations: &TVec<RelationId, Relation>) -> Self {
         // Optimize symbolic rule by merging variables.
         //
         // P(x), A(y), unify(x,y) => P(x), A(y), unify(x,y)
@@ -584,21 +612,32 @@ impl SymbolicRule {
             .collect();
 
         let merge = |(pa, ma): &(IsPremise, VariableMeta), (pb, mb): &(IsPremise, VariableMeta)| {
-            (IsPremise::merge(*pa, *pb), VariableMeta::merge(ma, mb))
+            (
+                IsPremise::merge_prefer_premise(*pa, *pb),
+                VariableMeta::merge(ma, mb),
+            )
         };
 
+        let find_at =
+            |variable_id: VariableId, at: IsPremise, to_merge: &UFData<_, _>, unify: &UF<_>| {
+                // Action atoms can be canonicalized using `self.unify` but
+                // Premise atoms must be more conservative and use `to_merge`.
+                //
+                // Conceptually, `to_merge`'s and `unify`'s unions are valid *always* and *only among actions*, respectively.
+                match at {
+                    Premise => to_merge.find(variable_id),
+                    Action => unify.find(variable_id),
+                }
+            };
+
         for v in self
-            .atoms
-            .iter()
-            .filter(|x| x.is_premise == Premise)
-            .flat_map(|x| x.columns.iter().copied())
+            .premise_atoms()
+            .flat_map(|atom| atom.columns.iter().copied())
         {
             to_merge[v].0 = Premise;
         }
 
-        // We shouldn't need to unify two action variables.
-        // NOTE: this will aggressively introduce cycles in action. In practice the result of this
-        // is mostly to turn entry + union into insert.
+        // Action variables can be substituted away to avoid unifications.
         for (a, b) in self.unify.iter_edges_fully_connected() {
             match (to_merge[a].0, to_merge[b].0) {
                 (Premise, Premise) => {
@@ -614,108 +653,153 @@ impl SymbolicRule {
         // NOTE: we are missing optimizations that turn PREMISE into ACTION when it is infallible (eg
         // globals that don't filter).
 
-        let mut queue = self.atoms.clone();
+        let mut working_atoms: BTreeMap<
+            RelationId,
+            BTreeMap<TVec<ColumnId, VariableId>, (IsPremise, Option<ImplicitRuleId>)>,
+        > = {
+            let mut ret: BTreeMap<_, BTreeMap<_, _>> = BTreeMap::new();
+            for Atom {
+                relation,
+                ref columns,
+                is_premise,
+                entry,
+                incl,
+            } in self.atoms
+            {
+                assert_eq!(
+                    incl,
+                    Inclusion::All,
+                    "before tir, all `incl` should be `All`."
+                );
+                ret.entry(relation)
+                    .or_default()
+                    .entry(columns.clone())
+                    .and_modify(|_| panic!())
+                    .or_insert((is_premise, entry));
+            }
+            ret
+        };
 
-        let used_variables: BTreeSet<VariableId> = queue
-            .iter()
-            .flat_map(|x| x.columns.iter().copied())
-            .collect();
-
-        // TODO loke for erik: Explain the large loop below in one or more comments.
-
+        // Find variable substitutions implied by implicit rules
         loop {
-            // start with premise
-            queue.sort_by_key(|x| x.is_premise);
-
             let mut progress = false;
-            let mut assumed_true: BTreeSet<Atom> = BTreeSet::new();
-            for atom in queue {
-                let equivalent = vec![atom]; // .equivalent_atoms(relations);
-                let mut deleted = false;
-                'iter_assumed: for assumed in assumed_true.iter().cloned() {
-                    for atom in equivalent.iter().filter(|x| x.relation == assumed.relation) {
-                        for implicit_rule in &relations[atom.relation].implicit_rules {
-                            if implicit_rule
-                                .key_columns()
-                                .into_iter()
-                                .any(|c| atom.columns[c] != assumed.columns[c])
-                            {
+            for (relation, inner) in working_atoms.iter() {
+                for (cols1, meta1) in inner.iter() {
+                    for (cols2, meta2) in inner.iter() {
+                        for (a, b) in relations[relation].implied_variable_equalities(cols1, cols2)
+                        {
+                            let implied_at = IsPremise::merge_prefer_action(meta1.0, meta2.0);
+                            let (a, b) = (
+                                find_at(a, implied_at, &to_merge, &self.unify),
+                                find_at(b, implied_at, &to_merge, &self.unify),
+                            );
+                            if a == b {
                                 continue;
                             }
-                            deleted = true;
-                            for c in implicit_rule.value_columns() {
-                                let lhs = atom.columns[c];
-                                let rhs = assumed.columns[c];
-                                if lhs == rhs {
-                                    continue;
+                            progress = true;
+                            match (implied_at, to_merge[a].0, to_merge[b].0) {
+                                (Premise, Premise, Premise)
+                                | (Action, Action, _)
+                                | (Action, _, Action) => {
+                                    to_merge.union_merge(a, b, &merge);
+                                    self.unify.union(a, b);
                                 }
-                                match (atom.is_premise, to_merge[lhs].0, to_merge[rhs].0) {
-                                    (Premise, _, _) => {
-                                        progress = true;
-                                        to_merge.union_merge(lhs, rhs, &merge);
-                                    }
-                                    (Action, Premise, Premise) => {
-                                        deleted = false;
-                                        // We don't want contents of action to cause a merge of two premise variables
-                                        //
-                                        // Example:
-                                        //
-                                        // Premise: (Add a b c)
-                                        // Action: (Neg a b), (Neg a c)
-                                        //
-                                        // Premise: (Add a b b)
-                                        // Action: (Neg a b), (Neg a c)
-                                    }
-                                    (Action, Action, _) | (Action, _, Action) => {
-                                        progress = true;
-                                        to_merge.union_merge(lhs, rhs, &merge);
-                                    }
+                                (Action, Premise, Premise) => {
+                                    // Implicit rules on action atoms cause run-time unifications, not variable substitutions.
+                                    self.unify.union(a, b);
                                 }
-                            }
-                            if deleted {
-                                break 'iter_assumed;
+                                (Premise, _, _) => unreachable!(),
                             }
                         }
                     }
                 }
-                if !deleted {
-                    assumed_true.insert(Atom::canonical_atom(&equivalent));
-                }
             }
-            queue = assumed_true
-                .into_iter()
-                .map(|x| x.map_columns(|v| to_merge.find(v)))
-                .collect();
             if !progress {
                 break;
             }
+            working_atoms = working_atoms
+                .into_iter()
+                .map(|(relation, inner)| {
+                    let mut ret = BTreeMap::new();
+                    for (cols, meta) in inner {
+                        let cols = cols.map(|&v| find_at(v, meta.0, &to_merge, &self.unify));
+                        ret.entry(cols.clone())
+                            .and_modify(|other_meta: &mut (IsPremise, Option<ImplicitRuleId>)| {
+                                *other_meta = match (*other_meta, meta) {
+                                    (ret @ (Premise, _), (Action, _))
+                                    | ((Action, _), ret @ (Premise, _)) => ret,
+
+                                    (ret @ (Premise, a), (Premise, b))
+                                    | (ret @ (Action, a), (Action, b)) => {
+                                        assert_eq!(a, b, "TODO figure out how to merge `entry` in HIR optimization, if this even occurs in practice");
+                                        ret
+                                    }
+                                };
+                            })
+                            .or_insert(meta);
+                    }
+                    // Automatically, the above code guarantees that all `find_premise(P)` and
+                    // `find_action(A)` are unique. It is however still possible to have
+                    // `find_action(P1) == find_action(A1)`. In this case, the code below drops
+                    // `A1`.
+                    for (cols, meta) in ret.clone().into_iter() {
+                        if meta.0 == Premise {
+                            let cols_actions = cols.map(|&v| self.unify.find(v));
+                            if cols != cols_actions {
+                                ret.remove(&cols_actions);
+                            }
+                        }
+                    }
+                    (relation, ret)
+                })
+                .collect();
         }
 
-        let mut n = 0;
-        let old_to_new: BTreeMap<VariableId, VariableId> = to_merge
-            .iter_sets()
-            .filter(|set| set.iter().any(|v| used_variables.contains(v)))
-            .zip((0..).map(VariableId))
-            .flat_map(|(from, to)| {
-                n = n.max(to.0 + 1);
-                from.iter().copied().map(move |from| (from, to))
-            })
-            .collect();
+        let (n, old_to_new) = {
+            let used_variables: BTreeSet<VariableId> = working_atoms
+                .iter()
+                .flat_map(|(_, inner)| inner.keys().flatten().copied())
+                .collect();
+            let mut n: usize = 0;
+            let old_to_new: BTreeMap<VariableId, VariableId> = to_merge
+                .iter_sets()
+                .filter(|set| set.iter().any(|v| used_variables.contains(v)))
+                .zip((0..).map(VariableId))
+                .flat_map(|(from, to)| {
+                    n = n.max(to.0 + 1);
+                    from.iter().copied().map(move |from| (from, to))
+                })
+                .collect();
+            (n, old_to_new)
+        };
 
         Self {
             meta: self.meta.clone(),
-            atoms: queue
+            atoms: working_atoms
                 .into_iter()
-                .map(|atom| atom.map_columns(|x| old_to_new[&x]))
+                .flat_map(|(relation, inner)| {
+                    let old_to_new = &old_to_new;
+                    inner
+                        .into_iter()
+                        .map(move |(columns, (is_premise, entry))| {
+                            Atom {
+                                is_premise,
+                                relation,
+                                columns,
+                                entry,
+                                incl: Inclusion::All, // NOTE: correct due to previous assert
+                            }
+                            .map_columns(|v| old_to_new[&v])
+                        })
+                })
                 .collect(),
             unify: UF::from_pairs(
                 n,
                 self.unify
                     .iter_edges_fully_connected()
-                    .filter(|(a, b)| a != b)
-                    .map(|(a, b)| {
+                    .filter_map(|(a, b)| {
                         // Index because it's a bug if we delete a variable that is part of a union.
-                        (old_to_new[&a], old_to_new[&b])
+                        Some((*old_to_new.get(&a)?, *old_to_new.get(&b)?))
                     }),
             ),
             variables: TVec::from_iter_unordered(
@@ -786,7 +870,7 @@ pub(crate) struct RuleArgs {
     pub(crate) action_unify: Vec<(VariableId, VariableId)>,
 }
 impl RuleArgs {
-    pub(crate) fn build(mut self) -> SymbolicRule {
+    pub(crate) fn build(self) -> SymbolicRule {
         // TODO erik: assert that no atoms contain unit variables.
 
         // NOTE: we don't need to delete variables assuming they are unused.
@@ -916,9 +1000,13 @@ impl Theory {
         let remap_relations = relations_to_keep.into_remap_table();
 
         for rule in &mut self.symbolic_rules {
-            for atom in &mut rule.atoms {
-                atom.relation = remap_relations[atom.relation].unwrap();
-            }
+            rule.atoms = mem::take(&mut rule.atoms)
+                .into_iter()
+                .map(|mut atom| {
+                    atom.relation = remap_relations[atom.relation].unwrap();
+                    atom
+                })
+                .collect();
             for variable in &mut rule.variables {
                 variable.ty = remap_types[variable.ty].unwrap();
             }

@@ -268,7 +268,7 @@ fn action_topo_resolve<'a>(
         let mut to_merge: UFData<VariableId, IsPremise> =
             variables.iter().copied().map(|_| Action).collect();
 
-        let merge = |pa: &IsPremise, pb: &IsPremise| IsPremise::merge(*pa, *pb);
+        let merge = |pa: &IsPremise, pb: &IsPremise| IsPremise::merge_prefer_premise(*pa, *pb);
 
         for &v in bound_premise {
             to_merge[v] = Premise;
@@ -440,7 +440,10 @@ fn action_topo_resolve<'a>(
                 }
             }
         }
-        assert!(ok, "could not remove cycles");
+        assert!(
+            ok,
+            "could not remove cycles: schedule={schedule:?} conflict_free={conflict_free:?} problematic={problematic:?}"
+        );
     }
     schedule
 }
