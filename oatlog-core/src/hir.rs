@@ -15,7 +15,7 @@ use quote::ToTokens as _;
 
 use std::{
     collections::{BTreeMap, BTreeSet},
-    fmt::{Debug, Display, Formatter},
+    fmt::{Debug, Display},
     hash::Hash,
 };
 
@@ -83,7 +83,7 @@ pub(crate) enum TypeKind {
 /// If there is not a conflict, the rule is not run at all.
 ///
 /// TODO: add optimization pass to turn symbolic rules to implicit rules.
-#[derive(Clone, Eq, PartialEq, Ord, PartialOrd, Hash)]
+#[derive(Clone, Eq, PartialEq, Ord, PartialOrd, Hash, Debug)]
 pub(crate) struct ImplicitRule {
     /// If all columns other than the ones mentioned here are equal, trigger rule for each column.
     pub(crate) out: BTreeMap<ColumnId, ImplicitRuleAction>,
@@ -839,171 +839,117 @@ impl RuleArgs {
 }
 
 impl Theory {
-    pub(crate) fn optimize(&self, config: Configuration) -> Self {
-        let mut this = self.clone();
-        for rule in &mut this.symbolic_rules {
-            *rule = rule.optimize(&this.relations);
+    pub(crate) fn optimize(mut self, config: Configuration) -> Self {
+        for rule in &mut self.symbolic_rules {
+            *rule = rule.optimize(&self.relations);
         }
 
         if config.egglog_compat.allow_column_invariant_permutations() {
-            for rule in &this.symbolic_rules {
+            for rule in &self.symbolic_rules {
                 rule.extract_invariant_permutations(|relation, perm| {
                     tracing::debug!(?relation, perm = ?&*perm);
 
-                    this.relations[relation]
+                    self.relations[relation]
                         .invariant_permutations
                         .add_invariant_permutations(perm);
                 });
             }
 
-            for rule in &mut this.symbolic_rules {
-                *rule = rule.optimize(&this.relations);
+            for rule in &mut self.symbolic_rules {
+                *rule = rule.optimize(&self.relations);
+            }
+        }
+        self.remove_unused_relations_and_types()
+    }
+    pub(crate) fn remove_unused_relations_and_types(mut self) -> Self {
+        let mut types_to_keep: TVec<TypeId, bool> = self.types.new_same_size();
+        let mut relations_to_keep: TVec<RelationId, bool> = self.relations.new_same_size();
+
+        for rule in &self.symbolic_rules {
+            rule.atoms
+                .iter()
+                .for_each(|Atom { relation, .. }| relations_to_keep[relation] = true);
+            rule.variables
+                .iter()
+                .for_each(|VariableMeta { ty, .. }| types_to_keep[ty] = true);
+        }
+        self.global_types
+            .iter()
+            .for_each(|ty| types_to_keep[ty] = true);
+        self.global_to_relation
+            .iter()
+            .for_each(|rel| relations_to_keep[rel] = true);
+        self.initial.iter().for_each(|initial| {
+            if let lir::Initial::ComputeGlobal {
+                compute: lir::GlobalCompute::Compute { relation, .. },
+                ..
+            } = initial
+            {
+                relations_to_keep[relation] = true
+            }
+        });
+        for (rel, relation) in self.relations.iter_enumerate() {
+            if relations_to_keep[rel] {
+                for col_ty in &relation.columns {
+                    types_to_keep[col_ty] = true;
+                }
             }
         }
 
-        {
-            // Remove unused relations and types
-            let mut types_to_keep: TVec<TypeId, bool> = this.types.new_same_size();
-            let mut relations_to_keep: TVec<RelationId, bool> = this.relations.new_same_size();
+        let remap_types = types_to_keep.into_remap_table();
+        let remap_relations = relations_to_keep.into_remap_table();
 
-            for rule in &this.symbolic_rules {
-                rule.atoms
-                    .iter()
-                    .for_each(|Atom { relation, .. }| relations_to_keep[relation] = true);
-                rule.variables
-                    .iter()
-                    .for_each(|VariableMeta { ty, .. }| types_to_keep[ty] = true);
+        for rule in &mut self.symbolic_rules {
+            for atom in &mut rule.atoms {
+                atom.relation = remap_relations[atom.relation].unwrap();
             }
-            this.global_types
-                .iter()
-                .for_each(|ty| types_to_keep[ty] = true);
-            this.global_to_relation
-                .iter()
-                .for_each(|rel| relations_to_keep[rel] = true);
-            this.initial.iter().for_each(|initial| {
-                if let lir::Initial::ComputeGlobal {
-                    compute: lir::GlobalCompute::Compute { relation, .. },
-                    ..
-                } = initial
-                {
-                    relations_to_keep[relation] = true
-                }
-            });
-            for (rel, relation) in this.relations.iter_enumerate() {
-                if relations_to_keep[rel] {
-                    for col_ty in &relation.columns {
-                        types_to_keep[col_ty] = true;
+            for variable in &mut rule.variables {
+                variable.ty = remap_types[variable.ty].unwrap();
+            }
+        }
+        for ty in &mut self.global_types {
+            *ty = remap_types[*ty].unwrap();
+        }
+        for rel in &mut self.global_to_relation {
+            *rel = remap_relations[*rel].unwrap();
+        }
+        for initial in &mut self.initial {
+            if let lir::Initial::ComputeGlobal {
+                compute: lir::GlobalCompute::Compute { relation, .. },
+                ..
+            } = initial
+            {
+                *relation = remap_relations[*relation].unwrap();
+            }
+        }
+        self.relations = TVec::from_iter_ordered(self.relations.into_iter_enumerate().filter_map(
+            |(relation_id, mut relation)| {
+                remap_relations[relation_id].map(|new_relation_id| {
+                    for col_ty in &mut relation.columns {
+                        *col_ty = remap_types[*col_ty].unwrap();
                     }
-                }
-            }
-
-            let remap_types = types_to_keep.into_remap_table();
-            let remap_relations = relations_to_keep.into_remap_table();
-
-            for rule in &mut this.symbolic_rules {
-                for atom in &mut rule.atoms {
-                    atom.relation = remap_relations[atom.relation].unwrap();
-                }
-                for variable in &mut rule.variables {
-                    variable.ty = remap_types[variable.ty].unwrap();
-                }
-            }
-            for ty in &mut this.global_types {
-                *ty = remap_types[*ty].unwrap();
-            }
-            for rel in &mut this.global_to_relation {
-                *rel = remap_relations[*rel].unwrap();
-            }
-            for initial in &mut this.initial {
-                if let lir::Initial::ComputeGlobal {
-                    compute: lir::GlobalCompute::Compute { relation, .. },
-                    ..
-                } = initial
-                {
-                    *relation = remap_relations[*relation].unwrap();
-                }
-            }
-            this.relations =
-                TVec::from_iter_ordered(this.relations.into_iter_enumerate().filter_map(
-                    |(relation_id, mut relation)| {
-                        remap_relations[relation_id].map(|new_relation_id| {
-                            for col_ty in &mut relation.columns {
-                                *col_ty = remap_types[*col_ty].unwrap();
-                            }
-                            (new_relation_id, relation)
-                        })
-                    },
-                ));
-            this.types = TVec::from_iter_ordered(this.types.into_iter_enumerate().filter_map(
-                |(type_id, type_)| {
-                    remap_types[type_id].map(|new_relation_id| (new_relation_id, type_))
-                },
-            ));
-        }
-        this
-    }
-}
-
-struct Dbg(String);
-
-impl Debug for Dbg {
-    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
-        f.write_str(&self.0)
-    }
-}
-
-impl Debug for ImplicitRule {
-    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
-        let Self { out, columns } = self;
-
-        f.debug_list()
-            .entries(
-                (0..*columns)
-                    .map(ColumnId)
-                    .map(|i| {
-                        Dbg(out
-                            .get(&i)
-                            .map_or("_", |x| match x {
-                                ImplicitRuleAction::Panic => "!",
-                                ImplicitRuleAction::Union => "U",
-                                ImplicitRuleAction::Lattice {} => "+",
-                            })
-                            .to_string())
-                    })
-                    .collect::<Vec<_>>(),
-            )
-            .finish()
-    }
-}
-
-impl Display for TypeKind {
-    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
-        match self {
-            TypeKind::Symbolic => f.write_str("[symbolic]"),
-            TypeKind::Primitive { type_path } => f.write_str(type_path),
-        }
-    }
-}
-
-impl Debug for Type {
-    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
-        let Self { name, kind } = self;
-        f.debug_struct("Type")
-            .field("name", &Dbg((*name).to_string()))
-            .field("kind", &Dbg(format!("{kind}")))
-            .finish()
+                    (new_relation_id, relation)
+                })
+            },
+        ));
+        self.types = TVec::from_iter_ordered(self.types.into_iter_enumerate().filter_map(
+            |(type_id, type_)| remap_types[type_id].map(|new_relation_id| (new_relation_id, type_)),
+        ));
+        self
     }
 }
 
 #[cfg(test)]
 mod debug_print {
     use super::*;
+    use std::fmt::Formatter;
 
     impl Theory {
         pub(crate) fn dbg_summary(&self) -> String {
             format!("{:#?}", FmtCtx(self, &()))
         }
     }
+
     #[derive(PartialOrd, Ord, PartialEq, Eq)]
     struct DbgStr<const N: usize>([String; N]);
     impl<const N: usize> Debug for DbgStr<N> {
@@ -1025,7 +971,6 @@ mod debug_print {
     }
 
     struct FmtCtx<'a, 'b, A, B>(&'a A, &'b B);
-
     impl Debug for FmtCtx<'_, '_, Theory, ()> {
         fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
             let Self(
@@ -1072,7 +1017,7 @@ mod debug_print {
                 "relations",
                 &relations
                     .iter_enumerate()
-                    .map(|(id, x)| (id, Dbg(format!("{:?}", FmtCtx(*this, x)))))
+                    .map(|(id, x)| (id, DbgStr([format!("{:?}", FmtCtx(*this, x))])))
                     .collect::<BTreeMap<_, _>>(),
             );
             let _ = global_types;
@@ -1105,23 +1050,22 @@ mod debug_print {
                 "atoms",
                 &atoms
                     .iter()
-                    .map(|x| Dbg(format!("{:?}", FmtCtx(&(*theory, *this), x))))
+                    .map(|x| DbgStr([format!("{:?}", FmtCtx(&(*theory, *this), x))]))
                     .collect::<Vec<_>>(),
             );
-            dbg = dbg.field("variables", &variables.map(|m| Dbg(format!("{m:?}"))));
+            dbg = dbg.field("variables", &variables.map(|m| DbgStr([format!("{m:?}")])));
             dbg = dbg.field(
                 "unify",
                 &unify
                     .iter_sets()
                     .filter(|s| s.len() > 1)
                     .map(|v| {
-                        Dbg(format!(
+                        DbgStr([format!(
                             "{:?}",
                             v.iter()
-                                .map(|v| variables[v].name_or_id(*v))
-                                .map(Dbg)
+                                .map(|v| DbgStr([variables[v].name_or_id(*v)]))
                                 .collect::<Vec<_>>()
-                        ))
+                        )])
                     })
                     .collect::<Vec<_>>(),
             );
@@ -1156,21 +1100,21 @@ mod debug_print {
                     "columns",
                     &columns
                         .iter()
-                        .map(|x| Dbg(theory.types[x].name.to_owned()))
+                        .map(|x| DbgStr([theory.types[x].name.to_owned()]))
                         .collect::<Vec<_>>(),
                 )
-                .field("kind", &Dbg(kind))
+                .field("kind", &DbgStr([kind]))
                 .field(
                     "implicit_rules",
-                    &Dbg(format!(
-                        "{:?}",
-                        implicit_rules.iter_enumerate().collect::<BTreeMap<_, _>>()
-                    )),
+                    &FmtCtx(
+                        &(),
+                        &implicit_rules.iter_enumerate().collect::<BTreeMap<_, _>>(),
+                    ),
                 );
             if !invariant_permutations.inner.is_empty() {
                 dbg_struct.field(
                     "invariant_permutations",
-                    &Dbg(format!("{:?}", invariant_permutations.inner)),
+                    &DbgStr([format!("{:?}", invariant_permutations.inner)]),
                 );
             }
             dbg_struct.finish()
@@ -1203,31 +1147,62 @@ mod debug_print {
             let mut dbg = &mut f.debug_struct(&format!("{premise}{incl}"));
             dbg = dbg.field(
                 "relation",
-                &Dbg(theory.relations[*relation].name.to_owned()),
+                &DbgStr([theory.relations[*relation].name.to_owned()]),
             );
             dbg = dbg.field(
                 "columns",
                 &columns
                     .iter()
-                    .map(|x| Dbg(rule.variables[*x].name_or_id(*x).to_string()))
+                    .map(|x| DbgStr([rule.variables[*x].name_or_id(*x).to_string()]))
                     .collect::<Vec<_>>(),
             );
             if let Some(entry) = entry {
-                dbg = dbg.field("entry", &theory.relations[*relation].implicit_rules[entry]);
+                dbg = dbg.field(
+                    "entry",
+                    &FmtCtx(&(), &theory.relations[*relation].implicit_rules[entry]),
+                );
             }
             dbg.finish()
         }
     }
-    impl Debug for FmtCtx<'_, '_, &Theory, &VariableMeta> {
+
+    impl Debug for FmtCtx<'_, '_, (), BTreeMap<ImplicitRuleId, &ImplicitRule>> {
         fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
-            let Self(theory, VariableMeta { name, ty }) = self;
-
-            let ty = theory.types[*ty];
-
-            f.debug_struct("VariableMeta")
-                .field("name", &Dbg(name.unwrap_or("").to_string()))
-                .field("ty", &ty)
+            f.debug_map()
+                .entries(self.1.iter().map(|(k, v)| (k, FmtCtx(&(), *v))))
                 .finish()
+        }
+    }
+    impl Debug for FmtCtx<'_, '_, (), ImplicitRule> {
+        fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+            let Self((), ImplicitRule { out, columns }) = self;
+
+            f.debug_list()
+                .entries(
+                    (0..*columns)
+                        .map(ColumnId)
+                        .map(|i| {
+                            DbgStr([out
+                                .get(&i)
+                                .map_or("_", |x| match x {
+                                    ImplicitRuleAction::Panic => "!",
+                                    ImplicitRuleAction::Union => "U",
+                                    ImplicitRuleAction::Lattice {} => "+",
+                                })
+                                .to_string()])
+                        })
+                        .collect::<Vec<_>>(),
+                )
+                .finish()
+        }
+    }
+
+    impl Display for TypeKind {
+        fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+            match self {
+                TypeKind::Symbolic => f.write_str("[symbolic]"),
+                TypeKind::Primitive { type_path } => f.write_str(type_path),
+            }
         }
     }
 }
