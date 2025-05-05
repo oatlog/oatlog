@@ -91,13 +91,17 @@ pub(crate) fn emit_lir_theory(theory: hir::Theory) -> (hir::Theory, lir::Theory)
                 //    .map(|i| uses.push(BTreeSet::from_iter([i])))
                 //    .collect();
                 let column_back_references: TVec<ColumnId, IndexUsageId> = TVec::new();
-                // Guarantee some column
-                let _ = uses.push(relation.columns.enumerate().collect::<BTreeSet<ColumnId>>());
 
                 let implicit_with_index = relation.implicit_rules.map(|x| {
                     let index_usage = uses.push(x.key_columns());
                     (index_usage, x)
                 });
+
+                // * we want to guarantee *some* index
+                // * we require "index_all" if we don't have FD to find old.
+                if relation.implicit_rules.len() == 0 || uses.len() == 0 {
+                    let _ = uses.push(relation.columns.enumerate().collect::<BTreeSet<ColumnId>>());
+                }
 
                 let (usage_to_info, mut index_to_info) = index_selection::index_selection(
                     relation.columns.len(),

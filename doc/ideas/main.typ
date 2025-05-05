@@ -2757,6 +2757,8 @@ kill mandatory "index-all" by iterating FD index and filtering for new.
 
 kill dead code - DONE
 
+coverage testing.
+
 = TODO READ
 Papers are just under the first author i looked at.
 I stopped adding authors after a while since this is just too many papers.

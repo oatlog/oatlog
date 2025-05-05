@@ -651,39 +651,70 @@ fn update(
         })
         .collect_vecs();
 
-    let (allset, allset_cols) = {
-        let usage_info = usage_to_info
-            .iter()
-            .find(|usage_info| usage_info.prefix == rel.columns.len())
-            .expect("some IndexUsage that queryies all columns");
-        let index_info = &index_to_info[usage_info.index];
-        assert_eq!(index_info.permuted_columns.len(), usage_info.prefix);
-        (
-            ident::index_usage_field(index_info.permuted_columns.inner()),
-            index_info
-                .permuted_columns
-                .iter()
-                .copied()
-                .map(ident::column)
-                .collect_vec(),
-        )
-    };
-
-    // NOTE: these have the invariant that each element must be root.
-    let iter_cols_superset_new = if let (Some(index), Some(keys), Some(vals)) = (
+    // INVARIANTS:
+    // * all = union(old, new)
+    // * {} = intersection(old, new)
+    // * all elements in new are canonical.
+    // * new contains no duplicates
+    // * (maybe?) new is sorted
+    let fill_new_impl = if let (Some(index), Some(keys), Some(vals)) = (
         indexes_fd.first(),
         indexes_fd_keys.first(),
         indexes_fd_vals.first(),
     ) {
         quote! {
             // find is not needed because this index is used for congruence closure
-            self.#index.iter().map(|(&(#(#keys,)*), &(#(#vals,)* _timestamp,))| (#(#cols,)*))
+
+            self.new.extend(
+                self.#index.iter()
+                .filter_map(|(&(#(#keys,)*), &(#(#vals,)* timestamp,))| {
+                    // assert_eq!(timestamp == latest_timestamp, !self.#allset.contains_key(&(#(#allset_cols,)*)));
+                    if timestamp == latest_timestamp {
+                        Some((#(#cols,)*))
+                    } else {
+                        None
+                    }
+                })
+                // .map(|(&(#(#keys,)*), &(#(#vals,)* _timestamp,))| (#(#cols,)*))
+                // .filter(|&(#(#cols,)*)| !self.#allset.contains_key(&(#(#allset_cols,)*)))
+            );
+
+            #sort_new
+            // NOTE: since we get all elements of new from an index, we already know that it is
+            // deduplicated.
         }
     } else {
+        let (allset, allset_cols) = {
+            let usage_info = usage_to_info
+                .iter()
+                .find(|usage_info| usage_info.prefix == rel.columns.len())
+                .expect("some IndexUsage that queryies all columns");
+            let index_info = &index_to_info[usage_info.index];
+            assert_eq!(index_info.permuted_columns.len(), usage_info.prefix);
+            (
+                ident::index_usage_field(index_info.permuted_columns.inner()),
+                index_info
+                    .permuted_columns
+                    .iter()
+                    .copied()
+                    .map(ident::column)
+                    .collect_vec(),
+            )
+        };
+
         quote! {
-            // find is needed if we don't have FD because then update and update_begin
-            // are empty.
-            insertions.iter().map(|&(#(#cols,)*)| (#(#cols_find,)*))
+            // find is needed if we don't have FD then we have to iterate insertions which is was never
+            // canonicalized.
+
+            // WARNING: this codepath is kinda untested and performance of it does not matter that
+            // much
+            self.new.extend(
+                insertions.iter().map(|&(#(#cols,)*)| (#(#cols_find,)*))
+                .filter(|&(#(#cols,)*)| !self.#allset.contains_key(&(#(#allset_cols,)*)))
+            );
+
+            #sort_new
+            self.new.dedup();
         }
     };
 
@@ -735,13 +766,8 @@ fn update(
                 assert!(self.new.is_empty());
 
                 log_duration!("fill new: {}", {
-                    self.new.extend(#iter_cols_superset_new
-                        .filter(|&(#(#cols,)*)| !self.#allset.contains_key(&(#(#allset_cols,)*)))
-                    );
+                    #fill_new_impl
                     insertions.clear();
-
-                    #sort_new
-                    self.new.dedup();
                 });
 
                 #[cfg(debug_assertions)]
@@ -749,6 +775,11 @@ fn update(
                     self.new.iter().for_each(|&(#(#cols,)*)| {
                         assert_eq!((#(#cols,)*), (#(#cols_find,)*), "new is canonical");
                     });
+
+                    let mut new = self.new.clone();
+                    new.sort();
+                    new.dedup();
+                    assert_eq!(new.len(), self.new.len(), "new only has unique elements");
                 }
 
                 // At this point we know that there is no overlap between old and new because of
