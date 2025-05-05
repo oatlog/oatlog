@@ -518,7 +518,6 @@ fn hir_global() {
                             index_to_info: {ir0: 0_1_2 conflict[..2] => [2:union]},
                             usage_to_info: {
                                 iu0: ir0[..2],
-                                iu1: ir0[..2],
                             },
                             column_back_reference: {},
                         },
@@ -530,8 +529,6 @@ fn hir_global() {
                             index_to_info: {ir0: 0_1 conflict[..1] => [1:union]},
                             usage_to_info: {
                                 iu0: ir0[..1],
-                                iu1: ir0[..1],
-                                iu2: ir0[..1],
                             },
                             column_back_reference: {},
                         },
@@ -543,7 +540,6 @@ fn hir_global() {
                             index_to_info: {ir0: 0_1 conflict[..1] => [1:union]},
                             usage_to_info: {
                                 iu0: ir0[..1],
-                                iu1: ir0[..1],
                             },
                             column_back_reference: {},
                         },
@@ -598,7 +594,7 @@ fn hir_global() {
                     ],
                     atom: [PremiseNew, r3(v6)]
                     then: [
-                        atom: [PremiseOld, r1(v6, v7), iu1]
+                        atom: [PremiseOld, r1(v6, v7), iu0]
                         then: [
                             meta: "( rewrite ( Const one ) ( Add ( Var \"a\" ) ( Var \"b\" ) ) )"
                             atom: [Action::Insert, r4(v8) on iu0],
@@ -689,7 +685,6 @@ fn regression_tir2() {
                             index_to_info: {ir0: 0_1_2 conflict[..2] => [2:union]},
                             usage_to_info: {
                                 iu0: ir0[..2],
-                                iu1: ir0[..2],
                             },
                             column_back_reference: {},
                         },
@@ -702,9 +697,6 @@ fn regression_tir2() {
                             usage_to_info: {
                                 iu0: ir0[..2],
                                 iu1: ir0[..1],
-                                iu2: ir0[..1],
-                                iu3: ir0[..1],
-                                iu4: ir0[..2],
                             },
                             column_back_reference: {},
                         },
@@ -717,8 +709,6 @@ fn regression_tir2() {
                             usage_to_info: {
                                 iu0: ir0[..1],
                                 iu1: ir1[..1],
-                                iu2: ir0[..1],
-                                iu3: ir0[..1],
                             },
                             column_back_reference: {},
                         },
@@ -794,7 +784,7 @@ fn regression_tir2() {
                         then: [
                             atom: [PremiseAny, r3(v5), iu_bogus]
                             then: [
-                                atom: [PremiseOld, r1(v4, v6, v7), iu2]
+                                atom: [PremiseOld, r1(v4, v6, v7), iu1]
                                 then: [
                                     meta: "( rewrite ( Pow x ( Const 2 ) ) ( Mul x x ) )"
                                     atom: [Action::Insert, r0(v4, v4, v7)],
@@ -804,9 +794,9 @@ fn regression_tir2() {
                     ],
                     atom: [PremiseNew, r3(v9)]
                     then: [
-                        atom: [PremiseOld, r2(v9, v10), iu2]
+                        atom: [PremiseOld, r2(v9, v10), iu0]
                         then: [
-                            atom: [PremiseOld, r1(v8, v10, v11), iu3]
+                            atom: [PremiseOld, r1(v8, v10, v11), iu1]
                             then: [
                                 meta: "( rewrite ( Pow x ( Const 2 ) ) ( Mul x x ) )"
                                 atom: [Action::Insert, r0(v8, v8, v11)],
@@ -1749,7 +1739,6 @@ fn regression_tir1() {
                             index_to_info: {ir0: 0_1_2 conflict[..2] => [2:union]},
                             usage_to_info: {
                                 iu0: ir0[..2],
-                                iu1: ir0[..2],
                             },
                             column_back_reference: {},
                         },
@@ -1761,7 +1750,6 @@ fn regression_tir1() {
                             index_to_info: {ir0: 0_1 conflict[..1] => [1:union]},
                             usage_to_info: {
                                 iu0: ir0[..1],
-                                iu1: ir0[..1],
                             },
                             column_back_reference: {},
                         },
@@ -2462,7 +2450,6 @@ fn codegen_constant_propagation() {
                                 iu0: ir0[..2],
                                 iu1: ir0[..1],
                                 iu2: ir1[..1],
-                                iu3: ir0[..2],
                             },
                             column_back_reference: {},
                         },
@@ -2476,7 +2463,6 @@ fn codegen_constant_propagation() {
                                 iu0: ir0[..2],
                                 iu1: ir0[..1],
                                 iu2: ir1[..1],
-                                iu3: ir0[..2],
                             },
                             column_back_reference: {},
                         },
@@ -2489,16 +2475,6 @@ fn codegen_constant_propagation() {
                             usage_to_info: {
                                 iu0: ir0[..1],
                                 iu1: ir1[..1],
-                                iu2: ir1[..1],
-                                iu3: ir1[..1],
-                                iu4: ir1[..1],
-                                iu5: ir1[..1],
-                                iu6: ir1[..1],
-                                iu7: ir1[..1],
-                                iu8: ir1[..1],
-                                iu9: ir1[..1],
-                                iu10: ir1[..1],
-                                iu11: ir0[..1],
                             },
                             column_back_reference: {},
                         },
@@ -2548,9 +2524,9 @@ fn codegen_constant_propagation() {
                     then: [
                         atom: [PremiseAny, r4(v1, v2), iu1]
                         then: [
-                            atom: [PremiseAll, r4(v3, v4), iu3]
+                            atom: [PremiseAll, r4(v3, v4), iu1]
                             then: [
-                                atom: [PremiseAll, r4(v1, v2), iu2]
+                                atom: [PremiseAll, r4(v1, v2), iu1]
                                 then: [
                                     meta: "( rule ( ( = e ( Add ( Const a ) ( Const b ) ) ) ) ( ( union e ( Const ( + a b ) ) ) ) )"
                                     atom: [Action::Insert, r0(v1, v3, v5) on iu0],
@@ -2561,11 +2537,11 @@ fn codegen_constant_propagation() {
                     ],
                     atom: [PremiseNew, r3(v20, v22, v18)]
                     then: [
-                        atom: [PremiseAny, r4(v19, v20), iu4]
+                        atom: [PremiseAny, r4(v19, v20), iu1]
                         then: [
-                            atom: [PremiseAll, r4(v21, v22), iu6]
+                            atom: [PremiseAll, r4(v21, v22), iu1]
                             then: [
-                                atom: [PremiseAll, r4(v19, v20), iu5]
+                                atom: [PremiseAll, r4(v19, v20), iu1]
                                 then: [
                                     meta: "( rule ( ( = e ( Mul ( Const a ) ( Const b ) ) ) ) ( ( union e ( Const ( * a b ) ) ) ) )"
                                     atom: [Action::Insert, r1(v19, v21, v23) on iu0],
@@ -2578,7 +2554,7 @@ fn codegen_constant_propagation() {
                     then: [
                         atom: [PremiseOld, r2(v8, v10, v6), iu1]
                         then: [
-                            atom: [PremiseAll, r4(v9, v10), iu7]
+                            atom: [PremiseAll, r4(v9, v10), iu1]
                             then: [
                                 meta: "( rule ( ( = e ( Add ( Const a ) ( Const b ) ) ) ) ( ( union e ( Const ( + a b ) ) ) ) )"
                                 atom: [Action::Insert, r0(v7, v9, v11) on iu0],
@@ -2587,7 +2563,7 @@ fn codegen_constant_propagation() {
                         ],
                         atom: [PremiseOld, r2(v14, v8, v12), iu2]
                         then: [
-                            atom: [PremiseOld, r4(v13, v14), iu8]
+                            atom: [PremiseOld, r4(v13, v14), iu1]
                             then: [
                                 meta: "( rule ( ( = e ( Add ( Const a ) ( Const b ) ) ) ) ( ( union e ( Const ( + a b ) ) ) ) )"
                                 atom: [Action::Insert, r0(v13, v7, v17) on iu0],
@@ -2596,7 +2572,7 @@ fn codegen_constant_propagation() {
                         ],
                         atom: [PremiseOld, r3(v8, v28, v24), iu1]
                         then: [
-                            atom: [PremiseAll, r4(v27, v28), iu9]
+                            atom: [PremiseAll, r4(v27, v28), iu1]
                             then: [
                                 meta: "( rule ( ( = e ( Mul ( Const a ) ( Const b ) ) ) ) ( ( union e ( Const ( * a b ) ) ) ) )"
                                 atom: [Action::Insert, r1(v7, v27, v29) on iu0],
@@ -2605,7 +2581,7 @@ fn codegen_constant_propagation() {
                         ],
                         atom: [PremiseOld, r3(v32, v8, v30), iu2]
                         then: [
-                            atom: [PremiseOld, r4(v31, v32), iu10]
+                            atom: [PremiseOld, r4(v31, v32), iu1]
                             then: [
                                 meta: "( rule ( ( = e ( Mul ( Const a ) ( Const b ) ) ) ) ( ( union e ( Const ( * a b ) ) ) ) )"
                                 atom: [Action::Insert, r1(v31, v7, v35) on iu0],
@@ -4020,7 +3996,6 @@ fn regression_entry2() {
                             index_to_info: {ir0: 0_1_2 conflict[..2] => [2:union]},
                             usage_to_info: {
                                 iu0: ir0[..2],
-                                iu1: ir0[..2],
                             },
                             column_back_reference: {},
                         },
@@ -4032,7 +4007,6 @@ fn regression_entry2() {
                             index_to_info: {ir0: 0_1 conflict[..1] => [1:union]},
                             usage_to_info: {
                                 iu0: ir0[..1],
-                                iu1: ir0[..1],
                             },
                             column_back_reference: {},
                         },
@@ -4615,7 +4589,6 @@ fn regression_entry() {
                             index_to_info: {ir0: 0_1_2 conflict[..2] => [2:union]},
                             usage_to_info: {
                                 iu0: ir0[..2],
-                                iu1: ir0[..2],
                             },
                             column_back_reference: {},
                         },
@@ -4627,7 +4600,6 @@ fn regression_entry() {
                             index_to_info: {ir0: 0_1_2 conflict[..2] => [2:union]},
                             usage_to_info: {
                                 iu0: ir0[..2],
-                                iu1: ir0[..2],
                             },
                             column_back_reference: {},
                         },
@@ -5199,7 +5171,6 @@ fn test_bind_variable_multiple_times() {
                             index_to_info: {ir0: 0_1_2 conflict[..2] => [2:union]},
                             usage_to_info: {
                                 iu0: ir0[..2],
-                                iu1: ir0[..2],
                             },
                             column_back_reference: {},
                         },
@@ -5639,7 +5610,6 @@ fn codegen_variable_reuse_bug() {
                             usage_to_info: {
                                 iu0: ir0[..2],
                                 iu1: ir1[..2],
-                                iu2: ir0[..2],
                             },
                             column_back_reference: {},
                         },
@@ -5651,7 +5621,6 @@ fn codegen_variable_reuse_bug() {
                             index_to_info: {ir0: 0 conflict[..0] => [0:union]},
                             usage_to_info: {
                                 iu0: ir0[..0],
-                                iu1: ir0[..0],
                             },
                             column_back_reference: {},
                         },
@@ -12500,18 +12469,6 @@ fn lir_math() {
                             usage_to_info: {
                                 iu0: ir0[..1],
                                 iu1: ir1[..1],
-                                iu2: ir1[..1],
-                                iu3: ir1[..1],
-                                iu4: ir1[..1],
-                                iu5: ir1[..1],
-                                iu6: ir1[..1],
-                                iu7: ir1[..1],
-                                iu8: ir1[..1],
-                                iu9: ir1[..1],
-                                iu10: ir1[..1],
-                                iu11: ir1[..1],
-                                iu12: ir1[..1],
-                                iu13: ir0[..1],
                             },
                             column_back_reference: {},
                         },
@@ -12523,7 +12480,6 @@ fn lir_math() {
                             index_to_info: {ir0: 0 conflict[..0] => [0:union]},
                             usage_to_info: {
                                 iu0: ir0[..0],
-                                iu1: ir0[..0],
                             },
                             column_back_reference: {},
                         },
@@ -12536,10 +12492,6 @@ fn lir_math() {
                             usage_to_info: {
                                 iu0: ir0[..2],
                                 iu1: ir0[..1],
-                                iu2: ir0[..1],
-                                iu3: ir0[..2],
-                                iu4: ir0[..2],
-                                iu5: ir0[..2],
                             },
                             column_back_reference: {},
                         },
@@ -12553,13 +12505,7 @@ fn lir_math() {
                                 iu0: ir0[..3],
                                 iu1: ir0[..1],
                                 iu2: ir1[..1],
-                                iu3: ir1[..1],
-                                iu4: ir1[..1],
-                                iu5: ir1[..2],
-                                iu6: ir1[..2],
-                                iu7: ir1[..1],
-                                iu8: ir1[..1],
-                                iu9: ir0[..3],
+                                iu3: ir1[..2],
                             },
                             column_back_reference: {},
                         },
@@ -12572,16 +12518,8 @@ fn lir_math() {
                             usage_to_info: {
                                 iu0: ir1[..2],
                                 iu1: ir2[..1],
-                                iu2: ir2[..1],
-                                iu3: ir2[..1],
-                                iu4: ir2[..1],
-                                iu5: ir1[..1],
-                                iu6: ir2[..1],
-                                iu7: ir0[..1],
-                                iu8: ir1[..1],
-                                iu9: ir1[..1],
-                                iu10: ir1[..1],
-                                iu11: ir1[..2],
+                                iu2: ir1[..1],
+                                iu3: ir0[..1],
                             },
                             column_back_reference: {},
                         },
@@ -12594,8 +12532,6 @@ fn lir_math() {
                             usage_to_info: {
                                 iu0: ir0[..2],
                                 iu1: ir1[..1],
-                                iu2: ir1[..1],
-                                iu3: ir0[..2],
                             },
                             column_back_reference: {},
                         },
@@ -12608,24 +12544,9 @@ fn lir_math() {
                             usage_to_info: {
                                 iu0: ir1[..2],
                                 iu1: ir2[..1],
-                                iu2: ir2[..1],
-                                iu3: ir2[..1],
-                                iu4: ir1[..1],
-                                iu5: ir2[..1],
-                                iu6: ir2[..2],
-                                iu7: ir2[..1],
-                                iu8: ir2[..1],
-                                iu9: ir1[..1],
-                                iu10: ir0[..1],
-                                iu11: ir2[..2],
-                                iu12: ir2[..2],
-                                iu13: ir0[..1],
-                                iu14: ir1[..1],
-                                iu15: ir1[..1],
-                                iu16: ir1[..1],
-                                iu17: ir1[..1],
-                                iu18: ir1[..1],
-                                iu19: ir1[..2],
+                                iu2: ir1[..1],
+                                iu3: ir2[..2],
+                                iu4: ir0[..1],
                             },
                             column_back_reference: {},
                         },
@@ -12637,7 +12558,6 @@ fn lir_math() {
                             index_to_info: {ir0: 0_1_2 conflict[..2] => [2:union]},
                             usage_to_info: {
                                 iu0: ir0[..2],
-                                iu1: ir0[..2],
                             },
                             column_back_reference: {},
                         },
@@ -12651,16 +12571,8 @@ fn lir_math() {
                                 iu0: ir0[..2],
                                 iu1: ir2[..1],
                                 iu2: ir2[..2],
-                                iu3: ir2[..1],
-                                iu4: ir0[..1],
-                                iu5: ir2[..2],
-                                iu6: ir2[..2],
-                                iu7: ir1[..1],
-                                iu8: ir1[..1],
-                                iu9: ir1[..1],
-                                iu10: ir1[..1],
-                                iu11: ir1[..1],
-                                iu12: ir0[..2],
+                                iu3: ir0[..1],
+                                iu4: ir1[..1],
                             },
                             column_back_reference: {},
                         },
@@ -12672,7 +12584,6 @@ fn lir_math() {
                             index_to_info: {ir0: 0_1 conflict[..1] => [1:union]},
                             usage_to_info: {
                                 iu0: ir0[..1],
-                                iu1: ir0[..1],
                             },
                             column_back_reference: {},
                         },
@@ -12684,7 +12595,6 @@ fn lir_math() {
                             index_to_info: {ir0: 0_1 conflict[..1] => [1:union]},
                             usage_to_info: {
                                 iu0: ir0[..1],
-                                iu1: ir0[..1],
                             },
                             column_back_reference: {},
                         },
@@ -12697,8 +12607,6 @@ fn lir_math() {
                             usage_to_info: {
                                 iu0: ir0[..1],
                                 iu1: ir0[..2],
-                                iu2: ir0[..2],
-                                iu3: ir0[..1],
                             },
                             column_back_reference: {},
                         },
@@ -12711,9 +12619,6 @@ fn lir_math() {
                             usage_to_info: {
                                 iu0: ir0[..1],
                                 iu1: ir0[..2],
-                                iu2: ir0[..2],
-                                iu3: ir0[..2],
-                                iu4: ir0[..1],
                             },
                             column_back_reference: {},
                         },
@@ -12726,14 +12631,6 @@ fn lir_math() {
                             usage_to_info: {
                                 iu0: ir0[..1],
                                 iu1: ir1[..1],
-                                iu2: ir1[..1],
-                                iu3: ir1[..1],
-                                iu4: ir1[..1],
-                                iu5: ir1[..1],
-                                iu6: ir0[..1],
-                                iu7: ir0[..1],
-                                iu8: ir0[..1],
-                                iu9: ir0[..1],
                             },
                             column_back_reference: {},
                         },
@@ -12745,7 +12642,6 @@ fn lir_math() {
                             index_to_info: {ir0: 0_1 conflict[..1] => [1:union]},
                             usage_to_info: {
                                 iu0: ir0[..1],
-                                iu1: ir0[..1],
                             },
                             column_back_reference: {},
                         },
@@ -13434,14 +13330,14 @@ fn lir_math() {
                     ],
                     atom: [PremiseNew, r2(v20, v21, v22)]
                     then: [
-                        atom: [PremiseAll, r4(v179, v180, v21), iu2]
+                        atom: [PremiseAll, r4(v179, v180, v21), iu1]
                         then: [
                             meta: "( rewrite ( Diff x ( Add a b ) ) ( Add ( Diff x a ) ( Diff x b ) ) )"
                             atom: [Action::Insert, r2(v20, v179, v183) on iu0],
                             atom: [Action::Insert, r2(v20, v180, v184) on iu0],
                             atom: [Action::Insert, r4(v183, v184, v22)],
                         ],
-                        atom: [PremiseAll, r6(v193, v194, v21), iu2]
+                        atom: [PremiseAll, r6(v193, v194, v21), iu1]
                         then: [
                             meta: "( rewrite ( Diff x ( Mul a b ) ) ( Add ( Mul a ( Diff x b ) ) ( Mul b ( Diff x a ) ) ) )"
                             atom: [Action::Insert, r2(v20, v193, v199) on iu0],
@@ -13455,7 +13351,7 @@ fn lir_math() {
                             meta: "( rewrite ( Diff x ( Sin x ) ) ( Cos x ) )"
                             atom: [Action::Insert, r12(v20, v22)],
                         ],
-                        atom: [PremiseAll, r12(v20, v21), iu2]
+                        atom: [PremiseAll, r12(v20, v21), iu1]
                         then: [
                             meta: "( rewrite ( Diff x ( Cos x ) ) ( Mul ( Const -1 ) ( Sin x ) ) )"
                             atom: [Action::Insert, r11(v20, v25) on iu0],
@@ -13466,7 +13362,7 @@ fn lir_math() {
                     ],
                     atom: [PremiseNew, r3(v0, v2, v1, v3)]
                     then: [
-                        atom: [PremiseAll, r11(v1, v2), iu2]
+                        atom: [PremiseAll, r11(v1, v2), iu1]
                         then: [
                             meta: "( rewrite ( Integral fuel ( Sin x ) x ) ( Mul ( Const -1 ) ( Cos x ) ) )"
                             atom: [Action::Insert, r12(v1, v6) on iu0],
@@ -13476,9 +13372,9 @@ fn lir_math() {
                         ],
                         atom: [PremiseAny, r0(v222, v0), iu1]
                         then: [
-                            atom: [PremiseAll, r4(v266, v267, v2), iu3]
+                            atom: [PremiseAll, r4(v266, v267, v2), iu1]
                             then: [
-                                atom: [PremiseOld, r0(v264, v0), iu2]
+                                atom: [PremiseOld, r0(v264, v0), iu1]
                                 then: [
                                     meta: "( rewrite ( Integral ( Fuel fuel ) ( Add f g ) x ) ( Add ( Integral fuel f x ) ( Integral fuel g x ) ) )"
                                     atom: [Action::Insert, r3(v264, v266, v1, v271) on iu0],
@@ -13486,9 +13382,9 @@ fn lir_math() {
                                     atom: [Action::Insert, r4(v271, v272, v3)],
                                 ],
                             ],
-                            atom: [PremiseAll, r5(v293, v294, v2), iu2]
+                            atom: [PremiseAll, r5(v293, v294, v2), iu1]
                             then: [
-                                atom: [PremiseOld, r0(v291, v0), iu3]
+                                atom: [PremiseOld, r0(v291, v0), iu1]
                                 then: [
                                     meta: "( rewrite ( Integral ( Fuel fuel ) ( Sub f g ) x ) ( Sub ( Integral fuel f x ) ( Integral fuel g x ) ) )"
                                     atom: [Action::Insert, r3(v291, v293, v1, v298) on iu0],
@@ -13496,9 +13392,9 @@ fn lir_math() {
                                     atom: [Action::Insert, r5(v298, v299, v3)],
                                 ],
                             ],
-                            atom: [PremiseAll, r6(v323, v324, v2), iu3]
+                            atom: [PremiseAll, r6(v323, v324, v2), iu1]
                             then: [
-                                atom: [PremiseOld, r0(v321, v0), iu4]
+                                atom: [PremiseOld, r0(v321, v0), iu1]
                                 then: [
                                     meta: "( rewrite ( Integral ( Fuel fuel ) ( Mul a b ) x ) ( Sub ( Mul a ( Integral fuel b x ) ) ( Integral fuel ( Mul ( Diff x a ) ( Integral fuel b x ) ) x ) ) )"
                                     atom: [Action::Insert, r2(v1, v323, v329) on iu0],
@@ -13509,19 +13405,19 @@ fn lir_math() {
                                     atom: [Action::Insert, r5(v328, v332, v3)],
                                 ],
                             ],
-                            atom: [PremiseAll, r12(v1, v2), iu3]
+                            atom: [PremiseAll, r12(v1, v2), iu1]
                             then: [
-                                atom: [PremiseOld, r0(v245, v0), iu5]
+                                atom: [PremiseOld, r0(v245, v0), iu1]
                                 then: [
                                     meta: "( rewrite ( Integral ( Fuel fuel ) ( Cos x ) x ) ( Sin x ) )"
                                     atom: [Action::Insert, r11(v1, v3)],
                                 ],
                             ],
-                            atom: [PremiseAll, r13(v224, v2), iu2]
+                            atom: [PremiseAll, r13(v224, v2), iu1]
                             then: [
                                 atom: [PremiseAny, r17(v224), iu_bogus]
                                 then: [
-                                    atom: [PremiseOld, r0(v222, v0), iu6]
+                                    atom: [PremiseOld, r0(v222, v0), iu1]
                                     then: [
                                         meta: "( rewrite ( Integral ( Fuel fuel ) ( Const 1 ) x ) x )"
                                         atom: [Action::Equate, v1=v3],
@@ -13543,7 +13439,7 @@ fn lir_math() {
                         ],
                         atom: [PremiseOld, r3(v274, v34, v278, v279), iu2]
                         then: [
-                            atom: [PremiseOld, r0(v273, v274), iu7]
+                            atom: [PremiseOld, r0(v273, v274), iu1]
                             then: [
                                 meta: "( rewrite ( Integral ( Fuel fuel ) ( Add f g ) x ) ( Add ( Integral fuel f x ) ( Integral fuel g x ) ) )"
                                 atom: [Action::Insert, r3(v273, v32, v278, v280) on iu0],
@@ -13551,26 +13447,26 @@ fn lir_math() {
                                 atom: [Action::Insert, r4(v280, v281, v279)],
                             ],
                         ],
-                        atom: [PremiseAll, r4(v39, v40, v33), iu4]
+                        atom: [PremiseAll, r4(v39, v40, v33), iu1]
                         then: [
                             meta: "( rewrite ( Add a ( Add b c ) ) ( Add ( Add a b ) c ) )"
                             atom: [Action::Insert, r4(v32, v39, v43) on iu0],
                             atom: [Action::Insert, r4(v43, v40, v34)],
                         ],
-                        atom: [PremiseOld, r4(v44, v34, v48), iu5]
+                        atom: [PremiseOld, r4(v44, v34, v48), iu2]
                         then: [
                             meta: "( rewrite ( Add a ( Add b c ) ) ( Add ( Add a b ) c ) )"
                             atom: [Action::Insert, r4(v44, v32, v49) on iu0],
                             atom: [Action::Insert, r4(v49, v33, v48)],
                         ],
-                        atom: [PremiseAll, r6(v98, v34, v102), iu4]
+                        atom: [PremiseAll, r6(v98, v34, v102), iu2]
                         then: [
                             meta: "( rewrite ( Mul a ( Add b c ) ) ( Add ( Mul a b ) ( Mul a c ) ) )"
                             atom: [Action::Insert, r6(v98, v32, v103) on iu0],
                             atom: [Action::Insert, r6(v98, v33, v104) on iu0],
                             atom: [Action::Insert, r4(v103, v104, v102)],
                         ],
-                        atom: [PremiseAll, r13(v63, v33), iu3]
+                        atom: [PremiseAll, r13(v63, v33), iu1]
                         then: [
                             atom: [PremiseAny, r16(v63), iu_bogus]
                             then: [
@@ -13578,11 +13474,11 @@ fn lir_math() {
                                 atom: [Action::Equate, v32=v34],
                             ],
                         ],
-                        atom: [PremiseAny, r6(v112, v113, v32), iu5]
+                        atom: [PremiseAny, r6(v112, v113, v32), iu1]
                         then: [
-                            atom: [PremiseAll, r6(v112, v115, v33), iu7]
+                            atom: [PremiseAll, r6(v112, v115, v33), iu1]
                             then: [
-                                atom: [PremiseAll, r6(v112, v113, v32), iu6]
+                                atom: [PremiseAll, r6(v112, v113, v32), iu3]
                                 then: [
                                     meta: "( rewrite ( Add ( Mul a b ) ( Mul a c ) ) ( Mul a ( Add b c ) ) )"
                                     atom: [Action::Insert, r4(v113, v115, v118) on iu0],
@@ -13598,9 +13494,9 @@ fn lir_math() {
                         atom: [Action::Insert, r13(v17, v18) on iu0],
                         atom: [Action::Insert, r6(v18, v15, v19) on iu0],
                         atom: [Action::Insert, r4(v14, v19, v16)],
-                        atom: [PremiseOld, r3(v301, v16, v305, v306), iu3]
+                        atom: [PremiseOld, r3(v301, v16, v305, v306), iu2]
                         then: [
-                            atom: [PremiseOld, r0(v300, v301), iu8]
+                            atom: [PremiseOld, r0(v300, v301), iu1]
                             then: [
                                 meta: "( rewrite ( Integral ( Fuel fuel ) ( Sub f g ) x ) ( Sub ( Integral fuel f x ) ( Integral fuel g x ) ) )"
                                 atom: [Action::Insert, r3(v300, v14, v305, v307) on iu0],
@@ -13613,7 +13509,7 @@ fn lir_math() {
                     then: [
                         meta: "( rewrite ( Mul a b ) ( Mul b a ) )"
                         atom: [Action::Insert, r6(v36, v35, v37)],
-                        atom: [PremiseOld, r2(v201, v37, v205), iu2]
+                        atom: [PremiseOld, r2(v201, v37, v205), iu1]
                         then: [
                             meta: "( rewrite ( Diff x ( Mul a b ) ) ( Add ( Mul a ( Diff x b ) ) ( Mul b ( Diff x a ) ) ) )"
                             atom: [Action::Insert, r2(v201, v35, v208) on iu0],
@@ -13622,9 +13518,9 @@ fn lir_math() {
                             atom: [Action::Insert, r6(v36, v208, v209) on iu0],
                             atom: [Action::Insert, r4(v207, v209, v205)],
                         ],
-                        atom: [PremiseOld, r3(v334, v37, v338, v339), iu4]
+                        atom: [PremiseOld, r3(v334, v37, v338, v339), iu2]
                         then: [
-                            atom: [PremiseOld, r0(v333, v334), iu9]
+                            atom: [PremiseOld, r0(v333, v334), iu1]
                             then: [
                                 meta: "( rewrite ( Integral ( Fuel fuel ) ( Mul a b ) x ) ( Sub ( Mul a ( Integral fuel b x ) ) ( Integral fuel ( Mul ( Diff x a ) ( Integral fuel b x ) ) x ) ) )"
                                 atom: [Action::Insert, r2(v338, v35, v341) on iu0],
@@ -13635,26 +13531,26 @@ fn lir_math() {
                                 atom: [Action::Insert, r5(v340, v344, v339)],
                             ],
                         ],
-                        atom: [PremiseOld, r4(v106, v107, v36), iu6]
+                        atom: [PremiseOld, r4(v106, v107, v36), iu1]
                         then: [
                             meta: "( rewrite ( Mul a ( Add b c ) ) ( Add ( Mul a b ) ( Mul a c ) ) )"
                             atom: [Action::Insert, r6(v35, v106, v110) on iu0],
                             atom: [Action::Insert, r6(v35, v107, v111) on iu0],
                             atom: [Action::Insert, r4(v110, v111, v37)],
                         ],
-                        atom: [PremiseAll, r6(v51, v52, v36), iu8]
+                        atom: [PremiseAll, r6(v51, v52, v36), iu1]
                         then: [
                             meta: "( rewrite ( Mul a ( Mul b c ) ) ( Mul ( Mul a b ) c ) )"
                             atom: [Action::Insert, r6(v35, v51, v55) on iu0],
                             atom: [Action::Insert, r6(v55, v52, v37)],
                         ],
-                        atom: [PremiseOld, r6(v56, v37, v60), iu9]
+                        atom: [PremiseOld, r6(v56, v37, v60), iu2]
                         then: [
                             meta: "( rewrite ( Mul a ( Mul b c ) ) ( Mul ( Mul a b ) c ) )"
                             atom: [Action::Insert, r6(v56, v35, v61) on iu0],
                             atom: [Action::Insert, r6(v61, v36, v60)],
                         ],
-                        atom: [PremiseAll, r13(v77, v36), iu4]
+                        atom: [PremiseAll, r13(v77, v36), iu1]
                         then: [
                             atom: [PremiseAny, r16(v77), iu_bogus]
                             then: [
@@ -13667,20 +13563,20 @@ fn lir_math() {
                                 atom: [Action::Equate, v35=v37],
                             ],
                         ],
-                        atom: [PremiseAny, r6(v35, v122, v123), iu10]
+                        atom: [PremiseAny, r6(v35, v122, v123), iu4]
                         then: [
-                            atom: [PremiseOld, r4(v37, v123, v124), iu7]
+                            atom: [PremiseOld, r4(v37, v123, v124), iu3]
                             then: [
-                                atom: [PremiseAll, r6(v35, v122, v123), iu11]
+                                atom: [PremiseAll, r6(v35, v122, v123), iu3]
                                 then: [
                                     meta: "( rewrite ( Add ( Mul a b ) ( Mul a c ) ) ( Mul a ( Add b c ) ) )"
                                     atom: [Action::Insert, r4(v36, v122, v125) on iu0],
                                     atom: [Action::Insert, r6(v35, v125, v124)],
                                 ],
                             ],
-                            atom: [PremiseOld, r4(v128, v37, v131), iu8]
+                            atom: [PremiseOld, r4(v128, v37, v131), iu2]
                             then: [
-                                atom: [PremiseOld, r6(v35, v127, v128), iu12]
+                                atom: [PremiseOld, r6(v35, v127, v128), iu3]
                                 then: [
                                     meta: "( rewrite ( Add ( Mul a b ) ( Mul a c ) ) ( Mul a ( Add b c ) ) )"
                                     atom: [Action::Insert, r4(v127, v36, v132) on iu0],
@@ -13690,7 +13586,7 @@ fn lir_math() {
                         ],
                         atom: [PremiseAny, r8(v133, v134, v35), iu1]
                         then: [
-                            atom: [PremiseAll, r8(v133, v136, v36), iu3]
+                            atom: [PremiseAll, r8(v133, v136, v36), iu1]
                             then: [
                                 atom: [PremiseAll, r8(v133, v134, v35), iu2]
                                 then: [
@@ -13703,7 +13599,7 @@ fn lir_math() {
                     ],
                     atom: [PremiseNew, r8(v140, v141, v142)]
                     then: [
-                        atom: [PremiseAll, r13(v155, v141), iu5]
+                        atom: [PremiseAll, r13(v155, v141), iu1]
                         then: [
                             atom: [PremiseAny, r17(v155), iu_bogus]
                             then: [
@@ -13716,20 +13612,20 @@ fn lir_math() {
                                 atom: [Action::Insert, r6(v140, v140, v142)],
                             ],
                         ],
-                        atom: [PremiseAny, r8(v140, v143, v144), iu4]
+                        atom: [PremiseAny, r8(v140, v143, v144), iu3]
                         then: [
-                            atom: [PremiseOld, r6(v142, v144, v145), iu13]
+                            atom: [PremiseOld, r6(v142, v144, v145), iu4]
                             then: [
-                                atom: [PremiseAll, r8(v140, v143, v144), iu5]
+                                atom: [PremiseAll, r8(v140, v143, v144), iu2]
                                 then: [
                                     meta: "( rewrite ( Mul ( Pow a b ) ( Pow a c ) ) ( Pow a ( Add b c ) ) )"
                                     atom: [Action::Insert, r4(v141, v143, v146) on iu0],
                                     atom: [Action::Insert, r8(v140, v146, v145)],
                                 ],
                             ],
-                            atom: [PremiseOld, r6(v149, v142, v152), iu14]
+                            atom: [PremiseOld, r6(v149, v142, v152), iu2]
                             then: [
-                                atom: [PremiseOld, r8(v140, v148, v149), iu6]
+                                atom: [PremiseOld, r8(v140, v148, v149), iu2]
                                 then: [
                                     meta: "( rewrite ( Mul ( Pow a b ) ( Pow a c ) ) ( Pow a ( Add b c ) ) )"
                                     atom: [Action::Insert, r4(v148, v141, v153) on iu0],
@@ -13740,12 +13636,12 @@ fn lir_math() {
                     ],
                     atom: [PremiseNew, r11(v8, v9)]
                     then: [
-                        atom: [PremiseOld, r2(v8, v9, v215), iu3]
+                        atom: [PremiseOld, r2(v8, v9, v215), iu0]
                         then: [
                             meta: "( rewrite ( Diff x ( Sin x ) ) ( Cos x ) )"
                             atom: [Action::Insert, r12(v8, v215)],
                         ],
-                        atom: [PremiseOld, r3(v7, v9, v8, v10), iu5]
+                        atom: [PremiseOld, r3(v7, v9, v8, v10), iu3]
                         then: [
                             meta: "( rewrite ( Integral fuel ( Sin x ) x ) ( Mul ( Const -1 ) ( Cos x ) ) )"
                             atom: [Action::Insert, r12(v8, v13) on iu0],
@@ -13756,7 +13652,7 @@ fn lir_math() {
                     ],
                     atom: [PremiseNew, r12(v26, v27)]
                     then: [
-                        atom: [PremiseOld, r2(v26, v27, v28), iu4]
+                        atom: [PremiseOld, r2(v26, v27, v28), iu0]
                         then: [
                             meta: "( rewrite ( Diff x ( Cos x ) ) ( Mul ( Const -1 ) ( Sin x ) ) )"
                             atom: [Action::Insert, r11(v26, v31) on iu0],
@@ -13764,9 +13660,9 @@ fn lir_math() {
                             atom: [Action::Insert, r13(v29, v30) on iu0],
                             atom: [Action::Insert, r6(v30, v31, v28)],
                         ],
-                        atom: [PremiseOld, r3(v251, v27, v26, v254), iu6]
+                        atom: [PremiseOld, r3(v251, v27, v26, v254), iu3]
                         then: [
-                            atom: [PremiseOld, r0(v250, v251), iu10]
+                            atom: [PremiseOld, r0(v250, v251), iu1]
                             then: [
                                 meta: "( rewrite ( Integral ( Fuel fuel ) ( Cos x ) x ) ( Sin x ) )"
                                 atom: [Action::Insert, r11(v26, v254)],
@@ -13775,11 +13671,11 @@ fn lir_math() {
                     ],
                     atom: [PremiseNew, r13(v67, v68)]
                     then: [
-                        atom: [PremiseAny, r8(v158, v68, v161), iu7]
+                        atom: [PremiseAny, r8(v158, v68, v161), iu4]
                         then: [
                             atom: [PremiseAny, r18(v67), iu_bogus]
                             then: [
-                                atom: [PremiseOld, r8(v170, v68, v173), iu8]
+                                atom: [PremiseOld, r8(v170, v68, v173), iu4]
                                 then: [
                                     meta: "( rewrite ( Pow x ( Const 2 ) ) ( Mul x x ) )"
                                     atom: [Action::Insert, r6(v170, v170, v173)],
@@ -13788,7 +13684,7 @@ fn lir_math() {
                         ],
                         atom: [PremiseAny, r16(v67), iu_bogus]
                         then: [
-                            atom: [PremiseOld, r4(v66, v68, v69), iu9]
+                            atom: [PremiseOld, r4(v66, v68, v69), iu2]
                             then: [
                                 atom: [PremiseAny, r16(v67), iu_bogus]
                                 then: [
@@ -13796,7 +13692,7 @@ fn lir_math() {
                                     atom: [Action::Equate, v66=v69],
                                 ],
                             ],
-                            atom: [PremiseOld, r6(v78, v68, v80), iu15]
+                            atom: [PremiseOld, r6(v78, v68, v80), iu2]
                             then: [
                                 atom: [PremiseAny, r16(v67), iu_bogus]
                                 then: [
@@ -13807,9 +13703,9 @@ fn lir_math() {
                         ],
                         atom: [PremiseAny, r17(v67), iu_bogus]
                         then: [
-                            atom: [PremiseOld, r3(v229, v68, v232, v233), iu7]
+                            atom: [PremiseOld, r3(v229, v68, v232, v233), iu2]
                             then: [
-                                atom: [PremiseOld, r0(v228, v229), iu11]
+                                atom: [PremiseOld, r0(v228, v229), iu1]
                                 then: [
                                     atom: [PremiseAny, r17(v67), iu_bogus]
                                     then: [
@@ -13818,7 +13714,7 @@ fn lir_math() {
                                     ],
                                 ],
                             ],
-                            atom: [PremiseOld, r6(v90, v68, v93), iu16]
+                            atom: [PremiseOld, r6(v90, v68, v93), iu2]
                             then: [
                                 atom: [PremiseAny, r17(v67), iu_bogus]
                                 then: [
@@ -13826,7 +13722,7 @@ fn lir_math() {
                                     atom: [Action::Equate, v90=v93],
                                 ],
                             ],
-                            atom: [PremiseOld, r8(v158, v68, v161), iu9]
+                            atom: [PremiseOld, r8(v158, v68, v161), iu4]
                             then: [
                                 atom: [PremiseAny, r17(v67), iu_bogus]
                                 then: [
@@ -13838,14 +13734,14 @@ fn lir_math() {
                     ],
                     atom: [PremiseNew, r16(v71)]
                     then: [
-                        atom: [PremiseOld, r13(v71, v72), iu6]
+                        atom: [PremiseOld, r13(v71, v72), iu0]
                         then: [
-                            atom: [PremiseOld, r4(v70, v72, v73), iu10]
+                            atom: [PremiseOld, r4(v70, v72, v73), iu2]
                             then: [
                                 meta: "( rewrite ( Add a ( Const 0 ) ) a )"
                                 atom: [Action::Equate, v70=v73],
                             ],
-                            atom: [PremiseOld, r6(v82, v72, v84), iu17]
+                            atom: [PremiseOld, r6(v82, v72, v84), iu2]
                             then: [
                                 meta: "( rewrite ( Mul a ( Const 0 ) ) ( Const 0 ) )"
                                 atom: [Action::Insert, r13(v71, v84)],
@@ -13854,22 +13750,22 @@ fn lir_math() {
                     ],
                     atom: [PremiseNew, r17(v95)]
                     then: [
-                        atom: [PremiseOld, r13(v95, v96), iu7]
+                        atom: [PremiseOld, r13(v95, v96), iu0]
                         then: [
-                            atom: [PremiseOld, r3(v235, v96, v238, v239), iu8]
+                            atom: [PremiseOld, r3(v235, v96, v238, v239), iu2]
                             then: [
-                                atom: [PremiseOld, r0(v234, v235), iu12]
+                                atom: [PremiseOld, r0(v234, v235), iu1]
                                 then: [
                                     meta: "( rewrite ( Integral ( Fuel fuel ) ( Const 1 ) x ) x )"
                                     atom: [Action::Equate, v238=v239],
                                 ],
                             ],
-                            atom: [PremiseOld, r6(v94, v96, v97), iu18]
+                            atom: [PremiseOld, r6(v94, v96, v97), iu2]
                             then: [
                                 meta: "( rewrite ( Mul a ( Const 1 ) ) a )"
                                 atom: [Action::Equate, v94=v97],
                             ],
-                            atom: [PremiseOld, r8(v162, v96, v165), iu10]
+                            atom: [PremiseOld, r8(v162, v96, v165), iu4]
                             then: [
                                 meta: "( rewrite ( Pow x ( Const 1 ) ) x )"
                                 atom: [Action::Equate, v162=v165],
@@ -13878,9 +13774,9 @@ fn lir_math() {
                     ],
                     atom: [PremiseNew, r18(v175)]
                     then: [
-                        atom: [PremiseOld, r13(v175, v176), iu8]
+                        atom: [PremiseOld, r13(v175, v176), iu0]
                         then: [
-                            atom: [PremiseOld, r8(v174, v176, v177), iu11]
+                            atom: [PremiseOld, r8(v174, v176, v177), iu4]
                             then: [
                                 meta: "( rewrite ( Pow x ( Const 2 ) ) ( Mul x x ) )"
                                 atom: [Action::Insert, r6(v174, v174, v177)],

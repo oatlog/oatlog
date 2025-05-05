@@ -1,16 +1,15 @@
-use itertools::Itertools as _;
-
-use std::{
-    collections::{BTreeMap, BTreeSet},
-    mem::replace,
-};
-
 use crate::{
     MultiMapCollect as _,
     hir::{self, Atom, IsPremise, Relation, SymbolicRule, VariableMeta},
     ids::{ColumnId, IndexUsageId, RelationId, TypeId, VariableId},
     lir,
+    typed_set::TSet,
     typed_vec::{TVec, tvec},
+};
+use itertools::Itertools as _;
+use std::{
+    collections::{BTreeMap, BTreeSet},
+    mem::replace,
 };
 
 #[derive(Clone, Eq, PartialEq, Ord, PartialOrd, Debug)]
@@ -450,7 +449,7 @@ pub(crate) fn lowering(
     trie: Trie,
     variables: &mut TVec<VariableId, VariableMeta>,
     relations: &TVec<RelationId, hir::Relation>,
-    table_uses: &mut TVec<RelationId, TVec<IndexUsageId, BTreeSet<ColumnId>>>,
+    table_uses: &mut TVec<RelationId, TSet<IndexUsageId, BTreeSet<ColumnId>>>,
     types: &TVec<TypeId, hir::Type>,
 ) -> (
     &'static [lir::RuleTrie],
@@ -476,7 +475,7 @@ pub(crate) fn lowering_rec(
     }: Trie,
     variables: &mut TVec<VariableId, VariableMeta>,
     relations: &TVec<RelationId, hir::Relation>,
-    table_uses: &mut TVec<RelationId, TVec<IndexUsageId, BTreeSet<ColumnId>>>,
+    table_uses: &mut TVec<RelationId, TSet<IndexUsageId, BTreeSet<ColumnId>>>,
     types: &TVec<TypeId, hir::Type>,
 ) -> &'static [lir::RuleTrie] {
     let schedule = action_topo_resolve(
@@ -609,7 +608,7 @@ pub(crate) fn lowering_rec(
                     let mut trie = lowering_rec(trie, variables, relations, table_uses, types);
 
                     let mut make_index_use = || {
-                        table_uses[atom.relation].push(
+                        table_uses[atom.relation].insert(
                             args.iter()
                                 .map(|x| bound_premise.contains(x))
                                 .enumerate()
@@ -685,7 +684,7 @@ pub(crate) fn lowering_rec(
                     let args = &*atom.columns.inner().clone().leak();
 
                     let mut make_index_use = || {
-                        table_uses[atom.relation].push(
+                        table_uses[atom.relation].insert(
                             args.iter()
                                 .map(|x| bound_premise.contains(x))
                                 .enumerate()

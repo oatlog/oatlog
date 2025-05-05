@@ -61,11 +61,6 @@ id_wrap!(
     "iu",
     "reference to something that requires an index"
 );
-id_wrap!(
-    IuDedupId,
-    "iud",
-    "index usage ids, deduplicated and compacted within `index_selection`"
-);
 id_wrap!(ImplicitRuleId, "n", "id for an implicit rule");
 
 impl IndexUsageId {

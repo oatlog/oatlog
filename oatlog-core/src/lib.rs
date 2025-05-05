@@ -9,6 +9,7 @@ mod lir;
 mod query_planning;
 mod tir;
 mod todo;
+mod typed_set;
 mod typed_vec;
 mod union_find;
 
