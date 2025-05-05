@@ -17,6 +17,7 @@ use std::{
     collections::{BTreeMap, BTreeSet},
     fmt::{Debug, Display},
     hash::Hash,
+    mem,
 };
 
 /// Represents a theory (set of rules) with associated information
@@ -562,7 +563,19 @@ impl SymbolicRule {
         }
     }
 
-    fn optimize(&self, relations: &TVec<RelationId, Relation>) -> Self {
+    fn optimize(self, relations: &TVec<RelationId, Relation>) -> Self {
+        // Optimize symbolic rule by merging variables.
+        //
+        // P(x), A(y), unify(x,y) => P(x), A(y), unify(x,y)
+        // P(x), P(y), unify(x,y) => identical
+        // A(x), A(y), unify(x,y) => A(x), unify(x,y)
+        //
+        // And through implicit rules:
+        //
+        // PI(x,y), PI(x,z) => PI(x,y), unify(y,z)
+        // P(y), P(z), AI(x,y), AI(x,z) => P(y), P(z), AI(x,y), unify(y,z)
+        // P(y), A(z), AI(x,y), AI(x,z) => P(y), A(y), AI(x,y), unify(y,z)
+
         let mut to_merge: UFData<VariableId, (IsPremise, VariableMeta)> = self
             .variables
             .iter()
@@ -643,8 +656,6 @@ impl SymbolicRule {
                                     }
                                     (Action, Premise, Premise) => {
                                         deleted = false;
-                                        // TODO loke for erik: I don't understand this comment.
-
                                         // We don't want contents of action to cause a merge of two premise variables
                                         //
                                         // Example:
@@ -775,7 +786,6 @@ pub(crate) struct RuleArgs {
     pub(crate) action_unify: Vec<(VariableId, VariableId)>,
 }
 impl RuleArgs {
-    #[allow(unused)]
     pub(crate) fn build(mut self) -> SymbolicRule {
         // TODO erik: assert that no atoms contain unit variables.
 
@@ -844,9 +854,10 @@ impl RuleArgs {
 
 impl Theory {
     pub(crate) fn optimize(mut self, config: Configuration) -> Self {
-        for rule in &mut self.symbolic_rules {
-            *rule = rule.optimize(&self.relations);
-        }
+        self.symbolic_rules = mem::take(&mut self.symbolic_rules)
+            .into_iter()
+            .map(|rule| rule.optimize(&self.relations))
+            .collect();
 
         if config.egglog_compat.allow_column_invariant_permutations() {
             for rule in &self.symbolic_rules {
@@ -859,9 +870,10 @@ impl Theory {
                 });
             }
 
-            for rule in &mut self.symbolic_rules {
-                *rule = rule.optimize(&self.relations);
-            }
+            self.symbolic_rules = mem::take(&mut self.symbolic_rules)
+                .into_iter()
+                .map(|rule| rule.optimize(&self.relations))
+                .collect();
         }
         self.remove_unused_relations_and_types()
     }
