@@ -176,37 +176,34 @@ pub(crate) struct InvariantPermutationSubgroup {
     /// 2. The permutation group is `{[0,1,2], [1,0,2]}`.
     /// 3. Whenever `a+b=c` is inserted into the relation, `b+a=c` should be inserted too.
     /// 4. Querying triplets `b+a=c` returns the same set (possibly different order) as querying `a+b=c`.
-    pub(crate) inner: Vec<Vec<usize>>,
+    ///
+    /// The identity permutation is never stored by itself, but will be stored if any non-identity
+    /// permutations are.
+    pub(crate) inner: BTreeSet<Vec<usize>>,
 }
 impl InvariantPermutationSubgroup {
-    fn new_identity(n: usize) -> Self {
+    fn new_identity() -> Self {
         Self {
-            inner: vec![(0..n).collect()],
+            inner: BTreeSet::new(),
         }
     }
     fn add_invariant_permutations(&mut self, perm: Vec<usize>) {
         const DERIVE_AND_OPTIMIZE_USING_INVARIANT_PERMUTATIONS: bool = false;
         if DERIVE_AND_OPTIMIZE_USING_INVARIANT_PERMUTATIONS {
-            self.inner.push(perm);
+            self.inner.insert(perm);
             self.close_permutation_subgroup();
         }
     }
     fn close_permutation_subgroup(&mut self) {
         loop {
-            let n = self.inner.len();
-            self.inner.sort();
-            self.inner.dedup();
-            for i in 0..n {
-                for j in 0..n {
-                    let a = &self.inner[i];
-                    let b = &self.inner[j];
+            let prev = self.inner.clone();
+            for a in &prev {
+                for b in &prev {
                     let c = a.iter().copied().map(|i| b[i]).collect();
-                    self.inner.push(c);
+                    self.inner.insert(c);
                 }
             }
-            self.inner.sort();
-            self.inner.dedup();
-            if n == self.inner.len() {
+            if prev.len() == self.inner.len() {
                 break;
             }
         }
@@ -214,9 +211,13 @@ impl InvariantPermutationSubgroup {
     fn apply<T: Copy>(&self, x: &[T]) -> impl Iterator<Item = Vec<T>> {
         // NOTE: `self` stores all permutations and their inverses, so whether we permute or
         // inverse permute here does not matter.
-        self.inner
+        let main = self
+            .inner
             .iter()
-            .map(|perm| perm.iter().map(|&i| x[i]).collect())
+            .map(|perm| perm.iter().map(|&i| x[i]).collect());
+        let fallback = self.inner.is_empty().then(|| x.to_owned());
+
+        main.chain(fallback)
     }
 }
 
@@ -245,7 +246,7 @@ impl Relation {
             name,
             kind: RelationTy::Table,
             implicit_rules,
-            invariant_permutations: InvariantPermutationSubgroup::new_identity(columns.len()),
+            invariant_permutations: InvariantPermutationSubgroup::new_identity(),
             columns,
         }
     }
@@ -263,7 +264,7 @@ impl Relation {
                 syn: WrapIgnore(syn.to_token_stream()),
                 ident,
             },
-            invariant_permutations: InvariantPermutationSubgroup::new_identity(columns.len()),
+            invariant_permutations: InvariantPermutationSubgroup::new_identity(),
             columns,
         }
     }
@@ -274,7 +275,7 @@ impl Relation {
             kind: RelationTy::Forall { ty },
             // forall is [x] -> (), so no implicit rules
             implicit_rules: TVec::new(),
-            invariant_permutations: InvariantPermutationSubgroup::new_identity(columns.len()),
+            invariant_permutations: InvariantPermutationSubgroup::new_identity(),
             columns,
         }
     }
@@ -285,7 +286,7 @@ impl Relation {
             kind: RelationTy::Global { id },
             // global is [] -> (x), so we have a implicit (panicing) rule.
             implicit_rules: tvec![ImplicitRule::new_panic(ColumnId(0), 1)],
-            invariant_permutations: InvariantPermutationSubgroup::new_identity(columns.len()),
+            invariant_permutations: InvariantPermutationSubgroup::new_identity(),
             columns,
         }
     }
@@ -1166,7 +1167,7 @@ mod debug_print {
                         implicit_rules.iter_enumerate().collect::<BTreeMap<_, _>>()
                     )),
                 );
-            if invariant_permutations.inner.len() > 1 {
+            if !invariant_permutations.inner.is_empty() {
                 dbg_struct.field(
                     "invariant_permutations",
                     &Dbg(format!("{:?}", invariant_permutations.inner)),
