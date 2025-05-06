@@ -2729,6 +2729,7 @@ Need to use fewer indexes.
 - (superhard) extraction
 - robust equality modulo permutation (more reasonable query planning).
 - re-evaluate "is_root" and switch to "is_root_mut"
+- iter prefetch
 
 = TODO: hard
 
@@ -2738,7 +2739,7 @@ Need to use fewer indexes.
 - scheduling/rulesets/check
 - check if we are doing semi-naive correctly and fix it - DONE?
     - check our performance with semi-naive disabled. - unclear results but can be done now.
-- try to isolate other optimizations from just being AOT vs interpreter.
+- try to isolate other optimizations from just being AOT vs interpreter. (impossible?)
 
 = async gather??
 
@@ -2751,9 +2752,9 @@ want to send 3 memory requests and continue as soon as one matches.
 
 retain/dedup not needed during index reconstruction if no overlap between old and new. - DONE
 
-sorting new means touching vecs exactly once, so whatever can be done eagerly.
+sorting new means touching vecs exactly once, so whatever can be done eagerly. - didn't really work and we will be switching to a new index.
 
-kill mandatory "index-all" by iterating FD index and filtering for new.
+kill mandatory "index-all" by iterating FD index and filtering for new. - DONE
 
 kill dead code - DONE
 

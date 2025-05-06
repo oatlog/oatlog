@@ -799,6 +799,9 @@ fn update(
                         });
                     });
                     log_duration!("fill index: {}", {
+                        // self.new.sort_by_key(|&(#(#indexes_nofd_cols,)*)| {
+                        //     (#(#indexes_nofd_keys,)*)
+                        // });
                         for &(#(#indexes_nofd_cols,)*) in &self.new {
                             self.#indexes_nofd
                                 .entry((#(#indexes_nofd_keys,)*))
