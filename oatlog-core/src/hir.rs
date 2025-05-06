@@ -246,6 +246,8 @@ pub(crate) struct Relation {
     pub(crate) columns: TVec<ColumnId, TypeId>,
 }
 impl Relation {
+    /// Given the variables in two atoms, and the functional dependencies (implicit_rules) 
+    /// in this relation, what pairs of atoms should be unified?
     pub(crate) fn implied_variable_equalities(
         &self,
         cols1: &TVec<ColumnId, VariableId>,
@@ -737,6 +739,9 @@ impl SymbolicRule {
         // NOTE: we are missing optimizations that turn PREMISE into ACTION when it is infallible (eg
         // globals that don't filter).
 
+        // TODO erik for loke: we really should not care about inclusion in optimize because this
+        // is before semi-naive is applied.
+        // also, what does `working_atoms` mean?
         let mut working_atoms: BTreeMap<
             (RelationId, Inclusion),
             BTreeMap<TVec<ColumnId, VariableId>, (IsPremise, Option<ImplicitRuleId>)>,
@@ -753,6 +758,9 @@ impl SymbolicRule {
                 ret.entry((relation, incl))
                     .or_default()
                     .entry(columns.clone())
+                    // TODO erik for loke: if you want to express that this atom is unique, it's
+                    // easier to express that as a plain insert `assert!(ret.insert(...))`.
+                    // Also, consider using `MultiMapCollect::collect_multimap()`.
                     .and_modify(|_| panic!())
                     .or_insert((is_premise, entry));
             }
