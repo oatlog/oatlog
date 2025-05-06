@@ -43,6 +43,47 @@ impl<T> Clear for Vec<T> {
     }
 }
 
+/// semantically a HashMap<Key, Vec<Value>>
+pub struct IndexedSortedList<Key, Value> {
+    // (start, end), exclusive range
+    map: HashMap<Key, (u32, u32)>,
+    list: Vec<Value>,
+}
+impl<Key: Copy + Ord + Hash, Value: Copy> IndexedSortedList<Key, Value> {
+    pub fn reconstruct<Row: Copy>(
+        &mut self,
+        all_rows: &mut [Row],
+        extract_key: impl Fn(Row) -> Key,
+        extract_value: impl Fn(Row) -> Value,
+    ) {
+        all_rows.sort_by_key(|row| extract_key(*row));
+        //                         ^^^^^^^^^^^^^^^^^
+        //                       we could sort by hash
+        self.map.clear();
+        let n = all_rows.len();
+        let mut i = 0;
+        while i < n {
+            let key_i = extract_key(all_rows[i]);
+            let mut j = i + 1;
+            while j < n && extract_key(all_rows[j]) == key_i {
+                j += 1;
+            }
+            self.map.insert(key_i, (i as u32, j as u32));
+            i = j;
+        }
+        self.list.clear();
+        self.list
+            .extend(all_rows.iter().copied().map(extract_value));
+    }
+    pub fn iter(&self, key: Key) -> impl Iterator<Item = Value> {
+        self.map
+            .get(&key)
+            .copied()
+            .into_iter()
+            .flat_map(|(start, end)| self.list[start as usize..end as usize].iter().copied())
+    }
+}
+
 pub trait Relation {
     type Row;
     type Unification;

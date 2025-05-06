@@ -246,7 +246,7 @@ pub(crate) struct Relation {
     pub(crate) columns: TVec<ColumnId, TypeId>,
 }
 impl Relation {
-    /// Given the variables in two atoms, and the functional dependencies (implicit_rules) 
+    /// Given the variables in two atoms, and the functional dependencies (implicit_rules)
     /// in this relation, what pairs of atoms should be unified?
     pub(crate) fn implied_variable_equalities(
         &self,
