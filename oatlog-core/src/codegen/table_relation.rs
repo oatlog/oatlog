@@ -39,16 +39,10 @@ pub fn codegen_table_relation(
         .map(|usage_info| per_usage(rel, theory, index_to_info, usage_info))
         .collect_vecs();
 
-    let update_fns = update(rel, theory, index_to_info, usage_to_info);
+    let update_impl = update(rel, theory, index_to_info, usage_to_info);
 
-    let (
-        primary_index_ident,
-        primary_index_keys,
-        primary_index_vals,
-        primary_index_order,
-        primary_index_iter_flatten,
-    ) = {
-        // NOTE: Currently arbitrary, only used for counting and graphviz
+    let emit_graphviz_impl = {
+        // NOTE: Currently arbitrary, as it is only used for counting and graphviz
         let primary_index_usage = &usage_to_info[IndexUsageId(0)];
         let primary_index = &index_to_info[primary_index_usage.index];
         let primary_index_order = primary_index
@@ -68,13 +62,20 @@ pub fn codegen_table_relation(
         } else {
             quote! { .flat_map(|(k,v)| v.iter().map(move |v| (k,v))) }
         };
-        (
-            primary_index_ident,
-            primary_index_keys,
-            primary_index_vals,
-            primary_index_order,
-            primary_index_iter_flatten,
-        )
+
+        quote! {
+            fn emit_graphviz(&self, buf: &mut String) {
+                use std::fmt::Write;
+                for (i, ((#(#primary_index_keys,)*), (#(#primary_index_vals,)* _timestamp,))) in self.#primary_index_ident
+                    .iter()
+                    #primary_index_iter_flatten
+                    .enumerate()
+                {
+                    #(writeln!(buf, "{}_{i} -> {}_{};", #relation_name, #column_types, #primary_index_order).unwrap();)*
+                    writeln!(buf, "{}_{i} [shape = box];", #relation_name).unwrap();
+                }
+            }
+        }
     };
 
     let relation_len = {
@@ -100,7 +101,7 @@ pub fn codegen_table_relation(
         }
     };
 
-    let (index_usage_fields_name, index_usage_fields_ty) = usage_to_info
+    let index_fields: TokenStream = usage_to_info
         .iter()
         .unique()
         .map(|index_info @ &IndexUsageInfo { prefix, index }| {
@@ -117,16 +118,16 @@ pub fn codegen_table_relation(
                 let ty: TypeId = rel.columns[key_col];
                 ident::type_ty(&theory.types[ty])
             });
-            (
-                ident::index_usage_field(&permuted_columns.inner()[..prefix]),
-                if index_to_info[index].has_any_fd(index_info) {
-                    quote! { runtime::HashMap<(#(#key_cols_ty,)*), (#(#value_cols_ty,)* TimeStamp,)> }
-                } else {
-                    quote! { runtime::HashMap<(#(#key_cols_ty,)*), runtime::SmallVec<[(#(#value_cols_ty,)* TimeStamp,); 1]>> }
-                }
-            )
-        })
-        .collect_vecs();
+            let index_usage_field_name = ident::index_usage_field(&permuted_columns.inner()[..prefix]);
+            let index_usage_field_ty = if index_to_info[index].has_any_fd(index_info) {
+                quote! { runtime::HashMap<(#(#key_cols_ty,)*), (#(#value_cols_ty,)* TimeStamp,)> }
+            } else {
+                quote! { runtime::HashMap<(#(#key_cols_ty,)*), runtime::SmallVec<[(#(#value_cols_ty,)* TimeStamp,); 1]>> }
+            };
+            quote! {
+                #index_usage_field_name: #index_usage_field_ty,
+            }
+        }).collect();
 
     let uf_num_uprooted_at_latest_retain = rel
         .columns
@@ -139,7 +140,7 @@ pub fn codegen_table_relation(
         #[derive(Debug, Default)]
         struct #rel_ty {
             new: Vec<<Self as Relation>::Row>,
-            #(#index_usage_fields_name: #index_usage_fields_ty,)*
+            #index_fields
             #(#uf_num_uprooted_at_latest_retain: usize,)*
         }
         impl Relation for #rel_ty {
@@ -163,18 +164,8 @@ pub fn codegen_table_relation(
             fn len(&self) -> usize {
                 #relation_len
             }
-            fn emit_graphviz(&self, buf: &mut String) {
-                use std::fmt::Write;
-                for (i, ((#(#primary_index_keys,)*), (#(#primary_index_vals,)* _timestamp,))) in self.#primary_index_ident
-                    .iter()
-                    #primary_index_iter_flatten
-                    .enumerate()
-                {
-                    #(writeln!(buf, "{}_{i} -> {}_{};", #relation_name, #column_types, #primary_index_order).unwrap();)*
-                    writeln!(buf, "{}_{i} [shape = box];", #relation_name).unwrap();
-                }
-            }
-            #update_fns
+            #emit_graphviz_impl
+            #update_impl
         }
         impl #rel_ty {
             #(#iter_all)*
@@ -193,31 +184,6 @@ fn update(
 ) -> TokenStream {
     use itertools::Itertools as _;
 
-    let no_fresh_uprooted = {
-        let no_fresh_uprooted: TokenStream = rel
-            .columns
-            .iter()
-            .unique()
-            .filter_map(|ty| {
-                let type_ = &theory.types[ty];
-                if matches!(type_.kind, TypeKind::Symbolic) {
-                    let latest = ident::type_num_uprooted_at_latest_retain(type_);
-                    let uf = ident::type_uf(type_);
-                    Some(quote! {
-                        self.#latest == uf.#uf.num_uprooted()
-                    })
-                } else {
-                    None
-                }
-            })
-            .intersperse(quote! { && })
-            .collect();
-        if no_fresh_uprooted.is_empty() {
-            quote! { true }
-        } else {
-            no_fresh_uprooted
-        }
-    };
     let (ty_uf_latest, ty_uf) = rel
         .columns
         .iter()
@@ -233,16 +199,6 @@ fn update(
             }
         })
         .collect_vecs();
-
-    let sort_new = if ty_uf.len() == rel.columns.iter().unique().count() && rel.columns.len() <= 4 {
-        quote! {
-            RadixSortable::wrap(&mut self.new).voracious_sort();
-        }
-    } else {
-        quote! {
-            self.new.sort_unstable();
-        }
-    };
 
     let cols = rel.columns.enumerate().map(ident::column).collect_vec();
 
@@ -324,8 +280,6 @@ fn update(
                             let changed = changed | (old_val != uf.#uf.union_mut(&mut #val_x, #val_y));
                         )*
                         if changed {
-                            // I think this is too conservative but I can't 
-                            // find an example to prove it.
                             *timestamp = latest_timestamp;
                         }
                     }
@@ -651,98 +605,51 @@ fn update(
         })
         .collect_vecs();
 
-    // INVARIANTS:
-    // * all = union(old, new)
-    // * {} = intersection(old, new)
-    // * all elements in new are canonical.
-    // * new contains no duplicates
-    // * (maybe?) new is sorted
-    let fill_new_impl = if let (Some(index), Some(keys), Some(vals)) = (
-        indexes_fd.first(),
-        indexes_fd_keys.first(),
-        indexes_fd_vals.first(),
-    ) {
+    let update_begin_impl = {
         quote! {
-            // find is not needed because this index is used for congruence closure
+            #(
+                for &(#(mut #indexes_fd_cols,)*) in insertions {
+                    match self.#indexes_fd.entry((#indexes_fd_find_keys)) {
+                        runtime::HashMapEntry::Occupied(mut entry) => #indexes_fd_merge,
+                        runtime::HashMapEntry::Vacant(entry) => { entry.insert((#indexes_fd_find_values latest_timestamp,)); }
+                    }
+                }
+            )*
+        }
+    };
 
-            self.new.extend(
-                self.#index.iter()
-                .filter_map(|(&(#(#keys,)*), &(#(#vals,)* timestamp,))| {
-                    // assert_eq!(timestamp == latest_timestamp, !self.#allset.contains_key(&(#(#allset_cols,)*)));
-                    if timestamp == latest_timestamp {
-                        Some((#(#cols,)*))
+    let update_impl = {
+        let no_fresh_uprooted = {
+            let no_fresh_uprooted: TokenStream = rel
+                .columns
+                .iter()
+                .unique()
+                .filter_map(|ty| {
+                    let type_ = &theory.types[ty];
+                    if matches!(type_.kind, TypeKind::Symbolic) {
+                        let latest = ident::type_num_uprooted_at_latest_retain(type_);
+                        let uf = ident::type_uf(type_);
+                        Some(quote! {
+                            self.#latest == uf.#uf.num_uprooted()
+                        })
                     } else {
                         None
                     }
                 })
-                // .map(|(&(#(#keys,)*), &(#(#vals,)* _timestamp,))| (#(#cols,)*))
-                // .filter(|&(#(#cols,)*)| !self.#allset.contains_key(&(#(#allset_cols,)*)))
-            );
-
-            #sort_new
-            // NOTE: since we get all elements of new from an index, we already know that it is
-            // deduplicated.
-        }
-    } else {
-        let (allset, allset_cols) = {
-            let usage_info = usage_to_info
-                .iter()
-                .find(|usage_info| usage_info.prefix == rel.columns.len())
-                .expect("some IndexUsage that queryies all columns");
-            let index_info = &index_to_info[usage_info.index];
-            assert_eq!(index_info.permuted_columns.len(), usage_info.prefix);
-            (
-                ident::index_usage_field(index_info.permuted_columns.inner()),
-                index_info
-                    .permuted_columns
-                    .iter()
-                    .copied()
-                    .map(ident::column)
-                    .collect_vec(),
-            )
+                .intersperse(quote! { && })
+                .collect();
+            if no_fresh_uprooted.is_empty() {
+                quote! { true }
+            } else {
+                no_fresh_uprooted
+            }
         };
-
         quote! {
-            // find is needed if we don't have FD then we have to iterate insertions which is was never
-            // canonicalized.
-
-            // WARNING: this codepath is kinda untested and performance of it does not matter that
-            // much
-            self.new.extend(
-                insertions.iter().map(|&(#(#cols,)*)| (#(#cols_find,)*))
-                .filter(|&(#(#cols,)*)| !self.#allset.contains_key(&(#(#allset_cols,)*)))
-            );
-
-            #sort_new
-            self.new.dedup();
-        }
-    };
-
-    let relation_name = ident::rel_get(rel).to_string();
-
-    quote! {
-        // Called once at beginning of canonicalization.
-        fn update_begin(&mut self, insertions: &[Self::Row], uf: &mut Unification, latest_timestamp: TimeStamp) {
-            // everything in "insertions" is considered new.
-            log_duration!("update_begin {}: {}", #relation_name, {
-                #(
-                    for &(#(mut #indexes_fd_cols,)*) in insertions {
-                        match self.#indexes_fd.entry((#indexes_fd_find_keys)) {
-                            runtime::HashMapEntry::Occupied(mut entry) => #indexes_fd_merge,
-                            runtime::HashMapEntry::Vacant(entry) => { entry.insert((#indexes_fd_find_values latest_timestamp,)); }
-                        }
-                    }
-                )*
-            });
-        }
-        // Called round robin on relations during canonicalization.
-        fn update(&mut self, insertions: &mut Vec<Self::Row>, uf: &mut Unification, latest_timestamp: TimeStamp) -> bool {
             // everything in "insertions" is considered new.
             if #no_fresh_uprooted {
                 return false;
             }
             let offset = insertions.len();
-            log_duration!("update {}: {}", #relation_name, {
                 #(self.#ty_uf_latest = uf.#ty_uf.num_uprooted();)*
                 #(
                     self.#indexes_fd
@@ -755,99 +662,199 @@ fn update(
                             }
                         });
                 )*
-            });
             self.update_begin(&insertions[offset..], uf, latest_timestamp);
             true
+        }
+    };
+
+    let update_finalize_impl = {
+        let sort_new =
+            if ty_uf.len() == rel.columns.iter().unique().count() && rel.columns.len() <= 4 {
+                quote! {
+                    RadixSortable::wrap(&mut self.new).voracious_sort();
+                }
+            } else {
+                quote! {
+                    self.new.sort_unstable();
+                }
+            };
+
+        // INVARIANTS:
+        // * all = union(old, new)
+        // * {} = intersection(old, new)
+        // * all elements in new are canonical.
+        // * new contains no duplicates
+        // * (maybe?) new is sorted
+        let fill_new_impl = {
+            if let (Some(index), Some(keys), Some(vals)) = (
+                indexes_fd.first(),
+                indexes_fd_keys.first(),
+                indexes_fd_vals.first(),
+            ) {
+                quote! {
+                    // find is not needed because this index is used for congruence closure
+
+                    self.new.extend(
+                        self.#index.iter()
+                        .filter_map(|(&(#(#keys,)*), &(#(#vals,)* timestamp,))| {
+                            // assert_eq!(timestamp == latest_timestamp, !self.#allset.contains_key(&(#(#allset_cols,)*)));
+                            if timestamp == latest_timestamp {
+                                Some((#(#cols,)*))
+                            } else {
+                                None
+                            }
+                        })
+                        // .map(|(&(#(#keys,)*), &(#(#vals,)* _timestamp,))| (#(#cols,)*))
+                        // .filter(|&(#(#cols,)*)| !self.#allset.contains_key(&(#(#allset_cols,)*)))
+                    );
+
+                    #sort_new
+                    // NOTE: since we get all elements of new from an index, we already know that it is
+                    // deduplicated.
+                }
+            } else {
+                let not_in_old = {
+                    let usage_info = usage_to_info
+                        .iter()
+                        .find(|usage_info| usage_info.prefix == rel.columns.len())
+                        .expect("some IndexUsage that queryies all columns");
+                    let index_info = &index_to_info[usage_info.index];
+                    assert_eq!(index_info.permuted_columns.len(), usage_info.prefix);
+                    let allset = ident::index_usage_field(index_info.permuted_columns.inner());
+                    let allset_cols = index_info
+                        .permuted_columns
+                        .iter()
+                        .copied()
+                        .map(ident::column)
+                        .collect_vec();
+                    quote! { !self.#allset.contains_key(&(#(#allset_cols,)*)) }
+                };
+
+                quote! {
+                    // find is needed if we don't have FD then we have to iterate insertions which is was never
+                    // canonicalized.
+
+                    // WARNING: this codepath is kinda untested and performance of it does not matter that
+                    // much
+                    self.new.extend(
+                        insertions.iter().map(|&(#(#cols,)*)| (#(#cols_find,)*))
+                        .filter(|&(#(#cols,)*)| #not_in_old)
+                    );
+
+                    #sort_new
+                    self.new.dedup();
+                }
+            }
+        };
+        quote! {
+            assert!(self.new.is_empty());
+
+            log_duration!("fill new: {}", {
+                #fill_new_impl
+                insertions.clear();
+            });
+
+            #[cfg(debug_assertions)]
+            {
+                self.new.iter().for_each(|&(#(#cols,)*)| {
+                    assert_eq!((#(#cols,)*), (#(#cols_find,)*), "new is canonical");
+                });
+
+                let mut new = self.new.clone();
+                new.sort();
+                new.dedup();
+                assert_eq!(new.len(), self.new.len(), "new only has unique elements");
+            }
+
+            // At this point we know that there is no overlap between old and new because of
+            // filtering
+            //
+            // We also know that new only contains root e-classes.
+
+            #(  // Indexes like `HashMap<(T, T, T), SmallVec<[(); 1]>>` and `HashMap<(T, T), SmallVec<[(T,); 1]>>`
+                log_duration!("retain index: {}", {
+                    self.#indexes_nofd.retain(|&(#(#indexes_nofd_keys,)*), v| {
+                        if #indexes_nofd_key_is_root {
+                            v.retain(|&mut (#(#indexes_nofd_vals,)* _timestamp)| #indexes_nofd_value_is_root);
+                            true
+                        } else {
+                            false
+                        }
+                    });
+                });
+                log_duration!("fill index: {}", {
+                    // self.new.sort_by_key(|&(#(#indexes_nofd_cols,)*)| {
+                    //     (#(#indexes_nofd_keys,)*)
+                    // });
+                    for &(#(#indexes_nofd_cols,)*) in &self.new {
+                        self.#indexes_nofd
+                            .entry((#(#indexes_nofd_keys,)*))
+                            .or_default()
+                            .push((#(#indexes_nofd_vals,)* latest_timestamp,));
+                    }
+                });
+
+                #[cfg(debug_assertions)]
+                {
+                    self.#indexes_nofd.iter().for_each(|(&(#(#indexes_nofd_keys,)*), v)| {
+                        let mut v = v.clone();
+                        let n = v.len();
+                        v.sort();
+                        v.dedup_by(|
+                            (#(#indexes_nofd_vals,)* t1,),
+                            (#(#indexes_nofd_vals_alt,)* t2,),
+                        |{
+                            true #(& (*#indexes_nofd_vals == *#indexes_nofd_vals_alt))*
+                        });
+                        assert_eq!(n, v.len(), "indexes do not have duplicates");
+
+                        assert!(#indexes_nofd_key_is_root, "key is root");
+
+                        v.iter().copied().for_each(|(#(#indexes_nofd_vals,)* _timestamp)| {
+                            assert!(#indexes_nofd_value_is_root, "value is root");
+                        });
+                    });
+                }
+            )*
+            #(  // Non-union functional dependency indexes, where merge is a panic or a primitive function.
+
+                for &(#(mut #indexes_othfd_cols,)*) in &self.new {
+                    match self.#indexes_othfd.entry((#(#indexes_othfd_keys,)*)) {
+                        runtime::HashMapEntry::Occupied(mut entry) => #indexes_othfd_merge,
+                        runtime::HashMapEntry::Vacant(entry) => { entry.insert(#indexes_othfd_find); }
+                    }
+                }
+                self.#indexes_othfd.retain(|&(#(#indexes_othfd_keys,)*), v| {
+                    #indexes_othfd_key_is_root
+                });
+            )*
+
+            #(self.#ty_uf_latest = 0;)*
+        }
+    };
+
+    let relation_name = ident::rel_get(rel).to_string();
+    quote! {
+        // Called once at beginning of canonicalization.
+        fn update_begin(&mut self, insertions: &[Self::Row], uf: &mut Unification, latest_timestamp: TimeStamp) {
+            // everything in "insertions" is considered new.
+            log_duration!("update_begin {}: {}", #relation_name, {
+                #update_begin_impl
+            });
+        }
+        // Called round robin on relations during canonicalization.
+        fn update(&mut self, insertions: &mut Vec<Self::Row>, uf: &mut Unification, latest_timestamp: TimeStamp) -> bool {
+
+            log_duration!("update {}: {}", #relation_name, {
+                #update_impl
+            })
         }
         // Called once at end of canonicalization.
         fn update_finalize(&mut self, insertions: &mut Vec<Self::Row>, uf: &mut Unification, latest_timestamp: TimeStamp) {
             // everything in "insertions" is considered new.
             log_duration!("update_finalize {}: {}", #relation_name, {
-                assert!(self.new.is_empty());
-
-                log_duration!("fill new: {}", {
-                    #fill_new_impl
-                    insertions.clear();
-                });
-
-                #[cfg(debug_assertions)]
-                {
-                    self.new.iter().for_each(|&(#(#cols,)*)| {
-                        assert_eq!((#(#cols,)*), (#(#cols_find,)*), "new is canonical");
-                    });
-
-                    let mut new = self.new.clone();
-                    new.sort();
-                    new.dedup();
-                    assert_eq!(new.len(), self.new.len(), "new only has unique elements");
-                }
-
-                // At this point we know that there is no overlap between old and new because of
-                // filtering
-                //
-                // We also know that new only contains root e-classes.
-
-                #(  // Indexes like `HashMap<(T, T, T), SmallVec<[(); 1]>>` and `HashMap<(T, T), SmallVec<[(T,); 1]>>`
-                    log_duration!("retain index: {}", {
-                        self.#indexes_nofd.retain(|&(#(#indexes_nofd_keys,)*), v| {
-                            if #indexes_nofd_key_is_root {
-                                v.retain(|&mut (#(#indexes_nofd_vals,)* _timestamp)| #indexes_nofd_value_is_root);
-                                true
-                            } else {
-                                false
-                            }
-                        });
-                    });
-                    log_duration!("fill index: {}", {
-                        // self.new.sort_by_key(|&(#(#indexes_nofd_cols,)*)| {
-                        //     (#(#indexes_nofd_keys,)*)
-                        // });
-                        for &(#(#indexes_nofd_cols,)*) in &self.new {
-                            self.#indexes_nofd
-                                .entry((#(#indexes_nofd_keys,)*))
-                                .or_default()
-                                .push((#(#indexes_nofd_vals,)* latest_timestamp,));
-                        }
-                    });
-
-                    #[cfg(debug_assertions)]
-                    {
-                        self.#indexes_nofd.iter().for_each(|(&(#(#indexes_nofd_keys,)*), v)| {
-                            let mut v = v.clone();
-                            let n = v.len();
-                            v.sort();
-                            v.dedup_by(|
-                                (#(#indexes_nofd_vals,)* t1,),
-                                (#(#indexes_nofd_vals_alt,)* t2,),
-                            |{
-                                true #(& (*#indexes_nofd_vals == *#indexes_nofd_vals_alt))*
-                            });
-                            assert_eq!(n, v.len(), "indexes do not have duplicates");
-
-                            assert!(#indexes_nofd_key_is_root, "key is root");
-
-                            v.iter().copied().for_each(|(#(#indexes_nofd_vals,)* _timestamp)| {
-                                assert!(#indexes_nofd_value_is_root, "value is root");
-                            });
-                        });
-                    }
-                )*
-                #(  // Non-union functional dependency indexes, where merge is a panic or a primitive function.
-
-                    for &(#(mut #indexes_othfd_cols,)*) in &self.new {
-                        match self.#indexes_othfd.entry((#(#indexes_othfd_keys,)*)) {
-                            runtime::HashMapEntry::Occupied(mut entry) => #indexes_othfd_merge,
-                            runtime::HashMapEntry::Vacant(entry) => { entry.insert(#indexes_othfd_find); }
-                        }
-                    }
-                    self.#indexes_othfd.retain(|&(#(#indexes_othfd_keys,)*), v| {
-                        #indexes_othfd_key_is_root
-                    });
-                )*
+                #update_finalize_impl
             });
-
-
-            #(self.#ty_uf_latest = 0;)*
         }
     }
 }

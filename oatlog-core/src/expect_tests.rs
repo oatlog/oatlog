@@ -9,7 +9,6 @@ struct Steps {
 }
 impl Steps {
     fn check(self) {
-        return;
         let sexps = crate::frontend::parse_str_to_sexps(self.code).unwrap();
         let config = crate::Configuration {
             egglog_compat: if self.strict_egglog_compat {
@@ -903,11 +902,11 @@ fn regression_tir2() {
                     uf: &mut Unification,
                     latest_timestamp: TimeStamp,
                 ) -> bool {
-                    if self.math_num_uprooted_at_latest_retain == uf.math_.num_uprooted() {
-                        return false;
-                    }
-                    let offset = insertions.len();
                     log_duration!("update {}: {}", "mul", {
+                        if self.math_num_uprooted_at_latest_retain == uf.math_.num_uprooted() {
+                            return false;
+                        }
+                        let offset = insertions.len();
                         self.math_num_uprooted_at_latest_retain = uf.math_.num_uprooted();
                         self.hash_index_0_1
                             .retain(|&(x0, x1), &mut (x2, _timestamp)| {
@@ -918,9 +917,9 @@ fn regression_tir2() {
                                     false
                                 }
                             });
-                    });
-                    self.update_begin(&insertions[offset..], uf, latest_timestamp);
-                    true
+                        self.update_begin(&insertions[offset..], uf, latest_timestamp);
+                        true
+                    })
                 }
                 fn update_finalize(
                     &mut self,
@@ -957,8 +956,8 @@ fn regression_tir2() {
                             new.dedup();
                             assert_eq!(new.len(), self.new.len(), "new only has unique elements");
                         }
+                        self.math_num_uprooted_at_latest_retain = 0;
                     });
-                    self.math_num_uprooted_at_latest_retain = 0;
                 }
             }
             impl MulRelation {
@@ -1063,11 +1062,11 @@ fn regression_tir2() {
                     uf: &mut Unification,
                     latest_timestamp: TimeStamp,
                 ) -> bool {
-                    if self.math_num_uprooted_at_latest_retain == uf.math_.num_uprooted() {
-                        return false;
-                    }
-                    let offset = insertions.len();
                     log_duration!("update {}: {}", "pow", {
+                        if self.math_num_uprooted_at_latest_retain == uf.math_.num_uprooted() {
+                            return false;
+                        }
+                        let offset = insertions.len();
                         self.math_num_uprooted_at_latest_retain = uf.math_.num_uprooted();
                         self.hash_index_1_0
                             .retain(|&(x1, x0), &mut (x2, _timestamp)| {
@@ -1078,9 +1077,9 @@ fn regression_tir2() {
                                     false
                                 }
                             });
-                    });
-                    self.update_begin(&insertions[offset..], uf, latest_timestamp);
-                    true
+                        self.update_begin(&insertions[offset..], uf, latest_timestamp);
+                        true
+                    })
                 }
                 fn update_finalize(
                     &mut self,
@@ -1151,8 +1150,8 @@ fn regression_tir2() {
                                 });
                             });
                         }
+                        self.math_num_uprooted_at_latest_retain = 0;
                     });
-                    self.math_num_uprooted_at_latest_retain = 0;
                 }
             }
             impl PowRelation {
@@ -1280,11 +1279,11 @@ fn regression_tir2() {
                     uf: &mut Unification,
                     latest_timestamp: TimeStamp,
                 ) -> bool {
-                    if self.math_num_uprooted_at_latest_retain == uf.math_.num_uprooted() {
-                        return false;
-                    }
-                    let offset = insertions.len();
                     log_duration!("update {}: {}", "const", {
+                        if self.math_num_uprooted_at_latest_retain == uf.math_.num_uprooted() {
+                            return false;
+                        }
+                        let offset = insertions.len();
                         self.math_num_uprooted_at_latest_retain = uf.math_.num_uprooted();
                         self.hash_index_0.retain(|&(x0,), &mut (x1, _timestamp)| {
                             if uf.math_.is_root(x1) {
@@ -1294,9 +1293,9 @@ fn regression_tir2() {
                                 false
                             }
                         });
-                    });
-                    self.update_begin(&insertions[offset..], uf, latest_timestamp);
-                    true
+                        self.update_begin(&insertions[offset..], uf, latest_timestamp);
+                        true
+                    })
                 }
                 fn update_finalize(
                     &mut self,
@@ -1361,8 +1360,8 @@ fn regression_tir2() {
                                 });
                             });
                         }
+                        self.math_num_uprooted_at_latest_retain = 0;
                     });
-                    self.math_num_uprooted_at_latest_retain = 0;
                 }
             }
             impl ConstRelation {
@@ -1867,11 +1866,11 @@ fn regression_tir1() {
                     uf: &mut Unification,
                     latest_timestamp: TimeStamp,
                 ) -> bool {
-                    if self.math_num_uprooted_at_latest_retain == uf.math_.num_uprooted() {
-                        return false;
-                    }
-                    let offset = insertions.len();
                     log_duration!("update {}: {}", "sub", {
+                        if self.math_num_uprooted_at_latest_retain == uf.math_.num_uprooted() {
+                            return false;
+                        }
+                        let offset = insertions.len();
                         self.math_num_uprooted_at_latest_retain = uf.math_.num_uprooted();
                         self.hash_index_0_1
                             .retain(|&(x0, x1), &mut (x2, _timestamp)| {
@@ -1882,9 +1881,9 @@ fn regression_tir1() {
                                     false
                                 }
                             });
-                    });
-                    self.update_begin(&insertions[offset..], uf, latest_timestamp);
-                    true
+                        self.update_begin(&insertions[offset..], uf, latest_timestamp);
+                        true
+                    })
                 }
                 fn update_finalize(
                     &mut self,
@@ -1921,8 +1920,8 @@ fn regression_tir1() {
                             new.dedup();
                             assert_eq!(new.len(), self.new.len(), "new only has unique elements");
                         }
+                        self.math_num_uprooted_at_latest_retain = 0;
                     });
-                    self.math_num_uprooted_at_latest_retain = 0;
                 }
             }
             impl SubRelation {
@@ -2023,11 +2022,11 @@ fn regression_tir1() {
                     uf: &mut Unification,
                     latest_timestamp: TimeStamp,
                 ) -> bool {
-                    if self.math_num_uprooted_at_latest_retain == uf.math_.num_uprooted() {
-                        return false;
-                    }
-                    let offset = insertions.len();
                     log_duration!("update {}: {}", "const", {
+                        if self.math_num_uprooted_at_latest_retain == uf.math_.num_uprooted() {
+                            return false;
+                        }
+                        let offset = insertions.len();
                         self.math_num_uprooted_at_latest_retain = uf.math_.num_uprooted();
                         self.hash_index_0.retain(|&(x0,), &mut (x1, _timestamp)| {
                             if uf.math_.is_root(x1) {
@@ -2037,9 +2036,9 @@ fn regression_tir1() {
                                 false
                             }
                         });
-                    });
-                    self.update_begin(&insertions[offset..], uf, latest_timestamp);
-                    true
+                        self.update_begin(&insertions[offset..], uf, latest_timestamp);
+                        true
+                    })
                 }
                 fn update_finalize(
                     &mut self,
@@ -2072,8 +2071,8 @@ fn regression_tir1() {
                             new.dedup();
                             assert_eq!(new.len(), self.new.len(), "new only has unique elements");
                         }
+                        self.math_num_uprooted_at_latest_retain = 0;
                     });
-                    self.math_num_uprooted_at_latest_retain = 0;
                 }
             }
             impl ConstRelation {
@@ -2673,11 +2672,11 @@ fn codegen_constant_propagation() {
                     uf: &mut Unification,
                     latest_timestamp: TimeStamp,
                 ) -> bool {
-                    if self.math_num_uprooted_at_latest_retain == uf.math_.num_uprooted() {
-                        return false;
-                    }
-                    let offset = insertions.len();
                     log_duration!("update {}: {}", "add", {
+                        if self.math_num_uprooted_at_latest_retain == uf.math_.num_uprooted() {
+                            return false;
+                        }
+                        let offset = insertions.len();
                         self.math_num_uprooted_at_latest_retain = uf.math_.num_uprooted();
                         self.hash_index_0_1
                             .retain(|&(x0, x1), &mut (x2, _timestamp)| {
@@ -2688,9 +2687,9 @@ fn codegen_constant_propagation() {
                                     false
                                 }
                             });
-                    });
-                    self.update_begin(&insertions[offset..], uf, latest_timestamp);
-                    true
+                        self.update_begin(&insertions[offset..], uf, latest_timestamp);
+                        true
+                    })
                 }
                 fn update_finalize(
                     &mut self,
@@ -2795,8 +2794,8 @@ fn codegen_constant_propagation() {
                                 });
                             });
                         }
+                        self.math_num_uprooted_at_latest_retain = 0;
                     });
-                    self.math_num_uprooted_at_latest_retain = 0;
                 }
             }
             impl AddRelation {
@@ -2952,11 +2951,11 @@ fn codegen_constant_propagation() {
                     uf: &mut Unification,
                     latest_timestamp: TimeStamp,
                 ) -> bool {
-                    if self.math_num_uprooted_at_latest_retain == uf.math_.num_uprooted() {
-                        return false;
-                    }
-                    let offset = insertions.len();
                     log_duration!("update {}: {}", "mul", {
+                        if self.math_num_uprooted_at_latest_retain == uf.math_.num_uprooted() {
+                            return false;
+                        }
+                        let offset = insertions.len();
                         self.math_num_uprooted_at_latest_retain = uf.math_.num_uprooted();
                         self.hash_index_0_1
                             .retain(|&(x0, x1), &mut (x2, _timestamp)| {
@@ -2967,9 +2966,9 @@ fn codegen_constant_propagation() {
                                     false
                                 }
                             });
-                    });
-                    self.update_begin(&insertions[offset..], uf, latest_timestamp);
-                    true
+                        self.update_begin(&insertions[offset..], uf, latest_timestamp);
+                        true
+                    })
                 }
                 fn update_finalize(
                     &mut self,
@@ -3074,8 +3073,8 @@ fn codegen_constant_propagation() {
                                 });
                             });
                         }
+                        self.math_num_uprooted_at_latest_retain = 0;
                     });
-                    self.math_num_uprooted_at_latest_retain = 0;
                 }
             }
             impl MulRelation {
@@ -3228,11 +3227,11 @@ fn codegen_constant_propagation() {
                     uf: &mut Unification,
                     latest_timestamp: TimeStamp,
                 ) -> bool {
-                    if self.math_num_uprooted_at_latest_retain == uf.math_.num_uprooted() {
-                        return false;
-                    }
-                    let offset = insertions.len();
                     log_duration!("update {}: {}", "const", {
+                        if self.math_num_uprooted_at_latest_retain == uf.math_.num_uprooted() {
+                            return false;
+                        }
+                        let offset = insertions.len();
                         self.math_num_uprooted_at_latest_retain = uf.math_.num_uprooted();
                         self.hash_index_0.retain(|&(x0,), &mut (x1, _timestamp)| {
                             if uf.math_.is_root(x1) {
@@ -3242,9 +3241,9 @@ fn codegen_constant_propagation() {
                                 false
                             }
                         });
-                    });
-                    self.update_begin(&insertions[offset..], uf, latest_timestamp);
-                    true
+                        self.update_begin(&insertions[offset..], uf, latest_timestamp);
+                        true
+                    })
                 }
                 fn update_finalize(
                     &mut self,
@@ -3309,8 +3308,8 @@ fn codegen_constant_propagation() {
                                 });
                             });
                         }
+                        self.math_num_uprooted_at_latest_retain = 0;
                     });
-                    self.math_num_uprooted_at_latest_retain = 0;
                 }
             }
             impl ConstRelation {
@@ -3703,11 +3702,11 @@ fn codegen_commutative() {
                     uf: &mut Unification,
                     latest_timestamp: TimeStamp,
                 ) -> bool {
-                    if self.math_num_uprooted_at_latest_retain == uf.math_.num_uprooted() {
-                        return false;
-                    }
-                    let offset = insertions.len();
                     log_duration!("update {}: {}", "add", {
+                        if self.math_num_uprooted_at_latest_retain == uf.math_.num_uprooted() {
+                            return false;
+                        }
+                        let offset = insertions.len();
                         self.math_num_uprooted_at_latest_retain = uf.math_.num_uprooted();
                         self.hash_index_0_1
                             .retain(|&(x0, x1), &mut (x2, _timestamp)| {
@@ -3718,9 +3717,9 @@ fn codegen_commutative() {
                                     false
                                 }
                             });
-                    });
-                    self.update_begin(&insertions[offset..], uf, latest_timestamp);
-                    true
+                        self.update_begin(&insertions[offset..], uf, latest_timestamp);
+                        true
+                    })
                 }
                 fn update_finalize(
                     &mut self,
@@ -3757,8 +3756,8 @@ fn codegen_commutative() {
                             new.dedup();
                             assert_eq!(new.len(), self.new.len(), "new only has unique elements");
                         }
+                        self.math_num_uprooted_at_latest_retain = 0;
                     });
-                    self.math_num_uprooted_at_latest_retain = 0;
                 }
             }
             impl AddRelation {
@@ -4114,11 +4113,11 @@ fn regression_entry2() {
                     uf: &mut Unification,
                     latest_timestamp: TimeStamp,
                 ) -> bool {
-                    if self.math_num_uprooted_at_latest_retain == uf.math_.num_uprooted() {
-                        return false;
-                    }
-                    let offset = insertions.len();
                     log_duration!("update {}: {}", "sub", {
+                        if self.math_num_uprooted_at_latest_retain == uf.math_.num_uprooted() {
+                            return false;
+                        }
+                        let offset = insertions.len();
                         self.math_num_uprooted_at_latest_retain = uf.math_.num_uprooted();
                         self.hash_index_0_1
                             .retain(|&(x0, x1), &mut (x2, _timestamp)| {
@@ -4129,9 +4128,9 @@ fn regression_entry2() {
                                     false
                                 }
                             });
-                    });
-                    self.update_begin(&insertions[offset..], uf, latest_timestamp);
-                    true
+                        self.update_begin(&insertions[offset..], uf, latest_timestamp);
+                        true
+                    })
                 }
                 fn update_finalize(
                     &mut self,
@@ -4168,8 +4167,8 @@ fn regression_entry2() {
                             new.dedup();
                             assert_eq!(new.len(), self.new.len(), "new only has unique elements");
                         }
+                        self.math_num_uprooted_at_latest_retain = 0;
                     });
-                    self.math_num_uprooted_at_latest_retain = 0;
                 }
             }
             impl SubRelation {
@@ -4270,11 +4269,11 @@ fn regression_entry2() {
                     uf: &mut Unification,
                     latest_timestamp: TimeStamp,
                 ) -> bool {
-                    if self.math_num_uprooted_at_latest_retain == uf.math_.num_uprooted() {
-                        return false;
-                    }
-                    let offset = insertions.len();
                     log_duration!("update {}: {}", "const", {
+                        if self.math_num_uprooted_at_latest_retain == uf.math_.num_uprooted() {
+                            return false;
+                        }
+                        let offset = insertions.len();
                         self.math_num_uprooted_at_latest_retain = uf.math_.num_uprooted();
                         self.hash_index_0.retain(|&(x0,), &mut (x1, _timestamp)| {
                             if uf.math_.is_root(x1) {
@@ -4284,9 +4283,9 @@ fn regression_entry2() {
                                 false
                             }
                         });
-                    });
-                    self.update_begin(&insertions[offset..], uf, latest_timestamp);
-                    true
+                        self.update_begin(&insertions[offset..], uf, latest_timestamp);
+                        true
+                    })
                 }
                 fn update_finalize(
                     &mut self,
@@ -4319,8 +4318,8 @@ fn regression_entry2() {
                             new.dedup();
                             assert_eq!(new.len(), self.new.len(), "new only has unique elements");
                         }
+                        self.math_num_uprooted_at_latest_retain = 0;
                     });
-                    self.math_num_uprooted_at_latest_retain = 0;
                 }
             }
             impl ConstRelation {
@@ -4695,11 +4694,11 @@ fn regression_entry() {
                     uf: &mut Unification,
                     latest_timestamp: TimeStamp,
                 ) -> bool {
-                    if self.math_num_uprooted_at_latest_retain == uf.math_.num_uprooted() {
-                        return false;
-                    }
-                    let offset = insertions.len();
                     log_duration!("update {}: {}", "integral", {
+                        if self.math_num_uprooted_at_latest_retain == uf.math_.num_uprooted() {
+                            return false;
+                        }
+                        let offset = insertions.len();
                         self.math_num_uprooted_at_latest_retain = uf.math_.num_uprooted();
                         self.hash_index_0_1
                             .retain(|&(x0, x1), &mut (x2, _timestamp)| {
@@ -4710,9 +4709,9 @@ fn regression_entry() {
                                     false
                                 }
                             });
-                    });
-                    self.update_begin(&insertions[offset..], uf, latest_timestamp);
-                    true
+                        self.update_begin(&insertions[offset..], uf, latest_timestamp);
+                        true
+                    })
                 }
                 fn update_finalize(
                     &mut self,
@@ -4749,8 +4748,8 @@ fn regression_entry() {
                             new.dedup();
                             assert_eq!(new.len(), self.new.len(), "new only has unique elements");
                         }
+                        self.math_num_uprooted_at_latest_retain = 0;
                     });
-                    self.math_num_uprooted_at_latest_retain = 0;
                 }
             }
             impl IntegralRelation {
@@ -4854,11 +4853,11 @@ fn regression_entry() {
                     uf: &mut Unification,
                     latest_timestamp: TimeStamp,
                 ) -> bool {
-                    if self.math_num_uprooted_at_latest_retain == uf.math_.num_uprooted() {
-                        return false;
-                    }
-                    let offset = insertions.len();
                     log_duration!("update {}: {}", "add", {
+                        if self.math_num_uprooted_at_latest_retain == uf.math_.num_uprooted() {
+                            return false;
+                        }
+                        let offset = insertions.len();
                         self.math_num_uprooted_at_latest_retain = uf.math_.num_uprooted();
                         self.hash_index_0_1
                             .retain(|&(x0, x1), &mut (x2, _timestamp)| {
@@ -4869,9 +4868,9 @@ fn regression_entry() {
                                     false
                                 }
                             });
-                    });
-                    self.update_begin(&insertions[offset..], uf, latest_timestamp);
-                    true
+                        self.update_begin(&insertions[offset..], uf, latest_timestamp);
+                        true
+                    })
                 }
                 fn update_finalize(
                     &mut self,
@@ -4908,8 +4907,8 @@ fn regression_entry() {
                             new.dedup();
                             assert_eq!(new.len(), self.new.len(), "new only has unique elements");
                         }
+                        self.math_num_uprooted_at_latest_retain = 0;
                     });
-                    self.math_num_uprooted_at_latest_retain = 0;
                 }
             }
             impl AddRelation {
@@ -5267,11 +5266,11 @@ fn test_bind_variable_multiple_times() {
                     uf: &mut Unification,
                     latest_timestamp: TimeStamp,
                 ) -> bool {
-                    if self.foo_num_uprooted_at_latest_retain == uf.foo_.num_uprooted() {
-                        return false;
-                    }
-                    let offset = insertions.len();
                     log_duration!("update {}: {}", "same", {
+                        if self.foo_num_uprooted_at_latest_retain == uf.foo_.num_uprooted() {
+                            return false;
+                        }
+                        let offset = insertions.len();
                         self.foo_num_uprooted_at_latest_retain = uf.foo_.num_uprooted();
                         self.hash_index_0_1
                             .retain(|&(x0, x1), &mut (x2, _timestamp)| {
@@ -5282,9 +5281,9 @@ fn test_bind_variable_multiple_times() {
                                     false
                                 }
                             });
-                    });
-                    self.update_begin(&insertions[offset..], uf, latest_timestamp);
-                    true
+                        self.update_begin(&insertions[offset..], uf, latest_timestamp);
+                        true
+                    })
                 }
                 fn update_finalize(
                     &mut self,
@@ -5321,8 +5320,8 @@ fn test_bind_variable_multiple_times() {
                             new.dedup();
                             assert_eq!(new.len(), self.new.len(), "new only has unique elements");
                         }
+                        self.foo_num_uprooted_at_latest_retain = 0;
                     });
-                    self.foo_num_uprooted_at_latest_retain = 0;
                 }
             }
             impl SameRelation {
@@ -5743,11 +5742,11 @@ fn codegen_variable_reuse_bug() {
                     uf: &mut Unification,
                     latest_timestamp: TimeStamp,
                 ) -> bool {
-                    if self.math_num_uprooted_at_latest_retain == uf.math_.num_uprooted() {
-                        return false;
-                    }
-                    let offset = insertions.len();
                     log_duration!("update {}: {}", "add", {
+                        if self.math_num_uprooted_at_latest_retain == uf.math_.num_uprooted() {
+                            return false;
+                        }
+                        let offset = insertions.len();
                         self.math_num_uprooted_at_latest_retain = uf.math_.num_uprooted();
                         self.hash_index_0_1
                             .retain(|&(x0, x1), &mut (x2, _timestamp)| {
@@ -5758,9 +5757,9 @@ fn codegen_variable_reuse_bug() {
                                     false
                                 }
                             });
-                    });
-                    self.update_begin(&insertions[offset..], uf, latest_timestamp);
-                    true
+                        self.update_begin(&insertions[offset..], uf, latest_timestamp);
+                        true
+                    })
                 }
                 fn update_finalize(
                     &mut self,
@@ -5829,8 +5828,8 @@ fn codegen_variable_reuse_bug() {
                                 });
                             });
                         }
+                        self.math_num_uprooted_at_latest_retain = 0;
                     });
-                    self.math_num_uprooted_at_latest_retain = 0;
                 }
             }
             impl AddRelation {
@@ -5953,11 +5952,11 @@ fn codegen_variable_reuse_bug() {
                     uf: &mut Unification,
                     latest_timestamp: TimeStamp,
                 ) -> bool {
-                    if self.math_num_uprooted_at_latest_retain == uf.math_.num_uprooted() {
-                        return false;
-                    }
-                    let offset = insertions.len();
                     log_duration!("update {}: {}", "zero", {
+                        if self.math_num_uprooted_at_latest_retain == uf.math_.num_uprooted() {
+                            return false;
+                        }
+                        let offset = insertions.len();
                         self.math_num_uprooted_at_latest_retain = uf.math_.num_uprooted();
                         self.hash_index_.retain(|&(), &mut (x0, _timestamp)| {
                             if uf.math_.is_root(x0) {
@@ -5967,9 +5966,9 @@ fn codegen_variable_reuse_bug() {
                                 false
                             }
                         });
-                    });
-                    self.update_begin(&insertions[offset..], uf, latest_timestamp);
-                    true
+                        self.update_begin(&insertions[offset..], uf, latest_timestamp);
+                        true
+                    })
                 }
                 fn update_finalize(
                     &mut self,
@@ -6004,8 +6003,8 @@ fn codegen_variable_reuse_bug() {
                             new.dedup();
                             assert_eq!(new.len(), self.new.len(), "new only has unique elements");
                         }
+                        self.math_num_uprooted_at_latest_retain = 0;
                     });
-                    self.math_num_uprooted_at_latest_retain = 0;
                 }
             }
             impl ZeroRelation {
@@ -6340,11 +6339,11 @@ fn initial_exprs() {
                     uf: &mut Unification,
                     latest_timestamp: TimeStamp,
                 ) -> bool {
-                    if self.math_num_uprooted_at_latest_retain == uf.math_.num_uprooted() {
-                        return false;
-                    }
-                    let offset = insertions.len();
                     log_duration!("update {}: {}", "add", {
+                        if self.math_num_uprooted_at_latest_retain == uf.math_.num_uprooted() {
+                            return false;
+                        }
+                        let offset = insertions.len();
                         self.math_num_uprooted_at_latest_retain = uf.math_.num_uprooted();
                         self.hash_index_0_1
                             .retain(|&(x0, x1), &mut (x2, _timestamp)| {
@@ -6355,9 +6354,9 @@ fn initial_exprs() {
                                     false
                                 }
                             });
-                    });
-                    self.update_begin(&insertions[offset..], uf, latest_timestamp);
-                    true
+                        self.update_begin(&insertions[offset..], uf, latest_timestamp);
+                        true
+                    })
                 }
                 fn update_finalize(
                     &mut self,
@@ -6394,8 +6393,8 @@ fn initial_exprs() {
                             new.dedup();
                             assert_eq!(new.len(), self.new.len(), "new only has unique elements");
                         }
+                        self.math_num_uprooted_at_latest_retain = 0;
                     });
-                    self.math_num_uprooted_at_latest_retain = 0;
                 }
             }
             impl AddRelation {
@@ -6499,11 +6498,11 @@ fn initial_exprs() {
                     uf: &mut Unification,
                     latest_timestamp: TimeStamp,
                 ) -> bool {
-                    if self.math_num_uprooted_at_latest_retain == uf.math_.num_uprooted() {
-                        return false;
-                    }
-                    let offset = insertions.len();
                     log_duration!("update {}: {}", "mul", {
+                        if self.math_num_uprooted_at_latest_retain == uf.math_.num_uprooted() {
+                            return false;
+                        }
+                        let offset = insertions.len();
                         self.math_num_uprooted_at_latest_retain = uf.math_.num_uprooted();
                         self.hash_index_0_1
                             .retain(|&(x0, x1), &mut (x2, _timestamp)| {
@@ -6514,9 +6513,9 @@ fn initial_exprs() {
                                     false
                                 }
                             });
-                    });
-                    self.update_begin(&insertions[offset..], uf, latest_timestamp);
-                    true
+                        self.update_begin(&insertions[offset..], uf, latest_timestamp);
+                        true
+                    })
                 }
                 fn update_finalize(
                     &mut self,
@@ -6553,8 +6552,8 @@ fn initial_exprs() {
                             new.dedup();
                             assert_eq!(new.len(), self.new.len(), "new only has unique elements");
                         }
+                        self.math_num_uprooted_at_latest_retain = 0;
                     });
-                    self.math_num_uprooted_at_latest_retain = 0;
                 }
             }
             impl MulRelation {
@@ -6655,11 +6654,11 @@ fn initial_exprs() {
                     uf: &mut Unification,
                     latest_timestamp: TimeStamp,
                 ) -> bool {
-                    if self.math_num_uprooted_at_latest_retain == uf.math_.num_uprooted() {
-                        return false;
-                    }
-                    let offset = insertions.len();
                     log_duration!("update {}: {}", "const", {
+                        if self.math_num_uprooted_at_latest_retain == uf.math_.num_uprooted() {
+                            return false;
+                        }
+                        let offset = insertions.len();
                         self.math_num_uprooted_at_latest_retain = uf.math_.num_uprooted();
                         self.hash_index_0.retain(|&(x0,), &mut (x1, _timestamp)| {
                             if uf.math_.is_root(x1) {
@@ -6669,9 +6668,9 @@ fn initial_exprs() {
                                 false
                             }
                         });
-                    });
-                    self.update_begin(&insertions[offset..], uf, latest_timestamp);
-                    true
+                        self.update_begin(&insertions[offset..], uf, latest_timestamp);
+                        true
+                    })
                 }
                 fn update_finalize(
                     &mut self,
@@ -6704,8 +6703,8 @@ fn initial_exprs() {
                             new.dedup();
                             assert_eq!(new.len(), self.new.len(), "new only has unique elements");
                         }
+                        self.math_num_uprooted_at_latest_retain = 0;
                     });
-                    self.math_num_uprooted_at_latest_retain = 0;
                 }
             }
             impl ConstRelation {
@@ -6810,11 +6809,11 @@ fn initial_exprs() {
                     uf: &mut Unification,
                     latest_timestamp: TimeStamp,
                 ) -> bool {
-                    if self.math_num_uprooted_at_latest_retain == uf.math_.num_uprooted() {
-                        return false;
-                    }
-                    let offset = insertions.len();
                     log_duration!("update {}: {}", "var", {
+                        if self.math_num_uprooted_at_latest_retain == uf.math_.num_uprooted() {
+                            return false;
+                        }
+                        let offset = insertions.len();
                         self.math_num_uprooted_at_latest_retain = uf.math_.num_uprooted();
                         self.hash_index_0.retain(|&(x0,), &mut (x1, _timestamp)| {
                             if uf.math_.is_root(x1) {
@@ -6824,9 +6823,9 @@ fn initial_exprs() {
                                 false
                             }
                         });
-                    });
-                    self.update_begin(&insertions[offset..], uf, latest_timestamp);
-                    true
+                        self.update_begin(&insertions[offset..], uf, latest_timestamp);
+                        true
+                    })
                 }
                 fn update_finalize(
                     &mut self,
@@ -6859,8 +6858,8 @@ fn initial_exprs() {
                             new.dedup();
                             assert_eq!(new.len(), self.new.len(), "new only has unique elements");
                         }
+                        self.math_num_uprooted_at_latest_retain = 0;
                     });
-                    self.math_num_uprooted_at_latest_retain = 0;
                 }
             }
             impl VarRelation {
@@ -7800,11 +7799,11 @@ fn test_primitives_simple() {
                     uf: &mut Unification,
                     latest_timestamp: TimeStamp,
                 ) -> bool {
-                    if self.math_num_uprooted_at_latest_retain == uf.math_.num_uprooted() {
-                        return false;
-                    }
-                    let offset = insertions.len();
                     log_duration!("update {}: {}", "mul", {
+                        if self.math_num_uprooted_at_latest_retain == uf.math_.num_uprooted() {
+                            return false;
+                        }
+                        let offset = insertions.len();
                         self.math_num_uprooted_at_latest_retain = uf.math_.num_uprooted();
                         self.hash_index_1_0
                             .retain(|&(x1, x0), &mut (x2, _timestamp)| {
@@ -7815,9 +7814,9 @@ fn test_primitives_simple() {
                                     false
                                 }
                             });
-                    });
-                    self.update_begin(&insertions[offset..], uf, latest_timestamp);
-                    true
+                        self.update_begin(&insertions[offset..], uf, latest_timestamp);
+                        true
+                    })
                 }
                 fn update_finalize(
                     &mut self,
@@ -7888,8 +7887,8 @@ fn test_primitives_simple() {
                                 });
                             });
                         }
+                        self.math_num_uprooted_at_latest_retain = 0;
                     });
-                    self.math_num_uprooted_at_latest_retain = 0;
                 }
             }
             impl MulRelation {
@@ -8018,11 +8017,11 @@ fn test_primitives_simple() {
                     uf: &mut Unification,
                     latest_timestamp: TimeStamp,
                 ) -> bool {
-                    if self.math_num_uprooted_at_latest_retain == uf.math_.num_uprooted() {
-                        return false;
-                    }
-                    let offset = insertions.len();
                     log_duration!("update {}: {}", "add", {
+                        if self.math_num_uprooted_at_latest_retain == uf.math_.num_uprooted() {
+                            return false;
+                        }
+                        let offset = insertions.len();
                         self.math_num_uprooted_at_latest_retain = uf.math_.num_uprooted();
                         self.hash_index_0_1
                             .retain(|&(x0, x1), &mut (x2, _timestamp)| {
@@ -8033,9 +8032,9 @@ fn test_primitives_simple() {
                                     false
                                 }
                             });
-                    });
-                    self.update_begin(&insertions[offset..], uf, latest_timestamp);
-                    true
+                        self.update_begin(&insertions[offset..], uf, latest_timestamp);
+                        true
+                    })
                 }
                 fn update_finalize(
                     &mut self,
@@ -8072,8 +8071,8 @@ fn test_primitives_simple() {
                             new.dedup();
                             assert_eq!(new.len(), self.new.len(), "new only has unique elements");
                         }
+                        self.math_num_uprooted_at_latest_retain = 0;
                     });
-                    self.math_num_uprooted_at_latest_retain = 0;
                 }
             }
             impl AddRelation {
@@ -8176,11 +8175,11 @@ fn test_primitives_simple() {
                     uf: &mut Unification,
                     latest_timestamp: TimeStamp,
                 ) -> bool {
-                    if self.math_num_uprooted_at_latest_retain == uf.math_.num_uprooted() {
-                        return false;
-                    }
-                    let offset = insertions.len();
                     log_duration!("update {}: {}", "const", {
+                        if self.math_num_uprooted_at_latest_retain == uf.math_.num_uprooted() {
+                            return false;
+                        }
+                        let offset = insertions.len();
                         self.math_num_uprooted_at_latest_retain = uf.math_.num_uprooted();
                         self.hash_index_0.retain(|&(x0,), &mut (x1, _timestamp)| {
                             if uf.math_.is_root(x1) {
@@ -8190,9 +8189,9 @@ fn test_primitives_simple() {
                                 false
                             }
                         });
-                    });
-                    self.update_begin(&insertions[offset..], uf, latest_timestamp);
-                    true
+                        self.update_begin(&insertions[offset..], uf, latest_timestamp);
+                        true
+                    })
                 }
                 fn update_finalize(
                     &mut self,
@@ -8257,8 +8256,8 @@ fn test_primitives_simple() {
                                 });
                             });
                         }
+                        self.math_num_uprooted_at_latest_retain = 0;
                     });
-                    self.math_num_uprooted_at_latest_retain = 0;
                 }
             }
             impl ConstRelation {
@@ -8386,11 +8385,11 @@ fn test_primitives_simple() {
                     uf: &mut Unification,
                     latest_timestamp: TimeStamp,
                 ) -> bool {
-                    if self.math_num_uprooted_at_latest_retain == uf.math_.num_uprooted() {
-                        return false;
-                    }
-                    let offset = insertions.len();
                     log_duration!("update {}: {}", "var", {
+                        if self.math_num_uprooted_at_latest_retain == uf.math_.num_uprooted() {
+                            return false;
+                        }
+                        let offset = insertions.len();
                         self.math_num_uprooted_at_latest_retain = uf.math_.num_uprooted();
                         self.hash_index_0.retain(|&(x0,), &mut (x1, _timestamp)| {
                             if uf.math_.is_root(x1) {
@@ -8400,9 +8399,9 @@ fn test_primitives_simple() {
                                 false
                             }
                         });
-                    });
-                    self.update_begin(&insertions[offset..], uf, latest_timestamp);
-                    true
+                        self.update_begin(&insertions[offset..], uf, latest_timestamp);
+                        true
+                    })
                 }
                 fn update_finalize(
                     &mut self,
@@ -8435,8 +8434,8 @@ fn test_primitives_simple() {
                             new.dedup();
                             assert_eq!(new.len(), self.new.len(), "new only has unique elements");
                         }
+                        self.math_num_uprooted_at_latest_retain = 0;
                     });
-                    self.math_num_uprooted_at_latest_retain = 0;
                 }
             }
             impl VarRelation {
@@ -8875,15 +8874,15 @@ fn triangle_join() {
                     uf: &mut Unification,
                     latest_timestamp: TimeStamp,
                 ) -> bool {
-                    if self.math_num_uprooted_at_latest_retain == uf.math_.num_uprooted() {
-                        return false;
-                    }
-                    let offset = insertions.len();
                     log_duration!("update {}: {}", "foo", {
+                        if self.math_num_uprooted_at_latest_retain == uf.math_.num_uprooted() {
+                            return false;
+                        }
+                        let offset = insertions.len();
                         self.math_num_uprooted_at_latest_retain = uf.math_.num_uprooted();
-                    });
-                    self.update_begin(&insertions[offset..], uf, latest_timestamp);
-                    true
+                        self.update_begin(&insertions[offset..], uf, latest_timestamp);
+                        true
+                    })
                 }
                 fn update_finalize(
                     &mut self,
@@ -9014,8 +9013,8 @@ fn triangle_join() {
                                 });
                             });
                         }
+                        self.math_num_uprooted_at_latest_retain = 0;
                     });
-                    self.math_num_uprooted_at_latest_retain = 0;
                 }
             }
             impl FooRelation {
@@ -9152,15 +9151,15 @@ fn triangle_join() {
                     uf: &mut Unification,
                     latest_timestamp: TimeStamp,
                 ) -> bool {
-                    if self.math_num_uprooted_at_latest_retain == uf.math_.num_uprooted() {
-                        return false;
-                    }
-                    let offset = insertions.len();
                     log_duration!("update {}: {}", "bar", {
+                        if self.math_num_uprooted_at_latest_retain == uf.math_.num_uprooted() {
+                            return false;
+                        }
+                        let offset = insertions.len();
                         self.math_num_uprooted_at_latest_retain = uf.math_.num_uprooted();
-                    });
-                    self.update_begin(&insertions[offset..], uf, latest_timestamp);
-                    true
+                        self.update_begin(&insertions[offset..], uf, latest_timestamp);
+                        true
+                    })
                 }
                 fn update_finalize(
                     &mut self,
@@ -9291,8 +9290,8 @@ fn triangle_join() {
                                 });
                             });
                         }
+                        self.math_num_uprooted_at_latest_retain = 0;
                     });
-                    self.math_num_uprooted_at_latest_retain = 0;
                 }
             }
             impl BarRelation {
@@ -9429,15 +9428,15 @@ fn triangle_join() {
                     uf: &mut Unification,
                     latest_timestamp: TimeStamp,
                 ) -> bool {
-                    if self.math_num_uprooted_at_latest_retain == uf.math_.num_uprooted() {
-                        return false;
-                    }
-                    let offset = insertions.len();
                     log_duration!("update {}: {}", "baz", {
+                        if self.math_num_uprooted_at_latest_retain == uf.math_.num_uprooted() {
+                            return false;
+                        }
+                        let offset = insertions.len();
                         self.math_num_uprooted_at_latest_retain = uf.math_.num_uprooted();
-                    });
-                    self.update_begin(&insertions[offset..], uf, latest_timestamp);
-                    true
+                        self.update_begin(&insertions[offset..], uf, latest_timestamp);
+                        true
+                    })
                 }
                 fn update_finalize(
                     &mut self,
@@ -9568,8 +9567,8 @@ fn triangle_join() {
                                 });
                             });
                         }
+                        self.math_num_uprooted_at_latest_retain = 0;
                     });
-                    self.math_num_uprooted_at_latest_retain = 0;
                 }
             }
             impl BazRelation {
@@ -9705,15 +9704,15 @@ fn triangle_join() {
                     uf: &mut Unification,
                     latest_timestamp: TimeStamp,
                 ) -> bool {
-                    if self.math_num_uprooted_at_latest_retain == uf.math_.num_uprooted() {
-                        return false;
-                    }
-                    let offset = insertions.len();
                     log_duration!("update {}: {}", "triangle", {
+                        if self.math_num_uprooted_at_latest_retain == uf.math_.num_uprooted() {
+                            return false;
+                        }
+                        let offset = insertions.len();
                         self.math_num_uprooted_at_latest_retain = uf.math_.num_uprooted();
-                    });
-                    self.update_begin(&insertions[offset..], uf, latest_timestamp);
-                    true
+                        self.update_begin(&insertions[offset..], uf, latest_timestamp);
+                        true
+                    })
                 }
                 fn update_finalize(
                     &mut self,
@@ -9785,8 +9784,8 @@ fn triangle_join() {
                                 });
                             });
                         }
+                        self.math_num_uprooted_at_latest_retain = 0;
                     });
-                    self.math_num_uprooted_at_latest_retain = 0;
                 }
             }
             impl TriangleRelation {
@@ -10194,11 +10193,11 @@ fn edgecase0() {
                     uf: &mut Unification,
                     latest_timestamp: TimeStamp,
                 ) -> bool {
-                    if self.math_num_uprooted_at_latest_retain == uf.math_.num_uprooted() {
-                        return false;
-                    }
-                    let offset = insertions.len();
                     log_duration!("update {}: {}", "mul", {
+                        if self.math_num_uprooted_at_latest_retain == uf.math_.num_uprooted() {
+                            return false;
+                        }
+                        let offset = insertions.len();
                         self.math_num_uprooted_at_latest_retain = uf.math_.num_uprooted();
                         self.hash_index_0_1
                             .retain(|&(x0, x1), &mut (x2, _timestamp)| {
@@ -10209,9 +10208,9 @@ fn edgecase0() {
                                     false
                                 }
                             });
-                    });
-                    self.update_begin(&insertions[offset..], uf, latest_timestamp);
-                    true
+                        self.update_begin(&insertions[offset..], uf, latest_timestamp);
+                        true
+                    })
                 }
                 fn update_finalize(
                     &mut self,
@@ -10348,8 +10347,8 @@ fn edgecase0() {
                                 });
                             });
                         }
+                        self.math_num_uprooted_at_latest_retain = 0;
                     });
-                    self.math_num_uprooted_at_latest_retain = 0;
                 }
             }
             impl MulRelation {
@@ -10529,11 +10528,11 @@ fn edgecase0() {
                     uf: &mut Unification,
                     latest_timestamp: TimeStamp,
                 ) -> bool {
-                    if self.math_num_uprooted_at_latest_retain == uf.math_.num_uprooted() {
-                        return false;
-                    }
-                    let offset = insertions.len();
                     log_duration!("update {}: {}", "add", {
+                        if self.math_num_uprooted_at_latest_retain == uf.math_.num_uprooted() {
+                            return false;
+                        }
+                        let offset = insertions.len();
                         self.math_num_uprooted_at_latest_retain = uf.math_.num_uprooted();
                         self.hash_index_0_1
                             .retain(|&(x0, x1), &mut (x2, _timestamp)| {
@@ -10544,9 +10543,9 @@ fn edgecase0() {
                                     false
                                 }
                             });
-                    });
-                    self.update_begin(&insertions[offset..], uf, latest_timestamp);
-                    true
+                        self.update_begin(&insertions[offset..], uf, latest_timestamp);
+                        true
+                    })
                 }
                 fn update_finalize(
                     &mut self,
@@ -10651,8 +10650,8 @@ fn edgecase0() {
                                 });
                             });
                         }
+                        self.math_num_uprooted_at_latest_retain = 0;
                     });
-                    self.math_num_uprooted_at_latest_retain = 0;
                 }
             }
             impl AddRelation {
@@ -11052,11 +11051,11 @@ fn test_into_codegen() {
                     uf: &mut Unification,
                     latest_timestamp: TimeStamp,
                 ) -> bool {
-                    if self.math_num_uprooted_at_latest_retain == uf.math_.num_uprooted() {
-                        return false;
-                    }
-                    let offset = insertions.len();
                     log_duration!("update {}: {}", "mul", {
+                        if self.math_num_uprooted_at_latest_retain == uf.math_.num_uprooted() {
+                            return false;
+                        }
+                        let offset = insertions.len();
                         self.math_num_uprooted_at_latest_retain = uf.math_.num_uprooted();
                         self.hash_index_0_1
                             .retain(|&(x0, x1), &mut (x2, _timestamp)| {
@@ -11067,9 +11066,9 @@ fn test_into_codegen() {
                                     false
                                 }
                             });
-                    });
-                    self.update_begin(&insertions[offset..], uf, latest_timestamp);
-                    true
+                        self.update_begin(&insertions[offset..], uf, latest_timestamp);
+                        true
+                    })
                 }
                 fn update_finalize(
                     &mut self,
@@ -11140,8 +11139,8 @@ fn test_into_codegen() {
                                 });
                             });
                         }
+                        self.math_num_uprooted_at_latest_retain = 0;
                     });
-                    self.math_num_uprooted_at_latest_retain = 0;
                 }
             }
             impl MulRelation {
@@ -11271,11 +11270,11 @@ fn test_into_codegen() {
                     uf: &mut Unification,
                     latest_timestamp: TimeStamp,
                 ) -> bool {
-                    if self.math_num_uprooted_at_latest_retain == uf.math_.num_uprooted() {
-                        return false;
-                    }
-                    let offset = insertions.len();
                     log_duration!("update {}: {}", "add", {
+                        if self.math_num_uprooted_at_latest_retain == uf.math_.num_uprooted() {
+                            return false;
+                        }
+                        let offset = insertions.len();
                         self.math_num_uprooted_at_latest_retain = uf.math_.num_uprooted();
                         self.hash_index_0_1
                             .retain(|&(x0, x1), &mut (x2, _timestamp)| {
@@ -11286,9 +11285,9 @@ fn test_into_codegen() {
                                     false
                                 }
                             });
-                    });
-                    self.update_begin(&insertions[offset..], uf, latest_timestamp);
-                    true
+                        self.update_begin(&insertions[offset..], uf, latest_timestamp);
+                        true
+                    })
                 }
                 fn update_finalize(
                     &mut self,
@@ -11359,8 +11358,8 @@ fn test_into_codegen() {
                                 });
                             });
                         }
+                        self.math_num_uprooted_at_latest_retain = 0;
                     });
-                    self.math_num_uprooted_at_latest_retain = 0;
                 }
             }
             impl AddRelation {
@@ -14052,11 +14051,11 @@ fn lir_math() {
                     uf: &mut Unification,
                     latest_timestamp: TimeStamp,
                 ) -> bool {
-                    if self.fuel_unit_num_uprooted_at_latest_retain == uf.fuel_unit_.num_uprooted() {
-                        return false;
-                    }
-                    let offset = insertions.len();
                     log_duration!("update {}: {}", "fuel", {
+                        if self.fuel_unit_num_uprooted_at_latest_retain == uf.fuel_unit_.num_uprooted() {
+                            return false;
+                        }
+                        let offset = insertions.len();
                         self.fuel_unit_num_uprooted_at_latest_retain = uf.fuel_unit_.num_uprooted();
                         self.hash_index_0.retain(|&(x0,), &mut (x1, _timestamp)| {
                             if uf.fuel_unit_.is_root(x0) & uf.fuel_unit_.is_root(x1) {
@@ -14066,9 +14065,9 @@ fn lir_math() {
                                 false
                             }
                         });
-                    });
-                    self.update_begin(&insertions[offset..], uf, latest_timestamp);
-                    true
+                        self.update_begin(&insertions[offset..], uf, latest_timestamp);
+                        true
+                    })
                 }
                 fn update_finalize(
                     &mut self,
@@ -14137,8 +14136,8 @@ fn lir_math() {
                                 });
                             });
                         }
+                        self.fuel_unit_num_uprooted_at_latest_retain = 0;
                     });
-                    self.fuel_unit_num_uprooted_at_latest_retain = 0;
                 }
             }
             impl FuelRelation {
@@ -14259,11 +14258,11 @@ fn lir_math() {
                     uf: &mut Unification,
                     latest_timestamp: TimeStamp,
                 ) -> bool {
-                    if self.fuel_unit_num_uprooted_at_latest_retain == uf.fuel_unit_.num_uprooted() {
-                        return false;
-                    }
-                    let offset = insertions.len();
                     log_duration!("update {}: {}", "zero_fuel", {
+                        if self.fuel_unit_num_uprooted_at_latest_retain == uf.fuel_unit_.num_uprooted() {
+                            return false;
+                        }
+                        let offset = insertions.len();
                         self.fuel_unit_num_uprooted_at_latest_retain = uf.fuel_unit_.num_uprooted();
                         self.hash_index_.retain(|&(), &mut (x0, _timestamp)| {
                             if uf.fuel_unit_.is_root(x0) {
@@ -14273,9 +14272,9 @@ fn lir_math() {
                                 false
                             }
                         });
-                    });
-                    self.update_begin(&insertions[offset..], uf, latest_timestamp);
-                    true
+                        self.update_begin(&insertions[offset..], uf, latest_timestamp);
+                        true
+                    })
                 }
                 fn update_finalize(
                     &mut self,
@@ -14310,8 +14309,8 @@ fn lir_math() {
                             new.dedup();
                             assert_eq!(new.len(), self.new.len(), "new only has unique elements");
                         }
+                        self.fuel_unit_num_uprooted_at_latest_retain = 0;
                     });
-                    self.fuel_unit_num_uprooted_at_latest_retain = 0;
                 }
             }
             impl ZeroFuelRelation {
@@ -14414,11 +14413,11 @@ fn lir_math() {
                     uf: &mut Unification,
                     latest_timestamp: TimeStamp,
                 ) -> bool {
-                    if self.math_num_uprooted_at_latest_retain == uf.math_.num_uprooted() {
-                        return false;
-                    }
-                    let offset = insertions.len();
                     log_duration!("update {}: {}", "diff", {
+                        if self.math_num_uprooted_at_latest_retain == uf.math_.num_uprooted() {
+                            return false;
+                        }
+                        let offset = insertions.len();
                         self.math_num_uprooted_at_latest_retain = uf.math_.num_uprooted();
                         self.hash_index_1_0
                             .retain(|&(x1, x0), &mut (x2, _timestamp)| {
@@ -14429,9 +14428,9 @@ fn lir_math() {
                                     false
                                 }
                             });
-                    });
-                    self.update_begin(&insertions[offset..], uf, latest_timestamp);
-                    true
+                        self.update_begin(&insertions[offset..], uf, latest_timestamp);
+                        true
+                    })
                 }
                 fn update_finalize(
                     &mut self,
@@ -14502,8 +14501,8 @@ fn lir_math() {
                                 });
                             });
                         }
+                        self.math_num_uprooted_at_latest_retain = 0;
                     });
-                    self.math_num_uprooted_at_latest_retain = 0;
                 }
             }
             impl DiffRelation {
@@ -14641,13 +14640,13 @@ fn lir_math() {
                     uf: &mut Unification,
                     latest_timestamp: TimeStamp,
                 ) -> bool {
-                    if self.fuel_unit_num_uprooted_at_latest_retain == uf.fuel_unit_.num_uprooted()
-                        && self.math_num_uprooted_at_latest_retain == uf.math_.num_uprooted()
-                    {
-                        return false;
-                    }
-                    let offset = insertions.len();
                     log_duration!("update {}: {}", "integral", {
+                        if self.fuel_unit_num_uprooted_at_latest_retain == uf.fuel_unit_.num_uprooted()
+                            && self.math_num_uprooted_at_latest_retain == uf.math_.num_uprooted()
+                        {
+                            return false;
+                        }
+                        let offset = insertions.len();
                         self.fuel_unit_num_uprooted_at_latest_retain = uf.fuel_unit_.num_uprooted();
                         self.math_num_uprooted_at_latest_retain = uf.math_.num_uprooted();
                         self.hash_index_0_1_2
@@ -14663,9 +14662,9 @@ fn lir_math() {
                                     false
                                 }
                             });
-                    });
-                    self.update_begin(&insertions[offset..], uf, latest_timestamp);
-                    true
+                        self.update_begin(&insertions[offset..], uf, latest_timestamp);
+                        true
+                    })
                 }
                 fn update_finalize(
                     &mut self,
@@ -14827,9 +14826,9 @@ fn lir_math() {
                                 });
                             });
                         }
+                        self.fuel_unit_num_uprooted_at_latest_retain = 0;
+                        self.math_num_uprooted_at_latest_retain = 0;
                     });
-                    self.fuel_unit_num_uprooted_at_latest_retain = 0;
-                    self.math_num_uprooted_at_latest_retain = 0;
                 }
             }
             impl IntegralRelation {
@@ -15035,11 +15034,11 @@ fn lir_math() {
                     uf: &mut Unification,
                     latest_timestamp: TimeStamp,
                 ) -> bool {
-                    if self.math_num_uprooted_at_latest_retain == uf.math_.num_uprooted() {
-                        return false;
-                    }
-                    let offset = insertions.len();
                     log_duration!("update {}: {}", "add", {
+                        if self.math_num_uprooted_at_latest_retain == uf.math_.num_uprooted() {
+                            return false;
+                        }
+                        let offset = insertions.len();
                         self.math_num_uprooted_at_latest_retain = uf.math_.num_uprooted();
                         self.hash_index_1_0
                             .retain(|&(x1, x0), &mut (x2, _timestamp)| {
@@ -15050,9 +15049,9 @@ fn lir_math() {
                                     false
                                 }
                             });
-                    });
-                    self.update_begin(&insertions[offset..], uf, latest_timestamp);
-                    true
+                        self.update_begin(&insertions[offset..], uf, latest_timestamp);
+                        true
+                    })
                 }
                 fn update_finalize(
                     &mut self,
@@ -15191,8 +15190,8 @@ fn lir_math() {
                                 });
                             });
                         }
+                        self.math_num_uprooted_at_latest_retain = 0;
                     });
-                    self.math_num_uprooted_at_latest_retain = 0;
                 }
             }
             impl AddRelation {
@@ -15372,11 +15371,11 @@ fn lir_math() {
                     uf: &mut Unification,
                     latest_timestamp: TimeStamp,
                 ) -> bool {
-                    if self.math_num_uprooted_at_latest_retain == uf.math_.num_uprooted() {
-                        return false;
-                    }
-                    let offset = insertions.len();
                     log_duration!("update {}: {}", "sub", {
+                        if self.math_num_uprooted_at_latest_retain == uf.math_.num_uprooted() {
+                            return false;
+                        }
+                        let offset = insertions.len();
                         self.math_num_uprooted_at_latest_retain = uf.math_.num_uprooted();
                         self.hash_index_0_1
                             .retain(|&(x0, x1), &mut (x2, _timestamp)| {
@@ -15387,9 +15386,9 @@ fn lir_math() {
                                     false
                                 }
                             });
-                    });
-                    self.update_begin(&insertions[offset..], uf, latest_timestamp);
-                    true
+                        self.update_begin(&insertions[offset..], uf, latest_timestamp);
+                        true
+                    })
                 }
                 fn update_finalize(
                     &mut self,
@@ -15460,8 +15459,8 @@ fn lir_math() {
                                 });
                             });
                         }
+                        self.math_num_uprooted_at_latest_retain = 0;
                     });
-                    self.math_num_uprooted_at_latest_retain = 0;
                 }
             }
             impl SubRelation {
@@ -15594,11 +15593,11 @@ fn lir_math() {
                     uf: &mut Unification,
                     latest_timestamp: TimeStamp,
                 ) -> bool {
-                    if self.math_num_uprooted_at_latest_retain == uf.math_.num_uprooted() {
-                        return false;
-                    }
-                    let offset = insertions.len();
                     log_duration!("update {}: {}", "mul", {
+                        if self.math_num_uprooted_at_latest_retain == uf.math_.num_uprooted() {
+                            return false;
+                        }
+                        let offset = insertions.len();
                         self.math_num_uprooted_at_latest_retain = uf.math_.num_uprooted();
                         self.hash_index_1_0
                             .retain(|&(x1, x0), &mut (x2, _timestamp)| {
@@ -15609,9 +15608,9 @@ fn lir_math() {
                                     false
                                 }
                             });
-                    });
-                    self.update_begin(&insertions[offset..], uf, latest_timestamp);
-                    true
+                        self.update_begin(&insertions[offset..], uf, latest_timestamp);
+                        true
+                    })
                 }
                 fn update_finalize(
                     &mut self,
@@ -15782,8 +15781,8 @@ fn lir_math() {
                                 });
                             });
                         }
+                        self.math_num_uprooted_at_latest_retain = 0;
                     });
-                    self.math_num_uprooted_at_latest_retain = 0;
                 }
             }
             impl MulRelation {
@@ -15986,11 +15985,11 @@ fn lir_math() {
                     uf: &mut Unification,
                     latest_timestamp: TimeStamp,
                 ) -> bool {
-                    if self.math_num_uprooted_at_latest_retain == uf.math_.num_uprooted() {
-                        return false;
-                    }
-                    let offset = insertions.len();
                     log_duration!("update {}: {}", "div", {
+                        if self.math_num_uprooted_at_latest_retain == uf.math_.num_uprooted() {
+                            return false;
+                        }
+                        let offset = insertions.len();
                         self.math_num_uprooted_at_latest_retain = uf.math_.num_uprooted();
                         self.hash_index_0_1
                             .retain(|&(x0, x1), &mut (x2, _timestamp)| {
@@ -16001,9 +16000,9 @@ fn lir_math() {
                                     false
                                 }
                             });
-                    });
-                    self.update_begin(&insertions[offset..], uf, latest_timestamp);
-                    true
+                        self.update_begin(&insertions[offset..], uf, latest_timestamp);
+                        true
+                    })
                 }
                 fn update_finalize(
                     &mut self,
@@ -16040,8 +16039,8 @@ fn lir_math() {
                             new.dedup();
                             assert_eq!(new.len(), self.new.len(), "new only has unique elements");
                         }
+                        self.math_num_uprooted_at_latest_retain = 0;
                     });
-                    self.math_num_uprooted_at_latest_retain = 0;
                 }
             }
             impl DivRelation {
@@ -16149,11 +16148,11 @@ fn lir_math() {
                     uf: &mut Unification,
                     latest_timestamp: TimeStamp,
                 ) -> bool {
-                    if self.math_num_uprooted_at_latest_retain == uf.math_.num_uprooted() {
-                        return false;
-                    }
-                    let offset = insertions.len();
                     log_duration!("update {}: {}", "pow", {
+                        if self.math_num_uprooted_at_latest_retain == uf.math_.num_uprooted() {
+                            return false;
+                        }
+                        let offset = insertions.len();
                         self.math_num_uprooted_at_latest_retain = uf.math_.num_uprooted();
                         self.hash_index_0_1
                             .retain(|&(x0, x1), &mut (x2, _timestamp)| {
@@ -16164,9 +16163,9 @@ fn lir_math() {
                                     false
                                 }
                             });
-                    });
-                    self.update_begin(&insertions[offset..], uf, latest_timestamp);
-                    true
+                        self.update_begin(&insertions[offset..], uf, latest_timestamp);
+                        true
+                    })
                 }
                 fn update_finalize(
                     &mut self,
@@ -16337,8 +16336,8 @@ fn lir_math() {
                                 });
                             });
                         }
+                        self.math_num_uprooted_at_latest_retain = 0;
                     });
-                    self.math_num_uprooted_at_latest_retain = 0;
                 }
             }
             impl PowRelation {
@@ -16537,11 +16536,11 @@ fn lir_math() {
                     uf: &mut Unification,
                     latest_timestamp: TimeStamp,
                 ) -> bool {
-                    if self.math_num_uprooted_at_latest_retain == uf.math_.num_uprooted() {
-                        return false;
-                    }
-                    let offset = insertions.len();
                     log_duration!("update {}: {}", "ln", {
+                        if self.math_num_uprooted_at_latest_retain == uf.math_.num_uprooted() {
+                            return false;
+                        }
+                        let offset = insertions.len();
                         self.math_num_uprooted_at_latest_retain = uf.math_.num_uprooted();
                         self.hash_index_0.retain(|&(x0,), &mut (x1, _timestamp)| {
                             if uf.math_.is_root(x0) & uf.math_.is_root(x1) {
@@ -16551,9 +16550,9 @@ fn lir_math() {
                                 false
                             }
                         });
-                    });
-                    self.update_begin(&insertions[offset..], uf, latest_timestamp);
-                    true
+                        self.update_begin(&insertions[offset..], uf, latest_timestamp);
+                        true
+                    })
                 }
                 fn update_finalize(
                     &mut self,
@@ -16590,8 +16589,8 @@ fn lir_math() {
                             new.dedup();
                             assert_eq!(new.len(), self.new.len(), "new only has unique elements");
                         }
+                        self.math_num_uprooted_at_latest_retain = 0;
                     });
-                    self.math_num_uprooted_at_latest_retain = 0;
                 }
             }
             impl LnRelation {
@@ -16690,11 +16689,11 @@ fn lir_math() {
                     uf: &mut Unification,
                     latest_timestamp: TimeStamp,
                 ) -> bool {
-                    if self.math_num_uprooted_at_latest_retain == uf.math_.num_uprooted() {
-                        return false;
-                    }
-                    let offset = insertions.len();
                     log_duration!("update {}: {}", "sqrt", {
+                        if self.math_num_uprooted_at_latest_retain == uf.math_.num_uprooted() {
+                            return false;
+                        }
+                        let offset = insertions.len();
                         self.math_num_uprooted_at_latest_retain = uf.math_.num_uprooted();
                         self.hash_index_0.retain(|&(x0,), &mut (x1, _timestamp)| {
                             if uf.math_.is_root(x0) & uf.math_.is_root(x1) {
@@ -16704,9 +16703,9 @@ fn lir_math() {
                                 false
                             }
                         });
-                    });
-                    self.update_begin(&insertions[offset..], uf, latest_timestamp);
-                    true
+                        self.update_begin(&insertions[offset..], uf, latest_timestamp);
+                        true
+                    })
                 }
                 fn update_finalize(
                     &mut self,
@@ -16743,8 +16742,8 @@ fn lir_math() {
                             new.dedup();
                             assert_eq!(new.len(), self.new.len(), "new only has unique elements");
                         }
+                        self.math_num_uprooted_at_latest_retain = 0;
                     });
-                    self.math_num_uprooted_at_latest_retain = 0;
                 }
             }
             impl SqrtRelation {
@@ -16844,11 +16843,11 @@ fn lir_math() {
                     uf: &mut Unification,
                     latest_timestamp: TimeStamp,
                 ) -> bool {
-                    if self.math_num_uprooted_at_latest_retain == uf.math_.num_uprooted() {
-                        return false;
-                    }
-                    let offset = insertions.len();
                     log_duration!("update {}: {}", "sin", {
+                        if self.math_num_uprooted_at_latest_retain == uf.math_.num_uprooted() {
+                            return false;
+                        }
+                        let offset = insertions.len();
                         self.math_num_uprooted_at_latest_retain = uf.math_.num_uprooted();
                         self.hash_index_0.retain(|&(x0,), &mut (x1, _timestamp)| {
                             if uf.math_.is_root(x0) & uf.math_.is_root(x1) {
@@ -16858,9 +16857,9 @@ fn lir_math() {
                                 false
                             }
                         });
-                    });
-                    self.update_begin(&insertions[offset..], uf, latest_timestamp);
-                    true
+                        self.update_begin(&insertions[offset..], uf, latest_timestamp);
+                        true
+                    })
                 }
                 fn update_finalize(
                     &mut self,
@@ -16929,8 +16928,8 @@ fn lir_math() {
                                 });
                             });
                         }
+                        self.math_num_uprooted_at_latest_retain = 0;
                     });
-                    self.math_num_uprooted_at_latest_retain = 0;
                 }
             }
             impl SinRelation {
@@ -17062,11 +17061,11 @@ fn lir_math() {
                     uf: &mut Unification,
                     latest_timestamp: TimeStamp,
                 ) -> bool {
-                    if self.math_num_uprooted_at_latest_retain == uf.math_.num_uprooted() {
-                        return false;
-                    }
-                    let offset = insertions.len();
                     log_duration!("update {}: {}", "cos", {
+                        if self.math_num_uprooted_at_latest_retain == uf.math_.num_uprooted() {
+                            return false;
+                        }
+                        let offset = insertions.len();
                         self.math_num_uprooted_at_latest_retain = uf.math_.num_uprooted();
                         self.hash_index_0.retain(|&(x0,), &mut (x1, _timestamp)| {
                             if uf.math_.is_root(x0) & uf.math_.is_root(x1) {
@@ -17076,9 +17075,9 @@ fn lir_math() {
                                 false
                             }
                         });
-                    });
-                    self.update_begin(&insertions[offset..], uf, latest_timestamp);
-                    true
+                        self.update_begin(&insertions[offset..], uf, latest_timestamp);
+                        true
+                    })
                 }
                 fn update_finalize(
                     &mut self,
@@ -17147,8 +17146,8 @@ fn lir_math() {
                                 });
                             });
                         }
+                        self.math_num_uprooted_at_latest_retain = 0;
                     });
-                    self.math_num_uprooted_at_latest_retain = 0;
                 }
             }
             impl CosRelation {
@@ -17282,11 +17281,11 @@ fn lir_math() {
                     uf: &mut Unification,
                     latest_timestamp: TimeStamp,
                 ) -> bool {
-                    if self.math_num_uprooted_at_latest_retain == uf.math_.num_uprooted() {
-                        return false;
-                    }
-                    let offset = insertions.len();
                     log_duration!("update {}: {}", "const", {
+                        if self.math_num_uprooted_at_latest_retain == uf.math_.num_uprooted() {
+                            return false;
+                        }
+                        let offset = insertions.len();
                         self.math_num_uprooted_at_latest_retain = uf.math_.num_uprooted();
                         self.hash_index_0.retain(|&(x0,), &mut (x1, _timestamp)| {
                             if uf.math_.is_root(x1) {
@@ -17296,9 +17295,9 @@ fn lir_math() {
                                 false
                             }
                         });
-                    });
-                    self.update_begin(&insertions[offset..], uf, latest_timestamp);
-                    true
+                        self.update_begin(&insertions[offset..], uf, latest_timestamp);
+                        true
+                    })
                 }
                 fn update_finalize(
                     &mut self,
@@ -17363,8 +17362,8 @@ fn lir_math() {
                                 });
                             });
                         }
+                        self.math_num_uprooted_at_latest_retain = 0;
                     });
-                    self.math_num_uprooted_at_latest_retain = 0;
                 }
             }
             impl ConstRelation {
@@ -17492,11 +17491,11 @@ fn lir_math() {
                     uf: &mut Unification,
                     latest_timestamp: TimeStamp,
                 ) -> bool {
-                    if self.math_num_uprooted_at_latest_retain == uf.math_.num_uprooted() {
-                        return false;
-                    }
-                    let offset = insertions.len();
                     log_duration!("update {}: {}", "var", {
+                        if self.math_num_uprooted_at_latest_retain == uf.math_.num_uprooted() {
+                            return false;
+                        }
+                        let offset = insertions.len();
                         self.math_num_uprooted_at_latest_retain = uf.math_.num_uprooted();
                         self.hash_index_0.retain(|&(x0,), &mut (x1, _timestamp)| {
                             if uf.math_.is_root(x1) {
@@ -17506,9 +17505,9 @@ fn lir_math() {
                                 false
                             }
                         });
-                    });
-                    self.update_begin(&insertions[offset..], uf, latest_timestamp);
-                    true
+                        self.update_begin(&insertions[offset..], uf, latest_timestamp);
+                        true
+                    })
                 }
                 fn update_finalize(
                     &mut self,
@@ -17541,8 +17540,8 @@ fn lir_math() {
                             new.dedup();
                             assert_eq!(new.len(), self.new.len(), "new only has unique elements");
                         }
+                        self.math_num_uprooted_at_latest_retain = 0;
                     });
-                    self.math_num_uprooted_at_latest_retain = 0;
                 }
             }
             impl VarRelation {
