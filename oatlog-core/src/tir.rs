@@ -8,6 +8,7 @@ use crate::{
 };
 use itertools::Itertools as _;
 use std::{
+    cmp::Reverse,
     collections::{BTreeMap, BTreeSet},
     mem::replace,
 };
@@ -257,194 +258,62 @@ fn action_topo_resolve<'a>(
     actions: &[Atom],
     bound_premise: &BTreeSet<VariableId>,
     relations: &TVec<RelationId, hir::Relation>,
-    unify: &mut Vec<(VariableId, VariableId)>,
-    variables: &mut TVec<VariableId, VariableMeta>,
-    types: &TVec<TypeId, hir::Type>,
+    _unify: &mut Vec<(VariableId, VariableId)>,
+    _variables: &mut TVec<VariableId, VariableMeta>,
+    _types: &TVec<TypeId, hir::Type>,
 ) -> Vec<Atom> {
-    let actions = {
-        use crate::union_find::UFData;
-        use hir::IsPremise::{Action, Premise};
-
-        let mut to_merge: UFData<VariableId, IsPremise> =
-            variables.iter().copied().map(|_| Action).collect();
-
-        let merge = |pa: &IsPremise, pb: &IsPremise| IsPremise::merge_prefer_premise(*pa, *pb);
-
-        for &v in bound_premise {
-            to_merge[v] = Premise;
-        }
-        let mut queue = actions.to_owned();
-
-        loop {
-            let pre = queue.clone();
-            let mut progress = false;
-            let mut assumed_true: BTreeSet<Atom> = BTreeSet::new();
-            for atom in queue {
-                let equivalent = vec![atom]; // .equivalent_atoms(relations);
-                let mut deleted = false;
-                'iter_assumed: for assumed in assumed_true.iter().cloned() {
-                    for atom in equivalent.iter().filter(|x| x.relation == assumed.relation) {
-                        for implicit_rule in &relations[atom.relation].implicit_rules {
-                            if !implicit_rule
-                                .key_columns()
-                                .into_iter()
-                                .all(|c| atom.columns[c] == assumed.columns[c])
-                            {
-                                continue;
-                            }
-                            deleted = true;
-                            for c in implicit_rule.value_columns() {
-                                let lhs = atom.columns[c];
-                                let rhs = assumed.columns[c];
-                                if lhs == rhs {
-                                    continue;
-                                }
-                                match (atom.is_premise, to_merge[lhs], to_merge[rhs]) {
-                                    (Premise, _, _) => {
-                                        progress = true;
-                                        to_merge.union_merge(lhs, rhs, &merge);
-                                    }
-                                    (Action, Premise, Premise) => {
-                                        deleted = false;
-                                        // We don't want contents of action to cause a merge of two premise variables
-
-                                        // Example:
-                                        //
-                                        // Premise: (Add a b c)
-                                        // Action: (Neg a b), (Neg a c)
-                                        //
-                                        // Premise: (Add a b b)
-                                        // Action: (Neg a b), (Neg a c)
-                                        //
-                                    }
-                                    (Action, Action, _) | (Action, _, Action) => {
-                                        progress = true;
-                                        to_merge.union_merge(lhs, rhs, &merge);
-                                    }
-                                }
-                            }
-                            if deleted {
-                                break 'iter_assumed;
-                            }
-                        }
-                    }
-                }
-                if !deleted {
-                    assumed_true.insert(Atom::canonical_atom(&equivalent));
-                }
-            }
-            queue = assumed_true
-                .into_iter()
-                .map(|x| x.map_columns(|v| to_merge.find(v)))
-                .collect();
-
-            if !progress {
-                break;
-            }
-            panic!("{pre:?} {queue:?}");
-        }
-        queue.sort();
-        queue.dedup();
-        queue
-    };
-
     let mut schedule: Vec<Atom> = Vec::new();
-    let mut conflict_free: Vec<Atom> = Vec::new();
-    let mut problematic: Vec<Atom> = actions;
+    let mut remaining_atoms: BTreeSet<Atom> = {
+        let mut ret: Vec<&Atom> = actions
+            .iter()
+            .inspect(|a| assert_eq!(a.is_premise, hir::IsPremise::Action))
+            .collect();
+        // In case of atoms differing only on entry, keep the one with entry.
+        ret.sort_by_key(|a| (a.relation, &a.columns, Reverse(&a.entry)));
+        ret.dedup_by_key(|a| (a.relation, &a.columns));
+        ret.into_iter().cloned().collect()
+    };
+    let mut bound_variables: BTreeSet<VariableId> = bound_premise.to_owned();
 
-    while !problematic.is_empty() || !conflict_free.is_empty() {
-        let mut write_deg: BTreeMap<VariableId, usize>;
+    loop {
+        remaining_atoms.retain(|atom| {
+            if atom.columns.iter().all(|col| bound_variables.contains(col)) {
+                let mut atom = atom.clone();
 
-        loop {
-            write_deg = BTreeMap::new();
-            for v in problematic
-                .iter()
-                .chain(conflict_free.iter())
-                .flat_map(|x| x.entry_outputs(relations))
-            {
-                *write_deg.entry(v).or_default() += 1;
-            }
-            for v in problematic
-                .iter()
-                .chain(conflict_free.iter())
-                .flat_map(|x| x.entry_inputs(relations))
-            {
-                write_deg.entry(v).or_default();
-            }
-            if conflict_free.is_empty() {
-                break;
-            }
-            let n = conflict_free.len();
-            conflict_free.retain(|x| {
-                let inputs = x.entry_inputs(relations);
-                let can_schedule = inputs.into_iter().all(|x| write_deg[&x] == 0);
-                if can_schedule {
-                    schedule.push(x.clone());
-                }
-                !can_schedule
-            });
-            assert_ne!(n, conflict_free.len());
-        }
-
-        let scc_sizes = scc_group_size(problematic.iter(), relations);
-
-        problematic.retain(|x| {
-            let inputs = x.entry_inputs(relations);
-            let outputs = x.entry_outputs(relations);
-
-            let is_problematic = scc_sizes[x] > 1
-                || outputs.into_iter().any(|output| {
-                    let write_conflict = write_deg[&output] > 1 || bound_premise.contains(&output);
-                    let self_cycle = inputs.contains(&output);
-                    write_conflict || self_cycle
-                });
-            if !is_problematic {
-                conflict_free.push(x.clone());
-            }
-
-            is_problematic
-        });
-        if problematic.is_empty() {
-            continue;
-        }
-
-        let mut ok = false;
-
-        for x in &mut problematic {
-            let im = x.entry.expect("problematic has entry");
-            let relation_ = &relations[x.relation];
-            if relation_.can_become_insert(im)
-                && x.entry_outputs(relations).iter().all(|x| write_deg[x] > 0)
-            {
-                x.entry = None;
-                ok = true;
-                break;
-            }
-        }
-        if !ok {
-            for x in &mut problematic {
-                if x.entry_outputs(relations)
-                    .iter()
-                    .all(|x| types[variables[x].ty].kind == hir::TypeKind::Symbolic)
-                {
-                    let relation_ = &relations[x.relation];
-                    let im = &relation_.implicit_rules[x.entry.unwrap()];
-                    for c in im.out.keys().copied() {
-                        let old_id = x.columns[c];
-                        let new_id = variables.push(variables[old_id]);
-                        x.columns[c] = new_id;
-                        unify.push((old_id, new_id));
+                // Remove unnecessary `.entry()` if possible.
+                if let Some(entry) = atom.entry {
+                    if relations[atom.relation].can_become_insert(entry) {
+                        atom.entry = None;
                     }
-                    ok = true;
-                    break;
                 }
+
+                schedule.push(atom);
+                false
+            } else {
+                true
             }
+        });
+        if remaining_atoms.is_empty() {
+            break;
         }
-        assert!(
-            ok,
-            "could not remove cycles: schedule={schedule:?} conflict_free={conflict_free:?} problematic={problematic:?}"
-        );
+
+        // Arbitrary atom that through `.entry()` binds a missing variable.
+        let atom_entry = remaining_atoms
+            .iter()
+            .filter(|atom| {
+                atom.entry_inputs(relations)
+                    .into_iter()
+                    .all(|col| bound_variables.contains(&col))
+            })
+            .max_by_key(|atom| atom.entry_outputs(relations).len())
+            .unwrap_or_else(|| panic!("must exist some atom for which all input columns are bound {actions:?} {bound_premise:?}"))
+            .clone();
+
+        bound_variables.extend(&atom_entry.columns);
+        remaining_atoms.remove(&atom_entry);
+        schedule.push(atom_entry);
     }
+
     schedule
 }
 
@@ -468,7 +337,7 @@ pub(crate) fn lowering(
     (trie, variables)
 }
 
-pub(crate) fn lowering_rec(
+fn lowering_rec(
     Trie {
         actions,
         mut unify,
@@ -872,6 +741,8 @@ impl Rule {
             meta,
         }
     }
+    // Modify `self` to begin query plan with `link`, return result.
+    // TODO: Allow relaxation of OLD to ALL.
     fn apply(&self, link: &TrieLink, salt: &Salt, ctx: &Ctx<'_>) -> Option<Self> {
         if salt != &self.salt() {
             return None;
@@ -911,9 +782,9 @@ impl Rule {
                 {
                     let this = &this;
                     // TODO erik: relax incl requirement.
-                    if !supported.contains(this)
-                        || this.relation != other.relation
-                        || this.incl != other.incl
+                    if !(supported.contains(this)
+                        && this.relation == other.relation
+                        && this.incl == other.incl)
                     {
                         continue;
                     }

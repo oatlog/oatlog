@@ -1,19 +1,17 @@
 //! All query plan *choices* occur here.
 use crate::{
-    hir::{self, Atom, RelationTy, SymbolicRule},
+    hir::{self, RelationTy},
     ids::{ColumnId, ImplicitRuleId, IndexUsageId, RelationId, VariableId},
     index_selection, lir, tir,
     typed_set::TSet,
     typed_vec::{TVec, tvec},
 };
-use std::{cmp::Ordering, collections::BTreeSet};
+use std::collections::BTreeSet;
 
 /// Returns `lir::Theory` and `hir::Theory` since the `hir::Theory` is modified when
 /// emitted.
 pub(crate) fn emit_lir_theory(theory: hir::Theory) -> (hir::Theory, lir::Theory) {
     let non_new_relations = theory.relations.len();
-
-    let rules = symbolic_rules_as_semi_naive(&theory.relations, &theory.symbolic_rules);
 
     let mut table_uses: TVec<RelationId, TSet<IndexUsageId, BTreeSet<ColumnId>>> =
         tvec![TSet::new(); non_new_relations];
@@ -37,7 +35,8 @@ pub(crate) fn emit_lir_theory(theory: hir::Theory) -> (hir::Theory, lir::Theory)
     let tries: Vec<lir::RuleTrie>;
 
     {
-        let (mut variables, trie) = tir::schedule_rules(rules, &theory.relations);
+        let (mut variables, trie) =
+            tir::schedule_rules(theory.symbolic_rules.clone(), &theory.relations);
 
         let (lir_tries, variables) = tir::lowering(
             trie,
@@ -194,58 +193,4 @@ fn remove_variable_collisions(s: &mut [lir::VariableData]) {
             }
         }
     }
-}
-
-/// Replace (all * all * all) with (NEW * all * all) + (all * NEW * all) + (all * all * NEW)
-fn symbolic_rules_as_semi_naive(
-    relations: &TVec<RelationId, hir::Relation>,
-    symbolic_rules: &[SymbolicRule],
-) -> Vec<SymbolicRule> {
-    fn seminaive(
-        rule: &SymbolicRule,
-        relations: &TVec<RelationId, hir::Relation>,
-    ) -> Vec<SymbolicRule> {
-        let newable = |atom: &Atom| {
-            atom.is_premise == hir::IsPremise::Premise && relations[atom.relation].has_new()
-        };
-
-        rule.atoms
-            .iter()
-            .enumerate()
-            .filter(|(_, atom)| newable(*atom))
-            .map(|(i, _)| {
-                let mut rule_new = rule.clone();
-                rule_new.atoms = rule_new
-                    .atoms
-                    .into_iter()
-                    .enumerate()
-                    .map(|(j, mut atom)| {
-                        atom.incl = match (newable(&atom), j.cmp(&i)) {
-                            (true, Ordering::Equal) => hir::Inclusion::New,
-                            (true, Ordering::Less) => hir::Inclusion::Old,
-                            (true, Ordering::Greater) | (false, _) => hir::Inclusion::All,
-                        };
-                        atom
-                    })
-                    .collect();
-                rule_new
-            })
-            .collect()
-    }
-
-    symbolic_rules
-        .iter()
-        .flat_map(|rule| {
-            let semi_naive_for_rule = seminaive(rule, relations);
-            assert_ne!(
-                semi_naive_for_rule.len(),
-                0,
-                concat!(
-                    "forall not yet supported, breaks because it is implicitly represented ",
-                    "by unbound premise variables which cannot be semi-naive-ified."
-                )
-            );
-            semi_naive_for_rule
-        })
-        .collect()
 }

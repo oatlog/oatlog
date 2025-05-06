@@ -124,7 +124,7 @@ fn test() {
     let mut sink = Vec::new();
     run(&mut sink);
     let sink = String::from_utf8(sink).unwrap();
-    expect_test::expect!([r"
+    expect_test::expect!([r#"
 
         >> x^2 + 2bx + c = 0
         >> (x+b)^2 = b^2 - c
@@ -144,6 +144,6 @@ fn test() {
         i=8 size=4459
 
         Verified!
-    "])
+    "#])
     .assert_eq(&sink);
 }

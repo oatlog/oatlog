@@ -26,7 +26,7 @@ impl Steps {
             exp.assert_eq(&hir.dbg_summary());
         }
 
-        let (_, lir) = crate::query_planning::emit_lir_theory(hir);
+        let (_, lir) = crate::query_planning::emit_lir_theory(hir.transform_into_seminaive(config));
         if let Some(exp) = self.expected_lir {
             exp.assert_eq(&lir.dbg_summary());
         }
@@ -585,10 +585,10 @@ fn hir_global() {
                         atom: [PremiseAny, r3(v0), iu_bogus]
                         then: [
                             meta: "( rewrite ( Const one ) ( Add ( Var \"a\" ) ( Var \"b\" ) ) )"
-                            atom: [Action::Insert, r4(v2) on iu0],
                             atom: [Action::Insert, r5(v4) on iu0],
-                            atom: [Action::Insert, r2(v2, v3) on iu0],
+                            atom: [Action::Insert, r4(v2) on iu0],
                             atom: [Action::Insert, r2(v4, v5) on iu0],
+                            atom: [Action::Insert, r2(v2, v3) on iu0],
                             atom: [Action::Insert, r0(v3, v5, v1)],
                         ],
                     ],
@@ -597,10 +597,10 @@ fn hir_global() {
                         atom: [PremiseOld, r1(v6, v7), iu0]
                         then: [
                             meta: "( rewrite ( Const one ) ( Add ( Var \"a\" ) ( Var \"b\" ) ) )"
-                            atom: [Action::Insert, r4(v8) on iu0],
                             atom: [Action::Insert, r5(v10) on iu0],
-                            atom: [Action::Insert, r2(v8, v9) on iu0],
+                            atom: [Action::Insert, r4(v8) on iu0],
                             atom: [Action::Insert, r2(v10, v11) on iu0],
+                            atom: [Action::Insert, r2(v8, v9) on iu0],
                             atom: [Action::Insert, r0(v9, v11, v7)],
                         ],
                     ],
@@ -11492,20 +11492,20 @@ fn test_into_codegen() {
                     for (v2, c, v4) in self.mul_.iter_new() {
                         for (a, b) in self.add_.iter_all1_2_0_1(v2) {
                             #[doc = "( rewrite ( Mul ( Add a b ) c ) ( Add ( Mul a c ) ( Mul b c ) ) )"]
-                            let (v5,) = self.mul_.entry2_0_1_2(a, c, &mut self.delta, &mut self.uf);
                             let (v6,) = self.mul_.entry2_0_1_2(b, c, &mut self.delta, &mut self.uf);
+                            let (v5,) = self.mul_.entry2_0_1_2(a, c, &mut self.delta, &mut self.uf);
                             self.delta.insert_add((v5, v6, v4));
                         }
                     }
                     for (a_2, b_2, v9) in self.add_.iter_new() {
                         for (c_2, v11) in self.mul_.iter_old1_0_1_2(v9, self.latest_timestamp) {
                             #[doc = "( rewrite ( Mul ( Add a b ) c ) ( Add ( Mul a c ) ( Mul b c ) ) )"]
-                            let (v12,) = self
-                                .mul_
-                                .entry2_0_1_2(a_2, c_2, &mut self.delta, &mut self.uf);
                             let (v13,) = self
                                 .mul_
                                 .entry2_0_1_2(b_2, c_2, &mut self.delta, &mut self.uf);
+                            let (v12,) = self
+                                .mul_
+                                .entry2_0_1_2(a_2, c_2, &mut self.delta, &mut self.uf);
                             self.delta.insert_add((v12, v13, v11));
                         }
                     }
@@ -13295,23 +13295,23 @@ fn lir_math() {
                             atom: [PremiseAll, r4(v257, v258, v219), iu1]
                             then: [
                                 meta: "( rewrite ( Integral ( Fuel fuel ) ( Add f g ) x ) ( Add ( Integral fuel f x ) ( Integral fuel g x ) ) )"
-                                atom: [Action::Insert, r3(v216, v257, v220, v262) on iu0],
                                 atom: [Action::Insert, r3(v216, v258, v220, v263) on iu0],
+                                atom: [Action::Insert, r3(v216, v257, v220, v262) on iu0],
                                 atom: [Action::Insert, r4(v262, v263, v221)],
                             ],
                             atom: [PremiseAll, r5(v284, v285, v219), iu1]
                             then: [
                                 meta: "( rewrite ( Integral ( Fuel fuel ) ( Sub f g ) x ) ( Sub ( Integral fuel f x ) ( Integral fuel g x ) ) )"
-                                atom: [Action::Insert, r3(v216, v284, v220, v289) on iu0],
                                 atom: [Action::Insert, r3(v216, v285, v220, v290) on iu0],
+                                atom: [Action::Insert, r3(v216, v284, v220, v289) on iu0],
                                 atom: [Action::Insert, r5(v289, v290, v221)],
                             ],
                             atom: [PremiseAll, r6(v311, v312, v219), iu1]
                             then: [
                                 meta: "( rewrite ( Integral ( Fuel fuel ) ( Mul a b ) x ) ( Sub ( Mul a ( Integral fuel b x ) ) ( Integral fuel ( Mul ( Diff x a ) ( Integral fuel b x ) ) x ) ) )"
-                                atom: [Action::Insert, r2(v220, v311, v318) on iu0],
                                 atom: [Action::Insert, r3(v216, v312, v220, v316) on iu0],
                                 atom: [Action::Insert, r6(v311, v316, v317) on iu0],
+                                atom: [Action::Insert, r2(v220, v311, v318) on iu0],
                                 atom: [Action::Insert, r6(v318, v316, v319) on iu0],
                                 atom: [Action::Insert, r3(v216, v319, v220, v320) on iu0],
                                 atom: [Action::Insert, r5(v317, v320, v221)],
@@ -13336,16 +13336,16 @@ fn lir_math() {
                         atom: [PremiseAll, r4(v179, v180, v21), iu1]
                         then: [
                             meta: "( rewrite ( Diff x ( Add a b ) ) ( Add ( Diff x a ) ( Diff x b ) ) )"
-                            atom: [Action::Insert, r2(v20, v179, v183) on iu0],
                             atom: [Action::Insert, r2(v20, v180, v184) on iu0],
+                            atom: [Action::Insert, r2(v20, v179, v183) on iu0],
                             atom: [Action::Insert, r4(v183, v184, v22)],
                         ],
                         atom: [PremiseAll, r6(v193, v194, v21), iu1]
                         then: [
                             meta: "( rewrite ( Diff x ( Mul a b ) ) ( Add ( Mul a ( Diff x b ) ) ( Mul b ( Diff x a ) ) ) )"
-                            atom: [Action::Insert, r2(v20, v193, v199) on iu0],
                             atom: [Action::Insert, r2(v20, v194, v197) on iu0],
                             atom: [Action::Insert, r6(v193, v197, v198) on iu0],
+                            atom: [Action::Insert, r2(v20, v193, v199) on iu0],
                             atom: [Action::Insert, r6(v194, v199, v200) on iu0],
                             atom: [Action::Insert, r4(v198, v200, v22)],
                         ],
@@ -13357,9 +13357,9 @@ fn lir_math() {
                         atom: [PremiseAll, r12(v20, v21), iu1]
                         then: [
                             meta: "( rewrite ( Diff x ( Cos x ) ) ( Mul ( Const -1 ) ( Sin x ) ) )"
-                            atom: [Action::Insert, r11(v20, v25) on iu0],
                             atom: [Action::Insert, r15(v23) on iu0],
                             atom: [Action::Insert, r13(v23, v24) on iu0],
+                            atom: [Action::Insert, r11(v20, v25) on iu0],
                             atom: [Action::Insert, r6(v24, v25, v22)],
                         ],
                     ],
@@ -13368,9 +13368,9 @@ fn lir_math() {
                         atom: [PremiseAll, r11(v1, v2), iu1]
                         then: [
                             meta: "( rewrite ( Integral fuel ( Sin x ) x ) ( Mul ( Const -1 ) ( Cos x ) ) )"
-                            atom: [Action::Insert, r12(v1, v6) on iu0],
                             atom: [Action::Insert, r15(v4) on iu0],
                             atom: [Action::Insert, r13(v4, v5) on iu0],
+                            atom: [Action::Insert, r12(v1, v6) on iu0],
                             atom: [Action::Insert, r6(v5, v6, v3)],
                         ],
                         atom: [PremiseAny, r0(v222, v0), iu1]
@@ -13380,8 +13380,8 @@ fn lir_math() {
                                 atom: [PremiseOld, r0(v264, v0), iu1]
                                 then: [
                                     meta: "( rewrite ( Integral ( Fuel fuel ) ( Add f g ) x ) ( Add ( Integral fuel f x ) ( Integral fuel g x ) ) )"
-                                    atom: [Action::Insert, r3(v264, v266, v1, v271) on iu0],
                                     atom: [Action::Insert, r3(v264, v267, v1, v272) on iu0],
+                                    atom: [Action::Insert, r3(v264, v266, v1, v271) on iu0],
                                     atom: [Action::Insert, r4(v271, v272, v3)],
                                 ],
                             ],
@@ -13390,8 +13390,8 @@ fn lir_math() {
                                 atom: [PremiseOld, r0(v291, v0), iu1]
                                 then: [
                                     meta: "( rewrite ( Integral ( Fuel fuel ) ( Sub f g ) x ) ( Sub ( Integral fuel f x ) ( Integral fuel g x ) ) )"
-                                    atom: [Action::Insert, r3(v291, v293, v1, v298) on iu0],
                                     atom: [Action::Insert, r3(v291, v294, v1, v299) on iu0],
+                                    atom: [Action::Insert, r3(v291, v293, v1, v298) on iu0],
                                     atom: [Action::Insert, r5(v298, v299, v3)],
                                 ],
                             ],
@@ -13400,9 +13400,9 @@ fn lir_math() {
                                 atom: [PremiseOld, r0(v321, v0), iu1]
                                 then: [
                                     meta: "( rewrite ( Integral ( Fuel fuel ) ( Mul a b ) x ) ( Sub ( Mul a ( Integral fuel b x ) ) ( Integral fuel ( Mul ( Diff x a ) ( Integral fuel b x ) ) x ) ) )"
-                                    atom: [Action::Insert, r2(v1, v323, v330) on iu0],
                                     atom: [Action::Insert, r3(v321, v324, v1, v328) on iu0],
                                     atom: [Action::Insert, r6(v323, v328, v329) on iu0],
+                                    atom: [Action::Insert, r2(v1, v323, v330) on iu0],
                                     atom: [Action::Insert, r6(v330, v328, v331) on iu0],
                                     atom: [Action::Insert, r3(v321, v331, v1, v332) on iu0],
                                     atom: [Action::Insert, r5(v329, v332, v3)],
@@ -13436,8 +13436,8 @@ fn lir_math() {
                         atom: [PremiseOld, r2(v185, v34, v189), iu1]
                         then: [
                             meta: "( rewrite ( Diff x ( Add a b ) ) ( Add ( Diff x a ) ( Diff x b ) ) )"
-                            atom: [Action::Insert, r2(v185, v32, v190) on iu0],
                             atom: [Action::Insert, r2(v185, v33, v191) on iu0],
+                            atom: [Action::Insert, r2(v185, v32, v190) on iu0],
                             atom: [Action::Insert, r4(v190, v191, v189)],
                         ],
                         atom: [PremiseOld, r3(v274, v34, v278, v279), iu2]
@@ -13445,8 +13445,8 @@ fn lir_math() {
                             atom: [PremiseOld, r0(v273, v274), iu1]
                             then: [
                                 meta: "( rewrite ( Integral ( Fuel fuel ) ( Add f g ) x ) ( Add ( Integral fuel f x ) ( Integral fuel g x ) ) )"
-                                atom: [Action::Insert, r3(v273, v32, v278, v280) on iu0],
                                 atom: [Action::Insert, r3(v273, v33, v278, v281) on iu0],
+                                atom: [Action::Insert, r3(v273, v32, v278, v280) on iu0],
                                 atom: [Action::Insert, r4(v280, v281, v279)],
                             ],
                         ],
@@ -13465,8 +13465,8 @@ fn lir_math() {
                         atom: [PremiseAll, r6(v98, v34, v102), iu2]
                         then: [
                             meta: "( rewrite ( Mul a ( Add b c ) ) ( Add ( Mul a b ) ( Mul a c ) ) )"
-                            atom: [Action::Insert, r6(v98, v32, v103) on iu0],
                             atom: [Action::Insert, r6(v98, v33, v104) on iu0],
+                            atom: [Action::Insert, r6(v98, v32, v103) on iu0],
                             atom: [Action::Insert, r4(v103, v104, v102)],
                         ],
                         atom: [PremiseAll, r13(v63, v33), iu1]
@@ -13502,8 +13502,8 @@ fn lir_math() {
                             atom: [PremiseOld, r0(v300, v301), iu1]
                             then: [
                                 meta: "( rewrite ( Integral ( Fuel fuel ) ( Sub f g ) x ) ( Sub ( Integral fuel f x ) ( Integral fuel g x ) ) )"
-                                atom: [Action::Insert, r3(v300, v14, v305, v307) on iu0],
                                 atom: [Action::Insert, r3(v300, v15, v305, v308) on iu0],
+                                atom: [Action::Insert, r3(v300, v14, v305, v307) on iu0],
                                 atom: [Action::Insert, r5(v307, v308, v306)],
                             ],
                         ],
@@ -13515,9 +13515,9 @@ fn lir_math() {
                         atom: [PremiseOld, r2(v201, v37, v205), iu1]
                         then: [
                             meta: "( rewrite ( Diff x ( Mul a b ) ) ( Add ( Mul a ( Diff x b ) ) ( Mul b ( Diff x a ) ) ) )"
-                            atom: [Action::Insert, r2(v201, v35, v208) on iu0],
                             atom: [Action::Insert, r2(v201, v36, v206) on iu0],
                             atom: [Action::Insert, r6(v35, v206, v207) on iu0],
+                            atom: [Action::Insert, r2(v201, v35, v208) on iu0],
                             atom: [Action::Insert, r6(v36, v208, v209) on iu0],
                             atom: [Action::Insert, r4(v207, v209, v205)],
                         ],
@@ -13526,9 +13526,9 @@ fn lir_math() {
                             atom: [PremiseOld, r0(v333, v334), iu1]
                             then: [
                                 meta: "( rewrite ( Integral ( Fuel fuel ) ( Mul a b ) x ) ( Sub ( Mul a ( Integral fuel b x ) ) ( Integral fuel ( Mul ( Diff x a ) ( Integral fuel b x ) ) x ) ) )"
-                                atom: [Action::Insert, r2(v338, v35, v342) on iu0],
                                 atom: [Action::Insert, r3(v333, v36, v338, v340) on iu0],
                                 atom: [Action::Insert, r6(v35, v340, v341) on iu0],
+                                atom: [Action::Insert, r2(v338, v35, v342) on iu0],
                                 atom: [Action::Insert, r6(v342, v340, v343) on iu0],
                                 atom: [Action::Insert, r3(v333, v343, v338, v344) on iu0],
                                 atom: [Action::Insert, r5(v341, v344, v339)],
@@ -13537,8 +13537,8 @@ fn lir_math() {
                         atom: [PremiseOld, r4(v106, v107, v36), iu1]
                         then: [
                             meta: "( rewrite ( Mul a ( Add b c ) ) ( Add ( Mul a b ) ( Mul a c ) ) )"
-                            atom: [Action::Insert, r6(v35, v106, v110) on iu0],
                             atom: [Action::Insert, r6(v35, v107, v111) on iu0],
+                            atom: [Action::Insert, r6(v35, v106, v110) on iu0],
                             atom: [Action::Insert, r4(v110, v111, v37)],
                         ],
                         atom: [PremiseAll, r6(v51, v52, v36), iu1]
@@ -13647,9 +13647,9 @@ fn lir_math() {
                         atom: [PremiseOld, r3(v7, v9, v8, v10), iu3]
                         then: [
                             meta: "( rewrite ( Integral fuel ( Sin x ) x ) ( Mul ( Const -1 ) ( Cos x ) ) )"
-                            atom: [Action::Insert, r12(v8, v13) on iu0],
                             atom: [Action::Insert, r15(v11) on iu0],
                             atom: [Action::Insert, r13(v11, v12) on iu0],
+                            atom: [Action::Insert, r12(v8, v13) on iu0],
                             atom: [Action::Insert, r6(v12, v13, v10)],
                         ],
                     ],
@@ -13658,9 +13658,9 @@ fn lir_math() {
                         atom: [PremiseOld, r2(v26, v27, v28), iu0]
                         then: [
                             meta: "( rewrite ( Diff x ( Cos x ) ) ( Mul ( Const -1 ) ( Sin x ) ) )"
-                            atom: [Action::Insert, r11(v26, v31) on iu0],
                             atom: [Action::Insert, r15(v29) on iu0],
                             atom: [Action::Insert, r13(v29, v30) on iu0],
+                            atom: [Action::Insert, r11(v26, v31) on iu0],
                             atom: [Action::Insert, r6(v30, v31, v28)],
                         ],
                         atom: [PremiseOld, r3(v251, v27, v26, v254), iu3]
@@ -18005,16 +18005,16 @@ fn lir_math() {
                         for (v219, x_17, v221) in self.integral_.iter_all1_0_1_2_3(v217) {
                             for (f, g) in self.add_.iter_all1_2_0_1(v219) {
                                 #[doc = "( rewrite ( Integral ( Fuel fuel ) ( Add f g ) x ) ( Add ( Integral fuel f x ) ( Integral fuel g x ) ) )"]
-                                let (v262,) = self.integral_.entry3_0_1_2_3(
+                                let (v263,) = self.integral_.entry3_0_1_2_3(
                                     fuel_3,
-                                    f,
+                                    g,
                                     x_17,
                                     &mut self.delta,
                                     &mut self.uf,
                                 );
-                                let (v263,) = self.integral_.entry3_0_1_2_3(
+                                let (v262,) = self.integral_.entry3_0_1_2_3(
                                     fuel_3,
-                                    g,
+                                    f,
                                     x_17,
                                     &mut self.delta,
                                     &mut self.uf,
@@ -18023,16 +18023,16 @@ fn lir_math() {
                             }
                             for (f_4, g_4) in self.sub_.iter_all1_2_0_1(v219) {
                                 #[doc = "( rewrite ( Integral ( Fuel fuel ) ( Sub f g ) x ) ( Sub ( Integral fuel f x ) ( Integral fuel g x ) ) )"]
-                                let (v289,) = self.integral_.entry3_0_1_2_3(
+                                let (v290,) = self.integral_.entry3_0_1_2_3(
                                     fuel_3,
-                                    f_4,
+                                    g_4,
                                     x_17,
                                     &mut self.delta,
                                     &mut self.uf,
                                 );
-                                let (v290,) = self.integral_.entry3_0_1_2_3(
+                                let (v289,) = self.integral_.entry3_0_1_2_3(
                                     fuel_3,
-                                    g_4,
+                                    f_4,
                                     x_17,
                                     &mut self.delta,
                                     &mut self.uf,
@@ -18041,9 +18041,6 @@ fn lir_math() {
                             }
                             for (a_29, b_20) in self.mul_.iter_all1_2_0_1(v219) {
                                 #[doc = "( rewrite ( Integral ( Fuel fuel ) ( Mul a b ) x ) ( Sub ( Mul a ( Integral fuel b x ) ) ( Integral fuel ( Mul ( Diff x a ) ( Integral fuel b x ) ) x ) ) )"]
-                                let (v318,) =
-                                    self.diff_
-                                        .entry2_1_0_2(a_29, x_17, &mut self.delta, &mut self.uf);
                                 let (v316,) = self.integral_.entry3_0_1_2_3(
                                     fuel_3,
                                     b_20,
@@ -18054,6 +18051,9 @@ fn lir_math() {
                                 let (v317,) = self
                                     .mul_
                                     .entry2_1_0_2(v316, a_29, &mut self.delta, &mut self.uf);
+                                let (v318,) =
+                                    self.diff_
+                                        .entry2_1_0_2(a_29, x_17, &mut self.delta, &mut self.uf);
                                 let (v319,) = self
                                     .mul_
                                     .entry2_1_0_2(v316, v318, &mut self.delta, &mut self.uf);
@@ -18081,25 +18081,25 @@ fn lir_math() {
                     for (x_3, v21, v22) in self.diff_.iter_new() {
                         for (a_25, b_16) in self.add_.iter_all1_2_0_1(v21) {
                             #[doc = "( rewrite ( Diff x ( Add a b ) ) ( Add ( Diff x a ) ( Diff x b ) ) )"]
-                            let (v183,) = self
-                                .diff_
-                                .entry2_1_0_2(a_25, x_3, &mut self.delta, &mut self.uf);
                             let (v184,) = self
                                 .diff_
                                 .entry2_1_0_2(b_16, x_3, &mut self.delta, &mut self.uf);
+                            let (v183,) = self
+                                .diff_
+                                .entry2_1_0_2(a_25, x_3, &mut self.delta, &mut self.uf);
                             self.delta.insert_add((v183, v184, v22));
                         }
                         for (a_27, b_18) in self.mul_.iter_all1_2_0_1(v21) {
                             #[doc = "( rewrite ( Diff x ( Mul a b ) ) ( Add ( Mul a ( Diff x b ) ) ( Mul b ( Diff x a ) ) ) )"]
-                            let (v199,) = self
-                                .diff_
-                                .entry2_1_0_2(a_27, x_3, &mut self.delta, &mut self.uf);
                             let (v197,) = self
                                 .diff_
                                 .entry2_1_0_2(b_18, x_3, &mut self.delta, &mut self.uf);
                             let (v198,) = self
                                 .mul_
                                 .entry2_1_0_2(v197, a_27, &mut self.delta, &mut self.uf);
+                            let (v199,) = self
+                                .diff_
+                                .entry2_1_0_2(a_27, x_3, &mut self.delta, &mut self.uf);
                             let (v200,) = self
                                 .mul_
                                 .entry2_1_0_2(v199, b_18, &mut self.delta, &mut self.uf);
@@ -18111,34 +18111,34 @@ fn lir_math() {
                         }
                         for () in self.cos_.iter_all2_0_1(x_3, v21) {
                             #[doc = "( rewrite ( Diff x ( Cos x ) ) ( Mul ( Const -1 ) ( Sin x ) ) )"]
-                            let (v25,) = self.sin_.entry1_0_1(x_3, &mut self.delta, &mut self.uf);
                             let v23 = self.global_i64.get(0usize);
                             let (v24,) = self.const_.entry1_0_1(v23, &mut self.delta, &mut self.uf);
+                            let (v25,) = self.sin_.entry1_0_1(x_3, &mut self.delta, &mut self.uf);
                             self.delta.insert_mul((v24, v25, v22));
                         }
                     }
                     for (fuel, v2, x, v3) in self.integral_.iter_new() {
                         for () in self.sin_.iter_all2_0_1(x, v2) {
                             #[doc = "( rewrite ( Integral fuel ( Sin x ) x ) ( Mul ( Const -1 ) ( Cos x ) ) )"]
-                            let (v6,) = self.cos_.entry1_0_1(x, &mut self.delta, &mut self.uf);
                             let v4 = self.global_i64.get(0usize);
                             let (v5,) = self.const_.entry1_0_1(v4, &mut self.delta, &mut self.uf);
+                            let (v6,) = self.cos_.entry1_0_1(x, &mut self.delta, &mut self.uf);
                             self.delta.insert_mul((v5, v6, v3));
                         }
                         if self.fuel_.check1_1_0(fuel) {
                             for (f_2, g_2) in self.add_.iter_all1_2_0_1(v2) {
                                 for (fuel_11,) in self.fuel_.iter_old1_1_0(fuel, self.latest_timestamp) {
                                     #[doc = "( rewrite ( Integral ( Fuel fuel ) ( Add f g ) x ) ( Add ( Integral fuel f x ) ( Integral fuel g x ) ) )"]
-                                    let (v271,) = self.integral_.entry3_0_1_2_3(
+                                    let (v272,) = self.integral_.entry3_0_1_2_3(
                                         fuel_11,
-                                        f_2,
+                                        g_2,
                                         x,
                                         &mut self.delta,
                                         &mut self.uf,
                                     );
-                                    let (v272,) = self.integral_.entry3_0_1_2_3(
+                                    let (v271,) = self.integral_.entry3_0_1_2_3(
                                         fuel_11,
-                                        g_2,
+                                        f_2,
                                         x,
                                         &mut self.delta,
                                         &mut self.uf,
@@ -18149,16 +18149,16 @@ fn lir_math() {
                             for (f_5, g_5) in self.sub_.iter_all1_2_0_1(v2) {
                                 for (fuel_14,) in self.fuel_.iter_old1_1_0(fuel, self.latest_timestamp) {
                                     #[doc = "( rewrite ( Integral ( Fuel fuel ) ( Sub f g ) x ) ( Sub ( Integral fuel f x ) ( Integral fuel g x ) ) )"]
-                                    let (v298,) = self.integral_.entry3_0_1_2_3(
+                                    let (v299,) = self.integral_.entry3_0_1_2_3(
                                         fuel_14,
-                                        f_5,
+                                        g_5,
                                         x,
                                         &mut self.delta,
                                         &mut self.uf,
                                     );
-                                    let (v299,) = self.integral_.entry3_0_1_2_3(
+                                    let (v298,) = self.integral_.entry3_0_1_2_3(
                                         fuel_14,
-                                        g_5,
+                                        f_5,
                                         x,
                                         &mut self.delta,
                                         &mut self.uf,
@@ -18169,9 +18169,6 @@ fn lir_math() {
                             for (a_30, b_21) in self.mul_.iter_all1_2_0_1(v2) {
                                 for (fuel_17,) in self.fuel_.iter_old1_1_0(fuel, self.latest_timestamp) {
                                     #[doc = "( rewrite ( Integral ( Fuel fuel ) ( Mul a b ) x ) ( Sub ( Mul a ( Integral fuel b x ) ) ( Integral fuel ( Mul ( Diff x a ) ( Integral fuel b x ) ) x ) ) )"]
-                                    let (v330,) =
-                                        self.diff_
-                                            .entry2_1_0_2(a_30, x, &mut self.delta, &mut self.uf);
                                     let (v328,) = self.integral_.entry3_0_1_2_3(
                                         fuel_17,
                                         b_21,
@@ -18182,6 +18179,9 @@ fn lir_math() {
                                     let (v329,) =
                                         self.mul_
                                             .entry2_1_0_2(v328, a_30, &mut self.delta, &mut self.uf);
+                                    let (v330,) =
+                                        self.diff_
+                                            .entry2_1_0_2(a_30, x, &mut self.delta, &mut self.uf);
                                     let (v331,) =
                                         self.mul_
                                             .entry2_1_0_2(v328, v330, &mut self.delta, &mut self.uf);
@@ -18216,27 +18216,27 @@ fn lir_math() {
                         self.delta.insert_add((b_2, a_2, v34));
                         for (x_12, v189) in self.diff_.iter_old1_1_0_2(v34, self.latest_timestamp) {
                             #[doc = "( rewrite ( Diff x ( Add a b ) ) ( Add ( Diff x a ) ( Diff x b ) ) )"]
-                            let (v190,) = self
-                                .diff_
-                                .entry2_1_0_2(a_2, x_12, &mut self.delta, &mut self.uf);
                             let (v191,) = self
                                 .diff_
                                 .entry2_1_0_2(b_2, x_12, &mut self.delta, &mut self.uf);
+                            let (v190,) = self
+                                .diff_
+                                .entry2_1_0_2(a_2, x_12, &mut self.delta, &mut self.uf);
                             self.delta.insert_add((v190, v191, v189));
                         }
                         for (x_26, v274, v279) in self.integral_.iter_old1_1_2_0_3(v34, self.latest_timestamp) {
                             for (fuel_12,) in self.fuel_.iter_old1_1_0(v274, self.latest_timestamp) {
                                 #[doc = "( rewrite ( Integral ( Fuel fuel ) ( Add f g ) x ) ( Add ( Integral fuel f x ) ( Integral fuel g x ) ) )"]
-                                let (v280,) = self.integral_.entry3_0_1_2_3(
+                                let (v281,) = self.integral_.entry3_0_1_2_3(
                                     fuel_12,
-                                    a_2,
+                                    b_2,
                                     x_26,
                                     &mut self.delta,
                                     &mut self.uf,
                                 );
-                                let (v281,) = self.integral_.entry3_0_1_2_3(
+                                let (v280,) = self.integral_.entry3_0_1_2_3(
                                     fuel_12,
-                                    b_2,
+                                    a_2,
                                     x_26,
                                     &mut self.delta,
                                     &mut self.uf,
@@ -18260,12 +18260,12 @@ fn lir_math() {
                         }
                         for (a_17, v102) in self.mul_.iter_all1_1_0_2(v34) {
                             #[doc = "( rewrite ( Mul a ( Add b c ) ) ( Add ( Mul a b ) ( Mul a c ) ) )"]
-                            let (v103,) = self
-                                .mul_
-                                .entry2_1_0_2(a_2, a_17, &mut self.delta, &mut self.uf);
                             let (v104,) = self
                                 .mul_
                                 .entry2_1_0_2(b_2, a_17, &mut self.delta, &mut self.uf);
+                            let (v103,) = self
+                                .mul_
+                                .entry2_1_0_2(a_2, a_17, &mut self.delta, &mut self.uf);
                             self.delta.insert_add((v103, v104, v102));
                         }
                         for (v63,) in self.const_.iter_all1_1_0(b_2) {
@@ -18297,16 +18297,16 @@ fn lir_math() {
                         for (x_29, v301, v306) in self.integral_.iter_old1_1_2_0_3(v16, self.latest_timestamp) {
                             for (fuel_15,) in self.fuel_.iter_old1_1_0(v301, self.latest_timestamp) {
                                 #[doc = "( rewrite ( Integral ( Fuel fuel ) ( Sub f g ) x ) ( Sub ( Integral fuel f x ) ( Integral fuel g x ) ) )"]
-                                let (v307,) = self.integral_.entry3_0_1_2_3(
+                                let (v308,) = self.integral_.entry3_0_1_2_3(
                                     fuel_15,
-                                    a,
+                                    b,
                                     x_29,
                                     &mut self.delta,
                                     &mut self.uf,
                                 );
-                                let (v308,) = self.integral_.entry3_0_1_2_3(
+                                let (v307,) = self.integral_.entry3_0_1_2_3(
                                     fuel_15,
-                                    b,
+                                    a,
                                     x_29,
                                     &mut self.delta,
                                     &mut self.uf,
@@ -18320,15 +18320,15 @@ fn lir_math() {
                         self.delta.insert_mul((b_3, a_3, v37));
                         for (x_14, v205) in self.diff_.iter_old1_1_0_2(v37, self.latest_timestamp) {
                             #[doc = "( rewrite ( Diff x ( Mul a b ) ) ( Add ( Mul a ( Diff x b ) ) ( Mul b ( Diff x a ) ) ) )"]
-                            let (v208,) = self
-                                .diff_
-                                .entry2_1_0_2(a_3, x_14, &mut self.delta, &mut self.uf);
                             let (v206,) = self
                                 .diff_
                                 .entry2_1_0_2(b_3, x_14, &mut self.delta, &mut self.uf);
                             let (v207,) = self
                                 .mul_
                                 .entry2_1_0_2(v206, a_3, &mut self.delta, &mut self.uf);
+                            let (v208,) = self
+                                .diff_
+                                .entry2_1_0_2(a_3, x_14, &mut self.delta, &mut self.uf);
                             let (v209,) = self
                                 .mul_
                                 .entry2_1_0_2(v208, b_3, &mut self.delta, &mut self.uf);
@@ -18337,9 +18337,6 @@ fn lir_math() {
                         for (x_32, v334, v339) in self.integral_.iter_old1_1_2_0_3(v37, self.latest_timestamp) {
                             for (fuel_18,) in self.fuel_.iter_old1_1_0(v334, self.latest_timestamp) {
                                 #[doc = "( rewrite ( Integral ( Fuel fuel ) ( Mul a b ) x ) ( Sub ( Mul a ( Integral fuel b x ) ) ( Integral fuel ( Mul ( Diff x a ) ( Integral fuel b x ) ) x ) ) )"]
-                                let (v342,) = self
-                                    .diff_
-                                    .entry2_1_0_2(a_3, x_32, &mut self.delta, &mut self.uf);
                                 let (v340,) = self.integral_.entry3_0_1_2_3(
                                     fuel_18,
                                     b_3,
@@ -18350,6 +18347,9 @@ fn lir_math() {
                                 let (v341,) = self
                                     .mul_
                                     .entry2_1_0_2(v340, a_3, &mut self.delta, &mut self.uf);
+                                let (v342,) = self
+                                    .diff_
+                                    .entry2_1_0_2(a_3, x_32, &mut self.delta, &mut self.uf);
                                 let (v343,) = self
                                     .mul_
                                     .entry2_1_0_2(v340, v342, &mut self.delta, &mut self.uf);
@@ -18365,12 +18365,12 @@ fn lir_math() {
                         }
                         for (b_9, c_6) in self.add_.iter_old1_2_0_1(b_3, self.latest_timestamp) {
                             #[doc = "( rewrite ( Mul a ( Add b c ) ) ( Add ( Mul a b ) ( Mul a c ) ) )"]
-                            let (v110,) = self
-                                .mul_
-                                .entry2_1_0_2(b_9, a_3, &mut self.delta, &mut self.uf);
                             let (v111,) = self
                                 .mul_
                                 .entry2_1_0_2(c_6, a_3, &mut self.delta, &mut self.uf);
+                            let (v110,) = self
+                                .mul_
+                                .entry2_1_0_2(b_9, a_3, &mut self.delta, &mut self.uf);
                             self.delta.insert_add((v110, v111, v37));
                         }
                         for (b_6, c_3) in self.mul_.iter_all1_2_0_1(b_3) {
@@ -18471,18 +18471,18 @@ fn lir_math() {
                             .iter_old2_1_2_0_3(v9, x_2, self.latest_timestamp)
                         {
                             #[doc = "( rewrite ( Integral fuel ( Sin x ) x ) ( Mul ( Const -1 ) ( Cos x ) ) )"]
-                            let (v13,) = self.cos_.entry1_0_1(x_2, &mut self.delta, &mut self.uf);
                             let v11 = self.global_i64.get(0usize);
                             let (v12,) = self.const_.entry1_0_1(v11, &mut self.delta, &mut self.uf);
+                            let (v13,) = self.cos_.entry1_0_1(x_2, &mut self.delta, &mut self.uf);
                             self.delta.insert_mul((v12, v13, v10));
                         }
                     }
                     for (x_4, v27) in self.cos_.iter_new() {
                         for (v28,) in self.diff_.iter_old2_1_0_2(v27, x_4, self.latest_timestamp) {
                             #[doc = "( rewrite ( Diff x ( Cos x ) ) ( Mul ( Const -1 ) ( Sin x ) ) )"]
-                            let (v31,) = self.sin_.entry1_0_1(x_4, &mut self.delta, &mut self.uf);
                             let v29 = self.global_i64.get(0usize);
                             let (v30,) = self.const_.entry1_0_1(v29, &mut self.delta, &mut self.uf);
+                            let (v31,) = self.sin_.entry1_0_1(x_4, &mut self.delta, &mut self.uf);
                             self.delta.insert_mul((v30, v31, v28));
                         }
                         for (v251, v254) in self

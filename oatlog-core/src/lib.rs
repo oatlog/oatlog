@@ -197,6 +197,19 @@ impl EgglogCompatibility {
             Self::PostSaturation => true,
         }
     }
+
+    /// Timestamps prevent some rule deduplication, notably they prevent merging
+    ///
+    /// `MulOld(AddNew(a,b),AddAll(a,c))` and
+    /// `MulOld(AddOld(a,b),AddNew(a,c))` in the distributive law.
+    ///
+    /// Until we implement recursive graph isomorphism for this, we disable OLD in relaxed mode
+    /// which has the possiblity of doing this deduplication through permutation tracking.
+    fn use_timestamps(self) -> bool {
+        //!self.allow_column_invariant_permutations()
+        // NOTE: Permutations are currently disabled
+        true
+    }
 }
 
 #[allow(dead_code)]
@@ -249,7 +262,10 @@ fn universal(input: Input, config: Configuration) -> Result<Output, CompileError
         let mut parser = frontend::Parser::new();
         parser.ingest_all(sexps, config)?;
 
-        let hir = parser.emit_hir().optimize(config);
+        let hir = parser
+            .emit_hir()
+            .optimize(config)
+            .transform_into_seminaive(config);
 
         let (_, lir) = query_planning::emit_lir_theory(hir);
 

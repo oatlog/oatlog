@@ -14,6 +14,7 @@ use itertools::Itertools as _;
 use quote::ToTokens as _;
 
 use std::{
+    cmp::Ordering,
     collections::{BTreeMap, BTreeSet},
     fmt::{Debug, Display},
     hash::Hash,
@@ -189,6 +190,9 @@ impl InvariantPermutationSubgroup {
         }
     }
     fn add_invariant_permutations(&mut self, perm: Vec<usize>) {
+        // TODO loke: Current problems preventing actually using this:
+        // - Combining semi-naive rules that are identical after old->all relaxation (distributive law mostly)
+        // - Deduplicating actions after such a merge
         const DERIVE_AND_OPTIMIZE_USING_INVARIANT_PERMUTATIONS: bool = false;
         if DERIVE_AND_OPTIMIZE_USING_INVARIANT_PERMUTATIONS {
             self.inner.insert(perm);
@@ -219,6 +223,10 @@ impl InvariantPermutationSubgroup {
         let fallback = self.inner.is_empty().then(|| x.to_owned());
 
         main.chain(fallback)
+    }
+    // Among the possible atoms, pick the one that we consider canonical.
+    fn canonical_permutation(&self, x: &TVec<ColumnId, VariableId>) -> TVec<ColumnId, VariableId> {
+        self.apply(x).min().unwrap()
     }
 }
 
@@ -591,6 +599,82 @@ impl SymbolicRule {
         }
     }
 
+    fn duplicate_actions_with_invariant_permutations(
+        mut self,
+        relations: &TVec<RelationId, Relation>,
+    ) -> Self {
+        self.atoms = self
+            .atoms
+            .into_iter()
+            .flat_map(|atom| {
+                Iterator::chain(
+                    (atom.is_premise == Premise)
+                        .then(|| atom.clone())
+                        .into_iter(),
+                    (atom.is_premise == Action)
+                        .then(|| {
+                            // Additional atoms should be insertions, not entry
+                            let mut atoms = atom.equivalent_atoms(&relations);
+                            atoms.iter_mut().skip(1).for_each(|a| a.entry = None);
+                            atoms
+                        })
+                        .into_iter()
+                        .flatten(),
+                )
+            })
+            .collect();
+        self
+    }
+
+    /// Replace (ALL * ALL * ALL) with (NEW * ALL * ALL) + (OLD * NEW * ALL) + (OLD * OLD * NEW)
+    fn as_semi_naive(
+        self,
+        relations: &TVec<RelationId, Relation>,
+        config: Configuration,
+    ) -> impl Iterator<Item = Self> {
+        let newable =
+            |atom: &Atom| atom.is_premise == Premise && relations[atom.relation].has_new();
+
+        let ret: Vec<_> = self
+            .atoms
+            .iter()
+            .enumerate()
+            .filter(|(_, atom)| newable(*atom))
+            .map(|(i, _)| {
+                let mut rule_new = self.clone();
+                rule_new.atoms = rule_new
+                    .atoms
+                    .into_iter()
+                    .enumerate()
+                    .map(|(j, mut atom)| {
+                        atom.incl = match (newable(&atom), j.cmp(&i)) {
+                            (true, Ordering::Equal) => Inclusion::New,
+                            (true, Ordering::Less) => {
+                                if config.egglog_compat.use_timestamps() {
+                                    Inclusion::Old
+                                } else {
+                                    Inclusion::All
+                                }
+                            }
+                            (true, Ordering::Greater) | (false, _) => Inclusion::All,
+                        };
+                        atom
+                    })
+                    .collect();
+                rule_new
+            })
+            .collect();
+
+        assert!(
+            !ret.is_empty(),
+            concat!(
+                "forall not yet supported, breaks because it is implicitly represented ",
+                "by unbound premise variables which cannot be semi-naive-ified."
+            )
+        );
+        ret.into_iter()
+    }
+
     fn optimize(mut self, relations: &TVec<RelationId, Relation>) -> Self {
         // Optimize symbolic rule by merging variables.
         //
@@ -654,7 +738,7 @@ impl SymbolicRule {
         // globals that don't filter).
 
         let mut working_atoms: BTreeMap<
-            RelationId,
+            (RelationId, Inclusion),
             BTreeMap<TVec<ColumnId, VariableId>, (IsPremise, Option<ImplicitRuleId>)>,
         > = {
             let mut ret: BTreeMap<_, BTreeMap<_, _>> = BTreeMap::new();
@@ -666,12 +750,7 @@ impl SymbolicRule {
                 incl,
             } in self.atoms
             {
-                assert_eq!(
-                    incl,
-                    Inclusion::All,
-                    "before tir, all `incl` should be `All`."
-                );
-                ret.entry(relation)
+                ret.entry((relation, incl))
                     .or_default()
                     .entry(columns.clone())
                     .and_modify(|_| panic!())
@@ -683,7 +762,7 @@ impl SymbolicRule {
         // Find variable substitutions implied by implicit rules
         loop {
             let mut progress = false;
-            for (relation, inner) in working_atoms.iter() {
+            for ((relation, _incl), inner) in working_atoms.iter() {
                 for (cols1, meta1) in inner.iter() {
                     for (cols2, meta2) in inner.iter() {
                         for (a, b) in relations[relation].implied_variable_equalities(cols1, cols2)
@@ -719,10 +798,13 @@ impl SymbolicRule {
             }
             working_atoms = working_atoms
                 .into_iter()
-                .map(|(relation, inner)| {
+                .map(|((relation, incl), inner)| {
+
                     let mut ret = BTreeMap::new();
                     for (cols, meta) in inner {
                         let cols = cols.map(|&v| find_at(v, meta.0, &to_merge, &self.unify));
+                        let cols = relations[relation].invariant_permutations.canonical_permutation(&cols);
+
                         ret.entry(cols.clone())
                             .and_modify(|other_meta: &mut (IsPremise, Option<ImplicitRuleId>)| {
                                 *other_meta = match (*other_meta, meta) {
@@ -750,7 +832,7 @@ impl SymbolicRule {
                             }
                         }
                     }
-                    (relation, ret)
+                    ((relation, incl), ret)
                 })
                 .collect();
         }
@@ -777,7 +859,7 @@ impl SymbolicRule {
             meta: self.meta.clone(),
             atoms: working_atoms
                 .into_iter()
-                .flat_map(|(relation, inner)| {
+                .flat_map(|((relation, incl), inner)| {
                     let old_to_new = &old_to_new;
                     inner
                         .into_iter()
@@ -787,7 +869,7 @@ impl SymbolicRule {
                                 relation,
                                 columns,
                                 entry,
-                                incl: Inclusion::All, // NOTE: correct due to previous assert
+                                incl,
                             }
                             .map_columns(|v| old_to_new[&v])
                         })
@@ -956,9 +1038,23 @@ impl Theory {
 
             self.symbolic_rules = mem::take(&mut self.symbolic_rules)
                 .into_iter()
-                .map(|rule| rule.optimize(&self.relations))
+                .map(|rule| {
+                    rule.optimize(&self.relations)
+                        .duplicate_actions_with_invariant_permutations(&self.relations)
+                })
                 .collect();
         }
+        self.remove_unused_relations_and_types()
+    }
+    pub(crate) fn transform_into_seminaive(mut self, config: Configuration) -> Self {
+        self.symbolic_rules = mem::take(&mut self.symbolic_rules)
+            .into_iter()
+            .flat_map(|rule| rule.as_semi_naive(&self.relations, config))
+            .map(|rule| {
+                rule.optimize(&self.relations)
+                    .duplicate_actions_with_invariant_permutations(&self.relations)
+            })
+            .collect();
         self.remove_unused_relations_and_types()
     }
     pub(crate) fn remove_unused_relations_and_types(mut self) -> Self {
