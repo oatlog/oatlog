@@ -21,7 +21,7 @@ impl<T> std::fmt::Debug for UnionFind<T> {
         writeln!(f)?;
         for i in 0..self.repr.len() {
             let repr = self.repr[i];
-            if repr == 0 {
+            if repr == i as u32 {
                 writeln!(f, "{i}")?;
             } else {
                 writeln!(f, "{i}: {repr}")?;
@@ -92,6 +92,9 @@ impl<T: Eclass> UnionFind<T> {
         // 1. Unroll this loop
         // 2. Unroll this loop with path compression
         // 3. Perform recursive path compression (well how could it given (2))
+
+        // TODO erik for loke: if this assert is needed for performance or something please
+        // document that.
         assert!((i as usize) < self.repr.len());
         loop {
             let i_old = i;

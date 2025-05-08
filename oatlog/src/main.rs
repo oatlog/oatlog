@@ -241,8 +241,9 @@ fn get_verdict(program: String, file: &mut File, wd: &Path) -> Verdict {
     }
     let test_ok = Command::new("cargo")
         .arg("run")
+        .arg("--quiet")
         .current_dir(wd)
-        .stderr(Stdio::null())
+        .stderr(Stdio::inherit())
         .stdout(Stdio::null())
         .status()
         .unwrap()
@@ -295,7 +296,14 @@ static EGGLOG_COUNT_REGEX: std::sync::LazyLock<regex::Regex> =
 
 fn main() {{
     let mut egglog = egglog::EGraph::default();
-    for msg in egglog.parse_and_run_program(None, INPUT).unwrap() {{
+    let msgs = match egglog.parse_and_run_program(None, INPUT) {{
+        Ok(msgs) => msgs,
+        Err(err) => {{
+            eprintln!(\"egglog failed to parse: {{err}}\");
+            return;
+        }},
+    }};
+    for msg in msgs {{
         println!(\"egglog msg: {{msg}}\");
     }}
     let mut theory = Theory::new();
@@ -333,8 +341,9 @@ fn check_ok(egglog: &mut egglog::EGraph, theory: &Theory) {{
 
     let oatlog_counts = theory.get_relation_entry_count();
 
-    for (&relation, &size) in oatlog_counts.iter() {{
-        assert_eq!(egglog_counts[relation], size);
+    dbg!(&theory);
+    for (&relation, &oatlog_count) in oatlog_counts.iter() {{
+        assert_eq!(egglog_counts[relation], oatlog_count, \"mismatch in {{relation}}\");
     }}
 }}
 "

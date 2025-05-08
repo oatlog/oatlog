@@ -165,6 +165,7 @@ pub(crate) fn schedule_rules(
     (variables, trie)
 }
 
+/*
 fn scc_group_size<'a>(
     actions: impl Iterator<Item = &'a hir::Atom>,
     relations: &TVec<RelationId, hir::Relation>,
@@ -253,6 +254,7 @@ fn scc_group_size<'a>(
         })
         .collect()
 }
+*/
 
 fn action_topo_resolve<'a>(
     actions: &[Atom],

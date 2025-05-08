@@ -1,3 +1,4 @@
+// TODO: module-level comment
 use std::hash::Hash;
 
 /// Some type that can be put in a relation.
@@ -10,13 +11,18 @@ pub trait RelationElement: Copy + Eq + Ord + Default + Hash + std::fmt::Debug {
     const MAX_ID: Self;
 }
 
-/// Must be produced from a [`UnionFind`]
 /// Trait to support wrapper types in [`UnionFind`]
 /// Essentially an object that "the engine" controls.
+///
+/// * Must only be produced from a [`UnionFind`]
 pub trait Eclass: RelationElement {
     fn new(value: u32) -> Self;
     fn inner(self) -> u32;
 }
+
+/// SAFETY:
+/// * repr(transparent) around a u32.
+pub unsafe trait ReprU32 {}
 
 // f64 not strictly required
 impl RelationElement for i64 {
@@ -47,7 +53,9 @@ macro_rules! relation_element_wrapper_ty {
         $(
             $(#[$($tt)*])*
             #[derive(Copy, Clone, Eq, PartialEq, Ord, PartialOrd, Default, Hash, Debug)]
+            #[repr(transparent)]
             pub struct $name(pub u32);
+            unsafe impl ReprU32 for $name {}
 
             impl RelationElement for $name {
                 const MIN_ID: Self = Self(0);

@@ -4,11 +4,11 @@ use crate::{
     codegen::{MultiUnzipVec as _, ident},
     ids::{ColumnId, IndexId, IndexUsageId, TypeId},
     lir::{IndexInfo, IndexUsageInfo, MergeTy, RelationData, RelationKind, Theory, TypeKind},
-    typed_vec::TVec,
+    typed_vec::{TVec, tvec},
 };
 use itertools::Itertools as _;
 use proc_macro2::TokenStream;
-use quote::quote;
+use quote::{format_ident, quote};
 use std::iter;
 
 pub fn codegen_table_relation(
@@ -57,19 +57,18 @@ pub fn codegen_table_relation(
             &primary_index.permuted_columns.inner()[..primary_index_usage.prefix],
         );
 
-        let primary_index_iter_flatten = if primary_index.has_any_fd(primary_index_usage) {
-            quote! {}
+        let primary_index_iter_impl = if primary_index.has_any_fd(primary_index_usage) {
+            quote! { self.#primary_index_ident.iter().map(|(k, v)| ((*k), (*v))) }
         } else {
-            quote! { .flat_map(|(k,v)| v.iter().map(move |v| (k,v))) }
+            quote! {
+                self.#primary_index_ident.iter_key_value()
+            }
         };
 
         quote! {
             fn emit_graphviz(&self, buf: &mut String) {
                 use std::fmt::Write;
-                for (i, ((#(#primary_index_keys,)*), (#(#primary_index_vals,)* _timestamp,))) in self.#primary_index_ident
-                    .iter()
-                    #primary_index_iter_flatten
-                    .enumerate()
+                for (i, ((#(#primary_index_keys,)*), (#(#primary_index_vals,)* _timestamp,))) in #primary_index_iter_impl.enumerate()
                 {
                     #(writeln!(buf, "{}_{i} -> {}_{};", #relation_name, #column_types, #primary_index_order).unwrap();)*
                     writeln!(buf, "{}_{i} [shape = box];", #relation_name).unwrap();
@@ -79,26 +78,15 @@ pub fn codegen_table_relation(
     };
 
     let relation_len = {
-        let (nfd, field) = usage_to_info
+        let field = usage_to_info
             .iter()
             .map(|index_usage| {
                 let index = &index_to_info[index_usage.index];
-                (
-                    !index.has_any_fd(index_usage),
-                    ident::index_usage_field(&index.permuted_columns.inner()[..index_usage.prefix]),
-                )
+                ident::index_usage_field(&index.permuted_columns.inner()[..index_usage.prefix])
             })
             .min()
             .unwrap();
-        if nfd {
-            quote! {
-                self.#field.values().map(|v| v.len()).sum()
-            }
-        } else {
-            quote! {
-                self.#field.len()
-            }
-        }
+        quote! { self.#field.len() }
     };
 
     let index_fields: TokenStream = usage_to_info
@@ -122,7 +110,7 @@ pub fn codegen_table_relation(
             let index_usage_field_ty = if index_to_info[index].has_any_fd(index_info) {
                 quote! { runtime::HashMap<(#(#key_cols_ty,)*), (#(#value_cols_ty,)* TimeStamp,)> }
             } else {
-                quote! { runtime::HashMap<(#(#key_cols_ty,)*), runtime::SmallVec<[(#(#value_cols_ty,)* TimeStamp,); 1]>> }
+                quote! { runtime::IndexedSortedList<(#(#key_cols_ty,)*), (#(#value_cols_ty,)* TimeStamp,)> }
             };
             quote! {
                 #index_usage_field_name: #index_usage_field_ty,
@@ -140,6 +128,8 @@ pub fn codegen_table_relation(
         #[derive(Debug, Default)]
         struct #rel_ty {
             new: Vec<<Self as Relation>::Row>,
+            // all is just scratch space to construct indexes
+            all: Vec<(#(#params,)* TimeStamp,)>,
             #index_fields
             #(#uf_num_uprooted_at_latest_retain: usize,)*
         }
@@ -221,6 +211,8 @@ fn update(
         })
         .collect_vec();
 
+    // primary FD
+    // HashMap<Key, Value>
     let (
         indexes_fd,
         indexes_fd_cols,
@@ -354,6 +346,9 @@ fn update(
         })
         .collect_vecs();
 
+    // non-fd indexes
+    // HashMap<Key, Vec<Value>>
+    // TODO: kill dead code
     let (
         indexes_nofd,
         indexes_nofd_cols,
@@ -362,8 +357,7 @@ fn update(
         indexes_nofd_vals_alt,
         indexes_nofd_key_is_root,
         indexes_nofd_value_is_root,
-        // indexes_nofd_find_keys,
-        // indexes_nofd_find_vals,
+        indexes_nofd_reconstruct,
     ) = usage_to_info
         .iter()
         .unique()
@@ -377,26 +371,28 @@ fn update(
             if index_to_info[index].has_any_fd(index_usage) {
                 None
             } else {
-                let field = ident::index_usage_field(&permuted_columns.inner()[..prefix]);
-                let keys = permuted_columns
+                let indexes_nofd_cols = cols.clone();
+                let indexes_nofd =
+                    ident::index_usage_field(&permuted_columns.inner()[..prefix]);
+                let indexes_nofd_keys = permuted_columns
                     .iter()
                     .take(prefix)
                     .copied()
                     .map(ident::column)
                     .collect_vec();
-                let vals = permuted_columns
+                let indexes_nofd_vals = permuted_columns
                     .iter()
                     .skip(prefix)
                     .copied()
                     .map(ident::column)
                     .collect_vec();
-                let vals_alt = permuted_columns
+                let indexes_nofd_vals_alt = permuted_columns
                     .iter()
                     .skip(prefix)
                     .copied()
                     .map(ident::column_alt)
                     .collect_vec();
-                let key_is_root = {
+                let indexes_nofd_key_is_root = {
                     let key_is_root: TokenStream = permuted_columns
                         .iter()
                         .take(prefix)
@@ -421,7 +417,7 @@ fn update(
                         key_is_root
                     }
                 };
-                let value_is_root = {
+                let indexes_nofd_value_is_root = {
                     let value_is_root: TokenStream = permuted_columns
                         .iter()
                         .skip(prefix)
@@ -446,50 +442,70 @@ fn update(
                         value_is_root
                     }
                 };
-                // let (find_keys, find_values) = {
-                //     let find_all = permuted_columns
-                //         .iter()
-                //         .map(|&c| {
-                //             let ty = rel.columns[c];
-                //             let type_ = &theory.types[ty];
-                //             let col = ident::column(c);
-                //             if matches!(type_.kind, TypeKind::Symbolic) {
-                //                 let uf = ident::type_uf(type_);
-                //                 quote! {
-                //                     uf.#uf.find(#col)
-                //                 }
-                //             } else {
-                //                 quote! {
-                //                     #col
-                //                 }
-                //             }
-                //         })
-                //         .collect_vec();
-                //     let find_keys = &find_all[..prefix];
-                //     let find_values = &find_all[prefix..];
-                //     (
-                //         quote! {
-                //             (#(#find_keys,)*)
-                //         },
-                //         quote! {
-                //             (#(#find_values,)*)
-                //         },
-                //     )
-                // };
+
+
+                let fallback_sort = quote! {
+                    self.all.sort_unstable_by_key(
+                        |&(#(#indexes_nofd_cols,)* timestamp,)|
+                            (#(#indexes_nofd_keys,)*)
+                    );
+                };
+
+                let sort_impl = {
+                    let n = cols.len();
+                    let all_symbolic = rel.columns.iter().map(|ty| &theory.types[ty]).all(|ty| matches!(ty.kind, TypeKind::Symbolic));
+
+                    if all_symbolic && n <= 3 {
+                        let mut is_key_col = tvec![false; n];
+                        for c in permuted_columns.iter().take(prefix) {
+                            is_key_col[*c] = true;
+                        }
+
+                        let bit_pattern: String = is_key_col.iter().copied().map(|x| if x { '1' } else { '0' }).collect();
+
+                        let row_ident = format_ident!("RowSort{bit_pattern}");
+
+                        quote!{
+                            #row_ident :: sort ( &mut self.all );
+                        }
+                    } else {
+                        fallback_sort
+                    }
+                };
+
+
+                let indexes_nofd_reconstruct = quote! {
+                    log_duration!("reconstruct index: {}", {
+                        log_duration!("reconstruct sort: {}", {
+                            #sort_impl
+                        });
+
+                        unsafe {
+                            self.#indexes_nofd.reconstruct(
+                                &mut self.all,
+                                |(#(#indexes_nofd_cols,)* timestamp,)| (#(#indexes_nofd_keys,)*),
+                                |(#(#indexes_nofd_cols,)* timestamp,)| (#(#indexes_nofd_vals,)* timestamp,),
+                            );
+                        }
+                    });
+
+                };
+
                 Some((
-                    field,
-                    cols.clone(),
-                    keys,
-                    vals,
-                    vals_alt,
-                    key_is_root,
-                    value_is_root,
-                    // find_keys,
-                    // find_values,
+                    indexes_nofd,
+                    indexes_nofd_cols,
+                    indexes_nofd_keys,
+                    indexes_nofd_vals,
+                    indexes_nofd_vals_alt,
+                    indexes_nofd_key_is_root,
+                    indexes_nofd_value_is_root,
+                    indexes_nofd_reconstruct,
                 ))
             }
         })
         .collect_vecs();
+
+    // non-primary FD
     let (
         indexes_othfd,
         indexes_othfd_cols,
@@ -685,7 +701,7 @@ fn update(
         // * all elements in new are canonical.
         // * new contains no duplicates
         // * (maybe?) new is sorted
-        let fill_new_impl = {
+        let fill_all_and_new_impl = {
             if let (Some(index), Some(keys), Some(vals)) = (
                 indexes_fd.first(),
                 indexes_fd_keys.first(),
@@ -697,60 +713,98 @@ fn update(
                     self.new.extend(
                         self.#index.iter()
                         .filter_map(|(&(#(#keys,)*), &(#(#vals,)* timestamp,))| {
-                            // assert_eq!(timestamp == latest_timestamp, !self.#allset.contains_key(&(#(#allset_cols,)*)));
                             if timestamp == latest_timestamp {
                                 Some((#(#cols,)*))
                             } else {
                                 None
                             }
                         })
-                        // .map(|(&(#(#keys,)*), &(#(#vals,)* _timestamp,))| (#(#cols,)*))
-                        // .filter(|&(#(#cols,)*)| !self.#allset.contains_key(&(#(#allset_cols,)*)))
                     );
 
-                    #sort_new
                     // NOTE: since we get all elements of new from an index, we already know that it is
                     // deduplicated.
+                    // we get a regression if it is not sorted.
+                    #sort_new
+
+                    // NOTE: we could just reuse the allocation for insertions to maintain all.
+                    // This is canonical because entire index is canonicalized in update() +
+                    // update_begin().
+                    self.all.clear();
+                    self.all.extend(
+                        self.#index.iter()
+                            .map(|(&(#(#keys,)*), &(#(#vals,)* timestamp,))| (#(#cols,)* timestamp,))
+                    );
                 }
             } else {
-                let not_in_old = {
-                    let usage_info = usage_to_info
-                        .iter()
-                        .find(|usage_info| usage_info.prefix == rel.columns.len())
-                        .expect("some IndexUsage that queryies all columns");
-                    let index_info = &index_to_info[usage_info.index];
-                    assert_eq!(index_info.permuted_columns.len(), usage_info.prefix);
-                    let allset = ident::index_usage_field(index_info.permuted_columns.inner());
-                    let allset_cols = index_info
-                        .permuted_columns
-                        .iter()
-                        .copied()
-                        .map(ident::column)
-                        .collect_vec();
-                    quote! { !self.#allset.contains_key(&(#(#allset_cols,)*)) }
-                };
+                let usage_info = usage_to_info
+                    .iter()
+                    .find(|usage_info| usage_info.prefix == rel.columns.len())
+                    .expect("some IndexUsage that queryies all columns");
+                let index_info = &index_to_info[usage_info.index];
+                assert_eq!(index_info.permuted_columns.len(), usage_info.prefix);
+                let allset = ident::index_usage_field(index_info.permuted_columns.inner());
+                let allset_cols = index_info
+                    .permuted_columns
+                    .iter()
+                    .copied()
+                    .map(ident::column)
+                    .collect_vec();
+                let not_in_old = quote! { !self.#allset.contains_key(&(#(#allset_cols,)*)) };
 
                 quote! {
+                    assert_eq!(self.new.len(), 0);
                     // find is needed if we don't have FD then we have to iterate insertions which is was never
                     // canonicalized.
 
                     // WARNING: this codepath is kinda untested and performance of it does not matter that
                     // much
                     self.new.extend(
-                        insertions.iter().map(|&(#(#cols,)*)| (#(#cols_find,)*))
-                        .filter(|&(#(#cols,)*)| #not_in_old)
+                        insertions
+                            .iter()
+                            .map(|&(#(#cols,)*)| (#(#cols_find,)*))
+                            .filter(|&(#(#cols,)*)| #not_in_old)
                     );
+
+
+                    #[cfg(debug_assertions)]
+                    {
+                        let mut old: Vec<_> = self.#allset.iter_key_value().map(|((#(#allset_cols,)*), _)| {
+                            (#(#cols,)*)
+                        }).collect();
+                        let n = old.len();
+                        old.sort();
+                        old.dedup();
+
+                        assert_eq!(n, old.len(), "old contains only unique elements");
+                    }
 
                     #sort_new
                     self.new.dedup();
+
+
+
+                    self.all.clear();
+                    self.all.extend(
+                        self.#allset.iter_key_value().map(|((#(#allset_cols,)*),(timestamp,))| {
+                            // We have to use find here because old index is not canonicalized.
+                            (#(#cols_find,)* timestamp,)
+                        })
+                    );
+                    self.all.sort();
+                    // The find above may introduce duplicates.
+                    self.all.dedup_by_key(|&mut (#(#cols, )* _timestamp,)| (#(#cols, )*));
+                    self.all.extend(
+                        self.new.iter().copied().map(|(#(#cols,)*)| (#(#cols,)* latest_timestamp,))
+                    );
+
                 }
             }
         };
         quote! {
             assert!(self.new.is_empty());
 
-            log_duration!("fill new: {}", {
-                #fill_new_impl
+            log_duration!("fill new and all: {}", {
+                #fill_all_and_new_impl
                 insertions.clear();
             });
 
@@ -764,6 +818,22 @@ fn update(
                 new.sort();
                 new.dedup();
                 assert_eq!(new.len(), self.new.len(), "new only has unique elements");
+
+
+                self.all.iter().for_each(|&(#(#cols,)* _timestamp)| {
+                    assert_eq!((#(#cols,)*), (#(#cols_find,)*), "all is canonical");
+                });
+
+                let mut all_: Vec<_> = self.all.clone();
+                all_.sort();
+                all_.dedup();
+                assert_eq!(all_.len(), self.all.len(), "all only has unique elements");
+
+                let mut all_: Vec<_> = self.all.iter().map(|&(#(#cols,)* _timestamp)| (#(#cols,)*)).collect();
+
+                all_.sort();
+                all_.dedup();
+                assert_eq!(all_.len(), self.all.len(), "all does not have duplicate timestamps");
             }
 
             // At this point we know that there is no overlap between old and new because of
@@ -771,52 +841,10 @@ fn update(
             //
             // We also know that new only contains root e-classes.
 
-            #(  // Indexes like `HashMap<(T, T, T), SmallVec<[(); 1]>>` and `HashMap<(T, T), SmallVec<[(T,); 1]>>`
-                log_duration!("retain index: {}", {
-                    self.#indexes_nofd.retain(|&(#(#indexes_nofd_keys,)*), v| {
-                        if #indexes_nofd_key_is_root {
-                            v.retain(|&mut (#(#indexes_nofd_vals,)* _timestamp)| #indexes_nofd_value_is_root);
-                            true
-                        } else {
-                            false
-                        }
-                    });
-                });
-                log_duration!("fill index: {}", {
-                    // self.new.sort_by_key(|&(#(#indexes_nofd_cols,)*)| {
-                    //     (#(#indexes_nofd_keys,)*)
-                    // });
-                    for &(#(#indexes_nofd_cols,)*) in &self.new {
-                        self.#indexes_nofd
-                            .entry((#(#indexes_nofd_keys,)*))
-                            .or_default()
-                            .push((#(#indexes_nofd_vals,)* latest_timestamp,));
-                    }
-                });
-
-                #[cfg(debug_assertions)]
-                {
-                    self.#indexes_nofd.iter().for_each(|(&(#(#indexes_nofd_keys,)*), v)| {
-                        let mut v = v.clone();
-                        let n = v.len();
-                        v.sort();
-                        v.dedup_by(|
-                            (#(#indexes_nofd_vals,)* t1,),
-                            (#(#indexes_nofd_vals_alt,)* t2,),
-                        |{
-                            true #(& (*#indexes_nofd_vals == *#indexes_nofd_vals_alt))*
-                        });
-                        assert_eq!(n, v.len(), "indexes do not have duplicates");
-
-                        assert!(#indexes_nofd_key_is_root, "key is root");
-
-                        v.iter().copied().for_each(|(#(#indexes_nofd_vals,)* _timestamp)| {
-                            assert!(#indexes_nofd_value_is_root, "value is root");
-                        });
-                    });
-                }
-            )*
+            #(#indexes_nofd_reconstruct)*
             #(  // Non-union functional dependency indexes, where merge is a panic or a primitive function.
+
+                // NOTE: this codepath is probably untested
 
                 for &(#(mut #indexes_othfd_cols,)*) in &self.new {
                     match self.#indexes_othfd.entry((#(#indexes_othfd_keys,)*)) {
@@ -903,31 +931,6 @@ fn per_usage(
     let iter_all_ident = ident::index_all_iter(usage_info, index_info);
     let iter_old_ident = ident::index_old_iter(usage_info, index_info);
     let (iter_all, iter_old) = {
-        /*
-        let col_placement = index_info.permuted_columns.invert_permutation();
-        let (range_from, range_to) = col_placement
-            .iter_enumerate()
-            .map(|(col, placement)| {
-                if placement.0 < usage_info.prefix {
-                    let col = ident::column(col);
-                    (quote! { #col }, quote! { #col })
-                } else {
-                    let ty = ident::type_ty(&theory.types[rel.columns[col]]);
-                    (quote! { #ty::MIN_ID }, quote! { #ty::MAX_ID })
-                }
-            })
-            .collect_vecs();
-
-        let col_symbs = rel.columns.enumerate().map(ident::column).collect_vec();
-
-        quote! {
-            fn #iter_all_ident(#(#args,)*) -> impl Iterator<Item = (#(#out_ty,)*)> + use<'_> {
-                self.#index_field
-                    .range((#(#range_from,)*)..=(#(#range_to,)*))
-                    .map(|(#(#col_symbs,)*)| (#(#out_columns,)*))
-            }
-        }
-        */
         let index_usage_field =
             ident::index_usage_field(&index_info.permuted_columns.inner()[..usage_info.prefix]);
 
@@ -950,13 +953,15 @@ fn per_usage(
             (
                 quote! {
                     fn #iter_all_ident(#(#args,)*) -> impl Iterator<Item = (#(#out_ty,)*)> + use<'_> {
-                        self.#index_usage_field.get(&(#(#call_args,)*)).into_iter().flatten().copied()
+                        // self.#index_usage_field.get(&(#(#call_args,)*)).into_iter().flatten().copied()
+                        self.#index_usage_field.iter((#(#call_args,)*))
                             .map(|(#(#out_columns,)* _timestamp)| (#(#out_columns,)*))
                     }
                 },
                 quote! {
                     fn #iter_old_ident(#(#args,)* latest_timestamp: TimeStamp,) -> impl Iterator<Item = (#(#out_ty,)*)> + use<'_> {
-                        self.#index_usage_field.get(&(#(#call_args,)*)).into_iter().flatten().copied()
+                        // self.#index_usage_field.get(&(#(#call_args,)*)).into_iter().flatten().copied()
+                        self.#index_usage_field.iter((#(#call_args,)*))
                             .filter_map(move |(#(#out_columns,)* timestamp,)| (timestamp < latest_timestamp).then_some((#(#out_columns,)*)))
                     }
                 },

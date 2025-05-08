@@ -1,10 +1,11 @@
+/*
 benchmarks! {
-    bench!(math11, samples=20, r#"(include "oatlog-bench/input/math.egg") (run 11)"#);
     bench!(fuel3_math, :saturation, samples=30, r#"(include "oatlog-bench/input/fuel3_math.egg") (run 100)"#);
     bench!(boolean_adder11, samples=20, r#"(include "oatlog-bench/input/boolean_adder.egg") (run 11)"#);
+    bench!(math11, samples=20, r#"(include "oatlog-bench/input/math.egg") (run 11)"#);
 }
+*/
 
-/*
 benchmarks! {
     bench!(fuel1_math, :saturation, r#"(include "oatlog-bench/input/fuel1_math.egg") (run 100)"#);
     bench!(fuel2_math, :saturation, r#"(include "oatlog-bench/input/fuel2_math.egg") (run 100)"#);
@@ -34,4 +35,3 @@ benchmarks! {
     bench!(boolean_adder10, r#"(include "oatlog-bench/input/boolean_adder.egg") (run 10)"#);
     bench!(boolean_adder11, samples=20, r#"(include "oatlog-bench/input/boolean_adder.egg") (run 11)"#);
 }
-*/

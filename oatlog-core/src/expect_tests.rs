@@ -837,6 +837,7 @@ fn regression_tir2() {
             #[derive(Debug, Default)]
             struct MulRelation {
                 new: Vec<<Self as Relation>::Row>,
+                all: Vec<(Math, Math, Math, TimeStamp)>,
                 hash_index_0_1: runtime::HashMap<(Math, Math), (Math, TimeStamp)>,
                 math_num_uprooted_at_latest_retain: usize,
             }
@@ -861,7 +862,12 @@ fn regression_tir2() {
                 }
                 fn emit_graphviz(&self, buf: &mut String) {
                     use std::fmt::Write;
-                    for (i, ((x0, x1), (x2, _timestamp))) in self.hash_index_0_1.iter().enumerate() {
+                    for (i, ((x0, x1), (x2, _timestamp))) in self
+                        .hash_index_0_1
+                        .iter()
+                        .map(|(k, v)| ((*k), (*v)))
+                        .enumerate()
+                    {
                         writeln!(buf, "{}_{i} -> {}_{};", "mul", "math", x0).unwrap();
                         writeln!(buf, "{}_{i} -> {}_{};", "mul", "math", x1).unwrap();
                         writeln!(buf, "{}_{i} -> {}_{};", "mul", "math", x2).unwrap();
@@ -929,7 +935,7 @@ fn regression_tir2() {
                 ) {
                     log_duration!("update_finalize {}: {}", "mul", {
                         assert!(self.new.is_empty());
-                        log_duration!("fill new: {}", {
+                        log_duration!("fill new and all: {}", {
                             self.new.extend(self.hash_index_0_1.iter().filter_map(
                                 |(&(x0, x1), &(x2, timestamp))| {
                                     if timestamp == latest_timestamp {
@@ -940,6 +946,12 @@ fn regression_tir2() {
                                 },
                             ));
                             RadixSortable::wrap(&mut self.new).voracious_sort();
+                            self.all.clear();
+                            self.all.extend(
+                                self.hash_index_0_1
+                                    .iter()
+                                    .map(|(&(x0, x1), &(x2, timestamp))| (x0, x1, x2, timestamp)),
+                            );
                             insertions.clear();
                         });
                         #[cfg(debug_assertions)]
@@ -955,6 +967,29 @@ fn regression_tir2() {
                             new.sort();
                             new.dedup();
                             assert_eq!(new.len(), self.new.len(), "new only has unique elements");
+                            self.all.iter().for_each(|&(x0, x1, x2, _timestamp)| {
+                                assert_eq!(
+                                    (x0, x1, x2,),
+                                    (uf.math_.find(x0), uf.math_.find(x1), uf.math_.find(x2),),
+                                    "all is canonical"
+                                );
+                            });
+                            let mut all_: Vec<_> = self.all.clone();
+                            all_.sort();
+                            all_.dedup();
+                            assert_eq!(all_.len(), self.all.len(), "all only has unique elements");
+                            let mut all_: Vec<_> = self
+                                .all
+                                .iter()
+                                .map(|&(x0, x1, x2, _timestamp)| (x0, x1, x2))
+                                .collect();
+                            all_.sort();
+                            all_.dedup();
+                            assert_eq!(
+                                all_.len(),
+                                self.all.len(),
+                                "all does not have duplicate timestamps"
+                            );
                         }
                         self.math_num_uprooted_at_latest_retain = 0;
                     });
@@ -996,8 +1031,9 @@ fn regression_tir2() {
             #[derive(Debug, Default)]
             struct PowRelation {
                 new: Vec<<Self as Relation>::Row>,
+                all: Vec<(Math, Math, Math, TimeStamp)>,
                 hash_index_1_0: runtime::HashMap<(Math, Math), (Math, TimeStamp)>,
-                hash_index_1: runtime::HashMap<(Math,), runtime::SmallVec<[(Math, Math, TimeStamp); 1]>>,
+                hash_index_1: runtime::IndexedSortedList<(Math,), (Math, Math, TimeStamp)>,
                 math_num_uprooted_at_latest_retain: usize,
             }
             impl Relation for PowRelation {
@@ -1017,11 +1053,16 @@ fn regression_tir2() {
                     self.new.iter().copied()
                 }
                 fn len(&self) -> usize {
-                    self.hash_index_1_0.len()
+                    self.hash_index_1.len()
                 }
                 fn emit_graphviz(&self, buf: &mut String) {
                     use std::fmt::Write;
-                    for (i, ((x1, x0), (x2, _timestamp))) in self.hash_index_1_0.iter().enumerate() {
+                    for (i, ((x1, x0), (x2, _timestamp))) in self
+                        .hash_index_1_0
+                        .iter()
+                        .map(|(k, v)| ((*k), (*v)))
+                        .enumerate()
+                    {
                         writeln!(buf, "{}_{i} -> {}_{};", "pow", "math", x1).unwrap();
                         writeln!(buf, "{}_{i} -> {}_{};", "pow", "math", x0).unwrap();
                         writeln!(buf, "{}_{i} -> {}_{};", "pow", "math", x2).unwrap();
@@ -1089,7 +1130,7 @@ fn regression_tir2() {
                 ) {
                     log_duration!("update_finalize {}: {}", "pow", {
                         assert!(self.new.is_empty());
-                        log_duration!("fill new: {}", {
+                        log_duration!("fill new and all: {}", {
                             self.new.extend(self.hash_index_1_0.iter().filter_map(
                                 |(&(x1, x0), &(x2, timestamp))| {
                                     if timestamp == latest_timestamp {
@@ -1100,6 +1141,12 @@ fn regression_tir2() {
                                 },
                             ));
                             RadixSortable::wrap(&mut self.new).voracious_sort();
+                            self.all.clear();
+                            self.all.extend(
+                                self.hash_index_1_0
+                                    .iter()
+                                    .map(|(&(x1, x0), &(x2, timestamp))| (x0, x1, x2, timestamp)),
+                            );
                             insertions.clear();
                         });
                         #[cfg(debug_assertions)]
@@ -1115,41 +1162,42 @@ fn regression_tir2() {
                             new.sort();
                             new.dedup();
                             assert_eq!(new.len(), self.new.len(), "new only has unique elements");
-                        }
-                        log_duration!("retain index: {}", {
-                            self.hash_index_1.retain(|&(x1,), v| {
-                                if uf.math_.is_root(x1) {
-                                    v.retain(|&mut (x0, x2, _timestamp)| {
-                                        uf.math_.is_root(x0) & uf.math_.is_root(x2)
-                                    });
-                                    true
-                                } else {
-                                    false
-                                }
+                            self.all.iter().for_each(|&(x0, x1, x2, _timestamp)| {
+                                assert_eq!(
+                                    (x0, x1, x2,),
+                                    (uf.math_.find(x0), uf.math_.find(x1), uf.math_.find(x2),),
+                                    "all is canonical"
+                                );
                             });
-                        });
-                        log_duration!("fill index: {}", {
-                            for &(x0, x1, x2) in &self.new {
-                                self.hash_index_1
-                                    .entry((x1,))
-                                    .or_default()
-                                    .push((x0, x2, latest_timestamp));
+                            let mut all_: Vec<_> = self.all.clone();
+                            all_.sort();
+                            all_.dedup();
+                            assert_eq!(all_.len(), self.all.len(), "all only has unique elements");
+                            let mut all_: Vec<_> = self
+                                .all
+                                .iter()
+                                .map(|&(x0, x1, x2, _timestamp)| (x0, x1, x2))
+                                .collect();
+                            all_.sort();
+                            all_.dedup();
+                            assert_eq!(
+                                all_.len(),
+                                self.all.len(),
+                                "all does not have duplicate timestamps"
+                            );
+                        }
+                        log_duration!("reconstruct index: {}", {
+                            log_duration!("reconstruct sort: {}", {
+                                RowSort010::sort(&mut self.all);
+                            });
+                            unsafe {
+                                self.hash_index_1.reconstruct(
+                                    &mut self.all,
+                                    |(x0, x1, x2, timestamp)| (x1,),
+                                    |(x0, x1, x2, timestamp)| (x0, x2, timestamp),
+                                );
                             }
                         });
-                        #[cfg(debug_assertions)]
-                        {
-                            self.hash_index_1.iter().for_each(|(&(x1,), v)| {
-                                let mut v = v.clone();
-                                let n = v.len();
-                                v.sort();
-                                v.dedup_by(|(x0, x2, t1), (y0, y2, t2)| true & (*x0 == *y0) & (*x2 == *y2));
-                                assert_eq!(n, v.len(), "indexes do not have duplicates");
-                                assert!(uf.math_.is_root(x1), "key is root");
-                                v.iter().copied().for_each(|(x0, x2, _timestamp)| {
-                                    assert!(uf.math_.is_root(x0) & uf.math_.is_root(x2), "value is root");
-                                });
-                            });
-                        }
                         self.math_num_uprooted_at_latest_retain = 0;
                     });
                 }
@@ -1164,10 +1212,7 @@ fn regression_tir2() {
                 }
                 fn iter_all1_1_0_2(&self, x1: Math) -> impl Iterator<Item = (Math, Math)> + use<'_> {
                     self.hash_index_1
-                        .get(&(x1,))
-                        .into_iter()
-                        .flatten()
-                        .copied()
+                        .iter((x1,))
                         .map(|(x0, x2, _timestamp)| (x0, x2))
                 }
                 fn iter_old2_1_0_2(
@@ -1188,10 +1233,7 @@ fn regression_tir2() {
                     latest_timestamp: TimeStamp,
                 ) -> impl Iterator<Item = (Math, Math)> + use<'_> {
                     self.hash_index_1
-                        .get(&(x1,))
-                        .into_iter()
-                        .flatten()
-                        .copied()
+                        .iter((x1,))
                         .filter_map(move |(x0, x2, timestamp)| {
                             (timestamp < latest_timestamp).then_some((x0, x2))
                         })
@@ -1215,9 +1257,9 @@ fn regression_tir2() {
             #[derive(Debug, Default)]
             struct ConstRelation {
                 new: Vec<<Self as Relation>::Row>,
+                all: Vec<(std::primitive::i64, Math, TimeStamp)>,
                 hash_index_0: runtime::HashMap<(std::primitive::i64,), (Math, TimeStamp)>,
-                hash_index_1:
-                    runtime::HashMap<(Math,), runtime::SmallVec<[(std::primitive::i64, TimeStamp); 1]>>,
+                hash_index_1: runtime::IndexedSortedList<(Math,), (std::primitive::i64, TimeStamp)>,
                 i64_num_uprooted_at_latest_retain: usize,
                 math_num_uprooted_at_latest_retain: usize,
             }
@@ -1242,7 +1284,12 @@ fn regression_tir2() {
                 }
                 fn emit_graphviz(&self, buf: &mut String) {
                     use std::fmt::Write;
-                    for (i, ((x0,), (x1, _timestamp))) in self.hash_index_0.iter().enumerate() {
+                    for (i, ((x0,), (x1, _timestamp))) in self
+                        .hash_index_0
+                        .iter()
+                        .map(|(k, v)| ((*k), (*v)))
+                        .enumerate()
+                    {
                         writeln!(buf, "{}_{i} -> {}_{};", "const", "i64", x0).unwrap();
                         writeln!(buf, "{}_{i} -> {}_{};", "const", "math", x1).unwrap();
                         writeln!(buf, "{}_{i} [shape = box];", "const").unwrap();
@@ -1305,7 +1352,7 @@ fn regression_tir2() {
                 ) {
                     log_duration!("update_finalize {}: {}", "const", {
                         assert!(self.new.is_empty());
-                        log_duration!("fill new: {}", {
+                        log_duration!("fill new and all: {}", {
                             self.new.extend(self.hash_index_0.iter().filter_map(
                                 |(&(x0,), &(x1, timestamp))| {
                                     if timestamp == latest_timestamp {
@@ -1316,6 +1363,12 @@ fn regression_tir2() {
                                 },
                             ));
                             self.new.sort_unstable();
+                            self.all.clear();
+                            self.all.extend(
+                                self.hash_index_0
+                                    .iter()
+                                    .map(|(&(x0,), &(x1, timestamp))| (x0, x1, timestamp)),
+                            );
                             insertions.clear();
                         });
                         #[cfg(debug_assertions)]
@@ -1327,39 +1380,38 @@ fn regression_tir2() {
                             new.sort();
                             new.dedup();
                             assert_eq!(new.len(), self.new.len(), "new only has unique elements");
-                        }
-                        log_duration!("retain index: {}", {
-                            self.hash_index_1.retain(|&(x1,), v| {
-                                if uf.math_.is_root(x1) {
-                                    v.retain(|&mut (x0, _timestamp)| true);
-                                    true
-                                } else {
-                                    false
-                                }
+                            self.all.iter().for_each(|&(x0, x1, _timestamp)| {
+                                assert_eq!((x0, x1,), (x0, uf.math_.find(x1),), "all is canonical");
                             });
-                        });
-                        log_duration!("fill index: {}", {
-                            for &(x0, x1) in &self.new {
-                                self.hash_index_1
-                                    .entry((x1,))
-                                    .or_default()
-                                    .push((x0, latest_timestamp));
+                            let mut all_: Vec<_> = self.all.clone();
+                            all_.sort();
+                            all_.dedup();
+                            assert_eq!(all_.len(), self.all.len(), "all only has unique elements");
+                            let mut all_: Vec<_> = self
+                                .all
+                                .iter()
+                                .map(|&(x0, x1, _timestamp)| (x0, x1))
+                                .collect();
+                            all_.sort();
+                            all_.dedup();
+                            assert_eq!(
+                                all_.len(),
+                                self.all.len(),
+                                "all does not have duplicate timestamps"
+                            );
+                        }
+                        log_duration!("reconstruct index: {}", {
+                            log_duration!("reconstruct sort: {}", {
+                                self.all.sort_unstable_by_key(|&(x0, x1, timestamp)| (x1,));
+                            });
+                            unsafe {
+                                self.hash_index_1.reconstruct(
+                                    &mut self.all,
+                                    |(x0, x1, timestamp)| (x1,),
+                                    |(x0, x1, timestamp)| (x0, timestamp),
+                                );
                             }
                         });
-                        #[cfg(debug_assertions)]
-                        {
-                            self.hash_index_1.iter().for_each(|(&(x1,), v)| {
-                                let mut v = v.clone();
-                                let n = v.len();
-                                v.sort();
-                                v.dedup_by(|(x0, t1), (y0, t2)| true & (*x0 == *y0));
-                                assert_eq!(n, v.len(), "indexes do not have duplicates");
-                                assert!(uf.math_.is_root(x1), "key is root");
-                                v.iter().copied().for_each(|(x0, _timestamp)| {
-                                    assert!(true, "value is root");
-                                });
-                            });
-                        }
                         self.math_num_uprooted_at_latest_retain = 0;
                     });
                 }
@@ -1373,12 +1425,7 @@ fn regression_tir2() {
                         .map(|(x1, _timestamp)| (x1,))
                 }
                 fn iter_all1_1_0(&self, x1: Math) -> impl Iterator<Item = (std::primitive::i64,)> + use<'_> {
-                    self.hash_index_1
-                        .get(&(x1,))
-                        .into_iter()
-                        .flatten()
-                        .copied()
-                        .map(|(x0, _timestamp)| (x0,))
+                    self.hash_index_1.iter((x1,)).map(|(x0, _timestamp)| (x0,))
                 }
                 fn iter_old1_0_1(
                     &self,
@@ -1397,10 +1444,7 @@ fn regression_tir2() {
                     latest_timestamp: TimeStamp,
                 ) -> impl Iterator<Item = (std::primitive::i64,)> + use<'_> {
                     self.hash_index_1
-                        .get(&(x1,))
-                        .into_iter()
-                        .flatten()
-                        .copied()
+                        .iter((x1,))
                         .filter_map(move |(x0, timestamp)| (timestamp < latest_timestamp).then_some((x0,)))
                 }
                 fn check1_0_1(&self, x0: std::primitive::i64) -> bool {
@@ -1801,6 +1845,7 @@ fn regression_tir1() {
             #[derive(Debug, Default)]
             struct SubRelation {
                 new: Vec<<Self as Relation>::Row>,
+                all: Vec<(Math, Math, Math, TimeStamp)>,
                 hash_index_0_1: runtime::HashMap<(Math, Math), (Math, TimeStamp)>,
                 math_num_uprooted_at_latest_retain: usize,
             }
@@ -1825,7 +1870,12 @@ fn regression_tir1() {
                 }
                 fn emit_graphviz(&self, buf: &mut String) {
                     use std::fmt::Write;
-                    for (i, ((x0, x1), (x2, _timestamp))) in self.hash_index_0_1.iter().enumerate() {
+                    for (i, ((x0, x1), (x2, _timestamp))) in self
+                        .hash_index_0_1
+                        .iter()
+                        .map(|(k, v)| ((*k), (*v)))
+                        .enumerate()
+                    {
                         writeln!(buf, "{}_{i} -> {}_{};", "sub", "math", x0).unwrap();
                         writeln!(buf, "{}_{i} -> {}_{};", "sub", "math", x1).unwrap();
                         writeln!(buf, "{}_{i} -> {}_{};", "sub", "math", x2).unwrap();
@@ -1893,7 +1943,7 @@ fn regression_tir1() {
                 ) {
                     log_duration!("update_finalize {}: {}", "sub", {
                         assert!(self.new.is_empty());
-                        log_duration!("fill new: {}", {
+                        log_duration!("fill new and all: {}", {
                             self.new.extend(self.hash_index_0_1.iter().filter_map(
                                 |(&(x0, x1), &(x2, timestamp))| {
                                     if timestamp == latest_timestamp {
@@ -1904,6 +1954,12 @@ fn regression_tir1() {
                                 },
                             ));
                             RadixSortable::wrap(&mut self.new).voracious_sort();
+                            self.all.clear();
+                            self.all.extend(
+                                self.hash_index_0_1
+                                    .iter()
+                                    .map(|(&(x0, x1), &(x2, timestamp))| (x0, x1, x2, timestamp)),
+                            );
                             insertions.clear();
                         });
                         #[cfg(debug_assertions)]
@@ -1919,6 +1975,29 @@ fn regression_tir1() {
                             new.sort();
                             new.dedup();
                             assert_eq!(new.len(), self.new.len(), "new only has unique elements");
+                            self.all.iter().for_each(|&(x0, x1, x2, _timestamp)| {
+                                assert_eq!(
+                                    (x0, x1, x2,),
+                                    (uf.math_.find(x0), uf.math_.find(x1), uf.math_.find(x2),),
+                                    "all is canonical"
+                                );
+                            });
+                            let mut all_: Vec<_> = self.all.clone();
+                            all_.sort();
+                            all_.dedup();
+                            assert_eq!(all_.len(), self.all.len(), "all only has unique elements");
+                            let mut all_: Vec<_> = self
+                                .all
+                                .iter()
+                                .map(|&(x0, x1, x2, _timestamp)| (x0, x1, x2))
+                                .collect();
+                            all_.sort();
+                            all_.dedup();
+                            assert_eq!(
+                                all_.len(),
+                                self.all.len(),
+                                "all does not have duplicate timestamps"
+                            );
                         }
                         self.math_num_uprooted_at_latest_retain = 0;
                     });
@@ -1960,6 +2039,7 @@ fn regression_tir1() {
             #[derive(Debug, Default)]
             struct ConstRelation {
                 new: Vec<<Self as Relation>::Row>,
+                all: Vec<(std::primitive::i64, Math, TimeStamp)>,
                 hash_index_0: runtime::HashMap<(std::primitive::i64,), (Math, TimeStamp)>,
                 i64_num_uprooted_at_latest_retain: usize,
                 math_num_uprooted_at_latest_retain: usize,
@@ -1985,7 +2065,12 @@ fn regression_tir1() {
                 }
                 fn emit_graphviz(&self, buf: &mut String) {
                     use std::fmt::Write;
-                    for (i, ((x0,), (x1, _timestamp))) in self.hash_index_0.iter().enumerate() {
+                    for (i, ((x0,), (x1, _timestamp))) in self
+                        .hash_index_0
+                        .iter()
+                        .map(|(k, v)| ((*k), (*v)))
+                        .enumerate()
+                    {
                         writeln!(buf, "{}_{i} -> {}_{};", "const", "i64", x0).unwrap();
                         writeln!(buf, "{}_{i} -> {}_{};", "const", "math", x1).unwrap();
                         writeln!(buf, "{}_{i} [shape = box];", "const").unwrap();
@@ -2048,7 +2133,7 @@ fn regression_tir1() {
                 ) {
                     log_duration!("update_finalize {}: {}", "const", {
                         assert!(self.new.is_empty());
-                        log_duration!("fill new: {}", {
+                        log_duration!("fill new and all: {}", {
                             self.new.extend(self.hash_index_0.iter().filter_map(
                                 |(&(x0,), &(x1, timestamp))| {
                                     if timestamp == latest_timestamp {
@@ -2059,6 +2144,12 @@ fn regression_tir1() {
                                 },
                             ));
                             self.new.sort_unstable();
+                            self.all.clear();
+                            self.all.extend(
+                                self.hash_index_0
+                                    .iter()
+                                    .map(|(&(x0,), &(x1, timestamp))| (x0, x1, timestamp)),
+                            );
                             insertions.clear();
                         });
                         #[cfg(debug_assertions)]
@@ -2070,6 +2161,25 @@ fn regression_tir1() {
                             new.sort();
                             new.dedup();
                             assert_eq!(new.len(), self.new.len(), "new only has unique elements");
+                            self.all.iter().for_each(|&(x0, x1, _timestamp)| {
+                                assert_eq!((x0, x1,), (x0, uf.math_.find(x1),), "all is canonical");
+                            });
+                            let mut all_: Vec<_> = self.all.clone();
+                            all_.sort();
+                            all_.dedup();
+                            assert_eq!(all_.len(), self.all.len(), "all only has unique elements");
+                            let mut all_: Vec<_> = self
+                                .all
+                                .iter()
+                                .map(|&(x0, x1, _timestamp)| (x0, x1))
+                                .collect();
+                            all_.sort();
+                            all_.dedup();
+                            assert_eq!(
+                                all_.len(),
+                                self.all.len(),
+                                "all does not have duplicate timestamps"
+                            );
                         }
                         self.math_num_uprooted_at_latest_retain = 0;
                     });
@@ -2605,9 +2715,10 @@ fn codegen_constant_propagation() {
             #[derive(Debug, Default)]
             struct AddRelation {
                 new: Vec<<Self as Relation>::Row>,
+                all: Vec<(Math, Math, Math, TimeStamp)>,
                 hash_index_0_1: runtime::HashMap<(Math, Math), (Math, TimeStamp)>,
-                hash_index_0: runtime::HashMap<(Math,), runtime::SmallVec<[(Math, Math, TimeStamp); 1]>>,
-                hash_index_1: runtime::HashMap<(Math,), runtime::SmallVec<[(Math, Math, TimeStamp); 1]>>,
+                hash_index_0: runtime::IndexedSortedList<(Math,), (Math, Math, TimeStamp)>,
+                hash_index_1: runtime::IndexedSortedList<(Math,), (Math, Math, TimeStamp)>,
                 math_num_uprooted_at_latest_retain: usize,
             }
             impl Relation for AddRelation {
@@ -2627,11 +2738,16 @@ fn codegen_constant_propagation() {
                     self.new.iter().copied()
                 }
                 fn len(&self) -> usize {
-                    self.hash_index_0_1.len()
+                    self.hash_index_0.len()
                 }
                 fn emit_graphviz(&self, buf: &mut String) {
                     use std::fmt::Write;
-                    for (i, ((x0, x1), (x2, _timestamp))) in self.hash_index_0_1.iter().enumerate() {
+                    for (i, ((x0, x1), (x2, _timestamp))) in self
+                        .hash_index_0_1
+                        .iter()
+                        .map(|(k, v)| ((*k), (*v)))
+                        .enumerate()
+                    {
                         writeln!(buf, "{}_{i} -> {}_{};", "add", "math", x0).unwrap();
                         writeln!(buf, "{}_{i} -> {}_{};", "add", "math", x1).unwrap();
                         writeln!(buf, "{}_{i} -> {}_{};", "add", "math", x2).unwrap();
@@ -2699,7 +2815,7 @@ fn codegen_constant_propagation() {
                 ) {
                     log_duration!("update_finalize {}: {}", "add", {
                         assert!(self.new.is_empty());
-                        log_duration!("fill new: {}", {
+                        log_duration!("fill new and all: {}", {
                             self.new.extend(self.hash_index_0_1.iter().filter_map(
                                 |(&(x0, x1), &(x2, timestamp))| {
                                     if timestamp == latest_timestamp {
@@ -2710,6 +2826,12 @@ fn codegen_constant_propagation() {
                                 },
                             ));
                             RadixSortable::wrap(&mut self.new).voracious_sort();
+                            self.all.clear();
+                            self.all.extend(
+                                self.hash_index_0_1
+                                    .iter()
+                                    .map(|(&(x0, x1), &(x2, timestamp))| (x0, x1, x2, timestamp)),
+                            );
                             insertions.clear();
                         });
                         #[cfg(debug_assertions)]
@@ -2725,75 +2847,54 @@ fn codegen_constant_propagation() {
                             new.sort();
                             new.dedup();
                             assert_eq!(new.len(), self.new.len(), "new only has unique elements");
-                        }
-                        log_duration!("retain index: {}", {
-                            self.hash_index_0.retain(|&(x0,), v| {
-                                if uf.math_.is_root(x0) {
-                                    v.retain(|&mut (x1, x2, _timestamp)| {
-                                        uf.math_.is_root(x1) & uf.math_.is_root(x2)
-                                    });
-                                    true
-                                } else {
-                                    false
-                                }
+                            self.all.iter().for_each(|&(x0, x1, x2, _timestamp)| {
+                                assert_eq!(
+                                    (x0, x1, x2,),
+                                    (uf.math_.find(x0), uf.math_.find(x1), uf.math_.find(x2),),
+                                    "all is canonical"
+                                );
                             });
-                        });
-                        log_duration!("fill index: {}", {
-                            for &(x0, x1, x2) in &self.new {
-                                self.hash_index_0
-                                    .entry((x0,))
-                                    .or_default()
-                                    .push((x1, x2, latest_timestamp));
+                            let mut all_: Vec<_> = self.all.clone();
+                            all_.sort();
+                            all_.dedup();
+                            assert_eq!(all_.len(), self.all.len(), "all only has unique elements");
+                            let mut all_: Vec<_> = self
+                                .all
+                                .iter()
+                                .map(|&(x0, x1, x2, _timestamp)| (x0, x1, x2))
+                                .collect();
+                            all_.sort();
+                            all_.dedup();
+                            assert_eq!(
+                                all_.len(),
+                                self.all.len(),
+                                "all does not have duplicate timestamps"
+                            );
+                        }
+                        log_duration!("reconstruct index: {}", {
+                            log_duration!("reconstruct sort: {}", {
+                                RowSort100::sort(&mut self.all);
+                            });
+                            unsafe {
+                                self.hash_index_0.reconstruct(
+                                    &mut self.all,
+                                    |(x0, x1, x2, timestamp)| (x0,),
+                                    |(x0, x1, x2, timestamp)| (x1, x2, timestamp),
+                                );
                             }
                         });
-                        #[cfg(debug_assertions)]
-                        {
-                            self.hash_index_0.iter().for_each(|(&(x0,), v)| {
-                                let mut v = v.clone();
-                                let n = v.len();
-                                v.sort();
-                                v.dedup_by(|(x1, x2, t1), (y1, y2, t2)| true & (*x1 == *y1) & (*x2 == *y2));
-                                assert_eq!(n, v.len(), "indexes do not have duplicates");
-                                assert!(uf.math_.is_root(x0), "key is root");
-                                v.iter().copied().for_each(|(x1, x2, _timestamp)| {
-                                    assert!(uf.math_.is_root(x1) & uf.math_.is_root(x2), "value is root");
-                                });
+                        log_duration!("reconstruct index: {}", {
+                            log_duration!("reconstruct sort: {}", {
+                                RowSort010::sort(&mut self.all);
                             });
-                        }
-                        log_duration!("retain index: {}", {
-                            self.hash_index_1.retain(|&(x1,), v| {
-                                if uf.math_.is_root(x1) {
-                                    v.retain(|&mut (x0, x2, _timestamp)| {
-                                        uf.math_.is_root(x0) & uf.math_.is_root(x2)
-                                    });
-                                    true
-                                } else {
-                                    false
-                                }
-                            });
-                        });
-                        log_duration!("fill index: {}", {
-                            for &(x0, x1, x2) in &self.new {
-                                self.hash_index_1
-                                    .entry((x1,))
-                                    .or_default()
-                                    .push((x0, x2, latest_timestamp));
+                            unsafe {
+                                self.hash_index_1.reconstruct(
+                                    &mut self.all,
+                                    |(x0, x1, x2, timestamp)| (x1,),
+                                    |(x0, x1, x2, timestamp)| (x0, x2, timestamp),
+                                );
                             }
                         });
-                        #[cfg(debug_assertions)]
-                        {
-                            self.hash_index_1.iter().for_each(|(&(x1,), v)| {
-                                let mut v = v.clone();
-                                let n = v.len();
-                                v.sort();
-                                v.dedup_by(|(x0, x2, t1), (y0, y2, t2)| true & (*x0 == *y0) & (*x2 == *y2));
-                                assert_eq!(n, v.len(), "indexes do not have duplicates");
-                                assert!(uf.math_.is_root(x1), "key is root");
-                                v.iter().copied().for_each(|(x0, x2, _timestamp)| {
-                                    assert!(uf.math_.is_root(x0) & uf.math_.is_root(x2), "value is root");
-                                });
-                            });
-                        }
                         self.math_num_uprooted_at_latest_retain = 0;
                     });
                 }
@@ -2808,18 +2909,12 @@ fn codegen_constant_propagation() {
                 }
                 fn iter_all1_0_1_2(&self, x0: Math) -> impl Iterator<Item = (Math, Math)> + use<'_> {
                     self.hash_index_0
-                        .get(&(x0,))
-                        .into_iter()
-                        .flatten()
-                        .copied()
+                        .iter((x0,))
                         .map(|(x1, x2, _timestamp)| (x1, x2))
                 }
                 fn iter_all1_1_0_2(&self, x1: Math) -> impl Iterator<Item = (Math, Math)> + use<'_> {
                     self.hash_index_1
-                        .get(&(x1,))
-                        .into_iter()
-                        .flatten()
-                        .copied()
+                        .iter((x1,))
                         .map(|(x0, x2, _timestamp)| (x0, x2))
                 }
                 fn iter_old2_0_1_2(
@@ -2840,10 +2935,7 @@ fn codegen_constant_propagation() {
                     latest_timestamp: TimeStamp,
                 ) -> impl Iterator<Item = (Math, Math)> + use<'_> {
                     self.hash_index_0
-                        .get(&(x0,))
-                        .into_iter()
-                        .flatten()
-                        .copied()
+                        .iter((x0,))
                         .filter_map(move |(x1, x2, timestamp)| {
                             (timestamp < latest_timestamp).then_some((x1, x2))
                         })
@@ -2854,10 +2946,7 @@ fn codegen_constant_propagation() {
                     latest_timestamp: TimeStamp,
                 ) -> impl Iterator<Item = (Math, Math)> + use<'_> {
                     self.hash_index_1
-                        .get(&(x1,))
-                        .into_iter()
-                        .flatten()
-                        .copied()
+                        .iter((x1,))
                         .filter_map(move |(x0, x2, timestamp)| {
                             (timestamp < latest_timestamp).then_some((x0, x2))
                         })
@@ -2884,9 +2973,10 @@ fn codegen_constant_propagation() {
             #[derive(Debug, Default)]
             struct MulRelation {
                 new: Vec<<Self as Relation>::Row>,
+                all: Vec<(Math, Math, Math, TimeStamp)>,
                 hash_index_0_1: runtime::HashMap<(Math, Math), (Math, TimeStamp)>,
-                hash_index_0: runtime::HashMap<(Math,), runtime::SmallVec<[(Math, Math, TimeStamp); 1]>>,
-                hash_index_1: runtime::HashMap<(Math,), runtime::SmallVec<[(Math, Math, TimeStamp); 1]>>,
+                hash_index_0: runtime::IndexedSortedList<(Math,), (Math, Math, TimeStamp)>,
+                hash_index_1: runtime::IndexedSortedList<(Math,), (Math, Math, TimeStamp)>,
                 math_num_uprooted_at_latest_retain: usize,
             }
             impl Relation for MulRelation {
@@ -2906,11 +2996,16 @@ fn codegen_constant_propagation() {
                     self.new.iter().copied()
                 }
                 fn len(&self) -> usize {
-                    self.hash_index_0_1.len()
+                    self.hash_index_0.len()
                 }
                 fn emit_graphviz(&self, buf: &mut String) {
                     use std::fmt::Write;
-                    for (i, ((x0, x1), (x2, _timestamp))) in self.hash_index_0_1.iter().enumerate() {
+                    for (i, ((x0, x1), (x2, _timestamp))) in self
+                        .hash_index_0_1
+                        .iter()
+                        .map(|(k, v)| ((*k), (*v)))
+                        .enumerate()
+                    {
                         writeln!(buf, "{}_{i} -> {}_{};", "mul", "math", x0).unwrap();
                         writeln!(buf, "{}_{i} -> {}_{};", "mul", "math", x1).unwrap();
                         writeln!(buf, "{}_{i} -> {}_{};", "mul", "math", x2).unwrap();
@@ -2978,7 +3073,7 @@ fn codegen_constant_propagation() {
                 ) {
                     log_duration!("update_finalize {}: {}", "mul", {
                         assert!(self.new.is_empty());
-                        log_duration!("fill new: {}", {
+                        log_duration!("fill new and all: {}", {
                             self.new.extend(self.hash_index_0_1.iter().filter_map(
                                 |(&(x0, x1), &(x2, timestamp))| {
                                     if timestamp == latest_timestamp {
@@ -2989,6 +3084,12 @@ fn codegen_constant_propagation() {
                                 },
                             ));
                             RadixSortable::wrap(&mut self.new).voracious_sort();
+                            self.all.clear();
+                            self.all.extend(
+                                self.hash_index_0_1
+                                    .iter()
+                                    .map(|(&(x0, x1), &(x2, timestamp))| (x0, x1, x2, timestamp)),
+                            );
                             insertions.clear();
                         });
                         #[cfg(debug_assertions)]
@@ -3004,75 +3105,54 @@ fn codegen_constant_propagation() {
                             new.sort();
                             new.dedup();
                             assert_eq!(new.len(), self.new.len(), "new only has unique elements");
-                        }
-                        log_duration!("retain index: {}", {
-                            self.hash_index_0.retain(|&(x0,), v| {
-                                if uf.math_.is_root(x0) {
-                                    v.retain(|&mut (x1, x2, _timestamp)| {
-                                        uf.math_.is_root(x1) & uf.math_.is_root(x2)
-                                    });
-                                    true
-                                } else {
-                                    false
-                                }
+                            self.all.iter().for_each(|&(x0, x1, x2, _timestamp)| {
+                                assert_eq!(
+                                    (x0, x1, x2,),
+                                    (uf.math_.find(x0), uf.math_.find(x1), uf.math_.find(x2),),
+                                    "all is canonical"
+                                );
                             });
-                        });
-                        log_duration!("fill index: {}", {
-                            for &(x0, x1, x2) in &self.new {
-                                self.hash_index_0
-                                    .entry((x0,))
-                                    .or_default()
-                                    .push((x1, x2, latest_timestamp));
+                            let mut all_: Vec<_> = self.all.clone();
+                            all_.sort();
+                            all_.dedup();
+                            assert_eq!(all_.len(), self.all.len(), "all only has unique elements");
+                            let mut all_: Vec<_> = self
+                                .all
+                                .iter()
+                                .map(|&(x0, x1, x2, _timestamp)| (x0, x1, x2))
+                                .collect();
+                            all_.sort();
+                            all_.dedup();
+                            assert_eq!(
+                                all_.len(),
+                                self.all.len(),
+                                "all does not have duplicate timestamps"
+                            );
+                        }
+                        log_duration!("reconstruct index: {}", {
+                            log_duration!("reconstruct sort: {}", {
+                                RowSort100::sort(&mut self.all);
+                            });
+                            unsafe {
+                                self.hash_index_0.reconstruct(
+                                    &mut self.all,
+                                    |(x0, x1, x2, timestamp)| (x0,),
+                                    |(x0, x1, x2, timestamp)| (x1, x2, timestamp),
+                                );
                             }
                         });
-                        #[cfg(debug_assertions)]
-                        {
-                            self.hash_index_0.iter().for_each(|(&(x0,), v)| {
-                                let mut v = v.clone();
-                                let n = v.len();
-                                v.sort();
-                                v.dedup_by(|(x1, x2, t1), (y1, y2, t2)| true & (*x1 == *y1) & (*x2 == *y2));
-                                assert_eq!(n, v.len(), "indexes do not have duplicates");
-                                assert!(uf.math_.is_root(x0), "key is root");
-                                v.iter().copied().for_each(|(x1, x2, _timestamp)| {
-                                    assert!(uf.math_.is_root(x1) & uf.math_.is_root(x2), "value is root");
-                                });
+                        log_duration!("reconstruct index: {}", {
+                            log_duration!("reconstruct sort: {}", {
+                                RowSort010::sort(&mut self.all);
                             });
-                        }
-                        log_duration!("retain index: {}", {
-                            self.hash_index_1.retain(|&(x1,), v| {
-                                if uf.math_.is_root(x1) {
-                                    v.retain(|&mut (x0, x2, _timestamp)| {
-                                        uf.math_.is_root(x0) & uf.math_.is_root(x2)
-                                    });
-                                    true
-                                } else {
-                                    false
-                                }
-                            });
-                        });
-                        log_duration!("fill index: {}", {
-                            for &(x0, x1, x2) in &self.new {
-                                self.hash_index_1
-                                    .entry((x1,))
-                                    .or_default()
-                                    .push((x0, x2, latest_timestamp));
+                            unsafe {
+                                self.hash_index_1.reconstruct(
+                                    &mut self.all,
+                                    |(x0, x1, x2, timestamp)| (x1,),
+                                    |(x0, x1, x2, timestamp)| (x0, x2, timestamp),
+                                );
                             }
                         });
-                        #[cfg(debug_assertions)]
-                        {
-                            self.hash_index_1.iter().for_each(|(&(x1,), v)| {
-                                let mut v = v.clone();
-                                let n = v.len();
-                                v.sort();
-                                v.dedup_by(|(x0, x2, t1), (y0, y2, t2)| true & (*x0 == *y0) & (*x2 == *y2));
-                                assert_eq!(n, v.len(), "indexes do not have duplicates");
-                                assert!(uf.math_.is_root(x1), "key is root");
-                                v.iter().copied().for_each(|(x0, x2, _timestamp)| {
-                                    assert!(uf.math_.is_root(x0) & uf.math_.is_root(x2), "value is root");
-                                });
-                            });
-                        }
                         self.math_num_uprooted_at_latest_retain = 0;
                     });
                 }
@@ -3087,18 +3167,12 @@ fn codegen_constant_propagation() {
                 }
                 fn iter_all1_0_1_2(&self, x0: Math) -> impl Iterator<Item = (Math, Math)> + use<'_> {
                     self.hash_index_0
-                        .get(&(x0,))
-                        .into_iter()
-                        .flatten()
-                        .copied()
+                        .iter((x0,))
                         .map(|(x1, x2, _timestamp)| (x1, x2))
                 }
                 fn iter_all1_1_0_2(&self, x1: Math) -> impl Iterator<Item = (Math, Math)> + use<'_> {
                     self.hash_index_1
-                        .get(&(x1,))
-                        .into_iter()
-                        .flatten()
-                        .copied()
+                        .iter((x1,))
                         .map(|(x0, x2, _timestamp)| (x0, x2))
                 }
                 fn iter_old2_0_1_2(
@@ -3119,10 +3193,7 @@ fn codegen_constant_propagation() {
                     latest_timestamp: TimeStamp,
                 ) -> impl Iterator<Item = (Math, Math)> + use<'_> {
                     self.hash_index_0
-                        .get(&(x0,))
-                        .into_iter()
-                        .flatten()
-                        .copied()
+                        .iter((x0,))
                         .filter_map(move |(x1, x2, timestamp)| {
                             (timestamp < latest_timestamp).then_some((x1, x2))
                         })
@@ -3133,10 +3204,7 @@ fn codegen_constant_propagation() {
                     latest_timestamp: TimeStamp,
                 ) -> impl Iterator<Item = (Math, Math)> + use<'_> {
                     self.hash_index_1
-                        .get(&(x1,))
-                        .into_iter()
-                        .flatten()
-                        .copied()
+                        .iter((x1,))
                         .filter_map(move |(x0, x2, timestamp)| {
                             (timestamp < latest_timestamp).then_some((x0, x2))
                         })
@@ -3163,9 +3231,9 @@ fn codegen_constant_propagation() {
             #[derive(Debug, Default)]
             struct ConstRelation {
                 new: Vec<<Self as Relation>::Row>,
+                all: Vec<(std::primitive::i64, Math, TimeStamp)>,
                 hash_index_0: runtime::HashMap<(std::primitive::i64,), (Math, TimeStamp)>,
-                hash_index_1:
-                    runtime::HashMap<(Math,), runtime::SmallVec<[(std::primitive::i64, TimeStamp); 1]>>,
+                hash_index_1: runtime::IndexedSortedList<(Math,), (std::primitive::i64, TimeStamp)>,
                 i64_num_uprooted_at_latest_retain: usize,
                 math_num_uprooted_at_latest_retain: usize,
             }
@@ -3190,7 +3258,12 @@ fn codegen_constant_propagation() {
                 }
                 fn emit_graphviz(&self, buf: &mut String) {
                     use std::fmt::Write;
-                    for (i, ((x0,), (x1, _timestamp))) in self.hash_index_0.iter().enumerate() {
+                    for (i, ((x0,), (x1, _timestamp))) in self
+                        .hash_index_0
+                        .iter()
+                        .map(|(k, v)| ((*k), (*v)))
+                        .enumerate()
+                    {
                         writeln!(buf, "{}_{i} -> {}_{};", "const", "i64", x0).unwrap();
                         writeln!(buf, "{}_{i} -> {}_{};", "const", "math", x1).unwrap();
                         writeln!(buf, "{}_{i} [shape = box];", "const").unwrap();
@@ -3253,7 +3326,7 @@ fn codegen_constant_propagation() {
                 ) {
                     log_duration!("update_finalize {}: {}", "const", {
                         assert!(self.new.is_empty());
-                        log_duration!("fill new: {}", {
+                        log_duration!("fill new and all: {}", {
                             self.new.extend(self.hash_index_0.iter().filter_map(
                                 |(&(x0,), &(x1, timestamp))| {
                                     if timestamp == latest_timestamp {
@@ -3264,6 +3337,12 @@ fn codegen_constant_propagation() {
                                 },
                             ));
                             self.new.sort_unstable();
+                            self.all.clear();
+                            self.all.extend(
+                                self.hash_index_0
+                                    .iter()
+                                    .map(|(&(x0,), &(x1, timestamp))| (x0, x1, timestamp)),
+                            );
                             insertions.clear();
                         });
                         #[cfg(debug_assertions)]
@@ -3275,39 +3354,38 @@ fn codegen_constant_propagation() {
                             new.sort();
                             new.dedup();
                             assert_eq!(new.len(), self.new.len(), "new only has unique elements");
-                        }
-                        log_duration!("retain index: {}", {
-                            self.hash_index_1.retain(|&(x1,), v| {
-                                if uf.math_.is_root(x1) {
-                                    v.retain(|&mut (x0, _timestamp)| true);
-                                    true
-                                } else {
-                                    false
-                                }
+                            self.all.iter().for_each(|&(x0, x1, _timestamp)| {
+                                assert_eq!((x0, x1,), (x0, uf.math_.find(x1),), "all is canonical");
                             });
-                        });
-                        log_duration!("fill index: {}", {
-                            for &(x0, x1) in &self.new {
-                                self.hash_index_1
-                                    .entry((x1,))
-                                    .or_default()
-                                    .push((x0, latest_timestamp));
+                            let mut all_: Vec<_> = self.all.clone();
+                            all_.sort();
+                            all_.dedup();
+                            assert_eq!(all_.len(), self.all.len(), "all only has unique elements");
+                            let mut all_: Vec<_> = self
+                                .all
+                                .iter()
+                                .map(|&(x0, x1, _timestamp)| (x0, x1))
+                                .collect();
+                            all_.sort();
+                            all_.dedup();
+                            assert_eq!(
+                                all_.len(),
+                                self.all.len(),
+                                "all does not have duplicate timestamps"
+                            );
+                        }
+                        log_duration!("reconstruct index: {}", {
+                            log_duration!("reconstruct sort: {}", {
+                                self.all.sort_unstable_by_key(|&(x0, x1, timestamp)| (x1,));
+                            });
+                            unsafe {
+                                self.hash_index_1.reconstruct(
+                                    &mut self.all,
+                                    |(x0, x1, timestamp)| (x1,),
+                                    |(x0, x1, timestamp)| (x0, timestamp),
+                                );
                             }
                         });
-                        #[cfg(debug_assertions)]
-                        {
-                            self.hash_index_1.iter().for_each(|(&(x1,), v)| {
-                                let mut v = v.clone();
-                                let n = v.len();
-                                v.sort();
-                                v.dedup_by(|(x0, t1), (y0, t2)| true & (*x0 == *y0));
-                                assert_eq!(n, v.len(), "indexes do not have duplicates");
-                                assert!(uf.math_.is_root(x1), "key is root");
-                                v.iter().copied().for_each(|(x0, _timestamp)| {
-                                    assert!(true, "value is root");
-                                });
-                            });
-                        }
                         self.math_num_uprooted_at_latest_retain = 0;
                     });
                 }
@@ -3321,12 +3399,7 @@ fn codegen_constant_propagation() {
                         .map(|(x1, _timestamp)| (x1,))
                 }
                 fn iter_all1_1_0(&self, x1: Math) -> impl Iterator<Item = (std::primitive::i64,)> + use<'_> {
-                    self.hash_index_1
-                        .get(&(x1,))
-                        .into_iter()
-                        .flatten()
-                        .copied()
-                        .map(|(x0, _timestamp)| (x0,))
+                    self.hash_index_1.iter((x1,)).map(|(x0, _timestamp)| (x0,))
                 }
                 fn iter_old1_0_1(
                     &self,
@@ -3345,10 +3418,7 @@ fn codegen_constant_propagation() {
                     latest_timestamp: TimeStamp,
                 ) -> impl Iterator<Item = (std::primitive::i64,)> + use<'_> {
                     self.hash_index_1
-                        .get(&(x1,))
-                        .into_iter()
-                        .flatten()
-                        .copied()
+                        .iter((x1,))
                         .filter_map(move |(x0, timestamp)| (timestamp < latest_timestamp).then_some((x0,)))
                 }
                 fn check1_0_1(&self, x0: std::primitive::i64) -> bool {
@@ -3637,6 +3707,7 @@ fn codegen_commutative() {
             #[derive(Debug, Default)]
             struct AddRelation {
                 new: Vec<<Self as Relation>::Row>,
+                all: Vec<(Math, Math, Math, TimeStamp)>,
                 hash_index_0_1: runtime::HashMap<(Math, Math), (Math, TimeStamp)>,
                 math_num_uprooted_at_latest_retain: usize,
             }
@@ -3661,7 +3732,12 @@ fn codegen_commutative() {
                 }
                 fn emit_graphviz(&self, buf: &mut String) {
                     use std::fmt::Write;
-                    for (i, ((x0, x1), (x2, _timestamp))) in self.hash_index_0_1.iter().enumerate() {
+                    for (i, ((x0, x1), (x2, _timestamp))) in self
+                        .hash_index_0_1
+                        .iter()
+                        .map(|(k, v)| ((*k), (*v)))
+                        .enumerate()
+                    {
                         writeln!(buf, "{}_{i} -> {}_{};", "add", "math", x0).unwrap();
                         writeln!(buf, "{}_{i} -> {}_{};", "add", "math", x1).unwrap();
                         writeln!(buf, "{}_{i} -> {}_{};", "add", "math", x2).unwrap();
@@ -3729,7 +3805,7 @@ fn codegen_commutative() {
                 ) {
                     log_duration!("update_finalize {}: {}", "add", {
                         assert!(self.new.is_empty());
-                        log_duration!("fill new: {}", {
+                        log_duration!("fill new and all: {}", {
                             self.new.extend(self.hash_index_0_1.iter().filter_map(
                                 |(&(x0, x1), &(x2, timestamp))| {
                                     if timestamp == latest_timestamp {
@@ -3740,6 +3816,12 @@ fn codegen_commutative() {
                                 },
                             ));
                             RadixSortable::wrap(&mut self.new).voracious_sort();
+                            self.all.clear();
+                            self.all.extend(
+                                self.hash_index_0_1
+                                    .iter()
+                                    .map(|(&(x0, x1), &(x2, timestamp))| (x0, x1, x2, timestamp)),
+                            );
                             insertions.clear();
                         });
                         #[cfg(debug_assertions)]
@@ -3755,6 +3837,29 @@ fn codegen_commutative() {
                             new.sort();
                             new.dedup();
                             assert_eq!(new.len(), self.new.len(), "new only has unique elements");
+                            self.all.iter().for_each(|&(x0, x1, x2, _timestamp)| {
+                                assert_eq!(
+                                    (x0, x1, x2,),
+                                    (uf.math_.find(x0), uf.math_.find(x1), uf.math_.find(x2),),
+                                    "all is canonical"
+                                );
+                            });
+                            let mut all_: Vec<_> = self.all.clone();
+                            all_.sort();
+                            all_.dedup();
+                            assert_eq!(all_.len(), self.all.len(), "all only has unique elements");
+                            let mut all_: Vec<_> = self
+                                .all
+                                .iter()
+                                .map(|&(x0, x1, x2, _timestamp)| (x0, x1, x2))
+                                .collect();
+                            all_.sort();
+                            all_.dedup();
+                            assert_eq!(
+                                all_.len(),
+                                self.all.len(),
+                                "all does not have duplicate timestamps"
+                            );
                         }
                         self.math_num_uprooted_at_latest_retain = 0;
                     });
@@ -4048,6 +4153,7 @@ fn regression_entry2() {
             #[derive(Debug, Default)]
             struct SubRelation {
                 new: Vec<<Self as Relation>::Row>,
+                all: Vec<(Math, Math, Math, TimeStamp)>,
                 hash_index_0_1: runtime::HashMap<(Math, Math), (Math, TimeStamp)>,
                 math_num_uprooted_at_latest_retain: usize,
             }
@@ -4072,7 +4178,12 @@ fn regression_entry2() {
                 }
                 fn emit_graphviz(&self, buf: &mut String) {
                     use std::fmt::Write;
-                    for (i, ((x0, x1), (x2, _timestamp))) in self.hash_index_0_1.iter().enumerate() {
+                    for (i, ((x0, x1), (x2, _timestamp))) in self
+                        .hash_index_0_1
+                        .iter()
+                        .map(|(k, v)| ((*k), (*v)))
+                        .enumerate()
+                    {
                         writeln!(buf, "{}_{i} -> {}_{};", "sub", "math", x0).unwrap();
                         writeln!(buf, "{}_{i} -> {}_{};", "sub", "math", x1).unwrap();
                         writeln!(buf, "{}_{i} -> {}_{};", "sub", "math", x2).unwrap();
@@ -4140,7 +4251,7 @@ fn regression_entry2() {
                 ) {
                     log_duration!("update_finalize {}: {}", "sub", {
                         assert!(self.new.is_empty());
-                        log_duration!("fill new: {}", {
+                        log_duration!("fill new and all: {}", {
                             self.new.extend(self.hash_index_0_1.iter().filter_map(
                                 |(&(x0, x1), &(x2, timestamp))| {
                                     if timestamp == latest_timestamp {
@@ -4151,6 +4262,12 @@ fn regression_entry2() {
                                 },
                             ));
                             RadixSortable::wrap(&mut self.new).voracious_sort();
+                            self.all.clear();
+                            self.all.extend(
+                                self.hash_index_0_1
+                                    .iter()
+                                    .map(|(&(x0, x1), &(x2, timestamp))| (x0, x1, x2, timestamp)),
+                            );
                             insertions.clear();
                         });
                         #[cfg(debug_assertions)]
@@ -4166,6 +4283,29 @@ fn regression_entry2() {
                             new.sort();
                             new.dedup();
                             assert_eq!(new.len(), self.new.len(), "new only has unique elements");
+                            self.all.iter().for_each(|&(x0, x1, x2, _timestamp)| {
+                                assert_eq!(
+                                    (x0, x1, x2,),
+                                    (uf.math_.find(x0), uf.math_.find(x1), uf.math_.find(x2),),
+                                    "all is canonical"
+                                );
+                            });
+                            let mut all_: Vec<_> = self.all.clone();
+                            all_.sort();
+                            all_.dedup();
+                            assert_eq!(all_.len(), self.all.len(), "all only has unique elements");
+                            let mut all_: Vec<_> = self
+                                .all
+                                .iter()
+                                .map(|&(x0, x1, x2, _timestamp)| (x0, x1, x2))
+                                .collect();
+                            all_.sort();
+                            all_.dedup();
+                            assert_eq!(
+                                all_.len(),
+                                self.all.len(),
+                                "all does not have duplicate timestamps"
+                            );
                         }
                         self.math_num_uprooted_at_latest_retain = 0;
                     });
@@ -4207,6 +4347,7 @@ fn regression_entry2() {
             #[derive(Debug, Default)]
             struct ConstRelation {
                 new: Vec<<Self as Relation>::Row>,
+                all: Vec<(std::primitive::i64, Math, TimeStamp)>,
                 hash_index_0: runtime::HashMap<(std::primitive::i64,), (Math, TimeStamp)>,
                 i64_num_uprooted_at_latest_retain: usize,
                 math_num_uprooted_at_latest_retain: usize,
@@ -4232,7 +4373,12 @@ fn regression_entry2() {
                 }
                 fn emit_graphviz(&self, buf: &mut String) {
                     use std::fmt::Write;
-                    for (i, ((x0,), (x1, _timestamp))) in self.hash_index_0.iter().enumerate() {
+                    for (i, ((x0,), (x1, _timestamp))) in self
+                        .hash_index_0
+                        .iter()
+                        .map(|(k, v)| ((*k), (*v)))
+                        .enumerate()
+                    {
                         writeln!(buf, "{}_{i} -> {}_{};", "const", "i64", x0).unwrap();
                         writeln!(buf, "{}_{i} -> {}_{};", "const", "math", x1).unwrap();
                         writeln!(buf, "{}_{i} [shape = box];", "const").unwrap();
@@ -4295,7 +4441,7 @@ fn regression_entry2() {
                 ) {
                     log_duration!("update_finalize {}: {}", "const", {
                         assert!(self.new.is_empty());
-                        log_duration!("fill new: {}", {
+                        log_duration!("fill new and all: {}", {
                             self.new.extend(self.hash_index_0.iter().filter_map(
                                 |(&(x0,), &(x1, timestamp))| {
                                     if timestamp == latest_timestamp {
@@ -4306,6 +4452,12 @@ fn regression_entry2() {
                                 },
                             ));
                             self.new.sort_unstable();
+                            self.all.clear();
+                            self.all.extend(
+                                self.hash_index_0
+                                    .iter()
+                                    .map(|(&(x0,), &(x1, timestamp))| (x0, x1, timestamp)),
+                            );
                             insertions.clear();
                         });
                         #[cfg(debug_assertions)]
@@ -4317,6 +4469,25 @@ fn regression_entry2() {
                             new.sort();
                             new.dedup();
                             assert_eq!(new.len(), self.new.len(), "new only has unique elements");
+                            self.all.iter().for_each(|&(x0, x1, _timestamp)| {
+                                assert_eq!((x0, x1,), (x0, uf.math_.find(x1),), "all is canonical");
+                            });
+                            let mut all_: Vec<_> = self.all.clone();
+                            all_.sort();
+                            all_.dedup();
+                            assert_eq!(all_.len(), self.all.len(), "all only has unique elements");
+                            let mut all_: Vec<_> = self
+                                .all
+                                .iter()
+                                .map(|&(x0, x1, _timestamp)| (x0, x1))
+                                .collect();
+                            all_.sort();
+                            all_.dedup();
+                            assert_eq!(
+                                all_.len(),
+                                self.all.len(),
+                                "all does not have duplicate timestamps"
+                            );
                         }
                         self.math_num_uprooted_at_latest_retain = 0;
                     });
@@ -4629,6 +4800,7 @@ fn regression_entry() {
             #[derive(Debug, Default)]
             struct IntegralRelation {
                 new: Vec<<Self as Relation>::Row>,
+                all: Vec<(Math, Math, Math, TimeStamp)>,
                 hash_index_0_1: runtime::HashMap<(Math, Math), (Math, TimeStamp)>,
                 math_num_uprooted_at_latest_retain: usize,
             }
@@ -4653,7 +4825,12 @@ fn regression_entry() {
                 }
                 fn emit_graphviz(&self, buf: &mut String) {
                     use std::fmt::Write;
-                    for (i, ((x0, x1), (x2, _timestamp))) in self.hash_index_0_1.iter().enumerate() {
+                    for (i, ((x0, x1), (x2, _timestamp))) in self
+                        .hash_index_0_1
+                        .iter()
+                        .map(|(k, v)| ((*k), (*v)))
+                        .enumerate()
+                    {
                         writeln!(buf, "{}_{i} -> {}_{};", "integral", "math", x0).unwrap();
                         writeln!(buf, "{}_{i} -> {}_{};", "integral", "math", x1).unwrap();
                         writeln!(buf, "{}_{i} -> {}_{};", "integral", "math", x2).unwrap();
@@ -4721,7 +4898,7 @@ fn regression_entry() {
                 ) {
                     log_duration!("update_finalize {}: {}", "integral", {
                         assert!(self.new.is_empty());
-                        log_duration!("fill new: {}", {
+                        log_duration!("fill new and all: {}", {
                             self.new.extend(self.hash_index_0_1.iter().filter_map(
                                 |(&(x0, x1), &(x2, timestamp))| {
                                     if timestamp == latest_timestamp {
@@ -4732,6 +4909,12 @@ fn regression_entry() {
                                 },
                             ));
                             RadixSortable::wrap(&mut self.new).voracious_sort();
+                            self.all.clear();
+                            self.all.extend(
+                                self.hash_index_0_1
+                                    .iter()
+                                    .map(|(&(x0, x1), &(x2, timestamp))| (x0, x1, x2, timestamp)),
+                            );
                             insertions.clear();
                         });
                         #[cfg(debug_assertions)]
@@ -4747,6 +4930,29 @@ fn regression_entry() {
                             new.sort();
                             new.dedup();
                             assert_eq!(new.len(), self.new.len(), "new only has unique elements");
+                            self.all.iter().for_each(|&(x0, x1, x2, _timestamp)| {
+                                assert_eq!(
+                                    (x0, x1, x2,),
+                                    (uf.math_.find(x0), uf.math_.find(x1), uf.math_.find(x2),),
+                                    "all is canonical"
+                                );
+                            });
+                            let mut all_: Vec<_> = self.all.clone();
+                            all_.sort();
+                            all_.dedup();
+                            assert_eq!(all_.len(), self.all.len(), "all only has unique elements");
+                            let mut all_: Vec<_> = self
+                                .all
+                                .iter()
+                                .map(|&(x0, x1, x2, _timestamp)| (x0, x1, x2))
+                                .collect();
+                            all_.sort();
+                            all_.dedup();
+                            assert_eq!(
+                                all_.len(),
+                                self.all.len(),
+                                "all does not have duplicate timestamps"
+                            );
                         }
                         self.math_num_uprooted_at_latest_retain = 0;
                     });
@@ -4788,6 +4994,7 @@ fn regression_entry() {
             #[derive(Debug, Default)]
             struct AddRelation {
                 new: Vec<<Self as Relation>::Row>,
+                all: Vec<(Math, Math, Math, TimeStamp)>,
                 hash_index_0_1: runtime::HashMap<(Math, Math), (Math, TimeStamp)>,
                 math_num_uprooted_at_latest_retain: usize,
             }
@@ -4812,7 +5019,12 @@ fn regression_entry() {
                 }
                 fn emit_graphviz(&self, buf: &mut String) {
                     use std::fmt::Write;
-                    for (i, ((x0, x1), (x2, _timestamp))) in self.hash_index_0_1.iter().enumerate() {
+                    for (i, ((x0, x1), (x2, _timestamp))) in self
+                        .hash_index_0_1
+                        .iter()
+                        .map(|(k, v)| ((*k), (*v)))
+                        .enumerate()
+                    {
                         writeln!(buf, "{}_{i} -> {}_{};", "add", "math", x0).unwrap();
                         writeln!(buf, "{}_{i} -> {}_{};", "add", "math", x1).unwrap();
                         writeln!(buf, "{}_{i} -> {}_{};", "add", "math", x2).unwrap();
@@ -4880,7 +5092,7 @@ fn regression_entry() {
                 ) {
                     log_duration!("update_finalize {}: {}", "add", {
                         assert!(self.new.is_empty());
-                        log_duration!("fill new: {}", {
+                        log_duration!("fill new and all: {}", {
                             self.new.extend(self.hash_index_0_1.iter().filter_map(
                                 |(&(x0, x1), &(x2, timestamp))| {
                                     if timestamp == latest_timestamp {
@@ -4891,6 +5103,12 @@ fn regression_entry() {
                                 },
                             ));
                             RadixSortable::wrap(&mut self.new).voracious_sort();
+                            self.all.clear();
+                            self.all.extend(
+                                self.hash_index_0_1
+                                    .iter()
+                                    .map(|(&(x0, x1), &(x2, timestamp))| (x0, x1, x2, timestamp)),
+                            );
                             insertions.clear();
                         });
                         #[cfg(debug_assertions)]
@@ -4906,6 +5124,29 @@ fn regression_entry() {
                             new.sort();
                             new.dedup();
                             assert_eq!(new.len(), self.new.len(), "new only has unique elements");
+                            self.all.iter().for_each(|&(x0, x1, x2, _timestamp)| {
+                                assert_eq!(
+                                    (x0, x1, x2,),
+                                    (uf.math_.find(x0), uf.math_.find(x1), uf.math_.find(x2),),
+                                    "all is canonical"
+                                );
+                            });
+                            let mut all_: Vec<_> = self.all.clone();
+                            all_.sort();
+                            all_.dedup();
+                            assert_eq!(all_.len(), self.all.len(), "all only has unique elements");
+                            let mut all_: Vec<_> = self
+                                .all
+                                .iter()
+                                .map(|&(x0, x1, x2, _timestamp)| (x0, x1, x2))
+                                .collect();
+                            all_.sort();
+                            all_.dedup();
+                            assert_eq!(
+                                all_.len(),
+                                self.all.len(),
+                                "all does not have duplicate timestamps"
+                            );
                         }
                         self.math_num_uprooted_at_latest_retain = 0;
                     });
@@ -5201,6 +5442,7 @@ fn test_bind_variable_multiple_times() {
             #[derive(Debug, Default)]
             struct SameRelation {
                 new: Vec<<Self as Relation>::Row>,
+                all: Vec<(Foo, Foo, Foo, TimeStamp)>,
                 hash_index_0_1: runtime::HashMap<(Foo, Foo), (Foo, TimeStamp)>,
                 foo_num_uprooted_at_latest_retain: usize,
             }
@@ -5225,7 +5467,12 @@ fn test_bind_variable_multiple_times() {
                 }
                 fn emit_graphviz(&self, buf: &mut String) {
                     use std::fmt::Write;
-                    for (i, ((x0, x1), (x2, _timestamp))) in self.hash_index_0_1.iter().enumerate() {
+                    for (i, ((x0, x1), (x2, _timestamp))) in self
+                        .hash_index_0_1
+                        .iter()
+                        .map(|(k, v)| ((*k), (*v)))
+                        .enumerate()
+                    {
                         writeln!(buf, "{}_{i} -> {}_{};", "same", "foo", x0).unwrap();
                         writeln!(buf, "{}_{i} -> {}_{};", "same", "foo", x1).unwrap();
                         writeln!(buf, "{}_{i} -> {}_{};", "same", "foo", x2).unwrap();
@@ -5293,7 +5540,7 @@ fn test_bind_variable_multiple_times() {
                 ) {
                     log_duration!("update_finalize {}: {}", "same", {
                         assert!(self.new.is_empty());
-                        log_duration!("fill new: {}", {
+                        log_duration!("fill new and all: {}", {
                             self.new.extend(self.hash_index_0_1.iter().filter_map(
                                 |(&(x0, x1), &(x2, timestamp))| {
                                     if timestamp == latest_timestamp {
@@ -5304,6 +5551,12 @@ fn test_bind_variable_multiple_times() {
                                 },
                             ));
                             RadixSortable::wrap(&mut self.new).voracious_sort();
+                            self.all.clear();
+                            self.all.extend(
+                                self.hash_index_0_1
+                                    .iter()
+                                    .map(|(&(x0, x1), &(x2, timestamp))| (x0, x1, x2, timestamp)),
+                            );
                             insertions.clear();
                         });
                         #[cfg(debug_assertions)]
@@ -5319,6 +5572,29 @@ fn test_bind_variable_multiple_times() {
                             new.sort();
                             new.dedup();
                             assert_eq!(new.len(), self.new.len(), "new only has unique elements");
+                            self.all.iter().for_each(|&(x0, x1, x2, _timestamp)| {
+                                assert_eq!(
+                                    (x0, x1, x2,),
+                                    (uf.foo_.find(x0), uf.foo_.find(x1), uf.foo_.find(x2),),
+                                    "all is canonical"
+                                );
+                            });
+                            let mut all_: Vec<_> = self.all.clone();
+                            all_.sort();
+                            all_.dedup();
+                            assert_eq!(all_.len(), self.all.len(), "all only has unique elements");
+                            let mut all_: Vec<_> = self
+                                .all
+                                .iter()
+                                .map(|&(x0, x1, x2, _timestamp)| (x0, x1, x2))
+                                .collect();
+                            all_.sort();
+                            all_.dedup();
+                            assert_eq!(
+                                all_.len(),
+                                self.all.len(),
+                                "all does not have duplicate timestamps"
+                            );
                         }
                         self.foo_num_uprooted_at_latest_retain = 0;
                     });
@@ -5676,8 +5952,9 @@ fn codegen_variable_reuse_bug() {
             #[derive(Debug, Default)]
             struct AddRelation {
                 new: Vec<<Self as Relation>::Row>,
+                all: Vec<(Math, Math, Math, TimeStamp)>,
                 hash_index_0_1: runtime::HashMap<(Math, Math), (Math, TimeStamp)>,
-                hash_index_0_2: runtime::HashMap<(Math, Math), runtime::SmallVec<[(Math, TimeStamp); 1]>>,
+                hash_index_0_2: runtime::IndexedSortedList<(Math, Math), (Math, TimeStamp)>,
                 math_num_uprooted_at_latest_retain: usize,
             }
             impl Relation for AddRelation {
@@ -5701,7 +5978,12 @@ fn codegen_variable_reuse_bug() {
                 }
                 fn emit_graphviz(&self, buf: &mut String) {
                     use std::fmt::Write;
-                    for (i, ((x0, x1), (x2, _timestamp))) in self.hash_index_0_1.iter().enumerate() {
+                    for (i, ((x0, x1), (x2, _timestamp))) in self
+                        .hash_index_0_1
+                        .iter()
+                        .map(|(k, v)| ((*k), (*v)))
+                        .enumerate()
+                    {
                         writeln!(buf, "{}_{i} -> {}_{};", "add", "math", x0).unwrap();
                         writeln!(buf, "{}_{i} -> {}_{};", "add", "math", x1).unwrap();
                         writeln!(buf, "{}_{i} -> {}_{};", "add", "math", x2).unwrap();
@@ -5769,7 +6051,7 @@ fn codegen_variable_reuse_bug() {
                 ) {
                     log_duration!("update_finalize {}: {}", "add", {
                         assert!(self.new.is_empty());
-                        log_duration!("fill new: {}", {
+                        log_duration!("fill new and all: {}", {
                             self.new.extend(self.hash_index_0_1.iter().filter_map(
                                 |(&(x0, x1), &(x2, timestamp))| {
                                     if timestamp == latest_timestamp {
@@ -5780,6 +6062,12 @@ fn codegen_variable_reuse_bug() {
                                 },
                             ));
                             RadixSortable::wrap(&mut self.new).voracious_sort();
+                            self.all.clear();
+                            self.all.extend(
+                                self.hash_index_0_1
+                                    .iter()
+                                    .map(|(&(x0, x1), &(x2, timestamp))| (x0, x1, x2, timestamp)),
+                            );
                             insertions.clear();
                         });
                         #[cfg(debug_assertions)]
@@ -5795,39 +6083,42 @@ fn codegen_variable_reuse_bug() {
                             new.sort();
                             new.dedup();
                             assert_eq!(new.len(), self.new.len(), "new only has unique elements");
-                        }
-                        log_duration!("retain index: {}", {
-                            self.hash_index_0_2.retain(|&(x0, x2), v| {
-                                if uf.math_.is_root(x0) & uf.math_.is_root(x2) {
-                                    v.retain(|&mut (x1, _timestamp)| uf.math_.is_root(x1));
-                                    true
-                                } else {
-                                    false
-                                }
+                            self.all.iter().for_each(|&(x0, x1, x2, _timestamp)| {
+                                assert_eq!(
+                                    (x0, x1, x2,),
+                                    (uf.math_.find(x0), uf.math_.find(x1), uf.math_.find(x2),),
+                                    "all is canonical"
+                                );
                             });
-                        });
-                        log_duration!("fill index: {}", {
-                            for &(x0, x1, x2) in &self.new {
-                                self.hash_index_0_2
-                                    .entry((x0, x2))
-                                    .or_default()
-                                    .push((x1, latest_timestamp));
+                            let mut all_: Vec<_> = self.all.clone();
+                            all_.sort();
+                            all_.dedup();
+                            assert_eq!(all_.len(), self.all.len(), "all only has unique elements");
+                            let mut all_: Vec<_> = self
+                                .all
+                                .iter()
+                                .map(|&(x0, x1, x2, _timestamp)| (x0, x1, x2))
+                                .collect();
+                            all_.sort();
+                            all_.dedup();
+                            assert_eq!(
+                                all_.len(),
+                                self.all.len(),
+                                "all does not have duplicate timestamps"
+                            );
+                        }
+                        log_duration!("reconstruct index: {}", {
+                            log_duration!("reconstruct sort: {}", {
+                                RowSort101::sort(&mut self.all);
+                            });
+                            unsafe {
+                                self.hash_index_0_2.reconstruct(
+                                    &mut self.all,
+                                    |(x0, x1, x2, timestamp)| (x0, x2),
+                                    |(x0, x1, x2, timestamp)| (x1, timestamp),
+                                );
                             }
                         });
-                        #[cfg(debug_assertions)]
-                        {
-                            self.hash_index_0_2.iter().for_each(|(&(x0, x2), v)| {
-                                let mut v = v.clone();
-                                let n = v.len();
-                                v.sort();
-                                v.dedup_by(|(x1, t1), (y1, t2)| true & (*x1 == *y1));
-                                assert_eq!(n, v.len(), "indexes do not have duplicates");
-                                assert!(uf.math_.is_root(x0) & uf.math_.is_root(x2), "key is root");
-                                v.iter().copied().for_each(|(x1, _timestamp)| {
-                                    assert!(uf.math_.is_root(x1), "value is root");
-                                });
-                            });
-                        }
                         self.math_num_uprooted_at_latest_retain = 0;
                     });
                 }
@@ -5842,10 +6133,7 @@ fn codegen_variable_reuse_bug() {
                 }
                 fn iter_all2_0_2_1(&self, x0: Math, x2: Math) -> impl Iterator<Item = (Math,)> + use<'_> {
                     self.hash_index_0_2
-                        .get(&(x0, x2))
-                        .into_iter()
-                        .flatten()
-                        .copied()
+                        .iter((x0, x2))
                         .map(|(x1, _timestamp)| (x1,))
                 }
                 fn iter_old2_0_1_2(
@@ -5867,10 +6155,7 @@ fn codegen_variable_reuse_bug() {
                     latest_timestamp: TimeStamp,
                 ) -> impl Iterator<Item = (Math,)> + use<'_> {
                     self.hash_index_0_2
-                        .get(&(x0, x2))
-                        .into_iter()
-                        .flatten()
-                        .copied()
+                        .iter((x0, x2))
                         .filter_map(move |(x1, timestamp)| (timestamp < latest_timestamp).then_some((x1,)))
                 }
                 fn check2_0_1_2(&self, x0: Math, x1: Math) -> bool {
@@ -5892,6 +6177,7 @@ fn codegen_variable_reuse_bug() {
             #[derive(Debug, Default)]
             struct ZeroRelation {
                 new: Vec<<Self as Relation>::Row>,
+                all: Vec<(Math, TimeStamp)>,
                 hash_index_: runtime::HashMap<(), (Math, TimeStamp)>,
                 math_num_uprooted_at_latest_retain: usize,
             }
@@ -5916,7 +6202,12 @@ fn codegen_variable_reuse_bug() {
                 }
                 fn emit_graphviz(&self, buf: &mut String) {
                     use std::fmt::Write;
-                    for (i, ((), (x0, _timestamp))) in self.hash_index_.iter().enumerate() {
+                    for (i, ((), (x0, _timestamp))) in self
+                        .hash_index_
+                        .iter()
+                        .map(|(k, v)| ((*k), (*v)))
+                        .enumerate()
+                    {
                         writeln!(buf, "{}_{i} -> {}_{};", "zero", "math", x0).unwrap();
                         writeln!(buf, "{}_{i} [shape = box];", "zero").unwrap();
                     }
@@ -5978,7 +6269,7 @@ fn codegen_variable_reuse_bug() {
                 ) {
                     log_duration!("update_finalize {}: {}", "zero", {
                         assert!(self.new.is_empty());
-                        log_duration!("fill new: {}", {
+                        log_duration!("fill new and all: {}", {
                             self.new.extend(
                                 self.hash_index_
                                     .iter()
@@ -5991,6 +6282,12 @@ fn codegen_variable_reuse_bug() {
                                     }),
                             );
                             RadixSortable::wrap(&mut self.new).voracious_sort();
+                            self.all.clear();
+                            self.all.extend(
+                                self.hash_index_
+                                    .iter()
+                                    .map(|(&(), &(x0, timestamp))| (x0, timestamp)),
+                            );
                             insertions.clear();
                         });
                         #[cfg(debug_assertions)]
@@ -6002,6 +6299,21 @@ fn codegen_variable_reuse_bug() {
                             new.sort();
                             new.dedup();
                             assert_eq!(new.len(), self.new.len(), "new only has unique elements");
+                            self.all.iter().for_each(|&(x0, _timestamp)| {
+                                assert_eq!((x0,), (uf.math_.find(x0),), "all is canonical");
+                            });
+                            let mut all_: Vec<_> = self.all.clone();
+                            all_.sort();
+                            all_.dedup();
+                            assert_eq!(all_.len(), self.all.len(), "all only has unique elements");
+                            let mut all_: Vec<_> = self.all.iter().map(|&(x0, _timestamp)| (x0,)).collect();
+                            all_.sort();
+                            all_.dedup();
+                            assert_eq!(
+                                all_.len(),
+                                self.all.len(),
+                                "all does not have duplicate timestamps"
+                            );
                         }
                         self.math_num_uprooted_at_latest_retain = 0;
                     });
@@ -6274,6 +6586,7 @@ fn initial_exprs() {
             #[derive(Debug, Default)]
             struct AddRelation {
                 new: Vec<<Self as Relation>::Row>,
+                all: Vec<(Math, Math, Math, TimeStamp)>,
                 hash_index_0_1: runtime::HashMap<(Math, Math), (Math, TimeStamp)>,
                 math_num_uprooted_at_latest_retain: usize,
             }
@@ -6298,7 +6611,12 @@ fn initial_exprs() {
                 }
                 fn emit_graphviz(&self, buf: &mut String) {
                     use std::fmt::Write;
-                    for (i, ((x0, x1), (x2, _timestamp))) in self.hash_index_0_1.iter().enumerate() {
+                    for (i, ((x0, x1), (x2, _timestamp))) in self
+                        .hash_index_0_1
+                        .iter()
+                        .map(|(k, v)| ((*k), (*v)))
+                        .enumerate()
+                    {
                         writeln!(buf, "{}_{i} -> {}_{};", "add", "math", x0).unwrap();
                         writeln!(buf, "{}_{i} -> {}_{};", "add", "math", x1).unwrap();
                         writeln!(buf, "{}_{i} -> {}_{};", "add", "math", x2).unwrap();
@@ -6366,7 +6684,7 @@ fn initial_exprs() {
                 ) {
                     log_duration!("update_finalize {}: {}", "add", {
                         assert!(self.new.is_empty());
-                        log_duration!("fill new: {}", {
+                        log_duration!("fill new and all: {}", {
                             self.new.extend(self.hash_index_0_1.iter().filter_map(
                                 |(&(x0, x1), &(x2, timestamp))| {
                                     if timestamp == latest_timestamp {
@@ -6377,6 +6695,12 @@ fn initial_exprs() {
                                 },
                             ));
                             RadixSortable::wrap(&mut self.new).voracious_sort();
+                            self.all.clear();
+                            self.all.extend(
+                                self.hash_index_0_1
+                                    .iter()
+                                    .map(|(&(x0, x1), &(x2, timestamp))| (x0, x1, x2, timestamp)),
+                            );
                             insertions.clear();
                         });
                         #[cfg(debug_assertions)]
@@ -6392,6 +6716,29 @@ fn initial_exprs() {
                             new.sort();
                             new.dedup();
                             assert_eq!(new.len(), self.new.len(), "new only has unique elements");
+                            self.all.iter().for_each(|&(x0, x1, x2, _timestamp)| {
+                                assert_eq!(
+                                    (x0, x1, x2,),
+                                    (uf.math_.find(x0), uf.math_.find(x1), uf.math_.find(x2),),
+                                    "all is canonical"
+                                );
+                            });
+                            let mut all_: Vec<_> = self.all.clone();
+                            all_.sort();
+                            all_.dedup();
+                            assert_eq!(all_.len(), self.all.len(), "all only has unique elements");
+                            let mut all_: Vec<_> = self
+                                .all
+                                .iter()
+                                .map(|&(x0, x1, x2, _timestamp)| (x0, x1, x2))
+                                .collect();
+                            all_.sort();
+                            all_.dedup();
+                            assert_eq!(
+                                all_.len(),
+                                self.all.len(),
+                                "all does not have duplicate timestamps"
+                            );
                         }
                         self.math_num_uprooted_at_latest_retain = 0;
                     });
@@ -6433,6 +6780,7 @@ fn initial_exprs() {
             #[derive(Debug, Default)]
             struct MulRelation {
                 new: Vec<<Self as Relation>::Row>,
+                all: Vec<(Math, Math, Math, TimeStamp)>,
                 hash_index_0_1: runtime::HashMap<(Math, Math), (Math, TimeStamp)>,
                 math_num_uprooted_at_latest_retain: usize,
             }
@@ -6457,7 +6805,12 @@ fn initial_exprs() {
                 }
                 fn emit_graphviz(&self, buf: &mut String) {
                     use std::fmt::Write;
-                    for (i, ((x0, x1), (x2, _timestamp))) in self.hash_index_0_1.iter().enumerate() {
+                    for (i, ((x0, x1), (x2, _timestamp))) in self
+                        .hash_index_0_1
+                        .iter()
+                        .map(|(k, v)| ((*k), (*v)))
+                        .enumerate()
+                    {
                         writeln!(buf, "{}_{i} -> {}_{};", "mul", "math", x0).unwrap();
                         writeln!(buf, "{}_{i} -> {}_{};", "mul", "math", x1).unwrap();
                         writeln!(buf, "{}_{i} -> {}_{};", "mul", "math", x2).unwrap();
@@ -6525,7 +6878,7 @@ fn initial_exprs() {
                 ) {
                     log_duration!("update_finalize {}: {}", "mul", {
                         assert!(self.new.is_empty());
-                        log_duration!("fill new: {}", {
+                        log_duration!("fill new and all: {}", {
                             self.new.extend(self.hash_index_0_1.iter().filter_map(
                                 |(&(x0, x1), &(x2, timestamp))| {
                                     if timestamp == latest_timestamp {
@@ -6536,6 +6889,12 @@ fn initial_exprs() {
                                 },
                             ));
                             RadixSortable::wrap(&mut self.new).voracious_sort();
+                            self.all.clear();
+                            self.all.extend(
+                                self.hash_index_0_1
+                                    .iter()
+                                    .map(|(&(x0, x1), &(x2, timestamp))| (x0, x1, x2, timestamp)),
+                            );
                             insertions.clear();
                         });
                         #[cfg(debug_assertions)]
@@ -6551,6 +6910,29 @@ fn initial_exprs() {
                             new.sort();
                             new.dedup();
                             assert_eq!(new.len(), self.new.len(), "new only has unique elements");
+                            self.all.iter().for_each(|&(x0, x1, x2, _timestamp)| {
+                                assert_eq!(
+                                    (x0, x1, x2,),
+                                    (uf.math_.find(x0), uf.math_.find(x1), uf.math_.find(x2),),
+                                    "all is canonical"
+                                );
+                            });
+                            let mut all_: Vec<_> = self.all.clone();
+                            all_.sort();
+                            all_.dedup();
+                            assert_eq!(all_.len(), self.all.len(), "all only has unique elements");
+                            let mut all_: Vec<_> = self
+                                .all
+                                .iter()
+                                .map(|&(x0, x1, x2, _timestamp)| (x0, x1, x2))
+                                .collect();
+                            all_.sort();
+                            all_.dedup();
+                            assert_eq!(
+                                all_.len(),
+                                self.all.len(),
+                                "all does not have duplicate timestamps"
+                            );
                         }
                         self.math_num_uprooted_at_latest_retain = 0;
                     });
@@ -6592,6 +6974,7 @@ fn initial_exprs() {
             #[derive(Debug, Default)]
             struct ConstRelation {
                 new: Vec<<Self as Relation>::Row>,
+                all: Vec<(std::primitive::i64, Math, TimeStamp)>,
                 hash_index_0: runtime::HashMap<(std::primitive::i64,), (Math, TimeStamp)>,
                 i64_num_uprooted_at_latest_retain: usize,
                 math_num_uprooted_at_latest_retain: usize,
@@ -6617,7 +7000,12 @@ fn initial_exprs() {
                 }
                 fn emit_graphviz(&self, buf: &mut String) {
                     use std::fmt::Write;
-                    for (i, ((x0,), (x1, _timestamp))) in self.hash_index_0.iter().enumerate() {
+                    for (i, ((x0,), (x1, _timestamp))) in self
+                        .hash_index_0
+                        .iter()
+                        .map(|(k, v)| ((*k), (*v)))
+                        .enumerate()
+                    {
                         writeln!(buf, "{}_{i} -> {}_{};", "const", "i64", x0).unwrap();
                         writeln!(buf, "{}_{i} -> {}_{};", "const", "math", x1).unwrap();
                         writeln!(buf, "{}_{i} [shape = box];", "const").unwrap();
@@ -6680,7 +7068,7 @@ fn initial_exprs() {
                 ) {
                     log_duration!("update_finalize {}: {}", "const", {
                         assert!(self.new.is_empty());
-                        log_duration!("fill new: {}", {
+                        log_duration!("fill new and all: {}", {
                             self.new.extend(self.hash_index_0.iter().filter_map(
                                 |(&(x0,), &(x1, timestamp))| {
                                     if timestamp == latest_timestamp {
@@ -6691,6 +7079,12 @@ fn initial_exprs() {
                                 },
                             ));
                             self.new.sort_unstable();
+                            self.all.clear();
+                            self.all.extend(
+                                self.hash_index_0
+                                    .iter()
+                                    .map(|(&(x0,), &(x1, timestamp))| (x0, x1, timestamp)),
+                            );
                             insertions.clear();
                         });
                         #[cfg(debug_assertions)]
@@ -6702,6 +7096,25 @@ fn initial_exprs() {
                             new.sort();
                             new.dedup();
                             assert_eq!(new.len(), self.new.len(), "new only has unique elements");
+                            self.all.iter().for_each(|&(x0, x1, _timestamp)| {
+                                assert_eq!((x0, x1,), (x0, uf.math_.find(x1),), "all is canonical");
+                            });
+                            let mut all_: Vec<_> = self.all.clone();
+                            all_.sort();
+                            all_.dedup();
+                            assert_eq!(all_.len(), self.all.len(), "all only has unique elements");
+                            let mut all_: Vec<_> = self
+                                .all
+                                .iter()
+                                .map(|&(x0, x1, _timestamp)| (x0, x1))
+                                .collect();
+                            all_.sort();
+                            all_.dedup();
+                            assert_eq!(
+                                all_.len(),
+                                self.all.len(),
+                                "all does not have duplicate timestamps"
+                            );
                         }
                         self.math_num_uprooted_at_latest_retain = 0;
                     });
@@ -6747,6 +7160,7 @@ fn initial_exprs() {
             #[derive(Debug, Default)]
             struct VarRelation {
                 new: Vec<<Self as Relation>::Row>,
+                all: Vec<(runtime::IString, Math, TimeStamp)>,
                 hash_index_0: runtime::HashMap<(runtime::IString,), (Math, TimeStamp)>,
                 string_num_uprooted_at_latest_retain: usize,
                 math_num_uprooted_at_latest_retain: usize,
@@ -6772,7 +7186,12 @@ fn initial_exprs() {
                 }
                 fn emit_graphviz(&self, buf: &mut String) {
                     use std::fmt::Write;
-                    for (i, ((x0,), (x1, _timestamp))) in self.hash_index_0.iter().enumerate() {
+                    for (i, ((x0,), (x1, _timestamp))) in self
+                        .hash_index_0
+                        .iter()
+                        .map(|(k, v)| ((*k), (*v)))
+                        .enumerate()
+                    {
                         writeln!(buf, "{}_{i} -> {}_{};", "var", "string", x0).unwrap();
                         writeln!(buf, "{}_{i} -> {}_{};", "var", "math", x1).unwrap();
                         writeln!(buf, "{}_{i} [shape = box];", "var").unwrap();
@@ -6835,7 +7254,7 @@ fn initial_exprs() {
                 ) {
                     log_duration!("update_finalize {}: {}", "var", {
                         assert!(self.new.is_empty());
-                        log_duration!("fill new: {}", {
+                        log_duration!("fill new and all: {}", {
                             self.new.extend(self.hash_index_0.iter().filter_map(
                                 |(&(x0,), &(x1, timestamp))| {
                                     if timestamp == latest_timestamp {
@@ -6846,6 +7265,12 @@ fn initial_exprs() {
                                 },
                             ));
                             self.new.sort_unstable();
+                            self.all.clear();
+                            self.all.extend(
+                                self.hash_index_0
+                                    .iter()
+                                    .map(|(&(x0,), &(x1, timestamp))| (x0, x1, timestamp)),
+                            );
                             insertions.clear();
                         });
                         #[cfg(debug_assertions)]
@@ -6857,6 +7282,25 @@ fn initial_exprs() {
                             new.sort();
                             new.dedup();
                             assert_eq!(new.len(), self.new.len(), "new only has unique elements");
+                            self.all.iter().for_each(|&(x0, x1, _timestamp)| {
+                                assert_eq!((x0, x1,), (x0, uf.math_.find(x1),), "all is canonical");
+                            });
+                            let mut all_: Vec<_> = self.all.clone();
+                            all_.sort();
+                            all_.dedup();
+                            assert_eq!(all_.len(), self.all.len(), "all only has unique elements");
+                            let mut all_: Vec<_> = self
+                                .all
+                                .iter()
+                                .map(|&(x0, x1, _timestamp)| (x0, x1))
+                                .collect();
+                            all_.sort();
+                            all_.dedup();
+                            assert_eq!(
+                                all_.len(),
+                                self.all.len(),
+                                "all does not have duplicate timestamps"
+                            );
                         }
                         self.math_num_uprooted_at_latest_retain = 0;
                     });
@@ -7733,8 +8177,9 @@ fn test_primitives_simple() {
             #[derive(Debug, Default)]
             struct MulRelation {
                 new: Vec<<Self as Relation>::Row>,
+                all: Vec<(Math, Math, Math, TimeStamp)>,
                 hash_index_1_0: runtime::HashMap<(Math, Math), (Math, TimeStamp)>,
-                hash_index_1: runtime::HashMap<(Math,), runtime::SmallVec<[(Math, Math, TimeStamp); 1]>>,
+                hash_index_1: runtime::IndexedSortedList<(Math,), (Math, Math, TimeStamp)>,
                 math_num_uprooted_at_latest_retain: usize,
             }
             impl Relation for MulRelation {
@@ -7754,11 +8199,16 @@ fn test_primitives_simple() {
                     self.new.iter().copied()
                 }
                 fn len(&self) -> usize {
-                    self.hash_index_1_0.len()
+                    self.hash_index_1.len()
                 }
                 fn emit_graphviz(&self, buf: &mut String) {
                     use std::fmt::Write;
-                    for (i, ((x1, x0), (x2, _timestamp))) in self.hash_index_1_0.iter().enumerate() {
+                    for (i, ((x1, x0), (x2, _timestamp))) in self
+                        .hash_index_1_0
+                        .iter()
+                        .map(|(k, v)| ((*k), (*v)))
+                        .enumerate()
+                    {
                         writeln!(buf, "{}_{i} -> {}_{};", "mul", "math", x1).unwrap();
                         writeln!(buf, "{}_{i} -> {}_{};", "mul", "math", x0).unwrap();
                         writeln!(buf, "{}_{i} -> {}_{};", "mul", "math", x2).unwrap();
@@ -7826,7 +8276,7 @@ fn test_primitives_simple() {
                 ) {
                     log_duration!("update_finalize {}: {}", "mul", {
                         assert!(self.new.is_empty());
-                        log_duration!("fill new: {}", {
+                        log_duration!("fill new and all: {}", {
                             self.new.extend(self.hash_index_1_0.iter().filter_map(
                                 |(&(x1, x0), &(x2, timestamp))| {
                                     if timestamp == latest_timestamp {
@@ -7837,6 +8287,12 @@ fn test_primitives_simple() {
                                 },
                             ));
                             RadixSortable::wrap(&mut self.new).voracious_sort();
+                            self.all.clear();
+                            self.all.extend(
+                                self.hash_index_1_0
+                                    .iter()
+                                    .map(|(&(x1, x0), &(x2, timestamp))| (x0, x1, x2, timestamp)),
+                            );
                             insertions.clear();
                         });
                         #[cfg(debug_assertions)]
@@ -7852,41 +8308,42 @@ fn test_primitives_simple() {
                             new.sort();
                             new.dedup();
                             assert_eq!(new.len(), self.new.len(), "new only has unique elements");
-                        }
-                        log_duration!("retain index: {}", {
-                            self.hash_index_1.retain(|&(x1,), v| {
-                                if uf.math_.is_root(x1) {
-                                    v.retain(|&mut (x0, x2, _timestamp)| {
-                                        uf.math_.is_root(x0) & uf.math_.is_root(x2)
-                                    });
-                                    true
-                                } else {
-                                    false
-                                }
+                            self.all.iter().for_each(|&(x0, x1, x2, _timestamp)| {
+                                assert_eq!(
+                                    (x0, x1, x2,),
+                                    (uf.math_.find(x0), uf.math_.find(x1), uf.math_.find(x2),),
+                                    "all is canonical"
+                                );
                             });
-                        });
-                        log_duration!("fill index: {}", {
-                            for &(x0, x1, x2) in &self.new {
-                                self.hash_index_1
-                                    .entry((x1,))
-                                    .or_default()
-                                    .push((x0, x2, latest_timestamp));
+                            let mut all_: Vec<_> = self.all.clone();
+                            all_.sort();
+                            all_.dedup();
+                            assert_eq!(all_.len(), self.all.len(), "all only has unique elements");
+                            let mut all_: Vec<_> = self
+                                .all
+                                .iter()
+                                .map(|&(x0, x1, x2, _timestamp)| (x0, x1, x2))
+                                .collect();
+                            all_.sort();
+                            all_.dedup();
+                            assert_eq!(
+                                all_.len(),
+                                self.all.len(),
+                                "all does not have duplicate timestamps"
+                            );
+                        }
+                        log_duration!("reconstruct index: {}", {
+                            log_duration!("reconstruct sort: {}", {
+                                RowSort010::sort(&mut self.all);
+                            });
+                            unsafe {
+                                self.hash_index_1.reconstruct(
+                                    &mut self.all,
+                                    |(x0, x1, x2, timestamp)| (x1,),
+                                    |(x0, x1, x2, timestamp)| (x0, x2, timestamp),
+                                );
                             }
                         });
-                        #[cfg(debug_assertions)]
-                        {
-                            self.hash_index_1.iter().for_each(|(&(x1,), v)| {
-                                let mut v = v.clone();
-                                let n = v.len();
-                                v.sort();
-                                v.dedup_by(|(x0, x2, t1), (y0, y2, t2)| true & (*x0 == *y0) & (*x2 == *y2));
-                                assert_eq!(n, v.len(), "indexes do not have duplicates");
-                                assert!(uf.math_.is_root(x1), "key is root");
-                                v.iter().copied().for_each(|(x0, x2, _timestamp)| {
-                                    assert!(uf.math_.is_root(x0) & uf.math_.is_root(x2), "value is root");
-                                });
-                            });
-                        }
                         self.math_num_uprooted_at_latest_retain = 0;
                     });
                 }
@@ -7901,10 +8358,7 @@ fn test_primitives_simple() {
                 }
                 fn iter_all1_1_0_2(&self, x1: Math) -> impl Iterator<Item = (Math, Math)> + use<'_> {
                     self.hash_index_1
-                        .get(&(x1,))
-                        .into_iter()
-                        .flatten()
-                        .copied()
+                        .iter((x1,))
                         .map(|(x0, x2, _timestamp)| (x0, x2))
                 }
                 fn iter_old2_1_0_2(
@@ -7925,10 +8379,7 @@ fn test_primitives_simple() {
                     latest_timestamp: TimeStamp,
                 ) -> impl Iterator<Item = (Math, Math)> + use<'_> {
                     self.hash_index_1
-                        .get(&(x1,))
-                        .into_iter()
-                        .flatten()
-                        .copied()
+                        .iter((x1,))
                         .filter_map(move |(x0, x2, timestamp)| {
                             (timestamp < latest_timestamp).then_some((x0, x2))
                         })
@@ -7952,6 +8403,7 @@ fn test_primitives_simple() {
             #[derive(Debug, Default)]
             struct AddRelation {
                 new: Vec<<Self as Relation>::Row>,
+                all: Vec<(Math, Math, Math, TimeStamp)>,
                 hash_index_0_1: runtime::HashMap<(Math, Math), (Math, TimeStamp)>,
                 math_num_uprooted_at_latest_retain: usize,
             }
@@ -7976,7 +8428,12 @@ fn test_primitives_simple() {
                 }
                 fn emit_graphviz(&self, buf: &mut String) {
                     use std::fmt::Write;
-                    for (i, ((x0, x1), (x2, _timestamp))) in self.hash_index_0_1.iter().enumerate() {
+                    for (i, ((x0, x1), (x2, _timestamp))) in self
+                        .hash_index_0_1
+                        .iter()
+                        .map(|(k, v)| ((*k), (*v)))
+                        .enumerate()
+                    {
                         writeln!(buf, "{}_{i} -> {}_{};", "add", "math", x0).unwrap();
                         writeln!(buf, "{}_{i} -> {}_{};", "add", "math", x1).unwrap();
                         writeln!(buf, "{}_{i} -> {}_{};", "add", "math", x2).unwrap();
@@ -8044,7 +8501,7 @@ fn test_primitives_simple() {
                 ) {
                     log_duration!("update_finalize {}: {}", "add", {
                         assert!(self.new.is_empty());
-                        log_duration!("fill new: {}", {
+                        log_duration!("fill new and all: {}", {
                             self.new.extend(self.hash_index_0_1.iter().filter_map(
                                 |(&(x0, x1), &(x2, timestamp))| {
                                     if timestamp == latest_timestamp {
@@ -8055,6 +8512,12 @@ fn test_primitives_simple() {
                                 },
                             ));
                             RadixSortable::wrap(&mut self.new).voracious_sort();
+                            self.all.clear();
+                            self.all.extend(
+                                self.hash_index_0_1
+                                    .iter()
+                                    .map(|(&(x0, x1), &(x2, timestamp))| (x0, x1, x2, timestamp)),
+                            );
                             insertions.clear();
                         });
                         #[cfg(debug_assertions)]
@@ -8070,6 +8533,29 @@ fn test_primitives_simple() {
                             new.sort();
                             new.dedup();
                             assert_eq!(new.len(), self.new.len(), "new only has unique elements");
+                            self.all.iter().for_each(|&(x0, x1, x2, _timestamp)| {
+                                assert_eq!(
+                                    (x0, x1, x2,),
+                                    (uf.math_.find(x0), uf.math_.find(x1), uf.math_.find(x2),),
+                                    "all is canonical"
+                                );
+                            });
+                            let mut all_: Vec<_> = self.all.clone();
+                            all_.sort();
+                            all_.dedup();
+                            assert_eq!(all_.len(), self.all.len(), "all only has unique elements");
+                            let mut all_: Vec<_> = self
+                                .all
+                                .iter()
+                                .map(|&(x0, x1, x2, _timestamp)| (x0, x1, x2))
+                                .collect();
+                            all_.sort();
+                            all_.dedup();
+                            assert_eq!(
+                                all_.len(),
+                                self.all.len(),
+                                "all does not have duplicate timestamps"
+                            );
                         }
                         self.math_num_uprooted_at_latest_retain = 0;
                     });
@@ -8111,9 +8597,9 @@ fn test_primitives_simple() {
             #[derive(Debug, Default)]
             struct ConstRelation {
                 new: Vec<<Self as Relation>::Row>,
+                all: Vec<(std::primitive::i64, Math, TimeStamp)>,
                 hash_index_0: runtime::HashMap<(std::primitive::i64,), (Math, TimeStamp)>,
-                hash_index_1:
-                    runtime::HashMap<(Math,), runtime::SmallVec<[(std::primitive::i64, TimeStamp); 1]>>,
+                hash_index_1: runtime::IndexedSortedList<(Math,), (std::primitive::i64, TimeStamp)>,
                 i64_num_uprooted_at_latest_retain: usize,
                 math_num_uprooted_at_latest_retain: usize,
             }
@@ -8138,7 +8624,12 @@ fn test_primitives_simple() {
                 }
                 fn emit_graphviz(&self, buf: &mut String) {
                     use std::fmt::Write;
-                    for (i, ((x0,), (x1, _timestamp))) in self.hash_index_0.iter().enumerate() {
+                    for (i, ((x0,), (x1, _timestamp))) in self
+                        .hash_index_0
+                        .iter()
+                        .map(|(k, v)| ((*k), (*v)))
+                        .enumerate()
+                    {
                         writeln!(buf, "{}_{i} -> {}_{};", "const", "i64", x0).unwrap();
                         writeln!(buf, "{}_{i} -> {}_{};", "const", "math", x1).unwrap();
                         writeln!(buf, "{}_{i} [shape = box];", "const").unwrap();
@@ -8201,7 +8692,7 @@ fn test_primitives_simple() {
                 ) {
                     log_duration!("update_finalize {}: {}", "const", {
                         assert!(self.new.is_empty());
-                        log_duration!("fill new: {}", {
+                        log_duration!("fill new and all: {}", {
                             self.new.extend(self.hash_index_0.iter().filter_map(
                                 |(&(x0,), &(x1, timestamp))| {
                                     if timestamp == latest_timestamp {
@@ -8212,6 +8703,12 @@ fn test_primitives_simple() {
                                 },
                             ));
                             self.new.sort_unstable();
+                            self.all.clear();
+                            self.all.extend(
+                                self.hash_index_0
+                                    .iter()
+                                    .map(|(&(x0,), &(x1, timestamp))| (x0, x1, timestamp)),
+                            );
                             insertions.clear();
                         });
                         #[cfg(debug_assertions)]
@@ -8223,39 +8720,38 @@ fn test_primitives_simple() {
                             new.sort();
                             new.dedup();
                             assert_eq!(new.len(), self.new.len(), "new only has unique elements");
-                        }
-                        log_duration!("retain index: {}", {
-                            self.hash_index_1.retain(|&(x1,), v| {
-                                if uf.math_.is_root(x1) {
-                                    v.retain(|&mut (x0, _timestamp)| true);
-                                    true
-                                } else {
-                                    false
-                                }
+                            self.all.iter().for_each(|&(x0, x1, _timestamp)| {
+                                assert_eq!((x0, x1,), (x0, uf.math_.find(x1),), "all is canonical");
                             });
-                        });
-                        log_duration!("fill index: {}", {
-                            for &(x0, x1) in &self.new {
-                                self.hash_index_1
-                                    .entry((x1,))
-                                    .or_default()
-                                    .push((x0, latest_timestamp));
+                            let mut all_: Vec<_> = self.all.clone();
+                            all_.sort();
+                            all_.dedup();
+                            assert_eq!(all_.len(), self.all.len(), "all only has unique elements");
+                            let mut all_: Vec<_> = self
+                                .all
+                                .iter()
+                                .map(|&(x0, x1, _timestamp)| (x0, x1))
+                                .collect();
+                            all_.sort();
+                            all_.dedup();
+                            assert_eq!(
+                                all_.len(),
+                                self.all.len(),
+                                "all does not have duplicate timestamps"
+                            );
+                        }
+                        log_duration!("reconstruct index: {}", {
+                            log_duration!("reconstruct sort: {}", {
+                                self.all.sort_unstable_by_key(|&(x0, x1, timestamp)| (x1,));
+                            });
+                            unsafe {
+                                self.hash_index_1.reconstruct(
+                                    &mut self.all,
+                                    |(x0, x1, timestamp)| (x1,),
+                                    |(x0, x1, timestamp)| (x0, timestamp),
+                                );
                             }
                         });
-                        #[cfg(debug_assertions)]
-                        {
-                            self.hash_index_1.iter().for_each(|(&(x1,), v)| {
-                                let mut v = v.clone();
-                                let n = v.len();
-                                v.sort();
-                                v.dedup_by(|(x0, t1), (y0, t2)| true & (*x0 == *y0));
-                                assert_eq!(n, v.len(), "indexes do not have duplicates");
-                                assert!(uf.math_.is_root(x1), "key is root");
-                                v.iter().copied().for_each(|(x0, _timestamp)| {
-                                    assert!(true, "value is root");
-                                });
-                            });
-                        }
                         self.math_num_uprooted_at_latest_retain = 0;
                     });
                 }
@@ -8269,12 +8765,7 @@ fn test_primitives_simple() {
                         .map(|(x1, _timestamp)| (x1,))
                 }
                 fn iter_all1_1_0(&self, x1: Math) -> impl Iterator<Item = (std::primitive::i64,)> + use<'_> {
-                    self.hash_index_1
-                        .get(&(x1,))
-                        .into_iter()
-                        .flatten()
-                        .copied()
-                        .map(|(x0, _timestamp)| (x0,))
+                    self.hash_index_1.iter((x1,)).map(|(x0, _timestamp)| (x0,))
                 }
                 fn iter_old1_0_1(
                     &self,
@@ -8293,10 +8784,7 @@ fn test_primitives_simple() {
                     latest_timestamp: TimeStamp,
                 ) -> impl Iterator<Item = (std::primitive::i64,)> + use<'_> {
                     self.hash_index_1
-                        .get(&(x1,))
-                        .into_iter()
-                        .flatten()
-                        .copied()
+                        .iter((x1,))
                         .filter_map(move |(x0, timestamp)| (timestamp < latest_timestamp).then_some((x0,)))
                 }
                 fn check1_0_1(&self, x0: std::primitive::i64) -> bool {
@@ -8323,6 +8811,7 @@ fn test_primitives_simple() {
             #[derive(Debug, Default)]
             struct VarRelation {
                 new: Vec<<Self as Relation>::Row>,
+                all: Vec<(runtime::IString, Math, TimeStamp)>,
                 hash_index_0: runtime::HashMap<(runtime::IString,), (Math, TimeStamp)>,
                 string_num_uprooted_at_latest_retain: usize,
                 math_num_uprooted_at_latest_retain: usize,
@@ -8348,7 +8837,12 @@ fn test_primitives_simple() {
                 }
                 fn emit_graphviz(&self, buf: &mut String) {
                     use std::fmt::Write;
-                    for (i, ((x0,), (x1, _timestamp))) in self.hash_index_0.iter().enumerate() {
+                    for (i, ((x0,), (x1, _timestamp))) in self
+                        .hash_index_0
+                        .iter()
+                        .map(|(k, v)| ((*k), (*v)))
+                        .enumerate()
+                    {
                         writeln!(buf, "{}_{i} -> {}_{};", "var", "string", x0).unwrap();
                         writeln!(buf, "{}_{i} -> {}_{};", "var", "math", x1).unwrap();
                         writeln!(buf, "{}_{i} [shape = box];", "var").unwrap();
@@ -8411,7 +8905,7 @@ fn test_primitives_simple() {
                 ) {
                     log_duration!("update_finalize {}: {}", "var", {
                         assert!(self.new.is_empty());
-                        log_duration!("fill new: {}", {
+                        log_duration!("fill new and all: {}", {
                             self.new.extend(self.hash_index_0.iter().filter_map(
                                 |(&(x0,), &(x1, timestamp))| {
                                     if timestamp == latest_timestamp {
@@ -8422,6 +8916,12 @@ fn test_primitives_simple() {
                                 },
                             ));
                             self.new.sort_unstable();
+                            self.all.clear();
+                            self.all.extend(
+                                self.hash_index_0
+                                    .iter()
+                                    .map(|(&(x0,), &(x1, timestamp))| (x0, x1, timestamp)),
+                            );
                             insertions.clear();
                         });
                         #[cfg(debug_assertions)]
@@ -8433,6 +8933,25 @@ fn test_primitives_simple() {
                             new.sort();
                             new.dedup();
                             assert_eq!(new.len(), self.new.len(), "new only has unique elements");
+                            self.all.iter().for_each(|&(x0, x1, _timestamp)| {
+                                assert_eq!((x0, x1,), (x0, uf.math_.find(x1),), "all is canonical");
+                            });
+                            let mut all_: Vec<_> = self.all.clone();
+                            all_.sort();
+                            all_.dedup();
+                            assert_eq!(all_.len(), self.all.len(), "all only has unique elements");
+                            let mut all_: Vec<_> = self
+                                .all
+                                .iter()
+                                .map(|&(x0, x1, _timestamp)| (x0, x1))
+                                .collect();
+                            all_.sort();
+                            all_.dedup();
+                            assert_eq!(
+                                all_.len(),
+                                self.all.len(),
+                                "all does not have duplicate timestamps"
+                            );
                         }
                         self.math_num_uprooted_at_latest_retain = 0;
                     });
@@ -8823,9 +9342,10 @@ fn triangle_join() {
             #[derive(Debug, Default)]
             struct FooRelation {
                 new: Vec<<Self as Relation>::Row>,
-                hash_index_1: runtime::HashMap<(Math,), runtime::SmallVec<[(Math, TimeStamp); 1]>>,
-                hash_index_1_0: runtime::HashMap<(Math, Math), runtime::SmallVec<[(TimeStamp,); 1]>>,
-                hash_index_0: runtime::HashMap<(Math,), runtime::SmallVec<[(Math, TimeStamp); 1]>>,
+                all: Vec<(Math, Math, TimeStamp)>,
+                hash_index_1: runtime::IndexedSortedList<(Math,), (Math, TimeStamp)>,
+                hash_index_1_0: runtime::IndexedSortedList<(Math, Math), (TimeStamp,)>,
+                hash_index_0: runtime::IndexedSortedList<(Math,), (Math, TimeStamp)>,
                 math_num_uprooted_at_latest_retain: usize,
             }
             impl Relation for FooRelation {
@@ -8845,16 +9365,11 @@ fn triangle_join() {
                     self.new.iter().copied()
                 }
                 fn len(&self) -> usize {
-                    self.hash_index_0.values().map(|v| v.len()).sum()
+                    self.hash_index_0.len()
                 }
                 fn emit_graphviz(&self, buf: &mut String) {
                     use std::fmt::Write;
-                    for (i, ((x1,), (x0, _timestamp))) in self
-                        .hash_index_1
-                        .iter()
-                        .flat_map(|(k, v)| v.iter().map(move |v| (k, v)))
-                        .enumerate()
-                    {
+                    for (i, ((x1,), (x0, _timestamp))) in self.hash_index_1.iter_key_value().enumerate() {
                         writeln!(buf, "{}_{i} -> {}_{};", "foo", "math", x1).unwrap();
                         writeln!(buf, "{}_{i} -> {}_{};", "foo", "math", x0).unwrap();
                         writeln!(buf, "{}_{i} [shape = box];", "foo").unwrap();
@@ -8892,15 +9407,40 @@ fn triangle_join() {
                 ) {
                     log_duration!("update_finalize {}: {}", "foo", {
                         assert!(self.new.is_empty());
-                        log_duration!("fill new: {}", {
+                        log_duration!("fill new and all: {}", {
+                            assert_eq!(self.new.len(), 0);
                             self.new.extend(
                                 insertions
                                     .iter()
                                     .map(|&(x0, x1)| (uf.math_.find(x0), uf.math_.find(x1)))
                                     .filter(|&(x0, x1)| !self.hash_index_1_0.contains_key(&(x1, x0))),
                             );
+                            #[cfg(debug_assertions)]
+                            {
+                                let mut old: Vec<_> = self
+                                    .hash_index_1_0
+                                    .iter_key_value()
+                                    .map(|((x1, x0), _)| (x0, x1))
+                                    .collect();
+                                let n = old.len();
+                                old.sort();
+                                old.dedup();
+                                assert_eq!(n, old.len(), "old contains only unique elements");
+                            }
                             RadixSortable::wrap(&mut self.new).voracious_sort();
                             self.new.dedup();
+                            self.all.clear();
+                            self.all.extend(self.hash_index_1_0.iter_key_value().map(
+                                |((x1, x0), (timestamp,))| (uf.math_.find(x0), uf.math_.find(x1), timestamp),
+                            ));
+                            self.all.sort();
+                            self.all.dedup_by_key(|&mut (x0, x1, _timestamp)| (x0, x1));
+                            self.all.extend(
+                                self.new
+                                    .iter()
+                                    .copied()
+                                    .map(|(x0, x1)| (x0, x1, latest_timestamp)),
+                            );
                             insertions.clear();
                         });
                         #[cfg(debug_assertions)]
@@ -8916,131 +9456,79 @@ fn triangle_join() {
                             new.sort();
                             new.dedup();
                             assert_eq!(new.len(), self.new.len(), "new only has unique elements");
-                        }
-                        log_duration!("retain index: {}", {
-                            self.hash_index_1.retain(|&(x1,), v| {
-                                if uf.math_.is_root(x1) {
-                                    v.retain(|&mut (x0, _timestamp)| uf.math_.is_root(x0));
-                                    true
-                                } else {
-                                    false
-                                }
+                            self.all.iter().for_each(|&(x0, x1, _timestamp)| {
+                                assert_eq!(
+                                    (x0, x1,),
+                                    (uf.math_.find(x0), uf.math_.find(x1),),
+                                    "all is canonical"
+                                );
                             });
-                        });
-                        log_duration!("fill index: {}", {
-                            for &(x0, x1) in &self.new {
-                                self.hash_index_1
-                                    .entry((x1,))
-                                    .or_default()
-                                    .push((x0, latest_timestamp));
+                            let mut all_: Vec<_> = self.all.clone();
+                            all_.sort();
+                            all_.dedup();
+                            assert_eq!(all_.len(), self.all.len(), "all only has unique elements");
+                            let mut all_: Vec<_> = self
+                                .all
+                                .iter()
+                                .map(|&(x0, x1, _timestamp)| (x0, x1))
+                                .collect();
+                            all_.sort();
+                            all_.dedup();
+                            assert_eq!(
+                                all_.len(),
+                                self.all.len(),
+                                "all does not have duplicate timestamps"
+                            );
+                        }
+                        log_duration!("reconstruct index: {}", {
+                            log_duration!("reconstruct sort: {}", {
+                                RowSort01::sort(&mut self.all);
+                            });
+                            unsafe {
+                                self.hash_index_1.reconstruct(
+                                    &mut self.all,
+                                    |(x0, x1, timestamp)| (x1,),
+                                    |(x0, x1, timestamp)| (x0, timestamp),
+                                );
                             }
                         });
-                        #[cfg(debug_assertions)]
-                        {
-                            self.hash_index_1.iter().for_each(|(&(x1,), v)| {
-                                let mut v = v.clone();
-                                let n = v.len();
-                                v.sort();
-                                v.dedup_by(|(x0, t1), (y0, t2)| true & (*x0 == *y0));
-                                assert_eq!(n, v.len(), "indexes do not have duplicates");
-                                assert!(uf.math_.is_root(x1), "key is root");
-                                v.iter().copied().for_each(|(x0, _timestamp)| {
-                                    assert!(uf.math_.is_root(x0), "value is root");
-                                });
+                        log_duration!("reconstruct index: {}", {
+                            log_duration!("reconstruct sort: {}", {
+                                RowSort11::sort(&mut self.all);
                             });
-                        }
-                        log_duration!("retain index: {}", {
-                            self.hash_index_1_0.retain(|&(x1, x0), v| {
-                                if uf.math_.is_root(x1) & uf.math_.is_root(x0) {
-                                    v.retain(|&mut (_timestamp)| true);
-                                    true
-                                } else {
-                                    false
-                                }
-                            });
-                        });
-                        log_duration!("fill index: {}", {
-                            for &(x0, x1) in &self.new {
-                                self.hash_index_1_0
-                                    .entry((x1, x0))
-                                    .or_default()
-                                    .push((latest_timestamp,));
+                            unsafe {
+                                self.hash_index_1_0.reconstruct(
+                                    &mut self.all,
+                                    |(x0, x1, timestamp)| (x1, x0),
+                                    |(x0, x1, timestamp)| (timestamp,),
+                                );
                             }
                         });
-                        #[cfg(debug_assertions)]
-                        {
-                            self.hash_index_1_0.iter().for_each(|(&(x1, x0), v)| {
-                                let mut v = v.clone();
-                                let n = v.len();
-                                v.sort();
-                                v.dedup_by(|(t1,), (t2,)| true);
-                                assert_eq!(n, v.len(), "indexes do not have duplicates");
-                                assert!(uf.math_.is_root(x1) & uf.math_.is_root(x0), "key is root");
-                                v.iter().copied().for_each(|(_timestamp)| {
-                                    assert!(true, "value is root");
-                                });
+                        log_duration!("reconstruct index: {}", {
+                            log_duration!("reconstruct sort: {}", {
+                                RowSort10::sort(&mut self.all);
                             });
-                        }
-                        log_duration!("retain index: {}", {
-                            self.hash_index_0.retain(|&(x0,), v| {
-                                if uf.math_.is_root(x0) {
-                                    v.retain(|&mut (x1, _timestamp)| uf.math_.is_root(x1));
-                                    true
-                                } else {
-                                    false
-                                }
-                            });
-                        });
-                        log_duration!("fill index: {}", {
-                            for &(x0, x1) in &self.new {
-                                self.hash_index_0
-                                    .entry((x0,))
-                                    .or_default()
-                                    .push((x1, latest_timestamp));
+                            unsafe {
+                                self.hash_index_0.reconstruct(
+                                    &mut self.all,
+                                    |(x0, x1, timestamp)| (x0,),
+                                    |(x0, x1, timestamp)| (x1, timestamp),
+                                );
                             }
                         });
-                        #[cfg(debug_assertions)]
-                        {
-                            self.hash_index_0.iter().for_each(|(&(x0,), v)| {
-                                let mut v = v.clone();
-                                let n = v.len();
-                                v.sort();
-                                v.dedup_by(|(x1, t1), (y1, t2)| true & (*x1 == *y1));
-                                assert_eq!(n, v.len(), "indexes do not have duplicates");
-                                assert!(uf.math_.is_root(x0), "key is root");
-                                v.iter().copied().for_each(|(x1, _timestamp)| {
-                                    assert!(uf.math_.is_root(x1), "value is root");
-                                });
-                            });
-                        }
                         self.math_num_uprooted_at_latest_retain = 0;
                     });
                 }
             }
             impl FooRelation {
                 fn iter_all1_1_0(&self, x1: Math) -> impl Iterator<Item = (Math,)> + use<'_> {
-                    self.hash_index_1
-                        .get(&(x1,))
-                        .into_iter()
-                        .flatten()
-                        .copied()
-                        .map(|(x0, _timestamp)| (x0,))
+                    self.hash_index_1.iter((x1,)).map(|(x0, _timestamp)| (x0,))
                 }
                 fn iter_all2_1_0(&self, x1: Math, x0: Math) -> impl Iterator<Item = ()> + use<'_> {
-                    self.hash_index_1_0
-                        .get(&(x1, x0))
-                        .into_iter()
-                        .flatten()
-                        .copied()
-                        .map(|(_timestamp)| ())
+                    self.hash_index_1_0.iter((x1, x0)).map(|(_timestamp)| ())
                 }
                 fn iter_all1_0_1(&self, x0: Math) -> impl Iterator<Item = (Math,)> + use<'_> {
-                    self.hash_index_0
-                        .get(&(x0,))
-                        .into_iter()
-                        .flatten()
-                        .copied()
-                        .map(|(x1, _timestamp)| (x1,))
+                    self.hash_index_0.iter((x0,)).map(|(x1, _timestamp)| (x1,))
                 }
                 fn iter_old1_1_0(
                     &self,
@@ -9048,10 +9536,7 @@ fn triangle_join() {
                     latest_timestamp: TimeStamp,
                 ) -> impl Iterator<Item = (Math,)> + use<'_> {
                     self.hash_index_1
-                        .get(&(x1,))
-                        .into_iter()
-                        .flatten()
-                        .copied()
+                        .iter((x1,))
                         .filter_map(move |(x0, timestamp)| (timestamp < latest_timestamp).then_some((x0,)))
                 }
                 fn iter_old2_1_0(
@@ -9061,10 +9546,7 @@ fn triangle_join() {
                     latest_timestamp: TimeStamp,
                 ) -> impl Iterator<Item = ()> + use<'_> {
                     self.hash_index_1_0
-                        .get(&(x1, x0))
-                        .into_iter()
-                        .flatten()
-                        .copied()
+                        .iter((x1, x0))
                         .filter_map(move |(timestamp,)| (timestamp < latest_timestamp).then_some(()))
                 }
                 fn iter_old1_0_1(
@@ -9073,10 +9555,7 @@ fn triangle_join() {
                     latest_timestamp: TimeStamp,
                 ) -> impl Iterator<Item = (Math,)> + use<'_> {
                     self.hash_index_0
-                        .get(&(x0,))
-                        .into_iter()
-                        .flatten()
-                        .copied()
+                        .iter((x0,))
                         .filter_map(move |(x1, timestamp)| (timestamp < latest_timestamp).then_some((x1,)))
                 }
                 fn check1_1_0(&self, x1: Math) -> bool {
@@ -9100,9 +9579,10 @@ fn triangle_join() {
             #[derive(Debug, Default)]
             struct BarRelation {
                 new: Vec<<Self as Relation>::Row>,
-                hash_index_0: runtime::HashMap<(Math,), runtime::SmallVec<[(Math, TimeStamp); 1]>>,
-                hash_index_0_1: runtime::HashMap<(Math, Math), runtime::SmallVec<[(TimeStamp,); 1]>>,
-                hash_index_1: runtime::HashMap<(Math,), runtime::SmallVec<[(Math, TimeStamp); 1]>>,
+                all: Vec<(Math, Math, TimeStamp)>,
+                hash_index_0: runtime::IndexedSortedList<(Math,), (Math, TimeStamp)>,
+                hash_index_0_1: runtime::IndexedSortedList<(Math, Math), (TimeStamp,)>,
+                hash_index_1: runtime::IndexedSortedList<(Math,), (Math, TimeStamp)>,
                 math_num_uprooted_at_latest_retain: usize,
             }
             impl Relation for BarRelation {
@@ -9122,16 +9602,11 @@ fn triangle_join() {
                     self.new.iter().copied()
                 }
                 fn len(&self) -> usize {
-                    self.hash_index_0.values().map(|v| v.len()).sum()
+                    self.hash_index_0.len()
                 }
                 fn emit_graphviz(&self, buf: &mut String) {
                     use std::fmt::Write;
-                    for (i, ((x0,), (x1, _timestamp))) in self
-                        .hash_index_0
-                        .iter()
-                        .flat_map(|(k, v)| v.iter().map(move |v| (k, v)))
-                        .enumerate()
-                    {
+                    for (i, ((x0,), (x1, _timestamp))) in self.hash_index_0.iter_key_value().enumerate() {
                         writeln!(buf, "{}_{i} -> {}_{};", "bar", "math", x0).unwrap();
                         writeln!(buf, "{}_{i} -> {}_{};", "bar", "math", x1).unwrap();
                         writeln!(buf, "{}_{i} [shape = box];", "bar").unwrap();
@@ -9169,15 +9644,40 @@ fn triangle_join() {
                 ) {
                     log_duration!("update_finalize {}: {}", "bar", {
                         assert!(self.new.is_empty());
-                        log_duration!("fill new: {}", {
+                        log_duration!("fill new and all: {}", {
+                            assert_eq!(self.new.len(), 0);
                             self.new.extend(
                                 insertions
                                     .iter()
                                     .map(|&(x0, x1)| (uf.math_.find(x0), uf.math_.find(x1)))
                                     .filter(|&(x0, x1)| !self.hash_index_0_1.contains_key(&(x0, x1))),
                             );
+                            #[cfg(debug_assertions)]
+                            {
+                                let mut old: Vec<_> = self
+                                    .hash_index_0_1
+                                    .iter_key_value()
+                                    .map(|((x0, x1), _)| (x0, x1))
+                                    .collect();
+                                let n = old.len();
+                                old.sort();
+                                old.dedup();
+                                assert_eq!(n, old.len(), "old contains only unique elements");
+                            }
                             RadixSortable::wrap(&mut self.new).voracious_sort();
                             self.new.dedup();
+                            self.all.clear();
+                            self.all.extend(self.hash_index_0_1.iter_key_value().map(
+                                |((x0, x1), (timestamp,))| (uf.math_.find(x0), uf.math_.find(x1), timestamp),
+                            ));
+                            self.all.sort();
+                            self.all.dedup_by_key(|&mut (x0, x1, _timestamp)| (x0, x1));
+                            self.all.extend(
+                                self.new
+                                    .iter()
+                                    .copied()
+                                    .map(|(x0, x1)| (x0, x1, latest_timestamp)),
+                            );
                             insertions.clear();
                         });
                         #[cfg(debug_assertions)]
@@ -9193,131 +9693,79 @@ fn triangle_join() {
                             new.sort();
                             new.dedup();
                             assert_eq!(new.len(), self.new.len(), "new only has unique elements");
-                        }
-                        log_duration!("retain index: {}", {
-                            self.hash_index_0.retain(|&(x0,), v| {
-                                if uf.math_.is_root(x0) {
-                                    v.retain(|&mut (x1, _timestamp)| uf.math_.is_root(x1));
-                                    true
-                                } else {
-                                    false
-                                }
+                            self.all.iter().for_each(|&(x0, x1, _timestamp)| {
+                                assert_eq!(
+                                    (x0, x1,),
+                                    (uf.math_.find(x0), uf.math_.find(x1),),
+                                    "all is canonical"
+                                );
                             });
-                        });
-                        log_duration!("fill index: {}", {
-                            for &(x0, x1) in &self.new {
-                                self.hash_index_0
-                                    .entry((x0,))
-                                    .or_default()
-                                    .push((x1, latest_timestamp));
+                            let mut all_: Vec<_> = self.all.clone();
+                            all_.sort();
+                            all_.dedup();
+                            assert_eq!(all_.len(), self.all.len(), "all only has unique elements");
+                            let mut all_: Vec<_> = self
+                                .all
+                                .iter()
+                                .map(|&(x0, x1, _timestamp)| (x0, x1))
+                                .collect();
+                            all_.sort();
+                            all_.dedup();
+                            assert_eq!(
+                                all_.len(),
+                                self.all.len(),
+                                "all does not have duplicate timestamps"
+                            );
+                        }
+                        log_duration!("reconstruct index: {}", {
+                            log_duration!("reconstruct sort: {}", {
+                                RowSort10::sort(&mut self.all);
+                            });
+                            unsafe {
+                                self.hash_index_0.reconstruct(
+                                    &mut self.all,
+                                    |(x0, x1, timestamp)| (x0,),
+                                    |(x0, x1, timestamp)| (x1, timestamp),
+                                );
                             }
                         });
-                        #[cfg(debug_assertions)]
-                        {
-                            self.hash_index_0.iter().for_each(|(&(x0,), v)| {
-                                let mut v = v.clone();
-                                let n = v.len();
-                                v.sort();
-                                v.dedup_by(|(x1, t1), (y1, t2)| true & (*x1 == *y1));
-                                assert_eq!(n, v.len(), "indexes do not have duplicates");
-                                assert!(uf.math_.is_root(x0), "key is root");
-                                v.iter().copied().for_each(|(x1, _timestamp)| {
-                                    assert!(uf.math_.is_root(x1), "value is root");
-                                });
+                        log_duration!("reconstruct index: {}", {
+                            log_duration!("reconstruct sort: {}", {
+                                RowSort11::sort(&mut self.all);
                             });
-                        }
-                        log_duration!("retain index: {}", {
-                            self.hash_index_0_1.retain(|&(x0, x1), v| {
-                                if uf.math_.is_root(x0) & uf.math_.is_root(x1) {
-                                    v.retain(|&mut (_timestamp)| true);
-                                    true
-                                } else {
-                                    false
-                                }
-                            });
-                        });
-                        log_duration!("fill index: {}", {
-                            for &(x0, x1) in &self.new {
-                                self.hash_index_0_1
-                                    .entry((x0, x1))
-                                    .or_default()
-                                    .push((latest_timestamp,));
+                            unsafe {
+                                self.hash_index_0_1.reconstruct(
+                                    &mut self.all,
+                                    |(x0, x1, timestamp)| (x0, x1),
+                                    |(x0, x1, timestamp)| (timestamp,),
+                                );
                             }
                         });
-                        #[cfg(debug_assertions)]
-                        {
-                            self.hash_index_0_1.iter().for_each(|(&(x0, x1), v)| {
-                                let mut v = v.clone();
-                                let n = v.len();
-                                v.sort();
-                                v.dedup_by(|(t1,), (t2,)| true);
-                                assert_eq!(n, v.len(), "indexes do not have duplicates");
-                                assert!(uf.math_.is_root(x0) & uf.math_.is_root(x1), "key is root");
-                                v.iter().copied().for_each(|(_timestamp)| {
-                                    assert!(true, "value is root");
-                                });
+                        log_duration!("reconstruct index: {}", {
+                            log_duration!("reconstruct sort: {}", {
+                                RowSort01::sort(&mut self.all);
                             });
-                        }
-                        log_duration!("retain index: {}", {
-                            self.hash_index_1.retain(|&(x1,), v| {
-                                if uf.math_.is_root(x1) {
-                                    v.retain(|&mut (x0, _timestamp)| uf.math_.is_root(x0));
-                                    true
-                                } else {
-                                    false
-                                }
-                            });
-                        });
-                        log_duration!("fill index: {}", {
-                            for &(x0, x1) in &self.new {
-                                self.hash_index_1
-                                    .entry((x1,))
-                                    .or_default()
-                                    .push((x0, latest_timestamp));
+                            unsafe {
+                                self.hash_index_1.reconstruct(
+                                    &mut self.all,
+                                    |(x0, x1, timestamp)| (x1,),
+                                    |(x0, x1, timestamp)| (x0, timestamp),
+                                );
                             }
                         });
-                        #[cfg(debug_assertions)]
-                        {
-                            self.hash_index_1.iter().for_each(|(&(x1,), v)| {
-                                let mut v = v.clone();
-                                let n = v.len();
-                                v.sort();
-                                v.dedup_by(|(x0, t1), (y0, t2)| true & (*x0 == *y0));
-                                assert_eq!(n, v.len(), "indexes do not have duplicates");
-                                assert!(uf.math_.is_root(x1), "key is root");
-                                v.iter().copied().for_each(|(x0, _timestamp)| {
-                                    assert!(uf.math_.is_root(x0), "value is root");
-                                });
-                            });
-                        }
                         self.math_num_uprooted_at_latest_retain = 0;
                     });
                 }
             }
             impl BarRelation {
                 fn iter_all1_0_1(&self, x0: Math) -> impl Iterator<Item = (Math,)> + use<'_> {
-                    self.hash_index_0
-                        .get(&(x0,))
-                        .into_iter()
-                        .flatten()
-                        .copied()
-                        .map(|(x1, _timestamp)| (x1,))
+                    self.hash_index_0.iter((x0,)).map(|(x1, _timestamp)| (x1,))
                 }
                 fn iter_all2_0_1(&self, x0: Math, x1: Math) -> impl Iterator<Item = ()> + use<'_> {
-                    self.hash_index_0_1
-                        .get(&(x0, x1))
-                        .into_iter()
-                        .flatten()
-                        .copied()
-                        .map(|(_timestamp)| ())
+                    self.hash_index_0_1.iter((x0, x1)).map(|(_timestamp)| ())
                 }
                 fn iter_all1_1_0(&self, x1: Math) -> impl Iterator<Item = (Math,)> + use<'_> {
-                    self.hash_index_1
-                        .get(&(x1,))
-                        .into_iter()
-                        .flatten()
-                        .copied()
-                        .map(|(x0, _timestamp)| (x0,))
+                    self.hash_index_1.iter((x1,)).map(|(x0, _timestamp)| (x0,))
                 }
                 fn iter_old1_0_1(
                     &self,
@@ -9325,10 +9773,7 @@ fn triangle_join() {
                     latest_timestamp: TimeStamp,
                 ) -> impl Iterator<Item = (Math,)> + use<'_> {
                     self.hash_index_0
-                        .get(&(x0,))
-                        .into_iter()
-                        .flatten()
-                        .copied()
+                        .iter((x0,))
                         .filter_map(move |(x1, timestamp)| (timestamp < latest_timestamp).then_some((x1,)))
                 }
                 fn iter_old2_0_1(
@@ -9338,10 +9783,7 @@ fn triangle_join() {
                     latest_timestamp: TimeStamp,
                 ) -> impl Iterator<Item = ()> + use<'_> {
                     self.hash_index_0_1
-                        .get(&(x0, x1))
-                        .into_iter()
-                        .flatten()
-                        .copied()
+                        .iter((x0, x1))
                         .filter_map(move |(timestamp,)| (timestamp < latest_timestamp).then_some(()))
                 }
                 fn iter_old1_1_0(
@@ -9350,10 +9792,7 @@ fn triangle_join() {
                     latest_timestamp: TimeStamp,
                 ) -> impl Iterator<Item = (Math,)> + use<'_> {
                     self.hash_index_1
-                        .get(&(x1,))
-                        .into_iter()
-                        .flatten()
-                        .copied()
+                        .iter((x1,))
                         .filter_map(move |(x0, timestamp)| (timestamp < latest_timestamp).then_some((x0,)))
                 }
                 fn check1_0_1(&self, x0: Math) -> bool {
@@ -9377,9 +9816,10 @@ fn triangle_join() {
             #[derive(Debug, Default)]
             struct BazRelation {
                 new: Vec<<Self as Relation>::Row>,
-                hash_index_1: runtime::HashMap<(Math,), runtime::SmallVec<[(Math, TimeStamp); 1]>>,
-                hash_index_0: runtime::HashMap<(Math,), runtime::SmallVec<[(Math, TimeStamp); 1]>>,
-                hash_index_1_0: runtime::HashMap<(Math, Math), runtime::SmallVec<[(TimeStamp,); 1]>>,
+                all: Vec<(Math, Math, TimeStamp)>,
+                hash_index_1: runtime::IndexedSortedList<(Math,), (Math, TimeStamp)>,
+                hash_index_0: runtime::IndexedSortedList<(Math,), (Math, TimeStamp)>,
+                hash_index_1_0: runtime::IndexedSortedList<(Math, Math), (TimeStamp,)>,
                 math_num_uprooted_at_latest_retain: usize,
             }
             impl Relation for BazRelation {
@@ -9399,16 +9839,11 @@ fn triangle_join() {
                     self.new.iter().copied()
                 }
                 fn len(&self) -> usize {
-                    self.hash_index_0.values().map(|v| v.len()).sum()
+                    self.hash_index_0.len()
                 }
                 fn emit_graphviz(&self, buf: &mut String) {
                     use std::fmt::Write;
-                    for (i, ((x1,), (x0, _timestamp))) in self
-                        .hash_index_1
-                        .iter()
-                        .flat_map(|(k, v)| v.iter().map(move |v| (k, v)))
-                        .enumerate()
-                    {
+                    for (i, ((x1,), (x0, _timestamp))) in self.hash_index_1.iter_key_value().enumerate() {
                         writeln!(buf, "{}_{i} -> {}_{};", "baz", "math", x1).unwrap();
                         writeln!(buf, "{}_{i} -> {}_{};", "baz", "math", x0).unwrap();
                         writeln!(buf, "{}_{i} [shape = box];", "baz").unwrap();
@@ -9446,15 +9881,40 @@ fn triangle_join() {
                 ) {
                     log_duration!("update_finalize {}: {}", "baz", {
                         assert!(self.new.is_empty());
-                        log_duration!("fill new: {}", {
+                        log_duration!("fill new and all: {}", {
+                            assert_eq!(self.new.len(), 0);
                             self.new.extend(
                                 insertions
                                     .iter()
                                     .map(|&(x0, x1)| (uf.math_.find(x0), uf.math_.find(x1)))
                                     .filter(|&(x0, x1)| !self.hash_index_1_0.contains_key(&(x1, x0))),
                             );
+                            #[cfg(debug_assertions)]
+                            {
+                                let mut old: Vec<_> = self
+                                    .hash_index_1_0
+                                    .iter_key_value()
+                                    .map(|((x1, x0), _)| (x0, x1))
+                                    .collect();
+                                let n = old.len();
+                                old.sort();
+                                old.dedup();
+                                assert_eq!(n, old.len(), "old contains only unique elements");
+                            }
                             RadixSortable::wrap(&mut self.new).voracious_sort();
                             self.new.dedup();
+                            self.all.clear();
+                            self.all.extend(self.hash_index_1_0.iter_key_value().map(
+                                |((x1, x0), (timestamp,))| (uf.math_.find(x0), uf.math_.find(x1), timestamp),
+                            ));
+                            self.all.sort();
+                            self.all.dedup_by_key(|&mut (x0, x1, _timestamp)| (x0, x1));
+                            self.all.extend(
+                                self.new
+                                    .iter()
+                                    .copied()
+                                    .map(|(x0, x1)| (x0, x1, latest_timestamp)),
+                            );
                             insertions.clear();
                         });
                         #[cfg(debug_assertions)]
@@ -9470,131 +9930,79 @@ fn triangle_join() {
                             new.sort();
                             new.dedup();
                             assert_eq!(new.len(), self.new.len(), "new only has unique elements");
-                        }
-                        log_duration!("retain index: {}", {
-                            self.hash_index_1.retain(|&(x1,), v| {
-                                if uf.math_.is_root(x1) {
-                                    v.retain(|&mut (x0, _timestamp)| uf.math_.is_root(x0));
-                                    true
-                                } else {
-                                    false
-                                }
+                            self.all.iter().for_each(|&(x0, x1, _timestamp)| {
+                                assert_eq!(
+                                    (x0, x1,),
+                                    (uf.math_.find(x0), uf.math_.find(x1),),
+                                    "all is canonical"
+                                );
                             });
-                        });
-                        log_duration!("fill index: {}", {
-                            for &(x0, x1) in &self.new {
-                                self.hash_index_1
-                                    .entry((x1,))
-                                    .or_default()
-                                    .push((x0, latest_timestamp));
+                            let mut all_: Vec<_> = self.all.clone();
+                            all_.sort();
+                            all_.dedup();
+                            assert_eq!(all_.len(), self.all.len(), "all only has unique elements");
+                            let mut all_: Vec<_> = self
+                                .all
+                                .iter()
+                                .map(|&(x0, x1, _timestamp)| (x0, x1))
+                                .collect();
+                            all_.sort();
+                            all_.dedup();
+                            assert_eq!(
+                                all_.len(),
+                                self.all.len(),
+                                "all does not have duplicate timestamps"
+                            );
+                        }
+                        log_duration!("reconstruct index: {}", {
+                            log_duration!("reconstruct sort: {}", {
+                                RowSort01::sort(&mut self.all);
+                            });
+                            unsafe {
+                                self.hash_index_1.reconstruct(
+                                    &mut self.all,
+                                    |(x0, x1, timestamp)| (x1,),
+                                    |(x0, x1, timestamp)| (x0, timestamp),
+                                );
                             }
                         });
-                        #[cfg(debug_assertions)]
-                        {
-                            self.hash_index_1.iter().for_each(|(&(x1,), v)| {
-                                let mut v = v.clone();
-                                let n = v.len();
-                                v.sort();
-                                v.dedup_by(|(x0, t1), (y0, t2)| true & (*x0 == *y0));
-                                assert_eq!(n, v.len(), "indexes do not have duplicates");
-                                assert!(uf.math_.is_root(x1), "key is root");
-                                v.iter().copied().for_each(|(x0, _timestamp)| {
-                                    assert!(uf.math_.is_root(x0), "value is root");
-                                });
+                        log_duration!("reconstruct index: {}", {
+                            log_duration!("reconstruct sort: {}", {
+                                RowSort10::sort(&mut self.all);
                             });
-                        }
-                        log_duration!("retain index: {}", {
-                            self.hash_index_0.retain(|&(x0,), v| {
-                                if uf.math_.is_root(x0) {
-                                    v.retain(|&mut (x1, _timestamp)| uf.math_.is_root(x1));
-                                    true
-                                } else {
-                                    false
-                                }
-                            });
-                        });
-                        log_duration!("fill index: {}", {
-                            for &(x0, x1) in &self.new {
-                                self.hash_index_0
-                                    .entry((x0,))
-                                    .or_default()
-                                    .push((x1, latest_timestamp));
+                            unsafe {
+                                self.hash_index_0.reconstruct(
+                                    &mut self.all,
+                                    |(x0, x1, timestamp)| (x0,),
+                                    |(x0, x1, timestamp)| (x1, timestamp),
+                                );
                             }
                         });
-                        #[cfg(debug_assertions)]
-                        {
-                            self.hash_index_0.iter().for_each(|(&(x0,), v)| {
-                                let mut v = v.clone();
-                                let n = v.len();
-                                v.sort();
-                                v.dedup_by(|(x1, t1), (y1, t2)| true & (*x1 == *y1));
-                                assert_eq!(n, v.len(), "indexes do not have duplicates");
-                                assert!(uf.math_.is_root(x0), "key is root");
-                                v.iter().copied().for_each(|(x1, _timestamp)| {
-                                    assert!(uf.math_.is_root(x1), "value is root");
-                                });
+                        log_duration!("reconstruct index: {}", {
+                            log_duration!("reconstruct sort: {}", {
+                                RowSort11::sort(&mut self.all);
                             });
-                        }
-                        log_duration!("retain index: {}", {
-                            self.hash_index_1_0.retain(|&(x1, x0), v| {
-                                if uf.math_.is_root(x1) & uf.math_.is_root(x0) {
-                                    v.retain(|&mut (_timestamp)| true);
-                                    true
-                                } else {
-                                    false
-                                }
-                            });
-                        });
-                        log_duration!("fill index: {}", {
-                            for &(x0, x1) in &self.new {
-                                self.hash_index_1_0
-                                    .entry((x1, x0))
-                                    .or_default()
-                                    .push((latest_timestamp,));
+                            unsafe {
+                                self.hash_index_1_0.reconstruct(
+                                    &mut self.all,
+                                    |(x0, x1, timestamp)| (x1, x0),
+                                    |(x0, x1, timestamp)| (timestamp,),
+                                );
                             }
                         });
-                        #[cfg(debug_assertions)]
-                        {
-                            self.hash_index_1_0.iter().for_each(|(&(x1, x0), v)| {
-                                let mut v = v.clone();
-                                let n = v.len();
-                                v.sort();
-                                v.dedup_by(|(t1,), (t2,)| true);
-                                assert_eq!(n, v.len(), "indexes do not have duplicates");
-                                assert!(uf.math_.is_root(x1) & uf.math_.is_root(x0), "key is root");
-                                v.iter().copied().for_each(|(_timestamp)| {
-                                    assert!(true, "value is root");
-                                });
-                            });
-                        }
                         self.math_num_uprooted_at_latest_retain = 0;
                     });
                 }
             }
             impl BazRelation {
                 fn iter_all1_1_0(&self, x1: Math) -> impl Iterator<Item = (Math,)> + use<'_> {
-                    self.hash_index_1
-                        .get(&(x1,))
-                        .into_iter()
-                        .flatten()
-                        .copied()
-                        .map(|(x0, _timestamp)| (x0,))
+                    self.hash_index_1.iter((x1,)).map(|(x0, _timestamp)| (x0,))
                 }
                 fn iter_all1_0_1(&self, x0: Math) -> impl Iterator<Item = (Math,)> + use<'_> {
-                    self.hash_index_0
-                        .get(&(x0,))
-                        .into_iter()
-                        .flatten()
-                        .copied()
-                        .map(|(x1, _timestamp)| (x1,))
+                    self.hash_index_0.iter((x0,)).map(|(x1, _timestamp)| (x1,))
                 }
                 fn iter_all2_1_0(&self, x1: Math, x0: Math) -> impl Iterator<Item = ()> + use<'_> {
-                    self.hash_index_1_0
-                        .get(&(x1, x0))
-                        .into_iter()
-                        .flatten()
-                        .copied()
-                        .map(|(_timestamp)| ())
+                    self.hash_index_1_0.iter((x1, x0)).map(|(_timestamp)| ())
                 }
                 fn iter_old1_1_0(
                     &self,
@@ -9602,10 +10010,7 @@ fn triangle_join() {
                     latest_timestamp: TimeStamp,
                 ) -> impl Iterator<Item = (Math,)> + use<'_> {
                     self.hash_index_1
-                        .get(&(x1,))
-                        .into_iter()
-                        .flatten()
-                        .copied()
+                        .iter((x1,))
                         .filter_map(move |(x0, timestamp)| (timestamp < latest_timestamp).then_some((x0,)))
                 }
                 fn iter_old1_0_1(
@@ -9614,10 +10019,7 @@ fn triangle_join() {
                     latest_timestamp: TimeStamp,
                 ) -> impl Iterator<Item = (Math,)> + use<'_> {
                     self.hash_index_0
-                        .get(&(x0,))
-                        .into_iter()
-                        .flatten()
-                        .copied()
+                        .iter((x0,))
                         .filter_map(move |(x1, timestamp)| (timestamp < latest_timestamp).then_some((x1,)))
                 }
                 fn iter_old2_1_0(
@@ -9627,10 +10029,7 @@ fn triangle_join() {
                     latest_timestamp: TimeStamp,
                 ) -> impl Iterator<Item = ()> + use<'_> {
                     self.hash_index_1_0
-                        .get(&(x1, x0))
-                        .into_iter()
-                        .flatten()
-                        .copied()
+                        .iter((x1, x0))
                         .filter_map(move |(timestamp,)| (timestamp < latest_timestamp).then_some(()))
                 }
                 fn check1_1_0(&self, x1: Math) -> bool {
@@ -9654,7 +10053,8 @@ fn triangle_join() {
             #[derive(Debug, Default)]
             struct TriangleRelation {
                 new: Vec<<Self as Relation>::Row>,
-                hash_index_0_1_2: runtime::HashMap<(Math, Math, Math), runtime::SmallVec<[(TimeStamp,); 1]>>,
+                all: Vec<(Math, Math, Math, TimeStamp)>,
+                hash_index_0_1_2: runtime::IndexedSortedList<(Math, Math, Math), (TimeStamp,)>,
                 math_num_uprooted_at_latest_retain: usize,
             }
             impl Relation for TriangleRelation {
@@ -9674,15 +10074,11 @@ fn triangle_join() {
                     self.new.iter().copied()
                 }
                 fn len(&self) -> usize {
-                    self.hash_index_0_1_2.values().map(|v| v.len()).sum()
+                    self.hash_index_0_1_2.len()
                 }
                 fn emit_graphviz(&self, buf: &mut String) {
                     use std::fmt::Write;
-                    for (i, ((x0, x1, x2), (_timestamp,))) in self
-                        .hash_index_0_1_2
-                        .iter()
-                        .flat_map(|(k, v)| v.iter().map(move |v| (k, v)))
-                        .enumerate()
+                    for (i, ((x0, x1, x2), (_timestamp,))) in self.hash_index_0_1_2.iter_key_value().enumerate()
                     {
                         writeln!(buf, "{}_{i} -> {}_{};", "triangle", "math", x0).unwrap();
                         writeln!(buf, "{}_{i} -> {}_{};", "triangle", "math", x1).unwrap();
@@ -9722,7 +10118,8 @@ fn triangle_join() {
                 ) {
                     log_duration!("update_finalize {}: {}", "triangle", {
                         assert!(self.new.is_empty());
-                        log_duration!("fill new: {}", {
+                        log_duration!("fill new and all: {}", {
+                            assert_eq!(self.new.len(), 0);
                             self.new.extend(
                                 insertions
                                     .iter()
@@ -9731,8 +10128,40 @@ fn triangle_join() {
                                     })
                                     .filter(|&(x0, x1, x2)| !self.hash_index_0_1_2.contains_key(&(x0, x1, x2))),
                             );
+                            #[cfg(debug_assertions)]
+                            {
+                                let mut old: Vec<_> = self
+                                    .hash_index_0_1_2
+                                    .iter_key_value()
+                                    .map(|((x0, x1, x2), _)| (x0, x1, x2))
+                                    .collect();
+                                let n = old.len();
+                                old.sort();
+                                old.dedup();
+                                assert_eq!(n, old.len(), "old contains only unique elements");
+                            }
                             RadixSortable::wrap(&mut self.new).voracious_sort();
                             self.new.dedup();
+                            self.all.clear();
+                            self.all.extend(self.hash_index_0_1_2.iter_key_value().map(
+                                |((x0, x1, x2), (timestamp,))| {
+                                    (
+                                        uf.math_.find(x0),
+                                        uf.math_.find(x1),
+                                        uf.math_.find(x2),
+                                        timestamp,
+                                    )
+                                },
+                            ));
+                            self.all.sort();
+                            self.all
+                                .dedup_by_key(|&mut (x0, x1, x2, _timestamp)| (x0, x1, x2));
+                            self.all.extend(
+                                self.new
+                                    .iter()
+                                    .copied()
+                                    .map(|(x0, x1, x2)| (x0, x1, x2, latest_timestamp)),
+                            );
                             insertions.clear();
                         });
                         #[cfg(debug_assertions)]
@@ -9748,42 +10177,42 @@ fn triangle_join() {
                             new.sort();
                             new.dedup();
                             assert_eq!(new.len(), self.new.len(), "new only has unique elements");
-                        }
-                        log_duration!("retain index: {}", {
-                            self.hash_index_0_1_2.retain(|&(x0, x1, x2), v| {
-                                if uf.math_.is_root(x0) & uf.math_.is_root(x1) & uf.math_.is_root(x2) {
-                                    v.retain(|&mut (_timestamp)| true);
-                                    true
-                                } else {
-                                    false
-                                }
+                            self.all.iter().for_each(|&(x0, x1, x2, _timestamp)| {
+                                assert_eq!(
+                                    (x0, x1, x2,),
+                                    (uf.math_.find(x0), uf.math_.find(x1), uf.math_.find(x2),),
+                                    "all is canonical"
+                                );
                             });
-                        });
-                        log_duration!("fill index: {}", {
-                            for &(x0, x1, x2) in &self.new {
-                                self.hash_index_0_1_2
-                                    .entry((x0, x1, x2))
-                                    .or_default()
-                                    .push((latest_timestamp,));
+                            let mut all_: Vec<_> = self.all.clone();
+                            all_.sort();
+                            all_.dedup();
+                            assert_eq!(all_.len(), self.all.len(), "all only has unique elements");
+                            let mut all_: Vec<_> = self
+                                .all
+                                .iter()
+                                .map(|&(x0, x1, x2, _timestamp)| (x0, x1, x2))
+                                .collect();
+                            all_.sort();
+                            all_.dedup();
+                            assert_eq!(
+                                all_.len(),
+                                self.all.len(),
+                                "all does not have duplicate timestamps"
+                            );
+                        }
+                        log_duration!("reconstruct index: {}", {
+                            log_duration!("reconstruct sort: {}", {
+                                RowSort111::sort(&mut self.all);
+                            });
+                            unsafe {
+                                self.hash_index_0_1_2.reconstruct(
+                                    &mut self.all,
+                                    |(x0, x1, x2, timestamp)| (x0, x1, x2),
+                                    |(x0, x1, x2, timestamp)| (timestamp,),
+                                );
                             }
                         });
-                        #[cfg(debug_assertions)]
-                        {
-                            self.hash_index_0_1_2.iter().for_each(|(&(x0, x1, x2), v)| {
-                                let mut v = v.clone();
-                                let n = v.len();
-                                v.sort();
-                                v.dedup_by(|(t1,), (t2,)| true);
-                                assert_eq!(n, v.len(), "indexes do not have duplicates");
-                                assert!(
-                                    uf.math_.is_root(x0) & uf.math_.is_root(x1) & uf.math_.is_root(x2),
-                                    "key is root"
-                                );
-                                v.iter().copied().for_each(|(_timestamp)| {
-                                    assert!(true, "value is root");
-                                });
-                            });
-                        }
                         self.math_num_uprooted_at_latest_retain = 0;
                     });
                 }
@@ -9791,10 +10220,7 @@ fn triangle_join() {
             impl TriangleRelation {
                 fn iter_all3_0_1_2(&self, x0: Math, x1: Math, x2: Math) -> impl Iterator<Item = ()> + use<'_> {
                     self.hash_index_0_1_2
-                        .get(&(x0, x1, x2))
-                        .into_iter()
-                        .flatten()
-                        .copied()
+                        .iter((x0, x1, x2))
                         .map(|(_timestamp)| ())
                 }
                 fn iter_old3_0_1_2(
@@ -9805,10 +10231,7 @@ fn triangle_join() {
                     latest_timestamp: TimeStamp,
                 ) -> impl Iterator<Item = ()> + use<'_> {
                     self.hash_index_0_1_2
-                        .get(&(x0, x1, x2))
-                        .into_iter()
-                        .flatten()
-                        .copied()
+                        .iter((x0, x1, x2))
                         .filter_map(move |(timestamp,)| (timestamp < latest_timestamp).then_some(()))
                 }
                 fn check3_0_1_2(&self, x0: Math, x1: Math, x2: Math) -> bool {
@@ -10125,10 +10548,11 @@ fn edgecase0() {
             #[derive(Debug, Default)]
             struct MulRelation {
                 new: Vec<<Self as Relation>::Row>,
+                all: Vec<(Math, Math, Math, TimeStamp)>,
                 hash_index_0_1: runtime::HashMap<(Math, Math), (Math, TimeStamp)>,
-                hash_index_0: runtime::HashMap<(Math,), runtime::SmallVec<[(Math, Math, TimeStamp); 1]>>,
-                hash_index_2_0: runtime::HashMap<(Math, Math), runtime::SmallVec<[(Math, TimeStamp); 1]>>,
-                hash_index_2: runtime::HashMap<(Math,), runtime::SmallVec<[(Math, Math, TimeStamp); 1]>>,
+                hash_index_0: runtime::IndexedSortedList<(Math,), (Math, Math, TimeStamp)>,
+                hash_index_2_0: runtime::IndexedSortedList<(Math, Math), (Math, TimeStamp)>,
+                hash_index_2: runtime::IndexedSortedList<(Math,), (Math, Math, TimeStamp)>,
                 math_num_uprooted_at_latest_retain: usize,
             }
             impl Relation for MulRelation {
@@ -10148,11 +10572,16 @@ fn edgecase0() {
                     self.new.iter().copied()
                 }
                 fn len(&self) -> usize {
-                    self.hash_index_0_1.len()
+                    self.hash_index_0.len()
                 }
                 fn emit_graphviz(&self, buf: &mut String) {
                     use std::fmt::Write;
-                    for (i, ((x0, x1), (x2, _timestamp))) in self.hash_index_0_1.iter().enumerate() {
+                    for (i, ((x0, x1), (x2, _timestamp))) in self
+                        .hash_index_0_1
+                        .iter()
+                        .map(|(k, v)| ((*k), (*v)))
+                        .enumerate()
+                    {
                         writeln!(buf, "{}_{i} -> {}_{};", "mul", "math", x0).unwrap();
                         writeln!(buf, "{}_{i} -> {}_{};", "mul", "math", x1).unwrap();
                         writeln!(buf, "{}_{i} -> {}_{};", "mul", "math", x2).unwrap();
@@ -10220,7 +10649,7 @@ fn edgecase0() {
                 ) {
                     log_duration!("update_finalize {}: {}", "mul", {
                         assert!(self.new.is_empty());
-                        log_duration!("fill new: {}", {
+                        log_duration!("fill new and all: {}", {
                             self.new.extend(self.hash_index_0_1.iter().filter_map(
                                 |(&(x0, x1), &(x2, timestamp))| {
                                     if timestamp == latest_timestamp {
@@ -10231,6 +10660,12 @@ fn edgecase0() {
                                 },
                             ));
                             RadixSortable::wrap(&mut self.new).voracious_sort();
+                            self.all.clear();
+                            self.all.extend(
+                                self.hash_index_0_1
+                                    .iter()
+                                    .map(|(&(x0, x1), &(x2, timestamp))| (x0, x1, x2, timestamp)),
+                            );
                             insertions.clear();
                         });
                         #[cfg(debug_assertions)]
@@ -10246,107 +10681,66 @@ fn edgecase0() {
                             new.sort();
                             new.dedup();
                             assert_eq!(new.len(), self.new.len(), "new only has unique elements");
-                        }
-                        log_duration!("retain index: {}", {
-                            self.hash_index_0.retain(|&(x0,), v| {
-                                if uf.math_.is_root(x0) {
-                                    v.retain(|&mut (x1, x2, _timestamp)| {
-                                        uf.math_.is_root(x1) & uf.math_.is_root(x2)
-                                    });
-                                    true
-                                } else {
-                                    false
-                                }
+                            self.all.iter().for_each(|&(x0, x1, x2, _timestamp)| {
+                                assert_eq!(
+                                    (x0, x1, x2,),
+                                    (uf.math_.find(x0), uf.math_.find(x1), uf.math_.find(x2),),
+                                    "all is canonical"
+                                );
                             });
-                        });
-                        log_duration!("fill index: {}", {
-                            for &(x0, x1, x2) in &self.new {
-                                self.hash_index_0
-                                    .entry((x0,))
-                                    .or_default()
-                                    .push((x1, x2, latest_timestamp));
+                            let mut all_: Vec<_> = self.all.clone();
+                            all_.sort();
+                            all_.dedup();
+                            assert_eq!(all_.len(), self.all.len(), "all only has unique elements");
+                            let mut all_: Vec<_> = self
+                                .all
+                                .iter()
+                                .map(|&(x0, x1, x2, _timestamp)| (x0, x1, x2))
+                                .collect();
+                            all_.sort();
+                            all_.dedup();
+                            assert_eq!(
+                                all_.len(),
+                                self.all.len(),
+                                "all does not have duplicate timestamps"
+                            );
+                        }
+                        log_duration!("reconstruct index: {}", {
+                            log_duration!("reconstruct sort: {}", {
+                                RowSort100::sort(&mut self.all);
+                            });
+                            unsafe {
+                                self.hash_index_0.reconstruct(
+                                    &mut self.all,
+                                    |(x0, x1, x2, timestamp)| (x0,),
+                                    |(x0, x1, x2, timestamp)| (x1, x2, timestamp),
+                                );
                             }
                         });
-                        #[cfg(debug_assertions)]
-                        {
-                            self.hash_index_0.iter().for_each(|(&(x0,), v)| {
-                                let mut v = v.clone();
-                                let n = v.len();
-                                v.sort();
-                                v.dedup_by(|(x1, x2, t1), (y1, y2, t2)| true & (*x1 == *y1) & (*x2 == *y2));
-                                assert_eq!(n, v.len(), "indexes do not have duplicates");
-                                assert!(uf.math_.is_root(x0), "key is root");
-                                v.iter().copied().for_each(|(x1, x2, _timestamp)| {
-                                    assert!(uf.math_.is_root(x1) & uf.math_.is_root(x2), "value is root");
-                                });
+                        log_duration!("reconstruct index: {}", {
+                            log_duration!("reconstruct sort: {}", {
+                                RowSort101::sort(&mut self.all);
                             });
-                        }
-                        log_duration!("retain index: {}", {
-                            self.hash_index_2_0.retain(|&(x2, x0), v| {
-                                if uf.math_.is_root(x2) & uf.math_.is_root(x0) {
-                                    v.retain(|&mut (x1, _timestamp)| uf.math_.is_root(x1));
-                                    true
-                                } else {
-                                    false
-                                }
-                            });
-                        });
-                        log_duration!("fill index: {}", {
-                            for &(x0, x1, x2) in &self.new {
-                                self.hash_index_2_0
-                                    .entry((x2, x0))
-                                    .or_default()
-                                    .push((x1, latest_timestamp));
+                            unsafe {
+                                self.hash_index_2_0.reconstruct(
+                                    &mut self.all,
+                                    |(x0, x1, x2, timestamp)| (x2, x0),
+                                    |(x0, x1, x2, timestamp)| (x1, timestamp),
+                                );
                             }
                         });
-                        #[cfg(debug_assertions)]
-                        {
-                            self.hash_index_2_0.iter().for_each(|(&(x2, x0), v)| {
-                                let mut v = v.clone();
-                                let n = v.len();
-                                v.sort();
-                                v.dedup_by(|(x1, t1), (y1, t2)| true & (*x1 == *y1));
-                                assert_eq!(n, v.len(), "indexes do not have duplicates");
-                                assert!(uf.math_.is_root(x2) & uf.math_.is_root(x0), "key is root");
-                                v.iter().copied().for_each(|(x1, _timestamp)| {
-                                    assert!(uf.math_.is_root(x1), "value is root");
-                                });
+                        log_duration!("reconstruct index: {}", {
+                            log_duration!("reconstruct sort: {}", {
+                                RowSort001::sort(&mut self.all);
                             });
-                        }
-                        log_duration!("retain index: {}", {
-                            self.hash_index_2.retain(|&(x2,), v| {
-                                if uf.math_.is_root(x2) {
-                                    v.retain(|&mut (x0, x1, _timestamp)| {
-                                        uf.math_.is_root(x0) & uf.math_.is_root(x1)
-                                    });
-                                    true
-                                } else {
-                                    false
-                                }
-                            });
-                        });
-                        log_duration!("fill index: {}", {
-                            for &(x0, x1, x2) in &self.new {
-                                self.hash_index_2
-                                    .entry((x2,))
-                                    .or_default()
-                                    .push((x0, x1, latest_timestamp));
+                            unsafe {
+                                self.hash_index_2.reconstruct(
+                                    &mut self.all,
+                                    |(x0, x1, x2, timestamp)| (x2,),
+                                    |(x0, x1, x2, timestamp)| (x0, x1, timestamp),
+                                );
                             }
                         });
-                        #[cfg(debug_assertions)]
-                        {
-                            self.hash_index_2.iter().for_each(|(&(x2,), v)| {
-                                let mut v = v.clone();
-                                let n = v.len();
-                                v.sort();
-                                v.dedup_by(|(x0, x1, t1), (y0, y1, t2)| true & (*x0 == *y0) & (*x1 == *y1));
-                                assert_eq!(n, v.len(), "indexes do not have duplicates");
-                                assert!(uf.math_.is_root(x2), "key is root");
-                                v.iter().copied().for_each(|(x0, x1, _timestamp)| {
-                                    assert!(uf.math_.is_root(x0) & uf.math_.is_root(x1), "value is root");
-                                });
-                            });
-                        }
                         self.math_num_uprooted_at_latest_retain = 0;
                     });
                 }
@@ -10361,26 +10755,17 @@ fn edgecase0() {
                 }
                 fn iter_all1_0_1_2(&self, x0: Math) -> impl Iterator<Item = (Math, Math)> + use<'_> {
                     self.hash_index_0
-                        .get(&(x0,))
-                        .into_iter()
-                        .flatten()
-                        .copied()
+                        .iter((x0,))
                         .map(|(x1, x2, _timestamp)| (x1, x2))
                 }
                 fn iter_all2_2_0_1(&self, x2: Math, x0: Math) -> impl Iterator<Item = (Math,)> + use<'_> {
                     self.hash_index_2_0
-                        .get(&(x2, x0))
-                        .into_iter()
-                        .flatten()
-                        .copied()
+                        .iter((x2, x0))
                         .map(|(x1, _timestamp)| (x1,))
                 }
                 fn iter_all1_2_0_1(&self, x2: Math) -> impl Iterator<Item = (Math, Math)> + use<'_> {
                     self.hash_index_2
-                        .get(&(x2,))
-                        .into_iter()
-                        .flatten()
-                        .copied()
+                        .iter((x2,))
                         .map(|(x0, x1, _timestamp)| (x0, x1))
                 }
                 fn iter_old2_0_1_2(
@@ -10401,10 +10786,7 @@ fn edgecase0() {
                     latest_timestamp: TimeStamp,
                 ) -> impl Iterator<Item = (Math, Math)> + use<'_> {
                     self.hash_index_0
-                        .get(&(x0,))
-                        .into_iter()
-                        .flatten()
-                        .copied()
+                        .iter((x0,))
                         .filter_map(move |(x1, x2, timestamp)| {
                             (timestamp < latest_timestamp).then_some((x1, x2))
                         })
@@ -10416,10 +10798,7 @@ fn edgecase0() {
                     latest_timestamp: TimeStamp,
                 ) -> impl Iterator<Item = (Math,)> + use<'_> {
                     self.hash_index_2_0
-                        .get(&(x2, x0))
-                        .into_iter()
-                        .flatten()
-                        .copied()
+                        .iter((x2, x0))
                         .filter_map(move |(x1, timestamp)| (timestamp < latest_timestamp).then_some((x1,)))
                 }
                 fn iter_old1_2_0_1(
@@ -10428,10 +10807,7 @@ fn edgecase0() {
                     latest_timestamp: TimeStamp,
                 ) -> impl Iterator<Item = (Math, Math)> + use<'_> {
                     self.hash_index_2
-                        .get(&(x2,))
-                        .into_iter()
-                        .flatten()
-                        .copied()
+                        .iter((x2,))
                         .filter_map(move |(x0, x1, timestamp)| {
                             (timestamp < latest_timestamp).then_some((x0, x1))
                         })
@@ -10461,9 +10837,10 @@ fn edgecase0() {
             #[derive(Debug, Default)]
             struct AddRelation {
                 new: Vec<<Self as Relation>::Row>,
+                all: Vec<(Math, Math, Math, TimeStamp)>,
                 hash_index_0_1: runtime::HashMap<(Math, Math), (Math, TimeStamp)>,
-                hash_index_0: runtime::HashMap<(Math,), runtime::SmallVec<[(Math, Math, TimeStamp); 1]>>,
-                hash_index_1: runtime::HashMap<(Math,), runtime::SmallVec<[(Math, Math, TimeStamp); 1]>>,
+                hash_index_0: runtime::IndexedSortedList<(Math,), (Math, Math, TimeStamp)>,
+                hash_index_1: runtime::IndexedSortedList<(Math,), (Math, Math, TimeStamp)>,
                 math_num_uprooted_at_latest_retain: usize,
             }
             impl Relation for AddRelation {
@@ -10483,11 +10860,16 @@ fn edgecase0() {
                     self.new.iter().copied()
                 }
                 fn len(&self) -> usize {
-                    self.hash_index_0_1.len()
+                    self.hash_index_0.len()
                 }
                 fn emit_graphviz(&self, buf: &mut String) {
                     use std::fmt::Write;
-                    for (i, ((x0, x1), (x2, _timestamp))) in self.hash_index_0_1.iter().enumerate() {
+                    for (i, ((x0, x1), (x2, _timestamp))) in self
+                        .hash_index_0_1
+                        .iter()
+                        .map(|(k, v)| ((*k), (*v)))
+                        .enumerate()
+                    {
                         writeln!(buf, "{}_{i} -> {}_{};", "add", "math", x0).unwrap();
                         writeln!(buf, "{}_{i} -> {}_{};", "add", "math", x1).unwrap();
                         writeln!(buf, "{}_{i} -> {}_{};", "add", "math", x2).unwrap();
@@ -10555,7 +10937,7 @@ fn edgecase0() {
                 ) {
                     log_duration!("update_finalize {}: {}", "add", {
                         assert!(self.new.is_empty());
-                        log_duration!("fill new: {}", {
+                        log_duration!("fill new and all: {}", {
                             self.new.extend(self.hash_index_0_1.iter().filter_map(
                                 |(&(x0, x1), &(x2, timestamp))| {
                                     if timestamp == latest_timestamp {
@@ -10566,6 +10948,12 @@ fn edgecase0() {
                                 },
                             ));
                             RadixSortable::wrap(&mut self.new).voracious_sort();
+                            self.all.clear();
+                            self.all.extend(
+                                self.hash_index_0_1
+                                    .iter()
+                                    .map(|(&(x0, x1), &(x2, timestamp))| (x0, x1, x2, timestamp)),
+                            );
                             insertions.clear();
                         });
                         #[cfg(debug_assertions)]
@@ -10581,75 +10969,54 @@ fn edgecase0() {
                             new.sort();
                             new.dedup();
                             assert_eq!(new.len(), self.new.len(), "new only has unique elements");
-                        }
-                        log_duration!("retain index: {}", {
-                            self.hash_index_0.retain(|&(x0,), v| {
-                                if uf.math_.is_root(x0) {
-                                    v.retain(|&mut (x1, x2, _timestamp)| {
-                                        uf.math_.is_root(x1) & uf.math_.is_root(x2)
-                                    });
-                                    true
-                                } else {
-                                    false
-                                }
+                            self.all.iter().for_each(|&(x0, x1, x2, _timestamp)| {
+                                assert_eq!(
+                                    (x0, x1, x2,),
+                                    (uf.math_.find(x0), uf.math_.find(x1), uf.math_.find(x2),),
+                                    "all is canonical"
+                                );
                             });
-                        });
-                        log_duration!("fill index: {}", {
-                            for &(x0, x1, x2) in &self.new {
-                                self.hash_index_0
-                                    .entry((x0,))
-                                    .or_default()
-                                    .push((x1, x2, latest_timestamp));
+                            let mut all_: Vec<_> = self.all.clone();
+                            all_.sort();
+                            all_.dedup();
+                            assert_eq!(all_.len(), self.all.len(), "all only has unique elements");
+                            let mut all_: Vec<_> = self
+                                .all
+                                .iter()
+                                .map(|&(x0, x1, x2, _timestamp)| (x0, x1, x2))
+                                .collect();
+                            all_.sort();
+                            all_.dedup();
+                            assert_eq!(
+                                all_.len(),
+                                self.all.len(),
+                                "all does not have duplicate timestamps"
+                            );
+                        }
+                        log_duration!("reconstruct index: {}", {
+                            log_duration!("reconstruct sort: {}", {
+                                RowSort100::sort(&mut self.all);
+                            });
+                            unsafe {
+                                self.hash_index_0.reconstruct(
+                                    &mut self.all,
+                                    |(x0, x1, x2, timestamp)| (x0,),
+                                    |(x0, x1, x2, timestamp)| (x1, x2, timestamp),
+                                );
                             }
                         });
-                        #[cfg(debug_assertions)]
-                        {
-                            self.hash_index_0.iter().for_each(|(&(x0,), v)| {
-                                let mut v = v.clone();
-                                let n = v.len();
-                                v.sort();
-                                v.dedup_by(|(x1, x2, t1), (y1, y2, t2)| true & (*x1 == *y1) & (*x2 == *y2));
-                                assert_eq!(n, v.len(), "indexes do not have duplicates");
-                                assert!(uf.math_.is_root(x0), "key is root");
-                                v.iter().copied().for_each(|(x1, x2, _timestamp)| {
-                                    assert!(uf.math_.is_root(x1) & uf.math_.is_root(x2), "value is root");
-                                });
+                        log_duration!("reconstruct index: {}", {
+                            log_duration!("reconstruct sort: {}", {
+                                RowSort010::sort(&mut self.all);
                             });
-                        }
-                        log_duration!("retain index: {}", {
-                            self.hash_index_1.retain(|&(x1,), v| {
-                                if uf.math_.is_root(x1) {
-                                    v.retain(|&mut (x0, x2, _timestamp)| {
-                                        uf.math_.is_root(x0) & uf.math_.is_root(x2)
-                                    });
-                                    true
-                                } else {
-                                    false
-                                }
-                            });
-                        });
-                        log_duration!("fill index: {}", {
-                            for &(x0, x1, x2) in &self.new {
-                                self.hash_index_1
-                                    .entry((x1,))
-                                    .or_default()
-                                    .push((x0, x2, latest_timestamp));
+                            unsafe {
+                                self.hash_index_1.reconstruct(
+                                    &mut self.all,
+                                    |(x0, x1, x2, timestamp)| (x1,),
+                                    |(x0, x1, x2, timestamp)| (x0, x2, timestamp),
+                                );
                             }
                         });
-                        #[cfg(debug_assertions)]
-                        {
-                            self.hash_index_1.iter().for_each(|(&(x1,), v)| {
-                                let mut v = v.clone();
-                                let n = v.len();
-                                v.sort();
-                                v.dedup_by(|(x0, x2, t1), (y0, y2, t2)| true & (*x0 == *y0) & (*x2 == *y2));
-                                assert_eq!(n, v.len(), "indexes do not have duplicates");
-                                assert!(uf.math_.is_root(x1), "key is root");
-                                v.iter().copied().for_each(|(x0, x2, _timestamp)| {
-                                    assert!(uf.math_.is_root(x0) & uf.math_.is_root(x2), "value is root");
-                                });
-                            });
-                        }
                         self.math_num_uprooted_at_latest_retain = 0;
                     });
                 }
@@ -10664,18 +11031,12 @@ fn edgecase0() {
                 }
                 fn iter_all1_0_1_2(&self, x0: Math) -> impl Iterator<Item = (Math, Math)> + use<'_> {
                     self.hash_index_0
-                        .get(&(x0,))
-                        .into_iter()
-                        .flatten()
-                        .copied()
+                        .iter((x0,))
                         .map(|(x1, x2, _timestamp)| (x1, x2))
                 }
                 fn iter_all1_1_0_2(&self, x1: Math) -> impl Iterator<Item = (Math, Math)> + use<'_> {
                     self.hash_index_1
-                        .get(&(x1,))
-                        .into_iter()
-                        .flatten()
-                        .copied()
+                        .iter((x1,))
                         .map(|(x0, x2, _timestamp)| (x0, x2))
                 }
                 fn iter_old2_0_1_2(
@@ -10696,10 +11057,7 @@ fn edgecase0() {
                     latest_timestamp: TimeStamp,
                 ) -> impl Iterator<Item = (Math, Math)> + use<'_> {
                     self.hash_index_0
-                        .get(&(x0,))
-                        .into_iter()
-                        .flatten()
-                        .copied()
+                        .iter((x0,))
                         .filter_map(move |(x1, x2, timestamp)| {
                             (timestamp < latest_timestamp).then_some((x1, x2))
                         })
@@ -10710,10 +11068,7 @@ fn edgecase0() {
                     latest_timestamp: TimeStamp,
                 ) -> impl Iterator<Item = (Math, Math)> + use<'_> {
                     self.hash_index_1
-                        .get(&(x1,))
-                        .into_iter()
-                        .flatten()
-                        .copied()
+                        .iter((x1,))
                         .filter_map(move |(x0, x2, timestamp)| {
                             (timestamp < latest_timestamp).then_some((x0, x2))
                         })
@@ -10985,8 +11340,9 @@ fn test_into_codegen() {
             #[derive(Debug, Default)]
             struct MulRelation {
                 new: Vec<<Self as Relation>::Row>,
+                all: Vec<(Math, Math, Math, TimeStamp)>,
                 hash_index_0_1: runtime::HashMap<(Math, Math), (Math, TimeStamp)>,
-                hash_index_0: runtime::HashMap<(Math,), runtime::SmallVec<[(Math, Math, TimeStamp); 1]>>,
+                hash_index_0: runtime::IndexedSortedList<(Math,), (Math, Math, TimeStamp)>,
                 math_num_uprooted_at_latest_retain: usize,
             }
             impl Relation for MulRelation {
@@ -11006,11 +11362,16 @@ fn test_into_codegen() {
                     self.new.iter().copied()
                 }
                 fn len(&self) -> usize {
-                    self.hash_index_0_1.len()
+                    self.hash_index_0.len()
                 }
                 fn emit_graphviz(&self, buf: &mut String) {
                     use std::fmt::Write;
-                    for (i, ((x0, x1), (x2, _timestamp))) in self.hash_index_0_1.iter().enumerate() {
+                    for (i, ((x0, x1), (x2, _timestamp))) in self
+                        .hash_index_0_1
+                        .iter()
+                        .map(|(k, v)| ((*k), (*v)))
+                        .enumerate()
+                    {
                         writeln!(buf, "{}_{i} -> {}_{};", "mul", "math", x0).unwrap();
                         writeln!(buf, "{}_{i} -> {}_{};", "mul", "math", x1).unwrap();
                         writeln!(buf, "{}_{i} -> {}_{};", "mul", "math", x2).unwrap();
@@ -11078,7 +11439,7 @@ fn test_into_codegen() {
                 ) {
                     log_duration!("update_finalize {}: {}", "mul", {
                         assert!(self.new.is_empty());
-                        log_duration!("fill new: {}", {
+                        log_duration!("fill new and all: {}", {
                             self.new.extend(self.hash_index_0_1.iter().filter_map(
                                 |(&(x0, x1), &(x2, timestamp))| {
                                     if timestamp == latest_timestamp {
@@ -11089,6 +11450,12 @@ fn test_into_codegen() {
                                 },
                             ));
                             RadixSortable::wrap(&mut self.new).voracious_sort();
+                            self.all.clear();
+                            self.all.extend(
+                                self.hash_index_0_1
+                                    .iter()
+                                    .map(|(&(x0, x1), &(x2, timestamp))| (x0, x1, x2, timestamp)),
+                            );
                             insertions.clear();
                         });
                         #[cfg(debug_assertions)]
@@ -11104,41 +11471,42 @@ fn test_into_codegen() {
                             new.sort();
                             new.dedup();
                             assert_eq!(new.len(), self.new.len(), "new only has unique elements");
-                        }
-                        log_duration!("retain index: {}", {
-                            self.hash_index_0.retain(|&(x0,), v| {
-                                if uf.math_.is_root(x0) {
-                                    v.retain(|&mut (x1, x2, _timestamp)| {
-                                        uf.math_.is_root(x1) & uf.math_.is_root(x2)
-                                    });
-                                    true
-                                } else {
-                                    false
-                                }
+                            self.all.iter().for_each(|&(x0, x1, x2, _timestamp)| {
+                                assert_eq!(
+                                    (x0, x1, x2,),
+                                    (uf.math_.find(x0), uf.math_.find(x1), uf.math_.find(x2),),
+                                    "all is canonical"
+                                );
                             });
-                        });
-                        log_duration!("fill index: {}", {
-                            for &(x0, x1, x2) in &self.new {
-                                self.hash_index_0
-                                    .entry((x0,))
-                                    .or_default()
-                                    .push((x1, x2, latest_timestamp));
+                            let mut all_: Vec<_> = self.all.clone();
+                            all_.sort();
+                            all_.dedup();
+                            assert_eq!(all_.len(), self.all.len(), "all only has unique elements");
+                            let mut all_: Vec<_> = self
+                                .all
+                                .iter()
+                                .map(|&(x0, x1, x2, _timestamp)| (x0, x1, x2))
+                                .collect();
+                            all_.sort();
+                            all_.dedup();
+                            assert_eq!(
+                                all_.len(),
+                                self.all.len(),
+                                "all does not have duplicate timestamps"
+                            );
+                        }
+                        log_duration!("reconstruct index: {}", {
+                            log_duration!("reconstruct sort: {}", {
+                                RowSort100::sort(&mut self.all);
+                            });
+                            unsafe {
+                                self.hash_index_0.reconstruct(
+                                    &mut self.all,
+                                    |(x0, x1, x2, timestamp)| (x0,),
+                                    |(x0, x1, x2, timestamp)| (x1, x2, timestamp),
+                                );
                             }
                         });
-                        #[cfg(debug_assertions)]
-                        {
-                            self.hash_index_0.iter().for_each(|(&(x0,), v)| {
-                                let mut v = v.clone();
-                                let n = v.len();
-                                v.sort();
-                                v.dedup_by(|(x1, x2, t1), (y1, y2, t2)| true & (*x1 == *y1) & (*x2 == *y2));
-                                assert_eq!(n, v.len(), "indexes do not have duplicates");
-                                assert!(uf.math_.is_root(x0), "key is root");
-                                v.iter().copied().for_each(|(x1, x2, _timestamp)| {
-                                    assert!(uf.math_.is_root(x1) & uf.math_.is_root(x2), "value is root");
-                                });
-                            });
-                        }
                         self.math_num_uprooted_at_latest_retain = 0;
                     });
                 }
@@ -11153,10 +11521,7 @@ fn test_into_codegen() {
                 }
                 fn iter_all1_0_1_2(&self, x0: Math) -> impl Iterator<Item = (Math, Math)> + use<'_> {
                     self.hash_index_0
-                        .get(&(x0,))
-                        .into_iter()
-                        .flatten()
-                        .copied()
+                        .iter((x0,))
                         .map(|(x1, x2, _timestamp)| (x1, x2))
                 }
                 fn iter_old2_0_1_2(
@@ -11177,10 +11542,7 @@ fn test_into_codegen() {
                     latest_timestamp: TimeStamp,
                 ) -> impl Iterator<Item = (Math, Math)> + use<'_> {
                     self.hash_index_0
-                        .get(&(x0,))
-                        .into_iter()
-                        .flatten()
-                        .copied()
+                        .iter((x0,))
                         .filter_map(move |(x1, x2, timestamp)| {
                             (timestamp < latest_timestamp).then_some((x1, x2))
                         })
@@ -11204,8 +11566,9 @@ fn test_into_codegen() {
             #[derive(Debug, Default)]
             struct AddRelation {
                 new: Vec<<Self as Relation>::Row>,
+                all: Vec<(Math, Math, Math, TimeStamp)>,
                 hash_index_0_1: runtime::HashMap<(Math, Math), (Math, TimeStamp)>,
-                hash_index_2: runtime::HashMap<(Math,), runtime::SmallVec<[(Math, Math, TimeStamp); 1]>>,
+                hash_index_2: runtime::IndexedSortedList<(Math,), (Math, Math, TimeStamp)>,
                 math_num_uprooted_at_latest_retain: usize,
             }
             impl Relation for AddRelation {
@@ -11229,7 +11592,12 @@ fn test_into_codegen() {
                 }
                 fn emit_graphviz(&self, buf: &mut String) {
                     use std::fmt::Write;
-                    for (i, ((x0, x1), (x2, _timestamp))) in self.hash_index_0_1.iter().enumerate() {
+                    for (i, ((x0, x1), (x2, _timestamp))) in self
+                        .hash_index_0_1
+                        .iter()
+                        .map(|(k, v)| ((*k), (*v)))
+                        .enumerate()
+                    {
                         writeln!(buf, "{}_{i} -> {}_{};", "add", "math", x0).unwrap();
                         writeln!(buf, "{}_{i} -> {}_{};", "add", "math", x1).unwrap();
                         writeln!(buf, "{}_{i} -> {}_{};", "add", "math", x2).unwrap();
@@ -11297,7 +11665,7 @@ fn test_into_codegen() {
                 ) {
                     log_duration!("update_finalize {}: {}", "add", {
                         assert!(self.new.is_empty());
-                        log_duration!("fill new: {}", {
+                        log_duration!("fill new and all: {}", {
                             self.new.extend(self.hash_index_0_1.iter().filter_map(
                                 |(&(x0, x1), &(x2, timestamp))| {
                                     if timestamp == latest_timestamp {
@@ -11308,6 +11676,12 @@ fn test_into_codegen() {
                                 },
                             ));
                             RadixSortable::wrap(&mut self.new).voracious_sort();
+                            self.all.clear();
+                            self.all.extend(
+                                self.hash_index_0_1
+                                    .iter()
+                                    .map(|(&(x0, x1), &(x2, timestamp))| (x0, x1, x2, timestamp)),
+                            );
                             insertions.clear();
                         });
                         #[cfg(debug_assertions)]
@@ -11323,41 +11697,42 @@ fn test_into_codegen() {
                             new.sort();
                             new.dedup();
                             assert_eq!(new.len(), self.new.len(), "new only has unique elements");
-                        }
-                        log_duration!("retain index: {}", {
-                            self.hash_index_2.retain(|&(x2,), v| {
-                                if uf.math_.is_root(x2) {
-                                    v.retain(|&mut (x0, x1, _timestamp)| {
-                                        uf.math_.is_root(x0) & uf.math_.is_root(x1)
-                                    });
-                                    true
-                                } else {
-                                    false
-                                }
+                            self.all.iter().for_each(|&(x0, x1, x2, _timestamp)| {
+                                assert_eq!(
+                                    (x0, x1, x2,),
+                                    (uf.math_.find(x0), uf.math_.find(x1), uf.math_.find(x2),),
+                                    "all is canonical"
+                                );
                             });
-                        });
-                        log_duration!("fill index: {}", {
-                            for &(x0, x1, x2) in &self.new {
-                                self.hash_index_2
-                                    .entry((x2,))
-                                    .or_default()
-                                    .push((x0, x1, latest_timestamp));
+                            let mut all_: Vec<_> = self.all.clone();
+                            all_.sort();
+                            all_.dedup();
+                            assert_eq!(all_.len(), self.all.len(), "all only has unique elements");
+                            let mut all_: Vec<_> = self
+                                .all
+                                .iter()
+                                .map(|&(x0, x1, x2, _timestamp)| (x0, x1, x2))
+                                .collect();
+                            all_.sort();
+                            all_.dedup();
+                            assert_eq!(
+                                all_.len(),
+                                self.all.len(),
+                                "all does not have duplicate timestamps"
+                            );
+                        }
+                        log_duration!("reconstruct index: {}", {
+                            log_duration!("reconstruct sort: {}", {
+                                RowSort001::sort(&mut self.all);
+                            });
+                            unsafe {
+                                self.hash_index_2.reconstruct(
+                                    &mut self.all,
+                                    |(x0, x1, x2, timestamp)| (x2,),
+                                    |(x0, x1, x2, timestamp)| (x0, x1, timestamp),
+                                );
                             }
                         });
-                        #[cfg(debug_assertions)]
-                        {
-                            self.hash_index_2.iter().for_each(|(&(x2,), v)| {
-                                let mut v = v.clone();
-                                let n = v.len();
-                                v.sort();
-                                v.dedup_by(|(x0, x1, t1), (y0, y1, t2)| true & (*x0 == *y0) & (*x1 == *y1));
-                                assert_eq!(n, v.len(), "indexes do not have duplicates");
-                                assert!(uf.math_.is_root(x2), "key is root");
-                                v.iter().copied().for_each(|(x0, x1, _timestamp)| {
-                                    assert!(uf.math_.is_root(x0) & uf.math_.is_root(x1), "value is root");
-                                });
-                            });
-                        }
                         self.math_num_uprooted_at_latest_retain = 0;
                     });
                 }
@@ -11372,10 +11747,7 @@ fn test_into_codegen() {
                 }
                 fn iter_all1_2_0_1(&self, x2: Math) -> impl Iterator<Item = (Math, Math)> + use<'_> {
                     self.hash_index_2
-                        .get(&(x2,))
-                        .into_iter()
-                        .flatten()
-                        .copied()
+                        .iter((x2,))
                         .map(|(x0, x1, _timestamp)| (x0, x1))
                 }
                 fn iter_old2_0_1_2(
@@ -11396,10 +11768,7 @@ fn test_into_codegen() {
                     latest_timestamp: TimeStamp,
                 ) -> impl Iterator<Item = (Math, Math)> + use<'_> {
                     self.hash_index_2
-                        .get(&(x2,))
-                        .into_iter()
-                        .flatten()
-                        .copied()
+                        .iter((x2,))
                         .filter_map(move |(x0, x1, timestamp)| {
                             (timestamp < latest_timestamp).then_some((x0, x1))
                         })
@@ -13989,8 +14358,9 @@ fn lir_math() {
             #[derive(Debug, Default)]
             struct FuelRelation {
                 new: Vec<<Self as Relation>::Row>,
+                all: Vec<(FuelUnit, FuelUnit, TimeStamp)>,
                 hash_index_0: runtime::HashMap<(FuelUnit,), (FuelUnit, TimeStamp)>,
-                hash_index_1: runtime::HashMap<(FuelUnit,), runtime::SmallVec<[(FuelUnit, TimeStamp); 1]>>,
+                hash_index_1: runtime::IndexedSortedList<(FuelUnit,), (FuelUnit, TimeStamp)>,
                 fuel_unit_num_uprooted_at_latest_retain: usize,
             }
             impl Relation for FuelRelation {
@@ -14014,7 +14384,12 @@ fn lir_math() {
                 }
                 fn emit_graphviz(&self, buf: &mut String) {
                     use std::fmt::Write;
-                    for (i, ((x0,), (x1, _timestamp))) in self.hash_index_0.iter().enumerate() {
+                    for (i, ((x0,), (x1, _timestamp))) in self
+                        .hash_index_0
+                        .iter()
+                        .map(|(k, v)| ((*k), (*v)))
+                        .enumerate()
+                    {
                         writeln!(buf, "{}_{i} -> {}_{};", "fuel", "fuel_unit", x0).unwrap();
                         writeln!(buf, "{}_{i} -> {}_{};", "fuel", "fuel_unit", x1).unwrap();
                         writeln!(buf, "{}_{i} [shape = box];", "fuel").unwrap();
@@ -14077,7 +14452,7 @@ fn lir_math() {
                 ) {
                     log_duration!("update_finalize {}: {}", "fuel", {
                         assert!(self.new.is_empty());
-                        log_duration!("fill new: {}", {
+                        log_duration!("fill new and all: {}", {
                             self.new.extend(self.hash_index_0.iter().filter_map(
                                 |(&(x0,), &(x1, timestamp))| {
                                     if timestamp == latest_timestamp {
@@ -14088,6 +14463,12 @@ fn lir_math() {
                                 },
                             ));
                             RadixSortable::wrap(&mut self.new).voracious_sort();
+                            self.all.clear();
+                            self.all.extend(
+                                self.hash_index_0
+                                    .iter()
+                                    .map(|(&(x0,), &(x1, timestamp))| (x0, x1, timestamp)),
+                            );
                             insertions.clear();
                         });
                         #[cfg(debug_assertions)]
@@ -14103,39 +14484,42 @@ fn lir_math() {
                             new.sort();
                             new.dedup();
                             assert_eq!(new.len(), self.new.len(), "new only has unique elements");
-                        }
-                        log_duration!("retain index: {}", {
-                            self.hash_index_1.retain(|&(x1,), v| {
-                                if uf.fuel_unit_.is_root(x1) {
-                                    v.retain(|&mut (x0, _timestamp)| uf.fuel_unit_.is_root(x0));
-                                    true
-                                } else {
-                                    false
-                                }
+                            self.all.iter().for_each(|&(x0, x1, _timestamp)| {
+                                assert_eq!(
+                                    (x0, x1,),
+                                    (uf.fuel_unit_.find(x0), uf.fuel_unit_.find(x1),),
+                                    "all is canonical"
+                                );
                             });
-                        });
-                        log_duration!("fill index: {}", {
-                            for &(x0, x1) in &self.new {
-                                self.hash_index_1
-                                    .entry((x1,))
-                                    .or_default()
-                                    .push((x0, latest_timestamp));
+                            let mut all_: Vec<_> = self.all.clone();
+                            all_.sort();
+                            all_.dedup();
+                            assert_eq!(all_.len(), self.all.len(), "all only has unique elements");
+                            let mut all_: Vec<_> = self
+                                .all
+                                .iter()
+                                .map(|&(x0, x1, _timestamp)| (x0, x1))
+                                .collect();
+                            all_.sort();
+                            all_.dedup();
+                            assert_eq!(
+                                all_.len(),
+                                self.all.len(),
+                                "all does not have duplicate timestamps"
+                            );
+                        }
+                        log_duration!("reconstruct index: {}", {
+                            log_duration!("reconstruct sort: {}", {
+                                RowSort01::sort(&mut self.all);
+                            });
+                            unsafe {
+                                self.hash_index_1.reconstruct(
+                                    &mut self.all,
+                                    |(x0, x1, timestamp)| (x1,),
+                                    |(x0, x1, timestamp)| (x0, timestamp),
+                                );
                             }
                         });
-                        #[cfg(debug_assertions)]
-                        {
-                            self.hash_index_1.iter().for_each(|(&(x1,), v)| {
-                                let mut v = v.clone();
-                                let n = v.len();
-                                v.sort();
-                                v.dedup_by(|(x0, t1), (y0, t2)| true & (*x0 == *y0));
-                                assert_eq!(n, v.len(), "indexes do not have duplicates");
-                                assert!(uf.fuel_unit_.is_root(x1), "key is root");
-                                v.iter().copied().for_each(|(x0, _timestamp)| {
-                                    assert!(uf.fuel_unit_.is_root(x0), "value is root");
-                                });
-                            });
-                        }
                         self.fuel_unit_num_uprooted_at_latest_retain = 0;
                     });
                 }
@@ -14149,12 +14533,7 @@ fn lir_math() {
                         .map(|(x1, _timestamp)| (x1,))
                 }
                 fn iter_all1_1_0(&self, x1: FuelUnit) -> impl Iterator<Item = (FuelUnit,)> + use<'_> {
-                    self.hash_index_1
-                        .get(&(x1,))
-                        .into_iter()
-                        .flatten()
-                        .copied()
-                        .map(|(x0, _timestamp)| (x0,))
+                    self.hash_index_1.iter((x1,)).map(|(x0, _timestamp)| (x0,))
                 }
                 fn iter_old1_0_1(
                     &self,
@@ -14173,10 +14552,7 @@ fn lir_math() {
                     latest_timestamp: TimeStamp,
                 ) -> impl Iterator<Item = (FuelUnit,)> + use<'_> {
                     self.hash_index_1
-                        .get(&(x1,))
-                        .into_iter()
-                        .flatten()
-                        .copied()
+                        .iter((x1,))
                         .filter_map(move |(x0, timestamp)| (timestamp < latest_timestamp).then_some((x0,)))
                 }
                 fn check1_0_1(&self, x0: FuelUnit) -> bool {
@@ -14198,6 +14574,7 @@ fn lir_math() {
             #[derive(Debug, Default)]
             struct ZeroFuelRelation {
                 new: Vec<<Self as Relation>::Row>,
+                all: Vec<(FuelUnit, TimeStamp)>,
                 hash_index_: runtime::HashMap<(), (FuelUnit, TimeStamp)>,
                 fuel_unit_num_uprooted_at_latest_retain: usize,
             }
@@ -14222,7 +14599,12 @@ fn lir_math() {
                 }
                 fn emit_graphviz(&self, buf: &mut String) {
                     use std::fmt::Write;
-                    for (i, ((), (x0, _timestamp))) in self.hash_index_.iter().enumerate() {
+                    for (i, ((), (x0, _timestamp))) in self
+                        .hash_index_
+                        .iter()
+                        .map(|(k, v)| ((*k), (*v)))
+                        .enumerate()
+                    {
                         writeln!(buf, "{}_{i} -> {}_{};", "zero_fuel", "fuel_unit", x0).unwrap();
                         writeln!(buf, "{}_{i} [shape = box];", "zero_fuel").unwrap();
                     }
@@ -14284,7 +14666,7 @@ fn lir_math() {
                 ) {
                     log_duration!("update_finalize {}: {}", "zero_fuel", {
                         assert!(self.new.is_empty());
-                        log_duration!("fill new: {}", {
+                        log_duration!("fill new and all: {}", {
                             self.new.extend(
                                 self.hash_index_
                                     .iter()
@@ -14297,6 +14679,12 @@ fn lir_math() {
                                     }),
                             );
                             RadixSortable::wrap(&mut self.new).voracious_sort();
+                            self.all.clear();
+                            self.all.extend(
+                                self.hash_index_
+                                    .iter()
+                                    .map(|(&(), &(x0, timestamp))| (x0, timestamp)),
+                            );
                             insertions.clear();
                         });
                         #[cfg(debug_assertions)]
@@ -14308,6 +14696,21 @@ fn lir_math() {
                             new.sort();
                             new.dedup();
                             assert_eq!(new.len(), self.new.len(), "new only has unique elements");
+                            self.all.iter().for_each(|&(x0, _timestamp)| {
+                                assert_eq!((x0,), (uf.fuel_unit_.find(x0),), "all is canonical");
+                            });
+                            let mut all_: Vec<_> = self.all.clone();
+                            all_.sort();
+                            all_.dedup();
+                            assert_eq!(all_.len(), self.all.len(), "all only has unique elements");
+                            let mut all_: Vec<_> = self.all.iter().map(|&(x0, _timestamp)| (x0,)).collect();
+                            all_.sort();
+                            all_.dedup();
+                            assert_eq!(
+                                all_.len(),
+                                self.all.len(),
+                                "all does not have duplicate timestamps"
+                            );
                         }
                         self.fuel_unit_num_uprooted_at_latest_retain = 0;
                     });
@@ -14347,8 +14750,9 @@ fn lir_math() {
             #[derive(Debug, Default)]
             struct DiffRelation {
                 new: Vec<<Self as Relation>::Row>,
+                all: Vec<(Math, Math, Math, TimeStamp)>,
                 hash_index_1_0: runtime::HashMap<(Math, Math), (Math, TimeStamp)>,
-                hash_index_1: runtime::HashMap<(Math,), runtime::SmallVec<[(Math, Math, TimeStamp); 1]>>,
+                hash_index_1: runtime::IndexedSortedList<(Math,), (Math, Math, TimeStamp)>,
                 math_num_uprooted_at_latest_retain: usize,
             }
             impl Relation for DiffRelation {
@@ -14368,11 +14772,16 @@ fn lir_math() {
                     self.new.iter().copied()
                 }
                 fn len(&self) -> usize {
-                    self.hash_index_1_0.len()
+                    self.hash_index_1.len()
                 }
                 fn emit_graphviz(&self, buf: &mut String) {
                     use std::fmt::Write;
-                    for (i, ((x1, x0), (x2, _timestamp))) in self.hash_index_1_0.iter().enumerate() {
+                    for (i, ((x1, x0), (x2, _timestamp))) in self
+                        .hash_index_1_0
+                        .iter()
+                        .map(|(k, v)| ((*k), (*v)))
+                        .enumerate()
+                    {
                         writeln!(buf, "{}_{i} -> {}_{};", "diff", "math", x1).unwrap();
                         writeln!(buf, "{}_{i} -> {}_{};", "diff", "math", x0).unwrap();
                         writeln!(buf, "{}_{i} -> {}_{};", "diff", "math", x2).unwrap();
@@ -14440,7 +14849,7 @@ fn lir_math() {
                 ) {
                     log_duration!("update_finalize {}: {}", "diff", {
                         assert!(self.new.is_empty());
-                        log_duration!("fill new: {}", {
+                        log_duration!("fill new and all: {}", {
                             self.new.extend(self.hash_index_1_0.iter().filter_map(
                                 |(&(x1, x0), &(x2, timestamp))| {
                                     if timestamp == latest_timestamp {
@@ -14451,6 +14860,12 @@ fn lir_math() {
                                 },
                             ));
                             RadixSortable::wrap(&mut self.new).voracious_sort();
+                            self.all.clear();
+                            self.all.extend(
+                                self.hash_index_1_0
+                                    .iter()
+                                    .map(|(&(x1, x0), &(x2, timestamp))| (x0, x1, x2, timestamp)),
+                            );
                             insertions.clear();
                         });
                         #[cfg(debug_assertions)]
@@ -14466,41 +14881,42 @@ fn lir_math() {
                             new.sort();
                             new.dedup();
                             assert_eq!(new.len(), self.new.len(), "new only has unique elements");
-                        }
-                        log_duration!("retain index: {}", {
-                            self.hash_index_1.retain(|&(x1,), v| {
-                                if uf.math_.is_root(x1) {
-                                    v.retain(|&mut (x0, x2, _timestamp)| {
-                                        uf.math_.is_root(x0) & uf.math_.is_root(x2)
-                                    });
-                                    true
-                                } else {
-                                    false
-                                }
+                            self.all.iter().for_each(|&(x0, x1, x2, _timestamp)| {
+                                assert_eq!(
+                                    (x0, x1, x2,),
+                                    (uf.math_.find(x0), uf.math_.find(x1), uf.math_.find(x2),),
+                                    "all is canonical"
+                                );
                             });
-                        });
-                        log_duration!("fill index: {}", {
-                            for &(x0, x1, x2) in &self.new {
-                                self.hash_index_1
-                                    .entry((x1,))
-                                    .or_default()
-                                    .push((x0, x2, latest_timestamp));
+                            let mut all_: Vec<_> = self.all.clone();
+                            all_.sort();
+                            all_.dedup();
+                            assert_eq!(all_.len(), self.all.len(), "all only has unique elements");
+                            let mut all_: Vec<_> = self
+                                .all
+                                .iter()
+                                .map(|&(x0, x1, x2, _timestamp)| (x0, x1, x2))
+                                .collect();
+                            all_.sort();
+                            all_.dedup();
+                            assert_eq!(
+                                all_.len(),
+                                self.all.len(),
+                                "all does not have duplicate timestamps"
+                            );
+                        }
+                        log_duration!("reconstruct index: {}", {
+                            log_duration!("reconstruct sort: {}", {
+                                RowSort010::sort(&mut self.all);
+                            });
+                            unsafe {
+                                self.hash_index_1.reconstruct(
+                                    &mut self.all,
+                                    |(x0, x1, x2, timestamp)| (x1,),
+                                    |(x0, x1, x2, timestamp)| (x0, x2, timestamp),
+                                );
                             }
                         });
-                        #[cfg(debug_assertions)]
-                        {
-                            self.hash_index_1.iter().for_each(|(&(x1,), v)| {
-                                let mut v = v.clone();
-                                let n = v.len();
-                                v.sort();
-                                v.dedup_by(|(x0, x2, t1), (y0, y2, t2)| true & (*x0 == *y0) & (*x2 == *y2));
-                                assert_eq!(n, v.len(), "indexes do not have duplicates");
-                                assert!(uf.math_.is_root(x1), "key is root");
-                                v.iter().copied().for_each(|(x0, x2, _timestamp)| {
-                                    assert!(uf.math_.is_root(x0) & uf.math_.is_root(x2), "value is root");
-                                });
-                            });
-                        }
                         self.math_num_uprooted_at_latest_retain = 0;
                     });
                 }
@@ -14515,10 +14931,7 @@ fn lir_math() {
                 }
                 fn iter_all1_1_0_2(&self, x1: Math) -> impl Iterator<Item = (Math, Math)> + use<'_> {
                     self.hash_index_1
-                        .get(&(x1,))
-                        .into_iter()
-                        .flatten()
-                        .copied()
+                        .iter((x1,))
                         .map(|(x0, x2, _timestamp)| (x0, x2))
                 }
                 fn iter_old2_1_0_2(
@@ -14539,10 +14952,7 @@ fn lir_math() {
                     latest_timestamp: TimeStamp,
                 ) -> impl Iterator<Item = (Math, Math)> + use<'_> {
                     self.hash_index_1
-                        .get(&(x1,))
-                        .into_iter()
-                        .flatten()
-                        .copied()
+                        .iter((x1,))
                         .filter_map(move |(x0, x2, timestamp)| {
                             (timestamp < latest_timestamp).then_some((x0, x2))
                         })
@@ -14566,13 +14976,11 @@ fn lir_math() {
             #[derive(Debug, Default)]
             struct IntegralRelation {
                 new: Vec<<Self as Relation>::Row>,
+                all: Vec<(FuelUnit, Math, Math, Math, TimeStamp)>,
                 hash_index_0_1_2: runtime::HashMap<(FuelUnit, Math, Math), (Math, TimeStamp)>,
-                hash_index_0:
-                    runtime::HashMap<(FuelUnit,), runtime::SmallVec<[(Math, Math, Math, TimeStamp); 1]>>,
-                hash_index_1:
-                    runtime::HashMap<(Math,), runtime::SmallVec<[(Math, FuelUnit, Math, TimeStamp); 1]>>,
-                hash_index_1_2:
-                    runtime::HashMap<(Math, Math), runtime::SmallVec<[(FuelUnit, Math, TimeStamp); 1]>>,
+                hash_index_0: runtime::IndexedSortedList<(FuelUnit,), (Math, Math, Math, TimeStamp)>,
+                hash_index_1: runtime::IndexedSortedList<(Math,), (Math, FuelUnit, Math, TimeStamp)>,
+                hash_index_1_2: runtime::IndexedSortedList<(Math, Math), (FuelUnit, Math, TimeStamp)>,
                 fuel_unit_num_uprooted_at_latest_retain: usize,
                 math_num_uprooted_at_latest_retain: usize,
             }
@@ -14593,11 +15001,16 @@ fn lir_math() {
                     self.new.iter().copied()
                 }
                 fn len(&self) -> usize {
-                    self.hash_index_0_1_2.len()
+                    self.hash_index_0.len()
                 }
                 fn emit_graphviz(&self, buf: &mut String) {
                     use std::fmt::Write;
-                    for (i, ((x0, x1, x2), (x3, _timestamp))) in self.hash_index_0_1_2.iter().enumerate() {
+                    for (i, ((x0, x1, x2), (x3, _timestamp))) in self
+                        .hash_index_0_1_2
+                        .iter()
+                        .map(|(k, v)| ((*k), (*v)))
+                        .enumerate()
+                    {
                         writeln!(buf, "{}_{i} -> {}_{};", "integral", "fuel_unit", x0).unwrap();
                         writeln!(buf, "{}_{i} -> {}_{};", "integral", "math", x1).unwrap();
                         writeln!(buf, "{}_{i} -> {}_{};", "integral", "math", x2).unwrap();
@@ -14674,7 +15087,7 @@ fn lir_math() {
                 ) {
                     log_duration!("update_finalize {}: {}", "integral", {
                         assert!(self.new.is_empty());
-                        log_duration!("fill new: {}", {
+                        log_duration!("fill new and all: {}", {
                             self.new.extend(self.hash_index_0_1_2.iter().filter_map(
                                 |(&(x0, x1, x2), &(x3, timestamp))| {
                                     if timestamp == latest_timestamp {
@@ -14685,6 +15098,12 @@ fn lir_math() {
                                 },
                             ));
                             RadixSortable::wrap(&mut self.new).voracious_sort();
+                            self.all.clear();
+                            self.all.extend(
+                                self.hash_index_0_1_2
+                                    .iter()
+                                    .map(|(&(x0, x1, x2), &(x3, timestamp))| (x0, x1, x2, x3, timestamp)),
+                            );
                             insertions.clear();
                         });
                         #[cfg(debug_assertions)]
@@ -14705,127 +15124,74 @@ fn lir_math() {
                             new.sort();
                             new.dedup();
                             assert_eq!(new.len(), self.new.len(), "new only has unique elements");
-                        }
-                        log_duration!("retain index: {}", {
-                            self.hash_index_0.retain(|&(x0,), v| {
-                                if uf.fuel_unit_.is_root(x0) {
-                                    v.retain(|&mut (x1, x2, x3, _timestamp)| {
-                                        uf.math_.is_root(x1) & uf.math_.is_root(x2) & uf.math_.is_root(x3)
-                                    });
-                                    true
-                                } else {
-                                    false
-                                }
+                            self.all.iter().for_each(|&(x0, x1, x2, x3, _timestamp)| {
+                                assert_eq!(
+                                    (x0, x1, x2, x3,),
+                                    (
+                                        uf.fuel_unit_.find(x0),
+                                        uf.math_.find(x1),
+                                        uf.math_.find(x2),
+                                        uf.math_.find(x3),
+                                    ),
+                                    "all is canonical"
+                                );
                             });
-                        });
-                        log_duration!("fill index: {}", {
-                            for &(x0, x1, x2, x3) in &self.new {
-                                self.hash_index_0.entry((x0,)).or_default().push((
-                                    x1,
-                                    x2,
-                                    x3,
-                                    latest_timestamp,
-                                ));
+                            let mut all_: Vec<_> = self.all.clone();
+                            all_.sort();
+                            all_.dedup();
+                            assert_eq!(all_.len(), self.all.len(), "all only has unique elements");
+                            let mut all_: Vec<_> = self
+                                .all
+                                .iter()
+                                .map(|&(x0, x1, x2, x3, _timestamp)| (x0, x1, x2, x3))
+                                .collect();
+                            all_.sort();
+                            all_.dedup();
+                            assert_eq!(
+                                all_.len(),
+                                self.all.len(),
+                                "all does not have duplicate timestamps"
+                            );
+                        }
+                        log_duration!("reconstruct index: {}", {
+                            log_duration!("reconstruct sort: {}", {
+                                self.all
+                                    .sort_unstable_by_key(|&(x0, x1, x2, x3, timestamp)| (x0,));
+                            });
+                            unsafe {
+                                self.hash_index_0.reconstruct(
+                                    &mut self.all,
+                                    |(x0, x1, x2, x3, timestamp)| (x0,),
+                                    |(x0, x1, x2, x3, timestamp)| (x1, x2, x3, timestamp),
+                                );
                             }
                         });
-                        #[cfg(debug_assertions)]
-                        {
-                            self.hash_index_0.iter().for_each(|(&(x0,), v)| {
-                                let mut v = v.clone();
-                                let n = v.len();
-                                v.sort();
-                                v.dedup_by(|(x1, x2, x3, t1), (y1, y2, y3, t2)| {
-                                    true & (*x1 == *y1) & (*x2 == *y2) & (*x3 == *y3)
-                                });
-                                assert_eq!(n, v.len(), "indexes do not have duplicates");
-                                assert!(uf.fuel_unit_.is_root(x0), "key is root");
-                                v.iter().copied().for_each(|(x1, x2, x3, _timestamp)| {
-                                    assert!(
-                                        uf.math_.is_root(x1) & uf.math_.is_root(x2) & uf.math_.is_root(x3),
-                                        "value is root"
-                                    );
-                                });
+                        log_duration!("reconstruct index: {}", {
+                            log_duration!("reconstruct sort: {}", {
+                                self.all
+                                    .sort_unstable_by_key(|&(x0, x1, x2, x3, timestamp)| (x1,));
                             });
-                        }
-                        log_duration!("retain index: {}", {
-                            self.hash_index_1.retain(|&(x1,), v| {
-                                if uf.math_.is_root(x1) {
-                                    v.retain(|&mut (x2, x0, x3, _timestamp)| {
-                                        uf.math_.is_root(x2) & uf.fuel_unit_.is_root(x0) & uf.math_.is_root(x3)
-                                    });
-                                    true
-                                } else {
-                                    false
-                                }
-                            });
-                        });
-                        log_duration!("fill index: {}", {
-                            for &(x0, x1, x2, x3) in &self.new {
-                                self.hash_index_1.entry((x1,)).or_default().push((
-                                    x2,
-                                    x0,
-                                    x3,
-                                    latest_timestamp,
-                                ));
+                            unsafe {
+                                self.hash_index_1.reconstruct(
+                                    &mut self.all,
+                                    |(x0, x1, x2, x3, timestamp)| (x1,),
+                                    |(x0, x1, x2, x3, timestamp)| (x2, x0, x3, timestamp),
+                                );
                             }
                         });
-                        #[cfg(debug_assertions)]
-                        {
-                            self.hash_index_1.iter().for_each(|(&(x1,), v)| {
-                                let mut v = v.clone();
-                                let n = v.len();
-                                v.sort();
-                                v.dedup_by(|(x2, x0, x3, t1), (y2, y0, y3, t2)| {
-                                    true & (*x2 == *y2) & (*x0 == *y0) & (*x3 == *y3)
-                                });
-                                assert_eq!(n, v.len(), "indexes do not have duplicates");
-                                assert!(uf.math_.is_root(x1), "key is root");
-                                v.iter().copied().for_each(|(x2, x0, x3, _timestamp)| {
-                                    assert!(
-                                        uf.math_.is_root(x2) & uf.fuel_unit_.is_root(x0) & uf.math_.is_root(x3),
-                                        "value is root"
-                                    );
-                                });
+                        log_duration!("reconstruct index: {}", {
+                            log_duration!("reconstruct sort: {}", {
+                                self.all
+                                    .sort_unstable_by_key(|&(x0, x1, x2, x3, timestamp)| (x1, x2));
                             });
-                        }
-                        log_duration!("retain index: {}", {
-                            self.hash_index_1_2.retain(|&(x1, x2), v| {
-                                if uf.math_.is_root(x1) & uf.math_.is_root(x2) {
-                                    v.retain(|&mut (x0, x3, _timestamp)| {
-                                        uf.fuel_unit_.is_root(x0) & uf.math_.is_root(x3)
-                                    });
-                                    true
-                                } else {
-                                    false
-                                }
-                            });
-                        });
-                        log_duration!("fill index: {}", {
-                            for &(x0, x1, x2, x3) in &self.new {
-                                self.hash_index_1_2.entry((x1, x2)).or_default().push((
-                                    x0,
-                                    x3,
-                                    latest_timestamp,
-                                ));
+                            unsafe {
+                                self.hash_index_1_2.reconstruct(
+                                    &mut self.all,
+                                    |(x0, x1, x2, x3, timestamp)| (x1, x2),
+                                    |(x0, x1, x2, x3, timestamp)| (x0, x3, timestamp),
+                                );
                             }
                         });
-                        #[cfg(debug_assertions)]
-                        {
-                            self.hash_index_1_2.iter().for_each(|(&(x1, x2), v)| {
-                                let mut v = v.clone();
-                                let n = v.len();
-                                v.sort();
-                                v.dedup_by(|(x0, x3, t1), (y0, y3, t2)| true & (*x0 == *y0) & (*x3 == *y3));
-                                assert_eq!(n, v.len(), "indexes do not have duplicates");
-                                assert!(uf.math_.is_root(x1) & uf.math_.is_root(x2), "key is root");
-                                v.iter().copied().for_each(|(x0, x3, _timestamp)| {
-                                    assert!(
-                                        uf.fuel_unit_.is_root(x0) & uf.math_.is_root(x3),
-                                        "value is root"
-                                    );
-                                });
-                            });
-                        }
                         self.fuel_unit_num_uprooted_at_latest_retain = 0;
                         self.math_num_uprooted_at_latest_retain = 0;
                     });
@@ -14849,10 +15215,7 @@ fn lir_math() {
                     x0: FuelUnit,
                 ) -> impl Iterator<Item = (Math, Math, Math)> + use<'_> {
                     self.hash_index_0
-                        .get(&(x0,))
-                        .into_iter()
-                        .flatten()
-                        .copied()
+                        .iter((x0,))
                         .map(|(x1, x2, x3, _timestamp)| (x1, x2, x3))
                 }
                 fn iter_all1_1_2_0_3(
@@ -14860,10 +15223,7 @@ fn lir_math() {
                     x1: Math,
                 ) -> impl Iterator<Item = (Math, FuelUnit, Math)> + use<'_> {
                     self.hash_index_1
-                        .get(&(x1,))
-                        .into_iter()
-                        .flatten()
-                        .copied()
+                        .iter((x1,))
                         .map(|(x2, x0, x3, _timestamp)| (x2, x0, x3))
                 }
                 fn iter_all2_1_2_0_3(
@@ -14872,10 +15232,7 @@ fn lir_math() {
                     x2: Math,
                 ) -> impl Iterator<Item = (FuelUnit, Math)> + use<'_> {
                     self.hash_index_1_2
-                        .get(&(x1, x2))
-                        .into_iter()
-                        .flatten()
-                        .copied()
+                        .iter((x1, x2))
                         .map(|(x0, x3, _timestamp)| (x0, x3))
                 }
                 fn iter_old3_0_1_2_3(
@@ -14897,10 +15254,7 @@ fn lir_math() {
                     latest_timestamp: TimeStamp,
                 ) -> impl Iterator<Item = (Math, Math, Math)> + use<'_> {
                     self.hash_index_0
-                        .get(&(x0,))
-                        .into_iter()
-                        .flatten()
-                        .copied()
+                        .iter((x0,))
                         .filter_map(move |(x1, x2, x3, timestamp)| {
                             (timestamp < latest_timestamp).then_some((x1, x2, x3))
                         })
@@ -14911,10 +15265,7 @@ fn lir_math() {
                     latest_timestamp: TimeStamp,
                 ) -> impl Iterator<Item = (Math, FuelUnit, Math)> + use<'_> {
                     self.hash_index_1
-                        .get(&(x1,))
-                        .into_iter()
-                        .flatten()
-                        .copied()
+                        .iter((x1,))
                         .filter_map(move |(x2, x0, x3, timestamp)| {
                             (timestamp < latest_timestamp).then_some((x2, x0, x3))
                         })
@@ -14926,10 +15277,7 @@ fn lir_math() {
                     latest_timestamp: TimeStamp,
                 ) -> impl Iterator<Item = (FuelUnit, Math)> + use<'_> {
                     self.hash_index_1_2
-                        .get(&(x1, x2))
-                        .into_iter()
-                        .flatten()
-                        .copied()
+                        .iter((x1, x2))
                         .filter_map(move |(x0, x3, timestamp)| {
                             (timestamp < latest_timestamp).then_some((x0, x3))
                         })
@@ -14966,10 +15314,11 @@ fn lir_math() {
             #[derive(Debug, Default)]
             struct AddRelation {
                 new: Vec<<Self as Relation>::Row>,
+                all: Vec<(Math, Math, Math, TimeStamp)>,
                 hash_index_1_0: runtime::HashMap<(Math, Math), (Math, TimeStamp)>,
-                hash_index_2: runtime::HashMap<(Math,), runtime::SmallVec<[(Math, Math, TimeStamp); 1]>>,
-                hash_index_1: runtime::HashMap<(Math,), runtime::SmallVec<[(Math, Math, TimeStamp); 1]>>,
-                hash_index_0: runtime::HashMap<(Math,), runtime::SmallVec<[(Math, Math, TimeStamp); 1]>>,
+                hash_index_2: runtime::IndexedSortedList<(Math,), (Math, Math, TimeStamp)>,
+                hash_index_1: runtime::IndexedSortedList<(Math,), (Math, Math, TimeStamp)>,
+                hash_index_0: runtime::IndexedSortedList<(Math,), (Math, Math, TimeStamp)>,
                 math_num_uprooted_at_latest_retain: usize,
             }
             impl Relation for AddRelation {
@@ -14989,11 +15338,16 @@ fn lir_math() {
                     self.new.iter().copied()
                 }
                 fn len(&self) -> usize {
-                    self.hash_index_1_0.len()
+                    self.hash_index_0.len()
                 }
                 fn emit_graphviz(&self, buf: &mut String) {
                     use std::fmt::Write;
-                    for (i, ((x1, x0), (x2, _timestamp))) in self.hash_index_1_0.iter().enumerate() {
+                    for (i, ((x1, x0), (x2, _timestamp))) in self
+                        .hash_index_1_0
+                        .iter()
+                        .map(|(k, v)| ((*k), (*v)))
+                        .enumerate()
+                    {
                         writeln!(buf, "{}_{i} -> {}_{};", "add", "math", x1).unwrap();
                         writeln!(buf, "{}_{i} -> {}_{};", "add", "math", x0).unwrap();
                         writeln!(buf, "{}_{i} -> {}_{};", "add", "math", x2).unwrap();
@@ -15061,7 +15415,7 @@ fn lir_math() {
                 ) {
                     log_duration!("update_finalize {}: {}", "add", {
                         assert!(self.new.is_empty());
-                        log_duration!("fill new: {}", {
+                        log_duration!("fill new and all: {}", {
                             self.new.extend(self.hash_index_1_0.iter().filter_map(
                                 |(&(x1, x0), &(x2, timestamp))| {
                                     if timestamp == latest_timestamp {
@@ -15072,6 +15426,12 @@ fn lir_math() {
                                 },
                             ));
                             RadixSortable::wrap(&mut self.new).voracious_sort();
+                            self.all.clear();
+                            self.all.extend(
+                                self.hash_index_1_0
+                                    .iter()
+                                    .map(|(&(x1, x0), &(x2, timestamp))| (x0, x1, x2, timestamp)),
+                            );
                             insertions.clear();
                         });
                         #[cfg(debug_assertions)]
@@ -15087,109 +15447,66 @@ fn lir_math() {
                             new.sort();
                             new.dedup();
                             assert_eq!(new.len(), self.new.len(), "new only has unique elements");
-                        }
-                        log_duration!("retain index: {}", {
-                            self.hash_index_2.retain(|&(x2,), v| {
-                                if uf.math_.is_root(x2) {
-                                    v.retain(|&mut (x0, x1, _timestamp)| {
-                                        uf.math_.is_root(x0) & uf.math_.is_root(x1)
-                                    });
-                                    true
-                                } else {
-                                    false
-                                }
+                            self.all.iter().for_each(|&(x0, x1, x2, _timestamp)| {
+                                assert_eq!(
+                                    (x0, x1, x2,),
+                                    (uf.math_.find(x0), uf.math_.find(x1), uf.math_.find(x2),),
+                                    "all is canonical"
+                                );
                             });
-                        });
-                        log_duration!("fill index: {}", {
-                            for &(x0, x1, x2) in &self.new {
-                                self.hash_index_2
-                                    .entry((x2,))
-                                    .or_default()
-                                    .push((x0, x1, latest_timestamp));
+                            let mut all_: Vec<_> = self.all.clone();
+                            all_.sort();
+                            all_.dedup();
+                            assert_eq!(all_.len(), self.all.len(), "all only has unique elements");
+                            let mut all_: Vec<_> = self
+                                .all
+                                .iter()
+                                .map(|&(x0, x1, x2, _timestamp)| (x0, x1, x2))
+                                .collect();
+                            all_.sort();
+                            all_.dedup();
+                            assert_eq!(
+                                all_.len(),
+                                self.all.len(),
+                                "all does not have duplicate timestamps"
+                            );
+                        }
+                        log_duration!("reconstruct index: {}", {
+                            log_duration!("reconstruct sort: {}", {
+                                RowSort001::sort(&mut self.all);
+                            });
+                            unsafe {
+                                self.hash_index_2.reconstruct(
+                                    &mut self.all,
+                                    |(x0, x1, x2, timestamp)| (x2,),
+                                    |(x0, x1, x2, timestamp)| (x0, x1, timestamp),
+                                );
                             }
                         });
-                        #[cfg(debug_assertions)]
-                        {
-                            self.hash_index_2.iter().for_each(|(&(x2,), v)| {
-                                let mut v = v.clone();
-                                let n = v.len();
-                                v.sort();
-                                v.dedup_by(|(x0, x1, t1), (y0, y1, t2)| true & (*x0 == *y0) & (*x1 == *y1));
-                                assert_eq!(n, v.len(), "indexes do not have duplicates");
-                                assert!(uf.math_.is_root(x2), "key is root");
-                                v.iter().copied().for_each(|(x0, x1, _timestamp)| {
-                                    assert!(uf.math_.is_root(x0) & uf.math_.is_root(x1), "value is root");
-                                });
+                        log_duration!("reconstruct index: {}", {
+                            log_duration!("reconstruct sort: {}", {
+                                RowSort010::sort(&mut self.all);
                             });
-                        }
-                        log_duration!("retain index: {}", {
-                            self.hash_index_1.retain(|&(x1,), v| {
-                                if uf.math_.is_root(x1) {
-                                    v.retain(|&mut (x0, x2, _timestamp)| {
-                                        uf.math_.is_root(x0) & uf.math_.is_root(x2)
-                                    });
-                                    true
-                                } else {
-                                    false
-                                }
-                            });
-                        });
-                        log_duration!("fill index: {}", {
-                            for &(x0, x1, x2) in &self.new {
-                                self.hash_index_1
-                                    .entry((x1,))
-                                    .or_default()
-                                    .push((x0, x2, latest_timestamp));
+                            unsafe {
+                                self.hash_index_1.reconstruct(
+                                    &mut self.all,
+                                    |(x0, x1, x2, timestamp)| (x1,),
+                                    |(x0, x1, x2, timestamp)| (x0, x2, timestamp),
+                                );
                             }
                         });
-                        #[cfg(debug_assertions)]
-                        {
-                            self.hash_index_1.iter().for_each(|(&(x1,), v)| {
-                                let mut v = v.clone();
-                                let n = v.len();
-                                v.sort();
-                                v.dedup_by(|(x0, x2, t1), (y0, y2, t2)| true & (*x0 == *y0) & (*x2 == *y2));
-                                assert_eq!(n, v.len(), "indexes do not have duplicates");
-                                assert!(uf.math_.is_root(x1), "key is root");
-                                v.iter().copied().for_each(|(x0, x2, _timestamp)| {
-                                    assert!(uf.math_.is_root(x0) & uf.math_.is_root(x2), "value is root");
-                                });
+                        log_duration!("reconstruct index: {}", {
+                            log_duration!("reconstruct sort: {}", {
+                                RowSort100::sort(&mut self.all);
                             });
-                        }
-                        log_duration!("retain index: {}", {
-                            self.hash_index_0.retain(|&(x0,), v| {
-                                if uf.math_.is_root(x0) {
-                                    v.retain(|&mut (x1, x2, _timestamp)| {
-                                        uf.math_.is_root(x1) & uf.math_.is_root(x2)
-                                    });
-                                    true
-                                } else {
-                                    false
-                                }
-                            });
-                        });
-                        log_duration!("fill index: {}", {
-                            for &(x0, x1, x2) in &self.new {
-                                self.hash_index_0
-                                    .entry((x0,))
-                                    .or_default()
-                                    .push((x1, x2, latest_timestamp));
+                            unsafe {
+                                self.hash_index_0.reconstruct(
+                                    &mut self.all,
+                                    |(x0, x1, x2, timestamp)| (x0,),
+                                    |(x0, x1, x2, timestamp)| (x1, x2, timestamp),
+                                );
                             }
                         });
-                        #[cfg(debug_assertions)]
-                        {
-                            self.hash_index_0.iter().for_each(|(&(x0,), v)| {
-                                let mut v = v.clone();
-                                let n = v.len();
-                                v.sort();
-                                v.dedup_by(|(x1, x2, t1), (y1, y2, t2)| true & (*x1 == *y1) & (*x2 == *y2));
-                                assert_eq!(n, v.len(), "indexes do not have duplicates");
-                                assert!(uf.math_.is_root(x0), "key is root");
-                                v.iter().copied().for_each(|(x1, x2, _timestamp)| {
-                                    assert!(uf.math_.is_root(x1) & uf.math_.is_root(x2), "value is root");
-                                });
-                            });
-                        }
                         self.math_num_uprooted_at_latest_retain = 0;
                     });
                 }
@@ -15204,26 +15521,17 @@ fn lir_math() {
                 }
                 fn iter_all1_2_0_1(&self, x2: Math) -> impl Iterator<Item = (Math, Math)> + use<'_> {
                     self.hash_index_2
-                        .get(&(x2,))
-                        .into_iter()
-                        .flatten()
-                        .copied()
+                        .iter((x2,))
                         .map(|(x0, x1, _timestamp)| (x0, x1))
                 }
                 fn iter_all1_1_0_2(&self, x1: Math) -> impl Iterator<Item = (Math, Math)> + use<'_> {
                     self.hash_index_1
-                        .get(&(x1,))
-                        .into_iter()
-                        .flatten()
-                        .copied()
+                        .iter((x1,))
                         .map(|(x0, x2, _timestamp)| (x0, x2))
                 }
                 fn iter_all1_0_1_2(&self, x0: Math) -> impl Iterator<Item = (Math, Math)> + use<'_> {
                     self.hash_index_0
-                        .get(&(x0,))
-                        .into_iter()
-                        .flatten()
-                        .copied()
+                        .iter((x0,))
                         .map(|(x1, x2, _timestamp)| (x1, x2))
                 }
                 fn iter_old2_1_0_2(
@@ -15244,10 +15552,7 @@ fn lir_math() {
                     latest_timestamp: TimeStamp,
                 ) -> impl Iterator<Item = (Math, Math)> + use<'_> {
                     self.hash_index_2
-                        .get(&(x2,))
-                        .into_iter()
-                        .flatten()
-                        .copied()
+                        .iter((x2,))
                         .filter_map(move |(x0, x1, timestamp)| {
                             (timestamp < latest_timestamp).then_some((x0, x1))
                         })
@@ -15258,10 +15563,7 @@ fn lir_math() {
                     latest_timestamp: TimeStamp,
                 ) -> impl Iterator<Item = (Math, Math)> + use<'_> {
                     self.hash_index_1
-                        .get(&(x1,))
-                        .into_iter()
-                        .flatten()
-                        .copied()
+                        .iter((x1,))
                         .filter_map(move |(x0, x2, timestamp)| {
                             (timestamp < latest_timestamp).then_some((x0, x2))
                         })
@@ -15272,10 +15574,7 @@ fn lir_math() {
                     latest_timestamp: TimeStamp,
                 ) -> impl Iterator<Item = (Math, Math)> + use<'_> {
                     self.hash_index_0
-                        .get(&(x0,))
-                        .into_iter()
-                        .flatten()
-                        .copied()
+                        .iter((x0,))
                         .filter_map(move |(x1, x2, timestamp)| {
                             (timestamp < latest_timestamp).then_some((x1, x2))
                         })
@@ -15305,8 +15604,9 @@ fn lir_math() {
             #[derive(Debug, Default)]
             struct SubRelation {
                 new: Vec<<Self as Relation>::Row>,
+                all: Vec<(Math, Math, Math, TimeStamp)>,
                 hash_index_0_1: runtime::HashMap<(Math, Math), (Math, TimeStamp)>,
-                hash_index_2: runtime::HashMap<(Math,), runtime::SmallVec<[(Math, Math, TimeStamp); 1]>>,
+                hash_index_2: runtime::IndexedSortedList<(Math,), (Math, Math, TimeStamp)>,
                 math_num_uprooted_at_latest_retain: usize,
             }
             impl Relation for SubRelation {
@@ -15330,7 +15630,12 @@ fn lir_math() {
                 }
                 fn emit_graphviz(&self, buf: &mut String) {
                     use std::fmt::Write;
-                    for (i, ((x0, x1), (x2, _timestamp))) in self.hash_index_0_1.iter().enumerate() {
+                    for (i, ((x0, x1), (x2, _timestamp))) in self
+                        .hash_index_0_1
+                        .iter()
+                        .map(|(k, v)| ((*k), (*v)))
+                        .enumerate()
+                    {
                         writeln!(buf, "{}_{i} -> {}_{};", "sub", "math", x0).unwrap();
                         writeln!(buf, "{}_{i} -> {}_{};", "sub", "math", x1).unwrap();
                         writeln!(buf, "{}_{i} -> {}_{};", "sub", "math", x2).unwrap();
@@ -15398,7 +15703,7 @@ fn lir_math() {
                 ) {
                     log_duration!("update_finalize {}: {}", "sub", {
                         assert!(self.new.is_empty());
-                        log_duration!("fill new: {}", {
+                        log_duration!("fill new and all: {}", {
                             self.new.extend(self.hash_index_0_1.iter().filter_map(
                                 |(&(x0, x1), &(x2, timestamp))| {
                                     if timestamp == latest_timestamp {
@@ -15409,6 +15714,12 @@ fn lir_math() {
                                 },
                             ));
                             RadixSortable::wrap(&mut self.new).voracious_sort();
+                            self.all.clear();
+                            self.all.extend(
+                                self.hash_index_0_1
+                                    .iter()
+                                    .map(|(&(x0, x1), &(x2, timestamp))| (x0, x1, x2, timestamp)),
+                            );
                             insertions.clear();
                         });
                         #[cfg(debug_assertions)]
@@ -15424,41 +15735,42 @@ fn lir_math() {
                             new.sort();
                             new.dedup();
                             assert_eq!(new.len(), self.new.len(), "new only has unique elements");
-                        }
-                        log_duration!("retain index: {}", {
-                            self.hash_index_2.retain(|&(x2,), v| {
-                                if uf.math_.is_root(x2) {
-                                    v.retain(|&mut (x0, x1, _timestamp)| {
-                                        uf.math_.is_root(x0) & uf.math_.is_root(x1)
-                                    });
-                                    true
-                                } else {
-                                    false
-                                }
+                            self.all.iter().for_each(|&(x0, x1, x2, _timestamp)| {
+                                assert_eq!(
+                                    (x0, x1, x2,),
+                                    (uf.math_.find(x0), uf.math_.find(x1), uf.math_.find(x2),),
+                                    "all is canonical"
+                                );
                             });
-                        });
-                        log_duration!("fill index: {}", {
-                            for &(x0, x1, x2) in &self.new {
-                                self.hash_index_2
-                                    .entry((x2,))
-                                    .or_default()
-                                    .push((x0, x1, latest_timestamp));
+                            let mut all_: Vec<_> = self.all.clone();
+                            all_.sort();
+                            all_.dedup();
+                            assert_eq!(all_.len(), self.all.len(), "all only has unique elements");
+                            let mut all_: Vec<_> = self
+                                .all
+                                .iter()
+                                .map(|&(x0, x1, x2, _timestamp)| (x0, x1, x2))
+                                .collect();
+                            all_.sort();
+                            all_.dedup();
+                            assert_eq!(
+                                all_.len(),
+                                self.all.len(),
+                                "all does not have duplicate timestamps"
+                            );
+                        }
+                        log_duration!("reconstruct index: {}", {
+                            log_duration!("reconstruct sort: {}", {
+                                RowSort001::sort(&mut self.all);
+                            });
+                            unsafe {
+                                self.hash_index_2.reconstruct(
+                                    &mut self.all,
+                                    |(x0, x1, x2, timestamp)| (x2,),
+                                    |(x0, x1, x2, timestamp)| (x0, x1, timestamp),
+                                );
                             }
                         });
-                        #[cfg(debug_assertions)]
-                        {
-                            self.hash_index_2.iter().for_each(|(&(x2,), v)| {
-                                let mut v = v.clone();
-                                let n = v.len();
-                                v.sort();
-                                v.dedup_by(|(x0, x1, t1), (y0, y1, t2)| true & (*x0 == *y0) & (*x1 == *y1));
-                                assert_eq!(n, v.len(), "indexes do not have duplicates");
-                                assert!(uf.math_.is_root(x2), "key is root");
-                                v.iter().copied().for_each(|(x0, x1, _timestamp)| {
-                                    assert!(uf.math_.is_root(x0) & uf.math_.is_root(x1), "value is root");
-                                });
-                            });
-                        }
                         self.math_num_uprooted_at_latest_retain = 0;
                     });
                 }
@@ -15473,10 +15785,7 @@ fn lir_math() {
                 }
                 fn iter_all1_2_0_1(&self, x2: Math) -> impl Iterator<Item = (Math, Math)> + use<'_> {
                     self.hash_index_2
-                        .get(&(x2,))
-                        .into_iter()
-                        .flatten()
-                        .copied()
+                        .iter((x2,))
                         .map(|(x0, x1, _timestamp)| (x0, x1))
                 }
                 fn iter_old2_0_1_2(
@@ -15497,10 +15806,7 @@ fn lir_math() {
                     latest_timestamp: TimeStamp,
                 ) -> impl Iterator<Item = (Math, Math)> + use<'_> {
                     self.hash_index_2
-                        .get(&(x2,))
-                        .into_iter()
-                        .flatten()
-                        .copied()
+                        .iter((x2,))
                         .filter_map(move |(x0, x1, timestamp)| {
                             (timestamp < latest_timestamp).then_some((x0, x1))
                         })
@@ -15524,11 +15830,12 @@ fn lir_math() {
             #[derive(Debug, Default)]
             struct MulRelation {
                 new: Vec<<Self as Relation>::Row>,
+                all: Vec<(Math, Math, Math, TimeStamp)>,
                 hash_index_1_0: runtime::HashMap<(Math, Math), (Math, TimeStamp)>,
-                hash_index_2: runtime::HashMap<(Math,), runtime::SmallVec<[(Math, Math, TimeStamp); 1]>>,
-                hash_index_1: runtime::HashMap<(Math,), runtime::SmallVec<[(Math, Math, TimeStamp); 1]>>,
-                hash_index_2_0: runtime::HashMap<(Math, Math), runtime::SmallVec<[(Math, TimeStamp); 1]>>,
-                hash_index_0: runtime::HashMap<(Math,), runtime::SmallVec<[(Math, Math, TimeStamp); 1]>>,
+                hash_index_2: runtime::IndexedSortedList<(Math,), (Math, Math, TimeStamp)>,
+                hash_index_1: runtime::IndexedSortedList<(Math,), (Math, Math, TimeStamp)>,
+                hash_index_2_0: runtime::IndexedSortedList<(Math, Math), (Math, TimeStamp)>,
+                hash_index_0: runtime::IndexedSortedList<(Math,), (Math, Math, TimeStamp)>,
                 math_num_uprooted_at_latest_retain: usize,
             }
             impl Relation for MulRelation {
@@ -15548,11 +15855,16 @@ fn lir_math() {
                     self.new.iter().copied()
                 }
                 fn len(&self) -> usize {
-                    self.hash_index_1_0.len()
+                    self.hash_index_0.len()
                 }
                 fn emit_graphviz(&self, buf: &mut String) {
                     use std::fmt::Write;
-                    for (i, ((x1, x0), (x2, _timestamp))) in self.hash_index_1_0.iter().enumerate() {
+                    for (i, ((x1, x0), (x2, _timestamp))) in self
+                        .hash_index_1_0
+                        .iter()
+                        .map(|(k, v)| ((*k), (*v)))
+                        .enumerate()
+                    {
                         writeln!(buf, "{}_{i} -> {}_{};", "mul", "math", x1).unwrap();
                         writeln!(buf, "{}_{i} -> {}_{};", "mul", "math", x0).unwrap();
                         writeln!(buf, "{}_{i} -> {}_{};", "mul", "math", x2).unwrap();
@@ -15620,7 +15932,7 @@ fn lir_math() {
                 ) {
                     log_duration!("update_finalize {}: {}", "mul", {
                         assert!(self.new.is_empty());
-                        log_duration!("fill new: {}", {
+                        log_duration!("fill new and all: {}", {
                             self.new.extend(self.hash_index_1_0.iter().filter_map(
                                 |(&(x1, x0), &(x2, timestamp))| {
                                     if timestamp == latest_timestamp {
@@ -15631,6 +15943,12 @@ fn lir_math() {
                                 },
                             ));
                             RadixSortable::wrap(&mut self.new).voracious_sort();
+                            self.all.clear();
+                            self.all.extend(
+                                self.hash_index_1_0
+                                    .iter()
+                                    .map(|(&(x1, x0), &(x2, timestamp))| (x0, x1, x2, timestamp)),
+                            );
                             insertions.clear();
                         });
                         #[cfg(debug_assertions)]
@@ -15646,141 +15964,78 @@ fn lir_math() {
                             new.sort();
                             new.dedup();
                             assert_eq!(new.len(), self.new.len(), "new only has unique elements");
-                        }
-                        log_duration!("retain index: {}", {
-                            self.hash_index_2.retain(|&(x2,), v| {
-                                if uf.math_.is_root(x2) {
-                                    v.retain(|&mut (x0, x1, _timestamp)| {
-                                        uf.math_.is_root(x0) & uf.math_.is_root(x1)
-                                    });
-                                    true
-                                } else {
-                                    false
-                                }
+                            self.all.iter().for_each(|&(x0, x1, x2, _timestamp)| {
+                                assert_eq!(
+                                    (x0, x1, x2,),
+                                    (uf.math_.find(x0), uf.math_.find(x1), uf.math_.find(x2),),
+                                    "all is canonical"
+                                );
                             });
-                        });
-                        log_duration!("fill index: {}", {
-                            for &(x0, x1, x2) in &self.new {
-                                self.hash_index_2
-                                    .entry((x2,))
-                                    .or_default()
-                                    .push((x0, x1, latest_timestamp));
+                            let mut all_: Vec<_> = self.all.clone();
+                            all_.sort();
+                            all_.dedup();
+                            assert_eq!(all_.len(), self.all.len(), "all only has unique elements");
+                            let mut all_: Vec<_> = self
+                                .all
+                                .iter()
+                                .map(|&(x0, x1, x2, _timestamp)| (x0, x1, x2))
+                                .collect();
+                            all_.sort();
+                            all_.dedup();
+                            assert_eq!(
+                                all_.len(),
+                                self.all.len(),
+                                "all does not have duplicate timestamps"
+                            );
+                        }
+                        log_duration!("reconstruct index: {}", {
+                            log_duration!("reconstruct sort: {}", {
+                                RowSort001::sort(&mut self.all);
+                            });
+                            unsafe {
+                                self.hash_index_2.reconstruct(
+                                    &mut self.all,
+                                    |(x0, x1, x2, timestamp)| (x2,),
+                                    |(x0, x1, x2, timestamp)| (x0, x1, timestamp),
+                                );
                             }
                         });
-                        #[cfg(debug_assertions)]
-                        {
-                            self.hash_index_2.iter().for_each(|(&(x2,), v)| {
-                                let mut v = v.clone();
-                                let n = v.len();
-                                v.sort();
-                                v.dedup_by(|(x0, x1, t1), (y0, y1, t2)| true & (*x0 == *y0) & (*x1 == *y1));
-                                assert_eq!(n, v.len(), "indexes do not have duplicates");
-                                assert!(uf.math_.is_root(x2), "key is root");
-                                v.iter().copied().for_each(|(x0, x1, _timestamp)| {
-                                    assert!(uf.math_.is_root(x0) & uf.math_.is_root(x1), "value is root");
-                                });
+                        log_duration!("reconstruct index: {}", {
+                            log_duration!("reconstruct sort: {}", {
+                                RowSort010::sort(&mut self.all);
                             });
-                        }
-                        log_duration!("retain index: {}", {
-                            self.hash_index_1.retain(|&(x1,), v| {
-                                if uf.math_.is_root(x1) {
-                                    v.retain(|&mut (x0, x2, _timestamp)| {
-                                        uf.math_.is_root(x0) & uf.math_.is_root(x2)
-                                    });
-                                    true
-                                } else {
-                                    false
-                                }
-                            });
-                        });
-                        log_duration!("fill index: {}", {
-                            for &(x0, x1, x2) in &self.new {
-                                self.hash_index_1
-                                    .entry((x1,))
-                                    .or_default()
-                                    .push((x0, x2, latest_timestamp));
+                            unsafe {
+                                self.hash_index_1.reconstruct(
+                                    &mut self.all,
+                                    |(x0, x1, x2, timestamp)| (x1,),
+                                    |(x0, x1, x2, timestamp)| (x0, x2, timestamp),
+                                );
                             }
                         });
-                        #[cfg(debug_assertions)]
-                        {
-                            self.hash_index_1.iter().for_each(|(&(x1,), v)| {
-                                let mut v = v.clone();
-                                let n = v.len();
-                                v.sort();
-                                v.dedup_by(|(x0, x2, t1), (y0, y2, t2)| true & (*x0 == *y0) & (*x2 == *y2));
-                                assert_eq!(n, v.len(), "indexes do not have duplicates");
-                                assert!(uf.math_.is_root(x1), "key is root");
-                                v.iter().copied().for_each(|(x0, x2, _timestamp)| {
-                                    assert!(uf.math_.is_root(x0) & uf.math_.is_root(x2), "value is root");
-                                });
+                        log_duration!("reconstruct index: {}", {
+                            log_duration!("reconstruct sort: {}", {
+                                RowSort101::sort(&mut self.all);
                             });
-                        }
-                        log_duration!("retain index: {}", {
-                            self.hash_index_2_0.retain(|&(x2, x0), v| {
-                                if uf.math_.is_root(x2) & uf.math_.is_root(x0) {
-                                    v.retain(|&mut (x1, _timestamp)| uf.math_.is_root(x1));
-                                    true
-                                } else {
-                                    false
-                                }
-                            });
-                        });
-                        log_duration!("fill index: {}", {
-                            for &(x0, x1, x2) in &self.new {
-                                self.hash_index_2_0
-                                    .entry((x2, x0))
-                                    .or_default()
-                                    .push((x1, latest_timestamp));
+                            unsafe {
+                                self.hash_index_2_0.reconstruct(
+                                    &mut self.all,
+                                    |(x0, x1, x2, timestamp)| (x2, x0),
+                                    |(x0, x1, x2, timestamp)| (x1, timestamp),
+                                );
                             }
                         });
-                        #[cfg(debug_assertions)]
-                        {
-                            self.hash_index_2_0.iter().for_each(|(&(x2, x0), v)| {
-                                let mut v = v.clone();
-                                let n = v.len();
-                                v.sort();
-                                v.dedup_by(|(x1, t1), (y1, t2)| true & (*x1 == *y1));
-                                assert_eq!(n, v.len(), "indexes do not have duplicates");
-                                assert!(uf.math_.is_root(x2) & uf.math_.is_root(x0), "key is root");
-                                v.iter().copied().for_each(|(x1, _timestamp)| {
-                                    assert!(uf.math_.is_root(x1), "value is root");
-                                });
+                        log_duration!("reconstruct index: {}", {
+                            log_duration!("reconstruct sort: {}", {
+                                RowSort100::sort(&mut self.all);
                             });
-                        }
-                        log_duration!("retain index: {}", {
-                            self.hash_index_0.retain(|&(x0,), v| {
-                                if uf.math_.is_root(x0) {
-                                    v.retain(|&mut (x1, x2, _timestamp)| {
-                                        uf.math_.is_root(x1) & uf.math_.is_root(x2)
-                                    });
-                                    true
-                                } else {
-                                    false
-                                }
-                            });
-                        });
-                        log_duration!("fill index: {}", {
-                            for &(x0, x1, x2) in &self.new {
-                                self.hash_index_0
-                                    .entry((x0,))
-                                    .or_default()
-                                    .push((x1, x2, latest_timestamp));
+                            unsafe {
+                                self.hash_index_0.reconstruct(
+                                    &mut self.all,
+                                    |(x0, x1, x2, timestamp)| (x0,),
+                                    |(x0, x1, x2, timestamp)| (x1, x2, timestamp),
+                                );
                             }
                         });
-                        #[cfg(debug_assertions)]
-                        {
-                            self.hash_index_0.iter().for_each(|(&(x0,), v)| {
-                                let mut v = v.clone();
-                                let n = v.len();
-                                v.sort();
-                                v.dedup_by(|(x1, x2, t1), (y1, y2, t2)| true & (*x1 == *y1) & (*x2 == *y2));
-                                assert_eq!(n, v.len(), "indexes do not have duplicates");
-                                assert!(uf.math_.is_root(x0), "key is root");
-                                v.iter().copied().for_each(|(x1, x2, _timestamp)| {
-                                    assert!(uf.math_.is_root(x1) & uf.math_.is_root(x2), "value is root");
-                                });
-                            });
-                        }
                         self.math_num_uprooted_at_latest_retain = 0;
                     });
                 }
@@ -15795,34 +16050,22 @@ fn lir_math() {
                 }
                 fn iter_all1_2_0_1(&self, x2: Math) -> impl Iterator<Item = (Math, Math)> + use<'_> {
                     self.hash_index_2
-                        .get(&(x2,))
-                        .into_iter()
-                        .flatten()
-                        .copied()
+                        .iter((x2,))
                         .map(|(x0, x1, _timestamp)| (x0, x1))
                 }
                 fn iter_all1_1_0_2(&self, x1: Math) -> impl Iterator<Item = (Math, Math)> + use<'_> {
                     self.hash_index_1
-                        .get(&(x1,))
-                        .into_iter()
-                        .flatten()
-                        .copied()
+                        .iter((x1,))
                         .map(|(x0, x2, _timestamp)| (x0, x2))
                 }
                 fn iter_all2_2_0_1(&self, x2: Math, x0: Math) -> impl Iterator<Item = (Math,)> + use<'_> {
                     self.hash_index_2_0
-                        .get(&(x2, x0))
-                        .into_iter()
-                        .flatten()
-                        .copied()
+                        .iter((x2, x0))
                         .map(|(x1, _timestamp)| (x1,))
                 }
                 fn iter_all1_0_1_2(&self, x0: Math) -> impl Iterator<Item = (Math, Math)> + use<'_> {
                     self.hash_index_0
-                        .get(&(x0,))
-                        .into_iter()
-                        .flatten()
-                        .copied()
+                        .iter((x0,))
                         .map(|(x1, x2, _timestamp)| (x1, x2))
                 }
                 fn iter_old2_1_0_2(
@@ -15843,10 +16086,7 @@ fn lir_math() {
                     latest_timestamp: TimeStamp,
                 ) -> impl Iterator<Item = (Math, Math)> + use<'_> {
                     self.hash_index_2
-                        .get(&(x2,))
-                        .into_iter()
-                        .flatten()
-                        .copied()
+                        .iter((x2,))
                         .filter_map(move |(x0, x1, timestamp)| {
                             (timestamp < latest_timestamp).then_some((x0, x1))
                         })
@@ -15857,10 +16097,7 @@ fn lir_math() {
                     latest_timestamp: TimeStamp,
                 ) -> impl Iterator<Item = (Math, Math)> + use<'_> {
                     self.hash_index_1
-                        .get(&(x1,))
-                        .into_iter()
-                        .flatten()
-                        .copied()
+                        .iter((x1,))
                         .filter_map(move |(x0, x2, timestamp)| {
                             (timestamp < latest_timestamp).then_some((x0, x2))
                         })
@@ -15872,10 +16109,7 @@ fn lir_math() {
                     latest_timestamp: TimeStamp,
                 ) -> impl Iterator<Item = (Math,)> + use<'_> {
                     self.hash_index_2_0
-                        .get(&(x2, x0))
-                        .into_iter()
-                        .flatten()
-                        .copied()
+                        .iter((x2, x0))
                         .filter_map(move |(x1, timestamp)| (timestamp < latest_timestamp).then_some((x1,)))
                 }
                 fn iter_old1_0_1_2(
@@ -15884,10 +16118,7 @@ fn lir_math() {
                     latest_timestamp: TimeStamp,
                 ) -> impl Iterator<Item = (Math, Math)> + use<'_> {
                     self.hash_index_0
-                        .get(&(x0,))
-                        .into_iter()
-                        .flatten()
-                        .copied()
+                        .iter((x0,))
                         .filter_map(move |(x1, x2, timestamp)| {
                             (timestamp < latest_timestamp).then_some((x1, x2))
                         })
@@ -15920,6 +16151,7 @@ fn lir_math() {
             #[derive(Debug, Default)]
             struct DivRelation {
                 new: Vec<<Self as Relation>::Row>,
+                all: Vec<(Math, Math, Math, TimeStamp)>,
                 hash_index_0_1: runtime::HashMap<(Math, Math), (Math, TimeStamp)>,
                 math_num_uprooted_at_latest_retain: usize,
             }
@@ -15944,7 +16176,12 @@ fn lir_math() {
                 }
                 fn emit_graphviz(&self, buf: &mut String) {
                     use std::fmt::Write;
-                    for (i, ((x0, x1), (x2, _timestamp))) in self.hash_index_0_1.iter().enumerate() {
+                    for (i, ((x0, x1), (x2, _timestamp))) in self
+                        .hash_index_0_1
+                        .iter()
+                        .map(|(k, v)| ((*k), (*v)))
+                        .enumerate()
+                    {
                         writeln!(buf, "{}_{i} -> {}_{};", "div", "math", x0).unwrap();
                         writeln!(buf, "{}_{i} -> {}_{};", "div", "math", x1).unwrap();
                         writeln!(buf, "{}_{i} -> {}_{};", "div", "math", x2).unwrap();
@@ -16012,7 +16249,7 @@ fn lir_math() {
                 ) {
                     log_duration!("update_finalize {}: {}", "div", {
                         assert!(self.new.is_empty());
-                        log_duration!("fill new: {}", {
+                        log_duration!("fill new and all: {}", {
                             self.new.extend(self.hash_index_0_1.iter().filter_map(
                                 |(&(x0, x1), &(x2, timestamp))| {
                                     if timestamp == latest_timestamp {
@@ -16023,6 +16260,12 @@ fn lir_math() {
                                 },
                             ));
                             RadixSortable::wrap(&mut self.new).voracious_sort();
+                            self.all.clear();
+                            self.all.extend(
+                                self.hash_index_0_1
+                                    .iter()
+                                    .map(|(&(x0, x1), &(x2, timestamp))| (x0, x1, x2, timestamp)),
+                            );
                             insertions.clear();
                         });
                         #[cfg(debug_assertions)]
@@ -16038,6 +16281,29 @@ fn lir_math() {
                             new.sort();
                             new.dedup();
                             assert_eq!(new.len(), self.new.len(), "new only has unique elements");
+                            self.all.iter().for_each(|&(x0, x1, x2, _timestamp)| {
+                                assert_eq!(
+                                    (x0, x1, x2,),
+                                    (uf.math_.find(x0), uf.math_.find(x1), uf.math_.find(x2),),
+                                    "all is canonical"
+                                );
+                            });
+                            let mut all_: Vec<_> = self.all.clone();
+                            all_.sort();
+                            all_.dedup();
+                            assert_eq!(all_.len(), self.all.len(), "all only has unique elements");
+                            let mut all_: Vec<_> = self
+                                .all
+                                .iter()
+                                .map(|&(x0, x1, x2, _timestamp)| (x0, x1, x2))
+                                .collect();
+                            all_.sort();
+                            all_.dedup();
+                            assert_eq!(
+                                all_.len(),
+                                self.all.len(),
+                                "all does not have duplicate timestamps"
+                            );
                         }
                         self.math_num_uprooted_at_latest_retain = 0;
                     });
@@ -16079,11 +16345,12 @@ fn lir_math() {
             #[derive(Debug, Default)]
             struct PowRelation {
                 new: Vec<<Self as Relation>::Row>,
+                all: Vec<(Math, Math, Math, TimeStamp)>,
                 hash_index_0_1: runtime::HashMap<(Math, Math), (Math, TimeStamp)>,
-                hash_index_2: runtime::HashMap<(Math,), runtime::SmallVec<[(Math, Math, TimeStamp); 1]>>,
-                hash_index_2_0: runtime::HashMap<(Math, Math), runtime::SmallVec<[(Math, TimeStamp); 1]>>,
-                hash_index_0: runtime::HashMap<(Math,), runtime::SmallVec<[(Math, Math, TimeStamp); 1]>>,
-                hash_index_1: runtime::HashMap<(Math,), runtime::SmallVec<[(Math, Math, TimeStamp); 1]>>,
+                hash_index_2: runtime::IndexedSortedList<(Math,), (Math, Math, TimeStamp)>,
+                hash_index_2_0: runtime::IndexedSortedList<(Math, Math), (Math, TimeStamp)>,
+                hash_index_0: runtime::IndexedSortedList<(Math,), (Math, Math, TimeStamp)>,
+                hash_index_1: runtime::IndexedSortedList<(Math,), (Math, Math, TimeStamp)>,
                 math_num_uprooted_at_latest_retain: usize,
             }
             impl Relation for PowRelation {
@@ -16103,11 +16370,16 @@ fn lir_math() {
                     self.new.iter().copied()
                 }
                 fn len(&self) -> usize {
-                    self.hash_index_0_1.len()
+                    self.hash_index_0.len()
                 }
                 fn emit_graphviz(&self, buf: &mut String) {
                     use std::fmt::Write;
-                    for (i, ((x0, x1), (x2, _timestamp))) in self.hash_index_0_1.iter().enumerate() {
+                    for (i, ((x0, x1), (x2, _timestamp))) in self
+                        .hash_index_0_1
+                        .iter()
+                        .map(|(k, v)| ((*k), (*v)))
+                        .enumerate()
+                    {
                         writeln!(buf, "{}_{i} -> {}_{};", "pow", "math", x0).unwrap();
                         writeln!(buf, "{}_{i} -> {}_{};", "pow", "math", x1).unwrap();
                         writeln!(buf, "{}_{i} -> {}_{};", "pow", "math", x2).unwrap();
@@ -16175,7 +16447,7 @@ fn lir_math() {
                 ) {
                     log_duration!("update_finalize {}: {}", "pow", {
                         assert!(self.new.is_empty());
-                        log_duration!("fill new: {}", {
+                        log_duration!("fill new and all: {}", {
                             self.new.extend(self.hash_index_0_1.iter().filter_map(
                                 |(&(x0, x1), &(x2, timestamp))| {
                                     if timestamp == latest_timestamp {
@@ -16186,6 +16458,12 @@ fn lir_math() {
                                 },
                             ));
                             RadixSortable::wrap(&mut self.new).voracious_sort();
+                            self.all.clear();
+                            self.all.extend(
+                                self.hash_index_0_1
+                                    .iter()
+                                    .map(|(&(x0, x1), &(x2, timestamp))| (x0, x1, x2, timestamp)),
+                            );
                             insertions.clear();
                         });
                         #[cfg(debug_assertions)]
@@ -16201,141 +16479,78 @@ fn lir_math() {
                             new.sort();
                             new.dedup();
                             assert_eq!(new.len(), self.new.len(), "new only has unique elements");
-                        }
-                        log_duration!("retain index: {}", {
-                            self.hash_index_2.retain(|&(x2,), v| {
-                                if uf.math_.is_root(x2) {
-                                    v.retain(|&mut (x0, x1, _timestamp)| {
-                                        uf.math_.is_root(x0) & uf.math_.is_root(x1)
-                                    });
-                                    true
-                                } else {
-                                    false
-                                }
+                            self.all.iter().for_each(|&(x0, x1, x2, _timestamp)| {
+                                assert_eq!(
+                                    (x0, x1, x2,),
+                                    (uf.math_.find(x0), uf.math_.find(x1), uf.math_.find(x2),),
+                                    "all is canonical"
+                                );
                             });
-                        });
-                        log_duration!("fill index: {}", {
-                            for &(x0, x1, x2) in &self.new {
-                                self.hash_index_2
-                                    .entry((x2,))
-                                    .or_default()
-                                    .push((x0, x1, latest_timestamp));
+                            let mut all_: Vec<_> = self.all.clone();
+                            all_.sort();
+                            all_.dedup();
+                            assert_eq!(all_.len(), self.all.len(), "all only has unique elements");
+                            let mut all_: Vec<_> = self
+                                .all
+                                .iter()
+                                .map(|&(x0, x1, x2, _timestamp)| (x0, x1, x2))
+                                .collect();
+                            all_.sort();
+                            all_.dedup();
+                            assert_eq!(
+                                all_.len(),
+                                self.all.len(),
+                                "all does not have duplicate timestamps"
+                            );
+                        }
+                        log_duration!("reconstruct index: {}", {
+                            log_duration!("reconstruct sort: {}", {
+                                RowSort001::sort(&mut self.all);
+                            });
+                            unsafe {
+                                self.hash_index_2.reconstruct(
+                                    &mut self.all,
+                                    |(x0, x1, x2, timestamp)| (x2,),
+                                    |(x0, x1, x2, timestamp)| (x0, x1, timestamp),
+                                );
                             }
                         });
-                        #[cfg(debug_assertions)]
-                        {
-                            self.hash_index_2.iter().for_each(|(&(x2,), v)| {
-                                let mut v = v.clone();
-                                let n = v.len();
-                                v.sort();
-                                v.dedup_by(|(x0, x1, t1), (y0, y1, t2)| true & (*x0 == *y0) & (*x1 == *y1));
-                                assert_eq!(n, v.len(), "indexes do not have duplicates");
-                                assert!(uf.math_.is_root(x2), "key is root");
-                                v.iter().copied().for_each(|(x0, x1, _timestamp)| {
-                                    assert!(uf.math_.is_root(x0) & uf.math_.is_root(x1), "value is root");
-                                });
+                        log_duration!("reconstruct index: {}", {
+                            log_duration!("reconstruct sort: {}", {
+                                RowSort101::sort(&mut self.all);
                             });
-                        }
-                        log_duration!("retain index: {}", {
-                            self.hash_index_2_0.retain(|&(x2, x0), v| {
-                                if uf.math_.is_root(x2) & uf.math_.is_root(x0) {
-                                    v.retain(|&mut (x1, _timestamp)| uf.math_.is_root(x1));
-                                    true
-                                } else {
-                                    false
-                                }
-                            });
-                        });
-                        log_duration!("fill index: {}", {
-                            for &(x0, x1, x2) in &self.new {
-                                self.hash_index_2_0
-                                    .entry((x2, x0))
-                                    .or_default()
-                                    .push((x1, latest_timestamp));
+                            unsafe {
+                                self.hash_index_2_0.reconstruct(
+                                    &mut self.all,
+                                    |(x0, x1, x2, timestamp)| (x2, x0),
+                                    |(x0, x1, x2, timestamp)| (x1, timestamp),
+                                );
                             }
                         });
-                        #[cfg(debug_assertions)]
-                        {
-                            self.hash_index_2_0.iter().for_each(|(&(x2, x0), v)| {
-                                let mut v = v.clone();
-                                let n = v.len();
-                                v.sort();
-                                v.dedup_by(|(x1, t1), (y1, t2)| true & (*x1 == *y1));
-                                assert_eq!(n, v.len(), "indexes do not have duplicates");
-                                assert!(uf.math_.is_root(x2) & uf.math_.is_root(x0), "key is root");
-                                v.iter().copied().for_each(|(x1, _timestamp)| {
-                                    assert!(uf.math_.is_root(x1), "value is root");
-                                });
+                        log_duration!("reconstruct index: {}", {
+                            log_duration!("reconstruct sort: {}", {
+                                RowSort100::sort(&mut self.all);
                             });
-                        }
-                        log_duration!("retain index: {}", {
-                            self.hash_index_0.retain(|&(x0,), v| {
-                                if uf.math_.is_root(x0) {
-                                    v.retain(|&mut (x1, x2, _timestamp)| {
-                                        uf.math_.is_root(x1) & uf.math_.is_root(x2)
-                                    });
-                                    true
-                                } else {
-                                    false
-                                }
-                            });
-                        });
-                        log_duration!("fill index: {}", {
-                            for &(x0, x1, x2) in &self.new {
-                                self.hash_index_0
-                                    .entry((x0,))
-                                    .or_default()
-                                    .push((x1, x2, latest_timestamp));
+                            unsafe {
+                                self.hash_index_0.reconstruct(
+                                    &mut self.all,
+                                    |(x0, x1, x2, timestamp)| (x0,),
+                                    |(x0, x1, x2, timestamp)| (x1, x2, timestamp),
+                                );
                             }
                         });
-                        #[cfg(debug_assertions)]
-                        {
-                            self.hash_index_0.iter().for_each(|(&(x0,), v)| {
-                                let mut v = v.clone();
-                                let n = v.len();
-                                v.sort();
-                                v.dedup_by(|(x1, x2, t1), (y1, y2, t2)| true & (*x1 == *y1) & (*x2 == *y2));
-                                assert_eq!(n, v.len(), "indexes do not have duplicates");
-                                assert!(uf.math_.is_root(x0), "key is root");
-                                v.iter().copied().for_each(|(x1, x2, _timestamp)| {
-                                    assert!(uf.math_.is_root(x1) & uf.math_.is_root(x2), "value is root");
-                                });
+                        log_duration!("reconstruct index: {}", {
+                            log_duration!("reconstruct sort: {}", {
+                                RowSort010::sort(&mut self.all);
                             });
-                        }
-                        log_duration!("retain index: {}", {
-                            self.hash_index_1.retain(|&(x1,), v| {
-                                if uf.math_.is_root(x1) {
-                                    v.retain(|&mut (x0, x2, _timestamp)| {
-                                        uf.math_.is_root(x0) & uf.math_.is_root(x2)
-                                    });
-                                    true
-                                } else {
-                                    false
-                                }
-                            });
-                        });
-                        log_duration!("fill index: {}", {
-                            for &(x0, x1, x2) in &self.new {
-                                self.hash_index_1
-                                    .entry((x1,))
-                                    .or_default()
-                                    .push((x0, x2, latest_timestamp));
+                            unsafe {
+                                self.hash_index_1.reconstruct(
+                                    &mut self.all,
+                                    |(x0, x1, x2, timestamp)| (x1,),
+                                    |(x0, x1, x2, timestamp)| (x0, x2, timestamp),
+                                );
                             }
                         });
-                        #[cfg(debug_assertions)]
-                        {
-                            self.hash_index_1.iter().for_each(|(&(x1,), v)| {
-                                let mut v = v.clone();
-                                let n = v.len();
-                                v.sort();
-                                v.dedup_by(|(x0, x2, t1), (y0, y2, t2)| true & (*x0 == *y0) & (*x2 == *y2));
-                                assert_eq!(n, v.len(), "indexes do not have duplicates");
-                                assert!(uf.math_.is_root(x1), "key is root");
-                                v.iter().copied().for_each(|(x0, x2, _timestamp)| {
-                                    assert!(uf.math_.is_root(x0) & uf.math_.is_root(x2), "value is root");
-                                });
-                            });
-                        }
                         self.math_num_uprooted_at_latest_retain = 0;
                     });
                 }
@@ -16350,34 +16565,22 @@ fn lir_math() {
                 }
                 fn iter_all1_2_0_1(&self, x2: Math) -> impl Iterator<Item = (Math, Math)> + use<'_> {
                     self.hash_index_2
-                        .get(&(x2,))
-                        .into_iter()
-                        .flatten()
-                        .copied()
+                        .iter((x2,))
                         .map(|(x0, x1, _timestamp)| (x0, x1))
                 }
                 fn iter_all2_2_0_1(&self, x2: Math, x0: Math) -> impl Iterator<Item = (Math,)> + use<'_> {
                     self.hash_index_2_0
-                        .get(&(x2, x0))
-                        .into_iter()
-                        .flatten()
-                        .copied()
+                        .iter((x2, x0))
                         .map(|(x1, _timestamp)| (x1,))
                 }
                 fn iter_all1_0_1_2(&self, x0: Math) -> impl Iterator<Item = (Math, Math)> + use<'_> {
                     self.hash_index_0
-                        .get(&(x0,))
-                        .into_iter()
-                        .flatten()
-                        .copied()
+                        .iter((x0,))
                         .map(|(x1, x2, _timestamp)| (x1, x2))
                 }
                 fn iter_all1_1_0_2(&self, x1: Math) -> impl Iterator<Item = (Math, Math)> + use<'_> {
                     self.hash_index_1
-                        .get(&(x1,))
-                        .into_iter()
-                        .flatten()
-                        .copied()
+                        .iter((x1,))
                         .map(|(x0, x2, _timestamp)| (x0, x2))
                 }
                 fn iter_old2_0_1_2(
@@ -16398,10 +16601,7 @@ fn lir_math() {
                     latest_timestamp: TimeStamp,
                 ) -> impl Iterator<Item = (Math, Math)> + use<'_> {
                     self.hash_index_2
-                        .get(&(x2,))
-                        .into_iter()
-                        .flatten()
-                        .copied()
+                        .iter((x2,))
                         .filter_map(move |(x0, x1, timestamp)| {
                             (timestamp < latest_timestamp).then_some((x0, x1))
                         })
@@ -16413,10 +16613,7 @@ fn lir_math() {
                     latest_timestamp: TimeStamp,
                 ) -> impl Iterator<Item = (Math,)> + use<'_> {
                     self.hash_index_2_0
-                        .get(&(x2, x0))
-                        .into_iter()
-                        .flatten()
-                        .copied()
+                        .iter((x2, x0))
                         .filter_map(move |(x1, timestamp)| (timestamp < latest_timestamp).then_some((x1,)))
                 }
                 fn iter_old1_0_1_2(
@@ -16425,10 +16622,7 @@ fn lir_math() {
                     latest_timestamp: TimeStamp,
                 ) -> impl Iterator<Item = (Math, Math)> + use<'_> {
                     self.hash_index_0
-                        .get(&(x0,))
-                        .into_iter()
-                        .flatten()
-                        .copied()
+                        .iter((x0,))
                         .filter_map(move |(x1, x2, timestamp)| {
                             (timestamp < latest_timestamp).then_some((x1, x2))
                         })
@@ -16439,10 +16633,7 @@ fn lir_math() {
                     latest_timestamp: TimeStamp,
                 ) -> impl Iterator<Item = (Math, Math)> + use<'_> {
                     self.hash_index_1
-                        .get(&(x1,))
-                        .into_iter()
-                        .flatten()
-                        .copied()
+                        .iter((x1,))
                         .filter_map(move |(x0, x2, timestamp)| {
                             (timestamp < latest_timestamp).then_some((x0, x2))
                         })
@@ -16475,6 +16666,7 @@ fn lir_math() {
             #[derive(Debug, Default)]
             struct LnRelation {
                 new: Vec<<Self as Relation>::Row>,
+                all: Vec<(Math, Math, TimeStamp)>,
                 hash_index_0: runtime::HashMap<(Math,), (Math, TimeStamp)>,
                 math_num_uprooted_at_latest_retain: usize,
             }
@@ -16499,7 +16691,12 @@ fn lir_math() {
                 }
                 fn emit_graphviz(&self, buf: &mut String) {
                     use std::fmt::Write;
-                    for (i, ((x0,), (x1, _timestamp))) in self.hash_index_0.iter().enumerate() {
+                    for (i, ((x0,), (x1, _timestamp))) in self
+                        .hash_index_0
+                        .iter()
+                        .map(|(k, v)| ((*k), (*v)))
+                        .enumerate()
+                    {
                         writeln!(buf, "{}_{i} -> {}_{};", "ln", "math", x0).unwrap();
                         writeln!(buf, "{}_{i} -> {}_{};", "ln", "math", x1).unwrap();
                         writeln!(buf, "{}_{i} [shape = box];", "ln").unwrap();
@@ -16562,7 +16759,7 @@ fn lir_math() {
                 ) {
                     log_duration!("update_finalize {}: {}", "ln", {
                         assert!(self.new.is_empty());
-                        log_duration!("fill new: {}", {
+                        log_duration!("fill new and all: {}", {
                             self.new.extend(self.hash_index_0.iter().filter_map(
                                 |(&(x0,), &(x1, timestamp))| {
                                     if timestamp == latest_timestamp {
@@ -16573,6 +16770,12 @@ fn lir_math() {
                                 },
                             ));
                             RadixSortable::wrap(&mut self.new).voracious_sort();
+                            self.all.clear();
+                            self.all.extend(
+                                self.hash_index_0
+                                    .iter()
+                                    .map(|(&(x0,), &(x1, timestamp))| (x0, x1, timestamp)),
+                            );
                             insertions.clear();
                         });
                         #[cfg(debug_assertions)]
@@ -16588,6 +16791,29 @@ fn lir_math() {
                             new.sort();
                             new.dedup();
                             assert_eq!(new.len(), self.new.len(), "new only has unique elements");
+                            self.all.iter().for_each(|&(x0, x1, _timestamp)| {
+                                assert_eq!(
+                                    (x0, x1,),
+                                    (uf.math_.find(x0), uf.math_.find(x1),),
+                                    "all is canonical"
+                                );
+                            });
+                            let mut all_: Vec<_> = self.all.clone();
+                            all_.sort();
+                            all_.dedup();
+                            assert_eq!(all_.len(), self.all.len(), "all only has unique elements");
+                            let mut all_: Vec<_> = self
+                                .all
+                                .iter()
+                                .map(|&(x0, x1, _timestamp)| (x0, x1))
+                                .collect();
+                            all_.sort();
+                            all_.dedup();
+                            assert_eq!(
+                                all_.len(),
+                                self.all.len(),
+                                "all does not have duplicate timestamps"
+                            );
                         }
                         self.math_num_uprooted_at_latest_retain = 0;
                     });
@@ -16628,6 +16854,7 @@ fn lir_math() {
             #[derive(Debug, Default)]
             struct SqrtRelation {
                 new: Vec<<Self as Relation>::Row>,
+                all: Vec<(Math, Math, TimeStamp)>,
                 hash_index_0: runtime::HashMap<(Math,), (Math, TimeStamp)>,
                 math_num_uprooted_at_latest_retain: usize,
             }
@@ -16652,7 +16879,12 @@ fn lir_math() {
                 }
                 fn emit_graphviz(&self, buf: &mut String) {
                     use std::fmt::Write;
-                    for (i, ((x0,), (x1, _timestamp))) in self.hash_index_0.iter().enumerate() {
+                    for (i, ((x0,), (x1, _timestamp))) in self
+                        .hash_index_0
+                        .iter()
+                        .map(|(k, v)| ((*k), (*v)))
+                        .enumerate()
+                    {
                         writeln!(buf, "{}_{i} -> {}_{};", "sqrt", "math", x0).unwrap();
                         writeln!(buf, "{}_{i} -> {}_{};", "sqrt", "math", x1).unwrap();
                         writeln!(buf, "{}_{i} [shape = box];", "sqrt").unwrap();
@@ -16715,7 +16947,7 @@ fn lir_math() {
                 ) {
                     log_duration!("update_finalize {}: {}", "sqrt", {
                         assert!(self.new.is_empty());
-                        log_duration!("fill new: {}", {
+                        log_duration!("fill new and all: {}", {
                             self.new.extend(self.hash_index_0.iter().filter_map(
                                 |(&(x0,), &(x1, timestamp))| {
                                     if timestamp == latest_timestamp {
@@ -16726,6 +16958,12 @@ fn lir_math() {
                                 },
                             ));
                             RadixSortable::wrap(&mut self.new).voracious_sort();
+                            self.all.clear();
+                            self.all.extend(
+                                self.hash_index_0
+                                    .iter()
+                                    .map(|(&(x0,), &(x1, timestamp))| (x0, x1, timestamp)),
+                            );
                             insertions.clear();
                         });
                         #[cfg(debug_assertions)]
@@ -16741,6 +16979,29 @@ fn lir_math() {
                             new.sort();
                             new.dedup();
                             assert_eq!(new.len(), self.new.len(), "new only has unique elements");
+                            self.all.iter().for_each(|&(x0, x1, _timestamp)| {
+                                assert_eq!(
+                                    (x0, x1,),
+                                    (uf.math_.find(x0), uf.math_.find(x1),),
+                                    "all is canonical"
+                                );
+                            });
+                            let mut all_: Vec<_> = self.all.clone();
+                            all_.sort();
+                            all_.dedup();
+                            assert_eq!(all_.len(), self.all.len(), "all only has unique elements");
+                            let mut all_: Vec<_> = self
+                                .all
+                                .iter()
+                                .map(|&(x0, x1, _timestamp)| (x0, x1))
+                                .collect();
+                            all_.sort();
+                            all_.dedup();
+                            assert_eq!(
+                                all_.len(),
+                                self.all.len(),
+                                "all does not have duplicate timestamps"
+                            );
                         }
                         self.math_num_uprooted_at_latest_retain = 0;
                     });
@@ -16781,8 +17042,9 @@ fn lir_math() {
             #[derive(Debug, Default)]
             struct SinRelation {
                 new: Vec<<Self as Relation>::Row>,
+                all: Vec<(Math, Math, TimeStamp)>,
                 hash_index_0: runtime::HashMap<(Math,), (Math, TimeStamp)>,
-                hash_index_0_1: runtime::HashMap<(Math, Math), runtime::SmallVec<[(TimeStamp,); 1]>>,
+                hash_index_0_1: runtime::IndexedSortedList<(Math, Math), (TimeStamp,)>,
                 math_num_uprooted_at_latest_retain: usize,
             }
             impl Relation for SinRelation {
@@ -16806,7 +17068,12 @@ fn lir_math() {
                 }
                 fn emit_graphviz(&self, buf: &mut String) {
                     use std::fmt::Write;
-                    for (i, ((x0,), (x1, _timestamp))) in self.hash_index_0.iter().enumerate() {
+                    for (i, ((x0,), (x1, _timestamp))) in self
+                        .hash_index_0
+                        .iter()
+                        .map(|(k, v)| ((*k), (*v)))
+                        .enumerate()
+                    {
                         writeln!(buf, "{}_{i} -> {}_{};", "sin", "math", x0).unwrap();
                         writeln!(buf, "{}_{i} -> {}_{};", "sin", "math", x1).unwrap();
                         writeln!(buf, "{}_{i} [shape = box];", "sin").unwrap();
@@ -16869,7 +17136,7 @@ fn lir_math() {
                 ) {
                     log_duration!("update_finalize {}: {}", "sin", {
                         assert!(self.new.is_empty());
-                        log_duration!("fill new: {}", {
+                        log_duration!("fill new and all: {}", {
                             self.new.extend(self.hash_index_0.iter().filter_map(
                                 |(&(x0,), &(x1, timestamp))| {
                                     if timestamp == latest_timestamp {
@@ -16880,6 +17147,12 @@ fn lir_math() {
                                 },
                             ));
                             RadixSortable::wrap(&mut self.new).voracious_sort();
+                            self.all.clear();
+                            self.all.extend(
+                                self.hash_index_0
+                                    .iter()
+                                    .map(|(&(x0,), &(x1, timestamp))| (x0, x1, timestamp)),
+                            );
                             insertions.clear();
                         });
                         #[cfg(debug_assertions)]
@@ -16895,39 +17168,42 @@ fn lir_math() {
                             new.sort();
                             new.dedup();
                             assert_eq!(new.len(), self.new.len(), "new only has unique elements");
-                        }
-                        log_duration!("retain index: {}", {
-                            self.hash_index_0_1.retain(|&(x0, x1), v| {
-                                if uf.math_.is_root(x0) & uf.math_.is_root(x1) {
-                                    v.retain(|&mut (_timestamp)| true);
-                                    true
-                                } else {
-                                    false
-                                }
+                            self.all.iter().for_each(|&(x0, x1, _timestamp)| {
+                                assert_eq!(
+                                    (x0, x1,),
+                                    (uf.math_.find(x0), uf.math_.find(x1),),
+                                    "all is canonical"
+                                );
                             });
-                        });
-                        log_duration!("fill index: {}", {
-                            for &(x0, x1) in &self.new {
-                                self.hash_index_0_1
-                                    .entry((x0, x1))
-                                    .or_default()
-                                    .push((latest_timestamp,));
+                            let mut all_: Vec<_> = self.all.clone();
+                            all_.sort();
+                            all_.dedup();
+                            assert_eq!(all_.len(), self.all.len(), "all only has unique elements");
+                            let mut all_: Vec<_> = self
+                                .all
+                                .iter()
+                                .map(|&(x0, x1, _timestamp)| (x0, x1))
+                                .collect();
+                            all_.sort();
+                            all_.dedup();
+                            assert_eq!(
+                                all_.len(),
+                                self.all.len(),
+                                "all does not have duplicate timestamps"
+                            );
+                        }
+                        log_duration!("reconstruct index: {}", {
+                            log_duration!("reconstruct sort: {}", {
+                                RowSort11::sort(&mut self.all);
+                            });
+                            unsafe {
+                                self.hash_index_0_1.reconstruct(
+                                    &mut self.all,
+                                    |(x0, x1, timestamp)| (x0, x1),
+                                    |(x0, x1, timestamp)| (timestamp,),
+                                );
                             }
                         });
-                        #[cfg(debug_assertions)]
-                        {
-                            self.hash_index_0_1.iter().for_each(|(&(x0, x1), v)| {
-                                let mut v = v.clone();
-                                let n = v.len();
-                                v.sort();
-                                v.dedup_by(|(t1,), (t2,)| true);
-                                assert_eq!(n, v.len(), "indexes do not have duplicates");
-                                assert!(uf.math_.is_root(x0) & uf.math_.is_root(x1), "key is root");
-                                v.iter().copied().for_each(|(_timestamp)| {
-                                    assert!(true, "value is root");
-                                });
-                            });
-                        }
                         self.math_num_uprooted_at_latest_retain = 0;
                     });
                 }
@@ -16941,12 +17217,7 @@ fn lir_math() {
                         .map(|(x1, _timestamp)| (x1,))
                 }
                 fn iter_all2_0_1(&self, x0: Math, x1: Math) -> impl Iterator<Item = ()> + use<'_> {
-                    self.hash_index_0_1
-                        .get(&(x0, x1))
-                        .into_iter()
-                        .flatten()
-                        .copied()
-                        .map(|(_timestamp)| ())
+                    self.hash_index_0_1.iter((x0, x1)).map(|(_timestamp)| ())
                 }
                 fn iter_old1_0_1(
                     &self,
@@ -16966,10 +17237,7 @@ fn lir_math() {
                     latest_timestamp: TimeStamp,
                 ) -> impl Iterator<Item = ()> + use<'_> {
                     self.hash_index_0_1
-                        .get(&(x0, x1))
-                        .into_iter()
-                        .flatten()
-                        .copied()
+                        .iter((x0, x1))
                         .filter_map(move |(timestamp,)| (timestamp < latest_timestamp).then_some(()))
                 }
                 fn check1_0_1(&self, x0: Math) -> bool {
@@ -16999,8 +17267,9 @@ fn lir_math() {
             #[derive(Debug, Default)]
             struct CosRelation {
                 new: Vec<<Self as Relation>::Row>,
+                all: Vec<(Math, Math, TimeStamp)>,
                 hash_index_0: runtime::HashMap<(Math,), (Math, TimeStamp)>,
-                hash_index_0_1: runtime::HashMap<(Math, Math), runtime::SmallVec<[(TimeStamp,); 1]>>,
+                hash_index_0_1: runtime::IndexedSortedList<(Math, Math), (TimeStamp,)>,
                 math_num_uprooted_at_latest_retain: usize,
             }
             impl Relation for CosRelation {
@@ -17024,7 +17293,12 @@ fn lir_math() {
                 }
                 fn emit_graphviz(&self, buf: &mut String) {
                     use std::fmt::Write;
-                    for (i, ((x0,), (x1, _timestamp))) in self.hash_index_0.iter().enumerate() {
+                    for (i, ((x0,), (x1, _timestamp))) in self
+                        .hash_index_0
+                        .iter()
+                        .map(|(k, v)| ((*k), (*v)))
+                        .enumerate()
+                    {
                         writeln!(buf, "{}_{i} -> {}_{};", "cos", "math", x0).unwrap();
                         writeln!(buf, "{}_{i} -> {}_{};", "cos", "math", x1).unwrap();
                         writeln!(buf, "{}_{i} [shape = box];", "cos").unwrap();
@@ -17087,7 +17361,7 @@ fn lir_math() {
                 ) {
                     log_duration!("update_finalize {}: {}", "cos", {
                         assert!(self.new.is_empty());
-                        log_duration!("fill new: {}", {
+                        log_duration!("fill new and all: {}", {
                             self.new.extend(self.hash_index_0.iter().filter_map(
                                 |(&(x0,), &(x1, timestamp))| {
                                     if timestamp == latest_timestamp {
@@ -17098,6 +17372,12 @@ fn lir_math() {
                                 },
                             ));
                             RadixSortable::wrap(&mut self.new).voracious_sort();
+                            self.all.clear();
+                            self.all.extend(
+                                self.hash_index_0
+                                    .iter()
+                                    .map(|(&(x0,), &(x1, timestamp))| (x0, x1, timestamp)),
+                            );
                             insertions.clear();
                         });
                         #[cfg(debug_assertions)]
@@ -17113,39 +17393,42 @@ fn lir_math() {
                             new.sort();
                             new.dedup();
                             assert_eq!(new.len(), self.new.len(), "new only has unique elements");
-                        }
-                        log_duration!("retain index: {}", {
-                            self.hash_index_0_1.retain(|&(x0, x1), v| {
-                                if uf.math_.is_root(x0) & uf.math_.is_root(x1) {
-                                    v.retain(|&mut (_timestamp)| true);
-                                    true
-                                } else {
-                                    false
-                                }
+                            self.all.iter().for_each(|&(x0, x1, _timestamp)| {
+                                assert_eq!(
+                                    (x0, x1,),
+                                    (uf.math_.find(x0), uf.math_.find(x1),),
+                                    "all is canonical"
+                                );
                             });
-                        });
-                        log_duration!("fill index: {}", {
-                            for &(x0, x1) in &self.new {
-                                self.hash_index_0_1
-                                    .entry((x0, x1))
-                                    .or_default()
-                                    .push((latest_timestamp,));
+                            let mut all_: Vec<_> = self.all.clone();
+                            all_.sort();
+                            all_.dedup();
+                            assert_eq!(all_.len(), self.all.len(), "all only has unique elements");
+                            let mut all_: Vec<_> = self
+                                .all
+                                .iter()
+                                .map(|&(x0, x1, _timestamp)| (x0, x1))
+                                .collect();
+                            all_.sort();
+                            all_.dedup();
+                            assert_eq!(
+                                all_.len(),
+                                self.all.len(),
+                                "all does not have duplicate timestamps"
+                            );
+                        }
+                        log_duration!("reconstruct index: {}", {
+                            log_duration!("reconstruct sort: {}", {
+                                RowSort11::sort(&mut self.all);
+                            });
+                            unsafe {
+                                self.hash_index_0_1.reconstruct(
+                                    &mut self.all,
+                                    |(x0, x1, timestamp)| (x0, x1),
+                                    |(x0, x1, timestamp)| (timestamp,),
+                                );
                             }
                         });
-                        #[cfg(debug_assertions)]
-                        {
-                            self.hash_index_0_1.iter().for_each(|(&(x0, x1), v)| {
-                                let mut v = v.clone();
-                                let n = v.len();
-                                v.sort();
-                                v.dedup_by(|(t1,), (t2,)| true);
-                                assert_eq!(n, v.len(), "indexes do not have duplicates");
-                                assert!(uf.math_.is_root(x0) & uf.math_.is_root(x1), "key is root");
-                                v.iter().copied().for_each(|(_timestamp)| {
-                                    assert!(true, "value is root");
-                                });
-                            });
-                        }
                         self.math_num_uprooted_at_latest_retain = 0;
                     });
                 }
@@ -17159,12 +17442,7 @@ fn lir_math() {
                         .map(|(x1, _timestamp)| (x1,))
                 }
                 fn iter_all2_0_1(&self, x0: Math, x1: Math) -> impl Iterator<Item = ()> + use<'_> {
-                    self.hash_index_0_1
-                        .get(&(x0, x1))
-                        .into_iter()
-                        .flatten()
-                        .copied()
-                        .map(|(_timestamp)| ())
+                    self.hash_index_0_1.iter((x0, x1)).map(|(_timestamp)| ())
                 }
                 fn iter_old1_0_1(
                     &self,
@@ -17184,10 +17462,7 @@ fn lir_math() {
                     latest_timestamp: TimeStamp,
                 ) -> impl Iterator<Item = ()> + use<'_> {
                     self.hash_index_0_1
-                        .get(&(x0, x1))
-                        .into_iter()
-                        .flatten()
-                        .copied()
+                        .iter((x0, x1))
                         .filter_map(move |(timestamp,)| (timestamp < latest_timestamp).then_some(()))
                 }
                 fn check1_0_1(&self, x0: Math) -> bool {
@@ -17217,9 +17492,9 @@ fn lir_math() {
             #[derive(Debug, Default)]
             struct ConstRelation {
                 new: Vec<<Self as Relation>::Row>,
+                all: Vec<(std::primitive::i64, Math, TimeStamp)>,
                 hash_index_0: runtime::HashMap<(std::primitive::i64,), (Math, TimeStamp)>,
-                hash_index_1:
-                    runtime::HashMap<(Math,), runtime::SmallVec<[(std::primitive::i64, TimeStamp); 1]>>,
+                hash_index_1: runtime::IndexedSortedList<(Math,), (std::primitive::i64, TimeStamp)>,
                 i64_num_uprooted_at_latest_retain: usize,
                 math_num_uprooted_at_latest_retain: usize,
             }
@@ -17244,7 +17519,12 @@ fn lir_math() {
                 }
                 fn emit_graphviz(&self, buf: &mut String) {
                     use std::fmt::Write;
-                    for (i, ((x0,), (x1, _timestamp))) in self.hash_index_0.iter().enumerate() {
+                    for (i, ((x0,), (x1, _timestamp))) in self
+                        .hash_index_0
+                        .iter()
+                        .map(|(k, v)| ((*k), (*v)))
+                        .enumerate()
+                    {
                         writeln!(buf, "{}_{i} -> {}_{};", "const", "i64", x0).unwrap();
                         writeln!(buf, "{}_{i} -> {}_{};", "const", "math", x1).unwrap();
                         writeln!(buf, "{}_{i} [shape = box];", "const").unwrap();
@@ -17307,7 +17587,7 @@ fn lir_math() {
                 ) {
                     log_duration!("update_finalize {}: {}", "const", {
                         assert!(self.new.is_empty());
-                        log_duration!("fill new: {}", {
+                        log_duration!("fill new and all: {}", {
                             self.new.extend(self.hash_index_0.iter().filter_map(
                                 |(&(x0,), &(x1, timestamp))| {
                                     if timestamp == latest_timestamp {
@@ -17318,6 +17598,12 @@ fn lir_math() {
                                 },
                             ));
                             self.new.sort_unstable();
+                            self.all.clear();
+                            self.all.extend(
+                                self.hash_index_0
+                                    .iter()
+                                    .map(|(&(x0,), &(x1, timestamp))| (x0, x1, timestamp)),
+                            );
                             insertions.clear();
                         });
                         #[cfg(debug_assertions)]
@@ -17329,39 +17615,38 @@ fn lir_math() {
                             new.sort();
                             new.dedup();
                             assert_eq!(new.len(), self.new.len(), "new only has unique elements");
-                        }
-                        log_duration!("retain index: {}", {
-                            self.hash_index_1.retain(|&(x1,), v| {
-                                if uf.math_.is_root(x1) {
-                                    v.retain(|&mut (x0, _timestamp)| true);
-                                    true
-                                } else {
-                                    false
-                                }
+                            self.all.iter().for_each(|&(x0, x1, _timestamp)| {
+                                assert_eq!((x0, x1,), (x0, uf.math_.find(x1),), "all is canonical");
                             });
-                        });
-                        log_duration!("fill index: {}", {
-                            for &(x0, x1) in &self.new {
-                                self.hash_index_1
-                                    .entry((x1,))
-                                    .or_default()
-                                    .push((x0, latest_timestamp));
+                            let mut all_: Vec<_> = self.all.clone();
+                            all_.sort();
+                            all_.dedup();
+                            assert_eq!(all_.len(), self.all.len(), "all only has unique elements");
+                            let mut all_: Vec<_> = self
+                                .all
+                                .iter()
+                                .map(|&(x0, x1, _timestamp)| (x0, x1))
+                                .collect();
+                            all_.sort();
+                            all_.dedup();
+                            assert_eq!(
+                                all_.len(),
+                                self.all.len(),
+                                "all does not have duplicate timestamps"
+                            );
+                        }
+                        log_duration!("reconstruct index: {}", {
+                            log_duration!("reconstruct sort: {}", {
+                                self.all.sort_unstable_by_key(|&(x0, x1, timestamp)| (x1,));
+                            });
+                            unsafe {
+                                self.hash_index_1.reconstruct(
+                                    &mut self.all,
+                                    |(x0, x1, timestamp)| (x1,),
+                                    |(x0, x1, timestamp)| (x0, timestamp),
+                                );
                             }
                         });
-                        #[cfg(debug_assertions)]
-                        {
-                            self.hash_index_1.iter().for_each(|(&(x1,), v)| {
-                                let mut v = v.clone();
-                                let n = v.len();
-                                v.sort();
-                                v.dedup_by(|(x0, t1), (y0, t2)| true & (*x0 == *y0));
-                                assert_eq!(n, v.len(), "indexes do not have duplicates");
-                                assert!(uf.math_.is_root(x1), "key is root");
-                                v.iter().copied().for_each(|(x0, _timestamp)| {
-                                    assert!(true, "value is root");
-                                });
-                            });
-                        }
                         self.math_num_uprooted_at_latest_retain = 0;
                     });
                 }
@@ -17375,12 +17660,7 @@ fn lir_math() {
                         .map(|(x1, _timestamp)| (x1,))
                 }
                 fn iter_all1_1_0(&self, x1: Math) -> impl Iterator<Item = (std::primitive::i64,)> + use<'_> {
-                    self.hash_index_1
-                        .get(&(x1,))
-                        .into_iter()
-                        .flatten()
-                        .copied()
-                        .map(|(x0, _timestamp)| (x0,))
+                    self.hash_index_1.iter((x1,)).map(|(x0, _timestamp)| (x0,))
                 }
                 fn iter_old1_0_1(
                     &self,
@@ -17399,10 +17679,7 @@ fn lir_math() {
                     latest_timestamp: TimeStamp,
                 ) -> impl Iterator<Item = (std::primitive::i64,)> + use<'_> {
                     self.hash_index_1
-                        .get(&(x1,))
-                        .into_iter()
-                        .flatten()
-                        .copied()
+                        .iter((x1,))
                         .filter_map(move |(x0, timestamp)| (timestamp < latest_timestamp).then_some((x0,)))
                 }
                 fn check1_0_1(&self, x0: std::primitive::i64) -> bool {
@@ -17429,6 +17706,7 @@ fn lir_math() {
             #[derive(Debug, Default)]
             struct VarRelation {
                 new: Vec<<Self as Relation>::Row>,
+                all: Vec<(runtime::IString, Math, TimeStamp)>,
                 hash_index_0: runtime::HashMap<(runtime::IString,), (Math, TimeStamp)>,
                 string_num_uprooted_at_latest_retain: usize,
                 math_num_uprooted_at_latest_retain: usize,
@@ -17454,7 +17732,12 @@ fn lir_math() {
                 }
                 fn emit_graphviz(&self, buf: &mut String) {
                     use std::fmt::Write;
-                    for (i, ((x0,), (x1, _timestamp))) in self.hash_index_0.iter().enumerate() {
+                    for (i, ((x0,), (x1, _timestamp))) in self
+                        .hash_index_0
+                        .iter()
+                        .map(|(k, v)| ((*k), (*v)))
+                        .enumerate()
+                    {
                         writeln!(buf, "{}_{i} -> {}_{};", "var", "string", x0).unwrap();
                         writeln!(buf, "{}_{i} -> {}_{};", "var", "math", x1).unwrap();
                         writeln!(buf, "{}_{i} [shape = box];", "var").unwrap();
@@ -17517,7 +17800,7 @@ fn lir_math() {
                 ) {
                     log_duration!("update_finalize {}: {}", "var", {
                         assert!(self.new.is_empty());
-                        log_duration!("fill new: {}", {
+                        log_duration!("fill new and all: {}", {
                             self.new.extend(self.hash_index_0.iter().filter_map(
                                 |(&(x0,), &(x1, timestamp))| {
                                     if timestamp == latest_timestamp {
@@ -17528,6 +17811,12 @@ fn lir_math() {
                                 },
                             ));
                             self.new.sort_unstable();
+                            self.all.clear();
+                            self.all.extend(
+                                self.hash_index_0
+                                    .iter()
+                                    .map(|(&(x0,), &(x1, timestamp))| (x0, x1, timestamp)),
+                            );
                             insertions.clear();
                         });
                         #[cfg(debug_assertions)]
@@ -17539,6 +17828,25 @@ fn lir_math() {
                             new.sort();
                             new.dedup();
                             assert_eq!(new.len(), self.new.len(), "new only has unique elements");
+                            self.all.iter().for_each(|&(x0, x1, _timestamp)| {
+                                assert_eq!((x0, x1,), (x0, uf.math_.find(x1),), "all is canonical");
+                            });
+                            let mut all_: Vec<_> = self.all.clone();
+                            all_.sort();
+                            all_.dedup();
+                            assert_eq!(all_.len(), self.all.len(), "all only has unique elements");
+                            let mut all_: Vec<_> = self
+                                .all
+                                .iter()
+                                .map(|&(x0, x1, _timestamp)| (x0, x1))
+                                .collect();
+                            all_.sort();
+                            all_.dedup();
+                            assert_eq!(
+                                all_.len(),
+                                self.all.len(),
+                                "all does not have duplicate timestamps"
+                            );
                         }
                         self.math_num_uprooted_at_latest_retain = 0;
                     });

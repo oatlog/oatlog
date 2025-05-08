@@ -1,3 +1,4 @@
+#![allow(unsafe_code)]
 #[cfg_attr(not(test), allow(unused))]
 use std::collections::BTreeMap;
 

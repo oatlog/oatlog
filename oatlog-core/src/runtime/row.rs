@@ -1,4 +1,4 @@
-use crate::runtime::{Eclass, RelationElement};
+use crate::runtime::{Eclass, RelationElement, ReprU32};
 
 /// Requirements to be used as an element in an index.
 /// Either a tuple or an element in a tuple.
@@ -113,6 +113,91 @@ impl<T> RadixSortable<T> {
             ret
         }
     }
+}
+
+macro_rules! mk_rowsort {
+    (($($tyvar:ident),*), $inner:tt, $rowty:ident, $key:ident, |$arg_radix_key:ident| $expr_radix_key:expr, |$arg_eq_key:ident| $expr_eq_key:expr) => {
+        #[derive(Copy, Clone)]
+        #[repr(transparent)]
+        pub struct $rowty {
+            inner: $inner,
+        }
+        impl crate::runtime::Radixable<$key> for $rowty {
+            type Key = $key;
+
+            #[inline(always)]
+            fn key(&self) -> Self::Key {
+                let $arg_radix_key = self.inner;
+                $expr_radix_key
+            }
+        }
+        impl PartialOrd for $rowty {
+            fn partial_cmp(&self, other: &Self) -> Option<std::cmp::Ordering> {
+                {
+                    let $arg_eq_key = self.inner;
+                    $expr_eq_key
+                }
+                .partial_cmp(&{
+                    let $arg_eq_key = other.inner;
+                    $expr_eq_key
+                })
+            }
+        }
+        impl PartialEq for $rowty {
+            fn eq(&self, other: &Self) -> bool {
+                (({
+                    let $arg_eq_key = self.inner;
+                    $expr_eq_key
+                }) == ({
+                    let $arg_eq_key = other.inner;
+                    $expr_eq_key
+                }))
+            }
+        }
+        impl $rowty {
+            #[allow(unused)]
+            pub fn sort<'a, $( $tyvar, )*>(slice: &'a mut [($( $tyvar, )*)])
+            where
+                $( $tyvar: ReprU32 + RelationElement, )*
+            {
+                use std::alloc::Layout;
+                assert_eq!(Layout::new::<($( $tyvar, )*)>(), Layout::new::<Self>());
+
+                // SAFETY: `Self` is `repr(transparent)` around `Self::Repr`.
+                let slice = unsafe {
+                    let slice: &'a mut [($( $tyvar, )*)] = slice;
+                    let ptr: *mut ($( $tyvar, )*) = slice.as_mut_ptr();
+                    let len = slice.len();
+                    let ptr: *mut Self = ptr.cast();
+                    let ret: &'a mut [Self] = std::slice::from_raw_parts_mut(ptr, len);
+                    ret
+                };
+                use voracious_radix_sort::RadixSort as _;
+
+                slice.voracious_sort();
+            }
+        }
+    };
+}
+
+/// case bashing all patterns we care about
+/// assumes last column is timestamp
+#[rustfmt::skip]
+pub mod mk_rowsort {
+    use super::*;
+    mk_rowsort!((A, B), (u32, u32,), RowSort1, u32, |s| s.0, |s| s.0);
+
+    mk_rowsort!((A, B, C), (u32, u32, u32,), RowSort10, u32, |s| s.0, |s| s.0);
+    mk_rowsort!((A, B, C), (u32, u32, u32,), RowSort01, u32, |s| s.1, |s| s.1);
+    mk_rowsort!((A, B, C), (u32, u32, u32,), RowSort11, u64, |s| (s.1 as u64) | ((s.0 as u64) << 32), |s| (s.0, s.1));
+
+    mk_rowsort!((A, B, C, D), (u32, u32, u32, u32,), RowSort100, u32, |s| s.0, |s| s.0);
+    mk_rowsort!((A, B, C, D), (u32, u32, u32, u32,), RowSort010, u32, |s| s.1, |s| s.1);
+    mk_rowsort!((A, B, C, D), (u32, u32, u32, u32,), RowSort001, u32, |s| s.2, |s| s.2);
+    mk_rowsort!((A, B, C, D), (u32, u32, u32, u32,), RowSort110, u64, |s| (s.1 as u64) | ((s.0 as u64) << 32), |s| (s.0, s.1));
+    mk_rowsort!((A, B, C, D), (u32, u32, u32, u32,), RowSort101, u64, |s| (s.2 as u64) | ((s.0 as u64) << 32), |s| (s.0, s.2));
+    mk_rowsort!((A, B, C, D), (u32, u32, u32, u32,), RowSort011, u64, |s| (s.2 as u64) | ((s.1 as u64) << 32), |s| (s.1, s.2));
+    mk_rowsort!((A, B, C, D), (u32, u32, u32, u32,), RowSort111, u128, |s| (s.2 as u128) | ((s.1 as u128) << 32) | ((s.0 as u128) << 64), |s| (s.0, s.1, s.2));
 }
 
 macro_rules! radix_sortable_raw_row {
