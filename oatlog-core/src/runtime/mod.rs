@@ -93,8 +93,6 @@ impl<Key: Copy + Ord + Hash, Value: Copy + Ord> IndexedSortedList<Key, Value> {
         //     });
         // });
 
-        // TODO erik: try to merge copy list with reconstruct index to avoid reading all_rows twice
-
         log_duration!("reconstruct copy list: {}", {
             // about 5 ms
             self.list

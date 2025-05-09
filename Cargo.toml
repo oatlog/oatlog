@@ -36,6 +36,7 @@ egglog = "0.4"
 eqlog-runtime = "0.8"
 expect-test = "1"
 hashbrown = "0.15"
+hashbrown_14 = { package = "hashbrown", version = "0.14", features = ["raw"] }
 heck = "0.5"
 itertools = "0.14"
 oorandom = "11"

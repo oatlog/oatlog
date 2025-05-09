@@ -109,3 +109,367 @@ impl<Key: Ord + Hash, Value> IndexedSortedListIndex<Key, Value> {
             .extend(rows.iter().copied().map(Row::extract_value));
     }
 }
+
+mod update {
+    use hashbrown_14::HashMap;
+    use hashbrown_14::hash_map::Entry;
+    fn update_begin_basic(
+        map: &mut HashMap<(u32, u32), u32>,
+        find: impl Fn(u32) -> u32,
+        union: impl Fn(u32, u32) -> u32,
+        insertions: &[((u32, u32), u32)],
+    ) {
+        for &(key, value) in insertions {
+            let key = (find(key.0), find(key.1));
+            match map.entry(key) {
+                Entry::Occupied(mut entry) => {
+                    let entry = entry.get_mut();
+                    *entry = union(value, *entry);
+                }
+                Entry::Vacant(entry) => {
+                    entry.insert(find(value));
+                }
+            }
+        }
+    }
+
+    fn prefetch<T>(addr: *const T) {
+        use core::arch::x86_64::{_MM_HINT_T0, _mm_prefetch};
+        unsafe { _mm_prefetch::<_MM_HINT_T0>(addr as _) }
+    }
+
+    fn find(repr: &[u32], mut i: u32) -> u32 {
+        loop {
+            let i_old = i;
+            i = repr[i as usize];
+            if i != i_old {
+                break i;
+            }
+        }
+    }
+    fn union(repr: &mut [u32], a: u32, b: u32) -> u32 {
+        let (a, b) = (find(repr, a), find(repr, b));
+
+        if a == b {
+            return a;
+        }
+        let old = u32::min(a, b);
+        let new = u32::max(a, b);
+        repr[new as usize] = old;
+        old
+    }
+
+    fn update_begin_no_iterator(
+        map: &mut HashMap<(u32, u32), u32>,
+        repr: &mut [u32],
+        insertions: &[((u32, u32), u32)],
+    ) {
+        let n = insertions.len();
+        let mut i = 0;
+        while i < n {
+            let (key, value) = insertions[i];
+            let key = (find(repr, key.0), find(repr, key.1));
+            match map.entry(key) {
+                Entry::Occupied(mut entry) => {
+                    let entry = entry.get_mut();
+                    *entry = union(repr, value, *entry);
+                }
+                Entry::Vacant(entry) => {
+                    entry.insert(find(repr, value));
+                }
+            }
+            i += 1;
+        }
+    }
+
+    fn update_begin_unroll(
+        map: &mut HashMap<(u32, u32), u32>,
+        find: impl Fn(u32) -> u32,
+        union: impl Fn(u32, u32) -> u32,
+        insertions: &[((u32, u32), u32)],
+    ) {
+        const PREFETCH: usize = 10;
+        let n = insertions.len();
+        let mut i = 0;
+        while i < n {
+            let (key, value) = insertions[i];
+            let key = (find(key.0), find(key.1));
+            match map.entry(key) {
+                Entry::Occupied(mut entry) => {
+                    let entry = entry.get_mut();
+                    *entry = union(value, *entry);
+                }
+                Entry::Vacant(entry) => {
+                    entry.insert(find(value));
+                }
+            }
+        }
+
+        // 1. key = find(key)
+        // 2. hash = hash(key)
+        // 3. hashmap[hash] (load)
+        // 4. find(value)
+        // 5. either
+        //     * union
+        //     * insert
+
+        // 1. (key, value) = insertions[i]
+        // 2. prefetch(&repr[key])
+        //    prefetch(&repr[value])
+        // 3. key = repr[key]
+        //    value = repr[value]
+        // 4. prefetch(&repr[key])
+        //    prefetch(&repr[value])
+        // 5. key = repr[key]
+        //    value = repr[value]
+        // 6. key = find(key)
+        // 7. hash = hash(key)
+        // 8. prefetch(&map_u8[hash]), prefetch(&map_data[hash])
+        // 9. entry = &mut map[hash]
+        //    if let Some(entry) = entry {
+        //        *entry = Some(union(find(entry), find(value)))
+        //    } else {
+        //        *entry = Some(find(value))
+        //    }
+
+        macro_rules! auto_pipeline {
+            ($($tt:tt)*) => {};
+        }
+
+        auto_pipeline! {
+            {
+                let (key, value) = insertions[i];
+                let (mut key2, mut value2) = (0, 0);
+                if_in_pipeline! {
+                    (key2, value2) = insertions[i + FOO];
+                }
+            }
+            save(key, value, key2, value2, s0),
+            {
+                prefetch(&repr[key]);
+                prefetch(&repr[value]);
+            },
+            save(key, value, s1),
+            {
+                let key = repr[key];
+                let value = repr[value];
+            },
+            save(key, value, s2),
+            {
+                let key = find(key);
+            },
+            save(key, value, s3),
+            {
+                load(key, value, s3);
+                let hash = hash(key);
+                save(key, value, hash, s4);
+            },
+            {
+                load(key, value, hash, s4);
+                prefetch(&map_u8[hash]);
+                prefetch(&map_data[hash]);
+                save(key, value, hash, s5);
+            },
+            {
+                ...
+            },
+        }
+    }
+
+    use std::{
+        hash::{BuildHasher, Hash},
+        mem::replace,
+    };
+
+    fn prefetch_key<K: Hash + Copy, V: Copy>(map: &HashMap<K, V>, key: K) {
+        if map.is_empty() {
+            // required by safety invariant of `RawTable::bucket`.
+            // it's probably still safe on x86 to prefetch out of bounds.
+            return;
+        }
+
+        let hasher = map.hasher();
+        let hash = hasher.hash_one(key);
+        let raw_table = map.raw_table();
+        let bucket_mask = (raw_table.buckets() - 1) as u64;
+        let idx = (hash & bucket_mask) as usize;
+
+        // from hashbrown 0.14 docs
+        // If mem::size_of::<T>() != 0 then return a pointer to the `element` in the `data part` of the table
+        // (we start counting from "0", so that in the expression T[n], the "n" index actually one less than
+        // the "buckets" number of our `RawTable`, i.e. "n = RawTable::buckets() - 1"):
+        //
+        //           `table.bucket(3).as_ptr()` returns a pointer that points here in the `data`
+        //           part of the `RawTable`, i.e. to the start of T3 (see `Bucket::as_ptr`)
+        //                  |
+        //                  |               `base = self.data_end()` points here
+        //                  |               (to the start of CT0 or to the end of T0)
+        //                  v                 v
+        // [Pad], T_n, ..., |T3|, T2, T1, T0, |CT0, CT1, CT2, CT3, ..., CT_n, CTa_0, CTa_1, ..., CTa_m
+        //                     ^                                              \__________  __________/
+        //        `table.bucket(3)` returns a pointer that points                        \/
+        //         here in the `data` part of the `RawTable` (to              additional control bytes
+        //         the end of T3)                                              `m = Group::WIDTH - 1`
+        //
+        // where: T0...T_n  - our stored data;
+        //        CT0...CT_n - control bytes or metadata for `data`;
+        //        CTa_0...CTa_m - additional control bytes (so that the search with loading `Group` bytes from
+        //                        the heap works properly, even if the result of `h1(hash) & self.table.bucket_mask`
+        //                        is equal to `self.table.bucket_mask`). See also `RawTableInner::set_ctrl` function.
+        //
+        // P.S. `h1(hash) & self.table.bucket_mask` is the same as `hash as usize % self.buckets()` because the number
+        // of buckets is a power of two, and `self.table.bucket_mask = self.buckets() - 1`.
+
+        // prefetch data
+        prefetch(unsafe { raw_table.bucket(idx) }.as_ptr());
+
+        let metadata_start = raw_table.data_end().as_ptr() as *const i8;
+
+        // prefetch metadata
+        prefetch(metadata_start.wrapping_add(idx));
+    }
+
+    fn update_begin_prefetch(
+        map: &mut HashMap<(u32, u32), u32>,
+        repr: &mut [u32],
+        insertions: &[((u32, u32), u32)],
+    ) {
+        let n = insertions.len();
+        let mut i = 0;
+        while i < n {
+            if i + 20 < n {
+                // prefetch repr
+                let (key_prefetch, value_prefetch) = insertions[i + 20];
+                prefetch(repr.as_ptr().wrapping_add(key_prefetch.0 as usize));
+                prefetch(repr.as_ptr().wrapping_add(key_prefetch.1 as usize));
+                prefetch(repr.as_ptr().wrapping_add(value_prefetch as usize));
+
+                // prefetch data
+                let (key_prefetch, _) = insertions[i + 10];
+                let key = (find(repr, key_prefetch.0), find(repr, key_prefetch.1));
+                prefetch_key(map, key);
+            }
+            let (key, value) = insertions[i];
+            let key = (find(repr, key.0), find(repr, key.1));
+            match map.entry(key) {
+                Entry::Occupied(mut entry) => {
+                    let entry = entry.get_mut();
+                    *entry = union(repr, value, *entry);
+                }
+                Entry::Vacant(entry) => {
+                    entry.insert(find(repr, value));
+                }
+            }
+            i += 1;
+        }
+    }
+
+    fn update_basic(
+        map: &mut HashMap<(u32, u32), u32>,
+        repr: &[u32],
+        insertions: &mut Vec<((u32, u32), u32)>,
+    ) {
+        map.retain(|&(x0, x1), &mut x2| {
+            if (repr[x0 as usize] == x0) & (repr[x1 as usize] == x1) & (repr[x2 as usize] == x2) {
+                true
+            } else {
+                insertions.push(((repr[x0 as usize], repr[x1 as usize]), repr[x2 as usize]));
+                false
+            }
+        })
+    }
+
+    // TODO: Insertions array can be cleared.
+    // TODO: We can do useful work *during* rehash.
+    // TODO: Do we *really* need to completely finish canonicalization?
+    // TODO: Regular entry actually hashes twice, once for check and once for insert, but we want
+    // to insert unconditionally.
+    //
+    // TODO: On the FD index, it's fine to store (min(a, b), max(a, b), c) instead of (a, b, c)
+    // in general, for any index, it is fine to apply a permutation as long as it only touches the
+    // *key* part.
+
+    fn update_begin_manual_rehash(
+        map: &mut HashMap<(u32, u32), u32>,
+        repr: &mut [u32],
+        insertions: &mut Vec<((u32, u32), u32)>,
+    ) {
+        // fill table until just before rehash, and then do rehash and find at the same time.
+        while map.capacity() - map.len() > 0 {
+            let Some((key, value)) = insertions.pop() else {
+                break;
+            };
+            let key = (find(repr, key.0), find(repr, key.1));
+
+            match map.entry(key) {
+                Entry::Occupied(mut entry) => {
+                    let entry = entry.get_mut();
+                    *entry = union(repr, value, *entry);
+                }
+                Entry::Vacant(entry) => {
+                    entry.insert(find(repr, value));
+                }
+            }
+        }
+
+        // if there are still more insertions, we need to rehash to fit them.
+        if !insertions.is_empty() {
+            rehash_grow(map, repr, insertions);
+        }
+    }
+
+    fn update_manual_rehash(
+        map: &mut HashMap<(u32, u32), u32>,
+        repr: &mut [u32],
+        insertions: &mut Vec<((u32, u32), u32)>,
+    ) {
+        // we *could* treat this as just a regular rehash instead.
+        map.retain(|&(x0, x1), &mut x2| {
+            if (repr[x0 as usize] == x0) & (repr[x1 as usize] == x1) & (repr[x2 as usize] == x2) {
+                true
+            } else {
+                insertions.push(((repr[x0 as usize], repr[x1 as usize]), repr[x2 as usize]));
+                false
+            }
+        });
+        update_begin_manual_rehash(map, repr, insertions);
+    }
+
+    fn rehash_grow(
+        map: &mut HashMap<(u32, u32), u32>,
+        repr: &mut [u32],
+        insertions: &mut Vec<((u32, u32), u32)>,
+    ) {
+        // Internally, hashbrown creates a new allocation when rehashing, so this is
+        // essentially equivalent in terms of performance, (I think).
+        let needed_capacity = insertions.len() + map.len();
+        let old_map = replace(map, HashMap::with_capacity(needed_capacity));
+
+        for (key, value) in old_map.into_iter() {
+            let key = (find(repr, key.0), find(repr, key.1));
+
+            match map.entry(key) {
+                Entry::Occupied(mut entry) => {
+                    let entry = entry.get_mut();
+                    *entry = union(repr, value, *entry);
+                }
+                Entry::Vacant(entry) => {
+                    entry.insert(find(repr, value));
+                }
+            }
+        }
+        for (key, value) in insertions.drain(..) {
+            let key = (find(repr, key.0), find(repr, key.1));
+
+            match map.entry(key) {
+                Entry::Occupied(mut entry) => {
+                    let entry = entry.get_mut();
+                    *entry = union(repr, value, *entry);
+                }
+                Entry::Vacant(entry) => {
+                    entry.insert(find(repr, value));
+                }
+            }
+        }
+    }
+}
