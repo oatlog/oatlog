@@ -391,7 +391,7 @@ impl CodegenRuleTrieCtx<'_> {
                     RelationKind::Table { index_to_info } => {
                         let (bound_columns, bound_columns_) =
                             self.bound_columns(args, &index_to_info[index]);
-                        let check_ident = ident::index_check(&bound_columns, args.len());
+                        let check_ident = ident::index_check(&bound_columns);
                         let relation_ident = ident::rel_var(relation);
                         quote! {
                             if self.#relation_ident.#check_ident(#(#bound_columns_,)*)

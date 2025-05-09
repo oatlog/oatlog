@@ -500,14 +500,6 @@ impl Atom {
         // vec![self.clone()]
     }
 
-    // Among the possible atoms, pick the one that we consider canonical.
-    pub(crate) fn canonical_atom(atoms: &[Atom]) -> Atom {
-        // TODO loke: revisit
-        // pick the one without permutation because changing what we write to is scary (eg for sub).
-        atoms[0].clone()
-        // .into_iter().min().unwrap().clone()
-    }
-
     pub(crate) fn map_columns(&self, f: impl FnMut(VariableId) -> VariableId) -> Self {
         Self {
             is_premise: self.is_premise,
@@ -756,9 +748,7 @@ impl SymbolicRule {
         // NOTE: we are missing optimizations that turn PREMISE into ACTION when it is infallible (eg
         // globals that don't filter).
 
-        // TODO erik for loke: we really should not care about inclusion in optimize because this
-        // is before semi-naive is applied.
-        // also, what does `working_atoms` mean?
+        // NOTE: HIR optimization is performed both before and after introducing semi-naive evaluation.
         let mut working_atoms: BTreeMap<
             (RelationId, Inclusion),
             BTreeMap<TVec<ColumnId, VariableId>, (IsPremise, Option<ImplicitRuleId>)>,
@@ -766,20 +756,18 @@ impl SymbolicRule {
             let mut ret: BTreeMap<_, BTreeMap<_, _>> = BTreeMap::new();
             for Atom {
                 relation,
-                ref columns,
+                columns,
                 is_premise,
                 entry,
                 incl,
             } in self.atoms
             {
-                ret.entry((relation, incl))
-                    .or_default()
-                    .entry(columns.clone())
-                    // TODO erik for loke: if you want to express that this atom is unique, it's
-                    // easier to express that as a plain insert `assert!(ret.insert(...))`.
-                    // Also, consider using `MultiMapCollect::collect_multimap()`.
-                    .and_modify(|_| panic!())
-                    .or_insert((is_premise, entry));
+                assert!(
+                    ret.entry((relation, incl))
+                        .or_default()
+                        .insert(columns, (is_premise, entry))
+                        .is_none()
+                );
             }
             ret
         };

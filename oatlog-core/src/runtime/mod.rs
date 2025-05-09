@@ -35,8 +35,6 @@ pub use std::{
 };
 pub use voracious_radix_sort::{RadixSort, Radixable};
 
-use std::hash::BuildHasher;
-
 pub trait Clear: Sized {
     fn clear(&mut self);
     /// set self to other and clear other without allocations

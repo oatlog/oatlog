@@ -588,29 +588,15 @@ mod ident {
                 key_columns,
                 value_columns: _,
                 generate_check_value_subsets: _,
-            } => format_ident!("hash_index_{}", fmt(key_columns)), // TODO loke: fd_index
+            } => format_ident!("fd_index_{}", fmt(key_columns)),
             IndexInfo::NonFd {
                 key_columns,
                 value_columns: _,
-            } => format_ident!("hash_index_{}", fmt(key_columns)), // TODO loke: nofd_index
+            } => format_ident!("nofd_index_{}", fmt(key_columns)),
         }
     }
     /// `check2_2_0_1`
-    pub fn index_check(key_columns: &BTreeSet<ColumnId>, columns: usize) -> Ident {
-        // TODO loke: FIXME
-        format_ident!(
-            "check{}_{}",
-            key_columns.len(),
-            Iterator::chain(
-                key_columns.iter().copied(),
-                (0..columns)
-                    .map(ColumnId)
-                    .filter(|c| !key_columns.contains(c))
-            )
-            .map(|ColumnId(x)| format!("{x}"))
-            .join("_")
-        )
-        /*
+    pub fn index_check(key_columns: &BTreeSet<ColumnId>) -> Ident {
         format_ident!(
             "check_{}",
             key_columns
@@ -618,7 +604,6 @@ mod ident {
                 .map(|ColumnId(x)| format!("{x}"))
                 .join("_")
         )
-        */
     }
     /// `iter2_2_0_1`/`iter_old2_2_0_1`/`entry2_2_0_1`
     pub fn index(i: Q, index: &IndexInfo) -> Ident {
@@ -641,15 +626,6 @@ mod ident {
                 value_columns,
             } => (key_columns, value_columns.clone()),
         };
-        // TODO loke: FIXME
-        format_ident!(
-            "{prefix}{}_{}",
-            key_columns.len(),
-            Iterator::chain(key_columns.iter(), value_columns.iter())
-                .map(|ColumnId(c)| format!("{c}"))
-                .join("_"),
-        )
-        /*
         format_ident!(
             "{prefix}_{}_to_{}",
             key_columns
@@ -661,15 +637,10 @@ mod ident {
                 .map(|ColumnId(c)| format!("{c}"))
                 .join("_")
         )
-        */
     }
     /// `x2`
     pub fn column(c: ColumnId) -> Ident {
         format_ident!("x{}", c.0)
-    }
-    /// `x2_old`
-    pub fn column_old(c: ColumnId) -> Ident {
-        format_ident!("x{}_old", c.0)
     }
     /// `y2`
     pub fn column_alt(c: ColumnId) -> Ident {

@@ -344,17 +344,7 @@ fn update(
 
     // non-fd indexes
     // HashMap<Key, Vec<Value>>
-    // TODO: kill dead code
-    let (
-        indexes_nofd,
-        indexes_nofd_cols,
-        indexes_nofd_keys,
-        indexes_nofd_vals,
-        indexes_nofd_vals_alt,
-        indexes_nofd_key_is_root,
-        indexes_nofd_value_is_root,
-        indexes_nofd_reconstruct,
-    ) = index_to_info
+    let indexes_nofd_reconstruct = index_to_info
         .iter()
         .filter_map(|index| {
             let IndexInfo::NonFd {
@@ -365,91 +355,43 @@ fn update(
                 return None;
             };
 
-            let indexes_nofd_cols = cols.clone();
-            let indexes_nofd = ident::index_field(&index);
-            let indexes_nofd_keys = key_columns.iter().map(|&c| ident::column(c)).collect_vec();
-            let (indexes_nofd_vals, indexes_nofd_vals_alt) = value_columns
-                .iter()
-                .map(|&c| (ident::column(c), ident::column_alt(c)))
-                .collect_vecs();
-            let indexes_nofd_key_is_root = {
-                let key_is_root: TokenStream = key_columns
-                    .iter()
-                    .filter_map(|&c| {
-                        let ty = rel.columns[c];
-                        let type_ = &theory.types[ty];
-                        if type_.kind == TypeKind::Symbolic {
-                            let uf = ident::type_uf(type_);
-                            let col = ident::column(c);
-                            Some(quote! {
-                                uf.#uf.is_root(#col)
-                            })
-                        } else {
-                            None
-                        }
-                    })
-                    .intersperse(quote! { & })
-                    .collect();
-                if key_is_root.is_empty() {
-                    quote! { true }
-                } else {
-                    key_is_root
-                }
-            };
-            let indexes_nofd_value_is_root = {
-                let value_is_root: TokenStream = value_columns
-                    .iter()
-                    .filter_map(|&c| {
-                        let ty = rel.columns[c];
-                        let type_ = &theory.types[ty];
-                        if type_.kind == TypeKind::Symbolic {
-                            let uf = ident::type_uf(type_);
-                            let col = ident::column(c);
-                            Some(quote! {
-                                uf.#uf.is_root(#col)
-                            })
-                        } else {
-                            None
-                        }
-                    })
-                    .intersperse(quote! { & })
-                    .collect();
-                if value_is_root.is_empty() {
-                    quote! { true }
-                } else {
-                    value_is_root
-                }
-            };
-
-            let fallback_sort = quote! {
-                self.all.sort_unstable_by_key(
-                    |&(#(#indexes_nofd_cols,)* timestamp,)|
-                        (#(#indexes_nofd_keys,)*)
-                );
-            };
+            let keys = key_columns.iter().map(|&c| ident::column(c)).collect_vec();
+            let vals = value_columns.iter().map(|&c| ident::column(c));
 
             let sort_impl = {
-                let n = cols.len();
-                let all_symbolic = rel.columns.iter().map(|ty| &theory.types[ty]).all(|ty| matches!(ty.kind, TypeKind::Symbolic));
+                let all_symbolic = rel
+                    .columns
+                    .iter()
+                    .map(|ty| &theory.types[ty])
+                    .all(|ty| ty.kind == TypeKind::Symbolic);
 
-                if all_symbolic && n <= 3 {
-                    let mut is_key_col = tvec![false; n];
+                if all_symbolic && cols.len() <= 3 {
+                    let mut is_key_col = tvec![false; cols.len()];
                     for c in key_columns {
                         is_key_col[*c] = true;
                     }
 
-                    let bit_pattern: String = is_key_col.iter().copied().map(|x| if x { '1' } else { '0' }).collect();
+                    let bit_pattern: String = is_key_col
+                        .iter()
+                        .copied()
+                        .map(|x| if x { '1' } else { '0' })
+                        .collect();
 
                     let row_ident = format_ident!("RowSort{bit_pattern}");
 
-                    quote!{
+                    quote! {
                         #row_ident :: sort ( &mut self.all );
                     }
                 } else {
-                    fallback_sort
+                    quote! {
+                        self.all.sort_unstable_by_key(
+                            |&(#(#cols,)* timestamp,)|
+                                (#(#keys,)*)
+                        );
+                    }
                 }
             };
-
+            let field = ident::index_field(&index);
 
             let indexes_nofd_reconstruct = quote! {
                 log_duration!("reconstruct index: {}", {
@@ -458,28 +400,18 @@ fn update(
                     });
 
                     unsafe {
-                        self.#indexes_nofd.reconstruct(
+                        self.#field.reconstruct(
                             &mut self.all,
-                            |(#(#indexes_nofd_cols,)* timestamp,)| (#(#indexes_nofd_keys,)*),
-                            |(#(#indexes_nofd_cols,)* timestamp,)| (#(#indexes_nofd_vals,)* timestamp,),
+                            |(#(#cols,)* timestamp,)| (#(#keys,)*),
+                            |(#(#cols,)* timestamp,)| (#(#vals,)* timestamp,),
                         );
                     }
                 });
 
             };
-
-            Some((
-                indexes_nofd,
-                indexes_nofd_cols,
-                indexes_nofd_keys,
-                indexes_nofd_vals,
-                indexes_nofd_vals_alt,
-                indexes_nofd_key_is_root,
-                indexes_nofd_value_is_root,
-                indexes_nofd_reconstruct,
-            ))
+            Some(indexes_nofd_reconstruct)
         })
-        .collect_vecs();
+        .collect_vec();
 
     // non-primary FD
     let (
@@ -902,7 +834,6 @@ fn per_index(rel: &RelationData, theory: &Theory, index: &IndexInfo) -> TokenStr
                         &Iterator::chain(key_columns.iter(), check_value_subset)
                             .copied()
                             .collect(),
-                        key_columns.len() + value_columns.len()
                     );
                     let iter_all_ident = ident::index(ident::Q::IterAll, index);
                     quote! {
@@ -946,8 +877,7 @@ fn per_index(rel: &RelationData, theory: &Theory, index: &IndexInfo) -> TokenStr
             let iter_all_ident = ident::index(ident::Q::IterAll, index);
             let iter_old_ident = ident::index(ident::Q::IterOld, index);
             let entry_ident = ident::index(ident::Q::Entry, index);
-            let check_ident =
-                ident::index_check(key_columns, key_columns.len() + value_columns.len());
+            let check_ident = ident::index_check(key_columns);
             let relation_delta = ident::delta_row(rel);
             quote! {
                 fn #iter_all_ident(&self, #(#key : #key_ty,)*) -> impl Iterator<Item = (#(#val_ty,)*)> + use<'_> {
@@ -999,8 +929,7 @@ fn per_index(rel: &RelationData, theory: &Theory, index: &IndexInfo) -> TokenStr
             let index_field = ident::index_field(index);
             let iter_all_ident = ident::index(ident::Q::IterAll, index);
             let iter_old_ident = ident::index(ident::Q::IterOld, index);
-            let check_ident =
-                ident::index_check(key_columns, key_columns.len() + value_columns.len());
+            let check_ident = ident::index_check(key_columns);
             quote! {
                 fn #iter_all_ident(&self, #(#key: #key_ty,)*) -> impl Iterator<Item = (#(#val_ty,)*)> + use<'_> {
                     self.#index_field.iter((#(#key,)*))

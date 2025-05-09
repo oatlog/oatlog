@@ -15,9 +15,6 @@ impl<K: Id, V: Ord + Clone> TSet<K, V> {
             h: BTreeMap::new(),
         }
     }
-    pub(crate) fn len(&self) -> usize {
-        self.v.len()
-    }
     pub(crate) fn as_tvec(&self) -> &TVec<K, V> {
         &self.v
     }
