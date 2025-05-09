@@ -2,75 +2,76 @@
 
 use crate::{
     codegen::{MultiUnzipVec as _, ident},
-    ids::{ColumnId, IndexId, IndexUsageId, TypeId},
-    lir::{IndexInfo, IndexUsageInfo, MergeTy, RelationData, RelationKind, Theory, TypeKind},
+    ids::{ColumnId, IndexId},
+    lir::{IndexInfo, MergeTy, RelationData, RelationKind, Theory, TypeKind},
     typed_vec::{TVec, tvec},
 };
 use itertools::Itertools as _;
 use proc_macro2::TokenStream;
 use quote::{format_ident, quote};
-use std::iter;
+use std::collections::BTreeSet;
 
 pub fn codegen_table_relation(
     rel: &RelationData,
     theory: &Theory,
-    usage_to_info: &TVec<IndexUsageId, IndexUsageInfo>,
     index_to_info: &TVec<IndexId, IndexInfo>,
 ) -> TokenStream {
     assert!(matches!(rel.kind, RelationKind::Table { .. }));
-
-    let (params, column_types) = rel
-        .columns
-        .iter()
-        .map(|ty| {
-            let type_ = &theory.types[ty];
-            (ident::type_ty(type_), ident::type_name(type_).to_string())
-        })
-        .collect_vecs();
 
     let rel_ty = ident::rel_ty(rel);
     let relation_name = ident::rel_get(rel).to_string();
 
     let cost = u32::try_from(index_to_info.len() * rel.columns.len()).unwrap();
 
-    let (iter_all, iter_old, check_all, entry_all) = usage_to_info
+    let query_functions: TokenStream = index_to_info
         .iter()
-        .unique()
-        .map(|usage_info| per_usage(rel, theory, index_to_info, usage_info))
-        .collect_vecs();
+        .map(|index| per_index(rel, theory, index))
+        .collect();
 
-    let update_impl = update(rel, theory, index_to_info, usage_to_info);
+    let update_impl = update(rel, theory, index_to_info);
 
     let emit_graphviz_impl = {
         // NOTE: Currently arbitrary, as it is only used for counting and graphviz
-        let primary_index_usage = &usage_to_info[IndexUsageId(0)];
-        let primary_index = &index_to_info[primary_index_usage.index];
-        let primary_index_order = primary_index
-            .permuted_columns
-            .iter()
-            .copied()
-            .map(ident::column)
-            .collect_vec();
-        let primary_index_keys = primary_index_order[..primary_index_usage.prefix].to_vec();
-        let primary_index_vals = primary_index_order[primary_index_usage.prefix..].to_vec();
-        let primary_index_ident = ident::index_usage_field(
-            &primary_index.permuted_columns.inner()[..primary_index_usage.prefix],
-        );
-
-        let primary_index_iter_impl = if primary_index.has_any_fd(primary_index_usage) {
-            quote! { self.#primary_index_ident.iter().map(|(k, v)| ((*k), (*v))) }
-        } else {
-            quote! {
-                self.#primary_index_ident.iter_key_value()
-            }
+        let index = &index_to_info[IndexId(0)];
+        let field = ident::index_field(index);
+        let (key_columns, value_columns, primary_index_iter_impl) = match index {
+            IndexInfo::Fd {
+                key_columns,
+                value_columns,
+                generate_check_value_subsets: _,
+            } => (
+                key_columns,
+                value_columns.iter().map(|(&c, _)| c).collect(),
+                quote! { self.#field.iter().map(|(k, v)| ((*k), (*v))) },
+            ),
+            IndexInfo::NonFd {
+                key_columns,
+                value_columns,
+            } => (
+                key_columns,
+                value_columns.clone(),
+                quote! { self.#field.iter_key_value() },
+            ),
         };
+
+        let (col, col_ty) = (0..rel.columns.len())
+            .map(|c| {
+                let c = ColumnId(c);
+                (
+                    ident::column(c),
+                    ident::type_name(&theory.types[rel.columns[c]]).to_string(),
+                )
+            })
+            .collect_vecs();
+        let key = key_columns.iter().map(|&c| ident::column(c));
+        let val = value_columns.iter().map(|&c| ident::column(c));
 
         quote! {
             fn emit_graphviz(&self, buf: &mut String) {
                 use std::fmt::Write;
-                for (i, ((#(#primary_index_keys,)*), (#(#primary_index_vals,)* _timestamp,))) in #primary_index_iter_impl.enumerate()
+                for (i, ((#(#key,)*), (#(#val,)* _timestamp,))) in #primary_index_iter_impl.enumerate()
                 {
-                    #(writeln!(buf, "{}_{i} -> {}_{};", #relation_name, #column_types, #primary_index_order).unwrap();)*
+                    #(writeln!(buf, "{}_{i} -> {}_{};", #relation_name, #col_ty, #col).unwrap();)*
                     writeln!(buf, "{}_{i} [shape = box];", #relation_name).unwrap();
                 }
             }
@@ -78,44 +79,47 @@ pub fn codegen_table_relation(
     };
 
     let relation_len = {
-        let field = usage_to_info
-            .iter()
-            .map(|index_usage| {
-                let index = &index_to_info[index_usage.index];
-                ident::index_usage_field(&index.permuted_columns.inner()[..index_usage.prefix])
-            })
-            .min()
-            .unwrap();
+        let index = &index_to_info[IndexId(0)];
+        let field = ident::index_field(index);
         quote! { self.#field.len() }
     };
 
-    let index_fields: TokenStream = usage_to_info
+    let index_fields = index_to_info
         .iter()
-        .unique()
-        .map(|index_info @ &IndexUsageInfo { prefix, index }| {
-            let IndexInfo {
-                permuted_columns,
-                primary_key_prefix_len: _,
-                primary_key_violation_merge: _,
-            } = &index_to_info[index];
-            let key_cols_ty = permuted_columns.inner()[..prefix].iter().map(|key_col| {
-                let ty: TypeId = rel.columns[key_col];
-                ident::type_ty(&theory.types[ty])
-            });
-            let value_cols_ty = permuted_columns.inner()[prefix..].iter().map(|key_col| {
-                let ty: TypeId = rel.columns[key_col];
-                ident::type_ty(&theory.types[ty])
-            });
-            let index_usage_field_name = ident::index_usage_field(&permuted_columns.inner()[..prefix]);
-            let index_usage_field_ty = if index_to_info[index].has_any_fd(index_info) {
-                quote! { runtime::HashMap<(#(#key_cols_ty,)*), (#(#value_cols_ty,)* TimeStamp,)> }
-            } else {
-                quote! { runtime::IndexedSortedList<(#(#key_cols_ty,)*), (#(#value_cols_ty,)* TimeStamp,)> }
-            };
-            quote! {
-                #index_usage_field_name: #index_usage_field_ty,
+        .map(|index_info| match &index_info {
+            IndexInfo::Fd {
+                key_columns,
+                value_columns,
+                generate_check_value_subsets: _,
+            } => {
+                let key_ty = key_columns
+                    .iter()
+                    .map(|col| ident::type_ty(&theory.types[rel.columns[col]]));
+                let val_ty = value_columns
+                    .iter()
+                    .map(|(col, _)| ident::type_ty(&theory.types[rel.columns[col]]));
+                let field = ident::index_field(index_info);
+                quote! {
+                    #field: runtime::HashMap<(#(#key_ty,)*), (#(#val_ty,)* TimeStamp,)>
+                }
             }
-        }).collect();
+            IndexInfo::NonFd {
+                key_columns,
+                value_columns,
+            } => {
+                let key_ty = key_columns
+                    .iter()
+                    .map(|&col| ident::type_ty(&theory.types[rel.columns[col]]));
+                let val_ty = value_columns
+                    .iter()
+                    .map(|&col| ident::type_ty(&theory.types[rel.columns[col]]));
+                let field = ident::index_field(index_info);
+                quote! {
+                    #field: runtime::IndexedSortedList<(#(#key_ty,)*), (#(#val_ty,)* TimeStamp,)>
+                }
+            }
+        })
+        .collect_vec();
 
     let uf_num_uprooted_at_latest_retain = rel
         .columns
@@ -124,17 +128,23 @@ pub fn codegen_table_relation(
         .unique()
         .collect_vec();
 
+    let col_ty = rel
+        .columns
+        .iter()
+        .map(|ty| ident::type_ty(&theory.types[ty]))
+        .collect_vec();
+
     quote! {
         #[derive(Debug, Default)]
         struct #rel_ty {
             new: Vec<<Self as Relation>::Row>,
             // all is just scratch space to construct indexes
-            all: Vec<(#(#params,)* TimeStamp,)>,
-            #index_fields
+            all: Vec<(#(#col_ty,)* TimeStamp,)>,
+            #(#index_fields,)*
             #(#uf_num_uprooted_at_latest_retain: usize,)*
         }
         impl Relation for #rel_ty {
-            type Row = (#(#params,)*);
+            type Row = (#(#col_ty,)*);
             type Unification = Unification;
 
             const COST: u32 = #cost;
@@ -158,10 +168,7 @@ pub fn codegen_table_relation(
             #update_impl
         }
         impl #rel_ty {
-            #(#iter_all)*
-            #(#iter_old)*
-            #(#check_all)*
-            #(#entry_all)*
+            #query_functions
         }
     }
 }
@@ -170,7 +177,6 @@ fn update(
     rel: &RelationData,
     theory: &Theory,
     index_to_info: &TVec<IndexId, IndexInfo>,
-    usage_to_info: &TVec<IndexUsageId, IndexUsageInfo>,
 ) -> TokenStream {
     use itertools::Itertools as _;
 
@@ -180,7 +186,7 @@ fn update(
         .unique()
         .filter_map(|ty| {
             let type_ = &theory.types[ty];
-            if matches!(type_.kind, TypeKind::Symbolic) {
+            if type_.kind == TypeKind::Symbolic {
                 let latest = ident::type_num_uprooted_at_latest_retain(type_);
                 let uf = ident::type_uf(type_);
                 Some((latest, uf))
@@ -198,7 +204,7 @@ fn update(
         .map(|(c, &ty)| {
             let type_ = &theory.types[ty];
             let col = ident::column(c);
-            if matches!(type_.kind, TypeKind::Symbolic) {
+            if type_.kind == TypeKind::Symbolic {
                 let uf = ident::type_uf(type_);
                 quote! {
                     uf.#uf.find(#col)
@@ -222,127 +228,117 @@ fn update(
         indexes_fd_find_keys,
         indexes_fd_find_values,
         indexes_fd_cols_is_root,
-    ) = usage_to_info
+    ) = index_to_info
         .iter()
-        .unique()
-        .filter_map(|index_usage @ &IndexUsageInfo { prefix, index }| {
-            let IndexInfo {
-                permuted_columns,
-                primary_key_prefix_len: _,
-                primary_key_violation_merge: _,
-            } = &index_to_info[index];
+        .filter_map(|index| {
+            let IndexInfo::Fd {
+                key_columns,
+                value_columns,
+                generate_check_value_subsets: _,
+            } = index
+            else {
+                return None;
+            };
+            if !index.has_union_fd() {
+                return None;
+            }
 
-            if index_to_info[index].has_union_fd(index_usage) {
-                let field = ident::index_usage_field(&permuted_columns.inner()[..prefix]);
-                let keys = permuted_columns
-                    .iter()
-                    .take(prefix)
-                    .copied()
-                    .map(ident::column)
-                    .collect_vec();
-                let vals = permuted_columns
-                    .iter()
-                    .skip(prefix)
-                    .copied()
-                    .map(ident::column)
-                    .collect_vec();
+            let field = ident::index_field(index);
+            let keys = key_columns.iter().map(|&c| ident::column(c)).collect_vec();
+            let vals = value_columns
+                .iter()
+                .map(|(&c, _)| ident::column(c))
+                .collect_vec();
 
-                let (uf, val_x, val_y) = permuted_columns
-                    .iter()
-                    .skip(prefix)
-                    .filter_map(|&c| {
-                        let ty = rel.columns[c];
-                        let type_ = &theory.types[ty];
-                        matches!(type_.kind, TypeKind::Symbolic).then(|| {
-                            (
-                                ident::type_uf(type_),
-                                ident::column(c),
-                                ident::column_alt(c),
-                            )
-                        })
+            let (uf, val_x, val_y) = value_columns
+                .iter()
+                .filter_map(|(&c, m)| {
+                    let ty = rel.columns[c];
+                    let type_ = &theory.types[ty];
+                    matches!(m, MergeTy::Union).then(|| {
+                        (
+                            ident::type_uf(type_),
+                            ident::column(c),
+                            ident::column_alt(c),
+                        )
                     })
-                    .collect_vecs();
+                })
+                .collect_vecs();
 
-                let merge = quote! {
-                    {
-                        let (#(#val_y,)* timestamp,) = entry.get_mut();
-                        let changed = false;
-                        #(
-                            let old_val = *#val_y;
-                            let changed = changed | (old_val != uf.#uf.union_mut(&mut #val_x, #val_y));
-                        )*
-                        if changed {
-                            *timestamp = latest_timestamp;
+            let merge = quote! {
+                {
+                    let (#(#val_y,)* timestamp,) = entry.get_mut();
+                    let changed = false;
+                    #(
+                        let old_val = *#val_y;
+                        let changed = changed | (old_val != uf.#uf.union_mut(&mut #val_x, #val_y));
+                    )*
+                    if changed {
+                        *timestamp = latest_timestamp;
+                    }
+                }
+            };
+            let (find_keys, find_values) = {
+                let find = |c| {
+                    let ty = rel.columns[c];
+                    let type_ = &theory.types[ty];
+                    let col = ident::column(c);
+                    if type_.kind == TypeKind::Symbolic {
+                        let uf = ident::type_uf(type_);
+                        quote! {
+                            uf.#uf.find(#col)
+                        }
+                    } else {
+                        quote! {
+                            #col
                         }
                     }
                 };
-                let (find_keys, find_values) = {
-                    let find_all = permuted_columns
-                        .iter()
-                        .map(|&c| {
-                            let ty = rel.columns[c];
-                            let type_ = &theory.types[ty];
+                let find_keys = key_columns.iter().map(|&c| find(c));
+                let find_values = value_columns.iter().map(|(&c, _)| find(c));
+                (
+                    quote! {
+                        #(#find_keys,)*
+                    },
+                    quote! {
+                        #(#find_values,)*
+                    },
+                )
+            };
+            let cols_is_root = {
+                let cols_is_root: TokenStream = rel
+                    .columns
+                    .iter_enumerate()
+                    .filter_map(|(c, ty)| {
+                        let type_ = &theory.types[ty];
+                        if type_.kind == TypeKind::Symbolic {
+                            let uf = ident::type_uf(type_);
                             let col = ident::column(c);
-                            if matches!(type_.kind, TypeKind::Symbolic) {
-                                let uf = ident::type_uf(type_);
-                                quote! {
-                                    uf.#uf.find(#col)
-                                }
-                            } else {
-                                quote! {
-                                    #col
-                                }
-                            }
-                        })
-                        .collect_vec();
-                    let find_keys = &find_all[..prefix];
-                    let find_values = &find_all[prefix..];
-                    (
-                        quote! {
-                            #(#find_keys,)*
-                        },
-                        quote! {
-                            #(#find_values,)*
-                        },
-                    )
-                };
-                let cols_is_root = {
-                    let cols_is_root: TokenStream = rel
-                        .columns
-                        .iter_enumerate()
-                        .filter_map(|(c, ty)| {
-                            let type_ = &theory.types[ty];
-                            if matches!(type_.kind, TypeKind::Symbolic) {
-                                let uf = ident::type_uf(type_);
-                                let col = ident::column(c);
-                                Some(quote! {
-                                    uf.#uf.is_root(#col)
-                                })
-                            } else {
-                                None
-                            }
-                        })
-                        .intersperse(quote! { & })
-                        .collect();
-                    if cols_is_root.is_empty() {
-                        quote! { true }
-                    } else {
-                        cols_is_root
-                    }
-                };
-                Some((
-                    field,
-                    cols.clone(),
-                    keys,
-                    vals,
-                    merge,
-                    find_keys,
-                    find_values,
-                    cols_is_root,
-                ))
-            } else {
-                None
-            }
+                            Some(quote! {
+                                uf.#uf.is_root(#col)
+                            })
+                        } else {
+                            None
+                        }
+                    })
+                    .intersperse(quote! { & })
+                    .collect();
+                if cols_is_root.is_empty() {
+                    quote! { true }
+                } else {
+                    cols_is_root
+                }
+            };
+            Some((
+                field,
+                cols.clone(),
+                keys,
+                vals,
+                merge,
+                find_keys,
+                find_values,
+                cols_is_root,
+            ))
         })
         .collect_vecs();
 
@@ -358,150 +354,130 @@ fn update(
         indexes_nofd_key_is_root,
         indexes_nofd_value_is_root,
         indexes_nofd_reconstruct,
-    ) = usage_to_info
+    ) = index_to_info
         .iter()
-        .unique()
-        .filter_map(|index_usage @ &IndexUsageInfo { prefix, index }| {
-            let IndexInfo {
-                permuted_columns,
-                primary_key_prefix_len: _,
-                primary_key_violation_merge: _,
-            } = &index_to_info[index];
+        .filter_map(|index| {
+            let IndexInfo::NonFd {
+                key_columns,
+                value_columns,
+            } = index
+            else {
+                return None;
+            };
 
-            if index_to_info[index].has_any_fd(index_usage) {
-                None
-            } else {
-                let indexes_nofd_cols = cols.clone();
-                let indexes_nofd =
-                    ident::index_usage_field(&permuted_columns.inner()[..prefix]);
-                let indexes_nofd_keys = permuted_columns
+            let indexes_nofd_cols = cols.clone();
+            let indexes_nofd = ident::index_field(&index);
+            let indexes_nofd_keys = key_columns.iter().map(|&c| ident::column(c)).collect_vec();
+            let (indexes_nofd_vals, indexes_nofd_vals_alt) = value_columns
+                .iter()
+                .map(|&c| (ident::column(c), ident::column_alt(c)))
+                .collect_vecs();
+            let indexes_nofd_key_is_root = {
+                let key_is_root: TokenStream = key_columns
                     .iter()
-                    .take(prefix)
-                    .copied()
-                    .map(ident::column)
-                    .collect_vec();
-                let indexes_nofd_vals = permuted_columns
+                    .filter_map(|&c| {
+                        let ty = rel.columns[c];
+                        let type_ = &theory.types[ty];
+                        if type_.kind == TypeKind::Symbolic {
+                            let uf = ident::type_uf(type_);
+                            let col = ident::column(c);
+                            Some(quote! {
+                                uf.#uf.is_root(#col)
+                            })
+                        } else {
+                            None
+                        }
+                    })
+                    .intersperse(quote! { & })
+                    .collect();
+                if key_is_root.is_empty() {
+                    quote! { true }
+                } else {
+                    key_is_root
+                }
+            };
+            let indexes_nofd_value_is_root = {
+                let value_is_root: TokenStream = value_columns
                     .iter()
-                    .skip(prefix)
-                    .copied()
-                    .map(ident::column)
-                    .collect_vec();
-                let indexes_nofd_vals_alt = permuted_columns
-                    .iter()
-                    .skip(prefix)
-                    .copied()
-                    .map(ident::column_alt)
-                    .collect_vec();
-                let indexes_nofd_key_is_root = {
-                    let key_is_root: TokenStream = permuted_columns
-                        .iter()
-                        .take(prefix)
-                        .filter_map(|&c| {
-                            let ty = rel.columns[c];
-                            let type_ = &theory.types[ty];
-                            if matches!(type_.kind, TypeKind::Symbolic) {
-                                let uf = ident::type_uf(type_);
-                                let col = ident::column(c);
-                                Some(quote! {
-                                    uf.#uf.is_root(#col)
-                                })
-                            } else {
-                                None
-                            }
-                        })
-                        .intersperse(quote! { & })
-                        .collect();
-                    if key_is_root.is_empty() {
-                        quote! { true }
-                    } else {
-                        key_is_root
-                    }
-                };
-                let indexes_nofd_value_is_root = {
-                    let value_is_root: TokenStream = permuted_columns
-                        .iter()
-                        .skip(prefix)
-                        .filter_map(|&c| {
-                            let ty = rel.columns[c];
-                            let type_ = &theory.types[ty];
-                            if matches!(type_.kind, TypeKind::Symbolic) {
-                                let uf = ident::type_uf(type_);
-                                let col = ident::column(c);
-                                Some(quote! {
-                                    uf.#uf.is_root(#col)
-                                })
-                            } else {
-                                None
-                            }
-                        })
-                        .intersperse(quote! { & })
-                        .collect();
-                    if value_is_root.is_empty() {
-                        quote! { true }
-                    } else {
-                        value_is_root
-                    }
-                };
-
-
-                let fallback_sort = quote! {
-                    self.all.sort_unstable_by_key(
-                        |&(#(#indexes_nofd_cols,)* timestamp,)|
-                            (#(#indexes_nofd_keys,)*)
-                    );
-                };
-
-                let sort_impl = {
-                    let n = cols.len();
-                    let all_symbolic = rel.columns.iter().map(|ty| &theory.types[ty]).all(|ty| matches!(ty.kind, TypeKind::Symbolic));
-
-                    if all_symbolic && n <= 3 {
-                        let mut is_key_col = tvec![false; n];
-                        for c in permuted_columns.iter().take(prefix) {
-                            is_key_col[*c] = true;
+                    .filter_map(|&c| {
+                        let ty = rel.columns[c];
+                        let type_ = &theory.types[ty];
+                        if type_.kind == TypeKind::Symbolic {
+                            let uf = ident::type_uf(type_);
+                            let col = ident::column(c);
+                            Some(quote! {
+                                uf.#uf.is_root(#col)
+                            })
+                        } else {
+                            None
                         }
+                    })
+                    .intersperse(quote! { & })
+                    .collect();
+                if value_is_root.is_empty() {
+                    quote! { true }
+                } else {
+                    value_is_root
+                }
+            };
 
-                        let bit_pattern: String = is_key_col.iter().copied().map(|x| if x { '1' } else { '0' }).collect();
+            let fallback_sort = quote! {
+                self.all.sort_unstable_by_key(
+                    |&(#(#indexes_nofd_cols,)* timestamp,)|
+                        (#(#indexes_nofd_keys,)*)
+                );
+            };
 
-                        let row_ident = format_ident!("RowSort{bit_pattern}");
+            let sort_impl = {
+                let n = cols.len();
+                let all_symbolic = rel.columns.iter().map(|ty| &theory.types[ty]).all(|ty| matches!(ty.kind, TypeKind::Symbolic));
 
-                        quote!{
-                            #row_ident :: sort ( &mut self.all );
-                        }
-                    } else {
-                        fallback_sort
+                if all_symbolic && n <= 3 {
+                    let mut is_key_col = tvec![false; n];
+                    for c in key_columns {
+                        is_key_col[*c] = true;
                     }
-                };
+
+                    let bit_pattern: String = is_key_col.iter().copied().map(|x| if x { '1' } else { '0' }).collect();
+
+                    let row_ident = format_ident!("RowSort{bit_pattern}");
+
+                    quote!{
+                        #row_ident :: sort ( &mut self.all );
+                    }
+                } else {
+                    fallback_sort
+                }
+            };
 
 
-                let indexes_nofd_reconstruct = quote! {
-                    log_duration!("reconstruct index: {}", {
-                        log_duration!("reconstruct sort: {}", {
-                            #sort_impl
-                        });
-
-                        unsafe {
-                            self.#indexes_nofd.reconstruct(
-                                &mut self.all,
-                                |(#(#indexes_nofd_cols,)* timestamp,)| (#(#indexes_nofd_keys,)*),
-                                |(#(#indexes_nofd_cols,)* timestamp,)| (#(#indexes_nofd_vals,)* timestamp,),
-                            );
-                        }
+            let indexes_nofd_reconstruct = quote! {
+                log_duration!("reconstruct index: {}", {
+                    log_duration!("reconstruct sort: {}", {
+                        #sort_impl
                     });
 
-                };
+                    unsafe {
+                        self.#indexes_nofd.reconstruct(
+                            &mut self.all,
+                            |(#(#indexes_nofd_cols,)* timestamp,)| (#(#indexes_nofd_keys,)*),
+                            |(#(#indexes_nofd_cols,)* timestamp,)| (#(#indexes_nofd_vals,)* timestamp,),
+                        );
+                    }
+                });
 
-                Some((
-                    indexes_nofd,
-                    indexes_nofd_cols,
-                    indexes_nofd_keys,
-                    indexes_nofd_vals,
-                    indexes_nofd_vals_alt,
-                    indexes_nofd_key_is_root,
-                    indexes_nofd_value_is_root,
-                    indexes_nofd_reconstruct,
-                ))
-            }
+            };
+
+            Some((
+                indexes_nofd,
+                indexes_nofd_cols,
+                indexes_nofd_keys,
+                indexes_nofd_vals,
+                indexes_nofd_vals_alt,
+                indexes_nofd_key_is_root,
+                indexes_nofd_value_is_root,
+                indexes_nofd_reconstruct,
+            ))
         })
         .collect_vecs();
 
@@ -513,111 +489,100 @@ fn update(
         indexes_othfd_merge,
         indexes_othfd_find,
         indexes_othfd_key_is_root,
-    ) = usage_to_info
+    ) = index_to_info
         .iter()
-        .unique()
-        .filter_map(|index_usage @ &IndexUsageInfo { prefix, index }| {
-            let IndexInfo {
-                permuted_columns,
-                primary_key_prefix_len: _,
-                primary_key_violation_merge,
-            } = &index_to_info[index];
+        .filter_map(|index| {
+            let IndexInfo::Fd {
+                key_columns,
+                value_columns,
+                generate_check_value_subsets: _,
+            } = index
+            else {
+                return None;
+            };
+            if index.has_union_fd() {
+                return None;
+            }
 
-            if index_to_info[index].has_any_fd(index_usage)
-                && !index_to_info[index].has_union_fd(index_usage)
-            {
-                let field = ident::index_usage_field(&permuted_columns.inner()[..prefix]);
-                let keys = permuted_columns
+            let field = ident::index_field(index);
+            let keys = key_columns.iter().map(|&c| ident::column(c)).collect_vec();
+
+            let (val_x, val_y) = value_columns
+                .iter()
+                .filter_map(|(&c, _)| {
+                    let ty = rel.columns[c];
+                    let type_ = &theory.types[ty];
+                    (type_.kind == TypeKind::Symbolic)
+                        .then(|| (ident::column(c), ident::column_alt(c)))
+                })
+                .collect_vecs();
+
+            let merge = {
+                let body = value_columns.values().zip(&val_x).zip(&val_y).map(
+                    |((merge, val_x), val_y)| match merge {
+                        MergeTy::Union => unreachable!("it seems a relation has mixed union and non-union functional dependency"),
+                        MergeTy::Panic => quote! {
+                            if #val_x != *#val_y {
+                                panic!("panic merge");
+                            }
+                        },
+                    },
+                );
+                quote! {
+                    {
+                        let (#(#val_y,)*) = entry.get_mut();
+                        #(#body)*
+                    }
+                }
+            };
+            let find = {
+                let find = value_columns
                     .iter()
-                    .take(prefix)
-                    .copied()
-                    .map(ident::column)
+                    .map(|(&c, _)| {
+                        let ty = rel.columns[c];
+                        let type_ = &theory.types[ty];
+                        let col = ident::column(c);
+                        if type_.kind == TypeKind::Symbolic {
+                            let uf = ident::type_uf(type_);
+                            quote! {
+                                uf.#uf.find(#col)
+                            }
+                        } else {
+                            quote! {
+                                #col
+                            }
+                        }
+                    })
                     .collect_vec();
-
-                let (val_x, val_y) = permuted_columns
+                quote! {
+                    (#(#find,)*)
+                }
+            };
+            let key_is_root = {
+                let key_is_root: TokenStream = key_columns
                     .iter()
-                    .skip(prefix)
                     .filter_map(|&c| {
                         let ty = rel.columns[c];
                         let type_ = &theory.types[ty];
-                        matches!(type_.kind, TypeKind::Symbolic)
-                            .then(|| (ident::column(c), ident::column_alt(c)))
-                    })
-                    .collect_vecs();
-
-                let merge = {
-                    let body = primary_key_violation_merge
-                        .values()
-                        .zip(&val_x)
-                        .zip(&val_y)
-                        .map(|((merge, val_x), val_y)| match merge {
-                            MergeTy::Union => unreachable!(),
-                            MergeTy::Panic => quote! {
-                                if #val_x != *#val_y {
-                                    panic!("panic merge");
-                                }
-                            },
-                        });
-                    quote! {
-                        {
-                            let (#(#val_y,)*) = entry.get_mut();
-                            #(#body)*
-                        }
-                    }
-                };
-                let find = {
-                    let find = permuted_columns
-                        .iter()
-                        .skip(prefix)
-                        .map(|&c| {
-                            let ty = rel.columns[c];
-                            let type_ = &theory.types[ty];
+                        if type_.kind == TypeKind::Symbolic {
+                            let uf = ident::type_uf(type_);
                             let col = ident::column(c);
-                            if matches!(type_.kind, TypeKind::Symbolic) {
-                                let uf = ident::type_uf(type_);
-                                quote! {
-                                    uf.#uf.find(#col)
-                                }
-                            } else {
-                                quote! {
-                                    #col
-                                }
-                            }
-                        })
-                        .collect_vec();
-                    quote! {
-                        (#(#find,)*)
-                    }
-                };
-                let key_is_root = {
-                    let key_is_root: TokenStream = permuted_columns
-                        .iter()
-                        .take(prefix)
-                        .filter_map(|&c| {
-                            let ty = rel.columns[c];
-                            let type_ = &theory.types[ty];
-                            if matches!(type_.kind, TypeKind::Symbolic) {
-                                let uf = ident::type_uf(type_);
-                                let col = ident::column(c);
-                                Some(quote! {
-                                    uf.#uf.is_root(#col)
-                                })
-                            } else {
-                                None
-                            }
-                        })
-                        .intersperse(quote! { & })
-                        .collect();
-                    if key_is_root.is_empty() {
-                        quote! { true }
-                    } else {
-                        key_is_root
-                    }
-                };
-                Some((field, cols.clone(), keys, merge, find, key_is_root))
-            } else {
-                None
-            }
+                            Some(quote! {
+                                uf.#uf.is_root(#col)
+                            })
+                        } else {
+                            None
+                        }
+                    })
+                    .intersperse(quote! { & })
+                    .collect();
+                if key_is_root.is_empty() {
+                    quote! { true }
+                } else {
+                    key_is_root
+                }
+            };
+            Some((field, cols.clone(), keys, merge, find, key_is_root))
         })
         .collect_vecs();
 
@@ -642,7 +607,7 @@ fn update(
                 .unique()
                 .filter_map(|ty| {
                     let type_ = &theory.types[ty];
-                    if matches!(type_.kind, TypeKind::Symbolic) {
+                    if type_.kind == TypeKind::Symbolic {
                         let latest = ident::type_num_uprooted_at_latest_retain(type_);
                         let uf = ident::type_uf(type_);
                         Some(quote! {
@@ -736,20 +701,35 @@ fn update(
                     );
                 }
             } else {
-                let usage_info = usage_to_info
-                    .iter()
-                    .find(|usage_info| usage_info.prefix == rel.columns.len())
-                    .expect("some IndexUsage that queryies all columns");
-                let index_info = &index_to_info[usage_info.index];
-                assert_eq!(index_info.permuted_columns.len(), usage_info.prefix);
-                let allset = ident::index_usage_field(index_info.permuted_columns.inner());
-                let allset_cols = index_info
-                    .permuted_columns
-                    .iter()
-                    .copied()
-                    .map(ident::column)
-                    .collect_vec();
-                let not_in_old = quote! { !self.#allset.contains_key(&(#(#allset_cols,)*)) };
+                let (not_in_old, allset, allset_cols) = {
+                    let Some((key_columns, index)) = index_to_info
+                        .inner()
+                        .iter()
+                        .filter_map(|index| {
+                            if let IndexInfo::NonFd {
+                                key_columns,
+                                value_columns,
+                            } = index
+                            {
+                                value_columns.is_empty().then_some((key_columns, index))
+                            } else {
+                                None
+                            }
+                        })
+                        .next()
+                    else {
+                        unreachable!(
+                            "when no fd index is present, a non-fd all columns index is required"
+                        )
+                    };
+                    let allset = ident::index_field(index);
+                    let key = key_columns.iter().map(|&c| ident::column(c)).collect_vec();
+                    (
+                        quote! { !self.#allset.contains_key(&(#(#key,)*)) },
+                        allset,
+                        key,
+                    )
+                };
 
                 quote! {
                     assert_eq!(self.new.len(), 0);
@@ -887,134 +867,153 @@ fn update(
     }
 }
 
-fn per_usage(
-    rel: &RelationData,
-    theory: &Theory,
-    index_to_info: &TVec<IndexId, IndexInfo>,
-    usage_info: &IndexUsageInfo,
-) -> (TokenStream, TokenStream, TokenStream, TokenStream) {
-    let index_info = &index_to_info[usage_info.index];
-
-    let call_args = index_info.permuted_columns.inner()[0..usage_info.prefix]
-        .iter()
-        .copied()
-        .map(ident::column)
-        .collect_vec();
-
-    // let input_columns = vec![];
-
-    let args = iter::once(quote! { &self })
-        .chain(
-            index_info.permuted_columns.inner()[0..usage_info.prefix]
+fn per_index(rel: &RelationData, theory: &Theory, index: &IndexInfo) -> TokenStream {
+    match index {
+        IndexInfo::Fd {
+            key_columns,
+            value_columns,
+            generate_check_value_subsets,
+        } => {
+            let check_fns = generate_check_value_subsets
                 .iter()
-                .copied()
-                .map(|x| {
-                    let ident = ident::column(x);
-                    let ident_ty = ident::type_ty(&theory.types[rel.columns[x]]);
-                    quote! { #ident : #ident_ty }
-                }),
-        )
-        .collect_vec();
-
-    let out_columns = index_info.permuted_columns.inner()[usage_info.prefix..]
-        .iter()
-        .copied()
-        .map(ident::column)
-        .collect_vec();
-
-    let out_ty = index_info.permuted_columns.inner()[usage_info.prefix..]
-        .iter()
-        .copied()
-        .map(|x| ident::type_ty(&theory.types[rel.columns[x]]))
-        .collect_vec();
-
-    let iter_all_ident = ident::index_all_iter(usage_info, index_info);
-    let iter_old_ident = ident::index_old_iter(usage_info, index_info);
-    let (iter_all, iter_old) = {
-        let index_usage_field =
-            ident::index_usage_field(&index_info.permuted_columns.inner()[..usage_info.prefix]);
-
-        if index_info.has_any_fd(usage_info) {
-            (
-                quote! {
-                    fn #iter_all_ident(#(#args,)*) -> impl Iterator<Item = (#(#out_ty,)*)> + use<'_> {
-                        self.#index_usage_field.get(&(#(#call_args,)*)).into_iter().copied()
-                            .map(|(#(#out_columns,)* _timestamp,)| (#(#out_columns,)*))
+                .map(|check_value_subset| {
+                    assert!(!check_value_subset.is_empty());
+                    let (arg, arg_types) = Iterator::chain(key_columns.iter(), check_value_subset)
+                        .copied()
+                        .collect::<BTreeSet<ColumnId>>()
+                        .into_iter()
+                        .map(|c| {
+                            (
+                                ident::column(c),
+                                ident::type_ty(&theory.types[rel.columns[c]]),
+                            )
+                        })
+                        .collect_vecs();
+                    let key = key_columns.iter().map(|&c| ident::column(c)).collect_vec();
+                    let val = value_columns
+                        .iter()
+                        .map(|(&c, _)| ident::column_alt(c))
+                        .collect_vec();
+                    let (value_subset, value_subset_alt) = check_value_subset
+                        .iter()
+                        .map(|&c| (ident::column(c), ident::column_alt(c)))
+                        .collect_vecs();
+                    let check_extra_ident = ident::index_check(
+                        &Iterator::chain(key_columns.iter(), check_value_subset)
+                            .copied()
+                            .collect(),
+                        key_columns.len() + value_columns.len()
+                    );
+                    let iter_all_ident = ident::index(ident::Q::IterAll, index);
+                    quote! {
+                        fn #check_extra_ident(&self, #(#arg: #arg_types,)*) -> bool {
+                            self.#iter_all_ident(#(#key,)*)
+                                .next()
+                                .is_some_and(|(#(#val,)*)| true #(&& #value_subset == #value_subset_alt)*)
+                        }
                     }
-                },
-                quote! {
-                    fn #iter_old_ident(#(#args,)* latest_timestamp: TimeStamp,) -> impl Iterator<Item = (#(#out_ty,)*)> + use<'_> {
-                        self.#index_usage_field.get(&(#(#call_args,)*)).into_iter().copied()
-                            .filter_map(move |(#(#out_columns,)* timestamp,)| (timestamp < latest_timestamp).then_some((#(#out_columns,)*)))
+                });
+            let (key, key_ty) = key_columns
+                .iter()
+                .map(|&c| {
+                    (
+                        ident::column(c),
+                        ident::type_ty(&theory.types[rel.columns[c]]),
+                    )
+                })
+                .collect_vecs();
+            let all = (0..(key_columns.len() + value_columns.len()))
+                .map(ColumnId)
+                .map(ident::column);
+            let (val, val_ty, entry_make_value) = value_columns.iter().map(|(&c,m)| {
+                let ty = &theory.types[rel.columns[c]];
+                let uf = ident::type_uf(ty);
+                (
+                    ident::column(c),
+                    ident::type_ty(ty),
+                    match m {
+                        MergeTy::Union => quote! {
+                            uf.#uf.add_eclass()
+                        },
+                        MergeTy::Panic => quote! {
+                            panic!("entry on value not present in database for a panic-merge implicit rule")
+                        },
                     }
-                },
-            )
-        } else {
-            (
-                quote! {
-                    fn #iter_all_ident(#(#args,)*) -> impl Iterator<Item = (#(#out_ty,)*)> + use<'_> {
-                        // self.#index_usage_field.get(&(#(#call_args,)*)).into_iter().flatten().copied()
-                        self.#index_usage_field.iter((#(#call_args,)*))
-                            .map(|(#(#out_columns,)* _timestamp)| (#(#out_columns,)*))
+                )
+            }).collect_vecs();
+
+            let index_field = ident::index_field(index);
+            let iter_all_ident = ident::index(ident::Q::IterAll, index);
+            let iter_old_ident = ident::index(ident::Q::IterOld, index);
+            let entry_ident = ident::index(ident::Q::Entry, index);
+            let check_ident =
+                ident::index_check(key_columns, key_columns.len() + value_columns.len());
+            let relation_delta = ident::delta_row(rel);
+            quote! {
+                fn #iter_all_ident(&self, #(#key : #key_ty,)*) -> impl Iterator<Item = (#(#val_ty,)*)> + use<'_> {
+                    self.#index_field.get(&(#(#key,)*)).into_iter().copied()
+                        .map(|(#(#val,)* _timestamp,)| (#(#val,)*))
+                }
+                fn #iter_old_ident(&self, #(#key: #key_ty,)* latest_timestamp: TimeStamp,) -> impl Iterator<Item = (#(#val_ty,)*)> + use<'_> {
+                    self.#index_field.get(&(#(#key,)*)).into_iter().copied()
+                        .filter_map(move |(#(#val,)* timestamp,)| (timestamp < latest_timestamp).then_some((#(#val,)*)))
+                }
+                #[allow(unreachable_code)]
+                fn #entry_ident(&self, #(#key: #key_ty,)* delta: &mut Delta, uf: &mut Unification) -> (#(#val_ty,)*) {
+                    if let Some((#(#val,)*)) = self.#iter_all_ident(#(#key,)*).next() {
+                        return (#(#val,)*);
                     }
-                },
-                quote! {
-                    fn #iter_old_ident(#(#args,)* latest_timestamp: TimeStamp,) -> impl Iterator<Item = (#(#out_ty,)*)> + use<'_> {
-                        // self.#index_usage_field.get(&(#(#call_args,)*)).into_iter().flatten().copied()
-                        self.#index_usage_field.iter((#(#call_args,)*))
-                            .filter_map(move |(#(#out_columns,)* timestamp,)| (timestamp < latest_timestamp).then_some((#(#out_columns,)*)))
-                    }
-                },
-            )
-        }
-    };
-    let check_all = {
-        let check_all_ident = ident::index_all_check(usage_info, index_info);
-        quote! {
-            fn #check_all_ident(#(#args,)*) -> bool {
-                self.#iter_all_ident(#(#call_args,)*).next().is_some()
+                    #(let #val = #entry_make_value;)*
+                    delta.#relation_delta.push((#(#all,)*));
+                    (#(#val,)*)
+                }
+                fn #check_ident(&self, #(#key: #key_ty,)*) -> bool {
+                    self.#iter_all_ident(#(#key,)*).next().is_some()
+                }
+                #(#check_fns)*
             }
         }
-    };
-    let entry_all = {
-        let entry_all_ident = ident::index_all_entry(usage_info, index_info);
-        let relation_delta = ident::delta_row(rel);
-        let all_columns = (0..index_info.permuted_columns.len())
-            .map(ColumnId)
-            .map(ident::column);
+        IndexInfo::NonFd {
+            key_columns,
+            value_columns,
+        } => {
+            let (key, key_ty) = key_columns
+                .iter()
+                .map(|&c| {
+                    (
+                        ident::column(c),
+                        ident::type_ty(&theory.types[rel.columns[c]]),
+                    )
+                })
+                .collect_vecs();
+            let (val, val_ty) = value_columns
+                .iter()
+                .map(|&c| {
+                    (
+                        ident::column(c),
+                        ident::type_ty(&theory.types[rel.columns[c]]),
+                    )
+                })
+                .collect_vecs();
 
-        index_info.permuted_columns
-            .iter_enumerate()
-            .skip(usage_info.prefix)
-            .map(|(i, &c)| index_info.primary_key_violation_merge.get(&c).map(|merge| {
-                let ty = &theory.types[rel.columns[i]];
-                let out_col = ident::column(c);
-
-                let uf = ident::type_uf(ty);
-
-                match merge {
-                    MergeTy::Union => quote! {
-                        let #out_col = uf.#uf.add_eclass();
-                    },
-                    MergeTy::Panic => quote! {
-                        let #out_col = panic!("entry on value not present in database for a panic-merge implicit rule");
-                    },
+            let index_field = ident::index_field(index);
+            let iter_all_ident = ident::index(ident::Q::IterAll, index);
+            let iter_old_ident = ident::index(ident::Q::IterOld, index);
+            let check_ident =
+                ident::index_check(key_columns, key_columns.len() + value_columns.len());
+            quote! {
+                fn #iter_all_ident(&self, #(#key: #key_ty,)*) -> impl Iterator<Item = (#(#val_ty,)*)> + use<'_> {
+                    self.#index_field.iter((#(#key,)*))
+                        .map(|(#(#val,)* _timestamp)| (#(#val,)*))
                 }
-            }))
-            .collect::<Option<Vec<_>>>()
-            .map(|body| {
-                quote! {
-                    #[allow(unreachable_code)]
-                    fn #entry_all_ident(#(#args,)* delta: &mut Delta, uf: &mut Unification) -> (#(#out_ty,)*) {
-                        if let Some((#(#out_columns,)*)) = self.#iter_all_ident(#(#call_args,)*).next() {
-                            return (#(#out_columns,)*);
-                        }
-                        #(#body)*
-                        delta.#relation_delta.push((#(#all_columns,)*));
-                        (#(#out_columns,)*)
-                    }
+                fn #iter_old_ident(&self, #(#key: #key_ty,)* latest_timestamp: TimeStamp,) -> impl Iterator<Item = (#(#val_ty,)*)> + use<'_> {
+                    self.#index_field.iter((#(#key,)*))
+                        .filter_map(move |(#(#val,)* timestamp,)| (timestamp < latest_timestamp).then_some((#(#val,)*)))
                 }
-            }).unwrap_or(quote!{})
-    };
-    (iter_all, iter_old, check_all, entry_all)
+                fn #check_ident(&self, #(#key: #key_ty,)*) -> bool {
+                    self.#iter_all_ident(#(#key,)*).next().is_some()
+                }
+            }
+        }
+    }
 }

@@ -116,6 +116,23 @@ impl ImplicitRule {
     pub(crate) fn value_columns(&self) -> BTreeSet<ColumnId> {
         self.out.keys().copied().collect()
     }
+    pub(crate) fn value_columns_with_merge_ty(&self) -> BTreeMap<ColumnId, lir::MergeTy> {
+        self.out
+            .iter()
+            .map(|(&k, v)| {
+                (
+                    k,
+                    match v {
+                        ImplicitRuleAction::Panic => lir::MergeTy::Panic,
+                        ImplicitRuleAction::Union => lir::MergeTy::Union,
+                        ImplicitRuleAction::Lattice { .. } => {
+                            todo!("implement lattice merge")
+                        }
+                    },
+                )
+            })
+            .collect()
+    }
     /// AKA inputs
     pub(crate) fn key_columns(&self) -> BTreeSet<ColumnId> {
         let value_columns = self.value_columns();

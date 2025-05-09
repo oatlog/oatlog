@@ -100,44 +100,6 @@ impl<K: Id, V> TVec<K, V> {
             .collect()
     }
 }
-impl<K: Id, V: Ord> TVec<K, V> {
-    pub(crate) fn permutation_to_sort(&self) -> TVec<K, K> {
-        let mut xs: Vec<(&V, K)> = self.iter_enumerate().map(|(k, v)| (v, k)).collect();
-        xs.sort_unstable();
-        let mut ret = self.new_same_size();
-        for (dest, &(_, src)) in xs.iter().enumerate() {
-            ret[src] = dest.into();
-        }
-        ret
-    }
-}
-impl<K: Id, V: Clone> TVec<K, V> {
-    pub(crate) fn permute(&self, perm: &TVec<K, K>) -> Self {
-        assert_eq!(self.len(), perm.len());
-        let inv_perm = perm.invert_permutation();
-        self.enumerate()
-            .map(|i| self[inv_perm[i]].clone())
-            .collect()
-    }
-}
-impl<K: Id> TVec<K, K> {
-    pub(crate) fn is_permutation(&self) -> bool {
-        let mut seen = self.new_same_size::<bool>();
-        for i in self.iter().copied() {
-            seen[i] = true;
-        }
-        let is_permutation = seen.iter().copied().all(std::convert::identity);
-        is_permutation
-    }
-    pub(crate) fn invert_permutation(&self) -> Self {
-        assert!(self.is_permutation(), "not a permutation: {self:?}");
-        let mut inverted = self.new_same_size::<K>();
-        for (i, e) in self.iter_enumerate() {
-            inverted[*e] = i;
-        }
-        inverted
-    }
-}
 impl<K: Id> TVec<K, bool> {
     pub(crate) fn into_remap_table(self) -> TVec<K, Option<K>> {
         let mut next = 0;

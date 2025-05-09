@@ -1,5 +1,5 @@
 use crate::{ids::Id, typed_vec::TVec};
-use std::collections::BTreeMap;
+use std::collections::{BTreeMap, BTreeSet};
 
 /// Set with typed index handles.
 #[derive(Clone, Eq, PartialEq, Ord, PartialOrd, Hash)]
@@ -20,6 +20,9 @@ impl<K: Id, V: Ord + Clone> TSet<K, V> {
     }
     pub(crate) fn as_tvec(&self) -> &TVec<K, V> {
         &self.v
+    }
+    pub(crate) fn to_set(&self) -> BTreeSet<V> {
+        self.v.iter().cloned().collect()
     }
     pub(crate) fn insert(&mut self, v: V) -> K {
         if let Some(&id) = self.h.get(&v) {

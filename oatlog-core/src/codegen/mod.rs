@@ -1,12 +1,10 @@
 use crate::{
-    ids::{ColumnId, GlobalId, TypeId},
-    lir::{
-        GlobalCompute, IndexInfo, Initial, Literal, RelationData, RelationKind, Theory, TypeKind,
-    },
+    ids::{GlobalId, TypeId},
+    lir::{GlobalCompute, Initial, Literal, RelationData, RelationKind, Theory, TypeKind},
     typed_vec::TVec,
 };
 use itertools::Itertools as _;
-use proc_macro2::{Ident, TokenStream};
+use proc_macro2::TokenStream;
 use quote::{format_ident, quote};
 
 use std::collections::{BTreeMap, BTreeSet};
@@ -48,17 +46,23 @@ pub fn codegen(theory: &Theory) -> TokenStream {
         .filter_map(|rel| Some(codegen_relation(rel.as_ref()?, theory)))
         .collect_vec();
 
-    let rule_contents = query::CodegenRuleTrieCtx {
-        types: &theory.types,
-        relations: &theory.relations,
-        variables: &theory.rule_variables,
+    let rule_contents: TokenStream = theory
+        .rule_tries
+        .iter()
+        .map(|trie| {
+            query::CodegenRuleTrieCtx {
+                types: &theory.types,
+                relations: &theory.relations,
+                variables: &theory.rule_variables,
 
-        variables_bound: &mut theory.rule_variables.new_same_size(),
-        scoped: true,
-        global_variable_types: &theory.global_variable_types,
-        global_idx: &global_variables_map,
-    }
-    .codegen_all(theory.rule_tries, true);
+                variables_bound: &mut theory.rule_variables.new_same_size(),
+                variable_bindings: Vec::new(),
+                global_variable_types: &theory.global_variable_types,
+                global_idx: &global_variables_map,
+            }
+            .codegen(trie)
+        })
+        .collect();
 
     let delta = {
         let (delta_functions, delta_fields, delta_field_name) = theory
@@ -338,11 +342,7 @@ fn codegen_globals_and_initial(
                     .expect("only LIR relations (the `Some` case) can be used in `Compute`");
                 match &relation_.kind {
                     RelationKind::Global { .. } => panic!(),
-                    RelationKind::Table {
-                        usage_to_info: _,
-                        index_to_info: _,
-                        column_back_reference: _,
-                    } => {
+                    RelationKind::Table { index_to_info: _ } => {
                         // TODO: this just assumes that the last type in the relation is the output and also an eqsort.
 
                         // let [others @ .., last] = relation_.param_types.inner().as_slice()
@@ -491,11 +491,9 @@ fn codegen_relation(rel: &RelationData, theory: &Theory) -> TokenStream {
             // will codegen into a single big struct.
             quote! {}
         }
-        RelationKind::Table {
-            usage_to_info,
-            index_to_info,
-            column_back_reference: _,
-        } => table_relation::codegen_table_relation(rel, theory, usage_to_info, index_to_info),
+        RelationKind::Table { index_to_info } => {
+            table_relation::codegen_table_relation(rel, theory, index_to_info)
+        }
         RelationKind::Primitive {
             codegen,
             out_col: _,
@@ -503,93 +501,22 @@ fn codegen_relation(rel: &RelationData, theory: &Theory) -> TokenStream {
     }
 }
 
-// TODO loke: Is declare_row now unused. Will we use it or should it be removed?
-#[allow(unused)]
-fn codegen_declare_row(
-    (
-        row_name,
-        IndexInfo {
-            permuted_columns,
-            primary_key_prefix_len,
-            primary_key_violation_merge: _,
-        },
-    ): (Ident, IndexInfo),
-) -> TokenStream {
-    let fc: usize = permuted_columns[ColumnId(0)].into();
-    let type_vars_with_first = (0..permuted_columns.len()).map(|i| {
-        let t = format_ident!("T{i}");
-        if i == fc {
-            let i = proc_macro2::Literal::usize_unsuffixed(i);
-            quote! { #t first #i }
-        } else {
-            quote! { #t }
-        }
-    });
-    let num_and_t = |i| {
-        (
-            proc_macro2::Literal::usize_unsuffixed(i),
-            format_ident!("T{i}"),
-        )
-    };
-    let (keys, keys_t) = permuted_columns.inner()[..primary_key_prefix_len]
-        .iter()
-        .map(|&ColumnId(i)| num_and_t(i))
-        .collect_vecs();
-    let (values, values_t) = permuted_columns.inner()[primary_key_prefix_len..]
-        .iter()
-        .map(|&ColumnId(i)| num_and_t(i))
-        .collect_vecs();
-    assert!(permuted_columns.inner()[primary_key_prefix_len..].is_sorted());
-    let radix_implementation = {
-        let ct = match permuted_columns.len() {
-            0 => unreachable!(),
-            1 => Some(quote! { u32 }),
-            2 => Some(quote! { u64 }),
-            3 | 4 => Some(quote! { u128 }),
-            _ => None,
-        };
-        if let Some(ct) = ct {
-            let ci: Vec<TokenStream> = permuted_columns
-                .iter_enumerate()
-                .map(|(ColumnId(i), &ColumnId(c))| {
-                    let idx = proc_macro2::Literal::usize_unsuffixed(c);
-                    let shift = proc_macro2::Literal::usize_unsuffixed(
-                        (permuted_columns.len() - 1 - i) * 32,
-                    );
-                    quote! {
-                        ((s.#idx.inner() as #ct) << #shift)
-                    }
-                })
-                .collect_vec();
-            quote! { where #ct = s => #(#ci)+* }
-        } else {
-            quote! {}
-        }
-    };
-    let ii = (0..permuted_columns.len()).map(proc_macro2::Literal::usize_unsuffixed);
-    let irev = (0..permuted_columns.len())
-        .rev()
-        .map(proc_macro2::Literal::usize_unsuffixed);
-    quote! {
-        decl_row!(
-            #row_name < #(#type_vars_with_first),*>
-            (#(#keys_t #keys),*)
-            (#(#values_t #values),*)
-            (#(#ii)*) (#(#irev)*)
-            #radix_implementation
-        );
-    }
-}
-
 mod ident {
     use crate::{
         ids::ColumnId,
-        lir::{IndexInfo, IndexUsageInfo, RelationData, Theory, TypeData, TypeKind, VariableData},
+        lir::{IndexInfo, RelationData, Theory, TypeData, TypeKind, VariableData},
     };
     use heck::{ToPascalCase as _, ToSnakeCase as _};
     use itertools::Itertools as _;
     use proc_macro2::{Ident, TokenStream};
     use quote::{format_ident, quote};
+    use std::collections::BTreeSet;
+
+    pub enum Q {
+        Entry,
+        IterAll,
+        IterOld,
+    }
 
     /// `a`
     pub fn var_var(var: &VariableData) -> Ident {
@@ -648,53 +575,93 @@ mod ident {
             format_ident!("Delta")
         }
     }
-    /// `hash_index_0_1`
-    pub fn index_usage_field(key_columns: &[ColumnId]) -> Ident {
-        let keys = key_columns
-            .iter()
-            .map(|ColumnId(x)| format!("{x}"))
-            .join("_");
-        format_ident!("hash_index_{keys}")
-    }
-    /// `iter2_2_0_1`
-    pub fn index_all_iter(usage: &IndexUsageInfo, index: &IndexInfo) -> Ident {
-        let index_perm = index
-            .permuted_columns
-            .iter()
-            .map(|ColumnId(x)| format!("{x}"))
-            .join("_");
-        let prefix = format!("{}", usage.prefix);
-        format_ident!("iter_all{prefix}_{index_perm}")
-    }
-    /// `iter_old2_2_0_1`
-    pub fn index_old_iter(usage: &IndexUsageInfo, index: &IndexInfo) -> Ident {
-        let index_perm = index
-            .permuted_columns
-            .iter()
-            .map(|ColumnId(x)| format!("{x}"))
-            .join("_");
-        let prefix = format!("{}", usage.prefix);
-        format_ident!("iter_old{prefix}_{index_perm}")
+    /// `fd_index_0_1`/`nofd_index_0_1`
+    pub fn index_field(index: &IndexInfo) -> Ident {
+        let fmt = |key_columns: &BTreeSet<ColumnId>| {
+            key_columns
+                .iter()
+                .map(|ColumnId(x)| format!("{x}"))
+                .join("_")
+        };
+        match index {
+            IndexInfo::Fd {
+                key_columns,
+                value_columns: _,
+                generate_check_value_subsets: _,
+            } => format_ident!("hash_index_{}", fmt(key_columns)), // TODO loke: fd_index
+            IndexInfo::NonFd {
+                key_columns,
+                value_columns: _,
+            } => format_ident!("hash_index_{}", fmt(key_columns)), // TODO loke: nofd_index
+        }
     }
     /// `check2_2_0_1`
-    pub fn index_all_check(usage: &IndexUsageInfo, index: &IndexInfo) -> Ident {
-        let index_perm = index
-            .permuted_columns
-            .iter()
+    pub fn index_check(key_columns: &BTreeSet<ColumnId>, columns: usize) -> Ident {
+        // TODO loke: FIXME
+        format_ident!(
+            "check{}_{}",
+            key_columns.len(),
+            Iterator::chain(
+                key_columns.iter().copied(),
+                (0..columns)
+                    .map(ColumnId)
+                    .filter(|c| !key_columns.contains(c))
+            )
             .map(|ColumnId(x)| format!("{x}"))
-            .join("_");
-        let prefix = format!("{}", usage.prefix);
-        format_ident!("check{prefix}_{index_perm}")
+            .join("_")
+        )
+        /*
+        format_ident!(
+            "check_{}",
+            key_columns
+                .iter()
+                .map(|ColumnId(x)| format!("{x}"))
+                .join("_")
+        )
+        */
     }
-    /// `entry2_2_0_1`
-    pub fn index_all_entry(usage: &IndexUsageInfo, index: &IndexInfo) -> Ident {
-        let index_perm = index
-            .permuted_columns
-            .iter()
-            .map(|ColumnId(x)| format!("{x}"))
-            .join("_");
-        let prefix = format!("{}", usage.prefix);
-        format_ident!("entry{prefix}_{index_perm}")
+    /// `iter2_2_0_1`/`iter_old2_2_0_1`/`entry2_2_0_1`
+    pub fn index(i: Q, index: &IndexInfo) -> Ident {
+        let prefix = match i {
+            Q::Entry => "entry",
+            Q::IterAll => "iter_all",
+            Q::IterOld => "iter_old",
+        };
+        let (key_columns, value_columns) = match index {
+            IndexInfo::Fd {
+                key_columns,
+                value_columns,
+                ..
+            } => (
+                key_columns,
+                value_columns.into_iter().map(|(&k, _)| k).collect(),
+            ),
+            IndexInfo::NonFd {
+                key_columns,
+                value_columns,
+            } => (key_columns, value_columns.clone()),
+        };
+        // TODO loke: FIXME
+        format_ident!(
+            "{prefix}{}_{}",
+            key_columns.len(),
+            Iterator::chain(key_columns.iter(), value_columns.iter())
+                .map(|ColumnId(c)| format!("{c}"))
+                .join("_"),
+        )
+        /*
+        format_ident!(
+            "{prefix}_{}_to_{}",
+            key_columns
+                .iter()
+                .map(|ColumnId(c)| format!("{c}"))
+                .join("_"),
+            value_columns
+                .iter()
+                .map(|ColumnId(c)| format!("{c}"))
+                .join("_")
+        )
+        */
     }
     /// `x2`
     pub fn column(c: ColumnId) -> Ident {

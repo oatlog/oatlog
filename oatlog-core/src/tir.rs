@@ -1,7 +1,7 @@
 use crate::{
     MultiMapCollect as _,
     hir::{self, Atom, IsPremise, Relation, SymbolicRule, VariableMeta},
-    ids::{ColumnId, IndexUsageId, RelationId, TypeId, VariableId},
+    ids::{ColumnId, IndexId, RelationId, TypeId, VariableId},
     lir,
     typed_set::TSet,
     typed_vec::{TVec, tvec},
@@ -10,7 +10,6 @@ use itertools::Itertools as _;
 use std::{
     cmp::Reverse,
     collections::{BTreeMap, BTreeSet},
-    mem::replace,
 };
 
 #[derive(Clone, Eq, PartialEq, Ord, PartialOrd, Debug)]
@@ -51,13 +50,14 @@ struct Salt {
 // actions then unify then perform queries for each map.
 #[derive(Clone, Eq, PartialEq, Ord, PartialOrd, Debug, Default)]
 pub(crate) struct Trie {
+    meta: Vec<hir::RuleMeta>,
+    /// Variables bound in the premise as of traversing the parent `TrieLink`. I.e. these variables
+    /// are bound as of performing `actions.`
+    bound_premise: BTreeSet<VariableId>,
+
     actions: Vec<Atom>,
     unify: Vec<(VariableId, VariableId)>,
     map: BTreeMap<TrieLink, Trie>,
-
-    // meta
-    bound_premise: BTreeSet<VariableId>,
-    meta: Vec<hir::RuleMeta>,
 }
 
 impl Trie {
@@ -165,104 +165,10 @@ pub(crate) fn schedule_rules(
     (variables, trie)
 }
 
-/*
-fn scc_group_size<'a>(
-    actions: impl Iterator<Item = &'a hir::Atom>,
-    relations: &TVec<RelationId, hir::Relation>,
-) -> BTreeMap<hir::Atom, usize> {
-    fn strongly_connected_components(adj: &[Vec<usize>]) -> Vec<Vec<usize>> {
-        fn adj_reverse(adj: &[Vec<usize>]) -> Vec<Vec<usize>> {
-            let n = adj.len();
-            let mut adj_inv = vec![vec![]; n];
-            for i in 0..n {
-                for &a in &adj[i] {
-                    adj_inv[a].push(i);
-                }
-            }
-            adj_inv
-        }
-        fn dfs(i: usize, adj: &[Vec<usize>], out: &mut Vec<usize>, visited: &mut Vec<bool>) {
-            if replace(&mut visited[i], true) {
-                return;
-            }
-            for &a in &adj[i] {
-                dfs(a, adj, out, visited);
-            }
-            out.push(i);
-        }
-        let n = adj.len();
-        let mut order = Vec::new();
-        let mut visited = vec![false; n];
-        for i in 0..n {
-            dfs(i, adj, &mut order, &mut visited);
-        }
-        let adj_inv = adj_reverse(adj);
-
-        visited.fill(false);
-
-        let mut components = Vec::new();
-        for &i in order.iter().rev() {
-            if visited[i] {
-                continue;
-            }
-            let mut component = Vec::new();
-            dfs(i, &adj_inv, &mut component, &mut visited);
-            components.push(component);
-        }
-        components
-    }
-
-    let mut var_to_action: BTreeMap<VariableId, Vec<&Atom>> = BTreeMap::new();
-    let (idx_to_action, action_to_idx): (BTreeMap<usize, &Atom>, BTreeMap<&Atom, usize>) = actions
-        .enumerate()
-        .map(|(i, a)| {
-            a.entry_inputs(relations).into_iter().for_each(|input| {
-                var_to_action.entry(input).or_default().push(a);
-            });
-            ((i, a), (a, i))
-        })
-        .collect();
-
-    let n = idx_to_action.len();
-    let mut adj: Vec<Vec<usize>> = vec![vec![]; n];
-
-    for (&i, &a) in &idx_to_action {
-        for output in a.entry_outputs(relations) {
-            let Some(actions) = var_to_action.get(&output) else {
-                continue;
-            };
-            for action in actions {
-                let j = action_to_idx[action];
-                adj[i].push(j);
-            }
-        }
-    }
-    for x in &mut adj {
-        x.sort_unstable();
-        x.dedup();
-    }
-
-    strongly_connected_components(&adj)
-        .into_iter()
-        .flat_map(|v| {
-            let idx_to_action = &idx_to_action;
-            let n = v.len();
-            v.iter()
-                .copied()
-                .map(move |i| (idx_to_action[&i].clone(), n))
-                .collect::<Vec<_>>()
-        })
-        .collect()
-}
-*/
-
 fn action_topo_resolve<'a>(
     actions: &[Atom],
     bound_premise: &BTreeSet<VariableId>,
     relations: &TVec<RelationId, hir::Relation>,
-    _unify: &mut Vec<(VariableId, VariableId)>,
-    _variables: &mut TVec<VariableId, VariableMeta>,
-    _types: &TVec<TypeId, hir::Type>,
 ) -> Vec<Atom> {
     let mut schedule: Vec<Atom> = Vec::new();
     let mut remaining_atoms: BTreeSet<Atom> = {
@@ -323,13 +229,34 @@ pub(crate) fn lowering(
     trie: Trie,
     variables: &mut TVec<VariableId, VariableMeta>,
     relations: &TVec<RelationId, hir::Relation>,
-    table_uses: &mut TVec<RelationId, TSet<IndexUsageId, BTreeSet<ColumnId>>>,
+    table_uses: &mut TVec<RelationId, TSet<IndexId, BTreeSet<ColumnId>>>,
     types: &TVec<TypeId, hir::Type>,
-) -> (
-    &'static [lir::RuleTrie],
-    TVec<VariableId, lir::VariableData>,
-) {
-    let trie = lowering_rec(trie, variables, relations, table_uses, types);
+) -> (Vec<lir::RuleTrie>, TVec<VariableId, lir::VariableData>) {
+    assert_eq!(
+        &trie.actions,
+        &[],
+        "top-level of trie should not have actions (these would be executed unconditionally)"
+    );
+    assert_eq!(
+        &trie.unify,
+        &[],
+        "top-level of trie should not have unifies (these would be executed unconditionally)"
+    );
+    let trie = trie
+        .map
+        .into_iter()
+        .filter_map(|(link, inner_trie)| {
+            lowering_rec(
+                &BTreeSet::new(),
+                &link,
+                &inner_trie,
+                variables,
+                relations,
+                table_uses,
+                types,
+            )
+        })
+        .collect();
 
     let variables: TVec<VariableId, lir::VariableData> = variables
         .iter_enumerate()
@@ -340,270 +267,261 @@ pub(crate) fn lowering(
 }
 
 fn lowering_rec(
+    parent_bound_premise: &BTreeSet<VariableId>,
+    link: &TrieLink,
     Trie {
         actions,
-        mut unify,
+        unify,
         map,
         bound_premise,
         meta,
-    }: Trie,
+    }: &Trie,
     variables: &mut TVec<VariableId, VariableMeta>,
     relations: &TVec<RelationId, hir::Relation>,
-    table_uses: &mut TVec<RelationId, TSet<IndexUsageId, BTreeSet<ColumnId>>>,
+    table_uses: &mut TVec<RelationId, TSet<IndexId, BTreeSet<ColumnId>>>,
     types: &TVec<TypeId, hir::Type>,
-) -> &'static [lir::RuleTrie] {
-    let schedule = action_topo_resolve(
-        &actions,
-        &bound_premise,
-        relations,
-        &mut unify,
-        variables,
-        types,
-    );
-
-    let mut lir_trie: Vec<_> = schedule
+) -> Option<lir::RuleTrie> {
+    let action_schedule = action_topo_resolve(&actions, &bound_premise, relations);
+    let actions: Vec<lir::Action> = action_schedule
         .into_iter()
-        .flat_map(|atom| {
-            // let () = ();
-
-            // TODO: UNSOUND IF WE HAVE HIR OPTIMIZATIONS THAT REMOVE PERMUTATIONS.
-
-            let equivalent = vec![atom]; //.equivalent_atoms(relations);
-            // if equivalent.len() > 1 {
-            //     dbg!(&equivalent, relations[atom.relation].name);
-            // }
-
-            let mut first = true;
-            equivalent
-                .into_iter()
-                .map(
-                    |hir::Atom {
-                         is_premise: _,
-                         relation,
-                         columns,
-                         entry,
-                         incl: _,
-                     }| {
-                        let args = columns.inner().clone().leak();
-                        if first {
-                            if let Some(entry) = entry {
-                                // NOTE: this is safe because the implicit rules are the first ones to be
-                                // assigned an IndexUsageId.
-                                let index = IndexUsageId(entry.0);
-
-                                return lir::Action::Entry {
-                                    relation,
-                                    index,
-                                    args,
-                                };
-                            }
-                        }
-                        first = false;
-                        lir::Action::Insert { relation, args }
-                    },
-                )
-                .collect::<Vec<_>>()
-
-            // let hir::Atom {
-            //     premise: _,
-            //     relation,
-            //     columns,
-            //     entry,
-            // } = atom;
-
-            // // match &relations[atom.relation].kind {
-            // //     hir::RelationTy::Forall { .. }
-            // //     | hir::RelationTy::NewOf { .. }
-            // //     | hir::RelationTy::Alias { .. } => panic!("does not make sense for action"),
-            // //     hir::RelationTy::Table => todo!(),
-            // //     hir::RelationTy::Global { id } => todo!(),
-            // //     hir::RelationTy::Primitive { syn, ident } => todo!(),
-            // // }
-            // let args = columns.inner().clone().leak();
-            // if let Some(entry) = entry {
-            //     // NOTE: this is safe because the implicit rules are the first ones to be
-            //     // assigned an IndexUsageId.
-            //     let index = IndexUsageId(entry.0);
-
-            //     lir::Action::Entry {
-            //         relation,
-            //         index,
-            //         args,
-            //     }
-            // } else {
-            //     lir::Action::Insert { relation, args }
-            // }
-        })
-        .chain(unify.into_iter().map(|(a, b)| lir::Action::Equate(a, b)))
-        .map(lir::RuleAtom::Action)
-        .map(|atom| lir::RuleTrie {
-            meta: None,
-            atom,
-            then: &[],
-        })
-        .chain(map.into_iter().map(|(mut link, trie)| {
-            match &mut link {
-                Primary(atom) => {
-                    // transform
-                    // for (x, x) in .. { .. }
-                    // into
-                    // for (x, y) in .. { if x == y { .. } }
-                    let mut to_equate: Vec<(VariableId, VariableId)> = vec![];
-                    loop {
-                        let mut progress = false;
-                        for i in 0..atom.columns.len() {
-                            if bound_premise.contains(&atom.columns[ColumnId(i)]) {
-                                continue;
-                            }
-                            for j in (i + 1)..atom.columns.len() {
-                                if bound_premise.contains(&atom.columns[ColumnId(j)]) {
-                                    continue;
-                                }
-                                if atom.columns[ColumnId(i)] != atom.columns[ColumnId(j)] {
-                                    continue;
-                                }
-                                progress = true;
-
-                                let old_id = atom.columns[ColumnId(i)];
-                                let new_id = variables.push(variables[old_id]);
-
-                                atom.columns[ColumnId(j)] = new_id;
-
-                                to_equate.push((old_id, new_id));
-                            }
-                        }
-                        if !progress {
-                            break;
-                        }
+        .map(
+            |hir::Atom {
+                 is_premise,
+                 relation,
+                 columns,
+                 entry,
+                 incl: _,
+             }| {
+                assert_eq!(is_premise, IsPremise::Action);
+                match &relations[relation].kind {
+                    hir::RelationTy::Forall { .. } | hir::RelationTy::Alias { .. } => {
+                        panic!("does not make sense for action")
                     }
-
-                    let args = &*atom.columns.inner().clone().leak();
-
-                    let mut trie = lowering_rec(trie, variables, relations, table_uses, types);
-
-                    let mut make_index_use = || {
-                        table_uses[atom.relation].insert(
-                            args.iter()
-                                .map(|x| bound_premise.contains(x))
-                                .enumerate()
-                                .filter_map(|(i, b)| b.then_some(i))
-                                .map(ColumnId)
-                                .collect(),
-                        )
-                    };
-
-                    for (a, b) in to_equate {
-                        trie = vec![lir::RuleTrie {
-                            meta: None,
-                            atom: lir::RuleAtom::IfEq(a, b),
-                            then: trie,
-                        }]
-                        .leak();
-                    }
-
-                    trie = {
-                        let lir_inclusion = match atom.incl {
-                            hir::Inclusion::New => None,
-                            hir::Inclusion::Old => Some(lir::Inclusion::Old),
-                            hir::Inclusion::All => Some(lir::Inclusion::All),
-                        };
-                        let atom = match lir_inclusion {
-                            None => lir::RuleAtom::PremiseNew {
-                                relation: atom.relation,
-                                args,
-                            },
-                            Some(lir_inclusion) => match &relations[atom.relation].kind {
-                                hir::RelationTy::Alias {} => panic!("primary join on alias"),
-                                hir::RelationTy::Forall { .. } => {
-                                    panic!("primary join on forall")
-                                }
-                                hir::RelationTy::Primitive { .. } => {
-                                    todo!("primary join on primitive")
-                                }
-                                hir::RelationTy::Table => lir::RuleAtom::Premise {
-                                    relation: atom.relation,
-                                    args,
-                                    index: make_index_use(),
-                                    inclusion: lir_inclusion,
-                                },
-                                hir::RelationTy::Global { .. } => {
-                                    if bound_premise.contains(&args[0]) {
-                                        lir::RuleAtom::PremiseAny {
-                                            relation: atom.relation,
-                                            args,
-                                            index: IndexUsageId::bogus(),
-                                        }
-                                    } else {
-                                        lir::RuleAtom::Premise {
-                                            relation: atom.relation,
-                                            args,
-                                            index: IndexUsageId::bogus(),
-                                            inclusion: lir_inclusion,
-                                        }
-                                    }
-                                }
-                            },
-                        };
-
-                        vec![lir::RuleTrie {
-                            meta: None,
-                            atom,
-                            then: trie,
-                        }]
-                        .leak()
-                    };
-                    trie[0]
+                    hir::RelationTy::Table
+                    | hir::RelationTy::Global { .. }
+                    | hir::RelationTy::Primitive { .. } => {}
                 }
-                Semi(atom) => {
-                    let args = &*atom.columns.inner().clone().leak();
 
-                    let mut make_index_use = || {
-                        table_uses[atom.relation].insert(
-                            args.iter()
-                                .map(|x| bound_premise.contains(x))
-                                .enumerate()
-                                .filter_map(|(i, b)| b.then_some(i))
-                                .map(ColumnId)
-                                .collect(),
-                        )
-                    };
-                    assert_ne!(
-                        hir::Inclusion::New,
-                        atom.incl,
-                        "semi-join on new not supported, (yet?)"
-                    );
-                    let atom = match &relations[atom.relation].kind {
-                        hir::RelationTy::Primitive { .. } => panic!("semi-join primitive"),
-                        hir::RelationTy::Forall { .. } => panic!("semi-join forall"),
-                        hir::RelationTy::Alias {} => panic!("semi-join alias"),
-                        hir::RelationTy::Table => lir::RuleAtom::PremiseAny {
-                            relation: atom.relation,
-                            args,
-                            index: make_index_use(),
+                if let Some(entry) = entry {
+                    lir::Action::Entry {
+                        relation,
+                        args: columns,
+                        index: if let hir::RelationTy::Table = relations[relation].kind {
+                            table_uses[relation]
+                                .insert(relations[relation].implicit_rules[entry].key_columns())
+                                .rebase()
+                        } else {
+                            IndexId::bogus()
                         },
-                        hir::RelationTy::Global { .. } => lir::RuleAtom::PremiseAny {
-                            relation: atom.relation,
-                            args,
-                            index: IndexUsageId::bogus(),
-                        },
-                    };
-
-                    let then = lowering_rec(trie, variables, relations, table_uses, types);
-                    lir::RuleTrie {
-                        meta: None,
-                        atom,
-                        then,
+                    }
+                } else {
+                    lir::Action::Insert {
+                        relation,
+                        args: columns,
                     }
                 }
-            }
-        }))
+            },
+        )
+        .chain(unify.into_iter().map(|&(a, b)| lir::Action::Equate(a, b)))
         .collect();
 
-    if !lir_trie.is_empty() && !meta.is_empty() {
-        lir_trie[0].meta = Some(meta.into_iter().map(|x| x.src).join("\n").leak());
+    let mut premises = match link {
+        Primary(atom) => {
+            let mut atom = atom.clone();
+            // transform
+            // for (x, x) in .. { .. }
+            // into
+            // for (x, y) in .. { if x == y { .. } }
+            let mut to_equate: Vec<(VariableId, VariableId)> = vec![];
+            loop {
+                let mut progress = false;
+                for i in 0..atom.columns.len() {
+                    if parent_bound_premise.contains(&atom.columns[ColumnId(i)]) {
+                        continue;
+                    }
+                    for j in (i + 1)..atom.columns.len() {
+                        if parent_bound_premise.contains(&atom.columns[ColumnId(j)]) {
+                            continue;
+                        }
+                        if atom.columns[ColumnId(i)] != atom.columns[ColumnId(j)] {
+                            continue;
+                        }
+                        progress = true;
+
+                        let old_id = atom.columns[ColumnId(i)];
+                        let new_id = variables.push(variables[old_id]);
+
+                        atom.columns[ColumnId(j)] = new_id;
+
+                        to_equate.push((old_id, new_id));
+                    }
+                }
+                if !progress {
+                    break;
+                }
+            }
+
+            let mut make_index_use = || {
+                table_uses[atom.relation]
+                    .insert(
+                        atom.columns
+                            .iter()
+                            .enumerate()
+                            .filter_map(|(i, x)| {
+                                parent_bound_premise.contains(x).then_some(ColumnId(i))
+                            })
+                            .collect(),
+                    )
+                    .rebase()
+            };
+
+            let all_columns_already_bound = atom
+                .columns
+                .iter()
+                .all(|c| parent_bound_premise.contains(c));
+
+            let mut premises = vec![{
+                let lir_inclusion = match atom.incl {
+                    hir::Inclusion::New => None,
+                    hir::Inclusion::Old => Some(lir::Inclusion::Old),
+                    hir::Inclusion::All => Some(lir::Inclusion::All),
+                };
+                match lir_inclusion {
+                    None => lir::Premise::Relation {
+                        relation: atom.relation,
+                        args: atom.columns.clone(),
+                        kind: lir::PremiseKind::IterNew,
+                    },
+                    Some(lir_inclusion) => match &relations[atom.relation].kind {
+                        hir::RelationTy::Alias {} => panic!("primary join on alias"),
+                        hir::RelationTy::Forall { .. } => {
+                            panic!("primary join on forall")
+                        }
+                        hir::RelationTy::Primitive { .. } => {
+                            todo!("primary join on primitive")
+                        }
+                        hir::RelationTy::Table => lir::Premise::Relation {
+                            relation: atom.relation,
+                            args: atom.columns.clone(),
+                            kind: if all_columns_already_bound {
+                                lir::PremiseKind::SemiJoin {
+                                    index: make_index_use(),
+                                }
+                            } else {
+                                lir::PremiseKind::Join {
+                                    index: make_index_use(),
+                                    inclusion: lir_inclusion,
+                                }
+                            },
+                        },
+                        hir::RelationTy::Global { .. } => {
+                            if parent_bound_premise.contains(&atom.columns[ColumnId(0)]) {
+                                lir::Premise::Relation {
+                                    relation: atom.relation,
+                                    args: atom.columns.clone(),
+                                    kind: lir::PremiseKind::SemiJoin {
+                                        index: IndexId::bogus(),
+                                    },
+                                }
+                            } else {
+                                lir::Premise::Relation {
+                                    relation: atom.relation,
+                                    args: atom.columns.clone(),
+                                    kind: lir::PremiseKind::Join {
+                                        index: IndexId::bogus(),
+                                        inclusion: lir_inclusion,
+                                    },
+                                }
+                            }
+                        }
+                    },
+                }
+            }];
+            premises.extend(to_equate.into_iter().map(|(a, b)| lir::Premise::IfEq(a, b)));
+            premises
+        }
+        Semi(atom) => {
+            let mut make_index_use = || {
+                table_uses[atom.relation]
+                    .insert(
+                        atom.columns
+                            .iter()
+                            .enumerate()
+                            .filter_map(|(i, x)| {
+                                parent_bound_premise.contains(x).then_some(ColumnId(i))
+                            })
+                            .collect(),
+                    )
+                    .rebase()
+            };
+            assert_ne!(
+                hir::Inclusion::New,
+                atom.incl,
+                "semi-join on new not supported, (yet?)"
+            );
+            vec![match &relations[atom.relation].kind {
+                hir::RelationTy::Primitive { .. } => panic!("semi-join primitive"),
+                hir::RelationTy::Forall { .. } => panic!("semi-join forall"),
+                hir::RelationTy::Alias {} => panic!("semi-join alias"),
+                hir::RelationTy::Table => lir::Premise::Relation {
+                    relation: atom.relation,
+                    args: atom.columns.clone(),
+                    kind: lir::PremiseKind::SemiJoin {
+                        index: make_index_use(),
+                    },
+                },
+                hir::RelationTy::Global { .. } => lir::Premise::Relation {
+                    relation: atom.relation,
+                    args: atom.columns.clone(),
+                    kind: lir::PremiseKind::SemiJoin {
+                        index: IndexId::bogus(),
+                    },
+                },
+            }]
+        }
+    };
+
+    let then: Vec<lir::RuleTrie> = map
+        .into_iter()
+        .filter_map(|(link, trie)| {
+            lowering_rec(
+                &bound_premise,
+                link,
+                trie,
+                variables,
+                relations,
+                table_uses,
+                types,
+            )
+        })
+        .collect();
+
+    if actions.is_empty() && then.is_empty() {
+        // Leaf nodes without actions can be created when some rule is strictly less powerful than
+        // another.
+        return None;
     }
 
-    lir_trie.leak()
+    let mut ret = {
+        let premise = premises.pop().unwrap();
+        lir::RuleTrie {
+            premise,
+            meta: (then.is_empty() && !meta.is_empty())
+                .then(|| &*meta.iter().map(|x| x.src).join("\n").leak()),
+            actions,
+            then,
+        }
+    };
+    // Construct a linked list from any `IfEq`.
+    for premise in premises.into_iter().rev() {
+        ret = lir::RuleTrie {
+            premise,
+            meta: None,
+            actions: Vec::new(),
+            then: vec![ret],
+        };
+    }
+    Some(ret)
 }
 
 #[derive(Clone, Eq, PartialEq, Ord, PartialOrd, Debug)]

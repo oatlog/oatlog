@@ -46,8 +46,6 @@ macro_rules! id_wrap {
 pub(crate) use id_wrap;
 id_wrap!(RelationId, "r", "id for a function/table/relation");
 id_wrap!(VariableId, "v", "id for a variable within a rule");
-// id_wrap!(PremiseId, "p", "id for a premise variable (forall)");
-// id_wrap!(ActionId, "a", "id for an action variable (exists)");
 id_wrap!(GlobalId, "g", "id for a global variable");
 id_wrap!(TypeId, "t", "id for a type");
 id_wrap!(TypeVarId, "x", "id for a type variable");
@@ -56,15 +54,18 @@ id_wrap!(RuleUsageId, "w", "id for a rule usage by a ruleset");
 id_wrap!(RuleSetId, "s", "id for a ruleset");
 id_wrap!(ColumnId, "c", "id for a column");
 id_wrap!(IndexId, "ir", "reference to an index");
-id_wrap!(
-    IndexUsageId,
-    "iu",
-    "reference to something that requires an index"
-);
 id_wrap!(ImplicitRuleId, "n", "id for an implicit rule");
 
-impl IndexUsageId {
+impl IndexId {
     pub(crate) fn bogus() -> Self {
-        IndexUsageId(usize::MAX)
+        Self(usize::MAX)
+    }
+    pub(crate) fn rebase(self) -> Self {
+        assert!(self.0 < 1_000_000_000);
+        Self(self.0 + 1_000_000_000)
+    }
+    pub(crate) fn unbase(self) -> Self {
+        assert_ne!(self, Self::bogus());
+        Self(self.0.checked_sub(1_000_000_000).unwrap())
     }
 }

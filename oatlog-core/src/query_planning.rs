@@ -1,38 +1,24 @@
 //! All query plan *choices* occur here.
 use crate::{
     hir::{self, RelationTy},
-    ids::{ColumnId, ImplicitRuleId, IndexUsageId, RelationId, VariableId},
+    ids::{ColumnId, ImplicitRuleId, IndexId, RelationId, VariableId},
     index_selection, lir, tir,
     typed_set::TSet,
     typed_vec::{TVec, tvec},
 };
-use std::collections::BTreeSet;
+use std::collections::{BTreeMap, BTreeSet};
 
 /// Returns `lir::Theory` and `hir::Theory` since the `hir::Theory` is modified when
 /// emitted.
 pub(crate) fn emit_lir_theory(theory: hir::Theory) -> (hir::Theory, lir::Theory) {
     let non_new_relations = theory.relations.len();
 
-    let mut table_uses: TVec<RelationId, TSet<IndexUsageId, BTreeSet<ColumnId>>> =
+    let mut table_uses: TVec<RelationId, TSet<IndexId, BTreeSet<ColumnId>>> =
         tvec![TSet::new(); non_new_relations];
-
-    for (relation_id, relation) in theory.relations.iter_enumerate() {
-        if relation.kind == RelationTy::Table {
-            let uses = &mut table_uses[relation_id];
-            // ImplicitRuleId(x) => IndexUsageId(x)
-            assert_eq!(uses.len(), 0);
-            uses.extend(
-                relation
-                    .implicit_rules
-                    .iter()
-                    .map(super::hir::ImplicitRule::key_columns),
-            );
-        }
-    }
 
     let mut lir_variables: TVec<VariableId, lir::VariableData>;
 
-    let tries: Vec<lir::RuleTrie>;
+    let mut tries: Vec<lir::RuleTrie>;
 
     {
         let (mut variables, trie) =
@@ -47,8 +33,11 @@ pub(crate) fn emit_lir_theory(theory: hir::Theory) -> (hir::Theory, lir::Theory)
         );
 
         lir_variables = variables;
-        tries = lir_tries.to_vec();
+        tries = lir_tries;
     }
+
+    let mut table_index_remap: TVec<RelationId, TVec<IndexId, IndexId>> =
+        table_uses.new_same_size();
 
     // compute indexes for relations.
     let mut lir_relations: TVec<RelationId, Option<lir::RelationData>> = TVec::new();
@@ -85,71 +74,59 @@ pub(crate) fn emit_lir_theory(theory: hir::Theory) -> (hir::Theory, lir::Theory)
             RelationTy::Table => {
                 let uses = &mut table_uses[relation_id];
 
-                //let column_back_references: TVec<ColumnId, IndexUsageId> = relation
-                //    .columns
-                //    .enumerate()
-                //    .map(|i| uses.push(BTreeSet::from_iter([i])))
-                //    .collect();
-                let column_back_references: TVec<ColumnId, IndexUsageId> = TVec::new();
-
-                let implicit_with_index = relation.implicit_rules.map(|x| {
-                    let index_usage = uses.insert(x.key_columns());
-                    (index_usage, x)
-                });
-
-                // * we want to guarantee *some* index
-                // * we require "index_all" if we don't have FD to find old.
-                if relation.implicit_rules.len() == 0 || uses.len() == 0 {
+                // If we lack any FD, we require a key on all columns to construct `new` in `update_finalize`.
+                if relation.implicit_rules.len() == 0 {
                     let _ =
                         uses.insert(relation.columns.enumerate().collect::<BTreeSet<ColumnId>>());
                 }
 
-                let (usage_to_info, mut index_to_info) = index_selection::index_selection(
+                let (use_assignment, indexes): (
+                    BTreeMap<BTreeSet<ColumnId>, IndexId>,
+                    TVec<IndexId, lir::IndexInfo>,
+                ) = index_selection::index_selection(
                     relation.columns.len(),
-                    uses,
-                    &relation.invariant_permutations,
+                    uses.to_set(),
+                    &relation.implicit_rules.inner(),
                 );
 
-                for (index_usage, implicit_rule) in implicit_with_index {
-                    let lir::IndexInfo {
-                        permuted_columns: _,
-                        primary_key_prefix_len,
-                        primary_key_violation_merge,
-                    } = &mut index_to_info[usage_to_info[index_usage].index];
-                    assert_eq!(
-                        *primary_key_prefix_len,
-                        relation.columns.len(),
-                        "implicit rule collision (this can be solved)"
-                    );
-                    *primary_key_prefix_len = relation.columns.len() - implicit_rule.out.len();
-                    *primary_key_violation_merge = implicit_rule
-                        .out
-                        .iter()
-                        .map(|(out_column, merge_action)| {
-                            (*out_column, {
-                                match merge_action {
-                                    hir::ImplicitRuleAction::Panic => lir::MergeTy::Panic,
-                                    hir::ImplicitRuleAction::Union => lir::MergeTy::Union,
-                                    hir::ImplicitRuleAction::Lattice { .. } => {
-                                        todo!("implement lattice merge")
-                                    }
-                                }
-                            })
-                        })
-                        .collect();
-                }
-
-                let lir_relation = lir::RelationData::new_table(
-                    relation.name,
-                    relation.columns.clone(),
-                    usage_to_info,
-                    index_to_info,
-                    column_back_references,
-                );
+                let lir_relation =
+                    lir::RelationData::new_table(relation.name, relation.columns.clone(), indexes);
                 lir_relations.push_expected(relation_id, Some(lir_relation));
+
+                table_index_remap[relation_id] = uses
+                    .as_tvec()
+                    .map(|colset: &BTreeSet<ColumnId>| use_assignment[colset]);
             }
         }
     }
+    fn fixup_trie_index_ids(
+        tries: &mut [lir::RuleTrie],
+        remap: &TVec<RelationId, TVec<IndexId, IndexId>>,
+    ) {
+        for t in tries {
+            match &mut t.premise {
+                lir::Premise::Relation {
+                    relation,
+                    kind:
+                        lir::PremiseKind::Join { index, .. } | lir::PremiseKind::SemiJoin { index },
+                    ..
+                } if *index != IndexId::bogus() => *index = remap[*relation][index.unbase()],
+                _ => {}
+            }
+            for a in &mut t.actions {
+                match a {
+                    lir::Action::Entry {
+                        relation,
+                        args: _,
+                        index,
+                    } if *index != IndexId::bogus() => *index = remap[*relation][index.unbase()],
+                    _ => {}
+                }
+            }
+            fixup_trie_index_ids(&mut t.then, remap);
+        }
+    }
+    fixup_trie_index_ids(&mut tries, &table_index_remap);
 
     let types = theory
         .types
@@ -170,7 +147,7 @@ pub(crate) fn emit_lir_theory(theory: hir::Theory) -> (hir::Theory, lir::Theory)
         relations: lir_relations,
         global_variable_types: theory.global_types.clone(),
         rule_variables: lir_variables,
-        rule_tries: tries.leak(),
+        rule_tries: tries,
         initial: theory.initial.clone(),
     };
 

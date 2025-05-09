@@ -515,33 +515,21 @@ fn hir_global() {
                         name: "Add",
                         param_types: {c0: t2, c1: t2, c2: t2},
                         kind: Table {
-                            index_to_info: {ir0: 0_1_2 conflict[..2] => [2:union]},
-                            usage_to_info: {
-                                iu0: ir0[..2],
-                            },
-                            column_back_reference: {},
+                            index_to_info: {ir0: 0_1=>2:union},
                         },
                     },
                     r1: RelationData {
                         name: "Const",
                         param_types: {c0: t0, c1: t2},
                         kind: Table {
-                            index_to_info: {ir0: 0_1 conflict[..1] => [1:union]},
-                            usage_to_info: {
-                                iu0: ir0[..1],
-                            },
-                            column_back_reference: {},
+                            index_to_info: {ir0: 0=>1:union},
                         },
                     },
                     r2: RelationData {
                         name: "Var",
                         param_types: {c0: t1, c1: t2},
                         kind: Table {
-                            index_to_info: {ir0: 0_1 conflict[..1] => [1:union]},
-                            usage_to_info: {
-                                iu0: ir0[..1],
-                            },
-                            column_back_reference: {},
+                            index_to_info: {ir0: 0=>1:union},
                         },
                     },
                     r3: RelationData {
@@ -580,28 +568,28 @@ fn hir_global() {
                     g2: t1,
                 },
                 rule_tries: [
-                    atom: [PremiseNew, r1(v0, v1)]
+                    premise: [IterNew, r1(v0, v1)]
                     then: [
-                        atom: [PremiseAny, r3(v0), iu_bogus]
-                        then: [
-                            meta: "( rewrite ( Const one ) ( Add ( Var \"a\" ) ( Var \"b\" ) ) )"
-                            atom: [Action::Insert, r5(v4) on iu0],
-                            atom: [Action::Insert, r4(v2) on iu0],
-                            atom: [Action::Insert, r2(v4, v5) on iu0],
-                            atom: [Action::Insert, r2(v2, v3) on iu0],
-                            atom: [Action::Insert, r0(v3, v5, v1)],
+                        premise: [SemiJoin, r3(v0), ir_bogus]
+                        meta: "( rewrite ( Const one ) ( Add ( Var \"a\" ) ( Var \"b\" ) ) )"
+                        actions: [
+                            [Action::Entry, r5(v4) on ir_bogus],
+                            [Action::Entry, r4(v2) on ir_bogus],
+                            [Action::Entry, r2(v4, v5) on ir0],
+                            [Action::Entry, r2(v2, v3) on ir0],
+                            [Action::Insert, r0(v3, v5, v1)],
                         ],
                     ],
-                    atom: [PremiseNew, r3(v6)]
+                    premise: [IterNew, r3(v6)]
                     then: [
-                        atom: [PremiseOld, r1(v6, v7), iu0]
-                        then: [
-                            meta: "( rewrite ( Const one ) ( Add ( Var \"a\" ) ( Var \"b\" ) ) )"
-                            atom: [Action::Insert, r5(v10) on iu0],
-                            atom: [Action::Insert, r4(v8) on iu0],
-                            atom: [Action::Insert, r2(v10, v11) on iu0],
-                            atom: [Action::Insert, r2(v8, v9) on iu0],
-                            atom: [Action::Insert, r0(v9, v11, v7)],
+                        premise: [JoinOld, r1(v6, v7), ir0]
+                        meta: "( rewrite ( Const one ) ( Add ( Var \"a\" ) ( Var \"b\" ) ) )"
+                        actions: [
+                            [Action::Entry, r5(v10) on ir_bogus],
+                            [Action::Entry, r4(v8) on ir_bogus],
+                            [Action::Entry, r2(v10, v11) on ir0],
+                            [Action::Entry, r2(v8, v9) on ir0],
+                            [Action::Insert, r0(v9, v11, v7)],
                         ],
                     ],
                 ],
@@ -682,35 +670,21 @@ fn regression_tir2() {
                         name: "Mul",
                         param_types: {c0: t1, c1: t1, c2: t1},
                         kind: Table {
-                            index_to_info: {ir0: 0_1_2 conflict[..2] => [2:union]},
-                            usage_to_info: {
-                                iu0: ir0[..2],
-                            },
-                            column_back_reference: {},
+                            index_to_info: {ir0: 0_1=>2:union},
                         },
                     },
                     r1: RelationData {
                         name: "Pow",
                         param_types: {c0: t1, c1: t1, c2: t1},
                         kind: Table {
-                            index_to_info: {ir0: 1_0_2 conflict[..2] => [2:union]},
-                            usage_to_info: {
-                                iu0: ir0[..2],
-                                iu1: ir0[..1],
-                            },
-                            column_back_reference: {},
+                            index_to_info: {ir0: 0_1=>2:union, ir1: 1=>0_2},
                         },
                     },
                     r2: RelationData {
                         name: "Const",
                         param_types: {c0: t0, c1: t1},
                         kind: Table {
-                            index_to_info: {ir0: 0_1 conflict[..1] => [1:union], ir1: 1_0},
-                            usage_to_info: {
-                                iu0: ir0[..1],
-                                iu1: ir1[..1],
-                            },
-                            column_back_reference: {},
+                            index_to_info: {ir0: 0=>1:union, ir1: 1=>0},
                         },
                     },
                     r3: RelationData {
@@ -767,39 +741,39 @@ fn regression_tir2() {
                     g5: t1,
                 },
                 rule_tries: [
-                    atom: [PremiseNew, r1(v0, v2, v3)]
+                    premise: [IterNew, r1(v0, v2, v3)]
                     then: [
-                        atom: [PremiseAll, r2(v1, v2), iu1]
+                        premise: [JoinAll, r2(v1, v2), ir1]
                         then: [
-                            atom: [PremiseAny, r3(v1), iu_bogus]
-                            then: [
-                                meta: "( rewrite ( Pow x ( Const 2 ) ) ( Mul x x ) )"
-                                atom: [Action::Insert, r0(v0, v0, v3)],
+                            premise: [SemiJoin, r3(v1), ir_bogus]
+                            meta: "( rewrite ( Pow x ( Const 2 ) ) ( Mul x x ) )"
+                            actions: [
+                                [Action::Insert, r0(v0, v0, v3)],
                             ],
                         ],
                     ],
-                    atom: [PremiseNew, r2(v5, v6)]
+                    premise: [IterNew, r2(v5, v6)]
                     then: [
-                        atom: [PremiseAny, r1(v4, v6, v7), iu1]
+                        premise: [SemiJoin, r1(v4, v6, v7), ir1]
                         then: [
-                            atom: [PremiseAny, r3(v5), iu_bogus]
+                            premise: [SemiJoin, r3(v5), ir_bogus]
                             then: [
-                                atom: [PremiseOld, r1(v4, v6, v7), iu1]
-                                then: [
-                                    meta: "( rewrite ( Pow x ( Const 2 ) ) ( Mul x x ) )"
-                                    atom: [Action::Insert, r0(v4, v4, v7)],
+                                premise: [JoinOld, r1(v4, v6, v7), ir1]
+                                meta: "( rewrite ( Pow x ( Const 2 ) ) ( Mul x x ) )"
+                                actions: [
+                                    [Action::Insert, r0(v4, v4, v7)],
                                 ],
                             ],
                         ],
                     ],
-                    atom: [PremiseNew, r3(v9)]
+                    premise: [IterNew, r3(v9)]
                     then: [
-                        atom: [PremiseOld, r2(v9, v10), iu0]
+                        premise: [JoinOld, r2(v9, v10), ir0]
                         then: [
-                            atom: [PremiseOld, r1(v8, v10, v11), iu1]
-                            then: [
-                                meta: "( rewrite ( Pow x ( Const 2 ) ) ( Mul x x ) )"
-                                atom: [Action::Insert, r0(v8, v8, v11)],
+                            premise: [JoinOld, r1(v8, v10, v11), ir1]
+                            meta: "( rewrite ( Pow x ( Const 2 ) ) ( Mul x x ) )"
+                            actions: [
+                                [Action::Insert, r0(v8, v8, v11)],
                             ],
                         ],
                     ],
@@ -1015,9 +989,6 @@ fn regression_tir2() {
                         .copied()
                         .filter_map(move |(x2, timestamp)| (timestamp < latest_timestamp).then_some((x2,)))
                 }
-                fn check2_0_1_2(&self, x0: Math, x1: Math) -> bool {
-                    self.iter_all2_0_1_2(x0, x1).next().is_some()
-                }
                 #[allow(unreachable_code)]
                 fn entry2_0_1_2(&self, x0: Math, x1: Math, delta: &mut Delta, uf: &mut Unification) -> (Math,) {
                     if let Some((x2,)) = self.iter_all2_0_1_2(x0, x1).next() {
@@ -1027,19 +998,22 @@ fn regression_tir2() {
                     delta.mul_.push((x0, x1, x2));
                     (x2,)
                 }
+                fn check2_0_1_2(&self, x0: Math, x1: Math) -> bool {
+                    self.iter_all2_0_1_2(x0, x1).next().is_some()
+                }
             }
             #[derive(Debug, Default)]
             struct PowRelation {
                 new: Vec<<Self as Relation>::Row>,
                 all: Vec<(Math, Math, Math, TimeStamp)>,
-                hash_index_1_0: runtime::HashMap<(Math, Math), (Math, TimeStamp)>,
+                hash_index_0_1: runtime::HashMap<(Math, Math), (Math, TimeStamp)>,
                 hash_index_1: runtime::IndexedSortedList<(Math,), (Math, Math, TimeStamp)>,
                 math_num_uprooted_at_latest_retain: usize,
             }
             impl Relation for PowRelation {
                 type Row = (Math, Math, Math);
                 type Unification = Unification;
-                const COST: u32 = 3u32;
+                const COST: u32 = 6u32;
                 fn new() -> Self {
                     Self::default()
                 }
@@ -1053,18 +1027,18 @@ fn regression_tir2() {
                     self.new.iter().copied()
                 }
                 fn len(&self) -> usize {
-                    self.hash_index_1.len()
+                    self.hash_index_0_1.len()
                 }
                 fn emit_graphviz(&self, buf: &mut String) {
                     use std::fmt::Write;
-                    for (i, ((x1, x0), (x2, _timestamp))) in self
-                        .hash_index_1_0
+                    for (i, ((x0, x1), (x2, _timestamp))) in self
+                        .hash_index_0_1
                         .iter()
                         .map(|(k, v)| ((*k), (*v)))
                         .enumerate()
                     {
-                        writeln!(buf, "{}_{i} -> {}_{};", "pow", "math", x1).unwrap();
                         writeln!(buf, "{}_{i} -> {}_{};", "pow", "math", x0).unwrap();
+                        writeln!(buf, "{}_{i} -> {}_{};", "pow", "math", x1).unwrap();
                         writeln!(buf, "{}_{i} -> {}_{};", "pow", "math", x2).unwrap();
                         writeln!(buf, "{}_{i} [shape = box];", "pow").unwrap();
                     }
@@ -1078,8 +1052,8 @@ fn regression_tir2() {
                     log_duration!("update_begin {}: {}", "pow", {
                         for &(mut x0, mut x1, mut x2) in insertions {
                             match self
-                                .hash_index_1_0
-                                .entry((uf.math_.find(x1), uf.math_.find(x0)))
+                                .hash_index_0_1
+                                .entry((uf.math_.find(x0), uf.math_.find(x1)))
                             {
                                 runtime::HashMapEntry::Occupied(mut entry) => {
                                     let (y2, timestamp) = entry.get_mut();
@@ -1109,8 +1083,8 @@ fn regression_tir2() {
                         }
                         let offset = insertions.len();
                         self.math_num_uprooted_at_latest_retain = uf.math_.num_uprooted();
-                        self.hash_index_1_0
-                            .retain(|&(x1, x0), &mut (x2, _timestamp)| {
+                        self.hash_index_0_1
+                            .retain(|&(x0, x1), &mut (x2, _timestamp)| {
                                 if uf.math_.is_root(x0) & uf.math_.is_root(x1) & uf.math_.is_root(x2) {
                                     true
                                 } else {
@@ -1131,8 +1105,8 @@ fn regression_tir2() {
                     log_duration!("update_finalize {}: {}", "pow", {
                         assert!(self.new.is_empty());
                         log_duration!("fill new and all: {}", {
-                            self.new.extend(self.hash_index_1_0.iter().filter_map(
-                                |(&(x1, x0), &(x2, timestamp))| {
+                            self.new.extend(self.hash_index_0_1.iter().filter_map(
+                                |(&(x0, x1), &(x2, timestamp))| {
                                     if timestamp == latest_timestamp {
                                         Some((x0, x1, x2))
                                     } else {
@@ -1143,9 +1117,9 @@ fn regression_tir2() {
                             RadixSortable::wrap(&mut self.new).voracious_sort();
                             self.all.clear();
                             self.all.extend(
-                                self.hash_index_1_0
+                                self.hash_index_0_1
                                     .iter()
-                                    .map(|(&(x1, x0), &(x2, timestamp))| (x0, x1, x2, timestamp)),
+                                    .map(|(&(x0, x1), &(x2, timestamp))| (x0, x1, x2, timestamp)),
                             );
                             insertions.clear();
                         });
@@ -1203,29 +1177,41 @@ fn regression_tir2() {
                 }
             }
             impl PowRelation {
-                fn iter_all2_1_0_2(&self, x1: Math, x0: Math) -> impl Iterator<Item = (Math,)> + use<'_> {
-                    self.hash_index_1_0
-                        .get(&(x1, x0))
+                fn iter_all2_0_1_2(&self, x0: Math, x1: Math) -> impl Iterator<Item = (Math,)> + use<'_> {
+                    self.hash_index_0_1
+                        .get(&(x0, x1))
                         .into_iter()
                         .copied()
                         .map(|(x2, _timestamp)| (x2,))
+                }
+                fn iter_old2_0_1_2(
+                    &self,
+                    x0: Math,
+                    x1: Math,
+                    latest_timestamp: TimeStamp,
+                ) -> impl Iterator<Item = (Math,)> + use<'_> {
+                    self.hash_index_0_1
+                        .get(&(x0, x1))
+                        .into_iter()
+                        .copied()
+                        .filter_map(move |(x2, timestamp)| (timestamp < latest_timestamp).then_some((x2,)))
+                }
+                #[allow(unreachable_code)]
+                fn entry2_0_1_2(&self, x0: Math, x1: Math, delta: &mut Delta, uf: &mut Unification) -> (Math,) {
+                    if let Some((x2,)) = self.iter_all2_0_1_2(x0, x1).next() {
+                        return (x2,);
+                    }
+                    let x2 = uf.math_.add_eclass();
+                    delta.pow_.push((x0, x1, x2));
+                    (x2,)
+                }
+                fn check2_0_1_2(&self, x0: Math, x1: Math) -> bool {
+                    self.iter_all2_0_1_2(x0, x1).next().is_some()
                 }
                 fn iter_all1_1_0_2(&self, x1: Math) -> impl Iterator<Item = (Math, Math)> + use<'_> {
                     self.hash_index_1
                         .iter((x1,))
                         .map(|(x0, x2, _timestamp)| (x0, x2))
-                }
-                fn iter_old2_1_0_2(
-                    &self,
-                    x1: Math,
-                    x0: Math,
-                    latest_timestamp: TimeStamp,
-                ) -> impl Iterator<Item = (Math,)> + use<'_> {
-                    self.hash_index_1_0
-                        .get(&(x1, x0))
-                        .into_iter()
-                        .copied()
-                        .filter_map(move |(x2, timestamp)| (timestamp < latest_timestamp).then_some((x2,)))
                 }
                 fn iter_old1_1_0_2(
                     &self,
@@ -1238,20 +1224,8 @@ fn regression_tir2() {
                             (timestamp < latest_timestamp).then_some((x0, x2))
                         })
                 }
-                fn check2_1_0_2(&self, x1: Math, x0: Math) -> bool {
-                    self.iter_all2_1_0_2(x1, x0).next().is_some()
-                }
                 fn check1_1_0_2(&self, x1: Math) -> bool {
                     self.iter_all1_1_0_2(x1).next().is_some()
-                }
-                #[allow(unreachable_code)]
-                fn entry2_1_0_2(&self, x1: Math, x0: Math, delta: &mut Delta, uf: &mut Unification) -> (Math,) {
-                    if let Some((x2,)) = self.iter_all2_1_0_2(x1, x0).next() {
-                        return (x2,);
-                    }
-                    let x2 = uf.math_.add_eclass();
-                    delta.pow_.push((x0, x1, x2));
-                    (x2,)
                 }
             }
             #[derive(Debug, Default)]
@@ -1424,9 +1398,6 @@ fn regression_tir2() {
                         .copied()
                         .map(|(x1, _timestamp)| (x1,))
                 }
-                fn iter_all1_1_0(&self, x1: Math) -> impl Iterator<Item = (std::primitive::i64,)> + use<'_> {
-                    self.hash_index_1.iter((x1,)).map(|(x0, _timestamp)| (x0,))
-                }
                 fn iter_old1_0_1(
                     &self,
                     x0: std::primitive::i64,
@@ -1437,21 +1408,6 @@ fn regression_tir2() {
                         .into_iter()
                         .copied()
                         .filter_map(move |(x1, timestamp)| (timestamp < latest_timestamp).then_some((x1,)))
-                }
-                fn iter_old1_1_0(
-                    &self,
-                    x1: Math,
-                    latest_timestamp: TimeStamp,
-                ) -> impl Iterator<Item = (std::primitive::i64,)> + use<'_> {
-                    self.hash_index_1
-                        .iter((x1,))
-                        .filter_map(move |(x0, timestamp)| (timestamp < latest_timestamp).then_some((x0,)))
-                }
-                fn check1_0_1(&self, x0: std::primitive::i64) -> bool {
-                    self.iter_all1_0_1(x0).next().is_some()
-                }
-                fn check1_1_0(&self, x1: Math) -> bool {
-                    self.iter_all1_1_0(x1).next().is_some()
                 }
                 #[allow(unreachable_code)]
                 fn entry1_0_1(
@@ -1466,6 +1422,24 @@ fn regression_tir2() {
                     let x1 = uf.math_.add_eclass();
                     delta.const_.push((x0, x1));
                     (x1,)
+                }
+                fn check1_0_1(&self, x0: std::primitive::i64) -> bool {
+                    self.iter_all1_0_1(x0).next().is_some()
+                }
+                fn iter_all1_1_0(&self, x1: Math) -> impl Iterator<Item = (std::primitive::i64,)> + use<'_> {
+                    self.hash_index_1.iter((x1,)).map(|(x0, _timestamp)| (x0,))
+                }
+                fn iter_old1_1_0(
+                    &self,
+                    x1: Math,
+                    latest_timestamp: TimeStamp,
+                ) -> impl Iterator<Item = (std::primitive::i64,)> + use<'_> {
+                    self.hash_index_1
+                        .iter((x1,))
+                        .filter_map(move |(x0, timestamp)| (timestamp < latest_timestamp).then_some((x0,)))
+                }
+                fn check1_1_0(&self, x1: Math) -> bool {
+                    self.iter_all1_1_0(x1).next().is_some()
                 }
             }
             #[derive(Debug, Default)]
@@ -1780,22 +1754,14 @@ fn regression_tir1() {
                         name: "Sub",
                         param_types: {c0: t1, c1: t1, c2: t1},
                         kind: Table {
-                            index_to_info: {ir0: 0_1_2 conflict[..2] => [2:union]},
-                            usage_to_info: {
-                                iu0: ir0[..2],
-                            },
-                            column_back_reference: {},
+                            index_to_info: {ir0: 0_1=>2:union},
                         },
                     },
                     r1: RelationData {
                         name: "Const",
                         param_types: {c0: t0, c1: t1},
                         kind: Table {
-                            index_to_info: {ir0: 0_1 conflict[..1] => [1:union]},
-                            usage_to_info: {
-                                iu0: ir0[..1],
-                            },
-                            column_back_reference: {},
+                            index_to_info: {ir0: 0=>1:union},
                         },
                     },
                     r2: RelationData {
@@ -1817,19 +1783,19 @@ fn regression_tir1() {
                     g0: t0,
                 },
                 rule_tries: [
-                    atom: [PremiseNew, r0(v0, v6, v1)]
+                    premise: [IterNew, r0(v0, v6, v1)]
                     then: [
-                        atom: [IfEq, v0=v6]
-                        then: [
-                            meta: "( rewrite ( Sub a a ) ( Const 0 ) )"
-                            atom: [Action::Insert, r2(v2) on iu0],
-                            atom: [Action::Insert, r1(v2, v1)],
+                        premise: [IfEq, v0=v6]
+                        meta: "( rewrite ( Sub a a ) ( Const 0 ) )"
+                        actions: [
+                            [Action::Entry, r2(v2) on ir_bogus],
+                            [Action::Insert, r1(v2, v1)],
                         ],
                     ],
-                    atom: [PremiseNew, r0(v3, v4, v5)]
-                    then: [
-                        meta: "( rewrite ( Sub f g ) g )"
-                        atom: [Action::Equate, v4=v5],
+                    premise: [IterNew, r0(v3, v4, v5)]
+                    meta: "( rewrite ( Sub f g ) g )"
+                    actions: [
+                        [Action::Equate, v4=v5],
                     ],
                 ],
                 initial: [
@@ -2023,9 +1989,6 @@ fn regression_tir1() {
                         .copied()
                         .filter_map(move |(x2, timestamp)| (timestamp < latest_timestamp).then_some((x2,)))
                 }
-                fn check2_0_1_2(&self, x0: Math, x1: Math) -> bool {
-                    self.iter_all2_0_1_2(x0, x1).next().is_some()
-                }
                 #[allow(unreachable_code)]
                 fn entry2_0_1_2(&self, x0: Math, x1: Math, delta: &mut Delta, uf: &mut Unification) -> (Math,) {
                     if let Some((x2,)) = self.iter_all2_0_1_2(x0, x1).next() {
@@ -2034,6 +1997,9 @@ fn regression_tir1() {
                     let x2 = uf.math_.add_eclass();
                     delta.sub_.push((x0, x1, x2));
                     (x2,)
+                }
+                fn check2_0_1_2(&self, x0: Math, x1: Math) -> bool {
+                    self.iter_all2_0_1_2(x0, x1).next().is_some()
                 }
             }
             #[derive(Debug, Default)]
@@ -2204,9 +2170,6 @@ fn regression_tir1() {
                         .copied()
                         .filter_map(move |(x1, timestamp)| (timestamp < latest_timestamp).then_some((x1,)))
                 }
-                fn check1_0_1(&self, x0: std::primitive::i64) -> bool {
-                    self.iter_all1_0_1(x0).next().is_some()
-                }
                 #[allow(unreachable_code)]
                 fn entry1_0_1(
                     &self,
@@ -2220,6 +2183,9 @@ fn regression_tir1() {
                     let x1 = uf.math_.add_eclass();
                     delta.const_.push((x0, x1));
                     (x1,)
+                }
+                fn check1_0_1(&self, x0: std::primitive::i64) -> bool {
+                    self.iter_all1_0_1(x0).next().is_some()
                 }
             }
             #[derive(Debug, Default)]
@@ -2556,38 +2522,21 @@ fn codegen_constant_propagation() {
                         name: "Add",
                         param_types: {c0: t1, c1: t1, c2: t1},
                         kind: Table {
-                            index_to_info: {ir0: 0_1_2 conflict[..2] => [2:union], ir1: 1_0_2},
-                            usage_to_info: {
-                                iu0: ir0[..2],
-                                iu1: ir0[..1],
-                                iu2: ir1[..1],
-                            },
-                            column_back_reference: {},
+                            index_to_info: {ir0: 0_1=>2:union, ir1: 0=>1_2, ir2: 1=>0_2},
                         },
                     },
                     r3: RelationData {
                         name: "Mul",
                         param_types: {c0: t1, c1: t1, c2: t1},
                         kind: Table {
-                            index_to_info: {ir0: 0_1_2 conflict[..2] => [2:union], ir1: 1_0_2},
-                            usage_to_info: {
-                                iu0: ir0[..2],
-                                iu1: ir0[..1],
-                                iu2: ir1[..1],
-                            },
-                            column_back_reference: {},
+                            index_to_info: {ir0: 0_1=>2:union, ir1: 0=>1_2, ir2: 1=>0_2},
                         },
                     },
                     r4: RelationData {
                         name: "Const",
                         param_types: {c0: t0, c1: t1},
                         kind: Table {
-                            index_to_info: {ir0: 0_1 conflict[..1] => [1:union], ir1: 1_0},
-                            usage_to_info: {
-                                iu0: ir0[..1],
-                                iu1: ir1[..1],
-                            },
-                            column_back_reference: {},
+                            index_to_info: {ir0: 0=>1:union, ir1: 1=>0},
                         },
                     },
                 },
@@ -2631,72 +2580,72 @@ fn codegen_constant_propagation() {
                 },
                 global_variable_types: {},
                 rule_tries: [
-                    atom: [PremiseNew, r2(v2, v4, v0)]
+                    premise: [IterNew, r2(v2, v4, v0)]
                     then: [
-                        atom: [PremiseAny, r4(v1, v2), iu1]
+                        premise: [SemiJoin, r4(v1, v2), ir1]
                         then: [
-                            atom: [PremiseAll, r4(v3, v4), iu1]
+                            premise: [JoinAll, r4(v3, v4), ir1]
                             then: [
-                                atom: [PremiseAll, r4(v1, v2), iu1]
-                                then: [
-                                    meta: "( rule ( ( = e ( Add ( Const a ) ( Const b ) ) ) ) ( ( union e ( Const ( + a b ) ) ) ) )"
-                                    atom: [Action::Insert, r0(v1, v3, v5) on iu0],
-                                    atom: [Action::Insert, r4(v5, v0)],
+                                premise: [JoinAll, r4(v1, v2), ir1]
+                                meta: "( rule ( ( = e ( Add ( Const a ) ( Const b ) ) ) ) ( ( union e ( Const ( + a b ) ) ) ) )"
+                                actions: [
+                                    [Action::Entry, r0(v1, v3, v5) on ir_bogus],
+                                    [Action::Insert, r4(v5, v0)],
                                 ],
                             ],
                         ],
                     ],
-                    atom: [PremiseNew, r3(v20, v22, v18)]
+                    premise: [IterNew, r3(v20, v22, v18)]
                     then: [
-                        atom: [PremiseAny, r4(v19, v20), iu1]
+                        premise: [SemiJoin, r4(v19, v20), ir1]
                         then: [
-                            atom: [PremiseAll, r4(v21, v22), iu1]
+                            premise: [JoinAll, r4(v21, v22), ir1]
                             then: [
-                                atom: [PremiseAll, r4(v19, v20), iu1]
-                                then: [
-                                    meta: "( rule ( ( = e ( Mul ( Const a ) ( Const b ) ) ) ) ( ( union e ( Const ( * a b ) ) ) ) )"
-                                    atom: [Action::Insert, r1(v19, v21, v23) on iu0],
-                                    atom: [Action::Insert, r4(v23, v18)],
+                                premise: [JoinAll, r4(v19, v20), ir1]
+                                meta: "( rule ( ( = e ( Mul ( Const a ) ( Const b ) ) ) ) ( ( union e ( Const ( * a b ) ) ) ) )"
+                                actions: [
+                                    [Action::Entry, r1(v19, v21, v23) on ir_bogus],
+                                    [Action::Insert, r4(v23, v18)],
                                 ],
                             ],
                         ],
                     ],
-                    atom: [PremiseNew, r4(v7, v8)]
+                    premise: [IterNew, r4(v7, v8)]
                     then: [
-                        atom: [PremiseOld, r2(v8, v10, v6), iu1]
+                        premise: [JoinOld, r2(v8, v10, v6), ir1]
                         then: [
-                            atom: [PremiseAll, r4(v9, v10), iu1]
-                            then: [
-                                meta: "( rule ( ( = e ( Add ( Const a ) ( Const b ) ) ) ) ( ( union e ( Const ( + a b ) ) ) ) )"
-                                atom: [Action::Insert, r0(v7, v9, v11) on iu0],
-                                atom: [Action::Insert, r4(v11, v6)],
+                            premise: [JoinAll, r4(v9, v10), ir1]
+                            meta: "( rule ( ( = e ( Add ( Const a ) ( Const b ) ) ) ) ( ( union e ( Const ( + a b ) ) ) ) )"
+                            actions: [
+                                [Action::Entry, r0(v7, v9, v11) on ir_bogus],
+                                [Action::Insert, r4(v11, v6)],
                             ],
                         ],
-                        atom: [PremiseOld, r2(v14, v8, v12), iu2]
+                        premise: [JoinOld, r2(v14, v8, v12), ir2]
                         then: [
-                            atom: [PremiseOld, r4(v13, v14), iu1]
-                            then: [
-                                meta: "( rule ( ( = e ( Add ( Const a ) ( Const b ) ) ) ) ( ( union e ( Const ( + a b ) ) ) ) )"
-                                atom: [Action::Insert, r0(v13, v7, v17) on iu0],
-                                atom: [Action::Insert, r4(v17, v12)],
+                            premise: [JoinOld, r4(v13, v14), ir1]
+                            meta: "( rule ( ( = e ( Add ( Const a ) ( Const b ) ) ) ) ( ( union e ( Const ( + a b ) ) ) ) )"
+                            actions: [
+                                [Action::Entry, r0(v13, v7, v17) on ir_bogus],
+                                [Action::Insert, r4(v17, v12)],
                             ],
                         ],
-                        atom: [PremiseOld, r3(v8, v28, v24), iu1]
+                        premise: [JoinOld, r3(v8, v28, v24), ir1]
                         then: [
-                            atom: [PremiseAll, r4(v27, v28), iu1]
-                            then: [
-                                meta: "( rule ( ( = e ( Mul ( Const a ) ( Const b ) ) ) ) ( ( union e ( Const ( * a b ) ) ) ) )"
-                                atom: [Action::Insert, r1(v7, v27, v29) on iu0],
-                                atom: [Action::Insert, r4(v29, v24)],
+                            premise: [JoinAll, r4(v27, v28), ir1]
+                            meta: "( rule ( ( = e ( Mul ( Const a ) ( Const b ) ) ) ) ( ( union e ( Const ( * a b ) ) ) ) )"
+                            actions: [
+                                [Action::Entry, r1(v7, v27, v29) on ir_bogus],
+                                [Action::Insert, r4(v29, v24)],
                             ],
                         ],
-                        atom: [PremiseOld, r3(v32, v8, v30), iu2]
+                        premise: [JoinOld, r3(v32, v8, v30), ir2]
                         then: [
-                            atom: [PremiseOld, r4(v31, v32), iu1]
-                            then: [
-                                meta: "( rule ( ( = e ( Mul ( Const a ) ( Const b ) ) ) ) ( ( union e ( Const ( * a b ) ) ) ) )"
-                                atom: [Action::Insert, r1(v31, v7, v35) on iu0],
-                                atom: [Action::Insert, r4(v35, v30)],
+                            premise: [JoinOld, r4(v31, v32), ir1]
+                            meta: "( rule ( ( = e ( Mul ( Const a ) ( Const b ) ) ) ) ( ( union e ( Const ( * a b ) ) ) ) )"
+                            actions: [
+                                [Action::Entry, r1(v31, v7, v35) on ir_bogus],
+                                [Action::Insert, r4(v35, v30)],
                             ],
                         ],
                     ],
@@ -2724,7 +2673,7 @@ fn codegen_constant_propagation() {
             impl Relation for AddRelation {
                 type Row = (Math, Math, Math);
                 type Unification = Unification;
-                const COST: u32 = 6u32;
+                const COST: u32 = 9u32;
                 fn new() -> Self {
                     Self::default()
                 }
@@ -2738,7 +2687,7 @@ fn codegen_constant_propagation() {
                     self.new.iter().copied()
                 }
                 fn len(&self) -> usize {
-                    self.hash_index_0.len()
+                    self.hash_index_0_1.len()
                 }
                 fn emit_graphviz(&self, buf: &mut String) {
                     use std::fmt::Write;
@@ -2907,16 +2856,6 @@ fn codegen_constant_propagation() {
                         .copied()
                         .map(|(x2, _timestamp)| (x2,))
                 }
-                fn iter_all1_0_1_2(&self, x0: Math) -> impl Iterator<Item = (Math, Math)> + use<'_> {
-                    self.hash_index_0
-                        .iter((x0,))
-                        .map(|(x1, x2, _timestamp)| (x1, x2))
-                }
-                fn iter_all1_1_0_2(&self, x1: Math) -> impl Iterator<Item = (Math, Math)> + use<'_> {
-                    self.hash_index_1
-                        .iter((x1,))
-                        .map(|(x0, x2, _timestamp)| (x0, x2))
-                }
                 fn iter_old2_0_1_2(
                     &self,
                     x0: Math,
@@ -2929,6 +2868,23 @@ fn codegen_constant_propagation() {
                         .copied()
                         .filter_map(move |(x2, timestamp)| (timestamp < latest_timestamp).then_some((x2,)))
                 }
+                #[allow(unreachable_code)]
+                fn entry2_0_1_2(&self, x0: Math, x1: Math, delta: &mut Delta, uf: &mut Unification) -> (Math,) {
+                    if let Some((x2,)) = self.iter_all2_0_1_2(x0, x1).next() {
+                        return (x2,);
+                    }
+                    let x2 = uf.math_.add_eclass();
+                    delta.add_.push((x0, x1, x2));
+                    (x2,)
+                }
+                fn check2_0_1_2(&self, x0: Math, x1: Math) -> bool {
+                    self.iter_all2_0_1_2(x0, x1).next().is_some()
+                }
+                fn iter_all1_0_1_2(&self, x0: Math) -> impl Iterator<Item = (Math, Math)> + use<'_> {
+                    self.hash_index_0
+                        .iter((x0,))
+                        .map(|(x1, x2, _timestamp)| (x1, x2))
+                }
                 fn iter_old1_0_1_2(
                     &self,
                     x0: Math,
@@ -2939,6 +2895,14 @@ fn codegen_constant_propagation() {
                         .filter_map(move |(x1, x2, timestamp)| {
                             (timestamp < latest_timestamp).then_some((x1, x2))
                         })
+                }
+                fn check1_0_1_2(&self, x0: Math) -> bool {
+                    self.iter_all1_0_1_2(x0).next().is_some()
+                }
+                fn iter_all1_1_0_2(&self, x1: Math) -> impl Iterator<Item = (Math, Math)> + use<'_> {
+                    self.hash_index_1
+                        .iter((x1,))
+                        .map(|(x0, x2, _timestamp)| (x0, x2))
                 }
                 fn iter_old1_1_0_2(
                     &self,
@@ -2951,23 +2915,8 @@ fn codegen_constant_propagation() {
                             (timestamp < latest_timestamp).then_some((x0, x2))
                         })
                 }
-                fn check2_0_1_2(&self, x0: Math, x1: Math) -> bool {
-                    self.iter_all2_0_1_2(x0, x1).next().is_some()
-                }
-                fn check1_0_1_2(&self, x0: Math) -> bool {
-                    self.iter_all1_0_1_2(x0).next().is_some()
-                }
                 fn check1_1_0_2(&self, x1: Math) -> bool {
                     self.iter_all1_1_0_2(x1).next().is_some()
-                }
-                #[allow(unreachable_code)]
-                fn entry2_0_1_2(&self, x0: Math, x1: Math, delta: &mut Delta, uf: &mut Unification) -> (Math,) {
-                    if let Some((x2,)) = self.iter_all2_0_1_2(x0, x1).next() {
-                        return (x2,);
-                    }
-                    let x2 = uf.math_.add_eclass();
-                    delta.add_.push((x0, x1, x2));
-                    (x2,)
                 }
             }
             #[derive(Debug, Default)]
@@ -2982,7 +2931,7 @@ fn codegen_constant_propagation() {
             impl Relation for MulRelation {
                 type Row = (Math, Math, Math);
                 type Unification = Unification;
-                const COST: u32 = 6u32;
+                const COST: u32 = 9u32;
                 fn new() -> Self {
                     Self::default()
                 }
@@ -2996,7 +2945,7 @@ fn codegen_constant_propagation() {
                     self.new.iter().copied()
                 }
                 fn len(&self) -> usize {
-                    self.hash_index_0.len()
+                    self.hash_index_0_1.len()
                 }
                 fn emit_graphviz(&self, buf: &mut String) {
                     use std::fmt::Write;
@@ -3165,16 +3114,6 @@ fn codegen_constant_propagation() {
                         .copied()
                         .map(|(x2, _timestamp)| (x2,))
                 }
-                fn iter_all1_0_1_2(&self, x0: Math) -> impl Iterator<Item = (Math, Math)> + use<'_> {
-                    self.hash_index_0
-                        .iter((x0,))
-                        .map(|(x1, x2, _timestamp)| (x1, x2))
-                }
-                fn iter_all1_1_0_2(&self, x1: Math) -> impl Iterator<Item = (Math, Math)> + use<'_> {
-                    self.hash_index_1
-                        .iter((x1,))
-                        .map(|(x0, x2, _timestamp)| (x0, x2))
-                }
                 fn iter_old2_0_1_2(
                     &self,
                     x0: Math,
@@ -3187,6 +3126,23 @@ fn codegen_constant_propagation() {
                         .copied()
                         .filter_map(move |(x2, timestamp)| (timestamp < latest_timestamp).then_some((x2,)))
                 }
+                #[allow(unreachable_code)]
+                fn entry2_0_1_2(&self, x0: Math, x1: Math, delta: &mut Delta, uf: &mut Unification) -> (Math,) {
+                    if let Some((x2,)) = self.iter_all2_0_1_2(x0, x1).next() {
+                        return (x2,);
+                    }
+                    let x2 = uf.math_.add_eclass();
+                    delta.mul_.push((x0, x1, x2));
+                    (x2,)
+                }
+                fn check2_0_1_2(&self, x0: Math, x1: Math) -> bool {
+                    self.iter_all2_0_1_2(x0, x1).next().is_some()
+                }
+                fn iter_all1_0_1_2(&self, x0: Math) -> impl Iterator<Item = (Math, Math)> + use<'_> {
+                    self.hash_index_0
+                        .iter((x0,))
+                        .map(|(x1, x2, _timestamp)| (x1, x2))
+                }
                 fn iter_old1_0_1_2(
                     &self,
                     x0: Math,
@@ -3197,6 +3153,14 @@ fn codegen_constant_propagation() {
                         .filter_map(move |(x1, x2, timestamp)| {
                             (timestamp < latest_timestamp).then_some((x1, x2))
                         })
+                }
+                fn check1_0_1_2(&self, x0: Math) -> bool {
+                    self.iter_all1_0_1_2(x0).next().is_some()
+                }
+                fn iter_all1_1_0_2(&self, x1: Math) -> impl Iterator<Item = (Math, Math)> + use<'_> {
+                    self.hash_index_1
+                        .iter((x1,))
+                        .map(|(x0, x2, _timestamp)| (x0, x2))
                 }
                 fn iter_old1_1_0_2(
                     &self,
@@ -3209,23 +3173,8 @@ fn codegen_constant_propagation() {
                             (timestamp < latest_timestamp).then_some((x0, x2))
                         })
                 }
-                fn check2_0_1_2(&self, x0: Math, x1: Math) -> bool {
-                    self.iter_all2_0_1_2(x0, x1).next().is_some()
-                }
-                fn check1_0_1_2(&self, x0: Math) -> bool {
-                    self.iter_all1_0_1_2(x0).next().is_some()
-                }
                 fn check1_1_0_2(&self, x1: Math) -> bool {
                     self.iter_all1_1_0_2(x1).next().is_some()
-                }
-                #[allow(unreachable_code)]
-                fn entry2_0_1_2(&self, x0: Math, x1: Math, delta: &mut Delta, uf: &mut Unification) -> (Math,) {
-                    if let Some((x2,)) = self.iter_all2_0_1_2(x0, x1).next() {
-                        return (x2,);
-                    }
-                    let x2 = uf.math_.add_eclass();
-                    delta.mul_.push((x0, x1, x2));
-                    (x2,)
                 }
             }
             #[derive(Debug, Default)]
@@ -3398,9 +3347,6 @@ fn codegen_constant_propagation() {
                         .copied()
                         .map(|(x1, _timestamp)| (x1,))
                 }
-                fn iter_all1_1_0(&self, x1: Math) -> impl Iterator<Item = (std::primitive::i64,)> + use<'_> {
-                    self.hash_index_1.iter((x1,)).map(|(x0, _timestamp)| (x0,))
-                }
                 fn iter_old1_0_1(
                     &self,
                     x0: std::primitive::i64,
@@ -3411,21 +3357,6 @@ fn codegen_constant_propagation() {
                         .into_iter()
                         .copied()
                         .filter_map(move |(x1, timestamp)| (timestamp < latest_timestamp).then_some((x1,)))
-                }
-                fn iter_old1_1_0(
-                    &self,
-                    x1: Math,
-                    latest_timestamp: TimeStamp,
-                ) -> impl Iterator<Item = (std::primitive::i64,)> + use<'_> {
-                    self.hash_index_1
-                        .iter((x1,))
-                        .filter_map(move |(x0, timestamp)| (timestamp < latest_timestamp).then_some((x0,)))
-                }
-                fn check1_0_1(&self, x0: std::primitive::i64) -> bool {
-                    self.iter_all1_0_1(x0).next().is_some()
-                }
-                fn check1_1_0(&self, x1: Math) -> bool {
-                    self.iter_all1_1_0(x1).next().is_some()
                 }
                 #[allow(unreachable_code)]
                 fn entry1_0_1(
@@ -3440,6 +3371,24 @@ fn codegen_constant_propagation() {
                     let x1 = uf.math_.add_eclass();
                     delta.const_.push((x0, x1));
                     (x1,)
+                }
+                fn check1_0_1(&self, x0: std::primitive::i64) -> bool {
+                    self.iter_all1_0_1(x0).next().is_some()
+                }
+                fn iter_all1_1_0(&self, x1: Math) -> impl Iterator<Item = (std::primitive::i64,)> + use<'_> {
+                    self.hash_index_1.iter((x1,)).map(|(x0, _timestamp)| (x0,))
+                }
+                fn iter_old1_1_0(
+                    &self,
+                    x1: Math,
+                    latest_timestamp: TimeStamp,
+                ) -> impl Iterator<Item = (std::primitive::i64,)> + use<'_> {
+                    self.hash_index_1
+                        .iter((x1,))
+                        .filter_map(move |(x0, timestamp)| (timestamp < latest_timestamp).then_some((x0,)))
+                }
+                fn check1_1_0(&self, x1: Math) -> bool {
+                    self.iter_all1_1_0(x1).next().is_some()
                 }
             }
             #[derive(Debug, Default)]
@@ -3885,9 +3834,6 @@ fn codegen_commutative() {
                         .copied()
                         .filter_map(move |(x2, timestamp)| (timestamp < latest_timestamp).then_some((x2,)))
                 }
-                fn check2_0_1_2(&self, x0: Math, x1: Math) -> bool {
-                    self.iter_all2_0_1_2(x0, x1).next().is_some()
-                }
                 #[allow(unreachable_code)]
                 fn entry2_0_1_2(&self, x0: Math, x1: Math, delta: &mut Delta, uf: &mut Unification) -> (Math,) {
                     if let Some((x2,)) = self.iter_all2_0_1_2(x0, x1).next() {
@@ -3896,6 +3842,9 @@ fn codegen_commutative() {
                     let x2 = uf.math_.add_eclass();
                     delta.add_.push((x0, x1, x2));
                     (x2,)
+                }
+                fn check2_0_1_2(&self, x0: Math, x1: Math) -> bool {
+                    self.iter_all2_0_1_2(x0, x1).next().is_some()
                 }
             }
             #[derive(Debug, Default)]
@@ -4099,22 +4048,14 @@ fn regression_entry2() {
                         name: "Sub",
                         param_types: {c0: t1, c1: t1, c2: t1},
                         kind: Table {
-                            index_to_info: {ir0: 0_1_2 conflict[..2] => [2:union]},
-                            usage_to_info: {
-                                iu0: ir0[..2],
-                            },
-                            column_back_reference: {},
+                            index_to_info: {ir0: 0_1=>2:union},
                         },
                     },
                     r1: RelationData {
                         name: "Const",
                         param_types: {c0: t0, c1: t1},
                         kind: Table {
-                            index_to_info: {ir0: 0_1 conflict[..1] => [1:union]},
-                            usage_to_info: {
-                                iu0: ir0[..1],
-                            },
-                            column_back_reference: {},
+                            index_to_info: {ir0: 0=>1:union},
                         },
                     },
                     r2: RelationData {
@@ -4133,11 +4074,11 @@ fn regression_entry2() {
                     g0: t0,
                 },
                 rule_tries: [
-                    atom: [PremiseNew, r0(v0, v1, v2)]
-                    then: [
-                        meta: "( rewrite ( Sub a b ) ( Const -1 ) )"
-                        atom: [Action::Insert, r2(v3) on iu0],
-                        atom: [Action::Insert, r1(v3, v2)],
+                    premise: [IterNew, r0(v0, v1, v2)]
+                    meta: "( rewrite ( Sub a b ) ( Const -1 ) )"
+                    actions: [
+                        [Action::Entry, r2(v3) on ir_bogus],
+                        [Action::Insert, r1(v3, v2)],
                     ],
                 ],
                 initial: [
@@ -4331,9 +4272,6 @@ fn regression_entry2() {
                         .copied()
                         .filter_map(move |(x2, timestamp)| (timestamp < latest_timestamp).then_some((x2,)))
                 }
-                fn check2_0_1_2(&self, x0: Math, x1: Math) -> bool {
-                    self.iter_all2_0_1_2(x0, x1).next().is_some()
-                }
                 #[allow(unreachable_code)]
                 fn entry2_0_1_2(&self, x0: Math, x1: Math, delta: &mut Delta, uf: &mut Unification) -> (Math,) {
                     if let Some((x2,)) = self.iter_all2_0_1_2(x0, x1).next() {
@@ -4342,6 +4280,9 @@ fn regression_entry2() {
                     let x2 = uf.math_.add_eclass();
                     delta.sub_.push((x0, x1, x2));
                     (x2,)
+                }
+                fn check2_0_1_2(&self, x0: Math, x1: Math) -> bool {
+                    self.iter_all2_0_1_2(x0, x1).next().is_some()
                 }
             }
             #[derive(Debug, Default)]
@@ -4512,9 +4453,6 @@ fn regression_entry2() {
                         .copied()
                         .filter_map(move |(x1, timestamp)| (timestamp < latest_timestamp).then_some((x1,)))
                 }
-                fn check1_0_1(&self, x0: std::primitive::i64) -> bool {
-                    self.iter_all1_0_1(x0).next().is_some()
-                }
                 #[allow(unreachable_code)]
                 fn entry1_0_1(
                     &self,
@@ -4528,6 +4466,9 @@ fn regression_entry2() {
                     let x1 = uf.math_.add_eclass();
                     delta.const_.push((x0, x1));
                     (x1,)
+                }
+                fn check1_0_1(&self, x0: std::primitive::i64) -> bool {
+                    self.iter_all1_0_1(x0).next().is_some()
                 }
             }
             #[derive(Debug, Default)]
@@ -4758,22 +4699,14 @@ fn regression_entry() {
                         name: "Integral",
                         param_types: {c0: t0, c1: t0, c2: t0},
                         kind: Table {
-                            index_to_info: {ir0: 0_1_2 conflict[..2] => [2:union]},
-                            usage_to_info: {
-                                iu0: ir0[..2],
-                            },
-                            column_back_reference: {},
+                            index_to_info: {ir0: 0_1=>2:union},
                         },
                     },
                     r1: RelationData {
                         name: "Add",
                         param_types: {c0: t0, c1: t0, c2: t0},
                         kind: Table {
-                            index_to_info: {ir0: 0_1_2 conflict[..2] => [2:union]},
-                            usage_to_info: {
-                                iu0: ir0[..2],
-                            },
-                            column_back_reference: {},
+                            index_to_info: {ir0: 0_1=>2:union},
                         },
                     },
                 },
@@ -4785,11 +4718,11 @@ fn regression_entry() {
                 },
                 global_variable_types: {},
                 rule_tries: [
-                    atom: [PremiseNew, r1(v0, v1, v2)]
-                    then: [
-                        meta: "( rewrite ( Add f g ) ( Add ( Integral f f ) g ) )"
-                        atom: [Action::Insert, r0(v0, v0, v3) on iu0],
-                        atom: [Action::Insert, r1(v3, v1, v2)],
+                    premise: [IterNew, r1(v0, v1, v2)]
+                    meta: "( rewrite ( Add f g ) ( Add ( Integral f f ) g ) )"
+                    actions: [
+                        [Action::Entry, r0(v0, v0, v3) on ir0],
+                        [Action::Insert, r1(v3, v1, v2)],
                     ],
                 ],
                 initial: [],
@@ -4978,9 +4911,6 @@ fn regression_entry() {
                         .copied()
                         .filter_map(move |(x2, timestamp)| (timestamp < latest_timestamp).then_some((x2,)))
                 }
-                fn check2_0_1_2(&self, x0: Math, x1: Math) -> bool {
-                    self.iter_all2_0_1_2(x0, x1).next().is_some()
-                }
                 #[allow(unreachable_code)]
                 fn entry2_0_1_2(&self, x0: Math, x1: Math, delta: &mut Delta, uf: &mut Unification) -> (Math,) {
                     if let Some((x2,)) = self.iter_all2_0_1_2(x0, x1).next() {
@@ -4989,6 +4919,9 @@ fn regression_entry() {
                     let x2 = uf.math_.add_eclass();
                     delta.integral_.push((x0, x1, x2));
                     (x2,)
+                }
+                fn check2_0_1_2(&self, x0: Math, x1: Math) -> bool {
+                    self.iter_all2_0_1_2(x0, x1).next().is_some()
                 }
             }
             #[derive(Debug, Default)]
@@ -5172,9 +5105,6 @@ fn regression_entry() {
                         .copied()
                         .filter_map(move |(x2, timestamp)| (timestamp < latest_timestamp).then_some((x2,)))
                 }
-                fn check2_0_1_2(&self, x0: Math, x1: Math) -> bool {
-                    self.iter_all2_0_1_2(x0, x1).next().is_some()
-                }
                 #[allow(unreachable_code)]
                 fn entry2_0_1_2(&self, x0: Math, x1: Math, delta: &mut Delta, uf: &mut Unification) -> (Math,) {
                     if let Some((x2,)) = self.iter_all2_0_1_2(x0, x1).next() {
@@ -5183,6 +5113,9 @@ fn regression_entry() {
                     let x2 = uf.math_.add_eclass();
                     delta.add_.push((x0, x1, x2));
                     (x2,)
+                }
+                fn check2_0_1_2(&self, x0: Math, x1: Math) -> bool {
+                    self.iter_all2_0_1_2(x0, x1).next().is_some()
                 }
             }
             #[derive(Debug, Default)]
@@ -5410,11 +5343,7 @@ fn test_bind_variable_multiple_times() {
                         name: "Same",
                         param_types: {c0: t0, c1: t0, c2: t0},
                         kind: Table {
-                            index_to_info: {ir0: 0_1_2 conflict[..2] => [2:union]},
-                            usage_to_info: {
-                                iu0: ir0[..2],
-                            },
-                            column_back_reference: {},
+                            index_to_info: {ir0: 0_1=>2:union},
                         },
                     },
                 },
@@ -5425,12 +5354,12 @@ fn test_bind_variable_multiple_times() {
                 },
                 global_variable_types: {},
                 rule_tries: [
-                    atom: [PremiseNew, r0(v0, v2, v1)]
+                    premise: [IterNew, r0(v0, v2, v1)]
                     then: [
-                        atom: [IfEq, v0=v2]
-                        then: [
-                            meta: "( rewrite ( Same x x ) x )"
-                            atom: [Action::Equate, v0=v1],
+                        premise: [IfEq, v0=v2]
+                        meta: "( rewrite ( Same x x ) x )"
+                        actions: [
+                            [Action::Equate, v0=v1],
                         ],
                     ],
                 ],
@@ -5620,9 +5549,6 @@ fn test_bind_variable_multiple_times() {
                         .copied()
                         .filter_map(move |(x2, timestamp)| (timestamp < latest_timestamp).then_some((x2,)))
                 }
-                fn check2_0_1_2(&self, x0: Foo, x1: Foo) -> bool {
-                    self.iter_all2_0_1_2(x0, x1).next().is_some()
-                }
                 #[allow(unreachable_code)]
                 fn entry2_0_1_2(&self, x0: Foo, x1: Foo, delta: &mut Delta, uf: &mut Unification) -> (Foo,) {
                     if let Some((x2,)) = self.iter_all2_0_1_2(x0, x1).next() {
@@ -5631,6 +5557,9 @@ fn test_bind_variable_multiple_times() {
                     let x2 = uf.foo_.add_eclass();
                     delta.same_.push((x0, x1, x2));
                     (x2,)
+                }
+                fn check2_0_1_2(&self, x0: Foo, x1: Foo) -> bool {
+                    self.iter_all2_0_1_2(x0, x1).next().is_some()
                 }
             }
             #[derive(Debug, Default)]
@@ -5883,23 +5812,14 @@ fn codegen_variable_reuse_bug() {
                         name: "Add",
                         param_types: {c0: t0, c1: t0, c2: t0},
                         kind: Table {
-                            index_to_info: {ir0: 0_1_2 conflict[..2] => [2:union], ir1: 0_2_1},
-                            usage_to_info: {
-                                iu0: ir0[..2],
-                                iu1: ir1[..2],
-                            },
-                            column_back_reference: {},
+                            index_to_info: {ir0: 0_1=>2:union, ir1: 0_2=>1},
                         },
                     },
                     r1: RelationData {
                         name: "Zero",
                         param_types: {c0: t0},
                         kind: Table {
-                            index_to_info: {ir0: 0 conflict[..0] => [0:union]},
-                            usage_to_info: {
-                                iu0: ir0[..0],
-                            },
-                            column_back_reference: {},
+                            index_to_info: {ir0: =>0:union},
                         },
                     },
                     r2: RelationData {
@@ -5919,23 +5839,23 @@ fn codegen_variable_reuse_bug() {
                     g0: t0,
                 },
                 rule_tries: [
-                    atom: [PremiseNew, r0(v0, v1, v4)]
+                    premise: [IterNew, r0(v0, v1, v4)]
                     then: [
-                        atom: [IfEq, v0=v4]
+                        premise: [IfEq, v0=v4]
                         then: [
-                            atom: [PremiseAny, r2(v0), iu_bogus]
-                            then: [
-                                meta: "( rule ( ( = zero ( Add zero x ) ) ) ( ( union x ( Zero ) ) ) )"
-                                atom: [Action::Insert, r1(v1)],
+                            premise: [SemiJoin, r2(v0), ir_bogus]
+                            meta: "( rule ( ( = zero ( Add zero x ) ) ) ( ( union x ( Zero ) ) ) )"
+                            actions: [
+                                [Action::Insert, r1(v1)],
                             ],
                         ],
                     ],
-                    atom: [PremiseNew, r2(v2)]
+                    premise: [IterNew, r2(v2)]
                     then: [
-                        atom: [PremiseOld, r0(v2, v3, v2), iu1]
-                        then: [
-                            meta: "( rule ( ( = zero ( Add zero x ) ) ) ( ( union x ( Zero ) ) ) )"
-                            atom: [Action::Insert, r1(v3)],
+                        premise: [JoinOld, r0(v2, v3, v2), ir1]
+                        meta: "( rule ( ( = zero ( Add zero x ) ) ) ( ( union x ( Zero ) ) ) )"
+                        actions: [
+                            [Action::Insert, r1(v3)],
                         ],
                     ],
                 ],
@@ -6131,11 +6051,6 @@ fn codegen_variable_reuse_bug() {
                         .copied()
                         .map(|(x2, _timestamp)| (x2,))
                 }
-                fn iter_all2_0_2_1(&self, x0: Math, x2: Math) -> impl Iterator<Item = (Math,)> + use<'_> {
-                    self.hash_index_0_2
-                        .iter((x0, x2))
-                        .map(|(x1, _timestamp)| (x1,))
-                }
                 fn iter_old2_0_1_2(
                     &self,
                     x0: Math,
@@ -6148,6 +6063,23 @@ fn codegen_variable_reuse_bug() {
                         .copied()
                         .filter_map(move |(x2, timestamp)| (timestamp < latest_timestamp).then_some((x2,)))
                 }
+                #[allow(unreachable_code)]
+                fn entry2_0_1_2(&self, x0: Math, x1: Math, delta: &mut Delta, uf: &mut Unification) -> (Math,) {
+                    if let Some((x2,)) = self.iter_all2_0_1_2(x0, x1).next() {
+                        return (x2,);
+                    }
+                    let x2 = uf.math_.add_eclass();
+                    delta.add_.push((x0, x1, x2));
+                    (x2,)
+                }
+                fn check2_0_1_2(&self, x0: Math, x1: Math) -> bool {
+                    self.iter_all2_0_1_2(x0, x1).next().is_some()
+                }
+                fn iter_all2_0_2_1(&self, x0: Math, x2: Math) -> impl Iterator<Item = (Math,)> + use<'_> {
+                    self.hash_index_0_2
+                        .iter((x0, x2))
+                        .map(|(x1, _timestamp)| (x1,))
+                }
                 fn iter_old2_0_2_1(
                     &self,
                     x0: Math,
@@ -6158,20 +6090,8 @@ fn codegen_variable_reuse_bug() {
                         .iter((x0, x2))
                         .filter_map(move |(x1, timestamp)| (timestamp < latest_timestamp).then_some((x1,)))
                 }
-                fn check2_0_1_2(&self, x0: Math, x1: Math) -> bool {
-                    self.iter_all2_0_1_2(x0, x1).next().is_some()
-                }
                 fn check2_0_2_1(&self, x0: Math, x2: Math) -> bool {
                     self.iter_all2_0_2_1(x0, x2).next().is_some()
-                }
-                #[allow(unreachable_code)]
-                fn entry2_0_1_2(&self, x0: Math, x1: Math, delta: &mut Delta, uf: &mut Unification) -> (Math,) {
-                    if let Some((x2,)) = self.iter_all2_0_1_2(x0, x1).next() {
-                        return (x2,);
-                    }
-                    let x2 = uf.math_.add_eclass();
-                    delta.add_.push((x0, x1, x2));
-                    (x2,)
                 }
             }
             #[derive(Debug, Default)]
@@ -6334,9 +6254,6 @@ fn codegen_variable_reuse_bug() {
                         .copied()
                         .filter_map(move |(x0, timestamp)| (timestamp < latest_timestamp).then_some((x0,)))
                 }
-                fn check0_0(&self) -> bool {
-                    self.iter_all0_0().next().is_some()
-                }
                 #[allow(unreachable_code)]
                 fn entry0_0(&self, delta: &mut Delta, uf: &mut Unification) -> (Math,) {
                     if let Some((x0,)) = self.iter_all0_0().next() {
@@ -6345,6 +6262,9 @@ fn codegen_variable_reuse_bug() {
                     let x0 = uf.math_.add_eclass();
                     delta.zero_.push((x0,));
                     (x0,)
+                }
+                fn check0_0(&self) -> bool {
+                    self.iter_all0_0().next().is_some()
                 }
             }
             #[derive(Debug, Default)]
@@ -6764,9 +6684,6 @@ fn initial_exprs() {
                         .copied()
                         .filter_map(move |(x2, timestamp)| (timestamp < latest_timestamp).then_some((x2,)))
                 }
-                fn check2_0_1_2(&self, x0: Math, x1: Math) -> bool {
-                    self.iter_all2_0_1_2(x0, x1).next().is_some()
-                }
                 #[allow(unreachable_code)]
                 fn entry2_0_1_2(&self, x0: Math, x1: Math, delta: &mut Delta, uf: &mut Unification) -> (Math,) {
                     if let Some((x2,)) = self.iter_all2_0_1_2(x0, x1).next() {
@@ -6775,6 +6692,9 @@ fn initial_exprs() {
                     let x2 = uf.math_.add_eclass();
                     delta.add_.push((x0, x1, x2));
                     (x2,)
+                }
+                fn check2_0_1_2(&self, x0: Math, x1: Math) -> bool {
+                    self.iter_all2_0_1_2(x0, x1).next().is_some()
                 }
             }
             #[derive(Debug, Default)]
@@ -6958,9 +6878,6 @@ fn initial_exprs() {
                         .copied()
                         .filter_map(move |(x2, timestamp)| (timestamp < latest_timestamp).then_some((x2,)))
                 }
-                fn check2_0_1_2(&self, x0: Math, x1: Math) -> bool {
-                    self.iter_all2_0_1_2(x0, x1).next().is_some()
-                }
                 #[allow(unreachable_code)]
                 fn entry2_0_1_2(&self, x0: Math, x1: Math, delta: &mut Delta, uf: &mut Unification) -> (Math,) {
                     if let Some((x2,)) = self.iter_all2_0_1_2(x0, x1).next() {
@@ -6969,6 +6886,9 @@ fn initial_exprs() {
                     let x2 = uf.math_.add_eclass();
                     delta.mul_.push((x0, x1, x2));
                     (x2,)
+                }
+                fn check2_0_1_2(&self, x0: Math, x1: Math) -> bool {
+                    self.iter_all2_0_1_2(x0, x1).next().is_some()
                 }
             }
             #[derive(Debug, Default)]
@@ -7139,9 +7059,6 @@ fn initial_exprs() {
                         .copied()
                         .filter_map(move |(x1, timestamp)| (timestamp < latest_timestamp).then_some((x1,)))
                 }
-                fn check1_0_1(&self, x0: std::primitive::i64) -> bool {
-                    self.iter_all1_0_1(x0).next().is_some()
-                }
                 #[allow(unreachable_code)]
                 fn entry1_0_1(
                     &self,
@@ -7155,6 +7072,9 @@ fn initial_exprs() {
                     let x1 = uf.math_.add_eclass();
                     delta.const_.push((x0, x1));
                     (x1,)
+                }
+                fn check1_0_1(&self, x0: std::primitive::i64) -> bool {
+                    self.iter_all1_0_1(x0).next().is_some()
                 }
             }
             #[derive(Debug, Default)]
@@ -7325,9 +7245,6 @@ fn initial_exprs() {
                         .copied()
                         .filter_map(move |(x1, timestamp)| (timestamp < latest_timestamp).then_some((x1,)))
                 }
-                fn check1_0_1(&self, x0: runtime::IString) -> bool {
-                    self.iter_all1_0_1(x0).next().is_some()
-                }
                 #[allow(unreachable_code)]
                 fn entry1_0_1(&self, x0: runtime::IString, delta: &mut Delta, uf: &mut Unification) -> (Math,) {
                     if let Some((x1,)) = self.iter_all1_0_1(x0).next() {
@@ -7336,6 +7253,9 @@ fn initial_exprs() {
                     let x1 = uf.math_.add_eclass();
                     delta.var_.push((x0, x1));
                     (x1,)
+                }
+                fn check1_0_1(&self, x0: runtime::IString) -> bool {
+                    self.iter_all1_0_1(x0).next().is_some()
                 }
             }
             #[derive(Debug, Default)]
@@ -8178,14 +8098,14 @@ fn test_primitives_simple() {
             struct MulRelation {
                 new: Vec<<Self as Relation>::Row>,
                 all: Vec<(Math, Math, Math, TimeStamp)>,
-                hash_index_1_0: runtime::HashMap<(Math, Math), (Math, TimeStamp)>,
+                hash_index_0_1: runtime::HashMap<(Math, Math), (Math, TimeStamp)>,
                 hash_index_1: runtime::IndexedSortedList<(Math,), (Math, Math, TimeStamp)>,
                 math_num_uprooted_at_latest_retain: usize,
             }
             impl Relation for MulRelation {
                 type Row = (Math, Math, Math);
                 type Unification = Unification;
-                const COST: u32 = 3u32;
+                const COST: u32 = 6u32;
                 fn new() -> Self {
                     Self::default()
                 }
@@ -8199,18 +8119,18 @@ fn test_primitives_simple() {
                     self.new.iter().copied()
                 }
                 fn len(&self) -> usize {
-                    self.hash_index_1.len()
+                    self.hash_index_0_1.len()
                 }
                 fn emit_graphviz(&self, buf: &mut String) {
                     use std::fmt::Write;
-                    for (i, ((x1, x0), (x2, _timestamp))) in self
-                        .hash_index_1_0
+                    for (i, ((x0, x1), (x2, _timestamp))) in self
+                        .hash_index_0_1
                         .iter()
                         .map(|(k, v)| ((*k), (*v)))
                         .enumerate()
                     {
-                        writeln!(buf, "{}_{i} -> {}_{};", "mul", "math", x1).unwrap();
                         writeln!(buf, "{}_{i} -> {}_{};", "mul", "math", x0).unwrap();
+                        writeln!(buf, "{}_{i} -> {}_{};", "mul", "math", x1).unwrap();
                         writeln!(buf, "{}_{i} -> {}_{};", "mul", "math", x2).unwrap();
                         writeln!(buf, "{}_{i} [shape = box];", "mul").unwrap();
                     }
@@ -8224,8 +8144,8 @@ fn test_primitives_simple() {
                     log_duration!("update_begin {}: {}", "mul", {
                         for &(mut x0, mut x1, mut x2) in insertions {
                             match self
-                                .hash_index_1_0
-                                .entry((uf.math_.find(x1), uf.math_.find(x0)))
+                                .hash_index_0_1
+                                .entry((uf.math_.find(x0), uf.math_.find(x1)))
                             {
                                 runtime::HashMapEntry::Occupied(mut entry) => {
                                     let (y2, timestamp) = entry.get_mut();
@@ -8255,8 +8175,8 @@ fn test_primitives_simple() {
                         }
                         let offset = insertions.len();
                         self.math_num_uprooted_at_latest_retain = uf.math_.num_uprooted();
-                        self.hash_index_1_0
-                            .retain(|&(x1, x0), &mut (x2, _timestamp)| {
+                        self.hash_index_0_1
+                            .retain(|&(x0, x1), &mut (x2, _timestamp)| {
                                 if uf.math_.is_root(x0) & uf.math_.is_root(x1) & uf.math_.is_root(x2) {
                                     true
                                 } else {
@@ -8277,8 +8197,8 @@ fn test_primitives_simple() {
                     log_duration!("update_finalize {}: {}", "mul", {
                         assert!(self.new.is_empty());
                         log_duration!("fill new and all: {}", {
-                            self.new.extend(self.hash_index_1_0.iter().filter_map(
-                                |(&(x1, x0), &(x2, timestamp))| {
+                            self.new.extend(self.hash_index_0_1.iter().filter_map(
+                                |(&(x0, x1), &(x2, timestamp))| {
                                     if timestamp == latest_timestamp {
                                         Some((x0, x1, x2))
                                     } else {
@@ -8289,9 +8209,9 @@ fn test_primitives_simple() {
                             RadixSortable::wrap(&mut self.new).voracious_sort();
                             self.all.clear();
                             self.all.extend(
-                                self.hash_index_1_0
+                                self.hash_index_0_1
                                     .iter()
-                                    .map(|(&(x1, x0), &(x2, timestamp))| (x0, x1, x2, timestamp)),
+                                    .map(|(&(x0, x1), &(x2, timestamp))| (x0, x1, x2, timestamp)),
                             );
                             insertions.clear();
                         });
@@ -8349,29 +8269,41 @@ fn test_primitives_simple() {
                 }
             }
             impl MulRelation {
-                fn iter_all2_1_0_2(&self, x1: Math, x0: Math) -> impl Iterator<Item = (Math,)> + use<'_> {
-                    self.hash_index_1_0
-                        .get(&(x1, x0))
+                fn iter_all2_0_1_2(&self, x0: Math, x1: Math) -> impl Iterator<Item = (Math,)> + use<'_> {
+                    self.hash_index_0_1
+                        .get(&(x0, x1))
                         .into_iter()
                         .copied()
                         .map(|(x2, _timestamp)| (x2,))
+                }
+                fn iter_old2_0_1_2(
+                    &self,
+                    x0: Math,
+                    x1: Math,
+                    latest_timestamp: TimeStamp,
+                ) -> impl Iterator<Item = (Math,)> + use<'_> {
+                    self.hash_index_0_1
+                        .get(&(x0, x1))
+                        .into_iter()
+                        .copied()
+                        .filter_map(move |(x2, timestamp)| (timestamp < latest_timestamp).then_some((x2,)))
+                }
+                #[allow(unreachable_code)]
+                fn entry2_0_1_2(&self, x0: Math, x1: Math, delta: &mut Delta, uf: &mut Unification) -> (Math,) {
+                    if let Some((x2,)) = self.iter_all2_0_1_2(x0, x1).next() {
+                        return (x2,);
+                    }
+                    let x2 = uf.math_.add_eclass();
+                    delta.mul_.push((x0, x1, x2));
+                    (x2,)
+                }
+                fn check2_0_1_2(&self, x0: Math, x1: Math) -> bool {
+                    self.iter_all2_0_1_2(x0, x1).next().is_some()
                 }
                 fn iter_all1_1_0_2(&self, x1: Math) -> impl Iterator<Item = (Math, Math)> + use<'_> {
                     self.hash_index_1
                         .iter((x1,))
                         .map(|(x0, x2, _timestamp)| (x0, x2))
-                }
-                fn iter_old2_1_0_2(
-                    &self,
-                    x1: Math,
-                    x0: Math,
-                    latest_timestamp: TimeStamp,
-                ) -> impl Iterator<Item = (Math,)> + use<'_> {
-                    self.hash_index_1_0
-                        .get(&(x1, x0))
-                        .into_iter()
-                        .copied()
-                        .filter_map(move |(x2, timestamp)| (timestamp < latest_timestamp).then_some((x2,)))
                 }
                 fn iter_old1_1_0_2(
                     &self,
@@ -8384,20 +8316,8 @@ fn test_primitives_simple() {
                             (timestamp < latest_timestamp).then_some((x0, x2))
                         })
                 }
-                fn check2_1_0_2(&self, x1: Math, x0: Math) -> bool {
-                    self.iter_all2_1_0_2(x1, x0).next().is_some()
-                }
                 fn check1_1_0_2(&self, x1: Math) -> bool {
                     self.iter_all1_1_0_2(x1).next().is_some()
-                }
-                #[allow(unreachable_code)]
-                fn entry2_1_0_2(&self, x1: Math, x0: Math, delta: &mut Delta, uf: &mut Unification) -> (Math,) {
-                    if let Some((x2,)) = self.iter_all2_1_0_2(x1, x0).next() {
-                        return (x2,);
-                    }
-                    let x2 = uf.math_.add_eclass();
-                    delta.mul_.push((x0, x1, x2));
-                    (x2,)
                 }
             }
             #[derive(Debug, Default)]
@@ -8581,9 +8501,6 @@ fn test_primitives_simple() {
                         .copied()
                         .filter_map(move |(x2, timestamp)| (timestamp < latest_timestamp).then_some((x2,)))
                 }
-                fn check2_0_1_2(&self, x0: Math, x1: Math) -> bool {
-                    self.iter_all2_0_1_2(x0, x1).next().is_some()
-                }
                 #[allow(unreachable_code)]
                 fn entry2_0_1_2(&self, x0: Math, x1: Math, delta: &mut Delta, uf: &mut Unification) -> (Math,) {
                     if let Some((x2,)) = self.iter_all2_0_1_2(x0, x1).next() {
@@ -8592,6 +8509,9 @@ fn test_primitives_simple() {
                     let x2 = uf.math_.add_eclass();
                     delta.add_.push((x0, x1, x2));
                     (x2,)
+                }
+                fn check2_0_1_2(&self, x0: Math, x1: Math) -> bool {
+                    self.iter_all2_0_1_2(x0, x1).next().is_some()
                 }
             }
             #[derive(Debug, Default)]
@@ -8764,9 +8684,6 @@ fn test_primitives_simple() {
                         .copied()
                         .map(|(x1, _timestamp)| (x1,))
                 }
-                fn iter_all1_1_0(&self, x1: Math) -> impl Iterator<Item = (std::primitive::i64,)> + use<'_> {
-                    self.hash_index_1.iter((x1,)).map(|(x0, _timestamp)| (x0,))
-                }
                 fn iter_old1_0_1(
                     &self,
                     x0: std::primitive::i64,
@@ -8777,21 +8694,6 @@ fn test_primitives_simple() {
                         .into_iter()
                         .copied()
                         .filter_map(move |(x1, timestamp)| (timestamp < latest_timestamp).then_some((x1,)))
-                }
-                fn iter_old1_1_0(
-                    &self,
-                    x1: Math,
-                    latest_timestamp: TimeStamp,
-                ) -> impl Iterator<Item = (std::primitive::i64,)> + use<'_> {
-                    self.hash_index_1
-                        .iter((x1,))
-                        .filter_map(move |(x0, timestamp)| (timestamp < latest_timestamp).then_some((x0,)))
-                }
-                fn check1_0_1(&self, x0: std::primitive::i64) -> bool {
-                    self.iter_all1_0_1(x0).next().is_some()
-                }
-                fn check1_1_0(&self, x1: Math) -> bool {
-                    self.iter_all1_1_0(x1).next().is_some()
                 }
                 #[allow(unreachable_code)]
                 fn entry1_0_1(
@@ -8806,6 +8708,24 @@ fn test_primitives_simple() {
                     let x1 = uf.math_.add_eclass();
                     delta.const_.push((x0, x1));
                     (x1,)
+                }
+                fn check1_0_1(&self, x0: std::primitive::i64) -> bool {
+                    self.iter_all1_0_1(x0).next().is_some()
+                }
+                fn iter_all1_1_0(&self, x1: Math) -> impl Iterator<Item = (std::primitive::i64,)> + use<'_> {
+                    self.hash_index_1.iter((x1,)).map(|(x0, _timestamp)| (x0,))
+                }
+                fn iter_old1_1_0(
+                    &self,
+                    x1: Math,
+                    latest_timestamp: TimeStamp,
+                ) -> impl Iterator<Item = (std::primitive::i64,)> + use<'_> {
+                    self.hash_index_1
+                        .iter((x1,))
+                        .filter_map(move |(x0, timestamp)| (timestamp < latest_timestamp).then_some((x0,)))
+                }
+                fn check1_1_0(&self, x1: Math) -> bool {
+                    self.iter_all1_1_0(x1).next().is_some()
                 }
             }
             #[derive(Debug, Default)]
@@ -8976,9 +8896,6 @@ fn test_primitives_simple() {
                         .copied()
                         .filter_map(move |(x1, timestamp)| (timestamp < latest_timestamp).then_some((x1,)))
                 }
-                fn check1_0_1(&self, x0: runtime::IString) -> bool {
-                    self.iter_all1_0_1(x0).next().is_some()
-                }
                 #[allow(unreachable_code)]
                 fn entry1_0_1(&self, x0: runtime::IString, delta: &mut Delta, uf: &mut Unification) -> (Math,) {
                     if let Some((x1,)) = self.iter_all1_0_1(x0).next() {
@@ -8987,6 +8904,9 @@ fn test_primitives_simple() {
                     let x1 = uf.math_.add_eclass();
                     delta.var_.push((x0, x1));
                     (x1,)
+                }
+                fn check1_0_1(&self, x0: runtime::IString) -> bool {
+                    self.iter_all1_0_1(x0).next().is_some()
                 }
             }
             #[derive(Debug, Default)]
@@ -9343,15 +9263,15 @@ fn triangle_join() {
             struct FooRelation {
                 new: Vec<<Self as Relation>::Row>,
                 all: Vec<(Math, Math, TimeStamp)>,
-                hash_index_1: runtime::IndexedSortedList<(Math,), (Math, TimeStamp)>,
-                hash_index_1_0: runtime::IndexedSortedList<(Math, Math), (TimeStamp,)>,
                 hash_index_0: runtime::IndexedSortedList<(Math,), (Math, TimeStamp)>,
+                hash_index_0_1: runtime::IndexedSortedList<(Math, Math), (TimeStamp,)>,
+                hash_index_1: runtime::IndexedSortedList<(Math,), (Math, TimeStamp)>,
                 math_num_uprooted_at_latest_retain: usize,
             }
             impl Relation for FooRelation {
                 type Row = (Math, Math);
                 type Unification = Unification;
-                const COST: u32 = 4u32;
+                const COST: u32 = 6u32;
                 fn new() -> Self {
                     Self::default()
                 }
@@ -9369,9 +9289,9 @@ fn triangle_join() {
                 }
                 fn emit_graphviz(&self, buf: &mut String) {
                     use std::fmt::Write;
-                    for (i, ((x1,), (x0, _timestamp))) in self.hash_index_1.iter_key_value().enumerate() {
-                        writeln!(buf, "{}_{i} -> {}_{};", "foo", "math", x1).unwrap();
+                    for (i, ((x0,), (x1, _timestamp))) in self.hash_index_0.iter_key_value().enumerate() {
                         writeln!(buf, "{}_{i} -> {}_{};", "foo", "math", x0).unwrap();
+                        writeln!(buf, "{}_{i} -> {}_{};", "foo", "math", x1).unwrap();
                         writeln!(buf, "{}_{i} [shape = box];", "foo").unwrap();
                     }
                 }
@@ -9413,14 +9333,14 @@ fn triangle_join() {
                                 insertions
                                     .iter()
                                     .map(|&(x0, x1)| (uf.math_.find(x0), uf.math_.find(x1)))
-                                    .filter(|&(x0, x1)| !self.hash_index_1_0.contains_key(&(x1, x0))),
+                                    .filter(|&(x0, x1)| !self.hash_index_0_1.contains_key(&(x0, x1))),
                             );
                             #[cfg(debug_assertions)]
                             {
                                 let mut old: Vec<_> = self
-                                    .hash_index_1_0
+                                    .hash_index_0_1
                                     .iter_key_value()
-                                    .map(|((x1, x0), _)| (x0, x1))
+                                    .map(|((x0, x1), _)| (x0, x1))
                                     .collect();
                                 let n = old.len();
                                 old.sort();
@@ -9430,8 +9350,8 @@ fn triangle_join() {
                             RadixSortable::wrap(&mut self.new).voracious_sort();
                             self.new.dedup();
                             self.all.clear();
-                            self.all.extend(self.hash_index_1_0.iter_key_value().map(
-                                |((x1, x0), (timestamp,))| (uf.math_.find(x0), uf.math_.find(x1), timestamp),
+                            self.all.extend(self.hash_index_0_1.iter_key_value().map(
+                                |((x0, x1), (timestamp,))| (uf.math_.find(x0), uf.math_.find(x1), timestamp),
                             ));
                             self.all.sort();
                             self.all.dedup_by_key(|&mut (x0, x1, _timestamp)| (x0, x1));
@@ -9482,30 +9402,6 @@ fn triangle_join() {
                         }
                         log_duration!("reconstruct index: {}", {
                             log_duration!("reconstruct sort: {}", {
-                                RowSort01::sort(&mut self.all);
-                            });
-                            unsafe {
-                                self.hash_index_1.reconstruct(
-                                    &mut self.all,
-                                    |(x0, x1, timestamp)| (x1,),
-                                    |(x0, x1, timestamp)| (x0, timestamp),
-                                );
-                            }
-                        });
-                        log_duration!("reconstruct index: {}", {
-                            log_duration!("reconstruct sort: {}", {
-                                RowSort11::sort(&mut self.all);
-                            });
-                            unsafe {
-                                self.hash_index_1_0.reconstruct(
-                                    &mut self.all,
-                                    |(x0, x1, timestamp)| (x1, x0),
-                                    |(x0, x1, timestamp)| (timestamp,),
-                                );
-                            }
-                        });
-                        log_duration!("reconstruct index: {}", {
-                            log_duration!("reconstruct sort: {}", {
                                 RowSort10::sort(&mut self.all);
                             });
                             unsafe {
@@ -9516,38 +9412,37 @@ fn triangle_join() {
                                 );
                             }
                         });
+                        log_duration!("reconstruct index: {}", {
+                            log_duration!("reconstruct sort: {}", {
+                                RowSort11::sort(&mut self.all);
+                            });
+                            unsafe {
+                                self.hash_index_0_1.reconstruct(
+                                    &mut self.all,
+                                    |(x0, x1, timestamp)| (x0, x1),
+                                    |(x0, x1, timestamp)| (timestamp,),
+                                );
+                            }
+                        });
+                        log_duration!("reconstruct index: {}", {
+                            log_duration!("reconstruct sort: {}", {
+                                RowSort01::sort(&mut self.all);
+                            });
+                            unsafe {
+                                self.hash_index_1.reconstruct(
+                                    &mut self.all,
+                                    |(x0, x1, timestamp)| (x1,),
+                                    |(x0, x1, timestamp)| (x0, timestamp),
+                                );
+                            }
+                        });
                         self.math_num_uprooted_at_latest_retain = 0;
                     });
                 }
             }
             impl FooRelation {
-                fn iter_all1_1_0(&self, x1: Math) -> impl Iterator<Item = (Math,)> + use<'_> {
-                    self.hash_index_1.iter((x1,)).map(|(x0, _timestamp)| (x0,))
-                }
-                fn iter_all2_1_0(&self, x1: Math, x0: Math) -> impl Iterator<Item = ()> + use<'_> {
-                    self.hash_index_1_0.iter((x1, x0)).map(|(_timestamp)| ())
-                }
                 fn iter_all1_0_1(&self, x0: Math) -> impl Iterator<Item = (Math,)> + use<'_> {
                     self.hash_index_0.iter((x0,)).map(|(x1, _timestamp)| (x1,))
-                }
-                fn iter_old1_1_0(
-                    &self,
-                    x1: Math,
-                    latest_timestamp: TimeStamp,
-                ) -> impl Iterator<Item = (Math,)> + use<'_> {
-                    self.hash_index_1
-                        .iter((x1,))
-                        .filter_map(move |(x0, timestamp)| (timestamp < latest_timestamp).then_some((x0,)))
-                }
-                fn iter_old2_1_0(
-                    &self,
-                    x1: Math,
-                    x0: Math,
-                    latest_timestamp: TimeStamp,
-                ) -> impl Iterator<Item = ()> + use<'_> {
-                    self.hash_index_1_0
-                        .iter((x1, x0))
-                        .filter_map(move |(timestamp,)| (timestamp < latest_timestamp).then_some(()))
                 }
                 fn iter_old1_0_1(
                     &self,
@@ -9558,22 +9453,39 @@ fn triangle_join() {
                         .iter((x0,))
                         .filter_map(move |(x1, timestamp)| (timestamp < latest_timestamp).then_some((x1,)))
                 }
-                fn check1_1_0(&self, x1: Math) -> bool {
-                    self.iter_all1_1_0(x1).next().is_some()
-                }
-                fn check2_1_0(&self, x1: Math, x0: Math) -> bool {
-                    self.iter_all2_1_0(x1, x0).next().is_some()
-                }
                 fn check1_0_1(&self, x0: Math) -> bool {
                     self.iter_all1_0_1(x0).next().is_some()
                 }
-                #[allow(unreachable_code)]
-                fn entry2_1_0(&self, x1: Math, x0: Math, delta: &mut Delta, uf: &mut Unification) -> () {
-                    if let Some(()) = self.iter_all2_1_0(x1, x0).next() {
-                        return ();
-                    }
-                    delta.foo_.push((x0, x1));
-                    ()
+                fn iter_all2_0_1(&self, x0: Math, x1: Math) -> impl Iterator<Item = ()> + use<'_> {
+                    self.hash_index_0_1.iter((x0, x1)).map(|(_timestamp)| ())
+                }
+                fn iter_old2_0_1(
+                    &self,
+                    x0: Math,
+                    x1: Math,
+                    latest_timestamp: TimeStamp,
+                ) -> impl Iterator<Item = ()> + use<'_> {
+                    self.hash_index_0_1
+                        .iter((x0, x1))
+                        .filter_map(move |(timestamp,)| (timestamp < latest_timestamp).then_some(()))
+                }
+                fn check2_0_1(&self, x0: Math, x1: Math) -> bool {
+                    self.iter_all2_0_1(x0, x1).next().is_some()
+                }
+                fn iter_all1_1_0(&self, x1: Math) -> impl Iterator<Item = (Math,)> + use<'_> {
+                    self.hash_index_1.iter((x1,)).map(|(x0, _timestamp)| (x0,))
+                }
+                fn iter_old1_1_0(
+                    &self,
+                    x1: Math,
+                    latest_timestamp: TimeStamp,
+                ) -> impl Iterator<Item = (Math,)> + use<'_> {
+                    self.hash_index_1
+                        .iter((x1,))
+                        .filter_map(move |(x0, timestamp)| (timestamp < latest_timestamp).then_some((x0,)))
+                }
+                fn check1_1_0(&self, x1: Math) -> bool {
+                    self.iter_all1_1_0(x1).next().is_some()
                 }
             }
             #[derive(Debug, Default)]
@@ -9588,7 +9500,7 @@ fn triangle_join() {
             impl Relation for BarRelation {
                 type Row = (Math, Math);
                 type Unification = Unification;
-                const COST: u32 = 4u32;
+                const COST: u32 = 6u32;
                 fn new() -> Self {
                     Self::default()
                 }
@@ -9761,12 +9673,6 @@ fn triangle_join() {
                 fn iter_all1_0_1(&self, x0: Math) -> impl Iterator<Item = (Math,)> + use<'_> {
                     self.hash_index_0.iter((x0,)).map(|(x1, _timestamp)| (x1,))
                 }
-                fn iter_all2_0_1(&self, x0: Math, x1: Math) -> impl Iterator<Item = ()> + use<'_> {
-                    self.hash_index_0_1.iter((x0, x1)).map(|(_timestamp)| ())
-                }
-                fn iter_all1_1_0(&self, x1: Math) -> impl Iterator<Item = (Math,)> + use<'_> {
-                    self.hash_index_1.iter((x1,)).map(|(x0, _timestamp)| (x0,))
-                }
                 fn iter_old1_0_1(
                     &self,
                     x0: Math,
@@ -9775,6 +9681,12 @@ fn triangle_join() {
                     self.hash_index_0
                         .iter((x0,))
                         .filter_map(move |(x1, timestamp)| (timestamp < latest_timestamp).then_some((x1,)))
+                }
+                fn check1_0_1(&self, x0: Math) -> bool {
+                    self.iter_all1_0_1(x0).next().is_some()
+                }
+                fn iter_all2_0_1(&self, x0: Math, x1: Math) -> impl Iterator<Item = ()> + use<'_> {
+                    self.hash_index_0_1.iter((x0, x1)).map(|(_timestamp)| ())
                 }
                 fn iter_old2_0_1(
                     &self,
@@ -9786,6 +9698,12 @@ fn triangle_join() {
                         .iter((x0, x1))
                         .filter_map(move |(timestamp,)| (timestamp < latest_timestamp).then_some(()))
                 }
+                fn check2_0_1(&self, x0: Math, x1: Math) -> bool {
+                    self.iter_all2_0_1(x0, x1).next().is_some()
+                }
+                fn iter_all1_1_0(&self, x1: Math) -> impl Iterator<Item = (Math,)> + use<'_> {
+                    self.hash_index_1.iter((x1,)).map(|(x0, _timestamp)| (x0,))
+                }
                 fn iter_old1_1_0(
                     &self,
                     x1: Math,
@@ -9795,37 +9713,23 @@ fn triangle_join() {
                         .iter((x1,))
                         .filter_map(move |(x0, timestamp)| (timestamp < latest_timestamp).then_some((x0,)))
                 }
-                fn check1_0_1(&self, x0: Math) -> bool {
-                    self.iter_all1_0_1(x0).next().is_some()
-                }
-                fn check2_0_1(&self, x0: Math, x1: Math) -> bool {
-                    self.iter_all2_0_1(x0, x1).next().is_some()
-                }
                 fn check1_1_0(&self, x1: Math) -> bool {
                     self.iter_all1_1_0(x1).next().is_some()
-                }
-                #[allow(unreachable_code)]
-                fn entry2_0_1(&self, x0: Math, x1: Math, delta: &mut Delta, uf: &mut Unification) -> () {
-                    if let Some(()) = self.iter_all2_0_1(x0, x1).next() {
-                        return ();
-                    }
-                    delta.bar_.push((x0, x1));
-                    ()
                 }
             }
             #[derive(Debug, Default)]
             struct BazRelation {
                 new: Vec<<Self as Relation>::Row>,
                 all: Vec<(Math, Math, TimeStamp)>,
-                hash_index_1: runtime::IndexedSortedList<(Math,), (Math, TimeStamp)>,
                 hash_index_0: runtime::IndexedSortedList<(Math,), (Math, TimeStamp)>,
-                hash_index_1_0: runtime::IndexedSortedList<(Math, Math), (TimeStamp,)>,
+                hash_index_0_1: runtime::IndexedSortedList<(Math, Math), (TimeStamp,)>,
+                hash_index_1: runtime::IndexedSortedList<(Math,), (Math, TimeStamp)>,
                 math_num_uprooted_at_latest_retain: usize,
             }
             impl Relation for BazRelation {
                 type Row = (Math, Math);
                 type Unification = Unification;
-                const COST: u32 = 4u32;
+                const COST: u32 = 6u32;
                 fn new() -> Self {
                     Self::default()
                 }
@@ -9843,9 +9747,9 @@ fn triangle_join() {
                 }
                 fn emit_graphviz(&self, buf: &mut String) {
                     use std::fmt::Write;
-                    for (i, ((x1,), (x0, _timestamp))) in self.hash_index_1.iter_key_value().enumerate() {
-                        writeln!(buf, "{}_{i} -> {}_{};", "baz", "math", x1).unwrap();
+                    for (i, ((x0,), (x1, _timestamp))) in self.hash_index_0.iter_key_value().enumerate() {
                         writeln!(buf, "{}_{i} -> {}_{};", "baz", "math", x0).unwrap();
+                        writeln!(buf, "{}_{i} -> {}_{};", "baz", "math", x1).unwrap();
                         writeln!(buf, "{}_{i} [shape = box];", "baz").unwrap();
                     }
                 }
@@ -9887,14 +9791,14 @@ fn triangle_join() {
                                 insertions
                                     .iter()
                                     .map(|&(x0, x1)| (uf.math_.find(x0), uf.math_.find(x1)))
-                                    .filter(|&(x0, x1)| !self.hash_index_1_0.contains_key(&(x1, x0))),
+                                    .filter(|&(x0, x1)| !self.hash_index_0_1.contains_key(&(x0, x1))),
                             );
                             #[cfg(debug_assertions)]
                             {
                                 let mut old: Vec<_> = self
-                                    .hash_index_1_0
+                                    .hash_index_0_1
                                     .iter_key_value()
-                                    .map(|((x1, x0), _)| (x0, x1))
+                                    .map(|((x0, x1), _)| (x0, x1))
                                     .collect();
                                 let n = old.len();
                                 old.sort();
@@ -9904,8 +9808,8 @@ fn triangle_join() {
                             RadixSortable::wrap(&mut self.new).voracious_sort();
                             self.new.dedup();
                             self.all.clear();
-                            self.all.extend(self.hash_index_1_0.iter_key_value().map(
-                                |((x1, x0), (timestamp,))| (uf.math_.find(x0), uf.math_.find(x1), timestamp),
+                            self.all.extend(self.hash_index_0_1.iter_key_value().map(
+                                |((x0, x1), (timestamp,))| (uf.math_.find(x0), uf.math_.find(x1), timestamp),
                             ));
                             self.all.sort();
                             self.all.dedup_by_key(|&mut (x0, x1, _timestamp)| (x0, x1));
@@ -9956,18 +9860,6 @@ fn triangle_join() {
                         }
                         log_duration!("reconstruct index: {}", {
                             log_duration!("reconstruct sort: {}", {
-                                RowSort01::sort(&mut self.all);
-                            });
-                            unsafe {
-                                self.hash_index_1.reconstruct(
-                                    &mut self.all,
-                                    |(x0, x1, timestamp)| (x1,),
-                                    |(x0, x1, timestamp)| (x0, timestamp),
-                                );
-                            }
-                        });
-                        log_duration!("reconstruct index: {}", {
-                            log_duration!("reconstruct sort: {}", {
                                 RowSort10::sort(&mut self.all);
                             });
                             unsafe {
@@ -9983,10 +9875,22 @@ fn triangle_join() {
                                 RowSort11::sort(&mut self.all);
                             });
                             unsafe {
-                                self.hash_index_1_0.reconstruct(
+                                self.hash_index_0_1.reconstruct(
                                     &mut self.all,
-                                    |(x0, x1, timestamp)| (x1, x0),
+                                    |(x0, x1, timestamp)| (x0, x1),
                                     |(x0, x1, timestamp)| (timestamp,),
+                                );
+                            }
+                        });
+                        log_duration!("reconstruct index: {}", {
+                            log_duration!("reconstruct sort: {}", {
+                                RowSort01::sort(&mut self.all);
+                            });
+                            unsafe {
+                                self.hash_index_1.reconstruct(
+                                    &mut self.all,
+                                    |(x0, x1, timestamp)| (x1,),
+                                    |(x0, x1, timestamp)| (x0, timestamp),
                                 );
                             }
                         });
@@ -9995,23 +9899,8 @@ fn triangle_join() {
                 }
             }
             impl BazRelation {
-                fn iter_all1_1_0(&self, x1: Math) -> impl Iterator<Item = (Math,)> + use<'_> {
-                    self.hash_index_1.iter((x1,)).map(|(x0, _timestamp)| (x0,))
-                }
                 fn iter_all1_0_1(&self, x0: Math) -> impl Iterator<Item = (Math,)> + use<'_> {
                     self.hash_index_0.iter((x0,)).map(|(x1, _timestamp)| (x1,))
-                }
-                fn iter_all2_1_0(&self, x1: Math, x0: Math) -> impl Iterator<Item = ()> + use<'_> {
-                    self.hash_index_1_0.iter((x1, x0)).map(|(_timestamp)| ())
-                }
-                fn iter_old1_1_0(
-                    &self,
-                    x1: Math,
-                    latest_timestamp: TimeStamp,
-                ) -> impl Iterator<Item = (Math,)> + use<'_> {
-                    self.hash_index_1
-                        .iter((x1,))
-                        .filter_map(move |(x0, timestamp)| (timestamp < latest_timestamp).then_some((x0,)))
                 }
                 fn iter_old1_0_1(
                     &self,
@@ -10022,32 +9911,39 @@ fn triangle_join() {
                         .iter((x0,))
                         .filter_map(move |(x1, timestamp)| (timestamp < latest_timestamp).then_some((x1,)))
                 }
-                fn iter_old2_1_0(
-                    &self,
-                    x1: Math,
-                    x0: Math,
-                    latest_timestamp: TimeStamp,
-                ) -> impl Iterator<Item = ()> + use<'_> {
-                    self.hash_index_1_0
-                        .iter((x1, x0))
-                        .filter_map(move |(timestamp,)| (timestamp < latest_timestamp).then_some(()))
-                }
-                fn check1_1_0(&self, x1: Math) -> bool {
-                    self.iter_all1_1_0(x1).next().is_some()
-                }
                 fn check1_0_1(&self, x0: Math) -> bool {
                     self.iter_all1_0_1(x0).next().is_some()
                 }
-                fn check2_1_0(&self, x1: Math, x0: Math) -> bool {
-                    self.iter_all2_1_0(x1, x0).next().is_some()
+                fn iter_all2_0_1(&self, x0: Math, x1: Math) -> impl Iterator<Item = ()> + use<'_> {
+                    self.hash_index_0_1.iter((x0, x1)).map(|(_timestamp)| ())
                 }
-                #[allow(unreachable_code)]
-                fn entry2_1_0(&self, x1: Math, x0: Math, delta: &mut Delta, uf: &mut Unification) -> () {
-                    if let Some(()) = self.iter_all2_1_0(x1, x0).next() {
-                        return ();
-                    }
-                    delta.baz_.push((x0, x1));
-                    ()
+                fn iter_old2_0_1(
+                    &self,
+                    x0: Math,
+                    x1: Math,
+                    latest_timestamp: TimeStamp,
+                ) -> impl Iterator<Item = ()> + use<'_> {
+                    self.hash_index_0_1
+                        .iter((x0, x1))
+                        .filter_map(move |(timestamp,)| (timestamp < latest_timestamp).then_some(()))
+                }
+                fn check2_0_1(&self, x0: Math, x1: Math) -> bool {
+                    self.iter_all2_0_1(x0, x1).next().is_some()
+                }
+                fn iter_all1_1_0(&self, x1: Math) -> impl Iterator<Item = (Math,)> + use<'_> {
+                    self.hash_index_1.iter((x1,)).map(|(x0, _timestamp)| (x0,))
+                }
+                fn iter_old1_1_0(
+                    &self,
+                    x1: Math,
+                    latest_timestamp: TimeStamp,
+                ) -> impl Iterator<Item = (Math,)> + use<'_> {
+                    self.hash_index_1
+                        .iter((x1,))
+                        .filter_map(move |(x0, timestamp)| (timestamp < latest_timestamp).then_some((x0,)))
+                }
+                fn check1_1_0(&self, x1: Math) -> bool {
+                    self.iter_all1_1_0(x1).next().is_some()
                 }
             }
             #[derive(Debug, Default)]
@@ -10237,21 +10133,6 @@ fn triangle_join() {
                 fn check3_0_1_2(&self, x0: Math, x1: Math, x2: Math) -> bool {
                     self.iter_all3_0_1_2(x0, x1, x2).next().is_some()
                 }
-                #[allow(unreachable_code)]
-                fn entry3_0_1_2(
-                    &self,
-                    x0: Math,
-                    x1: Math,
-                    x2: Math,
-                    delta: &mut Delta,
-                    uf: &mut Unification,
-                ) -> () {
-                    if let Some(()) = self.iter_all3_0_1_2(x0, x1, x2).next() {
-                        return ();
-                    }
-                    delta.triangle_.push((x0, x1, x2));
-                    ()
-                }
             }
             #[derive(Debug, Default)]
             pub struct Delta {
@@ -10337,7 +10218,7 @@ fn triangle_join() {
                     for (a, b) in self.foo_.iter_new() {
                         if self.bar_.check1_0_1(b) {
                             for (c,) in self.baz_.iter_all1_1_0(a) {
-                                for () in self.bar_.iter_all2_0_1(b, c) {
+                                if self.bar_.check2_0_1(b, c) {
                                     #[doc = "( rule ( ( Foo a b ) ( Bar b c ) ( Baz c a ) ) ( ( Triangle a b c ) ) )"]
                                     self.delta.insert_triangle((a, b, c));
                                 }
@@ -10347,7 +10228,7 @@ fn triangle_join() {
                     for (b_2, c_2) in self.bar_.iter_new() {
                         if self.foo_.check1_1_0(b_2) {
                             for (a_2,) in self.baz_.iter_all1_0_1(c_2) {
-                                for () in self.foo_.iter_old2_1_0(b_2, a_2, self.latest_timestamp) {
+                                if self.foo_.check2_0_1(a_2, b_2) {
                                     #[doc = "( rule ( ( Foo a b ) ( Bar b c ) ( Baz c a ) ) ( ( Triangle a b c ) ) )"]
                                     self.delta.insert_triangle((a_2, b_2, c_2));
                                 }
@@ -10357,7 +10238,7 @@ fn triangle_join() {
                     for (c_3, a_3) in self.baz_.iter_new() {
                         if self.foo_.check1_0_1(a_3) {
                             for (b_3,) in self.bar_.iter_old1_1_0(c_3, self.latest_timestamp) {
-                                for () in self.foo_.iter_old2_1_0(b_3, a_3, self.latest_timestamp) {
+                                if self.foo_.check2_0_1(a_3, b_3) {
                                     #[doc = "( rule ( ( Foo a b ) ( Bar b c ) ( Baz c a ) ) ( ( Triangle a b c ) ) )"]
                                     self.delta.insert_triangle((a_3, b_3, c_3));
                                 }
@@ -10551,14 +10432,14 @@ fn edgecase0() {
                 all: Vec<(Math, Math, Math, TimeStamp)>,
                 hash_index_0_1: runtime::HashMap<(Math, Math), (Math, TimeStamp)>,
                 hash_index_0: runtime::IndexedSortedList<(Math,), (Math, Math, TimeStamp)>,
-                hash_index_2_0: runtime::IndexedSortedList<(Math, Math), (Math, TimeStamp)>,
+                hash_index_0_2: runtime::IndexedSortedList<(Math, Math), (Math, TimeStamp)>,
                 hash_index_2: runtime::IndexedSortedList<(Math,), (Math, Math, TimeStamp)>,
                 math_num_uprooted_at_latest_retain: usize,
             }
             impl Relation for MulRelation {
                 type Row = (Math, Math, Math);
                 type Unification = Unification;
-                const COST: u32 = 6u32;
+                const COST: u32 = 12u32;
                 fn new() -> Self {
                     Self::default()
                 }
@@ -10572,7 +10453,7 @@ fn edgecase0() {
                     self.new.iter().copied()
                 }
                 fn len(&self) -> usize {
-                    self.hash_index_0.len()
+                    self.hash_index_0_1.len()
                 }
                 fn emit_graphviz(&self, buf: &mut String) {
                     use std::fmt::Write;
@@ -10722,9 +10603,9 @@ fn edgecase0() {
                                 RowSort101::sort(&mut self.all);
                             });
                             unsafe {
-                                self.hash_index_2_0.reconstruct(
+                                self.hash_index_0_2.reconstruct(
                                     &mut self.all,
-                                    |(x0, x1, x2, timestamp)| (x2, x0),
+                                    |(x0, x1, x2, timestamp)| (x0, x2),
                                     |(x0, x1, x2, timestamp)| (x1, timestamp),
                                 );
                             }
@@ -10753,21 +10634,6 @@ fn edgecase0() {
                         .copied()
                         .map(|(x2, _timestamp)| (x2,))
                 }
-                fn iter_all1_0_1_2(&self, x0: Math) -> impl Iterator<Item = (Math, Math)> + use<'_> {
-                    self.hash_index_0
-                        .iter((x0,))
-                        .map(|(x1, x2, _timestamp)| (x1, x2))
-                }
-                fn iter_all2_2_0_1(&self, x2: Math, x0: Math) -> impl Iterator<Item = (Math,)> + use<'_> {
-                    self.hash_index_2_0
-                        .iter((x2, x0))
-                        .map(|(x1, _timestamp)| (x1,))
-                }
-                fn iter_all1_2_0_1(&self, x2: Math) -> impl Iterator<Item = (Math, Math)> + use<'_> {
-                    self.hash_index_2
-                        .iter((x2,))
-                        .map(|(x0, x1, _timestamp)| (x0, x1))
-                }
                 fn iter_old2_0_1_2(
                     &self,
                     x0: Math,
@@ -10780,6 +10646,23 @@ fn edgecase0() {
                         .copied()
                         .filter_map(move |(x2, timestamp)| (timestamp < latest_timestamp).then_some((x2,)))
                 }
+                #[allow(unreachable_code)]
+                fn entry2_0_1_2(&self, x0: Math, x1: Math, delta: &mut Delta, uf: &mut Unification) -> (Math,) {
+                    if let Some((x2,)) = self.iter_all2_0_1_2(x0, x1).next() {
+                        return (x2,);
+                    }
+                    let x2 = uf.math_.add_eclass();
+                    delta.mul_.push((x0, x1, x2));
+                    (x2,)
+                }
+                fn check2_0_1_2(&self, x0: Math, x1: Math) -> bool {
+                    self.iter_all2_0_1_2(x0, x1).next().is_some()
+                }
+                fn iter_all1_0_1_2(&self, x0: Math) -> impl Iterator<Item = (Math, Math)> + use<'_> {
+                    self.hash_index_0
+                        .iter((x0,))
+                        .map(|(x1, x2, _timestamp)| (x1, x2))
+                }
                 fn iter_old1_0_1_2(
                     &self,
                     x0: Math,
@@ -10791,15 +10674,31 @@ fn edgecase0() {
                             (timestamp < latest_timestamp).then_some((x1, x2))
                         })
                 }
-                fn iter_old2_2_0_1(
+                fn check1_0_1_2(&self, x0: Math) -> bool {
+                    self.iter_all1_0_1_2(x0).next().is_some()
+                }
+                fn iter_all2_0_2_1(&self, x0: Math, x2: Math) -> impl Iterator<Item = (Math,)> + use<'_> {
+                    self.hash_index_0_2
+                        .iter((x0, x2))
+                        .map(|(x1, _timestamp)| (x1,))
+                }
+                fn iter_old2_0_2_1(
                     &self,
-                    x2: Math,
                     x0: Math,
+                    x2: Math,
                     latest_timestamp: TimeStamp,
                 ) -> impl Iterator<Item = (Math,)> + use<'_> {
-                    self.hash_index_2_0
-                        .iter((x2, x0))
+                    self.hash_index_0_2
+                        .iter((x0, x2))
                         .filter_map(move |(x1, timestamp)| (timestamp < latest_timestamp).then_some((x1,)))
+                }
+                fn check2_0_2_1(&self, x0: Math, x2: Math) -> bool {
+                    self.iter_all2_0_2_1(x0, x2).next().is_some()
+                }
+                fn iter_all1_2_0_1(&self, x2: Math) -> impl Iterator<Item = (Math, Math)> + use<'_> {
+                    self.hash_index_2
+                        .iter((x2,))
+                        .map(|(x0, x1, _timestamp)| (x0, x1))
                 }
                 fn iter_old1_2_0_1(
                     &self,
@@ -10812,26 +10711,8 @@ fn edgecase0() {
                             (timestamp < latest_timestamp).then_some((x0, x1))
                         })
                 }
-                fn check2_0_1_2(&self, x0: Math, x1: Math) -> bool {
-                    self.iter_all2_0_1_2(x0, x1).next().is_some()
-                }
-                fn check1_0_1_2(&self, x0: Math) -> bool {
-                    self.iter_all1_0_1_2(x0).next().is_some()
-                }
-                fn check2_2_0_1(&self, x2: Math, x0: Math) -> bool {
-                    self.iter_all2_2_0_1(x2, x0).next().is_some()
-                }
                 fn check1_2_0_1(&self, x2: Math) -> bool {
                     self.iter_all1_2_0_1(x2).next().is_some()
-                }
-                #[allow(unreachable_code)]
-                fn entry2_0_1_2(&self, x0: Math, x1: Math, delta: &mut Delta, uf: &mut Unification) -> (Math,) {
-                    if let Some((x2,)) = self.iter_all2_0_1_2(x0, x1).next() {
-                        return (x2,);
-                    }
-                    let x2 = uf.math_.add_eclass();
-                    delta.mul_.push((x0, x1, x2));
-                    (x2,)
                 }
             }
             #[derive(Debug, Default)]
@@ -10846,7 +10727,7 @@ fn edgecase0() {
             impl Relation for AddRelation {
                 type Row = (Math, Math, Math);
                 type Unification = Unification;
-                const COST: u32 = 6u32;
+                const COST: u32 = 9u32;
                 fn new() -> Self {
                     Self::default()
                 }
@@ -10860,7 +10741,7 @@ fn edgecase0() {
                     self.new.iter().copied()
                 }
                 fn len(&self) -> usize {
-                    self.hash_index_0.len()
+                    self.hash_index_0_1.len()
                 }
                 fn emit_graphviz(&self, buf: &mut String) {
                     use std::fmt::Write;
@@ -11029,16 +10910,6 @@ fn edgecase0() {
                         .copied()
                         .map(|(x2, _timestamp)| (x2,))
                 }
-                fn iter_all1_0_1_2(&self, x0: Math) -> impl Iterator<Item = (Math, Math)> + use<'_> {
-                    self.hash_index_0
-                        .iter((x0,))
-                        .map(|(x1, x2, _timestamp)| (x1, x2))
-                }
-                fn iter_all1_1_0_2(&self, x1: Math) -> impl Iterator<Item = (Math, Math)> + use<'_> {
-                    self.hash_index_1
-                        .iter((x1,))
-                        .map(|(x0, x2, _timestamp)| (x0, x2))
-                }
                 fn iter_old2_0_1_2(
                     &self,
                     x0: Math,
@@ -11051,6 +10922,23 @@ fn edgecase0() {
                         .copied()
                         .filter_map(move |(x2, timestamp)| (timestamp < latest_timestamp).then_some((x2,)))
                 }
+                #[allow(unreachable_code)]
+                fn entry2_0_1_2(&self, x0: Math, x1: Math, delta: &mut Delta, uf: &mut Unification) -> (Math,) {
+                    if let Some((x2,)) = self.iter_all2_0_1_2(x0, x1).next() {
+                        return (x2,);
+                    }
+                    let x2 = uf.math_.add_eclass();
+                    delta.add_.push((x0, x1, x2));
+                    (x2,)
+                }
+                fn check2_0_1_2(&self, x0: Math, x1: Math) -> bool {
+                    self.iter_all2_0_1_2(x0, x1).next().is_some()
+                }
+                fn iter_all1_0_1_2(&self, x0: Math) -> impl Iterator<Item = (Math, Math)> + use<'_> {
+                    self.hash_index_0
+                        .iter((x0,))
+                        .map(|(x1, x2, _timestamp)| (x1, x2))
+                }
                 fn iter_old1_0_1_2(
                     &self,
                     x0: Math,
@@ -11061,6 +10949,14 @@ fn edgecase0() {
                         .filter_map(move |(x1, x2, timestamp)| {
                             (timestamp < latest_timestamp).then_some((x1, x2))
                         })
+                }
+                fn check1_0_1_2(&self, x0: Math) -> bool {
+                    self.iter_all1_0_1_2(x0).next().is_some()
+                }
+                fn iter_all1_1_0_2(&self, x1: Math) -> impl Iterator<Item = (Math, Math)> + use<'_> {
+                    self.hash_index_1
+                        .iter((x1,))
+                        .map(|(x0, x2, _timestamp)| (x0, x2))
                 }
                 fn iter_old1_1_0_2(
                     &self,
@@ -11073,23 +10969,8 @@ fn edgecase0() {
                             (timestamp < latest_timestamp).then_some((x0, x2))
                         })
                 }
-                fn check2_0_1_2(&self, x0: Math, x1: Math) -> bool {
-                    self.iter_all2_0_1_2(x0, x1).next().is_some()
-                }
-                fn check1_0_1_2(&self, x0: Math) -> bool {
-                    self.iter_all1_0_1_2(x0).next().is_some()
-                }
                 fn check1_1_0_2(&self, x1: Math) -> bool {
                     self.iter_all1_1_0_2(x1).next().is_some()
-                }
-                #[allow(unreachable_code)]
-                fn entry2_0_1_2(&self, x0: Math, x1: Math, delta: &mut Delta, uf: &mut Unification) -> (Math,) {
-                    if let Some((x2,)) = self.iter_all2_0_1_2(x0, x1).next() {
-                        return (x2,);
-                    }
-                    let x2 = uf.math_.add_eclass();
-                    delta.add_.push((x0, x1, x2));
-                    (x2,)
                 }
             }
             #[derive(Debug, Default)]
@@ -11164,14 +11045,14 @@ fn edgecase0() {
                     for (a, b, v2) in self.mul_.iter_new() {
                         if self.mul_.check1_0_1_2(a) {
                             for (v4, v5) in self.add_.iter_all1_0_1_2(v2) {
-                                for (c,) in self.mul_.iter_all2_2_0_1(v4, a) {
+                                for (c,) in self.mul_.iter_all2_0_2_1(a, v4) {
                                     #[doc = "( rewrite ( Add ( Mul a b ) ( Mul a c ) ) ( Mul a ( Add b c ) ) )"]
                                     let (v6,) = self.add_.entry2_0_1_2(b, c, &mut self.delta, &mut self.uf);
                                     self.delta.insert_mul((a, v6, v5));
                                 }
                             }
                             for (v9, v12) in self.add_.iter_all1_1_0_2(v2) {
-                                for (b_2,) in self.mul_.iter_old2_2_0_1(v9, a, self.latest_timestamp) {
+                                for (b_2,) in self.mul_.iter_old2_0_2_1(a, v9, self.latest_timestamp) {
                                     #[doc = "( rewrite ( Add ( Mul a b ) ( Mul a c ) ) ( Mul a ( Add b c ) ) )"]
                                     let (v13,) = self
                                         .add_
@@ -11184,7 +11065,7 @@ fn edgecase0() {
                     for (v16, v18, v19) in self.add_.iter_new() {
                         if self.mul_.check1_2_0_1(v16) {
                             for (a_3, c_3) in self.mul_.iter_old1_2_0_1(v18, self.latest_timestamp) {
-                                for (b_3,) in self.mul_.iter_old2_2_0_1(v16, a_3, self.latest_timestamp) {
+                                for (b_3,) in self.mul_.iter_old2_0_2_1(a_3, v16, self.latest_timestamp) {
                                     #[doc = "( rewrite ( Add ( Mul a b ) ( Mul a c ) ) ( Mul a ( Add b c ) ) )"]
                                     let (v20,) =
                                         self.add_
@@ -11348,7 +11229,7 @@ fn test_into_codegen() {
             impl Relation for MulRelation {
                 type Row = (Math, Math, Math);
                 type Unification = Unification;
-                const COST: u32 = 3u32;
+                const COST: u32 = 6u32;
                 fn new() -> Self {
                     Self::default()
                 }
@@ -11362,7 +11243,7 @@ fn test_into_codegen() {
                     self.new.iter().copied()
                 }
                 fn len(&self) -> usize {
-                    self.hash_index_0.len()
+                    self.hash_index_0_1.len()
                 }
                 fn emit_graphviz(&self, buf: &mut String) {
                     use std::fmt::Write;
@@ -11519,11 +11400,6 @@ fn test_into_codegen() {
                         .copied()
                         .map(|(x2, _timestamp)| (x2,))
                 }
-                fn iter_all1_0_1_2(&self, x0: Math) -> impl Iterator<Item = (Math, Math)> + use<'_> {
-                    self.hash_index_0
-                        .iter((x0,))
-                        .map(|(x1, x2, _timestamp)| (x1, x2))
-                }
                 fn iter_old2_0_1_2(
                     &self,
                     x0: Math,
@@ -11536,6 +11412,23 @@ fn test_into_codegen() {
                         .copied()
                         .filter_map(move |(x2, timestamp)| (timestamp < latest_timestamp).then_some((x2,)))
                 }
+                #[allow(unreachable_code)]
+                fn entry2_0_1_2(&self, x0: Math, x1: Math, delta: &mut Delta, uf: &mut Unification) -> (Math,) {
+                    if let Some((x2,)) = self.iter_all2_0_1_2(x0, x1).next() {
+                        return (x2,);
+                    }
+                    let x2 = uf.math_.add_eclass();
+                    delta.mul_.push((x0, x1, x2));
+                    (x2,)
+                }
+                fn check2_0_1_2(&self, x0: Math, x1: Math) -> bool {
+                    self.iter_all2_0_1_2(x0, x1).next().is_some()
+                }
+                fn iter_all1_0_1_2(&self, x0: Math) -> impl Iterator<Item = (Math, Math)> + use<'_> {
+                    self.hash_index_0
+                        .iter((x0,))
+                        .map(|(x1, x2, _timestamp)| (x1, x2))
+                }
                 fn iter_old1_0_1_2(
                     &self,
                     x0: Math,
@@ -11547,20 +11440,8 @@ fn test_into_codegen() {
                             (timestamp < latest_timestamp).then_some((x1, x2))
                         })
                 }
-                fn check2_0_1_2(&self, x0: Math, x1: Math) -> bool {
-                    self.iter_all2_0_1_2(x0, x1).next().is_some()
-                }
                 fn check1_0_1_2(&self, x0: Math) -> bool {
                     self.iter_all1_0_1_2(x0).next().is_some()
-                }
-                #[allow(unreachable_code)]
-                fn entry2_0_1_2(&self, x0: Math, x1: Math, delta: &mut Delta, uf: &mut Unification) -> (Math,) {
-                    if let Some((x2,)) = self.iter_all2_0_1_2(x0, x1).next() {
-                        return (x2,);
-                    }
-                    let x2 = uf.math_.add_eclass();
-                    delta.mul_.push((x0, x1, x2));
-                    (x2,)
                 }
             }
             #[derive(Debug, Default)]
@@ -11745,11 +11626,6 @@ fn test_into_codegen() {
                         .copied()
                         .map(|(x2, _timestamp)| (x2,))
                 }
-                fn iter_all1_2_0_1(&self, x2: Math) -> impl Iterator<Item = (Math, Math)> + use<'_> {
-                    self.hash_index_2
-                        .iter((x2,))
-                        .map(|(x0, x1, _timestamp)| (x0, x1))
-                }
                 fn iter_old2_0_1_2(
                     &self,
                     x0: Math,
@@ -11762,6 +11638,23 @@ fn test_into_codegen() {
                         .copied()
                         .filter_map(move |(x2, timestamp)| (timestamp < latest_timestamp).then_some((x2,)))
                 }
+                #[allow(unreachable_code)]
+                fn entry2_0_1_2(&self, x0: Math, x1: Math, delta: &mut Delta, uf: &mut Unification) -> (Math,) {
+                    if let Some((x2,)) = self.iter_all2_0_1_2(x0, x1).next() {
+                        return (x2,);
+                    }
+                    let x2 = uf.math_.add_eclass();
+                    delta.add_.push((x0, x1, x2));
+                    (x2,)
+                }
+                fn check2_0_1_2(&self, x0: Math, x1: Math) -> bool {
+                    self.iter_all2_0_1_2(x0, x1).next().is_some()
+                }
+                fn iter_all1_2_0_1(&self, x2: Math) -> impl Iterator<Item = (Math, Math)> + use<'_> {
+                    self.hash_index_2
+                        .iter((x2,))
+                        .map(|(x0, x1, _timestamp)| (x0, x1))
+                }
                 fn iter_old1_2_0_1(
                     &self,
                     x2: Math,
@@ -11773,20 +11666,8 @@ fn test_into_codegen() {
                             (timestamp < latest_timestamp).then_some((x0, x1))
                         })
                 }
-                fn check2_0_1_2(&self, x0: Math, x1: Math) -> bool {
-                    self.iter_all2_0_1_2(x0, x1).next().is_some()
-                }
                 fn check1_2_0_1(&self, x2: Math) -> bool {
                     self.iter_all1_2_0_1(x2).next().is_some()
-                }
-                #[allow(unreachable_code)]
-                fn entry2_0_1_2(&self, x0: Math, x1: Math, delta: &mut Delta, uf: &mut Unification) -> (Math,) {
-                    if let Some((x2,)) = self.iter_all2_0_1_2(x0, x1).next() {
-                        return (x2,);
-                    }
-                    let x2 = uf.math_.add_eclass();
-                    delta.add_.push((x0, x1, x2));
-                    (x2,)
                 }
             }
             #[derive(Debug, Default)]
@@ -12837,185 +12718,105 @@ fn lir_math() {
                         name: "Fuel",
                         param_types: {c0: t2, c1: t2},
                         kind: Table {
-                            index_to_info: {ir0: 0_1 conflict[..1] => [1:union], ir1: 1_0},
-                            usage_to_info: {
-                                iu0: ir0[..1],
-                                iu1: ir1[..1],
-                            },
-                            column_back_reference: {},
+                            index_to_info: {ir0: 0=>1:union, ir1: 1=>0},
                         },
                     },
                     r1: RelationData {
                         name: "ZeroFuel",
                         param_types: {c0: t2},
                         kind: Table {
-                            index_to_info: {ir0: 0 conflict[..0] => [0:union]},
-                            usage_to_info: {
-                                iu0: ir0[..0],
-                            },
-                            column_back_reference: {},
+                            index_to_info: {ir0: =>0:union},
                         },
                     },
                     r2: RelationData {
                         name: "Diff",
                         param_types: {c0: t3, c1: t3, c2: t3},
                         kind: Table {
-                            index_to_info: {ir0: 1_0_2 conflict[..2] => [2:union]},
-                            usage_to_info: {
-                                iu0: ir0[..2],
-                                iu1: ir0[..1],
-                            },
-                            column_back_reference: {},
+                            index_to_info: {ir0: 0_1=>2:union, ir1: 1=>0_2},
                         },
                     },
                     r3: RelationData {
                         name: "Integral",
                         param_types: {c0: t2, c1: t3, c2: t3, c3: t3},
                         kind: Table {
-                            index_to_info: {ir0: 0_1_2_3 conflict[..3] => [3:union], ir1: 1_2_0_3},
-                            usage_to_info: {
-                                iu0: ir0[..3],
-                                iu1: ir0[..1],
-                                iu2: ir1[..1],
-                                iu3: ir1[..2],
-                            },
-                            column_back_reference: {},
+                            index_to_info: {ir0: 0_1_2=>3:union, ir1: 0=>1_2_3, ir2: 1=>0_2_3, ir3: 1_2=>0_3},
                         },
                     },
                     r4: RelationData {
                         name: "Add",
                         param_types: {c0: t3, c1: t3, c2: t3},
                         kind: Table {
-                            index_to_info: {ir0: 0_1_2, ir1: 1_0_2 conflict[..2] => [2:union], ir2: 2_0_1},
-                            usage_to_info: {
-                                iu0: ir1[..2],
-                                iu1: ir2[..1],
-                                iu2: ir1[..1],
-                                iu3: ir0[..1],
-                            },
-                            column_back_reference: {},
+                            index_to_info: {ir0: 0_1=>2:union, ir1: 0=>1_2, ir2: 1=>0_2, ir3: 2=>0_1},
                         },
                     },
                     r5: RelationData {
                         name: "Sub",
                         param_types: {c0: t3, c1: t3, c2: t3},
                         kind: Table {
-                            index_to_info: {ir0: 0_1_2 conflict[..2] => [2:union], ir1: 2_0_1},
-                            usage_to_info: {
-                                iu0: ir0[..2],
-                                iu1: ir1[..1],
-                            },
-                            column_back_reference: {},
+                            index_to_info: {ir0: 0_1=>2:union, ir1: 2=>0_1},
                         },
                     },
                     r6: RelationData {
                         name: "Mul",
                         param_types: {c0: t3, c1: t3, c2: t3},
                         kind: Table {
-                            index_to_info: {ir0: 0_1_2, ir1: 1_0_2 conflict[..2] => [2:union], ir2: 2_0_1},
-                            usage_to_info: {
-                                iu0: ir1[..2],
-                                iu1: ir2[..1],
-                                iu2: ir1[..1],
-                                iu3: ir2[..2],
-                                iu4: ir0[..1],
-                            },
-                            column_back_reference: {},
+                            index_to_info: {ir0: 0_1=>2:union, ir1: 0=>1_2, ir2: 0_2=>1, ir3: 1=>0_2, ir4: 2=>0_1},
                         },
                     },
                     r7: RelationData {
                         name: "Div",
                         param_types: {c0: t3, c1: t3, c2: t3},
                         kind: Table {
-                            index_to_info: {ir0: 0_1_2 conflict[..2] => [2:union]},
-                            usage_to_info: {
-                                iu0: ir0[..2],
-                            },
-                            column_back_reference: {},
+                            index_to_info: {ir0: 0_1=>2:union},
                         },
                     },
                     r8: RelationData {
                         name: "Pow",
                         param_types: {c0: t3, c1: t3, c2: t3},
                         kind: Table {
-                            index_to_info: {ir0: 0_1_2 conflict[..2] => [2:union], ir1: 1_0_2, ir2: 2_0_1},
-                            usage_to_info: {
-                                iu0: ir0[..2],
-                                iu1: ir2[..1],
-                                iu2: ir2[..2],
-                                iu3: ir0[..1],
-                                iu4: ir1[..1],
-                            },
-                            column_back_reference: {},
+                            index_to_info: {ir0: 0_1=>2:union, ir1: 0=>1_2, ir2: 0_2=>1, ir3: 1=>0_2, ir4: 2=>0_1},
                         },
                     },
                     r9: RelationData {
                         name: "Ln",
                         param_types: {c0: t3, c1: t3},
                         kind: Table {
-                            index_to_info: {ir0: 0_1 conflict[..1] => [1:union]},
-                            usage_to_info: {
-                                iu0: ir0[..1],
-                            },
-                            column_back_reference: {},
+                            index_to_info: {ir0: 0=>1:union},
                         },
                     },
                     r10: RelationData {
                         name: "Sqrt",
                         param_types: {c0: t3, c1: t3},
                         kind: Table {
-                            index_to_info: {ir0: 0_1 conflict[..1] => [1:union]},
-                            usage_to_info: {
-                                iu0: ir0[..1],
-                            },
-                            column_back_reference: {},
+                            index_to_info: {ir0: 0=>1:union},
                         },
                     },
                     r11: RelationData {
                         name: "Sin",
                         param_types: {c0: t3, c1: t3},
                         kind: Table {
-                            index_to_info: {ir0: 0_1 conflict[..1] => [1:union]},
-                            usage_to_info: {
-                                iu0: ir0[..1],
-                                iu1: ir0[..2],
-                            },
-                            column_back_reference: {},
+                            index_to_info: {ir0: 0=>1:union (check: {{0, 1}})},
                         },
                     },
                     r12: RelationData {
                         name: "Cos",
                         param_types: {c0: t3, c1: t3},
                         kind: Table {
-                            index_to_info: {ir0: 0_1 conflict[..1] => [1:union]},
-                            usage_to_info: {
-                                iu0: ir0[..1],
-                                iu1: ir0[..2],
-                            },
-                            column_back_reference: {},
+                            index_to_info: {ir0: 0=>1:union (check: {{0, 1}})},
                         },
                     },
                     r13: RelationData {
                         name: "Const",
                         param_types: {c0: t0, c1: t3},
                         kind: Table {
-                            index_to_info: {ir0: 0_1 conflict[..1] => [1:union], ir1: 1_0},
-                            usage_to_info: {
-                                iu0: ir0[..1],
-                                iu1: ir1[..1],
-                            },
-                            column_back_reference: {},
+                            index_to_info: {ir0: 0=>1:union, ir1: 1=>0},
                         },
                     },
                     r14: RelationData {
                         name: "Var",
                         param_types: {c0: t1, c1: t3},
                         kind: Table {
-                            index_to_info: {ir0: 0_1 conflict[..1] => [1:union]},
-                            usage_to_info: {
-                                iu0: ir0[..1],
-                            },
-                            column_back_reference: {},
+                            index_to_info: {ir0: 0=>1:union},
                         },
                     },
                     r15: RelationData {
@@ -13657,501 +13458,504 @@ fn lir_math() {
                     g47: t3,
                 },
                 rule_tries: [
-                    atom: [PremiseNew, r0(v216, v217)]
+                    premise: [IterNew, r0(v216, v217)]
                     then: [
-                        atom: [PremiseAll, r3(v217, v219, v220, v221), iu1]
+                        premise: [JoinAll, r3(v217, v219, v220, v221), ir1]
                         then: [
-                            atom: [PremiseAll, r4(v257, v258, v219), iu1]
+                            premise: [JoinAll, r4(v257, v258, v219), ir3]
+                            meta: "( rewrite ( Integral ( Fuel fuel ) ( Add f g ) x ) ( Add ( Integral fuel f x ) ( Integral fuel g x ) ) )"
+                            actions: [
+                                [Action::Entry, r3(v216, v258, v220, v263) on ir0],
+                                [Action::Entry, r3(v216, v257, v220, v262) on ir0],
+                                [Action::Insert, r4(v262, v263, v221)],
+                            ],
+                            premise: [JoinAll, r5(v284, v285, v219), ir1]
+                            meta: "( rewrite ( Integral ( Fuel fuel ) ( Sub f g ) x ) ( Sub ( Integral fuel f x ) ( Integral fuel g x ) ) )"
+                            actions: [
+                                [Action::Entry, r3(v216, v285, v220, v290) on ir0],
+                                [Action::Entry, r3(v216, v284, v220, v289) on ir0],
+                                [Action::Insert, r5(v289, v290, v221)],
+                            ],
+                            premise: [JoinAll, r6(v311, v312, v219), ir4]
+                            meta: "( rewrite ( Integral ( Fuel fuel ) ( Mul a b ) x ) ( Sub ( Mul a ( Integral fuel b x ) ) ( Integral fuel ( Mul ( Diff x a ) ( Integral fuel b x ) ) x ) ) )"
+                            actions: [
+                                [Action::Entry, r3(v216, v312, v220, v316) on ir0],
+                                [Action::Entry, r6(v311, v316, v317) on ir0],
+                                [Action::Entry, r2(v220, v311, v318) on ir0],
+                                [Action::Entry, r6(v318, v316, v319) on ir0],
+                                [Action::Entry, r3(v216, v319, v220, v320) on ir0],
+                                [Action::Insert, r5(v317, v320, v221)],
+                            ],
+                            premise: [SemiJoin, r12(v220, v219), ir0]
+                            meta: "( rewrite ( Integral ( Fuel fuel ) ( Cos x ) x ) ( Sin x ) )"
+                            actions: [
+                                [Action::Insert, r11(v220, v221)],
+                            ],
+                            premise: [JoinAll, r13(v218, v219), ir1]
                             then: [
+                                premise: [SemiJoin, r17(v218), ir_bogus]
+                                meta: "( rewrite ( Integral ( Fuel fuel ) ( Const 1 ) x ) x )"
+                                actions: [
+                                    [Action::Equate, v220=v221],
+                                ],
+                            ],
+                        ],
+                    ],
+                    premise: [IterNew, r2(v20, v21, v22)]
+                    then: [
+                        premise: [JoinAll, r4(v179, v180, v21), ir3]
+                        meta: "( rewrite ( Diff x ( Add a b ) ) ( Add ( Diff x a ) ( Diff x b ) ) )"
+                        actions: [
+                            [Action::Entry, r2(v20, v180, v184) on ir0],
+                            [Action::Entry, r2(v20, v179, v183) on ir0],
+                            [Action::Insert, r4(v183, v184, v22)],
+                        ],
+                        premise: [JoinAll, r6(v193, v194, v21), ir4]
+                        meta: "( rewrite ( Diff x ( Mul a b ) ) ( Add ( Mul a ( Diff x b ) ) ( Mul b ( Diff x a ) ) ) )"
+                        actions: [
+                            [Action::Entry, r2(v20, v194, v197) on ir0],
+                            [Action::Entry, r6(v193, v197, v198) on ir0],
+                            [Action::Entry, r2(v20, v193, v199) on ir0],
+                            [Action::Entry, r6(v194, v199, v200) on ir0],
+                            [Action::Insert, r4(v198, v200, v22)],
+                        ],
+                        premise: [SemiJoin, r11(v20, v21), ir0]
+                        meta: "( rewrite ( Diff x ( Sin x ) ) ( Cos x ) )"
+                        actions: [
+                            [Action::Insert, r12(v20, v22)],
+                        ],
+                        premise: [SemiJoin, r12(v20, v21), ir0]
+                        meta: "( rewrite ( Diff x ( Cos x ) ) ( Mul ( Const -1 ) ( Sin x ) ) )"
+                        actions: [
+                            [Action::Entry, r15(v23) on ir_bogus],
+                            [Action::Entry, r13(v23, v24) on ir0],
+                            [Action::Entry, r11(v20, v25) on ir0],
+                            [Action::Insert, r6(v24, v25, v22)],
+                        ],
+                    ],
+                    premise: [IterNew, r3(v0, v2, v1, v3)]
+                    then: [
+                        premise: [SemiJoin, r11(v1, v2), ir0]
+                        meta: "( rewrite ( Integral fuel ( Sin x ) x ) ( Mul ( Const -1 ) ( Cos x ) ) )"
+                        actions: [
+                            [Action::Entry, r15(v4) on ir_bogus],
+                            [Action::Entry, r13(v4, v5) on ir0],
+                            [Action::Entry, r12(v1, v6) on ir0],
+                            [Action::Insert, r6(v5, v6, v3)],
+                        ],
+                        premise: [SemiJoin, r0(v222, v0), ir1]
+                        then: [
+                            premise: [JoinAll, r4(v266, v267, v2), ir3]
+                            then: [
+                                premise: [JoinOld, r0(v264, v0), ir1]
                                 meta: "( rewrite ( Integral ( Fuel fuel ) ( Add f g ) x ) ( Add ( Integral fuel f x ) ( Integral fuel g x ) ) )"
-                                atom: [Action::Insert, r3(v216, v258, v220, v263) on iu0],
-                                atom: [Action::Insert, r3(v216, v257, v220, v262) on iu0],
-                                atom: [Action::Insert, r4(v262, v263, v221)],
+                                actions: [
+                                    [Action::Entry, r3(v264, v267, v1, v272) on ir0],
+                                    [Action::Entry, r3(v264, v266, v1, v271) on ir0],
+                                    [Action::Insert, r4(v271, v272, v3)],
+                                ],
                             ],
-                            atom: [PremiseAll, r5(v284, v285, v219), iu1]
+                            premise: [JoinAll, r5(v293, v294, v2), ir1]
                             then: [
+                                premise: [JoinOld, r0(v291, v0), ir1]
                                 meta: "( rewrite ( Integral ( Fuel fuel ) ( Sub f g ) x ) ( Sub ( Integral fuel f x ) ( Integral fuel g x ) ) )"
-                                atom: [Action::Insert, r3(v216, v285, v220, v290) on iu0],
-                                atom: [Action::Insert, r3(v216, v284, v220, v289) on iu0],
-                                atom: [Action::Insert, r5(v289, v290, v221)],
+                                actions: [
+                                    [Action::Entry, r3(v291, v294, v1, v299) on ir0],
+                                    [Action::Entry, r3(v291, v293, v1, v298) on ir0],
+                                    [Action::Insert, r5(v298, v299, v3)],
+                                ],
                             ],
-                            atom: [PremiseAll, r6(v311, v312, v219), iu1]
+                            premise: [JoinAll, r6(v323, v324, v2), ir4]
                             then: [
+                                premise: [JoinOld, r0(v321, v0), ir1]
                                 meta: "( rewrite ( Integral ( Fuel fuel ) ( Mul a b ) x ) ( Sub ( Mul a ( Integral fuel b x ) ) ( Integral fuel ( Mul ( Diff x a ) ( Integral fuel b x ) ) x ) ) )"
-                                atom: [Action::Insert, r3(v216, v312, v220, v316) on iu0],
-                                atom: [Action::Insert, r6(v311, v316, v317) on iu0],
-                                atom: [Action::Insert, r2(v220, v311, v318) on iu0],
-                                atom: [Action::Insert, r6(v318, v316, v319) on iu0],
-                                atom: [Action::Insert, r3(v216, v319, v220, v320) on iu0],
-                                atom: [Action::Insert, r5(v317, v320, v221)],
+                                actions: [
+                                    [Action::Entry, r3(v321, v324, v1, v328) on ir0],
+                                    [Action::Entry, r6(v323, v328, v329) on ir0],
+                                    [Action::Entry, r2(v1, v323, v330) on ir0],
+                                    [Action::Entry, r6(v330, v328, v331) on ir0],
+                                    [Action::Entry, r3(v321, v331, v1, v332) on ir0],
+                                    [Action::Insert, r5(v329, v332, v3)],
+                                ],
                             ],
-                            atom: [PremiseAll, r12(v220, v219), iu1]
+                            premise: [SemiJoin, r12(v1, v2), ir0]
                             then: [
+                                premise: [JoinOld, r0(v245, v0), ir1]
                                 meta: "( rewrite ( Integral ( Fuel fuel ) ( Cos x ) x ) ( Sin x ) )"
-                                atom: [Action::Insert, r11(v220, v221)],
+                                actions: [
+                                    [Action::Insert, r11(v1, v3)],
+                                ],
                             ],
-                            atom: [PremiseAll, r13(v218, v219), iu1]
+                            premise: [JoinAll, r13(v224, v2), ir1]
                             then: [
-                                atom: [PremiseAny, r17(v218), iu_bogus]
+                                premise: [SemiJoin, r17(v224), ir_bogus]
                                 then: [
+                                    premise: [JoinOld, r0(v222, v0), ir1]
                                     meta: "( rewrite ( Integral ( Fuel fuel ) ( Const 1 ) x ) x )"
-                                    atom: [Action::Equate, v220=v221],
-                                ],
-                            ],
-                        ],
-                    ],
-                    atom: [PremiseNew, r2(v20, v21, v22)]
-                    then: [
-                        atom: [PremiseAll, r4(v179, v180, v21), iu1]
-                        then: [
-                            meta: "( rewrite ( Diff x ( Add a b ) ) ( Add ( Diff x a ) ( Diff x b ) ) )"
-                            atom: [Action::Insert, r2(v20, v180, v184) on iu0],
-                            atom: [Action::Insert, r2(v20, v179, v183) on iu0],
-                            atom: [Action::Insert, r4(v183, v184, v22)],
-                        ],
-                        atom: [PremiseAll, r6(v193, v194, v21), iu1]
-                        then: [
-                            meta: "( rewrite ( Diff x ( Mul a b ) ) ( Add ( Mul a ( Diff x b ) ) ( Mul b ( Diff x a ) ) ) )"
-                            atom: [Action::Insert, r2(v20, v194, v197) on iu0],
-                            atom: [Action::Insert, r6(v193, v197, v198) on iu0],
-                            atom: [Action::Insert, r2(v20, v193, v199) on iu0],
-                            atom: [Action::Insert, r6(v194, v199, v200) on iu0],
-                            atom: [Action::Insert, r4(v198, v200, v22)],
-                        ],
-                        atom: [PremiseAll, r11(v20, v21), iu1]
-                        then: [
-                            meta: "( rewrite ( Diff x ( Sin x ) ) ( Cos x ) )"
-                            atom: [Action::Insert, r12(v20, v22)],
-                        ],
-                        atom: [PremiseAll, r12(v20, v21), iu1]
-                        then: [
-                            meta: "( rewrite ( Diff x ( Cos x ) ) ( Mul ( Const -1 ) ( Sin x ) ) )"
-                            atom: [Action::Insert, r15(v23) on iu0],
-                            atom: [Action::Insert, r13(v23, v24) on iu0],
-                            atom: [Action::Insert, r11(v20, v25) on iu0],
-                            atom: [Action::Insert, r6(v24, v25, v22)],
-                        ],
-                    ],
-                    atom: [PremiseNew, r3(v0, v2, v1, v3)]
-                    then: [
-                        atom: [PremiseAll, r11(v1, v2), iu1]
-                        then: [
-                            meta: "( rewrite ( Integral fuel ( Sin x ) x ) ( Mul ( Const -1 ) ( Cos x ) ) )"
-                            atom: [Action::Insert, r15(v4) on iu0],
-                            atom: [Action::Insert, r13(v4, v5) on iu0],
-                            atom: [Action::Insert, r12(v1, v6) on iu0],
-                            atom: [Action::Insert, r6(v5, v6, v3)],
-                        ],
-                        atom: [PremiseAny, r0(v222, v0), iu1]
-                        then: [
-                            atom: [PremiseAll, r4(v266, v267, v2), iu1]
-                            then: [
-                                atom: [PremiseOld, r0(v264, v0), iu1]
-                                then: [
-                                    meta: "( rewrite ( Integral ( Fuel fuel ) ( Add f g ) x ) ( Add ( Integral fuel f x ) ( Integral fuel g x ) ) )"
-                                    atom: [Action::Insert, r3(v264, v267, v1, v272) on iu0],
-                                    atom: [Action::Insert, r3(v264, v266, v1, v271) on iu0],
-                                    atom: [Action::Insert, r4(v271, v272, v3)],
-                                ],
-                            ],
-                            atom: [PremiseAll, r5(v293, v294, v2), iu1]
-                            then: [
-                                atom: [PremiseOld, r0(v291, v0), iu1]
-                                then: [
-                                    meta: "( rewrite ( Integral ( Fuel fuel ) ( Sub f g ) x ) ( Sub ( Integral fuel f x ) ( Integral fuel g x ) ) )"
-                                    atom: [Action::Insert, r3(v291, v294, v1, v299) on iu0],
-                                    atom: [Action::Insert, r3(v291, v293, v1, v298) on iu0],
-                                    atom: [Action::Insert, r5(v298, v299, v3)],
-                                ],
-                            ],
-                            atom: [PremiseAll, r6(v323, v324, v2), iu1]
-                            then: [
-                                atom: [PremiseOld, r0(v321, v0), iu1]
-                                then: [
-                                    meta: "( rewrite ( Integral ( Fuel fuel ) ( Mul a b ) x ) ( Sub ( Mul a ( Integral fuel b x ) ) ( Integral fuel ( Mul ( Diff x a ) ( Integral fuel b x ) ) x ) ) )"
-                                    atom: [Action::Insert, r3(v321, v324, v1, v328) on iu0],
-                                    atom: [Action::Insert, r6(v323, v328, v329) on iu0],
-                                    atom: [Action::Insert, r2(v1, v323, v330) on iu0],
-                                    atom: [Action::Insert, r6(v330, v328, v331) on iu0],
-                                    atom: [Action::Insert, r3(v321, v331, v1, v332) on iu0],
-                                    atom: [Action::Insert, r5(v329, v332, v3)],
-                                ],
-                            ],
-                            atom: [PremiseAll, r12(v1, v2), iu1]
-                            then: [
-                                atom: [PremiseOld, r0(v245, v0), iu1]
-                                then: [
-                                    meta: "( rewrite ( Integral ( Fuel fuel ) ( Cos x ) x ) ( Sin x ) )"
-                                    atom: [Action::Insert, r11(v1, v3)],
-                                ],
-                            ],
-                            atom: [PremiseAll, r13(v224, v2), iu1]
-                            then: [
-                                atom: [PremiseAny, r17(v224), iu_bogus]
-                                then: [
-                                    atom: [PremiseOld, r0(v222, v0), iu1]
-                                    then: [
-                                        meta: "( rewrite ( Integral ( Fuel fuel ) ( Const 1 ) x ) x )"
-                                        atom: [Action::Equate, v1=v3],
+                                    actions: [
+                                        [Action::Equate, v1=v3],
                                     ],
                                 ],
                             ],
                         ],
                     ],
-                    atom: [PremiseNew, r4(v32, v33, v34)]
+                    premise: [IterNew, r4(v32, v33, v34)]
+                    actions: [
+                        [Action::Insert, r4(v33, v32, v34)],
+                    ]
                     then: [
-                        meta: "( rewrite ( Add a b ) ( Add b a ) )"
-                        atom: [Action::Insert, r4(v33, v32, v34)],
-                        atom: [PremiseOld, r2(v185, v34, v189), iu1]
-                        then: [
-                            meta: "( rewrite ( Diff x ( Add a b ) ) ( Add ( Diff x a ) ( Diff x b ) ) )"
-                            atom: [Action::Insert, r2(v185, v33, v191) on iu0],
-                            atom: [Action::Insert, r2(v185, v32, v190) on iu0],
-                            atom: [Action::Insert, r4(v190, v191, v189)],
+                        premise: [JoinOld, r2(v185, v34, v189), ir1]
+                        meta: "( rewrite ( Diff x ( Add a b ) ) ( Add ( Diff x a ) ( Diff x b ) ) )"
+                        actions: [
+                            [Action::Entry, r2(v185, v33, v191) on ir0],
+                            [Action::Entry, r2(v185, v32, v190) on ir0],
+                            [Action::Insert, r4(v190, v191, v189)],
                         ],
-                        atom: [PremiseOld, r3(v274, v34, v278, v279), iu2]
+                        premise: [JoinOld, r3(v274, v34, v278, v279), ir2]
                         then: [
-                            atom: [PremiseOld, r0(v273, v274), iu1]
-                            then: [
-                                meta: "( rewrite ( Integral ( Fuel fuel ) ( Add f g ) x ) ( Add ( Integral fuel f x ) ( Integral fuel g x ) ) )"
-                                atom: [Action::Insert, r3(v273, v33, v278, v281) on iu0],
-                                atom: [Action::Insert, r3(v273, v32, v278, v280) on iu0],
-                                atom: [Action::Insert, r4(v280, v281, v279)],
+                            premise: [JoinOld, r0(v273, v274), ir1]
+                            meta: "( rewrite ( Integral ( Fuel fuel ) ( Add f g ) x ) ( Add ( Integral fuel f x ) ( Integral fuel g x ) ) )"
+                            actions: [
+                                [Action::Entry, r3(v273, v33, v278, v281) on ir0],
+                                [Action::Entry, r3(v273, v32, v278, v280) on ir0],
+                                [Action::Insert, r4(v280, v281, v279)],
                             ],
                         ],
-                        atom: [PremiseAll, r4(v39, v40, v33), iu1]
-                        then: [
-                            meta: "( rewrite ( Add a ( Add b c ) ) ( Add ( Add a b ) c ) )"
-                            atom: [Action::Insert, r4(v32, v39, v43) on iu0],
-                            atom: [Action::Insert, r4(v43, v40, v34)],
+                        premise: [JoinAll, r4(v39, v40, v33), ir3]
+                        meta: "( rewrite ( Add a ( Add b c ) ) ( Add ( Add a b ) c ) )"
+                        actions: [
+                            [Action::Entry, r4(v32, v39, v43) on ir0],
+                            [Action::Insert, r4(v43, v40, v34)],
                         ],
-                        atom: [PremiseOld, r4(v44, v34, v48), iu2]
-                        then: [
-                            meta: "( rewrite ( Add a ( Add b c ) ) ( Add ( Add a b ) c ) )"
-                            atom: [Action::Insert, r4(v44, v32, v49) on iu0],
-                            atom: [Action::Insert, r4(v49, v33, v48)],
+                        premise: [JoinOld, r4(v44, v34, v48), ir2]
+                        meta: "( rewrite ( Add a ( Add b c ) ) ( Add ( Add a b ) c ) )"
+                        actions: [
+                            [Action::Entry, r4(v44, v32, v49) on ir0],
+                            [Action::Insert, r4(v49, v33, v48)],
                         ],
-                        atom: [PremiseAll, r6(v98, v34, v102), iu2]
-                        then: [
-                            meta: "( rewrite ( Mul a ( Add b c ) ) ( Add ( Mul a b ) ( Mul a c ) ) )"
-                            atom: [Action::Insert, r6(v98, v33, v104) on iu0],
-                            atom: [Action::Insert, r6(v98, v32, v103) on iu0],
-                            atom: [Action::Insert, r4(v103, v104, v102)],
+                        premise: [JoinAll, r6(v98, v34, v102), ir3]
+                        meta: "( rewrite ( Mul a ( Add b c ) ) ( Add ( Mul a b ) ( Mul a c ) ) )"
+                        actions: [
+                            [Action::Entry, r6(v98, v33, v104) on ir0],
+                            [Action::Entry, r6(v98, v32, v103) on ir0],
+                            [Action::Insert, r4(v103, v104, v102)],
                         ],
-                        atom: [PremiseAll, r13(v63, v33), iu1]
+                        premise: [JoinAll, r13(v63, v33), ir1]
                         then: [
-                            atom: [PremiseAny, r16(v63), iu_bogus]
-                            then: [
-                                meta: "( rewrite ( Add a ( Const 0 ) ) a )"
-                                atom: [Action::Equate, v32=v34],
+                            premise: [SemiJoin, r16(v63), ir_bogus]
+                            meta: "( rewrite ( Add a ( Const 0 ) ) a )"
+                            actions: [
+                                [Action::Equate, v32=v34],
                             ],
                         ],
-                        atom: [PremiseAny, r6(v112, v113, v32), iu1]
+                        premise: [SemiJoin, r6(v112, v113, v32), ir4]
                         then: [
-                            atom: [PremiseAll, r6(v112, v115, v33), iu1]
+                            premise: [JoinAll, r6(v112, v115, v33), ir4]
                             then: [
-                                atom: [PremiseAll, r6(v112, v113, v32), iu3]
-                                then: [
-                                    meta: "( rewrite ( Add ( Mul a b ) ( Mul a c ) ) ( Mul a ( Add b c ) ) )"
-                                    atom: [Action::Insert, r4(v113, v115, v118) on iu0],
-                                    atom: [Action::Insert, r6(v112, v118, v34)],
+                                premise: [JoinAll, r6(v112, v113, v32), ir2]
+                                meta: "( rewrite ( Add ( Mul a b ) ( Mul a c ) ) ( Mul a ( Add b c ) ) )"
+                                actions: [
+                                    [Action::Entry, r4(v113, v115, v118) on ir0],
+                                    [Action::Insert, r6(v112, v118, v34)],
                                 ],
                             ],
                         ],
                     ],
-                    atom: [PremiseNew, r5(v14, v15, v16)]
+                    premise: [IterNew, r5(v14, v15, v16)]
+                    actions: [
+                        [Action::Entry, r15(v17) on ir_bogus],
+                        [Action::Entry, r13(v17, v18) on ir0],
+                        [Action::Entry, r6(v18, v15, v19) on ir0],
+                        [Action::Insert, r4(v14, v19, v16)],
+                    ]
                     then: [
-                        meta: "( rewrite ( Sub a b ) ( Add a ( Mul ( Const -1 ) b ) ) )"
-                        atom: [Action::Insert, r15(v17) on iu0],
-                        atom: [Action::Insert, r13(v17, v18) on iu0],
-                        atom: [Action::Insert, r6(v18, v15, v19) on iu0],
-                        atom: [Action::Insert, r4(v14, v19, v16)],
-                        atom: [PremiseOld, r3(v301, v16, v305, v306), iu2]
+                        premise: [JoinOld, r3(v301, v16, v305, v306), ir2]
                         then: [
-                            atom: [PremiseOld, r0(v300, v301), iu1]
-                            then: [
-                                meta: "( rewrite ( Integral ( Fuel fuel ) ( Sub f g ) x ) ( Sub ( Integral fuel f x ) ( Integral fuel g x ) ) )"
-                                atom: [Action::Insert, r3(v300, v15, v305, v308) on iu0],
-                                atom: [Action::Insert, r3(v300, v14, v305, v307) on iu0],
-                                atom: [Action::Insert, r5(v307, v308, v306)],
+                            premise: [JoinOld, r0(v300, v301), ir1]
+                            meta: "( rewrite ( Integral ( Fuel fuel ) ( Sub f g ) x ) ( Sub ( Integral fuel f x ) ( Integral fuel g x ) ) )"
+                            actions: [
+                                [Action::Entry, r3(v300, v15, v305, v308) on ir0],
+                                [Action::Entry, r3(v300, v14, v305, v307) on ir0],
+                                [Action::Insert, r5(v307, v308, v306)],
                             ],
                         ],
                     ],
-                    atom: [PremiseNew, r6(v35, v36, v37)]
+                    premise: [IterNew, r6(v35, v36, v37)]
+                    actions: [
+                        [Action::Insert, r6(v36, v35, v37)],
+                    ]
                     then: [
-                        meta: "( rewrite ( Mul a b ) ( Mul b a ) )"
-                        atom: [Action::Insert, r6(v36, v35, v37)],
-                        atom: [PremiseOld, r2(v201, v37, v205), iu1]
-                        then: [
-                            meta: "( rewrite ( Diff x ( Mul a b ) ) ( Add ( Mul a ( Diff x b ) ) ( Mul b ( Diff x a ) ) ) )"
-                            atom: [Action::Insert, r2(v201, v36, v206) on iu0],
-                            atom: [Action::Insert, r6(v35, v206, v207) on iu0],
-                            atom: [Action::Insert, r2(v201, v35, v208) on iu0],
-                            atom: [Action::Insert, r6(v36, v208, v209) on iu0],
-                            atom: [Action::Insert, r4(v207, v209, v205)],
+                        premise: [JoinOld, r2(v201, v37, v205), ir1]
+                        meta: "( rewrite ( Diff x ( Mul a b ) ) ( Add ( Mul a ( Diff x b ) ) ( Mul b ( Diff x a ) ) ) )"
+                        actions: [
+                            [Action::Entry, r2(v201, v36, v206) on ir0],
+                            [Action::Entry, r6(v35, v206, v207) on ir0],
+                            [Action::Entry, r2(v201, v35, v208) on ir0],
+                            [Action::Entry, r6(v36, v208, v209) on ir0],
+                            [Action::Insert, r4(v207, v209, v205)],
                         ],
-                        atom: [PremiseOld, r3(v334, v37, v338, v339), iu2]
+                        premise: [JoinOld, r3(v334, v37, v338, v339), ir2]
                         then: [
-                            atom: [PremiseOld, r0(v333, v334), iu1]
-                            then: [
-                                meta: "( rewrite ( Integral ( Fuel fuel ) ( Mul a b ) x ) ( Sub ( Mul a ( Integral fuel b x ) ) ( Integral fuel ( Mul ( Diff x a ) ( Integral fuel b x ) ) x ) ) )"
-                                atom: [Action::Insert, r3(v333, v36, v338, v340) on iu0],
-                                atom: [Action::Insert, r6(v35, v340, v341) on iu0],
-                                atom: [Action::Insert, r2(v338, v35, v342) on iu0],
-                                atom: [Action::Insert, r6(v342, v340, v343) on iu0],
-                                atom: [Action::Insert, r3(v333, v343, v338, v344) on iu0],
-                                atom: [Action::Insert, r5(v341, v344, v339)],
+                            premise: [JoinOld, r0(v333, v334), ir1]
+                            meta: "( rewrite ( Integral ( Fuel fuel ) ( Mul a b ) x ) ( Sub ( Mul a ( Integral fuel b x ) ) ( Integral fuel ( Mul ( Diff x a ) ( Integral fuel b x ) ) x ) ) )"
+                            actions: [
+                                [Action::Entry, r3(v333, v36, v338, v340) on ir0],
+                                [Action::Entry, r6(v35, v340, v341) on ir0],
+                                [Action::Entry, r2(v338, v35, v342) on ir0],
+                                [Action::Entry, r6(v342, v340, v343) on ir0],
+                                [Action::Entry, r3(v333, v343, v338, v344) on ir0],
+                                [Action::Insert, r5(v341, v344, v339)],
                             ],
                         ],
-                        atom: [PremiseOld, r4(v106, v107, v36), iu1]
-                        then: [
-                            meta: "( rewrite ( Mul a ( Add b c ) ) ( Add ( Mul a b ) ( Mul a c ) ) )"
-                            atom: [Action::Insert, r6(v35, v107, v111) on iu0],
-                            atom: [Action::Insert, r6(v35, v106, v110) on iu0],
-                            atom: [Action::Insert, r4(v110, v111, v37)],
+                        premise: [JoinOld, r4(v106, v107, v36), ir3]
+                        meta: "( rewrite ( Mul a ( Add b c ) ) ( Add ( Mul a b ) ( Mul a c ) ) )"
+                        actions: [
+                            [Action::Entry, r6(v35, v107, v111) on ir0],
+                            [Action::Entry, r6(v35, v106, v110) on ir0],
+                            [Action::Insert, r4(v110, v111, v37)],
                         ],
-                        atom: [PremiseAll, r6(v51, v52, v36), iu1]
-                        then: [
-                            meta: "( rewrite ( Mul a ( Mul b c ) ) ( Mul ( Mul a b ) c ) )"
-                            atom: [Action::Insert, r6(v35, v51, v55) on iu0],
-                            atom: [Action::Insert, r6(v55, v52, v37)],
+                        premise: [JoinAll, r6(v51, v52, v36), ir4]
+                        meta: "( rewrite ( Mul a ( Mul b c ) ) ( Mul ( Mul a b ) c ) )"
+                        actions: [
+                            [Action::Entry, r6(v35, v51, v55) on ir0],
+                            [Action::Insert, r6(v55, v52, v37)],
                         ],
-                        atom: [PremiseOld, r6(v56, v37, v60), iu2]
-                        then: [
-                            meta: "( rewrite ( Mul a ( Mul b c ) ) ( Mul ( Mul a b ) c ) )"
-                            atom: [Action::Insert, r6(v56, v35, v61) on iu0],
-                            atom: [Action::Insert, r6(v61, v36, v60)],
+                        premise: [JoinOld, r6(v56, v37, v60), ir3]
+                        meta: "( rewrite ( Mul a ( Mul b c ) ) ( Mul ( Mul a b ) c ) )"
+                        actions: [
+                            [Action::Entry, r6(v56, v35, v61) on ir0],
+                            [Action::Insert, r6(v61, v36, v60)],
                         ],
-                        atom: [PremiseAll, r13(v75, v36), iu1]
+                        premise: [JoinAll, r13(v75, v36), ir1]
                         then: [
-                            atom: [PremiseAny, r16(v75), iu_bogus]
-                            then: [
-                                meta: "( rewrite ( Mul a ( Const 0 ) ) ( Const 0 ) )"
-                                atom: [Action::Equate, v36=v37],
+                            premise: [SemiJoin, r16(v75), ir_bogus]
+                            meta: "( rewrite ( Mul a ( Const 0 ) ) ( Const 0 ) )"
+                            actions: [
+                                [Action::Equate, v36=v37],
                             ],
-                            atom: [PremiseAny, r17(v75), iu_bogus]
-                            then: [
-                                meta: "( rewrite ( Mul a ( Const 1 ) ) a )"
-                                atom: [Action::Equate, v35=v37],
+                            premise: [SemiJoin, r17(v75), ir_bogus]
+                            meta: "( rewrite ( Mul a ( Const 1 ) ) a )"
+                            actions: [
+                                [Action::Equate, v35=v37],
                             ],
                         ],
-                        atom: [PremiseAny, r6(v35, v122, v123), iu4]
+                        premise: [SemiJoin, r6(v35, v122, v123), ir1]
                         then: [
-                            atom: [PremiseOld, r4(v37, v123, v124), iu3]
+                            premise: [JoinOld, r4(v37, v123, v124), ir1]
                             then: [
-                                atom: [PremiseAll, r6(v35, v122, v123), iu3]
-                                then: [
-                                    meta: "( rewrite ( Add ( Mul a b ) ( Mul a c ) ) ( Mul a ( Add b c ) ) )"
-                                    atom: [Action::Insert, r4(v36, v122, v125) on iu0],
-                                    atom: [Action::Insert, r6(v35, v125, v124)],
+                                premise: [JoinAll, r6(v35, v122, v123), ir2]
+                                meta: "( rewrite ( Add ( Mul a b ) ( Mul a c ) ) ( Mul a ( Add b c ) ) )"
+                                actions: [
+                                    [Action::Entry, r4(v36, v122, v125) on ir0],
+                                    [Action::Insert, r6(v35, v125, v124)],
                                 ],
                             ],
-                            atom: [PremiseOld, r4(v128, v37, v131), iu2]
+                            premise: [JoinOld, r4(v128, v37, v131), ir2]
                             then: [
-                                atom: [PremiseOld, r6(v35, v127, v128), iu3]
-                                then: [
-                                    meta: "( rewrite ( Add ( Mul a b ) ( Mul a c ) ) ( Mul a ( Add b c ) ) )"
-                                    atom: [Action::Insert, r4(v127, v36, v132) on iu0],
-                                    atom: [Action::Insert, r6(v35, v132, v131)],
+                                premise: [JoinOld, r6(v35, v127, v128), ir2]
+                                meta: "( rewrite ( Add ( Mul a b ) ( Mul a c ) ) ( Mul a ( Add b c ) ) )"
+                                actions: [
+                                    [Action::Entry, r4(v127, v36, v132) on ir0],
+                                    [Action::Insert, r6(v35, v132, v131)],
                                 ],
                             ],
                         ],
-                        atom: [PremiseAny, r8(v133, v134, v35), iu1]
+                        premise: [SemiJoin, r8(v133, v134, v35), ir4]
                         then: [
-                            atom: [PremiseAll, r8(v133, v136, v36), iu1]
+                            premise: [JoinAll, r8(v133, v136, v36), ir4]
                             then: [
-                                atom: [PremiseAll, r8(v133, v134, v35), iu2]
-                                then: [
-                                    meta: "( rewrite ( Mul ( Pow a b ) ( Pow a c ) ) ( Pow a ( Add b c ) ) )"
-                                    atom: [Action::Insert, r4(v134, v136, v139) on iu0],
-                                    atom: [Action::Insert, r8(v133, v139, v37)],
+                                premise: [JoinAll, r8(v133, v134, v35), ir2]
+                                meta: "( rewrite ( Mul ( Pow a b ) ( Pow a c ) ) ( Pow a ( Add b c ) ) )"
+                                actions: [
+                                    [Action::Entry, r4(v134, v136, v139) on ir0],
+                                    [Action::Insert, r8(v133, v139, v37)],
                                 ],
                             ],
                         ],
                     ],
-                    atom: [PremiseNew, r8(v140, v141, v142)]
+                    premise: [IterNew, r8(v140, v141, v142)]
                     then: [
-                        atom: [PremiseAll, r13(v155, v141), iu1]
+                        premise: [JoinAll, r13(v155, v141), ir1]
                         then: [
-                            atom: [PremiseAny, r17(v155), iu_bogus]
-                            then: [
-                                meta: "( rewrite ( Pow x ( Const 1 ) ) x )"
-                                atom: [Action::Equate, v140=v142],
+                            premise: [SemiJoin, r17(v155), ir_bogus]
+                            meta: "( rewrite ( Pow x ( Const 1 ) ) x )"
+                            actions: [
+                                [Action::Equate, v140=v142],
                             ],
-                            atom: [PremiseAny, r18(v155), iu_bogus]
+                            premise: [SemiJoin, r18(v155), ir_bogus]
+                            meta: "( rewrite ( Pow x ( Const 2 ) ) ( Mul x x ) )"
+                            actions: [
+                                [Action::Insert, r6(v140, v140, v142)],
+                            ],
+                        ],
+                        premise: [SemiJoin, r8(v140, v143, v144), ir1]
+                        then: [
+                            premise: [JoinOld, r6(v142, v144, v145), ir1]
                             then: [
+                                premise: [JoinAll, r8(v140, v143, v144), ir2]
+                                meta: "( rewrite ( Mul ( Pow a b ) ( Pow a c ) ) ( Pow a ( Add b c ) ) )"
+                                actions: [
+                                    [Action::Entry, r4(v141, v143, v146) on ir0],
+                                    [Action::Insert, r8(v140, v146, v145)],
+                                ],
+                            ],
+                            premise: [JoinOld, r6(v149, v142, v152), ir3]
+                            then: [
+                                premise: [JoinOld, r8(v140, v148, v149), ir2]
+                                meta: "( rewrite ( Mul ( Pow a b ) ( Pow a c ) ) ( Pow a ( Add b c ) ) )"
+                                actions: [
+                                    [Action::Entry, r4(v148, v141, v153) on ir0],
+                                    [Action::Insert, r8(v140, v153, v152)],
+                                ],
+                            ],
+                        ],
+                    ],
+                    premise: [IterNew, r11(v8, v9)]
+                    then: [
+                        premise: [JoinOld, r2(v8, v9, v215), ir0]
+                        meta: "( rewrite ( Diff x ( Sin x ) ) ( Cos x ) )"
+                        actions: [
+                            [Action::Insert, r12(v8, v215)],
+                        ],
+                        premise: [JoinOld, r3(v7, v9, v8, v10), ir3]
+                        meta: "( rewrite ( Integral fuel ( Sin x ) x ) ( Mul ( Const -1 ) ( Cos x ) ) )"
+                        actions: [
+                            [Action::Entry, r15(v11) on ir_bogus],
+                            [Action::Entry, r13(v11, v12) on ir0],
+                            [Action::Entry, r12(v8, v13) on ir0],
+                            [Action::Insert, r6(v12, v13, v10)],
+                        ],
+                    ],
+                    premise: [IterNew, r12(v26, v27)]
+                    then: [
+                        premise: [JoinOld, r2(v26, v27, v28), ir0]
+                        meta: "( rewrite ( Diff x ( Cos x ) ) ( Mul ( Const -1 ) ( Sin x ) ) )"
+                        actions: [
+                            [Action::Entry, r15(v29) on ir_bogus],
+                            [Action::Entry, r13(v29, v30) on ir0],
+                            [Action::Entry, r11(v26, v31) on ir0],
+                            [Action::Insert, r6(v30, v31, v28)],
+                        ],
+                        premise: [JoinOld, r3(v251, v27, v26, v254), ir3]
+                        then: [
+                            premise: [JoinOld, r0(v250, v251), ir1]
+                            meta: "( rewrite ( Integral ( Fuel fuel ) ( Cos x ) x ) ( Sin x ) )"
+                            actions: [
+                                [Action::Insert, r11(v26, v254)],
+                            ],
+                        ],
+                    ],
+                    premise: [IterNew, r13(v67, v68)]
+                    then: [
+                        premise: [SemiJoin, r8(v158, v68, v161), ir3]
+                        then: [
+                            premise: [SemiJoin, r18(v67), ir_bogus]
+                            then: [
+                                premise: [JoinOld, r8(v170, v68, v173), ir3]
                                 meta: "( rewrite ( Pow x ( Const 2 ) ) ( Mul x x ) )"
-                                atom: [Action::Insert, r6(v140, v140, v142)],
-                            ],
-                        ],
-                        atom: [PremiseAny, r8(v140, v143, v144), iu3]
-                        then: [
-                            atom: [PremiseOld, r6(v142, v144, v145), iu4]
-                            then: [
-                                atom: [PremiseAll, r8(v140, v143, v144), iu2]
-                                then: [
-                                    meta: "( rewrite ( Mul ( Pow a b ) ( Pow a c ) ) ( Pow a ( Add b c ) ) )"
-                                    atom: [Action::Insert, r4(v141, v143, v146) on iu0],
-                                    atom: [Action::Insert, r8(v140, v146, v145)],
-                                ],
-                            ],
-                            atom: [PremiseOld, r6(v149, v142, v152), iu2]
-                            then: [
-                                atom: [PremiseOld, r8(v140, v148, v149), iu2]
-                                then: [
-                                    meta: "( rewrite ( Mul ( Pow a b ) ( Pow a c ) ) ( Pow a ( Add b c ) ) )"
-                                    atom: [Action::Insert, r4(v148, v141, v153) on iu0],
-                                    atom: [Action::Insert, r8(v140, v153, v152)],
+                                actions: [
+                                    [Action::Insert, r6(v170, v170, v173)],
                                 ],
                             ],
                         ],
-                    ],
-                    atom: [PremiseNew, r11(v8, v9)]
-                    then: [
-                        atom: [PremiseOld, r2(v8, v9, v215), iu0]
+                        premise: [SemiJoin, r16(v67), ir_bogus]
                         then: [
-                            meta: "( rewrite ( Diff x ( Sin x ) ) ( Cos x ) )"
-                            atom: [Action::Insert, r12(v8, v215)],
-                        ],
-                        atom: [PremiseOld, r3(v7, v9, v8, v10), iu3]
-                        then: [
-                            meta: "( rewrite ( Integral fuel ( Sin x ) x ) ( Mul ( Const -1 ) ( Cos x ) ) )"
-                            atom: [Action::Insert, r15(v11) on iu0],
-                            atom: [Action::Insert, r13(v11, v12) on iu0],
-                            atom: [Action::Insert, r12(v8, v13) on iu0],
-                            atom: [Action::Insert, r6(v12, v13, v10)],
-                        ],
-                    ],
-                    atom: [PremiseNew, r12(v26, v27)]
-                    then: [
-                        atom: [PremiseOld, r2(v26, v27, v28), iu0]
-                        then: [
-                            meta: "( rewrite ( Diff x ( Cos x ) ) ( Mul ( Const -1 ) ( Sin x ) ) )"
-                            atom: [Action::Insert, r15(v29) on iu0],
-                            atom: [Action::Insert, r13(v29, v30) on iu0],
-                            atom: [Action::Insert, r11(v26, v31) on iu0],
-                            atom: [Action::Insert, r6(v30, v31, v28)],
-                        ],
-                        atom: [PremiseOld, r3(v251, v27, v26, v254), iu3]
-                        then: [
-                            atom: [PremiseOld, r0(v250, v251), iu1]
+                            premise: [JoinOld, r4(v66, v68, v69), ir2]
                             then: [
-                                meta: "( rewrite ( Integral ( Fuel fuel ) ( Cos x ) x ) ( Sin x ) )"
-                                atom: [Action::Insert, r11(v26, v254)],
+                                premise: [SemiJoin, r16(v67), ir_bogus]
+                                meta: "( rewrite ( Add a ( Const 0 ) ) a )"
+                                actions: [
+                                    [Action::Equate, v66=v69],
+                                ],
                             ],
-                        ],
-                    ],
-                    atom: [PremiseNew, r13(v67, v68)]
-                    then: [
-                        atom: [PremiseAny, r8(v158, v68, v161), iu4]
-                        then: [
-                            atom: [PremiseAny, r18(v67), iu_bogus]
+                            premise: [JoinOld, r6(v78, v68, v81), ir3]
                             then: [
-                                atom: [PremiseOld, r8(v170, v68, v173), iu4]
-                                then: [
-                                    meta: "( rewrite ( Pow x ( Const 2 ) ) ( Mul x x ) )"
-                                    atom: [Action::Insert, r6(v170, v170, v173)],
+                                premise: [SemiJoin, r16(v67), ir_bogus]
+                                meta: "( rewrite ( Mul a ( Const 0 ) ) ( Const 0 ) )"
+                                actions: [
+                                    [Action::Equate, v68=v81],
                                 ],
                             ],
                         ],
-                        atom: [PremiseAny, r16(v67), iu_bogus]
+                        premise: [SemiJoin, r17(v67), ir_bogus]
                         then: [
-                            atom: [PremiseOld, r4(v66, v68, v69), iu2]
+                            premise: [JoinOld, r3(v229, v68, v232, v233), ir2]
                             then: [
-                                atom: [PremiseAny, r16(v67), iu_bogus]
+                                premise: [JoinOld, r0(v228, v229), ir1]
                                 then: [
-                                    meta: "( rewrite ( Add a ( Const 0 ) ) a )"
-                                    atom: [Action::Equate, v66=v69],
-                                ],
-                            ],
-                            atom: [PremiseOld, r6(v78, v68, v81), iu2]
-                            then: [
-                                atom: [PremiseAny, r16(v67), iu_bogus]
-                                then: [
-                                    meta: "( rewrite ( Mul a ( Const 0 ) ) ( Const 0 ) )"
-                                    atom: [Action::Equate, v68=v81],
-                                ],
-                            ],
-                        ],
-                        atom: [PremiseAny, r17(v67), iu_bogus]
-                        then: [
-                            atom: [PremiseOld, r3(v229, v68, v232, v233), iu2]
-                            then: [
-                                atom: [PremiseOld, r0(v228, v229), iu1]
-                                then: [
-                                    atom: [PremiseAny, r17(v67), iu_bogus]
-                                    then: [
-                                        meta: "( rewrite ( Integral ( Fuel fuel ) ( Const 1 ) x ) x )"
-                                        atom: [Action::Equate, v232=v233],
+                                    premise: [SemiJoin, r17(v67), ir_bogus]
+                                    meta: "( rewrite ( Integral ( Fuel fuel ) ( Const 1 ) x ) x )"
+                                    actions: [
+                                        [Action::Equate, v232=v233],
                                     ],
                                 ],
                             ],
-                            atom: [PremiseOld, r6(v90, v68, v93), iu2]
+                            premise: [JoinOld, r6(v90, v68, v93), ir3]
                             then: [
-                                atom: [PremiseAny, r17(v67), iu_bogus]
-                                then: [
-                                    meta: "( rewrite ( Mul a ( Const 1 ) ) a )"
-                                    atom: [Action::Equate, v90=v93],
-                                ],
-                            ],
-                            atom: [PremiseOld, r8(v158, v68, v161), iu4]
-                            then: [
-                                atom: [PremiseAny, r17(v67), iu_bogus]
-                                then: [
-                                    meta: "( rewrite ( Pow x ( Const 1 ) ) x )"
-                                    atom: [Action::Equate, v158=v161],
-                                ],
-                            ],
-                        ],
-                    ],
-                    atom: [PremiseNew, r16(v71)]
-                    then: [
-                        atom: [PremiseOld, r13(v71, v72), iu0]
-                        then: [
-                            atom: [PremiseOld, r4(v70, v72, v73), iu2]
-                            then: [
-                                meta: "( rewrite ( Add a ( Const 0 ) ) a )"
-                                atom: [Action::Equate, v70=v73],
-                            ],
-                            atom: [PremiseOld, r6(v82, v72, v85), iu2]
-                            then: [
-                                meta: "( rewrite ( Mul a ( Const 0 ) ) ( Const 0 ) )"
-                                atom: [Action::Equate, v72=v85],
-                            ],
-                        ],
-                    ],
-                    atom: [PremiseNew, r17(v95)]
-                    then: [
-                        atom: [PremiseOld, r13(v95, v96), iu0]
-                        then: [
-                            atom: [PremiseOld, r3(v235, v96, v238, v239), iu2]
-                            then: [
-                                atom: [PremiseOld, r0(v234, v235), iu1]
-                                then: [
-                                    meta: "( rewrite ( Integral ( Fuel fuel ) ( Const 1 ) x ) x )"
-                                    atom: [Action::Equate, v238=v239],
-                                ],
-                            ],
-                            atom: [PremiseOld, r6(v94, v96, v97), iu2]
-                            then: [
+                                premise: [SemiJoin, r17(v67), ir_bogus]
                                 meta: "( rewrite ( Mul a ( Const 1 ) ) a )"
-                                atom: [Action::Equate, v94=v97],
+                                actions: [
+                                    [Action::Equate, v90=v93],
+                                ],
                             ],
-                            atom: [PremiseOld, r8(v162, v96, v165), iu4]
+                            premise: [JoinOld, r8(v158, v68, v161), ir3]
                             then: [
+                                premise: [SemiJoin, r17(v67), ir_bogus]
                                 meta: "( rewrite ( Pow x ( Const 1 ) ) x )"
-                                atom: [Action::Equate, v162=v165],
+                                actions: [
+                                    [Action::Equate, v158=v161],
+                                ],
                             ],
                         ],
                     ],
-                    atom: [PremiseNew, r18(v175)]
+                    premise: [IterNew, r16(v71)]
                     then: [
-                        atom: [PremiseOld, r13(v175, v176), iu0]
+                        premise: [JoinOld, r13(v71, v72), ir0]
                         then: [
-                            atom: [PremiseOld, r8(v174, v176, v177), iu4]
+                            premise: [JoinOld, r4(v70, v72, v73), ir2]
+                            meta: "( rewrite ( Add a ( Const 0 ) ) a )"
+                            actions: [
+                                [Action::Equate, v70=v73],
+                            ],
+                            premise: [JoinOld, r6(v82, v72, v85), ir3]
+                            meta: "( rewrite ( Mul a ( Const 0 ) ) ( Const 0 ) )"
+                            actions: [
+                                [Action::Equate, v72=v85],
+                            ],
+                        ],
+                    ],
+                    premise: [IterNew, r17(v95)]
+                    then: [
+                        premise: [JoinOld, r13(v95, v96), ir0]
+                        then: [
+                            premise: [JoinOld, r3(v235, v96, v238, v239), ir2]
                             then: [
-                                meta: "( rewrite ( Pow x ( Const 2 ) ) ( Mul x x ) )"
-                                atom: [Action::Insert, r6(v174, v174, v177)],
+                                premise: [JoinOld, r0(v234, v235), ir1]
+                                meta: "( rewrite ( Integral ( Fuel fuel ) ( Const 1 ) x ) x )"
+                                actions: [
+                                    [Action::Equate, v238=v239],
+                                ],
+                            ],
+                            premise: [JoinOld, r6(v94, v96, v97), ir3]
+                            meta: "( rewrite ( Mul a ( Const 1 ) ) a )"
+                            actions: [
+                                [Action::Equate, v94=v97],
+                            ],
+                            premise: [JoinOld, r8(v162, v96, v165), ir3]
+                            meta: "( rewrite ( Pow x ( Const 1 ) ) x )"
+                            actions: [
+                                [Action::Equate, v162=v165],
+                            ],
+                        ],
+                    ],
+                    premise: [IterNew, r18(v175)]
+                    then: [
+                        premise: [JoinOld, r13(v175, v176), ir0]
+                        then: [
+                            premise: [JoinOld, r8(v174, v176, v177), ir3]
+                            meta: "( rewrite ( Pow x ( Const 2 ) ) ( Mul x x ) )"
+                            actions: [
+                                [Action::Insert, r6(v174, v174, v177)],
                             ],
                         ],
                     ],
@@ -14532,9 +14336,6 @@ fn lir_math() {
                         .copied()
                         .map(|(x1, _timestamp)| (x1,))
                 }
-                fn iter_all1_1_0(&self, x1: FuelUnit) -> impl Iterator<Item = (FuelUnit,)> + use<'_> {
-                    self.hash_index_1.iter((x1,)).map(|(x0, _timestamp)| (x0,))
-                }
                 fn iter_old1_0_1(
                     &self,
                     x0: FuelUnit,
@@ -14546,6 +14347,21 @@ fn lir_math() {
                         .copied()
                         .filter_map(move |(x1, timestamp)| (timestamp < latest_timestamp).then_some((x1,)))
                 }
+                #[allow(unreachable_code)]
+                fn entry1_0_1(&self, x0: FuelUnit, delta: &mut Delta, uf: &mut Unification) -> (FuelUnit,) {
+                    if let Some((x1,)) = self.iter_all1_0_1(x0).next() {
+                        return (x1,);
+                    }
+                    let x1 = uf.fuel_unit_.add_eclass();
+                    delta.fuel_.push((x0, x1));
+                    (x1,)
+                }
+                fn check1_0_1(&self, x0: FuelUnit) -> bool {
+                    self.iter_all1_0_1(x0).next().is_some()
+                }
+                fn iter_all1_1_0(&self, x1: FuelUnit) -> impl Iterator<Item = (FuelUnit,)> + use<'_> {
+                    self.hash_index_1.iter((x1,)).map(|(x0, _timestamp)| (x0,))
+                }
                 fn iter_old1_1_0(
                     &self,
                     x1: FuelUnit,
@@ -14555,20 +14371,8 @@ fn lir_math() {
                         .iter((x1,))
                         .filter_map(move |(x0, timestamp)| (timestamp < latest_timestamp).then_some((x0,)))
                 }
-                fn check1_0_1(&self, x0: FuelUnit) -> bool {
-                    self.iter_all1_0_1(x0).next().is_some()
-                }
                 fn check1_1_0(&self, x1: FuelUnit) -> bool {
                     self.iter_all1_1_0(x1).next().is_some()
-                }
-                #[allow(unreachable_code)]
-                fn entry1_0_1(&self, x0: FuelUnit, delta: &mut Delta, uf: &mut Unification) -> (FuelUnit,) {
-                    if let Some((x1,)) = self.iter_all1_0_1(x0).next() {
-                        return (x1,);
-                    }
-                    let x1 = uf.fuel_unit_.add_eclass();
-                    delta.fuel_.push((x0, x1));
-                    (x1,)
                 }
             }
             #[derive(Debug, Default)]
@@ -14734,9 +14538,6 @@ fn lir_math() {
                         .copied()
                         .filter_map(move |(x0, timestamp)| (timestamp < latest_timestamp).then_some((x0,)))
                 }
-                fn check0_0(&self) -> bool {
-                    self.iter_all0_0().next().is_some()
-                }
                 #[allow(unreachable_code)]
                 fn entry0_0(&self, delta: &mut Delta, uf: &mut Unification) -> (FuelUnit,) {
                     if let Some((x0,)) = self.iter_all0_0().next() {
@@ -14746,19 +14547,22 @@ fn lir_math() {
                     delta.zero_fuel_.push((x0,));
                     (x0,)
                 }
+                fn check0_0(&self) -> bool {
+                    self.iter_all0_0().next().is_some()
+                }
             }
             #[derive(Debug, Default)]
             struct DiffRelation {
                 new: Vec<<Self as Relation>::Row>,
                 all: Vec<(Math, Math, Math, TimeStamp)>,
-                hash_index_1_0: runtime::HashMap<(Math, Math), (Math, TimeStamp)>,
+                hash_index_0_1: runtime::HashMap<(Math, Math), (Math, TimeStamp)>,
                 hash_index_1: runtime::IndexedSortedList<(Math,), (Math, Math, TimeStamp)>,
                 math_num_uprooted_at_latest_retain: usize,
             }
             impl Relation for DiffRelation {
                 type Row = (Math, Math, Math);
                 type Unification = Unification;
-                const COST: u32 = 3u32;
+                const COST: u32 = 6u32;
                 fn new() -> Self {
                     Self::default()
                 }
@@ -14772,18 +14576,18 @@ fn lir_math() {
                     self.new.iter().copied()
                 }
                 fn len(&self) -> usize {
-                    self.hash_index_1.len()
+                    self.hash_index_0_1.len()
                 }
                 fn emit_graphviz(&self, buf: &mut String) {
                     use std::fmt::Write;
-                    for (i, ((x1, x0), (x2, _timestamp))) in self
-                        .hash_index_1_0
+                    for (i, ((x0, x1), (x2, _timestamp))) in self
+                        .hash_index_0_1
                         .iter()
                         .map(|(k, v)| ((*k), (*v)))
                         .enumerate()
                     {
-                        writeln!(buf, "{}_{i} -> {}_{};", "diff", "math", x1).unwrap();
                         writeln!(buf, "{}_{i} -> {}_{};", "diff", "math", x0).unwrap();
+                        writeln!(buf, "{}_{i} -> {}_{};", "diff", "math", x1).unwrap();
                         writeln!(buf, "{}_{i} -> {}_{};", "diff", "math", x2).unwrap();
                         writeln!(buf, "{}_{i} [shape = box];", "diff").unwrap();
                     }
@@ -14797,8 +14601,8 @@ fn lir_math() {
                     log_duration!("update_begin {}: {}", "diff", {
                         for &(mut x0, mut x1, mut x2) in insertions {
                             match self
-                                .hash_index_1_0
-                                .entry((uf.math_.find(x1), uf.math_.find(x0)))
+                                .hash_index_0_1
+                                .entry((uf.math_.find(x0), uf.math_.find(x1)))
                             {
                                 runtime::HashMapEntry::Occupied(mut entry) => {
                                     let (y2, timestamp) = entry.get_mut();
@@ -14828,8 +14632,8 @@ fn lir_math() {
                         }
                         let offset = insertions.len();
                         self.math_num_uprooted_at_latest_retain = uf.math_.num_uprooted();
-                        self.hash_index_1_0
-                            .retain(|&(x1, x0), &mut (x2, _timestamp)| {
+                        self.hash_index_0_1
+                            .retain(|&(x0, x1), &mut (x2, _timestamp)| {
                                 if uf.math_.is_root(x0) & uf.math_.is_root(x1) & uf.math_.is_root(x2) {
                                     true
                                 } else {
@@ -14850,8 +14654,8 @@ fn lir_math() {
                     log_duration!("update_finalize {}: {}", "diff", {
                         assert!(self.new.is_empty());
                         log_duration!("fill new and all: {}", {
-                            self.new.extend(self.hash_index_1_0.iter().filter_map(
-                                |(&(x1, x0), &(x2, timestamp))| {
+                            self.new.extend(self.hash_index_0_1.iter().filter_map(
+                                |(&(x0, x1), &(x2, timestamp))| {
                                     if timestamp == latest_timestamp {
                                         Some((x0, x1, x2))
                                     } else {
@@ -14862,9 +14666,9 @@ fn lir_math() {
                             RadixSortable::wrap(&mut self.new).voracious_sort();
                             self.all.clear();
                             self.all.extend(
-                                self.hash_index_1_0
+                                self.hash_index_0_1
                                     .iter()
-                                    .map(|(&(x1, x0), &(x2, timestamp))| (x0, x1, x2, timestamp)),
+                                    .map(|(&(x0, x1), &(x2, timestamp))| (x0, x1, x2, timestamp)),
                             );
                             insertions.clear();
                         });
@@ -14922,29 +14726,41 @@ fn lir_math() {
                 }
             }
             impl DiffRelation {
-                fn iter_all2_1_0_2(&self, x1: Math, x0: Math) -> impl Iterator<Item = (Math,)> + use<'_> {
-                    self.hash_index_1_0
-                        .get(&(x1, x0))
+                fn iter_all2_0_1_2(&self, x0: Math, x1: Math) -> impl Iterator<Item = (Math,)> + use<'_> {
+                    self.hash_index_0_1
+                        .get(&(x0, x1))
                         .into_iter()
                         .copied()
                         .map(|(x2, _timestamp)| (x2,))
+                }
+                fn iter_old2_0_1_2(
+                    &self,
+                    x0: Math,
+                    x1: Math,
+                    latest_timestamp: TimeStamp,
+                ) -> impl Iterator<Item = (Math,)> + use<'_> {
+                    self.hash_index_0_1
+                        .get(&(x0, x1))
+                        .into_iter()
+                        .copied()
+                        .filter_map(move |(x2, timestamp)| (timestamp < latest_timestamp).then_some((x2,)))
+                }
+                #[allow(unreachable_code)]
+                fn entry2_0_1_2(&self, x0: Math, x1: Math, delta: &mut Delta, uf: &mut Unification) -> (Math,) {
+                    if let Some((x2,)) = self.iter_all2_0_1_2(x0, x1).next() {
+                        return (x2,);
+                    }
+                    let x2 = uf.math_.add_eclass();
+                    delta.diff_.push((x0, x1, x2));
+                    (x2,)
+                }
+                fn check2_0_1_2(&self, x0: Math, x1: Math) -> bool {
+                    self.iter_all2_0_1_2(x0, x1).next().is_some()
                 }
                 fn iter_all1_1_0_2(&self, x1: Math) -> impl Iterator<Item = (Math, Math)> + use<'_> {
                     self.hash_index_1
                         .iter((x1,))
                         .map(|(x0, x2, _timestamp)| (x0, x2))
-                }
-                fn iter_old2_1_0_2(
-                    &self,
-                    x1: Math,
-                    x0: Math,
-                    latest_timestamp: TimeStamp,
-                ) -> impl Iterator<Item = (Math,)> + use<'_> {
-                    self.hash_index_1_0
-                        .get(&(x1, x0))
-                        .into_iter()
-                        .copied()
-                        .filter_map(move |(x2, timestamp)| (timestamp < latest_timestamp).then_some((x2,)))
                 }
                 fn iter_old1_1_0_2(
                     &self,
@@ -14957,20 +14773,8 @@ fn lir_math() {
                             (timestamp < latest_timestamp).then_some((x0, x2))
                         })
                 }
-                fn check2_1_0_2(&self, x1: Math, x0: Math) -> bool {
-                    self.iter_all2_1_0_2(x1, x0).next().is_some()
-                }
                 fn check1_1_0_2(&self, x1: Math) -> bool {
                     self.iter_all1_1_0_2(x1).next().is_some()
-                }
-                #[allow(unreachable_code)]
-                fn entry2_1_0_2(&self, x1: Math, x0: Math, delta: &mut Delta, uf: &mut Unification) -> (Math,) {
-                    if let Some((x2,)) = self.iter_all2_1_0_2(x1, x0).next() {
-                        return (x2,);
-                    }
-                    let x2 = uf.math_.add_eclass();
-                    delta.diff_.push((x0, x1, x2));
-                    (x2,)
                 }
             }
             #[derive(Debug, Default)]
@@ -14979,7 +14783,7 @@ fn lir_math() {
                 all: Vec<(FuelUnit, Math, Math, Math, TimeStamp)>,
                 hash_index_0_1_2: runtime::HashMap<(FuelUnit, Math, Math), (Math, TimeStamp)>,
                 hash_index_0: runtime::IndexedSortedList<(FuelUnit,), (Math, Math, Math, TimeStamp)>,
-                hash_index_1: runtime::IndexedSortedList<(Math,), (Math, FuelUnit, Math, TimeStamp)>,
+                hash_index_1: runtime::IndexedSortedList<(Math,), (FuelUnit, Math, Math, TimeStamp)>,
                 hash_index_1_2: runtime::IndexedSortedList<(Math, Math), (FuelUnit, Math, TimeStamp)>,
                 fuel_unit_num_uprooted_at_latest_retain: usize,
                 math_num_uprooted_at_latest_retain: usize,
@@ -14987,7 +14791,7 @@ fn lir_math() {
             impl Relation for IntegralRelation {
                 type Row = (FuelUnit, Math, Math, Math);
                 type Unification = Unification;
-                const COST: u32 = 8u32;
+                const COST: u32 = 16u32;
                 fn new() -> Self {
                     Self::default()
                 }
@@ -15001,7 +14805,7 @@ fn lir_math() {
                     self.new.iter().copied()
                 }
                 fn len(&self) -> usize {
-                    self.hash_index_0.len()
+                    self.hash_index_0_1_2.len()
                 }
                 fn emit_graphviz(&self, buf: &mut String) {
                     use std::fmt::Write;
@@ -15175,7 +14979,7 @@ fn lir_math() {
                                 self.hash_index_1.reconstruct(
                                     &mut self.all,
                                     |(x0, x1, x2, x3, timestamp)| (x1,),
-                                    |(x0, x1, x2, x3, timestamp)| (x2, x0, x3, timestamp),
+                                    |(x0, x1, x2, x3, timestamp)| (x0, x2, x3, timestamp),
                                 );
                             }
                         });
@@ -15210,31 +15014,6 @@ fn lir_math() {
                         .copied()
                         .map(|(x3, _timestamp)| (x3,))
                 }
-                fn iter_all1_0_1_2_3(
-                    &self,
-                    x0: FuelUnit,
-                ) -> impl Iterator<Item = (Math, Math, Math)> + use<'_> {
-                    self.hash_index_0
-                        .iter((x0,))
-                        .map(|(x1, x2, x3, _timestamp)| (x1, x2, x3))
-                }
-                fn iter_all1_1_2_0_3(
-                    &self,
-                    x1: Math,
-                ) -> impl Iterator<Item = (Math, FuelUnit, Math)> + use<'_> {
-                    self.hash_index_1
-                        .iter((x1,))
-                        .map(|(x2, x0, x3, _timestamp)| (x2, x0, x3))
-                }
-                fn iter_all2_1_2_0_3(
-                    &self,
-                    x1: Math,
-                    x2: Math,
-                ) -> impl Iterator<Item = (FuelUnit, Math)> + use<'_> {
-                    self.hash_index_1_2
-                        .iter((x1, x2))
-                        .map(|(x0, x3, _timestamp)| (x0, x3))
-                }
                 fn iter_old3_0_1_2_3(
                     &self,
                     x0: FuelUnit,
@@ -15247,52 +15026,6 @@ fn lir_math() {
                         .into_iter()
                         .copied()
                         .filter_map(move |(x3, timestamp)| (timestamp < latest_timestamp).then_some((x3,)))
-                }
-                fn iter_old1_0_1_2_3(
-                    &self,
-                    x0: FuelUnit,
-                    latest_timestamp: TimeStamp,
-                ) -> impl Iterator<Item = (Math, Math, Math)> + use<'_> {
-                    self.hash_index_0
-                        .iter((x0,))
-                        .filter_map(move |(x1, x2, x3, timestamp)| {
-                            (timestamp < latest_timestamp).then_some((x1, x2, x3))
-                        })
-                }
-                fn iter_old1_1_2_0_3(
-                    &self,
-                    x1: Math,
-                    latest_timestamp: TimeStamp,
-                ) -> impl Iterator<Item = (Math, FuelUnit, Math)> + use<'_> {
-                    self.hash_index_1
-                        .iter((x1,))
-                        .filter_map(move |(x2, x0, x3, timestamp)| {
-                            (timestamp < latest_timestamp).then_some((x2, x0, x3))
-                        })
-                }
-                fn iter_old2_1_2_0_3(
-                    &self,
-                    x1: Math,
-                    x2: Math,
-                    latest_timestamp: TimeStamp,
-                ) -> impl Iterator<Item = (FuelUnit, Math)> + use<'_> {
-                    self.hash_index_1_2
-                        .iter((x1, x2))
-                        .filter_map(move |(x0, x3, timestamp)| {
-                            (timestamp < latest_timestamp).then_some((x0, x3))
-                        })
-                }
-                fn check3_0_1_2_3(&self, x0: FuelUnit, x1: Math, x2: Math) -> bool {
-                    self.iter_all3_0_1_2_3(x0, x1, x2).next().is_some()
-                }
-                fn check1_0_1_2_3(&self, x0: FuelUnit) -> bool {
-                    self.iter_all1_0_1_2_3(x0).next().is_some()
-                }
-                fn check1_1_2_0_3(&self, x1: Math) -> bool {
-                    self.iter_all1_1_2_0_3(x1).next().is_some()
-                }
-                fn check2_1_2_0_3(&self, x1: Math, x2: Math) -> bool {
-                    self.iter_all2_1_2_0_3(x1, x2).next().is_some()
                 }
                 #[allow(unreachable_code)]
                 fn entry3_0_1_2_3(
@@ -15310,21 +15043,92 @@ fn lir_math() {
                     delta.integral_.push((x0, x1, x2, x3));
                     (x3,)
                 }
+                fn check3_0_1_2_3(&self, x0: FuelUnit, x1: Math, x2: Math) -> bool {
+                    self.iter_all3_0_1_2_3(x0, x1, x2).next().is_some()
+                }
+                fn iter_all1_0_1_2_3(
+                    &self,
+                    x0: FuelUnit,
+                ) -> impl Iterator<Item = (Math, Math, Math)> + use<'_> {
+                    self.hash_index_0
+                        .iter((x0,))
+                        .map(|(x1, x2, x3, _timestamp)| (x1, x2, x3))
+                }
+                fn iter_old1_0_1_2_3(
+                    &self,
+                    x0: FuelUnit,
+                    latest_timestamp: TimeStamp,
+                ) -> impl Iterator<Item = (Math, Math, Math)> + use<'_> {
+                    self.hash_index_0
+                        .iter((x0,))
+                        .filter_map(move |(x1, x2, x3, timestamp)| {
+                            (timestamp < latest_timestamp).then_some((x1, x2, x3))
+                        })
+                }
+                fn check1_0_1_2_3(&self, x0: FuelUnit) -> bool {
+                    self.iter_all1_0_1_2_3(x0).next().is_some()
+                }
+                fn iter_all1_1_0_2_3(
+                    &self,
+                    x1: Math,
+                ) -> impl Iterator<Item = (FuelUnit, Math, Math)> + use<'_> {
+                    self.hash_index_1
+                        .iter((x1,))
+                        .map(|(x0, x2, x3, _timestamp)| (x0, x2, x3))
+                }
+                fn iter_old1_1_0_2_3(
+                    &self,
+                    x1: Math,
+                    latest_timestamp: TimeStamp,
+                ) -> impl Iterator<Item = (FuelUnit, Math, Math)> + use<'_> {
+                    self.hash_index_1
+                        .iter((x1,))
+                        .filter_map(move |(x0, x2, x3, timestamp)| {
+                            (timestamp < latest_timestamp).then_some((x0, x2, x3))
+                        })
+                }
+                fn check1_1_0_2_3(&self, x1: Math) -> bool {
+                    self.iter_all1_1_0_2_3(x1).next().is_some()
+                }
+                fn iter_all2_1_2_0_3(
+                    &self,
+                    x1: Math,
+                    x2: Math,
+                ) -> impl Iterator<Item = (FuelUnit, Math)> + use<'_> {
+                    self.hash_index_1_2
+                        .iter((x1, x2))
+                        .map(|(x0, x3, _timestamp)| (x0, x3))
+                }
+                fn iter_old2_1_2_0_3(
+                    &self,
+                    x1: Math,
+                    x2: Math,
+                    latest_timestamp: TimeStamp,
+                ) -> impl Iterator<Item = (FuelUnit, Math)> + use<'_> {
+                    self.hash_index_1_2
+                        .iter((x1, x2))
+                        .filter_map(move |(x0, x3, timestamp)| {
+                            (timestamp < latest_timestamp).then_some((x0, x3))
+                        })
+                }
+                fn check2_1_2_0_3(&self, x1: Math, x2: Math) -> bool {
+                    self.iter_all2_1_2_0_3(x1, x2).next().is_some()
+                }
             }
             #[derive(Debug, Default)]
             struct AddRelation {
                 new: Vec<<Self as Relation>::Row>,
                 all: Vec<(Math, Math, Math, TimeStamp)>,
-                hash_index_1_0: runtime::HashMap<(Math, Math), (Math, TimeStamp)>,
-                hash_index_2: runtime::IndexedSortedList<(Math,), (Math, Math, TimeStamp)>,
-                hash_index_1: runtime::IndexedSortedList<(Math,), (Math, Math, TimeStamp)>,
+                hash_index_0_1: runtime::HashMap<(Math, Math), (Math, TimeStamp)>,
                 hash_index_0: runtime::IndexedSortedList<(Math,), (Math, Math, TimeStamp)>,
+                hash_index_1: runtime::IndexedSortedList<(Math,), (Math, Math, TimeStamp)>,
+                hash_index_2: runtime::IndexedSortedList<(Math,), (Math, Math, TimeStamp)>,
                 math_num_uprooted_at_latest_retain: usize,
             }
             impl Relation for AddRelation {
                 type Row = (Math, Math, Math);
                 type Unification = Unification;
-                const COST: u32 = 9u32;
+                const COST: u32 = 12u32;
                 fn new() -> Self {
                     Self::default()
                 }
@@ -15338,18 +15142,18 @@ fn lir_math() {
                     self.new.iter().copied()
                 }
                 fn len(&self) -> usize {
-                    self.hash_index_0.len()
+                    self.hash_index_0_1.len()
                 }
                 fn emit_graphviz(&self, buf: &mut String) {
                     use std::fmt::Write;
-                    for (i, ((x1, x0), (x2, _timestamp))) in self
-                        .hash_index_1_0
+                    for (i, ((x0, x1), (x2, _timestamp))) in self
+                        .hash_index_0_1
                         .iter()
                         .map(|(k, v)| ((*k), (*v)))
                         .enumerate()
                     {
-                        writeln!(buf, "{}_{i} -> {}_{};", "add", "math", x1).unwrap();
                         writeln!(buf, "{}_{i} -> {}_{};", "add", "math", x0).unwrap();
+                        writeln!(buf, "{}_{i} -> {}_{};", "add", "math", x1).unwrap();
                         writeln!(buf, "{}_{i} -> {}_{};", "add", "math", x2).unwrap();
                         writeln!(buf, "{}_{i} [shape = box];", "add").unwrap();
                     }
@@ -15363,8 +15167,8 @@ fn lir_math() {
                     log_duration!("update_begin {}: {}", "add", {
                         for &(mut x0, mut x1, mut x2) in insertions {
                             match self
-                                .hash_index_1_0
-                                .entry((uf.math_.find(x1), uf.math_.find(x0)))
+                                .hash_index_0_1
+                                .entry((uf.math_.find(x0), uf.math_.find(x1)))
                             {
                                 runtime::HashMapEntry::Occupied(mut entry) => {
                                     let (y2, timestamp) = entry.get_mut();
@@ -15394,8 +15198,8 @@ fn lir_math() {
                         }
                         let offset = insertions.len();
                         self.math_num_uprooted_at_latest_retain = uf.math_.num_uprooted();
-                        self.hash_index_1_0
-                            .retain(|&(x1, x0), &mut (x2, _timestamp)| {
+                        self.hash_index_0_1
+                            .retain(|&(x0, x1), &mut (x2, _timestamp)| {
                                 if uf.math_.is_root(x0) & uf.math_.is_root(x1) & uf.math_.is_root(x2) {
                                     true
                                 } else {
@@ -15416,8 +15220,8 @@ fn lir_math() {
                     log_duration!("update_finalize {}: {}", "add", {
                         assert!(self.new.is_empty());
                         log_duration!("fill new and all: {}", {
-                            self.new.extend(self.hash_index_1_0.iter().filter_map(
-                                |(&(x1, x0), &(x2, timestamp))| {
+                            self.new.extend(self.hash_index_0_1.iter().filter_map(
+                                |(&(x0, x1), &(x2, timestamp))| {
                                     if timestamp == latest_timestamp {
                                         Some((x0, x1, x2))
                                     } else {
@@ -15428,9 +15232,9 @@ fn lir_math() {
                             RadixSortable::wrap(&mut self.new).voracious_sort();
                             self.all.clear();
                             self.all.extend(
-                                self.hash_index_1_0
+                                self.hash_index_0_1
                                     .iter()
-                                    .map(|(&(x1, x0), &(x2, timestamp))| (x0, x1, x2, timestamp)),
+                                    .map(|(&(x0, x1), &(x2, timestamp))| (x0, x1, x2, timestamp)),
                             );
                             insertions.clear();
                         });
@@ -15473,13 +15277,13 @@ fn lir_math() {
                         }
                         log_duration!("reconstruct index: {}", {
                             log_duration!("reconstruct sort: {}", {
-                                RowSort001::sort(&mut self.all);
+                                RowSort100::sort(&mut self.all);
                             });
                             unsafe {
-                                self.hash_index_2.reconstruct(
+                                self.hash_index_0.reconstruct(
                                     &mut self.all,
-                                    |(x0, x1, x2, timestamp)| (x2,),
-                                    |(x0, x1, x2, timestamp)| (x0, x1, timestamp),
+                                    |(x0, x1, x2, timestamp)| (x0,),
+                                    |(x0, x1, x2, timestamp)| (x1, x2, timestamp),
                                 );
                             }
                         });
@@ -15497,13 +15301,13 @@ fn lir_math() {
                         });
                         log_duration!("reconstruct index: {}", {
                             log_duration!("reconstruct sort: {}", {
-                                RowSort100::sort(&mut self.all);
+                                RowSort001::sort(&mut self.all);
                             });
                             unsafe {
-                                self.hash_index_0.reconstruct(
+                                self.hash_index_2.reconstruct(
                                     &mut self.all,
-                                    |(x0, x1, x2, timestamp)| (x0,),
-                                    |(x0, x1, x2, timestamp)| (x1, x2, timestamp),
+                                    |(x0, x1, x2, timestamp)| (x2,),
+                                    |(x0, x1, x2, timestamp)| (x0, x1, timestamp),
                                 );
                             }
                         });
@@ -15512,61 +15316,41 @@ fn lir_math() {
                 }
             }
             impl AddRelation {
-                fn iter_all2_1_0_2(&self, x1: Math, x0: Math) -> impl Iterator<Item = (Math,)> + use<'_> {
-                    self.hash_index_1_0
-                        .get(&(x1, x0))
+                fn iter_all2_0_1_2(&self, x0: Math, x1: Math) -> impl Iterator<Item = (Math,)> + use<'_> {
+                    self.hash_index_0_1
+                        .get(&(x0, x1))
                         .into_iter()
                         .copied()
                         .map(|(x2, _timestamp)| (x2,))
                 }
-                fn iter_all1_2_0_1(&self, x2: Math) -> impl Iterator<Item = (Math, Math)> + use<'_> {
-                    self.hash_index_2
-                        .iter((x2,))
-                        .map(|(x0, x1, _timestamp)| (x0, x1))
+                fn iter_old2_0_1_2(
+                    &self,
+                    x0: Math,
+                    x1: Math,
+                    latest_timestamp: TimeStamp,
+                ) -> impl Iterator<Item = (Math,)> + use<'_> {
+                    self.hash_index_0_1
+                        .get(&(x0, x1))
+                        .into_iter()
+                        .copied()
+                        .filter_map(move |(x2, timestamp)| (timestamp < latest_timestamp).then_some((x2,)))
                 }
-                fn iter_all1_1_0_2(&self, x1: Math) -> impl Iterator<Item = (Math, Math)> + use<'_> {
-                    self.hash_index_1
-                        .iter((x1,))
-                        .map(|(x0, x2, _timestamp)| (x0, x2))
+                #[allow(unreachable_code)]
+                fn entry2_0_1_2(&self, x0: Math, x1: Math, delta: &mut Delta, uf: &mut Unification) -> (Math,) {
+                    if let Some((x2,)) = self.iter_all2_0_1_2(x0, x1).next() {
+                        return (x2,);
+                    }
+                    let x2 = uf.math_.add_eclass();
+                    delta.add_.push((x0, x1, x2));
+                    (x2,)
+                }
+                fn check2_0_1_2(&self, x0: Math, x1: Math) -> bool {
+                    self.iter_all2_0_1_2(x0, x1).next().is_some()
                 }
                 fn iter_all1_0_1_2(&self, x0: Math) -> impl Iterator<Item = (Math, Math)> + use<'_> {
                     self.hash_index_0
                         .iter((x0,))
                         .map(|(x1, x2, _timestamp)| (x1, x2))
-                }
-                fn iter_old2_1_0_2(
-                    &self,
-                    x1: Math,
-                    x0: Math,
-                    latest_timestamp: TimeStamp,
-                ) -> impl Iterator<Item = (Math,)> + use<'_> {
-                    self.hash_index_1_0
-                        .get(&(x1, x0))
-                        .into_iter()
-                        .copied()
-                        .filter_map(move |(x2, timestamp)| (timestamp < latest_timestamp).then_some((x2,)))
-                }
-                fn iter_old1_2_0_1(
-                    &self,
-                    x2: Math,
-                    latest_timestamp: TimeStamp,
-                ) -> impl Iterator<Item = (Math, Math)> + use<'_> {
-                    self.hash_index_2
-                        .iter((x2,))
-                        .filter_map(move |(x0, x1, timestamp)| {
-                            (timestamp < latest_timestamp).then_some((x0, x1))
-                        })
-                }
-                fn iter_old1_1_0_2(
-                    &self,
-                    x1: Math,
-                    latest_timestamp: TimeStamp,
-                ) -> impl Iterator<Item = (Math, Math)> + use<'_> {
-                    self.hash_index_1
-                        .iter((x1,))
-                        .filter_map(move |(x0, x2, timestamp)| {
-                            (timestamp < latest_timestamp).then_some((x0, x2))
-                        })
                 }
                 fn iter_old1_0_1_2(
                     &self,
@@ -15579,26 +15363,46 @@ fn lir_math() {
                             (timestamp < latest_timestamp).then_some((x1, x2))
                         })
                 }
-                fn check2_1_0_2(&self, x1: Math, x0: Math) -> bool {
-                    self.iter_all2_1_0_2(x1, x0).next().is_some()
+                fn check1_0_1_2(&self, x0: Math) -> bool {
+                    self.iter_all1_0_1_2(x0).next().is_some()
                 }
-                fn check1_2_0_1(&self, x2: Math) -> bool {
-                    self.iter_all1_2_0_1(x2).next().is_some()
+                fn iter_all1_1_0_2(&self, x1: Math) -> impl Iterator<Item = (Math, Math)> + use<'_> {
+                    self.hash_index_1
+                        .iter((x1,))
+                        .map(|(x0, x2, _timestamp)| (x0, x2))
+                }
+                fn iter_old1_1_0_2(
+                    &self,
+                    x1: Math,
+                    latest_timestamp: TimeStamp,
+                ) -> impl Iterator<Item = (Math, Math)> + use<'_> {
+                    self.hash_index_1
+                        .iter((x1,))
+                        .filter_map(move |(x0, x2, timestamp)| {
+                            (timestamp < latest_timestamp).then_some((x0, x2))
+                        })
                 }
                 fn check1_1_0_2(&self, x1: Math) -> bool {
                     self.iter_all1_1_0_2(x1).next().is_some()
                 }
-                fn check1_0_1_2(&self, x0: Math) -> bool {
-                    self.iter_all1_0_1_2(x0).next().is_some()
+                fn iter_all1_2_0_1(&self, x2: Math) -> impl Iterator<Item = (Math, Math)> + use<'_> {
+                    self.hash_index_2
+                        .iter((x2,))
+                        .map(|(x0, x1, _timestamp)| (x0, x1))
                 }
-                #[allow(unreachable_code)]
-                fn entry2_1_0_2(&self, x1: Math, x0: Math, delta: &mut Delta, uf: &mut Unification) -> (Math,) {
-                    if let Some((x2,)) = self.iter_all2_1_0_2(x1, x0).next() {
-                        return (x2,);
-                    }
-                    let x2 = uf.math_.add_eclass();
-                    delta.add_.push((x0, x1, x2));
-                    (x2,)
+                fn iter_old1_2_0_1(
+                    &self,
+                    x2: Math,
+                    latest_timestamp: TimeStamp,
+                ) -> impl Iterator<Item = (Math, Math)> + use<'_> {
+                    self.hash_index_2
+                        .iter((x2,))
+                        .filter_map(move |(x0, x1, timestamp)| {
+                            (timestamp < latest_timestamp).then_some((x0, x1))
+                        })
+                }
+                fn check1_2_0_1(&self, x2: Math) -> bool {
+                    self.iter_all1_2_0_1(x2).next().is_some()
                 }
             }
             #[derive(Debug, Default)]
@@ -15783,11 +15587,6 @@ fn lir_math() {
                         .copied()
                         .map(|(x2, _timestamp)| (x2,))
                 }
-                fn iter_all1_2_0_1(&self, x2: Math) -> impl Iterator<Item = (Math, Math)> + use<'_> {
-                    self.hash_index_2
-                        .iter((x2,))
-                        .map(|(x0, x1, _timestamp)| (x0, x1))
-                }
                 fn iter_old2_0_1_2(
                     &self,
                     x0: Math,
@@ -15800,6 +15599,23 @@ fn lir_math() {
                         .copied()
                         .filter_map(move |(x2, timestamp)| (timestamp < latest_timestamp).then_some((x2,)))
                 }
+                #[allow(unreachable_code)]
+                fn entry2_0_1_2(&self, x0: Math, x1: Math, delta: &mut Delta, uf: &mut Unification) -> (Math,) {
+                    if let Some((x2,)) = self.iter_all2_0_1_2(x0, x1).next() {
+                        return (x2,);
+                    }
+                    let x2 = uf.math_.add_eclass();
+                    delta.sub_.push((x0, x1, x2));
+                    (x2,)
+                }
+                fn check2_0_1_2(&self, x0: Math, x1: Math) -> bool {
+                    self.iter_all2_0_1_2(x0, x1).next().is_some()
+                }
+                fn iter_all1_2_0_1(&self, x2: Math) -> impl Iterator<Item = (Math, Math)> + use<'_> {
+                    self.hash_index_2
+                        .iter((x2,))
+                        .map(|(x0, x1, _timestamp)| (x0, x1))
+                }
                 fn iter_old1_2_0_1(
                     &self,
                     x2: Math,
@@ -15811,37 +15627,25 @@ fn lir_math() {
                             (timestamp < latest_timestamp).then_some((x0, x1))
                         })
                 }
-                fn check2_0_1_2(&self, x0: Math, x1: Math) -> bool {
-                    self.iter_all2_0_1_2(x0, x1).next().is_some()
-                }
                 fn check1_2_0_1(&self, x2: Math) -> bool {
                     self.iter_all1_2_0_1(x2).next().is_some()
-                }
-                #[allow(unreachable_code)]
-                fn entry2_0_1_2(&self, x0: Math, x1: Math, delta: &mut Delta, uf: &mut Unification) -> (Math,) {
-                    if let Some((x2,)) = self.iter_all2_0_1_2(x0, x1).next() {
-                        return (x2,);
-                    }
-                    let x2 = uf.math_.add_eclass();
-                    delta.sub_.push((x0, x1, x2));
-                    (x2,)
                 }
             }
             #[derive(Debug, Default)]
             struct MulRelation {
                 new: Vec<<Self as Relation>::Row>,
                 all: Vec<(Math, Math, Math, TimeStamp)>,
-                hash_index_1_0: runtime::HashMap<(Math, Math), (Math, TimeStamp)>,
-                hash_index_2: runtime::IndexedSortedList<(Math,), (Math, Math, TimeStamp)>,
-                hash_index_1: runtime::IndexedSortedList<(Math,), (Math, Math, TimeStamp)>,
-                hash_index_2_0: runtime::IndexedSortedList<(Math, Math), (Math, TimeStamp)>,
+                hash_index_0_1: runtime::HashMap<(Math, Math), (Math, TimeStamp)>,
                 hash_index_0: runtime::IndexedSortedList<(Math,), (Math, Math, TimeStamp)>,
+                hash_index_0_2: runtime::IndexedSortedList<(Math, Math), (Math, TimeStamp)>,
+                hash_index_1: runtime::IndexedSortedList<(Math,), (Math, Math, TimeStamp)>,
+                hash_index_2: runtime::IndexedSortedList<(Math,), (Math, Math, TimeStamp)>,
                 math_num_uprooted_at_latest_retain: usize,
             }
             impl Relation for MulRelation {
                 type Row = (Math, Math, Math);
                 type Unification = Unification;
-                const COST: u32 = 9u32;
+                const COST: u32 = 15u32;
                 fn new() -> Self {
                     Self::default()
                 }
@@ -15855,18 +15659,18 @@ fn lir_math() {
                     self.new.iter().copied()
                 }
                 fn len(&self) -> usize {
-                    self.hash_index_0.len()
+                    self.hash_index_0_1.len()
                 }
                 fn emit_graphviz(&self, buf: &mut String) {
                     use std::fmt::Write;
-                    for (i, ((x1, x0), (x2, _timestamp))) in self
-                        .hash_index_1_0
+                    for (i, ((x0, x1), (x2, _timestamp))) in self
+                        .hash_index_0_1
                         .iter()
                         .map(|(k, v)| ((*k), (*v)))
                         .enumerate()
                     {
-                        writeln!(buf, "{}_{i} -> {}_{};", "mul", "math", x1).unwrap();
                         writeln!(buf, "{}_{i} -> {}_{};", "mul", "math", x0).unwrap();
+                        writeln!(buf, "{}_{i} -> {}_{};", "mul", "math", x1).unwrap();
                         writeln!(buf, "{}_{i} -> {}_{};", "mul", "math", x2).unwrap();
                         writeln!(buf, "{}_{i} [shape = box];", "mul").unwrap();
                     }
@@ -15880,8 +15684,8 @@ fn lir_math() {
                     log_duration!("update_begin {}: {}", "mul", {
                         for &(mut x0, mut x1, mut x2) in insertions {
                             match self
-                                .hash_index_1_0
-                                .entry((uf.math_.find(x1), uf.math_.find(x0)))
+                                .hash_index_0_1
+                                .entry((uf.math_.find(x0), uf.math_.find(x1)))
                             {
                                 runtime::HashMapEntry::Occupied(mut entry) => {
                                     let (y2, timestamp) = entry.get_mut();
@@ -15911,8 +15715,8 @@ fn lir_math() {
                         }
                         let offset = insertions.len();
                         self.math_num_uprooted_at_latest_retain = uf.math_.num_uprooted();
-                        self.hash_index_1_0
-                            .retain(|&(x1, x0), &mut (x2, _timestamp)| {
+                        self.hash_index_0_1
+                            .retain(|&(x0, x1), &mut (x2, _timestamp)| {
                                 if uf.math_.is_root(x0) & uf.math_.is_root(x1) & uf.math_.is_root(x2) {
                                     true
                                 } else {
@@ -15933,8 +15737,8 @@ fn lir_math() {
                     log_duration!("update_finalize {}: {}", "mul", {
                         assert!(self.new.is_empty());
                         log_duration!("fill new and all: {}", {
-                            self.new.extend(self.hash_index_1_0.iter().filter_map(
-                                |(&(x1, x0), &(x2, timestamp))| {
+                            self.new.extend(self.hash_index_0_1.iter().filter_map(
+                                |(&(x0, x1), &(x2, timestamp))| {
                                     if timestamp == latest_timestamp {
                                         Some((x0, x1, x2))
                                     } else {
@@ -15945,9 +15749,9 @@ fn lir_math() {
                             RadixSortable::wrap(&mut self.new).voracious_sort();
                             self.all.clear();
                             self.all.extend(
-                                self.hash_index_1_0
+                                self.hash_index_0_1
                                     .iter()
-                                    .map(|(&(x1, x0), &(x2, timestamp))| (x0, x1, x2, timestamp)),
+                                    .map(|(&(x0, x1), &(x2, timestamp))| (x0, x1, x2, timestamp)),
                             );
                             insertions.clear();
                         });
@@ -15990,13 +15794,25 @@ fn lir_math() {
                         }
                         log_duration!("reconstruct index: {}", {
                             log_duration!("reconstruct sort: {}", {
-                                RowSort001::sort(&mut self.all);
+                                RowSort100::sort(&mut self.all);
                             });
                             unsafe {
-                                self.hash_index_2.reconstruct(
+                                self.hash_index_0.reconstruct(
                                     &mut self.all,
-                                    |(x0, x1, x2, timestamp)| (x2,),
-                                    |(x0, x1, x2, timestamp)| (x0, x1, timestamp),
+                                    |(x0, x1, x2, timestamp)| (x0,),
+                                    |(x0, x1, x2, timestamp)| (x1, x2, timestamp),
+                                );
+                            }
+                        });
+                        log_duration!("reconstruct index: {}", {
+                            log_duration!("reconstruct sort: {}", {
+                                RowSort101::sort(&mut self.all);
+                            });
+                            unsafe {
+                                self.hash_index_0_2.reconstruct(
+                                    &mut self.all,
+                                    |(x0, x1, x2, timestamp)| (x0, x2),
+                                    |(x0, x1, x2, timestamp)| (x1, timestamp),
                                 );
                             }
                         });
@@ -16014,25 +15830,13 @@ fn lir_math() {
                         });
                         log_duration!("reconstruct index: {}", {
                             log_duration!("reconstruct sort: {}", {
-                                RowSort101::sort(&mut self.all);
+                                RowSort001::sort(&mut self.all);
                             });
                             unsafe {
-                                self.hash_index_2_0.reconstruct(
+                                self.hash_index_2.reconstruct(
                                     &mut self.all,
-                                    |(x0, x1, x2, timestamp)| (x2, x0),
-                                    |(x0, x1, x2, timestamp)| (x1, timestamp),
-                                );
-                            }
-                        });
-                        log_duration!("reconstruct index: {}", {
-                            log_duration!("reconstruct sort: {}", {
-                                RowSort100::sort(&mut self.all);
-                            });
-                            unsafe {
-                                self.hash_index_0.reconstruct(
-                                    &mut self.all,
-                                    |(x0, x1, x2, timestamp)| (x0,),
-                                    |(x0, x1, x2, timestamp)| (x1, x2, timestamp),
+                                    |(x0, x1, x2, timestamp)| (x2,),
+                                    |(x0, x1, x2, timestamp)| (x0, x1, timestamp),
                                 );
                             }
                         });
@@ -16041,76 +15845,41 @@ fn lir_math() {
                 }
             }
             impl MulRelation {
-                fn iter_all2_1_0_2(&self, x1: Math, x0: Math) -> impl Iterator<Item = (Math,)> + use<'_> {
-                    self.hash_index_1_0
-                        .get(&(x1, x0))
+                fn iter_all2_0_1_2(&self, x0: Math, x1: Math) -> impl Iterator<Item = (Math,)> + use<'_> {
+                    self.hash_index_0_1
+                        .get(&(x0, x1))
                         .into_iter()
                         .copied()
                         .map(|(x2, _timestamp)| (x2,))
                 }
-                fn iter_all1_2_0_1(&self, x2: Math) -> impl Iterator<Item = (Math, Math)> + use<'_> {
-                    self.hash_index_2
-                        .iter((x2,))
-                        .map(|(x0, x1, _timestamp)| (x0, x1))
+                fn iter_old2_0_1_2(
+                    &self,
+                    x0: Math,
+                    x1: Math,
+                    latest_timestamp: TimeStamp,
+                ) -> impl Iterator<Item = (Math,)> + use<'_> {
+                    self.hash_index_0_1
+                        .get(&(x0, x1))
+                        .into_iter()
+                        .copied()
+                        .filter_map(move |(x2, timestamp)| (timestamp < latest_timestamp).then_some((x2,)))
                 }
-                fn iter_all1_1_0_2(&self, x1: Math) -> impl Iterator<Item = (Math, Math)> + use<'_> {
-                    self.hash_index_1
-                        .iter((x1,))
-                        .map(|(x0, x2, _timestamp)| (x0, x2))
+                #[allow(unreachable_code)]
+                fn entry2_0_1_2(&self, x0: Math, x1: Math, delta: &mut Delta, uf: &mut Unification) -> (Math,) {
+                    if let Some((x2,)) = self.iter_all2_0_1_2(x0, x1).next() {
+                        return (x2,);
+                    }
+                    let x2 = uf.math_.add_eclass();
+                    delta.mul_.push((x0, x1, x2));
+                    (x2,)
                 }
-                fn iter_all2_2_0_1(&self, x2: Math, x0: Math) -> impl Iterator<Item = (Math,)> + use<'_> {
-                    self.hash_index_2_0
-                        .iter((x2, x0))
-                        .map(|(x1, _timestamp)| (x1,))
+                fn check2_0_1_2(&self, x0: Math, x1: Math) -> bool {
+                    self.iter_all2_0_1_2(x0, x1).next().is_some()
                 }
                 fn iter_all1_0_1_2(&self, x0: Math) -> impl Iterator<Item = (Math, Math)> + use<'_> {
                     self.hash_index_0
                         .iter((x0,))
                         .map(|(x1, x2, _timestamp)| (x1, x2))
-                }
-                fn iter_old2_1_0_2(
-                    &self,
-                    x1: Math,
-                    x0: Math,
-                    latest_timestamp: TimeStamp,
-                ) -> impl Iterator<Item = (Math,)> + use<'_> {
-                    self.hash_index_1_0
-                        .get(&(x1, x0))
-                        .into_iter()
-                        .copied()
-                        .filter_map(move |(x2, timestamp)| (timestamp < latest_timestamp).then_some((x2,)))
-                }
-                fn iter_old1_2_0_1(
-                    &self,
-                    x2: Math,
-                    latest_timestamp: TimeStamp,
-                ) -> impl Iterator<Item = (Math, Math)> + use<'_> {
-                    self.hash_index_2
-                        .iter((x2,))
-                        .filter_map(move |(x0, x1, timestamp)| {
-                            (timestamp < latest_timestamp).then_some((x0, x1))
-                        })
-                }
-                fn iter_old1_1_0_2(
-                    &self,
-                    x1: Math,
-                    latest_timestamp: TimeStamp,
-                ) -> impl Iterator<Item = (Math, Math)> + use<'_> {
-                    self.hash_index_1
-                        .iter((x1,))
-                        .filter_map(move |(x0, x2, timestamp)| {
-                            (timestamp < latest_timestamp).then_some((x0, x2))
-                        })
-                }
-                fn iter_old2_2_0_1(
-                    &self,
-                    x2: Math,
-                    x0: Math,
-                    latest_timestamp: TimeStamp,
-                ) -> impl Iterator<Item = (Math,)> + use<'_> {
-                    self.hash_index_2_0
-                        .iter((x2, x0))
-                        .filter_map(move |(x1, timestamp)| (timestamp < latest_timestamp).then_some((x1,)))
                 }
                 fn iter_old1_0_1_2(
                     &self,
@@ -16123,29 +15892,64 @@ fn lir_math() {
                             (timestamp < latest_timestamp).then_some((x1, x2))
                         })
                 }
-                fn check2_1_0_2(&self, x1: Math, x0: Math) -> bool {
-                    self.iter_all2_1_0_2(x1, x0).next().is_some()
+                fn check1_0_1_2(&self, x0: Math) -> bool {
+                    self.iter_all1_0_1_2(x0).next().is_some()
                 }
-                fn check1_2_0_1(&self, x2: Math) -> bool {
-                    self.iter_all1_2_0_1(x2).next().is_some()
+                fn iter_all2_0_2_1(&self, x0: Math, x2: Math) -> impl Iterator<Item = (Math,)> + use<'_> {
+                    self.hash_index_0_2
+                        .iter((x0, x2))
+                        .map(|(x1, _timestamp)| (x1,))
+                }
+                fn iter_old2_0_2_1(
+                    &self,
+                    x0: Math,
+                    x2: Math,
+                    latest_timestamp: TimeStamp,
+                ) -> impl Iterator<Item = (Math,)> + use<'_> {
+                    self.hash_index_0_2
+                        .iter((x0, x2))
+                        .filter_map(move |(x1, timestamp)| (timestamp < latest_timestamp).then_some((x1,)))
+                }
+                fn check2_0_2_1(&self, x0: Math, x2: Math) -> bool {
+                    self.iter_all2_0_2_1(x0, x2).next().is_some()
+                }
+                fn iter_all1_1_0_2(&self, x1: Math) -> impl Iterator<Item = (Math, Math)> + use<'_> {
+                    self.hash_index_1
+                        .iter((x1,))
+                        .map(|(x0, x2, _timestamp)| (x0, x2))
+                }
+                fn iter_old1_1_0_2(
+                    &self,
+                    x1: Math,
+                    latest_timestamp: TimeStamp,
+                ) -> impl Iterator<Item = (Math, Math)> + use<'_> {
+                    self.hash_index_1
+                        .iter((x1,))
+                        .filter_map(move |(x0, x2, timestamp)| {
+                            (timestamp < latest_timestamp).then_some((x0, x2))
+                        })
                 }
                 fn check1_1_0_2(&self, x1: Math) -> bool {
                     self.iter_all1_1_0_2(x1).next().is_some()
                 }
-                fn check2_2_0_1(&self, x2: Math, x0: Math) -> bool {
-                    self.iter_all2_2_0_1(x2, x0).next().is_some()
+                fn iter_all1_2_0_1(&self, x2: Math) -> impl Iterator<Item = (Math, Math)> + use<'_> {
+                    self.hash_index_2
+                        .iter((x2,))
+                        .map(|(x0, x1, _timestamp)| (x0, x1))
                 }
-                fn check1_0_1_2(&self, x0: Math) -> bool {
-                    self.iter_all1_0_1_2(x0).next().is_some()
+                fn iter_old1_2_0_1(
+                    &self,
+                    x2: Math,
+                    latest_timestamp: TimeStamp,
+                ) -> impl Iterator<Item = (Math, Math)> + use<'_> {
+                    self.hash_index_2
+                        .iter((x2,))
+                        .filter_map(move |(x0, x1, timestamp)| {
+                            (timestamp < latest_timestamp).then_some((x0, x1))
+                        })
                 }
-                #[allow(unreachable_code)]
-                fn entry2_1_0_2(&self, x1: Math, x0: Math, delta: &mut Delta, uf: &mut Unification) -> (Math,) {
-                    if let Some((x2,)) = self.iter_all2_1_0_2(x1, x0).next() {
-                        return (x2,);
-                    }
-                    let x2 = uf.math_.add_eclass();
-                    delta.mul_.push((x0, x1, x2));
-                    (x2,)
+                fn check1_2_0_1(&self, x2: Math) -> bool {
+                    self.iter_all1_2_0_1(x2).next().is_some()
                 }
             }
             #[derive(Debug, Default)]
@@ -16329,9 +16133,6 @@ fn lir_math() {
                         .copied()
                         .filter_map(move |(x2, timestamp)| (timestamp < latest_timestamp).then_some((x2,)))
                 }
-                fn check2_0_1_2(&self, x0: Math, x1: Math) -> bool {
-                    self.iter_all2_0_1_2(x0, x1).next().is_some()
-                }
                 #[allow(unreachable_code)]
                 fn entry2_0_1_2(&self, x0: Math, x1: Math, delta: &mut Delta, uf: &mut Unification) -> (Math,) {
                     if let Some((x2,)) = self.iter_all2_0_1_2(x0, x1).next() {
@@ -16341,22 +16142,25 @@ fn lir_math() {
                     delta.div_.push((x0, x1, x2));
                     (x2,)
                 }
+                fn check2_0_1_2(&self, x0: Math, x1: Math) -> bool {
+                    self.iter_all2_0_1_2(x0, x1).next().is_some()
+                }
             }
             #[derive(Debug, Default)]
             struct PowRelation {
                 new: Vec<<Self as Relation>::Row>,
                 all: Vec<(Math, Math, Math, TimeStamp)>,
                 hash_index_0_1: runtime::HashMap<(Math, Math), (Math, TimeStamp)>,
-                hash_index_2: runtime::IndexedSortedList<(Math,), (Math, Math, TimeStamp)>,
-                hash_index_2_0: runtime::IndexedSortedList<(Math, Math), (Math, TimeStamp)>,
                 hash_index_0: runtime::IndexedSortedList<(Math,), (Math, Math, TimeStamp)>,
+                hash_index_0_2: runtime::IndexedSortedList<(Math, Math), (Math, TimeStamp)>,
                 hash_index_1: runtime::IndexedSortedList<(Math,), (Math, Math, TimeStamp)>,
+                hash_index_2: runtime::IndexedSortedList<(Math,), (Math, Math, TimeStamp)>,
                 math_num_uprooted_at_latest_retain: usize,
             }
             impl Relation for PowRelation {
                 type Row = (Math, Math, Math);
                 type Unification = Unification;
-                const COST: u32 = 9u32;
+                const COST: u32 = 15u32;
                 fn new() -> Self {
                     Self::default()
                 }
@@ -16370,7 +16174,7 @@ fn lir_math() {
                     self.new.iter().copied()
                 }
                 fn len(&self) -> usize {
-                    self.hash_index_0.len()
+                    self.hash_index_0_1.len()
                 }
                 fn emit_graphviz(&self, buf: &mut String) {
                     use std::fmt::Write;
@@ -16505,13 +16309,13 @@ fn lir_math() {
                         }
                         log_duration!("reconstruct index: {}", {
                             log_duration!("reconstruct sort: {}", {
-                                RowSort001::sort(&mut self.all);
+                                RowSort100::sort(&mut self.all);
                             });
                             unsafe {
-                                self.hash_index_2.reconstruct(
+                                self.hash_index_0.reconstruct(
                                     &mut self.all,
-                                    |(x0, x1, x2, timestamp)| (x2,),
-                                    |(x0, x1, x2, timestamp)| (x0, x1, timestamp),
+                                    |(x0, x1, x2, timestamp)| (x0,),
+                                    |(x0, x1, x2, timestamp)| (x1, x2, timestamp),
                                 );
                             }
                         });
@@ -16520,22 +16324,10 @@ fn lir_math() {
                                 RowSort101::sort(&mut self.all);
                             });
                             unsafe {
-                                self.hash_index_2_0.reconstruct(
+                                self.hash_index_0_2.reconstruct(
                                     &mut self.all,
-                                    |(x0, x1, x2, timestamp)| (x2, x0),
+                                    |(x0, x1, x2, timestamp)| (x0, x2),
                                     |(x0, x1, x2, timestamp)| (x1, timestamp),
-                                );
-                            }
-                        });
-                        log_duration!("reconstruct index: {}", {
-                            log_duration!("reconstruct sort: {}", {
-                                RowSort100::sort(&mut self.all);
-                            });
-                            unsafe {
-                                self.hash_index_0.reconstruct(
-                                    &mut self.all,
-                                    |(x0, x1, x2, timestamp)| (x0,),
-                                    |(x0, x1, x2, timestamp)| (x1, x2, timestamp),
                                 );
                             }
                         });
@@ -16551,6 +16343,18 @@ fn lir_math() {
                                 );
                             }
                         });
+                        log_duration!("reconstruct index: {}", {
+                            log_duration!("reconstruct sort: {}", {
+                                RowSort001::sort(&mut self.all);
+                            });
+                            unsafe {
+                                self.hash_index_2.reconstruct(
+                                    &mut self.all,
+                                    |(x0, x1, x2, timestamp)| (x2,),
+                                    |(x0, x1, x2, timestamp)| (x0, x1, timestamp),
+                                );
+                            }
+                        });
                         self.math_num_uprooted_at_latest_retain = 0;
                     });
                 }
@@ -16562,26 +16366,6 @@ fn lir_math() {
                         .into_iter()
                         .copied()
                         .map(|(x2, _timestamp)| (x2,))
-                }
-                fn iter_all1_2_0_1(&self, x2: Math) -> impl Iterator<Item = (Math, Math)> + use<'_> {
-                    self.hash_index_2
-                        .iter((x2,))
-                        .map(|(x0, x1, _timestamp)| (x0, x1))
-                }
-                fn iter_all2_2_0_1(&self, x2: Math, x0: Math) -> impl Iterator<Item = (Math,)> + use<'_> {
-                    self.hash_index_2_0
-                        .iter((x2, x0))
-                        .map(|(x1, _timestamp)| (x1,))
-                }
-                fn iter_all1_0_1_2(&self, x0: Math) -> impl Iterator<Item = (Math, Math)> + use<'_> {
-                    self.hash_index_0
-                        .iter((x0,))
-                        .map(|(x1, x2, _timestamp)| (x1, x2))
-                }
-                fn iter_all1_1_0_2(&self, x1: Math) -> impl Iterator<Item = (Math, Math)> + use<'_> {
-                    self.hash_index_1
-                        .iter((x1,))
-                        .map(|(x0, x2, _timestamp)| (x0, x2))
                 }
                 fn iter_old2_0_1_2(
                     &self,
@@ -16595,26 +16379,22 @@ fn lir_math() {
                         .copied()
                         .filter_map(move |(x2, timestamp)| (timestamp < latest_timestamp).then_some((x2,)))
                 }
-                fn iter_old1_2_0_1(
-                    &self,
-                    x2: Math,
-                    latest_timestamp: TimeStamp,
-                ) -> impl Iterator<Item = (Math, Math)> + use<'_> {
-                    self.hash_index_2
-                        .iter((x2,))
-                        .filter_map(move |(x0, x1, timestamp)| {
-                            (timestamp < latest_timestamp).then_some((x0, x1))
-                        })
+                #[allow(unreachable_code)]
+                fn entry2_0_1_2(&self, x0: Math, x1: Math, delta: &mut Delta, uf: &mut Unification) -> (Math,) {
+                    if let Some((x2,)) = self.iter_all2_0_1_2(x0, x1).next() {
+                        return (x2,);
+                    }
+                    let x2 = uf.math_.add_eclass();
+                    delta.pow_.push((x0, x1, x2));
+                    (x2,)
                 }
-                fn iter_old2_2_0_1(
-                    &self,
-                    x2: Math,
-                    x0: Math,
-                    latest_timestamp: TimeStamp,
-                ) -> impl Iterator<Item = (Math,)> + use<'_> {
-                    self.hash_index_2_0
-                        .iter((x2, x0))
-                        .filter_map(move |(x1, timestamp)| (timestamp < latest_timestamp).then_some((x1,)))
+                fn check2_0_1_2(&self, x0: Math, x1: Math) -> bool {
+                    self.iter_all2_0_1_2(x0, x1).next().is_some()
+                }
+                fn iter_all1_0_1_2(&self, x0: Math) -> impl Iterator<Item = (Math, Math)> + use<'_> {
+                    self.hash_index_0
+                        .iter((x0,))
+                        .map(|(x1, x2, _timestamp)| (x1, x2))
                 }
                 fn iter_old1_0_1_2(
                     &self,
@@ -16627,6 +16407,32 @@ fn lir_math() {
                             (timestamp < latest_timestamp).then_some((x1, x2))
                         })
                 }
+                fn check1_0_1_2(&self, x0: Math) -> bool {
+                    self.iter_all1_0_1_2(x0).next().is_some()
+                }
+                fn iter_all2_0_2_1(&self, x0: Math, x2: Math) -> impl Iterator<Item = (Math,)> + use<'_> {
+                    self.hash_index_0_2
+                        .iter((x0, x2))
+                        .map(|(x1, _timestamp)| (x1,))
+                }
+                fn iter_old2_0_2_1(
+                    &self,
+                    x0: Math,
+                    x2: Math,
+                    latest_timestamp: TimeStamp,
+                ) -> impl Iterator<Item = (Math,)> + use<'_> {
+                    self.hash_index_0_2
+                        .iter((x0, x2))
+                        .filter_map(move |(x1, timestamp)| (timestamp < latest_timestamp).then_some((x1,)))
+                }
+                fn check2_0_2_1(&self, x0: Math, x2: Math) -> bool {
+                    self.iter_all2_0_2_1(x0, x2).next().is_some()
+                }
+                fn iter_all1_1_0_2(&self, x1: Math) -> impl Iterator<Item = (Math, Math)> + use<'_> {
+                    self.hash_index_1
+                        .iter((x1,))
+                        .map(|(x0, x2, _timestamp)| (x0, x2))
+                }
                 fn iter_old1_1_0_2(
                     &self,
                     x1: Math,
@@ -16638,29 +16444,27 @@ fn lir_math() {
                             (timestamp < latest_timestamp).then_some((x0, x2))
                         })
                 }
-                fn check2_0_1_2(&self, x0: Math, x1: Math) -> bool {
-                    self.iter_all2_0_1_2(x0, x1).next().is_some()
-                }
-                fn check1_2_0_1(&self, x2: Math) -> bool {
-                    self.iter_all1_2_0_1(x2).next().is_some()
-                }
-                fn check2_2_0_1(&self, x2: Math, x0: Math) -> bool {
-                    self.iter_all2_2_0_1(x2, x0).next().is_some()
-                }
-                fn check1_0_1_2(&self, x0: Math) -> bool {
-                    self.iter_all1_0_1_2(x0).next().is_some()
-                }
                 fn check1_1_0_2(&self, x1: Math) -> bool {
                     self.iter_all1_1_0_2(x1).next().is_some()
                 }
-                #[allow(unreachable_code)]
-                fn entry2_0_1_2(&self, x0: Math, x1: Math, delta: &mut Delta, uf: &mut Unification) -> (Math,) {
-                    if let Some((x2,)) = self.iter_all2_0_1_2(x0, x1).next() {
-                        return (x2,);
-                    }
-                    let x2 = uf.math_.add_eclass();
-                    delta.pow_.push((x0, x1, x2));
-                    (x2,)
+                fn iter_all1_2_0_1(&self, x2: Math) -> impl Iterator<Item = (Math, Math)> + use<'_> {
+                    self.hash_index_2
+                        .iter((x2,))
+                        .map(|(x0, x1, _timestamp)| (x0, x1))
+                }
+                fn iter_old1_2_0_1(
+                    &self,
+                    x2: Math,
+                    latest_timestamp: TimeStamp,
+                ) -> impl Iterator<Item = (Math, Math)> + use<'_> {
+                    self.hash_index_2
+                        .iter((x2,))
+                        .filter_map(move |(x0, x1, timestamp)| {
+                            (timestamp < latest_timestamp).then_some((x0, x1))
+                        })
+                }
+                fn check1_2_0_1(&self, x2: Math) -> bool {
+                    self.iter_all1_2_0_1(x2).next().is_some()
                 }
             }
             #[derive(Debug, Default)]
@@ -16838,9 +16642,6 @@ fn lir_math() {
                         .copied()
                         .filter_map(move |(x1, timestamp)| (timestamp < latest_timestamp).then_some((x1,)))
                 }
-                fn check1_0_1(&self, x0: Math) -> bool {
-                    self.iter_all1_0_1(x0).next().is_some()
-                }
                 #[allow(unreachable_code)]
                 fn entry1_0_1(&self, x0: Math, delta: &mut Delta, uf: &mut Unification) -> (Math,) {
                     if let Some((x1,)) = self.iter_all1_0_1(x0).next() {
@@ -16849,6 +16650,9 @@ fn lir_math() {
                     let x1 = uf.math_.add_eclass();
                     delta.ln_.push((x0, x1));
                     (x1,)
+                }
+                fn check1_0_1(&self, x0: Math) -> bool {
+                    self.iter_all1_0_1(x0).next().is_some()
                 }
             }
             #[derive(Debug, Default)]
@@ -17026,9 +16830,6 @@ fn lir_math() {
                         .copied()
                         .filter_map(move |(x1, timestamp)| (timestamp < latest_timestamp).then_some((x1,)))
                 }
-                fn check1_0_1(&self, x0: Math) -> bool {
-                    self.iter_all1_0_1(x0).next().is_some()
-                }
                 #[allow(unreachable_code)]
                 fn entry1_0_1(&self, x0: Math, delta: &mut Delta, uf: &mut Unification) -> (Math,) {
                     if let Some((x1,)) = self.iter_all1_0_1(x0).next() {
@@ -17038,13 +16839,15 @@ fn lir_math() {
                     delta.sqrt_.push((x0, x1));
                     (x1,)
                 }
+                fn check1_0_1(&self, x0: Math) -> bool {
+                    self.iter_all1_0_1(x0).next().is_some()
+                }
             }
             #[derive(Debug, Default)]
             struct SinRelation {
                 new: Vec<<Self as Relation>::Row>,
                 all: Vec<(Math, Math, TimeStamp)>,
                 hash_index_0: runtime::HashMap<(Math,), (Math, TimeStamp)>,
-                hash_index_0_1: runtime::IndexedSortedList<(Math, Math), (TimeStamp,)>,
                 math_num_uprooted_at_latest_retain: usize,
             }
             impl Relation for SinRelation {
@@ -17192,18 +16995,6 @@ fn lir_math() {
                                 "all does not have duplicate timestamps"
                             );
                         }
-                        log_duration!("reconstruct index: {}", {
-                            log_duration!("reconstruct sort: {}", {
-                                RowSort11::sort(&mut self.all);
-                            });
-                            unsafe {
-                                self.hash_index_0_1.reconstruct(
-                                    &mut self.all,
-                                    |(x0, x1, timestamp)| (x0, x1),
-                                    |(x0, x1, timestamp)| (timestamp,),
-                                );
-                            }
-                        });
                         self.math_num_uprooted_at_latest_retain = 0;
                     });
                 }
@@ -17216,9 +17007,6 @@ fn lir_math() {
                         .copied()
                         .map(|(x1, _timestamp)| (x1,))
                 }
-                fn iter_all2_0_1(&self, x0: Math, x1: Math) -> impl Iterator<Item = ()> + use<'_> {
-                    self.hash_index_0_1.iter((x0, x1)).map(|(_timestamp)| ())
-                }
                 fn iter_old1_0_1(
                     &self,
                     x0: Math,
@@ -17230,22 +17018,6 @@ fn lir_math() {
                         .copied()
                         .filter_map(move |(x1, timestamp)| (timestamp < latest_timestamp).then_some((x1,)))
                 }
-                fn iter_old2_0_1(
-                    &self,
-                    x0: Math,
-                    x1: Math,
-                    latest_timestamp: TimeStamp,
-                ) -> impl Iterator<Item = ()> + use<'_> {
-                    self.hash_index_0_1
-                        .iter((x0, x1))
-                        .filter_map(move |(timestamp,)| (timestamp < latest_timestamp).then_some(()))
-                }
-                fn check1_0_1(&self, x0: Math) -> bool {
-                    self.iter_all1_0_1(x0).next().is_some()
-                }
-                fn check2_0_1(&self, x0: Math, x1: Math) -> bool {
-                    self.iter_all2_0_1(x0, x1).next().is_some()
-                }
                 #[allow(unreachable_code)]
                 fn entry1_0_1(&self, x0: Math, delta: &mut Delta, uf: &mut Unification) -> (Math,) {
                     if let Some((x1,)) = self.iter_all1_0_1(x0).next() {
@@ -17255,13 +17027,13 @@ fn lir_math() {
                     delta.sin_.push((x0, x1));
                     (x1,)
                 }
-                #[allow(unreachable_code)]
-                fn entry2_0_1(&self, x0: Math, x1: Math, delta: &mut Delta, uf: &mut Unification) -> () {
-                    if let Some(()) = self.iter_all2_0_1(x0, x1).next() {
-                        return ();
-                    }
-                    delta.sin_.push((x0, x1));
-                    ()
+                fn check1_0_1(&self, x0: Math) -> bool {
+                    self.iter_all1_0_1(x0).next().is_some()
+                }
+                fn check2_0_1(&self, x0: Math, x1: Math) -> bool {
+                    self.iter_all1_0_1(x0)
+                        .next()
+                        .is_some_and(|(y1,)| true && x1 == y1)
                 }
             }
             #[derive(Debug, Default)]
@@ -17269,7 +17041,6 @@ fn lir_math() {
                 new: Vec<<Self as Relation>::Row>,
                 all: Vec<(Math, Math, TimeStamp)>,
                 hash_index_0: runtime::HashMap<(Math,), (Math, TimeStamp)>,
-                hash_index_0_1: runtime::IndexedSortedList<(Math, Math), (TimeStamp,)>,
                 math_num_uprooted_at_latest_retain: usize,
             }
             impl Relation for CosRelation {
@@ -17417,18 +17188,6 @@ fn lir_math() {
                                 "all does not have duplicate timestamps"
                             );
                         }
-                        log_duration!("reconstruct index: {}", {
-                            log_duration!("reconstruct sort: {}", {
-                                RowSort11::sort(&mut self.all);
-                            });
-                            unsafe {
-                                self.hash_index_0_1.reconstruct(
-                                    &mut self.all,
-                                    |(x0, x1, timestamp)| (x0, x1),
-                                    |(x0, x1, timestamp)| (timestamp,),
-                                );
-                            }
-                        });
                         self.math_num_uprooted_at_latest_retain = 0;
                     });
                 }
@@ -17441,9 +17200,6 @@ fn lir_math() {
                         .copied()
                         .map(|(x1, _timestamp)| (x1,))
                 }
-                fn iter_all2_0_1(&self, x0: Math, x1: Math) -> impl Iterator<Item = ()> + use<'_> {
-                    self.hash_index_0_1.iter((x0, x1)).map(|(_timestamp)| ())
-                }
                 fn iter_old1_0_1(
                     &self,
                     x0: Math,
@@ -17455,22 +17211,6 @@ fn lir_math() {
                         .copied()
                         .filter_map(move |(x1, timestamp)| (timestamp < latest_timestamp).then_some((x1,)))
                 }
-                fn iter_old2_0_1(
-                    &self,
-                    x0: Math,
-                    x1: Math,
-                    latest_timestamp: TimeStamp,
-                ) -> impl Iterator<Item = ()> + use<'_> {
-                    self.hash_index_0_1
-                        .iter((x0, x1))
-                        .filter_map(move |(timestamp,)| (timestamp < latest_timestamp).then_some(()))
-                }
-                fn check1_0_1(&self, x0: Math) -> bool {
-                    self.iter_all1_0_1(x0).next().is_some()
-                }
-                fn check2_0_1(&self, x0: Math, x1: Math) -> bool {
-                    self.iter_all2_0_1(x0, x1).next().is_some()
-                }
                 #[allow(unreachable_code)]
                 fn entry1_0_1(&self, x0: Math, delta: &mut Delta, uf: &mut Unification) -> (Math,) {
                     if let Some((x1,)) = self.iter_all1_0_1(x0).next() {
@@ -17480,13 +17220,13 @@ fn lir_math() {
                     delta.cos_.push((x0, x1));
                     (x1,)
                 }
-                #[allow(unreachable_code)]
-                fn entry2_0_1(&self, x0: Math, x1: Math, delta: &mut Delta, uf: &mut Unification) -> () {
-                    if let Some(()) = self.iter_all2_0_1(x0, x1).next() {
-                        return ();
-                    }
-                    delta.cos_.push((x0, x1));
-                    ()
+                fn check1_0_1(&self, x0: Math) -> bool {
+                    self.iter_all1_0_1(x0).next().is_some()
+                }
+                fn check2_0_1(&self, x0: Math, x1: Math) -> bool {
+                    self.iter_all1_0_1(x0)
+                        .next()
+                        .is_some_and(|(y1,)| true && x1 == y1)
                 }
             }
             #[derive(Debug, Default)]
@@ -17659,9 +17399,6 @@ fn lir_math() {
                         .copied()
                         .map(|(x1, _timestamp)| (x1,))
                 }
-                fn iter_all1_1_0(&self, x1: Math) -> impl Iterator<Item = (std::primitive::i64,)> + use<'_> {
-                    self.hash_index_1.iter((x1,)).map(|(x0, _timestamp)| (x0,))
-                }
                 fn iter_old1_0_1(
                     &self,
                     x0: std::primitive::i64,
@@ -17672,21 +17409,6 @@ fn lir_math() {
                         .into_iter()
                         .copied()
                         .filter_map(move |(x1, timestamp)| (timestamp < latest_timestamp).then_some((x1,)))
-                }
-                fn iter_old1_1_0(
-                    &self,
-                    x1: Math,
-                    latest_timestamp: TimeStamp,
-                ) -> impl Iterator<Item = (std::primitive::i64,)> + use<'_> {
-                    self.hash_index_1
-                        .iter((x1,))
-                        .filter_map(move |(x0, timestamp)| (timestamp < latest_timestamp).then_some((x0,)))
-                }
-                fn check1_0_1(&self, x0: std::primitive::i64) -> bool {
-                    self.iter_all1_0_1(x0).next().is_some()
-                }
-                fn check1_1_0(&self, x1: Math) -> bool {
-                    self.iter_all1_1_0(x1).next().is_some()
                 }
                 #[allow(unreachable_code)]
                 fn entry1_0_1(
@@ -17701,6 +17423,24 @@ fn lir_math() {
                     let x1 = uf.math_.add_eclass();
                     delta.const_.push((x0, x1));
                     (x1,)
+                }
+                fn check1_0_1(&self, x0: std::primitive::i64) -> bool {
+                    self.iter_all1_0_1(x0).next().is_some()
+                }
+                fn iter_all1_1_0(&self, x1: Math) -> impl Iterator<Item = (std::primitive::i64,)> + use<'_> {
+                    self.hash_index_1.iter((x1,)).map(|(x0, _timestamp)| (x0,))
+                }
+                fn iter_old1_1_0(
+                    &self,
+                    x1: Math,
+                    latest_timestamp: TimeStamp,
+                ) -> impl Iterator<Item = (std::primitive::i64,)> + use<'_> {
+                    self.hash_index_1
+                        .iter((x1,))
+                        .filter_map(move |(x0, timestamp)| (timestamp < latest_timestamp).then_some((x0,)))
+                }
+                fn check1_1_0(&self, x1: Math) -> bool {
+                    self.iter_all1_1_0(x1).next().is_some()
                 }
             }
             #[derive(Debug, Default)]
@@ -17871,9 +17611,6 @@ fn lir_math() {
                         .copied()
                         .filter_map(move |(x1, timestamp)| (timestamp < latest_timestamp).then_some((x1,)))
                 }
-                fn check1_0_1(&self, x0: runtime::IString) -> bool {
-                    self.iter_all1_0_1(x0).next().is_some()
-                }
                 #[allow(unreachable_code)]
                 fn entry1_0_1(&self, x0: runtime::IString, delta: &mut Delta, uf: &mut Unification) -> (Math,) {
                     if let Some((x1,)) = self.iter_all1_0_1(x0).next() {
@@ -17882,6 +17619,9 @@ fn lir_math() {
                     let x1 = uf.math_.add_eclass();
                     delta.var_.push((x0, x1));
                     (x1,)
+                }
+                fn check1_0_1(&self, x0: runtime::IString) -> bool {
+                    self.iter_all1_0_1(x0).next().is_some()
                 }
             }
             #[derive(Debug, Default)]
@@ -18358,13 +18098,13 @@ fn lir_math() {
                                 );
                                 let (v317,) = self
                                     .mul_
-                                    .entry2_1_0_2(v316, a_29, &mut self.delta, &mut self.uf);
+                                    .entry2_0_1_2(a_29, v316, &mut self.delta, &mut self.uf);
                                 let (v318,) =
                                     self.diff_
-                                        .entry2_1_0_2(a_29, x_17, &mut self.delta, &mut self.uf);
+                                        .entry2_0_1_2(x_17, a_29, &mut self.delta, &mut self.uf);
                                 let (v319,) = self
                                     .mul_
-                                    .entry2_1_0_2(v316, v318, &mut self.delta, &mut self.uf);
+                                    .entry2_0_1_2(v318, v316, &mut self.delta, &mut self.uf);
                                 let (v320,) = self.integral_.entry3_0_1_2_3(
                                     fuel_3,
                                     v319,
@@ -18374,7 +18114,7 @@ fn lir_math() {
                                 );
                                 self.delta.insert_sub((v317, v320, v221));
                             }
-                            for () in self.cos_.iter_all2_0_1(x_17, v219) {
+                            if self.cos_.check2_0_1(x_17, v219) {
                                 #[doc = "( rewrite ( Integral ( Fuel fuel ) ( Cos x ) x ) ( Sin x ) )"]
                                 self.delta.insert_sin((x_17, v221));
                             }
@@ -18391,33 +18131,33 @@ fn lir_math() {
                             #[doc = "( rewrite ( Diff x ( Add a b ) ) ( Add ( Diff x a ) ( Diff x b ) ) )"]
                             let (v184,) = self
                                 .diff_
-                                .entry2_1_0_2(b_16, x_3, &mut self.delta, &mut self.uf);
+                                .entry2_0_1_2(x_3, b_16, &mut self.delta, &mut self.uf);
                             let (v183,) = self
                                 .diff_
-                                .entry2_1_0_2(a_25, x_3, &mut self.delta, &mut self.uf);
+                                .entry2_0_1_2(x_3, a_25, &mut self.delta, &mut self.uf);
                             self.delta.insert_add((v183, v184, v22));
                         }
                         for (a_27, b_18) in self.mul_.iter_all1_2_0_1(v21) {
                             #[doc = "( rewrite ( Diff x ( Mul a b ) ) ( Add ( Mul a ( Diff x b ) ) ( Mul b ( Diff x a ) ) ) )"]
                             let (v197,) = self
                                 .diff_
-                                .entry2_1_0_2(b_18, x_3, &mut self.delta, &mut self.uf);
+                                .entry2_0_1_2(x_3, b_18, &mut self.delta, &mut self.uf);
                             let (v198,) = self
                                 .mul_
-                                .entry2_1_0_2(v197, a_27, &mut self.delta, &mut self.uf);
+                                .entry2_0_1_2(a_27, v197, &mut self.delta, &mut self.uf);
                             let (v199,) = self
                                 .diff_
-                                .entry2_1_0_2(a_27, x_3, &mut self.delta, &mut self.uf);
+                                .entry2_0_1_2(x_3, a_27, &mut self.delta, &mut self.uf);
                             let (v200,) = self
                                 .mul_
-                                .entry2_1_0_2(v199, b_18, &mut self.delta, &mut self.uf);
+                                .entry2_0_1_2(b_18, v199, &mut self.delta, &mut self.uf);
                             self.delta.insert_add((v198, v200, v22));
                         }
-                        for () in self.sin_.iter_all2_0_1(x_3, v21) {
+                        if self.sin_.check2_0_1(x_3, v21) {
                             #[doc = "( rewrite ( Diff x ( Sin x ) ) ( Cos x ) )"]
                             self.delta.insert_cos((x_3, v22));
                         }
-                        for () in self.cos_.iter_all2_0_1(x_3, v21) {
+                        if self.cos_.check2_0_1(x_3, v21) {
                             #[doc = "( rewrite ( Diff x ( Cos x ) ) ( Mul ( Const -1 ) ( Sin x ) ) )"]
                             let v23 = self.global_i64.get(0usize);
                             let (v24,) = self.const_.entry1_0_1(v23, &mut self.delta, &mut self.uf);
@@ -18426,7 +18166,7 @@ fn lir_math() {
                         }
                     }
                     for (fuel, v2, x, v3) in self.integral_.iter_new() {
-                        for () in self.sin_.iter_all2_0_1(x, v2) {
+                        if self.sin_.check2_0_1(x, v2) {
                             #[doc = "( rewrite ( Integral fuel ( Sin x ) x ) ( Mul ( Const -1 ) ( Cos x ) ) )"]
                             let v4 = self.global_i64.get(0usize);
                             let (v5,) = self.const_.entry1_0_1(v4, &mut self.delta, &mut self.uf);
@@ -18486,13 +18226,13 @@ fn lir_math() {
                                     );
                                     let (v329,) =
                                         self.mul_
-                                            .entry2_1_0_2(v328, a_30, &mut self.delta, &mut self.uf);
+                                            .entry2_0_1_2(a_30, v328, &mut self.delta, &mut self.uf);
                                     let (v330,) =
                                         self.diff_
-                                            .entry2_1_0_2(a_30, x, &mut self.delta, &mut self.uf);
+                                            .entry2_0_1_2(x, a_30, &mut self.delta, &mut self.uf);
                                     let (v331,) =
                                         self.mul_
-                                            .entry2_1_0_2(v328, v330, &mut self.delta, &mut self.uf);
+                                            .entry2_0_1_2(v330, v328, &mut self.delta, &mut self.uf);
                                     let (v332,) = self.integral_.entry3_0_1_2_3(
                                         fuel_17,
                                         v331,
@@ -18503,7 +18243,7 @@ fn lir_math() {
                                     self.delta.insert_sub((v329, v332, v3));
                                 }
                             }
-                            for () in self.cos_.iter_all2_0_1(x, v2) {
+                            if self.cos_.check2_0_1(x, v2) {
                                 for (fuel_8,) in self.fuel_.iter_old1_1_0(fuel, self.latest_timestamp) {
                                     #[doc = "( rewrite ( Integral ( Fuel fuel ) ( Cos x ) x ) ( Sin x ) )"]
                                     self.delta.insert_sin((x, v3));
@@ -18520,19 +18260,20 @@ fn lir_math() {
                         }
                     }
                     for (a_2, b_2, v34) in self.add_.iter_new() {
-                        #[doc = "( rewrite ( Add a b ) ( Add b a ) )"]
-                        self.delta.insert_add((b_2, a_2, v34));
+                        {
+                            self.delta.insert_add((b_2, a_2, v34));
+                        }
                         for (x_12, v189) in self.diff_.iter_old1_1_0_2(v34, self.latest_timestamp) {
                             #[doc = "( rewrite ( Diff x ( Add a b ) ) ( Add ( Diff x a ) ( Diff x b ) ) )"]
                             let (v191,) = self
                                 .diff_
-                                .entry2_1_0_2(b_2, x_12, &mut self.delta, &mut self.uf);
+                                .entry2_0_1_2(x_12, b_2, &mut self.delta, &mut self.uf);
                             let (v190,) = self
                                 .diff_
-                                .entry2_1_0_2(a_2, x_12, &mut self.delta, &mut self.uf);
+                                .entry2_0_1_2(x_12, a_2, &mut self.delta, &mut self.uf);
                             self.delta.insert_add((v190, v191, v189));
                         }
-                        for (x_26, v274, v279) in self.integral_.iter_old1_1_2_0_3(v34, self.latest_timestamp) {
+                        for (v274, x_26, v279) in self.integral_.iter_old1_1_0_2_3(v34, self.latest_timestamp) {
                             for (fuel_12,) in self.fuel_.iter_old1_1_0(v274, self.latest_timestamp) {
                                 #[doc = "( rewrite ( Integral ( Fuel fuel ) ( Add f g ) x ) ( Add ( Integral fuel f x ) ( Integral fuel g x ) ) )"]
                                 let (v281,) = self.integral_.entry3_0_1_2_3(
@@ -18556,24 +18297,24 @@ fn lir_math() {
                             #[doc = "( rewrite ( Add a ( Add b c ) ) ( Add ( Add a b ) c ) )"]
                             let (v43,) = self
                                 .add_
-                                .entry2_1_0_2(b_4, a_2, &mut self.delta, &mut self.uf);
+                                .entry2_0_1_2(a_2, b_4, &mut self.delta, &mut self.uf);
                             self.delta.insert_add((v43, c, v34));
                         }
                         for (a_5, v48) in self.add_.iter_old1_1_0_2(v34, self.latest_timestamp) {
                             #[doc = "( rewrite ( Add a ( Add b c ) ) ( Add ( Add a b ) c ) )"]
                             let (v49,) = self
                                 .add_
-                                .entry2_1_0_2(a_2, a_5, &mut self.delta, &mut self.uf);
+                                .entry2_0_1_2(a_5, a_2, &mut self.delta, &mut self.uf);
                             self.delta.insert_add((v49, b_2, v48));
                         }
                         for (a_17, v102) in self.mul_.iter_all1_1_0_2(v34) {
                             #[doc = "( rewrite ( Mul a ( Add b c ) ) ( Add ( Mul a b ) ( Mul a c ) ) )"]
                             let (v104,) = self
                                 .mul_
-                                .entry2_1_0_2(b_2, a_17, &mut self.delta, &mut self.uf);
+                                .entry2_0_1_2(a_17, b_2, &mut self.delta, &mut self.uf);
                             let (v103,) = self
                                 .mul_
-                                .entry2_1_0_2(a_2, a_17, &mut self.delta, &mut self.uf);
+                                .entry2_0_1_2(a_17, a_2, &mut self.delta, &mut self.uf);
                             self.delta.insert_add((v103, v104, v102));
                         }
                         for (v63,) in self.const_.iter_all1_1_0(b_2) {
@@ -18584,25 +18325,26 @@ fn lir_math() {
                         }
                         if self.mul_.check1_2_0_1(a_2) {
                             for (a_19, c_7) in self.mul_.iter_all1_2_0_1(b_2) {
-                                for (b_10,) in self.mul_.iter_all2_2_0_1(a_2, a_19) {
+                                for (b_10,) in self.mul_.iter_all2_0_2_1(a_19, a_2) {
                                     #[doc = "( rewrite ( Add ( Mul a b ) ( Mul a c ) ) ( Mul a ( Add b c ) ) )"]
                                     let (v118,) =
                                         self.add_
-                                            .entry2_1_0_2(c_7, b_10, &mut self.delta, &mut self.uf);
+                                            .entry2_0_1_2(b_10, c_7, &mut self.delta, &mut self.uf);
                                     self.delta.insert_mul((a_19, v118, v34));
                                 }
                             }
                         }
                     }
                     for (a, b, v16) in self.sub_.iter_new() {
-                        #[doc = "( rewrite ( Sub a b ) ( Add a ( Mul ( Const -1 ) b ) ) )"]
-                        let v17 = self.global_i64.get(0usize);
-                        let (v18,) = self.const_.entry1_0_1(v17, &mut self.delta, &mut self.uf);
-                        let (v19,) = self
-                            .mul_
-                            .entry2_1_0_2(b, v18, &mut self.delta, &mut self.uf);
-                        self.delta.insert_add((a, v19, v16));
-                        for (x_29, v301, v306) in self.integral_.iter_old1_1_2_0_3(v16, self.latest_timestamp) {
+                        {
+                            let v17 = self.global_i64.get(0usize);
+                            let (v18,) = self.const_.entry1_0_1(v17, &mut self.delta, &mut self.uf);
+                            let (v19,) = self
+                                .mul_
+                                .entry2_0_1_2(v18, b, &mut self.delta, &mut self.uf);
+                            self.delta.insert_add((a, v19, v16));
+                        }
+                        for (v301, x_29, v306) in self.integral_.iter_old1_1_0_2_3(v16, self.latest_timestamp) {
                             for (fuel_15,) in self.fuel_.iter_old1_1_0(v301, self.latest_timestamp) {
                                 #[doc = "( rewrite ( Integral ( Fuel fuel ) ( Sub f g ) x ) ( Sub ( Integral fuel f x ) ( Integral fuel g x ) ) )"]
                                 let (v308,) = self.integral_.entry3_0_1_2_3(
@@ -18624,25 +18366,26 @@ fn lir_math() {
                         }
                     }
                     for (a_3, b_3, v37) in self.mul_.iter_new() {
-                        #[doc = "( rewrite ( Mul a b ) ( Mul b a ) )"]
-                        self.delta.insert_mul((b_3, a_3, v37));
+                        {
+                            self.delta.insert_mul((b_3, a_3, v37));
+                        }
                         for (x_14, v205) in self.diff_.iter_old1_1_0_2(v37, self.latest_timestamp) {
                             #[doc = "( rewrite ( Diff x ( Mul a b ) ) ( Add ( Mul a ( Diff x b ) ) ( Mul b ( Diff x a ) ) ) )"]
                             let (v206,) = self
                                 .diff_
-                                .entry2_1_0_2(b_3, x_14, &mut self.delta, &mut self.uf);
+                                .entry2_0_1_2(x_14, b_3, &mut self.delta, &mut self.uf);
                             let (v207,) = self
                                 .mul_
-                                .entry2_1_0_2(v206, a_3, &mut self.delta, &mut self.uf);
+                                .entry2_0_1_2(a_3, v206, &mut self.delta, &mut self.uf);
                             let (v208,) = self
                                 .diff_
-                                .entry2_1_0_2(a_3, x_14, &mut self.delta, &mut self.uf);
+                                .entry2_0_1_2(x_14, a_3, &mut self.delta, &mut self.uf);
                             let (v209,) = self
                                 .mul_
-                                .entry2_1_0_2(v208, b_3, &mut self.delta, &mut self.uf);
+                                .entry2_0_1_2(b_3, v208, &mut self.delta, &mut self.uf);
                             self.delta.insert_add((v207, v209, v205));
                         }
-                        for (x_32, v334, v339) in self.integral_.iter_old1_1_2_0_3(v37, self.latest_timestamp) {
+                        for (v334, x_32, v339) in self.integral_.iter_old1_1_0_2_3(v37, self.latest_timestamp) {
                             for (fuel_18,) in self.fuel_.iter_old1_1_0(v334, self.latest_timestamp) {
                                 #[doc = "( rewrite ( Integral ( Fuel fuel ) ( Mul a b ) x ) ( Sub ( Mul a ( Integral fuel b x ) ) ( Integral fuel ( Mul ( Diff x a ) ( Integral fuel b x ) ) x ) ) )"]
                                 let (v340,) = self.integral_.entry3_0_1_2_3(
@@ -18654,13 +18397,13 @@ fn lir_math() {
                                 );
                                 let (v341,) = self
                                     .mul_
-                                    .entry2_1_0_2(v340, a_3, &mut self.delta, &mut self.uf);
+                                    .entry2_0_1_2(a_3, v340, &mut self.delta, &mut self.uf);
                                 let (v342,) = self
                                     .diff_
-                                    .entry2_1_0_2(a_3, x_32, &mut self.delta, &mut self.uf);
+                                    .entry2_0_1_2(x_32, a_3, &mut self.delta, &mut self.uf);
                                 let (v343,) = self
                                     .mul_
-                                    .entry2_1_0_2(v340, v342, &mut self.delta, &mut self.uf);
+                                    .entry2_0_1_2(v342, v340, &mut self.delta, &mut self.uf);
                                 let (v344,) = self.integral_.entry3_0_1_2_3(
                                     fuel_18,
                                     v343,
@@ -18675,24 +18418,24 @@ fn lir_math() {
                             #[doc = "( rewrite ( Mul a ( Add b c ) ) ( Add ( Mul a b ) ( Mul a c ) ) )"]
                             let (v111,) = self
                                 .mul_
-                                .entry2_1_0_2(c_6, a_3, &mut self.delta, &mut self.uf);
+                                .entry2_0_1_2(a_3, c_6, &mut self.delta, &mut self.uf);
                             let (v110,) = self
                                 .mul_
-                                .entry2_1_0_2(b_9, a_3, &mut self.delta, &mut self.uf);
+                                .entry2_0_1_2(a_3, b_9, &mut self.delta, &mut self.uf);
                             self.delta.insert_add((v110, v111, v37));
                         }
                         for (b_6, c_3) in self.mul_.iter_all1_2_0_1(b_3) {
                             #[doc = "( rewrite ( Mul a ( Mul b c ) ) ( Mul ( Mul a b ) c ) )"]
                             let (v55,) = self
                                 .mul_
-                                .entry2_1_0_2(b_6, a_3, &mut self.delta, &mut self.uf);
+                                .entry2_0_1_2(a_3, b_6, &mut self.delta, &mut self.uf);
                             self.delta.insert_mul((v55, c_3, v37));
                         }
                         for (a_7, v60) in self.mul_.iter_old1_1_0_2(v37, self.latest_timestamp) {
                             #[doc = "( rewrite ( Mul a ( Mul b c ) ) ( Mul ( Mul a b ) c ) )"]
                             let (v61,) = self
                                 .mul_
-                                .entry2_1_0_2(a_3, a_7, &mut self.delta, &mut self.uf);
+                                .entry2_0_1_2(a_7, a_3, &mut self.delta, &mut self.uf);
                             self.delta.insert_mul((v61, b_3, v60));
                         }
                         for (v75,) in self.const_.iter_all1_1_0(b_3) {
@@ -18707,31 +18450,31 @@ fn lir_math() {
                         }
                         if self.mul_.check1_0_1_2(a_3) {
                             for (v123, v124) in self.add_.iter_old1_0_1_2(v37, self.latest_timestamp) {
-                                for (c_8,) in self.mul_.iter_all2_2_0_1(v123, a_3) {
+                                for (c_8,) in self.mul_.iter_all2_0_2_1(a_3, v123) {
                                     #[doc = "( rewrite ( Add ( Mul a b ) ( Mul a c ) ) ( Mul a ( Add b c ) ) )"]
                                     let (v125,) =
                                         self.add_
-                                            .entry2_1_0_2(c_8, b_3, &mut self.delta, &mut self.uf);
+                                            .entry2_0_1_2(b_3, c_8, &mut self.delta, &mut self.uf);
                                     self.delta.insert_mul((a_3, v125, v124));
                                 }
                             }
                             for (v128, v131) in self.add_.iter_old1_1_0_2(v37, self.latest_timestamp) {
-                                for (b_12,) in self.mul_.iter_old2_2_0_1(v128, a_3, self.latest_timestamp) {
+                                for (b_12,) in self.mul_.iter_old2_0_2_1(a_3, v128, self.latest_timestamp) {
                                     #[doc = "( rewrite ( Add ( Mul a b ) ( Mul a c ) ) ( Mul a ( Add b c ) ) )"]
                                     let (v132,) =
                                         self.add_
-                                            .entry2_1_0_2(b_3, b_12, &mut self.delta, &mut self.uf);
+                                            .entry2_0_1_2(b_12, b_3, &mut self.delta, &mut self.uf);
                                     self.delta.insert_mul((a_3, v132, v131));
                                 }
                             }
                         }
                         if self.pow_.check1_2_0_1(a_3) {
                             for (a_22, c_10) in self.pow_.iter_all1_2_0_1(b_3) {
-                                for (b_13,) in self.pow_.iter_all2_2_0_1(a_3, a_22) {
+                                for (b_13,) in self.pow_.iter_all2_0_2_1(a_22, a_3) {
                                     #[doc = "( rewrite ( Mul ( Pow a b ) ( Pow a c ) ) ( Pow a ( Add b c ) ) )"]
                                     let (v139,) =
                                         self.add_
-                                            .entry2_1_0_2(c_10, b_13, &mut self.delta, &mut self.uf);
+                                            .entry2_0_1_2(b_13, c_10, &mut self.delta, &mut self.uf);
                                     self.delta.insert_pow((a_22, v139, v37));
                                 }
                             }
@@ -18750,27 +18493,27 @@ fn lir_math() {
                         }
                         if self.pow_.check1_0_1_2(a_23) {
                             for (v144, v145) in self.mul_.iter_old1_0_1_2(v142, self.latest_timestamp) {
-                                for (c_11,) in self.pow_.iter_all2_2_0_1(v144, a_23) {
+                                for (c_11,) in self.pow_.iter_all2_0_2_1(a_23, v144) {
                                     #[doc = "( rewrite ( Mul ( Pow a b ) ( Pow a c ) ) ( Pow a ( Add b c ) ) )"]
                                     let (v146,) =
                                         self.add_
-                                            .entry2_1_0_2(c_11, b_14, &mut self.delta, &mut self.uf);
+                                            .entry2_0_1_2(b_14, c_11, &mut self.delta, &mut self.uf);
                                     self.delta.insert_pow((a_23, v146, v145));
                                 }
                             }
                             for (v149, v152) in self.mul_.iter_old1_1_0_2(v142, self.latest_timestamp) {
-                                for (b_15,) in self.pow_.iter_old2_2_0_1(v149, a_23, self.latest_timestamp) {
+                                for (b_15,) in self.pow_.iter_old2_0_2_1(a_23, v149, self.latest_timestamp) {
                                     #[doc = "( rewrite ( Mul ( Pow a b ) ( Pow a c ) ) ( Pow a ( Add b c ) ) )"]
                                     let (v153,) =
                                         self.add_
-                                            .entry2_1_0_2(b_14, b_15, &mut self.delta, &mut self.uf);
+                                            .entry2_0_1_2(b_15, b_14, &mut self.delta, &mut self.uf);
                                     self.delta.insert_pow((a_23, v153, v152));
                                 }
                             }
                         }
                     }
                     for (x_2, v9) in self.sin_.iter_new() {
-                        for (v215,) in self.diff_.iter_old2_1_0_2(v9, x_2, self.latest_timestamp) {
+                        for (v215,) in self.diff_.iter_old2_0_1_2(x_2, v9, self.latest_timestamp) {
                             #[doc = "( rewrite ( Diff x ( Sin x ) ) ( Cos x ) )"]
                             self.delta.insert_cos((x_2, v215));
                         }
@@ -18786,7 +18529,7 @@ fn lir_math() {
                         }
                     }
                     for (x_4, v27) in self.cos_.iter_new() {
-                        for (v28,) in self.diff_.iter_old2_1_0_2(v27, x_4, self.latest_timestamp) {
+                        for (v28,) in self.diff_.iter_old2_0_1_2(x_4, v27, self.latest_timestamp) {
                             #[doc = "( rewrite ( Diff x ( Cos x ) ) ( Mul ( Const -1 ) ( Sin x ) ) )"]
                             let v29 = self.global_i64.get(0usize);
                             let (v30,) = self.const_.entry1_0_1(v29, &mut self.delta, &mut self.uf);
@@ -18827,8 +18570,8 @@ fn lir_math() {
                             }
                         }
                         if v67 == self.global_i64.get(2usize) {
-                            for (x_19, v229, v233) in
-                                self.integral_.iter_old1_1_2_0_3(v68, self.latest_timestamp)
+                            for (v229, x_19, v233) in
+                                self.integral_.iter_old1_1_0_2_3(v68, self.latest_timestamp)
                             {
                                 for (fuel_5,) in self.fuel_.iter_old1_1_0(v229, self.latest_timestamp) {
                                     if v67 == self.global_i64.get(2usize) {
@@ -18865,8 +18608,8 @@ fn lir_math() {
                     }
                     if let Some(v95) = self.global_i64.get_new(2usize) {
                         for (v96,) in self.const_.iter_old1_0_1(v95, self.latest_timestamp) {
-                            for (x_20, v235, v239) in
-                                self.integral_.iter_old1_1_2_0_3(v96, self.latest_timestamp)
+                            for (v235, x_20, v239) in
+                                self.integral_.iter_old1_1_0_2_3(v96, self.latest_timestamp)
                             {
                                 for (fuel_6,) in self.fuel_.iter_old1_1_0(v235, self.latest_timestamp) {
                                     #[doc = "( rewrite ( Integral ( Fuel fuel ) ( Const 1 ) x ) x )"]
