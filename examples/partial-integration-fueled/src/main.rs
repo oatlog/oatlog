@@ -48,29 +48,23 @@ fn test() {
     run(&mut sink);
     let sink = String::from_utf8(sink).unwrap();
     expect_test::expect!([r#"
-        i=0 size=73
-        i=1 size=122
-        i=2 size=212
-        i=3 size=388
-        i=4 size=721
-        i=5 size=1268
-        i=6 size=1955
-        i=7 size=3111
-        i=8 size=5015
-        i=9 size=8210
-        i=10 size=13212
-        i=11 size=18235
-        i=12 size=24041
-        i=13 size=30151
-        i=14 size=34823
-        i=15 size=39190
-        i=16 size=43411
-        i=17 size=46494
-        i=18 size=48583
-        i=19 size=49775
-        i=20 size=50083
-        i=21 size=50021
-        i=22 size=50021
+        i=0 size=82
+        i=1 size=147
+        i=2 size=320
+        i=3 size=674
+        i=4 size=1365
+        i=5 size=2291
+        i=6 size=4128
+        i=7 size=8139
+        i=8 size=15098
+        i=9 size=23573
+        i=10 size=32457
+        i=11 size=36575
+        i=12 size=43119
+        i=13 size=46445
+        i=14 size=49909
+        i=15 size=50021
+        i=16 size=50021
 
         Add: 35587
         Const: 5
@@ -91,7 +85,7 @@ fn test() {
         total e-nodes: 50021
 
         FuelUnit: tot=4 roots=4
-        Math: tot=43464 roots=5127
+        Math: tot=33180 roots=5127
     "#])
     .assert_eq(&sink);
 }

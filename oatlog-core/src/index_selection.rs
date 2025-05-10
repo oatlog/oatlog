@@ -12,9 +12,6 @@ use crate::{
 
 use std::collections::{BTreeMap, BTreeSet};
 
-// TODO: compute *optimal* indexes using flow/similar.
-// TODO: optimize for queries where only a semi-join is performed (no introduced variables)
-// TODO: add some "maybe_contains" API.
 // TODO: bloom filters
 
 /// Pick a set of indexes that are compatible with the required uses.

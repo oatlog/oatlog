@@ -134,14 +134,12 @@ fn test() {
         Let's verify that this is a solution!
 
         i=0 size=10
-        i=1 size=19
-        i=2 size=35
-        i=3 size=71
-        i=4 size=149
-        i=5 size=347
-        i=6 size=996
-        i=7 size=1394
-        i=8 size=4459
+        i=1 size=23
+        i=2 size=41
+        i=3 size=96
+        i=4 size=292
+        i=5 size=762
+        i=6 size=2543
 
         Verified!
     "#])

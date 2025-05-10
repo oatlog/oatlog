@@ -266,6 +266,33 @@ pub(crate) fn lowering(
     (trie, variables)
 }
 
+fn register_columns_to_index(
+    table_uses: &mut TVec<RelationId, TSet<IndexId, BTreeSet<ColumnId>>>,
+    bound_premise: &BTreeSet<VariableId>,
+    relations: &TVec<RelationId, hir::Relation>,
+    relation: RelationId,
+    columns: &TVec<ColumnId, VariableId>,
+) -> (TVec<ColumnId, VariableId>, IndexId) {
+    let base = columns
+        .iter()
+        .map(|v| (!bound_premise.contains(v), *v))
+        .collect();
+
+    let best = relations[relation]
+        .invariant_permutations
+        .apply(&base)
+        .min()
+        .unwrap();
+
+    let columns = best.iter().map(|(_, v)| *v).collect();
+    let colset = best
+        .iter_enumerate()
+        .filter_map(|(c, (output, _))| (!output).then_some(c))
+        .collect();
+
+    (columns, table_uses[relation].insert(colset).rebase())
+}
+
 fn lowering_rec(
     parent_bound_premise: &BTreeSet<VariableId>,
     link: &TrieLink,
@@ -361,20 +388,6 @@ fn lowering_rec(
                 }
             }
 
-            let mut make_index_use = || {
-                table_uses[atom.relation]
-                    .insert(
-                        atom.columns
-                            .iter()
-                            .enumerate()
-                            .filter_map(|(i, x)| {
-                                parent_bound_premise.contains(x).then_some(ColumnId(i))
-                            })
-                            .collect(),
-                    )
-                    .rebase()
-            };
-
             let all_columns_already_bound = atom
                 .columns
                 .iter()
@@ -400,20 +413,27 @@ fn lowering_rec(
                         hir::RelationTy::Primitive { .. } => {
                             todo!("primary join on primitive")
                         }
-                        hir::RelationTy::Table => lir::Premise::Relation {
-                            relation: atom.relation,
-                            args: atom.columns.clone(),
-                            kind: if all_columns_already_bound {
-                                lir::PremiseKind::SemiJoin {
-                                    index: make_index_use(),
-                                }
-                            } else {
-                                lir::PremiseKind::Join {
-                                    index: make_index_use(),
-                                    inclusion: lir_inclusion,
-                                }
-                            },
-                        },
+                        hir::RelationTy::Table => {
+                            let (args, index) = register_columns_to_index(
+                                table_uses,
+                                parent_bound_premise,
+                                relations,
+                                atom.relation,
+                                &atom.columns,
+                            );
+                            lir::Premise::Relation {
+                                relation: atom.relation,
+                                args,
+                                kind: if all_columns_already_bound {
+                                    lir::PremiseKind::SemiJoin { index }
+                                } else {
+                                    lir::PremiseKind::Join {
+                                        index,
+                                        inclusion: lir_inclusion,
+                                    }
+                                },
+                            }
+                        }
                         hir::RelationTy::Global { .. } => {
                             if parent_bound_premise.contains(&atom.columns[ColumnId(0)]) {
                                 lir::Premise::Relation {
@@ -441,19 +461,6 @@ fn lowering_rec(
             premises
         }
         Semi(atom) => {
-            let mut make_index_use = || {
-                table_uses[atom.relation]
-                    .insert(
-                        atom.columns
-                            .iter()
-                            .enumerate()
-                            .filter_map(|(i, x)| {
-                                parent_bound_premise.contains(x).then_some(ColumnId(i))
-                            })
-                            .collect(),
-                    )
-                    .rebase()
-            };
             assert_ne!(
                 hir::Inclusion::New,
                 atom.incl,
@@ -463,13 +470,20 @@ fn lowering_rec(
                 hir::RelationTy::Primitive { .. } => panic!("semi-join primitive"),
                 hir::RelationTy::Forall { .. } => panic!("semi-join forall"),
                 hir::RelationTy::Alias {} => panic!("semi-join alias"),
-                hir::RelationTy::Table => lir::Premise::Relation {
-                    relation: atom.relation,
-                    args: atom.columns.clone(),
-                    kind: lir::PremiseKind::SemiJoin {
-                        index: make_index_use(),
-                    },
-                },
+                hir::RelationTy::Table => {
+                    let (args, index) = register_columns_to_index(
+                        table_uses,
+                        parent_bound_premise,
+                        relations,
+                        atom.relation,
+                        &atom.columns,
+                    );
+                    lir::Premise::Relation {
+                        relation: atom.relation,
+                        args,
+                        kind: lir::PremiseKind::SemiJoin { index },
+                    }
+                }
                 hir::RelationTy::Global { .. } => lir::Premise::Relation {
                     relation: atom.relation,
                     args: atom.columns.clone(),
@@ -500,6 +514,34 @@ fn lowering_rec(
         // Leaf nodes without actions can be created when some rule is strictly less powerful than
         // another.
         return None;
+    }
+
+    // We can elide a `SemiJoin` just before its corresponding `Join` (or additional `SemiJoin`).
+    match (&actions[..], &premises[..], &then[..]) {
+        (
+            [],
+            [
+                lir::Premise::Relation {
+                    relation: r1,
+                    args: a1,
+                    kind: lir::PremiseKind::SemiJoin { .. },
+                },
+            ],
+            [
+                lir::RuleTrie {
+                    premise:
+                        lir::Premise::Relation {
+                            relation: r2,
+                            args: a2,
+                            kind: lir::PremiseKind::Join { .. } | lir::PremiseKind::SemiJoin { .. },
+                        },
+                    meta: _,
+                    actions: _,
+                    then: _,
+                },
+            ],
+        ) if r1 == r2 && a1 == a2 => return then.into_iter().next(),
+        _ => {}
     }
 
     let mut ret = {
@@ -759,11 +801,26 @@ impl Rule {
                         let tmp = other.columns.iter().copied().collect::<BTreeSet<_>>();
                         let introduced_vars: BTreeSet<_> =
                             tmp.difference(&ctx.bound_premise).collect();
+                        let bound_vars: BTreeSet<_> = tmp.union(&ctx.bound_premise).collect();
 
                         this_rule.semi = this_rule
                             .premise
                             .iter()
-                            .filter(|&x| x.columns.iter().any(|v| introduced_vars.contains(v)))
+                            .filter(|&x| {
+                                let relation = &ctx.relations[x.relation];
+                                let is_global =
+                                    matches!(relation.kind, hir::RelationTy::Global { .. });
+                                let got_introduced =
+                                    x.columns.iter().any(|v| introduced_vars.contains(v));
+                                let already_determined =
+                                    x.columns.iter().all(|v| bound_vars.contains(v))
+                                        || relation.implicit_rules.iter().any(|im| {
+                                            im.key_columns()
+                                                .iter()
+                                                .all(|c| bound_vars.contains(&x.columns[c]))
+                                        });
+                                !is_global && got_introduced && already_determined
+                            })
                             .cloned()
                             .collect();
 
@@ -841,7 +898,8 @@ impl Rule {
                 #[derive(Copy, Clone, Ord, PartialOrd, PartialEq, Eq, Debug)]
                 enum RelationScore {
                     NoQuery,
-                    Indexed,
+                    IndexedAll,
+                    IndexedOld,
                     SingleElement,
                     AllBound,
                     Global,
@@ -858,7 +916,8 @@ impl Rule {
                     NoQuery,
                     IndexedDisconnected,
                     SingleElementDisconnected,
-                    IndexedConnected,
+                    IndexedAllConnected,
+                    IndexedOldConnected,
                     SingleElementConnected,
                     AllBound,
                     Global,
@@ -871,7 +930,7 @@ impl Rule {
                     .map(|atom| {
                         use IsConnected::{Connected, Disconnected};
                         use RelationScore::{
-                            AllBound, Global, Indexed, New, NoQuery, SingleElement,
+                            AllBound, Global, IndexedAll, IndexedOld, New, NoQuery, SingleElement,
                         };
                         let connected =
                             if atom.columns.iter().any(|x| ctx.bound_premise.contains(x)) {
@@ -891,7 +950,11 @@ impl Rule {
                         let relation = &ctx.relations[atom.relation];
                         match &relation.kind {
                             hir::RelationTy::Table => {
-                                score = score.max(Indexed);
+                                score = score.max(if atom.incl == hir::Inclusion::Old {
+                                    IndexedOld
+                                } else {
+                                    IndexedAll
+                                });
                             }
                             hir::RelationTy::Alias {} => {
                                 unreachable!();
@@ -919,11 +982,14 @@ impl Rule {
 
                         let score = match (score, connected) {
                             (NoQuery, _) => CompoundRelationScore::NoQuery,
-                            (Indexed, Disconnected) => CompoundRelationScore::IndexedDisconnected,
+                            (IndexedAll | IndexedOld, Disconnected) => {
+                                CompoundRelationScore::IndexedDisconnected
+                            }
                             (SingleElement, Disconnected) => {
                                 CompoundRelationScore::SingleElementDisconnected
                             }
-                            (Indexed, Connected) => CompoundRelationScore::IndexedConnected,
+                            (IndexedAll, Connected) => CompoundRelationScore::IndexedAllConnected,
+                            (IndexedOld, Connected) => CompoundRelationScore::IndexedOldConnected,
                             (SingleElement, Connected) => {
                                 CompoundRelationScore::SingleElementConnected
                             }
@@ -950,7 +1016,8 @@ impl Rule {
                             CompoundRelationScore::SingleElementDisconnected => {
                                 panic!("query is disconnected (valid but surprising)")
                             }
-                            CompoundRelationScore::IndexedConnected
+                            CompoundRelationScore::IndexedAllConnected
+                            | CompoundRelationScore::IndexedOldConnected
                             | CompoundRelationScore::SingleElementConnected
                             | CompoundRelationScore::AllBound
                             | CompoundRelationScore::New
@@ -959,11 +1026,6 @@ impl Rule {
                         best.into_iter().cloned().map(TrieLink::Primary).collect()
                     })
                     .unwrap_or(vec![])
-            }
-            [atom] => {
-                // if there is a single semi-join left, it's better to just iterate that then to do
-                // a check.
-                vec![Primary(atom.clone())]
             }
             _ => self.semi.iter().cloned().map(Semi).collect(),
         })

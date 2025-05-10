@@ -26,7 +26,7 @@ impl Steps {
             exp.assert_eq(&hir.dbg_summary());
         }
 
-        let (_, lir) = crate::query_planning::emit_lir_theory(hir.transform_into_seminaive(config));
+        let (_, lir) = crate::query_planning::emit_lir_theory(hir.transform_into_seminaive());
         if let Some(exp) = self.expected_lir {
             exp.assert_eq(&lir.dbg_summary());
         }
@@ -684,7 +684,7 @@ fn regression_tir2() {
                         name: "Const",
                         param_types: {c0: t0, c1: t1},
                         kind: Table {
-                            index_to_info: {ir0: 0=>1:union, ir1: 1=>0},
+                            index_to_info: {ir0: 0=>1:union (check: {{0, 1}})},
                         },
                     },
                     r3: RelationData {
@@ -743,9 +743,9 @@ fn regression_tir2() {
                 rule_tries: [
                     premise: [IterNew, r1(v0, v2, v3)]
                     then: [
-                        premise: [JoinAll, r2(v1, v2), ir1]
+                        premise: [JoinAll, r3(v1), ir_bogus]
                         then: [
-                            premise: [SemiJoin, r3(v1), ir_bogus]
+                            premise: [SemiJoin, r2(v1, v2), ir0]
                             meta: "( rewrite ( Pow x ( Const 2 ) ) ( Mul x x ) )"
                             actions: [
                                 [Action::Insert, r0(v0, v0, v3)],
@@ -754,15 +754,12 @@ fn regression_tir2() {
                     ],
                     premise: [IterNew, r2(v5, v6)]
                     then: [
-                        premise: [SemiJoin, r1(v4, v6, v7), ir1]
+                        premise: [SemiJoin, r3(v5), ir_bogus]
                         then: [
-                            premise: [SemiJoin, r3(v5), ir_bogus]
-                            then: [
-                                premise: [JoinOld, r1(v4, v6, v7), ir1]
-                                meta: "( rewrite ( Pow x ( Const 2 ) ) ( Mul x x ) )"
-                                actions: [
-                                    [Action::Insert, r0(v4, v4, v7)],
-                                ],
+                            premise: [JoinOld, r1(v4, v6, v7), ir1]
+                            meta: "( rewrite ( Pow x ( Const 2 ) ) ( Mul x x ) )"
+                            actions: [
+                                [Action::Insert, r0(v4, v4, v7)],
                             ],
                         ],
                     ],
@@ -1245,14 +1242,13 @@ fn regression_tir2() {
                 new: Vec<<Self as Relation>::Row>,
                 all: Vec<(std::primitive::i64, Math, TimeStamp)>,
                 fd_index_0: runtime::HashMap<(std::primitive::i64,), (Math, TimeStamp)>,
-                nofd_index_1: runtime::IndexedSortedList<(Math,), (std::primitive::i64, TimeStamp)>,
                 i64_num_uprooted_at_latest_retain: usize,
                 math_num_uprooted_at_latest_retain: usize,
             }
             impl Relation for ConstRelation {
                 type Row = (std::primitive::i64, Math);
                 type Unification = Unification;
-                const COST: u32 = 4u32;
+                const COST: u32 = 2u32;
                 fn new() -> Self {
                     Self::default()
                 }
@@ -1388,18 +1384,6 @@ fn regression_tir2() {
                                 "all does not have duplicate timestamps"
                             );
                         }
-                        log_duration!("reconstruct index: {}", {
-                            log_duration!("reconstruct sort: {}", {
-                                self.all.sort_unstable_by_key(|&(x0, x1, timestamp)| (x1,));
-                            });
-                            unsafe {
-                                self.nofd_index_1.reconstruct(
-                                    &mut self.all,
-                                    |(x0, x1, timestamp)| (x1,),
-                                    |(x0, x1, timestamp)| (x0, timestamp),
-                                );
-                            }
-                        });
                         self.math_num_uprooted_at_latest_retain = 0;
                     });
                 }
@@ -1440,20 +1424,10 @@ fn regression_tir2() {
                 fn check_0(&self, x0: std::primitive::i64) -> bool {
                     self.iter_all_0_to_1(x0).next().is_some()
                 }
-                fn iter_all_1_to_0(&self, x1: Math) -> impl Iterator<Item = (std::primitive::i64,)> + use<'_> {
-                    self.nofd_index_1.iter((x1,)).map(|(x0, _timestamp)| (x0,))
-                }
-                fn iter_old_1_to_0(
-                    &self,
-                    x1: Math,
-                    latest_timestamp: TimeStamp,
-                ) -> impl Iterator<Item = (std::primitive::i64,)> + use<'_> {
-                    self.nofd_index_1
-                        .iter((x1,))
-                        .filter_map(move |(x0, timestamp)| (timestamp < latest_timestamp).then_some((x0,)))
-                }
-                fn check_1(&self, x1: Math) -> bool {
-                    self.iter_all_1_to_0(x1).next().is_some()
+                fn check_0_1(&self, x0: std::primitive::i64, x1: Math) -> bool {
+                    self.iter_all_0_to_1(x0)
+                        .next()
+                        .is_some_and(|(y1,)| true && x1 == y1)
                 }
             }
             #[derive(Debug, Default)]
@@ -1557,20 +1531,18 @@ fn regression_tir2() {
                 #[inline(never)]
                 pub fn apply_rules(&mut self) {
                     for (x, v2, v3) in self.pow_.iter_new() {
-                        for (v1,) in self.const_.iter_all_1_to_0(v2) {
-                            if v1 == self.global_i64.get(0usize) {
+                        if let v1 = self.global_i64.get(0usize) {
+                            if self.const_.check_0_1(v1, v2) {
                                 #[doc = "( rewrite ( Pow x ( Const 2 ) ) ( Mul x x ) )"]
                                 self.delta.insert_mul((x, x, v3));
                             }
                         }
                     }
                     for (v5, v6) in self.const_.iter_new() {
-                        if self.pow_.check_1(v6) {
-                            if v5 == self.global_i64.get(0usize) {
-                                for (x_2, v7) in self.pow_.iter_old_1_to_0_2(v6, self.latest_timestamp) {
-                                    #[doc = "( rewrite ( Pow x ( Const 2 ) ) ( Mul x x ) )"]
-                                    self.delta.insert_mul((x_2, x_2, v7));
-                                }
+                        if v5 == self.global_i64.get(0usize) {
+                            for (x_2, v7) in self.pow_.iter_old_1_to_0_2(v6, self.latest_timestamp) {
+                                #[doc = "( rewrite ( Pow x ( Const 2 ) ) ( Mul x x ) )"]
+                                self.delta.insert_mul((x_2, x_2, v7));
                             }
                         }
                     }
@@ -2604,31 +2576,25 @@ fn codegen_constant_propagation() {
                 rule_tries: [
                     premise: [IterNew, r2(v2, v4, v0)]
                     then: [
-                        premise: [SemiJoin, r4(v1, v2), ir1]
+                        premise: [JoinAll, r4(v1, v2), ir1]
                         then: [
                             premise: [JoinAll, r4(v3, v4), ir1]
-                            then: [
-                                premise: [JoinAll, r4(v1, v2), ir1]
-                                meta: "( rule ( ( = e ( Add ( Const a ) ( Const b ) ) ) ) ( ( union e ( Const ( + a b ) ) ) ) )"
-                                actions: [
-                                    [Action::Entry, r0(v1, v3, v5) on ir_bogus],
-                                    [Action::Insert, r4(v5, v0)],
-                                ],
+                            meta: "( rule ( ( = e ( Add ( Const a ) ( Const b ) ) ) ) ( ( union e ( Const ( + a b ) ) ) ) )"
+                            actions: [
+                                [Action::Entry, r0(v1, v3, v5) on ir_bogus],
+                                [Action::Insert, r4(v5, v0)],
                             ],
                         ],
                     ],
                     premise: [IterNew, r3(v20, v22, v18)]
                     then: [
-                        premise: [SemiJoin, r4(v19, v20), ir1]
+                        premise: [JoinAll, r4(v19, v20), ir1]
                         then: [
                             premise: [JoinAll, r4(v21, v22), ir1]
-                            then: [
-                                premise: [JoinAll, r4(v19, v20), ir1]
-                                meta: "( rule ( ( = e ( Mul ( Const a ) ( Const b ) ) ) ) ( ( union e ( Const ( * a b ) ) ) ) )"
-                                actions: [
-                                    [Action::Entry, r1(v19, v21, v23) on ir_bogus],
-                                    [Action::Insert, r4(v23, v18)],
-                                ],
+                            meta: "( rule ( ( = e ( Mul ( Const a ) ( Const b ) ) ) ) ( ( union e ( Const ( * a b ) ) ) ) )"
+                            actions: [
+                                [Action::Entry, r1(v19, v21, v23) on ir_bogus],
+                                [Action::Insert, r4(v23, v18)],
                             ],
                         ],
                     ],
@@ -3503,24 +3469,20 @@ fn codegen_constant_propagation() {
                 #[inline(never)]
                 pub fn apply_rules(&mut self) {
                     for (v2, v4, e) in self.add_.iter_new() {
-                        if self.const_.check_1(v2) {
+                        for (a,) in self.const_.iter_all_1_to_0(v2) {
                             for (b,) in self.const_.iter_all_1_to_0(v4) {
-                                for (a,) in self.const_.iter_all_1_to_0(v2) {
-                                    #[doc = "( rule ( ( = e ( Add ( Const a ) ( Const b ) ) ) ) ( ( union e ( Const ( + a b ) ) ) ) )"]
-                                    let (v5,) = i64_add012(a, b).next().unwrap();
-                                    self.delta.insert_const((v5, e));
-                                }
+                                #[doc = "( rule ( ( = e ( Add ( Const a ) ( Const b ) ) ) ) ( ( union e ( Const ( + a b ) ) ) ) )"]
+                                let (v5,) = i64_add012(a, b).next().unwrap();
+                                self.delta.insert_const((v5, e));
                             }
                         }
                     }
                     for (v20, v22, e_4) in self.mul_.iter_new() {
-                        if self.const_.check_1(v20) {
+                        for (a_4,) in self.const_.iter_all_1_to_0(v20) {
                             for (b_4,) in self.const_.iter_all_1_to_0(v22) {
-                                for (a_4,) in self.const_.iter_all_1_to_0(v20) {
-                                    #[doc = "( rule ( ( = e ( Mul ( Const a ) ( Const b ) ) ) ) ( ( union e ( Const ( * a b ) ) ) ) )"]
-                                    let (v23,) = i64_mul012(a_4, b_4).next().unwrap();
-                                    self.delta.insert_const((v23, e_4));
-                                }
+                                #[doc = "( rule ( ( = e ( Mul ( Const a ) ( Const b ) ) ) ) ( ( union e ( Const ( * a b ) ) ) ) )"]
+                                let (v23,) = i64_mul012(a_4, b_4).next().unwrap();
+                                self.delta.insert_const((v23, e_4));
                             }
                         }
                     }
@@ -8617,14 +8579,13 @@ fn test_primitives_simple() {
                 new: Vec<<Self as Relation>::Row>,
                 all: Vec<(std::primitive::i64, Math, TimeStamp)>,
                 fd_index_0: runtime::HashMap<(std::primitive::i64,), (Math, TimeStamp)>,
-                nofd_index_1: runtime::IndexedSortedList<(Math,), (std::primitive::i64, TimeStamp)>,
                 i64_num_uprooted_at_latest_retain: usize,
                 math_num_uprooted_at_latest_retain: usize,
             }
             impl Relation for ConstRelation {
                 type Row = (std::primitive::i64, Math);
                 type Unification = Unification;
-                const COST: u32 = 4u32;
+                const COST: u32 = 2u32;
                 fn new() -> Self {
                     Self::default()
                 }
@@ -8760,18 +8721,6 @@ fn test_primitives_simple() {
                                 "all does not have duplicate timestamps"
                             );
                         }
-                        log_duration!("reconstruct index: {}", {
-                            log_duration!("reconstruct sort: {}", {
-                                self.all.sort_unstable_by_key(|&(x0, x1, timestamp)| (x1,));
-                            });
-                            unsafe {
-                                self.nofd_index_1.reconstruct(
-                                    &mut self.all,
-                                    |(x0, x1, timestamp)| (x1,),
-                                    |(x0, x1, timestamp)| (x0, timestamp),
-                                );
-                            }
-                        });
                         self.math_num_uprooted_at_latest_retain = 0;
                     });
                 }
@@ -8812,20 +8761,10 @@ fn test_primitives_simple() {
                 fn check_0(&self, x0: std::primitive::i64) -> bool {
                     self.iter_all_0_to_1(x0).next().is_some()
                 }
-                fn iter_all_1_to_0(&self, x1: Math) -> impl Iterator<Item = (std::primitive::i64,)> + use<'_> {
-                    self.nofd_index_1.iter((x1,)).map(|(x0, _timestamp)| (x0,))
-                }
-                fn iter_old_1_to_0(
-                    &self,
-                    x1: Math,
-                    latest_timestamp: TimeStamp,
-                ) -> impl Iterator<Item = (std::primitive::i64,)> + use<'_> {
-                    self.nofd_index_1
-                        .iter((x1,))
-                        .filter_map(move |(x0, timestamp)| (timestamp < latest_timestamp).then_some((x0,)))
-                }
-                fn check_1(&self, x1: Math) -> bool {
-                    self.iter_all_1_to_0(x1).next().is_some()
+                fn check_0_1(&self, x0: std::primitive::i64, x1: Math) -> bool {
+                    self.iter_all_0_to_1(x0)
+                        .next()
+                        .is_some_and(|(y1,)| true && x1 == y1)
                 }
             }
             #[derive(Debug, Default)]
@@ -9115,8 +9054,8 @@ fn test_primitives_simple() {
                 #[inline(never)]
                 pub fn apply_rules(&mut self) {
                     for (a, v24, v25) in self.mul_.iter_new() {
-                        for (v23,) in self.const_.iter_all_1_to_0(v24) {
-                            if v23 == self.global_i64.get(2usize) {
+                        if let v23 = self.global_i64.get(2usize) {
+                            if self.const_.check_0_1(v23, v24) {
                                 #[doc = "( rewrite ( Mul a ( Const 0 ) ) ( Const 0 ) )"]
                                 self.uf.math_.union(v24, v25);
                             }
@@ -9135,12 +9074,10 @@ fn test_primitives_simple() {
                             let (v3,) = self.var_.entry_0_to_1(v2, &mut self.delta, &mut self.uf);
                             self.delta.insert_add((v3, v3, v1));
                         }
-                        if self.mul_.check_1(v1) {
-                            if one == self.global_i64.get(2usize) {
-                                for (a_2, v29) in self.mul_.iter_old_1_to_0_2(v1, self.latest_timestamp) {
-                                    #[doc = "( rewrite ( Mul a ( Const 0 ) ) ( Const 0 ) )"]
-                                    self.uf.math_.union(v1, v29);
-                                }
+                        if one == self.global_i64.get(2usize) {
+                            for (a_2, v29) in self.mul_.iter_old_1_to_0_2(v1, self.latest_timestamp) {
+                                #[doc = "( rewrite ( Mul a ( Const 0 ) ) ( Const 0 ) )"]
+                                self.uf.math_.union(v1, v29);
                             }
                         }
                     }
@@ -9601,13 +9538,12 @@ fn triangle_join() {
                 all: Vec<(Math, Math, TimeStamp)>,
                 nofd_index_0: runtime::IndexedSortedList<(Math,), (Math, TimeStamp)>,
                 nofd_index_0_1: runtime::IndexedSortedList<(Math, Math), (TimeStamp,)>,
-                nofd_index_1: runtime::IndexedSortedList<(Math,), (Math, TimeStamp)>,
                 math_num_uprooted_at_latest_retain: usize,
             }
             impl Relation for BarRelation {
                 type Row = (Math, Math);
                 type Unification = Unification;
-                const COST: u32 = 6u32;
+                const COST: u32 = 4u32;
                 fn new() -> Self {
                     Self::default()
                 }
@@ -9760,18 +9696,6 @@ fn triangle_join() {
                                 );
                             }
                         });
-                        log_duration!("reconstruct index: {}", {
-                            log_duration!("reconstruct sort: {}", {
-                                RowSort01::sort(&mut self.all);
-                            });
-                            unsafe {
-                                self.nofd_index_1.reconstruct(
-                                    &mut self.all,
-                                    |(x0, x1, timestamp)| (x1,),
-                                    |(x0, x1, timestamp)| (x0, timestamp),
-                                );
-                            }
-                        });
                         self.math_num_uprooted_at_latest_retain = 0;
                     });
                 }
@@ -9808,35 +9732,18 @@ fn triangle_join() {
                 fn check_0_1(&self, x0: Math, x1: Math) -> bool {
                     self.iter_all_0_1_to_(x0, x1).next().is_some()
                 }
-                fn iter_all_1_to_0(&self, x1: Math) -> impl Iterator<Item = (Math,)> + use<'_> {
-                    self.nofd_index_1.iter((x1,)).map(|(x0, _timestamp)| (x0,))
-                }
-                fn iter_old_1_to_0(
-                    &self,
-                    x1: Math,
-                    latest_timestamp: TimeStamp,
-                ) -> impl Iterator<Item = (Math,)> + use<'_> {
-                    self.nofd_index_1
-                        .iter((x1,))
-                        .filter_map(move |(x0, timestamp)| (timestamp < latest_timestamp).then_some((x0,)))
-                }
-                fn check_1(&self, x1: Math) -> bool {
-                    self.iter_all_1_to_0(x1).next().is_some()
-                }
             }
             #[derive(Debug, Default)]
             struct BazRelation {
                 new: Vec<<Self as Relation>::Row>,
                 all: Vec<(Math, Math, TimeStamp)>,
-                nofd_index_0: runtime::IndexedSortedList<(Math,), (Math, TimeStamp)>,
                 nofd_index_0_1: runtime::IndexedSortedList<(Math, Math), (TimeStamp,)>,
-                nofd_index_1: runtime::IndexedSortedList<(Math,), (Math, TimeStamp)>,
                 math_num_uprooted_at_latest_retain: usize,
             }
             impl Relation for BazRelation {
                 type Row = (Math, Math);
                 type Unification = Unification;
-                const COST: u32 = 6u32;
+                const COST: u32 = 2u32;
                 fn new() -> Self {
                     Self::default()
                 }
@@ -9850,11 +9757,11 @@ fn triangle_join() {
                     self.new.iter().copied()
                 }
                 fn len(&self) -> usize {
-                    self.nofd_index_0.len()
+                    self.nofd_index_0_1.len()
                 }
                 fn emit_graphviz(&self, buf: &mut String) {
                     use std::fmt::Write;
-                    for (i, ((x0,), (x1, _timestamp))) in self.nofd_index_0.iter_key_value().enumerate() {
+                    for (i, ((x0, x1), (_timestamp,))) in self.nofd_index_0_1.iter_key_value().enumerate() {
                         writeln!(buf, "{}_{i} -> {}_{};", "baz", "math", x0).unwrap();
                         writeln!(buf, "{}_{i} -> {}_{};", "baz", "math", x1).unwrap();
                         writeln!(buf, "{}_{i} [shape = box];", "baz").unwrap();
@@ -9967,18 +9874,6 @@ fn triangle_join() {
                         }
                         log_duration!("reconstruct index: {}", {
                             log_duration!("reconstruct sort: {}", {
-                                RowSort10::sort(&mut self.all);
-                            });
-                            unsafe {
-                                self.nofd_index_0.reconstruct(
-                                    &mut self.all,
-                                    |(x0, x1, timestamp)| (x0,),
-                                    |(x0, x1, timestamp)| (x1, timestamp),
-                                );
-                            }
-                        });
-                        log_duration!("reconstruct index: {}", {
-                            log_duration!("reconstruct sort: {}", {
                                 RowSort11::sort(&mut self.all);
                             });
                             unsafe {
@@ -9989,38 +9884,11 @@ fn triangle_join() {
                                 );
                             }
                         });
-                        log_duration!("reconstruct index: {}", {
-                            log_duration!("reconstruct sort: {}", {
-                                RowSort01::sort(&mut self.all);
-                            });
-                            unsafe {
-                                self.nofd_index_1.reconstruct(
-                                    &mut self.all,
-                                    |(x0, x1, timestamp)| (x1,),
-                                    |(x0, x1, timestamp)| (x0, timestamp),
-                                );
-                            }
-                        });
                         self.math_num_uprooted_at_latest_retain = 0;
                     });
                 }
             }
             impl BazRelation {
-                fn iter_all_0_to_1(&self, x0: Math) -> impl Iterator<Item = (Math,)> + use<'_> {
-                    self.nofd_index_0.iter((x0,)).map(|(x1, _timestamp)| (x1,))
-                }
-                fn iter_old_0_to_1(
-                    &self,
-                    x0: Math,
-                    latest_timestamp: TimeStamp,
-                ) -> impl Iterator<Item = (Math,)> + use<'_> {
-                    self.nofd_index_0
-                        .iter((x0,))
-                        .filter_map(move |(x1, timestamp)| (timestamp < latest_timestamp).then_some((x1,)))
-                }
-                fn check_0(&self, x0: Math) -> bool {
-                    self.iter_all_0_to_1(x0).next().is_some()
-                }
                 fn iter_all_0_1_to_(&self, x0: Math, x1: Math) -> impl Iterator<Item = ()> + use<'_> {
                     self.nofd_index_0_1.iter((x0, x1)).map(|(_timestamp)| ())
                 }
@@ -10036,21 +9904,6 @@ fn triangle_join() {
                 }
                 fn check_0_1(&self, x0: Math, x1: Math) -> bool {
                     self.iter_all_0_1_to_(x0, x1).next().is_some()
-                }
-                fn iter_all_1_to_0(&self, x1: Math) -> impl Iterator<Item = (Math,)> + use<'_> {
-                    self.nofd_index_1.iter((x1,)).map(|(x0, _timestamp)| (x0,))
-                }
-                fn iter_old_1_to_0(
-                    &self,
-                    x1: Math,
-                    latest_timestamp: TimeStamp,
-                ) -> impl Iterator<Item = (Math,)> + use<'_> {
-                    self.nofd_index_1
-                        .iter((x1,))
-                        .filter_map(move |(x0, timestamp)| (timestamp < latest_timestamp).then_some((x0,)))
-                }
-                fn check_1(&self, x1: Math) -> bool {
-                    self.iter_all_1_to_0(x1).next().is_some()
                 }
             }
             #[derive(Debug, Default)]
@@ -10328,32 +10181,26 @@ fn triangle_join() {
                 #[inline(never)]
                 pub fn apply_rules(&mut self) {
                     for (a, b) in self.foo_.iter_new() {
-                        if self.bar_.check_0(b) {
-                            for (c,) in self.baz_.iter_all_1_to_0(a) {
-                                if self.bar_.check_0_1(b, c) {
-                                    #[doc = "( rule ( ( Foo a b ) ( Bar b c ) ( Baz c a ) ) ( ( Triangle a b c ) ) )"]
-                                    self.delta.insert_triangle((a, b, c));
-                                }
+                        for (c,) in self.bar_.iter_all_0_to_1(b) {
+                            if self.baz_.check_0_1(c, a) {
+                                #[doc = "( rule ( ( Foo a b ) ( Bar b c ) ( Baz c a ) ) ( ( Triangle a b c ) ) )"]
+                                self.delta.insert_triangle((a, b, c));
                             }
                         }
                     }
                     for (b_2, c_2) in self.bar_.iter_new() {
-                        if self.foo_.check_1(b_2) {
-                            for (a_2,) in self.baz_.iter_all_0_to_1(c_2) {
-                                if self.foo_.check_0_1(a_2, b_2) {
-                                    #[doc = "( rule ( ( Foo a b ) ( Bar b c ) ( Baz c a ) ) ( ( Triangle a b c ) ) )"]
-                                    self.delta.insert_triangle((a_2, b_2, c_2));
-                                }
+                        for (a_2,) in self.foo_.iter_old_1_to_0(b_2, self.latest_timestamp) {
+                            if self.baz_.check_0_1(c_2, a_2) {
+                                #[doc = "( rule ( ( Foo a b ) ( Bar b c ) ( Baz c a ) ) ( ( Triangle a b c ) ) )"]
+                                self.delta.insert_triangle((a_2, b_2, c_2));
                             }
                         }
                     }
                     for (c_3, a_3) in self.baz_.iter_new() {
-                        if self.foo_.check_0(a_3) {
-                            for (b_3,) in self.bar_.iter_old_1_to_0(c_3, self.latest_timestamp) {
-                                if self.foo_.check_0_1(a_3, b_3) {
-                                    #[doc = "( rule ( ( Foo a b ) ( Bar b c ) ( Baz c a ) ) ( ( Triangle a b c ) ) )"]
-                                    self.delta.insert_triangle((a_3, b_3, c_3));
-                                }
+                        for (b_3,) in self.foo_.iter_old_0_to_1(a_3, self.latest_timestamp) {
+                            if self.bar_.check_0_1(b_3, c_3) {
+                                #[doc = "( rule ( ( Foo a b ) ( Bar b c ) ( Baz c a ) ) ( ( Triangle a b c ) ) )"]
+                                self.delta.insert_triangle((a_3, b_3, c_3));
                             }
                         }
                     }
@@ -10838,14 +10685,12 @@ fn edgecase0() {
                 new: Vec<<Self as Relation>::Row>,
                 all: Vec<(Math, Math, Math, TimeStamp)>,
                 fd_index_0_1: runtime::HashMap<(Math, Math), (Math, TimeStamp)>,
-                nofd_index_0: runtime::IndexedSortedList<(Math,), (Math, Math, TimeStamp)>,
-                nofd_index_1: runtime::IndexedSortedList<(Math,), (Math, Math, TimeStamp)>,
                 math_num_uprooted_at_latest_retain: usize,
             }
             impl Relation for AddRelation {
                 type Row = (Math, Math, Math);
                 type Unification = Unification;
-                const COST: u32 = 9u32;
+                const COST: u32 = 3u32;
                 fn new() -> Self {
                     Self::default()
                 }
@@ -10992,30 +10837,6 @@ fn edgecase0() {
                                 "all does not have duplicate timestamps"
                             );
                         }
-                        log_duration!("reconstruct index: {}", {
-                            log_duration!("reconstruct sort: {}", {
-                                RowSort100::sort(&mut self.all);
-                            });
-                            unsafe {
-                                self.nofd_index_0.reconstruct(
-                                    &mut self.all,
-                                    |(x0, x1, x2, timestamp)| (x0,),
-                                    |(x0, x1, x2, timestamp)| (x1, x2, timestamp),
-                                );
-                            }
-                        });
-                        log_duration!("reconstruct index: {}", {
-                            log_duration!("reconstruct sort: {}", {
-                                RowSort010::sort(&mut self.all);
-                            });
-                            unsafe {
-                                self.nofd_index_1.reconstruct(
-                                    &mut self.all,
-                                    |(x0, x1, x2, timestamp)| (x1,),
-                                    |(x0, x1, x2, timestamp)| (x0, x2, timestamp),
-                                );
-                            }
-                        });
                         self.math_num_uprooted_at_latest_retain = 0;
                     });
                 }
@@ -11057,44 +10878,6 @@ fn edgecase0() {
                 }
                 fn check_0_1(&self, x0: Math, x1: Math) -> bool {
                     self.iter_all_0_1_to_2(x0, x1).next().is_some()
-                }
-                fn iter_all_0_to_1_2(&self, x0: Math) -> impl Iterator<Item = (Math, Math)> + use<'_> {
-                    self.nofd_index_0
-                        .iter((x0,))
-                        .map(|(x1, x2, _timestamp)| (x1, x2))
-                }
-                fn iter_old_0_to_1_2(
-                    &self,
-                    x0: Math,
-                    latest_timestamp: TimeStamp,
-                ) -> impl Iterator<Item = (Math, Math)> + use<'_> {
-                    self.nofd_index_0
-                        .iter((x0,))
-                        .filter_map(move |(x1, x2, timestamp)| {
-                            (timestamp < latest_timestamp).then_some((x1, x2))
-                        })
-                }
-                fn check_0(&self, x0: Math) -> bool {
-                    self.iter_all_0_to_1_2(x0).next().is_some()
-                }
-                fn iter_all_1_to_0_2(&self, x1: Math) -> impl Iterator<Item = (Math, Math)> + use<'_> {
-                    self.nofd_index_1
-                        .iter((x1,))
-                        .map(|(x0, x2, _timestamp)| (x0, x2))
-                }
-                fn iter_old_1_to_0_2(
-                    &self,
-                    x1: Math,
-                    latest_timestamp: TimeStamp,
-                ) -> impl Iterator<Item = (Math, Math)> + use<'_> {
-                    self.nofd_index_1
-                        .iter((x1,))
-                        .filter_map(move |(x0, x2, timestamp)| {
-                            (timestamp < latest_timestamp).then_some((x0, x2))
-                        })
-                }
-                fn check_1(&self, x1: Math) -> bool {
-                    self.iter_all_1_to_0_2(x1).next().is_some()
                 }
             }
             #[derive(Debug, Default)]
@@ -11167,37 +10950,33 @@ fn edgecase0() {
                 #[inline(never)]
                 pub fn apply_rules(&mut self) {
                     for (a, b, v2) in self.mul_.iter_new() {
-                        if self.mul_.check_0(a) {
-                            for (v4, v5) in self.add_.iter_all_0_to_1_2(v2) {
-                                for (c,) in self.mul_.iter_all_0_2_to_1(a, v4) {
-                                    #[doc = "( rewrite ( Add ( Mul a b ) ( Mul a c ) ) ( Mul a ( Add b c ) ) )"]
-                                    let (v6,) = self
-                                        .add_
-                                        .entry_0_1_to_2(b, c, &mut self.delta, &mut self.uf);
-                                    self.delta.insert_mul((a, v6, v5));
-                                }
+                        for (c, v4) in self.mul_.iter_all_0_to_1_2(a) {
+                            for (v5,) in self.add_.iter_all_0_1_to_2(v2, v4) {
+                                #[doc = "( rewrite ( Add ( Mul a b ) ( Mul a c ) ) ( Mul a ( Add b c ) ) )"]
+                                let (v6,) = self
+                                    .add_
+                                    .entry_0_1_to_2(b, c, &mut self.delta, &mut self.uf);
+                                self.delta.insert_mul((a, v6, v5));
                             }
-                            for (v9, v12) in self.add_.iter_all_1_to_0_2(v2) {
-                                for (b_2,) in self.mul_.iter_old_0_2_to_1(a, v9, self.latest_timestamp) {
-                                    #[doc = "( rewrite ( Add ( Mul a b ) ( Mul a c ) ) ( Mul a ( Add b c ) ) )"]
-                                    let (v13,) =
-                                        self.add_
-                                            .entry_0_1_to_2(b_2, b, &mut self.delta, &mut self.uf);
-                                    self.delta.insert_mul((a, v13, v12));
-                                }
+                        }
+                        for (b_2, v9) in self.mul_.iter_old_0_to_1_2(a, self.latest_timestamp) {
+                            for (v12,) in self.add_.iter_all_0_1_to_2(v9, v2) {
+                                #[doc = "( rewrite ( Add ( Mul a b ) ( Mul a c ) ) ( Mul a ( Add b c ) ) )"]
+                                let (v13,) = self
+                                    .add_
+                                    .entry_0_1_to_2(b_2, b, &mut self.delta, &mut self.uf);
+                                self.delta.insert_mul((a, v13, v12));
                             }
                         }
                     }
                     for (v16, v18, v19) in self.add_.iter_new() {
-                        if self.mul_.check_2(v16) {
-                            for (a_3, c_3) in self.mul_.iter_old_2_to_0_1(v18, self.latest_timestamp) {
-                                for (b_3,) in self.mul_.iter_old_0_2_to_1(a_3, v16, self.latest_timestamp) {
-                                    #[doc = "( rewrite ( Add ( Mul a b ) ( Mul a c ) ) ( Mul a ( Add b c ) ) )"]
-                                    let (v20,) =
-                                        self.add_
-                                            .entry_0_1_to_2(b_3, c_3, &mut self.delta, &mut self.uf);
-                                    self.delta.insert_mul((a_3, v20, v19));
-                                }
+                        for (a_3, b_3) in self.mul_.iter_old_2_to_0_1(v16, self.latest_timestamp) {
+                            for (c_3,) in self.mul_.iter_old_0_2_to_1(a_3, v18, self.latest_timestamp) {
+                                #[doc = "( rewrite ( Add ( Mul a b ) ( Mul a c ) ) ( Mul a ( Add b c ) ) )"]
+                                let (v20,) = self
+                                    .add_
+                                    .entry_0_1_to_2(b_3, c_3, &mut self.delta, &mut self.uf);
+                                self.delta.insert_mul((a_3, v20, v19));
                             }
                         }
                     }
@@ -12349,6 +12128,7 @@ fn lir_math() {
                             Premise { relation: Integral, columns: [fuel, v2, x, v3] },
                             Premise { relation: Sin, columns: [x, v2] },
                             Action { relation: Mul, columns: [v5, v6, v3], entry: [_, _, U] },
+                            Action { relation: Mul, columns: [v6, v5, v3] },
                             Action { relation: Cos, columns: [x, v6], entry: [_, U] },
                             Action { relation: Const, columns: [v4, v5], entry: [_, U] },
                             Action { relation: g0, columns: [v4], entry: [!] },
@@ -12369,6 +12149,8 @@ fn lir_math() {
                         atoms: [
                             Premise { relation: Sub, columns: [a, b, v2] },
                             Action { relation: Add, columns: [a, v5, v2], entry: [_, _, U] },
+                            Action { relation: Add, columns: [v5, a, v2] },
+                            Action { relation: Mul, columns: [b, v4, v5] },
                             Action { relation: Mul, columns: [v4, b, v5], entry: [_, _, U] },
                             Action { relation: Const, columns: [v3, v4], entry: [_, U] },
                             Action { relation: g0, columns: [v3], entry: [!] },
@@ -12389,6 +12171,7 @@ fn lir_math() {
                             Premise { relation: Diff, columns: [x, v1, v2] },
                             Premise { relation: Cos, columns: [x, v1] },
                             Action { relation: Mul, columns: [v4, v5, v2], entry: [_, _, U] },
+                            Action { relation: Mul, columns: [v5, v4, v2] },
                             Action { relation: Sin, columns: [x, v5], entry: [_, U] },
                             Action { relation: Const, columns: [v3, v4], entry: [_, U] },
                             Action { relation: g0, columns: [v3], entry: [!] },
@@ -12407,6 +12190,7 @@ fn lir_math() {
                         src: "( rewrite ( Add a b ) ( Add b a ) )",
                         atoms: [
                             Premise { relation: Add, columns: [a, b, v2] },
+                            Action { relation: Add, columns: [a, b, v2] },
                             Action { relation: Add, columns: [b, a, v2], entry: [_, _, U] },
                         ],
                         variables: {
@@ -12420,6 +12204,7 @@ fn lir_math() {
                         src: "( rewrite ( Mul a b ) ( Mul b a ) )",
                         atoms: [
                             Premise { relation: Mul, columns: [a, b, v2] },
+                            Action { relation: Mul, columns: [a, b, v2] },
                             Action { relation: Mul, columns: [b, a, v2], entry: [_, _, U] },
                         ],
                         variables: {
@@ -12435,6 +12220,8 @@ fn lir_math() {
                             Premise { relation: Add, columns: [a, v3, v4] },
                             Premise { relation: Add, columns: [b, c, v3] },
                             Action { relation: Add, columns: [a, b, v5], entry: [_, _, U] },
+                            Action { relation: Add, columns: [b, a, v5] },
+                            Action { relation: Add, columns: [c, v5, v4] },
                             Action { relation: Add, columns: [v5, c, v4], entry: [_, _, U] },
                         ],
                         variables: {
@@ -12453,6 +12240,8 @@ fn lir_math() {
                             Premise { relation: Mul, columns: [a, v3, v4] },
                             Premise { relation: Mul, columns: [b, c, v3] },
                             Action { relation: Mul, columns: [a, b, v5], entry: [_, _, U] },
+                            Action { relation: Mul, columns: [b, a, v5] },
+                            Action { relation: Mul, columns: [c, v5, v4] },
                             Action { relation: Mul, columns: [v5, c, v4], entry: [_, _, U] },
                         ],
                         variables: {
@@ -12522,8 +12311,11 @@ fn lir_math() {
                             Premise { relation: Add, columns: [b, c, v3] },
                             Premise { relation: Mul, columns: [a, v3, v4] },
                             Action { relation: Add, columns: [v5, v6, v4], entry: [_, _, U] },
+                            Action { relation: Add, columns: [v6, v5, v4] },
                             Action { relation: Mul, columns: [a, b, v5], entry: [_, _, U] },
                             Action { relation: Mul, columns: [a, c, v6], entry: [_, _, U] },
+                            Action { relation: Mul, columns: [b, a, v5] },
+                            Action { relation: Mul, columns: [c, a, v6] },
                         ],
                         variables: {
                             v0: VariableMeta { name: Some("a"), ty: t3 },
@@ -12543,7 +12335,9 @@ fn lir_math() {
                             Premise { relation: Mul, columns: [a, b, v2] },
                             Premise { relation: Mul, columns: [a, c, v4] },
                             Action { relation: Add, columns: [b, c, v6], entry: [_, _, U] },
+                            Action { relation: Add, columns: [c, b, v6] },
                             Action { relation: Mul, columns: [a, v6, v5], entry: [_, _, U] },
+                            Action { relation: Mul, columns: [v6, a, v5] },
                         ],
                         variables: {
                             v0: VariableMeta { name: Some("a"), ty: t3 },
@@ -12563,6 +12357,7 @@ fn lir_math() {
                             Premise { relation: Pow, columns: [a, b, v2] },
                             Premise { relation: Pow, columns: [a, c, v4] },
                             Action { relation: Add, columns: [b, c, v6], entry: [_, _, U] },
+                            Action { relation: Add, columns: [c, b, v6] },
                             Action { relation: Pow, columns: [a, v6, v5], entry: [_, _, U] },
                         ],
                         variables: {
@@ -12617,6 +12412,7 @@ fn lir_math() {
                             Action { relation: Diff, columns: [x, a, v5], entry: [_, _, U] },
                             Action { relation: Diff, columns: [x, b, v6], entry: [_, _, U] },
                             Action { relation: Add, columns: [v5, v6, v4], entry: [_, _, U] },
+                            Action { relation: Add, columns: [v6, v5, v4] },
                         ],
                         variables: {
                             v0: VariableMeta { name: Some("x"), ty: t3 },
@@ -12637,8 +12433,11 @@ fn lir_math() {
                             Action { relation: Diff, columns: [x, a, v7], entry: [_, _, U] },
                             Action { relation: Diff, columns: [x, b, v5], entry: [_, _, U] },
                             Action { relation: Add, columns: [v6, v8, v4], entry: [_, _, U] },
+                            Action { relation: Add, columns: [v8, v6, v4] },
                             Action { relation: Mul, columns: [a, v5, v6], entry: [_, _, U] },
                             Action { relation: Mul, columns: [b, v7, v8], entry: [_, _, U] },
+                            Action { relation: Mul, columns: [v5, a, v6] },
+                            Action { relation: Mul, columns: [v7, b, v8] },
                         ],
                         variables: {
                             v0: VariableMeta { name: Some("x"), ty: t3 },
@@ -12713,6 +12512,7 @@ fn lir_math() {
                             Action { relation: Integral, columns: [fuel, f, x, v7], entry: [_, _, _, U] },
                             Action { relation: Integral, columns: [fuel, g, x, v8], entry: [_, _, _, U] },
                             Action { relation: Add, columns: [v7, v8, v6], entry: [_, _, U] },
+                            Action { relation: Add, columns: [v8, v7, v6] },
                         ],
                         variables: {
                             v0: VariableMeta { name: Some("fuel"), ty: t2 },
@@ -12761,6 +12561,8 @@ fn lir_math() {
                             Action { relation: Integral, columns: [fuel, v10, x, v11], entry: [_, _, _, U] },
                             Action { relation: Sub, columns: [v8, v11, v6], entry: [_, _, U] },
                             Action { relation: Mul, columns: [a, v7, v8], entry: [_, _, U] },
+                            Action { relation: Mul, columns: [v7, a, v8] },
+                            Action { relation: Mul, columns: [v7, v9, v10] },
                             Action { relation: Mul, columns: [v9, v7, v10], entry: [_, _, U] },
                         ],
                         variables: {
@@ -12785,9 +12587,9 @@ fn lir_math() {
                     r1: ZeroFuel { columns: [FuelUnit], kind: Table, implicit_rules: {n0: [U]} },
                     r2: Diff { columns: [Math, Math, Math], kind: Table, implicit_rules: {n0: [_, _, U]} },
                     r3: Integral { columns: [FuelUnit, Math, Math, Math], kind: Table, implicit_rules: {n0: [_, _, _, U]} },
-                    r4: Add { columns: [Math, Math, Math], kind: Table, implicit_rules: {n0: [_, _, U]} },
+                    r4: Add { columns: [Math, Math, Math], kind: Table, implicit_rules: {n0: [_, _, U]}, invariant_permutations: {[0, 1, 2], [1, 0, 2]} },
                     r5: Sub { columns: [Math, Math, Math], kind: Table, implicit_rules: {n0: [_, _, U]} },
-                    r6: Mul { columns: [Math, Math, Math], kind: Table, implicit_rules: {n0: [_, _, U]} },
+                    r6: Mul { columns: [Math, Math, Math], kind: Table, implicit_rules: {n0: [_, _, U]}, invariant_permutations: {[0, 1, 2], [1, 0, 2]} },
                     r7: Div { columns: [Math, Math, Math], kind: Table, implicit_rules: {n0: [_, _, U]} },
                     r8: Pow { columns: [Math, Math, Math], kind: Table, implicit_rules: {n0: [_, _, U]} },
                     r9: Ln { columns: [Math, Math], kind: Table, implicit_rules: {n0: [_, U]} },
@@ -12881,14 +12683,14 @@ fn lir_math() {
                         name: "Integral",
                         param_types: {c0: t2, c1: t3, c2: t3, c3: t3},
                         kind: Table {
-                            index_to_info: {ir0: 0_1_2=>3:union, ir1: 0=>1_2_3, ir2: 1=>0_2_3, ir3: 1_2=>0_3},
+                            index_to_info: {ir0: 0_1_2=>3:union, ir1: 0=>1_2_3, ir2: 0_1=>2_3, ir3: 1=>0_2_3, ir4: 1_2=>0_3},
                         },
                     },
                     r4: RelationData {
                         name: "Add",
                         param_types: {c0: t3, c1: t3, c2: t3},
                         kind: Table {
-                            index_to_info: {ir0: 0_1=>2:union, ir1: 0=>1_2, ir2: 1=>0_2, ir3: 2=>0_1},
+                            index_to_info: {ir0: 0_1=>2:union, ir1: 0=>1_2, ir2: 2=>0_1},
                         },
                     },
                     r5: RelationData {
@@ -12902,7 +12704,7 @@ fn lir_math() {
                         name: "Mul",
                         param_types: {c0: t3, c1: t3, c2: t3},
                         kind: Table {
-                            index_to_info: {ir0: 0_1=>2:union, ir1: 0=>1_2, ir2: 0_2=>1, ir3: 1=>0_2, ir4: 2=>0_1},
+                            index_to_info: {ir0: 0_1=>2:union, ir1: 0=>1_2, ir2: 0_2=>1, ir3: 2=>0_1},
                         },
                     },
                     r7: RelationData {
@@ -12916,7 +12718,7 @@ fn lir_math() {
                         name: "Pow",
                         param_types: {c0: t3, c1: t3, c2: t3},
                         kind: Table {
-                            index_to_info: {ir0: 0_1=>2:union, ir1: 0=>1_2, ir2: 0_2=>1, ir3: 1=>0_2, ir4: 2=>0_1},
+                            index_to_info: {ir0: 0_1=>2:union, ir1: 0_2=>1, ir2: 1=>0_2, ir3: 2=>0_1},
                         },
                     },
                     r9: RelationData {
@@ -12951,7 +12753,7 @@ fn lir_math() {
                         name: "Const",
                         param_types: {c0: t0, c1: t3},
                         kind: Table {
-                            index_to_info: {ir0: 0=>1:union, ir1: 1=>0},
+                            index_to_info: {ir0: 0=>1:union (check: {{0, 1}})},
                         },
                     },
                     r14: RelationData {
@@ -13250,48 +13052,48 @@ fn lir_math() {
                     [v138, v138]: t3,
                     [v139, v139]: t3,
                     [v14, a]: t3,
-                    [v140, a_23]: t3,
-                    [v141, b_14]: t3,
+                    [v140, x_5]: t3,
+                    [v141, v141]: t0,
                     [v142, v142]: t3,
-                    [v143, c_11]: t3,
-                    [v144, v144]: t3,
-                    [v145, v145]: t3,
+                    [v143, v143]: t3,
+                    [v144, x_6]: t3,
+                    [v145, v145]: t0,
                     [v146, v146]: t3,
-                    [v147, a_24]: t3,
-                    [v148, b_15]: t3,
-                    [v149, v149]: t3,
+                    [v147, v147]: t3,
+                    [v148, x_7]: t3,
+                    [v149, v149]: t0,
                     [v15, b]: t3,
-                    [v150, c_12]: t3,
+                    [v150, v150]: t3,
                     [v151, v151]: t3,
-                    [v152, v152]: t3,
-                    [v153, v153]: t3,
-                    [v154, x_5]: t3,
-                    [v155, v155]: t0,
-                    [v156, v156]: t3,
-                    [v157, v157]: t3,
-                    [v158, x_6]: t3,
-                    [v159, v159]: t0,
+                    [v152, x_8]: t3,
+                    [v153, v153]: t0,
+                    [v154, v154]: t3,
+                    [v155, v155]: t3,
+                    [v156, x_9]: t3,
+                    [v157, v157]: t0,
+                    [v158, v158]: t3,
+                    [v159, v159]: t3,
                     [v16, v16]: t3,
-                    [v160, v160]: t3,
-                    [v161, v161]: t3,
-                    [v162, x_7]: t3,
-                    [v163, v163]: t0,
-                    [v164, v164]: t3,
-                    [v165, v165]: t3,
-                    [v166, x_8]: t3,
-                    [v167, v167]: t0,
+                    [v160, x_10]: t3,
+                    [v161, v161]: t0,
+                    [v162, v162]: t3,
+                    [v163, v163]: t3,
+                    [v164, x_11]: t3,
+                    [v165, a_23]: t3,
+                    [v166, b_14]: t3,
+                    [v167, v167]: t3,
                     [v168, v168]: t3,
                     [v169, v169]: t3,
                     [v17, v17]: t0,
-                    [v170, x_9]: t3,
-                    [v171, v171]: t0,
-                    [v172, v172]: t3,
-                    [v173, v173]: t3,
-                    [v174, x_10]: t3,
-                    [v175, v175]: t0,
+                    [v170, v170]: t3,
+                    [v171, x_12]: t3,
+                    [v172, a_24]: t3,
+                    [v173, b_15]: t3,
+                    [v174, v174]: t3,
+                    [v175, v175]: t3,
                     [v176, v176]: t3,
                     [v177, v177]: t3,
-                    [v178, x_11]: t3,
+                    [v178, x_13]: t3,
                     [v179, a_25]: t3,
                     [v18, v18]: t3,
                     [v180, b_16]: t3,
@@ -13299,184 +13101,170 @@ fn lir_math() {
                     [v182, v182]: t3,
                     [v183, v183]: t3,
                     [v184, v184]: t3,
-                    [v185, x_12]: t3,
-                    [v186, a_26]: t3,
-                    [v187, b_17]: t3,
-                    [v188, v188]: t3,
-                    [v189, v189]: t3,
+                    [v185, v185]: t3,
+                    [v186, v186]: t3,
+                    [v187, x_14]: t3,
+                    [v188, a_26]: t3,
+                    [v189, b_17]: t3,
                     [v19, v19]: t3,
                     [v190, v190]: t3,
                     [v191, v191]: t3,
-                    [v192, x_13]: t3,
-                    [v193, a_27]: t3,
-                    [v194, b_18]: t3,
+                    [v192, v192]: t3,
+                    [v193, v193]: t3,
+                    [v194, v194]: t3,
                     [v195, v195]: t3,
-                    [v196, v196]: t3,
+                    [v196, x_15]: t3,
                     [v197, v197]: t3,
                     [v198, v198]: t3,
-                    [v199, v199]: t3,
+                    [v199, x_16]: t3,
                     [v2, v2]: t3,
                     [v20, x_3]: t3,
                     [v200, v200]: t3,
-                    [v201, x_14]: t3,
-                    [v202, a_28]: t3,
-                    [v203, b_19]: t3,
-                    [v204, v204]: t3,
+                    [v201, v201]: t3,
+                    [v202, fuel_3]: t2,
+                    [v203, v203]: t2,
+                    [v204, v204]: t0,
                     [v205, v205]: t3,
-                    [v206, v206]: t3,
+                    [v206, x_17]: t3,
                     [v207, v207]: t3,
-                    [v208, v208]: t3,
-                    [v209, v209]: t3,
+                    [v208, fuel_4]: t2,
+                    [v209, v209]: t2,
                     [v21, v21]: t3,
-                    [v210, x_15]: t3,
+                    [v210, v210]: t0,
                     [v211, v211]: t3,
-                    [v212, v212]: t3,
-                    [v213, x_16]: t3,
-                    [v214, v214]: t3,
-                    [v215, v215]: t3,
-                    [v216, fuel_3]: t2,
-                    [v217, v217]: t2,
-                    [v218, v218]: t0,
+                    [v212, x_18]: t3,
+                    [v213, v213]: t3,
+                    [v214, fuel_5]: t2,
+                    [v215, v215]: t2,
+                    [v216, v216]: t0,
+                    [v217, v217]: t3,
+                    [v218, x_19]: t3,
                     [v219, v219]: t3,
                     [v22, v22]: t3,
-                    [v220, x_17]: t3,
-                    [v221, v221]: t3,
-                    [v222, fuel_4]: t2,
-                    [v223, v223]: t2,
-                    [v224, v224]: t0,
+                    [v220, fuel_6]: t2,
+                    [v221, v221]: t2,
+                    [v222, v222]: t0,
+                    [v223, v223]: t3,
+                    [v224, x_20]: t3,
                     [v225, v225]: t3,
-                    [v226, x_18]: t3,
-                    [v227, v227]: t3,
-                    [v228, fuel_5]: t2,
-                    [v229, v229]: t2,
+                    [v226, fuel_7]: t2,
+                    [v227, v227]: t2,
+                    [v228, x_21]: t3,
+                    [v229, v229]: t3,
                     [v23, v23]: t0,
-                    [v230, v230]: t0,
-                    [v231, v231]: t3,
-                    [v232, x_19]: t3,
-                    [v233, v233]: t3,
-                    [v234, fuel_6]: t2,
-                    [v235, v235]: t2,
-                    [v236, v236]: t0,
-                    [v237, v237]: t3,
-                    [v238, x_20]: t3,
+                    [v230, v230]: t3,
+                    [v231, fuel_8]: t2,
+                    [v232, v232]: t2,
+                    [v233, x_22]: t3,
+                    [v234, v234]: t3,
+                    [v235, v235]: t3,
+                    [v236, fuel_9]: t2,
+                    [v237, v237]: t2,
+                    [v238, x_23]: t3,
                     [v239, v239]: t3,
                     [v24, v24]: t3,
-                    [v240, fuel_7]: t2,
-                    [v241, v241]: t2,
-                    [v242, x_21]: t3,
-                    [v243, v243]: t3,
-                    [v244, v244]: t3,
-                    [v245, fuel_8]: t2,
-                    [v246, v246]: t2,
-                    [v247, x_22]: t3,
+                    [v240, v240]: t3,
+                    [v241, fuel_10]: t2,
+                    [v242, v242]: t2,
+                    [v243, f]: t3,
+                    [v244, g]: t3,
+                    [v245, v245]: t3,
+                    [v246, x_24]: t3,
+                    [v247, v247]: t3,
                     [v248, v248]: t3,
                     [v249, v249]: t3,
                     [v25, v25]: t3,
-                    [v250, fuel_9]: t2,
+                    [v250, fuel_11]: t2,
                     [v251, v251]: t2,
-                    [v252, x_23]: t3,
-                    [v253, v253]: t3,
+                    [v252, f_2]: t3,
+                    [v253, g_2]: t3,
                     [v254, v254]: t3,
-                    [v255, fuel_10]: t2,
-                    [v256, v256]: t2,
-                    [v257, f]: t3,
-                    [v258, g]: t3,
-                    [v259, v259]: t3,
+                    [v255, x_25]: t3,
+                    [v256, v256]: t3,
+                    [v257, v257]: t3,
+                    [v258, v258]: t3,
+                    [v259, fuel_12]: t2,
                     [v26, x_4]: t3,
-                    [v260, x_24]: t3,
-                    [v261, v261]: t3,
-                    [v262, v262]: t3,
+                    [v260, v260]: t2,
+                    [v261, f_3]: t3,
+                    [v262, g_3]: t3,
                     [v263, v263]: t3,
-                    [v264, fuel_11]: t2,
-                    [v265, v265]: t2,
-                    [v266, f_2]: t3,
-                    [v267, g_2]: t3,
-                    [v268, v268]: t3,
-                    [v269, x_25]: t3,
+                    [v264, x_26]: t3,
+                    [v265, v265]: t3,
+                    [v266, v266]: t3,
+                    [v267, v267]: t3,
+                    [v268, fuel_13]: t2,
+                    [v269, v269]: t2,
                     [v27, v27]: t3,
-                    [v270, v270]: t3,
-                    [v271, v271]: t3,
+                    [v270, f_4]: t3,
+                    [v271, g_4]: t3,
                     [v272, v272]: t3,
-                    [v273, fuel_12]: t2,
-                    [v274, v274]: t2,
-                    [v275, f_3]: t3,
-                    [v276, g_3]: t3,
-                    [v277, v277]: t3,
-                    [v278, x_26]: t3,
-                    [v279, v279]: t3,
+                    [v273, x_27]: t3,
+                    [v274, v274]: t3,
+                    [v275, v275]: t3,
+                    [v276, v276]: t3,
+                    [v277, fuel_14]: t2,
+                    [v278, v278]: t2,
+                    [v279, f_5]: t3,
                     [v28, v28]: t3,
-                    [v280, v280]: t3,
+                    [v280, g_5]: t3,
                     [v281, v281]: t3,
-                    [v282, fuel_13]: t2,
-                    [v283, v283]: t2,
-                    [v284, f_4]: t3,
-                    [v285, g_4]: t3,
-                    [v286, v286]: t3,
-                    [v287, x_27]: t3,
-                    [v288, v288]: t3,
-                    [v289, v289]: t3,
+                    [v282, x_28]: t3,
+                    [v283, v283]: t3,
+                    [v284, v284]: t3,
+                    [v285, v285]: t3,
+                    [v286, fuel_15]: t2,
+                    [v287, v287]: t2,
+                    [v288, f_6]: t3,
+                    [v289, g_6]: t3,
                     [v29, v29]: t0,
                     [v290, v290]: t3,
-                    [v291, fuel_14]: t2,
-                    [v292, v292]: t2,
-                    [v293, f_5]: t3,
-                    [v294, g_5]: t3,
-                    [v295, v295]: t3,
-                    [v296, x_28]: t3,
-                    [v297, v297]: t3,
-                    [v298, v298]: t3,
+                    [v291, x_29]: t3,
+                    [v292, v292]: t3,
+                    [v293, v293]: t3,
+                    [v294, v294]: t3,
+                    [v295, fuel_16]: t2,
+                    [v296, v296]: t2,
+                    [v297, a_27]: t3,
+                    [v298, b_18]: t3,
                     [v299, v299]: t3,
                     [v3, v3]: t3,
                     [v30, v30]: t3,
-                    [v300, fuel_15]: t2,
-                    [v301, v301]: t2,
-                    [v302, f_6]: t3,
-                    [v303, g_6]: t3,
+                    [v300, x_30]: t3,
+                    [v301, v301]: t3,
+                    [v302, v302]: t3,
+                    [v303, v303]: t3,
                     [v304, v304]: t3,
-                    [v305, x_29]: t3,
+                    [v305, v305]: t3,
                     [v306, v306]: t3,
-                    [v307, v307]: t3,
-                    [v308, v308]: t3,
-                    [v309, fuel_16]: t2,
+                    [v307, fuel_17]: t2,
+                    [v308, v308]: t2,
+                    [v309, a_28]: t3,
                     [v31, v31]: t3,
-                    [v310, v310]: t2,
-                    [v311, a_29]: t3,
-                    [v312, b_20]: t3,
+                    [v310, b_19]: t3,
+                    [v311, v311]: t3,
+                    [v312, x_31]: t3,
                     [v313, v313]: t3,
-                    [v314, x_30]: t3,
+                    [v314, v314]: t3,
                     [v315, v315]: t3,
                     [v316, v316]: t3,
                     [v317, v317]: t3,
                     [v318, v318]: t3,
-                    [v319, v319]: t3,
+                    [v319, fuel_18]: t2,
                     [v32, a_2]: t3,
-                    [v320, v320]: t3,
-                    [v321, fuel_17]: t2,
-                    [v322, v322]: t2,
-                    [v323, a_30]: t3,
-                    [v324, b_21]: t3,
+                    [v320, v320]: t2,
+                    [v321, a_29]: t3,
+                    [v322, b_20]: t3,
+                    [v323, v323]: t3,
+                    [v324, x_32]: t3,
                     [v325, v325]: t3,
-                    [v326, x_31]: t3,
+                    [v326, v326]: t3,
                     [v327, v327]: t3,
                     [v328, v328]: t3,
                     [v329, v329]: t3,
                     [v33, b_2]: t3,
                     [v330, v330]: t3,
-                    [v331, v331]: t3,
-                    [v332, v332]: t3,
-                    [v333, fuel_18]: t2,
-                    [v334, v334]: t2,
-                    [v335, a_31]: t3,
-                    [v336, b_22]: t3,
-                    [v337, v337]: t3,
-                    [v338, x_32]: t3,
-                    [v339, v339]: t3,
                     [v34, v34]: t3,
-                    [v340, v340]: t3,
-                    [v341, v341]: t3,
-                    [v342, v342]: t3,
-                    [v343, v343]: t3,
-                    [v344, v344]: t3,
                     [v35, a_3]: t3,
                     [v36, b_3]: t3,
                     [v37, v37]: t3,
@@ -13600,66 +13388,76 @@ fn lir_math() {
                     g47: t3,
                 },
                 rule_tries: [
-                    premise: [IterNew, r0(v216, v217)]
+                    premise: [IterNew, r0(v202, v203)]
                     then: [
-                        premise: [JoinAll, r3(v217, v219, v220, v221), ir1]
+                        premise: [JoinAll, r3(v203, v229, v228, v230), ir1]
                         then: [
-                            premise: [JoinAll, r4(v257, v258, v219), ir3]
+                            premise: [JoinAll, r4(v243, v244, v229), ir2]
                             meta: "( rewrite ( Integral ( Fuel fuel ) ( Add f g ) x ) ( Add ( Integral fuel f x ) ( Integral fuel g x ) ) )"
                             actions: [
-                                [Action::Entry, r3(v216, v258, v220, v263) on ir0],
-                                [Action::Entry, r3(v216, v257, v220, v262) on ir0],
-                                [Action::Insert, r4(v262, v263, v221)],
+                                [Action::Entry, r3(v202, v244, v228, v249) on ir0],
+                                [Action::Entry, r3(v202, v243, v228, v248) on ir0],
+                                [Action::Insert, r4(v248, v249, v230)],
+                                [Action::Insert, r4(v249, v248, v230)],
                             ],
-                            premise: [JoinAll, r5(v284, v285, v219), ir1]
+                            premise: [JoinAll, r5(v270, v271, v229), ir1]
                             meta: "( rewrite ( Integral ( Fuel fuel ) ( Sub f g ) x ) ( Sub ( Integral fuel f x ) ( Integral fuel g x ) ) )"
                             actions: [
-                                [Action::Entry, r3(v216, v285, v220, v290) on ir0],
-                                [Action::Entry, r3(v216, v284, v220, v289) on ir0],
-                                [Action::Insert, r5(v289, v290, v221)],
+                                [Action::Entry, r3(v202, v271, v228, v276) on ir0],
+                                [Action::Entry, r3(v202, v270, v228, v275) on ir0],
+                                [Action::Insert, r5(v275, v276, v230)],
                             ],
-                            premise: [JoinAll, r6(v311, v312, v219), ir4]
+                            premise: [JoinAll, r6(v297, v298, v229), ir3]
                             meta: "( rewrite ( Integral ( Fuel fuel ) ( Mul a b ) x ) ( Sub ( Mul a ( Integral fuel b x ) ) ( Integral fuel ( Mul ( Diff x a ) ( Integral fuel b x ) ) x ) ) )"
                             actions: [
-                                [Action::Entry, r3(v216, v312, v220, v316) on ir0],
-                                [Action::Entry, r6(v311, v316, v317) on ir0],
-                                [Action::Entry, r2(v220, v311, v318) on ir0],
-                                [Action::Entry, r6(v318, v316, v319) on ir0],
-                                [Action::Entry, r3(v216, v319, v220, v320) on ir0],
-                                [Action::Insert, r5(v317, v320, v221)],
+                                [Action::Entry, r3(v202, v298, v228, v302) on ir0],
+                                [Action::Entry, r6(v297, v302, v303) on ir0],
+                                [Action::Insert, r6(v302, v297, v303)],
+                                [Action::Entry, r2(v228, v297, v304) on ir0],
+                                [Action::Entry, r6(v304, v302, v305) on ir0],
+                                [Action::Insert, r6(v302, v304, v305)],
+                                [Action::Entry, r3(v202, v305, v228, v306) on ir0],
+                                [Action::Insert, r5(v303, v306, v230)],
                             ],
-                            premise: [SemiJoin, r12(v220, v219), ir0]
+                            premise: [SemiJoin, r12(v228, v229), ir0]
                             meta: "( rewrite ( Integral ( Fuel fuel ) ( Cos x ) x ) ( Sin x ) )"
                             actions: [
-                                [Action::Insert, r11(v220, v221)],
+                                [Action::Insert, r11(v228, v230)],
                             ],
-                            premise: [JoinAll, r13(v218, v219), ir1]
+                        ],
+                        premise: [JoinAll, r17(v204), ir_bogus]
+                        then: [
+                            premise: [JoinAll, r13(v204, v205), ir0]
                             then: [
-                                premise: [SemiJoin, r17(v218), ir_bogus]
+                                premise: [JoinAll, r3(v203, v205, v206, v207), ir2]
                                 meta: "( rewrite ( Integral ( Fuel fuel ) ( Const 1 ) x ) x )"
                                 actions: [
-                                    [Action::Equate, v220=v221],
+                                    [Action::Equate, v206=v207],
                                 ],
                             ],
                         ],
                     ],
                     premise: [IterNew, r2(v20, v21, v22)]
                     then: [
-                        premise: [JoinAll, r4(v179, v180, v21), ir3]
+                        premise: [JoinAll, r4(v165, v166, v21), ir2]
                         meta: "( rewrite ( Diff x ( Add a b ) ) ( Add ( Diff x a ) ( Diff x b ) ) )"
                         actions: [
-                            [Action::Entry, r2(v20, v180, v184) on ir0],
-                            [Action::Entry, r2(v20, v179, v183) on ir0],
-                            [Action::Insert, r4(v183, v184, v22)],
+                            [Action::Entry, r2(v20, v166, v170) on ir0],
+                            [Action::Entry, r2(v20, v165, v169) on ir0],
+                            [Action::Insert, r4(v169, v170, v22)],
+                            [Action::Insert, r4(v170, v169, v22)],
                         ],
-                        premise: [JoinAll, r6(v193, v194, v21), ir4]
+                        premise: [JoinAll, r6(v179, v180, v21), ir3]
                         meta: "( rewrite ( Diff x ( Mul a b ) ) ( Add ( Mul a ( Diff x b ) ) ( Mul b ( Diff x a ) ) ) )"
                         actions: [
-                            [Action::Entry, r2(v20, v194, v197) on ir0],
-                            [Action::Entry, r6(v193, v197, v198) on ir0],
-                            [Action::Entry, r2(v20, v193, v199) on ir0],
-                            [Action::Entry, r6(v194, v199, v200) on ir0],
-                            [Action::Insert, r4(v198, v200, v22)],
+                            [Action::Entry, r2(v20, v180, v183) on ir0],
+                            [Action::Entry, r6(v179, v183, v184) on ir0],
+                            [Action::Insert, r6(v183, v179, v184)],
+                            [Action::Entry, r2(v20, v179, v185) on ir0],
+                            [Action::Entry, r6(v180, v185, v186) on ir0],
+                            [Action::Insert, r4(v184, v186, v22)],
+                            [Action::Insert, r4(v186, v184, v22)],
+                            [Action::Insert, r6(v185, v180, v186)],
                         ],
                         premise: [SemiJoin, r11(v20, v21), ir0]
                         meta: "( rewrite ( Diff x ( Sin x ) ) ( Cos x ) )"
@@ -13673,10 +13471,52 @@ fn lir_math() {
                             [Action::Entry, r13(v23, v24) on ir0],
                             [Action::Entry, r11(v20, v25) on ir0],
                             [Action::Insert, r6(v24, v25, v22)],
+                            [Action::Insert, r6(v25, v24, v22)],
                         ],
                     ],
                     premise: [IterNew, r3(v0, v2, v1, v3)]
                     then: [
+                        premise: [JoinOld, r0(v250, v0), ir1]
+                        then: [
+                            premise: [JoinAll, r4(v252, v253, v2), ir2]
+                            meta: "( rewrite ( Integral ( Fuel fuel ) ( Add f g ) x ) ( Add ( Integral fuel f x ) ( Integral fuel g x ) ) )"
+                            actions: [
+                                [Action::Entry, r3(v250, v253, v1, v258) on ir0],
+                                [Action::Entry, r3(v250, v252, v1, v257) on ir0],
+                                [Action::Insert, r4(v257, v258, v3)],
+                                [Action::Insert, r4(v258, v257, v3)],
+                            ],
+                            premise: [JoinAll, r5(v279, v280, v2), ir1]
+                            meta: "( rewrite ( Integral ( Fuel fuel ) ( Sub f g ) x ) ( Sub ( Integral fuel f x ) ( Integral fuel g x ) ) )"
+                            actions: [
+                                [Action::Entry, r3(v250, v280, v1, v285) on ir0],
+                                [Action::Entry, r3(v250, v279, v1, v284) on ir0],
+                                [Action::Insert, r5(v284, v285, v3)],
+                            ],
+                            premise: [JoinAll, r6(v309, v310, v2), ir3]
+                            meta: "( rewrite ( Integral ( Fuel fuel ) ( Mul a b ) x ) ( Sub ( Mul a ( Integral fuel b x ) ) ( Integral fuel ( Mul ( Diff x a ) ( Integral fuel b x ) ) x ) ) )"
+                            actions: [
+                                [Action::Entry, r3(v250, v310, v1, v314) on ir0],
+                                [Action::Entry, r6(v309, v314, v315) on ir0],
+                                [Action::Insert, r6(v314, v309, v315)],
+                                [Action::Entry, r2(v1, v309, v316) on ir0],
+                                [Action::Entry, r6(v316, v314, v317) on ir0],
+                                [Action::Insert, r6(v314, v316, v317)],
+                                [Action::Entry, r3(v250, v317, v1, v318) on ir0],
+                                [Action::Insert, r5(v315, v318, v3)],
+                            ],
+                        ],
+                        premise: [JoinAll, r17(v210), ir_bogus]
+                        then: [
+                            premise: [SemiJoin, r13(v210, v2), ir0]
+                            then: [
+                                premise: [JoinOld, r0(v208, v0), ir1]
+                                meta: "( rewrite ( Integral ( Fuel fuel ) ( Const 1 ) x ) x )"
+                                actions: [
+                                    [Action::Equate, v1=v3],
+                                ],
+                            ],
+                        ],
                         premise: [SemiJoin, r11(v1, v2), ir0]
                         meta: "( rewrite ( Integral fuel ( Sin x ) x ) ( Mul ( Const -1 ) ( Cos x ) ) )"
                         actions: [
@@ -13684,122 +13524,85 @@ fn lir_math() {
                             [Action::Entry, r13(v4, v5) on ir0],
                             [Action::Entry, r12(v1, v6) on ir0],
                             [Action::Insert, r6(v5, v6, v3)],
+                            [Action::Insert, r6(v6, v5, v3)],
                         ],
-                        premise: [SemiJoin, r0(v222, v0), ir1]
+                        premise: [SemiJoin, r12(v1, v2), ir0]
                         then: [
-                            premise: [JoinAll, r4(v266, v267, v2), ir3]
-                            then: [
-                                premise: [JoinOld, r0(v264, v0), ir1]
-                                meta: "( rewrite ( Integral ( Fuel fuel ) ( Add f g ) x ) ( Add ( Integral fuel f x ) ( Integral fuel g x ) ) )"
-                                actions: [
-                                    [Action::Entry, r3(v264, v267, v1, v272) on ir0],
-                                    [Action::Entry, r3(v264, v266, v1, v271) on ir0],
-                                    [Action::Insert, r4(v271, v272, v3)],
-                                ],
-                            ],
-                            premise: [JoinAll, r5(v293, v294, v2), ir1]
-                            then: [
-                                premise: [JoinOld, r0(v291, v0), ir1]
-                                meta: "( rewrite ( Integral ( Fuel fuel ) ( Sub f g ) x ) ( Sub ( Integral fuel f x ) ( Integral fuel g x ) ) )"
-                                actions: [
-                                    [Action::Entry, r3(v291, v294, v1, v299) on ir0],
-                                    [Action::Entry, r3(v291, v293, v1, v298) on ir0],
-                                    [Action::Insert, r5(v298, v299, v3)],
-                                ],
-                            ],
-                            premise: [JoinAll, r6(v323, v324, v2), ir4]
-                            then: [
-                                premise: [JoinOld, r0(v321, v0), ir1]
-                                meta: "( rewrite ( Integral ( Fuel fuel ) ( Mul a b ) x ) ( Sub ( Mul a ( Integral fuel b x ) ) ( Integral fuel ( Mul ( Diff x a ) ( Integral fuel b x ) ) x ) ) )"
-                                actions: [
-                                    [Action::Entry, r3(v321, v324, v1, v328) on ir0],
-                                    [Action::Entry, r6(v323, v328, v329) on ir0],
-                                    [Action::Entry, r2(v1, v323, v330) on ir0],
-                                    [Action::Entry, r6(v330, v328, v331) on ir0],
-                                    [Action::Entry, r3(v321, v331, v1, v332) on ir0],
-                                    [Action::Insert, r5(v329, v332, v3)],
-                                ],
-                            ],
-                            premise: [SemiJoin, r12(v1, v2), ir0]
-                            then: [
-                                premise: [JoinOld, r0(v245, v0), ir1]
-                                meta: "( rewrite ( Integral ( Fuel fuel ) ( Cos x ) x ) ( Sin x ) )"
-                                actions: [
-                                    [Action::Insert, r11(v1, v3)],
-                                ],
-                            ],
-                            premise: [JoinAll, r13(v224, v2), ir1]
-                            then: [
-                                premise: [SemiJoin, r17(v224), ir_bogus]
-                                then: [
-                                    premise: [JoinOld, r0(v222, v0), ir1]
-                                    meta: "( rewrite ( Integral ( Fuel fuel ) ( Const 1 ) x ) x )"
-                                    actions: [
-                                        [Action::Equate, v1=v3],
-                                    ],
-                                ],
+                            premise: [JoinOld, r0(v231, v0), ir1]
+                            meta: "( rewrite ( Integral ( Fuel fuel ) ( Cos x ) x ) ( Sin x ) )"
+                            actions: [
+                                [Action::Insert, r11(v1, v3)],
                             ],
                         ],
                     ],
                     premise: [IterNew, r4(v32, v33, v34)]
                     actions: [
+                        [Action::Insert, r4(v32, v33, v34)],
                         [Action::Insert, r4(v33, v32, v34)],
                     ]
                     then: [
-                        premise: [JoinOld, r2(v185, v34, v189), ir1]
+                        premise: [JoinOld, r2(v171, v34, v175), ir1]
                         meta: "( rewrite ( Diff x ( Add a b ) ) ( Add ( Diff x a ) ( Diff x b ) ) )"
                         actions: [
-                            [Action::Entry, r2(v185, v33, v191) on ir0],
-                            [Action::Entry, r2(v185, v32, v190) on ir0],
-                            [Action::Insert, r4(v190, v191, v189)],
+                            [Action::Entry, r2(v171, v33, v177) on ir0],
+                            [Action::Entry, r2(v171, v32, v176) on ir0],
+                            [Action::Insert, r4(v176, v177, v175)],
+                            [Action::Insert, r4(v177, v176, v175)],
                         ],
-                        premise: [JoinOld, r3(v274, v34, v278, v279), ir2]
+                        premise: [JoinOld, r3(v260, v34, v264, v265), ir3]
                         then: [
-                            premise: [JoinOld, r0(v273, v274), ir1]
+                            premise: [JoinOld, r0(v259, v260), ir1]
                             meta: "( rewrite ( Integral ( Fuel fuel ) ( Add f g ) x ) ( Add ( Integral fuel f x ) ( Integral fuel g x ) ) )"
                             actions: [
-                                [Action::Entry, r3(v273, v33, v278, v281) on ir0],
-                                [Action::Entry, r3(v273, v32, v278, v280) on ir0],
-                                [Action::Insert, r4(v280, v281, v279)],
+                                [Action::Entry, r3(v259, v33, v264, v267) on ir0],
+                                [Action::Entry, r3(v259, v32, v264, v266) on ir0],
+                                [Action::Insert, r4(v266, v267, v265)],
+                                [Action::Insert, r4(v267, v266, v265)],
                             ],
                         ],
-                        premise: [JoinAll, r4(v39, v40, v33), ir3]
+                        premise: [JoinAll, r4(v39, v40, v33), ir2]
                         meta: "( rewrite ( Add a ( Add b c ) ) ( Add ( Add a b ) c ) )"
                         actions: [
                             [Action::Entry, r4(v32, v39, v43) on ir0],
+                            [Action::Insert, r4(v39, v32, v43)],
+                            [Action::Insert, r4(v40, v43, v34)],
                             [Action::Insert, r4(v43, v40, v34)],
                         ],
-                        premise: [JoinOld, r4(v44, v34, v48), ir2]
+                        premise: [JoinOld, r4(v34, v44, v48), ir1]
                         meta: "( rewrite ( Add a ( Add b c ) ) ( Add ( Add a b ) c ) )"
                         actions: [
                             [Action::Entry, r4(v44, v32, v49) on ir0],
+                            [Action::Insert, r4(v32, v44, v49)],
+                            [Action::Insert, r4(v33, v49, v48)],
                             [Action::Insert, r4(v49, v33, v48)],
                         ],
-                        premise: [JoinAll, r6(v98, v34, v102), ir3]
+                        premise: [JoinAll, r6(v34, v98, v102), ir1]
                         meta: "( rewrite ( Mul a ( Add b c ) ) ( Add ( Mul a b ) ( Mul a c ) ) )"
                         actions: [
                             [Action::Entry, r6(v98, v33, v104) on ir0],
+                            [Action::Insert, r6(v33, v98, v104)],
                             [Action::Entry, r6(v98, v32, v103) on ir0],
                             [Action::Insert, r4(v103, v104, v102)],
+                            [Action::Insert, r4(v104, v103, v102)],
+                            [Action::Insert, r6(v32, v98, v103)],
                         ],
-                        premise: [JoinAll, r13(v63, v33), ir1]
+                        premise: [JoinAll, r6(v112, v113, v32), ir3]
                         then: [
-                            premise: [SemiJoin, r16(v63), ir_bogus]
+                            premise: [JoinAll, r6(v112, v115, v33), ir2]
+                            meta: "( rewrite ( Add ( Mul a b ) ( Mul a c ) ) ( Mul a ( Add b c ) ) )"
+                            actions: [
+                                [Action::Entry, r4(v113, v115, v118) on ir0],
+                                [Action::Insert, r4(v115, v113, v118)],
+                                [Action::Insert, r6(v112, v118, v34)],
+                                [Action::Insert, r6(v118, v112, v34)],
+                            ],
+                        ],
+                        premise: [JoinAll, r16(v63), ir_bogus]
+                        then: [
+                            premise: [SemiJoin, r13(v63, v33), ir0]
                             meta: "( rewrite ( Add a ( Const 0 ) ) a )"
                             actions: [
                                 [Action::Equate, v32=v34],
-                            ],
-                        ],
-                        premise: [SemiJoin, r6(v112, v113, v32), ir4]
-                        then: [
-                            premise: [JoinAll, r6(v112, v115, v33), ir4]
-                            then: [
-                                premise: [JoinAll, r6(v112, v113, v32), ir2]
-                                meta: "( rewrite ( Add ( Mul a b ) ( Mul a c ) ) ( Mul a ( Add b c ) ) )"
-                                actions: [
-                                    [Action::Entry, r4(v113, v115, v118) on ir0],
-                                    [Action::Insert, r6(v112, v118, v34)],
-                                ],
                             ],
                         ],
                     ],
@@ -13809,167 +13612,174 @@ fn lir_math() {
                         [Action::Entry, r13(v17, v18) on ir0],
                         [Action::Entry, r6(v18, v15, v19) on ir0],
                         [Action::Insert, r4(v14, v19, v16)],
+                        [Action::Insert, r4(v19, v14, v16)],
+                        [Action::Insert, r6(v15, v18, v19)],
                     ]
                     then: [
-                        premise: [JoinOld, r3(v301, v16, v305, v306), ir2]
+                        premise: [JoinOld, r3(v287, v16, v291, v292), ir3]
                         then: [
-                            premise: [JoinOld, r0(v300, v301), ir1]
+                            premise: [JoinOld, r0(v286, v287), ir1]
                             meta: "( rewrite ( Integral ( Fuel fuel ) ( Sub f g ) x ) ( Sub ( Integral fuel f x ) ( Integral fuel g x ) ) )"
                             actions: [
-                                [Action::Entry, r3(v300, v15, v305, v308) on ir0],
-                                [Action::Entry, r3(v300, v14, v305, v307) on ir0],
-                                [Action::Insert, r5(v307, v308, v306)],
+                                [Action::Entry, r3(v286, v15, v291, v294) on ir0],
+                                [Action::Entry, r3(v286, v14, v291, v293) on ir0],
+                                [Action::Insert, r5(v293, v294, v292)],
                             ],
                         ],
                     ],
                     premise: [IterNew, r6(v35, v36, v37)]
                     actions: [
+                        [Action::Insert, r6(v35, v36, v37)],
                         [Action::Insert, r6(v36, v35, v37)],
                     ]
                     then: [
-                        premise: [JoinOld, r2(v201, v37, v205), ir1]
+                        premise: [JoinOld, r2(v187, v37, v191), ir1]
                         meta: "( rewrite ( Diff x ( Mul a b ) ) ( Add ( Mul a ( Diff x b ) ) ( Mul b ( Diff x a ) ) ) )"
                         actions: [
-                            [Action::Entry, r2(v201, v36, v206) on ir0],
-                            [Action::Entry, r6(v35, v206, v207) on ir0],
-                            [Action::Entry, r2(v201, v35, v208) on ir0],
-                            [Action::Entry, r6(v36, v208, v209) on ir0],
-                            [Action::Insert, r4(v207, v209, v205)],
+                            [Action::Entry, r2(v187, v36, v192) on ir0],
+                            [Action::Entry, r6(v35, v192, v193) on ir0],
+                            [Action::Insert, r6(v192, v35, v193)],
+                            [Action::Entry, r2(v187, v35, v194) on ir0],
+                            [Action::Entry, r6(v36, v194, v195) on ir0],
+                            [Action::Insert, r4(v193, v195, v191)],
+                            [Action::Insert, r4(v195, v193, v191)],
+                            [Action::Insert, r6(v194, v36, v195)],
                         ],
-                        premise: [JoinOld, r3(v334, v37, v338, v339), ir2]
+                        premise: [JoinOld, r3(v320, v37, v324, v325), ir3]
                         then: [
-                            premise: [JoinOld, r0(v333, v334), ir1]
+                            premise: [JoinOld, r0(v319, v320), ir1]
                             meta: "( rewrite ( Integral ( Fuel fuel ) ( Mul a b ) x ) ( Sub ( Mul a ( Integral fuel b x ) ) ( Integral fuel ( Mul ( Diff x a ) ( Integral fuel b x ) ) x ) ) )"
                             actions: [
-                                [Action::Entry, r3(v333, v36, v338, v340) on ir0],
-                                [Action::Entry, r6(v35, v340, v341) on ir0],
-                                [Action::Entry, r2(v338, v35, v342) on ir0],
-                                [Action::Entry, r6(v342, v340, v343) on ir0],
-                                [Action::Entry, r3(v333, v343, v338, v344) on ir0],
-                                [Action::Insert, r5(v341, v344, v339)],
+                                [Action::Entry, r3(v319, v36, v324, v326) on ir0],
+                                [Action::Entry, r6(v35, v326, v327) on ir0],
+                                [Action::Insert, r6(v326, v35, v327)],
+                                [Action::Entry, r2(v324, v35, v328) on ir0],
+                                [Action::Entry, r6(v328, v326, v329) on ir0],
+                                [Action::Insert, r6(v326, v328, v329)],
+                                [Action::Entry, r3(v319, v329, v324, v330) on ir0],
+                                [Action::Insert, r5(v327, v330, v325)],
                             ],
                         ],
-                        premise: [JoinOld, r4(v106, v107, v36), ir3]
+                        premise: [JoinOld, r4(v37, v123, v124), ir1]
+                        then: [
+                            premise: [JoinAll, r6(v35, v122, v123), ir2]
+                            meta: "( rewrite ( Add ( Mul a b ) ( Mul a c ) ) ( Mul a ( Add b c ) ) )"
+                            actions: [
+                                [Action::Entry, r4(v36, v122, v125) on ir0],
+                                [Action::Insert, r4(v122, v36, v125)],
+                                [Action::Insert, r6(v35, v125, v124)],
+                                [Action::Insert, r6(v125, v35, v124)],
+                            ],
+                        ],
+                        premise: [JoinOld, r4(v106, v107, v36), ir2]
                         meta: "( rewrite ( Mul a ( Add b c ) ) ( Add ( Mul a b ) ( Mul a c ) ) )"
                         actions: [
                             [Action::Entry, r6(v35, v107, v111) on ir0],
+                            [Action::Insert, r6(v107, v35, v111)],
                             [Action::Entry, r6(v35, v106, v110) on ir0],
                             [Action::Insert, r4(v110, v111, v37)],
+                            [Action::Insert, r4(v111, v110, v37)],
+                            [Action::Insert, r6(v106, v35, v110)],
                         ],
-                        premise: [JoinAll, r6(v51, v52, v36), ir4]
+                        premise: [JoinAll, r6(v51, v52, v36), ir3]
                         meta: "( rewrite ( Mul a ( Mul b c ) ) ( Mul ( Mul a b ) c ) )"
                         actions: [
                             [Action::Entry, r6(v35, v51, v55) on ir0],
+                            [Action::Insert, r6(v51, v35, v55)],
+                            [Action::Insert, r6(v52, v55, v37)],
                             [Action::Insert, r6(v55, v52, v37)],
                         ],
-                        premise: [JoinOld, r6(v56, v37, v60), ir3]
+                        premise: [JoinOld, r6(v37, v56, v60), ir1]
                         meta: "( rewrite ( Mul a ( Mul b c ) ) ( Mul ( Mul a b ) c ) )"
                         actions: [
                             [Action::Entry, r6(v56, v35, v61) on ir0],
+                            [Action::Insert, r6(v35, v56, v61)],
+                            [Action::Insert, r6(v36, v61, v60)],
                             [Action::Insert, r6(v61, v36, v60)],
                         ],
-                        premise: [JoinAll, r13(v75, v36), ir1]
+                        premise: [JoinAll, r8(v126, v127, v35), ir3]
                         then: [
-                            premise: [SemiJoin, r16(v75), ir_bogus]
+                            premise: [JoinAll, r8(v126, v129, v36), ir1]
+                            meta: "( rewrite ( Mul ( Pow a b ) ( Pow a c ) ) ( Pow a ( Add b c ) ) )"
+                            actions: [
+                                [Action::Entry, r4(v127, v129, v132) on ir0],
+                                [Action::Insert, r4(v129, v127, v132)],
+                                [Action::Insert, r8(v126, v132, v37)],
+                            ],
+                        ],
+                        premise: [JoinAll, r16(v75), ir_bogus]
+                        then: [
+                            premise: [SemiJoin, r13(v75, v36), ir0]
                             meta: "( rewrite ( Mul a ( Const 0 ) ) ( Const 0 ) )"
                             actions: [
                                 [Action::Equate, v36=v37],
                             ],
-                            premise: [SemiJoin, r17(v75), ir_bogus]
+                        ],
+                        premise: [JoinAll, r17(v87), ir_bogus]
+                        then: [
+                            premise: [SemiJoin, r13(v87, v36), ir0]
                             meta: "( rewrite ( Mul a ( Const 1 ) ) a )"
                             actions: [
                                 [Action::Equate, v35=v37],
                             ],
                         ],
-                        premise: [SemiJoin, r6(v35, v122, v123), ir1]
-                        then: [
-                            premise: [JoinOld, r4(v37, v123, v124), ir1]
-                            then: [
-                                premise: [JoinAll, r6(v35, v122, v123), ir2]
-                                meta: "( rewrite ( Add ( Mul a b ) ( Mul a c ) ) ( Mul a ( Add b c ) ) )"
-                                actions: [
-                                    [Action::Entry, r4(v36, v122, v125) on ir0],
-                                    [Action::Insert, r6(v35, v125, v124)],
-                                ],
-                            ],
-                            premise: [JoinOld, r4(v128, v37, v131), ir2]
-                            then: [
-                                premise: [JoinOld, r6(v35, v127, v128), ir2]
-                                meta: "( rewrite ( Add ( Mul a b ) ( Mul a c ) ) ( Mul a ( Add b c ) ) )"
-                                actions: [
-                                    [Action::Entry, r4(v127, v36, v132) on ir0],
-                                    [Action::Insert, r6(v35, v132, v131)],
-                                ],
-                            ],
-                        ],
-                        premise: [SemiJoin, r8(v133, v134, v35), ir4]
-                        then: [
-                            premise: [JoinAll, r8(v133, v136, v36), ir4]
-                            then: [
-                                premise: [JoinAll, r8(v133, v134, v35), ir2]
-                                meta: "( rewrite ( Mul ( Pow a b ) ( Pow a c ) ) ( Pow a ( Add b c ) ) )"
-                                actions: [
-                                    [Action::Entry, r4(v134, v136, v139) on ir0],
-                                    [Action::Insert, r8(v133, v139, v37)],
-                                ],
-                            ],
-                        ],
                     ],
-                    premise: [IterNew, r8(v140, v141, v142)]
+                    premise: [IterNew, r8(v133, v134, v135)]
                     then: [
-                        premise: [JoinAll, r13(v155, v141), ir1]
+                        premise: [JoinOld, r6(v135, v137, v138), ir1]
                         then: [
-                            premise: [SemiJoin, r17(v155), ir_bogus]
+                            premise: [JoinAll, r8(v133, v136, v137), ir1]
+                            meta: "( rewrite ( Mul ( Pow a b ) ( Pow a c ) ) ( Pow a ( Add b c ) ) )"
+                            actions: [
+                                [Action::Entry, r4(v134, v136, v139) on ir0],
+                                [Action::Insert, r4(v136, v134, v139)],
+                                [Action::Insert, r8(v133, v139, v138)],
+                            ],
+                        ],
+                        premise: [JoinAll, r17(v141), ir_bogus]
+                        then: [
+                            premise: [SemiJoin, r13(v141, v134), ir0]
                             meta: "( rewrite ( Pow x ( Const 1 ) ) x )"
                             actions: [
-                                [Action::Equate, v140=v142],
-                            ],
-                            premise: [SemiJoin, r18(v155), ir_bogus]
-                            meta: "( rewrite ( Pow x ( Const 2 ) ) ( Mul x x ) )"
-                            actions: [
-                                [Action::Insert, r6(v140, v140, v142)],
+                                [Action::Equate, v133=v135],
                             ],
                         ],
-                        premise: [SemiJoin, r8(v140, v143, v144), ir1]
+                        premise: [JoinAll, r18(v153), ir_bogus]
                         then: [
-                            premise: [JoinOld, r6(v142, v144, v145), ir1]
-                            then: [
-                                premise: [JoinAll, r8(v140, v143, v144), ir2]
-                                meta: "( rewrite ( Mul ( Pow a b ) ( Pow a c ) ) ( Pow a ( Add b c ) ) )"
-                                actions: [
-                                    [Action::Entry, r4(v141, v143, v146) on ir0],
-                                    [Action::Insert, r8(v140, v146, v145)],
-                                ],
-                            ],
-                            premise: [JoinOld, r6(v149, v142, v152), ir3]
-                            then: [
-                                premise: [JoinOld, r8(v140, v148, v149), ir2]
-                                meta: "( rewrite ( Mul ( Pow a b ) ( Pow a c ) ) ( Pow a ( Add b c ) ) )"
-                                actions: [
-                                    [Action::Entry, r4(v148, v141, v153) on ir0],
-                                    [Action::Insert, r8(v140, v153, v152)],
-                                ],
+                            premise: [SemiJoin, r13(v153, v134), ir0]
+                            meta: "( rewrite ( Pow x ( Const 2 ) ) ( Mul x x ) )"
+                            actions: [
+                                [Action::Insert, r6(v133, v133, v135)],
                             ],
                         ],
                     ],
                     premise: [IterNew, r11(v8, v9)]
                     then: [
-                        premise: [JoinOld, r2(v8, v9, v215), ir0]
-                        meta: "( rewrite ( Diff x ( Sin x ) ) ( Cos x ) )"
-                        actions: [
-                            [Action::Insert, r12(v8, v215)],
-                        ],
-                        premise: [JoinOld, r3(v7, v9, v8, v10), ir3]
+                        premise: [JoinOld, r3(v7, v9, v8, v10), ir4]
                         meta: "( rewrite ( Integral fuel ( Sin x ) x ) ( Mul ( Const -1 ) ( Cos x ) ) )"
                         actions: [
                             [Action::Entry, r15(v11) on ir_bogus],
                             [Action::Entry, r13(v11, v12) on ir0],
                             [Action::Entry, r12(v8, v13) on ir0],
                             [Action::Insert, r6(v12, v13, v10)],
+                            [Action::Insert, r6(v13, v12, v10)],
+                        ],
+                        premise: [JoinOld, r2(v8, v9, v201), ir0]
+                        meta: "( rewrite ( Diff x ( Sin x ) ) ( Cos x ) )"
+                        actions: [
+                            [Action::Insert, r12(v8, v201)],
                         ],
                     ],
                     premise: [IterNew, r12(v26, v27)]
                     then: [
+                        premise: [JoinOld, r3(v237, v27, v26, v240), ir4]
+                        then: [
+                            premise: [JoinOld, r0(v236, v237), ir1]
+                            meta: "( rewrite ( Integral ( Fuel fuel ) ( Cos x ) x ) ( Sin x ) )"
+                            actions: [
+                                [Action::Insert, r11(v26, v240)],
+                            ],
+                        ],
                         premise: [JoinOld, r2(v26, v27, v28), ir0]
                         meta: "( rewrite ( Diff x ( Cos x ) ) ( Mul ( Const -1 ) ( Sin x ) ) )"
                         actions: [
@@ -13977,76 +13787,51 @@ fn lir_math() {
                             [Action::Entry, r13(v29, v30) on ir0],
                             [Action::Entry, r11(v26, v31) on ir0],
                             [Action::Insert, r6(v30, v31, v28)],
-                        ],
-                        premise: [JoinOld, r3(v251, v27, v26, v254), ir3]
-                        then: [
-                            premise: [JoinOld, r0(v250, v251), ir1]
-                            meta: "( rewrite ( Integral ( Fuel fuel ) ( Cos x ) x ) ( Sin x ) )"
-                            actions: [
-                                [Action::Insert, r11(v26, v254)],
-                            ],
+                            [Action::Insert, r6(v31, v30, v28)],
                         ],
                     ],
                     premise: [IterNew, r13(v67, v68)]
                     then: [
-                        premise: [SemiJoin, r8(v158, v68, v161), ir3]
-                        then: [
-                            premise: [SemiJoin, r18(v67), ir_bogus]
-                            then: [
-                                premise: [JoinOld, r8(v170, v68, v173), ir3]
-                                meta: "( rewrite ( Pow x ( Const 2 ) ) ( Mul x x ) )"
-                                actions: [
-                                    [Action::Insert, r6(v170, v170, v173)],
-                                ],
-                            ],
-                        ],
                         premise: [SemiJoin, r16(v67), ir_bogus]
                         then: [
-                            premise: [JoinOld, r4(v66, v68, v69), ir2]
-                            then: [
-                                premise: [SemiJoin, r16(v67), ir_bogus]
-                                meta: "( rewrite ( Add a ( Const 0 ) ) a )"
-                                actions: [
-                                    [Action::Equate, v66=v69],
-                                ],
+                            premise: [JoinOld, r4(v68, v66, v69), ir1]
+                            meta: "( rewrite ( Add a ( Const 0 ) ) a )"
+                            actions: [
+                                [Action::Equate, v66=v69],
                             ],
-                            premise: [JoinOld, r6(v78, v68, v81), ir3]
-                            then: [
-                                premise: [SemiJoin, r16(v67), ir_bogus]
-                                meta: "( rewrite ( Mul a ( Const 0 ) ) ( Const 0 ) )"
-                                actions: [
-                                    [Action::Equate, v68=v81],
-                                ],
+                            premise: [JoinOld, r6(v68, v78, v81), ir1]
+                            meta: "( rewrite ( Mul a ( Const 0 ) ) ( Const 0 ) )"
+                            actions: [
+                                [Action::Equate, v68=v81],
                             ],
                         ],
                         premise: [SemiJoin, r17(v67), ir_bogus]
                         then: [
-                            premise: [JoinOld, r3(v229, v68, v232, v233), ir2]
+                            premise: [JoinOld, r3(v215, v68, v218, v219), ir3]
                             then: [
-                                premise: [JoinOld, r0(v228, v229), ir1]
-                                then: [
-                                    premise: [SemiJoin, r17(v67), ir_bogus]
-                                    meta: "( rewrite ( Integral ( Fuel fuel ) ( Const 1 ) x ) x )"
-                                    actions: [
-                                        [Action::Equate, v232=v233],
-                                    ],
+                                premise: [JoinOld, r0(v214, v215), ir1]
+                                meta: "( rewrite ( Integral ( Fuel fuel ) ( Const 1 ) x ) x )"
+                                actions: [
+                                    [Action::Equate, v218=v219],
                                 ],
                             ],
-                            premise: [JoinOld, r6(v90, v68, v93), ir3]
-                            then: [
-                                premise: [SemiJoin, r17(v67), ir_bogus]
-                                meta: "( rewrite ( Mul a ( Const 1 ) ) a )"
-                                actions: [
-                                    [Action::Equate, v90=v93],
-                                ],
+                            premise: [JoinOld, r6(v68, v90, v93), ir1]
+                            meta: "( rewrite ( Mul a ( Const 1 ) ) a )"
+                            actions: [
+                                [Action::Equate, v90=v93],
                             ],
-                            premise: [JoinOld, r8(v158, v68, v161), ir3]
-                            then: [
-                                premise: [SemiJoin, r17(v67), ir_bogus]
-                                meta: "( rewrite ( Pow x ( Const 1 ) ) x )"
-                                actions: [
-                                    [Action::Equate, v158=v161],
-                                ],
+                            premise: [JoinOld, r8(v144, v68, v147), ir2]
+                            meta: "( rewrite ( Pow x ( Const 1 ) ) x )"
+                            actions: [
+                                [Action::Equate, v144=v147],
+                            ],
+                        ],
+                        premise: [SemiJoin, r18(v67), ir_bogus]
+                        then: [
+                            premise: [JoinOld, r8(v156, v68, v159), ir2]
+                            meta: "( rewrite ( Pow x ( Const 2 ) ) ( Mul x x ) )"
+                            actions: [
+                                [Action::Insert, r6(v156, v156, v159)],
                             ],
                         ],
                     ],
@@ -14054,12 +13839,12 @@ fn lir_math() {
                     then: [
                         premise: [JoinOld, r13(v71, v72), ir0]
                         then: [
-                            premise: [JoinOld, r4(v70, v72, v73), ir2]
+                            premise: [JoinOld, r4(v72, v70, v73), ir1]
                             meta: "( rewrite ( Add a ( Const 0 ) ) a )"
                             actions: [
                                 [Action::Equate, v70=v73],
                             ],
-                            premise: [JoinOld, r6(v82, v72, v85), ir3]
+                            premise: [JoinOld, r6(v72, v82, v85), ir1]
                             meta: "( rewrite ( Mul a ( Const 0 ) ) ( Const 0 ) )"
                             actions: [
                                 [Action::Equate, v72=v85],
@@ -14070,34 +13855,34 @@ fn lir_math() {
                     then: [
                         premise: [JoinOld, r13(v95, v96), ir0]
                         then: [
-                            premise: [JoinOld, r3(v235, v96, v238, v239), ir2]
+                            premise: [JoinOld, r3(v221, v96, v224, v225), ir3]
                             then: [
-                                premise: [JoinOld, r0(v234, v235), ir1]
+                                premise: [JoinOld, r0(v220, v221), ir1]
                                 meta: "( rewrite ( Integral ( Fuel fuel ) ( Const 1 ) x ) x )"
                                 actions: [
-                                    [Action::Equate, v238=v239],
+                                    [Action::Equate, v224=v225],
                                 ],
                             ],
-                            premise: [JoinOld, r6(v94, v96, v97), ir3]
+                            premise: [JoinOld, r6(v96, v94, v97), ir1]
                             meta: "( rewrite ( Mul a ( Const 1 ) ) a )"
                             actions: [
                                 [Action::Equate, v94=v97],
                             ],
-                            premise: [JoinOld, r8(v162, v96, v165), ir3]
+                            premise: [JoinOld, r8(v148, v96, v151), ir2]
                             meta: "( rewrite ( Pow x ( Const 1 ) ) x )"
                             actions: [
-                                [Action::Equate, v162=v165],
+                                [Action::Equate, v148=v151],
                             ],
                         ],
                     ],
-                    premise: [IterNew, r18(v175)]
+                    premise: [IterNew, r18(v161)]
                     then: [
-                        premise: [JoinOld, r13(v175, v176), ir0]
+                        premise: [JoinOld, r13(v161, v162), ir0]
                         then: [
-                            premise: [JoinOld, r8(v174, v176, v177), ir3]
+                            premise: [JoinOld, r8(v160, v162, v163), ir2]
                             meta: "( rewrite ( Pow x ( Const 2 ) ) ( Mul x x ) )"
                             actions: [
-                                [Action::Insert, r6(v174, v174, v177)],
+                                [Action::Insert, r6(v160, v160, v163)],
                             ],
                         ],
                     ],
@@ -14927,6 +14712,7 @@ fn lir_math() {
                 all: Vec<(FuelUnit, Math, Math, Math, TimeStamp)>,
                 fd_index_0_1_2: runtime::HashMap<(FuelUnit, Math, Math), (Math, TimeStamp)>,
                 nofd_index_0: runtime::IndexedSortedList<(FuelUnit,), (Math, Math, Math, TimeStamp)>,
+                nofd_index_0_1: runtime::IndexedSortedList<(FuelUnit, Math), (Math, Math, TimeStamp)>,
                 nofd_index_1: runtime::IndexedSortedList<(Math,), (FuelUnit, Math, Math, TimeStamp)>,
                 nofd_index_1_2: runtime::IndexedSortedList<(Math, Math), (FuelUnit, Math, TimeStamp)>,
                 fuel_unit_num_uprooted_at_latest_retain: usize,
@@ -14935,7 +14721,7 @@ fn lir_math() {
             impl Relation for IntegralRelation {
                 type Row = (FuelUnit, Math, Math, Math);
                 type Unification = Unification;
-                const COST: u32 = 16u32;
+                const COST: u32 = 20u32;
                 fn new() -> Self {
                     Self::default()
                 }
@@ -15117,6 +14903,19 @@ fn lir_math() {
                         log_duration!("reconstruct index: {}", {
                             log_duration!("reconstruct sort: {}", {
                                 self.all
+                                    .sort_unstable_by_key(|&(x0, x1, x2, x3, timestamp)| (x0, x1));
+                            });
+                            unsafe {
+                                self.nofd_index_0_1.reconstruct(
+                                    &mut self.all,
+                                    |(x0, x1, x2, x3, timestamp)| (x0, x1),
+                                    |(x0, x1, x2, x3, timestamp)| (x2, x3, timestamp),
+                                );
+                            }
+                        });
+                        log_duration!("reconstruct index: {}", {
+                            log_duration!("reconstruct sort: {}", {
+                                self.all
                                     .sort_unstable_by_key(|&(x0, x1, x2, x3, timestamp)| (x1,));
                             });
                             unsafe {
@@ -15212,6 +15011,30 @@ fn lir_math() {
                 fn check_0(&self, x0: FuelUnit) -> bool {
                     self.iter_all_0_to_1_2_3(x0).next().is_some()
                 }
+                fn iter_all_0_1_to_2_3(
+                    &self,
+                    x0: FuelUnit,
+                    x1: Math,
+                ) -> impl Iterator<Item = (Math, Math)> + use<'_> {
+                    self.nofd_index_0_1
+                        .iter((x0, x1))
+                        .map(|(x2, x3, _timestamp)| (x2, x3))
+                }
+                fn iter_old_0_1_to_2_3(
+                    &self,
+                    x0: FuelUnit,
+                    x1: Math,
+                    latest_timestamp: TimeStamp,
+                ) -> impl Iterator<Item = (Math, Math)> + use<'_> {
+                    self.nofd_index_0_1
+                        .iter((x0, x1))
+                        .filter_map(move |(x2, x3, timestamp)| {
+                            (timestamp < latest_timestamp).then_some((x2, x3))
+                        })
+                }
+                fn check_0_1(&self, x0: FuelUnit, x1: Math) -> bool {
+                    self.iter_all_0_1_to_2_3(x0, x1).next().is_some()
+                }
                 fn iter_all_1_to_0_2_3(
                     &self,
                     x1: Math,
@@ -15265,14 +15088,13 @@ fn lir_math() {
                 all: Vec<(Math, Math, Math, TimeStamp)>,
                 fd_index_0_1: runtime::HashMap<(Math, Math), (Math, TimeStamp)>,
                 nofd_index_0: runtime::IndexedSortedList<(Math,), (Math, Math, TimeStamp)>,
-                nofd_index_1: runtime::IndexedSortedList<(Math,), (Math, Math, TimeStamp)>,
                 nofd_index_2: runtime::IndexedSortedList<(Math,), (Math, Math, TimeStamp)>,
                 math_num_uprooted_at_latest_retain: usize,
             }
             impl Relation for AddRelation {
                 type Row = (Math, Math, Math);
                 type Unification = Unification;
-                const COST: u32 = 12u32;
+                const COST: u32 = 9u32;
                 fn new() -> Self {
                     Self::default()
                 }
@@ -15433,18 +15255,6 @@ fn lir_math() {
                         });
                         log_duration!("reconstruct index: {}", {
                             log_duration!("reconstruct sort: {}", {
-                                RowSort010::sort(&mut self.all);
-                            });
-                            unsafe {
-                                self.nofd_index_1.reconstruct(
-                                    &mut self.all,
-                                    |(x0, x1, x2, timestamp)| (x1,),
-                                    |(x0, x1, x2, timestamp)| (x0, x2, timestamp),
-                                );
-                            }
-                        });
-                        log_duration!("reconstruct index: {}", {
-                            log_duration!("reconstruct sort: {}", {
                                 RowSort001::sort(&mut self.all);
                             });
                             unsafe {
@@ -15515,25 +15325,6 @@ fn lir_math() {
                 }
                 fn check_0(&self, x0: Math) -> bool {
                     self.iter_all_0_to_1_2(x0).next().is_some()
-                }
-                fn iter_all_1_to_0_2(&self, x1: Math) -> impl Iterator<Item = (Math, Math)> + use<'_> {
-                    self.nofd_index_1
-                        .iter((x1,))
-                        .map(|(x0, x2, _timestamp)| (x0, x2))
-                }
-                fn iter_old_1_to_0_2(
-                    &self,
-                    x1: Math,
-                    latest_timestamp: TimeStamp,
-                ) -> impl Iterator<Item = (Math, Math)> + use<'_> {
-                    self.nofd_index_1
-                        .iter((x1,))
-                        .filter_map(move |(x0, x2, timestamp)| {
-                            (timestamp < latest_timestamp).then_some((x0, x2))
-                        })
-                }
-                fn check_1(&self, x1: Math) -> bool {
-                    self.iter_all_1_to_0_2(x1).next().is_some()
                 }
                 fn iter_all_2_to_0_1(&self, x2: Math) -> impl Iterator<Item = (Math, Math)> + use<'_> {
                     self.nofd_index_2
@@ -15794,14 +15585,13 @@ fn lir_math() {
                 fd_index_0_1: runtime::HashMap<(Math, Math), (Math, TimeStamp)>,
                 nofd_index_0: runtime::IndexedSortedList<(Math,), (Math, Math, TimeStamp)>,
                 nofd_index_0_2: runtime::IndexedSortedList<(Math, Math), (Math, TimeStamp)>,
-                nofd_index_1: runtime::IndexedSortedList<(Math,), (Math, Math, TimeStamp)>,
                 nofd_index_2: runtime::IndexedSortedList<(Math,), (Math, Math, TimeStamp)>,
                 math_num_uprooted_at_latest_retain: usize,
             }
             impl Relation for MulRelation {
                 type Row = (Math, Math, Math);
                 type Unification = Unification;
-                const COST: u32 = 15u32;
+                const COST: u32 = 12u32;
                 fn new() -> Self {
                     Self::default()
                 }
@@ -15974,18 +15764,6 @@ fn lir_math() {
                         });
                         log_duration!("reconstruct index: {}", {
                             log_duration!("reconstruct sort: {}", {
-                                RowSort010::sort(&mut self.all);
-                            });
-                            unsafe {
-                                self.nofd_index_1.reconstruct(
-                                    &mut self.all,
-                                    |(x0, x1, x2, timestamp)| (x1,),
-                                    |(x0, x1, x2, timestamp)| (x0, x2, timestamp),
-                                );
-                            }
-                        });
-                        log_duration!("reconstruct index: {}", {
-                            log_duration!("reconstruct sort: {}", {
                                 RowSort001::sort(&mut self.all);
                             });
                             unsafe {
@@ -16074,25 +15852,6 @@ fn lir_math() {
                 }
                 fn check_0_2(&self, x0: Math, x2: Math) -> bool {
                     self.iter_all_0_2_to_1(x0, x2).next().is_some()
-                }
-                fn iter_all_1_to_0_2(&self, x1: Math) -> impl Iterator<Item = (Math, Math)> + use<'_> {
-                    self.nofd_index_1
-                        .iter((x1,))
-                        .map(|(x0, x2, _timestamp)| (x0, x2))
-                }
-                fn iter_old_1_to_0_2(
-                    &self,
-                    x1: Math,
-                    latest_timestamp: TimeStamp,
-                ) -> impl Iterator<Item = (Math, Math)> + use<'_> {
-                    self.nofd_index_1
-                        .iter((x1,))
-                        .filter_map(move |(x0, x2, timestamp)| {
-                            (timestamp < latest_timestamp).then_some((x0, x2))
-                        })
-                }
-                fn check_1(&self, x1: Math) -> bool {
-                    self.iter_all_1_to_0_2(x1).next().is_some()
                 }
                 fn iter_all_2_to_0_1(&self, x2: Math) -> impl Iterator<Item = (Math, Math)> + use<'_> {
                     self.nofd_index_2
@@ -16319,7 +16078,6 @@ fn lir_math() {
                 new: Vec<<Self as Relation>::Row>,
                 all: Vec<(Math, Math, Math, TimeStamp)>,
                 fd_index_0_1: runtime::HashMap<(Math, Math), (Math, TimeStamp)>,
-                nofd_index_0: runtime::IndexedSortedList<(Math,), (Math, Math, TimeStamp)>,
                 nofd_index_0_2: runtime::IndexedSortedList<(Math, Math), (Math, TimeStamp)>,
                 nofd_index_1: runtime::IndexedSortedList<(Math,), (Math, Math, TimeStamp)>,
                 nofd_index_2: runtime::IndexedSortedList<(Math,), (Math, Math, TimeStamp)>,
@@ -16328,7 +16086,7 @@ fn lir_math() {
             impl Relation for PowRelation {
                 type Row = (Math, Math, Math);
                 type Unification = Unification;
-                const COST: u32 = 15u32;
+                const COST: u32 = 12u32;
                 fn new() -> Self {
                     Self::default()
                 }
@@ -16477,18 +16235,6 @@ fn lir_math() {
                         }
                         log_duration!("reconstruct index: {}", {
                             log_duration!("reconstruct sort: {}", {
-                                RowSort100::sort(&mut self.all);
-                            });
-                            unsafe {
-                                self.nofd_index_0.reconstruct(
-                                    &mut self.all,
-                                    |(x0, x1, x2, timestamp)| (x0,),
-                                    |(x0, x1, x2, timestamp)| (x1, x2, timestamp),
-                                );
-                            }
-                        });
-                        log_duration!("reconstruct index: {}", {
-                            log_duration!("reconstruct sort: {}", {
                                 RowSort101::sort(&mut self.all);
                             });
                             unsafe {
@@ -16564,25 +16310,6 @@ fn lir_math() {
                 }
                 fn check_0_1(&self, x0: Math, x1: Math) -> bool {
                     self.iter_all_0_1_to_2(x0, x1).next().is_some()
-                }
-                fn iter_all_0_to_1_2(&self, x0: Math) -> impl Iterator<Item = (Math, Math)> + use<'_> {
-                    self.nofd_index_0
-                        .iter((x0,))
-                        .map(|(x1, x2, _timestamp)| (x1, x2))
-                }
-                fn iter_old_0_to_1_2(
-                    &self,
-                    x0: Math,
-                    latest_timestamp: TimeStamp,
-                ) -> impl Iterator<Item = (Math, Math)> + use<'_> {
-                    self.nofd_index_0
-                        .iter((x0,))
-                        .filter_map(move |(x1, x2, timestamp)| {
-                            (timestamp < latest_timestamp).then_some((x1, x2))
-                        })
-                }
-                fn check_0(&self, x0: Math) -> bool {
-                    self.iter_all_0_to_1_2(x0).next().is_some()
                 }
                 fn iter_all_0_2_to_1(&self, x0: Math, x2: Math) -> impl Iterator<Item = (Math,)> + use<'_> {
                     self.nofd_index_0_2
@@ -17416,14 +17143,13 @@ fn lir_math() {
                 new: Vec<<Self as Relation>::Row>,
                 all: Vec<(std::primitive::i64, Math, TimeStamp)>,
                 fd_index_0: runtime::HashMap<(std::primitive::i64,), (Math, TimeStamp)>,
-                nofd_index_1: runtime::IndexedSortedList<(Math,), (std::primitive::i64, TimeStamp)>,
                 i64_num_uprooted_at_latest_retain: usize,
                 math_num_uprooted_at_latest_retain: usize,
             }
             impl Relation for ConstRelation {
                 type Row = (std::primitive::i64, Math);
                 type Unification = Unification;
-                const COST: u32 = 4u32;
+                const COST: u32 = 2u32;
                 fn new() -> Self {
                     Self::default()
                 }
@@ -17559,18 +17285,6 @@ fn lir_math() {
                                 "all does not have duplicate timestamps"
                             );
                         }
-                        log_duration!("reconstruct index: {}", {
-                            log_duration!("reconstruct sort: {}", {
-                                self.all.sort_unstable_by_key(|&(x0, x1, timestamp)| (x1,));
-                            });
-                            unsafe {
-                                self.nofd_index_1.reconstruct(
-                                    &mut self.all,
-                                    |(x0, x1, timestamp)| (x1,),
-                                    |(x0, x1, timestamp)| (x0, timestamp),
-                                );
-                            }
-                        });
                         self.math_num_uprooted_at_latest_retain = 0;
                     });
                 }
@@ -17611,20 +17325,10 @@ fn lir_math() {
                 fn check_0(&self, x0: std::primitive::i64) -> bool {
                     self.iter_all_0_to_1(x0).next().is_some()
                 }
-                fn iter_all_1_to_0(&self, x1: Math) -> impl Iterator<Item = (std::primitive::i64,)> + use<'_> {
-                    self.nofd_index_1.iter((x1,)).map(|(x0, _timestamp)| (x0,))
-                }
-                fn iter_old_1_to_0(
-                    &self,
-                    x1: Math,
-                    latest_timestamp: TimeStamp,
-                ) -> impl Iterator<Item = (std::primitive::i64,)> + use<'_> {
-                    self.nofd_index_1
-                        .iter((x1,))
-                        .filter_map(move |(x0, timestamp)| (timestamp < latest_timestamp).then_some((x0,)))
-                }
-                fn check_1(&self, x1: Math) -> bool {
-                    self.iter_all_1_to_0(x1).next().is_some()
+                fn check_0_1(&self, x0: std::primitive::i64, x1: Math) -> bool {
+                    self.iter_all_0_to_1(x0)
+                        .next()
+                        .is_some_and(|(y1,)| true && x1 == y1)
                 }
             }
             #[derive(Debug, Default)]
@@ -18240,109 +17944,118 @@ fn lir_math() {
                 }
                 #[inline(never)]
                 pub fn apply_rules(&mut self) {
-                    for (fuel_3, v217) in self.fuel_.iter_new() {
-                        for (v219, x_17, v221) in self.integral_.iter_all_0_to_1_2_3(v217) {
-                            for (f, g) in self.add_.iter_all_2_to_0_1(v219) {
+                    for (fuel_3, v203) in self.fuel_.iter_new() {
+                        for (v229, x_21, v230) in self.integral_.iter_all_0_to_1_2_3(v203) {
+                            for (f, g) in self.add_.iter_all_2_to_0_1(v229) {
                                 #[doc = "( rewrite ( Integral ( Fuel fuel ) ( Add f g ) x ) ( Add ( Integral fuel f x ) ( Integral fuel g x ) ) )"]
-                                let (v263,) = self.integral_.entry_0_1_2_to_3(
+                                let (v249,) = self.integral_.entry_0_1_2_to_3(
                                     fuel_3,
                                     g,
-                                    x_17,
+                                    x_21,
                                     &mut self.delta,
                                     &mut self.uf,
                                 );
-                                let (v262,) = self.integral_.entry_0_1_2_to_3(
+                                let (v248,) = self.integral_.entry_0_1_2_to_3(
                                     fuel_3,
                                     f,
-                                    x_17,
+                                    x_21,
                                     &mut self.delta,
                                     &mut self.uf,
                                 );
-                                self.delta.insert_add((v262, v263, v221));
+                                self.delta.insert_add((v248, v249, v230));
+                                self.delta.insert_add((v249, v248, v230));
                             }
-                            for (f_4, g_4) in self.sub_.iter_all_2_to_0_1(v219) {
+                            for (f_4, g_4) in self.sub_.iter_all_2_to_0_1(v229) {
                                 #[doc = "( rewrite ( Integral ( Fuel fuel ) ( Sub f g ) x ) ( Sub ( Integral fuel f x ) ( Integral fuel g x ) ) )"]
-                                let (v290,) = self.integral_.entry_0_1_2_to_3(
+                                let (v276,) = self.integral_.entry_0_1_2_to_3(
                                     fuel_3,
                                     g_4,
-                                    x_17,
+                                    x_21,
                                     &mut self.delta,
                                     &mut self.uf,
                                 );
-                                let (v289,) = self.integral_.entry_0_1_2_to_3(
+                                let (v275,) = self.integral_.entry_0_1_2_to_3(
                                     fuel_3,
                                     f_4,
-                                    x_17,
+                                    x_21,
                                     &mut self.delta,
                                     &mut self.uf,
                                 );
-                                self.delta.insert_sub((v289, v290, v221));
+                                self.delta.insert_sub((v275, v276, v230));
                             }
-                            for (a_29, b_20) in self.mul_.iter_all_2_to_0_1(v219) {
+                            for (a_27, b_18) in self.mul_.iter_all_2_to_0_1(v229) {
                                 #[doc = "( rewrite ( Integral ( Fuel fuel ) ( Mul a b ) x ) ( Sub ( Mul a ( Integral fuel b x ) ) ( Integral fuel ( Mul ( Diff x a ) ( Integral fuel b x ) ) x ) ) )"]
-                                let (v316,) = self.integral_.entry_0_1_2_to_3(
+                                let (v302,) = self.integral_.entry_0_1_2_to_3(
                                     fuel_3,
-                                    b_20,
-                                    x_17,
+                                    b_18,
+                                    x_21,
                                     &mut self.delta,
                                     &mut self.uf,
                                 );
-                                let (v317,) =
+                                let (v303,) =
                                     self.mul_
-                                        .entry_0_1_to_2(a_29, v316, &mut self.delta, &mut self.uf);
-                                let (v318,) =
+                                        .entry_0_1_to_2(a_27, v302, &mut self.delta, &mut self.uf);
+                                self.delta.insert_mul((v302, a_27, v303));
+                                let (v304,) =
                                     self.diff_
-                                        .entry_0_1_to_2(x_17, a_29, &mut self.delta, &mut self.uf);
-                                let (v319,) =
+                                        .entry_0_1_to_2(x_21, a_27, &mut self.delta, &mut self.uf);
+                                let (v305,) =
                                     self.mul_
-                                        .entry_0_1_to_2(v318, v316, &mut self.delta, &mut self.uf);
-                                let (v320,) = self.integral_.entry_0_1_2_to_3(
+                                        .entry_0_1_to_2(v304, v302, &mut self.delta, &mut self.uf);
+                                self.delta.insert_mul((v302, v304, v305));
+                                let (v306,) = self.integral_.entry_0_1_2_to_3(
                                     fuel_3,
-                                    v319,
-                                    x_17,
+                                    v305,
+                                    x_21,
                                     &mut self.delta,
                                     &mut self.uf,
                                 );
-                                self.delta.insert_sub((v317, v320, v221));
+                                self.delta.insert_sub((v303, v306, v230));
                             }
-                            if self.cos_.check_0_1(x_17, v219) {
+                            if self.cos_.check_0_1(x_21, v229) {
                                 #[doc = "( rewrite ( Integral ( Fuel fuel ) ( Cos x ) x ) ( Sin x ) )"]
-                                self.delta.insert_sin((x_17, v221));
+                                self.delta.insert_sin((x_21, v230));
                             }
-                            for (v218,) in self.const_.iter_all_1_to_0(v219) {
-                                if v218 == self.global_i64.get(2usize) {
+                        }
+                        if let v204 = self.global_i64.get(2usize) {
+                            for (v205,) in self.const_.iter_all_0_to_1(v204) {
+                                for (x_17, v207) in self.integral_.iter_all_0_1_to_2_3(v203, v205) {
                                     #[doc = "( rewrite ( Integral ( Fuel fuel ) ( Const 1 ) x ) x )"]
-                                    self.uf.math_.union(x_17, v221);
+                                    self.uf.math_.union(x_17, v207);
                                 }
                             }
                         }
                     }
                     for (x_3, v21, v22) in self.diff_.iter_new() {
-                        for (a_25, b_16) in self.add_.iter_all_2_to_0_1(v21) {
+                        for (a_23, b_14) in self.add_.iter_all_2_to_0_1(v21) {
                             #[doc = "( rewrite ( Diff x ( Add a b ) ) ( Add ( Diff x a ) ( Diff x b ) ) )"]
-                            let (v184,) = self
+                            let (v170,) = self
                                 .diff_
-                                .entry_0_1_to_2(x_3, b_16, &mut self.delta, &mut self.uf);
+                                .entry_0_1_to_2(x_3, b_14, &mut self.delta, &mut self.uf);
+                            let (v169,) = self
+                                .diff_
+                                .entry_0_1_to_2(x_3, a_23, &mut self.delta, &mut self.uf);
+                            self.delta.insert_add((v169, v170, v22));
+                            self.delta.insert_add((v170, v169, v22));
+                        }
+                        for (a_25, b_16) in self.mul_.iter_all_2_to_0_1(v21) {
+                            #[doc = "( rewrite ( Diff x ( Mul a b ) ) ( Add ( Mul a ( Diff x b ) ) ( Mul b ( Diff x a ) ) ) )"]
                             let (v183,) = self
                                 .diff_
+                                .entry_0_1_to_2(x_3, b_16, &mut self.delta, &mut self.uf);
+                            let (v184,) = self
+                                .mul_
+                                .entry_0_1_to_2(a_25, v183, &mut self.delta, &mut self.uf);
+                            self.delta.insert_mul((v183, a_25, v184));
+                            let (v185,) = self
+                                .diff_
                                 .entry_0_1_to_2(x_3, a_25, &mut self.delta, &mut self.uf);
-                            self.delta.insert_add((v183, v184, v22));
-                        }
-                        for (a_27, b_18) in self.mul_.iter_all_2_to_0_1(v21) {
-                            #[doc = "( rewrite ( Diff x ( Mul a b ) ) ( Add ( Mul a ( Diff x b ) ) ( Mul b ( Diff x a ) ) ) )"]
-                            let (v197,) = self
-                                .diff_
-                                .entry_0_1_to_2(x_3, b_18, &mut self.delta, &mut self.uf);
-                            let (v198,) = self
+                            let (v186,) = self
                                 .mul_
-                                .entry_0_1_to_2(a_27, v197, &mut self.delta, &mut self.uf);
-                            let (v199,) = self
-                                .diff_
-                                .entry_0_1_to_2(x_3, a_27, &mut self.delta, &mut self.uf);
-                            let (v200,) = self
-                                .mul_
-                                .entry_0_1_to_2(b_18, v199, &mut self.delta, &mut self.uf);
-                            self.delta.insert_add((v198, v200, v22));
+                                .entry_0_1_to_2(b_16, v185, &mut self.delta, &mut self.uf);
+                            self.delta.insert_add((v184, v186, v22));
+                            self.delta.insert_add((v186, v184, v22));
+                            self.delta.insert_mul((v185, b_16, v186));
                         }
                         if self.sin_.check_0_1(x_3, v21) {
                             #[doc = "( rewrite ( Diff x ( Sin x ) ) ( Cos x ) )"]
@@ -18354,137 +18067,139 @@ fn lir_math() {
                             let (v24,) = self.const_.entry_0_to_1(v23, &mut self.delta, &mut self.uf);
                             let (v25,) = self.sin_.entry_0_to_1(x_3, &mut self.delta, &mut self.uf);
                             self.delta.insert_mul((v24, v25, v22));
+                            self.delta.insert_mul((v25, v24, v22));
                         }
                     }
                     for (fuel, v2, x, v3) in self.integral_.iter_new() {
+                        for (fuel_11,) in self.fuel_.iter_old_1_to_0(fuel, self.latest_timestamp) {
+                            for (f_2, g_2) in self.add_.iter_all_2_to_0_1(v2) {
+                                #[doc = "( rewrite ( Integral ( Fuel fuel ) ( Add f g ) x ) ( Add ( Integral fuel f x ) ( Integral fuel g x ) ) )"]
+                                let (v258,) = self.integral_.entry_0_1_2_to_3(
+                                    fuel_11,
+                                    g_2,
+                                    x,
+                                    &mut self.delta,
+                                    &mut self.uf,
+                                );
+                                let (v257,) = self.integral_.entry_0_1_2_to_3(
+                                    fuel_11,
+                                    f_2,
+                                    x,
+                                    &mut self.delta,
+                                    &mut self.uf,
+                                );
+                                self.delta.insert_add((v257, v258, v3));
+                                self.delta.insert_add((v258, v257, v3));
+                            }
+                            for (f_5, g_5) in self.sub_.iter_all_2_to_0_1(v2) {
+                                #[doc = "( rewrite ( Integral ( Fuel fuel ) ( Sub f g ) x ) ( Sub ( Integral fuel f x ) ( Integral fuel g x ) ) )"]
+                                let (v285,) = self.integral_.entry_0_1_2_to_3(
+                                    fuel_11,
+                                    g_5,
+                                    x,
+                                    &mut self.delta,
+                                    &mut self.uf,
+                                );
+                                let (v284,) = self.integral_.entry_0_1_2_to_3(
+                                    fuel_11,
+                                    f_5,
+                                    x,
+                                    &mut self.delta,
+                                    &mut self.uf,
+                                );
+                                self.delta.insert_sub((v284, v285, v3));
+                            }
+                            for (a_28, b_19) in self.mul_.iter_all_2_to_0_1(v2) {
+                                #[doc = "( rewrite ( Integral ( Fuel fuel ) ( Mul a b ) x ) ( Sub ( Mul a ( Integral fuel b x ) ) ( Integral fuel ( Mul ( Diff x a ) ( Integral fuel b x ) ) x ) ) )"]
+                                let (v314,) = self.integral_.entry_0_1_2_to_3(
+                                    fuel_11,
+                                    b_19,
+                                    x,
+                                    &mut self.delta,
+                                    &mut self.uf,
+                                );
+                                let (v315,) =
+                                    self.mul_
+                                        .entry_0_1_to_2(a_28, v314, &mut self.delta, &mut self.uf);
+                                self.delta.insert_mul((v314, a_28, v315));
+                                let (v316,) = self
+                                    .diff_
+                                    .entry_0_1_to_2(x, a_28, &mut self.delta, &mut self.uf);
+                                let (v317,) =
+                                    self.mul_
+                                        .entry_0_1_to_2(v316, v314, &mut self.delta, &mut self.uf);
+                                self.delta.insert_mul((v314, v316, v317));
+                                let (v318,) = self.integral_.entry_0_1_2_to_3(
+                                    fuel_11,
+                                    v317,
+                                    x,
+                                    &mut self.delta,
+                                    &mut self.uf,
+                                );
+                                self.delta.insert_sub((v315, v318, v3));
+                            }
+                        }
+                        if let v210 = self.global_i64.get(2usize) {
+                            if self.const_.check_0_1(v210, v2) {
+                                for (fuel_4,) in self.fuel_.iter_old_1_to_0(fuel, self.latest_timestamp) {
+                                    #[doc = "( rewrite ( Integral ( Fuel fuel ) ( Const 1 ) x ) x )"]
+                                    self.uf.math_.union(x, v3);
+                                }
+                            }
+                        }
                         if self.sin_.check_0_1(x, v2) {
                             #[doc = "( rewrite ( Integral fuel ( Sin x ) x ) ( Mul ( Const -1 ) ( Cos x ) ) )"]
                             let v4 = self.global_i64.get(0usize);
                             let (v5,) = self.const_.entry_0_to_1(v4, &mut self.delta, &mut self.uf);
                             let (v6,) = self.cos_.entry_0_to_1(x, &mut self.delta, &mut self.uf);
                             self.delta.insert_mul((v5, v6, v3));
+                            self.delta.insert_mul((v6, v5, v3));
                         }
-                        if self.fuel_.check_1(fuel) {
-                            for (f_2, g_2) in self.add_.iter_all_2_to_0_1(v2) {
-                                for (fuel_11,) in self.fuel_.iter_old_1_to_0(fuel, self.latest_timestamp) {
-                                    #[doc = "( rewrite ( Integral ( Fuel fuel ) ( Add f g ) x ) ( Add ( Integral fuel f x ) ( Integral fuel g x ) ) )"]
-                                    let (v272,) = self.integral_.entry_0_1_2_to_3(
-                                        fuel_11,
-                                        g_2,
-                                        x,
-                                        &mut self.delta,
-                                        &mut self.uf,
-                                    );
-                                    let (v271,) = self.integral_.entry_0_1_2_to_3(
-                                        fuel_11,
-                                        f_2,
-                                        x,
-                                        &mut self.delta,
-                                        &mut self.uf,
-                                    );
-                                    self.delta.insert_add((v271, v272, v3));
-                                }
-                            }
-                            for (f_5, g_5) in self.sub_.iter_all_2_to_0_1(v2) {
-                                for (fuel_14,) in self.fuel_.iter_old_1_to_0(fuel, self.latest_timestamp) {
-                                    #[doc = "( rewrite ( Integral ( Fuel fuel ) ( Sub f g ) x ) ( Sub ( Integral fuel f x ) ( Integral fuel g x ) ) )"]
-                                    let (v299,) = self.integral_.entry_0_1_2_to_3(
-                                        fuel_14,
-                                        g_5,
-                                        x,
-                                        &mut self.delta,
-                                        &mut self.uf,
-                                    );
-                                    let (v298,) = self.integral_.entry_0_1_2_to_3(
-                                        fuel_14,
-                                        f_5,
-                                        x,
-                                        &mut self.delta,
-                                        &mut self.uf,
-                                    );
-                                    self.delta.insert_sub((v298, v299, v3));
-                                }
-                            }
-                            for (a_30, b_21) in self.mul_.iter_all_2_to_0_1(v2) {
-                                for (fuel_17,) in self.fuel_.iter_old_1_to_0(fuel, self.latest_timestamp) {
-                                    #[doc = "( rewrite ( Integral ( Fuel fuel ) ( Mul a b ) x ) ( Sub ( Mul a ( Integral fuel b x ) ) ( Integral fuel ( Mul ( Diff x a ) ( Integral fuel b x ) ) x ) ) )"]
-                                    let (v328,) = self.integral_.entry_0_1_2_to_3(
-                                        fuel_17,
-                                        b_21,
-                                        x,
-                                        &mut self.delta,
-                                        &mut self.uf,
-                                    );
-                                    let (v329,) =
-                                        self.mul_
-                                            .entry_0_1_to_2(a_30, v328, &mut self.delta, &mut self.uf);
-                                    let (v330,) =
-                                        self.diff_
-                                            .entry_0_1_to_2(x, a_30, &mut self.delta, &mut self.uf);
-                                    let (v331,) =
-                                        self.mul_
-                                            .entry_0_1_to_2(v330, v328, &mut self.delta, &mut self.uf);
-                                    let (v332,) = self.integral_.entry_0_1_2_to_3(
-                                        fuel_17,
-                                        v331,
-                                        x,
-                                        &mut self.delta,
-                                        &mut self.uf,
-                                    );
-                                    self.delta.insert_sub((v329, v332, v3));
-                                }
-                            }
-                            if self.cos_.check_0_1(x, v2) {
-                                for (fuel_8,) in self.fuel_.iter_old_1_to_0(fuel, self.latest_timestamp) {
-                                    #[doc = "( rewrite ( Integral ( Fuel fuel ) ( Cos x ) x ) ( Sin x ) )"]
-                                    self.delta.insert_sin((x, v3));
-                                }
-                            }
-                            for (v224,) in self.const_.iter_all_1_to_0(v2) {
-                                if v224 == self.global_i64.get(2usize) {
-                                    for (fuel_4,) in self.fuel_.iter_old_1_to_0(fuel, self.latest_timestamp) {
-                                        #[doc = "( rewrite ( Integral ( Fuel fuel ) ( Const 1 ) x ) x )"]
-                                        self.uf.math_.union(x, v3);
-                                    }
-                                }
+                        if self.cos_.check_0_1(x, v2) {
+                            for (fuel_8,) in self.fuel_.iter_old_1_to_0(fuel, self.latest_timestamp) {
+                                #[doc = "( rewrite ( Integral ( Fuel fuel ) ( Cos x ) x ) ( Sin x ) )"]
+                                self.delta.insert_sin((x, v3));
                             }
                         }
                     }
                     for (a_2, b_2, v34) in self.add_.iter_new() {
                         {
+                            self.delta.insert_add((a_2, b_2, v34));
                             self.delta.insert_add((b_2, a_2, v34));
                         }
-                        for (x_12, v189) in self.diff_.iter_old_1_to_0_2(v34, self.latest_timestamp) {
+                        for (x_12, v175) in self.diff_.iter_old_1_to_0_2(v34, self.latest_timestamp) {
                             #[doc = "( rewrite ( Diff x ( Add a b ) ) ( Add ( Diff x a ) ( Diff x b ) ) )"]
-                            let (v191,) = self
+                            let (v177,) = self
                                 .diff_
                                 .entry_0_1_to_2(x_12, b_2, &mut self.delta, &mut self.uf);
-                            let (v190,) = self
+                            let (v176,) = self
                                 .diff_
                                 .entry_0_1_to_2(x_12, a_2, &mut self.delta, &mut self.uf);
-                            self.delta.insert_add((v190, v191, v189));
+                            self.delta.insert_add((v176, v177, v175));
+                            self.delta.insert_add((v177, v176, v175));
                         }
-                        for (v274, x_26, v279) in self
+                        for (v260, x_26, v265) in self
                             .integral_
                             .iter_old_1_to_0_2_3(v34, self.latest_timestamp)
                         {
-                            for (fuel_12,) in self.fuel_.iter_old_1_to_0(v274, self.latest_timestamp) {
+                            for (fuel_12,) in self.fuel_.iter_old_1_to_0(v260, self.latest_timestamp) {
                                 #[doc = "( rewrite ( Integral ( Fuel fuel ) ( Add f g ) x ) ( Add ( Integral fuel f x ) ( Integral fuel g x ) ) )"]
-                                let (v281,) = self.integral_.entry_0_1_2_to_3(
+                                let (v267,) = self.integral_.entry_0_1_2_to_3(
                                     fuel_12,
                                     b_2,
                                     x_26,
                                     &mut self.delta,
                                     &mut self.uf,
                                 );
-                                let (v280,) = self.integral_.entry_0_1_2_to_3(
+                                let (v266,) = self.integral_.entry_0_1_2_to_3(
                                     fuel_12,
                                     a_2,
                                     x_26,
                                     &mut self.delta,
                                     &mut self.uf,
                                 );
-                                self.delta.insert_add((v280, v281, v279));
+                                self.delta.insert_add((v266, v267, v265));
+                                self.delta.insert_add((v267, v266, v265));
                             }
                         }
                         for (b_4, c) in self.add_.iter_all_2_to_0_1(b_2) {
@@ -18492,40 +18207,47 @@ fn lir_math() {
                             let (v43,) = self
                                 .add_
                                 .entry_0_1_to_2(a_2, b_4, &mut self.delta, &mut self.uf);
+                            self.delta.insert_add((b_4, a_2, v43));
+                            self.delta.insert_add((c, v43, v34));
                             self.delta.insert_add((v43, c, v34));
                         }
-                        for (a_5, v48) in self.add_.iter_old_1_to_0_2(v34, self.latest_timestamp) {
+                        for (a_5, v48) in self.add_.iter_old_0_to_1_2(v34, self.latest_timestamp) {
                             #[doc = "( rewrite ( Add a ( Add b c ) ) ( Add ( Add a b ) c ) )"]
                             let (v49,) = self
                                 .add_
                                 .entry_0_1_to_2(a_5, a_2, &mut self.delta, &mut self.uf);
+                            self.delta.insert_add((a_2, a_5, v49));
+                            self.delta.insert_add((b_2, v49, v48));
                             self.delta.insert_add((v49, b_2, v48));
                         }
-                        for (a_17, v102) in self.mul_.iter_all_1_to_0_2(v34) {
+                        for (a_17, v102) in self.mul_.iter_all_0_to_1_2(v34) {
                             #[doc = "( rewrite ( Mul a ( Add b c ) ) ( Add ( Mul a b ) ( Mul a c ) ) )"]
                             let (v104,) = self
                                 .mul_
                                 .entry_0_1_to_2(a_17, b_2, &mut self.delta, &mut self.uf);
+                            self.delta.insert_mul((b_2, a_17, v104));
                             let (v103,) = self
                                 .mul_
                                 .entry_0_1_to_2(a_17, a_2, &mut self.delta, &mut self.uf);
                             self.delta.insert_add((v103, v104, v102));
+                            self.delta.insert_add((v104, v103, v102));
+                            self.delta.insert_mul((a_2, a_17, v103));
                         }
-                        for (v63,) in self.const_.iter_all_1_to_0(b_2) {
-                            if v63 == self.global_i64.get(1usize) {
-                                #[doc = "( rewrite ( Add a ( Const 0 ) ) a )"]
-                                self.uf.math_.union(a_2, v34);
+                        for (a_19, b_10) in self.mul_.iter_all_2_to_0_1(a_2) {
+                            for (c_7,) in self.mul_.iter_all_0_2_to_1(a_19, b_2) {
+                                #[doc = "( rewrite ( Add ( Mul a b ) ( Mul a c ) ) ( Mul a ( Add b c ) ) )"]
+                                let (v118,) =
+                                    self.add_
+                                        .entry_0_1_to_2(b_10, c_7, &mut self.delta, &mut self.uf);
+                                self.delta.insert_add((c_7, b_10, v118));
+                                self.delta.insert_mul((a_19, v118, v34));
+                                self.delta.insert_mul((v118, a_19, v34));
                             }
                         }
-                        if self.mul_.check_2(a_2) {
-                            for (a_19, c_7) in self.mul_.iter_all_2_to_0_1(b_2) {
-                                for (b_10,) in self.mul_.iter_all_0_2_to_1(a_19, a_2) {
-                                    #[doc = "( rewrite ( Add ( Mul a b ) ( Mul a c ) ) ( Mul a ( Add b c ) ) )"]
-                                    let (v118,) =
-                                        self.add_
-                                            .entry_0_1_to_2(b_10, c_7, &mut self.delta, &mut self.uf);
-                                    self.delta.insert_mul((a_19, v118, v34));
-                                }
+                        if let v63 = self.global_i64.get(1usize) {
+                            if self.const_.check_0_1(v63, b_2) {
+                                #[doc = "( rewrite ( Add a ( Const 0 ) ) a )"]
+                                self.uf.math_.union(a_2, v34);
                             }
                         }
                     }
@@ -18537,81 +18259,100 @@ fn lir_math() {
                                 .mul_
                                 .entry_0_1_to_2(v18, b, &mut self.delta, &mut self.uf);
                             self.delta.insert_add((a, v19, v16));
+                            self.delta.insert_add((v19, a, v16));
+                            self.delta.insert_mul((b, v18, v19));
                         }
-                        for (v301, x_29, v306) in self
+                        for (v287, x_29, v292) in self
                             .integral_
                             .iter_old_1_to_0_2_3(v16, self.latest_timestamp)
                         {
-                            for (fuel_15,) in self.fuel_.iter_old_1_to_0(v301, self.latest_timestamp) {
+                            for (fuel_15,) in self.fuel_.iter_old_1_to_0(v287, self.latest_timestamp) {
                                 #[doc = "( rewrite ( Integral ( Fuel fuel ) ( Sub f g ) x ) ( Sub ( Integral fuel f x ) ( Integral fuel g x ) ) )"]
-                                let (v308,) = self.integral_.entry_0_1_2_to_3(
+                                let (v294,) = self.integral_.entry_0_1_2_to_3(
                                     fuel_15,
                                     b,
                                     x_29,
                                     &mut self.delta,
                                     &mut self.uf,
                                 );
-                                let (v307,) = self.integral_.entry_0_1_2_to_3(
+                                let (v293,) = self.integral_.entry_0_1_2_to_3(
                                     fuel_15,
                                     a,
                                     x_29,
                                     &mut self.delta,
                                     &mut self.uf,
                                 );
-                                self.delta.insert_sub((v307, v308, v306));
+                                self.delta.insert_sub((v293, v294, v292));
                             }
                         }
                     }
                     for (a_3, b_3, v37) in self.mul_.iter_new() {
                         {
+                            self.delta.insert_mul((a_3, b_3, v37));
                             self.delta.insert_mul((b_3, a_3, v37));
                         }
-                        for (x_14, v205) in self.diff_.iter_old_1_to_0_2(v37, self.latest_timestamp) {
+                        for (x_14, v191) in self.diff_.iter_old_1_to_0_2(v37, self.latest_timestamp) {
                             #[doc = "( rewrite ( Diff x ( Mul a b ) ) ( Add ( Mul a ( Diff x b ) ) ( Mul b ( Diff x a ) ) ) )"]
-                            let (v206,) = self
+                            let (v192,) = self
                                 .diff_
                                 .entry_0_1_to_2(x_14, b_3, &mut self.delta, &mut self.uf);
-                            let (v207,) = self
+                            let (v193,) = self
                                 .mul_
-                                .entry_0_1_to_2(a_3, v206, &mut self.delta, &mut self.uf);
-                            let (v208,) = self
+                                .entry_0_1_to_2(a_3, v192, &mut self.delta, &mut self.uf);
+                            self.delta.insert_mul((v192, a_3, v193));
+                            let (v194,) = self
                                 .diff_
                                 .entry_0_1_to_2(x_14, a_3, &mut self.delta, &mut self.uf);
-                            let (v209,) = self
+                            let (v195,) = self
                                 .mul_
-                                .entry_0_1_to_2(b_3, v208, &mut self.delta, &mut self.uf);
-                            self.delta.insert_add((v207, v209, v205));
+                                .entry_0_1_to_2(b_3, v194, &mut self.delta, &mut self.uf);
+                            self.delta.insert_add((v193, v195, v191));
+                            self.delta.insert_add((v195, v193, v191));
+                            self.delta.insert_mul((v194, b_3, v195));
                         }
-                        for (v334, x_32, v339) in self
+                        for (v320, x_32, v325) in self
                             .integral_
                             .iter_old_1_to_0_2_3(v37, self.latest_timestamp)
                         {
-                            for (fuel_18,) in self.fuel_.iter_old_1_to_0(v334, self.latest_timestamp) {
+                            for (fuel_18,) in self.fuel_.iter_old_1_to_0(v320, self.latest_timestamp) {
                                 #[doc = "( rewrite ( Integral ( Fuel fuel ) ( Mul a b ) x ) ( Sub ( Mul a ( Integral fuel b x ) ) ( Integral fuel ( Mul ( Diff x a ) ( Integral fuel b x ) ) x ) ) )"]
-                                let (v340,) = self.integral_.entry_0_1_2_to_3(
+                                let (v326,) = self.integral_.entry_0_1_2_to_3(
                                     fuel_18,
                                     b_3,
                                     x_32,
                                     &mut self.delta,
                                     &mut self.uf,
                                 );
-                                let (v341,) =
+                                let (v327,) =
                                     self.mul_
-                                        .entry_0_1_to_2(a_3, v340, &mut self.delta, &mut self.uf);
-                                let (v342,) =
+                                        .entry_0_1_to_2(a_3, v326, &mut self.delta, &mut self.uf);
+                                self.delta.insert_mul((v326, a_3, v327));
+                                let (v328,) =
                                     self.diff_
                                         .entry_0_1_to_2(x_32, a_3, &mut self.delta, &mut self.uf);
-                                let (v343,) =
+                                let (v329,) =
                                     self.mul_
-                                        .entry_0_1_to_2(v342, v340, &mut self.delta, &mut self.uf);
-                                let (v344,) = self.integral_.entry_0_1_2_to_3(
+                                        .entry_0_1_to_2(v328, v326, &mut self.delta, &mut self.uf);
+                                self.delta.insert_mul((v326, v328, v329));
+                                let (v330,) = self.integral_.entry_0_1_2_to_3(
                                     fuel_18,
-                                    v343,
+                                    v329,
                                     x_32,
                                     &mut self.delta,
                                     &mut self.uf,
                                 );
-                                self.delta.insert_sub((v341, v344, v339));
+                                self.delta.insert_sub((v327, v330, v325));
+                            }
+                        }
+                        for (v123, v124) in self.add_.iter_old_0_to_1_2(v37, self.latest_timestamp) {
+                            for (c_8,) in self.mul_.iter_all_0_2_to_1(a_3, v123) {
+                                #[doc = "( rewrite ( Add ( Mul a b ) ( Mul a c ) ) ( Mul a ( Add b c ) ) )"]
+                                let (v125,) = self
+                                    .add_
+                                    .entry_0_1_to_2(b_3, c_8, &mut self.delta, &mut self.uf);
+                                self.delta.insert_add((c_8, b_3, v125));
+                                self.delta.insert_mul((a_3, v125, v124));
+                                self.delta.insert_mul((v125, a_3, v124));
                             }
                         }
                         for (b_9, c_6) in self.add_.iter_old_2_to_0_1(b_3, self.latest_timestamp) {
@@ -18619,110 +18360,80 @@ fn lir_math() {
                             let (v111,) = self
                                 .mul_
                                 .entry_0_1_to_2(a_3, c_6, &mut self.delta, &mut self.uf);
+                            self.delta.insert_mul((c_6, a_3, v111));
                             let (v110,) = self
                                 .mul_
                                 .entry_0_1_to_2(a_3, b_9, &mut self.delta, &mut self.uf);
                             self.delta.insert_add((v110, v111, v37));
+                            self.delta.insert_add((v111, v110, v37));
+                            self.delta.insert_mul((b_9, a_3, v110));
                         }
                         for (b_6, c_3) in self.mul_.iter_all_2_to_0_1(b_3) {
                             #[doc = "( rewrite ( Mul a ( Mul b c ) ) ( Mul ( Mul a b ) c ) )"]
                             let (v55,) = self
                                 .mul_
                                 .entry_0_1_to_2(a_3, b_6, &mut self.delta, &mut self.uf);
+                            self.delta.insert_mul((b_6, a_3, v55));
+                            self.delta.insert_mul((c_3, v55, v37));
                             self.delta.insert_mul((v55, c_3, v37));
                         }
-                        for (a_7, v60) in self.mul_.iter_old_1_to_0_2(v37, self.latest_timestamp) {
+                        for (a_7, v60) in self.mul_.iter_old_0_to_1_2(v37, self.latest_timestamp) {
                             #[doc = "( rewrite ( Mul a ( Mul b c ) ) ( Mul ( Mul a b ) c ) )"]
                             let (v61,) = self
                                 .mul_
                                 .entry_0_1_to_2(a_7, a_3, &mut self.delta, &mut self.uf);
+                            self.delta.insert_mul((a_3, a_7, v61));
+                            self.delta.insert_mul((b_3, v61, v60));
                             self.delta.insert_mul((v61, b_3, v60));
                         }
-                        for (v75,) in self.const_.iter_all_1_to_0(b_3) {
-                            if v75 == self.global_i64.get(1usize) {
+                        for (a_21, b_12) in self.pow_.iter_all_2_to_0_1(a_3) {
+                            for (c_9,) in self.pow_.iter_all_0_2_to_1(a_21, b_3) {
+                                #[doc = "( rewrite ( Mul ( Pow a b ) ( Pow a c ) ) ( Pow a ( Add b c ) ) )"]
+                                let (v132,) =
+                                    self.add_
+                                        .entry_0_1_to_2(b_12, c_9, &mut self.delta, &mut self.uf);
+                                self.delta.insert_add((c_9, b_12, v132));
+                                self.delta.insert_pow((a_21, v132, v37));
+                            }
+                        }
+                        if let v75 = self.global_i64.get(1usize) {
+                            if self.const_.check_0_1(v75, b_3) {
                                 #[doc = "( rewrite ( Mul a ( Const 0 ) ) ( Const 0 ) )"]
                                 self.uf.math_.union(b_3, v37);
                             }
-                            if v75 == self.global_i64.get(2usize) {
+                        }
+                        if let v87 = self.global_i64.get(2usize) {
+                            if self.const_.check_0_1(v87, b_3) {
                                 #[doc = "( rewrite ( Mul a ( Const 1 ) ) a )"]
                                 self.uf.math_.union(a_3, v37);
                             }
                         }
-                        if self.mul_.check_0(a_3) {
-                            for (v123, v124) in self.add_.iter_old_0_to_1_2(v37, self.latest_timestamp) {
-                                for (c_8,) in self.mul_.iter_all_0_2_to_1(a_3, v123) {
-                                    #[doc = "( rewrite ( Add ( Mul a b ) ( Mul a c ) ) ( Mul a ( Add b c ) ) )"]
-                                    let (v125,) =
-                                        self.add_
-                                            .entry_0_1_to_2(b_3, c_8, &mut self.delta, &mut self.uf);
-                                    self.delta.insert_mul((a_3, v125, v124));
-                                }
-                            }
-                            for (v128, v131) in self.add_.iter_old_1_to_0_2(v37, self.latest_timestamp) {
-                                for (b_12,) in self
-                                    .mul_
-                                    .iter_old_0_2_to_1(a_3, v128, self.latest_timestamp)
-                                {
-                                    #[doc = "( rewrite ( Add ( Mul a b ) ( Mul a c ) ) ( Mul a ( Add b c ) ) )"]
-                                    let (v132,) =
-                                        self.add_
-                                            .entry_0_1_to_2(b_12, b_3, &mut self.delta, &mut self.uf);
-                                    self.delta.insert_mul((a_3, v132, v131));
-                                }
-                            }
-                        }
-                        if self.pow_.check_2(a_3) {
-                            for (a_22, c_10) in self.pow_.iter_all_2_to_0_1(b_3) {
-                                for (b_13,) in self.pow_.iter_all_0_2_to_1(a_22, a_3) {
-                                    #[doc = "( rewrite ( Mul ( Pow a b ) ( Pow a c ) ) ( Pow a ( Add b c ) ) )"]
-                                    let (v139,) =
-                                        self.add_
-                                            .entry_0_1_to_2(b_13, c_10, &mut self.delta, &mut self.uf);
-                                    self.delta.insert_pow((a_22, v139, v37));
-                                }
-                            }
-                        }
                     }
-                    for (a_23, b_14, v142) in self.pow_.iter_new() {
-                        for (v155,) in self.const_.iter_all_1_to_0(b_14) {
-                            if v155 == self.global_i64.get(2usize) {
-                                #[doc = "( rewrite ( Pow x ( Const 1 ) ) x )"]
-                                self.uf.math_.union(a_23, v142);
-                            }
-                            if v155 == self.global_i64.get(3usize) {
-                                #[doc = "( rewrite ( Pow x ( Const 2 ) ) ( Mul x x ) )"]
-                                self.delta.insert_mul((a_23, a_23, v142));
+                    for (a_22, b_13, v135) in self.pow_.iter_new() {
+                        for (v137, v138) in self.mul_.iter_old_0_to_1_2(v135, self.latest_timestamp) {
+                            for (c_10,) in self.pow_.iter_all_0_2_to_1(a_22, v137) {
+                                #[doc = "( rewrite ( Mul ( Pow a b ) ( Pow a c ) ) ( Pow a ( Add b c ) ) )"]
+                                let (v139,) =
+                                    self.add_
+                                        .entry_0_1_to_2(b_13, c_10, &mut self.delta, &mut self.uf);
+                                self.delta.insert_add((c_10, b_13, v139));
+                                self.delta.insert_pow((a_22, v139, v138));
                             }
                         }
-                        if self.pow_.check_0(a_23) {
-                            for (v144, v145) in self.mul_.iter_old_0_to_1_2(v142, self.latest_timestamp) {
-                                for (c_11,) in self.pow_.iter_all_0_2_to_1(a_23, v144) {
-                                    #[doc = "( rewrite ( Mul ( Pow a b ) ( Pow a c ) ) ( Pow a ( Add b c ) ) )"]
-                                    let (v146,) =
-                                        self.add_
-                                            .entry_0_1_to_2(b_14, c_11, &mut self.delta, &mut self.uf);
-                                    self.delta.insert_pow((a_23, v146, v145));
-                                }
+                        if let v141 = self.global_i64.get(2usize) {
+                            if self.const_.check_0_1(v141, b_13) {
+                                #[doc = "( rewrite ( Pow x ( Const 1 ) ) x )"]
+                                self.uf.math_.union(a_22, v135);
                             }
-                            for (v149, v152) in self.mul_.iter_old_1_to_0_2(v142, self.latest_timestamp) {
-                                for (b_15,) in self
-                                    .pow_
-                                    .iter_old_0_2_to_1(a_23, v149, self.latest_timestamp)
-                                {
-                                    #[doc = "( rewrite ( Mul ( Pow a b ) ( Pow a c ) ) ( Pow a ( Add b c ) ) )"]
-                                    let (v153,) =
-                                        self.add_
-                                            .entry_0_1_to_2(b_15, b_14, &mut self.delta, &mut self.uf);
-                                    self.delta.insert_pow((a_23, v153, v152));
-                                }
+                        }
+                        if let v153 = self.global_i64.get(3usize) {
+                            if self.const_.check_0_1(v153, b_13) {
+                                #[doc = "( rewrite ( Pow x ( Const 2 ) ) ( Mul x x ) )"]
+                                self.delta.insert_mul((a_22, a_22, v135));
                             }
                         }
                     }
                     for (x_2, v9) in self.sin_.iter_new() {
-                        for (v215,) in self.diff_.iter_old_0_1_to_2(x_2, v9, self.latest_timestamp) {
-                            #[doc = "( rewrite ( Diff x ( Sin x ) ) ( Cos x ) )"]
-                            self.delta.insert_cos((x_2, v215));
-                        }
                         for (fuel_2, v10) in self
                             .integral_
                             .iter_old_1_2_to_0_3(v9, x_2, self.latest_timestamp)
@@ -18732,9 +18443,23 @@ fn lir_math() {
                             let (v12,) = self.const_.entry_0_to_1(v11, &mut self.delta, &mut self.uf);
                             let (v13,) = self.cos_.entry_0_to_1(x_2, &mut self.delta, &mut self.uf);
                             self.delta.insert_mul((v12, v13, v10));
+                            self.delta.insert_mul((v13, v12, v10));
+                        }
+                        for (v201,) in self.diff_.iter_old_0_1_to_2(x_2, v9, self.latest_timestamp) {
+                            #[doc = "( rewrite ( Diff x ( Sin x ) ) ( Cos x ) )"]
+                            self.delta.insert_cos((x_2, v201));
                         }
                     }
                     for (x_4, v27) in self.cos_.iter_new() {
+                        for (v237, v240) in self
+                            .integral_
+                            .iter_old_1_2_to_0_3(v27, x_4, self.latest_timestamp)
+                        {
+                            for (fuel_9,) in self.fuel_.iter_old_1_to_0(v237, self.latest_timestamp) {
+                                #[doc = "( rewrite ( Integral ( Fuel fuel ) ( Cos x ) x ) ( Sin x ) )"]
+                                self.delta.insert_sin((x_4, v240));
+                            }
+                        }
                         for (v28,) in self
                             .diff_
                             .iter_old_0_1_to_2(x_4, v27, self.latest_timestamp)
@@ -18744,73 +18469,53 @@ fn lir_math() {
                             let (v30,) = self.const_.entry_0_to_1(v29, &mut self.delta, &mut self.uf);
                             let (v31,) = self.sin_.entry_0_to_1(x_4, &mut self.delta, &mut self.uf);
                             self.delta.insert_mul((v30, v31, v28));
-                        }
-                        for (v251, v254) in self
-                            .integral_
-                            .iter_old_1_2_to_0_3(v27, x_4, self.latest_timestamp)
-                        {
-                            for (fuel_9,) in self.fuel_.iter_old_1_to_0(v251, self.latest_timestamp) {
-                                #[doc = "( rewrite ( Integral ( Fuel fuel ) ( Cos x ) x ) ( Sin x ) )"]
-                                self.delta.insert_sin((x_4, v254));
-                            }
+                            self.delta.insert_mul((v31, v30, v28));
                         }
                     }
                     for (v67, v68) in self.const_.iter_new() {
-                        if self.pow_.check_1(v68) {
-                            if v67 == self.global_i64.get(3usize) {
-                                for (x_9, v173) in self.pow_.iter_old_1_to_0_2(v68, self.latest_timestamp) {
-                                    #[doc = "( rewrite ( Pow x ( Const 2 ) ) ( Mul x x ) )"]
-                                    self.delta.insert_mul((x_9, x_9, v173));
-                                }
-                            }
-                        }
                         if v67 == self.global_i64.get(1usize) {
-                            for (a_9, v69) in self.add_.iter_old_1_to_0_2(v68, self.latest_timestamp) {
-                                if v67 == self.global_i64.get(1usize) {
-                                    #[doc = "( rewrite ( Add a ( Const 0 ) ) a )"]
-                                    self.uf.math_.union(a_9, v69);
-                                }
+                            for (a_9, v69) in self.add_.iter_old_0_to_1_2(v68, self.latest_timestamp) {
+                                #[doc = "( rewrite ( Add a ( Const 0 ) ) a )"]
+                                self.uf.math_.union(a_9, v69);
                             }
-                            for (a_12, v81) in self.mul_.iter_old_1_to_0_2(v68, self.latest_timestamp) {
-                                if v67 == self.global_i64.get(1usize) {
-                                    #[doc = "( rewrite ( Mul a ( Const 0 ) ) ( Const 0 ) )"]
-                                    self.uf.math_.union(v68, v81);
-                                }
+                            for (a_12, v81) in self.mul_.iter_old_0_to_1_2(v68, self.latest_timestamp) {
+                                #[doc = "( rewrite ( Mul a ( Const 0 ) ) ( Const 0 ) )"]
+                                self.uf.math_.union(v68, v81);
                             }
                         }
                         if v67 == self.global_i64.get(2usize) {
-                            for (v229, x_19, v233) in self
+                            for (v215, x_19, v219) in self
                                 .integral_
                                 .iter_old_1_to_0_2_3(v68, self.latest_timestamp)
                             {
-                                for (fuel_5,) in self.fuel_.iter_old_1_to_0(v229, self.latest_timestamp) {
-                                    if v67 == self.global_i64.get(2usize) {
-                                        #[doc = "( rewrite ( Integral ( Fuel fuel ) ( Const 1 ) x ) x )"]
-                                        self.uf.math_.union(x_19, v233);
-                                    }
+                                for (fuel_5,) in self.fuel_.iter_old_1_to_0(v215, self.latest_timestamp) {
+                                    #[doc = "( rewrite ( Integral ( Fuel fuel ) ( Const 1 ) x ) x )"]
+                                    self.uf.math_.union(x_19, v219);
                                 }
                             }
-                            for (a_15, v93) in self.mul_.iter_old_1_to_0_2(v68, self.latest_timestamp) {
-                                if v67 == self.global_i64.get(2usize) {
-                                    #[doc = "( rewrite ( Mul a ( Const 1 ) ) a )"]
-                                    self.uf.math_.union(a_15, v93);
-                                }
+                            for (a_15, v93) in self.mul_.iter_old_0_to_1_2(v68, self.latest_timestamp) {
+                                #[doc = "( rewrite ( Mul a ( Const 1 ) ) a )"]
+                                self.uf.math_.union(a_15, v93);
                             }
-                            for (x_6, v161) in self.pow_.iter_old_1_to_0_2(v68, self.latest_timestamp) {
-                                if v67 == self.global_i64.get(2usize) {
-                                    #[doc = "( rewrite ( Pow x ( Const 1 ) ) x )"]
-                                    self.uf.math_.union(x_6, v161);
-                                }
+                            for (x_6, v147) in self.pow_.iter_old_1_to_0_2(v68, self.latest_timestamp) {
+                                #[doc = "( rewrite ( Pow x ( Const 1 ) ) x )"]
+                                self.uf.math_.union(x_6, v147);
+                            }
+                        }
+                        if v67 == self.global_i64.get(3usize) {
+                            for (x_9, v159) in self.pow_.iter_old_1_to_0_2(v68, self.latest_timestamp) {
+                                #[doc = "( rewrite ( Pow x ( Const 2 ) ) ( Mul x x ) )"]
+                                self.delta.insert_mul((x_9, x_9, v159));
                             }
                         }
                     }
                     if let Some(v71) = self.global_i64.get_new(1usize) {
                         for (v72,) in self.const_.iter_old_0_to_1(v71, self.latest_timestamp) {
-                            for (a_10, v73) in self.add_.iter_old_1_to_0_2(v72, self.latest_timestamp) {
+                            for (a_10, v73) in self.add_.iter_old_0_to_1_2(v72, self.latest_timestamp) {
                                 #[doc = "( rewrite ( Add a ( Const 0 ) ) a )"]
                                 self.uf.math_.union(a_10, v73);
                             }
-                            for (a_13, v85) in self.mul_.iter_old_1_to_0_2(v72, self.latest_timestamp) {
+                            for (a_13, v85) in self.mul_.iter_old_0_to_1_2(v72, self.latest_timestamp) {
                                 #[doc = "( rewrite ( Mul a ( Const 0 ) ) ( Const 0 ) )"]
                                 self.uf.math_.union(v72, v85);
                             }
@@ -18818,30 +18523,30 @@ fn lir_math() {
                     }
                     if let Some(v95) = self.global_i64.get_new(2usize) {
                         for (v96,) in self.const_.iter_old_0_to_1(v95, self.latest_timestamp) {
-                            for (v235, x_20, v239) in self
+                            for (v221, x_20, v225) in self
                                 .integral_
                                 .iter_old_1_to_0_2_3(v96, self.latest_timestamp)
                             {
-                                for (fuel_6,) in self.fuel_.iter_old_1_to_0(v235, self.latest_timestamp) {
+                                for (fuel_6,) in self.fuel_.iter_old_1_to_0(v221, self.latest_timestamp) {
                                     #[doc = "( rewrite ( Integral ( Fuel fuel ) ( Const 1 ) x ) x )"]
-                                    self.uf.math_.union(x_20, v239);
+                                    self.uf.math_.union(x_20, v225);
                                 }
                             }
-                            for (a_16, v97) in self.mul_.iter_old_1_to_0_2(v96, self.latest_timestamp) {
+                            for (a_16, v97) in self.mul_.iter_old_0_to_1_2(v96, self.latest_timestamp) {
                                 #[doc = "( rewrite ( Mul a ( Const 1 ) ) a )"]
                                 self.uf.math_.union(a_16, v97);
                             }
-                            for (x_7, v165) in self.pow_.iter_old_1_to_0_2(v96, self.latest_timestamp) {
+                            for (x_7, v151) in self.pow_.iter_old_1_to_0_2(v96, self.latest_timestamp) {
                                 #[doc = "( rewrite ( Pow x ( Const 1 ) ) x )"]
-                                self.uf.math_.union(x_7, v165);
+                                self.uf.math_.union(x_7, v151);
                             }
                         }
                     }
-                    if let Some(v175) = self.global_i64.get_new(3usize) {
-                        for (v176,) in self.const_.iter_old_0_to_1(v175, self.latest_timestamp) {
-                            for (x_10, v177) in self.pow_.iter_old_1_to_0_2(v176, self.latest_timestamp) {
+                    if let Some(v161) = self.global_i64.get_new(3usize) {
+                        for (v162,) in self.const_.iter_old_0_to_1(v161, self.latest_timestamp) {
+                            for (x_10, v163) in self.pow_.iter_old_1_to_0_2(v162, self.latest_timestamp) {
                                 #[doc = "( rewrite ( Pow x ( Const 2 ) ) ( Mul x x ) )"]
-                                self.delta.insert_mul((x_10, x_10, v177));
+                                self.delta.insert_mul((x_10, x_10, v163));
                             }
                         }
                     }
