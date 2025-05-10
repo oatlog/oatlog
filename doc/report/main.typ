@@ -28,16 +28,22 @@
   examiner: ("Matti Karppa", department),
   abstract: [
     // Abstract text about your project in Computer Science and Engineering
-    #TODO[Write abstract]
-    #TODO[We have made an egglog compatible e-graph engine]
+    Modern software development depends on efficient and reliable optimizing compilers.
+    Traditional compilers apply transformations on a single instance of a program until reaching a fixpoint, but since each transformation has to be strictly beneficial, compiler authors need to be conservative.
+    This motivates equality saturation which efficiently keeps multiple versions of a program using e-graphs and later extracting the optimal program.
+
+    However, the performance of e-graphs engines is a major obstacle for using them in compilers, which motivates improving the underlying e-graph technology.
+    We have created oatlog, which is an ahead-of-time compiled e-graph engine.
+    It significantly outperforms egglog, which is the current fastest mainstream e-graph engine.
   ],
   keywords: ("e-graphs", "equality saturation", "datalog", "program optimization", "rewrite rules"),
   acknowledgements: [
     // Here, you can say thank you to your supervisor(s), company advisors and other people that
     // supported you during your project.
     #TODO[Write acknowledgements]
-    // egraph community
-    // supervisor
+    // egraph community/egglog authors
+    // supervisor/examiner
+    // fellow students
   ],
 )
 
@@ -159,8 +165,6 @@
 
 #TODO[improve program = optimize program?]
 
-/*
-
 Modern software development depends on efficient and reliable compilers, which apply sophisticated
 optimizations to improve performance while enabling portability and abstraction. For example,
 autovectorization allows code to take advantage of SIMD hardware without using architecture-specific
@@ -206,10 +210,7 @@ rewriting to make it nondestructive.
 
 == E-graphs and equality saturation
 
-*/
-
 #TODO[explain limitations of aegraphs]
-/*
 
 E-graphs @oldegraph are data structures for rewriting that allow multiple representations of a
 value, committing to one only after all rewrites have been searched. The representations are stored
@@ -253,10 +254,7 @@ e-graphs within compilers would require them to become faster.
 
 == Datalog and relational databases
 
-*/
-
 #TODO[e-graphs as relational databases is discovered "recently" provide year/citation]
-/*
 
 Recent developments in e-graphs and equality saturation @relationalematching @eqlog @egglog have
 shown that adding indexes to e-graph pattern-matching creates a structure that is very similar to
@@ -296,6 +294,7 @@ work.
 
 #NOTE[This section talks about report sections that aren't finished as if they were.]
 
+/*
 @conceptual_background extends this introduction with a conceptual background. This is a
 step-by-step explanation of what e-graphs are and how they have been implement prior to their
 unification to Datalog. We then motivate the idea of e-graphs as relational databases, culminating
@@ -308,18 +307,17 @@ within oatlog.
 @oatlog_implementation then concretely describes the implementation of these techniques in oatlog,
 in addition to showing what oatlog can do and how it is used. @oatlog_evaluation follows by
 evaluating oatlog through its test suite and benchmarks.
-
 */
 
-+ Kompilatorer viktiga
-+ peepholes är bra
-+ Vad är en rewrite
-  - exempel?
-+ Kompilatorer har phase ordering problem pga destructive rewrites
-+ e-grafer löser phase ordering
-+ e-grafer är långsamma
-+ Finns lovande innovation inom e-graf-implementering
-+ Vi har implementerat e-graf som är snabbare än egglog i många fall
+// + Kompilatorer viktiga
+// + peepholes är bra
+// + Vad är en rewrite
+//   - exempel?
+// + Kompilatorer har phase ordering problem pga destructive rewrites
+// + e-grafer löser phase ordering
+// + e-grafer är långsamma
+// + Finns lovande innovation inom e-graf-implementering
+// + Vi har implementerat e-graf som är snabbare än egglog i många fall
 
 #figure(
   image("../figures/egraph_cluster.svg", width: 60%),
@@ -1423,7 +1421,7 @@ Note that while the Python implementations are just example implementations, the
   caption: [A simplified union-find implementation without path compression nor smaller-to-larger merging.],
 ) <union-find-simplified-impl>
 
-Union-find is a datastructure that maintains disjoint sets, meaning that every element belongs to exactly one set.
+Union-find @unionfindoriginal @fastunionfind @unionfindvariantbounds is a datastructure that maintains disjoint sets, meaning that every element belongs to exactly one set.
 This is a very general-purpose datastructure, for example it can be used to implement Kruskal's algorithm for minimum spanning trees.
 
 Because of the property that each element belongs to exactly one set, we can refer to an arbitrary representative element in the set instead of referring to the entire set.
@@ -1439,8 +1437,6 @@ An example implementation is shown in @union-find-simplified-impl.
 
 To implement union-find, each element is an integer, so it maintains sets of integers, but this is equivalent to storing sets of any type since we can assign unique integer ids to each element.
 
-#TODO[picture of before/after merge that also shows what elements are representatives]
-
 Each element has a representative element stored in the `representative` array where each element initially claims that they are their own representative and that their set size is one.
 
 For elements $a,b$ where $a != b$ and `representative[a] = b`, the representative of $a$ is recursively the representative of $b$.
@@ -1450,11 +1446,9 @@ To unify the sets that $a$ and $b$ belong to, we make the representative of $a$,
 In the previous metaphor, this would be finding the tallest person in the first set and telling them to point to the tallest person in the second set.
 This means that if you started in either sets you would now end up with the same representative and therefore the sets are merged.
 
-#TODO[limitations of union-find (can't iterate over sets)]
-
-#TODO[this is one of many ways to implement it]
-
 === Efficient union-find
+
+#TODO[maybe we can skip this part]
 
 To make union-find efficient, there are two optimizations that are applied, smaller-to-larger merging and path-compression. This is shown in @union-find-impl.
 
@@ -1462,8 +1456,6 @@ In the worst-case for this implementation the `find()` operation may be $O(n)$ s
 With smaller-to-larger merging we ensure that the trees are balanced and therefore get a $O(log n)$ complexity for `find()`.
 
 Path compression amortizes the cost of `find()` by modifying the representatives along the path to the root to just directly point to the root.
-
-#TODO[picture of path compression]
 
 With path compression and smaller-to-larger merging, it is extremely hard to find a worst-case and the amortized complexity of `find()` becomes $O($alpha$(n))$ @fastunionfind @unionfindvariantbounds
 where $alpha$ is the inverse of the Ackermann function.
@@ -1482,13 +1474,12 @@ An example implementation can be found in @e-graph-impl.
 
 It contains a union-find and a map from e-node to e-class called the hashcons.
 It supports the same operations as union-find on its e-classes (`union`, `find`, `make`), and additionally has the functions `canonicalize` and `insert_enode`.
-`insert_enode` just inserts a new e-node and returns its e-class.
+`insert_enode` inserts a new e-node and returns its e-class.
 
 `canonicalize` replaces all e-classes with their representatives, and merges e-classes when conflicts occur, $f(a) = b and f(a) = c => b = c$.
 
-#TODO[explain `tuple(map(canonicalize_element, enode))`]
-
-#TODO[note that this formulation ignores the e-class map because it's actually not needed and is kinda just confusing]
+// #TODO[explain `tuple(map(canonicalize_element, enode))`]
+// #TODO[note that this formulation ignores the e-class map because it's actually not needed and is kinda just confusing]
 
 #pagebreak(to: "even")
 == E-graph example implementation and usage <e-graph-impl>
@@ -1741,7 +1732,99 @@ However, a problem with relational e-matching is that we constantly re-discover 
 
 == Semi-naive evaluation
 
-#TODO[]
+Semi-naive evaluation splits a relation into two parts, "old" and "new" and uses that to avoid join results that only uses information from the "old" parts of relations.
+
+For example, consider two sets $A$ and $B$, where we want to compute the cartesian product, or all pairs of elements from $A$ and $B$.
+How can we compute $A times B$ while excluding $A_"old" times B_"old"$?
+If we expand $A times B$, we get:
+
+$
+  A times B &= (A_"old" union A_"new") times (B_"old" union B_"new") \
+  A times B &=
+  (A_"old" times B_"old") union (A_"new" times B_"old") union
+  (A_"old" times B_"new") union (A_"new" times B_"new") \
+  A times B &=
+  (A_"old" times B_"old") union (A_"new" times B) union
+  (A_"old" times B_"new") \
+$
+If we exclude $A_"old" times B_"old"$, we get:
+$
+  A times B - (A_"old" times B_"old") &= (A_"new" times B) union (A_"old" times B_"new") \
+$
+
+This generalizes to joins and joins involving more than 2 relations.
+Using semi-naive evaluation is key to both minimize how much work has to be done during queries and canonicalization.
+
+#TODO[do we need a bridge here?]
+
+== Functional dependency
+
+On a relation, some columns may depend on others, this is typically called a functional dependency, implicit functionality or a primary key constraint.
+For example on the Add relation, we have the constraint $x, y -> "res"$.
+
+== Egglog language
+
+Since oatlog implements the egglog language, it is helpful to have some understanding of it.
+@informal-theory-example shows an example EqSat theory specified in the egglog domain-specific
+language @egglog. `Math` is essentially a sum type, where `Add`, `Sub`, etc are constructors.
+Rewrites mean that if the left side matches, add the right side to the database and unify it with
+the left side. Egglog semantics define running a set of rules as using their left side patterns to
+figure out what right side actions to perform, then doing all actions as a batch. Egglog defines a
+command `run <count>`, not shown here, that runs the set of all rules some number of times or until
+convergence.
+
+#figure(
+  ```egglog
+  (sort Math)
+  (constructor Add (Math Math) Math)
+  (constructor Mul (Math Math) Math)
+  (constructor Const (i64) Math)
+  (constructor Var (String) Math)
+
+  (rewrite (Add a b) (Add b a))                         ; commutativity
+  (rewrite (Add a (Add b c)) (Add (Add a b) c))         ; associativity
+
+  (rewrite (Mul a b) (Mul b a))                         ; commutativity
+  (rewrite (Mul a (Mul b c)) (Mul (Mul a b) c))         ; associativity
+
+  (rewrite (Mul (Add a b) c) (Add (Mul a c) (Mul b c))) ; distributivity
+
+  (rewrite (Add x (Const 0)) x)                         ; additive unit
+  (rewrite (Mul x (Const 1)) (x))                       ; multiplicative unit
+  ```,
+
+  caption: [A theory written in the egglog language.],
+) <informal-theory-example>
+
+Egglog also supports a form of sum types
+
+```egglog
+(datatype Math
+    (Add (Math Math))
+    (Mul (Math Math))
+    (Const (i64))
+)
+; desugars to:
+(sort Math)
+(constructor Add (Math Math) Math)
+(constructor Mul (Math Math) Math)
+(constructor Const (i64) Math)
+```
+
+This is analogous to sum types in other languages like Rust or Haskell, which could be written as:
+```rust
+enum Math {
+    Add(&Math, &Math),
+    Mul(&Math, &Math),
+    Const(i64),
+}
+```
+```haskell
+data Math =
+   Add Math Math |
+   Mul Math Math |
+   Const Int
+```
 
 == #TODO[egglog/(Datalog?) language]
 
@@ -1752,6 +1835,10 @@ However, a problem with relational e-matching is that we constantly re-discover 
 #TODO[]
 
 == #TODO[nomenclature]
+
+#TODO[]
+
+== #TODO[scheduling and termination, maybe]
 
 #TODO[]
 
@@ -2079,17 +2166,93 @@ Overall, our comparative testing infrastructure (against egglog) can handle the 
 
 === Egglog AST
 
-#TODO[]
+We parse egglog into S-expressions and then into a egglog AST.
+This AST can be converted back into a string, and therefore makes it possible for us to implement shrinking of egglog code into minimal misbehaving examples.
+We include span information in the egglog AST to be able to provide reasonable errors to the user.
+This is parsed into the HIR.
 
-=== HIR
+=== HIR, high-level IR
 
-#TODO[]
+The HIR is mainly used to normalize and optimize rules.
+A rule is represented as a set of premises, actions and unifications.
+The main intra-rule optimizations are to merge identical variables, deduplicate premises and remove actions that are part of the premise.
 
-=== TIR
+Additionally, after optimizations, here is where we apply the semi-naive transform where a rule is split into multiple variants, for example:
 
-#TODO[]
+$
+  "Add" join "Mul" join "Sub"
+$
 
-=== LIR
+becomes
+
+$ "Add"_"new" join "Mul"_"old" join "Sub"_"old" $
+$ "Add"_"all" join "Mul"_"new" join "Sub"_"old" $
+$ "Add"_"all" join "Mul"_"all" join "Sub"_"new" $
+
+Because of symmetries in premises, the semi-naive transformation can generate rules that are actually equivalent, and therefore duplicates are removed, similarly to what is done in Eqlog @eqlog.
+
+#TODO[equality modulo permutation should maybe have it's own section, or this should link to more in-depth explanations]
+
+=== TIR, trie IR
+
+#figure(
+  placement: top,
+  scope: "parent",
+  grid(
+    columns: (auto, auto, auto, auto),
+    ```python
+    # rule 1
+    for _ in A:
+        for _ in B:
+            for _ in C:
+                X()
+                Y()
+    ```,
+    ```python
+    # rule 2
+    for _ in A:
+        for _ in B:
+            for _ in D:
+                X()
+                Z()
+    ```,
+    ```python
+    # rule 3
+    for _ in A:
+        for _ in B:
+            X()
+    ```,
+    ```python
+    # rule 1 + rule 2 + rule 3
+    for _ in A:
+        for _ in B:
+            X()
+            for _ in C:
+                Y()
+            for _ in D:
+                Z()
+    ```,
+  ),
+  caption: [
+    Merging similar rules to avoid repeated joins and actions where A,B,C,D are premises and X,Y,Z are actions (inserts and unifications).
+  ],
+) <trie-ir>
+
+The TIR is motivated by the fact that many rules have overlapping premises as seen in @trie-ir.
+To generate the TIR, we perform query planning and when multiple equally good choices are possible for a given rule, we select the choice that maximizes premise sharing.
+
+#TODO[forward reference to query planning]
+
+// While optimal query planning needs to consider the runtime sizes of relations, since we are performing query planning without runtime information we use a simple heuristic:
+// + Iterate new part of relation
+// + Global variable lookup
+// + All variables are bound
+// + The relation result is guaranteed to produce 0 or 1 elements due to functional dependency
+// + The relation contains some bound variable
+// + The relation contains no bound variables.
+// SEMI-JOIN
+
+=== LIR, low-level IR
 
 #TODO[]
 

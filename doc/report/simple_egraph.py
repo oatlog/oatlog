@@ -28,25 +28,24 @@ class EGraph:
 
     # canonicalize e-graph
     def canonicalize(self):
-        def canonicalize_element(x):
-            if type(x) is EClass:
-                return self.find(x)
-            else:
-                return x
-
         while True:
             changed = False
             new_hashcons = dict()
             for enode, eclass in self.hashcons.items():
                 eclass = self.find(eclass)
-                new_enode = tuple(map(canonicalize_element, enode))
 
-                existing_eclass = new_hashcons.get(new_enode)
+                # canonicalize e-node
+                enode = list(enode)
+                for i in range(1, len(enode)):
+                    enode[i] = self.find(enode[i])
+                enode = tuple(enode)
+
+                existing_eclass = new_hashcons.get(enode)
                 if existing_eclass is not None:
                     self.union(eclass, existing_eclass)
                     changed = True
                 else:
-                    new_hashcons[new_enode] = eclass
+                    new_hashcons[enode] = eclass
             self.hashcons = new_hashcons
             if not changed:
                 break
