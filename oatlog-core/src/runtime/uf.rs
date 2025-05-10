@@ -93,9 +93,7 @@ impl<T: Eclass> UnionFind<T> {
         // 2. Unroll this loop with path compression
         // 3. Perform recursive path compression (well how could it given (2))
 
-        // TODO erik for loke: if this assert is needed for performance or something please
-        // document that.
-        assert!((i as usize) < self.repr.len());
+        assert!((i as usize) < self.repr.len(), "out of bounds uf access");
         loop {
             let i_old = i;
             // SAFETY: `i` being in bounds initially is checked above, and UF parents will always
