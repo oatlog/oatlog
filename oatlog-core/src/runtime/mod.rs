@@ -35,21 +35,6 @@ pub use std::{
 };
 pub use voracious_radix_sort::{RadixSort, Radixable};
 
-pub trait Clear: Sized {
-    fn clear(&mut self);
-    /// set self to other and clear other without allocations
-    fn take_scratch(&mut self, other: &mut Self) {
-        self.clear();
-        swap(self, other);
-    }
-}
-impl<T> Clear for Vec<T> {
-    #[inline]
-    fn clear(&mut self) {
-        Vec::clear(self);
-    }
-}
-
 /// semantically a HashMap<Key, Vec<Value>>
 #[derive(Debug, Default)]
 pub struct IndexedSortedList<Key, Value> {
@@ -146,19 +131,6 @@ impl<Key: Copy + Ord + Hash, Value: Copy + Ord> IndexedSortedList<Key, Value> {
     pub fn contains_key(&self, key: &Key) -> bool {
         self.map.contains_key(key)
     }
-    /*
-    pub unsafe fn iter_unchecked(&self, key: Key) -> impl Iterator<Item = Value> {
-        self.map
-            .get(&key)
-            .copied()
-            .into_iter()
-            .flat_map(|(start, end)| {
-                unsafe { self.list.get_unchecked(start as usize..end as usize) }
-                    .iter()
-                    .copied()
-            })
-    }
-    */
     pub fn len(&self) -> usize {
         self.list.len()
     }
@@ -227,58 +199,4 @@ impl StringIntern {
     pub fn lookup(&self, i: IString) -> &str {
         &self.to_string[&i]
     }
-}
-
-// TODO erik: delete, this is dead code.
-pub trait RangeQuery<T, V> {
-    fn query(&self, t: T) -> impl Iterator<Item = V>; // + use<'a, T, V, Self>;
-    fn check(&self, t: T) -> bool {
-        self.query(t).next().is_some()
-    }
-}
-
-// TODO erik: delete, this is dead code.
-mod range_query_impl {
-    use super::RangeQuery;
-    use super::RelationElement;
-    use std::collections::BTreeSet;
-    macro_rules! oh_no {
-        ( , $($name0:ident $digit0:tt)*) => {};
-        ( $($name0:ident $digit0:tt)*, ) => {};
-        ($($name0:ident $digit0:tt)* , $($name1:ident $digit1:tt)*) => {
-            #[allow(unused_parens)]
-            impl<$($name0,)* $($name1),*> RangeQuery<($($name0,)*), ($($name1),*)> for BTreeSet<($($name0,)* $($name1),*)>
-            where
-                $($name0 : RelationElement,)*
-                $($name1 : RelationElement,)*
-            {
-                #[inline]
-                fn query(&self, t: ($($name0,)*)) -> impl Iterator<Item = ($($name1),*)> {
-                    self.range(($(t . $digit0,)* $($name1::MIN_ID,)*)..($(t . $digit0,)* $($name1::MAX_ID,)*))
-                        .copied()
-                        .map(|x| ($(x . $digit1),*))
-                }
-            }
-
-        };
-    }
-    macro_rules! what {
-        ($($name0:ident $digit0:tt)* , ) => {
-            oh_no!($($name0 $digit0)*,);
-        };
-        ($($name0:ident $digit0:tt)* , $name1:ident $digit1:tt $($name2:ident $digit2:tt)*) => {
-            oh_no!($($name0 $digit0)*, $name1 $digit1 $($name2 $digit2)*);
-            what!($($name0 $digit0)* $name1 $digit1, $($name2 $digit2)*);
-        }
-    }
-    macro_rules! why {
-        ($($name0:ident $digit0:tt)* , ) => {
-            what!(,$($name0 $digit0)*);
-        };
-        ($($name0:ident $digit0:tt)* , $name1:ident $digit1:tt $($name2:ident $digit2:tt)*) => {
-            what!(,$($name0 $digit0)*);
-            why!($($name0 $digit0)* $name1 $digit1, $($name2 $digit2)*);
-        };
-    }
-    why!(, A 0 B 1 C 2 D 3 E 4 F 5 G 6 H 7 I 8 J 9 K 10 L 11);
 }
