@@ -10,7 +10,7 @@ use std::collections::{BTreeMap, BTreeSet};
 
 /// Returns `lir::Theory` and `hir::Theory` since the `hir::Theory` is modified when
 /// emitted.
-pub(crate) fn emit_lir_theory(theory: hir::Theory) -> (hir::Theory, lir::Theory) {
+pub(crate) fn emit_lir_theory(theory: hir::Theory) -> (hir::Theory, tir::Trie, lir::Theory) {
     let non_new_relations = theory.relations.len();
 
     let mut table_uses: TVec<RelationId, TSet<IndexId, BTreeSet<ColumnId>>> =
@@ -20,12 +20,12 @@ pub(crate) fn emit_lir_theory(theory: hir::Theory) -> (hir::Theory, lir::Theory)
 
     let mut tries: Vec<lir::RuleTrie>;
 
-    {
+    let tir = {
         let (mut variables, trie) =
             tir::schedule_rules(theory.symbolic_rules.clone(), &theory.relations);
 
         let (lir_tries, variables) = tir::lowering(
-            trie,
+            &trie,
             &mut variables,
             &theory.relations,
             &mut table_uses,
@@ -34,7 +34,8 @@ pub(crate) fn emit_lir_theory(theory: hir::Theory) -> (hir::Theory, lir::Theory)
 
         lir_variables = variables;
         tries = lir_tries;
-    }
+        trie
+    };
 
     let mut table_index_remap: TVec<RelationId, TVec<IndexId, IndexId>> =
         table_uses.new_same_size();
@@ -151,7 +152,7 @@ pub(crate) fn emit_lir_theory(theory: hir::Theory) -> (hir::Theory, lir::Theory)
         initial: theory.initial.clone(),
     };
 
-    (theory, lir_theory)
+    (theory, tir, lir_theory)
 }
 
 fn remove_variable_collisions(s: &mut [lir::VariableData]) {

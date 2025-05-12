@@ -156,7 +156,6 @@ impl Input {
     }
 }
 
-#[allow(dead_code)]
 #[derive(Copy, Clone, Default)]
 enum FileNotFoundAction {
     /// just call panic!()
@@ -166,7 +165,6 @@ enum FileNotFoundAction {
     EmitError,
 }
 
-#[allow(dead_code)]
 #[derive(Copy, Clone, Default)]
 enum BackTraceAction {
     /// Catch panic and re-emit panic that contains the backtrace as a message
@@ -179,12 +177,15 @@ enum BackTraceAction {
 }
 
 /// Specify when oatlog matches egglog (after every step, or after saturation).
-#[allow(dead_code)]
 #[derive(Copy, Clone, Default)]
 enum EgglogCompatibility {
+    /// Equal after step.
+    ///
     /// Create identical e-nodes, modulo e-class naming, after each `(run 1)`.
     #[default]
     PostStep,
+    /// Equal after saturation.
+    ///
     /// Create identical e-graph after saturation.
     ///
     /// Necessary to optimize relations using invariant column permutations.
@@ -199,7 +200,6 @@ impl EgglogCompatibility {
     }
 }
 
-#[allow(dead_code)]
 #[derive(Copy, Clone, Default)]
 struct Configuration {
     file_not_found: FileNotFoundAction,
@@ -207,9 +207,12 @@ struct Configuration {
     egglog_compat: EgglogCompatibility,
 }
 
-#[allow(dead_code)]
 enum CompileError {
-    Panic { message: String, backtrace: String },
+    #[allow(unused)]
+    Panic {
+        message: String,
+        backtrace: String,
+    },
     Err(frontend::span::MError),
 }
 
@@ -254,7 +257,7 @@ fn universal(input: Input, config: Configuration) -> Result<Output, CompileError
             .optimize(config)
             .transform_into_seminaive();
 
-        let (_, lir) = query_planning::emit_lir_theory(hir);
+        let (_, _, lir) = query_planning::emit_lir_theory(hir);
 
         let generated_tokens = codegen::codegen(&lir);
         Ok(Output::Tokens(generated_tokens))

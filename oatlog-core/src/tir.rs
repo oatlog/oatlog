@@ -51,8 +51,9 @@ struct Salt {
 #[derive(Clone, Eq, PartialEq, Ord, PartialOrd, Debug, Default)]
 pub(crate) struct Trie {
     meta: Vec<hir::RuleMeta>,
+
     /// Variables bound in the premise as of traversing the parent `TrieLink`. I.e. these variables
-    /// are bound as of performing `actions.`
+    /// are bound from the moment `self.actions`/`self.unify` starts executing.
     bound_premise: BTreeSet<VariableId>,
 
     actions: Vec<Atom>,
@@ -80,6 +81,24 @@ impl Trie {
     }
     fn size(&self) -> usize {
         1 + self.map.values().map(Trie::size).sum::<usize>()
+    }
+    #[allow(unused)]
+    pub(crate) fn dbg_compact(&self) -> String {
+        format!("{:#?}", DbgCompact(self))
+    }
+}
+
+#[allow(unused)]
+struct DbgCompact<'a>(&'a Trie);
+
+impl<'a> std::fmt::Debug for DbgCompact<'a> {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        let trie = self.0;
+        let mut x = f.debug_struct("Trie");
+        for (key, trie) in &trie.map {
+            x.field(&key.dbg_compact(), &mut DbgCompact(trie));
+        }
+        x.finish()
     }
 }
 
@@ -226,7 +245,7 @@ fn action_topo_resolve<'a>(
 }
 
 pub(crate) fn lowering(
-    trie: Trie,
+    trie: &Trie,
     variables: &mut TVec<VariableId, VariableMeta>,
     relations: &TVec<RelationId, hir::Relation>,
     table_uses: &mut TVec<RelationId, TSet<IndexId, BTreeSet<ColumnId>>>,
@@ -244,7 +263,7 @@ pub(crate) fn lowering(
     );
     let trie = trie
         .map
-        .into_iter()
+        .iter()
         .filter_map(|(link, inner_trie)| {
             lowering_rec(
                 &BTreeSet::new(),
@@ -424,7 +443,10 @@ fn lowering_rec(
                             lir::Premise::Relation {
                                 relation: atom.relation,
                                 args,
-                                kind: if all_columns_already_bound {
+                                kind:
+                                // TODO erik for loke: What is the actual motivation for making
+                                // sure we call this a semi-join?
+                                if all_columns_already_bound {
                                     lir::PremiseKind::SemiJoin { index }
                                 } else {
                                     lir::PremiseKind::Join {
@@ -604,6 +626,12 @@ impl TrieLink {
             Primary(atom) | Semi(atom) => atom,
         }
     }
+    fn dbg_compact(&self) -> String {
+        match self {
+            Primary(atom) => format!("Primary({})", atom.dbg_compact()),
+            Semi(atom) => format!("Semi({})", atom.dbg_compact()),
+        }
+    }
 }
 
 #[derive(Clone, Debug)]
@@ -743,7 +771,6 @@ impl Rule {
                     .flat_map(|x| x.equivalent_atoms(ctx.relations))
                 {
                     let this = &this;
-                    // TODO erik: relax incl requirement.
                     if !(supported.contains(this)
                         && this.relation == other.relation
                         && this.incl == other.incl)
@@ -806,21 +833,23 @@ impl Rule {
                         this_rule.semi = this_rule
                             .premise
                             .iter()
-                            .filter(|&x| {
-                                let relation = &ctx.relations[x.relation];
-                                let is_global =
-                                    matches!(relation.kind, hir::RelationTy::Global { .. });
-                                let got_introduced =
-                                    x.columns.iter().any(|v| introduced_vars.contains(v));
-                                let already_determined =
-                                    x.columns.iter().all(|v| bound_vars.contains(v))
-                                        || relation.implicit_rules.iter().any(|im| {
-                                            im.key_columns()
-                                                .iter()
-                                                .all(|c| bound_vars.contains(&x.columns[c]))
-                                        });
-                                !is_global && got_introduced && already_determined
-                            })
+                            .filter(|&x| x.columns.iter().any(|v| introduced_vars.contains(v)))
+                            // TODO erik for loke: removed because it breaks WCOJ, see triangle join expect test.
+                            // .filter(|&x| {
+                            //     let relation = &ctx.relations[x.relation];
+                            //     let is_global =
+                            //         matches!(relation.kind, hir::RelationTy::Global { .. });
+                            //     let got_introduced =
+                            //         x.columns.iter().any(|v| introduced_vars.contains(v));
+                            //     let already_determined =
+                            //         x.columns.iter().all(|v| bound_vars.contains(v))
+                            //             || relation.implicit_rules.iter().any(|im| {
+                            //                 im.key_columns()
+                            //                     .iter()
+                            //                     .all(|c| bound_vars.contains(&x.columns[c]))
+                            //             });
+                            //     !is_global && got_introduced && already_determined
+                            // })
                             .cloned()
                             .collect();
 
@@ -894,7 +923,6 @@ impl Rule {
     fn make_votes(&self, ctx: &Ctx<'_>) -> Vec<(Salt, TrieLink)> {
         (match self.semi.as_slice() {
             [] => {
-                // TODO: allbound should probably be a semi-join.
                 #[derive(Copy, Clone, Ord, PartialOrd, PartialEq, Eq, Debug)]
                 enum RelationScore {
                     NoQuery,
@@ -1027,6 +1055,12 @@ impl Rule {
                     })
                     .unwrap_or(vec![])
             }
+            [atom] => {
+                // if there is a single semi-join left, it's better to just iterate that then to do
+                // a check, since otherwise we have an unnecessary semi-join before a join.
+                // also, the apply code assumes this is being run.
+                vec![Primary(atom.clone())]
+            }
             _ => self.semi.iter().cloned().map(Semi).collect(),
         })
         .into_iter()
@@ -1044,6 +1078,21 @@ impl Rule {
                 .collect::<Vec<_>>(),
         })
         .collect()
+    }
+
+    #[allow(unused)]
+    fn dbg_compact(&self) -> String {
+        let primary: String = itertools::Itertools::intersperse(
+            self.premise.iter().map(|x| x.dbg_compact()),
+            format!(", "),
+        )
+        .collect();
+        let semi: String = itertools::Itertools::intersperse(
+            self.semi.iter().map(|x| x.dbg_compact()),
+            format!(", "),
+        )
+        .collect();
+        format!("Rule {{ primary: [{primary}], semi: [{semi}] }}")
     }
 }
 

@@ -68,8 +68,8 @@ impl Initial {
 
 #[derive(Debug)]
 pub(crate) struct TypeData {
-    pub name: &'static str,
-    pub kind: TypeKind,
+    pub(crate) name: &'static str,
+    pub(crate) kind: TypeKind,
 }
 impl TypeData {
     pub(crate) fn new_symbolic(name: &'static str) -> Self {
@@ -92,7 +92,7 @@ impl TypeData {
             },
         }
     }
-    pub fn is_zero_sized(&self) -> bool {
+    pub(crate) fn is_zero_sized(&self) -> bool {
         self.name == "unit"
     }
 }
@@ -108,9 +108,9 @@ pub(crate) enum TypeKind {
 #[derive(Debug)]
 pub(crate) struct RelationData {
     /// Generated name
-    pub name: &'static str,
-    pub columns: TVec<ColumnId, TypeId>,
-    pub kind: RelationKind,
+    pub(crate) name: &'static str,
+    pub(crate) columns: TVec<ColumnId, TypeId>,
+    pub(crate) kind: RelationKind,
 }
 impl RelationData {
     pub(crate) fn new_table(
@@ -200,7 +200,7 @@ impl IndexInfo {
 }
 
 #[derive(Clone, Eq, PartialEq, Ord, PartialOrd, Hash, Debug)]
-pub enum MergeTy {
+pub(crate) enum MergeTy {
     Union,
     Panic,
     // Lattice { .. },
@@ -247,8 +247,8 @@ impl Default for Literal {
 
 #[derive(Debug)]
 pub(crate) struct VariableData {
-    pub name: &'static str,
-    pub type_: TypeId,
+    pub(crate) name: &'static str,
+    pub(crate) type_: TypeId,
 }
 impl VariableData {
     pub(crate) fn new(name: &'static str, ty: TypeId) -> Self {
@@ -303,7 +303,9 @@ pub(crate) enum PremiseKind {
     /// Proceed only if at least one row matching the `args` pattern exists in `relation`.
     /// AKA semi-join.
     /// if relation.check(a, b) { .. }
-    SemiJoin { index: IndexId },
+    SemiJoin {
+        index: IndexId, // TODO: PERF: semi-joins should have inclusion
+    },
 }
 
 #[derive(Debug)]

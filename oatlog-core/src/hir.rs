@@ -224,7 +224,10 @@ impl InvariantPermutationSubgroup {
             }
         }
     }
-    pub fn apply<T: Copy>(&self, x: &TVec<ColumnId, T>) -> impl Iterator<Item = TVec<ColumnId, T>> {
+    pub(crate) fn apply<T: Copy>(
+        &self,
+        x: &TVec<ColumnId, T>,
+    ) -> impl Iterator<Item = TVec<ColumnId, T>> {
         // NOTE: `self` stores all permutations and their inverses, so whether we permute or
         // inverse permute here does not matter.
         let main = self
@@ -528,6 +531,19 @@ impl Atom {
             vec![]
         }
     }
+
+    #[allow(unused)]
+    pub(crate) fn dbg_compact(&self) -> String {
+        format!(
+            "{}({})",
+            self.relation,
+            itertools::Itertools::intersperse(
+                self.columns.iter().copied().map(|x| format!("{x}")),
+                format!(", ")
+            )
+            .collect::<String>()
+        )
+    }
 }
 
 #[must_use]
@@ -631,6 +647,10 @@ impl SymbolicRule {
         self
     }
 
+    // TODO erik for loke: are the following properties of `dominates` always true?
+    // - dominates(x, y) and dominates(y, z) => dominates(x, z)
+    // - dominates(x, x) = true
+    //
     /// `self` dominates `other` if `other` is unnecessary when executing `self`,
     /// or concretely if
     /// - `self.premises` matches everything matched by `other.premises`
@@ -734,6 +754,7 @@ impl SymbolicRule {
                 })
         }
 
+        // used to compute "dominates"
         fn backtracking_solve(
             atoms_dom: Vec<&Atom>,
             atoms_sub: Vec<&Atom>,
@@ -839,6 +860,10 @@ impl SymbolicRule {
             )
         );
 
+        // TODO erik for loke: I think this might not generate the minimum set in some edge cases,
+        // what if the very last element in `rules` dominates all previous rules? In that case,
+        // nothing will be removed from ret?
+        //
         // Let `ret` be a minimal dominating subset of `rules`. Concretely, this unifies
         //
         // `MulOld(AddNew(a,b),AddAll(a,c))` and

@@ -39,6 +39,7 @@ macro_rules! benchmarks {
                     let theory = $name::Theory::new();
                     black_box(theory);
                 });
+                /*
                 bench_custom(&mut group, "egglog", || {
                     let mut egglog = egglog::EGraph::default();
                     egglog
@@ -47,6 +48,7 @@ macro_rules! benchmarks {
                         .for_each(|_| ());
                     black_box(egglog);
                 });
+                */
                 group.finish();
             })*
         }

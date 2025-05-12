@@ -13,7 +13,7 @@ mod query;
 mod table_relation;
 
 macro_rules! impl_unzip_iter {
-    () => { pub trait MultiUnzipVec<FromI>: Iterator { fn collect_vecs(self) -> FromI; } };
+    () => { pub(crate) trait MultiUnzipVec<FromI>: Iterator { fn collect_vecs(self) -> FromI; } };
     ($T:ident $(, $TS:ident)*) => (
         impl_unzip_iter!($($TS),*);
         impl<IT: Iterator<Item = ($T, $($TS,)*)>, $T, $($TS),* > MultiUnzipVec<(Vec<$T>, $(Vec<$TS>,)*)> for IT {
@@ -27,7 +27,7 @@ impl_unzip_iter!(A, B, C, D, E, F, G, H, I, J, K, L);
 
 // TODO: emit identifiers with correct spans.
 
-pub fn codegen(theory: &Theory) -> TokenStream {
+pub(crate) fn codegen(theory: &Theory) -> TokenStream {
     let (uf_ident, uf_ty, uf_ty_names) = theory
         .types
         .iter()
@@ -512,18 +512,18 @@ mod ident {
     use quote::{format_ident, quote};
     use std::collections::BTreeSet;
 
-    pub enum Q {
+    pub(crate) enum Q {
         Entry,
         IterAll,
         IterOld,
     }
 
     /// `a`
-    pub fn var_var(var: &VariableData) -> Ident {
+    pub(crate) fn var_var(var: &VariableData) -> Ident {
         format_ident!("{}", var.name.to_snake_case())
     }
     /// `Math`, `std::primitive::i64`
-    pub fn type_ty(ty: &TypeData) -> TokenStream {
+    pub(crate) fn type_ty(ty: &TypeData) -> TokenStream {
         match ty.kind {
             TypeKind::Symbolic => {
                 let x = format_ident!("{}", ty.name.to_pascal_case());
@@ -533,34 +533,34 @@ mod ident {
         }
     }
     /// `math`
-    pub fn type_name(ty: &TypeData) -> Ident {
+    pub(crate) fn type_name(ty: &TypeData) -> Ident {
         format_ident!("{}", ty.name.to_snake_case())
     }
-    pub fn type_global(ty: &TypeData) -> Ident {
+    pub(crate) fn type_global(ty: &TypeData) -> Ident {
         format_ident!("global_{}", ty.name.to_snake_case())
     }
     /// `math_`
-    pub fn type_uf(ty: &TypeData) -> Ident {
+    pub(crate) fn type_uf(ty: &TypeData) -> Ident {
         format_ident!("{}_", ty.name.to_snake_case())
     }
     /// `math_num_uprooted_at_latest_retain`
-    pub fn type_num_uprooted_at_latest_retain(ty: &TypeData) -> Ident {
+    pub(crate) fn type_num_uprooted_at_latest_retain(ty: &TypeData) -> Ident {
         format_ident!("{}_num_uprooted_at_latest_retain", ty.name.to_snake_case())
     }
     /// `MathRelation`, `AddRelation`
-    pub fn rel_ty(rel: &RelationData) -> Ident {
+    pub(crate) fn rel_ty(rel: &RelationData) -> Ident {
         format_ident!("{}Relation", rel.name.to_pascal_case())
     }
     /// `add_`
-    pub fn rel_var(rel: &RelationData) -> Ident {
+    pub(crate) fn rel_var(rel: &RelationData) -> Ident {
         format_ident!("{}_", rel.name.to_snake_case())
     }
     /// `add`, `mul`
-    pub fn rel_get(rel: &RelationData) -> Ident {
+    pub(crate) fn rel_get(rel: &RelationData) -> Ident {
         format_ident!("{}", rel.name.to_snake_case())
     }
     /// `SemilatticeTheory`
-    pub fn theory_ty(theory: &Theory) -> Ident {
+    pub(crate) fn theory_ty(theory: &Theory) -> Ident {
         if let Some(name) = theory.name {
             format_ident!("{}Theory", name.to_pascal_case())
         } else {
@@ -568,7 +568,7 @@ mod ident {
         }
     }
     /// `SemilatticeDelta`
-    pub fn theory_delta_ty(theory: &Theory) -> Ident {
+    pub(crate) fn theory_delta_ty(theory: &Theory) -> Ident {
         if let Some(name) = theory.name {
             format_ident!("{}Delta", name.to_pascal_case())
         } else {
@@ -576,7 +576,7 @@ mod ident {
         }
     }
     /// `fd_index_0_1`/`nofd_index_0_1`
-    pub fn index_field(index: &IndexInfo) -> Ident {
+    pub(crate) fn index_field(index: &IndexInfo) -> Ident {
         let fmt = |key_columns: &BTreeSet<ColumnId>| {
             key_columns
                 .iter()
@@ -596,7 +596,7 @@ mod ident {
         }
     }
     /// `check2_2_0_1`
-    pub fn index_check(key_columns: &BTreeSet<ColumnId>) -> Ident {
+    pub(crate) fn index_check(key_columns: &BTreeSet<ColumnId>) -> Ident {
         format_ident!(
             "check_{}",
             key_columns
@@ -606,7 +606,7 @@ mod ident {
         )
     }
     /// `iter2_2_0_1`/`iter_old2_2_0_1`/`entry2_2_0_1`
-    pub fn index(i: Q, index: &IndexInfo) -> Ident {
+    pub(crate) fn index(i: Q, index: &IndexInfo) -> Ident {
         let prefix = match i {
             Q::Entry => "entry",
             Q::IterAll => "iter_all",
@@ -639,20 +639,20 @@ mod ident {
         )
     }
     /// `x2`
-    pub fn column(c: ColumnId) -> Ident {
+    pub(crate) fn column(c: ColumnId) -> Ident {
         format_ident!("x{}", c.0)
     }
     /// `y2`
-    pub fn column_alt(c: ColumnId) -> Ident {
+    pub(crate) fn column_alt(c: ColumnId) -> Ident {
         format_ident!("y{}", c.0)
     }
     /// `add_`
-    pub fn delta_row(rel: &RelationData) -> Ident {
+    pub(crate) fn delta_row(rel: &RelationData) -> Ident {
         let x = rel.name.to_snake_case();
         format_ident!("{x}_")
     }
     /// `insert_add`
-    pub fn delta_insert_row(rel: &RelationData) -> Ident {
+    pub(crate) fn delta_insert_row(rel: &RelationData) -> Ident {
         let x = rel.name.to_snake_case();
         format_ident!("insert_{x}")
     }

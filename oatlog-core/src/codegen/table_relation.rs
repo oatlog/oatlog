@@ -11,7 +11,7 @@ use proc_macro2::TokenStream;
 use quote::{format_ident, quote};
 use std::collections::BTreeSet;
 
-pub fn codegen_table_relation(
+pub(crate) fn codegen_table_relation(
     rel: &RelationData,
     theory: &Theory,
     index_to_info: &TVec<IndexId, IndexInfo>,

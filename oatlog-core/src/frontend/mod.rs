@@ -331,7 +331,7 @@ impl<V: Clone> MapExt<&'static str, Spanned<V>> for BTreeMap<&'static str, Spann
 
 /// Global parsing state
 #[derive(Debug)]
-pub struct Parser {
+pub(crate) struct Parser {
     /// Not yet implemented, sets of rules executed together.
     rulesets: BTreeMap<Str, ()>,
 

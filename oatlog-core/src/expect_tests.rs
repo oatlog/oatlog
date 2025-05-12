@@ -4,6 +4,7 @@ struct Steps {
     strict_egglog_compat: bool,
     code: &'static str,
     expected_hir: Option<expect_test::Expect>,
+    expected_tir: Option<expect_test::Expect>,
     expected_lir: Option<expect_test::Expect>,
     expected_codegen: Option<expect_test::Expect>,
 }
@@ -26,7 +27,10 @@ impl Steps {
             exp.assert_eq(&hir.dbg_summary());
         }
 
-        let (_, lir) = crate::query_planning::emit_lir_theory(hir.transform_into_seminaive());
+        let (_, tir, lir) = crate::query_planning::emit_lir_theory(hir.transform_into_seminaive());
+        if let Some(exp) = self.expected_tir {
+            exp.assert_eq(&tir.dbg_compact());
+        }
         if let Some(exp) = self.expected_lir {
             exp.assert_eq(&lir.dbg_summary());
         }
@@ -186,6 +190,7 @@ fn redundant_premise_simplify() {
                     r2: g0 { columns: [i64], kind: Global(g0), implicit_rules: {n0: [!]} },
                 },
             }"#]]),
+        expected_tir: None,
         expected_lir: None,
         expected_codegen: None,
     }
@@ -277,6 +282,7 @@ fn redundant_action_simplify() {
                     r3: g1 { columns: [i64], kind: Global(g1), implicit_rules: {n0: [!]} },
                 },
             }"#]]),
+        expected_tir: None,
         expected_lir: None,
         expected_codegen: None,
     }
@@ -311,6 +317,7 @@ fn weird_premise_equality() {
                     r0: g0 { columns: [i64], kind: Global(g0), implicit_rules: {n0: [!]} },
                 },
             }"#]]),
+        expected_tir: None,
         expected_lir: None,
         expected_codegen: None,
     }
@@ -351,6 +358,7 @@ fn hir_commutative() {
                     r0: Add { columns: [Math, Math, Math], kind: Table, implicit_rules: {n0: [_, _, U]} },
                 },
             }"#]]),
+        expected_tir: None,
         expected_lir: None,
         expected_codegen: None,
     }
@@ -400,6 +408,7 @@ fn hir_distributive() {
                     r1: Mul { columns: [Math, Math, Math], kind: Table, implicit_rules: {n0: [_, _, U]} },
                 },
             }"#]]),
+        expected_tir: None,
         expected_lir: None,
         expected_codegen: None,
     }
@@ -443,6 +452,7 @@ fn hir_userspace_implicit_functionality() {
                     r0: Add { columns: [Math, Math, Math], kind: Table, implicit_rules: {} },
                 },
             }"#]]),
+        expected_tir: None,
         expected_lir: None,
         expected_codegen: None,
     }
@@ -502,6 +512,7 @@ fn hir_global() {
                     r5: g2 { columns: [String], kind: Global(g2), implicit_rules: {n0: [!]} },
                 },
             }"#]]),
+        expected_tir: None,
         expected_lir: Some(expect![[r#"
             Theory {
                 name: None,
@@ -658,6 +669,7 @@ fn regression_tir2() {
                     r8: g5 { columns: [Math], kind: Global(g5), implicit_rules: {n0: [!]} },
                 },
             }"#]]),
+        expected_tir: None,
         expected_lir: Some(expect![[r#"
             Theory {
                 name: None,
@@ -1728,6 +1740,7 @@ fn regression_tir1() {
                     r2: g0 { columns: [i64], kind: Global(g0), implicit_rules: {n0: [!]} },
                 },
             }"#]]),
+        expected_tir: None,
         expected_lir: Some(expect![[r#"
             Theory {
                 name: None,
@@ -2407,6 +2420,7 @@ fn regression_elim_problematic() {
                     r2: zero { columns: [Math], kind: Global(g0), implicit_rules: {n0: [!]} },
                 },
             }"#]]),
+        expected_tir: None,
         expected_lir: None,
         expected_codegen: None,
     }
@@ -2421,6 +2435,7 @@ fn codegen_template() {
         code: r"
         ",
         expected_hir: Some(expect![[r""]]),
+        expected_tir: None,
         expected_lir: Some(expect![[r""]]),
         expected_codegen: Some(expect![[r""]]),
     }
@@ -2494,6 +2509,7 @@ fn codegen_constant_propagation() {
                     r4: Const { columns: [i64, Math], kind: Table, implicit_rules: {n0: [_, U]} },
                 },
             }"#]]),
+        expected_tir: None,
         expected_lir: Some(expect![[r#"
             Theory {
                 name: None,
@@ -3647,6 +3663,7 @@ fn codegen_commutative() {
             (rule ((= e (Add a b) )) ((union e (Add b a))))
         ",
         expected_hir: None,
+        expected_tir: None,
         expected_lir: None,
         expected_codegen: Some(expect![[r#"
             use oatlog::runtime::{self, *};
@@ -4040,6 +4057,7 @@ fn regression_entry2() {
                     r2: g0 { columns: [i64], kind: Global(g0), implicit_rules: {n0: [!]} },
                 },
             }"#]]),
+        expected_tir: None,
         expected_lir: Some(expect![[r#"
             Theory {
                 name: None,
@@ -4700,6 +4718,7 @@ fn regression_entry() {
                     r1: Add { columns: [Math, Math, Math], kind: Table, implicit_rules: {n0: [_, _, U]} },
                 },
             }"#]]),
+        expected_tir: None,
         expected_lir: Some(expect![[r#"
             Theory {
                 name: None,
@@ -5356,6 +5375,7 @@ fn test_bind_variable_multiple_times() {
                     r0: Same { columns: [Foo, Foo, Foo], kind: Table, implicit_rules: {n0: [_, _, U]} },
                 },
             }"#]]),
+        expected_tir: None,
         expected_lir: Some(expect![[r#"
             Theory {
                 name: None,
@@ -5783,6 +5803,7 @@ fn test_negative_i64_tokens() {
                     r3: g2 { columns: [i64], kind: Global(g2), implicit_rules: {n0: [!]} },
                 },
             }"#]]),
+        expected_tir: None,
         expected_lir: None,
         expected_codegen: None,
     }
@@ -5825,6 +5846,7 @@ fn codegen_variable_reuse_bug() {
                     r2: zero { columns: [Math], kind: Global(g0), implicit_rules: {n0: [!]} },
                 },
             }"#]]),
+        expected_tir: None,
         expected_lir: Some(expect![[r#"
             Theory {
                 name: None,
@@ -6526,6 +6548,7 @@ fn initial_exprs() {
                     r13: g9 { columns: [Math], kind: Global(g9), implicit_rules: {n0: [!]} },
                 },
             }"#]]),
+        expected_tir: None,
         expected_lir: None,
         expected_codegen: Some(expect![[r#"
             use oatlog::runtime::{self, *};
@@ -7587,6 +7610,7 @@ fn codegen_panic_merge() {
             f(i64)
 
         "#]]),
+        expected_tir: None,
         expected_lir: None,
         expected_codegen: Some(expect![[r#"
             use oatlog::runtime::{self, *};
@@ -7785,6 +7809,7 @@ fn codegen_bug1() {
                 symbolic_rules: [],
                 relations: {},
             }"#]]),
+        expected_tir: None,
         expected_lir: None,
         expected_codegen: Some(expect![[r#"
             use oatlog::runtime::{self, *};
@@ -7913,6 +7938,7 @@ fn initial() {
                 symbolic_rules: [],
                 relations: {},
             }"#]]),
+        expected_tir: None,
         expected_lir: None,
         expected_codegen: Some(expect![[r#"
             use oatlog::runtime::{self, *};
@@ -8138,6 +8164,7 @@ fn test_primitives_simple() {
                     r11: g7 { columns: [i64], kind: Global(g7), implicit_rules: {n0: [!]} },
                 },
             }"#]]),
+        expected_tir: None,
         expected_lir: None,
         expected_codegen : Some(expect![[r#"
             use oatlog::runtime::{self, *};
@@ -9299,7 +9326,109 @@ fn triangle_join() {
                     r3: Triangle { columns: [Math, Math, Math], kind: Table, implicit_rules: {} },
                 },
             }"#]]),
-        expected_lir: None,
+        expected_tir: Some(expect![[r#"
+            Trie {
+                Primary(r0(v0, v1)): Trie {
+                    Primary(r1(v1, v2)): Trie {
+                        Primary(r2(v2, v0)): Trie,
+                    },
+                },
+                Primary(r1(v4, v5)): Trie {
+                    Primary(r0(v3, v4)): Trie {
+                        Primary(r2(v5, v3)): Trie,
+                    },
+                },
+                Primary(r2(v8, v6)): Trie {
+                    Primary(r0(v6, v7)): Trie {
+                        Primary(r1(v7, v8)): Trie,
+                    },
+                },
+            }"#]]),
+        expected_lir: Some(expect![[r#"
+            Theory {
+                name: None,
+                types: {
+                    [t0, Math]: [symbolic],
+                },
+                relations: {
+                    r0: RelationData {
+                        name: "Foo",
+                        param_types: {c0: t0, c1: t0},
+                        kind: Table {
+                            index_to_info: {ir0: 0=>1, ir1: 0_1=>, ir2: 1=>0},
+                        },
+                    },
+                    r1: RelationData {
+                        name: "Bar",
+                        param_types: {c0: t0, c1: t0},
+                        kind: Table {
+                            index_to_info: {ir0: 0=>1, ir1: 0_1=>},
+                        },
+                    },
+                    r2: RelationData {
+                        name: "Baz",
+                        param_types: {c0: t0, c1: t0},
+                        kind: Table {
+                            index_to_info: {ir0: 0_1=>},
+                        },
+                    },
+                    r3: RelationData {
+                        name: "Triangle",
+                        param_types: {c0: t0, c1: t0, c2: t0},
+                        kind: Table {
+                            index_to_info: {ir0: 0_1_2=>},
+                        },
+                    },
+                },
+                rule_variables: {
+                    [v0, a]: t0,
+                    [v1, b]: t0,
+                    [v2, c]: t0,
+                    [v3, a_2]: t0,
+                    [v4, b_2]: t0,
+                    [v5, c_2]: t0,
+                    [v6, a_3]: t0,
+                    [v7, b_3]: t0,
+                    [v8, c_3]: t0,
+                },
+                global_variable_types: {},
+                rule_tries: [
+                    premise: [IterNew, r0(v0, v1)]
+                    then: [
+                        premise: [JoinAll, r1(v1, v2), ir0]
+                        then: [
+                            premise: [SemiJoin, r2(v2, v0), ir0]
+                            meta: "( rule ( ( Foo a b ) ( Bar b c ) ( Baz c a ) ) ( ( Triangle a b c ) ) )"
+                            actions: [
+                                [Action::Insert, r3(v0, v1, v2)],
+                            ],
+                        ],
+                    ],
+                    premise: [IterNew, r1(v4, v5)]
+                    then: [
+                        premise: [JoinOld, r0(v3, v4), ir2]
+                        then: [
+                            premise: [SemiJoin, r2(v5, v3), ir0]
+                            meta: "( rule ( ( Foo a b ) ( Bar b c ) ( Baz c a ) ) ( ( Triangle a b c ) ) )"
+                            actions: [
+                                [Action::Insert, r3(v3, v4, v5)],
+                            ],
+                        ],
+                    ],
+                    premise: [IterNew, r2(v8, v6)]
+                    then: [
+                        premise: [JoinOld, r0(v6, v7), ir0]
+                        then: [
+                            premise: [SemiJoin, r1(v7, v8), ir1]
+                            meta: "( rule ( ( Foo a b ) ( Bar b c ) ( Baz c a ) ) ( ( Triangle a b c ) ) )"
+                            actions: [
+                                [Action::Insert, r3(v6, v7, v8)],
+                            ],
+                        ],
+                    ],
+                ],
+                initial: [],
+            }"#]]),
         expected_codegen: Some(expect![[r#"
             use oatlog::runtime::{self, *};
             eclass_wrapper_ty!(Math);
@@ -10337,6 +10466,18 @@ fn triangle_join() {
     .check();
 }
 
+// NOTE: this is a actually a triangle join.
+//
+// (Add t0 t1 _)
+// (Mul a _ t0)
+// (Mul a _ t1)
+//
+// which is essentially the same as:
+//
+// (Foo a b)
+// (Bar b c)
+// (Baz c a)
+//
 #[test]
 fn edgecase0() {
     // needed a "PremiseAny"
@@ -10349,7 +10490,7 @@ fn edgecase0() {
             )
             (rewrite (Add (Mul a b) (Mul a c)) (Mul a (Add b c)))
         ",
-        expected_hir :Some( expect![[r#"
+        expected_hir: Some(expect![[r#"
             Theory {
                 types: {
                     [t0, Math]: [symbolic],
@@ -10381,7 +10522,105 @@ fn edgecase0() {
                     r1: Add { columns: [Math, Math, Math], kind: Table, implicit_rules: {n0: [_, _, U]} },
                 },
             }"#]]),
-        expected_lir: None,
+        expected_tir: Some(expect![[r#"
+            Trie {
+                Primary(r0(v0, v1, v2)): Trie {
+                    Primary(r0(v0, v3, v4)): Trie {
+                        Primary(r1(v2, v4, v5)): Trie,
+                    },
+                    Primary(r0(v0, v8, v9)): Trie {
+                        Primary(r1(v9, v2, v12)): Trie,
+                    },
+                },
+                Primary(r1(v16, v18, v19)): Trie {
+                    Primary(r0(v14, v15, v16)): Trie {
+                        Primary(r0(v14, v17, v18)): Trie,
+                    },
+                },
+            }"#]]),
+        expected_lir: Some(expect![[r#"
+            Theory {
+                name: None,
+                types: {
+                    [t0, Math]: [symbolic],
+                },
+                relations: {
+                    r0: RelationData {
+                        name: "Mul",
+                        param_types: {c0: t0, c1: t0, c2: t0},
+                        kind: Table {
+                            index_to_info: {ir0: 0_1=>2:union, ir1: 0=>1_2, ir2: 0_2=>1, ir3: 2=>0_1},
+                        },
+                    },
+                    r1: RelationData {
+                        name: "Add",
+                        param_types: {c0: t0, c1: t0, c2: t0},
+                        kind: Table {
+                            index_to_info: {ir0: 0_1=>2:union},
+                        },
+                    },
+                },
+                rule_variables: {
+                    [v0, a]: t0,
+                    [v1, b]: t0,
+                    [v10, c_2]: t0,
+                    [v11, v11]: t0,
+                    [v12, v12]: t0,
+                    [v13, v13]: t0,
+                    [v14, a_3]: t0,
+                    [v15, b_3]: t0,
+                    [v16, v16]: t0,
+                    [v17, c_3]: t0,
+                    [v18, v18]: t0,
+                    [v19, v19]: t0,
+                    [v2, v2]: t0,
+                    [v20, v20]: t0,
+                    [v3, c]: t0,
+                    [v4, v4]: t0,
+                    [v5, v5]: t0,
+                    [v6, v6]: t0,
+                    [v7, a_2]: t0,
+                    [v8, b_2]: t0,
+                    [v9, v9]: t0,
+                },
+                global_variable_types: {},
+                rule_tries: [
+                    premise: [IterNew, r0(v0, v1, v2)]
+                    then: [
+                        premise: [JoinAll, r0(v0, v3, v4), ir1]
+                        then: [
+                            premise: [JoinAll, r1(v2, v4, v5), ir0]
+                            meta: "( rewrite ( Add ( Mul a b ) ( Mul a c ) ) ( Mul a ( Add b c ) ) )"
+                            actions: [
+                                [Action::Entry, r1(v1, v3, v6) on ir0],
+                                [Action::Insert, r0(v0, v6, v5)],
+                            ],
+                        ],
+                        premise: [JoinOld, r0(v0, v8, v9), ir1]
+                        then: [
+                            premise: [JoinAll, r1(v9, v2, v12), ir0]
+                            meta: "( rewrite ( Add ( Mul a b ) ( Mul a c ) ) ( Mul a ( Add b c ) ) )"
+                            actions: [
+                                [Action::Entry, r1(v8, v1, v13) on ir0],
+                                [Action::Insert, r0(v0, v13, v12)],
+                            ],
+                        ],
+                    ],
+                    premise: [IterNew, r1(v16, v18, v19)]
+                    then: [
+                        premise: [JoinOld, r0(v14, v15, v16), ir3]
+                        then: [
+                            premise: [JoinOld, r0(v14, v17, v18), ir2]
+                            meta: "( rewrite ( Add ( Mul a b ) ( Mul a c ) ) ( Mul a ( Add b c ) ) )"
+                            actions: [
+                                [Action::Entry, r1(v15, v17, v20) on ir0],
+                                [Action::Insert, r0(v14, v20, v19)],
+                            ],
+                        ],
+                    ],
+                ],
+                initial: [],
+            }"#]]),
         expected_codegen : Some(expect![[r#"
             use oatlog::runtime::{self, *};
             eclass_wrapper_ty!(Math);
@@ -11119,6 +11358,7 @@ fn test_into_codegen() {
                     r1: Add { columns: [Math, Math, Math], kind: Table, implicit_rules: {n0: [_, _, U]} },
                 },
             }"#]]),
+        expected_tir: None,
         expected_lir: None,
         expected_codegen: Some(expect![[r#"
             use oatlog::runtime::{self, *};
@@ -11802,6 +12042,7 @@ fn simple_forall() {
             Insert: Le(x, x)
 
         "#]]),
+        expected_tir: None,
         expected_lir: Some(expect![[r#"
             Theory {
                 name: "",
@@ -12648,6 +12889,7 @@ fn lir_math() {
                     r62: g47 { columns: [Math], kind: Global(g47), implicit_rules: {n0: [!]} },
                 },
             }"#]]),
+        expected_tir: None,
         expected_lir: Some(expect![[r#"
             Theory {
                 name: None,
@@ -13506,17 +13748,6 @@ fn lir_math() {
                                 [Action::Insert, r5(v315, v318, v3)],
                             ],
                         ],
-                        premise: [JoinAll, r17(v210), ir_bogus]
-                        then: [
-                            premise: [SemiJoin, r13(v210, v2), ir0]
-                            then: [
-                                premise: [JoinOld, r0(v208, v0), ir1]
-                                meta: "( rewrite ( Integral ( Fuel fuel ) ( Const 1 ) x ) x )"
-                                actions: [
-                                    [Action::Equate, v1=v3],
-                                ],
-                            ],
-                        ],
                         premise: [SemiJoin, r11(v1, v2), ir0]
                         meta: "( rewrite ( Integral fuel ( Sin x ) x ) ( Mul ( Const -1 ) ( Cos x ) ) )"
                         actions: [
@@ -13532,6 +13763,17 @@ fn lir_math() {
                             meta: "( rewrite ( Integral ( Fuel fuel ) ( Cos x ) x ) ( Sin x ) )"
                             actions: [
                                 [Action::Insert, r11(v1, v3)],
+                            ],
+                        ],
+                        premise: [JoinAll, r17(v210), ir_bogus]
+                        then: [
+                            premise: [SemiJoin, r13(v210, v2), ir0]
+                            then: [
+                                premise: [JoinOld, r0(v208, v0), ir1]
+                                meta: "( rewrite ( Integral ( Fuel fuel ) ( Const 1 ) x ) x )"
+                                actions: [
+                                    [Action::Equate, v1=v3],
+                                ],
                             ],
                         ],
                     ],
@@ -13755,6 +13997,11 @@ fn lir_math() {
                     ],
                     premise: [IterNew, r11(v8, v9)]
                     then: [
+                        premise: [JoinOld, r2(v8, v9, v201), ir0]
+                        meta: "( rewrite ( Diff x ( Sin x ) ) ( Cos x ) )"
+                        actions: [
+                            [Action::Insert, r12(v8, v201)],
+                        ],
                         premise: [JoinOld, r3(v7, v9, v8, v10), ir4]
                         meta: "( rewrite ( Integral fuel ( Sin x ) x ) ( Mul ( Const -1 ) ( Cos x ) ) )"
                         actions: [
@@ -13764,22 +14011,9 @@ fn lir_math() {
                             [Action::Insert, r6(v12, v13, v10)],
                             [Action::Insert, r6(v13, v12, v10)],
                         ],
-                        premise: [JoinOld, r2(v8, v9, v201), ir0]
-                        meta: "( rewrite ( Diff x ( Sin x ) ) ( Cos x ) )"
-                        actions: [
-                            [Action::Insert, r12(v8, v201)],
-                        ],
                     ],
                     premise: [IterNew, r12(v26, v27)]
                     then: [
-                        premise: [JoinOld, r3(v237, v27, v26, v240), ir4]
-                        then: [
-                            premise: [JoinOld, r0(v236, v237), ir1]
-                            meta: "( rewrite ( Integral ( Fuel fuel ) ( Cos x ) x ) ( Sin x ) )"
-                            actions: [
-                                [Action::Insert, r11(v26, v240)],
-                            ],
-                        ],
                         premise: [JoinOld, r2(v26, v27, v28), ir0]
                         meta: "( rewrite ( Diff x ( Cos x ) ) ( Mul ( Const -1 ) ( Sin x ) ) )"
                         actions: [
@@ -13788,6 +14022,14 @@ fn lir_math() {
                             [Action::Entry, r11(v26, v31) on ir0],
                             [Action::Insert, r6(v30, v31, v28)],
                             [Action::Insert, r6(v31, v30, v28)],
+                        ],
+                        premise: [JoinOld, r3(v237, v27, v26, v240), ir4]
+                        then: [
+                            premise: [JoinOld, r0(v236, v237), ir1]
+                            meta: "( rewrite ( Integral ( Fuel fuel ) ( Cos x ) x ) ( Sin x ) )"
+                            actions: [
+                                [Action::Insert, r11(v26, v240)],
+                            ],
                         ],
                     ],
                     premise: [IterNew, r13(v67, v68)]
@@ -18139,14 +18381,6 @@ fn lir_math() {
                                 self.delta.insert_sub((v315, v318, v3));
                             }
                         }
-                        if let v210 = self.global_i64.get(2usize) {
-                            if self.const_.check_0_1(v210, v2) {
-                                for (fuel_4,) in self.fuel_.iter_old_1_to_0(fuel, self.latest_timestamp) {
-                                    #[doc = "( rewrite ( Integral ( Fuel fuel ) ( Const 1 ) x ) x )"]
-                                    self.uf.math_.union(x, v3);
-                                }
-                            }
-                        }
                         if self.sin_.check_0_1(x, v2) {
                             #[doc = "( rewrite ( Integral fuel ( Sin x ) x ) ( Mul ( Const -1 ) ( Cos x ) ) )"]
                             let v4 = self.global_i64.get(0usize);
@@ -18159,6 +18393,14 @@ fn lir_math() {
                             for (fuel_8,) in self.fuel_.iter_old_1_to_0(fuel, self.latest_timestamp) {
                                 #[doc = "( rewrite ( Integral ( Fuel fuel ) ( Cos x ) x ) ( Sin x ) )"]
                                 self.delta.insert_sin((x, v3));
+                            }
+                        }
+                        if let v210 = self.global_i64.get(2usize) {
+                            if self.const_.check_0_1(v210, v2) {
+                                for (fuel_4,) in self.fuel_.iter_old_1_to_0(fuel, self.latest_timestamp) {
+                                    #[doc = "( rewrite ( Integral ( Fuel fuel ) ( Const 1 ) x ) x )"]
+                                    self.uf.math_.union(x, v3);
+                                }
                             }
                         }
                     }
@@ -18434,6 +18676,10 @@ fn lir_math() {
                         }
                     }
                     for (x_2, v9) in self.sin_.iter_new() {
+                        for (v201,) in self.diff_.iter_old_0_1_to_2(x_2, v9, self.latest_timestamp) {
+                            #[doc = "( rewrite ( Diff x ( Sin x ) ) ( Cos x ) )"]
+                            self.delta.insert_cos((x_2, v201));
+                        }
                         for (fuel_2, v10) in self
                             .integral_
                             .iter_old_1_2_to_0_3(v9, x_2, self.latest_timestamp)
@@ -18445,21 +18691,8 @@ fn lir_math() {
                             self.delta.insert_mul((v12, v13, v10));
                             self.delta.insert_mul((v13, v12, v10));
                         }
-                        for (v201,) in self.diff_.iter_old_0_1_to_2(x_2, v9, self.latest_timestamp) {
-                            #[doc = "( rewrite ( Diff x ( Sin x ) ) ( Cos x ) )"]
-                            self.delta.insert_cos((x_2, v201));
-                        }
                     }
                     for (x_4, v27) in self.cos_.iter_new() {
-                        for (v237, v240) in self
-                            .integral_
-                            .iter_old_1_2_to_0_3(v27, x_4, self.latest_timestamp)
-                        {
-                            for (fuel_9,) in self.fuel_.iter_old_1_to_0(v237, self.latest_timestamp) {
-                                #[doc = "( rewrite ( Integral ( Fuel fuel ) ( Cos x ) x ) ( Sin x ) )"]
-                                self.delta.insert_sin((x_4, v240));
-                            }
-                        }
                         for (v28,) in self
                             .diff_
                             .iter_old_0_1_to_2(x_4, v27, self.latest_timestamp)
@@ -18470,6 +18703,15 @@ fn lir_math() {
                             let (v31,) = self.sin_.entry_0_to_1(x_4, &mut self.delta, &mut self.uf);
                             self.delta.insert_mul((v30, v31, v28));
                             self.delta.insert_mul((v31, v30, v28));
+                        }
+                        for (v237, v240) in self
+                            .integral_
+                            .iter_old_1_2_to_0_3(v27, x_4, self.latest_timestamp)
+                        {
+                            for (fuel_9,) in self.fuel_.iter_old_1_to_0(v237, self.latest_timestamp) {
+                                #[doc = "( rewrite ( Integral ( Fuel fuel ) ( Cos x ) x ) ( Sin x ) )"]
+                                self.delta.insert_sin((x_4, v240));
+                            }
                         }
                     }
                     for (v67, v68) in self.const_.iter_new() {
