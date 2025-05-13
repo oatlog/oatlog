@@ -1,4 +1,5 @@
 #import "mastery-chs/lib.typ": template, appendices, flex-caption
+#import "@preview/fletcher:0.5.7" as fletcher: diagram, node, edge
 
 #let TODO(msg) = {
   [#text(fill: red, weight: "bold", size: 12pt)[TODO: #msg]]
@@ -18,25 +19,30 @@
 
 #let department = "Department of Computer Science and Engineering"
 #show: template.with(
-  // title: [Oatlog: Ahead-of-time compiled #box[e-graphs] with primitives],
-  title: [Oatlog: A performant ahead-of-time compiled #box[e-graph] engine],
-  subtitle: [Implementing a high-performance relational #box[e-graph] engine],
+  title: [Oatlog: A high-performance #box[e-graph] engine],
+  subtitle: [],
+  //title: [Oatlog: A performant ahead-of-time compiled #box[e-graph] engine],
+  //subtitle: [Implementing a high-performance relational #box[e-graph] engine],
   authors: ("Loke Gustafsson", "Erik Magnusson"),
   department: department,
   supervisor: ("Hazem Torfah", department),
   advisor: ("Alejandro Luque Cerpa", department),
   examiner: ("Matti Karppa", department),
   abstract: [
-    // Abstract text about your project in Computer Science and Engineering
-    Modern software development depends on efficient and reliable optimizing compilers.
-    Traditional compilers apply transformations on a single instance of a program until reaching a fixpoint, but since each transformation has to be strictly beneficial, compiler authors need to be conservative.
-    This motivates equality saturation which efficiently keeps multiple versions of a program using e-graphs and later extracting the optimal program.
 
-    However, the performance of e-graphs engines is a major obstacle for using them in compilers, which motivates improving the underlying e-graph technology.
-    We have created oatlog, which is an ahead-of-time compiled e-graph engine.
-    It significantly outperforms egglog, which is the current fastest mainstream e-graph engine.
+    Modern software development depends on efficient and reliable optimizing compilers. Traditional
+    compilers apply transformations on a single instance of a program until reaching a fixpoint, but
+    since each transformation has to be strictly beneficial, compiler authors need to be
+    conservative. This motivates equality saturation which efficiently keeps multiple versions of a
+    program using e-graphs and later extracting the optimal program.
+
+    However, the performance of e-graphs engines is a major obstacle for using them in compilers,
+    which motivates improving the underlying e-graph technology. We have created oatlog, which is an
+    ahead-of-time compiled e-graph engine. It significantly outperforms egglog, which is the current
+    fastest mainstream e-graph engine.
+
   ],
-  keywords: ("e-graphs", "equality saturation", "datalog", "program optimization", "rewrite rules"),
+  keywords: ("e-graphs", "equality saturation", "datalog", "program optimization", "rewrite systems"),
   acknowledgements: [
     // Here, you can say thank you to your supervisor(s), company advisors and other people that
     // supported you during your project.
@@ -157,49 +163,131 @@
 
 #TODO[Elaborate on evaluation once that's possible.]
 
-#NOTE[The midpoint draft is too early for a conclusion.]
-
 = Introduction
-
-#TODO[what is ad-hoc passes and why relevant]
-
-#TODO[improve program = optimize program?]
 
 Modern software development depends on efficient and reliable compilers, which apply sophisticated
 optimizations to improve performance while enabling portability and abstraction. For example,
 autovectorization allows code to take advantage of SIMD hardware without using architecture-specific
 intrinsics, while function inlining eliminates the overhead of function calls, enabling higher-level
 abstractions without sacrificing performance. These optimizations not only enhance program execution
-and energy efficiency but also make it easier for developers to write clean, maintainable, and
-portable code.
+and energy efficiency but also make it easier for developers to write maintainable and portable
+code.
 
 Implementing such a compiler is a complex task. In practice, there are a few large compiler backends
 that have received significant engineering effort and which are used across the industry to compile
-everything from database queries to GPU shaders. The foremost of these compiler backends is LLVM
-@llvm. Yet these compilers are typically difficult to modify while ensuring correctness and LLVM in
-particular struggles with the compilation-time and generated-code-quality trade-off.
+everything from database queries to GPU shaders in addition to traditional programs. The foremost of
+these compiler backends is LLVM @llvm. Yet these compilers are typically difficult to modify while
+ensuring correctness and LLVM in particular struggles with the compilation-time and
+generated-code-quality trade-off.
 
-A traditional optimizing compiler applies optimization passes sequentially and destructively, in
-such a way that earlier passes may perform rewrites that both unlock and inhibit other optimizations
-later #footnote[Concretely, unlocking could occur in the form of dead code elimination after
-function inlining while a simple example of inhibition would be constant folding the program
-`f(2*x+5+10); g(2*x+5)` into `f(2*x+15); g(2*x+5)`, preventing common subexpression elimination into
-`y=2*x+5; f(y+10); g(y)`.]. The unlocking aspect is traditionally partially handled by running
-important passes multiple times, interleaved with others, but this is computationally inefficient
-and does not address the inherent order dependence of destructive rewrites. This is called the phase
-ordering problem. Additionally, ad-hoc passes, implemented as arbitrary transforms on the compiler's
-intermediate representation, expressed in possibly thousands of lines of code, are difficult to
-model formally and to prove correct.
+A traditional optimizing compiler, or at least its optimization-applying mid-end, is typically
+architected as a sequence of passes on a single intermediate representation. Each pass applies one
+kind of optimization everywhere it is applicable. @fig_intro_compiler_passes shows a program
+fragment being optimized in this way, by store-to-load forwarding and constant folding. This program
+fragment highlights that optimization passes may, depending on program structure, need to be applied
+multiple times and interleaved with each other to reach an optimization fixed point. This is the
+first part of what is called the phase ordering problem.
 
-The unlocking half of the issue can be avoided by replacing global passes with local rewrites. These
-local rewrites can be expressed within some framework that tracks dependencies and thus
-incrementally applies them until reaching a fixpoint. This avoids the computational inefficiency of
-having to reprocess the entire code with repeated passes, while at the same time not missing
-rewrites unlocked by other rewrites. This is called peephole rewriting and it lets us apply
-monotonic rewrites to improve the program #footnote[Sea of Nodes is a compiler IR design that
-represents both data flow and control flow as expressions with no side effects, making it especially
-suited to peephole rewriting @son.]. At the same time, an optimization paradigm based on algebraic
-rewrites eases formally modeling programs and proving the correctness of optimizations.
+#figure({
+  let n(pos, content) = node(pos, align(left, content), width: 10.5em)
+    fletcher.diagram(
+      n((0,0), ```
+        mem[0] = 1
+        a = mem[0] + 2
+        mem[3] = 4
+        return mem[a] + 5
+      ```),
+      edge("->", [Load-to-store forwarding], label-side: left),
+      n((0,1),```
+        a = 1 + 2
+        mem[3] = 4
+        return mem[a] + 5
+      ```),
+      edge("->", [Constant folding], label-side: left),
+      n((0,2),```
+        mem[3] = 4
+        return mem[3] + 5
+      ```),
+      edge("->", [Load-to-store forwarding], label-side: left),
+      n((0,3),align(left, ```
+        return 4 + 5
+      ```)),
+      edge("->", [Constant folding], label-side: left),
+      n((0,4),align(left,```
+        return 9
+      ```)),
+    )
+  },
+  caption: [A program fragment optimized with repeated load-to-store forwarding and constant folding passes.],
+  placement: auto,
+) <fig_intro_compiler_passes>
+
+The second part of the phase ordering problem is that optimization passes are destructive and
+noncommutative, so the optimized output program may be different based on what order passes were
+applied in even if a fixed point was reached. Concretely, we can consider the program `(x * 2) / 2`.
+Strength reduction could be applied first, giving `(x << 1) / 2`, or the expression could be
+reassociated to `x * (2/2)` which constant folds to `x`. Depending on how the optimization passes
+are constructed, it is not obvious that the same simplification could be done from `(x << 1) / 2`,
+in which case the program would be stuck in a local but not global optimum due to previous
+scheduling of optimization passes. While most specific scenarios of noncommutative passes can be
+resolved at the cost of only slightly complicating the compiler, the general problem cannot be
+avoided within a optimization pass architecture.
+
+== Phase ordering and peephole rewriting
+
+In an optimization pass architecture, the phase ordering problem is often framed as figuring out
+what static list of passes, allowing repeats, result in the best performing output programs. For
+LLVM, such pass configurations are in practice hundreds of entries long with many passes being
+repeated many times. Pass configurations are effectively compiler hyperparameters and managing them
+is a challenge.
+
+A reasonable idea, if one wants to apply as many beneficial optimizations as possible, is to apply
+optimization passes to the program in a loop until having reached a fixed point. This is not done in
+practice for the simple reason that doing so would result in too long compile times -- each pass
+processes the entire program in at least linear time and there are hundreds of passes.
+
+Peephole rewriting takes the optimization pass architecture and makes it incremental. Rather than
+passes (re)processing the entire program, a data structure directs them towards the parts of the
+program that have been changed. In practice this requires two things: a program representation with
+a useful notion of locality and phrasing the optimizations as local rewrites on this representation.
+
+Such program representations are usually trees or graphs, with representations typically enforcing
+single static assignment (SSA), i.e. that variables are written to exactly once #footnote[Sea of
+Nodes is a compiler IR design that represents both data flow and control flow as expressions with no
+side effects, making it especially suited to peephole rewriting @son.]. @fig_intro_peephole_ir shows
+the program fragment of @fig_intro_compiler_passes represented in such an IR. The locality property
+that we care about in this IR is that most optimizations we apply will only do local updates. Later
+optimization passes need only attempt rewrites on or in the neighborhood of changed nodes. In some
+sense, peephole rewriting decreases the time complexity of optimization from $O("program size" dot
+"applied rewrites")$ to $O("program size" + "applied rewrites")$.
+
+#figure(
+  image("../figures/peephole_example.svg", fit: "contain", width: 50%),
+  caption: [Representing the program fragment of @fig_intro_compiler_passes in an IR suitable for
+  peephole rewriting. The IR is illustrative and simplified compared to real designs.],
+  placement: auto,
+) <fig_intro_peephole_ir>
+
+From a pure software organization perspective, the optimization passes (or now rather rewrite rules)
+must declare their inputs in sufficient detail that the peephole rewriting engine can dispatch them
+to parts of the program where optimizations are possible. For example, a constant folding rewrite
+rule may watch for substructures `<lhs> + <rhs>` where `<lhs>` and `<rhs>` themselves are constant.
+This rule input declaration interface takes the form of a syntactic pattern over terms in the IR,
+which the peephole rewriting engine is able to incrementally resolve into a set of candidate
+locations. Once a pattern match is found, the rewrite rule may need to run arbitrary logic to figure
+out whether its optimization is applicable and how to modify the program, but it may also directly
+specify a syntactic rewrite performing the optimization. In this latter case we have a purely
+syntactic rewrite rule, such as `Add(Const(a), Const(b)) => Const(a+b)` or
+`Add(Mul(a,b), Mul(a,c)) => Mul(a, Add(b,c))`, which not only are easy to state but also easier to
+reason about than ad-hoc passes, expressed in possibly very many lines of code.
+
+In summary, peephole rewriting has fundamental advantages over a optimization pass architecture
+while still serving as an approach to modularize the compiler implementation. Peephole rewriting
+optimizes to a fixed point, never leaving obvious further optimizations on the table. It does this
+incrementally, requiring significantly less computation than to achieve the same with a optimization
+pass architecture. Finally, it specifies many optimizations as syntactic rewrite rules, which are
+easier than passes to formally reason about when for example proving the correctness of
+optimizations.
 
 However, peephole rewriting does not avoid the issue of destructive rewrites being order-dependent
 in the face of multiple potentially good but mutually incompatible rewrites. Since one rewrite can
@@ -208,7 +296,7 @@ a slow backtracking search or with heuristics, with most compilers doing the lat
 third approach, using equality saturation and e-graphs, that can be used to augment peephole
 rewriting to make it nondestructive.
 
-== E-graphs and equality saturation
+== Equality saturation and e-graphs
 
 #TODO[explain limitations of aegraphs]
 
