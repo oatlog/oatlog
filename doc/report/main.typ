@@ -2377,7 +2377,11 @@ struct NonFdIndex<Key, Value> {
 
 == Size of e-class ids
 
-#TODO[we use 32 bit instead of 64 bit + some motivation]
+Using 32-bit e-class ids is preferable to using 64-bit ids since that halves the size of our indices.
+However, we might in theory run out of ids, so to justify this we need to reason about how many ids are needed in practice.
+As an extreme lower bound of memory usage per ids, we can look at what is stored in the union-find. 
+In the union-find we have at least 4 bytes per e-class id, which gives a lower bound of 16 GiB of memory usage before we run out of 32-bit ids.
+A less conservative estimates would assume that each e-class id corresponds to a row in a relation and lets say 3 indices and 3 columns, requiring in-total 40 GiB before running out of ids.
 
 == Union-find
 
@@ -2455,6 +2459,18 @@ Smaller-to-larger has two constant factor issues, maintaining the sizes and read
 #TODO[]
 
 == Congruence closure/canonicalization
+
+To implement canonicalization in $O(n log n)$, one would need to maintain an index from e-class to row (essentially reverse of hashcons) and merge smaller-to-larger.
+Informally, this is $O(n log n)$ because there are $O(n)$ e-classes and each e-class is changed at most $O(log n)$ times.
+#TODO[cite something formally maybe]
+
+To simplify explanations, we consider a relation `Add(x, y, res)` where there is a FD index from x,y to res.
+We implement canonicalization by iterating through the FD index ...
+#TODO[]
+
+#TODO[]
+
+== Query planning
 
 #TODO[]
 
