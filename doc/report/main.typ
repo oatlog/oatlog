@@ -2348,6 +2348,116 @@ To generate the TIR, we perform query planning and when multiple equally good ch
 
 #TODO[]
 
+== Index implementation
+
+#TODO[]
+
+For each relation, there are some number of indexes.
+We consider two types of indexes FD (functional dependency) and non-FD indexes.
+Initially, we tried using sorted lists and b-trees, but ended up performing badly due to the access patterns having low locality.
+Instead we are using hashmaps.
+
+=== FD indexes
+
+This type of index essentially corresponds to the hashcons, in e-graph theory.
+For every functional dependence in a relation, we have a FD index to enforce it, for a relation like `Add(x, y, res)` the key is `(x, y)` and the value is `res` and it is simply a `HashMap<Key, Value>`.
+
+=== non-FD indexes
+
+Without some functional dependency, performing lookups on a subset of all columns may yield multiple values, so a datastructure like `HashMap<Key, Vec<Value>>` is needed.
+However, having many small lists adds both space and allocation overhead, since an empty `Vec<T>` uses 24 bytes and creates individual allocations.
+This motivates having a hashmap that points into a list that is sorted by the key:
+```rust
+struct NonFdIndex<Key, Value> {
+    //                (start, end)
+    map: HashMap<Key, (u32, u32)>,
+    list: Vec<Value>
+}
+```
+
+== Size of e-class ids
+
+#TODO[we use 32 bit instead of 64 bit + some motivation]
+
+== Union-find
+
+#figure(
+  ```rust
+  // with path compression
+  fn find(i: u32, repr: &mut [u32]) -> u32 {
+      if repr[i] == i {
+          return i;
+      }
+      let root = find(repr[i], repr);
+      repr[i] = root;
+      root
+  }
+  // without path compression
+  fn find(mut i: u32, repr: &[u32]) -> u32 {
+      loop {
+          let i_old = i;
+          i = repr[i];
+          if i == old_i {
+              return i;
+          }
+      }
+  }
+  ```,
+  caption: [find function with and without path compression],
+) <fast-find-impl>
+
+#figure(
+  ```rust
+  // with smaller-to-larger
+  fn union(a: u32, b: u32, repr: &mut [u32], size: &mut [u32]) {
+      let a = find(a, repr);
+      let b = find(b, repr);
+      if a == b {
+          return;
+      }
+      let (smaller, larger) = if size[a] < size[b] {
+          (a, b)
+      } else {
+          (b, a)
+      };
+      repr[smaller] = larger;
+      size[larger] += size[smaller];
+  }
+  // with newer-to-older
+  fn union(a: u32, b: u32, repr: &mut [u32]) -> u32 {
+      let a = find(a, repr);
+      let b = find(b, repr);
+      if a == b {
+          return;
+      }
+      let (newer, older) = (u32::max(a, b), u32::min(a, b));
+  }
+  ```,
+  caption: [union function smaller-to-larger and newer-to-older],
+) <fast-union-impl>
+
+A typical implementation of union-find includes both path-compression (@fast-find-impl) and smaller-to-larger merging (@fast-union-impl), but we omit path-compression and merge based on the smallest e-class id.
+
+While path-compression improves the computational complexity, it has worse constant factors.
+Specifically the implementation in @fast-find-impl uses (non-tail) recursion, writes to the same memory it is reading from.
+Additionally these prohibit compiler optimizations.
+#TODO[argue why we think path length is small in practice]
+Without path-compression, `find` is simply the equivalent of a do-while loop.
+
+Smaller-to-larger has two constant factor issues, maintaining the sizes and reading the sizes.
+
+// In any reasonable implementation of union-find, one would use both path compression and smaller-to-larger merging, however we do not do that.
+// Since we call `find()` extremely often during canonicalization, it represents a non-insignificant part of the runtime.
+// We found that typically,
+
+// path compression (see @fast-find-impl) actually starts having a significant cost.
+
+#TODO[]
+
+== Congruence closure/canonicalization
+
+#TODO[]
+
 = Evaluation <oatlog_evaluation>
 
 #TODO[Section summary]
