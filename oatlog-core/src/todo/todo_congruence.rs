@@ -473,3 +473,200 @@ mod update {
         }
     }
 }
+
+/// A non-fd index, behaves like a `HashMap<Key, Vec<Value>>`
+///
+/// Only the *query* parts of the index, reconstruct is implementation dependent.
+pub trait NonFdIndex {
+    type Key;
+    type Value;
+
+    fn iter_key_value(&self) -> impl Iterator<Item = (Self::Key, Self::Value)>;
+    fn iter(&self, key: Self::Key) -> impl Iterator<Item = Self::Value>;
+    fn contains_key(&self, key: &Self::Key) -> bool;
+    fn len(&self) -> usize;
+}
+
+// 2^16 counts.
+
+#[allow(unused)]
+struct SimpleFdIndex<Key, Value> {
+    map: HashMap<Key, SmallVec<[Value; 1]>>,
+}
+impl<Key, Value> SimpleFdIndex<Key, Value>
+where
+    Key: Copy + Ord + Hash,
+    Value: Copy + Ord,
+{
+    #[allow(unused)]
+    fn reconstruct<Row: Copy>(
+        &mut self,
+        all_rows: &mut [Row],
+        extract_key: impl Fn(Row) -> Key,
+        extract_value: impl Fn(Row) -> Value,
+    ) {
+        let mut buckets: [Vec<Row>; 256] = std::array::from_fn(|_| Vec::new());
+        for &row in &*all_rows {
+            use std::hash::{BuildHasher, Hash};
+            let key = extract_key(row);
+
+            let h = self.map.hasher();
+            let hash = h.hash_one(key);
+            let bucket = (hash & 0xFF) as u8;
+
+            buckets[bucket as usize].push(row);
+        }
+
+        for bucket in &buckets {
+            for &row in bucket {
+                self.map
+                    .entry(extract_key(row))
+                    .or_insert_with(|| SmallVec::new())
+                    .push(extract_value(row));
+            }
+        }
+    }
+}
+
+fn radix_sort<
+    Row,
+    Key,
+    Value,
+    Continuation,
+    Output,
+    ExtractRadix,
+    ExtractKey,
+    MergeKey,
+    const COMPUTE_MASK: bool,
+>(
+    data: &mut [Row],
+    scratch: &mut [Row],
+    output_list: &mut [Value],
+    output_obj: &mut Output,
+    mut mask: Key,
+    extract_radix: ExtractRadix,
+    extract_key: ExtractKey,
+    merge_key: MergeKey,
+    continuation: Continuation,
+) -> Key
+where
+    Continuation: Fn(&mut [Row], &mut [Row], Key, &mut [Value], &mut Output) -> Key,
+    Row: Copy,
+    Key: Copy,
+    Value: Copy,
+    ExtractRadix: Fn(Key) -> u8 + Copy,
+    ExtractKey: Fn(Row) -> Key + Copy,
+    MergeKey: Fn(Key, Key) -> Key + Copy,
+{
+    // IF all paths agree on `mask`, then we won't have parity issues.
+    if !COMPUTE_MASK && extract_radix(mask) == 0 {
+        return continuation(data, scratch, mask, output_list, output_obj);
+    }
+
+    let mut counts: [usize; 256] = [0; 256];
+    for &x in &*data {
+        counts[extract_radix(extract_key(x)) as usize] += 1;
+        if COMPUTE_MASK {
+            mask = merge_key(mask, extract_key(x));
+        }
+    }
+
+    if COMPUTE_MASK && extract_radix(mask) == 0 {
+        return continuation(data, scratch, mask, output_list, output_obj);
+    }
+
+    let mut curr = 0;
+    for i in 0..256 {
+        let tmp = counts[i];
+        counts[i] = curr;
+        curr += tmp;
+    }
+    for &x in &*data {
+        let c = &mut counts[extract_radix(extract_key(x)) as usize];
+        scratch[*c] = x;
+        *c += 1;
+    }
+
+    let mut start = 0;
+    for i in 0..256 {
+        let end = counts[i];
+        if start != end {
+            continuation(
+                &mut scratch[start..end],
+                &mut data[start..end],
+                mask,
+                output_list,
+                output_obj,
+            );
+        }
+        start = end;
+    }
+    mask
+}
+
+fn radix_sort_usage(
+    data: &mut [(u32, u32)],
+    scratch: &mut [(u32, u32)],
+    map: &mut HashMap<u32, u32>,
+    list: &mut [u32],
+) {
+    let extract_key = |(a, b): (u32, u32)| a;
+    let extract_value = |(a, b): (u32, u32)| b;
+
+    let radix0 = |x: u32| (x & 0xFF) as u8;
+    let radix1 = |x: u32| ((x >> 8) & 0xFF) as u8;
+    let radix2 = |x: u32| ((x >> 16) & 0xFF) as u8;
+    let radix3 = |x: u32| ((x >> 24) & 0xFF) as u8;
+
+    let merge_key = |a: u32, b: u32| a | b;
+    let mask = radix_sort::<(u32, u32), u32, u32, _, _, _, _, _, true>(
+        data,
+        scratch,
+        list,
+        map,
+        u32::default(),
+        radix0,
+        extract_key,
+        merge_key,
+        |data, scratch, mask, list, map| {
+            radix_sort::<(u32, u32), u32, u32, _, _, _, _, _, false>(
+                data,
+                scratch,
+                list,
+                map,
+                mask,
+                radix1,
+                extract_key,
+                merge_key,
+                |data, scratch, mask, list, map| {
+                    radix_sort::<(u32, u32), u32, u32, _, _, _, _, _, false>(
+                        data,
+                        scratch,
+                        list,
+                        map,
+                        mask,
+                        radix2,
+                        extract_key,
+                        merge_key,
+                        |data, scratch, mask, list, map| {
+                            radix_sort::<(u32, u32), u32, u32, _, _, _, _, _, false>(
+                                data,
+                                scratch,
+                                list,
+                                map,
+                                mask,
+                                radix3,
+                                extract_key,
+                                merge_key,
+                                |data, _, _, list, map| {
+                                    let key = data[0].1;
+                                    todo!()
+                                },
+                            )
+                        },
+                    )
+                },
+            )
+        },
+    );
+}
