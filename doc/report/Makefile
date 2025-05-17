@@ -3,7 +3,7 @@ SHELL:=/usr/bin/env bash
 watch: dependencies
 	typst watch main.typ --root ../..
 
-dependencies: $(shell echo ../figures/{architecture,egraph_example,egraph_cluster,cse_pre,cse_post,cse_to_egraph,cse_to_egraph_post,cse_to_egraph_dag}.svg)
+dependencies: $(shell echo ../figures/{architecture,egraph_example,egraph_cluster,cse_pre,cse_post,cse_to_egraph,cse_to_egraph_post,cse_to_egraph_dag,peephole_example}.svg)
 
 ../figures/%.svg: ../figures/%.dot
 	dot -Tsvg $^ > $@
