@@ -180,34 +180,57 @@ these compiler backends is LLVM @llvm. Yet these compilers are typically difficu
 ensuring correctness and LLVM in particular struggles with the compilation-time and
 generated-code-quality trade-off.
 
-#figure({
-  let n(pos, content, ..any) = node(pos, align(left, content), ..any)
+#figure(
+  {
+    let n(pos, content, ..any) = node(pos, align(left, content), ..any)
     fletcher.diagram(
-      n((0,0), ```
-        mem[0] = 1
-        a = mem[0] + 2
-        mem[3] = 4
-        return mem[a] + 5
-      ```),
+      n(
+        (0, 0),
+        ```
+          mem[0] = 1
+          a = mem[0] + 2
+          mem[3] = 4
+          return mem[a] + 5
+        ```,
+      ),
       edge("->", [Load-to-store forwarding], label-side: left),
-      n((0,1),```
-        a = 1 + 2
-        mem[3] = 4
-        return mem[a] + 5
-      ```),
+      n(
+        (0, 1),
+        ```
+          a = 1 + 2
+          mem[3] = 4
+          return mem[a] + 5
+        ```,
+      ),
       edge("->", [Constant folding], label-side: right, label-sep: 1.8em),
-      n((1,1),```
-        mem[3] = 4
-        return mem[3] + 5
-      ```),
+      n(
+        (1, 1),
+        ```
+          mem[3] = 4
+          return mem[3] + 5
+        ```,
+      ),
       edge("->", [Load-to-store forwarding], label-side: right, label-sep: 1.8em),
-      n((2,1),align(left, ```
-        return 4 + 5
-      ```)),
+      n(
+        (2, 1),
+        align(
+          left,
+          ```
+            return 4 + 5
+          ```,
+        ),
+      ),
       edge("->", [Constant folding], label-side: left),
-      n((2,0),align(left + bottom,```
-        return 9
-      ```), height: 5em),
+      n(
+        (2, 0),
+        align(
+          left + bottom,
+          ```
+            return 9
+          ```,
+        ),
+        height: 5em,
+      ),
     )
   },
   caption: [A program fragment optimized with repeated load-to-store forwarding and constant folding passes.],
@@ -270,7 +293,7 @@ optimization from $O("program size" dot "applied rewrites")$ to $O("program size
 #figure(
   image("../figures/peephole_example.svg", fit: "contain", width: 50%),
   caption: [Representing the program fragment of @fig_intro_compiler_passes in an IR suitable for
-  peephole rewriting. The IR is illustrative and simplified compared to real designs.],
+    peephole rewriting. The IR is illustrative and simplified compared to real designs.],
   placement: auto,
 ) <fig_intro_peephole_ir>
 
@@ -320,53 +343,62 @@ by eliding e-classes consisting of a single e-node.
 #figure(
   grid(
     columns: (1fr, 1fr),
-    fletcher.diagram(spacing: 2.2em, {
-      let (A0, A1) = ((0,0),(1,0))
-      let (B0, B1, B2) = ((0,1),(1,1),(2,1))
-      let (C0, C1) = ((0,2),(1,2))
-      node(A0, $a$)
-      node(A1, $2$)
-      node(B2, $b$)
-      edge(A0, B0, "->")
-      edge(A1, B0, "->")
-      edge(A0, B1, "->")
-      edge(A1, B1, "->")
-      node(B0, $*$)
-      node(B1, $<<$)
-      edge(B0, C0, "->")
-      edge(B1, C1, "->")
-      edge(B2, C0, "->")
-      edge(B2, C1, "->")
-      node(C0, $+$)
-      node(C1, $+$)
-    }),
-    fletcher.diagram(spacing: 2.2em, {
-      let (A0, A1) = ((0,0),(1,0))
-      let (B0, B1) = ((0,1),(1,1))
-      let (C0, C1) = ((0,2),(1,2))
-      let (D0) = ((0,3))
-      node(A0, $a$)
-      node(A1, $2$)
-      edge(A0, B0, "->")
-      edge(A1, B0, "->")
-      edge(A0, B1, "->")
-      edge(A1, B1, "->")
-      node(B0, $*$)
-      node(B1, $<<$)
-      edge(B0, C0, "->")
-      edge(B1, C0, "->")
-      node(C0, [`union`])
-      node(C1, $b$)
-      edge(C0, D0, "->")
-      edge(C0, D0, "->")
-      edge(C1, D0, "->")
-      edge(C1, D0, "->")
-      node(D0, $+$)
-    }),
+    fletcher.diagram(
+      spacing: 2.2em,
+      node-stroke: 1pt,
+      {
+        let (A0, A1) = ((0, 0), (1, 0))
+        let (B0, B1, B2) = ((0, 1), (1, 1), (2, 1))
+        let (C0, C1) = ((0, 2), (1, 2))
+        node(A0, $a$)
+        node(A1, $2$)
+        node(B2, $b$)
+        edge(A0, B0, "->")
+        edge(A1, B0, "->")
+        edge(A0, B1, "->")
+        edge(A1, B1, "->")
+        node(B0, $*$)
+        node(B1, $<<$)
+        edge(B0, C0, "->")
+        edge(B1, C1, "->")
+        edge(B2, C0, "->")
+        edge(B2, C1, "->")
+        node(C0, $+$)
+        node(C1, $+$)
+      },
+    ),
+    fletcher.diagram(
+      spacing: 2.2em,
+      node-stroke: 1pt,
+      node-shape: circle,
+      {
+        let (A0, A1) = ((0, 0), (1, 0))
+        let (B0, B1) = ((0, 1), (1, 1))
+        let (C0, C1) = ((0, 2), (1, 2))
+        let (D0) = (0, 3)
+        node(A0, $a$)
+        node(A1, $2$)
+        edge(A0, B0, "->")
+        edge(A1, B0, "->")
+        edge(A0, B1, "->")
+        edge(A1, B1, "->")
+        node(B0, $*$)
+        node(B1, $<<$)
+        edge(B0, C0, "->")
+        edge(B1, C0, "->")
+        node(C0, text(size: 8pt, `union`))
+        node(C1, $b$)
+        edge(C0, D0, "->")
+        edge(C0, D0, "->")
+        edge(C1, D0, "->")
+        edge(C1, D0, "->")
+        node(D0, $+$)
+      },
+    ),
   ),
   caption: [Illustration on how e-graphs deduplicate usages of equivalent computations. The left
-  side is an expression DAG while the right side is a pseudo-e-graph with a `union` node to avoid
-  duplicating the addition.],
+    side is an expression DAG while the right side is a pseudo-e-graph with a `union` node to avoid
+    duplicating the addition.],
   placement: auto,
 ) <fig_intro_baby_egraph>
 
@@ -470,20 +502,301 @@ evaluating oatlog through its test suite and benchmarks.
 // + Finns lovande innovation inom e-graf-implementering
 // + Vi har implementerat e-graf som är snabbare än egglog i många fall
 
-#figure(
-  image("../figures/egraph_cluster.svg", width: 60%),
-  caption: flex-caption(
-    [Example of an equivalence-class-formulation e-graph that initially contains
-      $(a+2) dot c$.],
-    [
-      The sharp boxes are e-nodes and the rounded boxes are e-classes. E-classes
-      contain e-nodes evaluating to the same value and the input to an e-node can be computed from any
-      of the e-nodes in its input e-class.
-    ],
-  ),
-) <informal-egraph-figure-non-bipartite>
-
 = Background <background>
+
+#TODO[introduce the background section]
+
+== Expression trees and DAGs
+
+As a stepping stone towards describing e-graphs, let us consider the problem of storing mathematical
+expressions in a compact manner. Traditional notation represents expressions as strings of tokens,
+such as $(a+b) dot 2 dot (a+b+2)$, which given operator precedence rules can be interpreted as a
+tree, in this case $((a+b) dot 2) dot ((a+b)+2)$.
+
+This representation spells out $a+b$ twice, which may be acceptable for small expressions but
+quickly becomes cumbersome for larger expressions such as in the quadratic formula. We can avoid
+this using variable substitutions: let $t=a+b$ in $t dot 2 dot (t+2)$. The equivalent of this for
+the tree representation is allow re-use of syntactically identical expressions, which turns the tree
+into a DAG. @fig_background_expression_tree_and_dag shows the tree and DAG representations side by
+side. This transform is often called common subexpression elimination.
+
+#figure(
+  grid(
+    columns: (1fr, 1fr),
+    fletcher.diagram(
+      spacing: 2.2em,
+      node-stroke: 1pt,
+      node-shape: circle,
+      {
+        let (A0, A1, A2, A3) = ((0, 0), (1, 0), (2, 0), (3, 0))
+        let (B0, B1, B2, B3) = ((0, 1), (1, 1), (2, 1), (3, 1))
+        let (C0, C1) = ((0.5, 2), (2.5, 2))
+        let D = (1.5, 3)
+        node(A0, $a$)
+        node(A1, $b$)
+        node(A2, $a$)
+        node(A3, $b$)
+        edge(A0, B0, "->")
+        edge(A1, B0, "->")
+        edge(A2, B2, "->")
+        edge(A3, B2, "->")
+        node(B0, $+$)
+        node(B1, $2$)
+        node(B2, $+$)
+        node(B3, $2$)
+        edge(B0, C0, "->")
+        edge(B1, C0, "->")
+        edge(B2, C1, "->")
+        edge(B3, C1, "->")
+        node(C0, $*$)
+        node(C1, $+$)
+        edge(C0, D, "->")
+        edge(C1, D, "->")
+        node(D, $*$)
+      },
+    ),
+    fletcher.diagram(
+      spacing: 2.2em,
+      node-stroke: 1pt,
+      node-shape: circle,
+      {
+        let (A0, A1) = ((0, 0), (1, 0))
+        let (B0, B1) = ((0, 1), (1, 1))
+        let (C0, C1) = ((0, 2), (1, 2))
+        let D = (0.5, 3)
+        node(A0, $a$)
+        node(A1, $b$)
+        edge(A0, B0, "->")
+        edge(A1, B0, "->")
+        node(B0, $+$)
+        node(B1, $2$)
+        edge(B0, C0, "->")
+        edge(B1, C0, "->")
+        edge(B0, C1, "->")
+        edge(B1, C1, "->")
+        node(C0, $*$)
+        node(C1, $+$)
+        edge(C0, D, "->")
+        edge(C1, D, "->")
+        node(D, $*$)
+      },
+    ),
+  ),
+  caption: [$((a+b) dot 2) dot ((a+b)+2)$ represented as both an expression tree and an expression DAG.],
+  placement: auto,
+) <fig_background_expression_tree_and_dag>
+
+DAG representations efficiently deduplicate nodes in scenarios where syntactically identical
+subexpressions are used in multiple ways. However, they are not useful in scenarios where
+syntactically different subexpressions are processed identically. If one can represent functions,
+the expressions $(2+(a xor b)) dot (2 dot (a xor b))$ and $(2+(a+b)) dot (2 dot (a+b))$ could be
+compactly represented as $f(a xor b)$ and $f(a + b)$ with $f(x) = (2+x) dot (2 dot x)$. But this is
+not possible in expression DAGs, and they must instead duplicate the identical usage code downstream
+of the $xor$ and $+$ as shown in @fig_background_dag_duplicated.
+
+#figure(
+  fletcher.diagram(
+    spacing: 2.2em,
+    node-stroke: 1pt,
+    node-shape: circle,
+    {
+      let (A0, A1) = ((2, 0), (3, 0))
+      let (B0, B1, B2) = ((0, 1), (2, 1), (3, 1))
+      let (C0, C1, C2, C3) = ((0, 2), (1, 2), (2, 2), (3, 2))
+      let (D0, D1) = ((0.5, 3), (2.5, 3))
+      node(A0, $a$)
+      node(A1, $b$)
+      edge(A0, B0, "->")
+      edge(A1, B0, "->")
+      edge(A0, B1, "->")
+      edge(A1, B1, "->")
+      node(B0, $xor$)
+      node(B1, $+$)
+      node(B2, $2$)
+      edge(B0, C0, "->")
+      edge(B0, C1, "->")
+      edge(B1, C2, "->")
+      edge(B1, C3, "->")
+      edge(B2, C0, "->")
+      edge(B2, C1, "->")
+      edge(B2, C2, "->")
+      edge(B2, C3, "->")
+      node(C0, $*$)
+      node(C1, $+$)
+      node(C2, $*$)
+      node(C3, $+$)
+      edge(C0, D0, "->")
+      edge(C1, D0, "->")
+      edge(C2, D1, "->")
+      edge(C3, D1, "->")
+      node(D0, $*$)
+      node(D1, $*$)
+    },
+  ),
+  caption: [An expression DAG representing both
+    $(2+(a xor b)) dot (2 dot (a xor b))$ and
+    $(2+(a+b)) dot (2 dot (a+b))$.
+  ],
+  placement: auto,
+) <fig_background_dag_duplicated>
+
+== E-graphs
+
+E-graphs are at their core a solution to the problem illustrated in @fig_background_dag_duplicated,
+that identical usages of syntactically different inputs result in duplicated storage within an
+expression DAG. They do this not by solving the problem in general, which requires the ability to
+represent functions, but by considering the case of the syntactically different inputs being
+semantically equivalent.
+
+An initial expression mutated through local rewrites is in fact exactly the special case of
+syntactically different but semantically identical subexpressions being used identically. If a
+subexpression $x dot 2$ is nondestructively rewritten to $x << 1$ in an expression DAG, all
+downstream usages must be duplicated. The pre- and post-rewrite expressions are different this is
+the best we can do without a something function-like. However, when rewrites maintain equality, such
+as here where $x dot 2 == x << 1$, we can deduplicate our expressions in an e-graph.
+
+#figure(
+  fletcher.diagram(
+    spacing: 2.2em,
+    node-stroke: 1pt,
+    node-shape: circle,
+    {
+      let (A0, A1) = ((0, 0), (1, 0))
+      let (B0, B1, B2) = ((0, 1), (1, 1), (2, 1))
+      let (C0, C1) = ((0.75, 2), (1.75, 2))
+      let D = (1.25, 3)
+      node(A0, $a$)
+      node(enclose: (A0,), shape: square)
+      node(A1, $b$)
+      node(enclose: (A1,), shape: square)
+      edge(A0, <xor>, "->")
+      edge(A1, <xor>, "->")
+      edge(A0, <plus>, "->")
+      edge(A1, <plus>, "->")
+      node(B0, $xor$, name: <xor>)
+      node(B1, $+$, name: <plus>)
+      node(enclose: (B0, B1), shape: square, name: <either>)
+      node(B2, $2$, name: <two>)
+      node(enclose: (B2,), shape: square)
+      edge(<either>, <mul>, "->")
+      edge(<either>, <add>, "->")
+      edge(B2, <mul>, "->")
+      edge(B2, <add>, "->")
+      node(C0, $*$, name: <mul>)
+      node(enclose: (C0,), shape: square)
+      node(C1, $+$, name: <add>)
+      node(enclose: (C1,), shape: square)
+      edge(C0, <top>, "->")
+      edge(C1, <top>, "->")
+      node(D, $*$, name: <top>)
+      node(enclose: (D,), shape: square)
+    },
+  ),
+  caption: [An e-graph representing both
+    $(2+(a xor b)) dot (2 dot (a xor b))$ and
+    $(2+(a+b)) dot (2 dot (a+b))$.
+  ],
+  placement: auto,
+) <fig_background_nonbipartite_egraph>
+
+@fig_background_nonbipartite_egraph shows an e-graph corresponding to the scenario also shown in
+@fig_background_dag_duplicated, assuming that we for whatever reason have that $a+b=a xor b$. Nodes
+still correspond to computations, but their inputs are now no longer other nodes but rather groups
+of nodes. All nodes within a group must be equal, so a group is an equivalence class. For this
+reason we call the groups e-classes and the nodes e-nodes.
+
+In @fig_background_nonbipartite_egraph, e-nodes are circles and e-classes are rectangles. All
+e-nodes are contained within some e-class and all edges are define-use edges running from a value
+(e-class) to a computation (e-node). Constants, such as $2$, are usually represented as computations
+rather than values. This is because if constants are computations, then rewrites can mark values as
+constant incrementally by adding a constant computation to their e-class. If on the other hand
+constants are values, then a non-constant value cannot be marked constant without updating each of
+its usage sites.
+
+Compared to expression DAGs, e-graphs can achieve exponential compression. An example of this is the
+expression $f(f(...(f(x))...))$ where each $f$ is either $x arrow x dot 2$ or $x arrow x << 1$,
+which has $2^n$ top-level nodes in an expression DAG yet requires linear space as an e-graph. This
+example is of course synthetic but in general e-graphs achive compression exponential in the number
+of nested rewrites.
+
+E-graphs can be represented as graphs in multiple ways. We have already seen how e-nodes can be
+nodes and e-classes equivalence classes of nodes. This is representation that motivates the e-class
+and e-node terminology. In another formulation, e-graphs are bipartite graphs with e-classes and
+e-nodes being the two types of nodes. Edges run from e-node to e-classe denoting membership in that
+equivalence class, and from e-class to e-node denoting being used as input in that e-node's
+operation. As in the other representations, operation input edges are ordered from the point of view
+of the operation since not all operations are commutative. Finally, every e-node is a member of
+exactly one e-class and no e-class is empty. @fig_background_bipartite_egraph shows this
+representation.
+
+#figure(
+  fletcher.diagram(
+    spacing: 3em,
+    node-stroke: 1pt,
+    node-shape: circle,
+    {
+      let (A0, A1) = ((0, 0), (0, 1))
+      let (B0, B1) = ((1, 0), (1, 1))
+      let (C0, C1, C2) = ((2, 0), (2, 1), (2, 2))
+      let (D0, D1) = ((3, 0.5), (3, 1.5))
+      let (E0, E1) = ((4, 0.5), (4, 1.5))
+      let (F0, F1) = ((5, 0.5), (5, 1.5))
+      let G = (6, 1)
+      let H = (7, 1)
+
+      node(A0, $a$)
+      node(A1, $b$)
+      edge(A0, B0, "->")
+      edge(A1, B1, "->")
+      node(B0, " ", shape: rect)
+      node(B1, " ", shape: rect)
+
+      edge(B0, C0, "->")
+      edge(B0, C1, "->")
+      edge(B1, C0, "->")
+      edge(B1, C1, "->")
+
+      node(C0, $xor$)
+      node(C1, $+$)
+      node(C2, $2$)
+      edge(C0, D0, "->")
+      edge(C1, D0, "->")
+      edge(C2, D1, "->")
+      node(D0, " ", shape: rect)
+      node(D1, " ", shape: rect)
+
+      edge(D0, E0, "->")
+      edge(D0, E1, "->")
+      edge(D1, E0, "->")
+      edge(D1, E1, "->")
+
+      node(E0, $*$)
+      node(E1, $+$)
+      edge(E0, F0, "->")
+      edge(E1, F1, "->")
+      node(F0, " ", shape: rect)
+      node(F1, " ", shape: rect)
+
+      edge(F0, G, "->")
+      edge(F1, G, "->")
+
+      node(G, $*$)
+      edge(G, H, "->")
+      node(H, " ", shape: rect)
+    },
+  ),
+  caption: [A bipartite e-graph representing both
+    $(2+(a xor b)) dot (2 dot (a xor b))$ and
+    $(2+(a+b)) dot (2 dot (a+b))$.
+  ],
+  placement: auto,
+) <fig_background_bipartite_egraph>
+
+== Equality saturation in practice
+
+#TODO[explain eqsat and show simple, correct but slow code]
+
+#pagebreak()
 
 /*
 
@@ -1528,27 +1841,6 @@ Note that while the Python implementations are just example implementations, the
 // - scheduling and termination
 // - extraction
 
-== #TODO[Expression trees]
-
-#figure(
-  image("../figures/cse_pre.svg"),
-  caption: [TODO: before cse],
-) <todo1>
-#figure(
-  image("../figures/cse_post.svg"),
-  caption: [TODO: after cse],
-) <todo2>
-#figure(
-  image("../figures/cse_to_egraph.svg"),
-  caption: [TODO: before egraph],
-) <todo3>
-#figure(
-  image("../figures/cse_to_egraph_post.svg"),
-  caption: [TODO: after egraph],
-) <todo4>
-
-#TODO[@todo1 @todo2 @todo3 @todo4]
-
 == Union-find <union-find-explain>
 
 #figure(
@@ -1639,6 +1931,19 @@ It supports the same operations as union-find on its e-classes (`union`, `find`,
 
 #pagebreak()
 == Rewriting
+
+#figure(
+  image("../figures/egraph_cluster.svg", width: 60%),
+  caption: flex-caption(
+    [Example of an equivalence-class-formulation e-graph that initially contains
+      $(a+2) dot c$.],
+    [
+      The sharp boxes are e-nodes and the rounded boxes are e-classes. E-classes
+      contain e-nodes evaluating to the same value and the input to an e-node can be computed from any
+      of the e-nodes in its input e-class.
+    ],
+  ),
+) <informal-egraph-figure-non-bipartite>
 
 #figure(
   image("../figures/egraph_example.svg", width: 75%),
