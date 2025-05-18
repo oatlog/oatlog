@@ -180,16 +180,8 @@ these compiler backends is LLVM @llvm. Yet these compilers are typically difficu
 ensuring correctness and LLVM in particular struggles with the compilation-time and
 generated-code-quality trade-off.
 
-A traditional optimizing compiler, or at least its optimization-applying mid-end, is typically
-architected as a sequence of passes on a single intermediate representation. Each pass applies one
-kind of optimization everywhere it is applicable. @fig_intro_compiler_passes shows a program
-fragment being optimized in this way, by store-to-load forwarding and constant folding. This program
-fragment highlights that optimization passes may, depending on program structure, need to be applied
-multiple times and interleaved with each other to reach an optimization fixed point. This is the
-first part of what is called the phase ordering problem.
-
 #figure({
-  let n(pos, content) = node(pos, align(left, content), width: 10.5em)
+  let n(pos, content, ..any) = node(pos, align(left, content), ..any)
     fletcher.diagram(
       n((0,0), ```
         mem[0] = 1
@@ -203,31 +195,39 @@ first part of what is called the phase ordering problem.
         mem[3] = 4
         return mem[a] + 5
       ```),
-      edge("->", [Constant folding], label-side: left),
-      n((0,2),```
+      edge("->", [Constant folding], label-side: right, label-sep: 1.8em),
+      n((1,1),```
         mem[3] = 4
         return mem[3] + 5
       ```),
-      edge("->", [Load-to-store forwarding], label-side: left),
-      n((0,3),align(left, ```
+      edge("->", [Load-to-store forwarding], label-side: right, label-sep: 1.8em),
+      n((2,1),align(left, ```
         return 4 + 5
       ```)),
       edge("->", [Constant folding], label-side: left),
-      n((0,4),align(left,```
+      n((2,0),align(left + bottom,```
         return 9
-      ```)),
+      ```), height: 5em),
     )
   },
   caption: [A program fragment optimized with repeated load-to-store forwarding and constant folding passes.],
   placement: auto,
 ) <fig_intro_compiler_passes>
 
+A traditional optimizing compiler, or at least its optimization-applying mid-end, is typically
+architected as a sequence of passes on a single intermediate representation. Each pass applies
+one kind of optimization everywhere it is applicable. @fig_intro_compiler_passes shows a program
+fragment being optimized in this way, by store-to-load forwarding and constant folding. This program
+fragment highlights that optimization passes may, depending on program structure, need to be applied
+multiple times and interleaved with each other to reach an optimization fixed point. This is the
+first part of what is called the phase ordering problem.
+
 The second part of the phase ordering problem is that optimization passes are destructive and
 noncommutative, so the optimized output program may be different based on what order passes were
-applied in even if a fixed point was reached. Concretely, we can consider the program `(x * 2) / 2`.
-Strength reduction could be applied first, giving `(x << 1) / 2`, or the expression could be
-reassociated to `x * (2/2)` which constant folds to `x`. Depending on how the optimization passes
-are constructed, it is not obvious that the same simplification could be done from `(x << 1) / 2`,
+applied in even if a fixed point was reached. Concretely, we can consider the program `(x*2)/2`.
+Strength reduction could be applied first, giving `(x<<1)/2`, or the expression could be
+reassociated to `x*(2/2)` which constant folds to `x`. Depending on how the optimization passes
+are constructed, it is not obvious that the same simplification could be done from `(x<<1)/2`,
 in which case the program would be stuck in a local but not global optimum due to previous
 scheduling of optimization passes. While most specific scenarios of noncommutative passes can be
 resolved at the cost of only slightly complicating the compiler, the general problem cannot be
@@ -242,24 +242,30 @@ repeated many times. Pass configurations are effectively compiler hyperparameter
 is a challenge.
 
 A reasonable idea, if one wants to apply as many beneficial optimizations as possible, is to apply
-optimization passes to the program in a loop until having reached a fixed point. This is not done in
-practice for the simple reason that doing so would result in too long compile times -- each pass
-processes the entire program in at least linear time and there are hundreds of passes.
+optimization passes to the program in a loop until having reached a fixed point. But this is not
+done in practice for the simple reason that doing so would result in too long compile times -- each
+pass processes the entire program in at least linear time and there are hundreds of passes.
 
-Peephole rewriting takes the optimization pass architecture and makes it incremental. Rather than
-passes (re)processing the entire program, a data structure directs them towards the parts of the
-program that have been changed. In practice this requires two things: a program representation with
-a useful notion of locality and phrasing the optimizations as local rewrites on this representation.
+Optimization to a fixed point is made possible by peephole rewriting, which takes the optimization
+pass architecture and makes it incremental. Rather than passes (re)processing the entire program, a
+data structure directs them towards the parts of the program that have been changed. In practice
+this requires two things: a program representation with a useful notion of locality and phrasing the
+optimizations as local rewrites on this representation.
 
-Such program representations are usually trees or graphs, with representations typically enforcing
-single static assignment (SSA), i.e. that variables are written to exactly once #footnote[Sea of
-Nodes is a compiler IR design that represents both data flow and control flow as expressions with no
-side effects, making it especially suited to peephole rewriting @son.]. @fig_intro_peephole_ir shows
-the program fragment of @fig_intro_compiler_passes represented in such an IR. The locality property
-that we care about in this IR is that most optimizations we apply will only do local updates. Later
-optimization passes need only attempt rewrites on or in the neighborhood of changed nodes. In some
-sense, peephole rewriting decreases the time complexity of optimization from $O("program size" dot
-"applied rewrites")$ to $O("program size" + "applied rewrites")$.
+Such program representations #footnote[Sea of Nodes is a compiler IR design that represents both
+data flow and control flow as expressions with no side effects, making it especially suited to
+peephole rewriting @son.] are usually trees or (directed acyclic) graphs (DAGs), with
+representations typically enforcing single static assignment (SSA), i.e. that variables are written
+to exactly once. @fig_intro_peephole_ir shows the program fragment of @fig_intro_compiler_passes
+represented in such an intermediate representation (IR). It is crucial that the IR is designed in
+such a way that its optimizations become local, for if optimizations need to mutate large sections
+of the IR or if the applicability of optimizations depend on non-local properties, then incremental
+processing becomes impossible. This is why a linear list of instructions is an unsatisfactory IR for
+peephole rewriting -- the definition and usage of a variable must not be far away from each other
+and optimizations cannot lead to unnecessary mutation, such as shifting line numbers around or
+similar. If everything works out, peephole rewriting in some sense decreases the time complexity of
+optimization from $O("program size" dot "applied rewrites")$ to $O("program size"
++ "applied rewrites")$.
 
 #figure(
   image("../figures/peephole_example.svg", fit: "contain", width: 50%),
@@ -274,10 +280,10 @@ to parts of the program where optimizations are possible. For example, a constan
 rule may watch for substructures `<lhs> + <rhs>` where `<lhs>` and `<rhs>` themselves are constant.
 This rule input declaration interface takes the form of a syntactic pattern over terms in the IR,
 which the peephole rewriting engine is able to incrementally resolve into a set of candidate
-locations. Once a pattern match is found, the rewrite rule may need to run arbitrary logic to figure
-out whether its optimization is applicable and how to modify the program, but it may also directly
-specify a syntactic rewrite performing the optimization. In this latter case we have a purely
-syntactic rewrite rule, such as `Add(Const(a), Const(b)) => Const(a+b)` or
+locations. Once a pattern match is found, some rewrite rules may need to run arbitrary logic to
+figure out whether their optimizations are applicable and how to modify the program, but other
+rewrite rules may directly specify a syntactic rewrite performing the optimization. In this latter
+case we have a purely syntactic rewrite rule, such as `Add(Const(a), Const(b)) => Const(a+b)` or
 `Add(Mul(a,b), Mul(a,c)) => Mul(a, Add(b,c))`, which not only are easy to state but also easier to
 reason about than ad-hoc passes, expressed in possibly very many lines of code.
 
@@ -289,16 +295,14 @@ pass architecture. Finally, it specifies many optimizations as syntactic rewrite
 easier than passes to formally reason about when for example proving the correctness of
 optimizations.
 
-However, peephole rewriting does not avoid the issue of destructive rewrites being order-dependent
-in the face of multiple potentially good but mutually incompatible rewrites. Since one rewrite can
-unlock other beneficial rewrites later, one cannot select them greedily. This could be handled with
-a slow backtracking search or with heuristics, with most compilers doing the latter. But there is a
-third approach, using equality saturation and e-graphs, that can be used to augment peephole
-rewriting to make it nondestructive.
+However, peephole rewriting does not avoid the second part of the phase ordering problem, of
+destructive rewrites being order-dependent in the face of multiple potentially good but mutually
+incompatible rewrites. Since one rewrite can unlock other beneficial rewrites later, one cannot
+select them greedily. This could be handled with a slow backtracking search or with heuristics, with
+most compilers doing the latter. But there is a third approach, using equality saturation and
+e-graphs, that can be used to augment peephole rewriting to make it nondestructive.
 
 == Equality saturation and e-graphs
-
-#TODO[explain limitations of aegraphs]
 
 E-graphs @oldegraph are data structures for rewriting that allow multiple representations of a
 value, committing to one only after all rewrites have been searched. The representations are stored
@@ -310,7 +314,61 @@ An e-graph can be seen as a graph of e-nodes partitioned into e-classes, where e
 e-classes as input. Concretely, the expressions $(2a)+b$ and $(a<<1)+b$ would be stored as an
 addition taking as its left argument a reference to the equivalence class ${2a, a<<1}$, thus
 avoiding duplicated storage of any expression having $2a$ and therefore also $a<<1$ as possible
-subexpressions.
+subexpressions. This scenario is shown in @fig_intro_baby_egraph, althrough in a simplified manner
+by eliding e-classes consisting of a single e-node.
+
+#figure(
+  grid(
+    columns: (1fr, 1fr),
+    fletcher.diagram(spacing: 2.2em, {
+      let (A0, A1) = ((0,0),(1,0))
+      let (B0, B1, B2) = ((0,1),(1,1),(2,1))
+      let (C0, C1) = ((0,2),(1,2))
+      node(A0, $a$)
+      node(A1, $2$)
+      node(B2, $b$)
+      edge(A0, B0, "->")
+      edge(A1, B0, "->")
+      edge(A0, B1, "->")
+      edge(A1, B1, "->")
+      node(B0, $*$)
+      node(B1, $<<$)
+      edge(B0, C0, "->")
+      edge(B1, C1, "->")
+      edge(B2, C0, "->")
+      edge(B2, C1, "->")
+      node(C0, $+$)
+      node(C1, $+$)
+    }),
+    fletcher.diagram(spacing: 2.2em, {
+      let (A0, A1) = ((0,0),(1,0))
+      let (B0, B1) = ((0,1),(1,1))
+      let (C0, C1) = ((0,2),(1,2))
+      let (D0) = ((0,3))
+      node(A0, $a$)
+      node(A1, $2$)
+      edge(A0, B0, "->")
+      edge(A1, B0, "->")
+      edge(A0, B1, "->")
+      edge(A1, B1, "->")
+      node(B0, $*$)
+      node(B1, $<<$)
+      edge(B0, C0, "->")
+      edge(B1, C0, "->")
+      node(C0, [`union`])
+      node(C1, $b$)
+      edge(C0, D0, "->")
+      edge(C0, D0, "->")
+      edge(C1, D0, "->")
+      edge(C1, D0, "->")
+      node(D0, $+$)
+    }),
+  ),
+  caption: [Illustration on how e-graphs deduplicate usages of equivalent computations. The left
+  side is an expression DAG while the right side is a pseudo-e-graph with a `union` node to avoid
+  duplicating the addition.],
+  placement: auto,
+) <fig_intro_baby_egraph>
 
 E-graphs were originally developed for automated theorem proving @oldegraph @egraphwithexplain, in
 which they interact with a larger system. The e-graph is fed assumptions, possibly producing
@@ -336,13 +394,17 @@ despite their ability to solve the phase ordering problem.
 E-graphs have, however, been used in more specialized domains such as for synthesis of low-error
 floating point expressions @herbie and for optimization of linear algebra expressions @spores. They
 are also used in eggcc @eggcc, an experimental optimizing compiler for the toy language Bril, and
-the webassembly-oriented production compiler backend Cranelift @cranelift. Cranelift uses the weaker
-acyclic e-graphs (aegraphs), due to performance problems of full e-graphs. A proliferation of
-e-graphs within compilers would require them to become faster.
+the webassembly-oriented production compiler backend Cranelift @cranelift. Cranelift uses a weaker
+construct called acyclic e-graphs (aegraphs) due to performance problems of full e-graphs. A
+proliferation of e-graphs within compilers would require them to become faster.
+
+#TODO[Explain limitations of aegraphs. Or not? Seems excessive]
 
 == Datalog and relational databases
 
 #TODO[e-graphs as relational databases is discovered "recently" provide year/citation]
+
+#TODO[is this suitable for people who don't know databases or Datalog?]
 
 Recent developments in e-graphs and equality saturation @relationalematching @eqlog @egglog have
 shown that adding indexes to e-graph pattern-matching creates a structure that is very similar to
@@ -353,7 +415,7 @@ that e-graphs may be best thought of as Datalog extended with a unification oper
 This allows EqSat to leverage algorithms from Datalog, in particular the algorithm semi-naive join
 which, rather than running queries against the entire database, specifically queries newly inserted
 rows in a manner similar to a database trigger. Incremental rule matching, together with indexes and
-simple query planning, has brought an order of magnitude speedup to the recent e-graph engine egglog
+simple query planning, has brought an order of magnitude speedup to the e-graph engine egglog
 @egglog when compared to its predecessor egg @egg.
 
 Relational databases are a mature technology with rich theory and a wide breadth of implementations,
@@ -364,19 +426,20 @@ implementation for our master's thesis.
 
 == Oatlog
 
-Our work introduces oatlog, a rewrite engine compatible with the egglog language. Like egglog, it
+This thesis introduces oatlog, a rewrite engine compatible with the egglog language. Like egglog, it
 can be seen as a Datalog engine with support for unification. Unlike egglog, it compiles rules
 ahead-of-time (aot$#h(2pt)approx#h(2pt)$oat) which allows query planning and index selection to be
 optimized globally.
 
-Our goal is for oatlog to
-+ #[implement most of the egglog features that still make sense in the context
-    of ahead-of-time embedding within a Rust program.]
-+ be faster than egglog across a moderately broad set of benchmarks
+Oatlog has limited functionality compared to egglog, implementing only a subset of the language and
+its long tail of features. While a few features are impractical in a ahead-of-time setting, most
+egglog features could be implemented within the existing oatlog architecture.
 
-Currently, as of the midpoint report, oatlog is slower than egglog and does not implement quite a
-few of egglog's features. Addressing this is our priority for the remainder of our master's thesis
-work.
+For the language subset that oatlog supports, it exceeeds egglog in performance. The speedups range
+from over 10x for tiny e-graphs of only hundreds of nodes, to more moderate 2x speedups for small
+e-graphs of about $10^5$ nodes. These results stem not from one large but rather many small
+improvements compared to egglog, around rule preprocessing, query planning, index implementation and
+general performance engineering.
 
 == This thesis
 
@@ -2379,7 +2442,7 @@ struct NonFdIndex<Key, Value> {
 
 Using 32-bit e-class ids is preferable to using 64-bit ids since that halves the size of our indices.
 However, we might in theory run out of ids, so to justify this we need to reason about how many ids are needed in practice.
-As an extreme lower bound of memory usage per ids, we can look at what is stored in the union-find. 
+As an extreme lower bound of memory usage per ids, we can look at what is stored in the union-find.
 In the union-find we have at least 4 bytes per e-class id, which gives a lower bound of 16 GiB of memory usage before we run out of 32-bit ids.
 A less conservative estimates would assume that each e-class id corresponds to a row in a relation and lets say 3 indices and 3 columns, requiring in-total 40 GiB before running out of ids.
 
