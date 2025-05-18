@@ -354,17 +354,12 @@ mod construction {
 
     impl Rule {
         // Modify `self` to begin query plan with `link`, return result.
-        // TODO: Allow relaxation of OLD to ALL.
         fn apply(&self, link: &TrieLink, salt: &Salt, ctx: &Ctx<'_>) -> Option<Self> {
             if salt != &self.salt() {
                 return None;
             }
-            // link "wins" on variable collisions
 
-            // NOTE: mapping should be a SparseUf actually
-
-            // which of MY atoms is supported right now?
-            let supported = self
+            let my_votes = self
                 .make_votes(ctx)
                 .into_iter()
                 .flat_map(|(salt, link)| match link {
@@ -383,10 +378,11 @@ mod construction {
 
             match link {
                 Primary(other) => {
-                    let supported: Vec<_> = supported
+                    let supported: Vec<_> = my_votes
                         .into_iter()
                         .filter_map(|(_, x)| x.primary())
                         .collect();
+
                     for this in self
                         .premise
                         .iter()
@@ -440,40 +436,34 @@ mod construction {
                                     .into_iter()
                                     .any(|x| &x == other)
                             });
+                            this_rule.semi.retain(|x| {
+                                !x.equivalent_atoms(ctx.relations)
+                                    .into_iter()
+                                    .any(|x| &x == other)
+                            });
                             if n == this_rule.premise.len() {
-                                // TODO erik: HACK TO HIDE A BUG.
+                                // If this is reached, the join did not make any progress?
                                 return None;
                             }
-                            assert!(this_rule.semi.len() <= 1);
-                            this_rule.semi = vec![];
 
                             let tmp = other.columns.iter().copied().collect::<BTreeSet<_>>();
                             let introduced_vars: BTreeSet<_> =
                                 tmp.difference(&ctx.bound_premise).collect();
-                            let bound_vars: BTreeSet<_> = tmp.union(&ctx.bound_premise).collect();
 
-                            this_rule.semi = this_rule
-                                .premise
-                                .iter()
-                                .filter(|&x| x.columns.iter().any(|v| introduced_vars.contains(v)))
-                                // TODO erik for loke: removed because it breaks WCOJ, see triangle join expect test.
-                                // .filter(|&x| {
-                                //     let relation = &ctx.relations[x.relation];
-                                //     let is_global =
-                                //         matches!(relation.kind, hir::RelationTy::Global { .. });
-                                //     let got_introduced =
-                                //         x.columns.iter().any(|v| introduced_vars.contains(v));
-                                //     let already_determined =
-                                //         x.columns.iter().all(|v| bound_vars.contains(v))
-                                //             || relation.implicit_rules.iter().any(|im| {
-                                //                 im.key_columns()
-                                //                     .iter()
-                                //                     .all(|c| bound_vars.contains(&x.columns[c]))
-                                //             });
-                                //     !is_global && got_introduced && already_determined
-                                // })
-                                .cloned()
-                                .collect();
+                            this_rule.semi.extend(
+                                this_rule
+                                    .premise
+                                    .iter()
+                                    .filter(|&x| {
+                                        x.columns.iter().any(|v| introduced_vars.contains(v))
+                                        //                       ^^^^^^^^^^^^^^^^^^^^^^^^^^^
+                                        // For worst-case optimal joins, we need to introduce
+                                        // semi-joins each time variables are introduced.
+                                    })
+                                    .cloned(),
+                            );
+                            this_rule.semi.sort();
+                            this_rule.semi.dedup();
 
                             return Some(this_rule);
                         }
@@ -482,10 +472,8 @@ mod construction {
                 }
                 Semi(other) => {
                     // semi should be able to accept anything
-                    let supported: Vec<_> = supported
-                        .into_iter()
-                        .filter_map(|(_, x)| x.semi())
-                        .collect();
+                    let supported: Vec<_> =
+                        my_votes.into_iter().filter_map(|(_, x)| x.semi()).collect();
 
                     // Semi-joins are equivalent if the *bound* columns match by being exactly the
                     // same.
@@ -541,7 +529,11 @@ mod construction {
                 }
             }
         }
+
+        // keep old votes selection to compare.
+        // TODO: eventually remove.
         fn make_votes(&self, ctx: &Ctx<'_>) -> Vec<(Salt, TrieLink)> {
+            return self.make_votes2(ctx);
             (match self.semi.as_slice() {
                 [] => {
                     #[derive(Copy, Clone, Ord, PartialOrd, PartialEq, Eq, Debug)]
@@ -704,6 +696,154 @@ mod construction {
                     .collect::<Vec<_>>(),
             })
             .collect()
+        }
+
+        fn make_votes2<'a>(&'a self, ctx: &Ctx<'_>) -> Vec<(Salt, TrieLink)> {
+            let salt = self.salt();
+            #[derive(Copy, Clone, Ord, PartialOrd, PartialEq, Eq, Debug)]
+            enum RelationScore {
+                NoQuery,
+                IndexedAll,
+                IndexedOld,
+                SingleElement,
+                AllBound,
+                Global,
+                New,
+            }
+            #[derive(Copy, Clone, Ord, PartialOrd, PartialEq, Eq, Debug)]
+            enum IsConnected {
+                Disconnected,
+                Connected,
+            }
+            // TODO: we may want to separate what is optimal from what is supported, for example
+            // it's probably fine to do a semi-join early if another rule wants to do a semi-join.
+            #[derive(Copy, Clone, Ord, PartialOrd, PartialEq, Eq, Debug)]
+            enum CompoundRelationScore {
+                NoQuery,
+                IndexedDisconnected,
+                SingleElementDisconnected,
+                IndexedAllConnected,
+                IndexedOldConnected,
+
+                // the semi-join inclusion is backwards to make sure we are able to do old before
+                // new in a triangle join.
+                //
+                // We only care about .*Old and .*New cases because these are the
+                // only cases where semi-joins are prioritized over primary joins.
+                SemiJoinOld,
+                SemiJoinAll,
+
+                // if semi.len() == 1, then we should just do a primary join instead.
+                // in this case, we would also expect primary.len() == 1.
+                LastPrimary,
+
+                SingleElementConnected,
+                AllBound,
+                Global,
+                New,
+            }
+
+            let mut votes: BTreeMap<_, Vec<_>> = BTreeMap::new();
+
+            for atom in &self.semi {
+                let score = match atom.incl {
+                    hir::Inclusion::New => unreachable!(),
+                    hir::Inclusion::Old => CompoundRelationScore::SemiJoinOld,
+                    hir::Inclusion::All => CompoundRelationScore::SemiJoinAll,
+                };
+                votes
+                    .entry(score)
+                    .or_default()
+                    .push(TrieLink::Semi(atom.clone()));
+            }
+
+            if let [atom] = self.semi.as_slice() {
+                votes
+                    .entry(CompoundRelationScore::LastPrimary)
+                    .or_default()
+                    .push(TrieLink::Primary(atom.clone()));
+            }
+
+            for atom in &self.premise {
+                use IsConnected::{Connected, Disconnected};
+                use RelationScore::{
+                    AllBound, Global, IndexedAll, IndexedOld, New, NoQuery, SingleElement,
+                };
+
+                let connected = if atom.columns.iter().any(|x| ctx.bound_premise.contains(x)) {
+                    Connected
+                } else {
+                    Disconnected
+                };
+
+                let mut score = NoQuery;
+
+                match atom.incl {
+                    hir::Inclusion::New => {
+                        score = score.max(New);
+                    }
+                    hir::Inclusion::Old | hir::Inclusion::All => (),
+                }
+                let relation = &ctx.relations[atom.relation];
+                match &relation.kind {
+                    hir::RelationTy::Table => {
+                        score = score.max(if atom.incl == hir::Inclusion::Old {
+                            IndexedOld
+                        } else {
+                            IndexedAll
+                        });
+                    }
+                    hir::RelationTy::Alias {} => {
+                        unreachable!();
+                    }
+                    hir::RelationTy::Global { id: _ } => {
+                        score = score.max(Global);
+                    }
+                    hir::RelationTy::Primitive { syn: _, ident: _ } => {
+                        panic!("primitive premise not implemented")
+                    }
+                    hir::RelationTy::Forall { ty: _ } => panic!("forall unimplemented"),
+                }
+                for im in &relation.implicit_rules {
+                    if im
+                        .key_columns()
+                        .into_iter()
+                        .all(|c| ctx.bound_premise.contains(&atom.columns[c]))
+                    {
+                        score = score.max(SingleElement);
+                    }
+                }
+                if atom.columns.iter().all(|v| ctx.bound_premise.contains(v)) {
+                    score = score.max(AllBound);
+                }
+
+                let score = match (score, connected) {
+                    (NoQuery, _) => CompoundRelationScore::NoQuery,
+                    (IndexedAll | IndexedOld, Disconnected) => {
+                        CompoundRelationScore::IndexedDisconnected
+                    }
+                    (SingleElement, Disconnected) => {
+                        CompoundRelationScore::SingleElementDisconnected
+                    }
+                    (IndexedAll, Connected) => CompoundRelationScore::IndexedAllConnected,
+                    (IndexedOld, Connected) => CompoundRelationScore::IndexedOldConnected,
+                    (SingleElement, Connected) => CompoundRelationScore::SingleElementConnected,
+                    (AllBound, _) => CompoundRelationScore::AllBound,
+                    (New, _) => CompoundRelationScore::New,
+                    (Global, _) => CompoundRelationScore::Global,
+                };
+
+                votes
+                    .entry(score)
+                    .or_default()
+                    .push(TrieLink::Primary(atom.clone()));
+            }
+
+            // last = max score
+            votes
+                .pop_last()
+                .map(|(_, x)| x.into_iter().map(|x| (salt.clone(), x)).collect())
+                .unwrap_or(vec![])
         }
 
         fn salt(&self) -> Salt {

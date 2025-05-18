@@ -535,14 +535,23 @@ impl Atom {
     #[allow(unused)]
     pub(crate) fn dbg_compact(&self) -> String {
         format!(
-            "{}({})",
+            "{}{}({})",
             self.relation,
+            match self.incl {
+                Inclusion::New => "_New",
+                Inclusion::Old => "_Old",
+                Inclusion::All => "_All",
+            },
             itertools::Itertools::intersperse(
                 self.columns.iter().copied().map(|x| format!("{x}")),
                 format!(", ")
             )
             .collect::<String>()
         )
+    }
+
+    pub(crate) fn variables(&self) -> BTreeSet<VariableId> {
+        self.columns.iter().copied().collect()
     }
 }
 
