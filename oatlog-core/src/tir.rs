@@ -15,6 +15,92 @@ use std::{
 pub(crate) use construction::schedule_rules;
 pub(crate) use lowering::lowering;
 
+struct IndexEstimate<'a> {
+    iter: TVec<RelationId, BTreeSet<BTreeSet<ColumnId>>>,
+    check: TVec<RelationId, BTreeSet<BTreeSet<ColumnId>>>,
+    #[allow(unused)]
+    relations: &'a TVec<RelationId, hir::Relation>,
+}
+impl<'a> IndexEstimate<'a> {
+    fn score(&self) -> (usize, usize) {
+        (
+            self.iter.iter().map(BTreeSet::len).sum(),
+            self.check.iter().map(BTreeSet::len).sum(),
+        )
+    }
+    fn new(relations: &'a TVec<RelationId, hir::Relation>) -> Self {
+        let base_index_usage: TVec<RelationId, BTreeSet<BTreeSet<ColumnId>>> = relations.map(|x| {
+            x.implicit_rules
+                .iter()
+                .map(super::hir::ImplicitRule::key_columns)
+                .collect()
+        });
+        Self {
+            iter: base_index_usage.clone(),
+            check: base_index_usage,
+            relations,
+        }
+    }
+    #[allow(unused)]
+    fn introduces_indexes(&self, link: &TrieLink, bound: &BTreeSet<VariableId>) -> bool {
+        match link {
+            Primary(atom) => {
+                self.iter[atom.relation].contains(
+                    &atom
+                        .columns
+                        .iter_enumerate()
+                        .filter_map(|(i, v)| bound.contains(v).then_some(i))
+                        .collect(),
+                ) || self.check[atom.relation].contains(
+                    &atom
+                        .columns
+                        .iter_enumerate()
+                        .filter_map(|(i, v)| bound.contains(v).then_some(i))
+                        .collect(),
+                )
+            }
+            Semi(atom) => self.check[atom.relation].contains(
+                &atom
+                    .columns
+                    .iter_enumerate()
+                    .filter_map(|(i, v)| bound.contains(v).then_some(i))
+                    .collect(),
+            ),
+        }
+    }
+    #[allow(unused)]
+    fn add_index(&mut self, link: &TrieLink, bound: &BTreeSet<VariableId>) {
+        match link {
+            Primary(atom) => {
+                for atom in atom.equivalent_atoms(self.relations) {
+                    self.iter[atom.relation].insert(
+                        atom.columns
+                            .iter_enumerate()
+                            .filter_map(|(i, v)| bound.contains(v).then_some(i))
+                            .collect(),
+                    );
+                    self.check[atom.relation].insert(
+                        atom.columns
+                            .iter_enumerate()
+                            .filter_map(|(i, v)| bound.contains(v).then_some(i))
+                            .collect(),
+                    );
+                }
+            }
+            Semi(atom) => {
+                for atom in atom.equivalent_atoms(self.relations) {
+                    self.check[atom.relation].insert(
+                        atom.columns
+                            .iter_enumerate()
+                            .filter_map(|(i, v)| bound.contains(v).then_some(i))
+                            .collect(),
+                    );
+                }
+            }
+        }
+    }
+}
+
 // SEMANTICS:
 // actions then unify then perform queries for each map.
 #[derive(Clone, Eq, PartialEq, Ord, PartialOrd, Debug, Default)]
@@ -34,19 +120,37 @@ impl Trie {
     // only for score
     fn register_index_usages(
         &self,
-        index_usage: &mut TVec<RelationId, BTreeSet<BTreeSet<ColumnId>>>,
+        iter_index_usage: &mut TVec<RelationId, BTreeSet<BTreeSet<ColumnId>>>,
+        check_index_usage: &mut TVec<RelationId, BTreeSet<BTreeSet<ColumnId>>>,
     ) {
         for (link, trie) in &self.map {
-            trie.register_index_usages(index_usage);
+            trie.register_index_usages(iter_index_usage, check_index_usage);
             let bound = &self.bound_premise;
-            let atom = link.clone().atom();
 
-            index_usage[atom.relation].insert(
-                atom.columns
-                    .iter_enumerate()
-                    .filter_map(|(i, v)| bound.contains(v).then_some(i))
-                    .collect(),
-            );
+            match link {
+                Primary(atom) => {
+                    iter_index_usage[atom.relation].insert(
+                        atom.columns
+                            .iter_enumerate()
+                            .filter_map(|(i, v)| bound.contains(v).then_some(i))
+                            .collect(),
+                    );
+                    check_index_usage[atom.relation].insert(
+                        atom.columns
+                            .iter_enumerate()
+                            .filter_map(|(i, v)| bound.contains(v).then_some(i))
+                            .collect(),
+                    );
+                }
+                Semi(atom) => {
+                    check_index_usage[atom.relation].insert(
+                        atom.columns
+                            .iter_enumerate()
+                            .filter_map(|(i, v)| bound.contains(v).then_some(i))
+                            .collect(),
+                    );
+                }
+            }
         }
     }
     fn size(&self) -> usize {
@@ -247,6 +351,12 @@ mod construction {
             uf: SparseUf::new(),
             //rng: Rc::new(RefCell::new(rng)),
         };
+        #[derive(Copy, Clone, Debug, Ord, PartialOrd, Eq, PartialEq)]
+        struct Score {
+            iter_indexes: usize,
+            check_indexes: usize,
+            size: usize,
+        }
         let trie = {
             let base_index_usage: TVec<RelationId, BTreeSet<BTreeSet<ColumnId>>> =
                 relations.map(|x| {
@@ -256,21 +366,29 @@ mod construction {
                         .collect()
                 });
             let score_for_trie = |trie: &Trie| {
-                let mut index_usage = base_index_usage.clone();
-                trie.register_index_usages(&mut index_usage);
-                (
-                    index_usage
+                let mut index_usage_iter = base_index_usage.clone();
+                let mut index_usage_check = base_index_usage.clone();
+                trie.register_index_usages(&mut index_usage_iter, &mut index_usage_check);
+                Score {
+                    iter_indexes: index_usage_iter
                         .iter()
                         .map(std::collections::BTreeSet::len)
                         .sum::<usize>(),
-                    trie.size(),
-                )
+                    check_indexes: index_usage_check
+                        .iter()
+                        .map(std::collections::BTreeSet::len)
+                        .sum::<usize>(),
+                    size: trie.size(),
+                }
             };
 
-            let mut best_trie = construct_rec(ctx.clone(), &rules);
-            let mut best_score = score_for_trie(&best_trie);
-            tracing::info!("trie score {best_score:?}");
+            let mut estimate = IndexEstimate::new(relations);
+            let trie = construct_rec(&mut estimate, ctx.clone(), &rules);
+            let score = score_for_trie(&trie);
+            // tracing::info!("trie score estim {:?}", estimate.score());
+            tracing::info!("trie score {score:?}");
 
+            /*
             const TRIE_BUILDING_IMPROVEMENT_ITERATIONS: usize = 0;
             for _ in 0..TRIE_BUILDING_IMPROVEMENT_ITERATIONS {
                 let trie = construct_rec(ctx.clone(), &rules);
@@ -282,8 +400,9 @@ mod construction {
                     best_trie = trie;
                 }
             }
+            */
 
-            best_trie
+            trie
         };
 
         tracing::info!(
@@ -314,8 +433,8 @@ mod construction {
         }
     }
 
-    fn construct_rec(mut ctx: Ctx<'_>, rules: &[Rule]) -> Trie {
-        let (finished, map) = election(&ctx, rules);
+    fn construct_rec(estimate: &mut IndexEstimate<'_>, mut ctx: Ctx<'_>, rules: &[Rule]) -> Trie {
+        let (finished, map) = election(estimate, &ctx, rules);
 
         let mut actions = vec![];
         let mut unify = vec![];
@@ -340,7 +459,7 @@ mod construction {
             .into_iter()
             .map(|(link, rules)| {
                 let ctx = ctx.apply(&link);
-                (link, construct_rec(ctx, &rules))
+                (link, construct_rec(estimate, ctx, &rules))
             })
             .collect();
 
@@ -865,7 +984,11 @@ mod construction {
     /// For each rule, pick what the next step should be (if any)
     ///
     /// If we want to do random sampling, we might want to use a PDF here or something.
-    fn election(ctx: &Ctx<'_>, rules: &[Rule]) -> (Vec<Rule>, BTreeMap<TrieLink, Vec<Rule>>) {
+    fn election(
+        estimate: &mut IndexEstimate<'_>,
+        ctx: &Ctx<'_>,
+        rules: &[Rule],
+    ) -> (Vec<Rule>, BTreeMap<TrieLink, Vec<Rule>>) {
         use crate::ids::id_wrap;
         use itertools::Either::{Left, Right};
         id_wrap!(RuleId, "y", "id for a rule");
@@ -960,7 +1083,22 @@ mod construction {
             // not seem to improve things.
             // let mut rng = ctx.rng.borrow_mut();
             // let vote = *vote.choose(&mut rng).unwrap();
+
             let vote = vote[0];
+
+            // did not help to greedily pick atom with fewest introduced indexes.
+            // let vote = vote
+            //     .iter()
+            //     .copied()
+            //     .max_by_key(|&vote| {
+            //         (
+            //             estimate.introduces_indexes(&votes[vote].1, &ctx.bound_premise),
+            //             vote,
+            //         )
+            //     })
+            //     .unwrap();
+            // estimate.add_index(&votes[vote].1, &ctx.bound_premise);
+
             let existing = map.insert(
                 votes[vote].1.clone(),
                 matrix[vote]
