@@ -8,6 +8,23 @@
   [#text(fill: blue, weight: "bold", size: 12pt)[NOTE: #msg]]
 }
 
+#let raw_line_offset = state("raw_line_offset", -1)
+#show raw.line: it => context {
+  if raw_line_offset.get() == -1 {
+    return it
+  }
+  let num = it.number + raw_line_offset.get()
+  if num < 10 {
+    text(fill: gray)[~~#num]
+  } else if num < 100 {
+    text(fill: gray)[~#num]
+  } else {
+    text(fill: gray)[#num]
+  }
+  h(1em)
+  it.body
+};
+
 #show "naive": "naïve"
 #show "e-graph": box[e-graph]
 #show "e-graphs": box[e-graphs]
@@ -696,7 +713,7 @@ as here where $x dot 2 == x << 1$, we can deduplicate our expressions in an e-gr
   ),
   caption: [An e-graph representing both
     $(2+(a xor b)) dot (2 dot (a xor b))$ and
-    $(2+(a+b)) dot (2 dot (a+b))$.
+    $(2+(a+b)) dot (2 dot (a+b))$, assuming $a xor b = a + b$.
   ],
   placement: auto,
 ) <fig_background_nonbipartite_egraph>
@@ -721,12 +738,10 @@ which has $2^n$ top-level nodes in an expression DAG yet requires linear space a
 example is of course synthetic but in general e-graphs achive compression exponential in the number
 of nested rewrites.
 
-#TODO[typo? e-classe]
-
 E-graphs can be represented as graphs in multiple ways. We have already seen how e-nodes can be
 nodes and e-classes equivalence classes of nodes. This is representation that motivates the e-class
 and e-node terminology. In another formulation, e-graphs are bipartite graphs with e-classes and
-e-nodes being the two types of nodes. Edges run from e-node to e-classe denoting membership in that
+e-nodes being the two types of nodes. Edges run from e-node to e-class denoting membership in that
 equivalence class, and from e-class to e-node denoting being used as input in that e-node's
 operation. As in the other representations, operation input edges are ordered from the point of view
 of the operation since not all operations are commutative. Finally, every e-node is a member of
@@ -791,7 +806,7 @@ representation.
   ),
   caption: [A bipartite e-graph representing both
     $(2+(a xor b)) dot (2 dot (a xor b))$ and
-    $(2+(a+b)) dot (2 dot (a+b))$.
+    $(2+(a+b)) dot (2 dot (a+b))$, assuming $a xor b = a + b$.
   ],
   placement: auto,
 ) <fig_background_bipartite_egraph>
@@ -799,6 +814,34 @@ representation.
 == Equality saturation in practice
 
 #TODO[explain eqsat and show simple, correct but slow code]
+
+#figure(
+  {
+    let lines = read("egraph.rs").split("\n")
+    let mid = 69
+
+    let primary = raw_line_offset.update(_ => 0)
+    let secondary = raw_line_offset.update(_ => mid - 1)
+    let reset = raw_line_offset.update(_ => -1)
+
+    let a = raw(lines.slice(1, mid).join("\n"), lang: "rust", block: true)
+    let a = primary + a
+
+    let b = raw(lines.slice(mid).join("\n"), lang: "rust", block: true)
+    let b = secondary + b + reset
+
+    text(
+      size: 8pt,
+      grid(
+        columns: (1fr, 1fr),
+        a, b,
+      ),
+    )
+  },
+  caption: [A self-contained but naive e-graph implementation.],
+) <fig_background_self_contained_egraph_rust>
+
+#TODO[@fig_background_self_contained_egraph_rust]
 
 #pagebreak()
 
