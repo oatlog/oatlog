@@ -31,6 +31,7 @@ pub(crate) struct Trie {
 }
 
 impl Trie {
+    // only for score
     fn register_index_usages(
         &self,
         index_usage: &mut TVec<RelationId, BTreeSet<BTreeSet<ColumnId>>>,
@@ -726,9 +727,9 @@ mod construction {
                 IndexedOldConnected,
 
                 // the semi-join inclusion is backwards to make sure we are able to do old before
-                // new in a triangle join.
+                // all in a triangle join.
                 //
-                // We only care about .*Old and .*New cases because these are the
+                // We only care about .*Old and .*All cases because these are the
                 // only cases where semi-joins are prioritized over primary joins.
                 SemiJoinOld,
                 SemiJoinAll,

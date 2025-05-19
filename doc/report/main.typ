@@ -258,6 +258,8 @@ avoided within a optimization pass architecture.
 
 == Phase ordering and peephole rewriting
 
+#TODO[the first sentence here is hard to parse]
+
 In an optimization pass architecture, the phase ordering problem is often framed as figuring out
 what static list of passes, allowing repeats, result in the best performing output programs. For
 LLVM, such pass configurations are in practice hundreds of entries long with many passes being
@@ -718,6 +720,8 @@ expression $f(f(...(f(x))...))$ where each $f$ is either $x arrow x dot 2$ or $x
 which has $2^n$ top-level nodes in an expression DAG yet requires linear space as an e-graph. This
 example is of course synthetic but in general e-graphs achive compression exponential in the number
 of nested rewrites.
+
+#TODO[typo? e-classe]
 
 E-graphs can be represented as graphs in multiple ways. We have already seen how e-nodes can be
 nodes and e-classes equivalence classes of nodes. This is representation that motivates the e-class
@@ -2298,6 +2302,10 @@ data Math =
 
 #TODO[]
 
+== #TODO[WCOJ (needed to explain our query planning)]
+
+#TODO[]
+
 = Implementation <oatlog_implementation>
 
 #TODO[Elaborate and forward reference]
@@ -2836,9 +2844,40 @@ To simplify explanations, we consider a relation `Add(x, y, res)` where there is
 We implement canonicalization by iterating through the FD index ...
 #TODO[]
 
-#TODO[]
-
 == Query planning
+
+Generally for optimal query planning one would need to consider runtime information such as the sizes of the relations and the sizes of joins.
+We are performing static query planning at compile-time since that is less engineering effort and query planning is very well established research.
+Therefore, we have very limited information about the sizes of relations:
+- Old/New is smaller than All
+- Functional dependence may cause some joins to only produce a single element.
+- Some relations are known to only contain a single element (globals)
+
+At a high-level, the query planner selects a primary or a semi-join and if it introduced variables, semi-joins are added.
+
+We use the following scoring to select what join to perform next.
+
+```rust
+enum RelationScore {
+    Disconnected,
+    AllConnected,
+    OldConnected,
+    SemiJoinOld,
+    SemiJoinAll,
+    LastPrimary,
+    SingleElementConnected,
+    AllBound,
+    Global,
+    New,
+}
+```
+
+We perform joins with new first mainly because we maintain new as a deduplicated list and do not have any indexes on it.
+Globals, relations with all variables bound always produce a single element and are therefore queried first.
+We select old before all, since old is smaller.
+To make sure we still perform WCOJ, we need to ensure that we perform semi-joins before joins that may increase the number of elements, however we perform semi-joins with all first to make sure that the last semi-join can become a primary join on old, if possible.
+
+== Equality modulo permutation <eqmodperm>
 
 #TODO[]
 
