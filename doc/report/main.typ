@@ -28,6 +28,10 @@
 #show "naive": "naïve"
 #show "e-graph": box[e-graph]
 #show "e-graphs": box[e-graphs]
+#show "e-node": box[e-node]
+#show "e-nodes": box[e-nodes]
+#show "e-class": box[e-class]
+#show "e-classes": box[e-classes]
 
 #set document(title: [Oatlog])
 
@@ -745,7 +749,7 @@ e-nodes being the two types of nodes. Edges run from e-node to e-class denoting 
 equivalence class, and from e-class to e-node denoting being used as input in that e-node's
 operation. As in the other representations, operation input edges are ordered from the point of view
 of the operation since not all operations are commutative. Finally, every e-node is a member of
-exactly one e-class and no e-class is empty. @fig_background_bipartite_egraph shows this
+exactly one e-class and typically no e-class is empty. @fig_background_bipartite_egraph shows this
 representation.
 
 #figure(
@@ -813,7 +817,134 @@ representation.
 
 == Equality saturation in practice
 
-#TODO[explain eqsat and show simple, correct but slow code]
+While e-graph engines like oatlog contain significant complexity in order to support many kinds of
+rewrite rules and achieve good performance, both asymptotically and in terms of constant factors, a
+similar computation can be described in only about 100 lines of code. This section will present and
+explain such a snippet, simultaneously concretizing the steps involved in equality saturation.
+
+The operations that can be performed on an e-graph, expressed in the language of its bipartite
+representation shown in @fig_background_bipartite_egraph, are
+
+- `make`: Inserting an e-class with degree zero.
+- `insert`: Inserting an e-node, connecting to existing e-classes as inputs and output.
+- `union`: Merging two e-class with a node contraction.
+
+Colloquially, these correspond to declaring a unknown variable, declaring a computation that derives
+one variable from others, and declaring that two variables must in fact be equal.
+
+The operations `make` and `insert` are usually combined into a get-or-set operation that we call
+`entry`. Given an operation and its inputs, if such an e-node already exists return its containing
+e-class, otherwise `make` a new e-class and declare that it contains the e-node. Depending on how
+rewrite rules are specified, all or almost all calls to `make` can be replaced with `entry`, making
+`make` itself largely unnecessary. Still, for the purpose of implementation `make` is a reasonable
+abstraction.
+
+Note that this is oatlog terminology. In egg @egg, `entry` is called `add` and `union` is called
+`merge`.
+
+=== Union-find <section_background_practice_union_find>
+
+Let us first consider the easier problem of receiving only `make` and `union` operations. The
+operations create variables and declare that pairs of them are identical, and we must use the
+transitivity of equality to be able to answer queries on whether two variables are equal. This is a
+standard problem solved with a data structure called union-find or disjoint-sets @unionfindoriginal.
+@fig_background_practice_uf implements this data structure. Two variables `a` and `b` are equal if
+`find(a) == find(b)`.
+
+Conceptually, the union-find can be seen as a forest of rooted trees. Every tree is an equivalence
+class with its root being a representative. Every node `x` stores a pointer to its parent in
+`self.0[x.0]`, with the root pointing to itself or otherwise being distinguishable.
+
+The function `find` can in this implementation take linear time given adversarially ordered calls to
+`union`. Union-find can be optimized with path compression, in which the `find` loop after finding
+the representative rewrites non-root pointers along the walked path to point to the root. Another
+optimization involves modifying which root is is merged into the other in `union` to merge trees
+smaller-to-larger, guaranteeing logarithmic tree depth. Each of these optimizations individually
+guarantee an amortized $O(log n)$ time per `find` and `union`, with an amortized exceedingly slowly
+growing $O(alpha n)$ time per operation if both are applied @fastunionfind @unionfindvariantbounds.
+
+#figure(
+  {
+    let start = 79
+    let end = 100
+    let setup = raw_line_offset.update(_ => start - 1)
+    let reset = raw_line_offset.update(_ => -1)
+
+    let b = raw(read("egraph.rs").split("\n").slice(start, end).join("\n"), lang: "rust", block: true)
+    text(size: 8pt, setup + b + reset)
+  },
+  caption: [A minimal union-find implementation lacking path compression and smaller-to-larger
+    merging.],
+) <fig_background_practice_uf>
+
+=== E-graph representation and canonicalization
+
+Let us now decide how to store the e-graph in memory. Clearly this representation should be informed
+based on what how the e-graph will be queried and mutated, but let us first focus on finding
+something that is compact and to some extent natural. This decision can be seen as deciding how to
+store the edges of the bipartite graph from @fig_background_bipartite_egraph. There are two kinds of
+edges
+
++ Edges from e-node to e-class, denoting membership.
++ Edges from e-class to e-node, denoting computation inputs.
+
+For each of these we may store the edge in something like an adjacency matrix, either located
+alongside the e-node pointing towards the e-class or vice versa. Note that every e-node will have
+exactly one outgoing edge and some fixed number of ingoing edges, depending on the operation arity.
+On the other hand, e-classes may have an arbitrary number of ingoing and outgoing edges. A natural
+representation of the graph is therefore to store all edges as going from e-node to e-class, or in
+more concrete terms to let e-classes be numerical ids and e-nodes be tuples of their input and
+output e-class ids. The scenario $x_1 + x_2 = x_3$ can be represented with an e-node tuple $(+, 1,
+2, 3)$
+
+Representing e-classes with e-class ids additionally means that e-class `union` can be tracked with
+a union-find data structure as previously described in @section_background_practice_union_find.
+E-classes that are uprooted after a `union` will still be referred to in various e-nodes, so there
+must be a canonicalization step in which all such e-nodes are updated.
+
+Finally, addition along with all other functions satisfy that for any given input there is exactly
+one valid output, or for partial functions at most one valid output. This is called functional
+dependency and means that for e-nodes $(op, a, b, c)$ and $(op, a, b, d)$ we are guaranteed that
+$c=d$. This motivates storing e-nodes in a map from operator and inputs to output.
+
+@fig_background_practice_canonicalization combines these insights to represent an e-graph as a pair
+of `uf: UnionFind` and `enodes: HashMap<(Op, EClass, EClass), EClass>`. It also shows how e-class
+ids can be canonicalized after a batch of `union` operations, with the functional dependency
+possibly creating cascading `union`s during this process necessitating a loop to a fixed point.
+
+#figure(
+  {
+    let start = 3
+    let end = 30
+    let setup = raw_line_offset.update(_ => start - 1)
+    let reset = raw_line_offset.update(_ => -1)
+
+    let b = raw(read("egraph.rs").split("\n").slice(start, end).join("\n"), lang: "rust", block: true)
+    text(size: 8pt, setup + b + reset)
+  },
+  caption: [An e-graph represented as a data structure.],
+) <fig_background_practice_canonicalization>
+
+=== EqSat rewriting
+
+#TODO[@fig_background_practice_apply_rules]
+
+#figure(
+  {
+    let start = 30
+    let end = 68
+    let setup = raw_line_offset.update(_ => start - 1)
+    let reset = raw_line_offset.update(_ => -1)
+
+    let b = raw(read("egraph.rs").split("\n").slice(start, end).join("\n"), lang: "rust", block: true)
+    text(size: 8pt, setup + b + reset)
+  },
+  caption: [TODO],
+) <fig_background_practice_apply_rules>
+
+=== Full implementation
+
+#TODO[@fig_background_practice_full]
 
 #figure(
   {
@@ -838,10 +969,9 @@ representation.
       ),
     )
   },
-  caption: [A self-contained but naive e-graph implementation.],
-) <fig_background_self_contained_egraph_rust>
-
-#TODO[@fig_background_self_contained_egraph_rust]
+  caption: [A self-contained but asymptotically slow EqSat implementation with operations $+$ and
+    $dot$, with hardcoded rewrite rules for commutativity and distributivity.],
+) <fig_background_practice_full>
 
 #pagebreak()
 
