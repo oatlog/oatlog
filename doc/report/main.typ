@@ -861,12 +861,12 @@ the representative rewrites non-root pointers along the walked path to point to 
 optimization involves modifying which root is is merged into the other in `union` to merge trees
 smaller-to-larger, guaranteeing logarithmic tree depth. Each of these optimizations individually
 guarantee an amortized $O(log n)$ time per `find` and `union`, with an amortized exceedingly slowly
-growing $O(alpha n)$ time per operation if both are applied @fastunionfind @unionfindvariantbounds.
+growing $O(alpha(n))$ time per operation if both are applied @fastunionfind @unionfindvariantbounds.
 
 #figure(
   {
     let start = 79
-    let end = 100
+    let end = 99
     let setup = raw_line_offset.update(_ => start - 1)
     let reset = raw_line_offset.update(_ => -1)
 

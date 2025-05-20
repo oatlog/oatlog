@@ -67,8 +67,7 @@ impl EGraph {
         }
     }
 }
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
-struct EClass(usize);
+type EClass = usize;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 enum Op {
@@ -79,53 +78,57 @@ use Op::*;
 
 // Mapping nodes to their parent, roots to themselves.
 #[derive(Debug, Default)]
-struct UnionFind(Vec<EClass>);
+struct UnionFind { parents: Vec<EClass> }
 impl UnionFind {
     fn find(&self, mut x: EClass) -> EClass {
-        while x != self.0[x.0] {
-            x = self.0[x.0];
+        while x != self.parents[x] {
+            x = self.parents[x];
         }
         x
     }
     fn union(&mut self, a: EClass, b: EClass) {
         let a = self.find(a);
         let b = self.find(b);
-        self.0[b.0] = a;
+        self.parents[b] = a;
     }
     fn make(&mut self) -> EClass {
-        let ret = EClass(self.0.len());
-        self.0.push(ret);
+        let ret = self.parents.len() as EClass;
+        self.parents.push(ret);
         ret
     }
 }
 fn main() {
-    let ins = |k, g: &mut EGraph| *g.enodes
+    // Helper get-or-insert constructor functions.
+    let ins = |k, eg: &mut EGraph| *eg.enodes
         .entry(k)
-        .or_insert_with(|| g.uf.make());
-    let add = |a, b, g: &mut _| ins((Add, a, b), g);
-    let mul = |a, b, g: &mut _| ins((Mul, a, b), g);
+        .or_insert_with(|| eg.uf.make());
+    let add = |a, b, eg: &mut _| ins((Add, a, b), eg);
+    let mul = |a, b, eg: &mut _| ins((Mul, a, b), eg);
 
-    let g = &mut EGraph::default();
-    let [a, b, c, d] = [(); 4].map(|()| g.uf.make());
+    let eg = &mut EGraph::default();
+    let a = eg.uf.make();
+    let b = eg.uf.make();
+    let c = eg.uf.make();
+    let d = eg.uf.make();
 
     // factored: (a+b) * (c+d)
-    let fact = mul(add(a, b, g), add(c, d, g), g);
+    let fact = mul(add(a, b, eg), add(c, d, eg), eg);
 
     // expanded and commuted: c*(b+a) + (a+b)*d
     let exco = add(
-        mul(c, add(b, a, g), g),
-        mul(add(a, b, g), d, g),
-        g
+        mul(c, add(b, a, eg), eg),
+        mul(add(a, b, eg), d, eg),
+        eg
     );
 
-    g.canonicalize();
+    eg.canonicalize();
     // At first we don't know that `fact` and `exco`
     // are equal
-    assert_ne!(g.uf.find(fact), g.uf.find(exco));
+    assert_ne!(eg.uf.find(fact), eg.uf.find(exco));
     for _ in 0..2 {
-        g.apply_rules();
-        g.canonicalize();
+        eg.apply_rules();
+        eg.canonicalize();
     }
     // but after 2 EqSat steps we do.
-    assert_eq!(g.uf.find(fact), g.uf.find(exco));
+    assert_eq!(eg.uf.find(fact), eg.uf.find(exco));
 }
