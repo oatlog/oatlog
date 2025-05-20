@@ -2883,8 +2883,88 @@ To implement canonicalization in $O(n log n)$, one would need to maintain an ind
 Informally, this is $O(n log n)$ because there are $O(n)$ e-classes and each e-class is changed at most $O(log n)$ times.
 #TODO[cite something formally maybe]
 
+However, we do not do that #TODO[]
+
 To simplify explanations, we consider a relation `Add(x, y, res)` where there is a FD index from x,y to res.
-We implement canonicalization by iterating through the FD index ...
+We implement canonicalization by inserting delta into the FD index, which triggers unifications, and then we iterate the FD index, removing non-canonical rows and putting them in a delta.
+This is repeated until fixpoint.
+#TODO[]
+
+```python
+class AddRelation:
+    new: List[(Math, Math, Math)]
+    fd_index_x_y_to_res: Dict[(Math, Math), (Math, TimeStamp)]
+    index_x_to_y_res: Dict[(Math,), List[(Math, Math, TimeStamp)]]
+    index_y_to_x_res: Dict[(Math,), List[(Math, Math, TimeStamp)]]
+
+    # insert delta into FD index
+    def update_insert(self,
+        delta: List[(Math, Math, Math)],
+        uf: UnionFind,
+        latest_timestamp: TimeStamp
+    ):
+        fd_index = self.fd_index_x_y_to_res
+        for (x, y, res) in delta:
+            if (x, y) in fd_index:
+                (old_res, old_timestamp) = fd_index[(x, y)]
+                uf.union(res, old_res)
+
+                if old_res != uf.find(res):
+                    fd_index[(x, y)] = (uf.find(res), old_timestamp)
+                else:
+                    fd_index[(x, y)] = (uf.find(res), old_timestamp)
+
+            else:
+                fd_index[(x, y)] = (res, latest_timestamp)
+
+    # remove non-canonical rows from FD index
+    def update(self, uf: UnionFind, latest_timestamp: TimeStamp):
+        fd_index = self.fd_index_0_1_to_2
+        delta = []
+        for ((x, y), res) in fd_index:
+            if !(uf.is_root(x), uf.is_root(y), uf.is_root(res)):
+                delta.append((x, y, res))
+                del fd_index[(x, y)]
+
+        update_insert(fd_index, delta)
+
+    # reconstruct non-FD indexes
+    def update_finalize(self, latest_timestamp: TimeStamp):
+        self.new = []
+        self.index_x_to_y_res = dict()
+        self.index_y_to_x_res = dict()
+        for ((x, y), (res, timestamp)) in self.fd_index_x_y_to_res:
+            self.index_x_to_y_res.get(x), []).append((y, res, timestamp))
+            self.index_y_to_x_res.get(x), []).append((y, res, timestamp))
+            if timestamp == latest_timestamp:
+                self.new.append((x, y, res))
+```
+
+```python
+class Theory:
+    add: AddRelation
+    mul: MulRelation
+    add_delta: List[(Math, Math, Math)]
+    mul_delta: List[(Math, Math, Math)]
+    latest_timestamp: TimeStamp
+    uf: UnionFind
+
+    def canonicalize(self):
+        self.latest_timestamp += 1
+        self.add.update_insert(self.add_delta, self.uf, self.latest_timestamp)
+        self.mul.update_insert(self.mul_delta, self.uf, self.latest_timestamp)
+
+        while not reached fixpoint:
+            self.add.update(self.uf, self.latest_timestamp)
+            self.mul.update(self.uf, self.latest_timestamp)
+
+        self.add.update_finalize(self.latest_timestamp)
+        self.mul.update_finalize(self.latest_timestamp)
+
+```
+
+== Actions/apply rules
+
 #TODO[]
 
 == Query planning
