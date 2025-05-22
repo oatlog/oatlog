@@ -74,9 +74,6 @@
   ],
 )
 
-// #TODO[conceptual background: how things developed historically.]
-// #TODO[background: frontend, mid-end, backend.]
-
 // old structure
 // = Introduction
 //
@@ -184,7 +181,7 @@
 
 #TODO[Elaborate on evaluation once that's possible.]
 
-= Introduction
+= Introduction <chapter_introduction>
 
 Modern software development depends on efficient and reliable compilers, which apply sophisticated
 optimizations to improve performance while enabling portability and abstraction. For example,
@@ -498,34 +495,25 @@ general performance engineering.
 
 == This thesis
 
-#NOTE[This section talks about report sections that aren't finished as if they were.]
+#TODO[Elaborate further with short section summaries once the respective sections have been
+written.]
 
-/*
-@conceptual_background extends this introduction with a conceptual background. This is a
-step-by-step explanation of what e-graphs are and how they have been implement prior to their
-unification to Datalog. We then motivate the idea of e-graphs as relational databases, culminating
-in showing how semi-naive evaluation avoids rediscovering facts.
+@chapter_background extends this introduction with a step-by-step explanation of the topics relevant to
+implementing a state of the art e-graph engine. It does so by first motivating e-graphs starting
+from expression trees, then by incrementally showcasing a full self-contained implementation of
+equality saturation in about 100 lines of code, before finally explaining the similarity between
+e-graphs and relational databases and how this can be leveraged for a significantly more efficient
+implementation.
 
-The background, @background, changes the perspective to instead introduce the techniques that are
-relevant for anyone writing a Datalog-inspired EqSat engine, guided by their use
-within oatlog.
+@chapter_implementation then concretely describes the application of these techniques in oatlog and
+the implementation decisions we have made, in addition to showing how oatlog is used and its
+capabilities.
 
-@oatlog_implementation then concretely describes the implementation of these techniques in oatlog,
-in addition to showing what oatlog can do and how it is used. @oatlog_evaluation follows by
-evaluating oatlog through its test suite and benchmarks.
-*/
+@chapter_evaluation follows by evaluating oatlog through its test suite and benchmarks.
 
-// + Kompilatorer viktiga
-// + peepholes är bra
-// + Vad är en rewrite
-//   - exempel?
-// + Kompilatorer har phase ordering problem pga destructive rewrites
-// + e-grafer löser phase ordering
-// + e-grafer är långsamma
-// + Finns lovande innovation inom e-graf-implementering
-// + Vi har implementerat e-graf som är snabbare än egglog i många fall
+#TODO[@chapter_conclusion]
 
-= Background <background>
+= Background <chapter_background>
 
 #TODO[introduce the background section]
 
@@ -877,6 +865,131 @@ growing $O(alpha(n))$ time per operation if both are applied @fastunionfind @uni
     merging.],
 ) <fig_background_practice_uf>
 
+/*
+
+=== Union-find
+
+Union-find is a data structure that maintains disjoint sets, supporting the two operations
+`union()`, which merges two sets and `find()` which returns the unique representative element of a
+set @unionfindoriginal. Alternatively, it can be seen as representing an undirected graph with
+`union()` adding an edge between two nodes and `find()` returning some designated representative of
+the connected compontent containing a given node. E-graphs use a union-find data structure to store
+e-classes and unify them once they are discovered to be equal.
+
+There are two optimizations used to speed up the union-find datastructure, path compression and
+smaller-to-larger merging. Operations have an amortized time complexity of $O(log n)$ if either
+optimization is applied individually, with an amortized time complexity of $O(alpha(n))$
+#footnote[$alpha$ is the inverse of the Ackermann function and grows slowly enough to be considered
+constant for all practical inputs.] if they are applied together @fastunionfind
+@unionfindvariantbounds. An example implementation is shown in @union-find-path-compression.
+
+#figure(
+  ```python
+  class UnionFind:
+      def __init__(self, num_elements):
+          self.repr = [i for i in range(num_elements)]
+          self.size = [1] * num_elements
+
+      # find the representative element
+      def find(self, i):
+          if self.repr[i] == i:
+              return i
+          else:
+              root = self.find(self.repr[i])
+              self.repr[i] = root # path compression
+              return root
+
+      # merge the sets that i and j belong to
+      def union(self, i, j):
+          i = self.find(i)
+          j = self.find(j)
+          if i == j:
+              return
+
+          # smaller-to-larger merging
+          if self.size[i] > self.size[j]:
+              larger, smaller = i, j
+          else:
+              larger, smaller = j, i
+          self.repr[smaller] = larger
+          self.size[larger] += self.size[smaller]
+
+  uf = UnionFind(5) # [[0], [1], [2], [3], [4]]
+  uf.union(2, 3) # [[0], [1], [2, 3], [4]]
+  uf.union(0, 4) # [[0, 4], [1], [2, 3]]
+  uf.union(0, 3) # [[0, 4, 2, 3], [1]]
+
+  # find(a) == find(b) <=> a,b belong to the same set
+  assert uf.find(4) == uf.find(3) # 4 and 3 belong to the same set.
+  assert uf.find(4) != uf.find(1) # 4 and 1 belong to different sets.
+  ```,
+  caption: flex-caption(
+    [Union-find with path compression. ],
+    [If `repr[i] == i` then `i` is a representative of the set. Initially `repr[i] = i`, so all elements belong to disjoint sets of size 1.],
+  ),
+) <union-find-path-compression>
+
+In the context of e-graphs, it makes sense to apply path compression to avoid walking a linked list
+within `find()`, although this part of the code is unlikely to be a bottleneck in comparison to
+index lookups or index maintenance.
+
+Contrastingly, in the context of a relational e-graph engine, the canonicalization step will remove
+all "uprooted" e-classes, i.e. roots recently turned children after a `union()`, from all tables. If
+the index data structures are not recreated fully after each step, such as when using BTree
+indexes#footnote[When using immutable indexes recreated from scratch, such as sorted arrays with
+lookups using binary search, this matters less but there is still some constant-factor overhead in
+doing unnecessary uproots.], which e-classes are merged into which matters. Specifically, the merge
+order should be chosen to minimize the number of database modifications to remove the uprooted
+e-class. A good approximation of this is the number of times an e-classes is stored within a table
+row. However, in practice tracking this number brings additional maintenance overhead and is
+therefore not performed in oatlog. Instead, one can merge larger-id to smaller-id as a heuristic,
+since earlier and hence smaller ids are likely to be present in more existing tuples.
+
+
+
+
+Union-find @unionfindoriginal @fastunionfind @unionfindvariantbounds is a datastructure that maintains disjoint sets, meaning that every element belongs to exactly one set.
+This is a very general-purpose datastructure, for example it can be used to implement Kruskal's algorithm for minimum spanning trees.
+
+Because of the property that each element belongs to exactly one set, we can refer to an arbitrary representative element in the set instead of referring to the entire set.
+
+The `find()` function takes an arbitrary element in some set and returns the unique representative of that set.
+To check if two elements, $a,b$ belong to the same set, we check if their representatives are the same, if `find(a) == find(b)`.
+
+The `union()` function takes two elements $a,b$ and ensures that their sets are unified.
+
+An example implementation is shown in @union-find-simplified-impl.
+
+=== Implementation
+
+To implement union-find, each element is an integer, so it maintains sets of integers, but this is equivalent to storing sets of any type since we can assign unique integer ids to each element.
+
+Each element has a representative element stored in the `representative` array where each element initially claims that they are their own representative and that their set size is one.
+
+For elements $a,b$ where $a != b$ and `representative[a] = b`, the representative of $a$ is recursively the representative of $b$.
+For example if we had sets of persons and each person pointed to an arbitrary person who is taller than them, we could find the representative (tallest) person by following where people point until the representative is found.
+
+To unify the sets that $a$ and $b$ belong to, we make the representative of $a$, the representative of $b$, `representative[find(a)] = find(b)]`.
+In the previous metaphor, this would be finding the tallest person in the first set and telling them to point to the tallest person in the second set.
+This means that if you started in either sets you would now end up with the same representative and therefore the sets are merged.
+
+=== Efficient union-find
+
+#TODO[maybe we can skip this part]
+
+To make union-find efficient, there are two optimizations that are applied, smaller-to-larger
+merging and path-compression. This is shown in REMOVED
+
+In the worst-case for this implementation the `find()` operation may be $O(n)$ since the tree may be unbalanced.
+With smaller-to-larger merging we ensure that the trees are balanced and therefore get a $O(log n)$ complexity for `find()`.
+
+Path compression amortizes the cost of `find()` by modifying the representatives along the path to the root to just directly point to the root.
+
+With path compression and smaller-to-larger merging, it is extremely hard to find a worst-case and the amortized complexity of `find()` becomes $O($alpha$(n))$ @fastunionfind @unionfindvariantbounds
+where $alpha$ is the inverse of the Ackermann function.
+This grows extremely slowly (significantly slower than logarithmic) and in practice it has a good constant factor, so in practice it is typically treated as if it was $O(1)$.
+*/
+
 === E-graph representation and canonicalization
 
 Let us now decide how to store the e-graph in memory. Clearly this representation should be informed
@@ -927,7 +1040,9 @@ possibly creating cascading `union`s during this process necessitating a loop to
 
 === EqSat rewriting
 
-#TODO[@fig_background_practice_apply_rules]
+#TODO[@fig_background_practice_apply_rules. Rules here hardcoded, real engines generic either by
+compiler or interpreter. The `make`s could be rewritten to `entry`. NOTE that the egraph is not
+canonical afterwards, the unions called when inserting may make existing entries outdated.]
 
 #figure(
   {
@@ -942,9 +1057,51 @@ possibly creating cascading `union`s during this process necessitating a loop to
   caption: [TODO],
 ) <fig_background_practice_apply_rules>
 
-=== Full implementation
+=== A full implementation
 
-#TODO[@fig_background_practice_full]
+#TODO[@fig_background_practice_full. EqSat workflow involves creating e-graph by declaring variables
+and inserting e-nodes relating them, then doing some rounds of rewrites (apply_rules) incl
+canonicalization. At the one one can assert equality, such as here, or do extraction. Talk briefly
+about extraction but since oatlog does not do extraction we do not focus further on it. Real
+theories also usually more than 2 rewrite rules and operators. Define "theory"]
+
+/*
+A set of rewrite rules is called a theory, and these can be shown to converge to finite e-graphs
+under some conditions. In practice, many theories diverge and the EqSat rewriting phase is often
+performed until some timeout or until some other condition is met.
+
+When using EqSat to prove that two expressions are or are not equal, we simply query the e-class of
+these e-nodes after the e-matching and canonicalization loop has finished. But EqSat can also be
+used for optimization, in which case there is an extraction phase that selects a good expression
+computing a given e-class of the e-graph. Only slightly simplified#footnote[Only e-classes used in
+the extracted expression need to be realized as an e-node, and it would be possible although for
+most cost functions never desirable to realize the same e-class differently at different locations
+in the final expression.], extraction can be seen as selecting a primary e-node for each e-class.
+The cost of an e-node would usually depend on the e-nodes realizing its input e-classes, and the
+global cost to minimize would be the cost of the root e-class.
+
+A simple yet realistic cost function is a sum of static e-node costs for all e-nodes included in an
+extracted expression. This corresponds to minimizing the number of operations necessary to compute
+the final value, allowing reuse of temporaries. For trees, such a cost could be computed with
+dynamic programming in linear time since the cost of an e-node is a constant plus the sum of costs
+for its input e-classes. For general e-graphs extraction is NP-hard, but there are both heuristics
+and algorithms that perform in practice on some types of e-graphs @fastextract.
+*/
+
+
+/*
+
+== Extraction
+
+#NOTE[We have not implemented extraction yet.]
+
+Extraction is the process of selecting an expression from an e-graph. Doing so non-optimally is
+trivial, but selecting an optimal expression, even with simple cost functions is NP-hard
+@extractnphard @fastextract @egraphcircuit.
+
+Many NP-hard graph algorithms can be done in polynomial time for a fixed treewidth, and this also applies to extraction, where it can be done linear time @fastextract @egraphcircuit.
+
+*/
 
 #figure(
   {
@@ -975,122 +1132,9 @@ possibly creating cascading `union`s during this process necessitating a loop to
 
 #pagebreak()
 
-/*
+== Recursive e-matching
 
-= Conceptual background <conceptual_background>
-
-*/
-
-// #TODO[Asking Matti: Is the conceptual background sufficiently understandable?]
-
-/*
-The conceptual background explains the core concepts necessary to understand our work. Its
-explanation goes into greater technical detail than in the introduction, while remaining more
-pedagogical (and less comprehensive) than the background in @background.
-
-We start by describing e-graphs as a static data structure (@conceptual_background_egraphs) before
-explaining about how they are mutated in the e-matching and canonicalization stages of EqSat
-(@conceptual_background_nonrelational). Following this, we rethink the graph representation to
-simplify querying and end up with an e-graph represented as a collection of relational database
-tables (@conceptual_background_relational), a representation that unlocks semi-naive evaluation
-(@conceptual_background_seminaive). Finally, we briefly discuss the theory languages that one can
-use to interact with this entire machinery (@conceptual_background_theory_languages) and the design
-constraints that differentiate Datalog engines from SQL database management systems
-(@conceptual_background_datalog_vs_sql).
-
-== E-graphs <conceptual_background_egraphs>
-
-E-graphs are motivated by the observation that directed acyclic graphs (DAGs) of expressions can
-efficiently represent a nested expression with a common subexpression, like say $f(g(x), g(x))$, as
-well as multiple expressions sharing a common subexpression, like say $f(g(x))$ and $h(g(x))$), but
-they can not efficiently deduplicate multiple identical consumers of different inputs, such as
-$f(g(x))$ and $f(h(x))$. This is problematic when exploring local rewrites for optimization or
-theorem proving purposes as these activities will create many expressions with shared parts.
-
-One could address the deduplication problem by introducing a function-like abstraction#footnote[It
-turns out such a function-like abstraction is useful even within an e-graph, and there exists an
-e-graph variant known as slotted e-graphs that has this @slotted_egraph. But oatlog does not
-implement slotted e-graphs and they are not directly relevant to this thesis.], but this would still
-require some at least constant-sized top-level bookkeeping per expression. However, for local
-equality-preserving rewrites, it is more effective to introduce e-classes -- groups of equal e-nodes
--- that e-nodes reference instead of pointing to other e-nodes directly. This enables an e-graph to
-compactly represent an exponential number of equivalent expressions, parameterized by mappings from
-e-classes to e-nodes.
-
-*/
-#TODO[This paragraph is hard to understand before reading figure 1]
-/*
-
-E-graphs can be represented as graphs in multiple ways. In one formulation, hinted at by the
-terminology of e-nodes and e-classes, e-nodes are the nodes of the graph and e-classes are
-equivalence classes of nodes under an equivalence relation. Nodes are annotated by the primitive
-operation they perform on their inputs, like addition or bitshift. Unlike an actual graph, edges
-denoting inputs for use in operations do not run from nodes to nodes but rather from e-classes to
-(e-)nodes.
-
-E-graphs can also be represented as bipartite graphs with two types of nodes, e-classes and e-nodes.
-Edges run from e-nodes to e-classes denoting membership in that equivalence class, and from
-e-classes to e-nodes denoting being used as input in the e-node's operation. Operation input edges
-are ordered from the point of view of the operation since not all operations are commutative.
-Finally, every e-node is a member of exactly one e-class and no e-class is empty.
-
-@informal-egraph-figure-non-bipartite shows an example e-graph represented as e-classes, i.e.
-equivalence classes of e-nodes, pointing to e-nodes. @informal-egraph-figure shows the same e-graph
-represented as a bipartite graph.
-
-Note that we consider constants e-nodes rather than e-classes. While seeing constants as
-special e-classes would work, it would prevent use-cases such as equation solving in which e-nodes
-can have unknown inputs but known outputs.
-
-#figure(
-  image("../figures/egraph_cluster.svg", width: 60%),
-  caption: flex-caption(
-    [Example of an equivalence-class-formulation e-graph that initially contains
-      $(a+2) dot c$.],
-    [
-      The sharp boxes are e-nodes and the rounded boxes are e-classes. E-classes
-      contain e-nodes evaluating to the same value and the input to an e-node can be computed from any
-      of the e-nodes in its input e-class.
-    ],
-  ),
-) <informal-egraph-figure-non-bipartite>
-
-#figure(
-  image("../figures/egraph_example.svg", width: 75%),
-  caption: flex-caption(
-    [The same e-graph as in @informal-egraph-figure-non-bipartite, but drawn as a bipartite graph.],
-    [
-      The oval shapes are e-classes, representing a set of equivalent expressions, with incoming edges
-      denoting e-node members.
-      The rectangle shapes are e-nodes, which have e-classes as arguments.
-      The orange-colored edges and shapes are those added due to the applied rules.
-    ],
-  ),
-) <informal-egraph-figure>
-
-== Recursive e-matching and canonicalization <conceptual_background_nonrelational>
-
-@informal-egraph-figure shows not only an e-graph but one that has e-nodes and e-classes added to it
-after the application of rewrite rules. While @conceptual_background_egraphs explains the meaning
-and invariant of a static e-graph, we have not yet considered how they are mutated.
-
-The EqSat workflow consists of two parts, an e-matching phase and a canonicalization#footnote[Also
-known as rebuilding.] phase. E-matching involves searching the e-graph for all occurences of a
-pattern, i.e. a syntactic expression such as $(x+y) dot z$, for which e-matching involves selecting
-e-classes to assign to $x$, $y$ and $z$ which then implicitly selects unique e-nodes for $x+y$ and
-the root expression $(x+y) dot z$. E-matching requires solving the subgraph isomorphism problem for
-an e-graph.
-
-The rewrite rule will then describe some actions to take based on the match, the most important of
-which are adding new e-nodes to the graph, adding e-classes and unifying e-classes. These
-modifications are then applied to the e-graph in the canonicalization step, with the former two, in
-the bipartite formulation, corresponding to adding nodes and unification corresponding to a node
-contraction.
-
-*/
-#TODO[Formal e-graph representation (Union-find $U : "EClassId" -> "EClassId"$, map $M : "EClassId"
--> {"ENode"}$, hashcons $H : "ENode" -> "EClass"$, etc) suitable for implementation]
-/*
+#TODO[]
 
 #figure(
   ```rust
@@ -1110,43 +1154,6 @@ contraction.
   ```,
   caption: [Egg-like egraph representation],
 ) <listing_egglike_egraph>
-
-*/
-#TODO[Canonicalization on this representation]
-
-#TODO[Recursive e-matching]
-
-#TODO[Batching rewrites for EqSat. WHY is this incompatible with rollback and hence theorem
-  proving?]
-/*
-
-A set of rewrite rules is called a theory, and these can be shown to converge to finite e-graphs
-under some conditions. In practice, many theories diverge and the EqSat rewriting phase is often
-performed until some timeout or until some other condition is met.
-
-When using EqSat to prove that two expressions are or are not equal, we simply query the e-class of
-these e-nodes after the e-matching and canonicalization loop has finished. But EqSat can also be
-used for optimization, in which case there is an extraction phase that selects a good expression
-computing a given e-class of the e-graph. Only slightly simplified#footnote[Only e-classes used in
-the extracted expression need to be realized as an e-node, and it would be possible although for
-most cost functions never desirable to realize the same e-class differently at different locations
-in the final expression.], extraction can be seen as selecting a primary e-node for each e-class.
-The cost of an e-node would usually depend on the e-nodes realizing its input e-classes, and the
-global cost to minimize would be the cost of the root e-class.
-
-A simple yet realistic cost function is a sum of static e-node costs for all e-nodes included in an
-extracted expression. This corresponds to minimizing the number of operations necessary to compute
-the final value, allowing reuse of temporaries. For trees, such a cost could be computed with
-dynamic programming in linear time since the cost of an e-node is a constant plus the sum of costs
-for its input e-classes. For general e-graphs extraction is NP-hard, but there are both heuristics
-and algorithms that perform in practice on some types of e-graphs @fastextract.
-
-== E-graphs as relational databases <conceptual_background_relational>
-
-#NOTE[The introduction of recursive e-matching is not actually written yet]
-
-Recursive e-matching as introduced in the previous section could be implemented as in
-@listing_recursive_ematching.
 
 #figure(
   ```rust
@@ -1177,6 +1184,123 @@ Recursive e-matching as introduced in the previous section could be implemented 
   caption: [Pseudocode for recursive e-matching of the pattern $(x+y)dot z$.],
 ) <listing_recursive_ematching>
 
+== Database joins
+
+#let c2 = table.cell(fill: red.lighten(20%))[c2]
+#let c5 = table.cell(fill: blue.lighten(20%))[c5]
+#let c8 = table.cell(fill: green.lighten(20%))[c8]
+
+#figure(
+  grid(
+    columns: (auto, auto, auto),
+    inset: 2pt,
+    table(
+      columns: (auto, auto, auto),
+      inset: 8pt,
+      table.header(
+        table.cell(colspan: 3, [*Orders*]),
+        [Ord],
+        [Cust],
+        [Amnt],
+      ),
+
+      [o1], c8, [2],
+      [o2], c2, [1],
+      [o3], c5, [2],
+      [o4], c8, [5],
+      [o5], c2, [100],
+    ),
+    table(
+      columns: (auto, auto),
+      inset: 8pt,
+      table.header(
+        table.cell(colspan: 2, [*Customers*]),
+        [Cust],
+        [Name],
+      ),
+
+      c2, [Foo],
+      c5, [Bar],
+      c8, [Baz],
+    ),
+    table(
+      columns: (auto, auto, auto, auto),
+      inset: 8pt,
+      table.header(
+        table.cell(colspan: 4, [*Orders* $join$ *Customers*]),
+        [Order],
+        [Cust],
+        [Amount],
+        [Name],
+      ),
+
+      [o1], c8, [2], [Baz],
+      [o2], c2, [1], [Foo],
+      [o3], c5, [2], [Bar],
+      [o4], c8, [5], [Baz],
+      [o5], c2, [100], [Foo],
+    ),
+  ),
+  caption: [tables of a fictional company that maintains a table of orders and customers. Orders $join$ Customers is a join between the Orders and Customers table on "Cust"],
+) <database-table-example>
+
+In a database all information is stored in tables, see @database-table-example.
+We could keep a single table that merges Orders and Customers, but then we would be storing customer names multiple times and corrections to a customers information would need to modify multiple rows.
+
+But it is often useful to be able to be able to view the merged table, which is why the join ($join$) operation exists.
+Semantically it compares all pairs of the two relations and keeps the pairs where the attribute that we join on matches.
+The result of a join is shown in @database-table-example and an example implementation of nested-loop join is shown in @nested-loop-join-impl.
+
+#figure(
+  ```python
+  # join orders and customers on `cust` attribute
+  def join_orders_customers(orders, customers):
+      out = []
+
+      # for all pairs of the two relations
+      for (customer2, name) in customers:
+          for (order, customer1, amount) in orders:
+
+              # filter to make sure that the attribute we join on matches.
+              if customer1 != customer2:
+                  continue
+              out.append((order, customer1, amount, name))
+      return out
+  ```,
+  caption: [Example implementation of a nested-loop join.],
+) <nested-loop-join-impl>
+
+However, nested loop join is quite inefficient, since two random rows from the two relations are unlikely to match on their attribute.
+This makes us always perform $O(n^2)$ operations.
+This motivates indexed joins where we have data-structures to efficiently get a specific row in the relation.
+A simple implementation could use a hashmap and is shown in @hash-join-impl.
+
+#figure(
+  ```python
+  # join orders and customers on `cust` attribute
+  def join_orders_customers(orders, customers):
+      out = []
+
+      # make cust -> order index.
+      order_index = dict()
+      for (order, customer, amount) in orders:
+          order_index.get(customer, []).append(order, amount)
+
+      for (customer, name) in customers:
+          # indexed lookup
+          for (order, amount) in order_index[customer]:
+
+              out.append((order, customer1, amount, name))
+      return out
+  ```,
+  caption: [Example implementation of a nested-loop join.],
+) <hash-join-impl>
+
+== E-graphs as relational databases <conceptual_background_relational>
+
+Recursive e-matching as introduced in the previous section could be implemented as in
+@listing_recursive_ematching.
+
 Concretely, what this code does is iterate over e-nodes, filter based on the pattern constraints,
 recurse to match subpatterns and combine subpatterns with cartesian products. To speed this up, it
 would make sense to store e-nodes in a datastructure that allows us to do filtered lookups rather
@@ -1185,9 +1309,9 @@ than iterating then filtering.
 The filters that appear in recursive e-matching are of the form
 + Require e-nodes to be of a certain variant (e.g. addition or multiplication).
 + Require e-nodes to belong to a certain parent e-class.
-*/
+
 #TODO[DAG patterns need to be explained with an example]
-/*
+
 + If supporting DAG patterns, require some bound e-classes from different subpatterns to be identical.
 
 The e-graph representation previously introduced in @listing_egglike_egraph already has indexes from
@@ -1282,9 +1406,7 @@ The e-node $"Add"(a,b)=c$ implies that $c$ is uniquely determined by $a$ and $b$
 $"Add"$ is a function, and we have a functional dependency from $(x,y)$ to $"res"$. In database
 terminology, we have a primary key on (x,y) for this relation.
 
-*/
 #TODO[Maybe we should have a figure showing the tables Add and Mul being joined for $(x+y) dot z$ here?]
-/*
 
 What about e-matching? The pattern $(x+y) dot z$ for which we sketched recursive e-matching in
 @listing_recursive_ematching would in this new relational representation correspond to the SQL query
@@ -1298,9 +1420,8 @@ JOIN add ON add.sum = mul.lhs
 i.e. a query on the form of iterating the root of the pattern and then adjoining tables for its
 subpatterns. The pattern can also be written as
 
-*/
 #TODO[what is join]
-/*
+
 $"Mul"(t_0, c, t_1) join "Add"(a, b, t_0)$
 
 where $join$ denotes a natural join, here on the column $t_0$. This is a conjunctive query, a
@@ -1323,11 +1444,139 @@ of e-matching and canonicalization will rediscover all previously discovered rew
 addressed by semi-naive evaluation, an algorithm from Datalog that we now can use due to having
 conjunctive queries.
 
-== Semi-naive evaluation <conceptual_background_seminaive>
+=== Relational e-matching
 
-*/
+If we look at the implementation for finding the pattern $(a + b) dot c$, see @non-relational-e-matching, we notice that it looks very similar to a nested-loop database join.
+
+#figure(
+  ```python
+  # t1 = (a + b) * c
+  for enode, t1 in e_graph.hashcons.items():
+      if enode[0] != "*":
+          continue
+
+      # t0 = a + b
+      _, t0, c = enode
+      for enode, eclass in e_graph.hashcons.items():
+          if enode[0] != "+" or eclass != t0:
+              continue
+          # actions...
+  ```,
+  caption: [non-relational e-matching implementation to find $(a + b) dot c$],
+)<non-relational-e-matching>
+
+Similar to the previous database, we can treat an e-graph as a relational database and express e-matching as joins, see @database-egraph-table-example.
+We can, just like the indexed join example, add indexes when performing e-matching, as can be seen in the pseudocode in @indexed-e-matching.
+
+#figure(
+  ```python
+  # t1 = (a + b) * c
+  for enode, t1 in e_graph.iter_math():
+
+      # t0 = a + b
+      _, t0, c = enode
+      for enode, eclass in e_graph.iter_add_res(t0):
+          # actions...
+  ```,
+  caption: [pseudocode for indexed join of when implementing e-matching to find $(a + b) dot c$],
+)<indexed-e-matching>
+
+#figure(
+  grid(
+    columns: (auto, auto, auto),
+    inset: 2pt,
+    table(
+      columns: (auto, auto, auto),
+      inset: 8pt,
+      table.header(
+        table.cell(colspan: 3, [*Add*]),
+        [x],
+        [y],
+        [res],
+      ),
+
+      [e1], [e2], [e3],
+      [e2], [e1], [e3],
+      [e4], [e5], [e6],
+      [e5], [e4], [e6],
+      [e7], [e8], [e9],
+      [e8], [e7], [e9],
+      [..], [..], [..],
+    ),
+    table(
+      columns: (auto, auto, auto),
+      inset: 8pt,
+      table.header(
+        table.cell(colspan: 3, [*Mul*]),
+        [x],
+        [y],
+        [res],
+      ),
+
+      [e9], [e3], [e12],
+      [e3], [e9], [e12],
+      [e6], [e14], [e15],
+      [e14], [e6], [e15],
+      [e16], [e17], [e18],
+      [e17], [e16], [e18],
+      [..], [..], [..],
+    ),
+    table(
+      columns: (auto, auto, auto, auto, auto),
+      inset: 8pt,
+      table.header(
+        table.cell(colspan: 5, [*Add* $join_("Add"."res" = "Mul"."x")$ *Mul*]),
+        [Add.x],
+        [Add.y],
+        [Add.res or
+          Mul.x],
+        [Mul.y],
+        [Mul.res],
+      ),
+
+      [e1], [e2], [e3], [e9], [e12],
+      [e2], [e1], [e3], [e9], [e12],
+      [e4], [e5], [e6], [e14], [e15],
+      [e5], [e4], [e6], [e14], [e15],
+      [e7], [e8], [e9], [e3], [e12],
+      [e8], [e7], [e9], [e3], [e12],
+    ),
+  ),
+  caption: [Add and Mul as tables along with a join between them.],
+) <database-egraph-table-example>
+
+However, a problem with relational e-matching is that we constantly re-discover the same facts, which is what semi-naive evaluation solves.
+
+=== Semi-naive evaluation
+
+Semi-naive evaluation splits a relation into two parts, "old" and "new" and uses that to avoid join results that only uses information from the "old" parts of relations.
+
+For example, consider two sets $A$ and $B$, where we want to compute the cartesian product, or all pairs of elements from $A$ and $B$.
+How can we compute $A times B$ while excluding $A_"old" times B_"old"$?
+If we expand $A times B$, we get:
+
+$
+  A times B &= (A_"old" union A_"new") times (B_"old" union B_"new") \
+  A times B &=
+  (A_"old" times B_"old") union (A_"new" times B_"old") union
+  (A_"old" times B_"new") union (A_"new" times B_"new") \
+  A times B &=
+  (A_"old" times B_"old") union (A_"new" times B) union
+  (A_"old" times B_"new") \
+$
+If we exclude $A_"old" times B_"old"$, we get:
+$
+  A times B - (A_"old" times B_"old") &= (A_"new" times B) union (A_"old" times B_"new") \
+$
+
+This generalizes to joins and joins involving more than 2 relations.
+Using semi-naive evaluation is key to both minimize how much work has to be done during queries and canonicalization.
+
+#TODO[do we need a bridge here?]
+
+=== Semi-naive evaluation <conceptual_background_seminaive>
+
 #TODO[hard to understand without database 101 (join operator)]
-/*
 
 Semi-naive evaluation is an algorithm for joining relations, each consisting of both old and new
 tuples, guaranteeing that each joined tuple contains some new information. In the context of
@@ -1398,15 +1647,81 @@ since the first relation in the query plan is iterated in its entirety. This mak
 evaluation and recursive e-matching essentially incompatible, since the latter will always begin
 query execution at the pattern root.
 
-*/
 #TODO[what does this mean in practice?]
-/*
 
-== Theory languages <conceptual_background_theory_languages>
 
-*/
+#TODO[START TRIPLICATE]
+
+=== Semi-naive evaluation
+
+In @conceptual_background_seminaive within the conceptual overview we saw that a conjuctive query $A
+join B join C$ can be split into three queries
+
+$
+  &#`new`_A &join& #`all`_B &join& #`all`_C union \
+  &#`all`_A &join& #`new`_B &join& #`all`_C union \
+  &#`all`_A &join& #`all`_B &join& #`new`_C \
+$
+
+which can be implemented as
+
+```rust
+for _ in b_new(..) {
+    for _ in concat(a_new(..), a_old(..)) {
+        for _ in c_old(..) {
+            ..
+        }
+    }
+}
+```
+
+This is almost what a real implementation would do, but there are some problems with it. First of
+all, it requires indexing both `old` and either `all` or `new`, implying additional indexing
+overhead.
+
+Additionally, it can be beneficial to schedule queries to run differently often, in which case we
+can have a $#`new`_1$ for recently run queries $Q_1$ and a larger $#`new`_2$ for insertions made
+since running queries $Q_2$. This implies $#`old`_1$ and $#`old`_2$ which by the previous argument
+both require indexing. This leads to even more indexing overhead in the scenarios with more advanced
+scheduling.
+
+But if we replace all iterations of "old" with "all",
+$
+  "new information" subset
+  &"new" &join& "all" &join& "all" union \
+  &"all" &join& "new" &join& "all" union \
+  &"all" &join& "all" &join& "new", \
+$
+then we can get by with indexes only on `all`. `new` does not need indexes since efficient query
+planning will virtually always iterate the `new` relation in the outermost loop rather than
+performing an indexed lookup in one of the inner loops.
+
+We pay a cost in that we duplicate any tuples created by joining `new` from multiple relations. This
+duplication can be mitigated by annotating tuples with timestamps and eagerly filtering out such
+tuples after every join. The query $#`all`_A join #`new`_B join #`old`_C$ can now be implemented as
+
+```rust
+for _ in b_new(..) {
+    for _ in a_all(..) {
+        for _ in c_all(..).filter(old) {
+            ..
+        }
+    }
+}
+```
+
+#TODO[END TRIPLICATE]
+
+=== Functional dependency
+
+On a relation, some columns may depend on others, this is typically called a functional dependency, implicit functionality or a primary key constraint.
+For example on the Add relation, we have the constraint $x, y -> "res"$.
+
+== Egglog and other theory languages <conceptual_background_theory_languages>
+
 #TODO[Elaborate]
-/*
+
+@appendix_rosettaexample shows how an egglog rule can be transformed to eqlog, Rust, and SQL.
 
 @informal-theory-example shows an example EqSat theory specified in the egglog domain-specific
 language @egglog. `Math` is essentially a sum type, where `Add`, `Sub`, etc are constructors.
@@ -1525,6 +1840,10 @@ e-classes are just integer ids, and exist implicitly in the tables.
   caption: [Sum types as multiple tables.],
 ) <sum_type_tables>
 
+== Worst-case optimal join
+
+#TODO[]
+
 == Design constraints for Datalog engines vs SQL databases. <conceptual_background_datalog_vs_sql>
 
 SQL databases need to be extremely dynamic since arbitrary new queries can be done at run time, but
@@ -1535,956 +1854,12 @@ index data-structures based on exact queries.
 That said, it's entirely possible to create an e-graph engine that uses SQL internally and in fact a
 prototype of egglog, egglite, was originally implemented on top of sqlite @egglite @egraph_sqlite.
 
-*/
-// = Background <background>
-
-#TODO[Section overview]
-/*
-
-== Nomenclature
-
-@rosetta-table shows different terminology and relates e-graphs to relational databases. We use
-these terms largely interchangeably depending on the context.
-
-Egglog and eqlog are both relational e-graph engines, which as described in
-@conceptual_background_relational are essentially Datalog engines with unification. The
-nomenclature differs, primarily in the frontend language, but all represent statements as rows in
-table, with these statements in the e-graph context being e-nodes that relate e-classes to each
-other.
-
-#figure(
-  table(
-    columns: (1fr, 1fr, 1fr, 1fr, 2fr),
-    table.header(
-      table.cell(colspan: 5, [*Approximate nomenclature guide*]),
-      [*egglog* ],
-      [*eqlog* ],
-      [*Datalog* ],
-      [*database* ],
-      [*comment*],
-    ),
-
-    [rule ], [rule ], [rule ], [query ], [],
-    [predicate], [if stmt ], [body containing atoms], [join+where ], [logical premise],
-    [action ], [then stmt], [head ], [insert/unify], [logical consequence],
-    [function ], [function ], [ ], [table ], [e.g. `Add: Math * Math -> Math`],
-    [e-node ], [tuple ], [fact ], [row], [represents a small computation, e.g. `Add(a,b) = c`],
-    [e-class ], [element ], [ ], [cell element], [represents a set of equivalent expressions],
-    [sort ], [type ], [type ], [type ], [e.g. `Math`, `i64`],
-    [functional dependency], [implicit functionality], [], [primary key constraint], [],
-  ),
-  caption: [Comparison of egglog, eqlog, Datalog, and relational database terminology.],
-) <rosetta-table>
-
-== Logic programming languages
-
-@rosettaexample shows how an egglog rule can be transformed to eqlog, Rust, and SQL.
-
-*/
-#TODO[]
-/*
-
-=== Datalog
-
-*/
-#TODO[]
-/*
-
-=== Egglog <language-egglog>
-
-*/
-#TODO[]
-/*
-
-== Rule preprocessing
-
-Rule processing and optimization (at HIR level).
-
-=== Functional dependency
-
-A functional dependency, also known as implicit functionality or primary key constraint, can be
-formally described as:
-
-$ f(x) = a and f(x) = b => a = b $
-
-This restricts what rows can reside in tables. It can also be exploited to simplify rules, such as
-in the case of this conjunctive query:
-
-$ "Add"(x, y, a), "Add"(x, y, b) $
-
-Here, we know that $a=b$ because both atoms take $(x,y)$ as input, so the query can be rewritten to:
-
-$ "Add"(x, y, a) $
-
-=== Semi-naive evaluation
-
-In @conceptual_background_seminaive within the conceptual overview we saw that a conjuctive query $A
-join B join C$ can be split into three queries
-
-$
-  &#`new`_A &join& #`all`_B &join& #`all`_C union \
-  &#`all`_A &join& #`new`_B &join& #`all`_C union \
-  &#`all`_A &join& #`all`_B &join& #`new`_C \
-$
-
-which can be implemented as
-
-```rust
-for _ in b_new(..) {
-    for _ in concat(a_new(..), a_old(..)) {
-        for _ in c_old(..) {
-            ..
-        }
-    }
-}
-```
-
-This is almost what a real implementation would do, but there are some problems with it. First of
-all, it requires indexing both `old` and either `all` or `new`, implying additional indexing
-overhead.
-
-Additionally, it can be beneficial to schedule queries to run differently often, in which case we
-can have a $#`new`_1$ for recently run queries $Q_1$ and a larger $#`new`_2$ for insertions made
-since running queries $Q_2$. This implies $#`old`_1$ and $#`old`_2$ which by the previous argument
-both require indexing. This leads to even more indexing overhead in the scenarios with more advanced
-scheduling.
-
-But if we replace all iterations of "old" with "all",
-$
-  "new information" subset
-  &"new" &join& "all" &join& "all" union \
-  &"all" &join& "new" &join& "all" union \
-  &"all" &join& "all" &join& "new", \
-$
-then we can get by with indexes only on `all`. `new` does not need indexes since efficient query
-planning will virtually always iterate the `new` relation in the outermost loop rather than
-performing an indexed lookup in one of the inner loops.
-
-We pay a cost in that we duplicate any tuples created by joining `new` from multiple relations. This
-duplication can be mitigated by annotating tuples with timestamps and eagerly filtering out such
-tuples after every join. The query $#`all`_A join #`new`_B join #`old`_C$ can now be implemented as
-
-```rust
-for _ in b_new(..) {
-    for _ in a_all(..) {
-        for _ in c_all(..).filter(old) {
-            ..
-        }
-    }
-}
-```
-
-*/
-#TODO[what does egglog and eqlog do?]
-/*
-
-=== Merging rules with identical premises
-
-#NOTE[Not implemented yet.]
-
-It is very rare that the user provides rules with identical premises, but with semi-naive evaluation
-we produce many very similar rules that can potentially be merged. To merge rules, we compare the
-premises of the rules and, if they are equal, replace them with a rule that combines the actions of
-the original rules.
-
-=== Magic sets
-
-*/
-#TODO[Since oatlog/egglog is a superset of Datalog, this should be possible, right?]
-
-#TODO[we have not done this though, and it's unclear if it is useful, I guess rules can have a :magic annotation?]
-/*
-
-Magic sets are a way to get the performance of top-down evaluation using bottom-up evaluation.
-
-Top-down evaluation means starting from a goal and searching for facts until the starting facts are
-reached. Typically, Prolog uses Top-down evaluation */#TODO[citation needed]/*. Bottom-up evaluation
-                                                                            derives more facts from the starting facts until the goal facts are reached. Datalog engines, as
-                                                                            well as egglog and oatlog use bottom-up evaluation.
-
-                                                                            */
-#TODO[I guess this only makes sense if we want to prove two expressions equal?]
-
-#TODO[I think a fundamental problem to apply this to e-graphs is how to add "magic bits" to the equality relation.]
-
-#TODO[I don't know if the code is actually correct.]
-/*
-
-```datalog
-path(x, z) :- edge(x, y), path(y, z).
-
-path(x, y) :- edge(x, y).
-
-edge(1, 2).
-edge(2, 3).
-edge(3, 4).
-edge(4, 5).
-% edge(..., ...).
-
-?- path(2, 5)
-```
-
-Here, bottom-up evaluation would derive paths between all pairs of nodes, but
-we only care about the path between 2 and 5. For this case, top-down evaluation
-is faster to evaluate the query.
-
-The original program can be modified so that top-down evaluation only computes
-facts relevant to the query.
-
-```datalog
-path(x, z) :- edge(x, y), path(y, z), magic_path(x, z).
-
-path(x, y) :- edge(x, y), magic_path(x, y).
-
-magic_path(x, z) :- edge(x, y), magic_path(y, z).
-
-edge(1, 2).
-edge(2, 3).
-edge(3, 4).
-edge(4, 5).
-edge(5, 6).
-% edge(..., ...).
-
-magic_path(2, 5).
-
-?- path(2, 5)
-```
-
-Here, `magic_path` contains all the potentially useful paths, and paths are
-only computed if they are potentially useful.
-
-== Rule scheduling and termination
-
-*/
-#TODO[section summary]
-/*
-
-=== Surjectivity
-
-*/
-#TODO[Surjectivity and "syntactically new variables"]
-
-#TODO["no syntactically new variables" = epic <=> strong = deterministic]
-/*
-
-If a rule does not create any new e-classes it is called surjective @eqlog.
-A theory only containing surjective rules is guaranteed to terminate @eqlog.
-
-=== Running unifying rules to closure before running rules that introduce e-classes.
-
-*/
-#TODO[]
-/*
-
-=== Semi-naive without running all rules all the time.
-
-#NOTE[this is not implemented yet, right now all rules run at the same time]
-
-Given the previous definition of semi-naive evaluation, it's not obvious how to
-discard the *new* set before all rules have been run.
-
-One approach to disabling rules is to still run all rules, but instead wait
-with inserting the results of some rules into the database. This has the
-drawback of still computing the joins unconditionally.
-
-Another approach is to use timestamps for each element in the database and
-explicitly query for things that are new. This is what egglog @egglog does, but
-it is problematic because it increases memory usage and essentially makes
-queries iterate through all historical timestamps.
-
-Conceptually, our approach will be to store the new set in a push-only list,
-and make the rules store what index in these they are at. See @semi-something
-for a visualization of this.
-
-#figure(
-  ```
-    rule1    rule2
-      v        v
-  [x, x, x, x, x, x, x, x]
-
-  add y, z w:
-
-    rule1    rule2
-      v        v
-  [x, x, x, x, x, x, x, x, y, z, w]
-
-  run rule1:
-
-  [x, x, x, x, x, x, x, x, y, z, w]
-      ^                          ^
-      |------rule1 new set-------|
-
-             rule2                rule1
-               v                    v
-  [x, x, x, x, x, x, x, x, y, z, w]
-
-  add a, b, c:
-
-             rule2                rule1
-               v                    v
-  [x, x, x, x, x, x, x, x, y, z, w, a, b, c]
-
-  run rule2:
-
-             rule2                rule1
-               v                    v
-  [x, x, x, x, x, x, x, x, y, z, w, a, b, c]
-               ^                          ^
-               |------rule2 new set-------|
-  ```,
-  caption: [Keeping semi-naive evaluation while not running all rules at the same time.],
-) <semi-something>
-
-== Canonicalization
-
-*/
-#TODO[When one actually inserts pending inserts and canonicalizes uprooted e-classes. Interaction
-  with semi-naive, updating what `new` means.]
-/*
-
-=== Union-find
-
-Union-find is a data structure that maintains disjoint sets, supporting the two operations
-`union()`, which merges two sets and `find()` which returns the unique representative element of a
-set @unionfindoriginal. Alternatively, it can be seen as representing an undirected graph with
-`union()` adding an edge between two nodes and `find()` returning some designated representative of
-the connected compontent containing a given node. E-graphs use a union-find data structure to store
-e-classes and unify them once they are discovered to be equal.
-
-There are two optimizations used to speed up the union-find datastructure, path compression and
-smaller-to-larger merging. Operations have an amortized time complexity of $O(log n)$ if either
-optimization is applied individually, with an amortized time complexity of $O(alpha(n))$
-#footnote[$alpha$ is the inverse of the Ackermann function and grows slowly enough to be considered
-constant for all practical inputs.] if they are applied together @fastunionfind
-@unionfindvariantbounds. An example implementation is shown in @union-find-path-compression.
-
-#figure(
-  ```python
-  class UnionFind:
-      def __init__(self, num_elements):
-          self.repr = [i for i in range(num_elements)]
-          self.size = [1] * num_elements
-
-      # find the representative element
-      def find(self, i):
-          if self.repr[i] == i:
-              return i
-          else:
-              root = self.find(self.repr[i])
-              self.repr[i] = root # path compression
-              return root
-
-      # merge the sets that i and j belong to
-      def union(self, i, j):
-          i = self.find(i)
-          j = self.find(j)
-          if i == j:
-              return
-
-          # smaller-to-larger merging
-          if self.size[i] > self.size[j]:
-              larger, smaller = i, j
-          else:
-              larger, smaller = j, i
-          self.repr[smaller] = larger
-          self.size[larger] += self.size[smaller]
-
-  uf = UnionFind(5) # [[0], [1], [2], [3], [4]]
-  uf.union(2, 3) # [[0], [1], [2, 3], [4]]
-  uf.union(0, 4) # [[0, 4], [1], [2, 3]]
-  uf.union(0, 3) # [[0, 4, 2, 3], [1]]
-
-  # find(a) == find(b) <=> a,b belong to the same set
-  assert uf.find(4) == uf.find(3) # 4 and 3 belong to the same set.
-  assert uf.find(4) != uf.find(1) # 4 and 1 belong to different sets.
-  ```,
-  caption: flex-caption(
-    [Union-find with path compression. ],
-    [If `repr[i] == i` then `i` is a representative of the set. Initially `repr[i] = i`, so all elements belong to disjoint sets of size 1.],
-  ),
-) <union-find-path-compression>
-
-In the context of e-graphs, it makes sense to apply path compression to avoid walking a linked list
-within `find()`, although this part of the code is unlikely to be a bottleneck in comparison to
-index lookups or index maintenance.
-
-Contrastingly, in the context of a relational e-graph engine, the canonicalization step will remove
-all "uprooted" e-classes, i.e. roots recently turned children after a `union()`, from all tables. If
-the index data structures are not recreated fully after each step, such as when using BTree
-indexes#footnote[When using immutable indexes recreated from scratch, such as sorted arrays with
-lookups using binary search, this matters less but there is still some constant-factor overhead in
-doing unnecessary uproots.], which e-classes are merged into which matters. Specifically, the merge
-order should be chosen to minimize the number of database modifications to remove the uprooted
-e-class. A good approximation of this is the number of times an e-classes is stored within a table
-row. However, in practice tracking this number brings additional maintenance overhead and is
-therefore not performed in oatlog. Instead, one can merge larger-id to smaller-id as a heuristic,
-since earlier and hence smaller ids are likely to be present in more existing tuples.
-
-*/
-
-// === #TODO[]
-
-#TODO[Additional aspects of canonicalization, pseudocode etc]
-/*
-
-== Query planning
-
-*/
-#TODO[Worst-case optimal join, generic join, free join]
-/*
-
-== Index selection and implementation
-
-*/
-#TODO[@factor_db]
-
-#TODO[curried indexes, Something something trie, logical physical indexes, flow.]
-/*
-
-=== Curried indexes
-
-AKA factorized representation (DB theory) @relation_tensor
-
-=== Data structure selection
-
-We currently care about the following operations for (trie-like) indexes:
-- *insert*: Insert a list of $M$ tuples.
-- (*trigger*: Insert a list of $M$ tuples or perform action if something is in the database.)
-- *remove*: Remove tuples matching list of $M$ tuples.
-- (*uproot*: Drain $M$ tuples where the first column matches set of size $K$.)
-- *check*: Is pattern in the database
-- *range*: Range query that iterates in some order.
-See @index-datastructures.
-
-#figure(
-  table(
-    columns: (auto, auto, auto, auto, auto),
-    table.header(
-      [*datastructure*],
-      [*insert* ],
-      [*remove* ],
-      [*check* ],
-      [*range*],
-    ),
-
-    [Rust `std::collections::BTreeSet`, with a limited (non-batch) API],
-    [$M dot log N$],
-    [$M dot log N$],
-    [$log N$ ],
-    [$log N$],
-
-    [custom btreeset], [$M + log N$ ], [$M + log N$ ], [$log N$ ], [$log N$],
-    [sorted list ], [$N + M$ ], [$N + M$ ], [$log N$ ], [$log N$],
-    [compressed sparse row/column ], [$N + M + E$ ], [$N + M + E$ ], [$log sqrt(N)$], [$1$],
-  ),
-  caption: flex-caption(
-    [Big-$O$ costs for various index data structures.],
-    [
-      $N$ is the number of tuples, $E$ is the highest value stored in the relation.
-      Range query ignores the $M$ term since it would be mandatory.
-      Assuming relation with two columns containing random tuples.
-    ],
-  ),
-) <index-datastructures>
-
-*/
-#TODO[elaborate]
-/*
-
-== Extraction
-
-#NOTE[We have not implemented extraction yet.]
-
-Extraction is the process of selecting an expression from an e-graph. Doing so non-optimally is
-trivial, but selecting an optimal expression, even with simple cost functions is NP-hard
-@extractnphard @fastextract @egraphcircuit.
-
-Many NP-hard graph algorithms can be done in polynomial time for a fixed treewidth, and this also applies to extraction, where it can be done linear time @fastextract @egraphcircuit.
-
-*/
-
-This section introduces the union-find datastructure in @union-find-explain, which is used in e-graph implementations, which is shown in @e-graph-explain.
-How rewrites can be performed is shown in @rewriting-impl.
-Note that while the Python implementations are just example implementations, they are not pseudocode.
-
-// - definition of e-graph
-//   - math objects as python syntax?
-// - canonicalization and union-find
-// - recursive ematching
-// - ematching as a join + what is a join
-// - semi-naive evaluation
-// - egglog/Datalog language explained using examples
-// - nomenclature (+ pick what nomenclature we use for the report)
-// - scheduling and termination
-// - extraction
-
-== Union-find <union-find-explain>
-
-#figure(
-  ```python
-  class UnionFindSimple:
-      def __init__(self, num_elements):
-          self.representative = [i for i in range(num_elements)]
-
-      # find the representative element
-      def find(self, i):
-          if self.representative[i] == i:
-              return i
-          else:
-              return self.find(i)
-
-      # merge the sets that i and j belong to
-      def union(self, i, j):
-          self.representative[self.find(i)] = self.find(j)
-
-  ```,
-  caption: [A simplified union-find implementation without path compression nor smaller-to-larger merging.],
-) <union-find-simplified-impl>
-
-Union-find @unionfindoriginal @fastunionfind @unionfindvariantbounds is a datastructure that maintains disjoint sets, meaning that every element belongs to exactly one set.
-This is a very general-purpose datastructure, for example it can be used to implement Kruskal's algorithm for minimum spanning trees.
-
-Because of the property that each element belongs to exactly one set, we can refer to an arbitrary representative element in the set instead of referring to the entire set.
-
-The `find()` function takes an arbitrary element in some set and returns the unique representative of that set.
-To check if two elements, $a,b$ belong to the same set, we check if their representatives are the same, if `find(a) == find(b)`.
-
-The `union()` function takes two elements $a,b$ and ensures that their sets are unified.
-
-An example implementation is shown in @union-find-simplified-impl.
-
-=== Implementation
-
-To implement union-find, each element is an integer, so it maintains sets of integers, but this is equivalent to storing sets of any type since we can assign unique integer ids to each element.
-
-Each element has a representative element stored in the `representative` array where each element initially claims that they are their own representative and that their set size is one.
-
-For elements $a,b$ where $a != b$ and `representative[a] = b`, the representative of $a$ is recursively the representative of $b$.
-For example if we had sets of persons and each person pointed to an arbitrary person who is taller than them, we could find the representative (tallest) person by following where people point until the representative is found.
-
-To unify the sets that $a$ and $b$ belong to, we make the representative of $a$, the representative of $b$, `representative[find(a)] = find(b)]`.
-In the previous metaphor, this would be finding the tallest person in the first set and telling them to point to the tallest person in the second set.
-This means that if you started in either sets you would now end up with the same representative and therefore the sets are merged.
-
-=== Efficient union-find
-
-#TODO[maybe we can skip this part]
-
-To make union-find efficient, there are two optimizations that are applied, smaller-to-larger merging and path-compression. This is shown in @union-find-impl.
-
-In the worst-case for this implementation the `find()` operation may be $O(n)$ since the tree may be unbalanced.
-With smaller-to-larger merging we ensure that the trees are balanced and therefore get a $O(log n)$ complexity for `find()`.
-
-Path compression amortizes the cost of `find()` by modifying the representatives along the path to the root to just directly point to the root.
-
-With path compression and smaller-to-larger merging, it is extremely hard to find a worst-case and the amortized complexity of `find()` becomes $O($alpha$(n))$ @fastunionfind @unionfindvariantbounds
-where $alpha$ is the inverse of the Ackermann function.
-This grows extremely slowly (significantly slower than logarithmic) and in practice it has a good constant factor, so in practice it is typically treated as if it was $O(1)$.
-
-#pagebreak()
-== Union-find example implementation and usage <union-find-impl>
-
-#raw(read("simple_union_find.py"), lang: "python")
-
-#pagebreak()
-== E-graph <e-graph-explain>
-
-An e-graph is a data structure that maintains e-classes that contain e-nodes which refer to e-classes, see @informal-egraph-figure-non-bipartite.
-An example implementation can be found in @e-graph-impl.
-
-It contains a union-find and a map from e-node to e-class called the hashcons.
-It supports the same operations as union-find on its e-classes (`union`, `find`, `make`), and additionally has the functions `canonicalize` and `insert_enode`.
-`insert_enode` inserts a new e-node and returns its e-class.
-
-`canonicalize` replaces all e-classes with their representatives, and merges e-classes when conflicts occur, $f(a) = b and f(a) = c => b = c$.
-
-// #TODO[explain `tuple(map(canonicalize_element, enode))`]
-// #TODO[note that this formulation ignores the e-class map because it's actually not needed and is kinda just confusing]
-
-#pagebreak(to: "even")
-== E-graph example implementation and usage <e-graph-impl>
-
-#raw(read("simple_egraph.py"), lang: "python")
-
-#pagebreak()
-== Rewriting
-
-#figure(
-  image("../figures/egraph_cluster.svg", width: 60%),
-  caption: flex-caption(
-    [Example of an equivalence-class-formulation e-graph that initially contains
-      $(a+2) dot c$.],
-    [
-      The sharp boxes are e-nodes and the rounded boxes are e-classes. E-classes
-      contain e-nodes evaluating to the same value and the input to an e-node can be computed from any
-      of the e-nodes in its input e-class.
-    ],
-  ),
-) <informal-egraph-figure-non-bipartite>
-
-#figure(
-  image("../figures/egraph_example.svg", width: 75%),
-  caption: flex-caption(
-    [The same e-graph as in @informal-egraph-figure-non-bipartite, but drawn as a bipartite graph.],
-    [
-      The oval shapes are e-classes, representing a set of equivalent expressions, with incoming edges
-      denoting e-node members.
-      The rectangle shapes are e-nodes, which have e-classes as arguments.
-      The orange-colored edges and shapes are those added due to the applied rules.
-    ],
-  ),
-) <informal-egraph-figure>
-
-#TODO[...]
-#TODO[show some egglog here]
-
-When e-matching we are performing essentially the same computation as a database join.
-This motivates relational e-matching @relationalematching where patterns are found using database joins instead which unlocks further optimizations.
-
-#pagebreak(to: "even")
-== Rewriting example implementation and usage <rewriting-impl>
-
-#raw(read("simple_rewrite_rules.py"), lang: "python")
-
-#pagebreak()
-
-== Database joins
-
-#let c2 = table.cell(fill: red.lighten(20%))[c2]
-#let c5 = table.cell(fill: blue.lighten(20%))[c5]
-#let c8 = table.cell(fill: green.lighten(20%))[c8]
-
-#figure(
-  grid(
-    columns: (auto, auto, auto),
-    inset: 2pt,
-    table(
-      columns: (auto, auto, auto),
-      inset: 8pt,
-      table.header(
-        table.cell(colspan: 3, [*Orders*]),
-        [Ord],
-        [Cust],
-        [Amnt],
-      ),
-
-      [o1], c8, [2],
-      [o2], c2, [1],
-      [o3], c5, [2],
-      [o4], c8, [5],
-      [o5], c2, [100],
-    ),
-    table(
-      columns: (auto, auto),
-      inset: 8pt,
-      table.header(
-        table.cell(colspan: 2, [*Customers*]),
-        [Cust],
-        [Name],
-      ),
-
-      c2, [Foo],
-      c5, [Bar],
-      c8, [Baz],
-    ),
-    table(
-      columns: (auto, auto, auto, auto),
-      inset: 8pt,
-      table.header(
-        table.cell(colspan: 4, [*Orders* $join$ *Customers*]),
-        [Order],
-        [Cust],
-        [Amount],
-        [Name],
-      ),
-
-      [o1], c8, [2], [Baz],
-      [o2], c2, [1], [Foo],
-      [o3], c5, [2], [Bar],
-      [o4], c8, [5], [Baz],
-      [o5], c2, [100], [Foo],
-    ),
-  ),
-  caption: [tables of a fictional company that maintains a table of orders and customers. Orders $join$ Customers is a join between the Orders and Customers table on "Cust"],
-) <database-table-example>
-
-In a database all information is stored in tables, see @database-table-example.
-We could keep a single table that merges Orders and Customers, but then we would be storing customer names multiple times and corrections to a customers information would need to modify multiple rows.
-
-But it is often useful to be able to be able to view the merged table, which is why the join ($join$) operation exists.
-Semantically it compares all pairs of the two relations and keeps the pairs where the attribute that we join on matches.
-The result of a join is shown in @database-table-example and an example implementation of nested-loop join is shown in @nested-loop-join-impl.
-
-#figure(
-  ```python
-  # join orders and customers on `cust` attribute
-  def join_orders_customers(orders, customers):
-      out = []
-
-      # for all pairs of the two relations
-      for (customer2, name) in customers:
-          for (order, customer1, amount) in orders:
-
-              # filter to make sure that the attribute we join on matches.
-              if customer1 != customer2:
-                  continue
-              out.append((order, customer1, amount, name))
-      return out
-  ```,
-  caption: [Example implementation of a nested-loop join.],
-) <nested-loop-join-impl>
-
-However, nested loop join is quite inefficient, since two random rows from the two relations are unlikely to match on their attribute.
-This makes us always perform $O(n^2)$ operations.
-This motivates indexed joins where we have data-structures to efficiently get a specific row in the relation.
-A simple implementation could use a hashmap and is shown in @hash-join-impl.
-
-#figure(
-  ```python
-  # join orders and customers on `cust` attribute
-  def join_orders_customers(orders, customers):
-      out = []
-
-      # make cust -> order index.
-      order_index = dict()
-      for (order, customer, amount) in orders:
-          order_index.get(customer, []).append(order, amount)
-
-      for (customer, name) in customers:
-          # indexed lookup
-          for (order, amount) in order_index[customer]:
-
-              out.append((order, customer1, amount, name))
-      return out
-  ```,
-  caption: [Example implementation of a nested-loop join.],
-) <hash-join-impl>
-
-== Relational e-matching
-
-If we look at the implementation for finding the pattern $(a + b) dot c$, see @non-relational-e-matching, we notice that it looks very similar to a nested-loop database join.
-
-#figure(
-  ```python
-  # t1 = (a + b) * c
-  for enode, t1 in e_graph.hashcons.items():
-      if enode[0] != "*":
-          continue
-
-      # t0 = a + b
-      _, t0, c = enode
-      for enode, eclass in e_graph.hashcons.items():
-          if enode[0] != "+" or eclass != t0:
-              continue
-          # actions...
-  ```,
-  caption: [non-relational e-matching implementation to find $(a + b) dot c$],
-)<non-relational-e-matching>
-
-Similar to the previous database, we can treat an e-graph as a relational database and express e-matching as joins, see @database-egraph-table-example.
-We can, just like the indexed join example, add indexes when performing e-matching, as can be seen in the pseudocode in @indexed-e-matching.
-
-#figure(
-  ```python
-  # t1 = (a + b) * c
-  for enode, t1 in e_graph.iter_math():
-
-      # t0 = a + b
-      _, t0, c = enode
-      for enode, eclass in e_graph.iter_add_res(t0):
-          # actions...
-  ```,
-  caption: [pseudocode for indexed join of when implementing e-matching to find $(a + b) dot c$],
-)<indexed-e-matching>
-
-#figure(
-  grid(
-    columns: (auto, auto, auto),
-    inset: 2pt,
-    table(
-      columns: (auto, auto, auto),
-      inset: 8pt,
-      table.header(
-        table.cell(colspan: 3, [*Add*]),
-        [x],
-        [y],
-        [res],
-      ),
-
-      [e1], [e2], [e3],
-      [e2], [e1], [e3],
-      [e4], [e5], [e6],
-      [e5], [e4], [e6],
-      [e7], [e8], [e9],
-      [e8], [e7], [e9],
-      [..], [..], [..],
-    ),
-    table(
-      columns: (auto, auto, auto),
-      inset: 8pt,
-      table.header(
-        table.cell(colspan: 3, [*Mul*]),
-        [x],
-        [y],
-        [res],
-      ),
-
-      [e9], [e3], [e12],
-      [e3], [e9], [e12],
-      [e6], [e14], [e15],
-      [e14], [e6], [e15],
-      [e16], [e17], [e18],
-      [e17], [e16], [e18],
-      [..], [..], [..],
-    ),
-    table(
-      columns: (auto, auto, auto, auto, auto),
-      inset: 8pt,
-      table.header(
-        table.cell(colspan: 5, [*Add* $join_("Add"."res" = "Mul"."x")$ *Mul*]),
-        [Add.x],
-        [Add.y],
-        [Add.res or
-          Mul.x],
-        [Mul.y],
-        [Mul.res],
-      ),
-
-      [e1], [e2], [e3], [e9], [e12],
-      [e2], [e1], [e3], [e9], [e12],
-      [e4], [e5], [e6], [e14], [e15],
-      [e5], [e4], [e6], [e14], [e15],
-      [e7], [e8], [e9], [e3], [e12],
-      [e8], [e7], [e9], [e3], [e12],
-    ),
-  ),
-  caption: [Add and Mul as tables along with a join between them.],
-) <database-egraph-table-example>
-
-However, a problem with relational e-matching is that we constantly re-discover the same facts, which is what semi-naive evaluation solves.
-
-== Semi-naive evaluation
-
-Semi-naive evaluation splits a relation into two parts, "old" and "new" and uses that to avoid join results that only uses information from the "old" parts of relations.
-
-For example, consider two sets $A$ and $B$, where we want to compute the cartesian product, or all pairs of elements from $A$ and $B$.
-How can we compute $A times B$ while excluding $A_"old" times B_"old"$?
-If we expand $A times B$, we get:
-
-$
-  A times B &= (A_"old" union A_"new") times (B_"old" union B_"new") \
-  A times B &=
-  (A_"old" times B_"old") union (A_"new" times B_"old") union
-  (A_"old" times B_"new") union (A_"new" times B_"new") \
-  A times B &=
-  (A_"old" times B_"old") union (A_"new" times B) union
-  (A_"old" times B_"new") \
-$
-If we exclude $A_"old" times B_"old"$, we get:
-$
-  A times B - (A_"old" times B_"old") &= (A_"new" times B) union (A_"old" times B_"new") \
-$
-
-This generalizes to joins and joins involving more than 2 relations.
-Using semi-naive evaluation is key to both minimize how much work has to be done during queries and canonicalization.
-
-#TODO[do we need a bridge here?]
-
-== Functional dependency
-
-On a relation, some columns may depend on others, this is typically called a functional dependency, implicit functionality or a primary key constraint.
-For example on the Add relation, we have the constraint $x, y -> "res"$.
-
-== Egglog language
-
-Since oatlog implements the egglog language, it is helpful to have some understanding of it.
-@informal-theory-example shows an example EqSat theory specified in the egglog domain-specific
-language @egglog. `Math` is essentially a sum type, where `Add`, `Sub`, etc are constructors.
-Rewrites mean that if the left side matches, add the right side to the database and unify it with
-the left side. Egglog semantics define running a set of rules as using their left side patterns to
-figure out what right side actions to perform, then doing all actions as a batch. Egglog defines a
-command `run <count>`, not shown here, that runs the set of all rules some number of times or until
-convergence.
-
-#figure(
-  ```egglog
-  (sort Math)
-  (constructor Add (Math Math) Math)
-  (constructor Mul (Math Math) Math)
-  (constructor Const (i64) Math)
-  (constructor Var (String) Math)
-
-  (rewrite (Add a b) (Add b a))                         ; commutativity
-  (rewrite (Add a (Add b c)) (Add (Add a b) c))         ; associativity
-
-  (rewrite (Mul a b) (Mul b a))                         ; commutativity
-  (rewrite (Mul a (Mul b c)) (Mul (Mul a b) c))         ; associativity
-
-  (rewrite (Mul (Add a b) c) (Add (Mul a c) (Mul b c))) ; distributivity
-
-  (rewrite (Add x (Const 0)) x)                         ; additive unit
-  (rewrite (Mul x (Const 1)) (x))                       ; multiplicative unit
-  ```,
-
-  caption: [A theory written in the egglog language.],
-) <informal-theory-example>
-
-Egglog also supports a form of sum types
-
-```egglog
-(datatype Math
-    (Add (Math Math))
-    (Mul (Math Math))
-    (Const (i64))
-)
-; desugars to:
-(sort Math)
-(constructor Add (Math Math) Math)
-(constructor Mul (Math Math) Math)
-(constructor Const (i64) Math)
-```
-
-This is analogous to sum types in other languages like Rust or Haskell, which could be written as:
-```rust
-enum Math {
-    Add(&Math, &Math),
-    Mul(&Math, &Math),
-    Const(i64),
-}
-```
-```haskell
-data Math =
-   Add Math Math |
-   Mul Math Math |
-   Const Int
-```
-
-== #TODO[egglog/(Datalog?) language]
-
-#TODO[]
-
-== #TODO[egglog language]
-
-#TODO[]
-
-== #TODO[nomenclature]
-
-#TODO[]
-
-== #TODO[scheduling and termination, maybe]
-
-#TODO[]
-
-== #TODO[WCOJ (needed to explain our query planning)]
-
-#TODO[]
-
-= Implementation <oatlog_implementation>
+= Implementation <chapter_implementation>
 
 #TODO[Elaborate and forward reference]
 /*
 
-This section discusses oatlog in detail, including how its used, what it can do and how its
+This section discusses oatlog in detail, including how it is used, what it can do and how it is
 implemented.
 
 == Egglog-compatible external interface
@@ -2674,10 +2049,6 @@ inserts and unifications. HIR is lowered into LIR and that process also performs
 #NOTE[The current implementation is a very ad-hoc generic join and will be replaced by something
   similar to free-join, except entirely static (only a single cover)]
 
-  */
-#TODO[We need to have explained query planning in the background and refer to that here.]
-/*
-
 Represents all the choices made to transform a conjunctive query to LIR, specifically the order of
 joins and how the joins are performed. Note that this IR only contains queries and other
 information, such as relation properties are lowered directly from HIR.
@@ -2687,18 +2058,6 @@ information, such as relation properties are lowered directly from HIR.
 LIR is a low-level description of the actual code that is to be generated.
 
 // string or Rust tokens -> Sexp -> egglog ast -> hir -> query plan -> lir -> Rust code.
-
-== Selected algorithms
-
-*/
-#TODO[]
-/*
-
-== Selected implementation details
-
-*/
-#TODO[]
-/*
 
 === Rustc spans across files
 
@@ -2899,7 +2258,7 @@ To generate the TIR, we perform query planning and when multiple equally good ch
 
 == Index implementation
 
-#TODO[]
+#TODO[Remember to discuss trade-offs]
 
 For each relation, there are some number of indexes.
 We consider two types of indexes FD (functional dependency) and non-FD indexes.
@@ -3096,6 +2455,18 @@ class Theory:
 == Actions/apply rules
 
 #TODO[]
+/*
+
+=== Merging rules with identical premises
+
+#NOTE[Not implemented yet.]
+
+It is very rare that the user provides rules with identical premises, but with semi-naive evaluation
+we produce many very similar rules that can potentially be merged. To merge rules, we compare the
+premises of the rules and, if they are equal, replace them with a rule that combines the actions of
+the original rules.
+
+*/
 
 == Query planning
 
@@ -3134,7 +2505,7 @@ To make sure we still perform WCOJ, we need to ensure that we perform semi-joins
 
 #TODO[]
 
-= Evaluation <oatlog_evaluation>
+= Evaluation <chapter_evaluation>
 
 #TODO[Section summary]
 /*
@@ -3270,7 +2641,7 @@ For a list of currently passing tests, see @passingtests.
   ],
 ) <benchmark-results>
 
-= Conclusion <conclusion>
+= Conclusion <chapter_conclusion>
 
 We have shown that it is possible for an e-graph engine to be significantly faster than egglog, at
 least on small e-graphs, while still using fundamentally the same algorithms.
@@ -3278,10 +2649,149 @@ least on small e-graphs, while still using fundamentally the same algorithms.
 There are still many ways in which oatlog could be improved, from merging relations and better
 scheduling to more standard database improvements in the form of better indexes and query planning.
 
+
+/*
+=== Magic sets
+#TODO[Since oatlog/egglog is a superset of Datalog, this should be possible, right?]
+
+#TODO[we have not done this though, and it's unclear if it is useful, I guess rules can have a :magic annotation?]
+
+Magic sets are a way to get the performance of top-down evaluation using bottom-up evaluation.
+
+#TODO[I guess this only makes sense if we want to prove two expressions equal?]
+
+#TODO[I think a fundamental problem to apply this to e-graphs is how to add "magic bits" to the equality relation.]
+
+#TODO[I don't know if the code is actually correct.]
+
+```datalog
+path(x, z) :- edge(x, y), path(y, z).
+
+path(x, y) :- edge(x, y).
+
+edge(1, 2).
+edge(2, 3).
+edge(3, 4).
+edge(4, 5).
+% edge(..., ...).
+
+?- path(2, 5)
+```
+
+Here, bottom-up evaluation would derive paths between all pairs of nodes, but
+we only care about the path between 2 and 5. For this case, top-down evaluation
+is faster to evaluate the query.
+
+The original program can be modified so that top-down evaluation only computes
+facts relevant to the query.
+
+```datalog
+path(x, z) :- edge(x, y), path(y, z), magic_path(x, z).
+
+path(x, y) :- edge(x, y), magic_path(x, y).
+
+magic_path(x, z) :- edge(x, y), magic_path(y, z).
+
+edge(1, 2).
+edge(2, 3).
+edge(3, 4).
+edge(4, 5).
+edge(5, 6).
+% edge(..., ...).
+
+magic_path(2, 5).
+
+?- path(2, 5)
+```
+
+Here, `magic_path` contains all the potentially useful paths, and paths are
+only computed if they are potentially useful.
+*/
+
+
+/*
+== Rule scheduling and termination
+
+=== Surjectivity
+
+#TODO[Surjectivity and "syntactically new variables"]
+
+#TODO["no syntactically new variables" = epic <=> strong = deterministic]
+
+If a rule does not create any new e-classes it is called surjective @eqlog.
+A theory only containing surjective rules is guaranteed to terminate @eqlog.
+
+=== Running unifying rules to closure before running rules that introduce e-classes.
+
+*/
+
+/*
+
+=== Semi-naive without running all rules all the time.
+
+#NOTE[this is not implemented yet, right now all rules run at the same time]
+
+Given the previous definition of semi-naive evaluation, it's not obvious how to
+discard the *new* set before all rules have been run.
+
+One approach to disabling rules is to still run all rules, but instead wait
+with inserting the results of some rules into the database. This has the
+drawback of still computing the joins unconditionally.
+
+Another approach is to use timestamps for each element in the database and
+explicitly query for things that are new. This is what egglog @egglog does, but
+it is problematic because it increases memory usage and essentially makes
+queries iterate through all historical timestamps.
+
+Conceptually, our approach will be to store the new set in a push-only list,
+and make the rules store what index in these they are at. See @semi-something
+for a visualization of this.
+
+#figure(
+  ```
+    rule1    rule2
+      v        v
+  [x, x, x, x, x, x, x, x]
+
+  add y, z w:
+
+    rule1    rule2
+      v        v
+  [x, x, x, x, x, x, x, x, y, z, w]
+
+  run rule1:
+
+  [x, x, x, x, x, x, x, x, y, z, w]
+      ^                          ^
+      |------rule1 new set-------|
+
+             rule2                rule1
+               v                    v
+  [x, x, x, x, x, x, x, x, y, z, w]
+
+  add a, b, c:
+
+             rule2                rule1
+               v                    v
+  [x, x, x, x, x, x, x, x, y, z, w, a, b, c]
+
+  run rule2:
+
+             rule2                rule1
+               v                    v
+  [x, x, x, x, x, x, x, x, y, z, w, a, b, c]
+               ^                          ^
+               |------rule2 new set-------|
+  ```,
+  caption: [Keeping semi-naive evaluation while not running all rules at the same time.],
+) <semi-something>
+
+*/
+
 #bibliography("refs.bib")
 #show: appendices
 
-= Distributive law example in many languages <rosettaexample>
+= Distributive law example in many languages <appendix_rosettaexample>
 
 This appendix shows code implementing a rule for the distributive law, $(a + b) dot c = a dot c + b
 dot c$, in Egglog, Eqlog, Rust pseudocode and SQL pseudocode.
@@ -3371,7 +2881,7 @@ INNER JOIN Mul ON Add.result = Mul.lhs;
 FROM Add
 ```
 
-= Example of generated theory code <codegen_example_theory>
+= Example of generated theory code <appendix_codegen_example_theory>
 
 Egglog code is orders of magnitude more brief than the generated code that oatlog outputs. In this
 example, we consider the following egglog code implementing the distributive law:
@@ -3442,7 +2952,7 @@ impl Theory {
 }
 ```
 
-= Example of generated relation code <codegen_example_relation>
+= Example of generated relation code <appendix_codegen_example_relation>
 
 This is part of the generated Rust code for a binary operator `Add`. The querying functions are
 elided, but the included functions `update` and `update_finalize` are used within the theory's
@@ -3546,7 +3056,7 @@ insertion, the current run-time API is very unergonomic.
 
 #raw(read("../../examples/quadratic-formula/src/main.rs"), lang: "rust")
 
-= Passing egglog tests <passingtests>
+= Passing egglog tests <appendix_passingtests>
 
 #NOTE[`(check <fact>)` is not yet implemented (since it is not vital for most use-cases and would require running rules out-of-order, which we also do not support yet.), we only compare the number of e-nodes for all the relations.]
 

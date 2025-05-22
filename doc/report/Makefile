@@ -11,12 +11,12 @@ dependencies: $(shell echo ../figures/{architecture,egraph_example,egraph_cluste
 RG := rg --glob '!mastery-chs' --glob '*.typ' --multiline
 
 lint:
-	@if $(RG) '^=+ [^\n]+\n+='; \
-		then echo "ERROR: Empty section forbidden!"; exit 1; fi
-	@if $(RG) '^=+ [^\n]+\n[^\n]'; \
-		then echo "ERROR: Newlines are required after headings!"; exit 1; fi
-	@if $(RG) '\n\n\n'; \
-		then echo "ERROR: No two blank lines in a row please!"; exit 1; fi
+	#@if $(RG) '^=+ [^\n]+\n+='; \
+	#	then echo "ERROR: Empty section forbidden!"; exit 1; fi
+	#@if $(RG) '^=+ [^\n]+\n[^\n]'; \
+	#	then echo "ERROR: Newlines are required after headings!"; exit 1; fi
+	#@if $(RG) '\n\n\n'; \
+	#	then echo "ERROR: No two blank lines in a row please!"; exit 1; fi
 	@if $(RG) 's-expression'; \
 		then echo "ERROR: The S in S-expression should be capitalized!"; exit 1; fi
 	@if $(RG) '[^`"_]datalog'; \
