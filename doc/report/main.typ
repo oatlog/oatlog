@@ -1547,33 +1547,6 @@ We can, just like the indexed join example, add indexes when performing e-matchi
 
 However, a problem with relational e-matching is that we constantly re-discover the same facts, which is what semi-naive evaluation solves.
 
-=== Semi-naive evaluation
-
-Semi-naive evaluation splits a relation into two parts, "old" and "new" and uses that to avoid join results that only uses information from the "old" parts of relations.
-
-For example, consider two sets $A$ and $B$, where we want to compute the cartesian product, or all pairs of elements from $A$ and $B$.
-How can we compute $A times B$ while excluding $A_"old" times B_"old"$?
-If we expand $A times B$, we get:
-
-$
-  A times B &= (A_"old" union A_"new") times (B_"old" union B_"new") \
-  A times B &=
-  (A_"old" times B_"old") union (A_"new" times B_"old") union
-  (A_"old" times B_"new") union (A_"new" times B_"new") \
-  A times B &=
-  (A_"old" times B_"old") union (A_"new" times B) union
-  (A_"old" times B_"new") \
-$
-If we exclude $A_"old" times B_"old"$, we get:
-$
-  A times B - (A_"old" times B_"old") &= (A_"new" times B) union (A_"old" times B_"new") \
-$
-
-This generalizes to joins and joins involving more than 2 relations.
-Using semi-naive evaluation is key to both minimize how much work has to be done during queries and canonicalization.
-
-#TODO[do we need a bridge here?]
-
 === Semi-naive evaluation <conceptual_background_seminaive>
 
 #TODO[hard to understand without database 101 (join operator)]
@@ -1647,12 +1620,7 @@ since the first relation in the query plan is iterated in its entirety. This mak
 evaluation and recursive e-matching essentially incompatible, since the latter will always begin
 query execution at the pattern root.
 
-#TODO[what does this mean in practice?]
-
-
-#TODO[START TRIPLICATE]
-
-=== Semi-naive evaluation
+#TODO[concatenated two sections here, abrupt transition]
 
 In @conceptual_background_seminaive within the conceptual overview we saw that a conjuctive query $A
 join B join C$ can be split into three queries
@@ -1709,8 +1677,6 @@ for _ in b_new(..) {
     }
 }
 ```
-
-#TODO[END TRIPLICATE]
 
 === Functional dependency
 
@@ -1855,6 +1821,27 @@ That said, it's entirely possible to create an e-graph engine that uses SQL inte
 prototype of egglog, egglite, was originally implemented on top of sqlite @egglite @egraph_sqlite.
 
 = Implementation <chapter_implementation>
+
+#TODO[Suggested chapter structure
+
+- API interface
+- Architecture
+  - Roughly describe structure of each IR
+- HIR optimizations
+  - Pre-seminaive opts
+  - Semi-naive, why precise old vs only all/new
+  - Domination among semi-naive variants
+  - Equality modulo permutation (is mostly HIR level, so place here)
+- TIR, Query planning
+- LIR and runtime considerations
+  - Size of e-class ids
+  - Index implementation
+    - why hash over btree index
+    - why full over trie index
+  - Union find
+  - Canonicalization in detail
+]
+
 
 #TODO[Elaborate and forward reference]
 /*
