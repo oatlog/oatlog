@@ -1,4 +1,4 @@
-#import "mastery-chs/lib.typ": template, appendices, flex-caption
+#import "mastery-chs/lib.typ": template, appendices
 #import "@preview/fletcher:0.5.7" as fletcher: diagram, node, edge
 
 #let TODO(msg) = {
@@ -40,6 +40,10 @@
 
 #let department = "Department of Computer Science and Engineering"
 #show: template.with(
+  font: "New Computer Modern",
+  title-font: "New Computer Modern Sans",
+  extra-faithful: true,
+
   title: [Oatlog: A high-performance #box[e-graph] engine],
   subtitle: [],
   //title: [Oatlog: A performant ahead-of-time compiled #box[e-graph] engine],
@@ -50,6 +54,7 @@
   advisor: ("Alejandro Luque Cerpa", department),
   examiner: ("Matti Karppa", department),
   abstract: [
+    #TODO[revisit]
 
     Modern software development depends on efficient and reliable optimizing compilers. Traditional
     compilers apply transformations on a single instance of a program until reaching a fixpoint, but
@@ -1270,7 +1275,7 @@ Relational e-matching as described here allows more efficient join orders and al
 be indexed. It does not solve the other problem of recursive e-matching, that known matches are
 rediscovered in every iteration. For that, we need semi-naive evaluation.
 
-=== Semi-naive evaluation <conceptual_background_seminaive>
+== Semi-naive evaluation <conceptual_background_seminaive>
 
 Semi-naive evaluation is an algorithm for joining relations, each consisting of both old and new
 tuples, guaranteeing that each joined tuple contains some new information. In the context of
