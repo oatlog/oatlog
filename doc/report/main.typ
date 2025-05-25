@@ -1309,9 +1309,9 @@ $
   -& A join B join C
 $
 
-The expression can be expanded using the fact that joins distribute over union, $(X union Y) join Z
-= X join Z union Y join Z$ with $union$ binding weaker than $join$, allowing us to cancel out $A
-join B join C$.
+The expression can be expanded using the fact that joins distribute over union,
+$(X union Y) join Z = X join Z union Y join Z$ with $union$ binding weaker than $join$,
+allowing us to cancel out $A join B join C$.
 
 #let hl(x) = text(fill: red, $#x$)
 
@@ -1552,7 +1552,6 @@ prototype of egglog, egglite, was originally implemented on top of sqlite @eggli
     - Union find
     - Canonicalization in detail
 ]
-
 
 #TODO[Elaborate and forward reference]
 /*
@@ -2347,9 +2346,9 @@ least on small e-graphs, while still using fundamentally the same algorithms.
 There are still many ways in which Oatlog could be improved, from merging relations and better
 scheduling to more standard database improvements in the form of better indexes and query planning.
 
-
 /*
 === Magic sets
+
 #TODO[Since Oatlog/egglog is a superset of Datalog, this should be possible, right?]
 
 #TODO[we have not done this though, and it's unclear if it is useful, I guess rules can have a :magic annotation?]
@@ -2406,9 +2405,10 @@ Here, `magic_path` contains all the potentially useful paths, and paths are
 only computed if they are potentially useful.
 */
 
-
 /*
 == Rule scheduling and termination
+
+#TODO[]
 
 === Surjectivity
 
