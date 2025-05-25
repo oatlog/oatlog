@@ -463,17 +463,17 @@ proliferation of e-graphs within compilers would require them to become faster.
 
 #TODO[is this suitable for people who don't know databases or Datalog?]
 
-Recent developments in e-graphs and equality saturation @relationalematching @eqlog @egglog have
+Recent developments in e-graphs for equality saturation @relationalematching @eqlog @egglog have
 shown that adding indexes to e-graph pattern-matching creates a structure that is very similar to
 relational databases and in particular Datalog -- a declarative logic programming language that
 reasons bottom-up by inserting rows into tables. In fact, this similarity extends to the degree
 that e-graphs may be best thought of as Datalog extended with a unification operation.
 
-This allows EqSat to leverage algorithms from Datalog, in particular the algorithm semi-naive join
-which, rather than running queries against the entire database, specifically queries newly inserted
-rows in a manner similar to a database trigger. Incremental rule matching, together with indexes and
-simple query planning, has brought an order of magnitude speedup to the e-graph engine egglog
-@egglog when compared to its predecessor egg @egg.
+This allows EqSat to leverage algorithms from Datalog, in particular the algorithm semi-naive
+evaluation which, rather than running queries against the entire database, specifically queries
+newly inserted rows in a manner similar to a database trigger. Incremental rule matching, together
+with indexes and simple query planning, has brought an order of magnitude speedup to the e-graph
+engine egglog @egglog when compared to its predecessor egg @egg.
 
 Relational databases are a mature technology with rich theory and a wide breadth of implementations,
 providing many techniques that could be transferred to e-graphs beyond those already incorporated
@@ -1087,10 +1087,10 @@ e-matching also relies on a reversed `enodes_by_eclass: HashMap<EClass, ENode>`.
 Overall, recursive e-matching by only iterating all e-nodes in the outermost layer is significantly
 more efficient than what we presented previously, but there are still problems that arise.
 Roughly, these are
-+ Calls to `apply_rules()` will output all matches, even those discovered in previous calls to
-  `apply_rules()`.
 + Iterating through e-nodes that will be rejected on the bases of operator or variable agreement is
   unnecessary and wasteful.
++ Calls to `apply_rules()` will output all matches, even those discovered in previous calls to
+  `apply_rules()`.
 and later on we will see that relational e-matching addresses these issues.
 
 == Database joins
@@ -1263,35 +1263,46 @@ EqSat on a high level now looks like
 2. Perform actions (e-node insertions, creating e-classes, unifying e-classes) based on matches
 3. Canonicalization, applying these mutations to the database in batches.
 
-In comparison to recursive e-matching we benefit from being able to join in any order, not just
-recursively from the root of the pattern. We also benefit from already having implicit indices on
-e-node type, in that tuples for different partial functions are stored separately. We, however,
-still have an e-graph where all mutations leave pattern matches still matching, so every iteration
-of e-matching and canonicalization will rediscover all previously discovered rewrites. This is
-addressed by semi-naive evaluation, an algorithm from Datalog that we now can use due to having
-conjunctive queries.
+Relational e-matching improves upon recursive e-matching by being able to join in any order, not
+just recursively from the root of the pattern. We also benefit from already having implicit indices
+on e-node type, in that tuples for different partial functions are stored separately.
 
-Relational e-matching as described here allows more efficient join orders and allows all lookups to
-be indexed. It does not solve the other problem of recursive e-matching, that known matches are
-rediscovered in every iteration. For that, we need semi-naive evaluation.
+As a contextual tangent, egg @egg was released in 2021 and used recursive e-matching in a similar
+manner to how we describe it in @section_background_recursive_ematching. Later the same year,
+relational e-matching @relationalematching was published with a prototyped implementation on top of
+egg. The prototype used egg's canonicalization implementation and fully rebuilt the tables in every
+iteration of applying rules, achieving a large speedup over egg despite switching the data format
+back and forth in every EqSat iteration. The e-graph engine egglog @egglog was released in
+2023 and incorporates e-graphs as relational databases on a deeper level, achieving significant
+     further speedups largely by being able to apply the semi-naive evaluation algorithm from
+     Datalog.
 
 == Semi-naive evaluation <conceptual_background_seminaive>
 
-Semi-naive evaluation is an algorithm for joining relations, each consisting of both old and new
-tuples, guaranteeing that each joined tuple contains some new information. In the context of
-equality saturation, it avoids a situation in which we in each iteration rediscover every fact
-previously discovered in an earlier iteration. Expressing it as (pseudo)-relational algebra makes it
-more clear.
+Semi-naive evaluation is an algorithm that allows relational queries to be evaluated incrementally
+as new tuples are added to relations. It is associated with the implementation of Datalog engines
+and its use for e-graphs reveals a deep similarity between the two. In fact, Datalog can be seen as
+equality saturation without asserting the equality of two variables with `union()`, i.e. with only
+creation of e-classes using `make()` and insertions of e-classes with `insert()`. This removes the
+union-find aspect, and equality saturation can rightly be seen as Datalog with unification. Datalog
+has no canonicalization phase, but similarly alternates between evaluating rules and inserting new
+facts. Facts are, like e-nodes, tuples of variables stored in tables.
+
+Due to insertion and rule evaluation being batched, we can categorize table rows into `old` and
+`new`, or for a relation $X + Delta X$, the old $X$ and the new $Delta X$. Semi-naive evaluation
+provides a way to only compute those query matches that have not been matched in previous
+iterations, hence solving the second problem that we identified with recursive e-matching in
+@section_background_recursive_ematching.
 
 Let us say that we want to join relations A, B and C, where $join$ is a join, $union$ is the union
 of relations and $Delta$ is the change to a relation. Then
 
 $
-  "all information" = A join B join C.
+  "all information" = (A union Delta A) join (B union Delta B) join (C union Delta C).
 $
 
-But we only care about the new join results, and this can be represented by subtracting the join
-that already occurred from the full join of the new database.
+But we only care about the new join results, and this can be expressed by subtracting the
+information available in previous iterations.
 
 $
   "new information" = &(A union Delta A) join &(B union Delta B) join &(C union Delta C) \
@@ -1299,17 +1310,18 @@ $
 $
 
 The expression can be expanded using the fact that joins distribute over union, $(X union Y) join Z
-= X join Z union Y join Z$, and we get $A join B join C$ that can be canceled out.
+= X join Z union Y join Z$ with $union$ binding weaker than $join$, allowing us to cancel out $A
+join B join C$.
 
 #let hl(x) = text(fill: red, $#x$)
 
 $
-  "new information" =
-  &hl(A join B join C) union \
-  &Delta A join B join C union \
-  &(A union Delta A) join Delta B join C union \
-  &(A union Delta A) join (B union Delta B) join Delta C \
-  -& hl(A join B join C)
+  "new information"
+  &= hl(A &join& B &join& C) \
+  &union Delta A &join& B &join& C \
+  &union (A union Delta A) &join& Delta B &join& C \
+  &union (A union Delta A) &join& (B union Delta B) &join& Delta C \
+  &-  hl(A &join& B &join& C)
 $
 $
   "new information" =
