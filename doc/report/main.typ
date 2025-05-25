@@ -1531,6 +1531,17 @@ index data-structures based on exact queries.
 That said, it's entirely possible to create an e-graph engine that uses SQL internally and in fact a
 prototype of egglog, egglite, was originally implemented on top of sqlite @egglite @egraph_sqlite.
 
+== Nomenclature
+
+Between e-graphs, Datalog and relational databases there are some terms that have essentially
+identical meanings. We use the terms
+- table, relation, function, and
+- row, tuple, e-node, and
+- cell, variable, e-class,
+
+largely interchangably, sometimes highlighting different aspects of the same thing depending on the
+situation.
+
 = Implementation <chapter_implementation>
 
 #TODO[Suggested chapter structure
