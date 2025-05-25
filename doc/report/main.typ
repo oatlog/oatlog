@@ -2357,6 +2357,28 @@ least on small e-graphs, while still using fundamentally the same algorithms.
 There are still many ways in which Oatlog could be improved, from merging relations and better
 scheduling to more standard database improvements in the form of better indexes and query planning.
 
+== Future work
+
+#TODO[mention basics and interoperability stuff, extraction, ruleset support for `(check ..)` etc.
+Then continuing with more research-y ideas]
+
+Compatibility:
+- Support egglog primitive `:merge`, necessary for lattice-based computation
+- Extraction
+
+Smaller research-y:
+- Merge relations whose columns are permutations of each other (e.g. `Add` and `Sub`)
+- Scheduling and termination, prioritize union rules. Cite Eqlog.
+- Improve query planning through cardinality estimation (currently assuming $#`new` << #`old` <
+  #`all`$, identically across all relations)
+- Memory compression of various data structures
+- Variable-width radix sort
+
+Larger research-y:
+- Magic sets
+- Container types for efficient associativity
+- BTree merge join or dynamic sorting join
+
 /*
 === Magic sets
 
