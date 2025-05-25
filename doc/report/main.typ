@@ -63,7 +63,7 @@
     program using e-graphs and later extracting the optimal program.
 
     However, the performance of e-graphs engines is a major obstacle for using them in compilers,
-    which motivates improving the underlying e-graph technology. We have created oatlog, which is an
+    which motivates improving the underlying e-graph technology. We have created Oatlog, which is an
     ahead-of-time compiled e-graph engine. It significantly outperforms egglog, which is the current
     fastest mainstream e-graph engine.
 
@@ -84,7 +84,7 @@
 //
 // - compilers -> egraphs
 // - egraphs and equality saturation
-// - oatlog
+// - Oatlog
 // - this thesis
 //
 // = Background
@@ -483,16 +483,16 @@ implementation for our master's thesis.
 
 == Oatlog
 
-This thesis introduces oatlog, a rewrite engine compatible with the egglog language. Like egglog, it
+This thesis introduces Oatlog, a rewrite engine compatible with the egglog language. Like egglog, it
 can be seen as a Datalog engine with support for unification. Unlike egglog, it compiles rules
 ahead-of-time (aot$#h(2pt)approx#h(2pt)$oat) which allows query planning and index selection to be
 optimized globally.
 
 Oatlog has limited functionality compared to egglog, implementing only a subset of the language and
 its long tail of features. While a few features are impractical in a ahead-of-time setting, most
-egglog features could be implemented within the existing oatlog architecture.
+egglog features could be implemented within the existing Oatlog architecture.
 
-For the language subset that oatlog supports, it exceeeds egglog in performance. The speedups range
+For the language subset that Oatlog supports, it exceeeds egglog in performance. The speedups range
 from over 10x for tiny e-graphs of only hundreds of nodes, to more moderate 2x speedups for small
 e-graphs of about $10^5$ nodes. These results stem not from one large but rather many small
 improvements compared to egglog, around rule preprocessing, query planning, index implementation and
@@ -510,11 +510,11 @@ equality saturation in about 100 lines of code, before finally explaining the si
 e-graphs and relational databases and how this can be leveraged for a significantly more efficient
 implementation.
 
-@chapter_implementation then concretely describes the application of these techniques in oatlog and
-the implementation decisions we have made, in addition to showing how oatlog is used and its
+@chapter_implementation then concretely describes the application of these techniques in Oatlog and
+the implementation decisions we have made, in addition to showing how Oatlog is used and its
 capabilities.
 
-@chapter_evaluation follows by evaluating oatlog through its test suite and benchmarks.
+@chapter_evaluation follows by evaluating Oatlog through its test suite and benchmarks.
 
 #TODO[@chapter_conclusion]
 
@@ -810,7 +810,7 @@ representation.
 
 == Equality saturation in practice <section_background_practice>
 
-While e-graph engines like oatlog contain significant complexity in order to support many kinds of
+While e-graph engines like Oatlog contain significant complexity in order to support many kinds of
 rewrite rules and achieve good performance, both asymptotically and in terms of constant factors, a
 similar computation can be described in only about 100 lines of code. This section will present and
 explain such a snippet, simultaneously concretizing the steps involved in equality saturation.
@@ -832,7 +832,7 @@ rewrite rules are specified, all or almost all calls to `make()` can be replaced
 making `make()` itself largely unnecessary. Still, for the purpose of implementation `make()` is a
 reasonable abstraction.
 
-Note that this is oatlog terminology. In egg @egg, `entry` is called `add` and `union` is called
+Note that this is Oatlog terminology. In egg @egg, `entry` is called `add` and `union` is called
 `merge`.
 
 === Union-find <section_background_practice_union_find>
@@ -958,7 +958,7 @@ contains only root e-classes.
 
 This implementation never properly reaches a fixed point since it continually adds new e-classes
 using `make()` even these are always merged into existing e-classes when inserting. E-graph engines,
-including oatlog, resolve this by replacing calls such as `let ac = self.uf.make()` with some
+including Oatlog, resolve this by replacing calls such as `let ac = self.uf.make()` with some
 `entry()` operation that first queries for the e-node $(+, a, c)$ and uses its e-class if present.
 
 #figure(
@@ -1007,7 +1007,7 @@ acceptable.
   in linear time for e-graphs of fixed treewidth @fastextract.
 - Finally, for arbitrary cost functions approximate solutions can be found using various heuristics.
 
-However, oatlog does not in its current form implement any extraction, so it is not a major topic in
+However, Oatlog does not in its current form implement any extraction, so it is not a major topic in
 this thesis.
 
 #figure(
@@ -1557,7 +1557,7 @@ prototype of egglog, egglite, was originally implemented on top of sqlite @eggli
 #TODO[Elaborate and forward reference]
 /*
 
-This section discusses oatlog in detail, including how it is used, what it can do and how it is
+This section discusses Oatlog in detail, including how it is used, what it can do and how it is
 implemented.
 
 == Egglog-compatible external interface
@@ -1593,7 +1593,7 @@ We are planning to implement user-specified primitive functions by allowing Rust
 inline with the S-expressions.
 
 Oatlog does not currently support all Egglog language constructs. @oatlog_egglog_compatibility shows
-an overview of language keywords that oatlog supports. Aside from this, oatlog currently lacks
+an overview of language keywords that Oatlog supports. Aside from this, Oatlog currently lacks
 support for
 
 + #[Primitive functions, i.e. non-partial functions with exclusively primitive arguments and return
@@ -1612,7 +1612,7 @@ support for
       columns: (1fr, 1fr),
       table(
         columns: (45%, 45%),
-        table.cell(colspan: 2)[Features desirable in oatlog],
+        table.cell(colspan: 2)[Features desirable in Oatlog],
         [Egglog feature], [Oatlog support],
 
         table.cell(colspan: 2)[Core],
@@ -1641,7 +1641,7 @@ support for
       ),
       table(
         columns: (45%, 45%),
-        table.cell(colspan: 2)[Features more suitable to oatlog's run-time API],
+        table.cell(colspan: 2)[Features more suitable to Oatlog's run-time API],
         [Egglog feature], [Oatlog support],
 
         table.cell(colspan: 2)[Scheduling],
@@ -1676,7 +1676,7 @@ support for
     let ignored = box(outset: 2pt, radius: 2pt, fill: gray.lighten(30%))[ignored]
     let wont = box(outset: 2pt, radius: 2pt, fill: blue.lighten(40%))[won't]
     flex-caption(
-      [Egglog support in oatlog, by language keyword.],
+      [Egglog support in Oatlog, by language keyword.],
       [
         Rows marked #no could make sense to implement, at the very
         least for unit tests. Rows marked #ignored are currently no-ops but should be implemented while
@@ -1686,11 +1686,11 @@ support for
   },
 ) <oatlog_egglog_compatibility>
 
-Finally, oatlog has a run-time API that allows insertion and querying of rows and e-classes,
+Finally, Oatlog has a run-time API that allows insertion and querying of rows and e-classes,
 realized through functions implemented on the `Theory` type in the code generated by the
 `oatlog::compile_egraph!` macro. This API is currently overly cumbersome, as can be seen from its
 use in @appendix_examples. @oatlog_runtime_api_features summarizes the currently
-implemented and unimplemented features of the oatlog run-time API.
+implemented and unimplemented features of the Oatlog run-time API.
 
 #figure(
   {
@@ -1724,11 +1724,11 @@ implemented and unimplemented features of the oatlog run-time API.
 
 Oatlog is a Rust proc-macro that takes in egglog code and generates Rust code. See
 @codegen_example_theory and @codegen_example_relation for an example of what the generated code
-looks like. @oatlog-architecture shows an overview of oatlog's internal architecture.
+looks like. @oatlog-architecture shows an overview of Oatlog's internal architecture.
 
 #figure(
   image("../figures/architecture.svg"),
-  caption: [A coarse overview of the current oatlog architecture.],
+  caption: [A coarse overview of the current Oatlog architecture.],
 ) <oatlog-architecture>
 
 === Egglog AST
@@ -1772,7 +1772,7 @@ rustc span.
 
 === Testing infrastructure
 
-Since oatlog is implemented using a proc-macro, errors result in Rust compilation errors rather than
+Since Oatlog is implemented using a proc-macro, errors result in Rust compilation errors rather than
 single test failures. This means we require some mechanism to compile test cases separately.
 Luckily, Rust doctests do exactly this and so we use those for test cases expected to not compile.
 Overall, our comparative testing infrastructure (against egglog) can handle the 6 cases laid out in
@@ -1784,15 +1784,15 @@ Overall, our comparative testing infrastructure (against egglog) can handle the 
     [Code], [Condition],
     [`nogenerate`], [Oatlog is unable to generate code.],
     [`no_compile`], [The generated code does not compile.],
-    [`does_panic`], [Runtime panic when running oatlog and egglog.],
+    [`does_panic`], [Runtime panic when running Oatlog and egglog.],
     [`mismatched`], [Oatlog and egglog produce different numbers of e-nodes],
     [`zrocorrect`], [Oatlog and egglog produce zero e-nodes],
     [`allcorrect`], [Oatlog and egglog produce the same non-zero number of e-nodes],
   ),
   caption: flex-caption(
-    [Possible outcomes for comparative testing of oatlog and egglog.],
+    [Possible outcomes for comparative testing of Oatlog and egglog.],
     [
-      The `zrocorrect` verdict is broken out from `allcorrect` since oatlog ignores the `check`
+      The `zrocorrect` verdict is broken out from `allcorrect` since Oatlog ignores the `check`
       command, which usually is used in those tests.
     ],
   ),
@@ -1855,7 +1855,7 @@ Overall, our comparative testing infrastructure (against egglog) can handle the 
 
 #figure(
   image("../figures/architecture.svg"),
-  caption: [A coarse overview of the current oatlog architecture.],
+  caption: [A coarse overview of the current Oatlog architecture.],
 ) <oatlog-architecture>
 
 === Egglog AST
@@ -2223,33 +2223,33 @@ To make sure we still perform WCOJ, we need to ensure that we perform semi-joins
     table.header(
       [*benchmark*],
       [*egglog*#footnote[egglog version 0.4]],
-      [*oatlog*],
+      [*Oatlog*],
     ),
 
     [fuel math], [189.86 ms], [385.15 ms],
     [math], [16.419 ms], [13.434 ms],
     [boolean adder], [20.265 ms], [6.3821 ms],
   ),
-  caption: [Benchmark results comparing egglog with oatlog.],
+  caption: [Benchmark results comparing egglog with Oatlog.],
 ) <benchmark-results>
 
 @benchmark-results describe our benchmark results. The benchmarks include the egglog code in
 @appendix_benchmarks and run 9 steps. This is repeated 100 times and an average is taken.
 
-As of the midpoint report, there is low-hanging fruit in that oatlog creates unnecessary e-classes
+As of the midpoint report, there is low-hanging fruit in that Oatlog creates unnecessary e-classes
 that are quickly eliminated. We believe this should address the performance difference compared to
-egglog #footnote[It should be noted that oatlog is algorithmically more similar to eqlog, with
+egglog #footnote[It should be noted that Oatlog is algorithmically more similar to eqlog, with
 egglog being very different beyond also being a relational e-graph engine.].
 
 == Egglog test suite
 
-We run the entire egglog testsuite (93 tests) to validate oatlog.
-We compare the number of e-classes in egglog and oatlog to check if oatlog is likely producing the same result.
+We run the entire egglog testsuite (93 tests) to validate Oatlog.
+We compare the number of e-classes in egglog and Oatlog to check if Oatlog is likely producing the same result.
 
 Right now, we fail most tests because primitive functions are not implemented. Additionally, some
 tests are not very relevant for AOT compilation and supporting them is not really desirable. An
-example of this are extraction commands, since egglog-language-level commands are run at oatlog
-startup and oatlog extraction is better handled using the run-time API.
+example of this are extraction commands, since egglog-language-level commands are run at Oatlog
+startup and Oatlog extraction is better handled using the run-time API.
 
 For a list of currently passing tests, see @passingtests.
 
@@ -2274,7 +2274,7 @@ For a list of currently passing tests, see @passingtests.
         [*e-nodes*],
         [*egglog 0.4 deterministic*],
         [*egglog 0.4*],
-        [*oatlog*],
+        [*Oatlog*],
         [*speedup*],
       ),
       [`fuel2-math`, 10 steps, saturated], [1516], [7.0778 ms], [5.8908 ms], [1.1579 ms], table.cell(
@@ -2332,7 +2332,7 @@ For a list of currently passing tests, see @passingtests.
     ),
   ),
   caption: [
-    Microbenchmark results comparing egglog with oatlog. The reported timings are maximum likelihood
+    Microbenchmark results comparing egglog with Oatlog. The reported timings are maximum likelihood
     estimates over $100$ samples or $5$ seconds, whichever is greater, computed by Criterion.rs
     @criterionrs on an AMD Ryzen 5900X CPU. Oatlog is compared with nondeterministic egglog since
     it internally iterates `hashbrown::HashMap`s.
@@ -2344,13 +2344,13 @@ For a list of currently passing tests, see @passingtests.
 We have shown that it is possible for an e-graph engine to be significantly faster than egglog, at
 least on small e-graphs, while still using fundamentally the same algorithms.
 
-There are still many ways in which oatlog could be improved, from merging relations and better
+There are still many ways in which Oatlog could be improved, from merging relations and better
 scheduling to more standard database improvements in the form of better indexes and query planning.
 
 
 /*
 === Magic sets
-#TODO[Since oatlog/egglog is a superset of Datalog, this should be possible, right?]
+#TODO[Since Oatlog/egglog is a superset of Datalog, this should be possible, right?]
 
 #TODO[we have not done this though, and it's unclear if it is useful, I guess rules can have a :magic annotation?]
 
@@ -2581,7 +2581,7 @@ FROM Add
 
 = Example of generated theory code <appendix_codegen_example_theory>
 
-Egglog code is orders of magnitude more brief than the generated code that oatlog outputs. In this
+Egglog code is orders of magnitude more brief than the generated code that Oatlog outputs. In this
 example, we consider the following egglog code implementing the distributive law:
 
 ```egglog
@@ -2743,7 +2743,7 @@ impl AddRelation {
 
 = Examples <appendix_examples>
 
-This appendix contains self-contained examples that use oatlog.
+This appendix contains self-contained examples that use Oatlog.
 
 == Quadratic formula
 

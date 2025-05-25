@@ -23,8 +23,8 @@ lint:
 		then echo "ERROR: The D in Datalog should be capitalized!"; exit 1; fi
 	@if $(RG) '[^`"_]rust[^c]'; \
 		then echo "ERROR: The R in Rust should be capitalized!"; exit 1; fi
-	@if $(RG) '[^= \.] Oatlog'; \
-		then echo "ERROR: Only ever capitalize oatlog at the start of a sentence!"; exit 1; fi
+	@if $(RG) '[^/@<`"_]oatlog[^c(::)]'; \
+		then echo "ERROR: The O in Oatlog should be capitalized!"; exit 1; fi
 	@if $(RG) '[^= \.:] E-'; \
 		then echo "ERROR: Only ever capitalize E-graph/node/class at the start of a sentence!"; exit 1; fi
 	@if $(RG) '^#table'; \
