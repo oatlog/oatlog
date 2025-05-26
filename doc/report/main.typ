@@ -79,103 +79,6 @@
   ],
 )
 
-// old structure
-// = Introduction
-//
-// - compilers -> egraphs
-// - egraphs and equality saturation
-// - Oatlog
-// - this thesis
-//
-// = Background
-//
-// - definition of e-graph
-// - recursive matching
-// - canonicalization
-// - semi-naive evaluation
-// - egglog example
-//
-// - nomenclature
-// - egglog vs Datalog vs database
-// - rule preprocessing
-//     - semi-naive evaluation
-//     - functional dependency
-//     - merging rules
-//     - magic sets
-// - scheduling and termination
-// - canonicalization and union-find
-// - query planning
-// - index selection and implementation
-// - extraction
-//
-// = Implementation
-//
-// - egglog compatible API interface
-// - architecture and IRs
-// - selected algorithms
-// - selected implementation details
-//     - spans
-//     - testing infrastructure
-//
-// = Evaluation
-//
-// - benchmarks
-// - egglog testsuite
-//
-// = Conclusion
-//
-//
-// // new structure
-// = Introduction
-//
-// + Kompilatorer viktiga
-// + peepholes är bra
-// + Vad är en rewrite
-//     - exempel?
-// + Kompilatorer har phase ordering problem pga destructive rewrites
-// + e-grafer löser phase ordering
-// + e-grafer är långsamma
-// + Finns lovande innovation inom e-graf-implementering
-// + Vi har implementerat e-graf som är snabbare än egglog i många fall
-//
-// = Background
-//
-// - definition of e-graph
-//     - math objects as python syntax?
-// - canonicalization and union-find
-// - recursive ematching
-// - ematching as a join + what is a join
-// - semi-naive evaluation
-// - egglog/Datalog language explained using examples
-// - nomenclature (+ pick what nomenclature we use for the report)
-// - scheduling and termination
-// - extraction
-//
-// = Implementation
-//
-// - egglog compatible API interface
-//
-// - architecture and IRs
-//     - should contain bulk of text
-//     - explanations and optimizations interleaved
-//     - query planning
-//     - index selection + algorithms
-//
-// - exactly how is canonicalization implemented (cool optimizations)
-//     - essentially everything from the runtime library
-//
-// - misc implementation details
-//     - proc macro stuff
-//     - spans
-//     - testing infrastructure
-//
-// = Evaluation
-//
-// - benchmarks
-// - egglog testsuite
-//
-// = Conclusion
-
 #TODO[introduce relevant references]
 
 #TODO[Clearly present motivation for this work]
@@ -2275,43 +2178,12 @@ To make sure we still perform WCOJ, we need to ensure that we perform semi-joins
 = Evaluation <chapter_evaluation>
 
 #TODO[Section summary]
+
+== Testing
+
+- egglog testsuite
+
 /*
-
-== Benchmarks
-
-*/
-#TODO[eventually replace with a log/log graph and add more benchmarks, include sizes]
-/*
-
-// generated using:
-// cargo bench --no-run && taskset -c 3 cargo bench
-
-#figure(
-  table(
-    columns: (auto, auto, auto),
-    table.header(
-      [*benchmark*],
-      [*egglog*#footnote[egglog version 0.4]],
-      [*Oatlog*],
-    ),
-
-    [fuel math], [189.86 ms], [385.15 ms],
-    [math], [16.419 ms], [13.434 ms],
-    [boolean adder], [20.265 ms], [6.3821 ms],
-  ),
-  caption: [Benchmark results comparing egglog with Oatlog.],
-) <benchmark-results>
-
-@benchmark-results describe our benchmark results. The benchmarks include the egglog code in
-@appendix_benchmarks and run 9 steps. This is repeated 100 times and an average is taken.
-
-As of the midpoint report, there is low-hanging fruit in that Oatlog creates unnecessary e-classes
-that are quickly eliminated. We believe this should address the performance difference compared to
-egglog #footnote[It should be noted that Oatlog is algorithmically more similar to eqlog, with
-egglog being very different beyond also being a relational e-graph engine.].
-
-== Egglog test suite
-
 We run the entire egglog testsuite (93 tests) to validate Oatlog.
 We compare the number of e-classes in egglog and Oatlog to check if Oatlog is likely producing the same result.
 
@@ -2321,14 +2193,11 @@ example of this are extraction commands, since egglog-language-level commands ar
 startup and Oatlog extraction is better handled using the run-time API.
 
 For a list of currently passing tests, see @passingtests.
-
 */
 
-== Testing
-
-- egglog testsuite
-
 == Benchmarks
+
+#TODO[eventually replace with a log/log graph and add more benchmarks, include sizes]
 
 #figure(
   //placement: top,
@@ -2376,7 +2245,12 @@ For a list of currently passing tests, see @passingtests.
     Ryzen 5900X CPU. Oatlog is compared with nondeterministic egglog since Oatlog internally iterates
     `hashbrown::HashMap`s.
   ],
-) <benchmark-results>
+) <fig_eval_benchmarks_table>
+
+#figure(
+  image("benchmarks.svg"),
+  caption: [#TODO[]],
+) <fig_eval_benchmarks_plot>
 
 = Conclusion <chapter_conclusion>
 

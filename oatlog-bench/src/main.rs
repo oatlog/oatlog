@@ -5,21 +5,63 @@ fn main() {
 
     println!("table.header([*benchmark*], [*e-nodes*], [*egglog*], [*Oatlog*], [*speedup*]),");
 
+    let mut fixed_enodes = Vec::new();
+    let mut fixed_oatlog = Vec::new();
+    let mut fixed_egglog = Vec::new();
+
+    let mut math_enodes = Vec::new();
+    let mut math_oatlog = Vec::new();
+    let mut math_egglog = Vec::new();
+
+    let mut bool_enodes = Vec::new();
+    let mut bool_oatlog = Vec::new();
+    let mut bool_egglog = Vec::new();
+
     for (name, oatlog, egglog) in oatlog_bench::SATURATING_BENCHMARKS {
-        row(format!("`{name}`, saturated"), oatlog, egglog);
+        let (row, enodes, oatlog_time, egglog_time) =
+            row(format!("`{name}`, saturated"), oatlog, egglog);
+        println!("{row}");
+        fixed_enodes.push(enodes);
+        fixed_oatlog.push(oatlog_time.as_secs_f64());
+        fixed_egglog.push(egglog_time.as_secs_f64());
     }
     for (name, limit, oatlog, egglog) in oatlog_bench::BENCHMARKS {
         for i in 0..=limit {
-            row(format!("`{name}`, {i} steps"), || oatlog(i), || egglog(i));
+            let (row, enodes, oatlog_time, egglog_time) =
+                row(format!("`{name}`, {i} steps"), || oatlog(i), || egglog(i));
+            println!("{row}");
+            if row.contains("boolean") {
+                bool_enodes.push(enodes);
+                bool_oatlog.push(oatlog_time.as_secs_f64());
+                bool_egglog.push(egglog_time.as_secs_f64());
+            } else {
+                math_enodes.push(enodes);
+                math_oatlog.push(oatlog_time.as_secs_f64());
+                math_egglog.push(egglog_time.as_secs_f64());
+            }
         }
     }
+    println!();
+    println!("fixed_enodes={fixed_enodes:?}");
+    println!("fixed_oatlog={fixed_oatlog:?}");
+    println!("fixed_egglog={fixed_egglog:?}");
+    println!("math_enodes={math_enodes:?}");
+    println!("math_oatlog={math_oatlog:?}");
+    println!("math_egglog={math_egglog:?}");
+    println!("bool_enodes={bool_enodes:?}");
+    println!("bool_oatlog={bool_oatlog:?}");
+    println!("bool_egglog={bool_egglog:?}");
 }
 
-fn row(name: String, oatlog: impl Fn() -> usize, egglog: impl Fn()) {
+fn row(
+    name: String,
+    oatlog: impl Fn() -> usize,
+    egglog: impl Fn(),
+) -> (String, usize, Duration, Duration) {
     let (oatlog_time, enodes) = measure(oatlog);
     let (egglog_time, ()) = measure(egglog);
     let speedup = egglog_time.as_secs_f64() / oatlog_time.as_secs_f64();
-    println!(
+    let row = format!(
         "[{name}], [{enodes}], [{}], [{}], table.cell(fill: {})[{:.2}x],",
         fmt(egglog_time),
         fmt(oatlog_time),
@@ -30,6 +72,7 @@ fn row(name: String, oatlog: impl Fn() -> usize, egglog: impl Fn()) {
         },
         speedup,
     );
+    (row, enodes, oatlog_time, egglog_time)
 }
 fn fmt(d: Duration) -> String {
     let d = d.as_secs_f64();
