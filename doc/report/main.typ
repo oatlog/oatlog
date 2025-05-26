@@ -2252,6 +2252,51 @@ For a list of currently passing tests, see @passingtests.
   caption: [#TODO[]],
 ) <fig_eval_benchmarks_plot>
 
+#TODO[talk about what fuel1 etc means]
+
+== Egglog support
+
+Oatlog only implements a subset of the egglog language, notably
+- Lattice computations, for example lower bound of an e-class.
+- Scheduling/rulesets, to run some rules more often.
+- Extraction, to select an optimal expression.
+
+While these would be useful features, they are not required to evaluate the underlying engine.
+Lattice computations are performed in essentially the same way as canonicalization.
+Rulesets can be implemented by maintaining multiple sets of what is considered "new" depending on the timestamp that a rule was last run.
+Extraction is essentially orthogonal to an e-graph engine and there already exist solvers for that.
+
+== Testing
+
+#TODO[get exact numbers]
+
+We test Oatlog by comparing it against the egglog @egglog testsuite and comparing the number of e-nodes for each relation.
+In the testsuite, 16.3498 out of 90.859 only contain language constructs supported by Oatlog and it passes all of those tests.
+
+// birewrite
+// eqsat_basic
+// include
+// math_microbenchmark
+// path
+// pathproof
+// repro_querybug2
+// repro_querybug4
+// repro_querybug
+// repro_unsound
+// repro_unsound_htutorial
+//
+// quadratic
+// fuel3
+// fuel2
+// fuel1
+//
+// fuel2_saturating
+// fuel1_saturating
+
+// - egglog testsuite
+
+#TODO[thoughts about our development in general, what worked well?]
+
 = Conclusion <chapter_conclusion>
 
 We have shown that it is possible for an e-graph engine to be significantly faster than egglog, at
@@ -2276,6 +2321,8 @@ Smaller research-y:
   #`all`$, identically across all relations)
 - Memory compression of various data structures
 - Variable-width radix sort
+- Re-canonicalize during rehash (implemented in scratch).
+- Pick ideal ordering to reconstruct indexes so we sort the lists a minimum number of times (the flow stuff)
 
 Larger research-y:
 - Magic sets
