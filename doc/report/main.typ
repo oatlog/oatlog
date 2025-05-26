@@ -1900,6 +1900,9 @@ Because of symmetries in premises, the semi-naive transformation can generate ru
 
 #TODO[equality modulo permutation should maybe have it's own section, or this should link to more in-depth explanations]
 
+
+#TODO[forward reference to HIR opts]
+
 === TIR, trie IR
 
 #figure(
@@ -2178,6 +2181,60 @@ premises of the rules and, if they are equal, replace them with a rule that comb
 the original rules.
 
 */
+
+== HIR optimization
+
+In general we can think of a rule as $"Premise" => "Action"$, and the overall goal of optimizing the HIR is to remove everything from the actions that are already present in the premise and to simplify the premise and action.
+
+For example, consider this rule:
+```egglog
+(rewrite (Mul (Const 0) x) (Const 0))
+```
+
+It would be represented as:
+```
+premise = [Mul(a, x, b), Const(0, a)]
+inserts = [Const(0, c)]
+unify = [{b, c}]
+```
+Where `premise` is the atoms in the join we want to perform, `inserts` is the set of atoms we want to insert and `unify` is the e-classes we want to unify.
+
+We perform the following set of optimizations until we reach a fixpoint
+- Merging variables due to functional dependency.
+//     - from `(rule ((= c (Add a b)) (= d (Add a b))) (...))`
+//     - to   `(rule ((= c (Add a b)) (= c (Add a b))) (...))`
+- Deduplicating premise, action atoms.
+//     - from `(rule ((= c (Add a b)) (= c (Add a b))) (...))`
+//     - to   `(rule ((= c (Add a b))) (...))`
+- Removing all action atoms that are also present in premise.
+- Attempt to merge variables in unify, so the unify can be avoided.
+    - If both variables in unify are mentioned in premise, this is not done since it would modify the premise.
+- Make all action atoms use canonical variables according to unify. 
+
+The effect of these optimizations is to reduce atoms, variables and unifications.
+Reducing premise and action atoms results in a smaller query and fewer unnecessary inserts.
+Reducing variables is beneficial for queries because the join result is smaller and because it may cause further deduplication.
+
+Since this set of optimizations commute, we reach a global optima without needing e-graphs.
+
+// #TODO[can we "prove" that these commute and that we therefore reach a global optima?]
+// While one could use e-graphs for this, these optimizations already commute, so they will still reach the global optima.
+
+// Semi-formal fixpoint algorithm:
+// ```
+// P(r, x -> y), P(r, x -> z) => union(premise_unify, y, z)
+// P(r, x -> y), A(r, x -> z) => union(action_unify, y, z)
+// A(r, x -> y), A(r, x -> z) => union(action_unify, y, z)
+// 
+// union(premise_unify, x, y) => union(action_unify, x, y)
+// 
+// P(r, x) => replace(P(r, x), P(r, find(premise_unify, x)))
+// A(r, x) => replace(A(r, x), A(r, find(action_unify, x)))
+// 
+// P(r, equal_modulo(action_unify, x)), A(r, x) => remove(A(r, x))
+//
+// union(action_unify, x, y), !premise_var(x), !premise_var(y) => 
+// ```
 
 == Query planning
 
