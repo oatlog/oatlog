@@ -1900,7 +1900,6 @@ Because of symmetries in premises, the semi-naive transformation can generate ru
 
 #TODO[equality modulo permutation should maybe have it's own section, or this should link to more in-depth explanations]
 
-
 #TODO[forward reference to HIR opts]
 
 === TIR, trie IR
@@ -2208,8 +2207,8 @@ We perform the following set of optimizations until we reach a fixpoint
 //     - to   `(rule ((= c (Add a b))) (...))`
 - Removing all action atoms that are also present in premise.
 - Attempt to merge variables in unify, so the unify can be avoided.
-    - If both variables in unify are mentioned in premise, this is not done since it would modify the premise.
-- Make all action atoms use canonical variables according to unify. 
+  - If both variables in unify are mentioned in premise, this is not done since it would modify the premise.
+- Make all action atoms use canonical variables according to unify.
 
 The effect of these optimizations is to reduce atoms, variables and unifications.
 Reducing premise and action atoms results in a smaller query and fewer unnecessary inserts.
@@ -2225,15 +2224,15 @@ Since this set of optimizations commute, we reach a global optima without needin
 // P(r, x -> y), P(r, x -> z) => union(premise_unify, y, z)
 // P(r, x -> y), A(r, x -> z) => union(action_unify, y, z)
 // A(r, x -> y), A(r, x -> z) => union(action_unify, y, z)
-// 
+//
 // union(premise_unify, x, y) => union(action_unify, x, y)
-// 
+//
 // P(r, x) => replace(P(r, x), P(r, find(premise_unify, x)))
 // A(r, x) => replace(A(r, x), A(r, find(action_unify, x)))
-// 
+//
 // P(r, equal_modulo(action_unify, x)), A(r, x) => remove(A(r, x))
 //
-// union(action_unify, x, y), !premise_var(x), !premise_var(y) => 
+// union(action_unify, x, y), !premise_var(x), !premise_var(y) =>
 // ```
 
 == Query planning
