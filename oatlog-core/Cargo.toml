@@ -18,6 +18,7 @@ regex.workspace = true
 smallvec.workspace = true
 syn.workspace = true
 tracing.workspace = true
+tracing-subscriber.workspace = true
 voracious_radix_sort.workspace = true
 hashbrown_14.workspace = true
 

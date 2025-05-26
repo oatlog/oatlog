@@ -12,6 +12,14 @@ impl Steps {
     fn check(self) {
         std::env::set_current_dir(concat!(env!("CARGO_MANIFEST_DIR"), "/..")).unwrap();
 
+        // breaks if multiple tests are running.
+        // if !tracing::dispatcher::has_been_set() {
+        //     tracing_subscriber::fmt()
+        //         .with_max_level(tracing::Level::TRACE)
+        //         .with_writer(std::io::stdout)
+        //         .init();
+        // }
+
         let sexps = crate::frontend::parse_str_to_sexps(self.code).unwrap();
         let config = crate::Configuration {
             egglog_compat: if self.strict_egglog_compat {
@@ -2471,8 +2479,8 @@ fn fuel3_benchmark_hir() {
                             Premise { relation: Sub, columns: [a, b, v2] },
                             Action { relation: Add, columns: [a, v5, v2], entry: [_, _, U] },
                             Action { relation: Add, columns: [v5, a, v2] },
-                            Action { relation: Mul, columns: [b, v4, v5] },
-                            Action { relation: Mul, columns: [v4, b, v5], entry: [_, _, U] },
+                            Action { relation: Mul, columns: [b, v4, v5], entry: [_, _, U] },
+                            Action { relation: Mul, columns: [v4, b, v5] },
                             Action { relation: Const, columns: [v3, v4], entry: [_, U] },
                             Action { relation: g0, columns: [v3], entry: [!] },
                         ],
@@ -2511,7 +2519,6 @@ fn fuel3_benchmark_hir() {
                         src: "( rewrite ( Add a b ) ( Add b a ) )",
                         atoms: [
                             Premise { relation: Add, columns: [a, b, v2] },
-                            Action { relation: Add, columns: [a, b, v2] },
                             Action { relation: Add, columns: [b, a, v2], entry: [_, _, U] },
                         ],
                         variables: {
@@ -2525,7 +2532,6 @@ fn fuel3_benchmark_hir() {
                         src: "( rewrite ( Mul a b ) ( Mul b a ) )",
                         atoms: [
                             Premise { relation: Mul, columns: [a, b, v2] },
-                            Action { relation: Mul, columns: [a, b, v2] },
                             Action { relation: Mul, columns: [b, a, v2], entry: [_, _, U] },
                         ],
                         variables: {
@@ -2542,8 +2548,8 @@ fn fuel3_benchmark_hir() {
                             Premise { relation: Add, columns: [b, c, v3] },
                             Action { relation: Add, columns: [a, b, v5], entry: [_, _, U] },
                             Action { relation: Add, columns: [b, a, v5] },
-                            Action { relation: Add, columns: [c, v5, v4] },
-                            Action { relation: Add, columns: [v5, c, v4], entry: [_, _, U] },
+                            Action { relation: Add, columns: [c, v5, v4], entry: [_, _, U] },
+                            Action { relation: Add, columns: [v5, c, v4] },
                         ],
                         variables: {
                             v0: VariableMeta { name: Some("a"), ty: t3 },
@@ -2562,8 +2568,8 @@ fn fuel3_benchmark_hir() {
                             Premise { relation: Mul, columns: [b, c, v3] },
                             Action { relation: Mul, columns: [a, b, v5], entry: [_, _, U] },
                             Action { relation: Mul, columns: [b, a, v5] },
-                            Action { relation: Mul, columns: [c, v5, v4] },
-                            Action { relation: Mul, columns: [v5, c, v4], entry: [_, _, U] },
+                            Action { relation: Mul, columns: [c, v5, v4], entry: [_, _, U] },
+                            Action { relation: Mul, columns: [v5, c, v4] },
                         ],
                         variables: {
                             v0: VariableMeta { name: Some("a"), ty: t3 },
@@ -2883,8 +2889,8 @@ fn fuel3_benchmark_hir() {
                             Action { relation: Sub, columns: [v8, v11, v6], entry: [_, _, U] },
                             Action { relation: Mul, columns: [a, v7, v8], entry: [_, _, U] },
                             Action { relation: Mul, columns: [v7, a, v8] },
-                            Action { relation: Mul, columns: [v7, v9, v10] },
-                            Action { relation: Mul, columns: [v9, v7, v10], entry: [_, _, U] },
+                            Action { relation: Mul, columns: [v7, v9, v10], entry: [_, _, U] },
+                            Action { relation: Mul, columns: [v9, v7, v10] },
                         ],
                         variables: {
                             v0: VariableMeta { name: Some("fuel"), ty: t2 },
@@ -2967,6 +2973,150 @@ fn fuel3_benchmark_hir() {
                     r60: g45 { columns: [Math], kind: Global(g45), implicit_rules: {n0: [!]} },
                     r61: g46 { columns: [Math], kind: Global(g46), implicit_rules: {n0: [!]} },
                     r62: g47 { columns: [Math], kind: Global(g47), implicit_rules: {n0: [!]} },
+                },
+            }"#]]),
+        expected_tir: None,
+        expected_lir: None,
+        expected_codegen: None,
+    }
+    .check();
+}
+
+#[test]
+fn fixpoint_hir_opt() {
+    Steps {
+        strict_egglog_compat: true,
+        code: r"
+            (datatype Math
+                (Foo Math)
+            )
+
+            (rule (
+                (= a (Foo b))
+            ) (
+                (union a (Foo b))
+            ))
+        ",
+        expected_hir: Some(expect![[r#"
+            Theory {
+                types: {
+                    [t0, Math]: [symbolic],
+                },
+                symbolic_rules: [
+                    SymbolicRule {
+                        src: "( rule ( ( = a ( Foo b ) ) ) ( ( union a ( Foo b ) ) ) )",
+                        atoms: [
+                            Premise { relation: Foo, columns: [b, a] },
+                        ],
+                        variables: {
+                            v0: VariableMeta { name: Some("a"), ty: t0 },
+                            v1: VariableMeta { name: Some("b"), ty: t0 },
+                        },
+                        unify: [],
+                    },
+                ],
+                relations: {
+                    r0: Foo { columns: [Math, Math], kind: Table, implicit_rules: {n0: [_, U]} },
+                },
+            }"#]]),
+        expected_tir: None,
+        expected_lir: None,
+        expected_codegen: None,
+    }
+    .check();
+}
+
+#[test]
+fn pathproof_hir() {
+    Steps {
+        strict_egglog_compat: true,
+        code: r"
+            (datatype Proof
+              (Trans i64 Proof)
+              (Edge_x i64 i64))
+
+            (relation path (i64 i64 Proof))
+            (relation edge (i64 i64))
+
+            (edge 2 1)
+            (edge 3 2)
+            (edge 1 3)
+
+            (rule ((edge x y))  
+                  ((path x y (Edge_x x y))))
+            (rule ((edge x y) (path y z p))  
+                  ((path x z (Trans x p))))
+
+            (rule ((path x y p1) (path x y p2))  
+                  ((union p1 p2)))
+        ",
+        expected_hir: Some(expect![[r#"
+            Theory {
+                types: {
+                    [t0, ()]: std::primitive::unit,
+                    [t1, i64]: std::primitive::i64,
+                    [t2, Proof]: [symbolic],
+                },
+                symbolic_rules: [
+                    SymbolicRule {
+                        src: "( rule ( ( edge x y ) ) ( ( path x y ( Edge_x x y ) ) ) )",
+                        atoms: [
+                            Premise { relation: edge, columns: [x, y] },
+                            Action { relation: Edge_x, columns: [x, y, v2], entry: [_, _, U] },
+                            Action { relation: path, columns: [x, y, v2] },
+                        ],
+                        variables: {
+                            v0: VariableMeta { name: Some("x"), ty: t1 },
+                            v1: VariableMeta { name: Some("y"), ty: t1 },
+                            v2: VariableMeta { name: None, ty: t2 },
+                        },
+                        unify: [],
+                    },
+                    SymbolicRule {
+                        src: "( rule ( ( edge x y ) ( path y z p ) ) ( ( path x z ( Trans x p ) ) ) )",
+                        atoms: [
+                            Premise { relation: path, columns: [y, z, p] },
+                            Premise { relation: edge, columns: [x, y] },
+                            Action { relation: Trans, columns: [x, p, v4], entry: [_, _, U] },
+                            Action { relation: path, columns: [x, z, v4] },
+                        ],
+                        variables: {
+                            v0: VariableMeta { name: Some("x"), ty: t1 },
+                            v1: VariableMeta { name: Some("y"), ty: t1 },
+                            v2: VariableMeta { name: Some("z"), ty: t1 },
+                            v3: VariableMeta { name: Some("p"), ty: t2 },
+                            v4: VariableMeta { name: None, ty: t2 },
+                        },
+                        unify: [],
+                    },
+                    SymbolicRule {
+                        src: "( rule ( ( path x y p1 ) ( path x y p2 ) ) ( ( union p1 p2 ) ) )",
+                        atoms: [
+                            Premise { relation: path, columns: [x, y, p1] },
+                            Premise { relation: path, columns: [x, y, p2] },
+                        ],
+                        variables: {
+                            v0: VariableMeta { name: Some("x"), ty: t1 },
+                            v1: VariableMeta { name: Some("y"), ty: t1 },
+                            v2: VariableMeta { name: Some("p1"), ty: t2 },
+                            v3: VariableMeta { name: Some("p2"), ty: t2 },
+                        },
+                        unify: [
+                            [p1, p2],
+                        ],
+                    },
+                ],
+                relations: {
+                    r0: Trans { columns: [i64, Proof, Proof], kind: Table, implicit_rules: {n0: [_, _, U]} },
+                    r1: Edge_x { columns: [i64, i64, Proof], kind: Table, implicit_rules: {n0: [_, _, U]} },
+                    r2: path { columns: [i64, i64, Proof], kind: Table, implicit_rules: {} },
+                    r3: edge { columns: [i64, i64], kind: Table, implicit_rules: {} },
+                    r4: g0 { columns: [i64], kind: Global(g0), implicit_rules: {n0: [!]} },
+                    r5: g1 { columns: [i64], kind: Global(g1), implicit_rules: {n0: [!]} },
+                    r6: g2 { columns: [()], kind: Global(g2), implicit_rules: {n0: [!]} },
+                    r7: g3 { columns: [i64], kind: Global(g3), implicit_rules: {n0: [!]} },
+                    r8: g4 { columns: [()], kind: Global(g4), implicit_rules: {n0: [!]} },
+                    r9: g5 { columns: [()], kind: Global(g5), implicit_rules: {n0: [!]} },
                 },
             }"#]]),
         expected_tir: None,
@@ -12114,7 +12264,6 @@ fn edgecase0_no_egglog_compat() {
                         src: "( rewrite ( Add a b ) ( Add b a ) )",
                         atoms: [
                             Premise { relation: Add, columns: [a, b, v2] },
-                            Action { relation: Add, columns: [a, b, v2] },
                             Action { relation: Add, columns: [b, a, v2], entry: [_, _, U] },
                         ],
                         variables: {
@@ -12128,7 +12277,6 @@ fn edgecase0_no_egglog_compat() {
                         src: "( rewrite ( Mul a b ) ( Mul b a ) )",
                         atoms: [
                             Premise { relation: Mul, columns: [a, b, v2] },
-                            Action { relation: Mul, columns: [a, b, v2] },
                             Action { relation: Mul, columns: [b, a, v2], entry: [_, _, U] },
                         ],
                         variables: {
@@ -14083,8 +14231,8 @@ fn lir_math() {
                             Premise { relation: Sub, columns: [a, b, v2] },
                             Action { relation: Add, columns: [a, v5, v2], entry: [_, _, U] },
                             Action { relation: Add, columns: [v5, a, v2] },
-                            Action { relation: Mul, columns: [b, v4, v5] },
-                            Action { relation: Mul, columns: [v4, b, v5], entry: [_, _, U] },
+                            Action { relation: Mul, columns: [b, v4, v5], entry: [_, _, U] },
+                            Action { relation: Mul, columns: [v4, b, v5] },
                             Action { relation: Const, columns: [v3, v4], entry: [_, U] },
                             Action { relation: g0, columns: [v3], entry: [!] },
                         ],
@@ -14123,7 +14271,6 @@ fn lir_math() {
                         src: "( rewrite ( Add a b ) ( Add b a ) )",
                         atoms: [
                             Premise { relation: Add, columns: [a, b, v2] },
-                            Action { relation: Add, columns: [a, b, v2] },
                             Action { relation: Add, columns: [b, a, v2], entry: [_, _, U] },
                         ],
                         variables: {
@@ -14137,7 +14284,6 @@ fn lir_math() {
                         src: "( rewrite ( Mul a b ) ( Mul b a ) )",
                         atoms: [
                             Premise { relation: Mul, columns: [a, b, v2] },
-                            Action { relation: Mul, columns: [a, b, v2] },
                             Action { relation: Mul, columns: [b, a, v2], entry: [_, _, U] },
                         ],
                         variables: {
@@ -14154,8 +14300,8 @@ fn lir_math() {
                             Premise { relation: Add, columns: [b, c, v3] },
                             Action { relation: Add, columns: [a, b, v5], entry: [_, _, U] },
                             Action { relation: Add, columns: [b, a, v5] },
-                            Action { relation: Add, columns: [c, v5, v4] },
-                            Action { relation: Add, columns: [v5, c, v4], entry: [_, _, U] },
+                            Action { relation: Add, columns: [c, v5, v4], entry: [_, _, U] },
+                            Action { relation: Add, columns: [v5, c, v4] },
                         ],
                         variables: {
                             v0: VariableMeta { name: Some("a"), ty: t3 },
@@ -14174,8 +14320,8 @@ fn lir_math() {
                             Premise { relation: Mul, columns: [b, c, v3] },
                             Action { relation: Mul, columns: [a, b, v5], entry: [_, _, U] },
                             Action { relation: Mul, columns: [b, a, v5] },
-                            Action { relation: Mul, columns: [c, v5, v4] },
-                            Action { relation: Mul, columns: [v5, c, v4], entry: [_, _, U] },
+                            Action { relation: Mul, columns: [c, v5, v4], entry: [_, _, U] },
+                            Action { relation: Mul, columns: [v5, c, v4] },
                         ],
                         variables: {
                             v0: VariableMeta { name: Some("a"), ty: t3 },
@@ -14495,8 +14641,8 @@ fn lir_math() {
                             Action { relation: Sub, columns: [v8, v11, v6], entry: [_, _, U] },
                             Action { relation: Mul, columns: [a, v7, v8], entry: [_, _, U] },
                             Action { relation: Mul, columns: [v7, a, v8] },
-                            Action { relation: Mul, columns: [v7, v9, v10] },
-                            Action { relation: Mul, columns: [v9, v7, v10], entry: [_, _, U] },
+                            Action { relation: Mul, columns: [v7, v9, v10], entry: [_, _, U] },
+                            Action { relation: Mul, columns: [v9, v7, v10] },
                         ],
                         variables: {
                             v0: VariableMeta { name: Some("fuel"), ty: t2 },
@@ -15348,8 +15494,8 @@ fn lir_math() {
                                 [Action::Entry, r6(v297, v302, v303) on ir0],
                                 [Action::Insert, r6(v302, v297, v303)],
                                 [Action::Entry, r2(v228, v297, v304) on ir0],
-                                [Action::Entry, r6(v304, v302, v305) on ir0],
-                                [Action::Insert, r6(v302, v304, v305)],
+                                [Action::Entry, r6(v302, v304, v305) on ir0],
+                                [Action::Insert, r6(v304, v302, v305)],
                                 [Action::Entry, r3(v202, v305, v228, v306) on ir0],
                                 [Action::Insert, r5(v303, v306, v230)],
                             ],
@@ -15476,8 +15622,8 @@ fn lir_math() {
                                     [Action::Entry, r6(v309, v314, v315) on ir0],
                                     [Action::Insert, r6(v314, v309, v315)],
                                     [Action::Entry, r2(v1, v309, v316) on ir0],
-                                    [Action::Entry, r6(v316, v314, v317) on ir0],
-                                    [Action::Insert, r6(v314, v316, v317)],
+                                    [Action::Entry, r6(v314, v316, v317) on ir0],
+                                    [Action::Insert, r6(v316, v314, v317)],
                                     [Action::Entry, r3(v307, v317, v1, v318) on ir0],
                                     [Action::Insert, r5(v315, v318, v3)],
                                 ],
@@ -15562,10 +15708,10 @@ fn lir_math() {
                     actions: [
                         [Action::Entry, r15(v17) on ir_bogus],
                         [Action::Entry, r13(v17, v18) on ir0],
-                        [Action::Entry, r6(v18, v15, v19) on ir0],
+                        [Action::Entry, r6(v15, v18, v19) on ir0],
                         [Action::Insert, r4(v14, v19, v16)],
                         [Action::Insert, r4(v19, v14, v16)],
-                        [Action::Insert, r6(v15, v18, v19)],
+                        [Action::Insert, r6(v18, v15, v19)],
                     ]
                     then: [
                         premise: [JoinOld, r3(v287, v16, v291, v292), ir3]
@@ -15606,8 +15752,8 @@ fn lir_math() {
                                 [Action::Entry, r6(v35, v326, v327) on ir0],
                                 [Action::Insert, r6(v326, v35, v327)],
                                 [Action::Entry, r2(v324, v35, v328) on ir0],
-                                [Action::Entry, r6(v328, v326, v329) on ir0],
-                                [Action::Insert, r6(v326, v328, v329)],
+                                [Action::Entry, r6(v326, v328, v329) on ir0],
+                                [Action::Insert, r6(v328, v326, v329)],
                                 [Action::Entry, r3(v319, v329, v324, v330) on ir0],
                                 [Action::Insert, r5(v327, v330, v325)],
                             ],
@@ -19994,8 +20140,8 @@ fn lir_math() {
                                         .entry_0_1_to_2(x_21, a_27, &mut self.delta, &mut self.uf);
                                 let (v305,) =
                                     self.mul_
-                                        .entry_0_1_to_2(v304, v302, &mut self.delta, &mut self.uf);
-                                self.delta.insert_mul((v302, v304, v305));
+                                        .entry_0_1_to_2(v302, v304, &mut self.delta, &mut self.uf);
+                                self.delta.insert_mul((v304, v302, v305));
                                 let (v306,) = self.integral_.entry_0_1_2_to_3(
                                     fuel_3,
                                     v305,
@@ -20151,8 +20297,8 @@ fn lir_math() {
                                             .entry_0_1_to_2(x, a_28, &mut self.delta, &mut self.uf);
                                     let (v317,) =
                                         self.mul_
-                                            .entry_0_1_to_2(v316, v314, &mut self.delta, &mut self.uf);
-                                    self.delta.insert_mul((v314, v316, v317));
+                                            .entry_0_1_to_2(v314, v316, &mut self.delta, &mut self.uf);
+                                    self.delta.insert_mul((v316, v314, v317));
                                     let (v318,) = self.integral_.entry_0_1_2_to_3(
                                         fuel_17,
                                         v317,
@@ -20262,10 +20408,10 @@ fn lir_math() {
                             let (v18,) = self.const_.entry_0_to_1(v17, &mut self.delta, &mut self.uf);
                             let (v19,) = self
                                 .mul_
-                                .entry_0_1_to_2(v18, b, &mut self.delta, &mut self.uf);
+                                .entry_0_1_to_2(b, v18, &mut self.delta, &mut self.uf);
                             self.delta.insert_add((a, v19, v16));
                             self.delta.insert_add((v19, a, v16));
-                            self.delta.insert_mul((b, v18, v19));
+                            self.delta.insert_mul((v18, b, v19));
                         }
                         for (v287, x_29, v292) in self
                             .integral_
@@ -20337,8 +20483,8 @@ fn lir_math() {
                                         .entry_0_1_to_2(x_32, a_3, &mut self.delta, &mut self.uf);
                                 let (v329,) =
                                     self.mul_
-                                        .entry_0_1_to_2(v328, v326, &mut self.delta, &mut self.uf);
-                                self.delta.insert_mul((v326, v328, v329));
+                                        .entry_0_1_to_2(v326, v328, &mut self.delta, &mut self.uf);
+                                self.delta.insert_mul((v328, v326, v329));
                                 let (v330,) = self.integral_.entry_0_1_2_to_3(
                                     fuel_18,
                                     v329,

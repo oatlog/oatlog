@@ -908,6 +908,21 @@ impl SymbolicRule {
         // P(y), P(z), AI(x,y), AI(x,z) => P(y), P(z), AI(x,y), unify(y,z)
         // P(y), A(z), AI(x,y), AI(x,z) => P(y), A(y), AI(x,y), unify(y,z)
 
+        // P(r, x -> y), P(r, x -> z) => union(premise_unify, y, z)
+        // P(r, x -> y), A(r, x -> z) => union(action_unify, y, z)
+        // A(r, x -> y), A(r, x -> z) => union(action_unify, y, z)
+        //
+        // union(premise_unify, x, y) => union(action_unify, x, y)
+        //
+        // P(r, x) => replace(P(r, x), P(r, find(premise_unify, x)))
+        // A(r, x) => replace(A(r, x), A(r, find(action_unify, x)))
+        //
+        // P(r, equal_modulo(action_unify, x)), A(r, x) => remove(A(r, x))
+        //
+        // union(action_unify, x, y), !premise_var(y) => union(premise_unify, x, y)
+
+        tracing::trace!("optimize {}", self.dbg_summary(relations));
+
         let mut to_merge: UFData<VariableId, (IsPremise, VariableMeta)> = self
             .variables
             .iter()
@@ -942,6 +957,9 @@ impl SymbolicRule {
         }
 
         // Action variables can be substituted away to avoid unifications.
+        //
+        // implements
+        // union(action_unify, x, y), !premise_var(y) => union(premise_unify, x, y)
         for (a, b) in self.unify.iter_edges_fully_connected() {
             match (to_merge[a].0, to_merge[b].0) {
                 (Premise, Premise) => {
@@ -949,6 +967,11 @@ impl SymbolicRule {
                     // variable.
                 }
                 (_, Action) | (Action, _) => {
+                    if to_merge.find(a) != to_merge.find(b) {
+                        tracing::trace!(
+                            "eagerly merging {a} and {b} because they are in unify and at most one of them is mentioned in premise",
+                        )
+                    }
                     to_merge.union_merge(a, b, &merge);
                 }
             }
@@ -975,15 +998,25 @@ impl SymbolicRule {
                     ret.entry((relation, incl))
                         .or_default()
                         .insert(columns, (is_premise, entry))
-                        .is_none()
+                        .is_none(),
+                    "duplicate initial atoms?"
                 );
             }
             ret
         };
 
-        // Find variable substitutions implied by implicit rules
         loop {
             let mut progress = false;
+
+            // Find variable substitutions implied by implicit rules
+            //
+            // implements
+            //
+            // P(r, x -> y), P(r, x -> z) => union(premise_unify, y, z)
+            // P(r, x -> y), A(r, x -> z) => union(action_unify, y, z)
+            // A(r, x -> y), A(r, x -> z) => union(action_unify, y, z)
+            // union(premise_unify, x, y) => union(action_unify, x, y)
+            //
             for ((relation, _incl), inner) in working_atoms.iter() {
                 for (cols1, meta1) in inner.iter() {
                     for (cols2, meta2) in inner.iter() {
@@ -998,6 +1031,15 @@ impl SymbolicRule {
                                 continue;
                             }
                             progress = true;
+
+                            tracing::trace!(
+                                "merging {}({:?}) and {}({:?}) because of FD",
+                                a,
+                                to_merge[a].0,
+                                b,
+                                to_merge[b].0
+                            );
+
                             match (implied_at, to_merge[a].0, to_merge[b].0) {
                                 (Premise, Premise, Premise)
                                 | (Action, Action, _)
@@ -1015,28 +1057,52 @@ impl SymbolicRule {
                     }
                 }
             }
-            if !progress {
-                break;
-            }
+
             working_atoms = working_atoms
                 .into_iter()
                 .map(|((relation, incl), inner)| {
 
+                    // implements
+                    //
+                    // P(r, x) => replace(P(r, x), P(r, find(premise_unify, x)))
+                    // A(r, x) => replace(A(r, x), A(r, find(action_unify, x)))
+
                     let mut ret = BTreeMap::new();
                     for (cols, meta) in inner {
-                        let cols = cols.map(|&v| find_at(v, meta.0, &to_merge, &self.unify));
-                        let cols = relations[relation].invariant_permutations.canonical_permutation(&cols);
+                        let cols = cols.map(|&v| {
+                            let new_v = find_at(v, meta.0, &to_merge, &self.unify);
+
+                            if v != new_v {
+                                tracing::trace!("canonicalizing {:?}({:?}) to {:?}({:?}) in context {:?}", v, to_merge[v].0, new_v, to_merge[new_v].0, meta.0);
+                                progress = true;
+                            }
+
+                            new_v
+                        });
+                        let new_cols = relations[relation].invariant_permutations.canonical_permutation(&cols);
+
+                        if new_cols != cols {
+                            tracing::trace!("canonicalizing column permutation from {cols:?} to {new_cols:?}");
+                            progress = true;
+                        }
+                        let cols = new_cols;
 
                         ret.entry(cols.clone())
                             .and_modify(|other_meta: &mut (IsPremise, Option<ImplicitRuleId>)| {
                                 *other_meta = match (*other_meta, meta) {
-                                    (ret @ (Premise, _), (Action, _))
-                                    | ((Action, _), ret @ (Premise, _)) => ret,
+                                    (meta_premise @ (Premise, _), (Action, _))
+                                    | ((Action, _), meta_premise @ (Premise, _)) => meta_premise,
 
-                                    (ret @ (Premise, a), (Premise, b))
-                                    | (ret @ (Action, a), (Action, b)) => {
+                                    (ret @ (Premise, Some(a)), (Premise, Some(b)))
+                                    | (ret @ (Action, Some(a)), (Action, Some(b))) => {
                                         assert_eq!(a, b, "TODO figure out how to merge `entry` in HIR optimization, if this even occurs in practice");
                                         ret
+                                    }
+
+                                    // merging entry with insert is fine.
+                                    (meta @ (Premise, _), (Premise, _))
+                                    | (meta @ (Action, _), (Action, _)) => {
+                                        meta
                                     }
                                 };
                             })
@@ -1046,17 +1112,57 @@ impl SymbolicRule {
                     // `find_action(A)` are unique. It is however still possible to have
                     // `find_action(P1) == find_action(A1)`. In this case, the code below drops
                     // `A1`.
-                    for (cols, meta) in ret.clone().into_iter() {
-                        if meta.0 == Premise {
-                            let cols_actions = cols.map(|&v| self.unify.find(v));
-                            if cols != cols_actions {
-                                ret.remove(&cols_actions);
+
+                    // Has bug when:
+                    //
+                    // (relation Foo (Math Math))
+                    // (rule ((Foo a b) (Foo a c)) ((union a c)))
+                    //
+                    // which turns it into
+                    //
+                    // (rule ((Foo a b)) ((union a c)))
+                    //
+                    // so the bug is that we assume that the other atom is an action atom.
+                    //
+                    //
+                    // for (cols, meta) in ret.clone().into_iter() {
+                    //     if meta.0 == Premise {
+                    //         let cols_actions = cols.map(|&v| self.unify.find(v));
+                    //         if cols != cols_actions {
+                    //             ret.remove(&cols_actions);
+                    //         }
+                    //     }
+                    // }
+
+                    // the specific pattern we want to find is:
+                    //
+                    //        vvvvvvvvv             vvvvvvvvv
+                    // (rule ((Foo a b) (Foo a c)) ((Foo a d)))
+                    // unify = {b, c, d}
+                    //
+
+                    // implements
+                    //
+                    // P(r, equal_modulo(action_unify, x)), A(r, x) => remove(A(r, x))
+                    //
+                    for (premise_cols, premise_meta) in ret.clone().into_iter() {
+                        if premise_meta.0 == Premise {
+                            let premise_cols_modulo_unify = premise_cols.map(|&v| self.unify.find(v));
+                            if premise_cols != premise_cols_modulo_unify {
+                                if let Some(&(Action, _)) = ret.get(&premise_cols_modulo_unify) {
+                                    ret.remove(&premise_cols_modulo_unify);
+                                    progress = true;
+                                }
                             }
                         }
                     }
                     ((relation, incl), ret)
                 })
                 .collect();
+
+            if !progress {
+                break;
+            }
         }
 
         let (n, old_to_new) = {
@@ -1242,27 +1348,45 @@ impl RuleArgs {
 
 impl Theory {
     pub(crate) fn optimize(mut self, config: Configuration) -> Self {
-        self.symbolic_rules = mem::take(&mut self.symbolic_rules)
+        self.symbolic_rules = self
+            .symbolic_rules
             .into_iter()
             .map(|rule| rule.optimize(&self.relations))
             .collect();
 
         if config.egglog_compat.allow_column_invariant_permutations() {
-            for rule in &self.symbolic_rules {
-                rule.extract_invariant_permutations(|relation, perm| {
-                    tracing::debug!(?relation, perm = ?&*perm);
+            // Currently, insert_* functions do not insert all permutations, so we need to avoid turning
+            // (rewrite (Add a b) (Add b a)) into a no-op, since that still does important work.
+            //
+            // therefore, pin rules that create invariant permutations
 
-                    self.relations[relation]
-                        .invariant_permutations
-                        .add_invariant_permutations(perm);
-                });
-            }
-
-            self.symbolic_rules = mem::take(&mut self.symbolic_rules)
+            let symbolic_rules = mem::take(&mut self.symbolic_rules)
                 .into_iter()
                 .map(|rule| {
-                    rule.optimize(&self.relations)
-                        .duplicate_actions_with_invariant_permutations(&self.relations)
+                    let mut should_pin = false;
+                    rule.extract_invariant_permutations(|relation, perm| {
+                        tracing::debug!(?relation, perm = ?&*perm);
+
+                        should_pin = true;
+                        self.relations[relation]
+                            .invariant_permutations
+                            .add_invariant_permutations(perm);
+                    });
+                    (should_pin, rule)
+                })
+                .collect::<Vec<_>>();
+
+            tracing::trace!("applying optimizations with invariant_permutations");
+            self.symbolic_rules = symbolic_rules
+                .into_iter()
+                .map(|(should_pin, rule)| {
+                    if should_pin {
+                        rule // .duplicate_actions_with_invariant_permutations(&self.relations)
+                    } else {
+                        let opt_rule = rule.optimize(&self.relations);
+                        // dbg!(debug_print::FmtCtx(&self, &opt_rule));
+                        opt_rule.duplicate_actions_with_invariant_permutations(&self.relations)
+                    }
                 })
                 .collect();
         }
@@ -1361,7 +1485,7 @@ impl Theory {
     }
 }
 
-#[cfg(test)]
+#[allow(unused)]
 mod debug_print {
     use super::*;
     use std::fmt::Formatter;
@@ -1369,6 +1493,12 @@ mod debug_print {
     impl Theory {
         pub(crate) fn dbg_summary(&self) -> String {
             format!("{:#?}", FmtCtx(self, &()))
+        }
+    }
+
+    impl SymbolicRule {
+        pub(crate) fn dbg_summary(&self, relations: &TVec<RelationId, Relation>) -> String {
+            format!("{:#?}", FmtCtx(relations, self))
         }
     }
 
@@ -1392,7 +1522,7 @@ mod debug_print {
         }
     }
 
-    struct FmtCtx<'a, 'b, A, B>(&'a A, &'b B);
+    pub(super) struct FmtCtx<'a, 'b, A, B>(pub &'a A, pub &'b B);
     impl Debug for FmtCtx<'_, '_, Theory, ()> {
         fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
             let Self(
@@ -1432,7 +1562,7 @@ mod debug_print {
                 "symbolic_rules",
                 &symbolic_rules
                     .iter()
-                    .map(|x| FmtCtx(*this, x))
+                    .map(|x| FmtCtx(&this.relations, x))
                     .collect::<Vec<_>>(),
             );
             theory = theory.field(
@@ -1451,10 +1581,10 @@ mod debug_print {
         }
     }
 
-    impl Debug for FmtCtx<'_, '_, Theory, SymbolicRule> {
+    impl Debug for FmtCtx<'_, '_, TVec<RelationId, Relation>, SymbolicRule> {
         fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
             let Self(
-                theory,
+                relations,
                 this @ SymbolicRule {
                     meta,
                     atoms,
@@ -1472,7 +1602,7 @@ mod debug_print {
                 "atoms",
                 &atoms
                     .iter()
-                    .map(|x| DbgStr([format!("{:?}", FmtCtx(&(*theory, *this), x))]))
+                    .map(|x| DbgStr([format!("{:?}", FmtCtx(&(*relations, *this), x))]))
                     .collect::<Vec<_>>(),
             );
             dbg = dbg.field("variables", &variables.map(|m| DbgStr([format!("{m:?}")])));
@@ -1543,10 +1673,10 @@ mod debug_print {
         }
     }
 
-    impl Debug for FmtCtx<'_, '_, (&Theory, &SymbolicRule), Atom> {
+    impl Debug for FmtCtx<'_, '_, (&TVec<RelationId, Relation>, &SymbolicRule), Atom> {
         fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
             let Self(
-                (theory, rule),
+                (relations, rule),
                 Atom {
                     is_premise: premise,
                     relation,
@@ -1567,10 +1697,7 @@ mod debug_print {
             };
 
             let mut dbg = &mut f.debug_struct(&format!("{premise}{incl}"));
-            dbg = dbg.field(
-                "relation",
-                &DbgStr([theory.relations[*relation].name.to_owned()]),
-            );
+            dbg = dbg.field("relation", &DbgStr([relations[*relation].name.to_owned()]));
             dbg = dbg.field(
                 "columns",
                 &columns
@@ -1581,7 +1708,7 @@ mod debug_print {
             if let Some(entry) = entry {
                 dbg = dbg.field(
                     "entry",
-                    &FmtCtx(&(), &theory.relations[*relation].implicit_rules[entry]),
+                    &FmtCtx(&(), &relations[*relation].implicit_rules[entry]),
                 );
             }
             dbg.finish()

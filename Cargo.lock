@@ -998,6 +998,7 @@ dependencies = [
  "smallvec",
  "syn 2.0.98",
  "tracing",
+ "tracing-subscriber",
  "voracious_radix_sort",
 ]
 
