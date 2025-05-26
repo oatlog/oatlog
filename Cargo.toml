@@ -25,9 +25,8 @@ oatlog-macro.path = "oatlog-macro"
 # oatlog-bench.path = "oatlog-bench"
 # comparative-test.path = "comparative-test"
 
-#hashbrown = { version = "0.14", features = ["raw"] }
 blake3 = "1"
-clap = { version = "4", features = ["derive"]}
+clap = { version = "4", features = ["derive"] }
 criterion = "0.5"
 darling = "0.20"
 derive_more = { version = "2", features = ["full"] }

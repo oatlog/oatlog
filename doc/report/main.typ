@@ -1180,34 +1180,37 @@ of the smaller relation and the number of output rows. Both of these join implem
 illustrated in @fig_background_database_join_impl
 
 #figure(
-  text(9pt, grid(
-    columns: (1fr, 1fr),
-    ```rust
-    // nested loop join
-    let mut out = Vec::new();
-    for customer in customers {
-        for order in orders {
-            if customer.cust == order.cust {
-                out.push(foobar(order, customer));
-            }
-        }
-    }
-    return out;
-    ```,
-    ```rust
-    // hash join
-    let mut out = Vec::new();
-    let mut order_index = HashMap::new();
-    for order in orders {
-        order_index.insert(order.cust, order);
-    }
-    for customer in customers {
-        let order = order_index[customer.cust];
-        out.push(foobar(order, customer));
-    }
-    return out;
-    ```,
-  )),
+  text(
+    9pt,
+    grid(
+      columns: (1fr, 1fr),
+      ```rust
+      // nested loop join
+      let mut out = Vec::new();
+      for customer in customers {
+          for order in orders {
+              if customer.cust == order.cust {
+                  out.push(foobar(order, customer));
+              }
+          }
+      }
+      return out;
+      ```,
+      ```rust
+      // hash join
+      let mut out = Vec::new();
+      let mut order_index = HashMap::new();
+      for order in orders {
+          order_index.insert(order.cust, order);
+      }
+      for customer in customers {
+          let order = order_index[customer.cust];
+          out.push(foobar(order, customer));
+      }
+      return out;
+      ```,
+    ),
+  ),
   caption: [The implementation of a nested loop join and a hash join.],
 ) <fig_background_database_join_impl>
 
@@ -1274,8 +1277,8 @@ egg. The prototype used egg's canonicalization implementation and fully rebuilt 
 iteration of applying rules, achieving a large speedup over egg despite switching the data format
 back and forth in every EqSat iteration. The e-graph engine egglog @egglog was released in
 2023 and incorporates e-graphs as relational databases on a deeper level, achieving significant
-     further speedups largely by being able to apply the semi-naive evaluation algorithm from
-     Datalog.
+further speedups largely by being able to apply the semi-naive evaluation algorithm from
+Datalog.
 
 == Semi-naive evaluation <conceptual_background_seminaive>
 
@@ -1321,7 +1324,7 @@ $
   &union Delta A &join& B &join& C \
   &union (A union Delta A) &join& Delta B &join& C \
   &union (A union Delta A) &join& (B union Delta B) &join& Delta C \
-  &-  hl(A &join& B &join& C)
+  &- hl(A &join& B &join& C)
 $
 $
   "new information" =
@@ -2277,75 +2280,45 @@ For a list of currently passing tests, see @passingtests.
   text(
     size: 9pt,
     table(
-      columns: (auto, auto, auto, auto, auto, auto),
+      columns: (auto, auto, auto, auto, auto),
       inset: 4pt,
-      table.header(
-        [*benchmark*],
-        [*e-nodes*],
-        [*egglog 0.4 deterministic*],
-        [*egglog 0.4*],
-        [*Oatlog*],
-        [*speedup*],
-      ),
-      [`fuel2-math`, 10 steps, saturated], [1516], [7.0778 ms], [5.8908 ms], [1.1579 ms], table.cell(
-        fill: green.lighten(40%),
-      )[5.09x],
-      [`fuel3-math`, 21 steps, saturated], [50021], [192.50 ms], [170.06 ms], [52.954 ms], table.cell(
-        fill: green.lighten(40%),
-      )[3.21x],
-
-      [`math`, 1 step], [69], [688.83 µs], [660.76 µs], [17.055 µs], table.cell(fill: green.lighten(20%))[38.75x],
-      [`math`, 2 steps], [118], [871.97 µs], [828.21 µs], [32.492 µs], table.cell(fill: green.lighten(20%))[25.49x],
-      [`math`, 3 steps], [208], [1.0845 ms], [1.0066 ms], [61.145 µs], table.cell(fill: green.lighten(20%))[16.47x],
-      [`math`, 4 steps], [389], [1.3692 ms], [1.2498 ms], [122.53 µs], table.cell(fill: green.lighten(20%))[10.20x],
-      [`math`, 5 steps], [784], [1.8410 ms], [1.6360 ms], [253.68 µs], table.cell(fill: green.lighten(40%))[6.45x],
-      [`math`, 6 steps], [1576], [2.6639 ms], [2.3093 ms], [539.74 µs], table.cell(fill: green.lighten(40%))[4.28x],
-      [`math`, 7 steps], [3160], [4.3486 ms], [3.6846 ms], [1.1199 ms], table.cell(fill: green.lighten(40%))[3.29x],
-      [`math`, 8 steps], [8113], [7.6845 ms], [6.4288 ms], [2.6543 ms], table.cell(fill: green.lighten(40%))[2.42x],
-      [`math`, 9 steps], [28303], [16.224 ms], [13.825 ms], [8.6804 ms], table.cell(fill: green.lighten(60%))[1.59x],
-      [`math`, 10 steps], [136446], [63.135 ms], [54.481 ms], [53.112 ms], table.cell(fill: green.lighten(80%))[1.03x],
-      [`math`, 11 steps], [1047896], [448.77 ms], [436.24 ms], [563.93 ms], table.cell(fill: red.lighten(60%))[0.77x],
-
-      [`boolean-adder`, 1 step], [106], [936.01 µs], [902.80 µs], [19.588 µs], table.cell(
-        fill: green.lighten(20%),
-      )[46.07x],
-      [`boolean-adder`, 2 steps], [241], [1.1303 ms], [1.0787 ms], [49.379 µs], table.cell(
-        fill: green.lighten(20%),
-      )[21.84x],
-      [`boolean-adder`, 3 steps], [511], [1.5437 ms], [1.4349 ms], [120.61 µs], table.cell(
-        fill: green.lighten(20%),
-      )[11.89x],
-      [`boolean-adder`, 4 steps], [727], [2.2988 ms], [2.0731 ms], [226.53 µs], table.cell(
-        fill: green.lighten(20%),
-      )[9.15x],
-      [`boolean-adder`, 5 steps], [906], [3.7199 ms], [3.2451 ms], [370.08 µs], table.cell(
-        fill: green.lighten(20%),
-      )[8.77x],
-      [`boolean-adder`, 6 steps], [1332], [5.1971 ms], [4.4394 ms], [530.71 µs], table.cell(
-        fill: green.lighten(20%),
-      )[8.36x],
-      [`boolean-adder`, 7 steps], [2374], [6.9556 ms], [5.9033 ms], [919.43 µs], table.cell(
-        fill: green.lighten(40%),
-      )[6.42x],
-      [`boolean-adder`, 8 steps], [5246], [10.596 ms], [8.9572 ms], [2.0239 ms], table.cell(
-        fill: green.lighten(40%),
-      )[4.43x],
-      [`boolean-adder`, 9 steps], [15778], [20.219 ms], [17.294 ms], [5.5787 ms], table.cell(
-        fill: green.lighten(40%),
-      )[3.10x],
-      [`boolean-adder`, 10 steps], [77091], [52.227 ms], [45.194 ms], [25.410 ms], table.cell(
-        fill: green.lighten(60%),
-      )[1.78x],
-      [`boolean-adder`, 11 steps], [854974], [406.15 ms], [395.05 ms], [478.83 ms], table.cell(
-        fill: red.lighten(60%),
-      )[0.82x],
+      table.header([*benchmark*], [*e-nodes*], [*egglog*], [*Oatlog*], [*speedup*]),
+      [`fuel1_math`, saturated], [973], [4.588 ms], [435.3 µs], table.cell(fill: green.lighten(28%))[10.54x],
+      [`fuel2_math`, saturated], [1516], [5.832 ms], [591.2 µs], table.cell(fill: green.lighten(29%))[9.87x],
+      [`fuel3_math`, saturated], [50021], [165.4 ms], [28.56 ms], table.cell(fill: green.lighten(36%))[5.79x],
+      [`math`, 0 steps], [35], [534.9 µs], [4.414 µs], table.cell(fill: green.lighten(14%))[121.18x],
+      [`math`, 1 steps], [69], [657.4 µs], [9.675 µs], table.cell(fill: green.lighten(16%))[67.95x],
+      [`math`, 2 steps], [118], [811.8 µs], [18.58 µs], table.cell(fill: green.lighten(18%))[43.69x],
+      [`math`, 3 steps], [208], [992.0 µs], [34.90 µs], table.cell(fill: green.lighten(20%))[28.43x],
+      [`math`, 4 steps], [389], [1.229 ms], [69.57 µs], table.cell(fill: green.lighten(24%))[17.66x],
+      [`math`, 5 steps], [784], [1.611 ms], [151.5 µs], table.cell(fill: green.lighten(28%))[10.64x],
+      [`math`, 6 steps], [1576], [2.259 ms], [311.5 µs], table.cell(fill: green.lighten(33%))[7.25x],
+      [`math`, 7 steps], [3160], [3.610 ms], [622.0 µs], table.cell(fill: green.lighten(36%))[5.80x],
+      [`math`, 8 steps], [8113], [6.268 ms], [1.358 ms], table.cell(fill: green.lighten(40%))[4.62x],
+      [`math`, 9 steps], [28303], [13.44 ms], [4.116 ms], table.cell(fill: green.lighten(48%))[3.27x],
+      [`math`, 10 steps], [136446], [54.03 ms], [20.16 ms], table.cell(fill: green.lighten(53%))[2.68x],
+      [`math`, 11 steps], [1047896], [437.6 ms], [254.4 ms], table.cell(fill: green.lighten(69%))[1.72x],
+      [`math`, 12 steps], [15987528], [8.347 s], [6.686 s], table.cell(fill: green.lighten(86%))[1.25x],
+      [`boolean_adder`, 0 steps], [44], [755.7 µs], [3.613 µs], table.cell(fill: green.lighten(13%))[209.17x],
+      [`boolean_adder`, 1 steps], [106], [896.6 µs], [10.23 µs], table.cell(fill: green.lighten(15%))[87.66x],
+      [`boolean_adder`, 2 steps], [241], [1.070 ms], [25.67 µs], table.cell(fill: green.lighten(18%))[41.68x],
+      [`boolean_adder`, 3 steps], [511], [1.401 ms], [69.21 µs], table.cell(fill: green.lighten(23%))[20.25x],
+      [`boolean_adder`, 4 steps], [727], [2.043 ms], [132.6 µs], table.cell(fill: green.lighten(25%))[15.40x],
+      [`boolean_adder`, 5 steps], [906], [3.167 ms], [228.9 µs], table.cell(fill: green.lighten(26%))[13.84x],
+      [`boolean_adder`, 6 steps], [1332], [4.324 ms], [342.1 µs], table.cell(fill: green.lighten(27%))[12.64x],
+      [`boolean_adder`, 7 steps], [2374], [5.733 ms], [560.0 µs], table.cell(fill: green.lighten(29%))[10.24x],
+      [`boolean_adder`, 8 steps], [5246], [8.644 ms], [1.094 ms], table.cell(fill: green.lighten(32%))[7.90x],
+      [`boolean_adder`, 9 steps], [15778], [16.74 ms], [2.773 ms], table.cell(fill: green.lighten(36%))[6.03x],
+      [`boolean_adder`, 10 steps], [77091], [43.85 ms], [12.47 ms], table.cell(fill: green.lighten(46%))[3.52x],
+      [`boolean_adder`, 11 steps], [854974], [326.7 ms], [166.8 ms], table.cell(fill: green.lighten(64%))[1.96x],
+      [`boolean_adder`, 12 steps], [24610667], [158.4 s], [149.9 s], table.cell(fill: green.lighten(96%))[1.06x],
     ),
   ),
   caption: [
-    Microbenchmark results comparing egglog with Oatlog. The reported timings are maximum likelihood
-    estimates over $100$ samples or $5$ seconds, whichever is greater, computed by Criterion.rs
-    @criterionrs on an AMD Ryzen 5900X CPU. Oatlog is compared with nondeterministic egglog since
-    it internally iterates `hashbrown::HashMap`s.
+    Microbenchmark results comparing egglog with Oatlog. The reported timings are averages
+    continuous sampling for $10$ seconds, with a single sample for `boolean_adder-12`, on an AMD
+    Ryzen 5900X CPU. Oatlog is compared with nondeterministic egglog since Oatlog internally iterates
+    `hashbrown::HashMap`s.
   ],
 ) <benchmark-results>
 
@@ -2360,7 +2333,7 @@ scheduling to more standard database improvements in the form of better indexes 
 == Future work
 
 #TODO[mention basics and interoperability stuff, extraction, ruleset support for `(check ..)` etc.
-Then continuing with more research-y ideas]
+  Then continuing with more research-y ideas]
 
 Compatibility:
 - Support egglog primitive `:merge`, necessary for lattice-based computation

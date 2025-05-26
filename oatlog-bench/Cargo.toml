@@ -4,11 +4,10 @@ version = "0.1.0"
 edition = "2024"
 
 [dependencies]
-oatlog.workspace = true
 egglog.workspace = true
+oatlog.workspace = true
 
 [dev-dependencies]
-#expect-test.workspace = true
 criterion.workspace = true
 
 [[bench]]
