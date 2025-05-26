@@ -63,7 +63,7 @@ pub const BENCHMARKS: [(&'static str, usize, fn(usize) -> usize, fn(usize)); 2] 
     bench!(math, 12, r#"(include "oatlog-bench/input/math.egg")"#),
     bench!(
         boolean_adder,
-        if cfg!(test) { 11 } else { 12 },
+        12,
         r#"(include "oatlog-bench/input/boolean_adder.egg")"#
     ),
 ];
