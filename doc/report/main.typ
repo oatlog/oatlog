@@ -85,7 +85,7 @@
 
 #TODO[read feedback]
 
-#TODO[integrate from presentation, extended abstract]
+// #TODO[integrate from presentation, extended abstract]
 
 #TODO[Elaborate on evaluation once that's possible.]
 
@@ -179,23 +179,23 @@ reassociated to `x*(2/2)` which constant folds to `x`. Depending on how the opti
 are constructed, it is not obvious that the same simplification could be done from `(x<<1)/2`,
 in which case the program would be stuck in a local but not global optimum due to previous
 scheduling of optimization passes. While most specific scenarios of noncommutative passes can be
-resolved at the cost of only slightly complicating the compiler, the general problem cannot be
-avoided within a optimization pass architecture.
+resolved at the cost of only slightly complicating the compiler, the general problem of
+noncommutative and destructive passes cannot be avoided within such a compiler.
 
 == Phase ordering and peephole rewriting
 
-#TODO[the first sentence here is hard to parse]
+// #TODO[the first sentence here is hard to parse]
+// static list of passes, allowing repeats
 
 In an optimization pass architecture, the phase ordering problem is often framed as figuring out
-what static list of passes, allowing repeats, result in the best performing output programs. For
-LLVM, such pass configurations are in practice hundreds of entries long with many passes being
-repeated many times. Pass configurations are effectively compiler hyperparameters and managing them
-is a challenge.
+what sequence of passes result in the best performing output programs. For LLVM, such pass
+configurations are in practice hundreds of entries long with many passes being repeated many times.
+Pass configurations are effectively compiler hyperparameters and managing them is a challenge.
 
 A reasonable idea, if one wants to apply as many beneficial optimizations as possible, is to apply
 optimization passes to the program in a loop until having reached a fixed point. But this is not
-done in practice for the simple reason that doing so would result in too long compile times -- each
-pass processes the entire program in at least linear time and there are hundreds of passes.
+done in practice for the simple reason that doing so would result in excessively long compile times
+-- each pass processes the entire program in at least linear time and there are hundreds of passes.
 
 Optimization to a fixed point is made possible by peephole rewriting, which takes the optimization
 pass architecture and makes it incremental. Rather than passes (re)processing the entire program, a
@@ -203,9 +203,9 @@ data structure directs them towards the parts of the program that have been chan
 this requires two things: a program representation with a useful notion of locality and phrasing the
 optimizations as local rewrites on this representation.
 
-Such program representations #footnote[Sea of Nodes is a compiler IR design that represents both
+Such program representations #footnote[Sea of Nodes @son is a compiler IR design that represents both
 data flow and control flow as expressions with no side effects, making it especially suited to
-peephole rewriting @son.] are usually trees or (directed acyclic) graphs (DAGs), with
+peephole rewriting.] are usually trees or (directed acyclic) graphs (DAGs), with
 representations typically enforcing single static assignment (SSA), i.e. that variables are written
 to exactly once. @fig_intro_peephole_ir shows the program fragment of @fig_intro_compiler_passes
 represented in such an intermediate representation (IR). It is crucial that the IR is designed in
@@ -238,16 +238,16 @@ case we have a purely syntactic rewrite rule, such as `Add(Const(a), Const(b)) =
 `Add(Mul(a,b), Mul(a,c)) => Mul(a, Add(b,c))`, which not only are easy to state but also easier to
 reason about than ad-hoc passes, expressed in possibly very many lines of code.
 
-In summary, peephole rewriting has fundamental advantages over a optimization pass architecture
+In summary, peephole rewriting has fundamental advantages over an optimization pass architecture
 while still serving as an approach to modularize the compiler implementation. Peephole rewriting
 optimizes to a fixed point, never leaving obvious further optimizations on the table. It does this
-incrementally, requiring significantly less computation than to achieve the same with a optimization
+incrementally, requiring significantly less computation than /*to achieve the same with*/ an optimization
 pass architecture. Finally, it specifies many optimizations as syntactic rewrite rules, which are
 easier than passes to formally reason about when for example proving the correctness of
 optimizations.
 
-However, peephole rewriting does not avoid the second part of the phase ordering problem, of
-destructive rewrites being order-dependent in the face of multiple potentially good but mutually
+However, peephole rewriting does not avoid the second part of the phase ordering problem:
+destructive rewrites are still order-dependent in the face of multiple potentially good but mutually
 incompatible rewrites. Since one rewrite can unlock other beneficial rewrites later, one cannot
 select them greedily. This could be handled with a slow backtracking search or with heuristics, with
 most compilers doing the latter. But there is a third approach, using equality saturation and
@@ -257,7 +257,7 @@ e-graphs, that can be used to augment peephole rewriting to make it nondestructi
 
 E-graphs @oldegraph are data structures for rewriting that allow multiple representations of a
 value, committing to one only after all rewrites have been searched. The representations are stored
-simultaneously and since there is no backtracking there is no duplicated post-branch work.
+simultaneously and, since there is no backtracking there is no duplicated post-branch work.
 
 The trick that allows e-graphs to compactly represent an exponential number of equivalent
 expressions is that operators take equivalence classes as inputs instead of individual expressions.
@@ -265,7 +265,7 @@ An e-graph can be seen as a graph of e-nodes partitioned into e-classes, where e
 e-classes as input. Concretely, the expressions $(2a)+b$ and $(a<<1)+b$ would be stored as an
 addition taking as its left argument a reference to the equivalence class ${2a, a<<1}$, thus
 avoiding duplicated storage of any expression having $2a$ and therefore also $a<<1$ as possible
-subexpressions. This scenario is shown in @fig_intro_baby_egraph, althrough in a simplified manner
+subexpressions. This scenario is shown in @fig_intro_baby_egraph, although in a simplified manner
 by eliding e-classes consisting of a single e-node.
 
 #figure(
@@ -351,28 +351,33 @@ deduplication. This is a major problem in practice and currently severely limits
 e-graphs are suitable for. In particular, e-graphs are not used in current general-purpose compilers
 despite their ability to solve the phase ordering problem.
 
-E-graphs have, however, been used in more specialized domains such as for synthesis of low-error
-floating point expressions @herbie and for optimization of linear algebra expressions @spores. They
+E-graphs have, however, been used in more specialized domains such as synthesis of low-error
+floating point expressions @herbie and optimization of linear algebra expressions @spores. They
 are also used in eggcc @eggcc, an experimental optimizing compiler for the toy language Bril, and
 the webassembly-oriented production compiler backend Cranelift @cranelift. Cranelift uses a weaker
 construct called acyclic e-graphs (aegraphs) due to performance problems of full e-graphs. A
 proliferation of e-graphs within compilers would require them to become faster.
 
-#TODO[Explain limitations of aegraphs. Or not? Seems excessive]
+// #TODO[Explain limitations of aegraphs. Or not? Seems excessive]
+// it is actually unclear what exactly the weaknesses are with aegraphs, and therefore very hard to
+// explain.
 
-== Datalog and relational databases
+== Relational databases and Datalog
 
 #TODO[e-graphs as relational databases is discovered "recently" provide year/citation]
 
 #TODO[is this suitable for people who don't know databases or Datalog?]
 
+#TODO[add paragraph mentioning how databases have been a useful tool, what indexes are, why they are
+useful]
+
 Recent developments in e-graphs for equality saturation @relationalematching @eqlog @egglog have
 shown that adding indexes to e-graph pattern-matching creates a structure that is very similar to
-relational databases and in particular Datalog -- a declarative logic programming language that
+relational databases and in particular Datalog @egglog. Datalog is a declarative logic programming language that
 reasons bottom-up by inserting rows into tables. In fact, this similarity extends to the degree
 that e-graphs may be best thought of as Datalog extended with a unification operation.
 
-This allows EqSat to leverage algorithms from Datalog, in particular the algorithm semi-naive
+This allows EqSat @equalitysaturation  leverage algorithms from Datalog, in particular the algorithm semi-naive
 evaluation which, rather than running queries against the entire database, specifically queries
 newly inserted rows in a manner similar to a database trigger. Incremental rule matching, together
 with indexes and simple query planning, has brought an order of magnitude speedup to the e-graph
@@ -392,7 +397,7 @@ ahead-of-time (aot$#h(2pt)approx#h(2pt)$oat) which allows query planning and ind
 optimized globally.
 
 Oatlog has limited functionality compared to egglog, implementing only a subset of the language and
-its long tail of features. While a few features are impractical in a ahead-of-time setting, most
+its long tail of features. While a few features are impractical in an ahead-of-time setting, most
 egglog features could be implemented within the existing Oatlog architecture.
 
 For the language subset that Oatlog supports, it exceeeds egglog in performance. The speedups range
@@ -425,13 +430,25 @@ capabilities.
 
 #TODO[introduce the background section]
 
-== Expression trees and DAGs
+@section_background_dags
+@section_background_egraphs
+@section_background_practice
+@section_background_practice_union_find
+@section_background_recursive_ematching
+@section_background_db_join
+@section_background_relational
+@section_background_wcoj
+@section_background_datalog_vs_sql
+@section_nomenclature
+
+== Expression trees and DAGs <section_background_dags>
 
 As a stepping stone towards describing e-graphs, let us consider the problem of storing mathematical
 expressions in a compact manner. Traditional notation represents expressions as strings of tokens,
 such as $(a+b) dot 2 dot (a+b+2)$, which given operator precedence rules can be interpreted as a
 tree, in this case $((a+b) dot 2) dot ((a+b)+2)$.
 
+#TODO[allow grammar error]
 This representation spells out $a+b$ twice, which may be acceptable for small expressions but
 quickly becomes cumbersome for larger expressions such as in the quadratic formula. We can avoid
 this using variable substitutions: let $t=a+b$ in $t dot 2 dot (t+2)$. The equivalent of this for
@@ -559,13 +576,13 @@ of the $xor$ and $+$ as shown in @fig_background_dag_duplicated.
   placement: auto,
 ) <fig_background_dag_duplicated>
 
-== E-graphs
+== E-graphs <section_background_egraphs>
 
-E-graphs are at their core a solution to the problem illustrated in @fig_background_dag_duplicated,
-that identical usages of syntactically different inputs result in duplicated storage within an
-expression DAG. They do this not by solving the problem in general, which requires the ability to
-represent functions, but by considering the case of the syntactically different inputs being
-semantically equivalent.
+E-graphs are at their core a solution to the duplication illustrated in
+@fig_background_dag_duplicated, that identical usages of syntactically different inputs result in
+duplicated storage within an expression DAG. E-graphs do this not by representing functions
+#footnote[Although this is done in slotted e-graphs do @slotted_egraph.], but by grouping
+syntactically different, but semantically equal expressions into the same equivalence class.
 
 An initial expression mutated through local rewrites is in fact exactly the special case of
 syntactically different but semantically identical subexpressions being used identically. If a
@@ -619,7 +636,7 @@ as here where $x dot 2 == x << 1$, we can deduplicate our expressions in an e-gr
 ) <fig_background_nonbipartite_egraph>
 
 @fig_background_nonbipartite_egraph shows an e-graph corresponding to the scenario also shown in
-@fig_background_dag_duplicated, assuming that we for whatever reason have that $a+b=a xor b$. Nodes
+@fig_background_dag_duplicated, assuming that $a+b=a xor b$. Nodes
 still correspond to computations, but their inputs are now no longer other nodes but rather groups
 of nodes. All nodes within a group must be equal, so a group is an equivalence class. For this
 reason we call the groups e-classes and the nodes e-nodes.
@@ -635,7 +652,7 @@ its usage sites.
 Compared to expression DAGs, e-graphs can achieve exponential compression. An example of this is the
 expression $f(f(...(f(x))...))$ where each $f$ is either $x arrow x dot 2$ or $x arrow x << 1$,
 which has $2^n$ top-level nodes in an expression DAG yet requires linear space as an e-graph. This
-example is of course synthetic but in general e-graphs achive compression exponential in the number
+example is of course synthetic but in general e-graphs achieve compression exponential in the number
 of nested rewrites.
 
 E-graphs can be represented as graphs in multiple ways. We have already seen how e-nodes can be
@@ -723,7 +740,7 @@ representation shown in @fig_background_bipartite_egraph, are
 
 - `make()`: Inserting an e-class with degree zero.
 - `insert()`: Inserting an e-node, connecting to existing e-classes as inputs and output.
-- `union()`: Merging two e-class with a node contraction.
+- `union()`: Merging two e-classes with a node contraction.
 
 Colloquially, these correspond to declaring a unknown variable, declaring a computation that derives
 one variable from others, and declaring that two variables must in fact be equal.
@@ -751,7 +768,7 @@ structure called union-find or disjoint-sets @unionfindoriginal.
 @fig_background_practice_uf implements this data structure. Two variables `a` and `b` are equal if
 `find(a) == find(b)`. Conceptually, the union-find can be seen as a forest of rooted trees, with
 every tree being an equivalence class with its root being a representative. Every node `x` stores a
-pointer to its parent in `self.parents[x]`, with the root pointing to itself, which guarantess that
+pointer to its parent in `self.parents[x]`, with the root pointing to itself, which guarantees that
 the root can be found by chasing the pointers. Expressed as an analogy, if we has a set of people
 and each person pointed to an arbitrary person who is taller than them, we could find the root (i.e.
 the tallest) person by following where people point until the root is found.
@@ -769,7 +786,7 @@ optimization involves modifying which root is merged into the other in `union()`
 smaller-to-larger, guaranteeing logarithmic tree depth. Each of these optimizations individually
 guarantee an amortized $O(log n)$ time per `find()` and `union()`, with an amortized exceedingly
 slowly growing $O(alpha(n))$ time #footnote[$alpha$ is roughly the inverse of the Ackermann function
-and significantly more slowly than even nested logarithms.] per operation if both are applied
+and significantly slowly than even nested logarithms.] per operation if both are applied
 @fastunionfind @unionfindvariantbounds.
 
 For equality saturation the cost of different path compression and merging order choices affect not
@@ -819,6 +836,7 @@ with a union-find data structure as previously described in @section_background_
 E-classes that are uprooted after a `union()` will still be referred to in various e-nodes, so there
 must be a canonicalization step in which all such e-nodes are updated.
 
+#TODO[hard to parse]
 Finally, addition along with all other functions satisfy that for any given input there is exactly
 one valid output, or for partial functions at most one valid output. This is called functional
 dependency and means that for e-nodes $(op, a, b, c)$ and $(op, a, b, d)$ we are guaranteed that
@@ -845,19 +863,25 @@ due to functional dependencies possibly triggering a `union()` cascade.
 === EqSat rewriting
 
 Let us now implement rewrite rules that add new e-nodes based on existing e-graph substructures. In
-particular we consider commutativity of addition, $a+b=c => b+a=c$, commutativity of multiplication,
+particular, we consider commutativity of addition, $a+b=c => b+a=c$, commutativity of multiplication,
 $a dot b=c => b dot a=c$, and distributivity, $(a+b) dot c = d => a dot c + b dot c = d$.
 
-@fig_background_practice_apply_rules implements this, for simplicity in a hardcoded manner. This is
+#TODO[grammar: hand-written]
+
+@fig_background_practice_apply_rules implements this, for simplicity in a hard-coded manner. This is
 unlike a generic e-graph engine which must be able to handle arbitrary rules by interpreting or
 compiling them rather than relying on them being hand-written.
 
 Each of the three rules are phrased as conditional insertions, adding new e-classes and e-nodes when
 matching specific patterns in the existing structure. If this was the only effect of the rules then
 `canonicalize()` would never need to be run since `self.enodes` would never contain any uprooted
-e-class. However, e-node insertions on already existing e-node inputs result in `union()` operations
+e-class. 
+#TODO[hard to parse]
+However, e-node insertions on already existing e-node inputs result in `union()` operations
 make a future call to `canonicalize()` necessary to restore the invariant that `self.enodes`
 contains only root e-classes.
+
+#TODO[It reaches a fixed point modulo equality? I do not entry is strictly necessary]
 
 This implementation never properly reaches a fixed point since it continually adds new e-classes
 using `make()` even these are always merged into existing e-classes when inserting. E-graph engines,
@@ -874,7 +898,7 @@ including Oatlog, resolve this by replacing calls such as `let ac = self.uf.make
     let b = raw(read("egraph.rs").split("\n").slice(start, end).join("\n"), lang: "rust", block: true)
     text(size: 8pt, setup + b + reset)
   },
-  caption: [Hardcoded implementation of rewrite rules for commutativity and distributivity on an
+  caption: [Hard-coded implementation of rewrite rules for commutativity and distributivity on an
     e-graph.],
 ) <fig_background_practice_apply_rules>
 
@@ -900,6 +924,8 @@ All extraction roughly involves mapping each e-class to its least-cost e-node, b
 this task varies greatly depending on the cost model and on whether approximate solutions are
 acceptable.
 
+#TODO[isn't "dag size" a more clear term?]
+#TODO[bounded treewidth should be clarified that it is fixed parameter tractable]
 - If the cost is a per-node-sum over the expression tree, i.e. with duplicated contributions from
   shared DAG ancestors, optimal extraction can be done in linear time using a topological sort and
   dynamic programming since the cost of an e-node is a constant plus the sum of costs for its input
@@ -912,6 +938,9 @@ acceptable.
 
 However, Oatlog does not in its current form implement any extraction, so it is not a major topic in
 this thesis.
+Extraction is not implemented because the problem of extraction is unrelated to the problem of
+constructing the e-graph and the thesis is about the performance of constructing the e-graph.
+Note that existing extraction libraries could be used by serializing the e-graph.
 
 #figure(
   {
@@ -937,15 +966,17 @@ this thesis.
     )
   },
   caption: [A self-contained but asymptotically slow EqSat implementation with operations $+$ and
-    $dot$, with hardcoded rewrite rules for commutativity and distributivity.],
+    $dot$, with hard-coded rewrite rules for commutativity and distributivity.],
 ) <fig_background_practice_full>
 
 == Recursive e-matching <section_background_recursive_ematching>
 
-The rewrite rules implemented in @fig_background_practice_apply_rules were hardcoded as ad-hoc
-nested for-loops for commutativity and distributivity. We will now describe a structured manner of
+The rewrite rules implemented in @fig_background_practice_apply_rules were hard-coded as ad-hoc
+nested for-loops for commutativity and distributivity. We now describe a structured manner of
 implementing rewrite rules, called recursive e-matching, which is used in egg @egg and can be
 considered standard due to egg's ubiquity.
+
+#TODO[it recursively matching the left hand]
 
 The name recursive e-matching is derived from how it recursively matching the left hand side of a
 rewrite rule. A pattern $(a dot b) + (a dot c) = d$ can be seen as a tree of three nodes, a root
@@ -989,14 +1020,14 @@ e-matching also relies on a reversed `enodes_by_eclass: HashMap<EClass, ENode>`.
 
 Overall, recursive e-matching by only iterating all e-nodes in the outermost layer is significantly
 more efficient than what we presented previously, but there are still problems that arise.
-Roughly, these are
+Roughly, these are:
 + Iterating through e-nodes that will be rejected on the bases of operator or variable agreement is
   unnecessary and wasteful.
 + Calls to `apply_rules()` will output all matches, even those discovered in previous calls to
   `apply_rules()`.
-and later on we will see that relational e-matching addresses these issues.
+Later on, we will see that relational e-matching addresses these issues.
 
-== Database joins
+== Database joins <section_background_db_join>
 
 This section is an interlude from e-graphs and equality saturation to present the relational
 database concepts necessary that we later will apply to e-graphs.
@@ -1061,9 +1092,9 @@ database concepts necessary that we later will apply to e-graphs.
 ) <fig_background_database_join_concept>
 
 Relational databases store tables, also known as relations, such as the order and customer tables in
-@fig_background_database_join_concept. Tables are lists of rows, but they can often be seen as sets
-of rows due to not containing duplicates and their order being irrelevant. A row is a key-value
-record, with every row in a table satisfying the same schema.
+the example of @fig_background_database_join_concept. Tables are lists of rows, but they can often
+be seen as sets of rows due to not containing duplicates and their order being irrelevant. A row is
+a key-value record, with every row in a table satisfying the same schema.
 
 An algorithm that reads both the order and customer tables can be expressed in terms of reading and
 mutating them individually, but it is often useful to be able to be able to access the two
@@ -1075,10 +1106,10 @@ a customer name requires touching less memory and is more compact overall. Addit
 dynamically supports not just queries accessing $"Orders" join "Customers"$ but also more
 complicated joins involving more relations.
 
-A join can be implemented with a cartesian product and a filter, but this is inefficient if the
+A join can be implemented with a Cartesian product and a filter, but this is inefficient if the
 overwhelming majority of the $O(n^2)$ intermediate rows are filtered out and constructing them
 turned out to be unnecessary. Joins are therefore usually implemented using search trees such as
-B-trees or hashmaps, for which the time complexity scales linearitmically or linearly with the size
+B-trees or hash maps, for which the time complexity scales linearitmically or linearly with the size
 of the smaller relation and the number of output rows. Both of these join implementations are
 illustrated in @fig_background_database_join_impl
 
@@ -1114,10 +1145,10 @@ illustrated in @fig_background_database_join_impl
       ```,
     ),
   ),
-  caption: [The implementation of a nested loop join and a hash join.],
+  caption: [The implementation of a nested loop join, and a hash join.],
 ) <fig_background_database_join_impl>
 
-== E-graphs as relational databases <conceptual_background_relational>
+== E-graphs as relational databases <section_background_relational>
 
 In @section_background_recursive_ematching we determined that we can improve upon recursive
 e-matching either if we can avoid rediscovering matches from earlier iterations, or if we can do
@@ -1135,7 +1166,7 @@ and lookups are in form of one of
 + Recursive e-matching case, with the output known.
 + Recursive e-matching alternative case, with the output and some inputs known.
 
-This is very reminicient of various indexed lookups on a table! The table columns are the inputs and
+This is very reminicient of various indexed lookups on a table. The table columns are the inputs and
 outputs of the operator, which each row being an e-node and each cell being an e-class identifier.
 Functional dependencies, such as all operators uniquely determining their output from their input or
 addition uniquely determining any input from the other input and the output, correspond in database
@@ -1157,7 +1188,7 @@ subpatterns. The pattern can also be written in compact syntax as
 
 $"Add"("ab", "ac", "d") join "Add"("a", "b", "ab") join "Add"("a", "c", "ac")$
 
-where $join$ denotes a natural join, here on the columns $"ab"$, $"ac"$ and $"a"$ after renaming the
+Where $join$ denotes a natural join, here on the columns $"ab"$, $"ac"$ and $"a"$ after renaming the
 columns according to the labels within parenthesis. This is a conjunctive query, a (multi)set of
 tables that have their columns renamed and then naturally joined. In general, all patterns expressed
 as syntactic trees can be turned into conjunctive queries by adding temporary variables for function
@@ -1165,7 +1196,7 @@ outputs. The problem of e-matching becomes a join, for which we must determine a
 planning) as well as determine how to do the actually lookups (index selection and implementation).
 
 EqSat on a high level now looks like
-1. Execute conjuctive queries
+1. Execute conjunctive queries
 2. Perform actions (e-node insertions, creating e-classes, unifying e-classes) based on matches
 3. Canonicalization, applying these mutations to the database in batches.
 
@@ -1183,7 +1214,7 @@ back and forth in every EqSat iteration. The e-graph engine egglog @egglog was r
 further speedups largely by being able to apply the semi-naive evaluation algorithm from
 Datalog.
 
-== Semi-naive evaluation <conceptual_background_seminaive>
+== Semi-naive evaluation <section_background_seminaive>
 
 Semi-naive evaluation is an algorithm that allows relational queries to be evaluated incrementally
 as new tuples are added to relations. It is associated with the implementation of Datalog engines
@@ -1300,14 +1331,16 @@ for _ in b_new(..) {
 }
 ```
 
-== Egglog and other theory languages <conceptual_background_theory_languages>
+== the egglog language/*and other theory languages*/ <section_background_theory_languages>
 
-#TODO[Elaborate]
+#TODO[rework, we already do translation to relational database in another section, but maybe it
+could help to repeat ourselves?]
 
-@appendix_rosettaexample shows how an egglog rule can be transformed to eqlog, Rust, and SQL.
+The egglog language, not to be confused with egglog, an interpreter of the egglog
+language, is used in Oatlog, and some understanding of it is required to understand Oatlog.
 
 @informal-theory-example shows an example EqSat theory specified in the egglog domain-specific
-language @egglog. `Math` is essentially a sum type, where `Add`, `Sub`, etc are constructors.
+language @egglog. `Math` is essentially a sum type, where `Add`, `Sub`, etc. are constructors.
 Rewrites mean that if the left side matches, add the right side to the database and unify it with
 the left side. Egglog semantics define running a set of rules as using their left side patterns to
 figure out what right side actions to perform, then doing all actions as a batch. Egglog defines a
@@ -1369,12 +1402,12 @@ data Math =
 
 Here, `Add`, `Mul`, `Const` are constructors for `Math`.
 
-But implementing Math like this would not work for several reasons, firstly we
+Implementing Math like this would not work for several reasons, firstly we
 want the constructors to return e-classes, and take in e-classes, and secondly,
 sum types can not directly be stored in a relational database.
 
 This can be solved by creating a new table per constructor, as in @sum_type_tables. Now, all
-e-classes are just integer ids, and exist implicitly in the tables.
+e-classes are just integer IDs, and exist implicitly in the tables.
 
 #figure(
   grid(
@@ -1423,11 +1456,13 @@ e-classes are just integer ids, and exist implicitly in the tables.
   caption: [Sum types as multiple tables.],
 ) <sum_type_tables>
 
-== Worst-case optimal join
+@appendix_rosettaexample shows how an egglog rule can be transformed to eqlog, Rust, and SQL.
+
+== Worst-case optimal join <section_background_wcoj>
 
 #TODO[]
 
-== Design constraints for Datalog engines vs SQL databases. <conceptual_background_datalog_vs_sql>
+== Design constraints for Datalog engines vs SQL databases. <section_background_datalog_vs_sql>
 
 SQL databases need to be extremely dynamic since arbitrary new queries can be done at run time, but
 in Datalog engines all queries are known up-front before starting the rewrite loop. This means that
@@ -1437,7 +1472,7 @@ index data-structures based on exact queries.
 That said, it's entirely possible to create an e-graph engine that uses SQL internally and in fact a
 prototype of egglog, egglite, was originally implemented on top of sqlite @egglite @egraph_sqlite.
 
-== Nomenclature
+== Nomenclature <section_nomenclature>
 
 Between e-graphs, Datalog and relational databases there are some terms that have essentially
 identical meanings. We use the terms
@@ -1445,7 +1480,7 @@ identical meanings. We use the terms
 - row, tuple, e-node, and
 - cell, variable, e-class,
 
-largely interchangably, sometimes highlighting different aspects of the same thing depending on the
+largely interchangeably, sometimes highlighting different aspects of the same thing depending on the
 situation.
 
 = Implementation <chapter_implementation>
@@ -1879,7 +1914,7 @@ To generate the TIR, we perform query planning and when multiple equally good ch
 For each relation, there are some number of indexes.
 We consider two types of indexes FD (functional dependency) and non-FD indexes.
 Initially, we tried using sorted lists and b-trees, but ended up performing badly due to the access patterns having low locality.
-Instead we are using hashmaps.
+Instead, we are using hash maps.
 
 === FD indexes
 
@@ -1888,9 +1923,9 @@ For every functional dependence in a relation, we have a FD index to enforce it,
 
 === non-FD indexes
 
-Without some functional dependency, performing lookups on a subset of all columns may yield multiple values, so a datastructure like `HashMap<Key, Vec<Value>>` is needed.
+Without some functional dependency, performing lookups on a subset of all columns may yield multiple values, so a data structure like `HashMap<Key, Vec<Value>>` is needed.
 However, having many small lists adds both space and allocation overhead, since an empty `Vec<T>` uses 24 bytes and creates individual allocations.
-This motivates having a hashmap that points into a list that is sorted by the key:
+This motivates having a hash map that points into a list that is sorted by the key:
 ```rust
 struct NonFdIndex<Key, Value> {
     //                (start, end)
@@ -1899,13 +1934,16 @@ struct NonFdIndex<Key, Value> {
 }
 ```
 
-== Size of e-class ids
+== Size of e-class IDs
 
-Using 32-bit e-class ids is preferable to using 64-bit ids since that halves the size of our indices.
-However, we might in theory run out of ids, so to justify this we need to reason about how many ids are needed in practice.
-As an extreme lower bound of memory usage per ids, we can look at what is stored in the union-find.
-In the union-find we have at least 4 bytes per e-class id, which gives a lower bound of 16 GiB of memory usage before we run out of 32-bit ids.
-A less conservative estimates would assume that each e-class id corresponds to a row in a relation and lets say 3 indices and 3 columns, requiring in-total 40 GiB before running out of ids.
+Using 32-bit e-class IDs is preferable to using 64-bit IDs since that halves the size of our indices.
+However, we might in theory run out of IDs, so to justify this we need to reason about how many IDs are needed in practice.
+As an extreme lower bound of memory usage per IDs, we can look at what is stored in the union-find.
+In the union-find we have at least 4 bytes per e-class ID which gives a lower bound of 16 GiB of memory usage before we run out of 32-bit IDs.
+A less conservative estimate would assume that each e-class ID corresponds to a row in a relation
+and let's say 3 indices and 3 columns, requiring in-total 40 GiB before running out of IDs.
+
+#TODO[compiler applications motivate somewhat limited amount of memory]
 
 == Union-find
 
@@ -1968,7 +2006,7 @@ A typical implementation of union-find includes both path-compression (@fast-fin
 
 While path-compression improves the computational complexity, it has worse constant factors.
 Specifically the implementation in @fast-find-impl uses (non-tail) recursion, writes to the same memory it is reading from.
-Additionally these prohibit compiler optimizations.
+Additionally, these prohibit compiler optimizations.
 #TODO[argue why we think path length is small in practice]
 Without path-compression, `find` is simply the equivalent of a do-while loop.
 
@@ -2086,7 +2124,7 @@ the original rules.
 
 == HIR optimization
 
-In general we can think of a rule as $"Premise" => "Action"$, and the overall goal of optimizing the HIR is to remove everything from the actions that are already present in the premise and to simplify the premise and action.
+In general, we can think of a rule as $"Premise" => "Action"$, and the overall goal of optimizing the HIR is to remove everything from the actions that are already present in the premise and to simplify the premise and action.
 
 For example, consider this rule:
 ```egglog
@@ -2179,10 +2217,6 @@ To make sure we still perform WCOJ, we need to ensure that we perform semi-joins
 
 #TODO[Section summary]
 
-== Testing
-
-- egglog testsuite
-
 /*
 We run the entire egglog testsuite (93 tests) to validate Oatlog.
 We compare the number of e-classes in egglog and Oatlog to check if Oatlog is likely producing the same result.
@@ -2252,6 +2286,8 @@ For a list of currently passing tests, see @passingtests.
   caption: [#TODO[]],
 ) <fig_eval_benchmarks_plot>
 
+#TODO[`fig_eval_benchmarks_plot`: add line for when speedup is 1 (egglog and Oatlog has the same performance)]
+
 #TODO[talk about what fuel1 etc means]
 
 == Egglog support
@@ -2271,7 +2307,8 @@ Extraction is essentially orthogonal to an e-graph engine and there already exis
 #TODO[get exact numbers]
 
 We test Oatlog by comparing it against the egglog @egglog testsuite and comparing the number of e-nodes for each relation.
-In the testsuite, 16.3498 out of 90.859 only contain language constructs supported by Oatlog and it passes all of those tests.
+In the testsuite, 16.3498 out of 90.859 only contain language constructs supported by Oatlog, and it passes all of those tests.
+Additionally, we have property tests on our index implementations and snapshot testing on all of our IRs (HIR, TIR, LIR).
 
 // birewrite
 // eqsat_basic
