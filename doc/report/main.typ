@@ -241,10 +241,9 @@ reason about than ad-hoc passes, expressed in possibly very many lines of code.
 In summary, peephole rewriting has fundamental advantages over an optimization pass architecture
 while still serving as an approach to modularize the compiler implementation. Peephole rewriting
 optimizes to a fixed point, never leaving obvious further optimizations on the table. It does this
-incrementally, requiring significantly less computation than /*to achieve the same with*/ an optimization
-pass architecture. Finally, it specifies many optimizations as syntactic rewrite rules, which are
-easier than passes to formally reason about when for example proving the correctness of
-optimizations.
+incrementally, requiring significantly less computation than an optimization pass architecture.
+Finally, it specifies many optimizations as syntactic rewrite rules, which are easier than passes to
+formally reason about when for example proving the correctness of optimizations.
 
 However, peephole rewriting does not avoid the second part of the phase ordering problem:
 destructive rewrites are still order-dependent in the face of multiple potentially good but mutually
@@ -581,8 +580,9 @@ of the $xor$ and $+$ as shown in @fig_background_dag_duplicated.
 E-graphs are at their core a solution to the duplication illustrated in
 @fig_background_dag_duplicated, that identical usages of syntactically different inputs result in
 duplicated storage within an expression DAG. E-graphs do this not by representing functions
-#footnote[Although this is done in slotted e-graphs do @slotted_egraph.], but by grouping
-syntactically different, but semantically equal expressions into the same equivalence class.
+#footnote[There is an e-graph variant called slotted e-graphs @slotted_egraph which deduplicate data
+using functions.], but by grouping syntactically different, but semantically equal expressions into
+the same equivalence class.
 
 An initial expression mutated through local rewrites is in fact exactly the special case of
 syntactically different but semantically identical subexpressions being used identically. If a
@@ -785,8 +785,8 @@ representative rewrites non-root pointers along the walked path to point to the 
 optimization involves modifying which root is merged into the other in `union()` to merge trees
 smaller-to-larger, guaranteeing logarithmic tree depth. Each of these optimizations individually
 guarantee an amortized $O(log n)$ time per `find()` and `union()`, with an amortized exceedingly
-slowly growing $O(alpha(n))$ time #footnote[$alpha$ is roughly the inverse of the Ackermann function
-and significantly slowly than even nested logarithms.] per operation if both are applied
+slowly growing $O(alpha(n))$ time #footnote[$alpha(n)$ is roughly the inverse of the Ackermann
+function and significantly slowly than even nested logarithms.] per operation if both are applied
 @fastunionfind @unionfindvariantbounds.
 
 For equality saturation the cost of different path compression and merging order choices affect not
@@ -836,11 +836,11 @@ with a union-find data structure as previously described in @section_background_
 E-classes that are uprooted after a `union()` will still be referred to in various e-nodes, so there
 must be a canonicalization step in which all such e-nodes are updated.
 
-#TODO[hard to parse]
-Finally, addition along with all other functions satisfy that for any given input there is exactly
-one valid output, or for partial functions at most one valid output. This is called functional
-dependency and means that for e-nodes $(op, a, b, c)$ and $(op, a, b, d)$ we are guaranteed that
-$c=d$. This motivates storing e-nodes in a map from operator and inputs to output.
+Finally, addition satisfies that for any given input there is exactly one valid output. This is
+called functional dependency and holds for any total function, and for partial functions there is at
+most one valid output. This functional dependency means that for any e-nodes $(op, a, b, c)$ and
+$(op, a, b, d)$ we are guaranteed that $c=d$, motivating storing e-nodes in a map from operator and
+inputs to output.
 
 @fig_background_practice_canonicalization combines these insights to represent an e-graph as a pair
 of `uf: UnionFind` and `enodes: HashMap<(Op, EClass, EClass), EClass>`. It also shows how e-class
@@ -875,18 +875,16 @@ compiling them rather than relying on them being hand-written.
 Each of the three rules are phrased as conditional insertions, adding new e-classes and e-nodes when
 matching specific patterns in the existing structure. If this was the only effect of the rules then
 `canonicalize()` would never need to be run since `self.enodes` would never contain any uprooted
-e-class.
-#TODO[hard to parse]
-However, e-node insertions on already existing e-node inputs result in `union()` operations
-make a future call to `canonicalize()` necessary to restore the invariant that `self.enodes`
-contains only root e-classes.
+e-class. However, e-node insertions on already existing e-node inputs result in `union()`
+operations, making a future call to `canonicalize()` necessary to restore the invariant that
+`self.enodes` contain only root e-classes.
 
-#TODO[It reaches a fixed point modulo equality? I do not entry is strictly necessary]
-
-This implementation never properly reaches a fixed point since it continually adds new e-classes
-using `make()` even these are always merged into existing e-classes when inserting. E-graph engines,
-including Oatlog, resolve this by replacing calls such as `let ac = self.uf.make()` with some
-`entry()` operation that first queries for the e-node $(+, a, c)$ and uses its e-class if present.
+This implementation does reach a fixed point in the sense that it builds a semantically complete
+e-graph, but from an implementation perspective it continues to allocate new e-classes with `make()`
+in every call to `apply_rules()` even when these e-classes immediately afterwards are merged with
+existing e-classes. E-graph engines, including Oatlog, resolve this by replacing calls such as
+`let ac = self.uf.make()` with some `entry()` operation that first queries for the e-node $(+, a, c)$ and
+uses its e-class if present, only otherwise falling back to `make()`.
 
 #figure(
   {
@@ -976,9 +974,7 @@ nested for-loops for commutativity and distributivity. We now describe a structu
 implementing rewrite rules, called recursive e-matching, which is used in egg @egg and can be
 considered standard due to egg's ubiquity.
 
-#TODO[it recursively matching the left hand]
-
-The name recursive e-matching is derived from how it recursively matching the left hand side of a
+The name recursive e-matching is derived from how it recursively matches the left hand side of a
 rewrite rule. A pattern $(a dot b) + (a dot c) = d$ can be seen as a tree of three nodes, a root
 multiplication with two child additions, and it can be matched with the four functions shown in
 @fig_background_recursive_ematching_example.
@@ -1145,7 +1141,7 @@ illustrated in @fig_background_database_join_impl
       ```,
     ),
   ),
-  caption: [The implementation of a nested loop join, and a hash join.],
+  caption: [The implementation of a nested loop join and a hash join.],
 ) <fig_background_database_join_impl>
 
 == E-graphs as relational databases <section_background_relational>
@@ -1331,7 +1327,7 @@ for _ in b_new(..) {
 }
 ```
 
-== the egglog language/*and other theory languages*/ <section_background_theory_languages>
+== The egglog language <section_background_theory_languages>
 
 #TODO[rework, we already do translation to relational database in another section, but maybe it
   could help to repeat ourselves?]
@@ -2316,78 +2312,20 @@ To make sure we still perform WCOJ, we need to ensure that we perform semi-joins
 
 #TODO[Section summary]
 
-/*
-We run the entire egglog testsuite (93 tests) to validate Oatlog.
-We compare the number of e-classes in egglog and Oatlog to check if Oatlog is likely producing the same result.
-
-Right now, we fail most tests because primitive functions are not implemented. Additionally, some
-tests are not very relevant for AOT compilation and supporting them is not really desirable. An
-example of this are extraction commands, since egglog-language-level commands are run at Oatlog
-startup and Oatlog extraction is better handled using the run-time API.
-
-For a list of currently passing tests, see @passingtests.
-*/
-
-== Benchmarks
-
-#TODO[eventually replace with a log/log graph and add more benchmarks, include sizes]
-
-#figure(
-  //placement: top,
-  //scope: "parent",
-  text(
-    size: 9pt,
-    table(
-      columns: (auto, auto, auto, auto, auto),
-      inset: 4pt,
-      table.header([*benchmark*], [*e-nodes*], [*egglog*], [*Oatlog*], [*speedup*]),
-      [`fuel1_math`, saturated], [973], [4.588 ms], [435.3 µs], table.cell(fill: green.lighten(28%))[10.54x],
-      [`fuel2_math`, saturated], [1516], [5.832 ms], [591.2 µs], table.cell(fill: green.lighten(29%))[9.87x],
-      [`fuel3_math`, saturated], [50021], [165.4 ms], [28.56 ms], table.cell(fill: green.lighten(36%))[5.79x],
-      [`math`, 0 steps], [35], [534.9 µs], [4.414 µs], table.cell(fill: green.lighten(14%))[121.18x],
-      [`math`, 1 steps], [69], [657.4 µs], [9.675 µs], table.cell(fill: green.lighten(16%))[67.95x],
-      [`math`, 2 steps], [118], [811.8 µs], [18.58 µs], table.cell(fill: green.lighten(18%))[43.69x],
-      [`math`, 3 steps], [208], [992.0 µs], [34.90 µs], table.cell(fill: green.lighten(20%))[28.43x],
-      [`math`, 4 steps], [389], [1.229 ms], [69.57 µs], table.cell(fill: green.lighten(24%))[17.66x],
-      [`math`, 5 steps], [784], [1.611 ms], [151.5 µs], table.cell(fill: green.lighten(28%))[10.64x],
-      [`math`, 6 steps], [1576], [2.259 ms], [311.5 µs], table.cell(fill: green.lighten(33%))[7.25x],
-      [`math`, 7 steps], [3160], [3.610 ms], [622.0 µs], table.cell(fill: green.lighten(36%))[5.80x],
-      [`math`, 8 steps], [8113], [6.268 ms], [1.358 ms], table.cell(fill: green.lighten(40%))[4.62x],
-      [`math`, 9 steps], [28303], [13.44 ms], [4.116 ms], table.cell(fill: green.lighten(48%))[3.27x],
-      [`math`, 10 steps], [136446], [54.03 ms], [20.16 ms], table.cell(fill: green.lighten(53%))[2.68x],
-      [`math`, 11 steps], [1047896], [437.6 ms], [254.4 ms], table.cell(fill: green.lighten(69%))[1.72x],
-      [`math`, 12 steps], [15987528], [8.347 s], [6.686 s], table.cell(fill: green.lighten(86%))[1.25x],
-      [`boolean_adder`, 0 steps], [44], [755.7 µs], [3.613 µs], table.cell(fill: green.lighten(13%))[209.17x],
-      [`boolean_adder`, 1 steps], [106], [896.6 µs], [10.23 µs], table.cell(fill: green.lighten(15%))[87.66x],
-      [`boolean_adder`, 2 steps], [241], [1.070 ms], [25.67 µs], table.cell(fill: green.lighten(18%))[41.68x],
-      [`boolean_adder`, 3 steps], [511], [1.401 ms], [69.21 µs], table.cell(fill: green.lighten(23%))[20.25x],
-      [`boolean_adder`, 4 steps], [727], [2.043 ms], [132.6 µs], table.cell(fill: green.lighten(25%))[15.40x],
-      [`boolean_adder`, 5 steps], [906], [3.167 ms], [228.9 µs], table.cell(fill: green.lighten(26%))[13.84x],
-      [`boolean_adder`, 6 steps], [1332], [4.324 ms], [342.1 µs], table.cell(fill: green.lighten(27%))[12.64x],
-      [`boolean_adder`, 7 steps], [2374], [5.733 ms], [560.0 µs], table.cell(fill: green.lighten(29%))[10.24x],
-      [`boolean_adder`, 8 steps], [5246], [8.644 ms], [1.094 ms], table.cell(fill: green.lighten(32%))[7.90x],
-      [`boolean_adder`, 9 steps], [15778], [16.74 ms], [2.773 ms], table.cell(fill: green.lighten(36%))[6.03x],
-      [`boolean_adder`, 10 steps], [77091], [43.85 ms], [12.47 ms], table.cell(fill: green.lighten(46%))[3.52x],
-      [`boolean_adder`, 11 steps], [854974], [326.7 ms], [166.8 ms], table.cell(fill: green.lighten(64%))[1.96x],
-      [`boolean_adder`, 12 steps], [24610667], [158.4 s], [149.9 s], table.cell(fill: green.lighten(96%))[1.06x],
-    ),
-  ),
-  caption: [
-    Microbenchmark results comparing egglog with Oatlog. The reported timings are averages
-    continuous sampling for $10$ seconds, with a single sample for `boolean_adder-12`, on an AMD
-    Ryzen 5900X CPU. Oatlog is compared with nondeterministic egglog since Oatlog internally iterates
-    `hashbrown::HashMap`s.
-  ],
-) <fig_eval_benchmarks_table>
-
-#figure(
-  image("benchmarks.svg"),
-  caption: [#TODO[]],
-) <fig_eval_benchmarks_plot>
-
-#TODO[`fig_eval_benchmarks_plot`: add line for when speedup is 1 (egglog and Oatlog has the same performance)]
-
-#TODO[talk about what fuel1 etc means]
+#TODO[
+  Explain that we evaluate based on correctness, compatibility (feature richness) and performance.
+  Compat
+  - explain the features we lack, why (priorities mostly) and how difficult to fix
+  Performance
+  - revisit key categories of improvement
+  - talk about L3 cache, random access
+  - do some rough calculation, memory throughput, random accesses per second, etc
+  - explain bottleneck (sorting and hashmap access), show a flamegraph
+  - try to do some ABLATION
+  Finally, highlight especially novel optimizations
+  - highlight invariant permutations for saturating
+  - highlight reverse fundep for add not useful for math and requires extra index
+]
 
 == Egglog support
 
@@ -2433,7 +2371,307 @@ Additionally, we have property tests on our index implementations and snapshot t
 
 #TODO[thoughts about our development in general, what worked well?]
 
+/*
+We run the entire egglog testsuite (93 tests) to validate Oatlog.
+We compare the number of e-classes in egglog and Oatlog to check if Oatlog is likely producing the same result.
+
+Right now, we fail most tests because primitive functions are not implemented. Additionally, some
+tests are not very relevant for AOT compilation and supporting them is not really desirable. An
+example of this are extraction commands, since egglog-language-level commands are run at Oatlog
+startup and Oatlog extraction is better handled using the run-time API.
+
+For a list of currently passing tests, see @passingtests.
+*/
+
+== Benchmarks
+
+Oatlog's development has been guided by its performance on the three microbenchmarks --
+`fuelN_math`, `math`, and `boolean_adder` -- all of whose egglog code is available in
+@appendix_benchmarks.
+
+- The `boolean_adder` benchmark rewrites according to the laws of boolean algebra and is initialized
+  with a 10-bit ripple carry adder.
+- The `math` benchmark is taken from the egglog test suite and served as the primary performance
+  comparison between egg and egglog in #cite(<egglog>, form: "prose"). Its rewrite rules manipulate
+  expressions in real numbers, particularly by rewriting integrals using integration by parts.
+- Integration by parts produces an output that is matched by its own pattern, making the e-graph
+  divergent. For this reason we also adapted the `math` benchmark into the `fuelN_math` benchmark,
+  where the nesting count of integration by parts is limited to a $N$ between $1$ and $3$.
+
+The `fuelN_math` benchmark is run to a fixed point while the others are run with a specific step
+count. Although designing benchmarks is difficult and we cannot be sure that these benchmarks
+accurately capture the real-world performance of Oatlog,
+
+The complete benchmark results are shown in @fig_eval_benchmarks_table. The same data is also
+plotted in @fig_eval_benchmarks_plot, showing that Oatlog achieves very different speedups over
+egglog for different e-graph sizes. Oatlog is most competitive across the entire range, with 10-100x
+speedups below $10^3$ e-nodes, maintaining a large speedup down to about $2$x at $10^6$ e-nodes and
+performing very similarly to egglog over $10^7$ e-nodes.
+
+#figure(
+  placement: auto,
+  //scope: "parent",
+  text(
+    size: 9pt,
+    table(
+      columns: (auto, auto, auto, auto, auto),
+      inset: 4pt,
+      table.header([*benchmark*], [*e-nodes*], [*egglog*], [*Oatlog*], [*speedup*]),
+      [`fuel1_math`, saturated], [973], [4.588 ms], [435.3 µs], table.cell(fill: green.lighten(28%))[10.54x],
+      [`fuel2_math`, saturated], [1516], [5.832 ms], [591.2 µs], table.cell(fill: green.lighten(29%))[9.87x],
+      [`fuel3_math`, saturated], [50021], [165.4 ms], [28.56 ms], table.cell(fill: green.lighten(36%))[5.79x],
+      [`math`, 0 steps], [35], [534.9 µs], [4.414 µs], table.cell(fill: green.lighten(14%))[121.18x],
+      [`math`, 1 steps], [69], [657.4 µs], [9.675 µs], table.cell(fill: green.lighten(16%))[67.95x],
+      [`math`, 2 steps], [118], [811.8 µs], [18.58 µs], table.cell(fill: green.lighten(18%))[43.69x],
+      [`math`, 3 steps], [208], [992.0 µs], [34.90 µs], table.cell(fill: green.lighten(20%))[28.43x],
+      [`math`, 4 steps], [389], [1.229 ms], [69.57 µs], table.cell(fill: green.lighten(24%))[17.66x],
+      [`math`, 5 steps], [784], [1.611 ms], [151.5 µs], table.cell(fill: green.lighten(28%))[10.64x],
+      [`math`, 6 steps], [1576], [2.259 ms], [311.5 µs], table.cell(fill: green.lighten(33%))[7.25x],
+      [`math`, 7 steps], [3160], [3.610 ms], [622.0 µs], table.cell(fill: green.lighten(36%))[5.80x],
+      [`math`, 8 steps], [8113], [6.268 ms], [1.358 ms], table.cell(fill: green.lighten(40%))[4.62x],
+      [`math`, 9 steps], [28303], [13.44 ms], [4.116 ms], table.cell(fill: green.lighten(48%))[3.27x],
+      [`math`, 10 steps], [136446], [54.03 ms], [20.16 ms], table.cell(fill: green.lighten(53%))[2.68x],
+      [`math`, 11 steps], [1047896], [437.6 ms], [254.4 ms], table.cell(fill: green.lighten(69%))[1.72x],
+      [`math`, 12 steps], [15987528], [8.347 s], [6.686 s], table.cell(fill: green.lighten(86%))[1.25x],
+      [`boolean_adder`, 0 steps], [44], [755.7 µs], [3.613 µs], table.cell(fill: green.lighten(13%))[209.17x],
+      [`boolean_adder`, 1 steps], [106], [896.6 µs], [10.23 µs], table.cell(fill: green.lighten(15%))[87.66x],
+      [`boolean_adder`, 2 steps], [241], [1.070 ms], [25.67 µs], table.cell(fill: green.lighten(18%))[41.68x],
+      [`boolean_adder`, 3 steps], [511], [1.401 ms], [69.21 µs], table.cell(fill: green.lighten(23%))[20.25x],
+      [`boolean_adder`, 4 steps], [727], [2.043 ms], [132.6 µs], table.cell(fill: green.lighten(25%))[15.40x],
+      [`boolean_adder`, 5 steps], [906], [3.167 ms], [228.9 µs], table.cell(fill: green.lighten(26%))[13.84x],
+      [`boolean_adder`, 6 steps], [1332], [4.324 ms], [342.1 µs], table.cell(fill: green.lighten(27%))[12.64x],
+      [`boolean_adder`, 7 steps], [2374], [5.733 ms], [560.0 µs], table.cell(fill: green.lighten(29%))[10.24x],
+      [`boolean_adder`, 8 steps], [5246], [8.644 ms], [1.094 ms], table.cell(fill: green.lighten(32%))[7.90x],
+      [`boolean_adder`, 9 steps], [15778], [16.74 ms], [2.773 ms], table.cell(fill: green.lighten(36%))[6.03x],
+      [`boolean_adder`, 10 steps], [77091], [43.85 ms], [12.47 ms], table.cell(fill: green.lighten(46%))[3.52x],
+      [`boolean_adder`, 11 steps], [854974], [326.7 ms], [166.8 ms], table.cell(fill: green.lighten(64%))[1.96x],
+      [`boolean_adder`, 12 steps], [24610667], [158.4 s], [149.9 s], table.cell(fill: green.lighten(96%))[1.06x],
+    ),
+  ),
+  caption: [
+    Microbenchmark results comparing egglog with Oatlog. The reported timings are averages of
+    continuous sampling for $10$ seconds on an AMD Ryzen 5900X CPU, with the 12 step rows being
+    exactly two and one samples respectively for `math` and `boolean_adder`. Oatlog is compared with
+    nondeterministic egglog since Oatlog internally iterates `hashbrown::HashMap`s.
+  ],
+) <fig_eval_benchmarks_table>
+
+#figure(
+  placement: auto,
+  image("benchmarks.svg"),
+  caption: [Oatlog's speedup over egglog as a function of the number of e-nodes. Oatlog has a
+    double-digit speedup for scenarios less than a thousand e-nodes, which gradually shrinks to closely
+    approach egglog's performance for e-graphs of tens of millions of e-nodes.],
+) <fig_eval_benchmarks_plot>
+
+== Performance discussion
+
+It would have be useful if we at this point could present a clear explanation to why Oatlog is
+faster than egglog and why the difference diminishes for large e-graphs. Unfortunately we cannot,
+mostly because we lack a deep understanding of egglog's implementation details. Oatlog and egglog
+has some similarities, such as both
+
+- storing and filtering explicit timestamps,
+- using hashmaps for indexes,
+- producing worst-case optimal query plans,
+
+but there are also differences, such as Oatlog
+
+- executing queries as a trie rather than in mutual isolation,
+- using flat indexes (effectively `HashMap<A, &[(B, C)]>` and `HashMap<(A, B), C>`) over trie
+  indexes (effectively a single `HashMap<A, HashMap<B, C>>`),
+- exploiting invariant permutations for saturation benchmarks
+
+#TODO[Ablation? Although it would possibly be annoying to implement]
+
+#figure(
+  text(
+    size: 11pt,
+    ```
+             6,581.18 msec task-clock:u                     #    1.000 CPUs utilized
+       22,285,537,449      cpu_core/cycles/u                #    3.386 GHz
+       22,950,127,905      cpu_core/instructions/u
+        3,099,260,437      cpu_core/branches/u              #  470.928 M/sec
+           83,206,333      cpu_core/branch-misses/u
+        6,392,915,130      L1-dcache-loads:u                #  971.394 M/sec
+          564,439,150      L1-dcache-load-misses:u
+          290,365,095      LLC-loads:u                      #   44.121 M/sec
+           95,887,579      LLC-load-misses:u
+        6,438,351,299      dTLB-loads:u                     #  978.298 M/sec
+          134,767,626      dTLB-load-misses:u
+
+          6.579040563 seconds time elapsed
+
+          5.095351000 seconds user
+          1.436860000 seconds sys
+    ```,
+  ),
+  caption: [`perf stat` output for `math`, 12 steps, with less relevant information elided. Due to
+    `LLC-loads` and `LLC-load-misses` being unavailable on AMD, this was captured from a Intel
+    i7-12700H CPU.],
+) <fig_eval_discuss_stat>
+
+In the absence of a deep comparison of implementation details between Oatlog and egglog, let us
+instead identify and discuss the performance bottlenecks within Oatlog. With the command
+`perf stat -ddd` we can read a few very relevant performance counters, shown in
+@fig_eval_discuss_stat. We can see that there is very little instruction parallelism, with only
+about 1 instruction completed per cycle. There are quite many branches but the mispredict rate is
+low.
+
+However, every third instruction is a memory load, and while the cache hit rates are moderate, at
+91% for L1, 48% for L2 and 33% for L3, that still leaves 14.6M L3 cache misses per second. On the
+other hand, if the same computer has its memory benchmarked using
+`sysbench memory --threads=1 --memory-access-mode=rnd --memory-block-size=8 --memory-total-size=1G run`,
+it achieves only 12.4M random accesses per second.
+
+This somewhat indicates that Oatlog for large e-graphs is bottlenecked by L3 cache misses, although
+this data cannot distinguish between spending e.g. 100% of the time serving L3 cache misses
+sequentially or spending 50% of the time serving L3 cache misses in parallel pairs. From the
+perspective of how Oatlog works, being bottlenecked by RAM random access is largely expected. In
+flamegraphs of `math`, 12 steps, there is a roughly equal split of samples attributable to sorting,
+hashmap writes, hashmap reads and the rest. With the size of the hashmaps generally being equal to
+the number of e-nodes in a relation, these lookups are essentially always L3 cache misses for
+sufficiently large e-graphs.
+
+#figure(
+  placement: auto,
+  text(
+    size: 9pt,
+    grid(
+      columns: (1fr, 1fr),
+      ```rust
+      fn step(&mut self) {
+          self.apply_rules();
+          self.canonicalize(); // BOTTLENECK
+      }
+
+      fn canonicalize(&mut self) {
+        // no single bottleneck in this function
+        self.mul_.update_begin(..);
+        self.add_.update_begin(..);
+        loop /*(until func-dep fixed point)*/ {
+          self.mul_.update(..);
+          self.add_.update(..);
+        }
+        self.mul_.update_finalize(..);
+        self.add_.update_finalize(..);
+      }
+
+      // recreate secondary indexes
+      fn update_finalize(
+        &mut self,
+        uf: &mut Unification,
+        latest_ts: TimeStamp,
+      ) {
+        // recreate new
+        assert!(self.new.is_empty());
+        self.new.extend(
+          self.fd_index_0_1
+            .iter()
+            .filter_map(|(&(x0, x1), &(x2, ts))|
+              (ts == latest_ts).then_some((x0,x1,x2))
+            )
+        );
+        self.new.voracious_sort(); // SORTING BOTTLENECK
+
+        // recreate others by repeatedly sorting all
+        self.all.clear();
+        self.all.extend(
+          self.fd_index_0_1
+            .iter()
+            .map(|(&(x0, x1), &(x2, ts))| ..),
+        );
+        // SORTING BOTTLENECK
+        RowSort100::sort(&mut self.all);
+        // HASHMAP BUILDING BOTTLENECK
+        self.nofd_index_0.reconstruct(&mut self.all, ..);
+
+        // SORTING BOTTLENECK
+        RowSort010::sort(&mut self.all);
+        // HASHMAP BUILDING BOTTLENECK
+        self.nofd_index_1.reconstruct(&mut self.all, ..);
+      }
+      ```,
+      ```rust
+      // bulk insert
+      fn update_begin(
+        &mut self,
+        insertions: &[Self::Row],
+        uf: &mut Unification,
+        latest_ts: TimeStamp,
+      ) {
+        for &(x0, x1, x2) in insertions {
+          match self
+            .fd_index_0_1
+            // BOTTLENECK HASHMAP LOOKUP
+            .entry((uf.find(x0), uf.find(x1)))
+          {
+            Occupied(mut entry) => {
+              let (y2, ts) = entry.get_mut();
+              let old_val = *y2;
+              if old_val != uf.union_mut(x2, y2) {
+                *ts = latest_ts;
+              }
+            },
+            Vacant(entry) => entry.insert(
+              (uf.find(x2), latest_ts)
+            ),
+          }
+        }
+      }
+
+      // bulk find uprooted, then bulk insert
+      fn update(
+        &mut self,
+        uf: &mut Unification,
+        latest_ts: TimeStamp,
+      ) {
+        // (actually re-used allocation)
+        let mut insertions = Vec::new();
+        self.fd_index_0_1.retain(|&(x0,x1),&mut(x2,_)| {
+          // BOTTLENECK UNION-FIND LOOKUP
+          let canon = uf.are_roots(x0, x1, x2);
+          if !canon {
+            insertions.push((x0, x1, x2));
+          }
+          return canon;
+        });
+        self.update_begin(&insertions, ..);
+      }
+
+      ```,
+    ),
+  ),
+  caption: [Oatlog's generated code, significantly simplified and with its bottlenecks annotated.],
+) <fig_eval_discuss_code>
+
+Oatlog's heavy use of hashmaps can be made more clear by looking at its generated code, which is
+shown in @fig_eval_discuss_code. Effectively, the canonicalization phase performs a hashtable access
+for every e-node insertion created by `apply_rules` as well as every time the canonical tuple of an
+e-node is changed due to a functional-dependency-triggered union. Speeding up Oatlog is therefore
+not a matter of removing an accidental bottleneck but rather about addressing the fundamental issue
+of expensive random access by doing one of
+- fewer indexes,
+- fewer `update()` iterations to functional dependency fixed point,
+- more compact hashtable memory, increasing cache hit rates,
+- increased instruction-level parallelism for `update_begin()`,
+- a conceptual algorithmic change, avoiding random access for canonicalization, or
+- a conceptual change to the e-graph, storing fewer e-nodes for the same computation.
+
 = Conclusion <chapter_conclusion>
+
+#TODO[
+  We are correct and faster. We lack features but these are relatively easy to fix and were not a
+  priority for investigating the performance possibilities within the scope of a thesis.
+
+  We are not experts on how egglog does everything. More ablation and comparison with egglog would
+  be useful to more deeply understand the performance differences.
+
+  Highlight invariant permutations which is entirely novel (almost everything else is not novel (in
+  isolation))
+
+  We have lots of future work ideas.
+]
 
 We have shown that it is possible for an e-graph engine to be significantly faster than egglog, at
 least on small e-graphs, while still using fundamentally the same algorithms.
@@ -2453,12 +2691,17 @@ Compatibility:
 Smaller research-y:
 - Merge relations whose columns are permutations of each other (e.g. `Add` and `Sub`)
 - Scheduling and termination, prioritize union rules. Cite Eqlog.
-- Improve query planning through cardinality estimation (currently assuming $#`new` << #`old` <
+- Improve query planning though cardinality estimation (currently assuming $#`new` << #`old` <
   #`all`$, identically across all relations)
 - Memory compression of various data structures
 - Variable-width radix sort
 - Re-canonicalize during rehash (implemented in scratch).
 - Pick ideal ordering to reconstruct indexes so we sort the lists a minimum number of times (the flow stuff)
+- ```
+      // TODO: On the FD index, it's fine to store (min(a, b), max(a, b), c) instead of (a, b, c)
+      // in general, for any index, it is fine to apply a permutation as long as it only touches the
+      // *key* part.
+  ```
 
 Larger research-y:
 - Magic sets

@@ -6,6 +6,10 @@ watch: dependencies
 dependencies: $(shell echo ../figures/{architecture,egraph_example,egraph_cluster,cse_pre,cse_post,cse_to_egraph,cse_to_egraph_post,cse_to_egraph_dag,peephole_example}.svg)
 	python benchmark_plot.py
 
+stat:
+	cargo build --release -p partial-integration
+	taskset -c 2 perf stat -ddd $$CARGO_TARGET_DIR/release/partial-integration 12
+
 ../figures/%.svg: ../figures/%.dot
 	dot -Tsvg $^ > $@
 
