@@ -369,7 +369,7 @@ proliferation of e-graphs within compilers would require them to become faster.
 #TODO[is this suitable for people who don't know databases or Datalog?]
 
 #TODO[add paragraph mentioning how databases have been a useful tool, what indexes are, why they are
-useful]
+  useful]
 
 Recent developments in e-graphs for equality saturation @relationalematching @eqlog @egglog have
 shown that adding indexes to e-graph pattern-matching creates a structure that is very similar to
@@ -377,7 +377,7 @@ relational databases and in particular Datalog @egglog. Datalog is a declarative
 reasons bottom-up by inserting rows into tables. In fact, this similarity extends to the degree
 that e-graphs may be best thought of as Datalog extended with a unification operation.
 
-This allows EqSat @equalitysaturation  leverage algorithms from Datalog, in particular the algorithm semi-naive
+This allows EqSat @equalitysaturation leverage algorithms from Datalog, in particular the algorithm semi-naive
 evaluation which, rather than running queries against the entire database, specifically queries
 newly inserted rows in a manner similar to a database trigger. Incremental rule matching, together
 with indexes and simple query planning, has brought an order of magnitude speedup to the e-graph
@@ -875,7 +875,7 @@ compiling them rather than relying on them being hand-written.
 Each of the three rules are phrased as conditional insertions, adding new e-classes and e-nodes when
 matching specific patterns in the existing structure. If this was the only effect of the rules then
 `canonicalize()` would never need to be run since `self.enodes` would never contain any uprooted
-e-class. 
+e-class.
 #TODO[hard to parse]
 However, e-node insertions on already existing e-node inputs result in `union()` operations
 make a future call to `canonicalize()` necessary to restore the invariant that `self.enodes`
@@ -1334,7 +1334,7 @@ for _ in b_new(..) {
 == the egglog language/*and other theory languages*/ <section_background_theory_languages>
 
 #TODO[rework, we already do translation to relational database in another section, but maybe it
-could help to repeat ourselves?]
+  could help to repeat ourselves?]
 
 The egglog language, not to be confused with egglog, an interpreter of the egglog
 language, is used in Oatlog, and some understanding of it is required to understand Oatlog.
@@ -1460,7 +1460,106 @@ e-classes are just integer IDs, and exist implicitly in the tables.
 
 == Worst-case optimal join <section_background_wcoj>
 
-#TODO[]
+WCOJs (worst-case optimal joins) are asymptotically optimal if we consider only the sizes of the relations @agmbound.
+A triangle join is a motivating example for this#footnote[Triangle joins are somewhat common for rewrite rules, for example $a * c + b * c -> (a + b) * c$ is secretly just a triangle join.]:
+$
+  "Foo"(a, b) join "Bar"(b, c) join "Baz"(c, a)
+$
+$
+  n = max {|"Foo"|, |"Bar"|, |"Baz"|}
+$
+
+Such a join would result in a max of $O(n^(1.5))$ elements, so we would ideally want to only perform $O(n^(1.5))$ operations.
+Consider the join in @trijoin_2.
+It will perform $O(n^2)$ operations in the worst-case, since $O(|"Foo" join "Bar"|)$ = $O(n^2)$.
+However, we can introduce a semi-join on Baz, which results in only $O(n^(1.5))$ work being performed in @trijoin_15.
+
+#figure(
+  ```python
+  for (a, b) in Foo:
+    for c in Bar(b):
+      if (c, a) in Baz:
+        print(a, b, c)
+  ```,
+  caption: [Triangle join in $O(n^2)$],
+) <trijoin_2>
+
+#figure(
+  ```python
+  for (a, b) in Foo:
+    if (c, _) not in Baz:
+      continue
+    for c in Bar(b):
+      if (c, a) in Baz:
+        print(a, b, c)
+  ```,
+  caption: [Triangle join in $O(n^1.5)$],
+) <trijoin_15>
+
+Generic join is the first worst-case optimal join algorithm @optimaljoin. It
+works by joining all the relations at once. We first select an arbitrary
+variable ordering, for example $[a, b, c]$. We then recursively select a value
+for each variable while performing the relevant semi-joins. Presenting the
+pseudocode for the general algorithm would be very confusing since it is very
+abstract, it is therefore hard-coded for the above triangle join in @generic_join_triangle.
+
+#figure(
+  ```python
+  def join():
+    # select a value for `a`
+    for (a, _) in Foo:
+      # filter to ensure all other relations contain this `a`
+      if (_, a) not in Baz:
+        continue
+      join_a(a)
+
+  def join_a(a):
+    # select a value for `b`
+    for b in Foo(a):
+      # filter to ensure all other relations contain this `b`
+      if (b, _) not in Bar:
+        continue
+      join_ab(a, b)
+
+  def join_ab(a, b):
+    # select a value for `c`
+    for c in Bar(b):
+      # filter to ensure all other relations contain this `c`
+      if (c, a) not in Baz:
+        continue
+
+      join_abc(a, b, c)
+
+  def join_abc(a, b, c):
+    print(a, b, c)
+  ```,
+  caption: [
+    Generic join algorithm for a triangle join.
+  ],
+) <generic_join_triangle>
+
+While generic join is asymptotically optimal, its constant factor is clearly
+terrible, the wrong variable ordering may result in multiple orders of
+magnitude slowdowns. This motivates free-join @freejoin1 @freejoin2, which
+presents a way to describe joins based on what variables are introduced. For
+example the join in @generic_join_triangle would be described as:
+
+$
+  [["Foo"(a), "Baz"(a)], ["Foo"(b), "Bar"(b)], ["Bar"(c), "Baz"(c)]]
+$
+And the first example would look like this:
+$
+  [["Foo"(a, b), "Bar"(b)], ["Bar"(c), "Baz"(c)], ["Bar"(b), "Baz"(c, a)]]
+$
+
+One can think of it as the first element in the list is a for loop and the
+other elements are if statements. A benefit of this is that we can introduce
+multiple variables in each step. Our understanding of this is that we can
+select an arbitrary order to join our relations which determines a variable
+ordering and we remain WCOJ as long as we introduce relevant semi-joins when
+variables are introduced.
+
+// https://justinjaffray.com/a-gentle-ish-introduction-to-worst-case-optimal-joins/
 
 == Design constraints for Datalog engines vs SQL databases. <section_background_datalog_vs_sql>
 
