@@ -376,11 +376,11 @@ relational databases and in particular Datalog @egglog. Datalog is a declarative
 reasons bottom-up by inserting rows into tables. In fact, this similarity extends to the degree
 that e-graphs may be best thought of as Datalog extended with a unification operation.
 
-This allows EqSat @equalitysaturation leverage algorithms from Datalog, in particular the algorithm semi-naive
-evaluation which, rather than running queries against the entire database, specifically queries
-newly inserted rows in a manner similar to a database trigger. Incremental rule matching, together
-with indexes and simple query planning, has brought an order of magnitude speedup to the e-graph
-engine egglog @egglog when compared to its predecessor egg @egg.
+This allows EqSat @equalitysaturation to leverage algorithms from Datalog, in particular the
+algorithm semi-naive evaluation which, rather than running queries against the entire database,
+specifically queries newly inserted rows in a manner similar to a database trigger. Incremental rule
+matching, together with indexes and simple query planning, has brought an order of magnitude speedup
+to the e-graph engine egglog @egglog when compared to its predecessor egg @egg.
 
 Relational databases are a mature technology with rich theory and a wide breadth of implementations,
 providing many techniques that could be transferred to e-graphs beyond those already incorporated
