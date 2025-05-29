@@ -3088,12 +3088,12 @@ impl AddRelation {
 = Benchmarks <appendix_benchmarks>
 
 // apply_rules: 909.36789 ms
-// 
+//
 // update_begin add: 1601.2673670000001 ms
 // update_begin mul: 504.28003499999994 ms
-// 
+//
 // update_begin (total): 2138.8795809999997 ms
-// 
+//
 // update_begin add: 564.077363 ms
 // update add: 975.949347 ms
 // update_begin mul: 33.753891 ms
@@ -3108,9 +3108,9 @@ impl AddRelation {
 // update mul: 41.097564000000006 ms
 // update_begin add: 0.168043 ms
 // update add: 158.60982800000002 ms
-// 
+//
 // update_loop (total): 1770.301887 ms
-// 
+//
 // fill new and all: 3.0673190000000004 ms
 // reconstruct sort: 1.054001 ms
 // reconstruct alloc: 0.028943 ms
@@ -3142,7 +3142,7 @@ impl AddRelation {
 // reconstruct insert: 200.899722 ms
 // reconstruct index: 496.484987 ms
 // update_finalize add: 2200.637733 ms
-// 
+//
 // fill new and all: 2.4195 ms
 // reconstruct sort: 0.7800199999999999 ms
 // reconstruct alloc: 0.031722 ms
@@ -3172,11 +3172,11 @@ impl AddRelation {
 // reconstruct insert: 100.963103 ms
 // reconstruct index: 218.071351 ms
 // update_finalize mul: 1145.495132 ms
-// 
+//
 // update_finalize (total): 3369.000947 ms
-// 
+//
 // canonicalize (total): 7278.188252 ms
-// 
+//
 // ======== STEP took 8187.570132999999 ms ==========
 
 #TODO[explain driver code]
