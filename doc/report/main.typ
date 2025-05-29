@@ -3093,6 +3093,98 @@ impl AddRelation {
 
 = Benchmarks <appendix_benchmarks>
 
+// apply_rules: 909.36789 ms
+// 
+// update_begin add: 1601.2673670000001 ms
+// update_begin mul: 504.28003499999994 ms
+// 
+// update_begin (total): 2138.8795809999997 ms
+// 
+// update_begin add: 564.077363 ms
+// update add: 975.949347 ms
+// update_begin mul: 33.753891 ms
+// update mul: 90.060552 ms
+// update_begin add: 73.899965 ms
+// update add: 276.701263 ms
+// update_begin mul: 0.540592 ms
+// update mul: 41.932497999999995 ms
+// update_begin add: 1.7552379999999999 ms
+// update add: 162.456624 ms
+// update_begin mul: 0.00015099999999999998 ms
+// update mul: 41.097564000000006 ms
+// update_begin add: 0.168043 ms
+// update add: 158.60982800000002 ms
+// 
+// update_loop (total): 1770.301887 ms
+// 
+// fill new and all: 3.0673190000000004 ms
+// reconstruct sort: 1.054001 ms
+// reconstruct alloc: 0.028943 ms
+// reconstruct copy list: 0.091552 ms
+// reconstruct insert: 0.612987 ms
+// reconstruct index: 1.800622 ms
+// update_finalize diff: 4.877518 ms
+// fill new and all: 8.774716999999999 ms
+// reconstruct sort: 2.851369 ms
+// reconstruct alloc: 0.06363100000000001 ms
+// reconstruct copy list: 0.273632 ms
+// reconstruct insert: 2.232296 ms
+// reconstruct index: 5.438483 ms
+// update_finalize integral: 14.221852 ms
+// fill new and all: 729.653331 ms
+// reconstruct sort: 219.184252 ms
+// reconstruct alloc: 14.730801999999999 ms
+// reconstruct copy list: 55.576744 ms
+// reconstruct insert: 240.362689 ms
+// reconstruct index: 529.895088 ms
+// reconstruct sort: 238.513934 ms
+// reconstruct alloc: 11.996566 ms
+// reconstruct copy list: 59.122511 ms
+// reconstruct insert: 134.90960299999998 ms
+// reconstruct index: 444.58658699999995 ms
+// reconstruct sort: 220.973935 ms
+// reconstruct alloc: 11.564479 ms
+// reconstruct copy list: 63.003794 ms
+// reconstruct insert: 200.899722 ms
+// reconstruct index: 496.484987 ms
+// update_finalize add: 2200.637733 ms
+// 
+// fill new and all: 2.4195 ms
+// reconstruct sort: 0.7800199999999999 ms
+// reconstruct alloc: 0.031722 ms
+// reconstruct copy list: 0.09307399999999999 ms
+// reconstruct insert: 0.360728 ms
+// reconstruct index: 1.2767950000000001 ms
+// update_finalize sub: 3.7052840000000002 ms
+// fill new and all: 297.210276 ms
+// reconstruct sort: 81.459473 ms
+// reconstruct alloc: 5.811194 ms
+// reconstruct copy list: 21.451431 ms
+// reconstruct insert: 39.895211 ms
+// reconstruct index: 148.65249 ms
+// reconstruct sort: 194.557069 ms
+// reconstruct alloc: 4.021192 ms
+// reconstruct copy list: 5.59145 ms
+// reconstruct insert: 116.872101 ms
+// reconstruct index: 321.08574699999997 ms
+// reconstruct sort: 80.98064500000001 ms
+// reconstruct alloc: 4.351373000000001 ms
+// reconstruct copy list: 23.690911 ms
+// reconstruct insert: 51.389854 ms
+// reconstruct index: 160.44994200000002 ms
+// reconstruct sort: 93.987183 ms
+// reconstruct alloc: 4.658934 ms
+// reconstruct copy list: 18.428184 ms
+// reconstruct insert: 100.963103 ms
+// reconstruct index: 218.071351 ms
+// update_finalize mul: 1145.495132 ms
+// 
+// update_finalize (total): 3369.000947 ms
+// 
+// canonicalize (total): 7278.188252 ms
+// 
+// ======== STEP took 8187.570132999999 ms ==========
+
 #TODO[explain driver code]
 
 == Math
