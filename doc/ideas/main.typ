@@ -2760,6 +2760,20 @@ kill dead code - DONE
 
 coverage testing.
 
+= Phi nodes and e-graphs
+
+phi nodes kinda break e-graphs, equality saturation paper managed to do it to some extent, but loop unrolling is hard.
+
+RSVDG is essentially making all basic blocks have input/output "ports".
+
+But it looks like each basic block is a separate function...
+
+Could we not just treat each BB as a function and use slotted e-graphs?
+
+= Aggressive filtering while iterating
+
+If we find that the current row is not canonical, we know that it will be re-inserted later, so it can be skipped.
+
 = TODO READ
 Papers are just under the first author i looked at.
 I stopped adding authors after a while since this is just too many papers.
