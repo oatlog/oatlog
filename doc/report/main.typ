@@ -79,16 +79,6 @@
   ],
 )
 
-#TODO[introduce relevant references]
-
-#TODO[Clearly present motivation for this work]
-
-#TODO[read feedback]
-
-// #TODO[integrate from presentation, extended abstract]
-
-#TODO[Elaborate on evaluation once that's possible.]
-
 = Introduction <chapter_introduction>
 
 Modern software development depends on efficient and reliable compilers, which apply sophisticated
@@ -425,34 +415,32 @@ capabilities.
 
 #TODO[@chapter_conclusion]
 
+#TODO[we need to clarify what our actual contributions are]
+
 = Background <chapter_background>
 
-#TODO[introduce the background section]
+This background introduces relevant concepts to understand Oatlog and its implementation.
+@section_group_egraphs introduces e-graphs at a conceptual level.
+@section_background_practice discusses how e-graphs are used in practice and how they can be implemented.
+@section_background_relational_databases discusses database joins and how they are related to pattern matching in an e-graph.
+@section_background_theory_languages explains the basics of the egglog language, which is the frontend language used in Oatlog.
 
-@section_background_dags
-@section_background_egraphs
-@section_background_practice
-@section_background_practice_union_find
-@section_background_recursive_ematching
-@section_background_db_join
-@section_background_relational
-@section_background_wcoj
-@section_background_datalog_vs_sql
-@section_nomenclature
+== E-graphs <section_group_egraphs>
 
-== Expression trees and DAGs <section_background_dags>
+#TODO[I think it is fine for this space to be empty]
+
+=== Expression trees and DAGs <section_background_dags>
 
 As a stepping stone towards describing e-graphs, let us consider the problem of storing mathematical
 expressions in a compact manner. Traditional notation represents expressions as strings of tokens,
 such as $(a+b) dot 2 dot (a+b+2)$, which given operator precedence rules can be interpreted as a
 tree, in this case $((a+b) dot 2) dot ((a+b)+2)$.
 
-#TODO[allow grammar error]
 This representation spells out $a+b$ twice, which may be acceptable for small expressions but
 quickly becomes cumbersome for larger expressions such as in the quadratic formula. We can avoid
 this using variable substitutions: let $t=a+b$ in $t dot 2 dot (t+2)$. The equivalent of this for
 the tree representation is allow re-use of syntactically identical expressions, which turns the tree
-into a DAG. @fig_background_expression_tree_and_dag shows the tree and DAG representations side by
+into a DAG (Directed Acyclic Graph). @fig_background_expression_tree_and_dag shows the tree and DAG representations side by
 side. This transform is often called common subexpression elimination.
 
 #figure(
@@ -575,7 +563,7 @@ of the $xor$ and $+$ as shown in @fig_background_dag_duplicated.
   placement: auto,
 ) <fig_background_dag_duplicated>
 
-== E-graphs <section_background_egraphs>
+=== E-graphs <section_background_egraphs>
 
 E-graphs are at their core a solution to the duplication illustrated in
 @fig_background_dag_duplicated, that identical usages of syntactically different inputs result in
@@ -967,7 +955,7 @@ Note that existing extraction libraries could be used by serializing the e-graph
     $dot$, with hard-coded rewrite rules for commutativity and distributivity.],
 ) <fig_background_practice_full>
 
-== Recursive e-matching <section_background_recursive_ematching>
+=== Recursive e-matching <section_background_recursive_ematching>
 
 The rewrite rules implemented in @fig_background_practice_apply_rules were hard-coded as ad-hoc
 nested for-loops for commutativity and distributivity. We now describe a structured manner of
@@ -1023,7 +1011,11 @@ Roughly, these are:
   `apply_rules()`.
 Later on, we will see that relational e-matching addresses these issues.
 
-== Database joins <section_background_db_join>
+== Relational Databases <section_background_relational_databases>
+
+#TODO[I think it is fine for this space to be empty]
+
+=== Database joins <section_background_db_join>
 
 This section is an interlude from e-graphs and equality saturation to present the relational
 database concepts necessary that we later will apply to e-graphs.
@@ -1144,7 +1136,7 @@ illustrated in @fig_background_database_join_impl
   caption: [The implementation of a nested loop join and a hash join.],
 ) <fig_background_database_join_impl>
 
-== E-graphs as relational databases <section_background_relational>
+=== E-graphs as relational databases <section_background_relational>
 
 In @section_background_recursive_ematching we determined that we can improve upon recursive
 e-matching either if we can avoid rediscovering matches from earlier iterations, or if we can do
@@ -1210,7 +1202,7 @@ back and forth in every EqSat iteration. The e-graph engine egglog @egglog was r
 further speedups largely by being able to apply the semi-naive evaluation algorithm from
 Datalog.
 
-== Semi-naive evaluation <section_background_seminaive>
+=== Semi-naive evaluation <section_background_seminaive>
 
 Semi-naive evaluation is an algorithm that allows relational queries to be evaluated incrementally
 as new tuples are added to relations. It is associated with the implementation of Datalog engines
@@ -1327,134 +1319,7 @@ for _ in b_new(..) {
 }
 ```
 
-== The egglog language <section_background_theory_languages>
-
-#TODO[rework, we already do translation to relational database in another section, but maybe it
-  could help to repeat ourselves?]
-
-The egglog language, not to be confused with egglog, an interpreter of the egglog
-language, is used in Oatlog, and some understanding of it is required to understand Oatlog.
-
-@informal-theory-example shows an example EqSat theory specified in the egglog domain-specific
-language @egglog. `Math` is essentially a sum type, where `Add`, `Sub`, etc. are constructors.
-Rewrites mean that if the left side matches, add the right side to the database and unify it with
-the left side. Egglog semantics define running a set of rules as using their left side patterns to
-figure out what right side actions to perform, then doing all actions as a batch. Egglog defines a
-command `run <count>`, not shown here, that runs the set of all rules some number of times or until
-convergence.
-
-#figure(
-  ```egglog
-  (sort Math)
-  (constructor Add (Math Math) Math)
-  (constructor Mul (Math Math) Math)
-  (constructor Const (i64) Math)
-  (constructor Var (String) Math)
-
-  (rewrite (Add a b) (Add b a))                         ; commutativity
-  (rewrite (Add a (Add b c)) (Add (Add a b) c))         ; associativity
-
-  (rewrite (Mul a b) (Mul b a))                         ; commutativity
-  (rewrite (Mul a (Mul b c)) (Mul (Mul a b) c))         ; associativity
-
-  (rewrite (Mul (Add a b) c) (Add (Mul a c) (Mul b c))) ; distributivity
-
-  (rewrite (Add x (Const 0)) x)                         ; additive unit
-  (rewrite (Mul x (Const 1)) (x))                       ; multiplicative unit
-  ```,
-
-  caption: [A theory written in the egglog language.],
-) <informal-theory-example>
-
-Egglog also supports a form of sum types
-
-```egglog
-(datatype Math
-    (Add (Math Math))
-    (Mul (Math Math))
-    (Const (i64))
-)
-; desugars to:
-(sort Math)
-(constructor Add (Math Math) Math)
-(constructor Mul (Math Math) Math)
-(constructor Const (i64) Math)
-```
-
-This is analogous to sum types in other languages like Rust or Haskell, which could be written as:
-```rust
-enum Math {
-    Add(&Math, &Math),
-    Mul(&Math, &Math),
-    Const(i64),
-}
-```
-```haskell
-data Math =
-   Add Math Math |
-   Mul Math Math |
-   Const Int
-```
-
-Here, `Add`, `Mul`, `Const` are constructors for `Math`.
-
-Implementing Math like this would not work for several reasons, firstly we
-want the constructors to return e-classes, and take in e-classes, and secondly,
-sum types can not directly be stored in a relational database.
-
-This can be solved by creating a new table per constructor, as in @sum_type_tables. Now, all
-e-classes are just integer IDs, and exist implicitly in the tables.
-
-#figure(
-  grid(
-    columns: (auto, auto, auto),
-    rows: (auto, auto),
-    gutter: 8pt,
-    table(
-      columns: (auto, auto, auto),
-      inset: 8pt,
-      align: horizon,
-      table.header(
-        table.cell(colspan: 3, [*Add*]),
-        [x],
-        [y],
-        [res],
-      ),
-
-      [...], [...], [...],
-    ),
-    table(
-      columns: (auto, auto, auto),
-      inset: 8pt,
-      align: horizon,
-      table.header(
-        table.cell(colspan: 3, [*Mul*]),
-        [x],
-        [y],
-        [res],
-      ),
-
-      [...], [...], [...],
-    ),
-    table(
-      columns: (auto, auto),
-      inset: 8pt,
-      align: horizon,
-      table.header(
-        table.cell(colspan: 2, [*Const*]),
-        [x],
-        [res],
-      ),
-
-      [...], [...],
-    ),
-  ),
-  caption: [Sum types as multiple tables.],
-) <sum_type_tables>
-
-@appendix_rosettaexample shows how an egglog rule can be transformed to eqlog, Rust, and SQL.
-
-== Worst-case optimal join <section_background_wcoj>
+=== Worst-case optimal join <section_background_wcoj>
 
 WCOJs (worst-case optimal joins) are asymptotically optimal if we consider only the sizes of the relations @agmbound.
 A triangle join is a motivating example for this#footnote[Triangle joins are somewhat common for rewrite rules, for example $a * c + b * c -> (a + b) * c$ is secretly just a triangle join.]:
@@ -1557,7 +1422,7 @@ variables are introduced.
 
 // https://justinjaffray.com/a-gentle-ish-introduction-to-worst-case-optimal-joins/
 
-== Design constraints for Datalog engines vs SQL databases. <section_background_datalog_vs_sql>
+=== Design constraints for Datalog engines vs SQL databases. <section_background_datalog_vs_sql>
 
 SQL databases need to be extremely dynamic since arbitrary new queries can be done at run time, but
 in Datalog engines all queries are known up-front before starting the rewrite loop. This means that
@@ -1567,16 +1432,138 @@ index data-structures based on exact queries.
 That said, it's entirely possible to create an e-graph engine that uses SQL internally and in fact a
 prototype of egglog, egglite, was originally implemented on top of sqlite @egglite @egraph_sqlite.
 
-== Nomenclature <section_nomenclature>
+== The egglog language and nomenclature <section_background_theory_languages>
 
-Between e-graphs, Datalog and relational databases there are some terms that have essentially
-identical meanings. We use the terms
-- table, relation, function, and
-- row, tuple, e-node, and
-- cell, variable, e-class,
+#TODO[rework, we already do translation to relational database in another section, but maybe it
+  could help to repeat ourselves?]
 
-largely interchangeably, sometimes highlighting different aspects of the same thing depending on the
-situation.
+The egglog language, not to be confused with egglog, an interpreter of the egglog
+language, is used in Oatlog, and some understanding of it is helpful to understand Oatlog.
+
+@informal-theory-example shows an example EqSat theory specified in the egglog domain-specific
+language @egglog. `Math` is essentially a sum type, where `Add`, `Sub`, etc. are constructors.
+Rewrites mean that if the left side matches, add the right side to the database and unify it with
+the left side. Egglog semantics define running a set of rules as using their left side patterns to
+figure out what right side actions to perform, then doing all actions as a batch. Egglog defines a
+command `(run <count>)`, not shown here, that runs the set of all rules some number of times or until
+convergence.
+
+#figure(
+  ```egglog
+  (datatype Math
+      (Add (Math Math))
+      (Mul (Math Math))
+      (Const (i64))
+      (Var (String))
+  )
+  ; desugars to:
+  ; (sort Math)
+  ; (constructor Add (Math Math) Math)
+  ; (constructor Mul (Math Math) Math)
+  ; (constructor Const (i64) Math)
+  ; (constructor Var (String) Math)
+
+  (rewrite (Add a b) (Add b a))                         ; commutativity
+  (rewrite (Add a (Add b c)) (Add (Add a b) c))         ; associativity
+
+  (rewrite (Mul a b) (Mul b a))                         ; commutativity
+  (rewrite (Mul a (Mul b c)) (Mul (Mul a b) c))         ; associativity
+
+  (rewrite (Mul (Add a b) c) (Add (Mul a c) (Mul b c))) ; distributivity
+
+  (rewrite (Add x (Const 0)) x)                         ; additive unit
+  (rewrite (Mul x (Const 1)) (x))                       ; multiplicative unit
+  ```,
+
+  caption: [A theory written in the egglog language.],
+) <informal-theory-example>
+
+Egglog also supports a form of sum types
+
+```egglog
+```
+
+This is analogous to sum types in other languages like Rust or Haskell, which could be written as:
+```rust
+enum Math {
+    Add(&Math, &Math),
+    Mul(&Math, &Math),
+    Const(i64),
+}
+```
+```haskell
+data Math =
+   Add Math Math |
+   Mul Math Math |
+   Const Int
+```
+
+Here, `Add`, `Mul`, `Const` are constructors for `Math`.
+
+Implementing Math like this would not work for several reasons, firstly we
+want the constructors to return e-classes, and take in e-classes, and secondly,
+sum types can not directly be stored in a relational database.
+
+This can be solved by creating a new table per constructor, as in @sum_type_tables. Now, all
+e-classes are just integer IDs, and exist implicitly in the tables.
+
+#figure(
+  grid(
+    columns: (auto, auto, auto),
+    rows: (auto, auto),
+    gutter: 8pt,
+    table(
+      columns: (auto, auto, auto),
+      inset: 8pt,
+      align: horizon,
+      table.header(
+        table.cell(colspan: 3, [*Add*]),
+        [x],
+        [y],
+        [res],
+      ),
+
+      [...], [...], [...],
+    ),
+    table(
+      columns: (auto, auto, auto),
+      inset: 8pt,
+      align: horizon,
+      table.header(
+        table.cell(colspan: 3, [*Mul*]),
+        [x],
+        [y],
+        [res],
+      ),
+
+      [...], [...], [...],
+    ),
+    table(
+      columns: (auto, auto),
+      inset: 8pt,
+      align: horizon,
+      table.header(
+        table.cell(colspan: 2, [*Const*]),
+        [x],
+        [res],
+      ),
+
+      [...], [...],
+    ),
+  ),
+  caption: [Sum types as multiple tables.],
+) <sum_type_tables>
+
+@appendix_rosettaexample shows how an egglog rule can be transformed to eqlog, Rust, and SQL.
+
+Between e-graphs, Datalog and relational databases there are some terms that
+have essentially identical meanings. We use the following terms largely
+interchangeably, sometimes highlighting different aspects of the same thing
+depending on the situation.
+
+- table, relation, function
+- row, tuple, e-node
+- cell, variable, e-class
 
 = Implementation <chapter_implementation>
 
