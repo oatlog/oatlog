@@ -472,6 +472,44 @@ mod update {
             }
         }
     }
+
+    fn update_raw(
+        map: &mut HashMap<(u32, u32), u32>,
+        repr: &mut [u32],
+        insertions: &mut Vec<((u32, u32), u32)>,
+    ) {
+        rehash_grow(map, repr, insertions);
+        let raw_table = map.raw_table_mut();
+
+        // 1. You must not free the hash table while iterating (including via growing/shrinking).
+        // 2. It is fine to erase a bucket that has been yielded by the iterator.
+        // 3. Erasing a bucket that has not yet been yielded by the iterator may still result in
+        //    the iterator yielding that bucket (unless reflect_remove is called).
+        // 4. It is unspecified whether an element inserted after the iterator was created will be
+        //    yielded by that iterator (unless reflect_insert is called).
+        // 5. The order in which the iterator yields bucket is unspecified and may change in the
+        //    future.
+
+        // TODO: safety: avoid rehash here
+
+        // map.retain(|&(x0, x1), &mut x2| {
+        //     if (repr[x0 as usize] == x0) & (repr[x1 as usize] == x1) & (repr[x2 as usize] == x2) {
+        //         true
+        //     } else {
+        //         insertions.push(((repr[x0 as usize], repr[x1 as usize]), repr[x2 as usize]));
+        //         false
+        //     }
+        // });
+
+        for bucket in unsafe { raw_table.iter() } {
+            let (key, value) = *unsafe { bucket.as_ref() };
+
+            if !(repr[key.0 as usize] == key.0 && repr[key.1 as usize] == key.1) {
+                unsafe { raw_table.erase(bucket) };
+            } else {
+            }
+        }
+    }
 }
 
 /// A non-fd index, behaves like a `HashMap<Key, Vec<Value>>`

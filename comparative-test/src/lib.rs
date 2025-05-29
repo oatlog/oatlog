@@ -501,11 +501,11 @@ egglog_test!(nogenerate, eqsolve, expect![[r#"
 "#]], r#"(include "comparative-test/egglog-testsuite/eqsolve.egg")"#);//primitive functions
 egglog_test!(zrocorrect, f64, expect![], r#"(include "comparative-test/egglog-testsuite/f64.egg")"#);
 egglog_test!(nogenerate, fail_wrong_assertion, expect![[r#"
-    comparative-test/egglog-testsuite/fail_wrong_assertion.egg: lattice computations not implemented
-    ( function f ( i64 ) i64 :merge ( min old new ) )
+    comparative-test/egglog-testsuite/fail_wrong_assertion.egg: not implemented yet
+    ( set ( f 1 ) 4 )
 
     comparative-test/egglog-testsuite/fail_wrong_assertion.egg: while parsing this toplevel expression
-    ( function f ( i64 ) i64 :merge ( min old new ) )
+    ( set ( f 1 ) 4 )
 
     comparative-test/egglog-testsuite/fail_wrong_assertion.egg: while reading comparative-test/egglog-testsuite/fail_wrong_assertion.egg
     ( include "comparative-test/egglog-testsuite/fail_wrong_assertion.egg" )
@@ -618,11 +618,11 @@ egglog_test!(nogenerate, intersection, expect![[r#"
 
 "#]], r#"(include "comparative-test/egglog-testsuite/intersection.egg")"#);// needs query-extract
 egglog_test!(nogenerate, interval, expect![[r#"
-    comparative-test/egglog-testsuite/interval.egg: lattice computations not implemented
-    ( function hi ( Math ) i64 :merge ( min old new ) )
+    comparative-test/egglog-testsuite/interval.egg: not implemented yet
+    ( set ( lo x ) -10 )
 
     comparative-test/egglog-testsuite/interval.egg: while parsing this toplevel expression
-    ( function hi ( Math ) i64 :merge ( min old new ) )
+    ( set ( lo x ) -10 )
 
     comparative-test/egglog-testsuite/interval.egg: while reading comparative-test/egglog-testsuite/interval.egg
     ( include "comparative-test/egglog-testsuite/interval.egg" )
@@ -761,11 +761,11 @@ egglog_test!(nogenerate, matrix, expect![[r#"
 
 "#]], r#"(include "comparative-test/egglog-testsuite/matrix.egg")"#);// needs primitive functions
 egglog_test!(nogenerate, merge_during_rebuild, expect![[r#"
-    comparative-test/egglog-testsuite/merge-during-rebuild.egg: lattice computations not implemented
-    ( function distance ( N N ) i64 :merge ( min old new ) )
+    comparative-test/egglog-testsuite/merge-during-rebuild.egg: not implemented yet
+    ( set ( distance x y ) 1 )
 
     comparative-test/egglog-testsuite/merge-during-rebuild.egg: while parsing this toplevel expression
-    ( function distance ( N N ) i64 :merge ( min old new ) )
+    ( set ( distance x y ) 1 )
 
     comparative-test/egglog-testsuite/merge-during-rebuild.egg: while reading comparative-test/egglog-testsuite/merge-during-rebuild.egg
     ( include "comparative-test/egglog-testsuite/merge-during-rebuild.egg" )
@@ -775,8 +775,8 @@ egglog_test!(nogenerate, merge_during_rebuild, expect![[r#"
 
 "#]], r#"(include "comparative-test/egglog-testsuite/merge-during-rebuild.egg")"#);// needs merge
 egglog_test!(nogenerate, merge_read, expect![[r#"
-    comparative-test/egglog-testsuite/merge_read.egg: lattice computations not implemented
-    ( function bar ( ) i64 :merge ( foo ) )
+    comparative-test/egglog-testsuite/merge_read.egg: lattice computations must only take 2 arguments
+    ( foo )
 
     comparative-test/egglog-testsuite/merge_read.egg: while parsing this toplevel expression
     ( function bar ( ) i64 :merge ( foo ) )
@@ -789,11 +789,11 @@ egglog_test!(nogenerate, merge_read, expect![[r#"
 
 "#]], r#"(include "comparative-test/egglog-testsuite/merge_read.egg")"#);// proc macro paniced
 egglog_test!(nogenerate, merge_saturates, expect![[r#"
-    comparative-test/egglog-testsuite/merge-saturates.egg: lattice computations not implemented
-    ( function foo ( ) i64 :merge ( min old new ) )
+    comparative-test/egglog-testsuite/merge-saturates.egg: not implemented yet
+    ( set ( foo ) 0 )
 
     comparative-test/egglog-testsuite/merge-saturates.egg: while parsing this toplevel expression
-    ( function foo ( ) i64 :merge ( min old new ) )
+    ( set ( foo ) 0 )
 
     comparative-test/egglog-testsuite/merge-saturates.egg: while reading comparative-test/egglog-testsuite/merge-saturates.egg
     ( include "comparative-test/egglog-testsuite/merge-saturates.egg" )
@@ -857,11 +857,11 @@ egglog_test!(nogenerate, path_union, expect![[r#"
 egglog_test!(does_panic, points_to, expect!["Global variables should have been desugared"], r#"(include "comparative-test/egglog-testsuite/points-to.egg")"#);
 egglog_test!(zrocorrect, primitives, expect![], r#"(include "comparative-test/egglog-testsuite/primitives.egg")"#);
 egglog_test!(nogenerate, prims, expect![[r#"
-    comparative-test/egglog-testsuite/prims.egg: lattice computations not implemented
-    ( function vertex-included ( i64 ) i64 :merge ( max old new ) )
+    comparative-test/egglog-testsuite/prims.egg: invalid lattice
+    new
 
     comparative-test/egglog-testsuite/prims.egg: while parsing this toplevel expression
-    ( function vertex-included ( i64 ) i64 :merge ( max old new ) )
+    ( function iteration-to-best-edge ( i64 ) edge :merge new )
 
     comparative-test/egglog-testsuite/prims.egg: while reading comparative-test/egglog-testsuite/prims.egg
     ( include "comparative-test/egglog-testsuite/prims.egg" )
@@ -871,11 +871,11 @@ egglog_test!(nogenerate, prims, expect![[r#"
 
 "#]], r#"(include "comparative-test/egglog-testsuite/prims.egg")"#);//merge
 egglog_test!(nogenerate, push_pop, expect![[r#"
-    comparative-test/egglog-testsuite/push-pop.egg: lattice computations not implemented
-    ( function foo ( ) i64 :merge ( max old new ) )
+    comparative-test/egglog-testsuite/push-pop.egg: not implemented yet
+    ( set ( foo ) 1 )
 
     comparative-test/egglog-testsuite/push-pop.egg: while parsing this toplevel expression
-    ( function foo ( ) i64 :merge ( max old new ) )
+    ( set ( foo ) 1 )
 
     comparative-test/egglog-testsuite/push-pop.egg: while reading comparative-test/egglog-testsuite/push-pop.egg
     ( include "comparative-test/egglog-testsuite/push-pop.egg" )
@@ -927,11 +927,11 @@ egglog_test!(nogenerate, repro_desugar_143, expect![[r#"
 
 "#]], r#"(include "comparative-test/egglog-testsuite/repro-desugar-143.egg")"#);// primitive function
 egglog_test!(nogenerate, repro_empty_query, expect![[r#"
-    comparative-test/egglog-testsuite/repro-empty-query.egg: lattice computations not implemented
-    ( function foo ( ) i64 :merge ( min old new ) )
+    comparative-test/egglog-testsuite/repro-empty-query.egg: not implemented yet
+    ( set ( foo ) 10 )
 
     comparative-test/egglog-testsuite/repro-empty-query.egg: while parsing this toplevel expression
-    ( function foo ( ) i64 :merge ( min old new ) )
+    ( set ( foo ) 10 )
 
     comparative-test/egglog-testsuite/repro-empty-query.egg: while reading comparative-test/egglog-testsuite/repro-empty-query.egg
     ( include "comparative-test/egglog-testsuite/repro-empty-query.egg" )
@@ -941,11 +941,11 @@ egglog_test!(nogenerate, repro_empty_query, expect![[r#"
 
 "#]], r#"(include "comparative-test/egglog-testsuite/repro-empty-query.egg")"#);// merge
 egglog_test!(nogenerate, repro_equal_constant2, expect![[r#"
-    comparative-test/egglog-testsuite/repro-equal-constant2.egg: lattice computations not implemented
-    ( function foo ( ) i64 :merge ( min old new ) )
+    comparative-test/egglog-testsuite/repro-equal-constant2.egg: not implemented yet
+    ( set ( foo ) 10 )
 
     comparative-test/egglog-testsuite/repro-equal-constant2.egg: while parsing this toplevel expression
-    ( function foo ( ) i64 :merge ( min old new ) )
+    ( set ( foo ) 10 )
 
     comparative-test/egglog-testsuite/repro-equal-constant2.egg: while reading comparative-test/egglog-testsuite/repro-equal-constant2.egg
     ( include "comparative-test/egglog-testsuite/repro-equal-constant2.egg" )
@@ -955,11 +955,11 @@ egglog_test!(nogenerate, repro_equal_constant2, expect![[r#"
 
 "#]], r#"(include "comparative-test/egglog-testsuite/repro-equal-constant2.egg")"#);// merge
 egglog_test!(nogenerate, repro_equal_constant, expect![[r#"
-    comparative-test/egglog-testsuite/repro-equal-constant.egg: lattice computations not implemented
-    ( function foo ( ) i64 :merge ( min old new ) )
+    comparative-test/egglog-testsuite/repro-equal-constant.egg: not implemented yet
+    ( set ( foo ) 10 )
 
     comparative-test/egglog-testsuite/repro-equal-constant.egg: while parsing this toplevel expression
-    ( function foo ( ) i64 :merge ( min old new ) )
+    ( set ( foo ) 10 )
 
     comparative-test/egglog-testsuite/repro-equal-constant.egg: while reading comparative-test/egglog-testsuite/repro-equal-constant.egg
     ( include "comparative-test/egglog-testsuite/repro-equal-constant.egg" )
@@ -1024,11 +1024,11 @@ egglog_test!(allcorrect, repro_querybug, expect![[r#"
     eq: 2
 "#]], r#"(include "comparative-test/egglog-testsuite/repro-querybug.egg")"#);// codegen syntax error
 egglog_test!(nogenerate, repro_should_saturate, expect![[r#"
-    comparative-test/egglog-testsuite/repro-should-saturate.egg: lattice computations not implemented
-    ( function MyMap ( ) i64 :merge ( min old new ) )
+    comparative-test/egglog-testsuite/repro-should-saturate.egg: not implemented yet
+    ( set ( MyMap ) 1 )
 
     comparative-test/egglog-testsuite/repro-should-saturate.egg: while parsing this toplevel expression
-    ( function MyMap ( ) i64 :merge ( min old new ) )
+    ( set ( MyMap ) 1 )
 
     comparative-test/egglog-testsuite/repro-should-saturate.egg: while reading comparative-test/egglog-testsuite/repro-should-saturate.egg
     ( include "comparative-test/egglog-testsuite/repro-should-saturate.egg" )
@@ -1228,11 +1228,11 @@ egglog_test!(nogenerate, test_combined_steps, expect![[r#"
 
 "#]], r#"(include "comparative-test/egglog-testsuite/test-combined-steps.egg")"#);// primitive functions
 egglog_test!(nogenerate, towers_of_hanoi, expect![[r#"
-    comparative-test/egglog-testsuite/towers-of-hanoi.egg: lattice computations not implemented
-    ( function Config ( Stack Stack Stack ) i64 :merge ( min old new ) )
+    comparative-test/egglog-testsuite/towers-of-hanoi.egg: not implemented yet
+    ( set ( Config ( Cons 1 ( Cons 2 ( Cons 3 e ) ) ) e e ) 0 )
 
     comparative-test/egglog-testsuite/towers-of-hanoi.egg: while parsing this toplevel expression
-    ( function Config ( Stack Stack Stack ) i64 :merge ( min old new ) )
+    ( set ( Config ( Cons 1 ( Cons 2 ( Cons 3 e ) ) ) e e ) 0 )
 
     comparative-test/egglog-testsuite/towers-of-hanoi.egg: while reading comparative-test/egglog-testsuite/towers-of-hanoi.egg
     ( include "comparative-test/egglog-testsuite/towers-of-hanoi.egg" )

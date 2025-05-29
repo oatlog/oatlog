@@ -49,7 +49,8 @@ fn init_logging() {
                 .with_default(tracing::Level::TRACE)
                 .with_subscriber(
                     tracing_subscriber::FmtSubscriber::builder()
-                        .with_max_level(tracing::Level::TRACE)
+                        // .with_max_level(tracing::Level::TRACE)
+                        .with_max_level(tracing::Level::INFO)
                         .with_timer(UptimeMilliseconds(Instant::now()))
                         .finish(),
                 ),

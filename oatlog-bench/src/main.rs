@@ -1,6 +1,18 @@
 use std::time::{Duration, Instant};
 
 fn main() {
+    // mod math {
+    //     oatlog::compile_egraph_strict!(r#"(include "oatlog-bench/input/math.egg")"#);
+    // }
+    // let mut theory = math::Theory::new();
+    // for _ in 0..12 {
+    //     theory.step();
+    // }
+    // std::hint::black_box(theory);
+    record_timings();
+}
+
+fn record_timings() {
     std::env::set_current_dir(concat!(env!("CARGO_MANIFEST_DIR"), "/..")).unwrap();
 
     println!("table.header([*benchmark*], [*e-nodes*], [*egglog*], [*Oatlog*], [*speedup*]),");

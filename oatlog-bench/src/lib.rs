@@ -1,5 +1,3 @@
-use std::hint::black_box;
-
 macro_rules! bench_saturating {
     ($name:ident, $program:literal) => {{
         mod $name {
@@ -7,18 +5,19 @@ macro_rules! bench_saturating {
         }
         (
             stringify!($name),
-            || black_box($name::Theory::new()).get_total_relation_entry_count(),
+            || std::hint::black_box($name::Theory::new()).get_total_relation_entry_count(),
             || {
                 let mut egglog = egglog::EGraph::default();
                 egglog
                     .parse_and_run_program(None, $program)
                     .into_iter()
                     .for_each(|_| ());
-                black_box(egglog);
+                std::hint::black_box(egglog);
             },
         )
     }};
 }
+#[macro_export]
 macro_rules! bench {
     ($name:ident, $limit:expr, $program:literal) => {{
         mod $name {
@@ -32,7 +31,7 @@ macro_rules! bench {
                 for _ in 0..iters {
                     theory.step();
                 }
-                black_box(theory).get_total_relation_entry_count()
+                std::hint::black_box(theory).get_total_relation_entry_count()
             },
             |iters| {
                 let mut egglog = egglog::EGraph::default();
@@ -40,11 +39,12 @@ macro_rules! bench {
                 egglog
                     .parse_and_run_program(None, &format!("(run {iters})"))
                     .unwrap();
-                black_box(egglog);
+                std::hint::black_box(egglog);
             },
         )
     }};
 }
+pub use bench as bench_;
 pub const SATURATING_BENCHMARKS: [(&'static str, fn() -> usize, fn()); 3] = [
     bench_saturating!(
         fuel1_math,

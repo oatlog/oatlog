@@ -130,6 +130,234 @@ fn shrink_cases() {
 // Action: (Neg a b), (Neg a c)
 
 #[test]
+fn test_multi_insert_lattice() {
+    Steps {
+        strict_egglog_compat: true,
+        code: r#"
+            (datatype Math
+                (Const i64)
+            )
+            (function foo (Math) i64 :merge (max old new))
+
+            (rule (
+                (= (foo eclass) val)
+            ) (
+                (set (foo eclass) (+ 1 val))
+                (set (foo eclass) (+ 2 val))
+            ):name "hard case" )
+
+            (rule (
+                (= (Const val) eclass)
+            ) (
+                (set (foo eclass) (+ 1 val))
+                (set (foo eclass) (+ 2 val))
+            ):name "easier case" )
+        "#,
+        expected_hir: Some(expect![[r#"
+            Theory {
+                types: {
+                    [t0, i64]: std::primitive::i64,
+                    [t1, Math]: [symbolic],
+                },
+                symbolic_rules: [
+                    SymbolicRule {
+                        name: "hard case",
+                        src: "( rule ( ( = ( foo eclass ) val ) ) ( ( set ( foo eclass ) ( + 1 val ) ) ( set ( foo eclass ) ( + 2 val ) ) ) :name \"hard case\" )",
+                        atoms: [
+                            Premise { relation: foo, columns: [eclass, val] },
+                            Action { relation: +, columns: [v3, val, v2], entry: [_, _, !] },
+                            Action { relation: +, columns: [v5, val, v4], entry: [_, _, !] },
+                            Action { relation: foo, columns: [eclass, v2] },
+                            Action { relation: foo, columns: [eclass, v4] },
+                            Action { relation: g0, columns: [v3], entry: [!] },
+                            Action { relation: g1, columns: [v5], entry: [!] },
+                        ],
+                        variables: {
+                            v0: VariableMeta { name: Some("eclass"), ty: t1 },
+                            v1: VariableMeta { name: Some("val"), ty: t0 },
+                            v2: VariableMeta { name: None, ty: t0 },
+                            v3: VariableMeta { name: None, ty: t0 },
+                            v4: VariableMeta { name: None, ty: t0 },
+                            v5: VariableMeta { name: None, ty: t0 },
+                        },
+                        unify: [],
+                    },
+                    SymbolicRule {
+                        name: "easier case",
+                        src: "( rule ( ( = ( Const val ) eclass ) ) ( ( set ( foo eclass ) ( + 1 val ) ) ( set ( foo eclass ) ( + 2 val ) ) ) :name \"easier case\" )",
+                        atoms: [
+                            Premise { relation: Const, columns: [val, eclass] },
+                            Action { relation: +, columns: [v3, val, v2], entry: [_, _, !] },
+                            Action { relation: +, columns: [v5, val, v4], entry: [_, _, !] },
+                            Action { relation: foo, columns: [eclass, v2] },
+                            Action { relation: foo, columns: [eclass, v4] },
+                            Action { relation: g0, columns: [v3], entry: [!] },
+                            Action { relation: g1, columns: [v5], entry: [!] },
+                        ],
+                        variables: {
+                            v0: VariableMeta { name: Some("val"), ty: t0 },
+                            v1: VariableMeta { name: Some("eclass"), ty: t1 },
+                            v2: VariableMeta { name: None, ty: t0 },
+                            v3: VariableMeta { name: None, ty: t0 },
+                            v4: VariableMeta { name: None, ty: t0 },
+                            v5: VariableMeta { name: None, ty: t0 },
+                        },
+                        unify: [],
+                    },
+                ],
+                relations: {
+                    r0: + { columns: [i64, i64, i64], kind: Primitive(i64_add012), implicit_rules: {n0: [_, _, !]} },
+                    r1: max { columns: [i64, i64, i64], kind: Primitive(i64_max012), implicit_rules: {n0: [_, _, !]} },
+                    r2: Const { columns: [i64, Math], kind: Table, implicit_rules: {n0: [_, U]} },
+                    r3: foo { columns: [Math, i64], kind: Table, implicit_rules: {n0: [_, +r1]} },
+                    r4: g0 { columns: [i64], kind: Global(g0), implicit_rules: {n0: [!]} },
+                    r5: g1 { columns: [i64], kind: Global(g1), implicit_rules: {n0: [!]} },
+                },
+            }"#]]),
+        expected_tir: None,
+        expected_lir: None,
+        expected_codegen: None,
+    }
+    .check()
+}
+
+#[test]
+fn test_lattice_function() {
+    Steps {
+        strict_egglog_compat: true,
+        code: r#"
+            (datatype Math
+                (Const i64)
+            )
+            (function lower-bound (Math) i64 :merge (max old new))
+            (function upper-bound (Math) i64 :merge (min old new))
+
+            (rule (
+                (= eclass (Const val))
+            ) (
+                (set (lower-bound eclass) val)
+                (set (upper-bound eclass) val)
+            ))
+        "#,
+        expected_hir: Some(expect![[r#"
+            Theory {
+                types: {
+                    [t0, i64]: std::primitive::i64,
+                    [t1, Math]: [symbolic],
+                },
+                symbolic_rules: [
+                    SymbolicRule {
+                        src: "( rule ( ( = eclass ( Const val ) ) ) ( ( set ( lower-bound eclass ) val ) ( set ( upper-bound eclass ) val ) ) )",
+                        atoms: [
+                            Premise { relation: Const, columns: [val, eclass] },
+                            Action { relation: lower-bound, columns: [eclass, val] },
+                            Action { relation: upper-bound, columns: [eclass, val] },
+                        ],
+                        variables: {
+                            v0: VariableMeta { name: Some("eclass"), ty: t1 },
+                            v1: VariableMeta { name: Some("val"), ty: t0 },
+                        },
+                        unify: [],
+                    },
+                ],
+                relations: {
+                    r0: max { columns: [i64, i64, i64], kind: Primitive(i64_max012), implicit_rules: {n0: [_, _, !]} },
+                    r1: min { columns: [i64, i64, i64], kind: Primitive(i64_min012), implicit_rules: {n0: [_, _, !]} },
+                    r2: Const { columns: [i64, Math], kind: Table, implicit_rules: {n0: [_, U]} },
+                    r3: lower-bound { columns: [Math, i64], kind: Table, implicit_rules: {n0: [_, +r0]} },
+                    r4: upper-bound { columns: [Math, i64], kind: Table, implicit_rules: {n0: [_, +r1]} },
+                },
+            }"#]]),
+        expected_tir: None,
+        expected_lir: None,
+        expected_codegen: None,
+    }
+    .check()
+}
+
+#[test]
+fn test_frontend_function() {
+    Steps {
+        strict_egglog_compat: true,
+        code: r#"
+            (datatype Math (Const i64) (Add Math Math))
+
+            (function evals-to (Math) i64 :no-merge)
+
+            (rule ((= value (evals-to eclass))) ((union eclass (Const value))))
+        "#,
+        expected_hir: Some(expect![[r#"
+            Theory {
+                types: {
+                    [t0, i64]: std::primitive::i64,
+                    [t1, Math]: [symbolic],
+                },
+                symbolic_rules: [
+                    SymbolicRule {
+                        src: "( rule ( ( = value ( evals-to eclass ) ) ) ( ( union eclass ( Const value ) ) ) )",
+                        atoms: [
+                            Premise { relation: evals-to, columns: [eclass, value] },
+                            Action { relation: Const, columns: [value, eclass], entry: [_, U] },
+                        ],
+                        variables: {
+                            v0: VariableMeta { name: Some("value"), ty: t0 },
+                            v1: VariableMeta { name: Some("eclass"), ty: t1 },
+                        },
+                        unify: [],
+                    },
+                ],
+                relations: {
+                    r0: Const { columns: [i64, Math], kind: Table, implicit_rules: {n0: [_, U]} },
+                    r1: evals-to { columns: [Math, i64], kind: Table, implicit_rules: {n0: [_, !]} },
+                },
+            }"#]]),
+        expected_tir: Some(expect![[r#"
+            Trie {
+                Primary(r1_New(v1, v0)): Trie,
+            }"#]]),
+        expected_lir: Some(expect![[r#"
+            Theory {
+                name: None,
+                types: {
+                    [t0, i64]: std::primitive::i64,
+                    [t1, Math]: [symbolic],
+                },
+                relations: {
+                    r0: RelationData {
+                        name: "Const",
+                        param_types: {c0: t0, c1: t1},
+                        kind: Table {
+                            index_to_info: {ir0: 0=>1:union},
+                        },
+                    },
+                    r1: RelationData {
+                        name: "evals-to",
+                        param_types: {c0: t1, c1: t0},
+                        kind: Table {
+                            index_to_info: {ir0: 0=>1:panic},
+                        },
+                    },
+                },
+                rule_variables: {
+                    [v0, value]: t0,
+                    [v1, eclass]: t1,
+                },
+                global_variable_types: {},
+                rule_tries: [
+                    premise: [IterNew, r1(v1, v0)]
+                    meta: "( rule ( ( = value ( evals-to eclass ) ) ) ( ( union eclass ( Const value ) ) ) )"
+                    actions: [
+                        [Action::Insert, r0(v0, v1)],
+                    ],
+                ],
+                initial: [],
+            }"#]]),
+        expected_codegen: None,
+    }
+    .check()
+}
+
+#[test]
 fn redundant_premise_simplify() {
     Steps {
         strict_egglog_compat: true,
@@ -10230,13 +10458,7 @@ fn triangle_join() {
                     latest_timestamp: TimeStamp,
                 ) -> bool {
                     log_duration!("update {}: {}", "foo", {
-                        if self.math_num_uprooted_at_latest_retain == uf.math_.num_uprooted() {
-                            return false;
-                        }
-                        let offset = insertions.len();
-                        self.math_num_uprooted_at_latest_retain = uf.math_.num_uprooted();
-                        self.update_begin(&insertions[offset..], uf, latest_timestamp);
-                        true
+                        return false;
                     })
                 }
                 fn update_finalize(
@@ -10459,13 +10681,7 @@ fn triangle_join() {
                     latest_timestamp: TimeStamp,
                 ) -> bool {
                     log_duration!("update {}: {}", "bar", {
-                        if self.math_num_uprooted_at_latest_retain == uf.math_.num_uprooted() {
-                            return false;
-                        }
-                        let offset = insertions.len();
-                        self.math_num_uprooted_at_latest_retain = uf.math_.num_uprooted();
-                        self.update_begin(&insertions[offset..], uf, latest_timestamp);
-                        true
+                        return false;
                     })
                 }
                 fn update_finalize(
@@ -10688,13 +10904,7 @@ fn triangle_join() {
                     latest_timestamp: TimeStamp,
                 ) -> bool {
                     log_duration!("update {}: {}", "baz", {
-                        if self.math_num_uprooted_at_latest_retain == uf.math_.num_uprooted() {
-                            return false;
-                        }
-                        let offset = insertions.len();
-                        self.math_num_uprooted_at_latest_retain = uf.math_.num_uprooted();
-                        self.update_begin(&insertions[offset..], uf, latest_timestamp);
-                        true
+                        return false;
                     })
                 }
                 fn update_finalize(
@@ -10917,13 +11127,7 @@ fn triangle_join() {
                     latest_timestamp: TimeStamp,
                 ) -> bool {
                     log_duration!("update {}: {}", "triangle", {
-                        if self.math_num_uprooted_at_latest_retain == uf.math_.num_uprooted() {
-                            return false;
-                        }
-                        let offset = insertions.len();
-                        self.math_num_uprooted_at_latest_retain = uf.math_.num_uprooted();
-                        self.update_begin(&insertions[offset..], uf, latest_timestamp);
-                        true
+                        return false;
                     })
                 }
                 fn update_finalize(

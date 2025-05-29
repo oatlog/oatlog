@@ -7,6 +7,7 @@ use crate::{
     ids::{ColumnId, GlobalId, IndexId, RelationId, TypeId, VariableId},
     typed_vec::TVec,
 };
+use educe::Educe;
 use std::{
     collections::{BTreeMap, BTreeSet},
     iter,
@@ -144,6 +145,14 @@ impl RelationData {
             kind: RelationKind::Primitive { codegen, out_col },
         }
     }
+
+    pub(crate) fn can_radix_sort_new(&self, types: &TVec<TypeId, TypeData>) -> bool {
+        self.columns
+            .iter()
+            .copied()
+            .all(|x| types[x].kind == TypeKind::Symbolic)
+            && self.columns.len() <= 4
+    }
 }
 
 /// How to query this specific relation.
@@ -163,6 +172,8 @@ pub enum RelationKind {
     },
 }
 
+/// Note that storage is in sorted order, so key columns `{ 1, 0, 3 }` and value columns `{ 2 }`
+/// would become something like `HashMap<[0,1,3], [2]>`
 #[derive(Clone, Eq, PartialEq, Ord, PartialOrd, Hash, Debug)]
 pub(crate) enum IndexInfo {
     // Something like `HashMap<(Math, Math), (Math,)>`
@@ -203,7 +214,13 @@ impl IndexInfo {
 pub(crate) enum MergeTy {
     Union,
     Panic,
-    // Lattice { .. },
+    Lattice {
+        /// This must be:
+        /// * A primitive relation
+        /// * A binary function
+        /// * (a lattice if we care about correctness)
+        call: RelationId,
+    },
 }
 
 #[derive(Clone, Eq, PartialEq, Ord, PartialOrd, Hash, Debug)]
@@ -442,6 +459,8 @@ impl Theory {
                                                     .map(|(ColumnId(c), m)| match m {
                                                         MergeTy::Union => format!("{c}:union"),
                                                         MergeTy::Panic => format!("{c}:panic"),
+                                                        MergeTy::Lattice { call } =>
+                                                            format!("{c}:lattice({call})",),
                                                     })
                                                     .join("_"),
                                             )

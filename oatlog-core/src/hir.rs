@@ -105,16 +105,25 @@ impl ImplicitRule {
             columns,
         }
     }
-    pub(crate) fn new_lattice(output: ColumnId, columns: usize) -> Self {
-        // TODO: implement codegen lattice and then fix this
+    pub(crate) fn new_lattice(output: ColumnId, columns: usize, call: RelationId) -> Self {
         Self {
-            out: BTreeMap::from_iter([(output, ImplicitRuleAction::Panic)]),
+            out: BTreeMap::from_iter([(output, ImplicitRuleAction::Lattice { call })]),
             columns,
         }
     }
     /// AKA outputs
     pub(crate) fn value_columns(&self) -> BTreeSet<ColumnId> {
         self.out.keys().copied().collect()
+    }
+    pub(crate) fn value_columns_without_lattice(&self) -> BTreeSet<ColumnId> {
+        self.out
+            .iter()
+            .filter_map(|(c, action)| match action {
+                ImplicitRuleAction::Panic => Some(*c),
+                ImplicitRuleAction::Union => Some(*c),
+                ImplicitRuleAction::Lattice { .. } => None,
+            })
+            .collect()
     }
     pub(crate) fn value_columns_with_merge_ty(&self) -> BTreeMap<ColumnId, lir::MergeTy> {
         self.out
@@ -125,8 +134,8 @@ impl ImplicitRule {
                     match v {
                         ImplicitRuleAction::Panic => lir::MergeTy::Panic,
                         ImplicitRuleAction::Union => lir::MergeTy::Union,
-                        ImplicitRuleAction::Lattice { .. } => {
-                            todo!("implement lattice merge")
+                        ImplicitRuleAction::Lattice { call } => {
+                            lir::MergeTy::Lattice { call: *call }
                         }
                     },
                 )
@@ -154,22 +163,8 @@ pub(crate) enum ImplicitRuleAction {
     /// Merge with a union-find unification.
     Union,
     /// Run computation to figure out what to write.
-    #[allow(unused)]
-    Lattice {
-        // /// call these functions in this order.
-        // /// panic if result is empty.
-        // ops: Vec<(RelationId, Vec<VariableId>)>,
-        // /// Mostly here to insert literals.
-        // /// Reading literals should occur first.
-        // /// TODO: use globalid relation directly.
-        // variables: TVec<VariableId, (TypeId, Option<GlobalId>)>,
-        // /// existing output value in a table.
-        // old: Vec<(VariableId, ColumnId)>,
-        // /// output value we want to write.
-        // new: Vec<(VariableId, ColumnId)>,
-        // /// what `VariableId` to write to the column
-        // res: Vec<(VariableId, ColumnId)>,
-    },
+    /// See LIR docs for requirements
+    Lattice { call: RelationId },
 }
 
 #[derive(Clone, Eq, PartialEq, Ord, PartialOrd, Hash, Debug)]
@@ -270,7 +265,9 @@ impl Relation {
         let mut ret = BTreeSet::new();
         for implicit_rule in &self.implicit_rules {
             let key_columns = implicit_rule.key_columns();
-            let value_columns = implicit_rule.value_columns();
+
+            // we ignore lattice because FD on lattice variables in action does not apply.
+            let value_columns = implicit_rule.value_columns_without_lattice();
 
             for cols2_prime in self.invariant_permutations.apply(cols2) {
                 if key_columns.iter().all(|col| cols1[col] == cols2_prime[col]) {
@@ -350,6 +347,18 @@ impl Relation {
                 // for collections, inserts would be through entry.
                 false
             }
+            RelationTy::Forall { .. } => unreachable!(),
+        }
+    }
+    pub(crate) fn must_become_insert(&self, im: ImplicitRuleId) -> bool {
+        match &self.kind {
+            RelationTy::Table => self.implicit_rules[im].out.values().any(|x| match x {
+                ImplicitRuleAction::Panic | ImplicitRuleAction::Union => false,
+                ImplicitRuleAction::Lattice { .. } => true,
+            }),
+            RelationTy::Alias { .. } => unreachable!(),
+            RelationTy::Global { .. } => false,
+            RelationTy::Primitive { .. } => false,
             RelationTy::Forall { .. } => unreachable!(),
         }
     }
@@ -921,6 +930,19 @@ impl SymbolicRule {
         //
         // union(action_unify, x, y), !premise_var(y) => union(premise_unify, x, y)
 
+        self.atoms = self
+            .atoms
+            .into_iter()
+            .map(|mut atom| {
+                if let Some(entry) = atom.entry {
+                    if relations[atom.relation].must_become_insert(entry) {
+                        atom.entry = None;
+                    }
+                }
+                atom
+            })
+            .collect();
+
         tracing::trace!("optimize {}", self.dbg_summary(relations));
 
         let mut to_merge: UFData<VariableId, (IsPremise, VariableMeta)> = self
@@ -1430,10 +1452,30 @@ impl Theory {
                 relations_to_keep[relation] = true
             }
         });
-        for (rel, relation) in self.relations.iter_enumerate() {
-            if relations_to_keep[rel] {
-                for col_ty in &relation.columns {
-                    types_to_keep[col_ty] = true;
+        let mut fixpoint = false;
+        while !fixpoint {
+            fixpoint = true;
+
+            for (rel, relation) in self.relations.iter_enumerate() {
+                if relations_to_keep[rel] {
+                    for col_ty in &relation.columns {
+                        if !mem::replace(&mut types_to_keep[col_ty], true) {
+                            fixpoint = false;
+                        }
+                    }
+                    for im in relation.implicit_rules.iter() {
+                        for action in im.out.values() {
+                            match action {
+                                ImplicitRuleAction::Lattice { call } => {
+                                    if !mem::replace(&mut relations_to_keep[call], true) {
+                                        fixpoint = false;
+                                    }
+                                }
+                                ImplicitRuleAction::Panic => (),
+                                ImplicitRuleAction::Union => (),
+                            }
+                        }
+                    }
                 }
             }
         }
@@ -1470,9 +1512,20 @@ impl Theory {
         }
         self.relations = TVec::from_iter_ordered(self.relations.into_iter_enumerate().filter_map(
             |(relation_id, mut relation)| {
-                remap_relations[relation_id].map(|new_relation_id| {
+                remap_relations[relation_id].clone().map(|new_relation_id| {
                     for col_ty in &mut relation.columns {
                         *col_ty = remap_types[*col_ty].unwrap();
+                    }
+                    for im in &mut relation.implicit_rules {
+                        for action in im.out.values_mut() {
+                            match action {
+                                ImplicitRuleAction::Panic => (),
+                                ImplicitRuleAction::Union => (),
+                                ImplicitRuleAction::Lattice { call } => {
+                                    *call = remap_relations[*call].unwrap();
+                                }
+                            }
+                        }
                     }
                     (new_relation_id, relation)
                 })
@@ -1731,14 +1784,11 @@ mod debug_print {
                     (0..*columns)
                         .map(ColumnId)
                         .map(|i| {
-                            DbgStr([out
-                                .get(&i)
-                                .map_or("_", |x| match x {
-                                    ImplicitRuleAction::Panic => "!",
-                                    ImplicitRuleAction::Union => "U",
-                                    ImplicitRuleAction::Lattice {} => "+",
-                                })
-                                .to_string()])
+                            DbgStr([out.get(&i).map_or(format!("_"), |x| match x {
+                                ImplicitRuleAction::Panic => format!("!"),
+                                ImplicitRuleAction::Union => format!("U"),
+                                ImplicitRuleAction::Lattice { call } => format!("+{call}"),
+                            })])
                         })
                         .collect::<Vec<_>>(),
                 )

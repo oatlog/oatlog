@@ -527,15 +527,12 @@ impl Parser {
                 output,
                 merge,
             } => {
-                if merge.is_some() {
-                    return err!("lattice computations not implemented");
-                }
                 self.add_function(FunctionKind::Egg {
                     name,
                     inputs: input.mapf(|x| self.type_ids.lookup(x))?,
                     kind: EggFunctionKind::Function {
                         output: self.type_ids.lookup(output)?,
-                        merge: None,
+                        merge,
                     },
                 })?;
             }
@@ -834,11 +831,87 @@ impl Parser {
                             }
                         }
                         EggFunctionKind::Function {
-                            output: _,
-                            merge: Some(_),
+                            output,
+                            merge: Some(expr),
                         } => {
-                            // TODO: do something with lattice.
-                            tvec![hir::ImplicitRule::new_lattice(output_column, num_columns)]
+                            register_span!(expr.span);
+                            match &*expr {
+                                Expr::Literal(..) => return err!("invalid lattice"),
+                                Expr::Var(..) => return err!("invalid lattice"),
+                                Expr::Call(name, args) => {
+                                    let [a, b] = args.as_slice() else {
+                                        return err!(
+                                            "lattice computations must only take 2 arguments"
+                                        );
+                                    };
+
+                                    let mut has_old = false;
+                                    let mut has_new = false;
+                                    match **a {
+                                        Expr::Literal(..) | Expr::Call(..) => {
+                                            return err!("invalid lattice argument");
+                                        }
+                                        Expr::Var(name) => match *name {
+                                            "old" => has_old = true,
+                                            "new" => has_new = true,
+                                            _ => {
+                                                return err!(
+                                                    "invalid lattice function argument: {name:?}"
+                                                );
+                                            }
+                                        },
+                                    }
+                                    match **b {
+                                        Expr::Literal(..) | Expr::Call(..) => {
+                                            return err!("invalid lattice argument");
+                                        }
+                                        Expr::Var(name) => match *name {
+                                            "old" => has_old = true,
+                                            "new" => has_new = true,
+                                            _ => {
+                                                return err!(
+                                                    "invalid lattice function argument: {name:?}"
+                                                );
+                                            }
+                                        },
+                                    }
+
+                                    if !(has_old && has_new) {
+                                        return err!("lattice function must merge old and new");
+                                    }
+
+                                    let ids = self.function_possible_ids[name]
+                                        .iter()
+                                        .copied()
+                                        .filter(|x| {
+                                            self.lang_relations[x].check_compatible(
+                                                &[Some(output), Some(output)],
+                                                Some(output),
+                                            )
+                                        })
+                                        .collect::<Vec<_>>();
+
+                                    let id = match ids.as_slice() {
+                                        [] => return err!("no matching function for lattice"),
+                                        [id] => *id,
+                                        [..] => return err!("ambigious call for lattice"),
+                                    };
+
+                                    let hir::RelationTy::Primitive { .. } =
+                                        &self.hir_relations[id].kind
+                                    else {
+                                        return err!(
+                                            "lattice function is not a primitive function"
+                                        );
+                                    };
+
+                                    tvec![hir::ImplicitRule::new_lattice(
+                                        output_column,
+                                        num_columns,
+                                        id
+                                    )]
+                                }
+                            }
                         }
                         EggFunctionKind::Relation => tvec![],
                     },
