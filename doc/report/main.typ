@@ -2310,80 +2310,74 @@ To make sure we still perform WCOJ, we need to ensure that we perform semi-joins
 
 = Evaluation <chapter_evaluation>
 
-#TODO[Section summary]
+We evaluate Oatlog in two aspects: its compatibility with and its speedup relative to egglog. The
+compatibility can in turn be divided into correctness and completeness, both of which are evaluated
+using egglog's test suite. We find that, while Oatlog creates identical e-graphs, a large fraction
+of egglog programs require features that Oatlog does not support. Oatlog can therefore not replace
+egglog in most use-cases in the near term.
 
-#TODO[
-  Explain that we evaluate based on correctness, compatibility (feature richness) and performance.
-  Compat
-  - explain the features we lack, why (priorities mostly) and how difficult to fix
-  Performance
-  - revisit key categories of improvement
-  - talk about L3 cache, random access
-  - do some rough calculation, memory throughput, random accesses per second, etc
-  - explain bottleneck (sorting and hashmap access), show a flamegraph
-  - try to do some ABLATION
-  Finally, highlight especially novel optimizations
-  - highlight invariant permutations for saturating
-  - highlight reverse fundep for add not useful for math and requires extra index
-]
+In performance terms, Oatlog achieves order of magnitude speedups for small e-graphs, gradually
+shrinking to a 2x speedup at $10^6$ e-nodes and egglog performance parity beyond $10^7$ e-nodes.
 
-== Egglog support
+== Egglog language support and correctness
 
-Oatlog only implements a subset of the egglog language, notably
-- Lattice computations, for example lower bound of an e-class.
-- Scheduling/rulesets, to run some rules more often.
-- Extraction, to select an optimal expression.
+We developed Oatlog alongside a few different kinds of tests. These are
+- Property tests, where two implementations of a data structure or a function is fed randomized data
+  and the output compared between the two implementations. This is for example used to verify that
+  `IndexSortedList<K, V>`, which is a hashmap with values pointing into a single allocated vector,
+  behaves identically to a `HashMap<K, Vec<V>>`.
+- Snapshot tests, where various egglog programs are fed into the Oatlog compiler, with the IRs and
+  generated code being stored in version control and manually checked for every commit.
+- Compatibility tests, where Oatlog and egglog run the same egglog program and their outputs are
+  compared.
 
-While these would be useful features, they are not required to evaluate the underlying engine.
-Lattice computations are performed in essentially the same way as canonicalization.
-Rulesets can be implemented by maintaining multiple sets of what is considered "new" depending on the timestamp that a rule was last run.
-Extraction is essentially orthogonal to an e-graph engine and there already exist solvers for that.
+The compatibility tests are those most relevant to egglog compatibility and therefore those we focus
+on here. In addition to the benchmark programs used in @section_eval_benchmarks, the compatibility
+tests run egglog's test suite. Of its 93 tests,
+- 11 are successful, while outputting an e-graph with a nonzero number of e-nodes,
+- 5 are successful, but output an empty e-graph,
+- 2 cause egglog to panic, and
+- 74 require egglog features missing in Oatlog.
 
-== Testing
+A successful test means that both egglog and Oatlog are able to run the program, that every relation
+contains an equal number of e-nodes in both engines, and that this continues to hold for an
+additional 10 EqSat steps. In practice, this almost means that egglog and Oatlog behave identically,
+with two significant caveats.
 
-#TODO[get exact numbers]
+The first of these is that Oatlog does not implement rulesets, i.e. only running a few queries at
+once, which prevents Oatlog from executing `(check ..)` statements that are heavily used in tests,
+serving as assertions. Oatlog therefore entirely ignores these statements, instead leveraging egglog
+to compare e-node counts. This is a resonable approach only for e-graphs with a nonzero number of
+e-nodes, which is why the 5 empty success cases should be considered more as skip than pass
+verdicts.
 
-We test Oatlog by comparing it against the egglog @egglog testsuite and comparing the number of e-nodes for each relation.
-In the testsuite, 16.3498 out of 90.859 only contain language constructs supported by Oatlog, and it passes all of those tests.
-Additionally, we have property tests on our index implementations and snapshot testing on all of our IRs (HIR, TIR, LIR).
+The second caveat, assuming that the $11$ tests together with the benchmarks thoroughly exercise the
+engine, is e-class numbering. Since egglog and Oatlog match rules and perform canonicalization in
+different orders, the union-find will be issued `make()` and `union()` operations in different order
+and thus nominal e-class ids will be different. In fact, since both egglog in its nondeterministic
+mode and Oatlog iterate hashmaps, e-class numbering is not even reproducible between two runs of the
+same engine due to randomized hash functions. However, if the e-classes are only used as opaque
+identifiers then their e-graphs are indistinguishable.
 
-// birewrite
-// eqsat_basic
-// include
-// math_microbenchmark
-// path
-// pathproof
-// repro_querybug2
-// repro_querybug4
-// repro_querybug
-// repro_unsound
-// repro_unsound_htutorial
-//
-// quadratic
-// fuel3
-// fuel2
-// fuel1
-//
-// fuel2_saturating
-// fuel1_saturating
+The missing features that prevent Oatlog from running 74 of the tests are primarily, in descending
+order,
++ additional primitive types and operations (booleans, comparison functions, bigints),
++ non-union `:merge`, required for lattice-based computations,
++ containers, and
++ interpreter-oriented features such as CSV input and schema push/pop.
 
-// - egglog testsuite
+Among these, (1), (2) and (3) are all viable to implement within Oatlog's architecture, in
+increasing difficulty from easy to somewhat tricky. Egglog's interpreter-oriented features (4) are
+not reasonable implementation-wise or usability-wise in a non-interpreter architecture, but similar
+features could be surfaced in a different run-time API.
 
-#TODO[thoughts about our development in general, what worked well?]
+Finally, although it is only exercised in a few tests, Oatlog does not support `query-extract` or
+even extraction in general. This, as well as the previously mentioned unsupported features are
+unsupported mostly because they are not necessary to demonstrate the speedups that can be achieved
+compared to egglog, and focusing in implementing them would distract from our ability to optimize
+Oatlog for performance within the limited scope of a master's thesis.
 
-/*
-We run the entire egglog testsuite (93 tests) to validate Oatlog.
-We compare the number of e-classes in egglog and Oatlog to check if Oatlog is likely producing the same result.
-
-Right now, we fail most tests because primitive functions are not implemented. Additionally, some
-tests are not very relevant for AOT compilation and supporting them is not really desirable. An
-example of this are extraction commands, since egglog-language-level commands are run at Oatlog
-startup and Oatlog extraction is better handled using the run-time API.
-
-For a list of currently passing tests, see @passingtests.
-*/
-
-== Benchmarks
+== Benchmarks <section_eval_benchmarks>
 
 Oatlog's development has been guided by its performance on the three microbenchmarks --
 `fuelN_math`, `math`, and `boolean_adder` -- all of whose egglog code is available in
@@ -2407,6 +2401,14 @@ plotted in @fig_eval_benchmarks_plot, showing that Oatlog achieves very differen
 egglog for different e-graph sizes. Oatlog is most competitive across the entire range, with 10-100x
 speedups below $10^3$ e-nodes, maintaining a large speedup down to about $2$x at $10^6$ e-nodes and
 performing very similarly to egglog over $10^7$ e-nodes.
+
+#figure(
+  placement: auto,
+  image("benchmarks.svg"),
+  caption: [Oatlog's speedup over egglog as a function of the number of e-nodes. Oatlog has a
+    double-digit speedup for scenarios less than a thousand e-nodes, which gradually shrinks to closely
+    approach egglog's performance for e-graphs of tens of millions of e-nodes.],
+) <fig_eval_benchmarks_plot>
 
 #figure(
   placement: auto,
@@ -2455,14 +2457,6 @@ performing very similarly to egglog over $10^7$ e-nodes.
     nondeterministic egglog since Oatlog internally iterates `hashbrown::HashMap`s.
   ],
 ) <fig_eval_benchmarks_table>
-
-#figure(
-  placement: auto,
-  image("benchmarks.svg"),
-  caption: [Oatlog's speedup over egglog as a function of the number of e-nodes. Oatlog has a
-    double-digit speedup for scenarios less than a thousand e-nodes, which gradually shrinks to closely
-    approach egglog's performance for e-graphs of tens of millions of e-nodes.],
-) <fig_eval_benchmarks_plot>
 
 == Performance discussion
 
@@ -2525,12 +2519,12 @@ other hand, if the same computer has its memory benchmarked using
 it achieves only 12.4M random accesses per second.
 
 This somewhat indicates that Oatlog for large e-graphs is bottlenecked by L3 cache misses, although
-this data cannot distinguish between spending e.g. 100% of the time serving L3 cache misses
+this data cannot distinguish between e.g. spending 100% of the time serving L3 cache misses
 sequentially or spending 50% of the time serving L3 cache misses in parallel pairs. From the
 perspective of how Oatlog works, being bottlenecked by RAM random access is largely expected. In
 flamegraphs of `math`, 12 steps, there is a roughly equal split of samples attributable to sorting,
-hashmap writes, hashmap reads and the rest. With the size of the hashmaps generally being equal to
-the number of e-nodes in a relation, these lookups are essentially always L3 cache misses for
+hashmap writes, hashmap reads and miscellaneous. With the size of the hashmaps generally being equal
+to the number of e-nodes in a relation, these lookups are essentially always L3 cache misses for
 sufficiently large e-graphs.
 
 #figure(
