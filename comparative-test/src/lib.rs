@@ -103,17 +103,6 @@ macro_rules! comparative_test {
                     return;
                 }
             }
-            // {
-            //     let egglog = egglog.num_tuples();
-            //     let us = theory.get_total_relation_entry_count();
-            //     if egglog != us {
-            //         assert_eq!(verdict, Verdict::Mismatched, "unexpected mismatch");
-            //         if let Some(e) = &expected {
-            //             e.assert_eq(&format!("iter{i} {egglog}!={us}"));
-            //         }
-            //         return;
-            //     }
-            // }
 
             theory.step();
 
