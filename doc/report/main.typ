@@ -2807,9 +2807,8 @@ performing very similarly to egglog over $10^7$ e-nodes.
       [`boolean_adder`, 12 steps], [24610667], [158.4 s], [149.9 s], table.cell(fill: green.lighten(96%))[1.06x],
     ),
   ),
-  caption: [
-    Microbenchmark results comparing egglog with Oatlog. The reported timings are averages of
-    continuous sampling for $10$ seconds on an AMD Ryzen 5900X CPU, with the 12 step rows being
+  caption: [Microbenchmark results comparing egglog with Oatlog. The reported timings are averages
+    of continuous sampling for $10$ seconds on an AMD Ryzen 5900X CPU, with the 12 step rows being
     exactly two and one samples respectively for `math` and `boolean_adder`. Oatlog is compared with
     nondeterministic egglog since Oatlog internally iterates `hashbrown::HashMap`s.
   ],
