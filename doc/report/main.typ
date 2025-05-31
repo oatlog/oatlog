@@ -72,10 +72,17 @@
   acknowledgements: [
     // Here, you can say thank you to your supervisor(s), company advisors and other people that
     // supported you during your project.
-    #TODO[Write acknowledgements]
     // egraph community/egglog authors
     // supervisor/examiner
     // fellow students
+
+    We would like to thank our supervisor Hazem Torfah, our examiner Matti
+    Karppa, and especially our advisor Alejandro Luque Cerpa for their feedback
+    and guidance on our work.
+
+    We would also like to thank our opponent group Edvin Nilsson and Enayatullah Norozi for their feedback.
+
+    We also thank our fellow student Samuel Kyletoft for their peer review.
   ],
 )
 
