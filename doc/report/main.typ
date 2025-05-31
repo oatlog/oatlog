@@ -360,7 +360,7 @@ proliferation of e-graphs within compilers would require them to become faster.
 #TODO[add paragraph mentioning how databases have been a useful tool, what indexes are, why they are
   useful]
 
-Recent developments in e-graphs for equality saturation @relationalematching @eqlog @egglog have
+Recent developments in e-graphs for equality saturation @relationalematching @eqlog_algorithm @egglog have
 shown that adding indexes to e-graph pattern-matching creates a structure that is very similar to
 relational databases and in particular Datalog @egglog. Datalog is a declarative logic programming language that
 reasons bottom-up by inserting rows into tables. In fact, this similarity extends to the degree
@@ -2057,9 +2057,11 @@ Another way to think about it is that a project operation $pi_("<attributes>")("
 
 === Domination
 
-Because of symmetries in premises, the semi-naive transformation can generate rules that are actually equivalent, and therefore duplicates are removed, similarly to what is done in Eqlog @eqlog.
-This is implemented using recursive backtracking, but is feasible since the queries are small.
-We call this domination because some semi-naive variants of a rule may contain the entire join result of another rule.
+Because of symmetries in premises, the semi-naive transformation can generate rules that are
+actually equivalent, and therefore duplicates are removed, similarly to what is done in Eqlog
+@eqlog_algorithm. This is implemented using recursive backtracking, but is feasible since the
+queries are small. We call this domination because some semi-naive variants of a rule may contain
+the entire join result of another rule.
 
 === Equality modulo permutation <eqmodperm>
 
@@ -2741,8 +2743,8 @@ Oatlog's development has been guided by its performance on the three microbenchm
 - The `boolean_adder` benchmark rewrites according to the laws of boolean algebra and is initialized
   with a 10-bit ripple carry adder.
 - The `math` benchmark is taken from the egglog test suite and served as the primary performance
-  comparison between egg and egglog in #cite(<egglog>, form: "prose"). Its rewrite rules manipulate
-  expressions in real numbers, particularly by rewriting integrals using integration by parts.
+  comparison between egg and egglog in @egglog. Its rewrite rules manipulate expressions in real
+  numbers, particularly by rewriting integrals using integration by parts.
 - Integration by parts produces an output that is matched by its own pattern, making the e-graph
   divergent. For this reason we also adapted the `math` benchmark into the `fuelN_math` benchmark,
   where the nesting count of integration by parts is limited to a $N$ between $1$ and $3$.
@@ -2856,7 +2858,7 @@ but there are also differences, such as Oatlog
     ```,
   ),
   caption: [`perf stat` output for `math`, 12 steps, with less relevant information elided. Due to
-    `LLC-loads` and `LLC-load-misses` being unavailable on AMD, this was captured from a Intel
+    `LLC-loads` and `LLC-load-misses` being unavailable on AMD, this was captured from an Intel
     i7-12700H CPU.],
 ) <fig_eval_discuss_stat>
 
@@ -3009,193 +3011,136 @@ of expensive random access by doing one of
 
 = Conclusion <chapter_conclusion>
 
-#TODO[
-  We are correct and faster. We lack features but these are relatively easy to fix and were not a
-  priority for investigating the performance possibilities within the scope of a thesis.
+We introduce Oatlog, a relational e-graph engine implementing the egglog language. By combining a
+few novel techniques -- such as trie query planning and invariant permutations -- with solid
+performance-aware programming, Oatlog achives large speedups over egglog, particularly for small and
+medium e-graphs.
 
-  We are not experts on how egglog does everything. More ablation and comparison with egglog would
-  be useful to more deeply understand the performance differences.
+Oatlog is implemented as a procedural Rust macro, effectively compiling EqSat theories into a
+program. It can do so in two modes: strict and relaxed. Oatlog's strict mode is step-by-step
+equivalent to egglog modulo e-class renaming, providing essentially identical output guarantees as
+egglog's nondeterministic mode. Oatlog's relaxed mode guarantees only that the post-saturation
+e-graph is identical to renaming, allowing Oatlog to derive invariant permutations that eliminates
+duplicate work while at the same time allowing rules to run earlier and therefore reach saturation
+in fewer steps.
 
-  Highlight invariant permutations which is entirely novel (almost everything else is not novel (in
-  isolation))
+While our testing indicates Oatlog is generally correct, it is only able to run a fraction of egglog
+programs, as illustrated by egglog's test suite. This is a consequence of performance work having
+taken precedence over compatibility work -- allowing us to demonstrate a large speedup over the
+previous state of the art within the limited scope of a master's thesis.
 
-  We have lots of future work ideas.
-]
+We cannot pinpoint precisely why Oatlog is faster than egglog nor can we recommend the changes to
+egglog that would most effectively bridge the gap. This is largely due to us not having looked into
+this, particularly due to us not having a deep understanding of egglog's implementation details.
+Addressing this could be valuable future work.
 
-We have shown that it is possible for an e-graph engine to be significantly faster than egglog, at
-least on small e-graphs, while still using fundamentally the same algorithms.
-
-There are still many ways in which Oatlog could be improved, from merging relations and better
-scheduling to more standard database improvements in the form of better indexes and query planning.
+In particular, one large difference in implementation details between Oatlog and egglog is the
+choice of flat vs trie indexes. Flat indexes -- effectively `HashMap<(A, B), C>` -- require fewer
+lookups but have a larger working set while trie indexes -- effectively `HashMap<A, HashMap<B, C>>`
+-- require less memory but more lookups. We find it likely that flat indexes are superior when the
+e-graph is small enough to fit in some level of cache, but trie indexes both have the advantage of
+deferring the cache spill through their smaller size and possibly achieve greater cache locality for
+large e-graphs. This is possibly the most interesting implementation detail, from a performance
+perspective, to study further.
 
 == Future work
 
-#TODO[mention basics and interoperability stuff, extraction, ruleset support for `(check ..)` etc.
-  Then continuing with more research-y ideas]
+Aside from studying how implementation details drive performance differences in Oatlog and egglog,
+possible future work on Oatlog includes adding features to improve egglog compatibility, smaller
+implementation improvements and larger possible changes to e-graph engine design.
 
-Compatibility:
-- Support egglog primitive `:merge`, necessary for lattice-based computation
-- Extraction
+#let merge = raw("merge")
 
-Smaller research-y:
-- Merge relations whose columns are permutations of each other (e.g. `Add` and `Sub`)
-- Scheduling and termination, prioritize union rules. Cite Eqlog.
-- Improve query planning though cardinality estimation (currently assuming $#`new` << #`old` <
-  #`all`$, identically across all relations)
-- Memory compression of various data structures
-- Variable-width radix sort
-- Re-canonicalize during rehash (implemented in scratch).
-- Pick ideal ordering to reconstruct indexes so we sort the lists a minimum number of times (the flow stuff)
-- ```
-      // TODO: On the FD index, it's fine to store (min(a, b), max(a, b), c) instead of (a, b, c)
-      // in general, for any index, it is fine to apply a permutation as long as it only touches the
-      // *key* part.
-  ```
+Oatlog's egglog compatiblity can be improved by implementing
+- Non-union `:merge`, which is a kind of functional dependency where rather than $f(..) = y$ and
+  $f(..) = z$ triggering a union of $y$ and $z$, it replaces the e-node with a different $f(..) =
+  merge(y, z)$. This can be used to maintain lower or upper bounds, known bits of integers, etc.
+  Computations leveraging `:merge` are called lattice-based computations since their soundness
+  relies on the `merge` function being part of a mathematical semilattice. Examples of semilattices
+  include the relation less-than-or-equal with the function $max$ or $min$, the divisibility
+  relation with functions $gcd$ or $lcm$ and the subset relation with union or intersection.
+- Extraction, where low-cost expression trees or DAGs are derived from a (saturated) e-graph.
+- Rulesets, where Oatlog supports generating multiple query tries so that subsets of rules can be
+  run in isolation. This is particularly important since it is required to implement check
+  statements, which are heavily used in egglog's test suite.
+- Additional primitive types and their functions, such as booleans, bigints and comparisons.
+- Containers, which are primitive-like accelerators for representing structures such as lists, sets
+  and maps, yet differ from primitives in that unions among their contents can lead to containers
+  becoming equal. The egglog language as introduced by in @egglog does not support containers but
+  egglog itself does.
 
-Larger research-y:
-- Magic sets
-- Container types for efficient associativity
-- BTree merge join or dynamic sorting join
+Smaller changes that could further improve Oatlog's performance include
+- Merging relations whose columns are permutations of each other, such as adjusting all rewrite
+  rules to refer to `Add(c, b, a)` rather than `Sub(a, b, c)` while adding an implicit functionality
+  $a,b -> c$ on the Add relation.
+- Tiered scheduling of rewrite rules. In a sense actions can be tiered into `union` -- which
+  monotonically shrinks the e-graph, `insert` -- which is bounded to $O("eclasses"^"arity")$ and in
+  particular must terminate, and finally `entry` which may cause non-terminating rewrite steps. This
+  has the potential to trigger `union`s earlier, slowing the e-graph's growth. Eqlog implements
+  scheduling like this, doing `insert` and `union` to a fixed point before executing `entry`
+  @eqlog_algorithm.
+- Improving query planning through cardinality estimation within the constraints of a worst-case
+  optimal join, rather than assuming that $#`new` << #`old` < #`all`$ with identically sized
+  relations.
+- Memory compression of index and union-find data structures #footnote[We tried to implement memory
+  compression for union-find, but it is very difficult to combine with performant random access.].
+- Optimized sorting beyond the current general-purpose radix sort @voracious_sort. In particular,
+  while a radix sort is likely optimal, one could possibly achieve a speedup by treating e-classes
+  as variable-width integers rather than 32-bit integers, with their width determined by the
+  logarithm of the largest e-class ID.
+- Canonicalizing tuples within an index while rehashing. Currently, the bulk insertion
+  `update_begin` (see @fig_eval_discuss_code) may trigger a rehash of the underlying index, in which
+  all of the stored tuples are moved around. A custom implementation that calls `find()` while
+  rehashing could possibly reduce the number of `update` iterations required to canonicalize a
+  relation.
+- Eliminating unnecessary sorting within `update_finalize`. If there are non-FD indexes $a->b,c$ and
+  $a,b->c$, their construction involves sorting by $a$ and $(a,b)$ respectively, but since a
+  lexographic sort on $(a,b)$ leaves the data already sorted by $a$, only the latter sort is
+  necessary.
+- Eliminating unnecessary key and value storage using invariant permutations. Particularly, for a
+  commutative operation such as `Add(a, b, c)`, the index $a,b->c$ does not need to store the
+  corresponding tuples $b,a->c$ as the pair $(a,b)$ can be canonically permuted to $(min(a,b),
+  max(a,b))$ in every lookup. In general, any legal permutation that maps keys to keys and values to
+  values can be applied to canonicalize tuples; $c->a,b$ can emulate containing $c->b,a$ while
+  indexes where permutations span both keys and values, such as $a->b,c$ still must also contain the
+  tuple $b->a,c$.
 
-/*
-=== Magic sets
+Finally, we would like to suggest three larger ideas with the potential to more fundamentally affect
+e-graph engine performance -- magic sets, accelerating associativity and sort-merge joins.
 
-#TODO[Since Oatlog/egglog is a superset of Datalog, this should be possible, right?]
+Magic sets, also called demand-driven evaluation, is a technique that allows bottom-up Datalog
+engines to achieve a similar performance profile to top-down evaluation common in Prolog engines.
+Effectively, we supplement every relation $"Foo"$ with another relation $"MagicFoo"$, where the
+presence of the latter indices a demand to derive the former. Every inference rule $"Premise" =>
+"Action"$ is replaced with a guarded forwards rule $"Premise" and "MagicAction" => "Action"$ as well
+as a backwards rule $"MagicAction" => "MagicPremise"$. These somewhat correspond to walking up and
+down in a recursive search tree. Implementing demand-driven evaluation for e-graphs in a similar
+manner is nontrivial given `union` actions, but could possibly be useful in some equality saturation
+use-cases.
 
-#TODO[we have not done this though, and it's unclear if it is useful, I guess rules can have a :magic annotation?]
+Associativity, $(a+b)+c=a+(b+c)$ and similarly for multiplication, is a large contributor to the
+exponential growth of saturated e-graphs as a function of the size of the initial expression. This
+is because if $N$ items are added together like $x_1 + x_2 + ... + x_N$, or with any other
+associative and commutative operation, then there are $2^N$ different subsets that all in general
+must be represented with different e-classes. And beyond this, there are $3^N$ different e-nodes
+that produce one of these sums by adding two of the others. On the other hand, a container could
+store the entire addition tree as a single multiset, and egglog programs could in general be sped up
+with their associative operators transparently replaced with multisets. It is feasible that this can
+achieve speedups, but efficiently removing the need to represent the $2^N$ subsets is nontrivial --
+it is unclear what capability should be required from the multiset relation data structure in order
+to allow an efficient implementation of the original rewrite rules. Finally, note that other
+particularly expensive rewrites can be addressed in a similar manner, with container types such as
+polynomials for the distributive law. In general one might call this e-graphs modulo theories, in
+analogy to satisfiability modulo theories, and one approach to achieving it is by restricting query
+planning to bottom-up e-matching @egraph_modulo_theories.
 
-Magic sets are a way to get the performance of top-down evaluation using bottom-up evaluation.
-
-#TODO[I guess this only makes sense if we want to prove two expressions equal?]
-
-#TODO[I think a fundamental problem to apply this to e-graphs is how to add "magic bits" to the equality relation.]
-
-#TODO[I don't know if the code is actually correct.]
-
-```datalog
-path(x, z) :- edge(x, y), path(y, z).
-
-path(x, y) :- edge(x, y).
-
-edge(1, 2).
-edge(2, 3).
-edge(3, 4).
-edge(4, 5).
-% edge(..., ...).
-
-?- path(2, 5)
-```
-
-Here, bottom-up evaluation would derive paths between all pairs of nodes, but
-we only care about the path between 2 and 5. For this case, top-down evaluation
-is faster to evaluate the query.
-
-The original program can be modified so that top-down evaluation only computes
-facts relevant to the query.
-
-```datalog
-path(x, z) :- edge(x, y), path(y, z), magic_path(x, z).
-
-path(x, y) :- edge(x, y), magic_path(x, y).
-
-magic_path(x, z) :- edge(x, y), magic_path(y, z).
-
-edge(1, 2).
-edge(2, 3).
-edge(3, 4).
-edge(4, 5).
-edge(5, 6).
-% edge(..., ...).
-
-magic_path(2, 5).
-
-?- path(2, 5)
-```
-
-Here, `magic_path` contains all the potentially useful paths, and paths are
-only computed if they are potentially useful.
-*/
-
-/*
-== Rule scheduling and termination
-
-#TODO[]
-
-=== Surjectivity
-
-#TODO[Surjectivity and "syntactically new variables"]
-
-#TODO["no syntactically new variables" = epic <=> strong = deterministic]
-
-If a rule does not create any new e-classes it is called surjective @eqlog.
-A theory only containing surjective rules is guaranteed to terminate @eqlog.
-
-=== Running unifying rules to closure before running rules that introduce e-classes.
-
-*/
-
-/*
-
-=== Semi-naive without running all rules all the time.
-
-#NOTE[this is not implemented yet, right now all rules run at the same time]
-
-Given the previous definition of semi-naive evaluation, it's not obvious how to
-discard the *new* set before all rules have been run.
-
-One approach to disabling rules is to still run all rules, but instead wait
-with inserting the results of some rules into the database. This has the
-drawback of still computing the joins unconditionally.
-
-Another approach is to use timestamps for each element in the database and
-explicitly query for things that are new. This is what egglog @egglog does, but
-it is problematic because it increases memory usage and essentially makes
-queries iterate through all historical timestamps.
-
-Conceptually, our approach will be to store the new set in a push-only list,
-and make the rules store what index in these they are at. See @semi-something
-for a visualization of this.
-
-#figure(
-  ```
-    rule1    rule2
-      v        v
-  [x, x, x, x, x, x, x, x]
-
-  add y, z w:
-
-    rule1    rule2
-      v        v
-  [x, x, x, x, x, x, x, x, y, z, w]
-
-  run rule1:
-
-  [x, x, x, x, x, x, x, x, y, z, w]
-      ^                          ^
-      |------rule1 new set-------|
-
-             rule2                rule1
-               v                    v
-  [x, x, x, x, x, x, x, x, y, z, w]
-
-  add a, b, c:
-
-             rule2                rule1
-               v                    v
-  [x, x, x, x, x, x, x, x, y, z, w, a, b, c]
-
-  run rule2:
-
-             rule2                rule1
-               v                    v
-  [x, x, x, x, x, x, x, x, y, z, w, a, b, c]
-               ^                          ^
-               |------rule2 new set-------|
-  ```,
-  caption: [Keeping semi-naive evaluation while not running all rules at the same time.],
-) <semi-something>
-
-*/
+Finally, a large fraction of Oatlog's run time consists of hashmap accesses, which by being random
+access use the memory subsystem extremely inefficiently. This is particularly true when the accesses
+result in L3 cache misses. An implementation relying on sort-merge joins, where two relations can be
+scanned sequentially due to having indexes already sorted by the join key, could significantly speed
+up e-matching and possibly also index maintenance. At the same time, this requires more complex
+query planning and could possibly require too many indexes and hence too much sorting to be
+beneficial performance-wise.
 
 #bibliography("refs.bib")
 #show: appendices
