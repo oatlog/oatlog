@@ -1567,27 +1567,26 @@ depending on the situation.
 
 = Implementation <chapter_implementation>
 
-#TODO[Suggested chapter structure
+// #TODO[Suggested chapter structure
+//
+//   - API interface
+//   - Architecture
+//     - Roughly describe structure of each IR
+//   - HIR optimizations
+//     - Pre-seminaive opts
+//     - Semi-naive, why precise old vs only all/new
+//     - Domination among semi-naive variants
+//     - Equality modulo permutation (is mostly HIR level, so place here)
+//   - TIR, Query planning
+//   - LIR and runtime considerations
+//     - Size of e-class ids
+//     - Index implementation
+//       - why hash over btree index
+//       - why full over trie index
+//     - Union find
+//     - Canonicalization in detail
+// ]
 
-  - API interface
-  - Architecture
-    - Roughly describe structure of each IR
-  - HIR optimizations
-    - Pre-seminaive opts
-    - Semi-naive, why precise old vs only all/new
-    - Domination among semi-naive variants
-    - Equality modulo permutation (is mostly HIR level, so place here)
-  - TIR, Query planning
-  - LIR and runtime considerations
-    - Size of e-class ids
-    - Index implementation
-      - why hash over btree index
-      - why full over trie index
-    - Union find
-    - Canonicalization in detail
-]
-
-#TODO[Elaborate and forward reference]
 /*
 
 This section discusses Oatlog in detail, including how it is used, what it can do and how it is
@@ -1862,8 +1861,6 @@ Overall, our comparative testing infrastructure (against egglog) can handle the 
 
 */
 
-#TODO[section summary]
-
 // - egglog compatible API interface
 //
 // - architecture and IRs
@@ -1880,21 +1877,42 @@ Overall, our comparative testing infrastructure (against egglog) can handle the 
 //     - spans
 //     - testing infrastructure
 
-== API interface
+This section describes the implementation of Oatlog.
+@section_implementation_api_interface describes the interface to use Oatlog as a library.
+@section_implementation_architecture describes the overall architecture of Oatlog and the IRs (Intermediate Representations) used in it.
+@section_implementation_hir_details presents details on the HIR and how it is optimized.
+@section_implementation_tir_details describes how the query planning is done to create the TIR.
+@section_implementation_lir_details presents the LIR and many of the runtime considerations such as index implementation.
 
-#TODO[example and link to appendix]
+== Main API interface <section_implementation_api_interface>
 
-== Architecture
+An example of how Oatlog can be used is shown in @section_implementation_api_demo, it checks if the quadratic formula is correct.
+The macro `oatlog::compile_egraph_relaxed!()` takes in egglog code and emits a struct `Theory` which implements the e-graph engine.
+
+`Theory::make()` creates a new empty e-class.
+`Theory::insert_*()` inserts an e-node into a relation.
+`Theory::step()` canonicalizes the e-graph and applies all rewrite rules once.
+`Theory::are_equal()` checks if two e-classes have been unified.
+
+=== Example <section_implementation_api_demo>
+
+#raw(read("../../examples/api-demo/src/main.rs"), lang: "rust")
+
+== Architecture Overview <section_implementation_architecture>
 
 #figure(
   image("../figures/architecture.svg"),
   caption: [A coarse overview of the current Oatlog architecture.],
 ) <oatlog-architecture>
 
+This section provides an overview of the Oatlog architecture, a diagram of it is in @oatlog-architecture.
+At a high-level it takes the egglog language as input and emits Rust code for the relations and rewrite rules.
+
 === Egglog AST
 
 We parse egglog into S-expressions and then into a egglog AST.
 This AST can be converted back into a string, and therefore makes it possible for us to implement shrinking of egglog code into minimal misbehaving examples.
+The shrinking works essentially the same way as it does for QuickCheck @quickcheck, except that we implemented it manually#footnote[As in, we did not use external libraries for this. Also, the actual testing of a egglog program is a bit complicated since we invoke rustc for each test because Oatlog emits Rust code.].
 We include span information in the egglog AST to be able to provide reasonable errors to the user.
 This is parsed into the HIR.
 
@@ -1904,29 +1922,21 @@ The HIR is mainly used to normalize and optimize rules.
 A rule is represented as a set of premises, actions and unifications.
 The main intra-rule optimizations are to merge identical variables, deduplicate premises and remove actions that are part of the premise.
 
-Additionally, after optimizations, here is where we apply the semi-naive transform where a rule is split into multiple variants, for example:
-
-$
-  "Add" join "Mul" join "Sub"
-$
-
-becomes
-
-$ "Add"_"new" join "Mul"_"old" join "Sub"_"old" $
-$ "Add"_"all" join "Mul"_"new" join "Sub"_"old" $
-$ "Add"_"all" join "Mul"_"all" join "Sub"_"new" $
-
-Because of symmetries in premises, the semi-naive transformation can generate rules that are actually equivalent, and therefore duplicates are removed, similarly to what is done in Eqlog @eqlog.
-
-#TODO[equality modulo permutation should maybe have it's own section, or this should link to more in-depth explanations]
-
-#TODO[forward reference to HIR opts]
-
 === TIR, trie IR
 
+The TIR is motivated by the fact that many rules have overlapping premises as seen in @trie-ir.
+To generate the TIR, we perform query planning and when multiple equally good choices are possible for a given rule, we select the choice that maximizes premise sharing.
+
+// While optimal query planning needs to consider the runtime sizes of relations, since we are performing query planning without runtime information we use a simple heuristic:
+// + Iterate new part of relation
+// + Global variable lookup
+// + All variables are bound
+// + The relation result is guaranteed to produce 0 or 1 elements due to functional dependency
+// + The relation contains some bound variable
+// + The relation contains no bound variables.
+// SEMI-JOIN
+
 #figure(
-  placement: top,
-  scope: "parent",
   grid(
     columns: (auto, auto, auto, auto),
     ```python
@@ -1967,43 +1977,164 @@ Because of symmetries in premises, the semi-naive transformation can generate ru
   ],
 ) <trie-ir>
 
-The TIR is motivated by the fact that many rules have overlapping premises as seen in @trie-ir.
-To generate the TIR, we perform query planning and when multiple equally good choices are possible for a given rule, we select the choice that maximizes premise sharing.
-
-#TODO[forward reference to query planning]
-
-// While optimal query planning needs to consider the runtime sizes of relations, since we are performing query planning without runtime information we use a simple heuristic:
-// + Iterate new part of relation
-// + Global variable lookup
-// + All variables are bound
-// + The relation result is guaranteed to produce 0 or 1 elements due to functional dependency
-// + The relation contains some bound variable
-// + The relation contains no bound variables.
-// SEMI-JOIN
-
 === LIR, low-level IR
 
-#TODO[]
+The LIR describes all relations and what indices they use, and contains a low-level description of how all joins and actions will be performed in the form of a trie.
 
-=== Runtime
+== HIR transformations <section_implementation_hir_details>
 
-#TODO[]
+The HIR is a high-level representation of a rewrite rules, for example, consider this rule:
+```egglog
+(rewrite (Mul (Const 0) x) (Const 0))
+```
 
-== Index implementation
+It would be represented as:
+```
+premise = [Mul(a, x, b), Const(0, a)]
+inserts = [Const(0, c)]
+unify = [{b, c}]
+```
+Where `premise` is the atoms in the join we want to perform, `inserts` is the set of atoms we want to insert and `unify` is the e-classes we want to unify.
+
+=== Intra-rule optimization <implementation_intra_rule_opt>
+
+In general, we can think of a rule as $"Premise" => "Action"$, and the overall goal of optimizing the HIR is to remove everything from the actions that is already present in the premise and to simplify the premise and action.
+
+We perform the following set of optimizations until we reach a fixpoint#footnote[$"optimize"(x) = x$]
+- Merging variables due to functional dependency.
+//     - from `(rule ((= c (Add a b)) (= d (Add a b))) (...))`
+//     - to   `(rule ((= c (Add a b)) (= c (Add a b))) (...))`
+- Deduplicating premise, action atoms.
+//     - from `(rule ((= c (Add a b)) (= c (Add a b))) (...))`
+//     - to   `(rule ((= c (Add a b))) (...))`
+- Removing all action atoms that are also present in premise.
+- Attempt to merge variables in unify, so the unify can be avoided.
+  - If both variables in unify are mentioned in premise, this is not done since it would modify the premise.
+- Make all action atoms use canonical variables according to unify.
+
+The effect of these optimizations is to reduce atoms, variables and unifications.
+Reducing premise and action atoms results in a smaller query and fewer unnecessary inserts.
+Reducing variables is beneficial for queries because the join result is smaller and because it may cause further deduplication.
+
+Since this set of optimizations commute and are beneficial, we reach a global optima without needing e-graphs.
+
+// #TODO[can we "prove" that these commute and that we therefore reach a global optima?]
+// While one could use e-graphs for this, these optimizations already commute, so they will still reach the global optima.
+// Semi-formal fixpoint algorithm:
+// ```
+// P(r, x -> y), P(r, x -> z) => union(premise_unify, y, z)
+// P(r, x -> y), A(r, x -> z) => union(action_unify, y, z)
+// A(r, x -> y), A(r, x -> z) => union(action_unify, y, z)
+//
+// union(premise_unify, x, y) => union(action_unify, x, y)
+//
+// P(r, x) => replace(P(r, x), P(r, find(premise_unify, x)))
+// A(r, x) => replace(A(r, x), A(r, find(action_unify, x)))
+//
+// P(r, equal_modulo(action_unify, x)), A(r, x) => remove(A(r, x))
+//
+// union(action_unify, x, y), !premise_var(x), !premise_var(y) =>
+// ```
+
+=== Semi-naive transformation
+
+Additionally, after optimizations, we apply a semi-naive transform where a rule is split into multiple variants, for example this join
+
+$
+  "Add" join "Mul" join "Sub"
+$
+
+Will be split into the following:
+
+$ "Add"_"new" join "Mul"_"old" join "Sub"_"old" $
+$ "Add"_"all" join "Mul"_"new" join "Sub"_"old" $
+$ "Add"_"all" join "Mul"_"all" join "Sub"_"new" $
+
+As mentioned in @section_background_seminaive, the point of this is to avoid re-discovering join results that are guaranteed to always be part of the database.
+
+Note that while this transformation guarantees that we will never get the exact same join result, we might still get duplicate actions, since actions typically only use a small subset of the variables in the query.
+Another way to think about it is that a project operation $pi_("<attributes>")("Relation")$ is performed on the join result before actions are triggered, causing potential duplicates.
+
+=== Domination
+
+Because of symmetries in premises, the semi-naive transformation can generate rules that are actually equivalent, and therefore duplicates are removed, similarly to what is done in Eqlog @eqlog.
+This is implemented using recursive backtracking, but is feasible since the queries are small.
+We call this domination because some semi-naive variants of a rule may contain the entire join result of another rule.
+
+=== Equality modulo permutation <eqmodperm>
+
+Consider a rule for commutativity:
+```egglog
+(rule (
+    (= res (Add a b))
+) (
+    (union res (Add b a))
+))
+```
+
+This implies that swapping columns `a` and `b` in `Add(a, b, res)` is the same relation.
+By maintaining the invariant that $("a", "b", "res") in "Add" <=> ("b", "a", "res") in "Add"$, we can reduce the number of indexes required.
+For example the index $"a" -> "b","res"$ is identical to the index $"b" -> "a","res"$.
+Additionally, the optimizations @implementation_intra_rule_opt are extended to consider equality modulo column permutation.
+In practice, this is mostly important for checking if a rule dominates another rule, since it opens more symmetries.
+
+== Query planning when constructing TIR <section_implementation_tir_details>
+
+Generally for optimal query planning one would need to consider runtime information such as the sizes of the relations and the sizes of joins.
+We are performing static query planning at compile-time since that is less engineering effort and query planning is very well established research.
+Therefore, we have very limited information about the sizes of relations:
+- Old/New is smaller than All
+- Functional dependence may cause some joins to only produce a single element.
+- Some relations are known to only contain a single element (globals)
+
+At a high-level, the query planner greedily selects a primary or a semi-join and if it introduced variables, semi-joins are added.
+
+We use the following scoring to select what join to perform next.
+
+```rust
+enum RelationScore {
+    Disconnected,
+    AllConnected,
+    OldConnected,
+    SemiJoinOld,
+    SemiJoinAll,
+    LastPrimary,
+    SingleElementConnected,
+    AllBound,
+    Global,
+    New,
+}
+```
+
+We perform joins with new first mainly because we maintain new as a deduplicated list and do not have any indexes on it.
+Globals, relations with all variables bound always produce a single element and are therefore queried first.
+We select old before all, since old is smaller.
+To make sure we still perform WCOJ, we need to ensure that we perform semi-joins before joins that may increase the number of elements, however we perform semi-joins with all first to make sure that the last semi-join can become a primary join on old, if possible.
+
+== LIR and runtime <section_implementation_lir_details>
+
+This section describes the LIR and runtime implementation, such as indexes.
+
+=== Index implementation
 
 #TODO[Remember to discuss trade-offs]
+
+#TODO[
+  – why hash over btree index
+  – why full over trie index
+]
 
 For each relation, there are some number of indexes.
 We consider two types of indexes FD (functional dependency) and non-FD indexes.
 Initially, we tried using sorted lists and b-trees, but ended up performing badly due to the access patterns having low locality.
 Instead, we are using hash maps.
 
-=== FD indexes
+==== FD indexes
 
 This type of index essentially corresponds to the hashcons, in e-graph theory.
 For every functional dependence in a relation, we have a FD index to enforce it, for a relation like `Add(x, y, res)` the key is `(x, y)` and the value is `res` and it is simply a `HashMap<Key, Value>`.
 
-=== non-FD indexes
+==== non-FD indexes
 
 Without some functional dependency, performing lookups on a subset of all columns may yield multiple values, so a data structure like `HashMap<Key, Vec<Value>>` is needed.
 However, having many small lists adds both space and allocation overhead, since an empty `Vec<T>` uses 24 bytes and creates individual allocations.
@@ -2016,7 +2147,7 @@ struct NonFdIndex<Key, Value> {
 }
 ```
 
-== Size of e-class IDs
+=== Size of e-class IDs
 
 Using 32-bit e-class IDs is preferable to using 64-bit IDs since that halves the size of our indices.
 However, we might in theory run out of IDs, so to justify this we need to reason about how many IDs are needed in practice.
@@ -2025,11 +2156,10 @@ In the union-find we have at least 4 bytes per e-class ID which gives a lower bo
 A less conservative estimate would assume that each e-class ID corresponds to a row in a relation
 and let's say 3 indices and 3 columns, requiring in-total 40 GiB before running out of IDs.
 
-#TODO[compiler applications motivate somewhat limited amount of memory]
-
-== Union-find
+=== Union-find
 
 #figure(
+  placement: top,
   ```rust
   // with path compression
   fn find(i: u32, repr: &mut [u32]) -> u32 {
@@ -2055,6 +2185,7 @@ and let's say 3 indices and 3 columns, requiring in-total 40 GiB before running 
 ) <fast-find-impl>
 
 #figure(
+  placement: top,
   ```rust
   // with smaller-to-larger
   fn union(a: u32, b: u32, repr: &mut [u32], size: &mut [u32]) {
@@ -2079,9 +2210,10 @@ and let's say 3 indices and 3 columns, requiring in-total 40 GiB before running 
           return;
       }
       let (newer, older) = (u32::max(a, b), u32::min(a, b));
+      repr[newer] = older;
   }
   ```,
-  caption: [union function smaller-to-larger and newer-to-older],
+  caption: [union function based on smaller-to-larger and newer-to-older],
 ) <fast-union-impl>
 
 A typical implementation of union-find includes both path-compression (@fast-find-impl) and smaller-to-larger merging (@fast-union-impl), but we omit path-compression and merge based on the smallest e-class id.
@@ -2102,19 +2234,359 @@ Smaller-to-larger has two constant factor issues, maintaining the sizes and read
 
 #TODO[]
 
-== Congruence closure/canonicalization
+=== Relations and theory codegen
+
+Each relation is generated as a struct and contains some indexes and one instance of each relation is contained in the main theory struct as can be seen in @figure_relation_struct.
+Additional functions are also generated for iterating, notably to iterate the "old" set, we filter based on timestamps.
+The relations are only updated through canonicalization.
+
+#figure(
+  text(
+    9pt,
+    grid(
+      columns: (1fr, 1fr),
+      ```rust
+      use runtime::{self, *}
+
+      struct Math(u32);
+      struct TimeStamp(u32);
+
+      struct Theory {
+          add: AddRelation,
+          mul: MulRelation,
+          /* ... */
+
+          latest_timestamp: TimeStamp,
+          delta: Delta,
+          uf: Unification,
+      }
+
+      struct Delta {
+          add: Vec<(Math, Math, Math)>,
+          mul: Vec<(Math, Math, Math)>,
+          /* ... */
+      }
+
+      // we have a separate union-find per type
+      struct Unification {
+          math: UnionFind<Math>,
+          /* ... */
+      }
+      ```,
+      ```rust
+      struct AddRelation {
+          new: Vec<(Math, Math, Math)>,
+
+          // the "hashcons" for the add relation
+          // a, b -> res
+          fd_index_0_1: runtime::HashMap<
+              (Math, Math), (Math, TimeStamp)
+          >,
+
+          // a -> b, res
+          nofd_index_0: runtime::IndexedSortedList<
+              (Math,), (Math, Math, TimeStamp)
+          >,
+
+          // b -> a, res
+          nofd_index_1: runtime::IndexedSortedList<
+              (Math,), (Math, Math, TimeStamp)
+          >,
+
+          // res -> a, b
+          nofd_index_2: runtime::IndexedSortedList<
+              (Math,), (Math, Math, TimeStamp)
+          >,
+
+          math_num_uprooted_at_latest_retain: usize,
+      }
+      ```,
+    ),
+  ),
+  caption: [codegen example of a relation],
+) <figure_relation_struct>
+
+=== Canonicalization
 
 To implement canonicalization in $O(n log n)$, one would need to maintain an index from e-class to row (essentially reverse of hashcons) and merge smaller-to-larger.
 Informally, this is $O(n log n)$ because there are $O(n)$ e-classes and each e-class is changed at most $O(log n)$ times.
-#TODO[cite something formally maybe]
 
-However, we do not do that #TODO[]
+However, we do not do that because we want to avoid creating and maintaining a index from e-class to row.
+We instead alternate between filtering out non-canonical rows from the hashcons and then canonicalizing them and re-inserting them into the hashcons again.
+While this does bump our worst case to $O(n^2)$, for the benchmarks that we used we only needed at most 3 or 4 rounds at most to canonicalize.
+Assuming that in practice we have a bounded number of required rounds, we are in some sense still performing canonicalization in $O(n)$.
 
-To simplify explanations, we consider a relation `Add(x, y, res)` where there is a FD index from x,y to res.
-We implement canonicalization by inserting delta into the FD index, which triggers unifications, and then we iterate the FD index, removing non-canonical rows and putting them in a delta.
-This is repeated until fixpoint.
-#TODO[]
+How canonicalization on the theory is implemented is shown in @figure_canonicalize_impl.
+First, we insert all of delta into the relations using `update_insert`.
+Then, we call `update` on each relation, which triggers unifications.
+`update` is called until we reach a fixpoint, meaning that no more unifications are triggered.
+Then, to reconstruct the indexes, we call `update_finalize` on all the relations.
 
+The generated implementations of `update_insert`, `update` and `update_finalize` is shown in @figure_relation_update_insert_impl, @figure_relation_update_impl and @figure_relation_update_finalize_impl.
+`update_insert` inserts or re-inserts into the hashcons. It iterates through a slice, canonicalizes each row and if the e-node is already present, it unifies the output of the old and new e-node.
+The timestamp is only updated if the output e-node actually changes, which minimizes the size of the new set.
+`update` removes all non-canonical e-nodes from the hashcons and calls `update_insert` to re-insert them.
+`update_finalize` reconstructs all indexes, specifically it creates the "new" set by looking at timestamps in the hashcons, creates a list of all elements in the hashcons and sorts it according to each index order to facilitate index reconstruction.
+
+#figure(
+  text(
+    size: 9pt,
+    ```rust
+    fn update_insert(
+        &mut self,
+        insertions: &[Self::Row],
+        uf: &mut Unification,
+        latest_timestamp: TimeStamp,
+    ) {
+        for &(mut x0, mut x1, mut x2) in insertions {
+            match self
+                .fd_index_0_1
+                .entry((uf.math_.find(x0), uf.math_.find(x1)))
+            {
+                runtime::HashMapEntry::Occupied(mut entry) => {
+                    let (y2, timestamp) = entry.get_mut();
+                    let changed = false;
+                    let old_val = *y2;
+                    let changed = changed | (old_val != uf.math_.union_mut(&mut x2, y2));
+                    if changed {
+                        *timestamp = latest_timestamp;
+                    }
+                }
+                runtime::HashMapEntry::Vacant(entry) => {
+                    entry.insert((uf.math_.find(x2), latest_timestamp));
+                }
+            }
+        }
+    }
+    ```,
+  ),
+  caption: [`update_begin` implementation for the add relation. This has been modified for readability.],
+) <figure_relation_update_insert_impl>
+
+#figure(
+  text(
+    size: 9pt,
+    ```rust
+    fn canonicalize(&mut self) {
+        self.latest_timestamp += 1;
+
+        // insert new e-nodes into the relations
+        self.mul.clear_new();
+        self.add.clear_new();
+        self.mul.update_insert(&mut self.delta.mul, &mut self.uf, self.latest_timestamp);
+        self.add.update_insert(&mut self.delta.add, &mut self.uf, self.latest_timestamp);
+
+        // canonicalize until fixpoint
+        loop {
+            let mut progress = false;
+            progress |= self.mul.update(&mut self.delta.mul_, &mut self.uf, self.latest_timestamp);
+            progress |= self.add.update(&mut self.delta.add_, &mut self.uf, self.latest_timestamp);
+            if !progress {
+                break;
+            }
+        }
+
+        // reconstruct all indexes
+        self.mul_.update_finalize(
+            &mut self.delta.mul,
+            &mut self.uf,
+            self.latest_timestamp,
+        );
+        self.add_.update_finalize(
+            &mut self.delta.add,
+            &mut self.uf,
+            self.latest_timestamp,
+        );
+    }
+    ```,
+  ),
+  caption: [Canonicaliztion driver code for the main theory struct. This has been modified for readability.],
+) <figure_canonicalize_impl>
+
+#figure(
+  text(
+    size: 9pt,
+    ```rust
+    fn update(
+        &mut self,
+        insertions: &mut Vec<Self::Row>,
+        uf: &mut Unification,
+        latest_timestamp: TimeStamp,
+    ) -> bool {
+        if self.math_num_uprooted_at_latest_retain == uf.math_.num_uprooted() {
+            // we have reached a fixpoint for this relation if there where no more unifications since we
+            // last ran update.
+            return false;
+        }
+        self.math_num_uprooted_at_latest_retain = uf.math_.num_uprooted();
+        self.fd_index_0_1
+            .retain(|&(x0, x1), &mut (x2, _timestamp)| {
+                if uf.math_.is_root(x0) & uf.math_.is_root(x1) & uf.math_.is_root(x2) {
+                    true
+                } else {
+                    insertions.push((x0, x1, x2));
+                    false
+                }
+            });
+        self.update_insert(&insertions, uf, latest_timestamp);
+        insertions.clear();
+        true
+    }
+    ```,
+  ),
+  caption: [`update` implementation for the add relation. This has been modified for readability.],
+) <figure_relation_update_impl>
+
+#figure(
+  text(
+    size: 9pt,
+    ```rust
+    fn update_finalize(
+        &mut self,
+        uf: &mut Unification,
+        latest_timestamp: TimeStamp,
+    ) {
+        // fill new with the "new" part of the hashcons according to the timestamp.
+        self.new.extend(self.fd_index_0_1.iter().filter_map(
+            |(&(x0, x1), &(x2, timestamp))| {
+                if timestamp == latest_timestamp {
+                    Some((x0, x1, x2))
+                } else {
+                    None
+                }
+            },
+        ));
+        // sort new using radix sort
+        RadixSortable::wrap(&mut self.new).voracious_sort();
+
+        // fill a vector will all rows in the table to facilitate index reconstruction.
+        let mut all: Vec<_> = self.fd_index_0_1
+          .iter()
+          .map(|(&(x0, x1), &(x2, timestamp))| (x0, x1, x2, timestamp))
+          .collect();
+
+        // radix sort the "all" list by the relevant column set and reconstruct the index.
+        RowSort100::sort(&mut self.all);
+        self.nofd_index_0.reconstruct(
+            &mut self.all,
+            |(x0, x1, x2, timestamp)| (x0,),
+            |(x0, x1, x2, timestamp)| (x1, x2, timestamp),
+        );
+
+        // radix sort the "all" list by the relevant column set and reconstruct the index.
+        RowSort010::sort(&mut self.all);
+        self.nofd_index_1.reconstruct(
+            &mut self.all,
+            |(x0, x1, x2, timestamp)| (x1,),
+            |(x0, x1, x2, timestamp)| (x0, x2, timestamp),
+        );
+
+        // radix sort the "all" list by the relevant column set and reconstruct the index.
+        RowSort001::sort(&mut self.all);
+        self.nofd_index_2.reconstruct(
+            &mut self.all,
+            |(x0, x1, x2, timestamp)| (x2,),
+            |(x0, x1, x2, timestamp)| (x0, x1, timestamp),
+        );
+
+        self.math_num_uprooted_at_latest_retain = 0;
+    }
+    ```,
+  ),
+  caption: [`update_finalize` implementation for the add relation],
+) <figure_relation_update_finalize_impl>
+
+// self.uf.reset_num_uprooted();
+
+=== Applying rules
+
+An example of the generated code for applying rules is in @figure_apply_rules.
+The structure of the generated code matches the shape of the TIR, with some sharing between rules.
+Actions are applied through `entry`, `insert` and `union` which modify the union-find and delta.
+Entry checks if a given e-node is already part of a relation in the previous step, and then either returns the e-class for an existing e-node or creates a new e-node.
+
+#figure(
+  text(
+    size: 9pt,
+    ```rust
+
+    fn apply_rules(&mut self) {
+        for (x_4, v14, v15) in self.mul.iter_new() {
+            // ( rewrite ( Mul a b ) ( Mul b a ) )
+            self.delta.insert_mul((v14, x_4, v15));
+            if let v13 = self.global_i64.get(0usize) {
+                if self.const_.check_0_1(v13, v14) {
+                    // ( rewrite ( Mul x ( Const 0 ) ) ( Const 0 ) )
+                    self.uf.math_.union(v14, v15);
+                }
+            }
+        }
+        for (x, v2, v3) in self.add_.iter_new() {
+            // ( rewrite ( Mul a b ) ( Mul b a ) )
+            self.delta.insert_add((v2, x, v3));
+            for (x_11, v77) in self.mul_.iter_old_1_to_0_2(v3, self.latest_timestamp) {
+                // ( rewrite ( Mul x ( Add a b ) ) ( Add ( Mul x a ) ( Mul x b ) ) )
+                let (v79,) = self
+                    .mul_
+                    .entry_0_1_to_2(x_11, v2, &mut self.delta, &mut self.uf);
+                let (v78,) = self
+                    .mul_
+                    .entry_0_1_to_2(x_11, x, &mut self.delta, &mut self.uf);
+                self.delta.insert_add((v78, v79, v77));
+            }
+            for (c_3, v58) in self.add_.iter_all_0_to_1_2(v3) {
+                // ( rewrite ( Add ( Add a b ) c ) ( Add a ( Add b c ) ) )
+                let (v59,) = self
+                    .add_
+                    .entry_0_1_to_2(v2, c_3, &mut self.delta, &mut self.uf);
+                self.delta.insert_add((x, v59, v58));
+            }
+            for (a_6, b_6) in self.add_.iter_old_2_to_0_1(x, self.latest_timestamp) {
+                // ( rewrite ( Add ( Add a b ) c ) ( Add a ( Add b c ) ) )
+                let (v65,) = self
+                    .add_
+                    .entry_0_1_to_2(b_6, v2, &mut self.delta, &mut self.uf);
+                self.delta.insert_add((a_6, v65, v3));
+            }
+            if let v1 = self.global_i64.get(0usize) {
+                if self.const_.check_0_1(v1, v2) {
+                    // ( rewrite ( Add x ( Const 0 ) ) x )
+                    self.uf.math_.union(x, v3);
+                }
+            }
+        }
+        for (v5, v6) in self.const_.iter_new() {
+            if v5 == self.global_i64.get(0usize) {
+                for (x_5, v19) in self.mul_.iter_old_1_to_0_2(v6, self.latest_timestamp) {
+                    // ( rewrite ( Mul x ( Const 0 ) ) ( Const 0 ) )
+                    self.uf.math_.union(v6, v19);
+                }
+                for (x_2, v7) in self.add_.iter_old_1_to_0_2(v6, self.latest_timestamp) {
+                    // ( rewrite ( Add x ( Const 0 ) ) x )
+                    self.uf.math_.union(x_2, v7);
+                }
+            }
+        }
+        if let Some(v9) = self.global_i64.get_new(0usize) {
+            for (v10,) in self.const_.iter_old_0_to_1(v9, self.latest_timestamp) {
+                for (x_6, v23) in self.mul_.iter_old_1_to_0_2(v10, self.latest_timestamp) {
+                    // ( rewrite ( Mul x ( Const 0 ) ) ( Const 0 ) )
+                    self.uf.math_.union(v10, v23);
+                }
+                for (x_3, v11) in self.add_.iter_old_1_to_0_2(v10, self.latest_timestamp) {
+                    // ( rewrite ( Add x ( Const 0 ) ) x )
+                    self.uf.math_.union(x_3, v11);
+                }
+            }
+        }
+    }
+
+    ```,
+  ),
+  caption: [Example of generated code for `apply_rules`],
+) <figure_apply_rules>
+
+/*
 ```python
 class AddRelation:
     new: List[(Math, Math, Math)]
@@ -2187,111 +2659,7 @@ class Theory:
         self.mul.update_finalize(self.latest_timestamp)
 
 ```
-
-== Actions/apply rules
-
-#TODO[]
-/*
-
-=== Merging rules with identical premises
-
-#NOTE[Not implemented yet.]
-
-It is very rare that the user provides rules with identical premises, but with semi-naive evaluation
-we produce many very similar rules that can potentially be merged. To merge rules, we compare the
-premises of the rules and, if they are equal, replace them with a rule that combines the actions of
-the original rules.
-
 */
-
-== HIR optimization
-
-In general, we can think of a rule as $"Premise" => "Action"$, and the overall goal of optimizing the HIR is to remove everything from the actions that are already present in the premise and to simplify the premise and action.
-
-For example, consider this rule:
-```egglog
-(rewrite (Mul (Const 0) x) (Const 0))
-```
-
-It would be represented as:
-```
-premise = [Mul(a, x, b), Const(0, a)]
-inserts = [Const(0, c)]
-unify = [{b, c}]
-```
-Where `premise` is the atoms in the join we want to perform, `inserts` is the set of atoms we want to insert and `unify` is the e-classes we want to unify.
-
-We perform the following set of optimizations until we reach a fixpoint
-- Merging variables due to functional dependency.
-//     - from `(rule ((= c (Add a b)) (= d (Add a b))) (...))`
-//     - to   `(rule ((= c (Add a b)) (= c (Add a b))) (...))`
-- Deduplicating premise, action atoms.
-//     - from `(rule ((= c (Add a b)) (= c (Add a b))) (...))`
-//     - to   `(rule ((= c (Add a b))) (...))`
-- Removing all action atoms that are also present in premise.
-- Attempt to merge variables in unify, so the unify can be avoided.
-  - If both variables in unify are mentioned in premise, this is not done since it would modify the premise.
-- Make all action atoms use canonical variables according to unify.
-
-The effect of these optimizations is to reduce atoms, variables and unifications.
-Reducing premise and action atoms results in a smaller query and fewer unnecessary inserts.
-Reducing variables is beneficial for queries because the join result is smaller and because it may cause further deduplication.
-
-Since this set of optimizations commute, we reach a global optima without needing e-graphs.
-
-// #TODO[can we "prove" that these commute and that we therefore reach a global optima?]
-// While one could use e-graphs for this, these optimizations already commute, so they will still reach the global optima.
-
-// Semi-formal fixpoint algorithm:
-// ```
-// P(r, x -> y), P(r, x -> z) => union(premise_unify, y, z)
-// P(r, x -> y), A(r, x -> z) => union(action_unify, y, z)
-// A(r, x -> y), A(r, x -> z) => union(action_unify, y, z)
-//
-// union(premise_unify, x, y) => union(action_unify, x, y)
-//
-// P(r, x) => replace(P(r, x), P(r, find(premise_unify, x)))
-// A(r, x) => replace(A(r, x), A(r, find(action_unify, x)))
-//
-// P(r, equal_modulo(action_unify, x)), A(r, x) => remove(A(r, x))
-//
-// union(action_unify, x, y), !premise_var(x), !premise_var(y) =>
-// ```
-
-== Query planning
-
-Generally for optimal query planning one would need to consider runtime information such as the sizes of the relations and the sizes of joins.
-We are performing static query planning at compile-time since that is less engineering effort and query planning is very well established research.
-Therefore, we have very limited information about the sizes of relations:
-- Old/New is smaller than All
-- Functional dependence may cause some joins to only produce a single element.
-- Some relations are known to only contain a single element (globals)
-
-At a high-level, the query planner selects a primary or a semi-join and if it introduced variables, semi-joins are added.
-
-We use the following scoring to select what join to perform next.
-
-```rust
-enum RelationScore {
-    Disconnected,
-    AllConnected,
-    OldConnected,
-    SemiJoinOld,
-    SemiJoinAll,
-    LastPrimary,
-    SingleElementConnected,
-    AllBound,
-    Global,
-    New,
-}
-```
-
-We perform joins with new first mainly because we maintain new as a deduplicated list and do not have any indexes on it.
-Globals, relations with all variables bound always produce a single element and are therefore queried first.
-We select old before all, since old is smaller.
-To make sure we still perform WCOJ, we need to ensure that we perform semi-joins before joins that may increase the number of elements, however we perform semi-joins with all first to make sure that the last semi-join can become a primary join on old, if possible.
-
-== Equality modulo permutation <eqmodperm>
 
 #TODO[]
 

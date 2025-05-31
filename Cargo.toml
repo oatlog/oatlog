@@ -5,6 +5,7 @@ members = [
     "examples/partial-integration",
     "examples/partial-integration-fueled",
     "examples/quadratic-formula",
+    "examples/api-demo",
     "examples/simple-forall",
     "examples/test-api", "experiments",
     "experiments",
