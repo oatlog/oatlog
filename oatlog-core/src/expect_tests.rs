@@ -130,6 +130,688 @@ fn shrink_cases() {
 // Action: (Neg a b), (Neg a c)
 
 #[test]
+fn test_primitive_in_premise() {
+    Steps {
+        strict_egglog_compat: true,
+        code: r#"
+            (datatype Math
+                (Const i64)
+            )
+
+            (rule (
+                (Const a)
+                (Const b)
+                (Const (+ a b))
+            ) (
+                (Const (- a b))
+            ))
+
+            (rule (
+                (Const a)
+                (Const b)
+                (!= a b)
+            ) (
+                (Const (- a b))
+            ))
+        "#,
+        expected_hir: Some(expect![[r#"
+            Theory {
+                types: {
+                    [t0, i64]: std::primitive::i64,
+                    [t1, Math]: [symbolic],
+                },
+                symbolic_rules: [
+                    SymbolicRule {
+                        src: "( rule ( ( Const a ) ( Const b ) ( Const ( + a b ) ) ) ( ( Const ( - a b ) ) ) )",
+                        atoms: [
+                            Premise { relation: +, columns: [a, b, v4], entry: [_, _, !] },
+                            Premise { relation: Const, columns: [a, v1] },
+                            Premise { relation: Const, columns: [b, v3] },
+                            Premise { relation: Const, columns: [v4, v5] },
+                            Action { relation: -, columns: [a, b, v6], entry: [_, _, !] },
+                            Action { relation: Const, columns: [v6, v7], entry: [_, U] },
+                        ],
+                        variables: {
+                            v0: VariableMeta { name: Some("a"), ty: t0 },
+                            v1: VariableMeta { name: None, ty: t1 },
+                            v2: VariableMeta { name: Some("b"), ty: t0 },
+                            v3: VariableMeta { name: None, ty: t1 },
+                            v4: VariableMeta { name: None, ty: t0 },
+                            v5: VariableMeta { name: None, ty: t1 },
+                            v6: VariableMeta { name: None, ty: t0 },
+                            v7: VariableMeta { name: None, ty: t1 },
+                        },
+                        unify: [],
+                    },
+                    SymbolicRule {
+                        src: "( rule ( ( Const a ) ( Const b ) ( != a b ) ) ( ( Const ( - a b ) ) ) )",
+                        atoms: [
+                            Premise { relation: !=, columns: [a, b], entry: [_, _] },
+                            Premise { relation: Const, columns: [a, v1] },
+                            Premise { relation: Const, columns: [b, v3] },
+                            Action { relation: -, columns: [a, b, v4], entry: [_, _, !] },
+                            Action { relation: Const, columns: [v4, v5], entry: [_, U] },
+                        ],
+                        variables: {
+                            v0: VariableMeta { name: Some("a"), ty: t0 },
+                            v1: VariableMeta { name: None, ty: t1 },
+                            v2: VariableMeta { name: Some("b"), ty: t0 },
+                            v3: VariableMeta { name: None, ty: t1 },
+                            v4: VariableMeta { name: None, ty: t0 },
+                            v5: VariableMeta { name: None, ty: t1 },
+                        },
+                        unify: [],
+                    },
+                ],
+                relations: {
+                    r0: + { columns: [i64, i64, i64], kind: Primitive(i64_add012), implicit_rules: {n0: [_, _, !]} },
+                    r1: != { columns: [i64, i64], kind: Primitive(i64_ne01), implicit_rules: {n0: [_, _]} },
+                    r2: - { columns: [i64, i64, i64], kind: Primitive(i64_sub012), implicit_rules: {n0: [_, _, !]} },
+                    r3: Const { columns: [i64, Math], kind: Table, implicit_rules: {n0: [_, U]} },
+                },
+            }"#]]),
+        expected_tir: Some(expect![[r#"
+            Trie {
+                map: {
+                    Primary(r3_New(*v0*, *v1*)): Trie {
+                        map: {
+                            Primary(r3_All(*v2*, *v3*)): Trie {
+                                map: {
+                                    Primary(r0_All(v0, v2, *v4*)): Trie {
+                                        map: {
+                                            Primary(r3_All(v4, *v5*)): Trie {
+                                                map: {},
+                                            },
+                                        },
+                                    },
+                                    Primary(r1_All(v0, v2)): Trie {
+                                        map: {},
+                                    },
+                                    Primary(r3_Old(*v8*, *v9*)): Trie {
+                                        map: {
+                                            Primary(r0_All(v8, v0, v2)): Trie {
+                                                map: {},
+                                            },
+                                        },
+                                    },
+                                },
+                            },
+                            Primary(r3_Old(*v8*, *v9*)): Trie {
+                                map: {
+                                    Primary(r1_All(v8, v0)): Trie {
+                                        map: {},
+                                    },
+                                    Primary(r3_Old(*v18*, *v19*)): Trie {
+                                        map: {
+                                            Primary(r0_All(v8, v18, v0)): Trie {
+                                                map: {},
+                                            },
+                                        },
+                                    },
+                                },
+                            },
+                        },
+                    },
+                },
+            }"#]]),
+        expected_lir: Some(expect![[r#"
+            Theory {
+                name: None,
+                types: {
+                    [t0, i64]: std::primitive::i64,
+                    [t1, Math]: [symbolic],
+                },
+                relations: {
+                    r0: RelationData {
+                        name: "i64_add012",
+                        param_types: {c0: t0, c1: t0, c2: t0},
+                        kind: Primitive,
+                    },
+                    r1: RelationData {
+                        name: "i64_ne01",
+                        param_types: {c0: t0, c1: t0},
+                        kind: Primitive,
+                    },
+                    r2: RelationData {
+                        name: "i64_sub012",
+                        param_types: {c0: t0, c1: t0, c2: t0},
+                        kind: Primitive,
+                    },
+                    r3: RelationData {
+                        name: "Const",
+                        param_types: {c0: t0, c1: t1},
+                        kind: Table {
+                            index_to_info: {ir0: 0=>1:union, ir1: =>0_1},
+                        },
+                    },
+                },
+                rule_variables: {
+                    [v0, a]: t0,
+                    [v1, v1]: t1,
+                    [v10, b_2]: t0,
+                    [v11, v11]: t1,
+                    [v12, v12]: t0,
+                    [v13, v13]: t1,
+                    [v14, v14]: t0,
+                    [v15, v15]: t1,
+                    [v16, a_3]: t0,
+                    [v17, v17]: t1,
+                    [v18, b_3]: t0,
+                    [v19, v19]: t1,
+                    [v2, b]: t0,
+                    [v20, v20]: t0,
+                    [v21, v21]: t1,
+                    [v22, v22]: t0,
+                    [v23, v23]: t1,
+                    [v24, a_4]: t0,
+                    [v25, v25]: t1,
+                    [v26, b_4]: t0,
+                    [v27, v27]: t1,
+                    [v28, v28]: t0,
+                    [v29, v29]: t1,
+                    [v3, v3]: t1,
+                    [v30, a_5]: t0,
+                    [v31, v31]: t1,
+                    [v32, b_5]: t0,
+                    [v33, v33]: t1,
+                    [v34, v34]: t0,
+                    [v35, v35]: t1,
+                    [v36, b_6]: t0,
+                    [v37, a_6]: t0,
+                    [v4, v4]: t0,
+                    [v5, v5]: t1,
+                    [v6, v6]: t0,
+                    [v7, v7]: t1,
+                    [v8, a_2]: t0,
+                    [v9, v9]: t1,
+                },
+                global_variable_types: {},
+                rule_tries: [
+                    premise: [IterNew, r3(v0, v1)]
+                    then: [
+                        premise: [JoinAll, r3(v2, v3), ir1]
+                        then: [
+                            premise: [JoinAll, r0(v0, v2, v4), ir_bogus]
+                            then: [
+                                premise: [JoinAll, r3(v4, v5), ir0]
+                                meta: "( rule ( ( Const a ) ( Const b ) ( Const ( + a b ) ) ) ( ( Const ( - a b ) ) ) )"
+                                actions: [
+                                    [Action::Entry, r2(v0, v2, v6) on ir_bogus],
+                                    [Action::Entry, r3(v6, v7) on ir0],
+                                ],
+                            ],
+                            premise: [JoinAll, r1(v0, v2), ir_bogus]
+                            meta: "( rule ( ( Const a ) ( Const b ) ( != a b ) ) ( ( Const ( - a b ) ) ) )"
+                            actions: [
+                                [Action::Entry, r2(v0, v2, v28) on ir_bogus],
+                                [Action::Entry, r3(v28, v29) on ir0],
+                            ],
+                            premise: [JoinOld, r3(v8, v9), ir1]
+                            then: [
+                                premise: [JoinAll, r0(v8, v0, v36), ir_bogus]
+                                then: [
+                                    premise: [IfEq, v2=v36]
+                                    meta: "( rule ( ( Const a ) ( Const b ) ( Const ( + a b ) ) ) ( ( Const ( - a b ) ) ) )"
+                                    actions: [
+                                        [Action::Entry, r2(v8, v0, v14) on ir_bogus],
+                                        [Action::Entry, r3(v14, v15) on ir0],
+                                    ],
+                                ],
+                            ],
+                        ],
+                        premise: [JoinOld, r3(v8, v9), ir1]
+                        then: [
+                            premise: [JoinAll, r1(v8, v0), ir_bogus]
+                            meta: "( rule ( ( Const a ) ( Const b ) ( != a b ) ) ( ( Const ( - a b ) ) ) )"
+                            actions: [
+                                [Action::Entry, r2(v8, v0, v34) on ir_bogus],
+                                [Action::Entry, r3(v34, v35) on ir0],
+                            ],
+                            premise: [JoinOld, r3(v18, v19), ir1]
+                            then: [
+                                premise: [JoinAll, r0(v8, v18, v37), ir_bogus]
+                                then: [
+                                    premise: [IfEq, v0=v37]
+                                    meta: "( rule ( ( Const a ) ( Const b ) ( Const ( + a b ) ) ) ( ( Const ( - a b ) ) ) )"
+                                    actions: [
+                                        [Action::Entry, r2(v8, v18, v22) on ir_bogus],
+                                        [Action::Entry, r3(v22, v23) on ir0],
+                                    ],
+                                ],
+                            ],
+                        ],
+                    ],
+                ],
+                initial: [],
+            }"#]]),
+        expected_codegen: Some(expect![[r#"
+            use oatlog::runtime::{self, *};
+            eclass_wrapper_ty!(Math);
+            fn i64_add012(a: i64, b: i64) -> impl Iterator<Item = (i64,)> {
+                a.checked_add(b).map(|x| (x,)).into_iter()
+            }
+            fn i64_ne01(a: i64, b: i64) -> impl Iterator<Item = ()> {
+                (a != b).then_some(()).into_iter()
+            }
+            fn i64_sub012(a: i64, b: i64) -> impl Iterator<Item = (i64,)> {
+                a.checked_sub(b).map(|x| (x,)).into_iter()
+            }
+            #[derive(Debug, Default)]
+            struct ConstRelation {
+                new: Vec<<Self as Relation>::Row>,
+                all: Vec<(std::primitive::i64, Math, TimeStamp)>,
+                fd_index_0: runtime::HashMap<(std::primitive::i64,), (Math, TimeStamp)>,
+                nofd_index_: runtime::IndexedSortedList<(), (std::primitive::i64, Math, TimeStamp)>,
+                i64_num_uprooted_at_latest_retain: usize,
+                math_num_uprooted_at_latest_retain: usize,
+            }
+            impl Relation for ConstRelation {
+                type Row = (std::primitive::i64, Math);
+                type Unification = Unification;
+                const COST: u32 = 4u32;
+                fn new() -> Self {
+                    Self::default()
+                }
+                fn has_new(&self) -> bool {
+                    !self.new.is_empty()
+                }
+                fn clear_new(&mut self) {
+                    self.new.clear();
+                }
+                fn iter_new(&self) -> impl '_ + Iterator<Item = Self::Row> {
+                    self.new.iter().copied()
+                }
+                fn len(&self) -> usize {
+                    self.fd_index_0.len()
+                }
+                fn emit_graphviz(&self, buf: &mut String) {
+                    use std::fmt::Write;
+                    for (i, ((x0,), (x1, _timestamp))) in self
+                        .fd_index_0
+                        .iter()
+                        .map(|(k, v)| ((*k), (*v)))
+                        .enumerate()
+                    {
+                        writeln!(buf, "{}_{i} -> {}_{};", "const", "i64", x0).unwrap();
+                        writeln!(buf, "{}_{i} -> {}_{};", "const", "math", x1).unwrap();
+                        writeln!(buf, "{}_{i} [shape = box];", "const").unwrap();
+                    }
+                }
+                fn update_begin(
+                    &mut self,
+                    insertions: &[Self::Row],
+                    uf: &mut Unification,
+                    latest_timestamp: TimeStamp,
+                ) {
+                    log_duration!("update_begin {}: {}", "const", {
+                        for &(mut x0, mut x1) in insertions {
+                            match self.fd_index_0.entry((x0,)) {
+                                runtime::HashMapEntry::Occupied(mut entry) => {
+                                    let (y1, timestamp) = entry.get_mut();
+                                    let changed = false;
+                                    let old_val = *y1;
+                                    let changed = changed | (old_val != uf.math_.union_mut(&mut x1, y1));
+                                    if changed {
+                                        *timestamp = latest_timestamp;
+                                    }
+                                }
+                                runtime::HashMapEntry::Vacant(entry) => {
+                                    entry.insert((uf.math_.find(x1), latest_timestamp));
+                                }
+                            }
+                        }
+                    });
+                }
+                fn update(
+                    &mut self,
+                    insertions: &mut Vec<Self::Row>,
+                    uf: &mut Unification,
+                    latest_timestamp: TimeStamp,
+                ) -> bool {
+                    log_duration!("update {}: {}", "const", {
+                        if self.math_num_uprooted_at_latest_retain == uf.math_.num_uprooted() {
+                            return false;
+                        }
+                        let offset = insertions.len();
+                        self.math_num_uprooted_at_latest_retain = uf.math_.num_uprooted();
+                        self.fd_index_0.retain(|&(x0,), &mut (x1, _timestamp)| {
+                            if uf.math_.is_root(x1) {
+                                true
+                            } else {
+                                insertions.push((x0, x1));
+                                false
+                            }
+                        });
+                        self.update_begin(&insertions[offset..], uf, latest_timestamp);
+                        true
+                    })
+                }
+                fn update_finalize(
+                    &mut self,
+                    insertions: &mut Vec<Self::Row>,
+                    uf: &mut Unification,
+                    latest_timestamp: TimeStamp,
+                ) {
+                    log_duration!("update_finalize {}: {}", "const", {
+                        assert!(self.new.is_empty());
+                        log_duration!("fill new and all: {}", {
+                            self.new.extend(
+                                self.fd_index_0
+                                    .iter()
+                                    .filter_map(|(&(x0,), &(x1, timestamp))| {
+                                        if timestamp == latest_timestamp {
+                                            Some((x0, x1))
+                                        } else {
+                                            None
+                                        }
+                                    }),
+                            );
+                            self.new.sort_unstable();
+                            self.all.clear();
+                            self.all.extend(
+                                self.fd_index_0
+                                    .iter()
+                                    .map(|(&(x0,), &(x1, timestamp))| (x0, x1, timestamp)),
+                            );
+                            insertions.clear();
+                        });
+                        #[cfg(debug_assertions)]
+                        {
+                            self.new.iter().for_each(|&(x0, x1)| {
+                                assert_eq!((x0, x1,), (x0, uf.math_.find(x1),), "new is canonical");
+                            });
+                            let mut new = self.new.clone();
+                            new.sort();
+                            new.dedup();
+                            assert_eq!(new.len(), self.new.len(), "new only has unique elements");
+                            self.all.iter().for_each(|&(x0, x1, _timestamp)| {
+                                assert_eq!((x0, x1,), (x0, uf.math_.find(x1),), "all is canonical");
+                            });
+                            let mut all_: Vec<_> = self.all.clone();
+                            all_.sort();
+                            all_.dedup();
+                            assert_eq!(all_.len(), self.all.len(), "all only has unique elements");
+                            let mut all_: Vec<_> = self
+                                .all
+                                .iter()
+                                .map(|&(x0, x1, _timestamp)| (x0, x1))
+                                .collect();
+                            all_.sort();
+                            all_.dedup();
+                            assert_eq!(
+                                all_.len(),
+                                self.all.len(),
+                                "all does not have duplicate timestamps"
+                            );
+                        }
+                        log_duration!("reconstruct index: {}", {
+                            log_duration!("reconstruct sort: {}", {
+                                self.all.sort_unstable_by_key(|&(x0, x1, timestamp)| ());
+                            });
+                            unsafe {
+                                self.nofd_index_.reconstruct(
+                                    &mut self.all,
+                                    |(x0, x1, timestamp)| (),
+                                    |(x0, x1, timestamp)| (x0, x1, timestamp),
+                                );
+                            }
+                        });
+                        self.math_num_uprooted_at_latest_retain = 0;
+                    });
+                }
+            }
+            impl ConstRelation {
+                fn iter_all_0_to_1(&self, x0: std::primitive::i64) -> impl Iterator<Item = (Math,)> + use<'_> {
+                    self.fd_index_0
+                        .get(&(x0,))
+                        .into_iter()
+                        .copied()
+                        .map(|(x1, _timestamp)| (x1,))
+                }
+                fn iter_old_0_to_1(
+                    &self,
+                    x0: std::primitive::i64,
+                    latest_timestamp: TimeStamp,
+                ) -> impl Iterator<Item = (Math,)> + use<'_> {
+                    self.fd_index_0
+                        .get(&(x0,))
+                        .into_iter()
+                        .copied()
+                        .filter_map(move |(x1, timestamp)| (timestamp < latest_timestamp).then_some((x1,)))
+                }
+                #[allow(unreachable_code)]
+                fn entry_0_to_1(
+                    &self,
+                    x0: std::primitive::i64,
+                    delta: &mut Delta,
+                    uf: &mut Unification,
+                ) -> (Math,) {
+                    if let Some((x1,)) = self.iter_all_0_to_1(x0).next() {
+                        return (x1,);
+                    }
+                    let x1 = uf.math_.add_eclass();
+                    delta.const_.push((x0, x1));
+                    (x1,)
+                }
+                fn check_0(&self, x0: std::primitive::i64) -> bool {
+                    self.iter_all_0_to_1(x0).next().is_some()
+                }
+                fn iter_all__to_0_1(&self) -> impl Iterator<Item = (std::primitive::i64, Math)> + use<'_> {
+                    self.nofd_index_
+                        .iter(())
+                        .map(|(x0, x1, _timestamp)| (x0, x1))
+                }
+                fn iter_old__to_0_1(
+                    &self,
+                    latest_timestamp: TimeStamp,
+                ) -> impl Iterator<Item = (std::primitive::i64, Math)> + use<'_> {
+                    self.nofd_index_
+                        .iter(())
+                        .filter_map(move |(x0, x1, timestamp)| {
+                            (timestamp < latest_timestamp).then_some((x0, x1))
+                        })
+                }
+                fn check_(&self) -> bool {
+                    self.iter_all__to_0_1().next().is_some()
+                }
+            }
+            #[derive(Debug, Default)]
+            pub struct Delta {
+                const_: Vec<<ConstRelation as Relation>::Row>,
+            }
+            impl Delta {
+                fn new() -> Self {
+                    Self::default()
+                }
+                fn has_new_inserts(&self) -> bool {
+                    let mut has_new_inserts = false;
+                    has_new_inserts |= !self.const_.is_empty();
+                    has_new_inserts
+                }
+                pub fn insert_const(&mut self, x: <ConstRelation as Relation>::Row) {
+                    self.const_.push(x);
+                }
+            }
+            #[derive(Debug, Default)]
+            struct Unification {
+                pub math_: UnionFind<Math>,
+            }
+            impl Unification {
+                fn num_uprooted(&mut self) -> usize {
+                    let mut ret = 0;
+                    ret += self.math_.num_uprooted();
+                    ret
+                }
+                fn reset_num_uprooted(&mut self) {
+                    self.math_.reset_num_uprooted();
+                }
+            }
+            #[derive(Debug, Default)]
+            pub struct Theory {
+                pub latest_timestamp: TimeStamp,
+                pub delta: Delta,
+                pub uf: Unification,
+                pub const_: ConstRelation,
+            }
+            impl Theory {
+                pub fn new() -> Self {
+                    let mut theory = Self::default();
+                    theory
+                }
+                pub fn step(&mut self) -> [std::time::Duration; 2] {
+                    log_duration!("======== STEP took {} ==========", {
+                        [
+                            {
+                                let start = std::time::Instant::now();
+                                log_duration!("apply_rules: {}", {
+                                    self.apply_rules();
+                                });
+                                start.elapsed()
+                            },
+                            {
+                                let start = std::time::Instant::now();
+                                self.canonicalize();
+                                start.elapsed()
+                            },
+                        ]
+                    })
+                }
+                #[inline(never)]
+                pub fn apply_rules(&mut self) {
+                    for (a, v1) in self.const_.iter_new() {
+                        for (b, v3) in self.const_.iter_all__to_0_1() {
+                            for (v4,) in i64_add012(a, b) {
+                                for (v5,) in self.const_.iter_all_0_to_1(v4) {
+                                    #[doc = "( rule ( ( Const a ) ( Const b ) ( Const ( + a b ) ) ) ( ( Const ( - a b ) ) ) )"]
+                                    let (v6,) = i64_sub012(a, b).next().unwrap();
+                                    let (v7,) = self.const_.entry_0_to_1(v6, &mut self.delta, &mut self.uf);
+                                }
+                            }
+                            for () in i64_ne01(a, b) {
+                                #[doc = "( rule ( ( Const a ) ( Const b ) ( != a b ) ) ( ( Const ( - a b ) ) ) )"]
+                                let (v28,) = i64_sub012(a, b).next().unwrap();
+                                let (v29,) = self.const_.entry_0_to_1(v28, &mut self.delta, &mut self.uf);
+                            }
+                            for (a_2, v9) in self.const_.iter_old__to_0_1(self.latest_timestamp) {
+                                for (b_6,) in i64_add012(a_2, a) {
+                                    if b == b_6 {
+                                        #[doc = "( rule ( ( Const a ) ( Const b ) ( Const ( + a b ) ) ) ( ( Const ( - a b ) ) ) )"]
+                                        let (v14,) = i64_sub012(a_2, a).next().unwrap();
+                                        let (v15,) =
+                                            self.const_.entry_0_to_1(v14, &mut self.delta, &mut self.uf);
+                                    }
+                                }
+                            }
+                        }
+                        for (a_2, v9) in self.const_.iter_old__to_0_1(self.latest_timestamp) {
+                            for () in i64_ne01(a_2, a) {
+                                #[doc = "( rule ( ( Const a ) ( Const b ) ( != a b ) ) ( ( Const ( - a b ) ) ) )"]
+                                let (v34,) = i64_sub012(a_2, a).next().unwrap();
+                                let (v35,) = self.const_.entry_0_to_1(v34, &mut self.delta, &mut self.uf);
+                            }
+                            for (b_3, v19) in self.const_.iter_old__to_0_1(self.latest_timestamp) {
+                                for (a_6,) in i64_add012(a_2, b_3) {
+                                    if a == a_6 {
+                                        #[doc = "( rule ( ( Const a ) ( Const b ) ( Const ( + a b ) ) ) ( ( Const ( - a b ) ) ) )"]
+                                        let (v22,) = i64_sub012(a_2, b_3).next().unwrap();
+                                        let (v23,) =
+                                            self.const_.entry_0_to_1(v22, &mut self.delta, &mut self.uf);
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+                fn emit_graphviz(&self) -> String {
+                    let mut buf = String::new();
+                    buf.push_str("digraph G {\n");
+                    self.const_.emit_graphviz(&mut buf);
+                    buf.push_str("}\n");
+                    buf
+                }
+                pub fn get_total_relation_entry_count(&self) -> usize {
+                    self.get_relation_entry_count().values().sum()
+                }
+                pub fn get_relation_entry_count(&self) -> std::collections::BTreeMap<&'static str, usize> {
+                    [("Const", self.const_.len())].into_iter().collect()
+                }
+                pub fn get_total_uf_count(&self) -> (usize, usize) {
+                    self.get_uf_count()
+                        .values()
+                        .fold((0, 0), |(at, ar), (t, r)| (at + t, ar + r))
+                }
+                pub fn get_uf_count(&self) -> std::collections::BTreeMap<&'static str, (usize, usize)> {
+                    [("Math", (self.uf.math_.len(), self.uf.math_.num_roots()))]
+                        .into_iter()
+                        .collect()
+                }
+                #[inline(never)]
+                pub fn canonicalize(&mut self) {
+                    self.latest_timestamp.0 += 1;
+                    log_duration!("canonicalize (total): {}", {
+                        self.const_.clear_new();
+                        if !self.delta.has_new_inserts() && self.uf.num_uprooted() == 0 {
+                            return;
+                        }
+                        log_duration!("update_begin (total): {}", {
+                            self.const_.update_begin(
+                                &mut self.delta.const_,
+                                &mut self.uf,
+                                self.latest_timestamp,
+                            );
+                        });
+                        log_duration!("update_loop (total): {}", {
+                            loop {
+                                let mut progress = false;
+                                progress |= self.const_.update(
+                                    &mut self.delta.const_,
+                                    &mut self.uf,
+                                    self.latest_timestamp,
+                                );
+                                if !progress {
+                                    break;
+                                }
+                            }
+                        });
+                        log_duration!("update_finalize (total): {}", {
+                            self.const_.update_finalize(
+                                &mut self.delta.const_,
+                                &mut self.uf,
+                                self.latest_timestamp,
+                            );
+                            self.uf.reset_num_uprooted();
+                        });
+                    });
+                }
+            }
+            impl EclassProvider<Math> for Theory {
+                fn make(&mut self) -> Math {
+                    self.uf.math_.add_eclass()
+                }
+                fn find(&mut self, t: Math) -> Math {
+                    self.uf.math_.find(t)
+                }
+                fn union(&mut self, a: Math, b: Math) {
+                    self.uf.math_.union(a, b);
+                }
+            }
+            impl std::ops::Deref for Theory {
+                type Target = Delta;
+                fn deref(&self) -> &Self::Target {
+                    &self.delta
+                }
+            }
+            impl std::ops::DerefMut for Theory {
+                fn deref_mut(&mut self) -> &mut Self::Target {
+                    &mut self.delta
+                }
+            }
+        "#]]),
+    }
+    .check()
+}
+
+#[test]
 fn test_multi_insert_lattice() {
     Steps {
         strict_egglog_compat: true,
@@ -313,7 +995,11 @@ fn test_frontend_function() {
             }"#]]),
         expected_tir: Some(expect![[r#"
             Trie {
-                Primary(r1_New(v1, v0)): Trie,
+                map: {
+                    Primary(r1_New(*v1*, *v0*)): Trie {
+                        map: {},
+                    },
+                },
             }"#]]),
         expected_lir: Some(expect![[r#"
             Theory {
@@ -10288,24 +10974,50 @@ fn triangle_join() {
             }"#]]),
         expected_tir: Some(expect![[r#"
             Trie {
-                Primary(r0_New(v0, v1)): Trie {
-                    Semi(r1_All(v1, v2)): Trie {
-                        Primary(r2_All(v2, v0)): Trie {
-                            Primary(r1_All(v1, v2)): Trie,
+                map: {
+                    Primary(r0_New(*v0*, *v1*)): Trie {
+                        map: {
+                            Semi(r1_All(v1, *v2*)): Trie {
+                                map: {
+                                    Primary(r2_All(*v2*, v0)): Trie {
+                                        map: {
+                                            Primary(r1_All(v1, v2)): Trie {
+                                                map: {},
+                                            },
+                                        },
+                                    },
+                                },
+                            },
                         },
                     },
-                },
-                Primary(r1_New(v4, v5)): Trie {
-                    Semi(r2_All(v5, v3)): Trie {
-                        Primary(r0_Old(v3, v4)): Trie {
-                            Primary(r2_All(v5, v3)): Trie,
+                    Primary(r1_New(*v4*, *v5*)): Trie {
+                        map: {
+                            Semi(r2_All(v5, *v3*)): Trie {
+                                map: {
+                                    Primary(r0_Old(*v3*, v4)): Trie {
+                                        map: {
+                                            Primary(r2_All(v5, v3)): Trie {
+                                                map: {},
+                                            },
+                                        },
+                                    },
+                                },
+                            },
                         },
                     },
-                },
-                Primary(r2_New(v8, v6)): Trie {
-                    Semi(r0_Old(v6, v7)): Trie {
-                        Primary(r1_Old(v7, v8)): Trie {
-                            Primary(r0_Old(v6, v7)): Trie,
+                    Primary(r2_New(*v8*, *v6*)): Trie {
+                        map: {
+                            Semi(r0_Old(v6, *v7*)): Trie {
+                                map: {
+                                    Primary(r1_Old(*v7*, v8)): Trie {
+                                        map: {
+                                            Primary(r0_Old(v6, v7)): Trie {
+                                                map: {},
+                                            },
+                                        },
+                                    },
+                                },
+                            },
                         },
                     },
                 },
@@ -11565,22 +12277,46 @@ fn edgecase0() {
             }"#]]),
         expected_tir: Some(expect![[r#"
             Trie {
-                Primary(r0_New(v0, v1, v2)): Trie {
-                    Semi(r0_All(v0, v3, v4)): Trie {
-                        Primary(r1_All(v2, v4, v5)): Trie {
-                            Primary(r0_All(v0, v3, v4)): Trie,
+                map: {
+                    Primary(r0_New(*v0*, *v1*, *v2*)): Trie {
+                        map: {
+                            Semi(r0_All(v0, *v3*, *v4*)): Trie {
+                                map: {
+                                    Primary(r1_All(v2, *v4*, *v5*)): Trie {
+                                        map: {
+                                            Primary(r0_All(v0, *v3*, v4)): Trie {
+                                                map: {},
+                                            },
+                                        },
+                                    },
+                                },
+                            },
+                            Semi(r1_All(*v9*, v2, *v12*)): Trie {
+                                map: {
+                                    Primary(r0_Old(v0, *v8*, *v9*)): Trie {
+                                        map: {
+                                            Primary(r1_All(v9, v2, *v12*)): Trie {
+                                                map: {},
+                                            },
+                                        },
+                                    },
+                                },
+                            },
                         },
                     },
-                    Semi(r1_All(v9, v2, v12)): Trie {
-                        Primary(r0_Old(v0, v8, v9)): Trie {
-                            Primary(r1_All(v9, v2, v12)): Trie,
-                        },
-                    },
-                },
-                Primary(r1_New(v16, v18, v19)): Trie {
-                    Semi(r0_Old(v14, v15, v16)): Trie {
-                        Primary(r0_Old(v14, v17, v18)): Trie {
-                            Primary(r0_Old(v14, v15, v16)): Trie,
+                    Primary(r1_New(*v16*, *v18*, *v19*)): Trie {
+                        map: {
+                            Semi(r0_Old(*v14*, *v15*, v16)): Trie {
+                                map: {
+                                    Primary(r0_Old(*v14*, *v17*, v18)): Trie {
+                                        map: {
+                                            Primary(r0_Old(v14, *v15*, v16)): Trie {
+                                                map: {},
+                                            },
+                                        },
+                                    },
+                                },
+                            },
                         },
                     },
                 },
@@ -12520,17 +13256,35 @@ fn edgecase0_no_egglog_compat() {
             }"#]]),
         expected_tir: Some(expect![[r#"
             Trie {
-                Primary(r0_New(v3, v4, v5)): Trie {
-                    Semi(r0_All(v3, v9, v10)): Trie {
-                        Primary(r1_All(v5, v10, v11)): Trie {
-                            Primary(r0_All(v3, v9, v10)): Trie,
+                map: {
+                    Primary(r0_New(*v3*, *v4*, *v5*)): Trie {
+                        map: {
+                            Semi(r0_All(v3, *v9*, *v10*)): Trie {
+                                map: {
+                                    Primary(r1_All(v5, *v10*, *v11*)): Trie {
+                                        map: {
+                                            Primary(r0_All(v3, *v9*, v10)): Trie {
+                                                map: {},
+                                            },
+                                        },
+                                    },
+                                },
+                            },
                         },
                     },
-                },
-                Primary(r1_New(v0, v1, v2)): Trie {
-                    Semi(r0_Old(v13, v14, v0)): Trie {
-                        Primary(r0_Old(v13, v16, v1)): Trie {
-                            Primary(r0_Old(v13, v14, v0)): Trie,
+                    Primary(r1_New(*v0*, *v1*, *v2*)): Trie {
+                        map: {
+                            Semi(r0_Old(*v13*, *v14*, v0)): Trie {
+                                map: {
+                                    Primary(r0_Old(*v13*, *v16*, v1)): Trie {
+                                        map: {
+                                            Primary(r0_Old(v13, *v14*, v0)): Trie {
+                                                map: {},
+                                            },
+                                        },
+                                    },
+                                },
+                            },
                         },
                     },
                 },

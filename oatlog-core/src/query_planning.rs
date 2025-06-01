@@ -52,16 +52,16 @@ pub(crate) fn emit_lir_theory(theory: hir::Theory) -> (hir::Theory, tir::Trie, l
                 lir_relations.push_expected(relation_id, Some(lir_relation));
             }
             RelationTy::Primitive { syn, ident } => {
+                let out_col = relation.implicit_rules[ImplicitRuleId(0)]
+                    .out
+                    .iter()
+                    .next()
+                    .map(|(col, _)| *col);
                 let lir_relation = lir::RelationData::new_primitive(
                     ident,
                     relation.columns.clone(),
                     syn.0.clone(),
-                    relation.implicit_rules[ImplicitRuleId(0)]
-                        .out
-                        .iter()
-                        .next()
-                        .map(|(col, _)| *col)
-                        .unwrap(),
+                    out_col,
                 );
                 lir_relations.push_expected(relation_id, Some(lir_relation));
             }

@@ -330,7 +330,9 @@ fn update_with_category(
                             }
                         }
                         MergeTy::Panic => {
-                            quote!(panic!("panic merge"))
+                            quote!{
+                                panic!("panic merge");
+                            }
                         }
                         MergeTy::Lattice { call } => {
                             let val_y = ident::column_alt(column);

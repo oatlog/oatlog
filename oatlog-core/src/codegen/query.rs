@@ -64,7 +64,7 @@ impl CodegenRuleTrieCtx<'_> {
     fn bind_columns(
         &mut self,
         args: &TVec<ColumnId, VariableId>,
-        index: &IndexInfo,
+        index: Option<&IndexInfo>,
     ) -> (
         BTreeSet<ColumnId>,
         Vec<Ident>,
@@ -85,27 +85,29 @@ impl CodegenRuleTrieCtx<'_> {
                 new_.push(ident::var_var(self.var_of(variable)));
             }
         }
-        match index {
-            IndexInfo::Fd {
-                key_columns,
-                value_columns,
-                generate_check_value_subsets: _,
-            } => {
-                assert_eq!(&bound, key_columns, "index={index:?} args={args:?}");
-                assert_eq!(
-                    &new,
-                    &value_columns
-                        .iter()
-                        .map(|(&c, _)| c)
-                        .collect::<BTreeSet<_>>()
-                );
-            }
-            IndexInfo::NonFd {
-                key_columns,
-                value_columns,
-            } => {
-                assert_eq!(&bound, key_columns, "index={index:?} args={args:?}");
-                assert_eq!(&new, value_columns);
+        if let Some(index) = index {
+            match index {
+                IndexInfo::Fd {
+                    key_columns,
+                    value_columns,
+                    generate_check_value_subsets: _,
+                } => {
+                    assert_eq!(&bound, key_columns, "index={index:?} args={args:?}");
+                    assert_eq!(
+                        &new,
+                        &value_columns
+                            .iter()
+                            .map(|(&c, _)| c)
+                            .collect::<BTreeSet<_>>()
+                    );
+                }
+                IndexInfo::NonFd {
+                    key_columns,
+                    value_columns,
+                } => {
+                    assert_eq!(&bound, key_columns, "index={index:?} args={args:?}");
+                    assert_eq!(&new, value_columns);
+                }
             }
         }
         (bound, bound_, new, new_)
@@ -252,10 +254,12 @@ impl CodegenRuleTrieCtx<'_> {
                         out_col,
                     } => {
                         args.iter_enumerate()
-                            .filter_map(|(c, v)| (c != *out_col).then_some(v))
+                            .filter_map(|(c, v)| (Some(c) != *out_col).then_some(v))
                             .for_each(|a| assert!(self.is_bound(a)));
-                        self.bind_var(&args[out_col]);
-                        assert_eq!(out_col.0 + 1, args.len());
+                        if let Some(out_col) = out_col {
+                            self.bind_var(&args[out_col]);
+                            assert_eq!(out_col.0 + 1, args.len());
+                        }
 
                         let args = args
                             .iter()
@@ -345,7 +349,7 @@ impl CodegenRuleTrieCtx<'_> {
                         let index_info = &index_to_info[index];
 
                         let (_, bound_columns_, _, new_columns_) =
-                            self.bind_columns(args, index_info);
+                            self.bind_columns(args, Some(index_info));
 
                         let (iter_ident, maybe_timestamp) = match inclusion {
                             crate::lir::Inclusion::All => {
@@ -361,8 +365,19 @@ impl CodegenRuleTrieCtx<'_> {
                             for (#(#new_columns_,)*) in self.#relation_ident.#iter_ident(#(#bound_columns_,)* #(#maybe_timestamp)*)
                         }
                     }
-                    RelationKind::Primitive { .. } => {
-                        todo!("fix when new HIR has entry for premises")
+                    RelationKind::Primitive { codegen, out_col } => {
+                        // NOTE: assumes a single index on this primitive index
+
+                        let (_, bound_columns, _, new_columns) = self.bind_columns(args, None);
+
+                        if out_col.is_none() {
+                            assert_eq!(new_columns.len(), 0);
+                        }
+
+                        let relation_ident = ident::rel_get(relation);
+                        quote! {
+                            for (#(#new_columns,)*) in #relation_ident(#(#bound_columns,)*)
+                        }
                     }
                 }
             }

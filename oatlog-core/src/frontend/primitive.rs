@@ -214,20 +214,20 @@ pub(crate) fn runtime_primitive_functions() -> proc_macro2::TokenStream {
         #[prim_func(name = "max", id = "i64_max", index = [0, 1, 2], fd = true)]
         fn i64_max012(a: i64, b: i64) -> impl Iterator<Item = (i64,)> { std::iter::once((a.max(b),)) }
 
-        // #[prim_func(name = ">", id = "i64_gt", index = [0, 1], fd = false)]
-        // fn i64_gt01(a: i64, b: i64) -> impl Iterator<Item = ()> { (a > b).then_some(()).into_iter() }
+        #[prim_func(name = ">", id = "i64_gt", index = [0, 1], fd = true)]
+        fn i64_gt01(a: i64, b: i64) -> impl Iterator<Item = ()> { (a > b).then_some(()).into_iter() }
 
-        // #[prim_func(name = "<", id = "i64_lt", index = [0, 1], fd = false)]
-        // fn i64_lt01(a: i64, b: i64) -> impl Iterator<Item = ()> { (a < b).then_some(()).into_iter() }
+        #[prim_func(name = "<", id = "i64_lt", index = [0, 1], fd = true)]
+        fn i64_lt01(a: i64, b: i64) -> impl Iterator<Item = ()> { (a < b).then_some(()).into_iter() }
 
-        // #[prim_func(name = ">=", id = "i64_gte", index = [0, 1], fd = false)]
-        // fn i64_gt01(a: i64, b: i64) -> impl Iterator<Item = ()> { (a >= b).then_some(()).into_iter() }
+        #[prim_func(name = ">=", id = "i64_gte", index = [0, 1], fd = true)]
+        fn i64_gt01(a: i64, b: i64) -> impl Iterator<Item = ()> { (a >= b).then_some(()).into_iter() }
 
-        // #[prim_func(name = "<=", id = "i64_lte", index = [0, 1], fd = false)]
-        // fn i64_lt01(a: i64, b: i64) -> impl Iterator<Item = ()> { (a <= b).then_some(()).into_iter() }
+        #[prim_func(name = "<=", id = "i64_lte", index = [0, 1], fd = true)]
+        fn i64_lt01(a: i64, b: i64) -> impl Iterator<Item = ()> { (a <= b).then_some(()).into_iter() }
 
-        // #[prim_func(name = "!=", id = "i64_ne", index = [0, 1], fd = false)]
-        // fn i64_ne01(a: i64, b: i64) -> impl Iterator<Item = ()> { (a != b).then_some(()).into_iter() }
+        #[prim_func(name = "!=", id = "i64_ne", index = [0, 1], fd = true)]
+        fn i64_ne01(a: i64, b: i64) -> impl Iterator<Item = ()> { (a != b).then_some(()).into_iter() }
     }
 }
 

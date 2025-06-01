@@ -279,11 +279,11 @@ egglog_test!(nogenerate, array, expect![[r#"
 
 "#]], r#"(include "comparative-test/egglog-testsuite/array.egg")"#);// needs panic (does not use vec)
 egglog_test!(nogenerate, bdd, expect![[r#"
-    comparative-test/egglog-testsuite/bdd.egg: function call < is not defined
-    <
+    comparative-test/egglog-testsuite/bdd.egg: not implemented yet
+    ( push )
 
     comparative-test/egglog-testsuite/bdd.egg: while parsing this toplevel expression
-    ( rewrite ( bddand ( ITE n a1 a2 ) ( ITE m b1 b2 ) ) ( ITE n ( bddand a1 ( ITE m b1 b2 ) ) ( bddand a2 ( ITE m b1 b2 ) ) ) :when ( ( < n m ) ) )
+    ( push )
 
     comparative-test/egglog-testsuite/bdd.egg: while reading comparative-test/egglog-testsuite/bdd.egg
     ( include "comparative-test/egglog-testsuite/bdd.egg" )
@@ -343,8 +343,8 @@ egglog_test!(nogenerate, calc, expect![[r#"
 
 "#]], r#"(include "comparative-test/egglog-testsuite/calc.egg")"#);// push/pop
 egglog_test!(nogenerate, combinators, expect![[r#"
-    comparative-test/egglog-testsuite/combinators.egg: function call != is not defined
-    !=
+    comparative-test/egglog-testsuite/combinators.egg: No function named CVar can be used here with input ["i64"] and output "?"
+    CVar
 
     comparative-test/egglog-testsuite/combinators.egg: while parsing this toplevel expression
     ( rewrite ( CAbs v1 ( CVar v2 ) ) ( CApp K ( CVar v2 ) ) :when ( ( != v1 v2 ) ) )
@@ -504,11 +504,11 @@ egglog_test!(nogenerate, fail_wrong_assertion, expect![[r#"
 
 "#]], r#"(include "comparative-test/egglog-testsuite/fail_wrong_assertion.egg")"#);//primtive functions
 egglog_test!(nogenerate, fibonacci_demand, expect![[r#"
-    comparative-test/egglog-testsuite/fibonacci-demand.egg: function call > is not defined
-    >
+    comparative-test/egglog-testsuite/fibonacci-demand.egg: will not implement, this only makes sense for an interpreter
+    ( extract f7 )
 
     comparative-test/egglog-testsuite/fibonacci-demand.egg: while parsing this toplevel expression
-    ( rewrite ( Fib x ) ( Add ( Fib ( - x 1 ) ) ( Fib ( - x 2 ) ) ) :when ( ( > x 1 ) ) )
+    ( extract f7 )
 
     comparative-test/egglog-testsuite/fibonacci-demand.egg: while reading comparative-test/egglog-testsuite/fibonacci-demand.egg
     ( include "comparative-test/egglog-testsuite/fibonacci-demand.egg" )
@@ -579,7 +579,7 @@ egglog_test!(allcorrect, include, expect![[r#"
     path: 6
 "#]], r#"(include "comparative-test/egglog-testsuite/include.egg")"#);//needs updated paths
 egglog_test!(nogenerate, integer_math, expect![[r#"
-    comparative-test/egglog-testsuite/integer_math.egg: function call != is not defined
+    comparative-test/egglog-testsuite/integer_math.egg: No function named != can be used here with input ["Math", "Math"] and output "?"
     !=
 
     comparative-test/egglog-testsuite/integer_math.egg: while parsing this toplevel expression
@@ -620,19 +620,13 @@ egglog_test!(nogenerate, interval, expect![[r#"
     ( include "comparative-test/egglog-testsuite/interval.egg" )
 
 "#]], r#"(include "comparative-test/egglog-testsuite/interval.egg")"#);//needs merge
-egglog_test!(nogenerate, knapsack, expect![[r#"
-    comparative-test/egglog-testsuite/knapsack.egg: function call <= is not defined
-    <=
-
-    comparative-test/egglog-testsuite/knapsack.egg: while parsing this toplevel expression
-    ( rule ( ( = f ( Knap capacity ( Cons weight val rest ) ) ) ( <= weight capacity ) ) ( ( union ( Knap capacity ( Cons weight val rest ) ) ( Max ( Add ( Num val ) ( Knap ( - capacity weight ) rest ) ) ( Knap capacity rest ) ) ) ) )
-
-    comparative-test/egglog-testsuite/knapsack.egg: while reading comparative-test/egglog-testsuite/knapsack.egg
-    ( include "comparative-test/egglog-testsuite/knapsack.egg" )
-
-    toplevel: while parsing this toplevel expression
-    ( include "comparative-test/egglog-testsuite/knapsack.egg" )
-
+egglog_test!(allcorrect, knapsack, expect![[r#"
+    Add: 16
+    Cons: 13
+    Knap: 58
+    Max: 17
+    NilConst: 1
+    Num: 17
 "#]], r#"(include "comparative-test/egglog-testsuite/knapsack.egg")"#);// needs primitive functions
 egglog_test!(nogenerate, lambda, expect![[r#"
     comparative-test/egglog-testsuite/lambda.egg: collections are not supported yet: ("Set", [Var("VarType")])
@@ -649,7 +643,7 @@ egglog_test!(nogenerate, lambda, expect![[r#"
 
 "#]], r#"(include "comparative-test/egglog-testsuite/lambda.egg")"#);//needs sets
 egglog_test!(nogenerate, levenshtein_distance, expect![[r#"
-    comparative-test/egglog-testsuite/levenshtein-distance.egg: function call != is not defined
+    comparative-test/egglog-testsuite/levenshtein-distance.egg: No function named != can be used here with input ["String", "String"] and output "?"
     !=
 
     comparative-test/egglog-testsuite/levenshtein-distance.egg: while parsing this toplevel expression
@@ -663,11 +657,11 @@ egglog_test!(nogenerate, levenshtein_distance, expect![[r#"
 
 "#]], r#"(include "comparative-test/egglog-testsuite/levenshtein-distance.egg")"#);// needs primitive functions
 egglog_test!(nogenerate, list, expect![[r#"
-    comparative-test/egglog-testsuite/list.egg: function call > is not defined
-    >
+    comparative-test/egglog-testsuite/list.egg: not implemented yet
+    ( run-schedule ( saturate ( run list ) ) )
 
     comparative-test/egglog-testsuite/list.egg: while parsing this toplevel expression
-    ( rule ( ( list-get-demand list n ) ( > n 0 ) ( = list ( Cons head tail ) ) ) ( ( list-get-demand tail ( - n 1 ) ) ) :ruleset list )
+    ( run-schedule ( saturate ( run list ) ) )
 
     comparative-test/egglog-testsuite/list.egg: while reading comparative-test/egglog-testsuite/list.egg
     ( include "comparative-test/egglog-testsuite/list.egg" )
@@ -690,7 +684,7 @@ egglog_test!(nogenerate, looking_up_global, expect![[r#"
     ( include "comparative-test/egglog-testsuite/looking_up_global.egg" )
 
 "#]], r#"(include "comparative-test/egglog-testsuite/looking_up_global.egg")"#);// panics on a todo!()?
-egglog_test!(nogenerate, looking_up_nonconstructor_in_rewrite_good, expect!["PANIC: primitive premise not implemented"], r#"(include "comparative-test/egglog-testsuite/looking_up_nonconstructor_in_rewrite_good.egg" )"#);//primitive functions
+egglog_test!(zrocorrect, looking_up_nonconstructor_in_rewrite_good, expect![], r#"(include "comparative-test/egglog-testsuite/looking_up_nonconstructor_in_rewrite_good.egg" )"#);//primitive functions
 
 egglog_test!(nogenerate, map, expect![[r#"
     comparative-test/egglog-testsuite/map.egg: collections are not supported yet: ("Map", [Var("i64"), Var("String")])
@@ -707,11 +701,11 @@ egglog_test!(nogenerate, map, expect![[r#"
 
 "#]], r#"(include "comparative-test/egglog-testsuite/map.egg")"#);// needs map collections
 egglog_test!(nogenerate, math, expect![[r#"
-    comparative-test/egglog-testsuite/math.egg: function call != is not defined
+    comparative-test/egglog-testsuite/math.egg: No function named != can be used here with input ["String", "String"] and output "?"
     !=
 
     comparative-test/egglog-testsuite/math.egg: while parsing this toplevel expression
-    ( rule ( ( = e ( Div a b ) ) ( evals-to a va ) ( evals-to b vb ) ( != vb 0 ) ) ( ( evals-to e ( / va vb ) ) ) )
+    ( rule ( ( is-const-or-distinct-var-demand v w ) ( = v ( Var vv ) ) ( = w ( Var vw ) ) ( != vv vw ) ) ( ( is-const-or-distinct-var v w ) ) )
 
     comparative-test/egglog-testsuite/math.egg: while reading comparative-test/egglog-testsuite/math.egg
     ( include "comparative-test/egglog-testsuite/math.egg" )
@@ -1090,11 +1084,11 @@ egglog_test!(nogenerate, resolution, expect![[r#"
 
 "#]], r#"(include "comparative-test/egglog-testsuite/resolution.egg")"#);// type error(bool)
 egglog_test!(nogenerate, rw_analysis, expect![[r#"
-    comparative-test/egglog-testsuite/rw-analysis.egg: function call != is not defined
-    !=
+    comparative-test/egglog-testsuite/rw-analysis.egg: lattice function is not a primitive function
+    ( merge-val old new )
 
     comparative-test/egglog-testsuite/rw-analysis.egg: while parsing this toplevel expression
-    ( rewrite ( merge-val ( I x ) ( I y ) ) Top :when ( ( != x y ) ) )
+    ( function const-prop ( Loc VarT ) Val :merge ( merge-val old new ) )
 
     comparative-test/egglog-testsuite/rw-analysis.egg: while reading comparative-test/egglog-testsuite/rw-analysis.egg
     ( include "comparative-test/egglog-testsuite/rw-analysis.egg" )
@@ -1245,8 +1239,8 @@ egglog_test!(nogenerate, tricky_type_checking, expect![[r#"
 
 "#]], r#"(include "comparative-test/egglog-testsuite/tricky-type-checking.egg")"#); // push/pop
 egglog_test!(nogenerate, typecheck, expect![[r#"
-    comparative-test/egglog-testsuite/typecheck.egg: function call != is not defined
-    !=
+    comparative-test/egglog-testsuite/typecheck.egg: No function named Cons can be used here with input ["i64", "?", "?"] and output "?"
+    Cons
 
     comparative-test/egglog-testsuite/typecheck.egg: while parsing this toplevel expression
     ( rewrite ( typeof ( Cons y ty ctx ) ( Var x ) ) ( typeof ctx ( Var x ) ) :when ( ( != x y ) ) )

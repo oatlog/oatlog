@@ -675,17 +675,20 @@ impl Parser {
                 // ignored
             }
             egglog_ast::Statement::Include(filepath) => {
-                let working_directory = std::env::current_dir().unwrap();
+                let working_directory = dbg!(std::env::current_dir().unwrap());
+                let working_directory = &working_directory;
                 let span = filepath.span;
                 let filepath = filepath.x;
+                let filepath_canon = std::path::absolute(filepath).unwrap();
+                let filepath_canon = &*filepath_canon.to_str().unwrap().to_owned().leak();
 
                 let content =
                     std::fs::read_to_string(filepath).map_err(|e| match config.file_not_found {
                         FileNotFoundAction::ImmediatePanic => {
-                            panic!("error opening {filepath}: {e}, working directory is {working_directory:?}")
+                            panic!("error opening {filepath_canon}: {e}, working directory is {working_directory:?}")
                         }
                         FileNotFoundAction::EmitError => {
-                            bare_!(span, "error opening {filepath}: {e}, working directory is {working_directory:?}")
+                            bare_!(span, "error opening {filepath_canon}: {e}, working directory is {working_directory:?}")
                         }
                     })?;
 
@@ -952,27 +955,52 @@ impl Parser {
                         .zip((0..).map(ColumnId))
                         .all(|(a, b)| a == b)
                 );
-                assert_eq!(out.len(), 1);
-                let out_col = out.into_iter().next().unwrap();
-                assert_eq!(*index_to_main.inner().last().unwrap(), out_col);
-                assert!(fd);
+                match out.len() {
+                    0 => {
+                        let inputs = &columns.inner();
 
-                let inputs = &columns.inner()[0..columns.len() - 1];
-                let output = *columns.inner().last().unwrap();
+                        let lang_function = LangFunction::new(name, inputs, None);
+                        let ident = ident.leak();
 
-                let lang_function = LangFunction::new(name, inputs, Some(output));
-                let ident = ident.leak();
+                        let relation_id = self
+                            .hir_relations
+                            .push(hir::Relation::primitive(columns, *name, None, syn, ident));
 
-                let relation_id = self.hir_relations.push(hir::Relation::primitive(
-                    columns, *name, out_col, syn, ident,
-                ));
+                        self.lang_relations.insert(relation_id, lang_function);
 
-                self.lang_relations.insert(relation_id, lang_function);
+                        self.function_possible_ids
+                            .entry(name)
+                            .or_default()
+                            .push(relation_id);
+                    }
+                    1 => {
+                        let out_col = out.into_iter().next().unwrap();
+                        assert_eq!(*index_to_main.inner().last().unwrap(), out_col);
+                        assert!(fd);
 
-                self.function_possible_ids
-                    .entry(name)
-                    .or_default()
-                    .push(relation_id);
+                        let inputs = &columns.inner()[0..columns.len() - 1];
+                        let output = *columns.inner().last().unwrap();
+
+                        let lang_function = LangFunction::new(name, inputs, Some(output));
+                        let ident = ident.leak();
+
+                        let relation_id = self.hir_relations.push(hir::Relation::primitive(
+                            columns,
+                            *name,
+                            Some(out_col),
+                            syn,
+                            ident,
+                        ));
+
+                        self.lang_relations.insert(relation_id, lang_function);
+
+                        self.function_possible_ids
+                            .entry(name)
+                            .or_default()
+                            .push(relation_id);
+                    }
+                    _ => panic!(),
+                }
             }
         }
         Ok(())

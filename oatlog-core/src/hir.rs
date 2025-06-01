@@ -111,6 +111,12 @@ impl ImplicitRule {
             columns,
         }
     }
+    pub(crate) fn new_empty(columns: usize) -> Self {
+        Self {
+            out: BTreeMap::new(),
+            columns,
+        }
+    }
     /// AKA outputs
     pub(crate) fn value_columns(&self) -> BTreeSet<ColumnId> {
         self.out.keys().copied().collect()
@@ -297,13 +303,15 @@ impl Relation {
     pub(crate) fn primitive(
         columns: TVec<ColumnId, TypeId>,
         name: &'static str,
-        out_col: ColumnId,
+        out_col: Option<ColumnId>,
         syn: syn::ItemFn,
         ident: &'static str,
     ) -> Self {
         Self {
             name,
-            implicit_rules: tvec![ImplicitRule::new_panic(out_col, columns.len())],
+            implicit_rules: out_col
+                .map(|out_col| tvec![ImplicitRule::new_panic(out_col, columns.len())])
+                .unwrap_or_else(|| tvec![ImplicitRule::new_empty(columns.len())]),
             kind: RelationTy::Primitive {
                 syn: WrapIgnore(syn.to_token_stream()),
                 ident,
@@ -542,7 +550,10 @@ impl Atom {
     }
 
     #[allow(unused)]
-    pub(crate) fn dbg_compact(&self) -> String {
+    pub(crate) fn dbg_compact_annotated(
+        &self,
+        mut annotate: impl FnMut(VariableId, ColumnId) -> String,
+    ) -> String {
         format!(
             "{}{}({})",
             self.relation,
@@ -552,11 +563,16 @@ impl Atom {
                 Inclusion::All => "_All",
             },
             itertools::Itertools::intersperse(
-                self.columns.iter().copied().map(|x| format!("{x}")),
+                self.columns.iter_enumerate().map(|(c, &v)| annotate(v, c)),
                 format!(", ")
             )
             .collect::<String>()
         )
+    }
+
+    #[allow(unused)]
+    pub(crate) fn dbg_compact(&self) -> String {
+        self.dbg_compact_annotated(|v, _| format!("{v}"))
     }
 
     pub(crate) fn variables(&self) -> BTreeSet<VariableId> {
@@ -580,12 +596,10 @@ impl SymbolicRule {
     }
 
     pub(crate) fn premise_atoms(&self) -> impl Iterator<Item = &Atom> {
-        self.atoms
-            .iter()
-            .filter(|x| x.is_premise == Premise)
-            .inspect(|x| {
-                assert!(x.entry.is_none(), "entry in premise not implemented yet");
-            })
+        self.atoms.iter().filter(|x| x.is_premise == Premise)
+        // .inspect(|x| {
+        //     assert!(x.entry.is_none(), "entry in premise not implemented yet");
+        // })
     }
 
     /*
@@ -938,6 +952,12 @@ impl SymbolicRule {
                     if relations[atom.relation].must_become_insert(entry) {
                         atom.entry = None;
                     }
+                }
+                match relations[atom.relation].kind {
+                    RelationTy::Primitive { .. } => {
+                        atom.entry = Some(ImplicitRuleId(0));
+                    }
+                    _ => (),
                 }
                 atom
             })

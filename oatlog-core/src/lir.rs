@@ -7,7 +7,6 @@ use crate::{
     ids::{ColumnId, GlobalId, IndexId, RelationId, TypeId, VariableId},
     typed_vec::TVec,
 };
-use educe::Educe;
 use std::{
     collections::{BTreeMap, BTreeSet},
     iter,
@@ -137,7 +136,7 @@ impl RelationData {
         ident: &'static str,
         columns: TVec<ColumnId, TypeId>,
         codegen: proc_macro2::TokenStream,
-        out_col: ColumnId,
+        out_col: Option<ColumnId>,
     ) -> Self {
         Self {
             name: ident,
@@ -168,7 +167,7 @@ pub enum RelationKind {
     },
     Primitive {
         codegen: proc_macro2::TokenStream,
-        out_col: ColumnId,
+        out_col: Option<ColumnId>,
     },
 }
 

@@ -227,16 +227,51 @@ impl TrieLink {
 }
 
 #[allow(unused)]
-struct DbgCompact<'a>(&'a Trie);
+struct DbgCompact<'a, T>(&'a T);
 
-impl<'a> std::fmt::Debug for DbgCompact<'a> {
+impl<'a> std::fmt::Debug for DbgCompact<'a, Trie> {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        let trie = self.0;
         let mut x = f.debug_struct("Trie");
-        for (key, trie) in &trie.map {
-            x.field(&key.dbg_compact(), &mut DbgCompact(trie));
-        }
+
+        x.field("map", &DbgCompact(&(self.0, &self.0.map)));
+
         x.finish()
+    }
+}
+
+impl<'a> std::fmt::Debug for DbgCompact<'a, (&Trie, &BTreeMap<TrieLink, Trie>)> {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        let mut x = f.debug_map();
+        let mut x = &mut x;
+
+        for (link, trie) in self.0.1.iter() {
+            x = x.entry(&DbgCompact(&(self.0.0, link)), &DbgCompact(trie));
+        }
+
+        x.finish()
+    }
+}
+
+impl<'a> std::fmt::Debug for DbgCompact<'a, (&Trie, &TrieLink)> {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        let process_atom = |atom: &Atom| -> String {
+            atom.dbg_compact_annotated(|v, _| {
+                if self.0.0.bound_premise.contains(&v) {
+                    format!("{v}")
+                } else {
+                    format!("*{v}*")
+                }
+            })
+        };
+
+        match self.0.1 {
+            Primary(atom) => {
+                write!(f, "Primary({})", process_atom(atom))
+            }
+            Semi(atom) => {
+                write!(f, "Semi({})", process_atom(atom))
+            }
+        }
     }
 }
 
@@ -580,6 +615,14 @@ mod construction {
                                         // For worst-case optimal joins, we need to introduce
                                         // semi-joins each time variables are introduced.
                                     })
+                                    .filter(|x| {
+                                        // semi-joins are not really supported for primitives, and
+                                        // would typically not be helpful.
+                                        !matches!(
+                                            ctx.relations[x.relation].kind,
+                                            hir::RelationTy::Primitive { .. },
+                                        )
+                                    })
                                     .cloned(),
                             );
                             this_rule.semi.sort();
@@ -828,6 +871,12 @@ mod construction {
                 SingleElement,
                 AllBound,
                 Global,
+                /// If we only have the index (a, b) -> c, and (a, b, c) is bound, we can solve it
+                /// by doing a linear scan and filtering, but it's potentially slow.
+                PrimitiveAll,
+                /// we want to apply this VERY early since it is fragile in terms of what bound
+                /// columns exist
+                Primitive,
                 New,
             }
             #[derive(Copy, Clone, Ord, PartialOrd, PartialEq, Eq, Debug)]
@@ -842,8 +891,11 @@ mod construction {
                 NoQuery,
                 IndexedDisconnected,
                 SingleElementDisconnected,
+
                 IndexedAllConnected,
                 IndexedOldConnected,
+
+                PrimitiveAll,
 
                 // the semi-join inclusion is backwards to make sure we are able to do old before
                 // all in a triangle join.
@@ -860,6 +912,7 @@ mod construction {
                 SingleElementConnected,
                 AllBound,
                 Global,
+                Primitive,
                 New,
             }
 
@@ -887,7 +940,8 @@ mod construction {
             for atom in &self.premise {
                 use IsConnected::{Connected, Disconnected};
                 use RelationScore::{
-                    AllBound, Global, IndexedAll, IndexedOld, New, NoQuery, SingleElement,
+                    AllBound, Global, IndexedAll, IndexedOld, New, NoQuery, Primitive,
+                    PrimitiveAll, SingleElement,
                 };
 
                 let connected = if atom.columns.iter().any(|x| ctx.bound_premise.contains(x)) {
@@ -898,6 +952,8 @@ mod construction {
 
                 let mut score = NoQuery;
 
+                let mut ok = true;
+                let mut primitive_output_column_bound = false;
                 match atom.incl {
                     hir::Inclusion::New => {
                         score = score.max(New);
@@ -919,8 +975,31 @@ mod construction {
                     hir::RelationTy::Global { id: _ } => {
                         score = score.max(Global);
                     }
-                    hir::RelationTy::Primitive { syn: _, ident: _ } => {
-                        panic!("primitive premise not implemented")
+                    hir::RelationTy::Primitive { syn: _, ident } => {
+                        let Some(entry) = atom.entry else {
+                            panic!("primitive premise atoms must use entry");
+                        };
+
+                        // TODO: correct thing would probably be to SET the
+                        // entry here.
+
+                        let implicit_rule = &ctx.relations[atom.relation].implicit_rules[entry];
+
+                        for (c, v) in atom.columns.iter_enumerate() {
+                            let is_output = implicit_rule.out.get(&c).is_some();
+                            let is_bound = ctx.bound_premise.contains(v);
+                            if is_output {
+                                if is_bound {
+                                    primitive_output_column_bound = true;
+                                }
+                            } else {
+                                if !is_bound {
+                                    ok = false;
+                                }
+                            }
+                        }
+
+                        score = score.max(Primitive);
                     }
                     hir::RelationTy::Forall { ty: _ } => panic!("forall unimplemented"),
                 }
@@ -937,7 +1016,7 @@ mod construction {
                     score = score.max(AllBound);
                 }
 
-                let score = match (score, connected) {
+                let mut score = match (score, connected) {
                     (NoQuery, _) => CompoundRelationScore::NoQuery,
                     (IndexedAll | IndexedOld, Disconnected) => {
                         CompoundRelationScore::IndexedDisconnected
@@ -951,12 +1030,23 @@ mod construction {
                     (AllBound, _) => CompoundRelationScore::AllBound,
                     (New, _) => CompoundRelationScore::New,
                     (Global, _) => CompoundRelationScore::Global,
+                    (Primitive, _) => CompoundRelationScore::Primitive,
+                    (PrimitiveAll, _) => CompoundRelationScore::PrimitiveAll,
                 };
 
-                votes
-                    .entry(score)
-                    .or_default()
-                    .push(TrieLink::Primary(atom.clone()));
+                if primitive_output_column_bound {
+                    score = CompoundRelationScore::PrimitiveAll;
+                }
+                if !ok {
+                    score = CompoundRelationScore::NoQuery;
+                }
+
+                if score != CompoundRelationScore::NoQuery {
+                    votes
+                        .entry(score)
+                        .or_default()
+                        .push(TrieLink::Primary(atom.clone()));
+                }
             }
 
             // last = max score
@@ -1007,6 +1097,11 @@ mod construction {
             // eprintln!("votes = {}, rule = {}", votes.len(), rule.meta.src);
 
             if votes.is_empty() {
+                assert!(
+                    rule.premise.is_empty(),
+                    "if there are zero votes, there should be zero premises, premises = {:?}",
+                    &rule.premise
+                );
                 Left(rule.clone())
             } else {
                 Right((rule, votes))
@@ -1363,7 +1458,51 @@ mod lowering {
                                 panic!("primary join on forall")
                             }
                             hir::RelationTy::Primitive { .. } => {
-                                todo!("primary join on primitive")
+                                // as log as the *input* columns are bound, we can still perform
+                                // any perimitive join by doing (assuming a,b -> c):
+                                //
+                                // ```
+                                // for c in ... {
+                                //     for c in prim(a, b) {
+                                //         ...
+                                //     }
+                                // }
+                                // ```
+                                // ->
+                                // ```
+                                // for c1 in ... {
+                                //     for c2 in prim(a, b) {
+                                //         if c1 == c2 {
+                                //             ...
+                                //         }
+                                //     }
+                                // }
+                                // ```
+                                //
+                                if let Some(entry) = atom.entry {
+                                    for c in
+                                        relations[atom.relation].implicit_rules[entry].out.keys()
+                                    {
+                                        let out = &mut atom.columns[c];
+                                        if parent_bound_premise.contains(&*out) {
+                                            let old_id = *out;
+                                            let new_id = variables.push(variables[old_id]);
+
+                                            *out = new_id;
+
+                                            to_equate.push((old_id, new_id));
+                                        }
+                                    }
+                                }
+
+                                lir::Premise::Relation {
+                                    relation: atom.relation,
+                                    args: atom.columns.clone(),
+                                    kind: lir::PremiseKind::Join {
+                                        index: IndexId::bogus(),
+                                        inclusion: lir::Inclusion::All,
+                                    },
+                                }
                             }
                             hir::RelationTy::Table => {
                                 let (args, index) = register_columns_to_index(
@@ -1374,20 +1513,20 @@ mod lowering {
                                     &atom.columns,
                                 );
                                 lir::Premise::Relation {
-                                relation: atom.relation,
-                                args,
-                                kind:
-                                // TODO erik for loke: What is the actual motivation for making
-                                // sure we call this a semi-join?
-                                if all_columns_already_bound {
-                                    lir::PremiseKind::SemiJoin { index }
-                                } else {
-                                    lir::PremiseKind::Join {
-                                        index,
-                                        inclusion: lir_inclusion,
-                                    }
-                                },
-                            }
+                                    relation: atom.relation,
+                                    args,
+                                    kind:
+                                    // TODO erik for loke: What is the actual motivation for making
+                                    // sure we call this a semi-join?
+                                    if all_columns_already_bound {
+                                        lir::PremiseKind::SemiJoin { index }
+                                    } else {
+                                        lir::PremiseKind::Join {
+                                            index,
+                                            inclusion: lir_inclusion,
+                                        }
+                                    },
+                                }
                             }
                             hir::RelationTy::Global { .. } => {
                                 if parent_bound_premise.contains(&atom.columns[ColumnId(0)]) {
