@@ -3108,20 +3108,8 @@ Smaller changes that could further improve Oatlog's performance include
   indexes where permutations span both keys and values, such as $a->b,c$ still must also contain the
   tuple $b->a,c$.
 
-Finally, we would like to suggest three larger ideas with the potential to more fundamentally affect
-e-graph engine performance -- magic sets, accelerating associativity and sort-merge joins.
-
-#TODO[isn't adding both the lhs and rhs of an expression basically equivalent to doing magic sets?]
-
-Magic sets, also called demand-driven evaluation, is a technique that allows bottom-up Datalog
-engines to achieve a similar performance profile to top-down evaluation common in Prolog engines.
-Effectively, we supplement every relation $"Foo"$ with another relation $"MagicFoo"$, where the
-presence of the latter indices a demand to derive the former. Every inference rule $"Premise" =>
-"Action"$ is replaced with a guarded forwards rule $"Premise" and "MagicAction" => "Action"$ as well
-as a backwards rule $"MagicAction" => "MagicPremise"$. These somewhat correspond to walking up and
-down in a recursive search tree. Implementing demand-driven evaluation for e-graphs in a similar
-manner is nontrivial given `union` actions, but could possibly be useful in some equality saturation
-use-cases.
+Finally, we would like to suggest two larger ideas with the potential to more fundamentally affect
+e-graph engine performance: accelerating associativity and sort-merge joins.
 
 Associativity, $(a+b)+c=a+(b+c)$ and similarly for multiplication, is a large contributor to the
 exponential growth of saturated e-graphs as a function of the size of the initial expression. This
